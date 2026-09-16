@@ -1,0 +1,169 @@
+/* ==============================================================================
+   CSS COMPLETO DA PÁGINA 2 (CONSULTA DE ATAS) — ATUALIZADO
+   - Oculta header duplicado do template padrão APEX
+   - Badge Vigência: Verde (Vigente) / Vermelho (Expirada)
+   - KPI Contagem de Dias: Sem fundo, sem contorno (apenas ícone e texto coloridos)
+   - Badge Adesão: Pill com fundo suave
+   ============================================================================== */
+
+/* Ocultar cabeçalho e elementos externos duplicados do APEX */
+.a-CardView-header,
+.a-CardView-badgeWrap,
+.t-Card-wrap .t-Card-header {
+  display: none !important;
+}
+
+.a-CardView-item {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Card Container */
+.gov-card-ata {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-top: 4px solid #004088;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 6px rgba(0, 64, 136, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gov-card-ata:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0, 64, 136, 0.12);
+  border-color: #cbd5e1;
+}
+
+/* Header interno do Card */
+.gov-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gov-card-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #004088;
+  letter-spacing: -0.01em;
+}
+
+/* Badge de Vigência no Topo */
+.gov-badge-status {
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.status-VIGENTE {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.status-EXPIRADA {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+/* Body */
+.gov-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.gov-info-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gov-info-val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 2px;
+}
+
+/* Footer */
+.gov-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 4px;
+}
+
+/* Badge Adesão (Pill) */
+.gov-badge-adesao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.badge-adesao-S {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.badge-adesao-S i::before { content: "\f00c"; }
+.badge-adesao-S .adesao-text::after { content: "Aceita adesão"; }
+
+.badge-adesao-N {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+.badge-adesao-N i::before { content: "\f00d"; }
+.badge-adesao-N .adesao-text::after { content: "Não aceita adesão"; }
+
+/* KPI Dias Restantes - SEM FUNDO E SEM CONTORNO (Minimalista) */
+.gov-kpi-dias {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Acima de 91 dias - Verde */
+.kpi-dias-verde,
+.kpi-dias-verde i {
+  color: #166534 !important;
+}
+
+/* Entre 90 e 61 dias - Amarelo */
+.kpi-dias-amarelo,
+.kpi-dias-amarelo i {
+  color: #b45309 !important;
+}
+
+/* A partir de 60 dias ou Expirada - Vermelho */
+.kpi-dias-vermelho,
+.kpi-dias-vermelho i {
+  color: #dc2626 !important;
+}

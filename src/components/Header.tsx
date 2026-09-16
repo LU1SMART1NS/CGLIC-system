@@ -1,15 +1,17 @@
 import React from 'react';
-import { FileText, Building2 } from 'lucide-react';
+import { FileText, Building2, FileSpreadsheet } from 'lucide-react';
 
 interface HeaderProps {
   activeView?: 'search' | 'items' | 'balances' | 'allocations';
   onNavigateView?: (view: 'search' | 'allocations') => void;
   onOpenSeiModal?: () => void;
+  onOpenExportModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeView = 'search',
-  onNavigateView
+  onNavigateView,
+  onOpenExportModal
 }) => {
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -129,6 +131,30 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Building2 size={15} /> Saldos por Unidade Interna
             </button>
+            {onOpenExportModal && (
+              <button
+                type="button"
+                onClick={onOpenExportModal}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: '1px solid #10b981',
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(16, 185, 129, 0.15)',
+                  transition: 'var(--transition)'
+                }}
+                title="Exportar Relatório em Planilha Excel Parametrizável"
+              >
+                <FileSpreadsheet size={16} color="#059669" /> Exportar Excel (.xlsx)
+              </button>
+            )}
           </nav>
         )}
 

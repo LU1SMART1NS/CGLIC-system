@@ -16,12 +16,14 @@ import {
   ChevronDown, 
   ChevronUp, 
   Printer,
-  Trash2
+  Trash2,
+  FileSpreadsheet
 } from 'lucide-react';
 import { fetchAllAllocationsGlobal, fetchEmpenhoLinks, fetchManualEmpenhos, clearAllAllocations, type GlobalAllocationRecord } from '../services/allocationService';
 import { fetchArps, fetchArpItems, fetchEmpenhosSaldoItem, fetchPncpContracts, fetchContratosGovEmpenhos } from '../services/api';
 import { fetchArpsFromDb } from '../services/dbCacheService';
 import { ManageDepartmentsModal } from './ManageDepartmentsModal';
+import { ExportExcelModal } from './modals/ExportExcelModal';
 import type { ArpRecord, ArpItemRecord } from '../types';
 
 interface InternalAllocationsDashboardProps {
@@ -81,6 +83,7 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [expandedAtas, setExpandedAtas] = useState<Record<string, boolean>>({});
   const [isManageDepsModalOpen, setIsManageDepsModalOpen] = useState<boolean>(false);
+  const [isExportExcelModalOpen, setIsExportExcelModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     loadData();
@@ -629,11 +632,20 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
           </button>
           <button 
             type="button" 
-            onClick={handleExportCsv} 
+            onClick={() => setIsExportExcelModalOpen(true)} 
             className="btn btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', background: '#0c326f' }}
+            title="Exportar dados de cotas e alocações para planilha Excel parametrizável"
+          >
+            <FileSpreadsheet size={16} color="#00cc55" /> Exportar Excel (.xlsx)
+          </button>
+          <button 
+            type="button" 
+            onClick={handleExportCsv} 
+            className="btn btn-secondary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
           >
-            <Download size={16} /> Exportar Relatório (CSV)
+            <Download size={16} /> CSV
           </button>
         </div>
       </div>
@@ -953,6 +965,14 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
         onDepartmentsUpdated={() => {
           loadData();
         }}
+      />
+
+      <ExportExcelModal
+        isOpen={isExportExcelModalOpen}
+        onClose={() => setIsExportExcelModalOpen(false)}
+        atas={arps}
+        itemsByAta={itemsByAta}
+        defaultGranularity="BY_ALLOCATION"
       />
     </div>
   );

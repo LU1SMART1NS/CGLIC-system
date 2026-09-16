@@ -1,0 +1,61 @@
+<!-- ==============================================================================
+     HTML EXPRESSION DO HERO CARD LONGITUDINAL (PÁGINA 3)
+     Região: Relatório Clássico / Cards com 1 registro baseado na consulta da Ata
+     ============================================================================== -->
+
+<div class="gov-hero-card">
+  <!-- Topo: Botão Voltar + Título da Ata + Badges à Direita -->
+  <div class="gov-hero-header">
+    <div class="gov-hero-title-group">
+      <a href="f?p=&APP_ID.:2:&APP_SESSION." class="gov-btn-voltar">
+        <i class="fa fa-arrow-left"></i> Voltar para Consulta
+      </a>
+      <div class="gov-hero-title-wrapper">
+        <h1 class="gov-hero-title">ATA &NUMERO_ATA.</h1>
+        <span class="gov-hero-subtitle"><i class="fa fa-institution"></i> &ORGAO_FMT.</span>
+      </div>
+    </div>
+
+    <div class="gov-hero-status-group">
+      <span class="gov-badge-status status-&STATUS_VIGENCIA.">&STATUS_VIGENCIA.</span>
+      <div class="gov-kpi-dias &CLASSE_KPI_DIAS.">
+        <i class="fa &ICONE_KPI_DIAS."></i>
+        <span>&LABEL_KPI_DIAS.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid Longitudinal com 4 Colunas de Métricas -->
+  <div class="gov-hero-metrics-grid">
+    <div class="gov-metric-box">
+      <div class="gov-metric-label"><i class="fa fa-calendar"></i> Vigência</div>
+      <div class="gov-metric-value">&DATA_VIGENCIA_INICIO_FMT. até &DATA_VIGENCIA_FIM_FMT.</div>
+    </div>
+
+    <div class="gov-metric-box">
+      <div class="gov-metric-label"><i class="fa fa-money"></i> Valor Total Registrado</div>
+      <div class="gov-metric-value valor-destaque">&VALOR_TOTAL_FMT.</div>
+    </div>
+
+    <div class="gov-metric-box">
+      <div class="gov-metric-label"><i class="fa fa-cubes"></i> Total de Itens</div>
+      <div class="gov-metric-value">&TOTAL_ITENS. itens homologados</div>
+    </div>
+
+    <div class="gov-metric-box">
+      <div class="gov-metric-label"><i class="fa fa-shield"></i> Adesão (Carona)</div>
+      <div class="gov-metric-value">
+        <span class="gov-badge-adesao badge-adesao-&PERMITE_ADESAO_SN.">
+          <i class="fa"></i>
+          <span class="adesao-text"></span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Objeto da Contratação -->
+  <div class="gov-hero-objeto">
+    <span class="gov-objeto-label"><i class="fa fa-file-text-o"></i> Objeto:</span>
+    <span class="gov-objeto-text">&OBJETO.</span>
+  </div>
+</div>

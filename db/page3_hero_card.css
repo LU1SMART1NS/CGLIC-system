@@ -1,0 +1,235 @@
+/* ==============================================================================
+   CSS DA PÁGINA 3 (DETALHES DA ATA E ITENS) — EXPANSÃO 100% HORIZONTAL (FULL WIDTH)
+   ============================================================================== */
+
+/* Forçar containers do APEX Cards a ocuparem 100% da largura horizontal */
+.a-CardView {
+  width: 100% !important;
+}
+
+.a-CardView-items {
+  display: block !important;
+  width: 100% !important;
+  grid-template-columns: 1fr !important;
+}
+
+.a-CardView-item {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 100% !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Ocultar elementos sobressalentes do APEX */
+.a-CardView-header,
+.a-CardView-badgeWrap,
+.t-Card-wrap .t-Card-header {
+  display: none !important;
+}
+
+/* Container Principal do Hero Card Horizontal */
+.gov-hero-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-top: 5px solid #004088;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 12px rgba(0, 64, 136, 0.06);
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Header Horizontal: Voltar + Título à esquerda, Badges à direita */
+.gov-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 14px;
+}
+
+.gov-hero-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gov-btn-voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #004088;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  width: fit-content;
+}
+
+.gov-btn-voltar:hover {
+  color: #002855;
+  transform: translateX(-3px);
+  text-decoration: none;
+}
+
+.gov-hero-title-wrapper {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.gov-hero-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #004088;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.gov-hero-subtitle {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Status e KPI no Topo Direito */
+.gov-hero-status-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gov-badge-status {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.status-VIGENTE {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.status-EXPIRADA {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+/* KPI de Dias */
+.gov-kpi-dias {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.kpi-dias-verde, .kpi-dias-verde i { color: #166534 !important; }
+.kpi-dias-amarelo, .kpi-dias-amarelo i { color: #b45309 !important; }
+.kpi-dias-vermelho, .kpi-dias-vermelho i { color: #dc2626 !important; }
+
+/* Grid Horizontal: 4 Colunas Lado a Lado */
+.gov-hero-metrics-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 14px !important;
+}
+
+@media (max-width: 900px) {
+  .gov-hero-metrics-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+.gov-metric-box {
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gov-metric-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gov-metric-value {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.gov-metric-value.valor-destaque {
+  color: #004088;
+}
+
+/* Badge Adesão */
+.gov-badge-adesao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.badge-adesao-S {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.badge-adesao-S i::before { content: "\f00c"; }
+.badge-adesao-S .adesao-text::after { content: "Aceita adesão"; }
+
+.badge-adesao-N {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+.badge-adesao-N i::before { content: "\f00d"; }
+.badge-adesao-N .adesao-text::after { content: "Não aceita adesão"; }
+
+/* Bloco do Objeto Horizontal */
+.gov-hero-objeto {
+  background: #f8fafc;
+  border-left: 3px solid #004088;
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  color: #334155;
+  line-height: 1.4;
+}
+
+.gov-objeto-label {
+  font-weight: 700;
+  color: #004088;
+  margin-right: 6px;
+}

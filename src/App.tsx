@@ -5,6 +5,7 @@ import { ArpItems } from './components/ArpItems';
 import { ItemBalances } from './components/ItemBalances';
 import { InternalAllocationsDashboard } from './components/InternalAllocationsDashboard';
 import { SeiManagementModal } from './components/SeiManagementModal';
+import { ExportExcelModal } from './components/modals/ExportExcelModal';
 import type { ArpRecord, ArpItemRecord } from './types';
 
 type ViewState = 'search' | 'items' | 'balances' | 'allocations';
@@ -14,6 +15,9 @@ const App: React.FC = () => {
   const [selectedArp, setSelectedArp] = useState<ArpRecord | null>(null);
   const [selectedItem, setSelectedItem] = useState<ArpItemRecord | null>(null);
   const [isSeiModalOpen, setIsSeiModalOpen] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [globalArps, setGlobalArps] = useState<ArpRecord[]>([]);
+  const [globalItemsByAta, setGlobalItemsByAta] = useState<Record<string, ArpItemRecord[]>>({});
 
   const handleSelectArp = (arp: ArpRecord) => {
     setSelectedArp(arp);
@@ -53,6 +57,7 @@ const App: React.FC = () => {
       <Header 
         activeView={view} 
         onNavigateView={handleNavigateView} 
+        onOpenExportModal={() => setIsExportModalOpen(true)}
       />
 
       <main>
@@ -61,6 +66,10 @@ const App: React.FC = () => {
             onSelectArp={handleSelectArp} 
             onSelectItem={handleSelectItemFromSearch}
             onOpenAllocationsPanel={() => setView('allocations')}
+            onArpsLoaded={(loadedArps, loadedItems) => {
+              setGlobalArps(loadedArps);
+              if (loadedItems) setGlobalItemsByAta(loadedItems);
+            }}
           />
         )}
 
@@ -91,6 +100,14 @@ const App: React.FC = () => {
       <SeiManagementModal 
         isOpen={isSeiModalOpen} 
         onClose={() => setIsSeiModalOpen(false)} 
+      />
+
+      <ExportExcelModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        atas={globalArps}
+        itemsByAta={globalItemsByAta}
+        selectedAta={selectedArp}
       />
 
       <footer style={{
