@@ -134,7 +134,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
     } catch {}
   };
 
-  const handleGenerateReport = async () => {
+  const handleGenerateReport = () => {
     if (selectedColumnIds.length === 0 && granularity !== 'MULTI_SHEET') {
       alert('Por favor, selecione pelo menos 1 coluna para gerar o relatório.');
       return;
@@ -143,45 +143,46 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
     setIsExporting(true);
     setSuccessMsg(null);
 
-    try {
-      const exportConfig: ReportExportConfig = {
-        scope,
-        granularity,
-        preset,
-        selectedColumnIds,
-        includeHeaderMetadata,
-        includeTotalsSummary
-      };
+    // Permite que o navegador renderize o spinner antes de iniciar a compilação do Excel
+    setTimeout(async () => {
+      try {
+        const exportConfig: ReportExportConfig = {
+          scope,
+          granularity,
+          preset,
+          selectedColumnIds,
+          includeHeaderMetadata,
+          includeTotalsSummary
+        };
 
-      const payload = {
-        atas,
-        itemsByAta,
-        selectedAta: scope === 'SELECTED_ATA' ? selectedAta : null,
-        activeFiltersDesc
-      };
+        const payload = {
+          atas,
+          itemsByAta,
+          selectedAta: scope === 'SELECTED_ATA' ? selectedAta : null,
+          activeFiltersDesc
+        };
 
-      const blob = await generateCustomExcelReport(exportConfig, payload);
-      
-      const dateStr = new Date().toISOString().split('T')[0];
-      const presetSuffix = 
-        granularity === 'MULTI_SHEET' ? 'Consolidado_MultiAbas' :
-        preset === 'EXECUTIVE' ? 'Resumo_Executivo' :
-        preset === 'BALANCES' ? 'Balanco_Saldos' :
-        preset === 'ALLOCATIONS' ? 'Alocacoes_Setoriais' :
-        preset === 'PURCHASES' ? 'Catalogo_Compras' : 'Personalizado';
+        const blob = await generateCustomExcelReport(exportConfig, payload);
+        
+        const dateStr = new Date().toISOString().split('T')[0];
+        const presetSuffix = 
+          granularity === 'MULTI_SHEET' ? 'Consolidado_MultiAbas' :
+          preset === 'EXECUTIVE' ? 'Resumo_Executivo' :
+          preset === 'BALANCES' ? 'Balanco_Saldos' :
+          preset === 'ALLOCATIONS' ? 'Alocacoes_Setoriais' :
+          preset === 'PURCHASES' ? 'Catalogo_Compras' : 'Personalizado';
 
-      const filename = `SaldoARP_${presetSuffix}_${dateStr}`;
-      downloadExcelFile(blob, filename);
+        const filename = `SaldoARP_${presetSuffix}_${dateStr}`;
+        downloadExcelFile(blob, filename);
 
-      setSuccessMsg('Planilha Excel gerada e transferida com sucesso!');
-      setTimeout(() => {
+        setSuccessMsg('Planilha Excel gerada e transferida com sucesso!');
         setIsExporting(false);
-      }, 1000);
-    } catch (err: any) {
-      console.error('Erro ao gerar relatório Excel:', err);
-      alert('Ocorreu um erro ao compilar a planilha Excel: ' + (err.message || err));
-      setIsExporting(false);
-    }
+      } catch (err: any) {
+        console.error('Erro ao gerar relatório Excel:', err);
+        alert('Ocorreu um erro ao compilar a planilha Excel: ' + (err.message || err));
+        setIsExporting(false);
+      }
+    }, 50);
   };
 
   if (!isOpen) return null;
