@@ -1,9 +1,9 @@
 import React from 'react';
-import { FileText, Building2, FileSpreadsheet } from 'lucide-react';
+import { FileText, Building2, FileSpreadsheet, Briefcase } from 'lucide-react';
 
 interface HeaderProps {
-  activeView?: 'search' | 'items' | 'balances' | 'allocations';
-  onNavigateView?: (view: 'search' | 'allocations') => void;
+  activeView?: 'search' | 'items' | 'balances' | 'allocations' | 'contracts';
+  onNavigateView?: (view: 'search' | 'allocations' | 'contracts') => void;
   onOpenSeiModal?: () => void;
   onOpenExportModal?: () => void;
 }
@@ -99,16 +99,37 @@ export const Header: React.FC<HeaderProps> = ({
                 padding: '0.5rem 1rem',
                 borderRadius: '6px',
                 border: 'none',
-                background: activeView !== 'allocations' ? '#ffffff' : 'transparent',
-                color: activeView !== 'allocations' ? 'var(--primary)' : 'var(--text-secondary)',
+                background: activeView === 'search' || activeView === 'items' || activeView === 'balances' ? '#ffffff' : 'transparent',
+                color: activeView === 'search' || activeView === 'items' || activeView === 'balances' ? 'var(--primary)' : 'var(--text-secondary)',
                 fontWeight: 700,
                 fontSize: '0.85rem',
                 cursor: 'pointer',
-                boxShadow: activeView !== 'allocations' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                boxShadow: activeView === 'search' || activeView === 'items' || activeView === 'balances' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                 transition: 'var(--transition)'
               }}
             >
               <FileText size={15} /> Visão por Atas
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateView('contracts')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                border: 'none',
+                background: activeView === 'contracts' ? '#ffffff' : 'transparent',
+                color: activeView === 'contracts' ? 'var(--primary)' : 'var(--text-secondary)',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: activeView === 'contracts' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'var(--transition)'
+              }}
+            >
+              <Briefcase size={15} /> Visão por Contratos
             </button>
             <button
               type="button"
@@ -131,6 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Building2 size={15} /> Saldos por Unidade Interna
             </button>
+
             {onOpenExportModal && (
               <button
                 type="button"

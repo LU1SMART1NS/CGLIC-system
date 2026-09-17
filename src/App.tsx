@@ -4,11 +4,12 @@ import { ArpSearch } from './components/ArpSearch';
 import { ArpItems } from './components/ArpItems';
 import { ItemBalances } from './components/ItemBalances';
 import { InternalAllocationsDashboard } from './components/InternalAllocationsDashboard';
+import { ContractsDashboard } from './components/ContractsDashboard';
 import { SeiManagementModal } from './components/SeiManagementModal';
 import { ExportExcelModal } from './components/modals/ExportExcelModal';
 import type { ArpRecord, ArpItemRecord } from './types';
 
-type ViewState = 'search' | 'items' | 'balances' | 'allocations';
+type ViewState = 'search' | 'items' | 'balances' | 'allocations' | 'contracts';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('search');
@@ -46,7 +47,7 @@ const App: React.FC = () => {
     setView('items');
   };
 
-  const handleNavigateView = (targetView: 'search' | 'allocations') => {
+  const handleNavigateView = (targetView: 'search' | 'allocations' | 'contracts') => {
     setSelectedArp(null);
     setSelectedItem(null);
     setView(targetView);
@@ -71,6 +72,10 @@ const App: React.FC = () => {
               if (loadedItems) setGlobalItemsByAta(loadedItems);
             }}
           />
+        )}
+
+        {view === 'contracts' && (
+          <ContractsDashboard />
         )}
 
         {view === 'allocations' && (

@@ -9,6 +9,10 @@
       "destination": "https://pncp.gov.br/:path*"
     },
     {
+      "source": "/api-contratos-gov/:path*",
+      "destination": "https://contratos.comprasnet.gov.br/:path*"
+    },
+    {
       "source": "/((?!assets/|favicon|logo|icons).*)",
       "destination": "/index.html"
     }

@@ -406,3 +406,55 @@ export interface ReconciliationReport {
   status: StatusReconciliacao;
   mensagem: string;
 }
+
+export type StatusVigenciaContrato = 'Vigente' | 'Expirado' | 'A Vencer (60d)' | 'Não Informado';
+
+export interface ContractDashboardRecord {
+  id: string;
+  numero: string;
+  ano: number | string;
+  numeroFormatado: string;
+  uasg: string;
+  nomeUnidadeGestora?: string;
+  codigoOrgao?: string;
+  nomeOrgao?: string;
+  objeto?: string;
+  processo?: string;
+  fornecedorNome?: string;
+  fornecedorCnpjCpf?: string;
+  valorGlobal?: number;
+  valorInicial?: number;
+  dataAssinatura?: string;
+  dataVigenciaInicio?: string;
+  dataVigenciaFim?: string;
+  statusVigencia: StatusVigenciaContrato;
+  numeroControlePncp?: string;
+  idCompra?: string;
+  modalidadeCompra?: string;
+  contratoId?: number | string;
+  fonteDados: 'Compras.gov.br' | 'Contratos.gov.br' | 'PNCP';
+  itensCount?: number;
+  empenhosCount?: number;
+  linkPncp?: string;
+  raw?: any;
+}
+
+export interface ContractFilterParams {
+  uasg: string;
+  numeroAno: string;
+  fornecedor: string;
+  statusVigencia: 'todos' | 'vigente' | 'expirado' | 'a_vencer';
+  dataVigenciaMin: string;
+  dataVigenciaMax: string;
+  anoContrato: string;
+}
+
+export interface ContractDashboardKPIs {
+  totalContratos: number;
+  contratosVigentes: number;
+  contratosExpirados: number;
+  contratosAVencer: number;
+  totalFornecedores: number;
+  valorTotalGlobal: number;
+}
+
