@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Building2, HelpCircle, ArrowRightLeft, Users, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, Share2, RotateCcw } from 'lucide-react';
-import { fetchUnidadesItem, fetchEmpenhosSaldoItem, fetchPncpContracts, fetchPncpContractEmpenhos, fetchAdesoesItem, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey } from '../services/api';
+import { fetchUnidadesItem, fetchEmpenhosSaldoItem, fetchPncpContracts, fetchPncpContractEmpenhos, fetchAdesoesItem, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { fetchAllocations, saveAllocations, fetchEmpenhoLinks, saveEmpenhoLinks, fetchEmpenhoManualQuantities, saveEmpenhoManualQuantities, removeEmpenhoManualQuantity, fetchManualEmpenhos, saveManualEmpenhos, fetchManualContratos, saveManualContratos, fetchContratoEmpenhoLinks, saveContratoEmpenhoLinks } from '../services/allocationService';
 import { calculateTotalEmpenhado, reconcileBalances, matchAndMergeEmpenhos, normalizeEmpenhoNumero, calculateAllocationsWithEmpenhos, calculateItemCardMetrics, deduceEmpenhoQuantity } from '../services/balanceService';
 import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
@@ -302,6 +302,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   };
 
   const parsePncpParams = () => {
+    const parsed = parsePncpIdentifiers(arp);
+    if (parsed) return parsed;
+
     if (arp.linkAtaPNCP) {
       const match = arp.linkAtaPNCP.match(/atas\/(\d+)\/(\d+)\/(\d+)\/(\d+)/);
       if (match) {
@@ -321,7 +324,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         const purchasePart = parts[2];
         const purchaseMatch = purchasePart.split('/');
         const sequencial = purchaseMatch[0];
-        const ano = purchaseMatch[1] || arp.dataVigenciaInicial.split('-')[0];
+        const ano = purchaseMatch[1] || arp.dataVigenciaInicial?.split('-')[0];
         const lastPart = parts[parts.length - 1];
         const sequencialAta = parseInt(lastPart, 10).toString();
         
@@ -371,7 +374,16 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         nomeFornecedor: item.nomeRazaoSocialFornecedor
       };
 
-      const data = await fetchPncpContracts(cnpj, ano, sequencial, sequencialAta, item.numeroItem, fallbackParams, fornecedorInfo);
+      const data = await fetchPncpContracts(
+        cnpj,
+        ano,
+        sequencial,
+        sequencialAta,
+        item.numeroItem,
+        fallbackParams,
+        fornecedorInfo,
+        arp.numeroAtaRegistroPreco
+      );
       setContracts(data);
 
       // Carrega empenhos em background para todos os contratos e enriquece com dados oficiais

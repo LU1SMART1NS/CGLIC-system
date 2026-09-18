@@ -1206,9 +1206,120 @@ export async function fetchComprasGovContratosByPurchase(
   return Array.from(contractsMap.values());
 }
 
+export interface ParsedPncpParams {
+  cnpj: string;
+  ano: string;
+  sequencial: string;
+  sequencialAta?: string;
+  numeroAta?: string;
+  anoAta?: string;
+}
+
+/**
+ * Extrai e normaliza os identificadores do PNCP a partir de múltiplos padrões de URLs e números de controle
+ */
+export function parsePncpIdentifiers(arp?: Partial<ArpRecord> | any): ParsedPncpParams | null {
+  if (!arp) return null;
+
+  let cnpj = '';
+  let ano = '';
+  let sequencial = '';
+  let sequencialAta = '';
+  let numeroAta = '';
+  let anoAta = '';
+
+  // 1. Extração via linkAtaPNCP (ex: https://pncp.gov.br/app/atas/00394494000136/2024/001436/1 ou /atas/00394494000136/2024/1436/1)
+  if (arp.linkAtaPNCP) {
+    const match = arp.linkAtaPNCP.match(/atas\/(\d+)\/(\d+)\/(\d+)\/(\d+)/);
+    if (match) {
+      cnpj = match[1];
+      ano = match[2];
+      sequencial = parseInt(match[3], 10).toString();
+      sequencialAta = parseInt(match[4], 10).toString();
+    }
+  }
+
+  // 2. Extração via numeroControlePncpAta (ex: 00394494000136-1-001436/2024-000001)
+  if ((!cnpj || !sequencial) && arp.numeroControlePncpAta) {
+    const clean = String(arp.numeroControlePncpAta).trim();
+    const match = clean.match(/^(\d{14})-[^-]+-0*(\d+)\/(\d{4})-0*(\d+)/);
+    if (match) {
+      cnpj = match[1];
+      sequencial = match[2];
+      ano = match[3];
+      sequencialAta = match[4];
+    } else {
+      const parts = clean.split('-');
+      if (parts.length >= 4) {
+        cnpj = parts[0];
+        const purchasePart = parts[2];
+        const purchaseMatch = purchasePart.split('/');
+        sequencial = purchaseMatch[0]?.replace(/\D/g, '') || '';
+        ano = purchaseMatch[1]?.replace(/\D/g, '') || '';
+        sequencialAta = parts[parts.length - 1]?.replace(/\D/g, '') || '';
+      }
+    }
+  }
+
+  // 3. Extração via linkCompraPNCP (ex: https://pncp.gov.br/app/editais/00394494000136/2024/001436)
+  if ((!cnpj || !sequencial) && arp.linkCompraPNCP) {
+    const match = arp.linkCompraPNCP.match(/editais\/(\d+)\/(\d+)\/(\d+)/);
+    if (match) {
+      cnpj = match[1];
+      ano = match[2];
+      sequencial = parseInt(match[3], 10).toString();
+    }
+  }
+
+  // 4. Extração via numeroControlePncpCompra (ex: 00394494000136-1-001436/2024)
+  if ((!cnpj || !sequencial) && arp.numeroControlePncpCompra) {
+    const clean = String(arp.numeroControlePncpCompra).trim();
+    const match = clean.match(/^(\d{14})-[^-]+-0*(\d+)\/(\d{4})/);
+    if (match) {
+      cnpj = match[1];
+      sequencial = match[2];
+      ano = match[3];
+    }
+  }
+
+  // 5. Fallback por UASG Gerenciadora conhecida
+  if (!cnpj) {
+    if (arp.codigoUnidadeGerenciadora === '200331' || arp.codigoUnidadeGerenciadora === '200330') {
+      cnpj = '00394494000136';
+    }
+  }
+
+  if (!ano && arp.anoCompra) {
+    ano = String(arp.anoCompra).trim();
+  }
+  if (!sequencial && arp.numeroCompra) {
+    sequencial = String(arp.numeroCompra).replace(/\D/g, '').replace(/^0+/, '') || String(arp.numeroCompra).trim();
+  }
+
+  // Extração do número e ano da Ata
+  if (arp.numeroAtaRegistroPreco) {
+    const parts = String(arp.numeroAtaRegistroPreco).split('/');
+    numeroAta = parts[0]?.trim() || '';
+    anoAta = parts[1]?.trim() || ano || '';
+  }
+
+  if (cnpj && ano && sequencial) {
+    return {
+      cnpj,
+      ano,
+      sequencial,
+      sequencialAta: sequencialAta || undefined,
+      numeroAta: numeroAta || undefined,
+      anoAta: anoAta || undefined
+    };
+  }
+
+  return null;
+}
+
 /**
  * 5. Consultar Contratos da Contratação no PNCP e Compras.gov
- * Utiliza o número da Contratação/Compra + UASGs Gerenciadoras (200331 e 200330)
+ * Utiliza o número da Contratação/Compra + UASGs Gerenciadoras e Participantes
  * e aplica filtro estrito por fornecedor e item da Ata.
  */
 export async function fetchPncpContracts(
@@ -1218,7 +1329,8 @@ export async function fetchPncpContracts(
   sequencialAta: string,
   numeroItemDesejado?: string,
   fallbackParams?: FallbackPurchaseParams,
-  fornecedorInfo?: SupplierFilterInfo
+  fornecedorInfo?: SupplierFilterInfo,
+  numeroAtaRegistroPreco?: string
 ): Promise<PncpContract[]> {
   const contractsMergedMap = new Map<string, any>();
   const effectiveCnpj = (cnpj || fallbackParams?.numeroControlePncpCompra?.match(/^(\d{14})/)?.[1] || fallbackParams?.numeroControlePncpAta?.match(/^(\d{14})/)?.[1] || '').trim();
@@ -1241,28 +1353,59 @@ export async function fetchPncpContracts(
     }
   }
 
-  // 2. Consulta contratos associados à Ata no PNCP (se sequencialAta disponível)
-  if (effectiveCnpj && ano && sequencial && sequencialAta) {
+  // 2. Resolução dinâmica de Atas e Contratos da Ata no PNCP
+  if (effectiveCnpj && ano && sequencial) {
     try {
-      const ataContractsUrl = `/api-pncp/api/pncp/v1/orgaos/${effectiveCnpj}/compras/${ano}/${sequencial}/atas/${sequencialAta}/contratos`;
-      const res = await fetch(ataContractsUrl);
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
-        list.forEach((c: any) => {
-          const canKey = getCanonicalContractKey(c.numeroContrato || c.numeroContratoEmpenho || c.numero, c.anoContrato || ano, c.numeroControlePNCP || c.numeroControlePncpContrato);
-          if (canKey) {
-            const existing = contractsMergedMap.get(canKey);
-            contractsMergedMap.set(canKey, { ...(existing || {}), ...c, _fromPncp: true });
+      const atasListUrl = `/api-pncp/api/pncp/v1/orgaos/${effectiveCnpj}/compras/${ano}/${sequencial}/atas`;
+      const resAtas = await fetch(atasListUrl);
+      if (resAtas.ok) {
+        const atasData = await resAtas.json();
+        const atasList = Array.isArray(atasData) ? atasData : (Array.isArray(atasData?.data) ? atasData.data : []);
+
+        let matchedSeqAta: number | string | undefined = undefined;
+        const cleanAtaNum = (numeroAtaRegistroPreco || '').replace(/\D/g, '').replace(/^0+/, '');
+        const targetSupplierCnpjDigits = (fornecedorInfo?.niFornecedor || '').replace(/\D/g, '');
+
+        for (const a of atasList) {
+          const aNumDigits = String(a.numeroAtaRegistroPreco || '').replace(/\D/g, '').replace(/^0+/, '');
+          const aSupplierCnpj = String(a.niFornecedor || '').replace(/\D/g, '');
+
+          if (cleanAtaNum && aNumDigits && (cleanAtaNum === aNumDigits || aNumDigits.endsWith(cleanAtaNum) || cleanAtaNum.endsWith(aNumDigits))) {
+            matchedSeqAta = a.sequencialAta;
+            break;
+          } else if (targetSupplierCnpjDigits && aSupplierCnpj && targetSupplierCnpjDigits === aSupplierCnpj) {
+            matchedSeqAta = a.sequencialAta;
+            break;
           }
-        });
+        }
+
+        const seqsToFetch = Array.from(new Set([matchedSeqAta, sequencialAta].filter(Boolean)));
+        for (const s of seqsToFetch) {
+          try {
+            const ataContractsUrl = `/api-pncp/api/pncp/v1/orgaos/${effectiveCnpj}/compras/${ano}/${sequencial}/atas/${s}/contratos`;
+            const resAtaContratos = await fetch(ataContractsUrl);
+            if (resAtaContratos.ok) {
+              const ataContratosData = await resAtaContratos.json();
+              const list = Array.isArray(ataContratosData) ? ataContratosData : (Array.isArray(ataContratosData?.data) ? ataContratosData.data : []);
+              list.forEach((c: any) => {
+                const canKey = getCanonicalContractKey(c.numeroContrato || c.numeroContratoEmpenho || c.numero, c.anoContrato || ano, c.numeroControlePNCP || c.numeroControle || c.numeroControlePncpContrato);
+                if (canKey) {
+                  const existing = contractsMergedMap.get(canKey);
+                  contractsMergedMap.set(canKey, { ...(existing || {}), ...c, _fromPncp: true });
+                }
+              });
+            }
+          } catch (errAta) {
+            console.warn(`Falha na busca de contratos da ata seq ${s} no PNCP`, errAta);
+          }
+        }
       }
     } catch (e) {
-      console.warn("Falha na consulta de contratos da ata no PNCP", e);
+      console.warn("Falha na consulta de atas no PNCP", e);
     }
   }
 
-  // 3. Sempre complementar/unificar com contratos vinculados à compra no Compras.gov.br (Módulo Contratos - UASGs 200331 e 200330)
+  // 3. Sempre complementar/unificar com contratos vinculados à compra no Compras.gov.br e Contratos.gov.br
   if (fallbackParams) {
     try {
       const purchaseContracts = await fetchComprasGovContratosByPurchase(fallbackParams);
@@ -1328,9 +1471,19 @@ export async function fetchPncpContracts(
     const linkVisualizacao = formatPncpContractUrl(numeroControlePncp, rawLinkVisualizacao);
 
     // Identificação precisa da UASG e classificação (200331 e 200330 são Gerenciadoras)
-    const rawUasg = c.codigoUnidadeGestora || c.codigoUnidadeGestoraOrigemContrato || detail?.unidadeOrgao?.codigoUnidade || c.unidadeExecutora?.codigoUnidade || c.unidadeOrgao?.codigoUnidade || c.unidadeGestora || (c.unidadeNome?.match(/(\d{5,6})/)?.[1]) || fallbackParams?.codigoUnidadeGestora || '200331';
+    const rawUasg = c.codigoUnidadeGestora || 
+                    c.codigoUnidadeGestoraOrigemContrato || 
+                    detail?.unidadeOrgao?.codigoUnidade || 
+                    detail?.unidadeExecutora?.codigoUnidade || 
+                    c.unidadeExecutora?.codigo || 
+                    c.unidadeExecutora?.codigoUnidade || 
+                    c.unidadeOrgao?.codigoUnidade || 
+                    c.unidadeGestora || 
+                    (c.unidadeNome?.match(/(\d{5,6})/)?.[1]) || 
+                    fallbackParams?.codigoUnidadeGestora || 
+                    '200331';
     const resolvedUasg = String(rawUasg).trim();
-    const isGerenciadora = resolvedUasg === '200331' || resolvedUasg === '200330';
+    const isGerenciadora = resolvedUasg === String(fallbackParams?.codigoUnidadeGestora || '200331') || resolvedUasg === '200331' || resolvedUasg === '200330';
     const tipoUnidade: 'GERENCIADORA' | 'PARTICIPANTE' = isGerenciadora ? 'GERENCIADORA' : 'PARTICIPANTE';
 
     const numContrato = c.numeroContrato || c.numeroContratoEmpenho || c.numero || detail?.numeroContratoEmpenho || '';

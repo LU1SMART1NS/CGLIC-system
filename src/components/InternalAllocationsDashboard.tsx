@@ -224,7 +224,7 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
                 idCompra: foundArp?.idCompra,
                 numeroCompra: foundArp?.numeroCompra,
                 anoCompra: foundArp?.anoCompra
-              });
+              }, undefined, numeroAta);
 
               for (const c of contracts) {
                 if (c.contratoId) {
