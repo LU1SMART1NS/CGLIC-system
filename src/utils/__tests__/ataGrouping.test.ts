@@ -110,23 +110,19 @@ describe('Agrupamento de Atas e Utilitários', () => {
     expect(computeAdesaoStatus([])).toBe('NAO_INFORMADA');
   });
 
-  it('Agrupamento por ATA + FORNECEDOR', () => {
+  it('Agrupamento unívoco: 1 Ata = 1 Fornecedor Único = 1 Card', () => {
     const itemsMap: Record<string, ArpItemRecord[]> = {
-      '00017/2026-200331': [item1SupplierA, item2SupplierA, item3SupplierB]
+      '00017/2026-200331': [item1SupplierA, item2SupplierA]
     };
 
     const cards = groupArpsAndItems([mockArp2026], itemsMap);
-    expect(cards.length).toBe(2);
+    expect(cards.length).toBe(1);
 
-    const cardSupplierA = cards.find(c => c.fornecedorNome === 'QIAGEN BIOTECNOLOGIA BRASIL LTDA.');
-    expect(cardSupplierA).toBeDefined();
-    expect(cardSupplierA?.itens.length).toBe(2);
-    expect(cardSupplierA?.adesaoStatus).toBe('ACEITA');
-
-    const cardSupplierB = cards.find(c => c.fornecedorNome === 'DISTRIBUIDORA MEDICA BRASIL SA');
-    expect(cardSupplierB).toBeDefined();
-    expect(cardSupplierB?.itens.length).toBe(1);
-    expect(cardSupplierB?.adesaoStatus).toBe('NAO_ACEITA');
+    const card = cards[0];
+    expect(card.fornecedorNome).toBe('QIAGEN BIOTECNOLOGIA BRASIL LTDA.');
+    expect(card.fornecedorCnpj).toBe('00.111.222/0001-33');
+    expect(card.itens.length).toBe(2);
+    expect(card.adesaoStatus).toBe('ACEITA');
   });
 
   it('Separação de Atas com mesmo número e anos diferentes', () => {

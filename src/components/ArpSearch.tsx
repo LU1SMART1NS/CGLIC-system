@@ -824,7 +824,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
               </button>
             )}
             <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
-              {groupedCards.length} {groupedCards.length === 1 ? 'card' : 'cards'} (Ata + Fornecedor)
+              {groupedCards.length} {groupedCards.length === 1 ? 'Ata exibida' : 'Atas exibidas'}
             </span>
           </div>
         </div>

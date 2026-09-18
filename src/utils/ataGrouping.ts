@@ -65,11 +65,10 @@ export function formatItemNumber(numeroItem?: string | number): string {
 }
 
 /**
- * Agrupa Atas e Itens por combinação única de:
- * ATA + FORNECEDOR
+ * Agrupa Atas e Itens garantindo a regra de negócio contábil:
+ * 1 Ata de Registro de Preços (no mesmo ano e UASG) = 1 Fornecedor Único = 1 Card
  * 
  * Preserva a integridade e ordenação das Atas originais.
- * Se uma Ata possui itens de múltiplos fornecedores, gera um card para cada fornecedor.
  * Se uma Ata ainda não possui itens carregados, gera um card com itens vazios.
  */
 export function groupArpsAndItems(
@@ -89,7 +88,7 @@ export function groupArpsAndItems(
     // Se os itens ainda não foram carregados ou a lista está vazia
     if (!rawItems || rawItems.length === 0) {
       cards.push({
-        key: `card-${ataKey}-sem-fornecedor`,
+        key: `card-${ataKey}`,
         arp,
         fornecedorNome: arp.objeto ? 'Fornecedor Registrado / A carregar' : 'Fornecedor da Ata',
         fornecedorCnpj: '',
@@ -100,45 +99,41 @@ export function groupArpsAndItems(
       continue;
     }
 
-    // Agrupa os itens por fornecedor (CNPJ ou Razão Social)
-    const itemsBySupplier = new Map<string, { nome: string; cnpj: string; itens: ArpItemRecord[] }>();
+    // Identifica o fornecedor oficial único desta Ata
+    // Prioriza o primeiro item com CNPJ/Razão Social válidos
+    const itemComFornecedor = rawItems.find(i => i.niFornecedor || (i.nomeRazaoSocialFornecedor && i.nomeRazaoSocialFornecedor !== 'FORNECEDOR NÃO INFORMADO')) || rawItems[0];
+    
+    const fornecedorNome = (itemComFornecedor?.nomeRazaoSocialFornecedor || 'FORNECEDOR NÃO INFORMADO').trim();
+    const fornecedorCnpj = (itemComFornecedor?.niFornecedor || '').trim();
 
-    for (const item of rawItems) {
-      const cnpj = (item.niFornecedor || '').trim();
-      const nome = (item.nomeRazaoSocialFornecedor || 'FORNECEDOR NÃO INFORMADO').trim();
-      const supplierKey = cnpj || nome;
-
-      if (!itemsBySupplier.has(supplierKey)) {
-        itemsBySupplier.set(supplierKey, {
-          nome,
-          cnpj,
-          itens: []
-        });
+    // Filtra apenas os itens pertencentes a este fornecedor/ata (exclui itens sem CNPJ ou de outros lotes)
+    const targetCnpjDigits = fornecedorCnpj.replace(/\D/g, '');
+    let ataItens = rawItems;
+    if (targetCnpjDigits) {
+      const filteredBySupplier = rawItems.filter(i => {
+        const itemCnpjDigits = (i.niFornecedor || '').replace(/\D/g, '');
+        return itemCnpjDigits === targetCnpjDigits;
+      });
+      if (filteredBySupplier.length > 0) {
+        ataItens = filteredBySupplier;
       }
-
-      itemsBySupplier.get(supplierKey)!.itens.push(item);
     }
 
-    // Cria um card para cada combinação única de Ata + Fornecedor
-    for (const [supplierKey, supplierGroup] of itemsBySupplier.entries()) {
-      const sortedItens = [...supplierGroup.itens].sort((a, b) => {
-        const numA = parseInt(a.numeroItem, 10) || 0;
-        const numB = parseInt(b.numeroItem, 10) || 0;
-        return numA - numB;
-      });
+    const sortedItens = [...ataItens].sort((a, b) => {
+      const numA = parseInt(a.numeroItem, 10) || 0;
+      const numB = parseInt(b.numeroItem, 10) || 0;
+      return numA - numB;
+    });
 
-      const cardKey = `card-${ataKey}-${supplierKey}`;
-
-      cards.push({
-        key: cardKey,
-        arp,
-        fornecedorNome: supplierGroup.nome,
-        fornecedorCnpj: supplierGroup.cnpj,
-        itens: sortedItens,
-        adesaoStatus: computeAdesaoStatus(sortedItens),
-        totalItens: sortedItens.length
-      });
-    }
+    cards.push({
+      key: `card-${ataKey}`,
+      arp,
+      fornecedorNome,
+      fornecedorCnpj,
+      itens: sortedItens,
+      adesaoStatus: computeAdesaoStatus(sortedItens),
+      totalItens: sortedItens.length
+    });
   }
 
   return cards;

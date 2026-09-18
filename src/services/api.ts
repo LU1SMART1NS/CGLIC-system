@@ -625,6 +625,27 @@ export async function fetchArpItems(
     }
 
     if (foundItems.length > 0) {
+      // Invariante Contábil: 1 Ata de Registro de Preços pertence a 1 único fornecedor
+      const primaryItem = foundItems.find(i => (i.niFornecedor && i.niFornecedor.trim()) || (i.nomeRazaoSocialFornecedor && i.nomeRazaoSocialFornecedor !== 'FORNECEDOR NÃO INFORMADO'));
+      if (primaryItem) {
+        const primaryCnpjDigits = (primaryItem.niFornecedor || '').replace(/\D/g, '');
+        const primaryName = (primaryItem.nomeRazaoSocialFornecedor || '').toUpperCase().trim();
+        
+        if (primaryCnpjDigits) {
+          const filtered = foundItems.filter(i => {
+            const itemCnpjDigits = (i.niFornecedor || '').replace(/\D/g, '');
+            return itemCnpjDigits === primaryCnpjDigits;
+          });
+          if (filtered.length > 0) foundItems = filtered;
+        } else if (primaryName) {
+          const filtered = foundItems.filter(i => {
+            const itemName = (i.nomeRazaoSocialFornecedor || '').toUpperCase().trim();
+            return itemName === primaryName;
+          });
+          if (filtered.length > 0) foundItems = filtered;
+        }
+      }
+
       foundItems.sort((a, b) => (parseInt(a.numeroItem, 10) || 0) - (parseInt(b.numeroItem, 10) || 0));
 
       foundItems.forEach((item, idx) => {
