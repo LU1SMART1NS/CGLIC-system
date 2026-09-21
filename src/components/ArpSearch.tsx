@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Calendar, FileText, Building2, HelpCircle, DollarSign, Users, TrendingUp, BarChart2, ArrowUpRight, FileSpreadsheet } from 'lucide-react';
+import { Search, Calendar, FileText, Building2, HelpCircle, DollarSign, Users, TrendingUp, BarChart2, ArrowUpRight } from 'lucide-react';
 import { fetchArpItems, matchAtaNumber } from '../services/api';
 import { fetchAtasWithEmpenhosSet, fetchAtasWithAllocationsSet, fetchArpsWithItemsFromDb } from '../services/dbCacheService';
 import { runFullSync, checkAndTriggerAutoSync, getLastSyncMetadata } from '../services/syncService';
 import { SyncStatusBadge } from './SyncStatusBadge';
-import { ExportExcelModal } from './modals/ExportExcelModal';
 import type { ArpRecord, ArpItemRecord, FilterParams, SyncMetadata } from '../types';
 import { AtaCard } from './cards/AtaCard';
 import { AtaCardSkeleton } from './cards/AtaCardSkeleton';
@@ -42,7 +41,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
   const [syncInfo, setSyncInfo] = useState<SyncMetadata>(getLastSyncMetadata());
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncProgress, setSyncProgress] = useState<{ step: string; percent: number; current?: number; total?: number } | null>(null);
-  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (onArpsLoaded && arps.length > 0) {
@@ -745,24 +743,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
               Limpar Filtros
             </button>
 
-            <button
-              type="button"
-              onClick={() => setIsExportModalOpen(true)}
-              className="btn btn-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                background: '#ecfdf5',
-                color: '#065f46',
-                borderColor: '#10b981',
-                fontWeight: 700
-              }}
-              title="Exportar dados das atas para planilha Excel parametrizável"
-            >
-              <FileSpreadsheet size={18} color="#059669" /> EXPORTAR EXCEL (.XLSX)
-            </button>
-
             <button 
               type="submit" 
               className="btn btn-primary"
@@ -780,27 +760,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
             Resultados ({processedArps.length} Atas)
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {processedArps.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsExportModalOpen(true)}
-                className="btn btn-secondary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.4rem 0.85rem',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  color: '#065f46',
-                  background: '#ecfdf5',
-                  borderColor: '#a7f3d0'
-                }}
-                title="Exportar Atas filtradas para planilha Excel parametrizável"
-              >
-                <FileSpreadsheet size={15} color="#059669" /> Exportar Excel (.xlsx)
-              </button>
-            )}
             <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
               {groupedCards.length} {groupedCards.length === 1 ? 'Ata exibida' : 'Atas exibidas'}
             </span>
@@ -848,13 +807,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
           </div>
         )}
       </section>
-
-      <ExportExcelModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        atas={processedArps}
-        itemsByAta={itemsByAta}
-      />
     </div>
   );
 };
