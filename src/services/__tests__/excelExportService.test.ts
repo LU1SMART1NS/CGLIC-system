@@ -190,7 +190,7 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
         criadoEm: new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       }
-    ]);
+    ], 1);
 
     const payload: ReportDataPayload = {
       atas: [mockAta],

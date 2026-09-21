@@ -13,6 +13,7 @@ interface ManualEmpenhoModalProps {
   defaultCnpj?: string;
   defaultValorUnitario?: number;
   initialEmpenho?: Empenho | null;
+  isLoading?: boolean;
 }
 
 export const ManualEmpenhoModal: React.FC<ManualEmpenhoModalProps> = ({
@@ -25,7 +26,8 @@ export const ManualEmpenhoModal: React.FC<ManualEmpenhoModalProps> = ({
   defaultFornecedor = '',
   defaultCnpj = '',
   defaultValorUnitario = 0,
-  initialEmpenho
+  initialEmpenho,
+  isLoading = false
 }) => {
   const currentYear = new Date().getFullYear();
 
@@ -261,6 +263,7 @@ export const ManualEmpenhoModal: React.FC<ManualEmpenhoModalProps> = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={isLoading}
               className="btn btn-secondary"
               style={{ padding: '0.5rem 1rem', borderRadius: '6px' }}
             >
@@ -268,10 +271,21 @@ export const ManualEmpenhoModal: React.FC<ManualEmpenhoModalProps> = ({
             </button>
             <button
               type="submit"
+              disabled={isLoading}
               className="btn btn-primary"
               style={{ padding: '0.5rem 1.25rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
             >
-              <Check size={16} /> Salvar Empenho
+              {isLoading ? (
+                <>
+                  <div className="spinner" style={{ width: '14px', height: '14px' }} />
+                  <span>Salvando...</span>
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  <span>Salvar Empenho</span>
+                </>
+              )}
             </button>
           </div>
         </form>

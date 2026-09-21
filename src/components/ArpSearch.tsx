@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Calendar, FileText, Building2, HelpCircle, DollarSign, Users, TrendingUp, BarChart2, ArrowUpRight, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Search, Calendar, FileText, Building2, HelpCircle, DollarSign, Users, TrendingUp, BarChart2, ArrowUpRight, FileSpreadsheet } from 'lucide-react';
 import { fetchArpItems, matchAtaNumber } from '../services/api';
 import { fetchAtasWithEmpenhosSet, fetchAtasWithAllocationsSet, fetchArpsWithItemsFromDb } from '../services/dbCacheService';
 import { runFullSync, checkAndTriggerAutoSync, getLastSyncMetadata } from '../services/syncService';
-import { clearAllAllocations } from '../services/allocationService';
 import { SyncStatusBadge } from './SyncStatusBadge';
 import { ExportExcelModal } from './modals/ExportExcelModal';
 import type { ArpRecord, ArpItemRecord, FilterParams, SyncMetadata } from '../types';
@@ -99,7 +98,16 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
     try {
       const result = await runFullSync(params, (p) => setSyncProgress(p));
       if (result.success) {
-        await loadFromDatabase(params.codigoUnidadeGerenciadora);
+        if (result.arps && result.arps.length > 0) {
+          setArps(result.arps);
+          if (result.itemsByAta) {
+            setItemsByAta(prev => ({ ...prev, ...result.itemsByAta }));
+          }
+          setSyncInfo(getLastSyncMetadata());
+        } else {
+          await loadFromDatabase(params.codigoUnidadeGerenciadora);
+        }
+        await loadDbSets();
       } else {
         setError(result.error || 'Falha ao sincronizar com as APIs governamentais.');
       }
@@ -167,7 +175,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
     if (e) e.preventDefault();
     
     // Na arquitetura Database-First, a busca filtra instantaneamente a partir do banco carregado
-    // Se a lista estiver vazia, tenta recarregar do banco
+    // Se a lista estiver vazia, tenta recarregar do banco ou sincronizar
     if (arps.length === 0) {
       const foundInDb = await loadFromDatabase(params.codigoUnidadeGerenciadora);
       if (!foundInDb) {
@@ -527,36 +535,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
               <TrendingUp size={16} /> Saldo Unidades Internas
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              {kpis.totalAllocatedQty > 0 && (
-                <button
-                  type="button"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (window.confirm('⚠️ Tem certeza que deseja ZERAR todas as alocações internas de saldo e vínculos de empenhos?')) {
-                      await clearAllAllocations();
-                      await loadDbSets();
-                      setArps([...arps]);
-                      alert('Alocações internas zeradas com sucesso!');
-                    }
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#dc2626',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '2px',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    padding: '2px 4px',
-                    borderRadius: '4px'
-                  }}
-                  title="Zerar todas as alocações internas cadastradas"
-                >
-                  <Trash2 size={12} /> Zerar
-                </button>
-              )}
               {onOpenAllocationsPanel && (
                 <span style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
                   Ver Painel <ArrowUpRight size={13} />

@@ -8,13 +8,14 @@ interface ManualContratoModalProps {
   onSave: (
     contrato: Omit<Contrato, 'id' | 'criadoEm' | 'atualizadoEm'>,
     selectedEmpenhoIds: string[]
-  ) => void;
+  ) => Promise<void> | void;
   arpId: string;
   itemId?: string;
   defaultUasg: string;
   defaultFornecedor?: string;
   defaultCnpj?: string;
   availableEmpenhos: Empenho[];
+  isLoading?: boolean;
 }
 
 export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
@@ -26,7 +27,8 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
   defaultUasg,
   defaultFornecedor = '',
   defaultCnpj = '',
-  availableEmpenhos
+  availableEmpenhos,
+  isLoading = false
 }) => {
   const currentYear = new Date().getFullYear();
 
@@ -44,12 +46,14 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
   if (!isOpen) return null;
 
   const toggleEmpenhoSelection = (empId: string) => {
+    if (isLoading) return;
     setSelectedEmpenhoIds(prev =>
       prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
     );
   };
 
   const handleSelectAll = () => {
+    if (isLoading) return;
     if (selectedEmpenhoIds.length === availableEmpenhos.length) {
       setSelectedEmpenhoIds([]);
     } else {
@@ -57,8 +61,10 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     if (!numero.trim()) {
       setError('O número do contrato é obrigatório.');
       return;
@@ -72,27 +78,30 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
       return;
     }
 
-    onSave(
-      {
-        numero: numero.trim(),
-        ano: Number(ano),
-        arpId,
-        itemId,
-        uasg: uasg.trim(),
-        objeto: objeto.trim() || undefined,
-        fornecedor: fornecedor.trim() || undefined,
-        cnpjFornecedor: cnpjFornecedor.trim() || undefined,
-        numeroControlePncp: numeroControlePncp.trim() || undefined,
-        linkPncp: linkPncp.trim() || undefined,
-        origem: 'MANUAL'
-      },
-      selectedEmpenhoIds
-    );
-
-    onClose();
+    try {
+      await onSave(
+        {
+          numero: numero.trim(),
+          ano: Number(ano),
+          arpId,
+          itemId,
+          uasg: uasg.trim(),
+          objeto: objeto.trim() || undefined,
+          fornecedor: fornecedor.trim() || undefined,
+          cnpjFornecedor: cnpjFornecedor.trim() || undefined,
+          numeroControlePncp: numeroControlePncp.trim() || undefined,
+          linkPncp: linkPncp.trim() || undefined,
+          origem: 'MANUAL'
+        },
+        selectedEmpenhoIds
+      );
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao salvar contrato manual.');
+    }
   };
 
-  const isSaveDisabled = selectedEmpenhoIds.length === 0 || !numero.trim();
+  const isSaveDisabled = selectedEmpenhoIds.length === 0 || !numero.trim() || isLoading;
 
   return (
     <div className="modal-backdrop" style={{ zIndex: 1100 }}>
@@ -122,6 +131,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 type="text"
                 value={numero}
                 onChange={e => setNumero(e.target.value)}
+                disabled={isLoading}
                 placeholder="Ex: 00045/2026 ou 45"
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
                 required
@@ -135,6 +145,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 type="number"
                 value={ano}
                 onChange={e => setAno(parseInt(e.target.value, 10) || currentYear)}
+                disabled={isLoading}
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
                 required
               />
@@ -150,6 +161,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 type="text"
                 value={uasg}
                 onChange={e => setUasg(e.target.value)}
+                disabled={isLoading}
                 placeholder="Ex: 200331"
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
                 required
@@ -163,6 +175,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 type="text"
                 value={objeto}
                 onChange={e => setObjeto(e.target.value)}
+                disabled={isLoading}
                 placeholder="Ex: Aquisição de viaturas operacionais"
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
               />
@@ -178,6 +191,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 type="text"
                 value={fornecedor}
                 onChange={e => setFornecedor(e.target.value)}
+                disabled={isLoading}
                 placeholder="Razão Social"
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
               />
@@ -190,6 +204,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 type="text"
                 value={cnpjFornecedor}
                 onChange={e => setCnpjFornecedor(e.target.value)}
+                disabled={isLoading}
                 placeholder="00.000.000/0000-00"
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
               />
@@ -205,6 +220,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 type="text"
                 value={numeroControlePncp}
                 onChange={e => setNumeroControlePncp(e.target.value)}
+                disabled={isLoading}
                 placeholder="Ex: 00394494000136-1-000001/2026"
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
               />
@@ -217,6 +233,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 type="url"
                 value={linkPncp}
                 onChange={e => setLinkPncp(e.target.value)}
+                disabled={isLoading}
                 placeholder="https://pncp.gov.br/app/contratos/..."
                 style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
               />
@@ -234,7 +251,8 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSelectAll}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                  disabled={isLoading}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer' }}
                 >
                   {selectedEmpenhoIds.length === availableEmpenhos.length ? 'Desmarcar todos' : 'Selecionar todos'}
                 </button>
@@ -265,8 +283,9 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                         borderRadius: '6px',
                         border: isChecked ? '1px solid var(--primary)' : '1px solid #cbd5e1',
                         background: isChecked ? '#eff6ff' : '#ffffff',
-                        cursor: 'pointer',
-                        fontSize: '0.82rem'
+                        cursor: isLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.82rem',
+                        opacity: isLoading ? 0.7 : 1
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -274,7 +293,8 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => toggleEmpenhoSelection(emp.id)}
-                          style={{ cursor: 'pointer' }}
+                          disabled={isLoading}
+                          style={{ cursor: isLoading ? 'not-allowed' : 'pointer' }}
                         />
                         <span style={{ fontWeight: 700, color: '#0c326f' }}>{emp.numero}</span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({emp.ano})</span>
@@ -302,8 +322,9 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={isLoading}
               className="btn btn-secondary"
-              style={{ padding: '0.5rem 1rem', borderRadius: '6px' }}
+              style={{ padding: '0.5rem 1rem', borderRadius: '6px', cursor: isLoading ? 'not-allowed' : 'pointer' }}
             >
               Cancelar
             </button>
@@ -322,7 +343,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                 cursor: isSaveDisabled ? 'not-allowed' : 'pointer'
               }}
             >
-              <Check size={16} /> Salvar Contrato
+              {isLoading ? 'Salvando...' : <><Check size={16} /> Salvar Contrato</>}
             </button>
           </div>
         </form>

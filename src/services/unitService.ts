@@ -1,4 +1,9 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { 
+  saveDepartmentRpc, 
+  deleteDepartmentRpc, 
+  mergeDepartmentAllocationsRpc 
+} from '../adapters/departmentRpcAdapter';
 
 export interface InternalDepartment {
   id: string;
@@ -62,6 +67,9 @@ export const DEFAULT_DEPARTMENTS: InternalDepartment[] = [
 
 const STORAGE_KEY = 'saldoarp-internal-departments';
 
+/**
+ * Consulta o catálogo canônico de departamentos internos no PostgreSQL (SaldoARP 3.0)
+ */
 export async function fetchDepartments(): Promise<InternalDepartment[]> {
   if (isSupabaseConfigured && supabase) {
     try {
@@ -71,7 +79,7 @@ export async function fetchDepartments(): Promise<InternalDepartment[]> {
         .order('sigla');
 
       if (!error && data && data.length > 0) {
-        return data.map((d: any) => ({
+        const departments = data.map((d: any) => ({
           id: d.id,
           sigla: d.sigla,
           nomeCompleto: d.nome_completo || d.nomeCompleto || '',
@@ -79,9 +87,16 @@ export async function fetchDepartments(): Promise<InternalDepartment[]> {
           ativo: d.ativo !== false,
           criadoEm: d.created_at
         }));
+
+        // Atualiza espelhamento local pós-sucesso
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(departments));
+        } catch {}
+
+        return departments;
       }
     } catch (e) {
-      console.warn('Erro ao carregar departamentos do Supabase, usando localStorage', e);
+      console.warn('Erro ao carregar departamentos do Supabase, usando fallback', e);
     }
   }
 
@@ -96,131 +111,56 @@ export async function fetchDepartments(): Promise<InternalDepartment[]> {
     }
   } catch {}
 
-  // Inicializa com defaults
-  saveDepartments(DEFAULT_DEPARTMENTS);
   return DEFAULT_DEPARTMENTS;
 }
 
+/**
+ * @deprecated [LEGACY COMPATIBILITY] Utilize `useSaveDepartment` via React Query / `saveDepartmentRpc`
+ */
 export async function saveDepartments(departments: InternalDepartment[]): Promise<void> {
-  // Always update localStorage
+  console.warn('[DEPRECATED] saveDepartments em lote é obsoleto. Utilize useSaveDepartment individual.');
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(departments));
-  } catch (e) {
-    console.error('Erro ao salvar departamentos no localStorage', e);
-  }
-
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const rows = departments.map(d => ({
-        id: d.id,
-        sigla: d.sigla,
-        nome_completo: d.nomeCompleto,
-        descricao: d.descricao || '',
-        ativo: d.ativo
-      }));
-
-      await supabase.from('internal_departments').upsert(rows, { onConflict: 'id' });
-    } catch (e) {
-      console.warn('Erro ao sincronizar departamentos no Supabase', e);
-    }
-  }
-}
-
-export async function addDepartment(sigla: string, nomeCompleto: string): Promise<InternalDepartment> {
-  const current = await fetchDepartments();
-  const cleanSigla = sigla.trim();
-  const cleanNome = nomeCompleto.trim();
-
-  // Verifica duplicidade de sigla
-  const existing = current.find(d => d.sigla.toLowerCase() === cleanSigla.toLowerCase());
-  if (existing) {
-    return existing;
-  }
-
-  const newDep: InternalDepartment = {
-    id: `dep-${Date.now()}`,
-    sigla: cleanSigla,
-    nomeCompleto: cleanNome || cleanSigla,
-    ativo: true,
-    criadoEm: new Date().toISOString()
-  };
-
-  const updated = [...current, newDep];
-  await saveDepartments(updated);
-  return newDep;
-}
-
-export async function updateDepartment(id: string, sigla: string, nomeCompleto: string): Promise<void> {
-  const current = await fetchDepartments();
-  const updated = current.map(d => 
-    d.id === id 
-      ? { ...d, sigla: sigla.trim(), nomeCompleto: nomeCompleto.trim() } 
-      : d
-  );
-  await saveDepartments(updated);
-}
-
-export async function deleteDepartment(id: string): Promise<void> {
-  const current = await fetchDepartments();
-  const updated = current.filter(d => d.id !== id);
-  await saveDepartments(updated);
-
-  if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('internal_departments').delete().eq('id', id);
-    } catch {}
-  }
+  } catch {}
 }
 
 /**
- * Mescla e higieniza nomes legados de alocações (ex: "DFNSPdddd" -> "DFNSP")
- * Atualiza automaticamente o Supabase e localStorage
+ * @deprecated [LEGACY COMPATIBILITY] Utilize `useSaveDepartment` via React Query / `saveDepartmentRpc`
+ */
+export async function addDepartment(sigla: string, nomeCompleto: string): Promise<InternalDepartment> {
+  console.warn('[DEPRECATED] addDepartment é obsoleto. Redirecionando para saveDepartmentRpc.');
+  const res = await saveDepartmentRpc({ sigla, nomeCompleto });
+  return {
+    id: res.department.id,
+    sigla: res.department.sigla,
+    nomeCompleto: res.department.nome_completo,
+    descricao: res.department.descricao || '',
+    ativo: res.department.ativo,
+    criadoEm: res.department.created_at
+  };
+}
+
+/**
+ * @deprecated [LEGACY COMPATIBILITY] Utilize `useSaveDepartment` via React Query / `saveDepartmentRpc`
+ */
+export async function updateDepartment(id: string, sigla: string, nomeCompleto: string): Promise<void> {
+  console.warn('[DEPRECATED] updateDepartment é obsoleto. Redirecionando para saveDepartmentRpc.');
+  await saveDepartmentRpc({ id, sigla, nomeCompleto });
+}
+
+/**
+ * @deprecated [LEGACY COMPATIBILITY] Utilize `useDeleteDepartment` via React Query / `deleteDepartmentRpc`
+ */
+export async function deleteDepartment(id: string): Promise<void> {
+  console.warn('[DEPRECATED] deleteDepartment é obsoleto. Redirecionando para deleteDepartmentRpc.');
+  await deleteDepartmentRpc(id, false);
+}
+
+/**
+ * @deprecated [LEGACY COMPATIBILITY] Utilize `useMergeDepartment` via React Query / `mergeDepartmentAllocationsRpc`
  */
 export async function mergeDepartmentName(oldName: string, targetSigla: string): Promise<number> {
-  let count = 0;
-
-  // 1. Atualiza no Supabase
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data } = await supabase
-        .from('arp_allocations')
-        .update({ unit_name: targetSigla })
-        .eq('unit_name', oldName)
-        .select();
-      if (data) count = data.length;
-    } catch (e) {
-      console.warn('Erro ao mesclar alocações no Supabase', e);
-    }
-  }
-
-  // 2. Atualiza no LocalStorage
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('saldoarp-allocations-')) {
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          const list = JSON.parse(raw);
-          if (Array.isArray(list)) {
-            let changed = false;
-            const updated = list.map((a: any) => {
-              if (a.unitName === oldName) {
-                changed = true;
-                count++;
-                return { ...a, unitName: targetSigla };
-              }
-              return a;
-            });
-            if (changed) {
-              localStorage.setItem(key, JSON.stringify(updated));
-            }
-          }
-        }
-      }
-    }
-  } catch (e) {
-    console.error('Erro ao mesclar alocações no localStorage', e);
-  }
-
-  return count;
+  console.warn('[DEPRECATED] mergeDepartmentName é obsoleto. Redirecionando para mergeDepartmentAllocationsRpc.');
+  const res = await mergeDepartmentAllocationsRpc(oldName, targetSigla);
+  return res.rows_updated;
 }

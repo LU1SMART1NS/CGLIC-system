@@ -27,8 +27,11 @@ import {
   fetchEmpenhoManualQuantities,
   saveEmpenhoManualQuantities,
   removeEmpenhoManualQuantity,
-  clearAllAllocations
+  fetchEmpenhoLinksWithState,
+  fetchEmpenhoLinks,
+  saveEmpenhoLinks
 } from '../allocationService';
+
 import type { Empenho, Contrato, ContratoEmpenho } from '../../types';
 
 describe('allocationService - Persistência Híbrida (Supabase + LocalStorage)', () => {
@@ -60,7 +63,7 @@ describe('allocationService - Persistência Híbrida (Supabase + LocalStorage)',
     ];
 
     it('deve salvar no localStorage e persistir dados', async () => {
-      await saveManualEmpenhos(itemKey, mockEmpenhos);
+      await saveManualEmpenhos(itemKey, mockEmpenhos, 1);
       const stored = localStorage.getItem(`saldoarp-manual-empenhos-${itemKey}`);
       expect(stored).not.toBeNull();
       expect(JSON.parse(stored!)).toHaveLength(1);
@@ -126,33 +129,34 @@ describe('allocationService - Persistência Híbrida (Supabase + LocalStorage)',
   describe('Quantidades Manuais de Empenho', () => {
     it('deve salvar, ler e remover quantidades ajustadas manualmente', async () => {
       const quantities = { '2026NE000459': 35, '2026NE000173': 2 };
-      await saveEmpenhoManualQuantities(itemKey, quantities);
+      await saveEmpenhoManualQuantities(itemKey, quantities, 1);
 
       let fetched = await fetchEmpenhoManualQuantities(itemKey);
       expect(fetched['2026NE000459']).toBe(35);
       expect(fetched['2026NE000173']).toBe(2);
 
-      const afterRemoval = await removeEmpenhoManualQuantity(itemKey, '2026NE000459');
+      await removeEmpenhoManualQuantity(itemKey, '2026NE000459', 1);
+      const afterRemoval = await fetchEmpenhoManualQuantities(itemKey);
       expect(afterRemoval['2026NE000459']).toBeUndefined();
       expect(afterRemoval['2026NE000173']).toBe(2);
     });
   });
 
-  describe('Limpeza Global', () => {
-    it('deve limpar todas as chaves do localStorage ao acionar clearAllAllocations', async () => {
-      localStorage.setItem(`saldoarp-allocations-${itemKey}`, '[]');
-      localStorage.setItem(`saldoarp-manual-empenhos-${itemKey}`, '[]');
-      localStorage.setItem(`saldoarp-manual-contratos-${itemKey}`, '[]');
-      localStorage.setItem(`saldoarp-contrato-empenho-links-${itemKey}`, '[]');
-      localStorage.setItem(`saldoarp-empenho-quantities-${itemKey}`, '{}');
+  describe('Vínculos de Empenhos (empenho_links)', () => {
+    it('deve salvar e ler vínculos de empenhos do localStorage em modo fallback', async () => {
+      const mockLinks = {
+        '2026NE000123': 'alloc-1',
+        '2026NE000124': 'alloc-2'
+      };
 
-      await clearAllAllocations();
+      await saveEmpenhoLinks(itemKey, mockLinks, 1);
+      const state = await fetchEmpenhoLinksWithState(itemKey);
 
-      expect(localStorage.getItem(`saldoarp-allocations-${itemKey}`)).toBeNull();
-      expect(localStorage.getItem(`saldoarp-manual-empenhos-${itemKey}`)).toBeNull();
-      expect(localStorage.getItem(`saldoarp-manual-contratos-${itemKey}`)).toBeNull();
-      expect(localStorage.getItem(`saldoarp-contrato-empenho-links-${itemKey}`)).toBeNull();
-      expect(localStorage.getItem(`saldoarp-empenho-quantities-${itemKey}`)).toBeNull();
+      expect(state.links).toEqual(mockLinks);
+      expect(state.version).toBe(1);
+
+      const rawLinks = await fetchEmpenhoLinks(itemKey);
+      expect(rawLinks).toEqual(mockLinks);
     });
   });
 });

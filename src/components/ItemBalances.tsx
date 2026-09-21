@@ -1,16 +1,38 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Building2, HelpCircle, ArrowRightLeft, Users, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, Share2, RotateCcw } from 'lucide-react';
-import { fetchUnidadesItem, fetchEmpenhosSaldoItem, fetchPncpContracts, fetchPncpContractEmpenhos, fetchAdesoesItem, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
-import { fetchAllocations, saveAllocations, fetchEmpenhoLinks, saveEmpenhoLinks, fetchEmpenhoManualQuantities, saveEmpenhoManualQuantities, removeEmpenhoManualQuantity, fetchManualEmpenhos, saveManualEmpenhos, fetchManualContratos, saveManualContratos, fetchContratoEmpenhoLinks, saveContratoEmpenhoLinks } from '../services/allocationService';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Building2, Users, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, Share2, RotateCcw } from 'lucide-react';
+import { fetchPncpContractEmpenhos, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateTotalEmpenhado, reconcileBalances, matchAndMergeEmpenhos, normalizeEmpenhoNumero, calculateAllocationsWithEmpenhos, calculateItemCardMetrics, deduceEmpenhoQuantity } from '../services/balanceService';
 import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
-import { fetchDepartments, type InternalDepartment } from '../services/unitService';
+import { type InternalDepartment } from '../services/unitService';
+import { useItemUnidades } from '../hooks/useItemUnidades';
+import { useItemAdesoes } from '../hooks/useItemAdesoes';
+import { useDepartments } from '../hooks/useDepartments';
+import { useItemEmpenhos } from '../hooks/useItemEmpenhos';
+import { useItemContracts } from '../hooks/useItemContracts';
+import { useItemAllocations } from '../hooks/useItemAllocations';
+import { useSaveAllocations } from '../hooks/useSaveAllocations';
+import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
+import { useSaveEmpenhoLinks } from '../hooks/useSaveEmpenhoLinks';
+import { useItemManualEmpenhos } from '../hooks/useItemManualEmpenhos';
+import { useSaveManualEmpenhos } from '../hooks/useSaveManualEmpenhos';
+import { useItemManualQuantities } from '../hooks/useItemManualQuantities';
+import { useSaveManualQuantities } from '../hooks/useSaveManualQuantities';
+import { useItemManualContracts } from '../hooks/useItemManualContracts';
+import { useSaveManualContract } from '../hooks/useSaveManualContract';
+import { useDeleteManualContract } from '../hooks/useDeleteManualContract';
+import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLinks';
 import { ManageDepartmentsModal } from './ManageDepartmentsModal';
+
 import { ManualEmpenhoModal } from './modals/ManualEmpenhoModal';
 import { ManualContratoModal } from './modals/ManualContratoModal';
 import { ItemReconciliationCard } from './ItemReconciliationCard';
-import { formatPncpContractUrl, formatPncpAtaUrl, formatPncpCompraUrl } from '../utils/pncpUtils';
-import type { ArpRecord, ArpItemRecord, UnidadeItemRecord, EmpenhoSaldoItemRecord, InternalAllocation, PncpContract, PncpContractEmpenho, AdesaoItemRecord, ContratosGovEmpenhoRecord, Empenho, Contrato, ContratoEmpenho, ReconciliationReport } from '../types';
+import { ItemBalancesHeader } from './item-balances/ItemBalancesHeader';
+import { ItemBalancesSummaryCards } from './item-balances/ItemBalancesSummaryCards';
+import { UnidadesTab } from './item-balances/UnidadesTab';
+import { AdesoesTab } from './item-balances/AdesoesTab';
+import { EmpenhoDetailModal } from './item-balances/EmpenhoDetailModal';
+import { formatCurrency, formatNumber, formatDate, getProgressColorClass, isGerenciadoraUasg, isAllowedEmpenhoUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
+import type { ArpRecord, ArpItemRecord, EmpenhoSaldoItemRecord, InternalAllocation, PncpContract, PncpContractEmpenho, ContratosGovEmpenhoRecord, Empenho, Contrato, ReconciliationReport } from '../types';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -18,21 +40,46 @@ interface ItemBalancesProps {
   onBack: () => void;
 }
 
+const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
+const EMPTY_RECORD: Record<string, string> = {};
+const EMPTY_RECORD_NUM: Record<string, number> = {};
+const EMPTY_MANUAL_EMPENHOS: Empenho[] = [];
+
 export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack }) => {
-  const [unidades, setUnidades] = useState<UnidadeItemRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const [empenhos, setEmpenhos] = useState<EmpenhoSaldoItemRecord[]>([]);
+  const {
+    data: unidades = [],
+    isLoading: loading,
+    error: unidadesQueryError
+  } = useItemUnidades(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem,
+    arp,
+    item
+  );
+  const error = unidadesQueryError ? (unidadesQueryError.message || 'Erro ao buscar saldos por unidade.') : null;
+
+  const {
+    data: adesoes = [],
+    isLoading: adesoesLoading,
+    error: adesoesQueryError
+  } = useItemAdesoes(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem
+  );
+  const adesoesError = adesoesQueryError ? (adesoesQueryError.message || 'Falha ao buscar as adesões do item.') : null;
+
+  const {
+    data: empenhos = [],
+    refetch: refetchEmpenhos
+  } = useItemEmpenhos(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem
+  );
   const [activeTab, setActiveTab] = useState<'unidades' | 'empenhos' | 'alocacao' | 'adesoes'>('unidades');
-
-  const [adesoes, setAdesoes] = useState<AdesaoItemRecord[]>([]);
-  const [adesoesLoading, setAdesoesLoading] = useState<boolean>(true);
-  const [adesoesError, setAdesoesError] = useState<string | null>(null);
-
-  const [contracts, setContracts] = useState<PncpContract[]>([]);
-  const [contractsLoading, setContractsLoading] = useState<boolean>(true);
-  const [contractsError, setContractsError] = useState<string | null>(null);
 
   const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
   const [contractEmpenhos, setContractEmpenhos] = useState<Record<string, PncpContractEmpenho[]>>({});
@@ -40,19 +87,74 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const [empenhosLoadingMap, setEmpenhosLoadingMap] = useState<Record<string, boolean>>({});
   const [selectedEmpenhoDetail, setSelectedEmpenhoDetail] = useState<EmpenhoSaldoItemRecord | null>(null);
 
-  const [allocations, setAllocations] = useState<InternalAllocation[]>([]);
-  const [empenhoLinks, setEmpenhoLinks] = useState<Record<string, string>>({});
+  const {
+    data: allocationsState,
+    refetch: refetchAllocations
+  } = useItemAllocations(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem
+  );
+  const allocations = allocationsState?.allocations ?? EMPTY_ALLOCATIONS;
+  const allocationVersion = allocationsState?.version ?? 1;
+
+  const saveAllocationsMutation = useSaveAllocations();
+
+  const {
+    data: empenhoLinksState
+  } = useItemEmpenhoLinks(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem
+  );
+  const empenhoLinks = empenhoLinksState?.links ?? EMPTY_RECORD;
+  const empenhoLinkVersion = empenhoLinksState?.version ?? 1;
+
+  const saveEmpenhoLinksMutation = useSaveEmpenhoLinks();
+
   const [newUnitName, setNewUnitName] = useState<string>('');
+
   const [newAllocatedQty, setNewAllocatedQty] = useState<number | ''>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [allocationError, setAllocationError] = useState<string | null>(null);
 
-  // Estados Canônicos de Registros Manuais e Auditoria
+  // Hooks Canônicos de Leitura para Dados Manuais (React Query)
+  const { data: manualEmpenhosState, refetch: refetchManualEmpenhos } = useItemManualEmpenhos(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem
+  );
+  const manualEmpenhos = manualEmpenhosState?.empenhos ?? EMPTY_MANUAL_EMPENHOS;
+  const manualEmpenhosVersion = manualEmpenhosState?.version ?? 1;
+
+  const saveManualEmpenhosMutation = useSaveManualEmpenhos();
+
+  const { data: manualQuantitiesState, refetch: refetchManualQuantities } = useItemManualQuantities(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem
+  );
+  const empenhoManualQuantities = manualQuantitiesState?.quantities ?? EMPTY_RECORD_NUM;
+  const manualQuantitiesVersion = manualQuantitiesState?.version ?? 1;
+
+  const saveManualQuantitiesMutation = useSaveManualQuantities();
+  const saveManualContractMutation = useSaveManualContract();
+  const deleteManualContractMutation = useDeleteManualContract();
+
+  const { data: manualContratos = [], refetch: refetchManualContracts } = useItemManualContracts(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem
+  );
+
+  const { refetch: refetchContractEmpenhoLinks } = useItemContractEmpenhoLinks(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem
+  );
+
+  // Estados Locais de Formulários e Modais (UI State)
   const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
-  const [manualEmpenhos, setManualEmpenhos] = useState<Empenho[]>([]);
-  const [manualContratos, setManualContratos] = useState<Contrato[]>([]);
-  const [contratoEmpenhoLinks, setContratoEmpenhoLinks] = useState<ContratoEmpenho[]>([]);
-  const [empenhoManualQuantities, setEmpenhoManualQuantities] = useState<Record<string, number>>({});
   const [editingEmpenhoKey, setEditingEmpenhoKey] = useState<string | null>(null);
   const [editingEmpenhoQty, setEditingEmpenhoQty] = useState<string>('');
   const [isManualEmpenhoModalOpen, setIsManualEmpenhoModalOpen] = useState<boolean>(false);
@@ -61,16 +163,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
   const loadManualData = async () => {
     try {
-      const emps = await fetchManualEmpenhos(itemKey);
-      setManualEmpenhos(emps);
-      const ctrs = await fetchManualContratos(itemKey);
-      setManualContratos(ctrs);
-      const links = await fetchContratoEmpenhoLinks(itemKey);
-      setContratoEmpenhoLinks(links);
-      const manualQtds = await fetchEmpenhoManualQuantities(itemKey);
-      setEmpenhoManualQuantities(manualQtds);
+      await Promise.all([
+        refetchManualEmpenhos(),
+        refetchManualQuantities(),
+        refetchManualContracts(),
+        refetchContractEmpenhoLinks()
+      ]);
     } catch (e) {
-      console.warn('Erro ao carregar dados manuais:', e);
+      console.warn('Erro ao recarregar dados manuais:', e);
     }
   };
 
@@ -86,50 +186,115 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       return;
     }
     const updated = { ...empenhoManualQuantities, [empKey]: parsed };
-    setEmpenhoManualQuantities(updated);
-    await saveEmpenhoManualQuantities(itemKey, updated);
-    setEditingEmpenhoKey(null);
-  };
-
-  const handleRestoreEmpenhoQty = async (empKey: string) => {
-    const updated = await removeEmpenhoManualQuantity(itemKey, empKey);
-    setEmpenhoManualQuantities(updated);
-    if (editingEmpenhoKey === empKey) {
+    try {
+      await saveManualQuantitiesMutation.mutateAsync({
+        itemKey,
+        quantities: updated,
+        expectedVersion: manualQuantitiesVersion
+      });
       setEditingEmpenhoKey(null);
+    } catch (err: any) {
+      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
+        alert('Conflito de concorrência: as quantidades manuais foram modificadas por outro usuário. Os dados serão recarregados.');
+      } else {
+        alert(`Erro ao salvar quantidade manual: ${err?.message || 'Erro desconhecido'}`);
+      }
     }
   };
 
-  const handleSaveManualEmpenho = async (empData: Omit<Empenho, 'id' | 'criadoEm' | 'atualizadoEm'>) => {
-    let updated: Empenho[];
+  const handleRestoreEmpenhoQty = async (empKey: string) => {
+    const updated = { ...empenhoManualQuantities };
+    delete updated[empKey];
+    try {
+      await saveManualQuantitiesMutation.mutateAsync({
+        itemKey,
+        quantities: updated,
+        expectedVersion: manualQuantitiesVersion
+      });
+      if (editingEmpenhoKey === empKey) {
+        setEditingEmpenhoKey(null);
+      }
+    } catch (err: any) {
+      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
+        alert('Conflito de concorrência: as quantidades manuais foram modificadas por outro usuário. Os dados serão recarregados.');
+      } else {
+        alert(`Erro ao restaurar quantidade manual: ${err?.message || 'Erro desconhecido'}`);
+      }
+    }
+  };
+
+  // Handlers para Empenhos Manuais (Migrado para React Query na Fase 4.3D.2B)
+  const handleSaveManualEmpenho = async (empenhoData: Partial<Empenho>) => {
+    let updatedList: Empenho[];
     if (editingManualEmpenho) {
-      updated = manualEmpenhos.map(e =>
+      updatedList = manualEmpenhos.map(e =>
         e.id === editingManualEmpenho.id
-          ? { ...e, ...empData, atualizadoEm: new Date().toISOString() }
+          ? ({ ...e, ...empenhoData, atualizadoEm: new Date().toISOString() } as Empenho)
           : e
       );
     } else {
       const newEmp: Empenho = {
-        ...empData,
         id: `manual-emp-${Date.now()}`,
+        numero: empenhoData.numero || '',
+        ano: empenhoData.ano || new Date().getFullYear(),
+        arpId: arp.numeroAtaRegistroPreco,
+        itemId: item.numeroItem,
+        uasg: empenhoData.uasg || arp.codigoUnidadeGerenciadora || '200331',
+        quantidade: empenhoData.quantidade || 0,
+        valorUnitario: empenhoData.valorUnitario || Number(item.valorUnitario) || undefined,
+        valorTotal: empenhoData.valorTotal || (Number(empenhoData.quantidade || 0) * Number(item.valorUnitario || 0)),
+        data: empenhoData.data || new Date().toISOString().split('T')[0],
+        fornecedor: empenhoData.fornecedor || item.nomeRazaoSocialFornecedor,
+        cnpjFornecedor: empenhoData.cnpjFornecedor || item.niFornecedor,
+        unidadeInternaId: empenhoData.unidadeInternaId,
+        observacao: empenhoData.observacao,
+        origem: 'MANUAL',
+        status: empenhoData.status || 'CONFIRMADO',
         criadoEm: new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       };
-      updated = [...manualEmpenhos, newEmp];
+      updatedList = [...manualEmpenhos, newEmp];
     }
-    setManualEmpenhos(updated);
-    await saveManualEmpenhos(itemKey, updated);
-    setEditingManualEmpenho(null);
+
+    try {
+      await saveManualEmpenhosMutation.mutateAsync({
+        itemKey,
+        empenhos: updatedList,
+        expectedVersion: manualEmpenhosVersion
+      });
+      setEditingManualEmpenho(null);
+    } catch (err: any) {
+      console.error('Erro ao persistir empenhos manuais:', err);
+      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
+        alert('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
+      } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
+        alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+      } else {
+        alert(`Erro ao salvar empenho manual: ${err?.message || 'Erro desconhecido'}`);
+      }
+      throw err;
+    }
   };
 
-  const handleDeleteManualEmpenho = async (empId: string) => {
+  const handleDeleteManualEmpenho = async (empenhoId: string) => {
     if (window.confirm('Tem certeza que deseja excluir este empenho manual?')) {
-      const updated = manualEmpenhos.filter(e => e.id !== empId);
-      setManualEmpenhos(updated);
-      await saveManualEmpenhos(itemKey, updated);
-
-      const updatedLinks = contratoEmpenhoLinks.filter(l => l.empenhoId !== empId);
-      setContratoEmpenhoLinks(updatedLinks);
-      await saveContratoEmpenhoLinks(itemKey, updatedLinks);
+      const updated = manualEmpenhos.filter(e => e.id !== empenhoId);
+      try {
+        await saveManualEmpenhosMutation.mutateAsync({
+          itemKey,
+          empenhos: updated,
+          expectedVersion: manualEmpenhosVersion
+        });
+      } catch (err: any) {
+        console.error('Erro ao excluir empenho manual:', err);
+        if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
+          alert('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
+        } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
+          alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+        } else {
+          alert(`Erro ao excluir empenho manual: ${err?.message || 'Erro desconhecido'}`);
+        }
+      }
     }
   };
 
@@ -144,36 +309,50 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       criadoEm: new Date().toISOString(),
       atualizadoEm: new Date().toISOString()
     };
-    const updatedContratos = [...manualContratos, newContrato];
-    setManualContratos(updatedContratos);
-    await saveManualContratos(itemKey, updatedContratos);
 
-    const newLinks: ContratoEmpenho[] = selectedEmpenhoIds.map(empId => ({
-      id: `link-${newContratoId}-${empId}`,
-      contratoId: newContratoId,
-      empenhoId: empId,
-      dataVinculo: new Date().toISOString(),
-      origem: 'MANUAL'
-    }));
-    const updatedLinks = [...contratoEmpenhoLinks, ...newLinks];
-    setContratoEmpenhoLinks(updatedLinks);
-    await saveContratoEmpenhoLinks(itemKey, updatedLinks);
+    try {
+      await saveManualContractMutation.mutateAsync({
+        contrato: newContrato,
+        empenhoIds: selectedEmpenhoIds
+      });
+    } catch (err: any) {
+      console.error('Erro ao salvar contrato manual:', err);
+      if (err?.code === 'INVALID_CONTRACT_LINK' || err?.sqlState === '23514') {
+        alert('Regra RN-07: Todo contrato exige vinculação a pelo menos um empenho como lastro orçamentário.');
+      } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
+        alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+      } else {
+        alert(`Erro ao salvar contrato manual: ${err?.message || 'Erro desconhecido'}`);
+      }
+      throw err;
+    }
   };
 
   const handleDeleteManualContrato = async (contratoId: string) => {
     if (window.confirm('Tem certeza que deseja excluir este contrato manual?')) {
-      const updatedContratos = manualContratos.filter(c => c.id !== contratoId);
-      setManualContratos(updatedContratos);
-      await saveManualContratos(itemKey, updatedContratos);
-
-      const updatedLinks = contratoEmpenhoLinks.filter(l => l.contratoId !== contratoId);
-      setContratoEmpenhoLinks(updatedLinks);
-      await saveContratoEmpenhoLinks(itemKey, updatedLinks);
+      try {
+        await deleteManualContractMutation.mutateAsync({
+          id: contratoId,
+          itemKey
+        });
+      } catch (err: any) {
+        console.error('Erro ao excluir contrato manual:', err);
+        if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
+          alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+        } else if (err?.code === 'CONTRACT_NOT_FOUND' || err?.sqlState === 'P0002') {
+          alert('Contrato manual não encontrado ou já excluído.');
+        } else {
+          alert(`Erro ao excluir contrato manual: ${err?.message || 'Erro desconhecido'}`);
+        }
+      }
     }
   };
 
   // Cadastro de Unidades Oficiais
-  const [departments, setDepartments] = useState<InternalDepartment[]>([]);
+  const {
+    data: departments = [],
+    refetch: refetchDepartments
+  } = useDepartments();
   const [isManageDepsModalOpen, setIsManageDepsModalOpen] = useState<boolean>(false);
 
   const getFirstAvailableUnitSigla = (
@@ -190,118 +369,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     return available ? available.sigla : (deps[0]?.sigla || '');
   };
 
-  const loadDepartments = async () => {
-    const deps = await fetchDepartments();
-    setDepartments(deps);
-    if (deps.length > 0 && !newUnitName) {
-      setNewUnitName(getFirstAvailableUnitSigla(deps, allocations, editingId));
-    }
-  };
-
-
-  const loadUnidades = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchUnidadesItem(
-        item.numeroAtaRegistroPreco,
-        item.codigoUnidadeGerenciadora,
-        item.numeroItem
-      );
-      if (data.resultado && data.resultado.length > 0) {
-        setUnidades(data.resultado);
-      } else {
-        setUnidades([{
-          numeroAta: item.numeroAtaRegistroPreco,
-          unidadeGerenciadora: arp.codigoUnidadeGerenciadora || '200331',
-          numeroItem: item.numeroItem,
-          codigoPdm: String(item.codigoPdm || ''),
-          descricaoItem: item.descricaoItem,
-          fornecedor: item.nomeRazaoSocialFornecedor,
-          codigoUnidade: arp.codigoUnidadeGerenciadora || '200331',
-          nomeUnidade: arp.nomeUnidadeGerenciadora || arp.nomeOrgao || 'MINISTERIO DA JUSTICA E SEGURANCA PUBLICA',
-          tipoUnidade: 'GERENCIADORA',
-          quantidadeRegistrada: item.quantidadeHomologadaItem || 0,
-          saldoRemanejamentoEmpenho: item.quantidadeHomologadaItem || 0,
-          saldoAdesoes: 0,
-          qtdLimiteAdesao: item.maximoAdesao || 0,
-          qtdLimiteInformadoCompra: item.maximoAdesao || 0,
-          aceitaAdesao: item.maximoAdesao > 0,
-          dataHoraInclusao: new Date().toISOString(),
-          dataHoraAtualizacao: new Date().toISOString(),
-          dataHoraExclusao: null
-        }]);
-      }
-    } catch (err: any) {
-      // Fallback gracioso para a Unidade Gerenciadora
-      setUnidades([{
-        numeroAta: item.numeroAtaRegistroPreco,
-        unidadeGerenciadora: arp.codigoUnidadeGerenciadora || '200331',
-        numeroItem: item.numeroItem,
-        codigoPdm: String(item.codigoPdm || ''),
-        descricaoItem: item.descricaoItem,
-        fornecedor: item.nomeRazaoSocialFornecedor,
-        codigoUnidade: arp.codigoUnidadeGerenciadora || '200331',
-        nomeUnidade: arp.nomeUnidadeGerenciadora || arp.nomeOrgao || 'MINISTERIO DA JUSTICA E SEGURANCA PUBLICA',
-        tipoUnidade: 'GERENCIADORA',
-        quantidadeRegistrada: item.quantidadeHomologadaItem || 0,
-        saldoRemanejamentoEmpenho: item.quantidadeHomologadaItem || 0,
-        saldoAdesoes: 0,
-        qtdLimiteAdesao: item.maximoAdesao || 0,
-        qtdLimiteInformadoCompra: item.maximoAdesao || 0,
-        aceitaAdesao: item.maximoAdesao > 0,
-        dataHoraInclusao: new Date().toISOString(),
-        dataHoraAtualizacao: new Date().toISOString(),
-        dataHoraExclusao: null
-      }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadEmpenhos = async () => {
-    try {
-      const data = await fetchEmpenhosSaldoItem(
-        item.numeroAtaRegistroPreco,
-        item.codigoUnidadeGerenciadora
-      );
-      const targetItemNum = parseInt(item.numeroItem, 10);
-      const filtered = (data.resultado || []).filter(rec => {
-        const recItemNum = parseInt(rec.numeroItem, 10);
-        return recItemNum === targetItemNum || rec.numeroItem === item.numeroItem;
-      });
-      setEmpenhos(filtered);
-    } catch (err: any) {
-      console.warn('Erro ao buscar saldos de empenhos:', err);
-    }
-  };
-
-  const loadAdesoes = async () => {
-    setAdesoesLoading(true);
-    setAdesoesError(null);
-    try {
-      const data = await fetchAdesoesItem(
-        item.numeroAtaRegistroPreco,
-        item.codigoUnidadeGerenciadora,
-        item.numeroItem
-      );
-      const targetItemNum = parseInt(item.numeroItem, 10);
-      const filtered = (data.resultado || []).filter(rec => {
-        const recItemNum = parseInt(rec.numeroItem, 10);
-        return recItemNum === targetItemNum || rec.numeroItem === item.numeroItem || (!rec.numeroItem);
-      });
-      setAdesoes(filtered);
-      if (filtered.length === 0) {
-        setAdesoesError('Nenhuma adesão (carona) externa registrada para este item no Compras.gov.br.');
-      }
-    } catch (err: any) {
-      setAdesoesError(err.message || 'Falha ao buscar as adesões do item.');
-    } finally {
-      setAdesoesLoading(false);
-    }
-  };
-
-  const parsePncpParams = () => {
+  const pncpParams = useMemo(() => {
     const parsed = parsePncpIdentifiers(arp);
     if (parsed) return parsed;
 
@@ -345,86 +413,79 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     }
 
     return null;
-  };
+  }, [arp]);
 
-  const loadContracts = async () => {
-    setContractsLoading(true);
-    setContractsError(null);
-    const params = parsePncpParams();
+  const fallbackParams = useMemo(() => ({
+    codigoOrgao: arp.codigoOrgao,
+    codigoUnidadeGestora: arp.codigoUnidadeGerenciadora,
+    idCompra: arp.idCompra,
+    numeroCompra: arp.numeroCompra,
+    anoCompra: arp.anoCompra,
+    codigoModalidadeCompra: arp.codigoModalidadeCompra,
+    dataVigenciaInicial: arp.dataVigenciaInicial,
+    numeroControlePncpCompra: arp.numeroControlePncpCompra
+  }), [arp]);
 
-    try {
-      const cnpj = params?.cnpj || (arp.codigoUnidadeGerenciadora === '200331' || arp.codigoUnidadeGerenciadora === '200330' ? '00394494000136' : '');
-      const ano = params?.ano || arp.anoCompra || '2026';
-      const sequencial = params?.sequencial || arp.numeroCompra || '1';
-      const sequencialAta = params?.sequencialAta || '';
+  const fornecedorInfo = useMemo(() => ({
+    niFornecedor: item.niFornecedor,
+    nomeFornecedor: item.nomeRazaoSocialFornecedor
+  }), [item]);
 
-      const fallbackParams = {
-        codigoOrgao: arp.codigoOrgao,
-        codigoUnidadeGestora: arp.codigoUnidadeGerenciadora,
-        idCompra: arp.idCompra,
-        numeroCompra: arp.numeroCompra,
-        anoCompra: arp.anoCompra,
-        codigoModalidadeCompra: arp.codigoModalidadeCompra,
-        dataVigenciaInicial: arp.dataVigenciaInicial,
-        numeroControlePncpCompra: arp.numeroControlePncpCompra
-      };
+  const {
+    data: contracts = [],
+    isLoading: contractsLoading,
+    error: contractsQueryError,
+    refetch: refetchContracts
+  } = useItemContracts(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem,
+    pncpParams?.cnpj,
+    pncpParams?.ano,
+    pncpParams?.sequencial,
+    pncpParams?.sequencialAta,
+    fallbackParams,
+    fornecedorInfo,
+    arp.numeroAtaRegistroPreco
+  );
+  const contractsError = contractsQueryError ? (contractsQueryError.message || 'Falha ao buscar contratos do PNCP.') : null;
 
-      const fornecedorInfo = {
-        niFornecedor: item.niFornecedor,
-        nomeFornecedor: item.nomeRazaoSocialFornecedor
-      };
-
-      const data = await fetchPncpContracts(
-        cnpj,
-        ano,
-        sequencial,
-        sequencialAta,
-        item.numeroItem,
-        fallbackParams,
-        fornecedorInfo,
-        arp.numeroAtaRegistroPreco
-      );
-      setContracts(data);
-
-      // Carrega empenhos em background para todos os contratos e enriquece com dados oficiais
-      data.forEach(async (c) => {
-        const canKey = getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp);
-        if (c.contratoId) {
-          try {
-            const rawGovEmps = await fetchContratosGovEmpenhos(c.contratoId);
-            if (rawGovEmps && rawGovEmps.length > 0) {
-              const govEmps = await enrichGovEmpenhosWithDetails(rawGovEmps, c.contratoId, c);
-              setContractGovEmpenhos(prev => ({ 
-                ...prev, 
-                [c.numeroContrato]: govEmps,
-                [canKey]: govEmps
-              }));
-            }
-          } catch (e) {
-            console.warn('Erro ao carregar empenhos do Contratos.gov.br:', e);
+  // Carrega empenhos em background para todos os contratos e enriquece com dados oficiais
+  useEffect(() => {
+    if (!contracts || contracts.length === 0) return;
+    contracts.forEach(async (c) => {
+      const canKey = getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp);
+      if (c.contratoId) {
+        try {
+          const rawGovEmps = await fetchContratosGovEmpenhos(c.contratoId);
+          if (rawGovEmps && rawGovEmps.length > 0) {
+            const govEmps = await enrichGovEmpenhosWithDetails(rawGovEmps, c.contratoId, c);
+            setContractGovEmpenhos(prev => ({ 
+              ...prev, 
+              [c.numeroContrato]: govEmps,
+              [canKey]: govEmps
+            }));
           }
+        } catch (e) {
+          console.warn('Erro ao carregar empenhos do Contratos.gov.br:', e);
         }
-        if (c.cnpj && c.anoContrato && c.sequencialContrato) {
-          try {
-            const emps = await fetchPncpContractEmpenhos(c.cnpj, String(c.anoContrato), String(c.sequencialContrato));
-            if (emps && emps.length > 0) {
-              setContractEmpenhos(prev => ({
-                ...prev,
-                [c.numeroContrato]: emps,
-                [canKey]: emps
-              }));
-            }
-          } catch (e) {
-            console.warn('Erro ao carregar empenhos do PNCP:', e);
+      }
+      if (c.cnpj && c.anoContrato && c.sequencialContrato) {
+        try {
+          const emps = await fetchPncpContractEmpenhos(c.cnpj, String(c.anoContrato), String(c.sequencialContrato));
+          if (emps && emps.length > 0) {
+            setContractEmpenhos(prev => ({
+              ...prev,
+              [c.numeroContrato]: emps,
+              [canKey]: emps
+            }));
           }
+        } catch (e) {
+          console.warn('Erro ao carregar empenhos do PNCP:', e);
         }
-      });
-    } catch (err: any) {
-      setContractsError(err.message || 'Falha ao buscar contratos do PNCP.');
-    } finally {
-      setContractsLoading(false);
-    }
-  };
+      }
+    });
+  }, [contracts, item]);
 
   const enrichGovEmpenhosWithDetails = async (
     govEmps: ContratosGovEmpenhoRecord[],
@@ -635,64 +696,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     });
   };
 
-  const loadAllocations = async () => {
-    setAllocationError(null);
-    const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
-    const rawData = await fetchAllocations(itemKey);
-
-    // Consolidar alocações duplicadas com o mesmo nome de unidade se existirem
-    const mapByUnitName = new Map<string, InternalAllocation>();
-    const remappedIds = new Map<string, string>();
-    let hasDuplicates = false;
-
-    rawData.forEach(alloc => {
-      const normalizedName = alloc.unitName.trim();
-      const key = normalizedName.toLowerCase();
-      if (!mapByUnitName.has(key)) {
-        mapByUnitName.set(key, { ...alloc, unitName: normalizedName });
-      } else {
-        hasDuplicates = true;
-        const main = mapByUnitName.get(key)!;
-        remappedIds.set(alloc.id, main.id);
-        main.allocatedQty += alloc.allocatedQty;
-        main.empenhadaQty += alloc.empenhadaQty;
-      }
-    });
-
-    const consolidated = Array.from(mapByUnitName.values());
-
-    if (hasDuplicates) {
-      await saveAllocations(itemKey, consolidated);
-
-      if (remappedIds.size > 0) {
-        const currentLinks = await fetchEmpenhoLinks(itemKey);
-        let linksUpdated = false;
-        const newLinks = { ...currentLinks };
-        for (const empNum in newLinks) {
-          const targetId = newLinks[empNum];
-          if (remappedIds.has(targetId)) {
-            newLinks[empNum] = remappedIds.get(targetId)!;
-            linksUpdated = true;
-          }
-        }
-        if (linksUpdated) {
-          setEmpenhoLinks(newLinks);
-          await saveEmpenhoLinks(itemKey, newLinks);
-        }
-      }
-    }
-
-    setAllocations(consolidated);
-  };
-
-  const loadEmpenhoLinks = async () => {
-    const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
-    const links = await fetchEmpenhoLinks(itemKey);
-    setEmpenhoLinks(links);
-    const manualQtds = await fetchEmpenhoManualQuantities(itemKey);
-    setEmpenhoManualQuantities(manualQtds);
-  };
-
   useEffect(() => {
     cacheArpsInDb([arp]);
     cacheArpItemsInDb(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, [item]);
@@ -701,34 +704,27 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       localStorage.setItem(`saldoarp-item-meta-${arp.numeroAtaRegistroPreco}-${item.numeroItem}`, meta);
       localStorage.setItem(`saldoarp-item-meta-${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`, meta);
     } catch {}
-    loadUnidades();
-    loadEmpenhos();
-    loadContracts();
-    loadAllocations();
-    loadEmpenhoLinks();
-    loadManualData();
-    loadAdesoes();
-    loadDepartments();
   }, [item]);
 
   const saveAllocationsToStorage = async (newAllocations: InternalAllocation[]) => {
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
-    setAllocations(newAllocations);
-    await saveAllocations(itemKey, newAllocations);
+    try {
+      setAllocationError(null);
+      await saveAllocationsMutation.mutateAsync({
+        itemKey,
+        allocations: newAllocations,
+        expectedVersion: allocationVersion
+      });
+    } catch (err: any) {
+      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
+        setAllocationError('Conflito de concorrência: as alocações foram modificadas por outro usuário. Recarregue a página antes de salvar novamente.');
+      } else {
+        setAllocationError(err?.message || 'Erro ao salvar alocações.');
+      }
+    }
   };
 
-  const isGerenciadoraUasg = (codigo?: string | number) => {
-    const clean = String(codigo || '').replace(/\D/g, '');
-    return clean === '200331' || clean === '200330' || clean === String(arp.codigoUnidadeGerenciadora).replace(/\D/g, '');
-  };
-
-  const isAllowedEmpenhoUasg = (uasg?: string | number) => {
-    if (!uasg) return false;
-    const clean = String(uasg).replace(/\D/g, '');
-    return clean === '200331' || clean === '200330';
-  };
-
-  const gerenciadoraUnits = unidades.filter(uni => uni.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(uni.codigoUnidade));
+  const gerenciadoraUnits = unidades.filter(uni => uni.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(uni.codigoUnidade, arp.codigoUnidadeGerenciadora));
   const totalUGQty = gerenciadoraUnits.length > 0 
     ? gerenciadoraUnits.reduce((sum, u) => sum + (Number(u.quantidadeRegistrada) || 0), 0)
     : (Number(item.quantidadeHomologadaItem) || 0);
@@ -828,8 +824,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       }
     }
     if (hasChanges) {
-      setEmpenhoLinks(cleanedLinks);
-      saveEmpenhoLinks(itemKey, cleanedLinks);
+      saveEmpenhoLinksMutation.mutateAsync({
+        itemKey,
+        links: cleanedLinks,
+        expectedVersion: empenhoLinkVersion
+      }).catch(err => {
+        console.warn('Erro ao atualizar vínculos de empenhos após exclusão de alocação:', err);
+      });
     }
   };
 
@@ -850,38 +851,24 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     if (!departmentId) {
       delete updatedLinks[empenhoUnidade];
     }
-    setEmpenhoLinks(updatedLinks);
-    await saveEmpenhoLinks(itemKey, updatedLinks);
-
-    const updatedAllocations = calculateAllocationsWithEmpenhos(allocations, allEmpenhos, updatedLinks);
-    setAllocations(updatedAllocations);
-    await saveAllocations(itemKey, updatedAllocations);
-  };
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  };
-
-  const formatNumber = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val);
-  };
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-';
-    const cleanDate = dateStr.split('T')[0];
-    const parts = cleanDate.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    try {
+      setAllocationError(null);
+      await saveEmpenhoLinksMutation.mutateAsync({
+        itemKey,
+        links: updatedLinks,
+        expectedVersion: empenhoLinkVersion
+      });
+    } catch (err: any) {
+      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
+        setAllocationError('Conflito de concorrência: os vínculos de empenhos foram modificados por outro usuário. Recarregue a página antes de salvar novamente.');
+      } else {
+        setAllocationError(err?.message || 'Erro ao salvar vínculo de empenho.');
+      }
     }
-    return dateStr;
   };
 
-  const getContractPncpUrl = (contrato: PncpContract) => {
-    return formatPncpContractUrl(
-      contrato.numeroControlePncp,
-      contrato.linkVisualizacao
-    );
-  };
+
+
 
   // Mapeia empenhos oficiais da API (SIASG e Contratos.gov/PNCP) para a entidade canônica Empenho
   // FILTRAGEM OBRIGATÓRIA: Apresentar apenas empenhos das UASGs 200331 e 200330
@@ -1034,19 +1021,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     return calculateAllocationsWithEmpenhos(allocations, allEmpenhos, empenhoLinks);
   }, [allocations, allEmpenhos, empenhoLinks]);
 
-  // Sincroniza as quantidades empenhadas com o storage caso haja discrepância
-  useEffect(() => {
-    if (allocations.length > 0 && allEmpenhos.length > 0) {
-      const updatedAllocations = calculateAllocationsWithEmpenhos(allocations, allEmpenhos, empenhoLinks);
-      const hasDiff = updatedAllocations.some((u, i) => u.empenhadaQty !== allocations[i]?.empenhadaQty);
-      if (hasDiff) {
-        setAllocations(updatedAllocations);
-        const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
-        saveAllocations(itemKey, updatedAllocations);
-      }
-    }
-  }, [allEmpenhos, empenhoLinks]);
-
   const totalAllocatedSum = allocationsWithEmpenho.reduce((acc, curr) => acc + curr.allocatedQty, 0);
   const totalEmpenhadaSum = allocationsWithEmpenho.reduce((acc, curr) => acc + curr.empenhadaQty, 0);
   const remainingUGQty = totalUGQty - totalAllocatedSum;
@@ -1066,108 +1040,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     return (a.codigoUnidade || '').localeCompare(b.codigoUnidade || '');
   });
 
-  const getProgressColorClass = (percent: number) => {
-    if (percent < 20) return 'fill-danger';
-    if (percent < 50) return 'fill-warning';
-    return 'fill-success';
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Navigation Breadcrumb */}
-      <div className="breadcrumb">
-        <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={onBack}>
-          Ata {arp.numeroAtaRegistroPreco}
-        </span>
-        <span style={{ margin: '0 0.25rem' }}>/</span>
-        <span className="breadcrumb-item active">Item {item.numeroItem}</span>
-      </div>
-
-      {/* Item info overview */}
-      <section className="glass-card" style={{ background: 'linear-gradient(135deg, #f0f5fc 0%, #e1ebf8 100%)', borderColor: '#b2cbe6' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', marginBottom: '1rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-              <span className="item-number">Item {item.numeroItem}</span>
-              <span className="badge badge-info">{item.tipoItem}</span>
-              <span className="badge badge-success">Preço Unitário: {formatCurrency(item.valorUnitario)}</span>
-            </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
-              {item.descricaoItem}
-            </h2>
-          </div>
-          <button onClick={onBack} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-            <ChevronLeft size={16} /> Voltar aos itens
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
-          <div className="meta-field">
-            <span className="meta-label">Fornecedor</span>
-            <span className="meta-value" style={{ color: 'var(--text-secondary)' }}>{item.nomeRazaoSocialFornecedor}</span>
-          </div>
-          <div className="meta-field">
-            <span className="meta-label">Quantidade Original</span>
-            <span className="meta-value">{formatNumber(item.quantidadeHomologadaItem)} unidades</span>
-          </div>
-          <div className="meta-field">
-            <span className="meta-label">Valor Total do Item</span>
-            <span className="meta-value" style={{ fontWeight: 600, color: 'var(--accent)' }}>{formatCurrency(item.valorTotal)}</span>
-          </div>
-          <div className="meta-field">
-            <span className="meta-label">Situação Sicap / Adesão</span>
-            <span className="meta-value" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              {item.maximoAdesao > 0 ? (
-                <span className="badge badge-success">Aceita Adesão</span>
-              ) : (
-                <span className="badge badge-danger">Não Aceita Adesão</span>
-              )}
-            </span>
-          </div>
-        </div>
-
-        {/* Links externos para PNCP */}
-        {(() => {
-          const ataUrl = formatPncpAtaUrl(arp.linkAtaPNCP, arp.numeroControlePncpAta, arp.numeroAtaRegistroPreco);
-          const compraUrl = formatPncpCompraUrl(arp.linkCompraPNCP, arp.numeroControlePncpCompra, arp.numeroControlePncpAta);
-          if (!ataUrl && !compraUrl) return null;
-
-          return (
-            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {ataUrl && (
-                <a 
-                  href={ataUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="btn btn-secondary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: 600, color: '#0369a1', borderColor: '#bae6fd', background: '#f0f9ff', padding: '0.3rem 0.65rem' }}
-                >
-                  <ExternalLink size={12} /> Ver Ata no PNCP
-                </a>
-              )}
-              {compraUrl && (
-                <a 
-                  href={compraUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="btn btn-secondary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: 600, color: '#0369a1', borderColor: '#bae6fd', background: '#f0f9ff', padding: '0.3rem 0.65rem' }}
-                >
-                  <ExternalLink size={12} /> Ver Edital / Contratação no PNCP
-                </a>
-              )}
-            </div>
-          );
-        })()}
-      </section>
+      {/* Navigation Breadcrumb & Item Info Overview */}
+      <ItemBalancesHeader arp={arp} item={item} onBack={onBack} />
 
       {/* Executive Item Reconciliation Audit Card */}
       {!loading && (
         <ItemReconciliationCard
           report={reconciliationReport}
           onRefresh={() => {
-            loadEmpenhos();
-            loadContracts();
+            refetchEmpenhos();
+            refetchContracts();
             loadManualData();
           }}
           isLoading={loading || contractsLoading}
@@ -1176,98 +1060,24 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
       {/* Global item balance metrics */}
       {!loading && !error && (
-        <section className="balances-header-grid">
-          {/* Empenho Balance Card */}
-          <div className="glass-card balance-card-summary">
-            <div className="balance-icon-wrap" style={{ background: 'rgba(99, 102, 241, 0.12)', color: 'var(--primary)' }}>
-              <ArrowRightLeft size={24} />
-            </div>
-            <div className="balance-info-wrap" style={{ flexGrow: 1 }}>
-              <span className="meta-label">Saldo p/ Empenho / Remanejamento</span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <span className="balance-val" style={{ color: 'var(--text-primary)' }}>
-                  {formatNumber(officialCalculatedSaldo)}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  de {formatNumber(itemTotalQty)} un
-                  {item.quantidadeEstimadaEdital && item.quantidadeEstimadaEdital !== itemTotalQty && (
-                    <span style={{ marginLeft: '0.25rem', opacity: 0.8, fontWeight: 500 }} title={`Quantitativo originário do edital: ${formatNumber(item.quantidadeEstimadaEdital)} un`}>
-                      (Edital: {formatNumber(item.quantidadeEstimadaEdital)})
-                    </span>
-                  )}
-                </span>
-              </div>
-              
-              <div className="progress-container" style={{ marginTop: '0.75rem' }}>
-                <div className="progress-track">
-                  <div 
-                    className={`progress-fill ${getProgressColorClass(empenhoPercentClamped)}`}
-                    style={{ width: `${empenhoPercentClamped}%` }}
-                  ></div>
-                </div>
-                <div className="progress-label-row">
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Consumido: {formatNumber(totalConsumidoEmpenho)} ({formatNumber(empenhoConsumidoPercent)}%)</span>
-                  <span style={{ fontWeight: 700, fontSize: '0.7rem', color: rawEmpenhoPercentRestante < 20 ? 'var(--danger)' : 'var(--success)' }}>{formatNumber(rawEmpenhoPercentRestante)}% restante</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Adesao (Carona) Balance Card */}
-          <div 
-            className="glass-card balance-card-summary" 
-            onClick={() => setActiveTab('adesoes')}
-            style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
-            title="Clique para ver o detalhamento de caronas externas autorizadas"
-          >
-            <div className="balance-icon-wrap" style={{ background: 'rgba(6, 182, 212, 0.12)', color: 'var(--accent)' }}>
-              <Users size={24} />
-            </div>
-            <div className="balance-info-wrap" style={{ flexGrow: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="meta-label">Saldo para Adesões (Caronas)</span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 600 }}>Ver Caronas →</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <span className="balance-val" style={{ color: 'var(--accent)' }}>
-                  {formatNumber(totalSaldoAdesoes)}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  de {formatNumber(totalLimiteAdesao)} un
-                </span>
-              </div>
-
-              <div className="progress-container" style={{ marginTop: '0.75rem' }}>
-                <div className="progress-track">
-                  <div 
-                    className={`progress-fill ${getProgressColorClass(adsPercValClamped)}`}
-                    style={{ width: `${adsPercValClamped}%` }}
-                  ></div>
-                </div>
-                <div className="progress-label-row">
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Consumido: {formatNumber(totalConsumidoAdesao)} ({formatNumber(adsConsPercVal)}%)</span>
-                  <span style={{ fontWeight: 700, fontSize: '0.7rem', color: adsPercValClamped < 20 ? 'var(--danger)' : 'var(--accent)' }}>{formatNumber(adsPercVal)}% restante</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Value Balance Card */}
-          <div className="glass-card balance-card-summary">
-            <div className="balance-icon-wrap" style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--success)' }}>
-              <DollarSign size={24} />
-            </div>
-            <div className="balance-info-wrap">
-              <span className="meta-label">Valor Financeiro Disponível (Empenho)</span>
-              <span className="balance-val" style={{ color: valorFinanceiroDisponivel < 0 ? 'var(--danger)' : 'var(--success)', marginTop: '0.25rem' }}>
-                {formatCurrency(valorFinanceiroDisponivel)}
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                Total consumido: {formatCurrency(valorFinanceiroConsumido)}
-              </span>
-            </div>
-          </div>
-        </section>
+        <ItemBalancesSummaryCards
+          officialCalculatedSaldo={officialCalculatedSaldo}
+          itemTotalQty={itemTotalQty}
+          quantidadeEstimadaEdital={item.quantidadeEstimadaEdital}
+          empenhoPercentClamped={empenhoPercentClamped}
+          totalConsumidoEmpenho={totalConsumidoEmpenho}
+          empenhoConsumidoPercent={empenhoConsumidoPercent}
+          rawEmpenhoPercentRestante={rawEmpenhoPercentRestante}
+          totalSaldoAdesoes={totalSaldoAdesoes}
+          totalLimiteAdesao={totalLimiteAdesao}
+          adsPercValClamped={adsPercValClamped}
+          totalConsumidoAdesao={totalConsumidoAdesao}
+          adsConsPercVal={adsConsPercVal}
+          adsPercVal={adsPercVal}
+          valorFinanceiroDisponivel={valorFinanceiroDisponivel}
+          valorFinanceiroConsumido={valorFinanceiroConsumido}
+          onAdesoesClick={() => setActiveTab('adesoes')}
+        />
       )}
 
       {/* Granular unit breakdown */}
@@ -1364,99 +1174,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         </div>
 
         {activeTab === 'unidades' ? (
-          loading ? (
-            <div className="spinner-container">
-              <div className="spinner spinner-glow"></div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Buscando saldos individuais por unidade...</p>
-            </div>
-          ) : error ? (
-            <div className="empty-state">
-              <HelpCircle size={40} className="empty-state-icon" />
-              <p style={{ fontSize: '0.95rem' }}>{error}</p>
-            </div>
-          ) : (
-            <div className="table-container" style={{ marginTop: 0 }}>
-              <table className="custom-table">
-                <thead>
-                  <tr>
-                    <th>Órgão Participante / UASG</th>
-                    <th>Tipo</th>
-                    <th>Original Registrado</th>
-                    <th>Qtd Empenhada</th>
-                    <th style={{ width: '220px' }}>Saldo p/ Empenho</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedUnidades.map((uni, idx) => {
-                    const cleanUasg = String(uni.codigoUnidade || '').replace(/\D/g, '');
-                    const isUG = uni.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(cleanUasg);
-                    const hasMultipleUgRows = sortedUnidades.filter(u => isGerenciadoraUasg(u.codigoUnidade)).length > 1;
-
-                    const empsForUnit = allEmpenhos.filter(e => {
-                      const eUasg = String(e.uasg || '').replace(/\D/g, '');
-                      if (isUG) {
-                        if (hasMultipleUgRows) {
-                          return eUasg === cleanUasg;
-                        }
-                        return isAllowedEmpenhoUasg(eUasg);
-                      }
-                      return eUasg === cleanUasg;
-                    });
-
-                    const empenhadoUnitQty = calculateTotalEmpenhado(empsForUnit);
-                    const effectiveSaldo = isUG 
-                      ? (uni.quantidadeRegistrada - empenhadoUnitQty)
-                      : (uni.saldoRemanejamentoEmpenho !== undefined && uni.saldoRemanejamentoEmpenho !== null 
-                          ? uni.saldoRemanejamentoEmpenho 
-                          : (uni.quantidadeRegistrada - empenhadoUnitQty));
-
-                    const empPerc = uni.quantidadeRegistrada > 0 ? (effectiveSaldo / uni.quantidadeRegistrada) * 100 : 0;
-                    const clampedPerc = Math.max(0, Math.min(100, empPerc));
-
-                    return (
-                      <tr key={`${uni.codigoUnidade}-${idx}`}>
-                        <td style={{ fontSize: '0.88rem' }}>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {uni.nomeUnidade}
-                          </div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 500 }}>
-                            UASG: {uni.codigoUnidade}
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`badge ${isUG ? 'badge-info' : 'badge-success'}`}>
-                            {isUG ? 'GERENCIADORA' : 'PARTICIPANTE'}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                          {formatNumber(uni.quantidadeRegistrada)}
-                        </td>
-                        <td style={{ fontWeight: 700, fontFamily: 'monospace', color: empenhadoUnitQty > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                          {formatNumber(empenhadoUnitQty)} un
-                        </td>
-                        <td>
-                          <div className="progress-container">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                              <span style={{ fontWeight: 700, color: effectiveSaldo < 0 ? 'var(--danger)' : 'var(--text-primary)' }}>
-                                {formatNumber(effectiveSaldo)}
-                              </span>
-                              <span style={{ color: 'var(--text-muted)' }}>{formatNumber(empPerc)}%</span>
-                            </div>
-                            <div className="progress-track" style={{ height: '6px' }}>
-                              <div 
-                                className={`progress-fill ${getProgressColorClass(clampedPerc)}`}
-                                style={{ width: `${clampedPerc}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )
+          <UnidadesTab
+            loading={loading}
+            error={error}
+            sortedUnidades={sortedUnidades}
+            allEmpenhos={allEmpenhos}
+          />
         ) : activeTab === 'empenhos' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             
@@ -1693,6 +1416,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                           {c._isManual && c._manualId && (
                                             <button
                                               onClick={() => handleDeleteManualContrato(c._manualId)}
+                                              disabled={deleteManualContractMutation.isPending}
                                               className="btn btn-secondary"
                                               style={{ padding: '0.3rem 0.5rem', color: '#b91c1c', border: '1px solid #fecaca', background: '#fef2f2', borderRadius: '4px' }}
                                               title="Excluir contrato manual"
@@ -1783,6 +1507,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                               <select
                                                                 value={currentLinkId}
                                                                 onChange={(e) => handleLinkEmpenho(emp.numero, e.target.value)}
+                                                                disabled={saveEmpenhoLinksMutation.isPending}
                                                                 className="form-input"
                                                                 style={{
                                                                   padding: '0.2rem 0.4rem',
@@ -1795,6 +1520,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                                   fontWeight: currentLinkId ? 600 : 400
                                                                 }}
                                                               >
+
                                                                 <option value="">Não vinculado</option>
                                                                 {allocationsWithEmpenho.map(a => (
                                                                   <option key={a.id} value={a.id}>
@@ -1812,6 +1538,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                                   className="form-input"
                                                                   value={editingEmpenhoQty}
                                                                   onChange={(e) => setEditingEmpenhoQty(e.target.value)}
+                                                                  disabled={saveManualQuantitiesMutation.isPending}
                                                                   style={{ width: '65px', padding: '2px 4px', fontSize: '0.78rem', height: '24px', textAlign: 'center', fontWeight: 700 }}
                                                                   autoFocus
                                                                   onKeyDown={(e) => {
@@ -1822,6 +1549,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                                 <button
                                                                   type="button"
                                                                   onClick={() => handleSaveEmpenhoQty(empKey)}
+                                                                  disabled={saveManualQuantitiesMutation.isPending}
                                                                   style={{ background: '#22c55e', color: '#ffffff', border: 'none', borderRadius: '3px', padding: '2px 5px', cursor: 'pointer', height: '24px', display: 'flex', alignItems: 'center' }}
                                                                   title="Salvar quantidade manual"
                                                                 >
@@ -1830,12 +1558,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                                 <button
                                                                   type="button"
                                                                   onClick={() => setEditingEmpenhoKey(null)}
+                                                                  disabled={saveManualQuantitiesMutation.isPending}
                                                                   style={{ background: '#94a3b8', color: '#ffffff', border: 'none', borderRadius: '3px', padding: '2px 5px', cursor: 'pointer', height: '24px', display: 'flex', alignItems: 'center' }}
                                                                   title="Cancelar"
                                                                 >
                                                                   <X size={12} />
                                                                 </button>
-                                                               </div>
+                                                              </div>
                                                             ) : (
                                                               qtyInfo.isOfficial ? (
                                                                 qtyInfo.isReforco ? (
@@ -1873,6 +1602,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                               <button
                                                                 type="button"
                                                                 onClick={() => handleStartEditEmpenhoQty(empKey, qtyInfo.qty)}
+                                                                disabled={saveManualQuantitiesMutation.isPending}
                                                                 className="btn btn-secondary"
                                                                 style={{ padding: '2px 6px', fontSize: '0.72rem', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
                                                                 title="Ajustar quantidade física deste empenho"
@@ -1883,6 +1613,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                                 <button
                                                                   type="button"
                                                                   onClick={() => handleRestoreEmpenhoQty(empKey)}
+                                                                  disabled={saveManualQuantitiesMutation.isPending}
                                                                   style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px', display: 'inline-flex', alignItems: 'center' }}
                                                                   title="Restaurar para o valor oficial deduzido da API"
                                                                 >
@@ -1988,6 +1719,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 <select
                                   value={currentLinkId}
                                   onChange={(e) => handleLinkEmpenho(emp.numero, e.target.value)}
+                                  disabled={saveEmpenhoLinksMutation.isPending}
                                   className="form-input"
                                   style={{
                                     padding: '0.2rem 0.4rem',
@@ -2000,6 +1732,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                     fontWeight: currentLinkId ? 600 : 400
                                   }}
                                 >
+
                                   <option value="">Não vinculado</option>
                                   {allocationsWithEmpenho.map(a => (
                                     <option key={a.id} value={a.id}>
@@ -2042,6 +1775,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                       setEditingManualEmpenho(emp);
                                       setIsManualEmpenhoModalOpen(true);
                                     }}
+                                    disabled={saveManualEmpenhosMutation.isPending}
                                     className="btn btn-secondary"
                                     style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem' }}
                                     title="Editar empenho manual"
@@ -2050,6 +1784,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                   </button>
                                   <button
                                     onClick={() => handleDeleteManualEmpenho(emp.id)}
+                                    disabled={saveManualEmpenhosMutation.isPending}
                                     className="btn btn-secondary"
                                     style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem', color: '#b91c1c', border: '1px solid #fecaca', background: '#fef2f2' }}
                                     title="Excluir empenho manual"
@@ -2210,12 +1945,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                     type="submit" 
                     className="btn btn-primary" 
                     style={{ flex: 1, height: '38px', padding: '0 1rem', fontSize: '0.8rem' }}
-                    disabled={!editingId && departments.length > 0 && departments.every(d => allocations.some(a => a.unitName.trim().toLowerCase() === d.sigla.trim().toLowerCase()))}
+                    disabled={saveAllocationsMutation.isPending || (!editingId && departments.length > 0 && departments.every(d => allocations.some(a => a.unitName.trim().toLowerCase() === d.sigla.trim().toLowerCase())))}
                   >
-                    {editingId ? <Check size={14} /> : <Plus size={14} />} {editingId ? 'Salvar' : 'Adicionar'}
+                    {saveAllocationsMutation.isPending ? (
+                      'Salvando...'
+                    ) : (
+                      <>
+                        {editingId ? <Check size={14} /> : <Plus size={14} />} {editingId ? 'Salvar' : 'Adicionar'}
+                      </>
+                    )}
                   </button>
                   {editingId && (
-                    <button type="button" onClick={handleCancelEdit} className="btn btn-secondary" style={{ height: '38px', padding: '0 0.75rem', borderColor: '#df152a', color: '#df152a' }}>
+                    <button type="button" onClick={handleCancelEdit} disabled={saveAllocationsMutation.isPending} className="btn btn-secondary" style={{ height: '38px', padding: '0 0.75rem', borderColor: '#df152a', color: '#df152a' }}>
                       <X size={14} />
                     </button>
                   )}
@@ -2294,10 +2035,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 </button>
                                 <button 
                                   onClick={() => handleDeleteAllocation(alloc.id)}
+                                  disabled={saveAllocationsMutation.isPending || saveEmpenhoLinksMutation.isPending}
                                   className="btn btn-secondary" 
                                   style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', borderColor: '#f5c6cb', color: 'var(--danger)', textTransform: 'none', height: 'auto', border: '1px solid #f5c6cb' }}
                                   title="Excluir"
                                 >
+
                                   <Trash2 size={12} />
                                 </button>
                               </div>
@@ -2313,372 +2056,42 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
           </div>
         ) : (
-          /* ADESOES / CARONAS EXTERNAS TAB CONTENT (ENDPOINT 5) */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0.5rem 1rem' }}>
-            {/* Header / Context Banner */}
-            <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '1rem 1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                  <Share2 size={16} /> Adesões / Caronas de Órgãos Não Participantes
-                </h4>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>Endpoint 5: 5_consultarAdesoesItem</span>
-                  <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>Art. 86 da Lei 14.133/21</span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.8rem', color: '#1e3a8a', margin: 0, lineHeight: 1.5 }}>
-                Este painel detalha as solicitações e autorizações de adesão (caronas) formalizadas por órgãos e entidades externas que não integraram inicialmente o processo licitatório. 
-                Os limites legais da Lei 14.133/2021 estabelecem teto de até <strong>50%</strong> do quantitativo do item por órgão não participante e <strong>200% (2x)</strong> no total cumulativo da Ata.
-              </p>
-            </div>
-
-            {/* Stat Cards for Caronas */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-              <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <span className="meta-label" style={{ fontSize: '0.7rem' }}>Órgãos Solicitantes (Caronas)</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                  {adesoes.length} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>órgãos</span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Entidades com carona autorizada/registrada
-                </div>
-              </div>
-
-              <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <span className="meta-label" style={{ fontSize: '0.7rem' }}>Total Autorizado para Caronas</span>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '0.2rem' }}>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)', fontFamily: 'monospace' }}>
-                    {formatNumber(totalAdesaoRegistrada)}
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    de {formatNumber(item.maximoAdesao || (item.quantidadeHomologadaItem * 2))} máx
-                  </span>
-                </div>
-                <div className="progress-track" style={{ height: '5px', marginTop: '0.4rem', background: '#e9ecef' }}>
-                  <div className="progress-fill fill-info" style={{ width: `${Math.min((totalAdesaoRegistrada / (item.maximoAdesao || (item.quantidadeHomologadaItem * 2) || 1)) * 100, 100)}%` }}></div>
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Limite máximo global permitido: {formatNumber(item.maximoAdesao || (item.quantidadeHomologadaItem * 2))} un
-                </div>
-              </div>
-
-              <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <span className="meta-label" style={{ fontSize: '0.7rem' }}>Total Empenhado por Caronas</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--warning)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                  {formatNumber(totalAdesaoEmpenhada)} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>un</span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Consumo: {formatNumber(adesaoConsumidaPercent)}% da cota concedida
-                </div>
-              </div>
-
-              <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <span className="meta-label" style={{ fontSize: '0.7rem' }}>Saldo Concedido Não Empenhado</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                  {formatNumber(totalAdesaoSaldo || (totalAdesaoRegistrada - totalAdesaoEmpenhada))} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>un</span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Equivalente a {formatCurrency((totalAdesaoSaldo || (totalAdesaoRegistrada - totalAdesaoEmpenhada)) * item.valorUnitario)}
-                </div>
-              </div>
-            </div>
-
-            {/* Adesões Data Table */}
-            {adesoesLoading ? (
-              <div className="spinner-container" style={{ padding: '2rem' }}>
-                <div className="spinner spinner-glow"></div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Consultando adesões de carona no Compras.gov.br (Endpoint 5)...</p>
-              </div>
-            ) : adesoes.length === 0 ? (
-              <div className="empty-state" style={{ padding: '3rem 1.5rem', background: '#ffffff', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-                <Share2 size={40} className="empty-state-icon" style={{ opacity: 0.4, color: 'var(--primary)' }} />
-                <h4 style={{ margin: '0.5rem 0 0.25rem', fontSize: '1rem', color: 'var(--text-primary)' }}>Nenhuma Carona Externa Registrada</h4>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: '520px', margin: '0 auto' }}>
-                  {adesoesError || `Nenhum órgão não participante solicitou ou teve autorização de adesão registrada para o Item ${item.numeroItem} no módulo oficial do Compras.gov.br.`}
-                </p>
-              </div>
-            ) : (
-              <div className="table-container" style={{ marginTop: 0, overflowX: 'auto', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <table className="custom-table" style={{ margin: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Órgão Não Participante (Carona)</th>
-                      <th>Tipo de Vínculo</th>
-                      <th>Qtd. Concedida / Registrada</th>
-                      <th style={{ width: '220px' }}>Qtd. Empenhada</th>
-                      <th>Saldo p/ Empenho</th>
-                      <th>Data do Registro</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {adesoes.map((ade, idx) => {
-                      const empQtd = ade.quantidadeEmpenhada || 0;
-                      const regQtd = ade.quantidadeRegistrada || 0;
-                      const saldoQtd = ade.saldoEmpenho ?? (regQtd - empQtd);
-                      const consPerc = regQtd > 0 ? (empQtd / regQtd) * 100 : 0;
-
-                      return (
-                        <tr key={`ade-${ade.unidade}-${idx}`}>
-                          <td style={{ fontSize: '0.85rem' }}>
-                            <div style={{ fontWeight: 700, color: '#0c326f' }}>
-                              {ade.orgaoAdesao || (ade.unidade ? `UASG ${ade.unidade}` : 'Órgão Solicitante')}
-                            </div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                              {ade.unidade ? `UASG: ${ade.unidade}` : ''}
-                            </div>
-                          </td>
-                          <td>
-                            <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>
-                              {ade.tipo || 'NÃO PARTICIPANTE (CARONA)'}
-                            </span>
-                          </td>
-                          <td style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                            {formatNumber(regQtd)} un
-                          </td>
-                          <td>
-                            <div className="progress-container">
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{formatNumber(empQtd)}</span>
-                                <span style={{ color: 'var(--text-muted)' }}>{formatNumber(consPerc)}%</span>
-                              </div>
-                              <div className="progress-track" style={{ height: '6px', background: '#e9ecef' }}>
-                                <div 
-                                  className={`progress-fill ${getProgressColorClass(100 - consPerc)}`}
-                                  style={{ width: `${Math.min(consPerc, 100)}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, color: saldoQtd > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
-                            {formatNumber(saldoQtd)} un
-                          </td>
-                          <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            {ade.dataHoraInclusao ? formatDate(ade.dataHoraInclusao) : ade.dataHoraAtualizacao ? formatDate(ade.dataHoraAtualizacao) : '-'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <AdesoesTab
+            adesoesLoading={adesoesLoading}
+            adesoesError={adesoesError}
+            adesoes={adesoes}
+            item={item}
+            totalAdesaoRegistrada={totalAdesaoRegistrada}
+            totalAdesaoEmpenhada={totalAdesaoEmpenhada}
+            totalAdesaoSaldo={totalAdesaoSaldo}
+            adesaoConsumidaPercent={adesaoConsumidaPercent}
+          />
         )}
       </section>
 
       {/* Modal for detailing contract & empenhos */}
-      {selectedEmpenhoDetail && (
-        <div className="modal-backdrop" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-        }}>
-          <div className="glass-card" style={{
-            width: '90%',
-            maxWidth: '800px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            background: '#ffffff',
-            padding: '2rem',
-            borderRadius: '8px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1.5rem',
-            position: 'relative'
-          }}>
-            {/* Close Button */}
-            <button 
-              onClick={() => setSelectedEmpenhoDetail(null)}
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-secondary)'
-              }}
-            >
-              <X size={20} />
-            </button>
-
-            {/* Modal Header */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                <span className="badge badge-info" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                  {selectedEmpenhoDetail.tipo}
-                </span>
-                <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>
-                  UASG Beneficiária: {selectedEmpenhoDetail.unidade.match(/^(\d+)/)?.[1]}
-                </span>
-              </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                {selectedEmpenhoDetail.unidade.replace(/^\d+\s*-\s*/, '')}
-              </h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0.25rem 0 0 0' }}>
-                Ata n.º {arp.numeroAtaRegistroPreco} | Item {item.numeroItem}
-              </p>
-            </div>
-
-            {/* Section 1: Balanço de Saldos do SIASG */}
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.75rem 0', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <ArrowRightLeft size={14} color="var(--primary)" /> Balanço de Saldos (SIASG)
-              </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', textAlign: 'center' }}>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>QUANTIDADE REGISTRADA</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                    {formatNumber(selectedEmpenhoDetail.quantidadeRegistrada)}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>QUANTIDADE EMPENHADA</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--warning)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                    {formatNumber(selectedEmpenhoDetail.quantidadeEmpenhada)}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>SALDO P/ EMPENHAR</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: selectedEmpenhoDetail.saldoEmpenho < 0 ? 'var(--danger)' : 'var(--success)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                    {formatNumber(selectedEmpenhoDetail.saldoEmpenho)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 2: Contratos & Empenhos Vinculados (PNCP) */}
-            <div>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.75rem 0', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <Building2 size={14} color="var(--primary)" /> Contratos & Empenhos Publicados no PNCP
-              </h4>
-              
-              {contractsLoading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1.5rem', justifyContent: 'center' }}>
-                  <div className="spinner" style={{ width: '16px', height: '16px' }}></div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Buscando dados no PNCP...</span>
-                </div>
-              ) : getFilteredContractsForModal(selectedEmpenhoDetail).length === 0 ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', background: '#f8fafc', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
-                  Nenhum contrato cadastrado no PNCP para esta UASG nesta Ata.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  {getFilteredContractsForModal(selectedEmpenhoDetail).map((c, cidx) => {
-                    const contractUrl = getContractPncpUrl(c);
-                    const emps = contractEmpenhos[c.numeroContrato] || [];
-                    const isLoadingEmps = empenhosLoadingMap[c.numeroContrato];
-                    
-                    return (
-                      <div key={`${c.numeroContrato}-${cidx}`} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden' }}>
-                        {/* Contract Header Row */}
-                        <div style={{ background: '#f8fafc', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                              Contrato {c.numeroContrato}
-                            </span>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                              CNPJ Contratado: {c.niFornecedor?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") || '-'}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                              Vigência: {formatDate(c.dataVigenciaInicial)} a {formatDate(c.dataVigenciaFinal)}
-                            </span>
-                            <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--success)' }}>
-                              {formatCurrency(c.valorInicial || 0)}
-                            </span>
-                            {contractUrl && (
-                              <a href={contractUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.72rem', color: 'var(--primary)', textDecoration: 'underline' }}>
-                                PNCP <ExternalLink size={10} />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Contract Object */}
-                        <div style={{ padding: '0.75rem 1rem', fontSize: '0.78rem', color: 'var(--text-secondary)', borderBottom: '1px solid #f1f5f9', background: '#ffffff', textAlign: 'justify', lineHeight: '1.4' }}>
-                          <strong>Objeto:</strong> {c.objeto}
-                        </div>
-
-                        {/* Contract Empenhos */}
-                        <div style={{ padding: '0.75rem 1rem', background: '#ffffff' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <DollarSign size={11} /> Empenhos deste Contrato
-                          </div>
-                          
-                          {isLoadingEmps ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--text-secondary)', padding: '0.25rem 0' }}>
-                              <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
-                              <span>Carregando empenhos...</span>
-                            </div>
-                          ) : emps.length === 0 ? (
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '0.25rem 0' }}>
-                              Nenhum empenho publicado para este contrato no PNCP.
-                            </div>
-                          ) : (
-                            <table style={{ width: '100%', fontSize: '0.72rem', borderCollapse: 'collapse' }}>
-                              <thead>
-                                <tr style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                                  <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 600 }}>N.º Empenho</th>
-                                  <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 600 }}>Data Emissão</th>
-                                  <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600 }}>Valor do Empenho</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {emps.map((empItem, eidx) => (
-                                  <tr key={`${empItem.numeroEmpenho}-${eidx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                    <td style={{ padding: '4px 6px', fontWeight: 600 }}>{empItem.numeroEmpenho}</td>
-                                    <td style={{ padding: '4px 6px', color: 'var(--text-muted)' }}>{formatDate(empItem.dataEmissaoEmpenho)}</td>
-                                    <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 700, color: 'var(--success)', fontFamily: 'monospace' }}>
-                                      {formatCurrency(empItem.valorTotal)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-              <button 
-                onClick={() => setSelectedEmpenhoDetail(null)}
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem' }}
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EmpenhoDetailModal
+        selectedEmpenhoDetail={selectedEmpenhoDetail}
+        onClose={() => setSelectedEmpenhoDetail(null)}
+        arpNumeroAta={arp.numeroAtaRegistroPreco}
+        itemNumeroItem={item.numeroItem}
+        contractsLoading={contractsLoading}
+        filteredContracts={selectedEmpenhoDetail ? getFilteredContractsForModal(selectedEmpenhoDetail) : []}
+        contractEmpenhos={contractEmpenhos}
+        empenhosLoadingMap={empenhosLoadingMap}
+      />
 
       {/* Modal de Gestão Central de Unidades Oficiais */}
       <ManageDepartmentsModal
         isOpen={isManageDepsModalOpen}
         onClose={() => {
           setIsManageDepsModalOpen(false);
-          loadDepartments();
-          loadAllocations();
+          refetchDepartments();
+          refetchAllocations();
         }}
         onDepartmentsUpdated={() => {
-          loadDepartments();
-          loadAllocations();
+          refetchDepartments();
+          refetchAllocations();
         }}
       />
 
@@ -2697,6 +2110,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         defaultCnpj={item.niFornecedor}
         defaultValorUnitario={item.valorUnitario}
         initialEmpenho={editingManualEmpenho}
+        isLoading={saveManualEmpenhosMutation.isPending}
       />
 
       {/* Modal de Cadastro de Contrato Manual com Vínculo Obrigatório */}
@@ -2710,6 +2124,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         defaultFornecedor={item.nomeRazaoSocialFornecedor}
         defaultCnpj={item.niFornecedor}
         availableEmpenhos={allEmpenhos}
+        isLoading={saveManualContractMutation.isPending}
       />
     </div>
   );

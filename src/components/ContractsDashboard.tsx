@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   FileText, 
   Search, 
@@ -12,12 +12,12 @@ import {
   HelpCircle,
   ArrowUpDown
 } from 'lucide-react';
-import type { ContractDashboardRecord, ContractFilterParams } from '../types';
+import type { ContractFilterParams } from '../types';
 import { 
-  fetchContractsForDashboard, 
   calculateContractKPIs, 
   filterContracts 
 } from '../services/contractService';
+import { useContractsDashboard } from '../hooks/useContractsDashboard';
 import { ContractCard } from './cards/ContractCard';
 import { ContractCardSkeleton } from './cards/ContractCardSkeleton';
 
@@ -27,12 +27,6 @@ function formatCurrency(val?: number): string {
 }
 
 export const ContractsDashboard: React.FC = () => {
-  // Estado de carregamento e dados
-  const [contracts, setContracts] = useState<ContractDashboardRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-
   // Parâmetros de Filtro
   const [filters, setFilters] = useState<ContractFilterParams>({
     uasg: '200331',
@@ -44,37 +38,23 @@ export const ContractsDashboard: React.FC = () => {
     anoContrato: ''
   });
 
+  // Estado de servidor via React Query
+  const {
+    data: contracts = [],
+    isLoading: loading,
+    isFetching: isRefreshing,
+    error: contractsQueryError,
+    refetch
+  } = useContractsDashboard(filters.uasg);
+
+  const error = contractsQueryError ? (contractsQueryError.message || 'Falha ao buscar contratos nas APIs governamentais.') : null;
+
   // Ordenação
   const [sortBy, setSortBy] = useState<'ano_desc' | 'valor_desc' | 'numero_asc'>('ano_desc');
 
-  // Carrega contratos da UASG selecionada
-  const loadContracts = async (uasgToLoad: string, forceRefresh: boolean = false) => {
-    if (forceRefresh) {
-      setIsRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      const data = await fetchContractsForDashboard(uasgToLoad, forceRefresh);
-      setContracts(data);
-    } catch (err: any) {
-      console.error('Erro ao carregar contratos:', err);
-      setError(err.message || 'Falha ao buscar contratos nas APIs governamentais.');
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    loadContracts(filters.uasg);
-  }, []);
-
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loadContracts(filters.uasg);
+    refetch();
   };
 
   const handleClearFilters = () => {
@@ -88,9 +68,6 @@ export const ContractsDashboard: React.FC = () => {
       anoContrato: ''
     };
     setFilters(cleared);
-    if (filters.uasg !== '200331') {
-      loadContracts('200331');
-    }
   };
 
   // Aplicação dos filtros em memória
@@ -236,7 +213,7 @@ export const ContractsDashboard: React.FC = () => {
           
           <button
             type="button"
-            onClick={() => loadContracts(filters.uasg, true)}
+            onClick={() => refetch()}
             disabled={isRefreshing || loading}
             className="btn btn-secondary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
@@ -267,7 +244,6 @@ export const ContractsDashboard: React.FC = () => {
                   onClick={() => {
                     const nextUasg = filters.uasg === '200331' ? '200330' : '200331';
                     setFilters({ ...filters, uasg: nextUasg });
-                    loadContracts(nextUasg);
                   }}
                   className="btn btn-secondary"
                   style={{ fontSize: '0.72rem', padding: '0 0.5rem', whiteSpace: 'nowrap' }}

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Plus, Trash2, AlertCircle, X, RefreshCw } from 'lucide-react';
-import { fetchProcessosSei, saveProcessoSei, deleteProcessoSei } from '../services/seiService';
+import React, { useState } from 'react';
+import { FileText, Plus, Trash2, AlertCircle, X, RefreshCw, Loader2, CheckCircle2 } from 'lucide-react';
+import { useProcessosSei } from '../hooks/useProcessosSei';
+import { useSaveProcessoSei } from '../hooks/useSaveProcessoSei';
+import { useDeleteProcessoSei } from '../hooks/useDeleteProcessoSei';
 import type { ProcessoSei } from '../types';
 
 interface SeiManagementModalProps {
@@ -10,8 +12,10 @@ interface SeiManagementModalProps {
 }
 
 export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, onClose, onSelectSei }) => {
-  const [processos, setProcessos] = useState<ProcessoSei[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const { data: processos = [], isLoading: loading } = useProcessosSei();
+  const saveMutation = useSaveProcessoSei();
+  const deleteMutation = useDeleteProcessoSei();
+
   const [isAdding, setIsAdding] = useState<boolean>(false);
 
   // Form State
@@ -21,38 +25,29 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
   const [responsavel, setResponsavel] = useState<string>('');
   const [status, setStatus] = useState<'Em Instrução' | 'Aprovado' | 'Empenhado' | 'Concluído'>('Em Instrução');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const list = await fetchProcessosSei();
-      setProcessos(list);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isSubmitting = saveMutation.isPending || deleteMutation.isPending;
 
-  useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
-  }, [isOpen]);
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!numeroSei.trim()) {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const cleanNumero = numeroSei.trim();
+    if (!cleanNumero) {
       setErrorMsg('O Número do Processo SEI é obrigatório.');
       return;
     }
 
     try {
-      await saveProcessoSei({
-        numeroProcessoSei: numeroSei.trim(),
-        descricaoObjeto: objeto.trim(),
-        unidadeRequisitante: unidade.trim(),
-        responsavelNome: responsavel.trim(),
+      await saveMutation.mutateAsync({
+        numeroProcessoSei: cleanNumero,
+        descricaoObjeto: objeto.trim() || undefined,
+        unidadeRequisitante: unidade.trim() || undefined,
+        responsavelNome: responsavel.trim() || undefined,
         statusProcesso: status
       });
 
@@ -62,8 +57,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
       setResponsavel('');
       setStatus('Em Instrução');
       setIsAdding(false);
-      setErrorMsg(null);
-      loadData();
+      setSuccessMsg(`Processo SEI "${cleanNumero}" cadastrado com sucesso!`);
     } catch (err: any) {
       setErrorMsg(err.message || 'Falha ao salvar processo SEI.');
     }
@@ -71,12 +65,16 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
 
   const handleDelete = async (id: string, numero: string) => {
     if (window.confirm(`Deseja realmente excluir o Processo SEI ${numero}?`)) {
-      await deleteProcessoSei(id);
-      loadData();
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      try {
+        await deleteMutation.mutateAsync(id);
+        setSuccessMsg(`Processo SEI "${numero}" excluído com sucesso.`);
+      } catch (err: any) {
+        setErrorMsg(err.message || 'Falha ao excluir processo SEI.');
+      }
     }
   };
-
-  if (!isOpen) return null;
 
   return (
     <div style={{
@@ -121,6 +119,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
           </div>
           <button
             onClick={onClose}
+            disabled={isSubmitting}
             style={{
               background: 'none',
               border: 'none',
@@ -152,6 +151,23 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
             </div>
           )}
 
+          {successMsg && (
+            <div style={{
+              backgroundColor: 'var(--success-bg, #dcfce7)',
+              color: 'var(--success-text, #15803d)',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              marginBottom: '1rem',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <CheckCircle2 size={16} />
+              {successMsg}
+            </div>
+          )}
+
           {/* Action Bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>
@@ -159,6 +175,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
             </p>
             <button
               onClick={() => setIsAdding(!isAdding)}
+              disabled={isSubmitting}
               style={{
                 backgroundColor: isAdding ? '#64748b' : '#1351b4',
                 color: '#ffffff',
@@ -197,6 +214,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                     placeholder="Ex: 10154.000123/2024-11"
                     value={numeroSei}
                     onChange={(e) => setNumeroSei(e.target.value)}
+                    disabled={isSubmitting}
                     style={{
                       width: '100%',
                       padding: '0.5rem 0.75rem',
@@ -214,6 +232,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as any)}
+                    disabled={isSubmitting}
                     style={{
                       width: '100%',
                       padding: '0.5rem 0.75rem',
@@ -241,6 +260,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                     placeholder="Ex: SENASP / CGOE"
                     value={unidade}
                     onChange={(e) => setUnidade(e.target.value)}
+                    disabled={isSubmitting}
                     style={{
                       width: '100%',
                       padding: '0.5rem 0.75rem',
@@ -259,6 +279,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                     placeholder="Ex: Cap. Oliveira"
                     value={responsavel}
                     onChange={(e) => setResponsavel(e.target.value)}
+                    disabled={isSubmitting}
                     style={{
                       width: '100%',
                       padding: '0.5rem 0.75rem',
@@ -279,6 +300,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                   placeholder="Descreva a finalidade ou itens vinculados a esta instrução SEI..."
                   value={objeto}
                   onChange={(e) => setObjeto(e.target.value)}
+                  disabled={isSubmitting}
                   style={{
                     width: '100%',
                     padding: '0.5rem 0.75rem',
@@ -294,6 +316,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                 <button
                   type="button"
                   onClick={() => setIsAdding(false)}
+                  disabled={isSubmitting}
                   style={{
                     backgroundColor: '#e2e8f0',
                     color: '#334155',
@@ -308,6 +331,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                 </button>
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   style={{
                     backgroundColor: '#16a34a',
                     color: '#ffffff',
@@ -316,9 +340,13 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                     borderRadius: '4px',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    fontSize: '0.85rem'
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
                   }}
                 >
+                  {saveMutation.isPending && <Loader2 size={14} className="animate-spin" />}
                   Salvar Processo SEI
                 </button>
               </div>
@@ -413,13 +441,14 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
                     )}
                     <button
                       onClick={() => handleDelete(p.id, p.numeroProcessoSei)}
+                      disabled={isSubmitting}
                       style={{
                         backgroundColor: '#fff1f2',
                         color: '#e11d48',
                         border: '1px solid #fecdd3',
                         padding: '0.4rem 0.6rem',
                         borderRadius: '4px',
-                        cursor: 'pointer'
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer'
                       }}
                       title="Excluir Processo SEI"
                     >
@@ -442,6 +471,7 @@ export const SeiManagementModal: React.FC<SeiManagementModalProps> = ({ isOpen, 
         }}>
           <button
             onClick={onClose}
+            disabled={isSubmitting}
             style={{
               backgroundColor: '#64748b',
               color: '#ffffff',

@@ -458,3 +458,30 @@ export interface ContractDashboardKPIs {
   valorTotalGlobal: number;
 }
 
+export interface ContractDetailItem {
+  numero_item?: string | number;
+  numeroItem?: string | number;
+  codigoItem?: number;
+  descricao?: string;
+  descricaoIitem?: string;
+  material_ou_servico_nome?: string;
+  quantidade?: number;
+  quantidadeItem?: number;
+  valor_unitario?: number;
+  valorUnitarioItem?: number;
+  valor_total?: number;
+  valorTotalItem?: number;
+  [key: string]: any;
+}
+
+export interface ContractDetailEmpenho {
+  numero_empenho?: string;
+  numeroEmpenho?: string;
+  data_emissao?: string;
+  dataEmissao?: string;
+  valor_empenhado?: number;
+  valorEmpenhado?: number;
+  credor?: string;
+  [key: string]: any;
+}
+

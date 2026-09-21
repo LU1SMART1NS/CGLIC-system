@@ -14,7 +14,7 @@ import {
   Loader2
 } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
-import { fetchContractDetails } from '../../services/contractService';
+import { useContractDetails } from '../../hooks/useContractDetails';
 
 interface ContractCardProps {
   contract: ContractDashboardRecord;
@@ -48,29 +48,18 @@ function formatCurrency(val?: number): string {
 
 export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-  const [detailsLoaded, setDetailsLoaded] = useState(false);
-  const [items, setItems] = useState<any[]>([]);
-  const [empenhos, setEmpenhos] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'itens' | 'empenhos'>('itens');
 
-  const handleToggleExpand = async () => {
-    const nextState = !isExpanded;
-    setIsExpanded(nextState);
+  const {
+    data: details,
+    isLoading: isLoadingDetails
+  } = useContractDetails(contract, isExpanded);
 
-    if (nextState && !detailsLoaded) {
-      setIsLoadingDetails(true);
-      try {
-        const details = await fetchContractDetails(contract);
-        setItems(details.items || []);
-        setEmpenhos(details.empenhos || []);
-        setDetailsLoaded(true);
-      } catch (err) {
-        console.error('Erro ao carregar detalhes do contrato', err);
-      } finally {
-        setIsLoadingDetails(false);
-      }
-    }
+  const items = details?.items || [];
+  const empenhos = details?.empenhos || [];
+
+  const handleToggleExpand = () => {
+    setIsExpanded(!isExpanded);
   };
 
   const formattedCnpj = formatCnpjDisplay(contract.fornecedorCnpjCpf);

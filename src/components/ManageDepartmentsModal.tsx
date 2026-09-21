@@ -8,16 +8,14 @@ import {
   X, 
   AlertCircle, 
   Sparkles, 
-  CheckCircle2 
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
-import { 
-  fetchDepartments, 
-  addDepartment, 
-  updateDepartment, 
-  deleteDepartment, 
-  mergeDepartmentName,
-  type InternalDepartment 
-} from '../services/unitService';
+import { useDepartments } from '../hooks/useDepartments';
+import { useSaveDepartment } from '../hooks/useSaveDepartment';
+import { useDeleteDepartment } from '../hooks/useDeleteDepartment';
+import { useMergeDepartment } from '../hooks/useMergeDepartment';
+import type { InternalDepartment } from '../services/unitService';
 import { fetchAllAllocationsGlobal } from '../services/allocationService';
 
 interface ManageDepartmentsModalProps {
@@ -31,7 +29,11 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
   onClose,
   onDepartmentsUpdated
 }) => {
-  const [departments, setDepartments] = useState<InternalDepartment[]>([]);
+  const { data: departments = [], isLoading: isDepartmentsLoading, refetch } = useDepartments();
+  const saveMutation = useSaveDepartment();
+  const deleteMutation = useDeleteDepartment();
+  const mergeMutation = useMergeDepartment();
+
   const [sigla, setSigla] = useState('');
   const [nomeCompleto, setNomeCompleto] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,22 +44,21 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
   const [legacyNames, setLegacyNames] = useState<string[]>([]);
   const [mergeTargets, setMergeTargets] = useState<Record<string, string>>({});
 
+  const isSubmitting = saveMutation.isPending || deleteMutation.isPending || mergeMutation.isPending;
+
   useEffect(() => {
     if (isOpen) {
-      loadData();
+      setError(null);
+      setSuccessMsg(null);
+      detectLegacyAllocations(departments);
     }
-  }, [isOpen]);
+  }, [isOpen, departments]);
 
-  const loadData = async () => {
-    setError(null);
-    setSuccessMsg(null);
-    const deps = await fetchDepartments();
-    setDepartments(deps);
-
-    // Detecta alocações com nomes que não batem com nenhuma sigla ou nome oficial
+  const detectLegacyAllocations = async (currentDeps: InternalDepartment[]) => {
+    if (!currentDeps || currentDeps.length === 0) return;
     try {
       const allAllocs = await fetchAllAllocationsGlobal();
-      const officialNames = new Set(deps.map(d => d.sigla.toLowerCase()));
+      const officialNames = new Set(currentDeps.map(d => d.sigla.toLowerCase()));
       const unknownNames = new Set<string>();
 
       allAllocs.forEach(a => {
@@ -72,12 +73,16 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
       // Prepara alvos padrão para mesclagem
       const initialTargets: Record<string, string> = {};
       unknownList.forEach(u => {
-        // Tenta achar a sigla mais parecida
-        const match = deps.find(d => u.toLowerCase().startsWith(d.sigla.toLowerCase()) || d.sigla.toLowerCase().includes(u.toLowerCase()));
-        initialTargets[u] = match ? match.sigla : (deps[0]?.sigla || '');
+        const match = currentDeps.find(d => 
+          u.toLowerCase().startsWith(d.sigla.toLowerCase()) || 
+          d.sigla.toLowerCase().includes(u.toLowerCase())
+        );
+        initialTargets[u] = match ? match.sigla : (currentDeps[0]?.sigla || '');
       });
       setMergeTargets(initialTargets);
-    } catch {}
+    } catch (e) {
+      console.warn('Erro ao detectar alocações legadas:', e);
+    }
   };
 
   if (!isOpen) return null;
@@ -87,23 +92,34 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
     setError(null);
     setSuccessMsg(null);
 
-    if (!sigla.trim()) {
+    const cleanSigla = sigla.trim().toUpperCase();
+    const cleanNome = nomeCompleto.trim();
+
+    if (!cleanSigla) {
       setError('A sigla da unidade é obrigatória (Ex: DFNSP).');
       return;
     }
 
+    if (!cleanNome) {
+      setError('O nome completo da unidade é obrigatório.');
+      return;
+    }
+
     try {
-      if (editingId) {
-        await updateDepartment(editingId, sigla, nomeCompleto);
-        setSuccessMsg(`Unidade "${sigla.trim()}" atualizada com sucesso!`);
-        setEditingId(null);
-      } else {
-        await addDepartment(sigla, nomeCompleto);
-        setSuccessMsg(`Unidade "${sigla.trim()}" cadastrada com sucesso!`);
-      }
+      await saveMutation.mutateAsync({
+        id: editingId || undefined,
+        sigla: cleanSigla,
+        nomeCompleto: cleanNome
+      });
+
+      setSuccessMsg(
+        editingId 
+          ? `Unidade "${cleanSigla}" atualizada com sucesso!` 
+          : `Unidade "${cleanSigla}" cadastrada com sucesso!`
+      );
+      setEditingId(null);
       setSigla('');
       setNomeCompleto('');
-      await loadData();
       if (onDepartmentsUpdated) onDepartmentsUpdated();
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar unidade.');
@@ -118,11 +134,38 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
   };
 
   const handleDelete = async (id: string, depSigla: string) => {
-    if (confirm(`Tem certeza que deseja excluir a unidade "${depSigla}" do cadastro oficial?`)) {
-      await deleteDepartment(id);
-      setSuccessMsg(`Unidade "${depSigla}" removida.`);
-      await loadData();
+    if (!confirm(`Tem certeza que deseja excluir a unidade "${depSigla}" do cadastro oficial?`)) {
+      return;
+    }
+
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await deleteMutation.mutateAsync({ id, forceDeactivate: false });
+      if (res.deleted) {
+        setSuccessMsg(`Unidade "${depSigla}" removida com sucesso.`);
+      } else if (res.deactivated) {
+        setSuccessMsg(`Unidade "${depSigla}" desativada com sucesso.`);
+      }
       if (onDepartmentsUpdated) onDepartmentsUpdated();
+    } catch (err: any) {
+      if (err.code === 'CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS' || (err.sqlState === '23503')) {
+        const confirmDeactivate = confirm(
+          `A unidade "${depSigla}" possui alocações contábeis vinculadas e não pode ser excluída fisicamente.\n\nDeseja desativá-la para que não apareça em novas alocações, mantendo o histórico intacto?`
+        );
+        if (confirmDeactivate) {
+          try {
+            await deleteMutation.mutateAsync({ id, forceDeactivate: true });
+            setSuccessMsg(`Unidade "${depSigla}" desativada com sucesso.`);
+            if (onDepartmentsUpdated) onDepartmentsUpdated();
+          } catch (deactErr: any) {
+            setError(deactErr.message || 'Erro ao desativar unidade.');
+          }
+        }
+      } else {
+        setError(err.message || 'Erro ao excluir unidade.');
+      }
     }
   };
 
@@ -130,10 +173,17 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
     const targetSigla = mergeTargets[oldName];
     if (!targetSigla) return;
 
-    const count = await mergeDepartmentName(oldName, targetSigla);
-    setSuccessMsg(`Higienização concluída! ${count} registros com "${oldName}" foram unificados em "${targetSigla}".`);
-    await loadData();
-    if (onDepartmentsUpdated) onDepartmentsUpdated();
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await mergeMutation.mutateAsync({ oldName, targetSigla });
+      setSuccessMsg(`Higienização concluída! ${res.rows_updated} registros com "${oldName}" foram unificados em "${targetSigla}".`);
+      await refetch();
+      if (onDepartmentsUpdated) onDepartmentsUpdated();
+    } catch (err: any) {
+      setError(err.message || 'Erro ao mesclar registros da unidade.');
+    }
   };
 
   return (
@@ -186,6 +236,7 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
           <button 
             type="button" 
             onClick={onClose} 
+            disabled={isSubmitting}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem' }}
           >
             <X size={20} />
@@ -237,6 +288,7 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
                       className="form-input"
                       value={mergeTargets[name] || ''}
                       onChange={(e) => setMergeTargets({ ...mergeTargets, [name]: e.target.value })}
+                      disabled={isSubmitting}
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', height: 'auto', width: 'auto', fontWeight: 700 }}
                     >
                       {departments.map(d => (
@@ -246,10 +298,11 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleMerge(name)}
+                      disabled={isSubmitting}
                       className="btn btn-primary"
                       style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem', height: 'auto' }}
                     >
-                      Mesclar
+                      {mergeMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Mesclar'}
                     </button>
                   </div>
                 </div>
@@ -280,6 +333,7 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
                   placeholder="Ex: DFNSP"
                   value={sigla}
                   onChange={(e) => setSigla(e.target.value.toUpperCase())}
+                  disabled={isSubmitting}
                   required
                 />
               </div>
@@ -292,18 +346,33 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
                   placeholder="Ex: Diretoria da Força Nacional de Segurança Pública"
                   value={nomeCompleto}
                   onChange={(e) => setNomeCompleto(e.target.value)}
+                  disabled={isSubmitting}
                   required
                 />
               </div>
 
               <div style={{ display: 'flex', gap: '0.4rem' }}>
-                <button type="submit" className="btn btn-primary" style={{ padding: '0.55rem 1rem', height: '40px', fontSize: '0.82rem' }}>
-                  {editingId ? <Check size={14} /> : <Plus size={14} />} {editingId ? 'Salvar' : 'Adicionar'}
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="btn btn-primary" 
+                  style={{ padding: '0.55rem 1rem', height: '40px', fontSize: '0.82rem' }}
+                >
+                  {saveMutation.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : editingId ? (
+                    <Check size={14} />
+                  ) : (
+                    <Plus size={14} />
+                  )}
+                  {' '}
+                  {editingId ? 'Salvar' : 'Adicionar'}
                 </button>
                 {editingId && (
                   <button 
                     type="button" 
                     onClick={() => { setEditingId(null); setSigla(''); setNomeCompleto(''); }} 
+                    disabled={isSubmitting}
                     className="btn btn-secondary" 
                     style={{ padding: '0.55rem 0.75rem', height: '40px' }}
                   >
@@ -316,8 +385,9 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
 
           {/* List of Registered Departments */}
           <div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-              Unidades Disponíveis na Lista Suspensa ({departments.length})
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Unidades Disponíveis na Lista Suspensa ({departments.length})</span>
+              {isDepartmentsLoading && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Carregando...</span>}
             </div>
 
             <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
@@ -331,9 +401,9 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
                 </thead>
                 <tbody>
                   {departments.map((d) => (
-                    <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '0.65rem 1rem', fontWeight: 800, color: 'var(--primary)' }}>
-                        {d.sigla}
+                    <tr key={d.id} style={{ borderBottom: '1px solid var(--border)', opacity: d.ativo ? 1 : 0.6 }}>
+                      <td style={{ padding: '0.65rem 1rem', fontWeight: 800, color: d.ativo ? 'var(--primary)' : 'var(--text-muted)' }}>
+                        {d.sigla} {!d.ativo && <span style={{ fontSize: '0.7rem', color: 'var(--danger)', fontWeight: 600 }}>(Inativa)</span>}
                       </td>
                       <td style={{ padding: '0.65rem 1rem', color: 'var(--text-main)', fontSize: '0.85rem' }}>
                         {d.nomeCompleto}
@@ -343,7 +413,8 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleEdit(d)}
-                            style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '2px' }}
+                            disabled={isSubmitting}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: isSubmitting ? 'not-allowed' : 'pointer', padding: '2px' }}
                             title="Editar"
                           >
                             <Edit2 size={14} />
@@ -351,8 +422,9 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleDelete(d.id, d.sigla)}
-                            style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px' }}
-                            title="Excluir"
+                            disabled={isSubmitting}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: isSubmitting ? 'not-allowed' : 'pointer', padding: '2px' }}
+                            title="Excluir / Desativar"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -360,6 +432,13 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
                       </td>
                     </tr>
                   ))}
+                  {departments.length === 0 && !isDepartmentsLoading && (
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
+                        Nenhuma unidade cadastrada.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -375,7 +454,7 @@ export const ManageDepartmentsModal: React.FC<ManageDepartmentsModalProps> = ({
           justifyContent: 'flex-end',
           background: '#f8fafc'
         }}>
-          <button type="button" onClick={onClose} className="btn btn-secondary">
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="btn btn-secondary">
             Fechar
           </button>
         </div>

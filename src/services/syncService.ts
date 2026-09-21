@@ -1,7 +1,7 @@
 import { fetchArps, fetchArpItems, enrichArpsBatchWithPncpVigencia } from './api';
 import { cacheArpsInDb, cacheArpItemsInDb } from './dbCacheService';
 import { isSupabaseConfigured } from './supabaseClient';
-import type { FilterParams, SyncMetadata } from '../types';
+import type { FilterParams, SyncMetadata, ArpRecord, ArpItemRecord } from '../types';
 
 const SYNC_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 Horas
 const SYNC_STORAGE_KEY = 'saldoarp-sync-metadata';
@@ -56,7 +56,14 @@ export async function runFullSync(
     numeroAtaRegistroPreco: ''
   },
   onProgress?: SyncProgressCallback
-): Promise<{ success: boolean; totalAtas: number; totalItens: number; error?: string }> {
+): Promise<{
+  success: boolean;
+  totalAtas: number;
+  totalItens: number;
+  arps?: ArpRecord[];
+  itemsByAta?: Record<string, ArpItemRecord[]>;
+  error?: string;
+}> {
   if (isSyncingInProgress) {
     return { success: false, totalAtas: 0, totalItens: 0, error: 'Sincronização já em andamento' };
   }
@@ -82,7 +89,7 @@ export async function runFullSync(
         mensagem: 'Nenhuma ata encontrada para sincronizar.'
       });
       isSyncingInProgress = false;
-      return { success: true, totalAtas: 0, totalItens: 0 };
+      return { success: true, totalAtas: 0, totalItens: 0, arps: [], itemsByAta: {} };
     }
 
     onProgress?.({ step: 'Sincronizando vigências PNCP...', percent: 35, current: arpsList.length, total: arpsList.length });
@@ -97,6 +104,7 @@ export async function runFullSync(
 
     // 4. Busca e armazena itens das atas (com concorrência controlada)
     let totalItensCount = 0;
+    const itemsByAta: Record<string, ArpItemRecord[]> = {};
     const batchSize = 5;
     for (let i = 0; i < enrichedArps.length; i += batchSize) {
       const chunk = enrichedArps.slice(i, i + batchSize);
@@ -110,6 +118,8 @@ export async function runFullSync(
               arp
             );
             if (itemsRes.resultado && itemsRes.resultado.length > 0) {
+              const ataKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
+              itemsByAta[ataKey] = itemsRes.resultado;
               totalItensCount += itemsRes.resultado.length;
               await cacheArpItemsInDb(
                 arp.numeroAtaRegistroPreco,
@@ -144,7 +154,13 @@ export async function runFullSync(
     onProgress?.({ step: 'Sincronização concluída!', percent: 100, current: enrichedArps.length, total: enrichedArps.length });
 
     isSyncingInProgress = false;
-    return { success: true, totalAtas: enrichedArps.length, totalItens: totalItensCount };
+    return {
+      success: true,
+      totalAtas: enrichedArps.length,
+      totalItens: totalItensCount,
+      arps: enrichedArps,
+      itemsByAta
+    };
   } catch (error: any) {
     console.error('Erro na sincronização completa:', error);
     saveSyncMetadata({

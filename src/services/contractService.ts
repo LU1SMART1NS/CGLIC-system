@@ -1,4 +1,4 @@
-import type { ContractDashboardRecord, ContractFilterParams, ContractDashboardKPIs, StatusVigenciaContrato } from '../types';
+import type { ContractDashboardRecord, ContractFilterParams, ContractDashboardKPIs, StatusVigenciaContrato, ContractDetailItem, ContractDetailEmpenho } from '../types';
 import { getCanonicalContractKey, formatNumeroAnoContrato, fetchContratosGovData, fetchContratosGovEmpenhos, fetchContratoItensComprasGov } from './api';
 
 const BASE_URL = '/api-arp/modulo-contratos';
@@ -322,9 +322,9 @@ export function filterContracts(
 /**
  * Carrega itens e empenhos detalhados de um contrato sob demanda
  */
-export async function fetchContractDetails(contract: ContractDashboardRecord): Promise<{ items: any[]; empenhos: any[] }> {
-  let items: any[] = [];
-  let empenhos: any[] = [];
+export async function fetchContractDetails(contract: ContractDashboardRecord): Promise<{ items: ContractDetailItem[]; empenhos: ContractDetailEmpenho[] }> {
+  let items: ContractDetailItem[] = [];
+  let empenhos: ContractDetailEmpenho[] = [];
 
   // Se tem contratoId ou dados para Contratos.gov.br
   try {
