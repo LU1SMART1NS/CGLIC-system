@@ -316,7 +316,6 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
                           <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
                             <th style={{ padding: '0.5rem 0.75rem' }}>Número Empenho</th>
                             <th style={{ padding: '0.5rem 0.75rem' }}>Emissão</th>
-                            <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>Valor Empenhado</th>
                             <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>A Liquidar</th>
                             <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>Liquidado</th>
                             <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>Pago</th>
@@ -324,7 +323,6 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
                         </thead>
                         <tbody>
                           {empenhos.map((emp, idx) => {
-                            const vEmp = parseFloat(String(emp.empenhado || '0').replace(',', '.'));
                             const vAliq = parseFloat(String(emp.aliquidar || '0').replace(',', '.'));
                             const vLiq = parseFloat(String(emp.liquidado || '0').replace(',', '.'));
                             const vPago = parseFloat(String(emp.pago || '0').replace(',', '.'));
@@ -336,9 +334,6 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
                                 </td>
                                 <td style={{ padding: '0.5rem 0.75rem', color: '#475569' }}>
                                   {formatDateBR(emp.data_emissao)}
-                                </td>
-                                <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontWeight: 600, color: '#003399' }}>
-                                  {formatCurrency(vEmp)}
                                 </td>
                                 <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>
                                   {formatCurrency(vAliq)}

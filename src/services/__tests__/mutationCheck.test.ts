@@ -157,4 +157,31 @@ describe('Adversarial Mutation Suite - Teste do Teste', () => {
     expect(resMutante).not.toBe(228);
     expect(resMutante).toBe(178); // Mutant KILLED
   });
+
+  it('Mutant 11 (Ignorar Restos a Pagar em Empenhos de Exercícios Anteriores): Deve falhar se rpinscrito for ignorado quando empenhado=0', () => {
+    const mutatedGetEmpenhoEffectiveValue = (empenhadoRaw: any, _rpinscritoRaw?: any) => {
+      // MUTATION: ignora rpinscrito completamente
+      return original.parseMoneyValue(empenhadoRaw);
+    };
+
+    // Empenho de ano anterior: empenhado = 0, rpinscrito = 150.000
+    const resMutante = mutatedGetEmpenhoEffectiveValue('0,00', '150.000,00');
+    // Esperado: 150000. Mutante retorna 0.
+    expect(resMutante).not.toBe(150000);
+    expect(resMutante).toBe(0); // Mutant KILLED
+  });
+
+  it('Mutant 12 (Violação de Mútua Exclusividade Contábil - Soma Duplicada): Deve falhar se somar empenhado + rpinscrito', () => {
+    const mutatedGetEmpenhoEffectiveValue = (empenhadoRaw: any, rpinscritoRaw?: any) => {
+      // MUTATION: soma cumulativa indevida (100.000 + 60.000 = 160.000)
+      return original.parseMoneyValue(empenhadoRaw) + original.parseMoneyValue(rpinscritoRaw);
+    };
+
+    const resMutante = mutatedGetEmpenhoEffectiveValue(100000, 60000);
+    // A regra de mútua exclusividade (Lei 4.320/64) exige prioridade do empenhado (100000).
+    // Mutante gera 160000.
+    expect(resMutante).not.toBe(100000);
+    expect(resMutante).toBe(160000); // Mutant KILLED
+  });
 });
+

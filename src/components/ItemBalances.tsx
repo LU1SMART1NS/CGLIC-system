@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Building2, Users, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, Share2, RotateCcw } from 'lucide-react';
 import { fetchPncpContractEmpenhos, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
-import { calculateTotalEmpenhado, reconcileBalances, matchAndMergeEmpenhos, normalizeEmpenhoNumero, calculateAllocationsWithEmpenhos, calculateItemCardMetrics, deduceEmpenhoQuantity } from '../services/balanceService';
+import { calculateTotalEmpenhado, reconcileBalances, matchAndMergeEmpenhos, normalizeEmpenhoNumero, calculateAllocationsWithEmpenhos, calculateItemCardMetrics, deduceEmpenhoQuantity, getEmpenhoEffectiveValue } from '../services/balanceService';
 import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
 import { type InternalDepartment } from '../services/unitService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
@@ -31,7 +31,7 @@ import { ItemBalancesSummaryCards } from './item-balances/ItemBalancesSummaryCar
 import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { EmpenhoDetailModal } from './item-balances/EmpenhoDetailModal';
-import { formatCurrency, formatNumber, formatDate, getProgressColorClass, isGerenciadoraUasg, isAllowedEmpenhoUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
+import { formatNumber, formatDate, getProgressColorClass, isGerenciadoraUasg, isAllowedEmpenhoUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import type { ArpRecord, ArpItemRecord, EmpenhoSaldoItemRecord, InternalAllocation, PncpContract, PncpContractEmpenho, ContratosGovEmpenhoRecord, Empenho, Contrato, ReconciliationReport } from '../types';
 
 interface ItemBalancesProps {
@@ -522,9 +522,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         let isDeduzido = false;
         let isReforco = false;
 
-        if (quantidadeFisica === undefined && unitPrice && emp.empenhado) {
+        const effectiveEmpValue = getEmpenhoEffectiveValue(emp.empenhado, emp.rpinscrito);
+        if (quantidadeFisica === undefined && unitPrice && effectiveEmpValue > 0) {
           const deduction = deduceEmpenhoQuantity(
-            emp.empenhado,
+            effectiveEmpValue,
             unitPrice,
             emp.data_emissao,
             contratoObj?.historicoPrecos
@@ -576,8 +577,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     }
     // Fallback on-the-fly se emp ainda não foi enriquecido mas temos valor unitário
     const unitPrice = contratoObj?.valorUnitarioItem ?? item.valorUnitario;
-    if (emp?.empenhado && unitPrice) {
-      const deduction = deduceEmpenhoQuantity(emp.empenhado, unitPrice, emp.data_emissao, contratoObj?.historicoPrecos);
+    const effectiveEmpValue = getEmpenhoEffectiveValue(emp?.empenhado, emp?.rpinscrito);
+    if (effectiveEmpValue > 0 && unitPrice) {
+      const deduction = deduceEmpenhoQuantity(effectiveEmpValue, unitPrice, emp?.data_emissao, contratoObj?.historicoPrecos);
       if (deduction.quantidade > 0 || deduction.isReforco) {
         return { qty: deduction.quantidade, isManual: false, isOfficial: true, isDeduzido: true, isReforco: deduction.isReforco };
       }
@@ -1483,7 +1485,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                       <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Unidade Interna</th>
                                                       <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Qtd Física (Item)</th>
                                                       <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Data de Emissão</th>
-                                                      <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Valor Empenhado</th>
                                                       <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)', width: '100px' }}>Ação</th>
                                                     </tr>
                                                   </thead>
@@ -1594,9 +1595,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                             )}
                                                           </td>
                                                           <td style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{formatDate(emp.data_emissao)}</td>
-                                                          <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: 'var(--success)', fontFamily: 'monospace' }}>
-                                                            {formatCurrency(typeof emp.empenhado === 'number' ? emp.empenhado : parseFloat(String(emp.empenhado || '0').replace(/\./g, '').replace(',', '.')))}
-                                                          </td>
                                                           <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                                               <button
@@ -1688,7 +1686,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                         <th>UASG / Órgão</th>
                         <th>Unidade Interna (Alocação)</th>
                         <th style={{ textAlign: 'center' }}>Qtd Física (Item)</th>
-                        <th style={{ textAlign: 'right' }}>Valor Total</th>
                         <th style={{ textAlign: 'center' }}>Origem & Confiança</th>
                         <th style={{ textAlign: 'center' }}>Ações</th>
                       </tr>
@@ -1744,9 +1741,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                             </td>
                             <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--success)', fontFamily: 'monospace', fontSize: '0.88rem' }}>
                               {formatNumber(emp.quantidade)} un
-                            </td>
-                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                              {emp.valorTotal ? formatCurrency(emp.valorTotal) : '-'}
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               {isDivergente ? (

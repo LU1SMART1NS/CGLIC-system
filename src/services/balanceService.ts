@@ -439,6 +439,26 @@ export function parseMoneyValue(val: number | string | undefined | null): number
 }
 
 /**
+ * Obtém o valor monetário efetivo de uma Nota de Empenho, aplicando a regra de mútua exclusividade
+ * contábil (Lei 4.320/64):
+ * - Empenho do exercício corrente: empenhado > 0 e rpinscrito = 0.
+ * - Empenho de exercício anterior inscrito em Restos a Pagar: empenhado = 0 e rpinscrito > 0.
+ * 
+ * Regra:
+ * Se o valor empenhado for > 0, utiliza o valor empenhado.
+ * Se o valor empenhado for 0/nulo e houver valor em Restos a Pagar (rpinscrito > 0), utiliza o rpinscrito.
+ */
+export function getEmpenhoEffectiveValue(
+  empenhadoRaw: number | string | undefined | null,
+  rpinscritoRaw?: number | string | undefined | null
+): number {
+  const vEmp = parseMoneyValue(empenhadoRaw);
+  if (vEmp > 0) return vEmp;
+  const vRp = parseMoneyValue(rpinscritoRaw);
+  return vRp > 0 ? vRp : 0;
+}
+
+/**
  * Deduz a quantidade física oficial de uma Nota de Empenho vinculada a contrato,
  * respeitando o valor unitário base e a linha do tempo de reajustes contratuais (historico_item).
  */

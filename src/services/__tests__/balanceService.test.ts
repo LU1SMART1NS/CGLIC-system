@@ -14,7 +14,8 @@ import {
   getEmpenhoCanonicalKey,
   calculateItemCardMetrics,
   deduceEmpenhoQuantity,
-  parseMoneyValue
+  parseMoneyValue,
+  getEmpenhoEffectiveValue
 } from '../balanceService';
 import { enrichArpWithPncpVigencia } from '../api';
 import type { Empenho, Contrato, ContratoEmpenho, ArpRecord } from '../../types';
@@ -800,7 +801,45 @@ describe('balanceService - Suíte de 20 Testes Obrigatórios e Invariantes Cont�
     expect(restoredQty).toBe(10);
   });
 
+  // Teste 44: Validação de getEmpenhoEffectiveValue para empenho do exercício corrente
+  it('44. Deve retornar o valor de empenhado quando for do exercício corrente (empenhado > 0 e rpinscrito = 0)', () => {
+    const val = getEmpenhoEffectiveValue('150.000,00', '0,00');
+    expect(val).toBe(150000);
+
+    const valNum = getEmpenhoEffectiveValue(50000, 0);
+    expect(valNum).toBe(50000);
+  });
+
+  // Teste 45: Validação de getEmpenhoEffectiveValue para empenho de exercício anterior inscrito em Restos a Pagar (RP)
+  it('45. Deve retornar o valor de rpinscrito quando empenho for de ano anterior em RP (empenhado = 0 e rpinscrito > 0)', () => {
+    const val = getEmpenhoEffectiveValue('0,00', '150.000,00');
+    expect(val).toBe(150000);
+
+    const valNum = getEmpenhoEffectiveValue(0, 75000);
+    expect(valNum).toBe(75000);
+  });
+
+  // Teste 46: Prioridade e Mútua Exclusividade Contábil
+  it('46. Deve respeitar a prioridade de empenhado sobre rpinscrito caso ambos existam (sem soma cumulativa)', () => {
+    // Princípio da Anuidade / Mútua Exclusividade (Lei 4.320/64)
+    const val = getEmpenhoEffectiveValue(100000, 60000);
+    expect(val).toBe(100000); // Não deve somar 160.000
+  });
+
+  // Teste 47: Dedução temporal de quantidade a partir de Restos a Pagar (RP)
+  it('47. Deve deduzir a quantidade física exata de um item de contrato cujo empenho esteja em Restos a Pagar', () => {
+    const precoUnitario = 153000;
+    // Empenho de ano anterior: empenhado = 0, rpinscrito = 1.530.000,00 (10 unidades)
+    const effectiveVal = getEmpenhoEffectiveValue('0,00', '1.530.000,00');
+    const deduction = deduceEmpenhoQuantity(effectiveVal, precoUnitario);
+
+    expect(deduction.quantidade).toBe(10);
+    expect(deduction.isExato).toBe(true);
+    expect(deduction.isReforco).toBe(false);
+  });
+
 });
+
 
 
 

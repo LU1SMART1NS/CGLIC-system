@@ -1172,11 +1172,24 @@ export async function fetchComprasGovContratosByPurchase(
       }
       if (Array.isArray(ugContratos)) {
         const cleanParamsNum = (params.numeroCompra || '').replace(/\D/g, '').replace(/^0+/, '');
+        const cleanParamsAno = (params.anoCompra ? String(params.anoCompra) : (params.dataVigenciaInicial ? params.dataVigenciaInicial.split('-')[0] : '')).replace(/\D/g, '');
+
         for (const c of ugContratos) {
           let matched = false;
-          const cleanLic = (c.licitacao_numero || '').replace(/\D/g, '').replace(/^0+/, '');
-          if (cleanParamsNum && cleanLic && (cleanLic === cleanParamsNum || cleanLic.includes(cleanParamsNum) || cleanParamsNum.includes(cleanLic))) {
-            matched = true;
+          if (c.licitacao_numero && cleanParamsNum) {
+            const parts = String(c.licitacao_numero).split('/');
+            const cleanLicNum = parts[0].replace(/\D/g, '').replace(/^0+/, '');
+            const cleanLicAno = parts[1] ? parts[1].replace(/\D/g, '') : '';
+
+            const sameAno = !cleanParamsAno || !cleanLicAno || cleanParamsAno === cleanLicAno;
+            const sameNum = cleanLicNum === cleanParamsNum ||
+                            ('900' + cleanLicNum === cleanParamsNum) ||
+                            (cleanLicNum === '900' + cleanParamsNum) ||
+                            ('90' + cleanLicNum === cleanParamsNum);
+
+            if (sameNum && sameAno) {
+              matched = true;
+            }
           }
           if (matched) {
             const canKey = getCanonicalContractKey(c.numero, c.ano || (c.data_assinatura ? c.data_assinatura.split('-')[0] : '2025'));
