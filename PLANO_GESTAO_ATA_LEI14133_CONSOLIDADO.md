@@ -175,15 +175,32 @@ Todo evento carrega `processoSeiNumero` — já é o padrão em `ContractEvent`,
 - Especificar `AtaWorkflowStatus` completo (mirroring `ContractWorkflowStatus`) e o checklist de prontidão equivalente ao `ProrrogationReadinessChecklist`.
 - Mapear o teto de limite anual de dispensa por fornecedor/órgão (mencionado na seção 3.4, ainda não pesquisado a fundo).
 - Decidir se `AtaEvent`/`AtaWorkflow` viram arquivos próprios (`types/ataEvents.ts`, `services/ataEventService.ts`) espelhando os de contrato, ou se o domínio é unificado sob um tipo genérico `InstrumentoContratual`.
-- **Teto do alerta recorrente de remanejamento (§9.1)**: hoje o alerta a cada 2 dias não tem prazo final — falta decidir se/quando ele escala (ex: se não houver consentimento até D-90 da ata, o que acontece: força reclassificação pra 🔴 sem remanejamento, aciona encerramento por escopo do item, ou escala a notificação para um nível hierárquico acima?).
-
 ### 9.1. Decisões já tomadas (respostas às pendências da simulação de 23/09/2026)
 
 | Pendência | Decisão | Implicação registrada |
 |---|---|---|
-| Frequência do alerta de remanejamento até resposta da cedente | **Alerta recorrente a cada 2 dias**, sem teto definido ainda | Ver pendência em aberto acima — falta o critério de escalonamento/expiração |
-| Granularidade do card de remanejamento | **Vive no item afetado**, com indicativo visível de "remanejamento ativo" propagado para o card da Ata | O farol da Ata (pior estado entre itens) precisa de um segundo sinal, não-farol (badge lateral), pois um item 🔴 com remanejamento em curso não deve ler exatamente igual a um item 🔴 sem nenhuma ação em andamento |
+| Frequência do alerta de remanejamento até resposta da cedente | **Alerta recorrente a cada 2 dias**, escalonado em dois patamares (ver 9.2) | Nunca existe "parar de alertar" — só consentimento, recusa formal, ou a Ata sendo decidida primeiro |
+| Granularidade do card de remanejamento | **Vive no item afetado**, com indicativo visível de "remanejamento ativo" propagado para o card da Ata via badge separado da cor (ver 9.2) | O farol da Ata (pior estado entre itens) continua refletindo risco real pela cor; o badge só adiciona contexto de que já há ação em curso |
 | Origem do dado `tipoInstrumento` (Termo de Contrato vs. instrumento substitutivo art. 95) | **Cadastro manual**, sem inferência automática | Consistente com `previsaoRenovacaoQuantitativos` (seção 3.2) — nenhuma API oficial declara isso explicitamente, então os dois campos compartilham a mesma natureza: só existem se alguém os registrar no momento certo |
+
+### 9.2. Escalonamento do alerta de remanejamento e badge de status (resolução das pendências acima)
+
+Reaproveita os marcos temporais já usados em `contractProrrogationService.ts` (D-180/D-120/D-90) em vez de criar um conceito novo:
+
+- **0–15 dias sem resposta da cedente**: alerta a cada 2 dias, dirigido só à unidade cedente. Badge do item: `EM_NEGOCIACAO`.
+- **> 15 dias sem resposta**: escala — o alerta (ainda a cada 2 dias) passa a incluir também o gestor da Ata/coordenação. Badge muda para `ESTAGNADO`.
+- **Se chegar ao D-90 da vigência da Ata sem consentimento nem recusa formal**: o sistema deixa de contar o remanejamento como mitigador do farol — o item volta a valer como 🔴 puro para qualquer decisão de prorrogação/encerramento. Isso não cancela o remanejamento (pode ser respondido depois), só impede que uma negociação parada mascare risco real na decisão da Ata inteira.
+- **Nunca há corte de alerta** — persiste até consentimento, recusa formal, ou decisão da Ata.
+
+Estrutura de dados proposta para o badge (mesmo formato de `AditamentoLimitEvaluation`, paralelo à cor do farol, nunca substituindo-a):
+```ts
+interface RemanejamentoBadge {
+  ativo: boolean;
+  quantidadeItensAfetados: number;
+  estado: 'EM_NEGOCIACAO' | 'ESTAGNADO'; // muda em 15 dias sem resposta
+  label: string; // ex: "2 itens em remanejamento"
+}
+```
 
 ---
 
