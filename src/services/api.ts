@@ -1348,25 +1348,7 @@ export async function fetchPncpContracts(
   const contractsMergedMap = new Map<string, any>();
   const effectiveCnpj = (cnpj || fallbackParams?.numeroControlePncpCompra?.match(/^(\d{14})/)?.[1] || fallbackParams?.numeroControlePncpAta?.match(/^(\d{14})/)?.[1] || '').trim();
 
-  // 1. Consulta contratos diretos da Contratação/Compra no PNCP (apenas se CNPJ e sequencial válidos)
-  if (effectiveCnpj && ano && sequencial) {
-    try {
-      const purchaseContractsUrl = `/api-pncp/api/pncp/v1/orgaos/${effectiveCnpj}/compras/${ano}/${sequencial}/contratos`;
-      const res = await fetch(purchaseContractsUrl);
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
-        list.forEach((c: any) => {
-          const canKey = getCanonicalContractKey(c.numeroContrato || c.numeroContratoEmpenho || c.numero, c.anoContrato || ano, c.numeroControlePNCP || c.numeroControlePncpContrato);
-          if (canKey) contractsMergedMap.set(canKey, { ...c, _fromPncp: true });
-        });
-      }
-    } catch (e) {
-      console.warn("Falha na consulta de contratos da contratação no PNCP", e);
-    }
-  }
-
-  // 2. Resolução dinâmica de Atas e Contratos da Ata no PNCP
+  // 1. Resolução dinâmica de Atas e Contratos da Ata no PNCP
   if (effectiveCnpj && ano && sequencial) {
     try {
       const atasListUrl = `/api-pncp/api/pncp/v1/orgaos/${effectiveCnpj}/compras/${ano}/${sequencial}/atas`;
@@ -1418,7 +1400,7 @@ export async function fetchPncpContracts(
     }
   }
 
-  // 3. Sempre complementar/unificar com contratos vinculados à compra no Compras.gov.br e Contratos.gov.br
+  // 2. Sempre complementar/unificar com contratos vinculados à compra no Compras.gov.br e Contratos.gov.br
   if (fallbackParams) {
     try {
       const purchaseContracts = await fetchComprasGovContratosByPurchase(fallbackParams);
@@ -1462,7 +1444,7 @@ export async function fetchPncpContracts(
       }
     }
 
-    // 4. Validação estrita de Fornecedor: eliminar contratos de outras empresas da mesma licitação
+    // 3. Validação estrita de Fornecedor: eliminar contratos de outras empresas da mesma licitação
     const contractSupplierCnpj = (detail?.niFornecedor || c.niFornecedor || '').replace(/\D/g, '');
     const contractSupplierName = (detail?.nomeRazaoSocialFornecedor || c.nomeRazaoSocialFornecedor || '').toUpperCase().trim();
 
