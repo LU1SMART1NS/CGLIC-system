@@ -183,6 +183,10 @@ Padrão confirmado (CGU, TJDFT, ANTAQ): **processo-mãe** da Ata (aberto na lici
 
 Todo evento carrega `processoSeiNumero` — já é o padrão em `ContractEvent`, deve se repetir 1:1 em `AtaEvent`.
 
+### 7.3. Precedente de nomenclatura: regras de negócio com ID próprio (RN-XX)
+
+O código já tem pelo menos uma regra jurídica formalizada como invariante de banco, não só alerta de tela — nomeada **RN-07** (ver seção 8, item 7). Esse padrão (regra numerada, validada em 3 camadas: UI, adapter, banco) deve ser o padrão de referência ao formalizar as regras de Ata deste plano — por exemplo, a regra de renovação (seção 3.2: vantajosidade + saldo/exceção) e a vedação de acréscimo de quantitativo na Ata (seção 3.3) são candidatas naturais a virar `RN-08`, `RN-09` etc., com a mesma validação em 3 camadas.
+
 ---
 
 ## 8. Achados de código (gaps confirmados por leitura direta do repositório)
@@ -193,6 +197,7 @@ Todo evento carrega `processoSeiNumero` — já é o padrão em `ContractEvent`,
 4. **`Contrato.arpId`** (`src/types/index.ts:374`) é **obrigatório** (`arpId: string`, sem `?`) — o tipo atual não consegue representar um Contrato sem Ata, que é juridicamente válido (dispensa/inexigibilidade sem SRP). **Correção pontual recomendada, isolada do resto do plano.**
 5. Não existe campo `tipoInstrumento` para distinguir Termo de Contrato de instrumento substitutivo (art. 95).
 6. Nenhuma referência no código a `instrumentoSubstitutivo`, `cartaContrato`, `ordemExecucaoServico`, `autorizacaoCompra` ou art. 95 — categoria inteira ainda não modelada.
+7. **Achado positivo (não é gap)**: a regra "todo contrato exige empenho prévio" (art. 60, Lei 4.320/1964) já existe, nomeada **RN-07**, validada em 3 camadas — UI (`ManualContratoModal.tsx`, botão travado), adapter (`contractRpcAdapter.ts`) e banco (`supabase/migrations/20260917000006_backend_authority_hardening.sql`, `RAISE EXCEPTION` se `p_empenho_ids` vazio em `save_manual_contrato_atomic`). É o único caminho de escrita para Contrato manual — sem bypass possível mesmo via chamada direta de API. Serve de precedente de nomenclatura e de rigor para as regras de Ata deste plano (seção 7.3).
 
 ---
 
@@ -266,3 +271,4 @@ interface RemanejamentoBadge {
 - [Guia de Fluxos de Gestão e Fiscalização de Contratos Administrativos — CADE](https://cdn.cade.gov.br/Portal/centrais-de-conteudo/publicacoes/guias-e-manuais-administrativos-e-procedimentais/guia-de-fluxos-de-gestao-e-fiscalizacao-de-contratos-administrativos-do-cade.pdf)
 - [Manual de Boas Práticas do SEI — CGU](https://repositorio.cgu.gov.br/bitstream/1/38788/15/MANUAL_BOAS_PRATICAS_SEI.pdf)
 - [Caderno de Boas Práticas em Gestão e Fiscalização de Contratos — TJDFT](https://www.tjdft.jus.br/transparencia/governanca-institucional/governanca-de-aquisicoes/caderno-de-boas-praticas-em-gestao-e-fiscalizacao-de-contratos-do-tjdft.pdf)
+- [O significado efetivo da vedação à despesa sem prévio empenho (art. 60, Lei nº 4.320/64) — Blog Zênite](https://zenite.blog.br/o-significado-efetivo-da-vedacao-a-despesa-sem-previo-empenho-previsto-no-art-60-da-lei-no-4-320-64/)
