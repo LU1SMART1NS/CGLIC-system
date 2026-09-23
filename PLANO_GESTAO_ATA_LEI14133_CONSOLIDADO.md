@@ -104,6 +104,34 @@ Cálculo por **item** (onde o saldo realmente vive); a Ata herda o **pior estado
 
 Acessibilidade: cor nunca sozinha — ícone + rótulo textual sempre junto (site gov.br, requisito de acessibilidade).
 
+### 4.1. Hierarquia real do quantitativo — 3 níveis, não 2
+
+O código já modela uma hierarquia mais profunda do que as seções anteriores assumiam:
+
+```
+Ata (quantitativo total registrado)
+ ├─ Gerenciadora (UASG) — sua fatia do total
+ │   ├─ Alocação Interna (ex: DFNSP, DSUSP — diretorias da própria gerenciadora)
+ │   └─ ...
+ └─ Participantes externas (via PNCP partesenvolvidas / módulo-arp) — cada uma sua fatia
+```
+
+Evidência no código: `InternalDepartment` (`unitService.ts`) é o catálogo de unidades internas da gerenciadora; `InternalAllocation`/`GlobalAllocationRecord` (`types/index.ts`, `allocationService.ts`) é a cota alocada por departamento, indexada por `item_key = ${numeroAta}-${uasg}-${numeroItem}`.
+
+**Decisão**: o farol de saldo (seção 4) desce até o nível de **Alocação Interna**, não para na Unidade. Uma gerenciadora 🟢 no agregado pode esconder um departamento interno 🔴 — isso precisa ficar visível.
+
+**Confirmação de regra (com evidência de código)**: em qualquer um dos 3 níveis, **só o Empenho deduz saldo — nunca o Contrato, nunca a Alocação Interna**. `balanceService.ts` declara isso explicitamente:
+```ts
+/**
+ * Fórmula Oficial do Saldo Remanescente da Ata / Item:
+ * Saldo = QuantidadeRegistrada - ∑ Empenhos
+ * Regra Obrigatória:
+ * NUNCA subtrair Contratos.
+ * NUNCA subtrair Alocações Internas.
+ */
+```
+E `calculateSaldoWithContratos(quantidadeRegistrada, empenhos, _contratos?, _vinculos?)` recebe Contratos/Vínculos só para validação cruzada (ex: farol de aditivo 25%) — os parâmetros são propositalmente não usados no cálculo do saldo (convenção `_` no nome). Isso garante que o farol, em qualquer nível, soma os mesmos empenhos reparticionados por escopo, nunca duplicando ou subtraindo contrato em paralelo.
+
 ---
 
 ## 5. Camada ágil (Ata/Contrato tratados como "projeto")
