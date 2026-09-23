@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchContractsForDashboard } from '../services/contractService';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchContractsForDashboard, clearContractsCache } from '../services/contractService';
 import type { ContractDashboardRecord } from '../types';
 
 /**
@@ -27,7 +27,21 @@ export function getContractsDashboardQueryOptions(uasg: string = '200331') {
  * UI / ContractsDashboard -> useContractsDashboard(uasg) -> fetchContractsForDashboard() -> APIs Federais
  */
 export function useContractsDashboard(uasg: string = '200331') {
-  return useQuery<ContractDashboardRecord[], Error>(
-    getContractsDashboardQueryOptions(uasg)
+  const queryClient = useQueryClient();
+  const cleanUasg = uasg?.trim() || '200331';
+
+  const query = useQuery<ContractDashboardRecord[], Error>(
+    getContractsDashboardQueryOptions(cleanUasg)
   );
+
+  const refresh = async () => {
+    clearContractsCache(cleanUasg);
+    await queryClient.invalidateQueries({ queryKey: ['contracts-dashboard', cleanUasg] });
+    return query.refetch();
+  };
+
+  return {
+    ...query,
+    refresh
+  };
 }

@@ -1,38 +1,52 @@
 import type { ContractDashboardRecord, ContractFilterParams, ContractDashboardKPIs, StatusVigenciaContrato, ContractDetailItem, ContractDetailEmpenho } from '../types';
-import { getCanonicalContractKey, formatNumeroAnoContrato, fetchContratosGovData, fetchContratosGovEmpenhos, fetchContratoItensComprasGov } from './api';
+import { formatNumeroAnoContrato, fetchContratosGovData, fetchContratosGovEmpenhos, fetchContratoItensComprasGov, splitDateRange } from './api';
+import { resolveContractKey } from '../utils/contractKeyUtils';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { parseDateBRT, differenceInDays } from './temporalEngineService';
 
 const BASE_URL = '/api-arp/modulo-contratos';
 const CONTRATOS_CACHE = new Map<string, { timestamp: number; data: ContractDashboardRecord[] }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos de cache
 
 /**
- * Calcula o status de vigência com base na data final de vigência
+ * Limpa o cache em memória de contratos para forçar recarregamento imediato
+ */
+export function clearContractsCache(uasg?: string): void {
+  if (uasg) {
+    CONTRATOS_CACHE.delete(`contracts_${uasg.trim()}`);
+  } else {
+    CONTRATOS_CACHE.clear();
+  }
+}
+
+async function fetchWithTimeout(url: string, timeoutMs: number = 10000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+}
+
+/**
+ * Calcula o status de vigência com base na data final de vigência utilizando o motor temporal centralizado
  */
 export function calculateStatusVigencia(dataFim?: string): StatusVigenciaContrato {
   if (!dataFim) return 'Não Informado';
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const target = parseDateBRT(dataFim);
+  if (!target) return 'Não Informado';
 
-    const parts = dataFim.split('T')[0].split('-');
-    if (parts.length < 3) return 'Não Informado';
-
-    const fim = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-    fim.setHours(23, 59, 59, 999);
-
-    if (isNaN(fim.getTime())) return 'Não Informado';
-
-    const diffDays = Math.ceil((fim.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) {
-      return 'Expirado';
-    } else if (diffDays <= 60) {
-      return 'A Vencer (60d)';
-    } else {
-      return 'Vigente';
-    }
-  } catch {
-    return 'Não Informado';
+  const diffDays = differenceInDays(target);
+  if (diffDays < 0) {
+    return 'Expirado';
+  } else if (diffDays <= 60) {
+    return 'A Vencer (60d)';
+  } else {
+    return 'Vigente';
   }
 }
 
@@ -56,8 +70,12 @@ export async function fetchContractsForDashboard(
   uasg: string = '200331',
   forceRefresh: boolean = false
 ): Promise<ContractDashboardRecord[]> {
-  const cacheKey = `contracts_${uasg}`;
-  if (!forceRefresh && CONTRATOS_CACHE.has(cacheKey)) {
+  const cleanUasg = (uasg || '200331').trim();
+  const cacheKey = `contracts_${cleanUasg}`;
+
+  if (forceRefresh) {
+    CONTRATOS_CACHE.delete(cacheKey);
+  } else if (CONTRATOS_CACHE.has(cacheKey)) {
     const cached = CONTRATOS_CACHE.get(cacheKey)!;
     if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
       return cached.data;
@@ -65,24 +83,30 @@ export async function fetchContractsForDashboard(
   }
 
   const contractsMap = new Map<string, ContractDashboardRecord>();
-  const orgao = (uasg === '200331' || uasg === '200330') ? '30911' : '';
+  const orgao = (cleanUasg === '200331' || cleanUasg === '200330') ? '30911' : '';
 
   // 1. Tentar buscar da API Contratos.gov.br (diretamente pela UG)
   try {
-    const res = await fetch(`/api-contratos-gov/api/contrato/ug/${uasg}`);
+    const res = await fetchWithTimeout(`/api-contratos-gov/api/contrato/ug/${cleanUasg}`, 12000);
     const contentType = res.headers.get('content-type') || '';
     if (res.ok && contentType.includes('application/json')) {
       const list = await res.json();
       if (Array.isArray(list)) {
         for (const c of list) {
           const numRaw = c.numero ? String(c.numero).trim() : '';
-          const anoRaw = c.ano || (c.data_assinatura ? c.data_assinatura.split('-')[0] : c.vigencia_inicio?.split('-')[0] || '2025');
-          const canKey = getCanonicalContractKey(numRaw, anoRaw) || `${uasg}-${numRaw}-${anoRaw}`;
+          const ugCodigo = c.unidade_gestora || c.contratante?.orgao?.unidade_gestora?.codigo || c.contratante?.orgao_origem?.unidade_gestora_origem?.codigo || cleanUasg;
+
+          const keyResolution = resolveContractKey(ugCodigo, numRaw, c.data_assinatura || c.vigencia_inicio);
+          if (keyResolution.tipo === 'INVALIDO') {
+            console.warn(`[contractService] Contrato descartado: número "${numRaw}" não permitiu derivar identidade (sem "/" reconhecível e sem data de fallback).`);
+            continue;
+          }
+          const canKey = keyResolution.key;
+          const anoRaw = keyResolution.ano;
 
           const dataFim = c.vigencia_fim || c.dataVigenciaFinal;
           const status = calculateStatusVigencia(dataFim);
 
-          const ugCodigo = c.unidade_gestora || c.contratante?.orgao?.unidade_gestora?.codigo || c.contratante?.orgao_origem?.unidade_gestora_origem?.codigo || uasg;
           const ugNome = c.unidade_gestora_nome || c.contratante?.orgao?.unidade_gestora?.nome || c.contratante?.orgao_origem?.unidade_gestora_origem?.nome || c.contratante?.unidade_origem?.nome;
           const orgaoNome = c.contratante?.orgao?.nome || c.contratante?.orgao_origem?.nome;
 
@@ -108,6 +132,11 @@ export async function fetchContractsForDashboard(
             numeroControlePncp: c.numeroControlePncp || c.numeroControlePncpContrato,
             contratoId: c.id || c.contrato_id,
             fonteDados: 'Contratos.gov.br',
+            sourceSystem: 'Contratos.gov.br',
+            sourceRecordId: c.id || c.contrato_id || canKey,
+            sourceUpdatedAt: c.data_assinatura || c.vigencia_inicio,
+            lastSyncedAt: new Date().toISOString(),
+            origem: 'API',
             raw: c
           };
 
@@ -115,101 +144,163 @@ export async function fetchContractsForDashboard(
         }
       }
     } else if (res.ok) {
-      // Se retornou 200 mas não é JSON (ex: proxy do Vite ainda não recarregou)
       console.warn(`[contractService] API /api-contratos-gov retornou tipo não-JSON (${contentType}).`);
     }
   } catch (err) {
-    console.warn(`[contractService] Falha ao consultar Contratos.gov.br para UG ${uasg}:`, err);
+    console.warn(`[contractService] Falha ao consultar Contratos.gov.br para UG ${cleanUasg}:`, err);
   }
 
   // 2. Buscar também no Compras.gov.br Dados Abertos (módulo-contratos)
-  // Faz paginação para trazer os registros da UG
   try {
-    let pagina = 1;
-    let hasNext = true;
-    const maxPages = 5; // Proteção para não sobrecarregar
+    const anoAtual = new Date().getFullYear();
+    const dateChunks = splitDateRange(`${anoAtual - 2}-01-01`, `${anoAtual}-12-31`);
+    const maxPages = 5;
 
-    while (hasNext && pagina <= maxPages) {
-      const url = `${BASE_URL}/1_consultarContratos?pagina=${pagina}&tamanhoPagina=500${orgao ? `&codigoOrgao=${orgao}` : ''}&codigoUnidadeGestora=${uasg}`;
-      const res = await fetch(url);
-      if (!res.ok) break;
+    for (const chunk of dateChunks) {
+      let pagina = 1;
+      let hasNext = true;
 
-      const data = await res.json();
-      const list = data.resultado || [];
-      if (!Array.isArray(list) || list.length === 0) break;
+      while (hasNext && pagina <= maxPages) {
+        const url = `${BASE_URL}/1_consultarContratos?pagina=${pagina}&tamanhoPagina=500${orgao ? `&codigoOrgao=${orgao}` : ''}&codigoUnidadeGestora=${cleanUasg}&dataVigenciaInicialMin=${chunk.start}&dataVigenciaInicialMax=${chunk.end}`;
+        const res = await fetchWithTimeout(url, 8000).catch(() => null);
+        if (!res || !res.ok) break;
 
-      for (const c of list) {
-        const numRaw = c.numeroContrato ? String(c.numeroContrato).trim() : '';
-        const anoRaw = c.anoContrato || (c.dataVigenciaInicial ? c.dataVigenciaInicial.split('-')[0] : '2025');
-        const canKey = getCanonicalContractKey(numRaw, anoRaw, c.numeroControlePncpContrato) || `${uasg}-${numRaw}-${anoRaw}`;
+        const data = await res.json().catch(() => null);
+        if (!data) break;
+        const list = data.resultado || [];
+        if (!Array.isArray(list) || list.length === 0) break;
 
-        const dataFim = c.dataVigenciaFinal || c.vigencia_fim;
-        const status = calculateStatusVigencia(dataFim);
+        for (const c of list) {
+          const numRaw = c.numeroContrato ? String(c.numeroContrato).trim() : '';
 
-        const existing = contractsMap.get(canKey);
-        if (existing) {
-          // Enriquece campos faltantes
-          if (!existing.numeroControlePncp && c.numeroControlePncpContrato) {
-            existing.numeroControlePncp = c.numeroControlePncpContrato;
+          const keyResolution = resolveContractKey(c.codigoUnidadeGestora || cleanUasg, numRaw, c.dataVigenciaInicial);
+          if (keyResolution.tipo === 'INVALIDO') {
+            continue;
           }
-          if (!existing.idCompra && c.idCompra) {
-            existing.idCompra = c.idCompra;
+          const canKey = keyResolution.key;
+          const anoRaw = keyResolution.ano;
+
+          const dataFim = c.dataVigenciaFinal || c.vigencia_fim;
+          const status = calculateStatusVigencia(dataFim);
+
+          const existing = contractsMap.get(canKey);
+          if (existing) {
+            if (!existing.numeroControlePncp && c.numeroControlePncpContrato) {
+              existing.numeroControlePncp = c.numeroControlePncpContrato;
+            }
+            if (!existing.idCompra && c.idCompra) {
+              existing.idCompra = c.idCompra;
+            }
+            if (!existing.modalidadeCompra && c.modalidadeCompra) {
+              existing.modalidadeCompra = c.modalidadeCompra;
+            }
+            if (!existing.nomeUnidadeGestora && c.nomeUnidadeGestora) {
+              existing.nomeUnidadeGestora = c.nomeUnidadeGestora;
+            }
+            if (!existing.nomeOrgao && c.nomeOrgao) {
+              existing.nomeOrgao = c.nomeOrgao;
+            }
+            if (!existing.processo && c.processo) {
+              existing.processo = c.processo;
+            }
+            if (!existing.valorGlobal && c.valorGlobal) {
+              existing.valorGlobal = typeof c.valorGlobal === 'number' ? c.valorGlobal : parseFloat(c.valorGlobal || '0');
+            }
+          } else {
+            const record: ContractDashboardRecord = {
+              id: canKey,
+              numero: numRaw,
+              ano: anoRaw,
+              numeroFormatado: formatNumeroAnoContrato(numRaw, anoRaw) || `${numRaw}/${anoRaw}`,
+              uasg: String(c.codigoUnidadeGestora || cleanUasg),
+              nomeUnidadeGestora: c.nomeUnidadeGestora,
+              codigoOrgao: c.codigoOrgao || orgao,
+              nomeOrgao: c.nomeOrgao,
+              objeto: c.objeto || '',
+              processo: c.processo,
+              fornecedorNome: c.nomeRazaoSocialFornecedor,
+              fornecedorCnpjCpf: c.niFornecedor,
+              valorGlobal: typeof c.valorGlobal === 'number' ? c.valorGlobal : parseFloat(c.valorGlobal || '0'),
+              dataVigenciaInicio: c.dataVigenciaInicial,
+              dataVigenciaFim: dataFim,
+              statusVigencia: status,
+              numeroControlePncp: c.numeroControlePncpContrato,
+              idCompra: c.idCompra,
+              modalidadeCompra: c.modalidadeCompra,
+              fonteDados: 'Compras.gov.br',
+              sourceSystem: 'Compras.gov.br',
+              sourceRecordId: c.numeroControlePncpContrato || canKey,
+              sourceUpdatedAt: c.dataHoraAtualizacao || c.dataHoraInclusao || c.dataVigenciaInicial,
+              lastSyncedAt: new Date().toISOString(),
+              origem: 'API',
+              raw: c
+            };
+            contractsMap.set(canKey, record);
           }
-          if (!existing.modalidadeCompra && c.modalidadeCompra) {
-            existing.modalidadeCompra = c.modalidadeCompra;
-          }
-          if (!existing.nomeUnidadeGestora && c.nomeUnidadeGestora) {
-            existing.nomeUnidadeGestora = c.nomeUnidadeGestora;
-          }
-          if (!existing.nomeOrgao && c.nomeOrgao) {
-            existing.nomeOrgao = c.nomeOrgao;
-          }
-          if (!existing.processo && c.processo) {
-            existing.processo = c.processo;
-          }
-          if (!existing.valorGlobal && c.valorGlobal) {
-            existing.valorGlobal = typeof c.valorGlobal === 'number' ? c.valorGlobal : parseFloat(c.valorGlobal || '0');
-          }
-        } else {
-          const record: ContractDashboardRecord = {
-            id: canKey,
-            numero: numRaw,
-            ano: anoRaw,
-            numeroFormatado: formatNumeroAnoContrato(numRaw, anoRaw) || `${numRaw}/${anoRaw}`,
-            uasg: String(c.codigoUnidadeGestora || uasg),
-            nomeUnidadeGestora: c.nomeUnidadeGestora,
-            codigoOrgao: c.codigoOrgao || orgao,
-            nomeOrgao: c.nomeOrgao,
-            objeto: c.objeto || '',
-            processo: c.processo,
-            fornecedorNome: c.nomeRazaoSocialFornecedor,
-            fornecedorCnpjCpf: c.niFornecedor,
-            valorGlobal: typeof c.valorGlobal === 'number' ? c.valorGlobal : parseFloat(c.valorGlobal || '0'),
-            dataVigenciaInicio: c.dataVigenciaInicial,
-            dataVigenciaFim: dataFim,
-            statusVigencia: status,
-            numeroControlePncp: c.numeroControlePncpContrato,
-            idCompra: c.idCompra,
-            modalidadeCompra: c.modalidadeCompra,
-            fonteDados: 'Compras.gov.br',
-            raw: c
-          };
-          contractsMap.set(canKey, record);
         }
-      }
 
-      if (data.paginasRestantes && data.paginasRestantes > 0) {
-        pagina++;
-      } else {
-        hasNext = false;
+        if (data.paginasRestantes && data.paginasRestantes > 0) {
+          pagina++;
+        } else {
+          hasNext = false;
+        }
       }
     }
   } catch (err) {
-    console.warn(`[contractService] Falha ao consultar Compras.gov.br módulo-contratos para UG ${uasg}:`, err);
+    console.warn(`[contractService] Falha ao consultar Compras.gov.br módulo-contratos para UG ${cleanUasg}:`, err);
+  }
+
+  // 3. Fallback e consolidação com contratos manuais registrados no Supabase
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: manualList, error: manualErr } = await supabase
+        .from('contratos_manuais')
+        .select('*');
+
+      if (!manualErr && Array.isArray(manualList)) {
+        for (const m of manualList) {
+          const mUasg = String(m.uasg || '').trim();
+          const matchesUasg = !cleanUasg || mUasg === cleanUasg || (m.item_key && m.item_key.includes(`-${cleanUasg}-`));
+          if (!matchesUasg) continue;
+
+          const numRaw = m.numero ? String(m.numero).trim() : '';
+          const anoRaw = m.ano ? String(m.ano).trim() : '2025';
+          const keyResolution = resolveContractKey(m.uasg || cleanUasg, numRaw, anoRaw);
+          const canKey = keyResolution.tipo !== 'INVALIDO' ? keyResolution.key : `${m.uasg || cleanUasg}-${numRaw}-${anoRaw}`;
+
+          const existing = contractsMap.get(canKey);
+          if (!existing) {
+            const record: ContractDashboardRecord = {
+              id: canKey,
+              numero: numRaw,
+              ano: anoRaw,
+              numeroFormatado: formatNumeroAnoContrato(numRaw, anoRaw) || `${numRaw}/${anoRaw}`,
+              uasg: String(m.uasg || cleanUasg),
+              objeto: m.objeto || 'Contrato Manual SaldoARP',
+              fornecedorNome: m.fornecedor || 'Fornecedor Cadastrado',
+              fornecedorCnpjCpf: m.cnpj_fornecedor,
+              valorGlobal: parseMoney(m.valor_total),
+              valorInicial: parseMoney(m.valor_total),
+              statusVigencia: 'Vigente',
+              numeroControlePncp: m.numero_controle_pncp,
+              fonteDados: 'Sistema SaldoARP (Manual)',
+              sourceSystem: 'SaldoARP DB',
+              sourceRecordId: m.id || canKey,
+              sourceUpdatedAt: m.atualizado_em || m.criado_em || new Date().toISOString(),
+              lastSyncedAt: new Date().toISOString(),
+              origem: 'MANUAL',
+              raw: m
+            };
+            contractsMap.set(canKey, record);
+          }
+        }
+      }
+    } catch (dbErr) {
+      console.warn(`[contractService] Falha ao consultar contratos manuais do Supabase:`, dbErr);
+    }
   }
 
   const result = Array.from(contractsMap.values());
-  // Ordena prioritariamente por ano desc, depois por número desc
   result.sort((a, b) => {
     const anoA = parseInt(String(a.ano), 10) || 0;
     const anoB = parseInt(String(b.ano), 10) || 0;
@@ -219,7 +310,11 @@ export async function fetchContractsForDashboard(
     return numB - numA;
   });
 
-  CONTRATOS_CACHE.set(cacheKey, { timestamp: Date.now(), data: result });
+  // Apenas grava no cache se houver resultados encontrados
+  if (result.length > 0) {
+    CONTRATOS_CACHE.set(cacheKey, { timestamp: Date.now(), data: result });
+  }
+
   return result;
 }
 
@@ -351,3 +446,32 @@ export async function fetchContractDetails(contract: ContractDashboardRecord): P
 
   return { items, empenhos };
 }
+
+export interface MergedContractRecord extends ContractDashboardRecord {
+  gestorNome?: string;
+  gestorUpdatedAt?: string;
+  hasTaskPlan?: boolean;
+  observacoesInternas?: string;
+}
+
+/**
+ * Regra Arquitetural Fundamental — Sincronização Não-Destrutiva:
+ * Unifica dados oficiais obtidos de APIs (Compras.gov / Contratos.gov / PNCP) com
+ * informações operacionais internas cadastradas no SaldoARP (gestor, tarefas, observações),
+ * garantindo que atualizações oficiais NUNCA sobrescrevam ou apaguem dados gerenciais da equipe.
+ */
+export function mergeOfficialAndInternalContractData(
+  officialRecord: ContractDashboardRecord,
+  internalManager?: { gestorNome: string; updatedAt: string } | null,
+  internalPlan?: { id?: string; progresso?: any } | null,
+  internalMeta?: { observacoes?: string } | null
+): MergedContractRecord {
+  return {
+    ...officialRecord,
+    gestorNome: internalManager?.gestorNome,
+    gestorUpdatedAt: internalManager?.updatedAt,
+    hasTaskPlan: !!internalPlan,
+    observacoesInternas: internalMeta?.observacoes
+  };
+}
+

@@ -1,18 +1,12 @@
 import React from 'react';
-import { FileText, Building2, FileSpreadsheet, Briefcase } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 
 interface HeaderProps {
-  activeView?: 'search' | 'items' | 'balances' | 'allocations' | 'contracts';
-  onNavigateView?: (view: 'search' | 'allocations' | 'contracts') => void;
-  onOpenSeiModal?: () => void;
   onOpenExportModal?: () => void;
+  onOpenContractTemplatesModal?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({
-  activeView = 'search',
-  onNavigateView,
-  onOpenExportModal
-}) => {
+export const Header: React.FC<HeaderProps> = () => {
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Gov.br Federal Identity Topbar */}
@@ -46,11 +40,11 @@ export const Header: React.FC<HeaderProps> = ({
       <header style={{
         background: '#ffffff',
         borderBottom: '3px solid #0c326f',
-        padding: '1.1rem 3rem',
+        padding: '1rem 3rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
         fontFamily: 'var(--font-family)',
         flexWrap: 'wrap',
         gap: '1rem'
@@ -75,113 +69,40 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0c326f', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Ministério da Justiça e Segurança Pública
+              Ministério da Justiça e Segurança Pública • SENASP
             </div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0.1rem 0 0 0', letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
-              SaldoARP <span style={{ fontWeight: 400, fontSize: '1.1rem', color: '#475569' }}>| Gestão de Registro de Preços</span>
+            <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0.1rem 0 0 0', letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
+              ComprasSUSP <span style={{ fontWeight: 400, fontSize: '1.05rem', color: '#475569' }}>| Gestão Inteligente de Atas e Contratos</span>
             </h1>
             <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.1rem 0 0 0', fontWeight: 500 }}>
-              Secretaria Nacional de Segurança Pública — SENASP
+              Coordenação-Geral de Licitações e Contratos (CGLIC)
             </p>
           </div>
         </div>
 
-        {/* View Switcher Navigation */}
-        {onNavigateView && (
-          <nav style={{ display: 'flex', gap: '0.5rem', background: '#f1f5f9', padding: '0.35rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-            <button
-              type="button"
-              onClick={() => onNavigateView('search')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: activeView === 'search' || activeView === 'items' || activeView === 'balances' ? '#ffffff' : 'transparent',
-                color: activeView === 'search' || activeView === 'items' || activeView === 'balances' ? 'var(--primary)' : 'var(--text-secondary)',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                boxShadow: activeView === 'search' || activeView === 'items' || activeView === 'balances' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'var(--transition)'
-              }}
-            >
-              <FileText size={15} /> Visão por Atas
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateView('contracts')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: activeView === 'contracts' ? '#ffffff' : 'transparent',
-                color: activeView === 'contracts' ? 'var(--primary)' : 'var(--text-secondary)',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                boxShadow: activeView === 'contracts' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'var(--transition)'
-              }}
-            >
-              <Briefcase size={15} /> Visão por Contratos
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateView('allocations')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: activeView === 'allocations' ? '#ffffff' : 'transparent',
-                color: activeView === 'allocations' ? 'var(--primary)' : 'var(--text-secondary)',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                boxShadow: activeView === 'allocations' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'var(--transition)'
-              }}
-            >
-              <Building2 size={15} /> Saldos por Unidade Interna
-            </button>
-
-            {onOpenExportModal && (
-              <button
-                type="button"
-                onClick={onOpenExportModal}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  border: '1px solid #10b981',
-                  background: '#ecfdf5',
-                  color: '#065f46',
-                  fontWeight: 800,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(16, 185, 129, 0.15)',
-                  transition: 'var(--transition)'
-                }}
-                title="Exportar Relatório em Planilha Excel Parametrizável"
-              >
-                <FileSpreadsheet size={16} color="#059669" /> Exportar Excel (.xlsx)
-              </button>
-            )}
-          </nav>
-        )}
-
+        {/* Identificação Institucional da Unidade Gestora */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          padding: '0.45rem 0.85rem',
+          background: '#f8fafc',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <div style={{ padding: '0.35rem', background: '#eff6ff', borderRadius: '6px', color: '#0c326f' }}>
+            <Building2 size={16} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>
+              Unidade Gestora
+            </span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0c326f' }}>
+              UASG 200331
+            </span>
+          </div>
+        </div>
       </header>
     </div>
   );
 };
-

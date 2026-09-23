@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   CheckCircle2, 
   AlertTriangle, 
@@ -9,12 +10,15 @@ import {
   Building2, 
   Calendar, 
   FileText, 
-  Package, 
+  Package,
   Receipt,
-  Loader2
+  Loader2,
+  ClipboardList
 } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import { useContractDetails } from '../../hooks/useContractDetails';
+import { getContractManagementKey } from '../../services/contractManagementService';
+import { ContractManagementPanel } from './ContractManagementPanel';
 
 interface ContractCardProps {
   contract: ContractDashboardRecord;
@@ -48,7 +52,7 @@ function formatCurrency(val?: number): string {
 
 export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'itens' | 'empenhos'>('itens');
+  const [activeTab, setActiveTab] = useState<'gestao' | 'itens' | 'empenhos'>('gestao');
 
   const {
     data: details,
@@ -111,9 +115,12 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
               </span>
             )}
 
-            {/* Badge da Fonte */}
-            <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', fontWeight: 500 }}>
-              {contract.fonteDados}
+            {/* Badge discreto da Fonte Oficial */}
+            <span 
+              title={contract.lastSyncedAt ? `Fonte oficial governamental (${contract.fonteDados}) • Sincronizado em ${new Date(contract.lastSyncedAt).toLocaleString('pt-BR')}` : `Fonte oficial governamental: ${contract.fonteDados}`}
+              style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+            >
+              <span style={{ fontSize: '0.65rem' }}>🔗</span> {contract.fonteDados || 'Fonte Oficial'}
             </span>
           </div>
 
@@ -140,7 +147,28 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <Link
+              to={`/contratos/${encodeURIComponent(contract.id || getContractManagementKey(contract.uasg, contract.numero, contract.ano))}`}
+              className="btn btn-secondary"
+              style={{
+                padding: '0.25rem 0.65rem',
+                fontSize: '0.75rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                textDecoration: 'none',
+                color: '#0c326f',
+                fontWeight: 700,
+                backgroundColor: 'rgba(12, 50, 111, 0.08)',
+                borderColor: 'rgba(12, 50, 111, 0.25)'
+              }}
+              title="Abrir Visão 360° do Contrato"
+            >
+              <span>Visão 360°</span>
+              <ExternalLink size={12} />
+            </Link>
+
             {pncpUrl && (
               <a 
                 href={pncpUrl} 
@@ -197,18 +225,33 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
         </div>
       )}
 
-      {/* Painel Expansível (Itens e Empenhos) */}
+      {/* Painel Expansível (Gestão, Itens e Empenhos) */}
       {isExpanded && (
         <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
-          {isLoadingDetails ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', gap: '0.75rem', color: '#003399' }}>
-              <Loader2 className="animate-spin" size={20} />
-              <span style={{ fontSize: '0.88rem', fontWeight: 500 }}>Carregando itens e empenhos vinculados...</span>
-            </div>
-          ) : (
             <div>
-              {/* Abas Itens / Empenhos */}
+              {/* Abas Gestão / Itens / Empenhos */}
               <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', marginBottom: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('gestao')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0.5rem 1rem',
+                    border: 'none',
+                    background: 'none',
+                    borderBottom: activeTab === 'gestao' ? '2px solid #003399' : '2px solid transparent',
+                    color: activeTab === 'gestao' ? '#003399' : '#64748b',
+                    fontWeight: activeTab === 'gestao' ? 700 : 500,
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  <ClipboardList size={15} />
+                  <span>Gestão</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setActiveTab('itens')}
@@ -252,8 +295,20 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
                 </button>
               </div>
 
-              {/* Conteúdo da Aba Itens */}
-              {activeTab === 'itens' && (
+              {/* Conteúdo da Aba Gestão */}
+              {activeTab === 'gestao' && (
+                <ContractManagementPanel contract={contract} active={activeTab === 'gestao'} />
+              )}
+
+              {/* Conteúdo das Abas Itens / Empenhos (dependem da API de detalhes) */}
+              {(activeTab === 'itens' || activeTab === 'empenhos') && isLoadingDetails && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', gap: '0.75rem', color: '#003399' }}>
+                  <Loader2 className="animate-spin" size={20} />
+                  <span style={{ fontSize: '0.88rem', fontWeight: 500 }}>Carregando itens e empenhos vinculados...</span>
+                </div>
+              )}
+
+              {activeTab === 'itens' && !isLoadingDetails && (
                 <div>
                   {items.length === 0 ? (
                     <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic', padding: '0.5rem 0' }}>
@@ -303,7 +358,7 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
               )}
 
               {/* Conteúdo da Aba Empenhos */}
-              {activeTab === 'empenhos' && (
+              {activeTab === 'empenhos' && !isLoadingDetails && (
                 <div>
                   {empenhos.length === 0 ? (
                     <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic', padding: '0.5rem 0' }}>
@@ -354,7 +409,6 @@ export const ContractCard: React.FC<ContractCardProps> = ({ contract }) => {
                 </div>
               )}
             </div>
-          )}
         </div>
       )}
     </article>

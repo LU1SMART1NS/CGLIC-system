@@ -25,3 +25,5 @@ dist-ssr
 *.sln
 *.sw?
 scratch/
+supabase/.temp/
+.claude/

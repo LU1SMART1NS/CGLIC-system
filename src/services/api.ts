@@ -27,8 +27,10 @@ function buildQueryString(params: Record<string, string | number | undefined>): 
 
 /**
  * Splits a date range into chunks of at most 365 days to respect the Compras.gov API limit.
+ * Exportada para reuso em contractService.ts (endpoint /modulo-contratos/1_consultarContratos
+ * tem o MESMO limite de 365 dias por chamada, confirmado por sondagem read-only em produção).
  */
-function splitDateRange(startDateStr: string, endDateStr: string): { start: string; end: string }[] {
+export function splitDateRange(startDateStr: string, endDateStr: string): { start: string; end: string }[] {
   const start = new Date(startDateStr + 'T00:00:00Z');
   const end = new Date(endDateStr + 'T00:00:00Z');
   const chunks: { start: string; end: string }[] = [];

@@ -8,18 +8,26 @@ import {
   Users, 
   CheckCircle2, 
   Clock, 
-  RefreshCw,
-  HelpCircle,
-  ArrowUpDown
+  RefreshCw, 
+  HelpCircle, 
+  ArrowUpDown,
+  UserCheck,
+  AlertTriangle,
+  Filter
 } from 'lucide-react';
 import type { ContractFilterParams } from '../types';
 import { 
   calculateContractKPIs, 
   filterContracts 
 } from '../services/contractService';
+import { getContractManagementKey } from '../services/contractManagementService';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
+import { useAllContractManagers } from '../hooks/useAllContractManagers';
+import { useUsers } from '../hooks/useUsers';
 import { ContractCard } from './cards/ContractCard';
 import { ContractCardSkeleton } from './cards/ContractCardSkeleton';
+
+type ScopeFilter = 'TODOS' | 'MEUS' | 'NAO_ATRIBUIDOS';
 
 function formatCurrency(val?: number): string {
   if (typeof val !== 'number' || isNaN(val)) return 'R$ 0,00';
@@ -27,6 +35,16 @@ function formatCurrency(val?: number): string {
 }
 
 export const ContractsDashboard: React.FC = () => {
+  // Escopo de Gestão e Perfil de Visualização
+  const [scope, setScope] = useState<ScopeFilter>('TODOS');
+  const [selectedGestorFilter, setSelectedGestorFilter] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState<{ id?: string; nome: string; role: string }>({
+    nome: 'Coordenação Geral',
+    role: 'coordenador'
+  });
+
+  const { data: systemUsers = [] } = useUsers();
+
   // Parâmetros de Filtro
   const [filters, setFilters] = useState<ContractFilterParams>({
     uasg: '200331',
@@ -44,8 +62,12 @@ export const ContractsDashboard: React.FC = () => {
     isLoading: loading,
     isFetching: isRefreshing,
     error: contractsQueryError,
-    refetch
+    refetch,
+    refresh
   } = useContractsDashboard(filters.uasg);
+
+  // Mapa de gestores atribuídos no banco Supabase
+  const { data: managersMap = {} } = useAllContractManagers(filters.uasg);
 
   const error = contractsQueryError ? (contractsQueryError.message || 'Falha ao buscar contratos nas APIs governamentais.') : null;
 
@@ -68,13 +90,66 @@ export const ContractsDashboard: React.FC = () => {
       anoContrato: ''
     };
     setFilters(cleared);
+    setSelectedGestorFilter('');
+    setScope('TODOS');
   };
 
-  // Aplicação dos filtros em memória
-  const filteredContracts = useMemo(() => {
-    const res = filterContracts(contracts, filters);
+  // Contadores de Escopo (Meus, Todos, Não Atribuídos)
+  const scopeCounts = useMemo(() => {
+    let meusCount = 0;
+    let naoAtribuidosCount = 0;
+    const allGestores = new Set<string>();
 
-    // Ordenação
+    contracts.forEach(contract => {
+      const key = getContractManagementKey(contract.uasg, contract.numero, contract.ano);
+      const manager = managersMap[key];
+      if (manager && manager.gestorNome && manager.gestorNome.trim() !== '') {
+        allGestores.add(manager.gestorNome.trim());
+        if (currentUser.nome && manager.gestorNome.toLowerCase().includes(currentUser.nome.toLowerCase())) {
+          meusCount++;
+        }
+      } else {
+        naoAtribuidosCount++;
+      }
+    });
+
+    return {
+      todos: contracts.length,
+      meus: meusCount,
+      naoAtribuidos: naoAtribuidosCount,
+      gestores: Array.from(allGestores).sort()
+    };
+  }, [contracts, managersMap, currentUser]);
+
+  // Aplicação do Filtro de Escopo e Filtros de Busca
+  const filteredContracts = useMemo(() => {
+    // 1. Filtrar pelo escopo de atribuição
+    const inScope = contracts.filter(contract => {
+      const key = getContractManagementKey(contract.uasg, contract.numero, contract.ano);
+      const manager = managersMap[key];
+      const hasManager = Boolean(manager && manager.gestorNome && manager.gestorNome.trim() !== '');
+
+      if (scope === 'MEUS') {
+        if (!hasManager) return false;
+        return currentUser.nome && manager!.gestorNome.toLowerCase().includes(currentUser.nome.toLowerCase());
+      }
+
+      if (scope === 'NAO_ATRIBUIDOS') {
+        return !hasManager;
+      }
+
+      if (selectedGestorFilter) {
+        if (!hasManager) return false;
+        return manager!.gestorNome.toLowerCase() === selectedGestorFilter.toLowerCase();
+      }
+
+      return true;
+    });
+
+    // 2. Filtrar por parâmetros de busca (número, fornecedor, vigência, etc.)
+    const res = filterContracts(inScope, filters);
+
+    // 3. Ordenação
     return res.sort((a, b) => {
       if (sortBy === 'valor_desc') {
         const valA = a.valorGlobal || a.valorInicial || 0;
@@ -94,7 +169,7 @@ export const ContractsDashboard: React.FC = () => {
       const numB = parseInt(b.numero.replace(/\D/g, ''), 10) || 0;
       return numB - numA;
     });
-  }, [contracts, filters, sortBy]);
+  }, [contracts, managersMap, scope, selectedGestorFilter, currentUser, filters, sortBy]);
 
   // KPIs dos contratos filtrados
   const kpis = useMemo(() => {
@@ -111,13 +186,216 @@ export const ContractsDashboard: React.FC = () => {
   }, [contracts]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', padding: '1rem 0' }}>
       
-      {/* SEÇÃO DE KPIS DO DASHBOARD DE CONTRATOS */}
+      {/* 1. BARRA DE ESCOPO DE GESTÃO (MEUS / TODOS / NÃO ATRIBUÍDOS) */}
+      <section style={{
+        background: '#ffffff',
+        borderRadius: '12px',
+        padding: '1.25rem 1.5rem',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, borderBottom: 'none', paddingBottom: 0 }}>
+              Acompanhamento e Prazos
+            </h2>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
+              Gestão operacional, fiscalização e acompanhamento de vigências
+            </p>
+          </div>
+
+          {/* Seletor de Perfil / Usuário */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: '#f8fafc', padding: '0.35rem 0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Simular Operador:</span>
+            <select
+              value={currentUser.id || currentUser.role}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'coordenador') {
+                  setCurrentUser({
+                    nome: 'Coordenação Geral',
+                    role: 'coordenador'
+                  });
+                  setScope('TODOS');
+                } else {
+                  const targetUser = systemUsers.find(u => u.id === val);
+                  if (targetUser) {
+                    setCurrentUser({
+                      id: targetUser.id,
+                      nome: targetUser.nome,
+                      role: targetUser.perfil
+                    });
+                    if (targetUser.perfil === 'coordenador') {
+                      setScope('TODOS');
+                    } else {
+                      setScope('MEUS');
+                    }
+                  }
+                }
+              }}
+              style={{
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                border: 'none',
+                background: 'transparent',
+                color: '#0c326f',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="coordenador">👑 Coordenador Geral (Visão 100% da Pasta)</option>
+              {systemUsers.filter(u => u.ativo).map(u => (
+                <option key={u.id} value={u.id}>
+                  👤 {u.nome} ({u.cargo || 'Servidor'} - {u.perfil})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Pílulas de Alternância de Escopo */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Botão Todos */}
+            <button
+              type="button"
+              onClick={() => { setScope('TODOS'); setSelectedGestorFilter(''); }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.5rem 0.9rem',
+                borderRadius: '8px',
+                border: scope === 'TODOS' && !selectedGestorFilter ? '2px solid #0c326f' : '1px solid #cbd5e1',
+                background: scope === 'TODOS' && !selectedGestorFilter ? '#eff6ff' : '#ffffff',
+                color: scope === 'TODOS' && !selectedGestorFilter ? '#0c326f' : '#475569',
+                fontWeight: scope === 'TODOS' && !selectedGestorFilter ? 800 : 600,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Users size={15} />
+              <span>Todos os Contratos</span>
+              <span style={{
+                fontSize: '0.7rem',
+                padding: '0.1rem 0.45rem',
+                borderRadius: '999px',
+                background: scope === 'TODOS' && !selectedGestorFilter ? '#0c326f' : '#f1f5f9',
+                color: scope === 'TODOS' && !selectedGestorFilter ? '#ffffff' : '#64748b',
+                fontWeight: 700
+              }}>
+                {scopeCounts.todos}
+              </span>
+            </button>
+
+            {/* Botão Meus Contratos */}
+            <button
+              type="button"
+              onClick={() => { setScope('MEUS'); setSelectedGestorFilter(''); }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.5rem 0.9rem',
+                borderRadius: '8px',
+                border: scope === 'MEUS' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                background: scope === 'MEUS' ? '#e0f2fe' : '#ffffff',
+                color: scope === 'MEUS' ? '#0369a1' : '#475569',
+                fontWeight: scope === 'MEUS' ? 800 : 600,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <UserCheck size={15} />
+              <span>Meus Contratos</span>
+              <span style={{
+                fontSize: '0.7rem',
+                padding: '0.1rem 0.45rem',
+                borderRadius: '999px',
+                background: scope === 'MEUS' ? '#0284c7' : '#f1f5f9',
+                color: scope === 'MEUS' ? '#ffffff' : '#64748b',
+                fontWeight: 700
+              }}>
+                {scopeCounts.meus}
+              </span>
+            </button>
+
+            {/* Botão Não Atribuídos */}
+            <button
+              type="button"
+              onClick={() => { setScope('NAO_ATRIBUIDOS'); setSelectedGestorFilter(''); }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.5rem 0.9rem',
+                borderRadius: '8px',
+                border: scope === 'NAO_ATRIBUIDOS' ? '2px solid #d97706' : '1px solid #cbd5e1',
+                background: scope === 'NAO_ATRIBUIDOS' ? '#fef3c7' : '#ffffff',
+                color: scope === 'NAO_ATRIBUIDOS' ? '#b45309' : '#475569',
+                fontWeight: scope === 'NAO_ATRIBUIDOS' ? 800 : 600,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <AlertTriangle size={15} color={scope === 'NAO_ATRIBUIDOS' ? '#b45309' : '#f59e0b'} />
+              <span>Não Atribuídos</span>
+              <span style={{
+                fontSize: '0.7rem',
+                padding: '0.1rem 0.45rem',
+                borderRadius: '999px',
+                background: scope === 'NAO_ATRIBUIDOS' ? '#d97706' : '#fef3c7',
+                color: scope === 'NAO_ATRIBUIDOS' ? '#ffffff' : '#b45309',
+                fontWeight: 800
+              }}>
+                {scopeCounts.naoAtribuidos}
+              </span>
+            </button>
+          </div>
+
+          {/* Filtro por Gestor Específico (para Coordenadores) */}
+          {scopeCounts.gestores.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Filter size={14} color="#64748b" />
+              <select
+                value={selectedGestorFilter}
+                onChange={(e) => {
+                  setSelectedGestorFilter(e.target.value);
+                  if (e.target.value) setScope('TODOS');
+                }}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '0.4rem 0.6rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#334155',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">Filtrar por Gestor Designado...</option>
+                {scopeCounts.gestores.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 2. SEÇÃO DE KPIS DO DASHBOARD DE CONTRATOS */}
       <section className="kpi-grid">
         
         {/* KPI 1: Total de Contratos */}
-        <div className="kpi-card" style={{ borderTop: '4px solid var(--primary)' }}>
+        <div className="kpi-card" style={{ borderTop: '4px solid #0c326f' }}>
           <div className="kpi-header primary">
             <FileText size={16} /> Total de Contratos
           </div>
@@ -126,22 +404,24 @@ export const ContractsDashboard: React.FC = () => {
           </div>
           <div className="kpi-footer">
             <div>
-              <strong>UASG Atual:</strong>
-              <div className="kpi-footer-val">{filters.uasg || '200331'}</div>
+              <strong>No Escopo:</strong>
+              <div className="kpi-footer-val">{filteredContracts.length} contratos</div>
             </div>
             <div>
-              <strong>Fontes:</strong>
-              <div className="kpi-footer-val">Compras / Contratos.gov</div>
+              <strong>Atribuídos:</strong>
+              <div className="kpi-footer-val">
+                {scopeCounts.todos - scopeCounts.naoAtribuidos}
+              </div>
             </div>
           </div>
         </div>
 
         {/* KPI 2: Contratos Vigentes */}
-        <div className="kpi-card" style={{ borderTop: '4px solid var(--success)' }}>
+        <div className="kpi-card" style={{ borderTop: '4px solid #10b981' }}>
           <div className="kpi-header success">
-            <CheckCircle2 size={16} /> Contratos Vigentes
+            <CheckCircle2 size={16} /> Vigência Regular
           </div>
-          <div className="kpi-value" style={{ color: 'var(--success)' }}>
+          <div className="kpi-value" style={{ color: '#059669' }}>
             {kpis.contratosVigentes}
           </div>
           <div className="kpi-footer">
@@ -161,31 +441,31 @@ export const ContractsDashboard: React.FC = () => {
         </div>
 
         {/* KPI 3: Fornecedores Contratados */}
-        <div className="kpi-card" style={{ borderTop: '4px solid var(--primary)' }}>
+        <div className="kpi-card" style={{ borderTop: '4px solid #0284c7' }}>
           <div className="kpi-header primary">
-            <Users size={16} /> Fornecedores Contratados
+            <Users size={16} /> Fornecedores Credenciados
           </div>
           <div className="kpi-value">
             {kpis.totalFornecedores}
           </div>
           <div className="kpi-footer">
             <div>
-              <strong>Empresas / Credores:</strong>
+              <strong>Empresas:</strong>
               <div className="kpi-footer-val">CNPJs Distintos</div>
             </div>
             <div>
-              <strong>Status:</strong>
+              <strong>Contratos:</strong>
               <div className="kpi-footer-val">{filteredContracts.length} registros</div>
             </div>
           </div>
         </div>
 
         {/* KPI 4: Valor Global Total */}
-        <div className="kpi-card" style={{ borderTop: '4px solid var(--primary-hover)' }}>
+        <div className="kpi-card" style={{ borderTop: '4px solid #059669' }}>
           <div className="kpi-header primary">
-            <DollarSign size={16} /> Valor Global Total
+            <DollarSign size={16} /> Valor Global Contratado
           </div>
-          <div className="kpi-value" style={{ fontSize: '1.4rem' }}>
+          <div className="kpi-value" style={{ fontSize: '1.35rem', color: '#065f46' }}>
             {formatCurrency(kpis.valorTotalGlobal)}
           </div>
           <div className="kpi-footer">
@@ -196,24 +476,24 @@ export const ContractsDashboard: React.FC = () => {
               </div>
             </div>
             <div>
-              <strong>Base:</strong>
-              <div className="kpi-footer-val">Contratos Filtrados</div>
+              <strong>Total:</strong>
+              <div className="kpi-footer-val">Homologado</div>
             </div>
           </div>
         </div>
 
       </section>
 
-      {/* SEÇÃO DE FILTROS */}
+      {/* 3. SEÇÃO DE FILTROS DE PESQUISA */}
       <section className="comprassusp-filter-card">
         <div className="filter-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <h2 className="section-title" style={{ fontSize: '1.2rem', margin: 0, borderBottom: 'none', paddingBottom: 0 }}>
-            <Search size={20} color="var(--primary)" /> Filtrar Contratos Administrativos
+          <h2 className="section-title" style={{ fontSize: '1.15rem', margin: 0, borderBottom: 'none', paddingBottom: 0 }}>
+            <Search size={18} color="#0c326f" /> Filtros de Pesquisa
           </h2>
           
           <button
             type="button"
-            onClick={() => refetch()}
+            onClick={() => refresh ? refresh() : refetch()}
             disabled={isRefreshing || loading}
             className="btn btn-secondary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
@@ -357,7 +637,7 @@ export const ContractsDashboard: React.FC = () => {
         </form>
       </section>
 
-      {/* SEÇÃO DE RESULTADOS */}
+      {/* 4. SEÇÃO DE RESULTADOS */}
       <section className="glass-card" style={{ padding: '1.5rem' }}>
         <div style={{ padding: '0 0.5rem 1rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0c326f', margin: 0 }}>
@@ -382,9 +662,37 @@ export const ContractsDashboard: React.FC = () => {
             <p style={{ fontSize: '0.95rem' }}>{error}</p>
           </div>
         ) : filteredContracts.length === 0 ? (
-          <div className="empty-state">
-            <FileText size={40} className="empty-state-icon" />
-            <p style={{ fontSize: '0.95rem' }}>Nenhum contrato encontrado para os filtros especificados.</p>
+          <div className="empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', padding: '2.5rem 1rem' }}>
+            <FileText size={40} className="empty-state-icon" style={{ color: '#94a3b8' }} />
+            <p style={{ fontSize: '0.95rem', color: '#475569', margin: 0, fontWeight: 600 }}>
+              Nenhum contrato encontrado para a UASG {filters.uasg || '200331'} e filtros selecionados.
+            </p>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0, maxWidth: '520px', textAlign: 'center' }}>
+              Se as APIs do Governo Federal estiverem oscilando, você pode tentar atualizar os dados ou alternar a UASG para pesquisar outros contratos cadastrados.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => refresh ? refresh() : refetch()}
+                disabled={isRefreshing || loading}
+                className="btn btn-primary"
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
+                <span>{isRefreshing ? 'Consultando...' : 'Recarregar da API'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextUasg = filters.uasg === '200331' ? '200330' : '200331';
+                  setFilters({ ...filters, uasg: nextUasg });
+                }}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+              >
+                Alternar para UASG {filters.uasg === '200331' ? '200330' : '200331'}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="ata-cards-container" role="feed" aria-label="Lista de Contratos Administrativos">

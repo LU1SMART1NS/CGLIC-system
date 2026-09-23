@@ -178,6 +178,69 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
     };
   }
 
+  if (message.includes('DUPLICATE_TEMPLATE')) {
+    return {
+      code: 'DUPLICATE_TEMPLATE',
+      message: 'Já existe um template de gestão contratual cadastrado com este nome.',
+      sqlState: '23505',
+      details: error
+    };
+  }
+
+  if (message.includes('TEMPLATE_NOT_FOUND')) {
+    return {
+      code: 'TEMPLATE_NOT_FOUND',
+      message: 'Template de gestão contratual não encontrado.',
+      sqlState: 'P0002',
+      details: error
+    };
+  }
+
+  if (message.includes('MACROTASK_NOT_FOUND')) {
+    return {
+      code: 'MACROTASK_NOT_FOUND',
+      message: 'Macrotarefa não encontrada.',
+      sqlState: 'P0002',
+      details: error
+    };
+  }
+
+  if (message.includes('TEMPLATE_TASK_NOT_FOUND')) {
+    return {
+      code: 'TEMPLATE_TASK_NOT_FOUND',
+      message: 'Tarefa do template não encontrada.',
+      sqlState: 'P0002',
+      details: error
+    };
+  }
+
+  if (message.includes('CONTRACT_PLAN_ALREADY_EXISTS')) {
+    return {
+      code: 'CONTRACT_PLAN_ALREADY_EXISTS',
+      message: 'Este contrato já possui um plano de gestão aplicado.',
+      sqlState: '23505',
+      details: error
+    };
+  }
+
+  if (message.includes('CONTRACT_TASK_NOT_FOUND')) {
+    return {
+      code: 'CONTRACT_TASK_NOT_FOUND',
+      message: 'Tarefa do plano de gestão do contrato não encontrada.',
+      sqlState: 'P0002',
+      details: error
+    };
+  }
+
+  if (message.includes('INVALID_TASK_STATUS')) {
+    return {
+      code: 'INVALID_TASK_STATUS',
+      message: 'Status de tarefa inválido. Valores permitidos: PENDENTE, EM_ANDAMENTO, CONCLUIDA, NAO_APLICAVEL.',
+      sqlState: '22023',
+      details: error
+    };
+  }
+
   if (message.includes('INVALID_EMPENHO_ID_FORMAT')) {
     return {
       code: 'INVALID_EMPENHO_ID_FORMAT',

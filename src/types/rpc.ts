@@ -23,6 +23,13 @@ export type MutationErrorCode =
   | 'PROCESS_SEI_NOT_FOUND'
   | 'INVALID_PROCESS_SEI_STATUS'
   | 'CONTRACT_NOT_FOUND'
+  | 'DUPLICATE_TEMPLATE'
+  | 'TEMPLATE_NOT_FOUND'
+  | 'MACROTASK_NOT_FOUND'
+  | 'TEMPLATE_TASK_NOT_FOUND'
+  | 'CONTRACT_PLAN_ALREADY_EXISTS'
+  | 'CONTRACT_TASK_NOT_FOUND'
+  | 'INVALID_TASK_STATUS'
   | 'NETWORK_OR_CONFIG_ERROR'
   | 'UNKNOWN';
 
@@ -243,6 +250,108 @@ export interface RpcDeleteProcessoSeiResult {
   id: string;
   numero_processo_sei: string;
   message: string;
+}
+
+// -------------------------------------------------------------
+// Gestão de Contratos: Gestor, Templates e Plano de Tarefas
+// -------------------------------------------------------------
+export type ContractTaskStatus = 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'NAO_APLICAVEL';
+
+export interface RpcContractManagerItem {
+  contract_key: string;
+  uasg: string;
+  numero: string;
+  ano: number;
+  gestor_nome: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RpcContractManagerResult {
+  success: boolean;
+  manager: RpcContractManagerItem;
+}
+
+export interface RpcContractTaskTemplateItem {
+  id: string;
+  nome: string;
+  descricao?: string | null;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RpcContractTaskTemplateResult {
+  success: boolean;
+  template: RpcContractTaskTemplateItem;
+}
+
+export interface RpcDeleteContractTaskTemplateResult {
+  success: boolean;
+  id: string;
+  nome: string;
+  message: string;
+}
+
+export interface RpcContractTaskTemplateMacrotaskItem {
+  id: string;
+  template_id: string;
+  nome: string;
+  ordem: number;
+}
+
+export interface RpcContractTaskTemplateMacrotaskResult {
+  success: boolean;
+  macrotask: RpcContractTaskTemplateMacrotaskItem;
+}
+
+export interface RpcContractTaskTemplateTaskItem {
+  id: string;
+  macrotask_id: string;
+  nome: string;
+  ordem: number;
+}
+
+export interface RpcContractTaskTemplateTaskResult {
+  success: boolean;
+  task: RpcContractTaskTemplateTaskItem;
+}
+
+export interface RpcGenericDeleteResult {
+  success: boolean;
+  id: string;
+  message: string;
+}
+
+export interface RpcApplyContractTaskTemplateResult {
+  success: boolean;
+  plan_id: string;
+  contract_key: string;
+  template_id: string;
+  template_nome: string;
+  macrotasks_count: number;
+  tasks_count: number;
+  timestamp: string;
+}
+
+export interface RpcContractTaskItem {
+  id: string;
+  macrotask_id: string;
+  nome: string;
+  ordem: number;
+  status: ContractTaskStatus;
+  responsavel_nome?: string | null;
+  prazo?: string | null;
+  observacao?: string | null;
+  criado_em: string;
+  atualizado_em: string;
+  concluido_em?: string | null;
+  concluido_por?: string | null;
+}
+
+export interface RpcUpdateContractTaskResult {
+  success: boolean;
+  task: RpcContractTaskItem;
 }
 
 

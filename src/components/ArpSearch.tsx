@@ -585,8 +585,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({ onSelectArp, onSelectItem,
       {/* Search Filter Card */}
       <section className="comprassusp-filter-card">
         <div className="filter-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <h2 className="section-title" style={{ fontSize: '1.2rem', margin: 0, borderBottom: 'none', paddingBottom: 0 }}>
-            <Search size={20} color="var(--primary)" /> Filtrar Atas de Registro de Preços
+          <h2 className="section-title" style={{ fontSize: '1.15rem', margin: 0, borderBottom: 'none', paddingBottom: 0 }}>
+            <Search size={18} color="var(--primary)" /> Filtros de Pesquisa
           </h2>
           <SyncStatusBadge
             syncInfo={syncInfo}
