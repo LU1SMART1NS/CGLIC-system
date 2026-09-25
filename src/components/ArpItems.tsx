@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, HelpCircle, ShoppingBag, Eye, Users, Award, ExternalLink, DollarSign, RefreshCw, CheckCircle } from 'lucide-react';
+import { ChevronLeft, HelpCircle, Eye, Users, Award, ExternalLink, DollarSign, RefreshCw, CheckCircle, Package } from 'lucide-react';
 import { fetchArpItems, fetchPncpAtaVigencia, enrichArpWithPncpVigencia } from '../services/api';
 import { cacheArpsInDb } from '../services/dbCacheService';
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../utils/pncpUtils';
+import { AppCard, AppButton, PageHeader } from '../design-system';
 import type { ArpRecord, ArpItemRecord } from '../types';
 
 interface ArpItemsProps {
@@ -125,152 +126,125 @@ export const ArpItems: React.FC<ArpItemsProps> = ({ arp, onSelectItem, onBack })
     return { hasAllocations, hasEmpenhos };
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Navigation Breadcrumb */}
-      <div className="breadcrumb">
-        <span className="breadcrumb-item" style={{ cursor: 'pointer' }} onClick={onBack}>
-          Atas
-        </span>
-        <span style={{ margin: '0 0.25rem' }}>/</span>
-        <span className="breadcrumb-item active">Ata {arp.numeroAtaRegistroPreco}</span>
-      </div>
+  const ataUrl = formatPncpAtaUrl(currentArp.linkAtaPNCP, currentArp.numeroControlePncpAta, currentArp.numeroAtaRegistroPreco);
+  const compraUrl = formatPncpCompraUrl(currentArp.linkCompraPNCP, currentArp.numeroControlePncpCompra, currentArp.numeroControlePncpAta);
 
-      {/* Header card with ARP general info */}
-      <section className="glass-card" style={{ background: 'linear-gradient(135deg, #f0f5fc 0%, #e1ebf8 100%)', borderColor: '#b2cbe6' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-              <span className="badge badge-info">Ata nº {currentArp.numeroAtaRegistroPreco}</span>
-              <span className="badge badge-success">UASG Gerenciadora: {currentArp.codigoUnidadeGerenciadora}</span>
-              {currentArp.prorrogadaPncp && (
-                <span className="badge" style={{ backgroundColor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: '0.75rem', fontWeight: 700 }}>
-                  <CheckCircle size={12} style={{ display: 'inline', marginRight: '3px' }} /> Prorrogada no PNCP até {formatDate(currentArp.dataVigenciaFinal)}
-                </span>
-              )}
-              {syncStatus && (
-                <span className="badge" style={{ backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac', fontSize: '0.75rem' }}>
-                  ✓ {syncStatus}
-                </span>
-              )}
-            </div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              {currentArp.nomeUnidadeGerenciadora}
-            </h2>
-          </div>
+  return (
+    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Sovereign PageHeader */}
+      <PageHeader
+        title={`Itens Registrados na Ata nº ${currentArp.numeroAtaRegistroPreco}`}
+        subtitle={`${currentArp.nomeUnidadeGerenciadora} • UASG: ${currentArp.codigoUnidadeGerenciadora}`}
+        icon={<Package size={26} color="#0c326f" aria-hidden="true" />}
+        actions={
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button
+            <AppButton
+              variant="outline"
+              size="sm"
+              icon={<ChevronLeft size={14} />}
+              onClick={onBack}
+            >
+              Voltar para Atas
+            </AppButton>
+            <AppButton
+              variant="outline"
+              size="sm"
+              icon={<RefreshCw size={14} className={isSyncing ? 'spin-animation' : ''} />}
               onClick={handleManualSyncClick}
               disabled={isSyncing}
-              className="btn btn-primary"
-              style={{
-                padding: '0.4rem 0.85rem',
-                fontSize: '0.82rem',
-                backgroundColor: '#0284c7',
-                borderColor: '#0284c7',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem'
-              }}
+              isLoading={isSyncing}
             >
-              <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
               {isSyncing ? 'Sincronizando...' : 'Sincronizar com API'}
-            </button>
-
-            <button onClick={onBack} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-              <ChevronLeft size={16} /> Voltar à busca
-            </button>
+            </AppButton>
           </div>
+        }
+      />
+
+      {/* Modern Executive ARP Info Card */}
+      <AppCard style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }}>
+            Ata nº {currentArp.numeroAtaRegistroPreco}
+          </span>
+          <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }}>
+            UASG: {currentArp.codigoUnidadeGerenciadora}
+          </span>
+          {currentArp.prorrogadaPncp && (
+            <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '6px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <CheckCircle size={12} /> Prorrogada no PNCP até {formatDate(currentArp.dataVigenciaFinal)}
+            </span>
+          )}
+          {syncStatus && (
+            <span style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600 }}>
+              ✓ {syncStatus}
+            </span>
+          )}
         </div>
 
-        {/* Re-organized metadata layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '2rem', marginTop: '0.5rem' }}>
-          
-          {/* Left Column: Objeto (Justified description, centered label) */}
-          <div className="meta-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderRight: '1px solid rgba(0,0,0,0.06)', paddingRight: '1.5rem' }}>
-            <span className="meta-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', color: '#0c326f', textAlign: 'center', width: '100%', display: 'block' }}>
+        {/* 4-column Executive Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+          <div className="meta-field">
+            <span className="meta-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', color: '#0c326f', display: 'block', marginBottom: '0.25rem' }}>
               Objeto da Ata
             </span>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'justify', lineHeight: '1.5' }}>
-              {currentArp.objeto}
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5', textAlign: 'justify' }}>
+              {currentArp.objeto || 'Não informado'}
             </div>
           </div>
 
-          {/* Right Column: Stacked fields with centered labels and values */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', justifyContent: 'center' }}>
-            
-            <div className="meta-field" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-              <span className="meta-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', color: '#0c326f', width: '100%' }}>
-                Órgão Superior
-              </span>
-              <span className="meta-value" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '0.2rem', fontWeight: 600 }}>
-                {currentArp.nomeOrgao || currentArp.nomeUnidadeGerenciadora}
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', width: '100%' }}>
-              <div className="meta-field" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                <span className="meta-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', color: '#0c326f', width: '100%' }}>
-                  Vigência
-                </span>
-                <span className="meta-value" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '0.2rem', fontWeight: 600 }}>
-                  {formatDate(currentArp.dataVigenciaInicial)} a {formatDate(currentArp.dataVigenciaFinal)}
-                </span>
-              </div>
-
-              <div className="meta-field" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                <span className="meta-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', color: '#0c326f', width: '100%' }}>
-                  Valor Total da Ata
-                </span>
-                <span className="meta-value" style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--success)', marginTop: '0.2rem', fontFamily: 'monospace' }}>
-                  {formatCurrency(currentArp.valorTotal)}
-                </span>
-              </div>
-            </div>
-
+          <div className="meta-field">
+            <span className="meta-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', color: '#0c326f', display: 'block', marginBottom: '0.25rem' }}>
+              Órgão Superior
+            </span>
+            <span className="meta-value" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, display: 'block' }}>
+              {currentArp.nomeOrgao || currentArp.nomeUnidadeGerenciadora}
+            </span>
           </div>
 
+          <div className="meta-field">
+            <span className="meta-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', color: '#0c326f', display: 'block', marginBottom: '0.25rem' }}>
+              Vigência
+            </span>
+            <span className="meta-value" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, display: 'block' }}>
+              {formatDate(currentArp.dataVigenciaInicial)} a {formatDate(currentArp.dataVigenciaFinal)}
+            </span>
+          </div>
+
+          <div className="meta-field">
+            <span className="meta-label" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', color: '#0c326f', display: 'block', marginBottom: '0.25rem' }}>
+              Valor Total da Ata
+            </span>
+            <span className="meta-value" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--success)', fontFamily: 'monospace', display: 'block' }}>
+              {formatCurrency(currentArp.valorTotal)}
+            </span>
+          </div>
         </div>
 
-        {/* External links */}
-        {(() => {
-          const ataUrl = formatPncpAtaUrl(currentArp.linkAtaPNCP, currentArp.numeroControlePncpAta, currentArp.numeroAtaRegistroPreco);
-          const compraUrl = formatPncpCompraUrl(currentArp.linkCompraPNCP, currentArp.numeroControlePncpCompra, currentArp.numeroControlePncpAta);
-          if (!ataUrl && !compraUrl) return null;
+        {/* PNCP External Links */}
+        {(ataUrl || compraUrl) && (
+          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {ataUrl && (
+              <a href={ataUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                <AppButton variant="outline" size="sm" icon={<ExternalLink size={13} />}>
+                  Ver Ata no PNCP
+                </AppButton>
+              </a>
+            )}
+            {compraUrl && (
+              <a href={compraUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                <AppButton variant="outline" size="sm" icon={<ExternalLink size={13} />}>
+                  Ver Edital / Contratação no PNCP
+                </AppButton>
+              </a>
+            )}
+          </div>
+        )}
+      </AppCard>
 
-          return (
-            <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {ataUrl && (
-                <a 
-                  href={ataUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="btn btn-secondary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: 600, color: '#0369a1', borderColor: '#bae6fd', background: '#f0f9ff', padding: '0.35rem 0.75rem' }}
-                >
-                  <ExternalLink size={13} /> Ver Ata no PNCP
-                </a>
-              )}
-              {compraUrl && (
-                <a 
-                  href={compraUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="btn btn-secondary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: 600, color: '#0369a1', borderColor: '#bae6fd', background: '#f0f9ff', padding: '0.35rem 0.75rem' }}
-                >
-                  <ExternalLink size={13} /> Ver Edital / Contratação no PNCP
-                </a>
-              )}
-            </div>
-          );
-        })()}
-      </section>
-
-      {/* Items section */}
-      <section className="glass-card">
-        <h3 className="section-title" style={{ fontSize: '1.2rem', marginBottom: '1.5rem' }}>
-          <ShoppingBag size={18} color="var(--primary)" /> Itens Registrados na Ata ({items.length})
+      {/* Items Section */}
+      <AppCard style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
+        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0c326f', margin: 0, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Package size={18} color="#0c326f" /> Itens Registrados na Ata ({items.length})
         </h3>
 
         {loading ? (
@@ -292,11 +266,15 @@ export const ArpItems: React.FC<ArpItemsProps> = ({ arp, onSelectItem, onBack })
                 <div key={`${item.numeroItem}-${idx}`} className="item-card">
                   <div className="item-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span className="item-number">Item {item.numeroItem}</span>
-                      <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>
-                        {item.tipoItem}
+                      <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }}>
+                        Item {item.numeroItem}
                       </span>
-                      <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>
+                      {item.tipoItem && (
+                        <span style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 600 }}>
+                          {item.tipoItem}
+                        </span>
+                      )}
+                      <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 600 }}>
                         Código: {item.codigoItem}
                       </span>
 
@@ -341,13 +319,14 @@ export const ArpItems: React.FC<ArpItemsProps> = ({ arp, onSelectItem, onBack })
                         </span>
                       )}
                     </div>
-                    <button 
+                    <AppButton 
+                      variant="primary"
+                      size="sm"
+                      icon={<Eye size={13} />}
                       onClick={() => onSelectItem(item)}
-                      className="btn btn-primary" 
-                      style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', fontSize: '0.8rem' }}
                     >
-                      <Eye size={12} /> Saldos & Órgãos
-                    </button>
+                      Saldos & Órgãos
+                    </AppButton>
                   </div>
 
                   <div className="item-description">
@@ -403,7 +382,7 @@ export const ArpItems: React.FC<ArpItemsProps> = ({ arp, onSelectItem, onBack })
             })}
           </div>
         )}
-      </section>
+      </AppCard>
     </div>
   );
 };

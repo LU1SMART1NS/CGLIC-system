@@ -168,7 +168,10 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
   it('4. Deve calcular dias restantes de vigência com precisão', () => {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 45);
-    const dateStr = futureDate.toISOString().split('T')[0];
+    const year = futureDate.getFullYear();
+    const month = String(futureDate.getMonth() + 1).padStart(2, '0');
+    const day = String(futureDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const remaining = calculateDaysRemaining(dateStr);
     expect(remaining).toBe(45);
   });

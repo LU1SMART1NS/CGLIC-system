@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronUp,
   Sliders,
-  Loader2,
   ExternalLink,
   Save
 } from 'lucide-react';
@@ -23,6 +22,7 @@ import { useUpdateContractTask } from '../../hooks/useUpdateContractTask';
 import { getContractManagementKey } from '../../services/contractManagementService';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { getExecutionModeDisplay } from './ContractAttentionCenter';
+import { AppButton } from '../../design-system/components/AppButton';
 
 interface ContractTasksSectionProps {
   contract: ContractDashboardRecord;
@@ -250,39 +250,24 @@ const TaskItemRow: React.FC<{
           </div>
 
           <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-            <button
+            <AppButton
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => setExpanded(false)}
-              style={{
-                padding: '0.35rem 0.75rem',
-                fontSize: '0.78rem',
-                background: '#fff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
             >
               Cancelar
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="submit"
+              variant="primary"
+              size="sm"
+              icon={<Save size={13} />}
               disabled={updateMutation.isPending}
-              style={{
-                padding: '0.35rem 0.75rem',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                background: '#0c326f',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: updateMutation.isPending ? 'wait' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
+              isLoading={updateMutation.isPending}
             >
-              <Save size={13} /> Salvar Alterações
-            </button>
+              Salvar Alterações
+            </AppButton>
           </div>
         </form>
       )}
@@ -361,27 +346,16 @@ export const ContractTasksSection: React.FC<ContractTasksSectionProps> = ({
             ))}
           </select>
 
-          <button
+          <AppButton
             type="button"
+            variant="primary"
+            size="sm"
             onClick={handleApplyTemplate}
             disabled={!selectedTemplateId || applyTemplateMutation.isPending}
-            style={{
-              padding: '0.45rem 1rem',
-              backgroundColor: '#0c326f',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: !selectedTemplateId || applyTemplateMutation.isPending ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
+            isLoading={applyTemplateMutation.isPending}
           >
-            {applyTemplateMutation.isPending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : null}
             Aplicar Modelo
-          </button>
+          </AppButton>
         </div>
       </div>
     );

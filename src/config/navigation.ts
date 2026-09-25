@@ -1,19 +1,18 @@
 import {
-  Home,
+  LayoutDashboard,
   Package,
   FileText,
   Settings,
   Clock,
   Coins,
-  ShieldCheck,
   Sliders,
   Users,
   KeyRound,
-  FileCheck,
   Search,
-  Building2,
   FileSpreadsheet,
-  Activity
+  Receipt,
+  Landmark,
+  AlertTriangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -31,45 +30,44 @@ export interface NavItem {
   };
   /** Rotas que devem manter este item destacado no sidebar mesmo sem match exato (ex.: telas de detalhe). */
   matchPrefixes?: string[];
+  /** Subrotas específicas que NÃO devem ativar este item (para evitar conflito com itens irmãos). */
+  excludePrefixes?: string[];
   /** Identificador de ação customizada (ex.: abrir modal global) */
   actionId?: string;
 }
 
 /**
- * Configuração central de navegação do SaldoARP (Fase 3.5 — 6 Pilares):
- * - 🏠 Início
- * - ⏰ Central de Prazos
- * - 📦 Atas de Registro de Preços
- *     - Consulta e Vigência
- *     - Alocações por Unidade
- * - 📑 Contratos
- *     - Acompanhamento e Prazos
- *     - Modelos de Gestão Contratual (Templates)
- *     - Prorrogações & Reajustes (Em breve)
- * - ⚙️ Execução & Processos
- *     - Processos Administrativos (SEI)
- *     - Exportação Gerencial Excel
- *     - Empenhos e Conciliação (Em breve)
- * - 👥 Administração
- *     - Departamentos e Unidades
- *     - Usuários e Servidores
- *     - Perfis e Permissões
- *     - Auditoria (Em breve)
+ * Configuração definitiva de navegação do SaldoARP:
+ * - Visão Geral (/)
+ * - Central de Atenção (/prazos)
+ * - Atas de Registro de Preços (recolhível)
+ *     - Consulta e Vigência (/atas)
+ *     - Alocações por Unidade (/atas/saldos-unidade)
+ * - Contratos (recolhível)
+ *     - Acompanhamento e Prazos (/contratos)
+ *     - Modelos de Gestão (open-contract-templates)
+ * - Execução Financeira (recolhível)
+ *     - Pagamentos (/pagamentos)
+ *     - Empenhos & Execução (/empenhos)
+ * - Administração (recolhível)
+ *     - Usuários e Servidores (/admin/usuarios)
+ *     - Perfis e Permissões (/admin/perfis)
  */
 export const navigationConfig: NavItem[] = [
   {
-    id: 'inicio',
-    label: 'Início',
-    icon: Home,
+    id: 'visao-geral',
+    label: 'Visão Geral',
+    icon: LayoutDashboard,
     route: '/',
     status: 'active'
   },
   {
-    id: 'prazos',
-    label: 'Central de Prazos',
-    icon: Clock,
+    id: 'central-atencao',
+    label: 'Central de Atenção',
+    icon: AlertTriangle,
     route: '/prazos',
-    status: 'active'
+    status: 'active',
+    matchPrefixes: ['/prazos']
   },
   {
     id: 'atas',
@@ -78,15 +76,16 @@ export const navigationConfig: NavItem[] = [
     status: 'active',
     children: [
       {
-        id: 'atas-dashboard',
+        id: 'atas-consulta',
         label: 'Consulta e Vigência',
         icon: Search,
         route: '/atas',
         status: 'active',
-        matchPrefixes: ['/atas/itens']
+        matchPrefixes: ['/atas', '/atas/itens', '/atas/itens/saldo'],
+        excludePrefixes: ['/atas/saldos-unidade']
       },
       {
-        id: 'atas-saldos',
+        id: 'atas-alocacoes',
         label: 'Alocações por Unidade',
         icon: Coins,
         route: '/atas/saldos-unidade',
@@ -102,53 +101,45 @@ export const navigationConfig: NavItem[] = [
     status: 'active',
     children: [
       {
-        id: 'contratos-dashboard',
+        id: 'contratos-acompanhamento',
         label: 'Acompanhamento e Prazos',
         icon: Clock,
         route: '/contratos',
         status: 'active',
-        matchPrefixes: ['/contratos']
+        matchPrefixes: ['/contratos'],
+        excludePrefixes: ['/contratos/modelos']
       },
       {
-        id: 'contratos-templates',
+        id: 'contratos-modelos',
         label: 'Modelos de Gestão',
         icon: Sliders,
+        route: '/contratos/modelos',
         status: 'active',
-        actionId: 'open-contract-templates'
-      },
-      {
-        id: 'contratos-aditivos',
-        label: 'Prorrogações & Reajustes',
-        icon: FileCheck,
-        status: 'planned'
+        matchPrefixes: ['/contratos/modelos']
       }
     ]
   },
   {
-    id: 'execucao-processos',
-    label: 'Execução & Processos',
-    icon: Activity,
+    id: 'execucao-financeira',
+    label: 'Execução Financeira',
+    icon: Landmark,
     status: 'active',
     children: [
       {
-        id: 'processos-sei',
-        label: 'Processos Administrativos (SEI)',
-        icon: FileText,
+        id: 'execucao-pagamentos',
+        label: 'Pagamentos',
+        icon: Receipt,
+        route: '/pagamentos',
         status: 'active',
-        actionId: 'open-sei-modal'
-      },
-      {
-        id: 'execucao-exportar',
-        label: 'Exportação Gerencial Excel',
-        icon: FileSpreadsheet,
-        status: 'active',
-        actionId: 'open-export-modal'
+        matchPrefixes: ['/pagamentos']
       },
       {
         id: 'execucao-empenhos',
-        label: 'Empenhos e Conciliação',
-        icon: Coins,
-        status: 'planned'
+        label: 'Empenhos e Execução',
+        icon: FileSpreadsheet,
+        route: '/empenhos',
+        status: 'active',
+        matchPrefixes: ['/empenhos']
       }
     ]
   },
@@ -159,31 +150,20 @@ export const navigationConfig: NavItem[] = [
     status: 'active',
     children: [
       {
-        id: 'admin-departamentos',
-        label: 'Departamentos e Unidades',
-        icon: Building2,
-        status: 'active',
-        actionId: 'open-departments-modal'
-      },
-      {
         id: 'admin-usuarios',
         label: 'Usuários e Servidores',
         icon: Users,
         route: '/admin/usuarios',
-        status: 'active'
+        status: 'active',
+        matchPrefixes: ['/admin/usuarios']
       },
       {
         id: 'admin-perfis',
         label: 'Perfis e Permissões',
         icon: KeyRound,
         route: '/admin/perfis',
-        status: 'active'
-      },
-      {
-        id: 'admin-auditoria',
-        label: 'Auditoria',
-        icon: ShieldCheck,
-        status: 'planned'
+        status: 'active',
+        matchPrefixes: ['/admin/perfis']
       }
     ]
   }
@@ -195,24 +175,28 @@ export interface BreadcrumbEntry {
 }
 
 const staticRouteLabels: Record<string, string> = {
-  '/': 'Início',
-  '/prazos': 'Central de Prazos',
-  '/atas': 'Atas de Registro de Preços',
+  '/': 'Visão Geral',
+  '/prazos': 'Central de Atenção',
+  '/atas': 'Consulta e Vigência',
   '/atas/itens': 'Itens da Ata',
   '/atas/itens/saldo': 'Saldo do Item',
   '/atas/saldos-unidade': 'Alocações por Unidade',
-  '/contratos': 'Acompanhamento e Prazos de Contratos',
+  '/contratos': 'Acompanhamento e Prazos',
+  '/contratos/modelos': 'Modelos de Gestão',
+  '/pagamentos': 'Pagamentos',
+  '/empenhos': 'Empenhos e Execução',
+  '/admin/departamentos': 'Unidades Internas',
   '/admin/usuarios': 'Usuários e Servidores',
   '/admin/perfis': 'Perfis e Permissões'
 };
 
 export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   if (pathname === '/') {
-    return [{ label: 'Início' }];
+    return [{ label: 'Visão Geral' }];
   }
 
   const segments = pathname.split('/').filter(Boolean);
-  const crumbs: BreadcrumbEntry[] = [{ label: 'Início', route: '/' }];
+  const crumbs: BreadcrumbEntry[] = [{ label: 'Visão Geral', route: '/' }];
   let accPath = '';
 
   for (let i = 0; i < segments.length; i++) {
@@ -228,4 +212,3 @@ export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
 
   return crumbs;
 }
-

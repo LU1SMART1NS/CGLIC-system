@@ -7,7 +7,8 @@ import {
   CheckCircle2,
   ExternalLink,
   ShieldCheck,
-  Check
+  Check,
+  TrendingUp
 } from 'lucide-react';
 import type {
   ContractDashboardRecord,
@@ -15,13 +16,20 @@ import type {
   ContractTaskPlan,
   TaskExecutionMode
 } from '../../types';
+import type { PaymentAlert } from '../../types/paymentFollowUp';
+import type { ReajusteRadarAlert } from '../../types/contractReajusteRadar';
 import { differenceInDays, parseDateBRT, formatDateBR } from '../../services/temporalEngineService';
 import { useUpdateContractTask } from '../../hooks/useUpdateContractTask';
+import { useContractPaymentFollowUp } from '../../hooks/useContractPaymentFollowUp';
+import { useContractEvents } from '../../hooks/useContractEvents';
 import { getContractManagementKey } from '../../services/contractManagementService';
+import { evaluateContractReajusteRadar } from '../../services/contractReajusteRadarService';
 
 interface ContractAttentionCenterProps {
   contract: ContractDashboardRecord;
   plan: ContractTaskPlan | null;
+  paymentAlerts?: PaymentAlert[];
+  reajusteAlert?: ReajusteRadarAlert | null;
   isLoading?: boolean;
 }
 
@@ -101,10 +109,22 @@ export function getExecutionModeDisplay(mode?: TaskExecutionMode): {
 export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = ({
   contract,
   plan,
+  paymentAlerts: externalPaymentAlerts,
+  reajusteAlert: externalReajusteAlert,
   isLoading = false
 }) => {
   const contractKey = contract.id || getContractManagementKey(contract.uasg, contract.numero, contract.ano);
   const updateMutation = useUpdateContractTask(contractKey);
+  const { alerts: hookPaymentAlerts } = useContractPaymentFollowUp(contractKey);
+  const { data: contractEvents = [] } = useContractEvents(contract);
+
+  const paymentAlerts = externalPaymentAlerts || hookPaymentAlerts;
+
+  // Radar Preditivo de Reajuste / Repactuação (Fase 7.5-C3)
+  const computedReajusteAlert = React.useMemo(() => {
+    if (externalReajusteAlert !== undefined) return externalReajusteAlert;
+    return evaluateContractReajusteRadar({ contract, events: contractEvents });
+  }, [externalReajusteAlert, contract, contractEvents]);
 
   // Extrair tarefas ativas e ordenar por prioridade de atenção
   const attentionItems: AttentionItem[] = React.useMemo(() => {
@@ -165,6 +185,20 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
     });
   };
 
+  const scrollToPaymentSection = () => {
+    const el = document.getElementById('contract-payment-followup-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const scrollToTimelineSection = () => {
+    const el = document.getElementById('contract-timeline-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   if (isLoading) {
     return (
       <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
@@ -173,8 +207,13 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
     );
   }
 
+  const hasNoItems =
+    attentionItems.length === 0 &&
+    (!paymentAlerts || paymentAlerts.length === 0) &&
+    !computedReajusteAlert;
+
   // Estado Positivo: Sem pendências que exijam atenção
-  if (attentionItems.length === 0) {
+  if (hasNoItems) {
     return (
       <div
         style={{
@@ -205,7 +244,7 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
           Tudo em dia com este contrato
         </h4>
         <p style={{ fontSize: '0.85rem', color: '#166534', margin: 0 }}>
-          {plan ? 'Todas as tarefas do plano de gestão foram concluídas ou marcadas como não aplicáveis.' : 'Nenhum plano de tarefas ativo possui pendências críticas neste momento.'}
+          {plan ? 'Todas as tarefas do plano de gestão e ciclos de faturamento estão regulares.' : 'Nenhum plano de tarefas, ciclo de faturamento ou marco de reajuste possui pendências críticas neste momento.'}
         </p>
       </div>
     );
@@ -213,6 +252,238 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+      {/* Alerta de Radar Preditivo de Reajuste / Repactuação (Fase 7.5-C3) */}
+      {computedReajusteAlert && (
+        <div
+          data-testid="reajuste-radar-alert-card"
+          key={computedReajusteAlert.id}
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            padding: '1rem 1.25rem',
+            borderRadius: '8px',
+            backgroundColor:
+              computedReajusteAlert.nivel === 'VENCIDA'
+                ? '#fff8f8'
+                : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
+                ? '#fffbeb'
+                : '#f0f9ff',
+            border: `1px solid ${
+              computedReajusteAlert.nivel === 'VENCIDA'
+                ? '#fecaca'
+                : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
+                ? '#fde68a'
+                : '#bae6fd'
+            }`,
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+            flexWrap: 'wrap'
+          }}
+        >
+          <div style={{ flex: 1, minWidth: '280px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '4px',
+                  backgroundColor:
+                    computedReajusteAlert.nivel === 'VENCIDA'
+                      ? '#fee2e2'
+                      : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
+                      ? '#ffedd5'
+                      : '#e0f2fe',
+                  color:
+                    computedReajusteAlert.nivel === 'VENCIDA'
+                      ? '#991b1b'
+                      : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
+                      ? '#c2410c'
+                      : '#0369a1',
+                  border: `1px solid ${
+                    computedReajusteAlert.nivel === 'VENCIDA'
+                      ? '#fecaca'
+                      : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
+                      ? '#fed7aa'
+                      : '#bae6fd'
+                  }`
+                }}
+              >
+                <Clock size={12} />
+                {computedReajusteAlert.nivel === 'VENCIDA'
+                  ? 'Marco Transcorrido'
+                  : computedReajusteAlert.nivel === 'HOJE'
+                  ? 'Marco Atingido Hoje'
+                  : computedReajusteAlert.nivel === 'URGENTE'
+                  ? `Urgente (${computedReajusteAlert.diasRestantes}d)`
+                  : `Próximo (${computedReajusteAlert.diasRestantes}d)`}
+              </span>
+
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f3ff',
+                  color: '#6d28d9',
+                  border: '1px solid #ddd6fe'
+                }}
+              >
+                <TrendingUp size={12} /> Radar de Reajuste / Repactuação
+              </span>
+            </div>
+
+            <h4
+              style={{
+                fontSize: '0.96rem',
+                fontWeight: 700,
+                color: '#0f172a',
+                margin: '0 0 0.25rem 0',
+                lineHeight: '1.4'
+              }}
+            >
+              {computedReajusteAlert.titulo}
+            </h4>
+
+            <p style={{ fontSize: '0.84rem', color: '#334155', margin: '0 0 0.4rem 0', lineHeight: '1.4' }}>
+              {computedReajusteAlert.descricao}
+            </p>
+
+            <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>Orientação: {computedReajusteAlert.recomendacao}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={scrollToTimelineSection}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '0.4rem 0.8rem',
+                backgroundColor: '#0c326f',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <span>Ver Histórico</span>
+              <ExternalLink size={13} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Alertas Operacionais de Acompanhamento de Pagamentos */}
+      {paymentAlerts && paymentAlerts.map(alert => {
+        const isCritico = alert.nivel === 'CRITICO';
+        const isAtencao = alert.nivel === 'ATENCAO';
+
+        return (
+          <div
+            key={alert.id}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              padding: '1rem 1.25rem',
+              borderRadius: '8px',
+              backgroundColor: isCritico ? '#fff8f8' : isAtencao ? '#fffbeb' : '#f8faff',
+              border: `1px solid ${isCritico ? '#fecaca' : isAtencao ? '#fde68a' : '#bfdbfe'}`,
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ flex: 1, minWidth: '280px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '4px',
+                    backgroundColor: isCritico ? '#fee2e2' : isAtencao ? '#ffedd5' : '#e0f2fe',
+                    color: isCritico ? '#991b1b' : isAtencao ? '#c2410c' : '#0369a1',
+                    border: `1px solid ${isCritico ? '#fecaca' : isAtencao ? '#fed7aa' : '#bae6fd'}`
+                  }}
+                >
+                  {isCritico ? <AlertTriangle size={12} /> : <AlertCircle size={12} />}
+                  {isCritico ? 'Crítico / Vencido' : isAtencao ? 'Atenção Operacional' : 'Acompanhamento'}
+                </span>
+
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '4px',
+                    backgroundColor: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe'
+                  }}
+                >
+                  <ShieldCheck size={12} /> Acompanhamento de Pagamento
+                </span>
+              </div>
+
+              <h4
+                style={{
+                  fontSize: '0.96rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  margin: '0 0 0.25rem 0',
+                  lineHeight: '1.4'
+                }}
+              >
+                {alert.mensagem}
+              </h4>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={scrollToPaymentSection}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '0.4rem 0.8rem',
+                  backgroundColor: '#0c326f',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <span>Acessar Ciclo</span>
+                <ExternalLink size={13} />
+              </button>
+            </div>
+          </div>
+        );
+      })}
       {attentionItems.map(({ task, macrotaskName, level, diasRestantes }) => {
         const modeInfo = getExecutionModeDisplay(task.executionMode);
         const isConfirmacao = task.executionMode === 'CONFIRMACAO';
@@ -237,26 +508,26 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
         } else if (level === 'HOJE') {
           urgencyBadge = {
             label: 'Vence hoje',
-            bg: '#ffedd5',
-            color: '#c2410c',
-            border: '#fed7aa',
-            icon: AlertCircle
-          };
-        } else if (level === 'URGENTE') {
-          urgencyBadge = {
-            label: `Vence em ${diasRestantes} dias`,
             bg: '#fef3c7',
             color: '#b45309',
             border: '#fde68a',
             icon: Clock
           };
+        } else if (level === 'URGENTE') {
+          urgencyBadge = {
+            label: `${diasRestantes}d restantes`,
+            bg: '#ffedd5',
+            color: '#c2410c',
+            border: '#fed7aa',
+            icon: Clock
+          };
         } else if (level === 'PROXIMA') {
           urgencyBadge = {
-            label: `Prazo: ${diasRestantes} dias`,
-            bg: '#e0f2fe',
+            label: `${diasRestantes}d restantes`,
+            bg: '#f0f9ff',
             color: '#0369a1',
             border: '#bae6fd',
-            icon: Calendar
+            icon: Clock
           };
         }
 
@@ -272,16 +543,16 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
               gap: '1rem',
               padding: '1rem 1.25rem',
               borderRadius: '8px',
-              backgroundColor: isConfirmacao ? '#f8faff' : level === 'VENCIDA' ? '#fff8f8' : '#ffffff',
-              border: `1px solid ${level === 'VENCIDA' ? '#fecaca' : isConfirmacao ? '#bfdbfe' : '#e2e8f0'}`,
+              backgroundColor: level === 'VENCIDA' ? '#fff8f8' : level === 'HOJE' ? '#fffbeb' : '#ffffff',
+              border: `1px solid ${level === 'VENCIDA' ? '#fecaca' : level === 'HOJE' ? '#fde68a' : '#e2e8f0'}`,
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
               flexWrap: 'wrap'
             }}
           >
-            {/* Lado Esquerdo: Identificação e Contexto */}
+            {/* Lado Esquerdo: Badges, Título, Macrotarefa e Prazo */}
             <div style={{ flex: 1, minWidth: '280px' }}>
+              {/* Badges de Contexto: Nível de Atenção e Semântica de Execução */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-                {/* Badge de Urgência Temporal */}
                 <span
                   style={{
                     display: 'inline-flex',
@@ -296,10 +567,10 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
                     border: `1px solid ${urgencyBadge.border}`
                   }}
                 >
-                  <UrgencyIcon size={12} /> {urgencyBadge.label}
+                  <UrgencyIcon size={12} />
+                  {urgencyBadge.label}
                 </span>
 
-                {/* Badge de Modo de Execução */}
                 <span
                   style={{
                     display: 'inline-flex',
@@ -314,9 +585,12 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
                     border: `1px solid ${modeInfo.border}`
                   }}
                 >
-                  {isConfirmacao && <ShieldCheck size={12} />}
+                  {isConfirmacao ? <ShieldCheck size={12} /> : null}
                   {modeInfo.label}
-                  {task.sistemaDestino && ` (${task.sistemaDestino})`}
+                </span>
+
+                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                  {macrotaskName}
                 </span>
               </div>
 
@@ -333,83 +607,24 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
                 {task.nome}
               </h4>
 
-              {/* Contexto: Macrotarefa / Observação */}
-              <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '0.85rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                <span>
-                  <strong>Fase:</strong> {macrotaskName}
-                </span>
+              {/* Metadados: Data Limite e Sistema de Destino */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.78rem', color: '#64748b' }}>
                 {task.prazo && (
-                  <span>
-                    <strong>Vencimento:</strong> {formatDateBR(task.prazo)}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Calendar size={12} /> Prazo: <strong>{formatDateBR(task.prazo)}</strong>
                   </span>
                 )}
-                {task.responsavelNome && (
+                {task.sistemaDestino && (
                   <span>
-                    <strong>Responsável:</strong> {task.responsavelNome}
+                    Sistema: <strong>{task.sistemaDestino}</strong>
                   </span>
                 )}
               </div>
-
-              {task.observacao && (
-                <p style={{ fontSize: '0.8rem', color: '#475569', margin: '0.4rem 0 0 0', fontStyle: 'italic', background: '#f8fafc', padding: '0.35rem 0.6rem', borderRadius: '4px' }}>
-                  "{task.observacao}"
-                </p>
-              )}
             </div>
 
-            {/* Lado Direito: Ações Contextuais */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {/* Link para Sistema Externo */}
-              {task.externalLinkUrl && (
-                <a
-                  href={task.externalLinkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '0.35rem 0.75rem',
-                    backgroundColor: '#ffffff',
-                    color: '#0c326f',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    textDecoration: 'none'
-                  }}
-                >
-                  <span>{task.sistemaDestino ? `Abrir no ${task.sistemaDestino}` : 'Abrir Sistema'}</span>
-                  <ExternalLink size={13} />
-                </a>
-              )}
-
-              {/* Atalho PNCP para tarefas de confirmação oficial */}
-              {isConfirmacao && contract.linkPncp && !task.externalLinkUrl && (
-                <a
-                  href={contract.linkPncp}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '0.35rem 0.75rem',
-                    backgroundColor: '#eff6ff',
-                    color: '#1d4ed8',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: '6px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    textDecoration: 'none'
-                  }}
-                >
-                  <span>Verificar no PNCP</span>
-                  <ExternalLink size={13} />
-                </a>
-              )}
-
-              {/* Botão de Conclusão Rápida */}
+            {/* Lado Direito: Ações Rápidas Assistidas */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {/* Botão de Conclusão Rápida para Tarefas Internas */}
               <button
                 type="button"
                 onClick={() => handleQuickComplete(task)}
@@ -418,20 +633,47 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  padding: '0.35rem 0.75rem',
-                  backgroundColor: '#f0fdf4',
-                  color: '#15803d',
-                  border: '1px solid #bbf7d0',
+                  padding: '0.4rem 0.8rem',
+                  backgroundColor: isConfirmacao ? '#0c326f' : '#f8fafc',
+                  color: isConfirmacao ? '#ffffff' : '#0c326f',
+                  border: `1px solid ${isConfirmacao ? '#0c326f' : '#cbd5e1'}`,
                   borderRadius: '6px',
                   fontSize: '0.78rem',
                   fontWeight: 700,
-                  cursor: updateMutation.isPending ? 'wait' : 'pointer'
+                  cursor: updateMutation.isPending ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease'
                 }}
-                title="Marcar providência como concluída"
+                title="Marcar tarefa como concluída"
               >
-                <Check size={14} />
-                <span>Concluir</span>
+                <Check size={13} />
+                <span>{isConfirmacao ? 'Confirmar Oficialmente' : 'Concluir'}</span>
               </button>
+
+              {/* Link para o SEI se houver processo vinculado */}
+              {contract.processo && (
+                <a
+                  href={`https://sei.mj.gov.br/sei/controlador.php?acao=procedimento_trabalhar&id_procedimento=${encodeURIComponent(contract.processo)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '0.4rem 0.65rem',
+                    backgroundColor: '#ffffff',
+                    color: '#64748b',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    textDecoration: 'none'
+                  }}
+                  title="Abrir processo no SEI"
+                >
+                  <span>SEI</span>
+                  <ExternalLink size={12} />
+                </a>
+              )}
             </div>
           </div>
         );

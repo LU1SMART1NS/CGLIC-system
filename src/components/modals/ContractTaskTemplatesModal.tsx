@@ -19,6 +19,7 @@ import { useDeleteContractTaskTemplateMacrotask } from '../../hooks/useDeleteCon
 import { useSaveContractTaskTemplateTask } from '../../hooks/useSaveContractTaskTemplateTask';
 import { useDeleteContractTaskTemplateTask } from '../../hooks/useDeleteContractTaskTemplateTask';
 import type { ContractTaskTemplate, ContractTaskTemplateMacrotask } from '../../types';
+import { AppButton } from '../../design-system/components/AppButton';
 
 interface ContractTaskTemplatesModalProps {
   isOpen: boolean;
@@ -120,15 +121,17 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: ContractTaskTemplat
               onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); }}
               style={{ flex: 1, fontSize: '0.8rem', padding: '0.3rem 0.5rem', border: '1px solid #e2e8f0', borderRadius: '4px' }}
             />
-            <button
+            <AppButton
               type="button"
+              variant="secondary"
+              size="sm"
+              icon={<Plus size={12} />}
               onClick={handleAddTask}
               disabled={!newTaskNome.trim() || saveTask.isPending}
-              className="btn btn-secondary"
-              style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              isLoading={saveTask.isPending}
             >
-              <Plus size={12} /> Adicionar tarefa
-            </button>
+              Adicionar tarefa
+            </AppButton>
           </div>
         </div>
       )}
@@ -167,13 +170,18 @@ const TemplateEditor: React.FC<{ template: ContractTaskTemplate }> = ({ template
             INATIVO
           </span>
         )}
-        <button type="button" onClick={handleToggleAtivo} className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem' }}>
+        <AppButton
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={handleToggleAtivo}
+        >
           {template.ativo ? 'Desativar' : 'Ativar'}
-        </button>
+        </AppButton>
         <button
           type="button"
           onClick={() => { if (confirm(`Excluir o template "${template.nome}"? Contratos que já aplicaram este template não serão afetados.`)) deleteTemplate.mutate(template.id); }}
-          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}
+          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0.25rem' }}
           title="Excluir template"
         >
           <Trash2 size={15} />
@@ -198,15 +206,17 @@ const TemplateEditor: React.FC<{ template: ContractTaskTemplate }> = ({ template
               onKeyDown={e => { if (e.key === 'Enter') handleAddMacrotask(); }}
               style={{ flex: 1, fontSize: '0.82rem', padding: '0.35rem 0.6rem', border: '1px solid #e2e8f0', borderRadius: '6px' }}
             />
-            <button
+            <AppButton
               type="button"
+              variant="secondary"
+              size="sm"
+              icon={<Plus size={13} />}
               onClick={handleAddMacrotask}
               disabled={!newMacroNome.trim() || saveMacrotask.isPending}
-              className="btn btn-secondary"
-              style={{ fontSize: '0.78rem', padding: '0.35rem 0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              isLoading={saveMacrotask.isPending}
             >
-              <Plus size={13} /> Adicionar macrotarefa
-            </button>
+              Adicionar macrotarefa
+            </AppButton>
           </div>
         </div>
       )}
@@ -258,9 +268,16 @@ export const ContractTaskTemplatesModal: React.FC<ContractTaskTemplatesModalProp
               onChange={e => setNovoNome(e.target.value)}
               style={{ flex: 1, fontSize: '0.85rem', padding: '0.5rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '6px' }}
             />
-            <button type="submit" disabled={!novoNome.trim() || saveTemplate.isPending} className="btn btn-primary" style={{ fontSize: '0.82rem', padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-              <Plus size={14} /> Criar template
-            </button>
+            <AppButton
+              type="submit"
+              variant="primary"
+              size="sm"
+              icon={<Plus size={14} />}
+              disabled={!novoNome.trim() || saveTemplate.isPending}
+              isLoading={saveTemplate.isPending}
+            >
+              Criar template
+            </AppButton>
           </form>
 
           {error && (

@@ -2,6 +2,7 @@ import React from 'react';
 import { Share2 } from 'lucide-react';
 import { formatNumber, formatCurrency, formatDate, getProgressColorClass } from './itemBalanceUtils';
 import type { AdesaoItemRecord, ArpItemRecord } from '../../types';
+import { EmptyState } from '../../design-system/components/EmptyState';
 
 export interface AdesoesTabProps {
   adesoesLoading: boolean;
@@ -31,27 +32,31 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0.5rem 1rem' }}>
       {/* Header / Context Banner */}
-      <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '1rem 1.25rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
-          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-            <Share2 size={16} /> Adesões / Caronas de Órgãos Não Participantes
+      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem 1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+            Adesões e Caronas de Órgãos Não Participantes
           </h4>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>Endpoint 5: 5_consultarAdesoesItem</span>
-            <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>Art. 86 da Lei 14.133/21</span>
+            <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#0c326f', border: '1px solid #cbd5e1', fontSize: '0.72rem', fontWeight: 700 }}>
+              Compras.gov.br Oficial
+            </span>
+            <span className="badge" style={{ backgroundColor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: '0.72rem', fontWeight: 700 }}>
+              Art. 86 da Lei 14.133/21
+            </span>
           </div>
         </div>
-        <p style={{ fontSize: '0.8rem', color: '#1e3a8a', margin: 0, lineHeight: 1.5 }}>
+        <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
           Este painel detalha as solicitações e autorizações de adesão (caronas) formalizadas por órgãos e entidades externas que não integraram inicialmente o processo licitatório. 
-          Os limites legais da Lei 14.133/2021 estabelecem teto de até <strong>50%</strong> do quantitativo do item por órgão não participante e <strong>200% (2x)</strong> no total cumulativo da Ata.
+          Os limites da Lei 14.133/2021 estabelecem teto de até <strong>50%</strong> do quantitativo do item por órgão não participante e <strong>200% (2x)</strong> no total cumulativo da Ata.
         </p>
       </div>
 
       {/* Stat Cards for Caronas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-        <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <span className="meta-label" style={{ fontSize: '0.7rem' }}>Órgãos Solicitantes (Caronas)</span>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0c326f', fontFamily: 'monospace', marginTop: '0.2rem' }}>
             {adesoes.length} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>órgãos</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
@@ -59,10 +64,10 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
           </div>
         </div>
 
-        <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <span className="meta-label" style={{ fontSize: '0.7rem' }}>Total Autorizado para Caronas</span>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '0.2rem' }}>
-            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0c326f', fontFamily: 'monospace' }}>
               {formatNumber(totalAdesaoRegistrada)}
             </span>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -77,7 +82,7 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
           </div>
         </div>
 
-        <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <span className="meta-label" style={{ fontSize: '0.7rem' }}>Total Empenhado por Caronas</span>
           <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--warning)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
             {formatNumber(totalAdesaoEmpenhada)} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>un</span>
@@ -87,7 +92,7 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
           </div>
         </div>
 
-        <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <span className="meta-label" style={{ fontSize: '0.7rem' }}>Saldo Concedido Não Empenhado</span>
           <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
             {formatNumber(saldoNaoEmpenhado)} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>un</span>
@@ -102,15 +107,15 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
       {adesoesLoading ? (
         <div className="spinner-container" style={{ padding: '2rem' }}>
           <div className="spinner spinner-glow"></div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Consultando adesões de carona no Compras.gov.br (Endpoint 5)...</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Consultando adesões de carona no Compras.gov.br...</p>
         </div>
       ) : adesoes.length === 0 ? (
-        <div className="empty-state" style={{ padding: '3rem 1.5rem', background: '#ffffff', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-          <Share2 size={40} className="empty-state-icon" style={{ opacity: 0.4, color: 'var(--primary)' }} />
-          <h4 style={{ margin: '0.5rem 0 0.25rem', fontSize: '1rem', color: 'var(--text-primary)' }}>Nenhuma Carona Externa Registrada</h4>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: '520px', margin: '0 auto' }}>
-            {adesoesError || `Nenhum órgão não participante solicitou ou teve autorização de adesão registrada para o Item ${item.numeroItem} no módulo oficial do Compras.gov.br.`}
-          </p>
+        <div style={{ background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '1rem' }}>
+          <EmptyState
+            title="Nenhuma Carona Externa Registrada"
+            description={adesoesError || `Nenhum órgão não participante solicitou ou teve autorização de adesão registrada para o Item ${item.numeroItem} no módulo oficial do Compras.gov.br.`}
+            icon={<Share2 size={36} color="#94a3b8" />}
+          />
         </div>
       ) : (
         <div className="table-container" style={{ marginTop: 0, overflowX: 'auto', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>

@@ -15,11 +15,12 @@ import type {
   CentralPrazosFilterParams,
   EntidadeOrigemTipo
 } from '../types/centralPrazos';
-import type {
-  ContractDashboardRecord,
-  ArpRecord,
-  ContractManager,
-  ContractTaskPlan
+import {
+  type ContractDashboardRecord,
+  type ArpRecord,
+  type ContractManager,
+  type ContractTaskPlan,
+  isInstrumentoSubstitutivo
 } from '../types';
 import {
   parseDateBRT,
@@ -52,6 +53,29 @@ export interface BuildCentralPrazosOptions {
   managersMap?: Record<string, ContractManager>;
   plans?: Record<string, ContractTaskPlan>;
   taskPlansMap?: Record<string, ContractTaskPlan>;
+  arpItems?: Array<{
+    item_key?: string;
+    itemKey?: string;
+    numero_ata?: string;
+    numeroAta?: string;
+    codigo_uasg?: string;
+    codigoUasg?: string;
+    uasg?: string;
+    numero_item?: number | string;
+    numeroItem?: number | string;
+    descricao_item?: string;
+    descricaoItem?: string;
+    quantidade_homologada?: number;
+    quantidadeHomologada?: number;
+    quantidade_consumida?: number;
+    quantidadeConsumida?: number;
+    saldo_disponivel?: number;
+    saldoDisponivel?: number;
+    percentual_consumido?: number;
+    percentualConsumido?: number;
+    fornecedor_razao_social?: string;
+    fornecedorNome?: string;
+  }>;
   currentDate?: Date;
 }
 
@@ -70,6 +94,7 @@ export function buildCentralPrazosItems(
   let arps: ArpRecord[] = [];
   let managersMap: Record<string, ContractManager> = {};
   let taskPlansMap: Record<string, ContractTaskPlan> = {};
+  let arpItems: BuildCentralPrazosOptions['arpItems'] = [];
   let currentDate: Date | undefined;
 
   if (Array.isArray(contractsOrOptions)) {
@@ -83,6 +108,7 @@ export function buildCentralPrazosItems(
     arps = contractsOrOptions.arps || [];
     managersMap = contractsOrOptions.managers || contractsOrOptions.managersMap || {};
     taskPlansMap = contractsOrOptions.plans || contractsOrOptions.taskPlansMap || {};
+    arpItems = contractsOrOptions.arpItems || [];
     currentDate = contractsOrOptions.currentDate;
   }
 
@@ -174,103 +200,116 @@ export function buildCentralPrazosItems(
     if (contract.dataVigenciaFim) {
       const cicloVigencia = contract.dataVigenciaFim.replace(/\D/g, '');
 
-      // Gatilho 180d: Início do Planejamento de Prorrogação
-      const calc180 = calculateDeadline({
-        dataBase: contract.dataVigenciaFim,
-        fonteDataBase: contract.fonteDados || 'Contratos.gov.br',
-        regra: REGRAS_OPERACIONAIS_PADRAO.PRORROGACAO_180D,
-        currentDate
-      });
+      // Regra de Instrumentos Substitutivos (Art. 95 da Lei 14.133/2021):
+      // Instrumentos substitutivos (ex: Nota de Empenho, Autorização de Compra)
+      // que não possuam vigência/obrigação futura continuada (ex: compra com entrega imediata)
+      // não devem entrar automaticamente no radar D-180 / D-60 de prorrogação continuada.
+      // Se possuir vigência futura formal prolongada (dataVigenciaFim diferente e posterior à data inicial),
+      // mantém o comportamento temporal compatível.
+      const isSubst = isInstrumentoSubstitutivo(contract.tipoInstrumento);
+      const isEntregaImediataSemVigenciaFutura = isSubst && (
+        !contract.dataVigenciaInicio || contract.dataVigenciaInicio === contract.dataVigenciaFim
+      );
 
-      if (calc180) {
-        const trigger180Id = generateIdempotentItemId({
-          tipoEntidade: 'CONTRATO',
-          idEntidade: contractKey,
-          eventoId: 'PRORROGACAO',
-          regraId: 'GATILHO_180D',
-          cicloRef: `VIG_${cicloVigencia}`
+      if (!isEntregaImediataSemVigenciaFutura) {
+        // Gatilho 180d: Início do Planejamento de Prorrogação
+        const calc180 = calculateDeadline({
+          dataBase: contract.dataVigenciaFim,
+          fonteDataBase: contract.fonteDados || 'Contratos.gov.br',
+          regra: REGRAS_OPERACIONAIS_PADRAO.PRORROGACAO_180D,
+          currentDate
         });
 
-        if (!processedKeys.has(trigger180Id)) {
-          processedKeys.add(trigger180Id);
-          items.push({
-            id: trigger180Id,
-            tipoItem: 'GATILHO_OPERACIONAL',
-            entidadeOrigem: 'CONTRATO',
-            contractKey,
-            identificadorFormatado: numDisplay,
-            uasg: contract.uasg,
-            objetoResumido: contract.objeto,
-            fornecedorNome: contract.fornecedorNome,
-            fornecedorCnpj: contract.fornecedorCnpjCpf,
-            processoNumero: contract.processo,
-
-            marcoEvento: 'Término da Vigência',
-            dataBase: contract.dataVigenciaFim,
-            fonteDataBase: contract.fonteDados || 'Contratos.gov.br',
-            regraNome: calc180.explicabilidade.regraNome,
-            regraTipo: calc180.explicabilidade.regraTipo,
-            dataAlvo: calc180.dataAlvo,
-            diasRestantes: calc180.diasRestantes,
-            estadoTemporal: calc180.statusTemporal,
-            nivelAtencao: calc180.nivelAtencao,
-
-            responsavelNome: gestorNome || 'Gestor não atribuído',
-            isGestorContrato: !!gestorNome,
-            acaoDescricao: 'Avaliar viabilidade de prorrogação contratual (Gatilho preventivo)',
-
-            explicabilidade: calc180.explicabilidade
+        if (calc180) {
+          const trigger180Id = generateIdempotentItemId({
+            tipoEntidade: 'CONTRATO',
+            idEntidade: contractKey,
+            eventoId: 'PRORROGACAO',
+            regraId: 'GATILHO_180D',
+            cicloRef: `VIG_${cicloVigencia}`
           });
+
+          if (!processedKeys.has(trigger180Id)) {
+            processedKeys.add(trigger180Id);
+            items.push({
+              id: trigger180Id,
+              tipoItem: 'GATILHO_OPERACIONAL',
+              entidadeOrigem: 'CONTRATO',
+              contractKey,
+              identificadorFormatado: numDisplay,
+              uasg: contract.uasg,
+              objetoResumido: contract.objeto,
+              fornecedorNome: contract.fornecedorNome,
+              fornecedorCnpj: contract.fornecedorCnpjCpf,
+              processoNumero: contract.processo,
+
+              marcoEvento: 'Término da Vigência',
+              dataBase: contract.dataVigenciaFim,
+              fonteDataBase: contract.fonteDados || 'Contratos.gov.br',
+              regraNome: calc180.explicabilidade.regraNome,
+              regraTipo: calc180.explicabilidade.regraTipo,
+              dataAlvo: calc180.dataAlvo,
+              diasRestantes: calc180.diasRestantes,
+              estadoTemporal: calc180.statusTemporal,
+              nivelAtencao: calc180.nivelAtencao,
+
+              responsavelNome: gestorNome || 'Gestor não atribuído',
+              isGestorContrato: !!gestorNome,
+              acaoDescricao: 'Avaliar viabilidade de prorrogação contratual (Gatilho preventivo)',
+
+              explicabilidade: calc180.explicabilidade
+            });
+          }
         }
-      }
 
-      // Gatilho 60d: Remessa Jurídica / Urgência de Término
-      const calc60 = calculateDeadline({
-        dataBase: contract.dataVigenciaFim,
-        fonteDataBase: contract.fonteDados || 'Contratos.gov.br',
-        regra: REGRAS_OPERACIONAIS_PADRAO.REMESSA_JURIDICA_60D,
-        currentDate
-      });
-
-      if (calc60) {
-        const trigger60Id = generateIdempotentItemId({
-          tipoEntidade: 'CONTRATO',
-          idEntidade: contractKey,
-          eventoId: 'VIGENCIA_FINAL',
-          regraId: 'GATILHO_60D',
-          cicloRef: `VIG_${cicloVigencia}`
+        // Gatilho 60d: Remessa Jurídica / Urgência de Término
+        const calc60 = calculateDeadline({
+          dataBase: contract.dataVigenciaFim,
+          fonteDataBase: contract.fonteDados || 'Contratos.gov.br',
+          regra: REGRAS_OPERACIONAIS_PADRAO.REMESSA_JURIDICA_60D,
+          currentDate
         });
 
-        if (!processedKeys.has(trigger60Id)) {
-          processedKeys.add(trigger60Id);
-          items.push({
-            id: trigger60Id,
-            tipoItem: 'GATILHO_OPERACIONAL',
-            entidadeOrigem: 'CONTRATO',
-            contractKey,
-            identificadorFormatado: numDisplay,
-            uasg: contract.uasg,
-            objetoResumido: contract.objeto,
-            fornecedorNome: contract.fornecedorNome,
-            fornecedorCnpj: contract.fornecedorCnpjCpf,
-            processoNumero: contract.processo,
-
-            marcoEvento: 'Término da Vigência',
-            dataBase: contract.dataVigenciaFim,
-            fonteDataBase: contract.fonteDados || 'Contratos.gov.br',
-            regraNome: calc60.explicabilidade.regraNome,
-            regraTipo: calc60.explicabilidade.regraTipo,
-            dataAlvo: calc60.dataAlvo,
-            diasRestantes: calc60.diasRestantes,
-            estadoTemporal: calc60.statusTemporal,
-            nivelAtencao: calc60.nivelAtencao,
-
-            responsavelNome: gestorNome || 'Gestor não atribuído',
-            isGestorContrato: !!gestorNome,
-            acaoDescricao: 'Instrução final de aditamento ou preparativos de encerramento',
-
-            explicabilidade: calc60.explicabilidade
+        if (calc60) {
+          const trigger60Id = generateIdempotentItemId({
+            tipoEntidade: 'CONTRATO',
+            idEntidade: contractKey,
+            eventoId: 'VIGENCIA_FINAL',
+            regraId: 'GATILHO_60D',
+            cicloRef: `VIG_${cicloVigencia}`
           });
+
+          if (!processedKeys.has(trigger60Id)) {
+            processedKeys.add(trigger60Id);
+            items.push({
+              id: trigger60Id,
+              tipoItem: 'GATILHO_OPERACIONAL',
+              entidadeOrigem: 'CONTRATO',
+              contractKey,
+              identificadorFormatado: numDisplay,
+              uasg: contract.uasg,
+              objetoResumido: contract.objeto,
+              fornecedorNome: contract.fornecedorNome,
+              fornecedorCnpj: contract.fornecedorCnpjCpf,
+              processoNumero: contract.processo,
+
+              marcoEvento: 'Término da Vigência',
+              dataBase: contract.dataVigenciaFim,
+              fonteDataBase: contract.fonteDados || 'Contratos.gov.br',
+              regraNome: calc60.explicabilidade.regraNome,
+              regraTipo: calc60.explicabilidade.regraTipo,
+              dataAlvo: calc60.dataAlvo,
+              diasRestantes: calc60.diasRestantes,
+              estadoTemporal: calc60.statusTemporal,
+              nivelAtencao: calc60.nivelAtencao,
+
+              responsavelNome: gestorNome || 'Gestor não atribuído',
+              isGestorContrato: !!gestorNome,
+              acaoDescricao: 'Instrução final de aditamento ou preparativos de encerramento',
+
+              explicabilidade: calc60.explicabilidade
+            });
+          }
         }
       }
     }
@@ -280,19 +319,77 @@ export function buildCentralPrazosItems(
   for (const arp of arps) {
     if (!arp.dataVigenciaFinal) continue;
 
+    const targetDate = parseDateBRT(arp.dataVigenciaFinal);
+    if (!targetDate) continue;
+
     const arpKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
     const cicloAta = arp.dataVigenciaFinal.replace(/\D/g, '');
+    const diasAteVencimentoAta = differenceInDays(targetDate, currentDate);
+    const isAtaVencida = diasAteVencimentoAta < 0;
 
-    // Gatilho 90d: Alerta de Exaustão de Vigência da ARP
-    const calcArp = calculateDeadline({
+    // A) Gatilho 180d: Marco Operacional de Planejamento de Prorrogação da Ata
+    // REGRA CARDINAL: Se a Ata já estiver vencida (diasAteVencimentoAta < 0),
+    // NÃO gerar gatilho prospectivo de "Planejar prorrogação".
+    if (!isAtaVencida) {
+      const calc180 = calculateDeadline({
+        dataBase: arp.dataVigenciaFinal,
+        fonteDataBase: arp.linkAtaPNCP ? 'PNCP' : 'Compras.gov.br',
+        regra: REGRAS_OPERACIONAIS_PADRAO.ARP_PRORROGACAO_180D,
+        currentDate
+      });
+
+      if (calc180) {
+        const arpTrigger180Id = generateIdempotentItemId({
+          tipoEntidade: 'ARP',
+          idEntidade: arpKey,
+          eventoId: 'PRORROGACAO_ARP',
+          regraId: 'GATILHO_180D',
+          cicloRef: `VIG_${cicloAta}`
+        });
+
+        if (!processedKeys.has(arpTrigger180Id)) {
+          processedKeys.add(arpTrigger180Id);
+          items.push({
+            id: arpTrigger180Id,
+            tipoItem: 'GATILHO_OPERACIONAL',
+            entidadeOrigem: 'ARP',
+            arpKey,
+            identificadorFormatado: `ARP ${arp.numeroAtaRegistroPreco}`,
+            uasg: arp.codigoUnidadeGerenciadora,
+            objetoResumido: arp.objeto,
+            fornecedorNome: undefined,
+            processoNumero: arp.numeroCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : undefined,
+
+            marcoEvento: 'Vigência da Ata de Registro de Preços',
+            dataBase: arp.dataVigenciaFinal,
+            fonteDataBase: arp.linkAtaPNCP ? 'PNCP' : 'Compras.gov.br',
+            regraNome: calc180.explicabilidade.regraNome,
+            regraTipo: calc180.explicabilidade.regraTipo,
+            dataAlvo: calc180.dataAlvo,
+            diasRestantes: calc180.diasRestantes,
+            estadoTemporal: calc180.statusTemporal,
+            nivelAtencao: calc180.nivelAtencao,
+
+            responsavelNome: 'Coordenação de Compras / Gestor da Ata',
+            isGestorContrato: false,
+            acaoDescricao: 'Planejamento e análise de vantajosidade de prorrogação da Ata (Janela preventiva 180d)',
+
+            explicabilidade: calc180.explicabilidade
+          });
+        }
+      }
+    }
+
+    // B) Gatilho 90d: Alerta de Exaustão de Vigência da ARP (Preservado da arquitetura existente)
+    const calc90 = calculateDeadline({
       dataBase: arp.dataVigenciaFinal,
       fonteDataBase: arp.linkAtaPNCP ? 'PNCP' : 'Compras.gov.br',
       regra: REGRAS_OPERACIONAIS_PADRAO.ARP_VIGENCIA_90D,
       currentDate
     });
 
-    if (calcArp) {
-      const arpTriggerId = generateIdempotentItemId({
+    if (calc90) {
+      const arpTrigger90Id = generateIdempotentItemId({
         tipoEntidade: 'ARP',
         idEntidade: arpKey,
         eventoId: 'VIGENCIA_ARP',
@@ -300,10 +397,10 @@ export function buildCentralPrazosItems(
         cicloRef: `VIG_${cicloAta}`
       });
 
-      if (!processedKeys.has(arpTriggerId)) {
-        processedKeys.add(arpTriggerId);
+      if (!processedKeys.has(arpTrigger90Id)) {
+        processedKeys.add(arpTrigger90Id);
         items.push({
-          id: arpTriggerId,
+          id: arpTrigger90Id,
           tipoItem: 'GATILHO_OPERACIONAL',
           entidadeOrigem: 'ARP',
           arpKey,
@@ -313,22 +410,96 @@ export function buildCentralPrazosItems(
           fornecedorNome: undefined,
           processoNumero: arp.numeroCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : undefined,
 
-          marcoEvento: 'Vigência da Ata de Registro de Preços',
-          dataBase: arp.dataVigenciaFinal,
-          fonteDataBase: arp.linkAtaPNCP ? 'PNCP' : 'Compras.gov.br',
-          regraNome: calcArp.explicabilidade.regraNome,
-          regraTipo: calcArp.explicabilidade.regraTipo,
-          dataAlvo: calcArp.dataAlvo,
-          diasRestantes: calcArp.diasRestantes,
-          estadoTemporal: calcArp.statusTemporal,
-          nivelAtencao: calcArp.nivelAtencao,
+            marcoEvento: 'Vigência da Ata de Registro de Preços',
+            dataBase: arp.dataVigenciaFinal,
+            fonteDataBase: arp.linkAtaPNCP ? 'PNCP' : 'Compras.gov.br',
+            regraNome: calc90.explicabilidade.regraNome,
+            regraTipo: calc90.explicabilidade.regraTipo,
+            dataAlvo: calc90.dataAlvo,
+            diasRestantes: calc90.diasRestantes,
+            estadoTemporal: calc90.statusTemporal,
+            nivelAtencao: calc90.nivelAtencao,
 
-          responsavelNome: 'Coordenação de Compras / Gestor da Ata',
-          isGestorContrato: false,
-          acaoDescricao: 'Planejar nova licitação ou contratações remanescentes antes da expiração da Ata',
+            responsavelNome: 'Coordenação de Compras / Gestor da Ata',
+            isGestorContrato: false,
+            acaoDescricao: 'Planejar nova licitação ou contratações remanescentes antes da expiração da Ata',
 
-          explicabilidade: calcArp.explicabilidade
+            explicabilidade: calc90.explicabilidade
+          });
+        }
+      }
+    }
+
+  // 3. Processar Itens de Ata com Saldo Físico Crítico (>= 85%)
+  if (arpItems && arpItems.length > 0) {
+    for (const item of arpItems) {
+      const qtdHomologada = Number(item.quantidade_homologada ?? item.quantidadeHomologada ?? 0);
+      const qtdConsumida = Number(item.quantidade_consumida ?? item.quantidadeConsumida ?? 0);
+      const rawPerc = item.percentual_consumido ?? item.percentualConsumido;
+      const percentual = Number(
+        typeof rawPerc === 'number'
+          ? rawPerc
+          : (qtdHomologada > 0 ? (qtdConsumida / qtdHomologada) * 100 : 0)
+      );
+      const roundedPercentual = Number(percentual.toFixed(2));
+
+      if (roundedPercentual >= 85) {
+        const numAta = item.numero_ata || item.numeroAta || 'N/D';
+        const numItem = item.numero_item || item.numeroItem || 'N/D';
+        const uasg = item.codigo_uasg || item.codigoUasg || item.uasg || '200331';
+        const itemKey = item.item_key || item.itemKey || `${numAta}-${uasg}-${numItem}`;
+        const desc = item.descricao_item || item.descricaoItem || 'Item de Ata de Registro de Preços';
+        const fornecedor = item.fornecedor_razao_social || item.fornecedorNome;
+
+        const arpItemTriggerId = generateIdempotentItemId({
+          tipoEntidade: 'ARP',
+          idEntidade: itemKey,
+          eventoId: 'SALDO_CRITICO',
+          regraId: 'GATILHO_85PCT',
+          cicloRef: 'SALDO'
         });
+
+        if (!processedKeys.has(arpItemTriggerId)) {
+          processedKeys.add(arpItemTriggerId);
+          items.push({
+            id: arpItemTriggerId,
+            tipoItem: 'GATILHO_OPERACIONAL',
+            entidadeOrigem: 'ARP',
+            arpKey: itemKey,
+            identificadorFormatado: `Ata ${numAta} — Item ${numItem}`,
+            uasg,
+            objetoResumido: desc,
+            fornecedorNome: fornecedor,
+
+            marcoEvento: 'Saldo Físico de Ata',
+            dataBase: currentDate ? currentDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            fonteDataBase: 'v_arp_item_saldo_detalhado',
+            regraNome: 'Consumo Físico em Nível Crítico (≥85%)',
+            regraTipo: 'OPERACIONAL',
+            dataAlvo: '-',
+            diasRestantes: 0,
+            estadoTemporal: 'VENCE_HOJE',
+            nivelAtencao: 'CRITICO',
+
+            responsavelNome: 'Coordenação de Compras / Gestor da Ata',
+            isGestorContrato: false,
+            acaoDescricao: `Consumo físico atingiu ${roundedPercentual}%. Avaliar novo procedimento licitatório ou encerramento.`,
+
+            explicabilidade: {
+              dataBase: currentDate ? currentDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+              fonteDataBase: 'v_arp_item_saldo_detalhado',
+              regraNome: 'Consumo Físico em Nível Crítico (≥85%)',
+              regraTipo: 'OPERACIONAL',
+              unidadeContagem: 'DIAS_CORRIDOS',
+              offsetDias: 0,
+              dataCalculada: '-',
+              diasRestantes: 0,
+              statusTemporal: 'VENCE_HOJE',
+              nivelAtencao: 'CRITICO',
+              descricaoRegra: `Item com consumo de ${roundedPercentual}% (≥85% do saldo homologado). Alerta operacional preventivo.`
+            }
+          });
+        }
       }
     }
   }

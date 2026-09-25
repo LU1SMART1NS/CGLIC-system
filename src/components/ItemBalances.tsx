@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Building2, Users, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, Share2, RotateCcw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Building2, Users, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, RotateCcw, Eye } from 'lucide-react';
 import { fetchPncpContractEmpenhos, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateTotalEmpenhado, reconcileBalances, matchAndMergeEmpenhos, normalizeEmpenhoNumero, calculateAllocationsWithEmpenhos, calculateItemCardMetrics, deduceEmpenhoQuantity, getEmpenhoEffectiveValue } from '../services/balanceService';
 import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
@@ -21,10 +22,16 @@ import { useItemManualContracts } from '../hooks/useItemManualContracts';
 import { useSaveManualContract } from '../hooks/useSaveManualContract';
 import { useDeleteManualContract } from '../hooks/useDeleteManualContract';
 import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLinks';
-import { ManageDepartmentsModal } from './ManageDepartmentsModal';
+import { useItemContractLinks } from '../hooks/useItemContractLinks';
+import { useUnlinkContractFromItem } from '../hooks/useUnlinkContractFromItem';
+import { useContractsDashboard } from '../hooks/useContractsDashboard';
+import { enrichContractLinks } from '../services/arpContractLinkService';
+import { normalizeItemKey } from '../utils/itemKeyUtils';
+import { AppButton, AppCard, EmptyState } from '../design-system';
 
 import { ManualEmpenhoModal } from './modals/ManualEmpenhoModal';
 import { ManualContratoModal } from './modals/ManualContratoModal';
+import { LinkContractModal } from './modals/LinkContractModal';
 import { ItemReconciliationCard } from './ItemReconciliationCard';
 import { ItemBalancesHeader } from './item-balances/ItemBalancesHeader';
 import { ItemBalancesSummaryCards } from './item-balances/ItemBalancesSummaryCards';
@@ -88,8 +95,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const [selectedEmpenhoDetail, setSelectedEmpenhoDetail] = useState<EmpenhoSaldoItemRecord | null>(null);
 
   const {
-    data: allocationsState,
-    refetch: refetchAllocations
+    data: allocationsState
   } = useItemAllocations(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
@@ -155,6 +161,23 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
   // Estados Locais de Formulários e Modais (UI State)
   const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
+  const canonicalItemKey = normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
+
+  // Vínculos Oficiais com Contratos do SaldoARP (Fase 6.2)
+  const { data: contractLinks = [] } = useItemContractLinks(
+    arp.numeroAtaRegistroPreco,
+    arp.codigoUnidadeGerenciadora,
+    item.numeroItem,
+    canonicalItemKey
+  );
+  const { data: officialDashboardContracts = [] } = useContractsDashboard(arp.codigoUnidadeGerenciadora);
+  const unlinkContractMutation = useUnlinkContractFromItem();
+  const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
+
+  const enrichedOfficialLinks = useMemo(() => {
+    return enrichContractLinks(contractLinks, officialDashboardContracts);
+  }, [contractLinks, officialDashboardContracts]);
+
   const [editingEmpenhoKey, setEditingEmpenhoKey] = useState<string | null>(null);
   const [editingEmpenhoQty, setEditingEmpenhoQty] = useState<string>('');
   const [isManualEmpenhoModalOpen, setIsManualEmpenhoModalOpen] = useState<boolean>(false);
@@ -348,12 +371,28 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     }
   };
 
+  const handleUnlinkOfficialContract = async (linkId: string) => {
+    if (window.confirm('Tem certeza que deseja desvincular este contrato oficial deste item da ata?')) {
+      try {
+        await unlinkContractMutation.mutateAsync({
+          linkId,
+          itemKey: canonicalItemKey
+        });
+      } catch (err: any) {
+        console.error('Erro ao desvincular contrato oficial:', err);
+        if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
+          alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+        } else {
+          alert(`Erro ao desvincular contrato oficial: ${err?.message || 'Erro desconhecido'}`);
+        }
+      }
+    }
+  };
+
   // Cadastro de Unidades Oficiais
   const {
-    data: departments = [],
-    refetch: refetchDepartments
+    data: departments = []
   } = useDepartments();
-  const [isManageDepsModalOpen, setIsManageDepsModalOpen] = useState<boolean>(false);
 
   const getFirstAvailableUnitSigla = (
     deps: InternalDepartment[],
@@ -1043,7 +1082,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Navigation Breadcrumb & Item Info Overview */}
       <ItemBalancesHeader arp={arp} item={item} onBack={onBack} />
 
@@ -1083,86 +1122,86 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       )}
 
       {/* Granular unit breakdown */}
-      <section className="glass-card" style={{ padding: '1rem' }}>
-        <h3 className="section-title" style={{ fontSize: '1.1rem', padding: '0.5rem 1rem', marginBottom: '1rem' }}>
-          <Building2 size={16} color="var(--primary)" /> Detalhamento de Saldos e Empenhos por Órgão
+      <AppCard style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
+        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0c326f', margin: 0, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Building2 size={18} color="#0c326f" /> Detalhamento de Saldos e Empenhos por Órgão
         </h3>
 
-        {/* Tab navigation */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', paddingLeft: '1rem' }}>
+        {/* Tab navigation (Gov.br segmented / pill style) */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
           <button 
+            type="button"
             onClick={() => setActiveTab('unidades')}
             style={{
-              padding: '0.5rem 1.25rem',
-              borderRadius: '8px',
+              padding: '0.45rem 1rem',
+              borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '0.85rem',
-              fontWeight: 700,
-              background: activeTab === 'unidades' ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-              color: activeTab === 'unidades' ? '#fff' : 'var(--text-secondary)',
-              border: activeTab === 'unidades' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-              boxShadow: activeTab === 'unidades' ? '0 0 10px rgba(99, 102, 241, 0.3)' : 'none',
-              transition: 'all 0.2s ease'
+              fontWeight: activeTab === 'unidades' ? 700 : 500,
+              background: activeTab === 'unidades' ? '#0c326f' : '#f1f5f9',
+              color: activeTab === 'unidades' ? '#ffffff' : '#475569',
+              border: activeTab === 'unidades' ? '1px solid #0c326f' : '1px solid #e2e8f0',
+              transition: 'all 0.15s ease'
             }}
           >
-            Saldos dos Órgãos (Geral)
+            Saldos dos Órgãos
           </button>
           <button 
+            type="button"
             onClick={() => setActiveTab('alocacao')}
             style={{
-              padding: '0.5rem 1.25rem',
-              borderRadius: '8px',
+              padding: '0.45rem 1rem',
+              borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '0.85rem',
-              fontWeight: 700,
-              background: activeTab === 'alocacao' ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-              color: activeTab === 'alocacao' ? '#fff' : 'var(--text-secondary)',
-              border: activeTab === 'alocacao' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-              boxShadow: activeTab === 'alocacao' ? '0 0 10px rgba(99, 102, 241, 0.3)' : 'none',
-              transition: 'all 0.2s ease'
+              fontWeight: activeTab === 'alocacao' ? 700 : 500,
+              background: activeTab === 'alocacao' ? '#0c326f' : '#f1f5f9',
+              color: activeTab === 'alocacao' ? '#ffffff' : '#475569',
+              border: activeTab === 'alocacao' ? '1px solid #0c326f' : '1px solid #e2e8f0',
+              transition: 'all 0.15s ease'
             }}
           >
-            Alocação Interna (UG)
+            Alocação Interna
           </button>
           <button 
+            type="button"
             onClick={() => setActiveTab('empenhos')}
             style={{
-              padding: '0.5rem 1.25rem',
-              borderRadius: '8px',
+              padding: '0.45rem 1rem',
+              borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '0.85rem',
-              fontWeight: 700,
-              background: activeTab === 'empenhos' ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-              color: activeTab === 'empenhos' ? '#fff' : 'var(--text-secondary)',
-              border: activeTab === 'empenhos' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-              boxShadow: activeTab === 'empenhos' ? '0 0 10px rgba(99, 102, 241, 0.3)' : 'none',
-              transition: 'all 0.2s ease'
+              fontWeight: activeTab === 'empenhos' ? 700 : 500,
+              background: activeTab === 'empenhos' ? '#0c326f' : '#f1f5f9',
+              color: activeTab === 'empenhos' ? '#ffffff' : '#475569',
+              border: activeTab === 'empenhos' ? '1px solid #0c326f' : '1px solid #e2e8f0',
+              transition: 'all 0.15s ease'
             }}
           >
-            Contratos & Empenhos
+            Contratos e Empenhos
           </button>
           <button 
+            type="button"
             onClick={() => setActiveTab('adesoes')}
             style={{
-              padding: '0.5rem 1.25rem',
-              borderRadius: '8px',
+              padding: '0.45rem 1rem',
+              borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '0.85rem',
-              fontWeight: 700,
-              background: activeTab === 'adesoes' ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-              color: activeTab === 'adesoes' ? '#fff' : 'var(--text-secondary)',
-              border: activeTab === 'adesoes' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-              boxShadow: activeTab === 'adesoes' ? '0 0 10px rgba(99, 102, 241, 0.3)' : 'none',
-              transition: 'all 0.2s ease',
+              fontWeight: activeTab === 'adesoes' ? 700 : 500,
+              background: activeTab === 'adesoes' ? '#0c326f' : '#f1f5f9',
+              color: activeTab === 'adesoes' ? '#ffffff' : '#475569',
+              border: activeTab === 'adesoes' ? '1px solid #0c326f' : '1px solid #e2e8f0',
+              transition: 'all 0.15s ease',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.45rem'
             }}
           >
-            <Share2 size={13} /> Adesões / Caronas (Endpoint 5)
+            Adesões e Caronas
             {adesoes.length > 0 && (
               <span style={{
-                background: activeTab === 'adesoes' ? 'rgba(255,255,255,0.3)' : 'var(--accent)',
+                background: activeTab === 'adesoes' ? 'rgba(255,255,255,0.25)' : '#0c326f',
                 color: '#fff',
                 fontSize: '0.7rem',
                 padding: '0.1rem 0.45rem',
@@ -1185,20 +1224,32 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         ) : activeTab === 'empenhos' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             
-            {/* Section 1: Contratos (PNCP e Manuais) */}
-            <div className="glass-card" style={{ padding: '1.25rem', background: '#f8fafc', borderColor: '#e2e8f0' }}>
+            {/* Section 1: Contratos (PNCP, Oficiais e Manuais) */}
+            <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                  <Building2 size={16} /> Contratos Celebrados (PNCP e Manuais)
+                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                  <Building2 size={16} color="#0c326f" /> Contratos Celebrados
                 </h4>
-                <button
-                  type="button"
-                  onClick={() => setIsManualContratoModalOpen(true)}
-                  className="btn btn-primary"
-                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: '4px' }}
-                >
-                  <Plus size={14} /> Adicionar Contrato
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <AppButton
+                    variant="primary"
+                    size="sm"
+                    icon={<Plus size={14} />}
+                    onClick={() => setIsLinkContractModalOpen(true)}
+                    title="Vincular contrato oficial existente da UASG a este item da ata"
+                  >
+                    Vincular Contrato Oficial
+                  </AppButton>
+                  <AppButton
+                    variant="outline"
+                    size="sm"
+                    icon={<Plus size={14} />}
+                    onClick={() => setIsManualContratoModalOpen(true)}
+                    title="Cadastrar contrato manual (legado)"
+                  >
+                    Adicionar Manual
+                  </AppButton>
+                </div>
               </div>
 
               {contractsLoading ? (
@@ -1210,17 +1261,45 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                 <div style={{ padding: '1rem', color: 'var(--danger)', fontSize: '0.85rem', textAlign: 'center' }}>
                   ⚠️ {contractsError}
                 </div>
-              ) : (contracts.length === 0 && manualContratos.length === 0) ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', background: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
-                  Nenhum contrato cadastrado no PNCP ou manualmente para esta Ata.
-                </div>
+              ) : (contracts.length === 0 && manualContratos.length === 0 && enrichedOfficialLinks.length === 0) ? (
+                <EmptyState
+                  title="Nenhum contrato localizado"
+                  description="Nenhum contrato localizado no PNCP, vinculado oficialmente ou adicionado manualmente para esta Ata."
+                  icon={<Building2 size={32} color="#94a3b8" />}
+                />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   {(() => {
+                    const isGerenciadora = (u: string) => {
+                      const trimmed = String(u || '').trim();
+                      return trimmed === '200331' || trimmed === '200330' || (arp.codigoUnidadeGerenciadora && trimmed === String(arp.codigoUnidadeGerenciadora).trim());
+                    };
+
+                    const officialContractsList = enrichedOfficialLinks.map(oc => {
+                      const parts = oc.contractKey.split('-');
+                      const ano = parts.length >= 3 ? Number(parts[2]) : undefined;
+                      return {
+                        numeroContrato: oc.numeroContratoFormatado,
+                        anoContrato: ano,
+                        uasg: oc.uasg,
+                        orgaoNome: oc.orgaoNome,
+                        nomeRazaoSocialFornecedor: oc.fornecedorNome,
+                        niFornecedor: oc.fornecedorCnpj,
+                        numeroControlePncp: undefined,
+                        linkVisualizacao: oc.linkPncp,
+                        tipoUnidade: isGerenciadora(oc.uasg) ? 'GERENCIADORA' : 'PARTICIPANTE',
+                        quantidadeContratada: oc.quantidadeContratada,
+                        _isManual: false,
+                        _isOfficialLink: true,
+                        _linkId: oc.linkId,
+                        contractKey: oc.contractKey
+                      };
+                    });
+
                     const deduplicateContractsList = (list: any[]) => {
                       const map = new Map<string, any>();
                       list.forEach((c, idx) => {
-                        const canKey = getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp) || `contract-${idx}`;
+                        const canKey = c.contractKey || getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp) || `contract-${idx}`;
                         if (!map.has(canKey)) {
                           map.set(canKey, c);
                         } else {
@@ -1230,7 +1309,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                             ...c,
                             _isManual: existing._isManual || c._isManual,
                             _manualId: existing._manualId || c._manualId,
-                            quantidadeContratada: existing.quantidadeContratada ?? c.quantidadeContratada,
+                            _isOfficialLink: existing._isOfficialLink || c._isOfficialLink,
+                            _linkId: existing._linkId || c._linkId,
+                            contractKey: existing.contractKey || c.contractKey,
+                            quantidadeContratada: c.quantidadeContratada ?? existing.quantidadeContratada,
                             linkVisualizacao: existing.linkVisualizacao || c.linkVisualizacao
                           });
                         }
@@ -1245,12 +1327,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                         list: deduplicateContractsList([
                           ...contracts.filter(c => {
                             const u = String(c.uasg || '').trim();
-                            if (u === '200331' || u === '200330') return true;
+                            if (isGerenciadora(u)) return true;
                             if (c.tipoUnidade === 'GERENCIADORA') return true;
                             return false;
                           }),
+                          ...officialContractsList.filter(oc => isGerenciadora(oc.uasg)),
                           ...manualContratos
-                            .filter(mc => mc.uasg === '200331' || mc.uasg === '200330')
+                            .filter(mc => isGerenciadora(mc.uasg))
                             .map(mc => ({
                               numeroContrato: mc.numero,
                               anoContrato: mc.ano,
@@ -1274,12 +1357,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                         list: deduplicateContractsList([
                           ...contracts.filter(c => {
                             const u = String(c.uasg || '').trim();
-                            if (u === '200331' || u === '200330') return false;
+                            if (isGerenciadora(u)) return false;
                             if (c.tipoUnidade === 'GERENCIADORA') return false;
                             return true;
                           }),
+                          ...officialContractsList.filter(oc => !isGerenciadora(oc.uasg)),
                           ...manualContratos
-                            .filter(mc => mc.uasg !== '200331' && mc.uasg !== '200330')
+                            .filter(mc => !isGerenciadora(mc.uasg))
                             .map(mc => ({
                               numeroContrato: mc.numero,
                               anoContrato: mc.ano,
@@ -1330,7 +1414,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                             <tbody>
                               {section.list.map((c: any, idx) => {
                                 const contractUrl = c.linkVisualizacao || getContractPncpUrl(c);
-                                const canKey = getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp);
+                                const canKey = c.contractKey || getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp);
                                 const isExpanded = !!expandedContracts[c.numeroContrato] || !!expandedContracts[canKey];
                                 const govEmps = contractGovEmpenhos[c.numeroContrato] || contractGovEmpenhos[canKey];
                                 const pncpEmps = contractEmpenhos[c.numeroContrato] || contractEmpenhos[canKey];
@@ -1391,7 +1475,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                         )}
                                       </td>
                                       <td>
-                                        {c._isManual ? (
+                                        {c._isOfficialLink ? (
+                                          <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }} title="Contrato Oficial vinculado do SaldoARP">
+                                            🟢 Oficial
+                                          </span>
+                                        ) : c._isManual ? (
                                           <span style={{ background: '#fefce8', color: '#a16207', border: '1px solid #fde047', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }}>
                                             🟡 Manual
                                           </span>
@@ -1402,7 +1490,17 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                         )}
                                       </td>
                                       <td style={{ textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                          {c.contractKey && (
+                                            <Link
+                                              to={`/contratos/${encodeURIComponent(c.contractKey)}`}
+                                              className="btn btn-secondary"
+                                              style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', height: 'auto', border: '1px solid #93c5fd', color: '#1d4ed8', background: '#eff6ff', textDecoration: 'none', fontWeight: 600 }}
+                                              title="Abrir Contrato 360°"
+                                            >
+                                              <Eye size={13} /> Visão 360°
+                                            </Link>
+                                          )}
                                           {contractUrl ? (
                                             <a 
                                               href={contractUrl} 
@@ -1415,6 +1513,17 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                               <ExternalLink size={14} /> Visualizar
                                             </a>
                                           ) : null}
+                                          {c._isOfficialLink && c._linkId && (
+                                            <button
+                                              onClick={() => handleUnlinkOfficialContract(c._linkId)}
+                                              disabled={unlinkContractMutation.isPending}
+                                              className="btn btn-secondary"
+                                              style={{ padding: '0.3rem 0.5rem', color: '#b91c1c', border: '1px solid #fecaca', background: '#fef2f2', borderRadius: '4px' }}
+                                              title="Desvincular contrato oficial deste item"
+                                            >
+                                              <Trash2 size={13} />
+                                            </button>
+                                          )}
                                           {c._isManual && c._manualId && (
                                             <button
                                               onClick={() => handleDeleteManualContrato(c._manualId)}
@@ -1646,36 +1755,38 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                   ))}
                 </div>
               )}
-            </div>
+            </AppCard>
 
             {/* Section 2: Todas as Notas de Empenho Conhecidas (Consumo Real de Saldo) */}
-            <div className="glass-card" style={{ padding: '1.25rem', background: '#f8fafc', borderColor: '#e2e8f0' }}>
+            <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                    <DollarSign size={16} /> Notas de Empenho Conhecidas (Consumo de Saldo)
+                  <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                    <DollarSign size={16} color="#0c326f" /> Notas de Empenho Conhecidas (Consumo de Saldo)
                   </h4>
-                  <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>
+                  <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700 }}>
                     {allEmpenhos.length} {allEmpenhos.length === 1 ? 'empenho' : 'empenhos'}
                   </span>
                 </div>
-                <button
-                  type="button"
+                <AppButton
+                  variant="primary"
+                  size="sm"
+                  icon={<Plus size={14} />}
                   onClick={() => {
                     setEditingManualEmpenho(null);
                     setIsManualEmpenhoModalOpen(true);
                   }}
-                  className="btn btn-primary"
-                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: '4px' }}
                 >
-                  <Plus size={14} /> Adicionar Empenho
-                </button>
+                  Adicionar Empenho
+                </AppButton>
               </div>
 
               {allEmpenhos.length === 0 ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', background: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
-                  Nenhum empenho localizado na API ou cadastrado manualmente. Clique em <strong>"+ Adicionar Empenho"</strong> para registrar uma Nota de Empenho.
-                </div>
+                <EmptyState
+                  title="Nenhum empenho registrado"
+                  description="Nenhum empenho localizado na API ou cadastrado manualmente para este item."
+                  icon={<DollarSign size={32} color="#94a3b8" />}
+                />
               ) : (
                 <div className="table-container" style={{ marginTop: 0, overflowX: 'auto', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                   <table className="custom-table" style={{ margin: 0 }}>
@@ -1797,7 +1908,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                   </table>
                 </div>
               )}
-            </div>
+            </AppCard>
 
           </div>
         ) : activeTab === 'alocacao' ? (
@@ -1874,86 +1985,106 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             )}
 
             {/* Allocation Form */}
-            <div style={{ padding: '1.25rem', border: '1px solid var(--border-color)', borderRadius: '4px', background: '#fcfdfe' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0c326f', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderBottom: 'none', paddingBottom: 0 }}>
-                <Plus size={16} /> {editingId ? 'Editar Alocação de Unidade Interna' : 'Alocar Novo Quantitativo para Unidade Interna'}
-              </h4>
-              <form onSubmit={handleAddAllocation} style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr', gap: '1rem', alignItems: 'flex-end' }}>
-                <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                    <label className="form-label" style={{ fontSize: '0.8rem', margin: 0 }}>
-                      <Building2 size={13} style={{ marginRight: '4px' }} /> Unidade / Departamento Interno *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsManageDepsModalOpen(true)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--primary)',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem'
-                      }}
-                      title="Cadastrar, editar ou mesclar diretorias oficiais"
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '1.25rem',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', fontWeight: 800, color: '#0c326f' }}>
+                {editingId ? <Edit2 size={16} color="#0c326f" /> : <Plus size={16} color="#0c326f" />}
+                <span>{editingId ? 'Editar Alocação de Unidade Interna' : 'Alocar Novo Quantitativo para Unidade Interna'}</span>
+              </div>
+              <form onSubmit={handleAddAllocation} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', margin: 0 }}>
+                        <Building2 size={13} style={{ marginRight: '4px', verticalAlign: '-1px' }} /> Unidade / Departamento Interno *
+                      </label>
+                      <Link
+                        to="/admin/departamentos"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#0c326f',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          textDecoration: 'none'
+                        }}
+                        title="Abrir gestão de Unidades Internas em nova aba"
+                      >
+                        Unidades Internas <ExternalLink size={11} />
+                      </Link>
+                    </div>
+                    <select 
+                      className="form-input" 
+                      value={newUnitName || getFirstAvailableUnitSigla(departments, allocations, editingId)}
+                      onChange={(e) => setNewUnitName(e.target.value)}
+                      style={{ fontWeight: 700, color: '#0c326f', cursor: 'pointer', fontSize: '0.82rem', padding: '0.45rem 0.75rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
+                      required
                     >
-                      ⚙️ Gerenciar Unidades
-                    </button>
+                      {departments.map(d => {
+                        const isAllocated = allocations.some(
+                          a => a.id !== editingId && a.unitName.trim().toLowerCase() === d.sigla.trim().toLowerCase()
+                        );
+                        return (
+                          <option key={d.id} value={d.sigla} disabled={isAllocated}>
+                            {d.sigla} — {d.nomeCompleto} {isAllocated ? ' (Já alocada)' : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
-                  <select 
-                    className="form-input" 
-                    value={newUnitName || getFirstAvailableUnitSigla(departments, allocations, editingId)}
-                    onChange={(e) => setNewUnitName(e.target.value)}
-                    style={{ fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }}
-                    required
-                  >
-                    {departments.map(d => {
-                      const isAllocated = allocations.some(
-                        a => a.id !== editingId && a.unitName.trim().toLowerCase() === d.sigla.trim().toLowerCase()
-                      );
-                      return (
-                        <option key={d.id} value={d.sigla} disabled={isAllocated}>
-                          {d.sigla} — {d.nomeCompleto} {isAllocated ? ' (Já alocada)' : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem', display: 'block' }}>
+                      Qtd Alocada *
+                    </label>
+                    <input 
+                      type="number" 
+                      className="form-input" 
+                      min="1"
+                      placeholder="Ex: 50"
+                      value={newAllocatedQty}
+                      onChange={(e) => setNewAllocatedQty(e.target.value === '' ? '' : Number(e.target.value))}
+                      required
+                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.75rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
+                    />
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontSize: '0.8rem' }}>Qtd Alocada *</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    min="1"
-                    placeholder="Ex: 50"
-                    value={newAllocatedQty}
-                    onChange={(e) => setNewAllocatedQty(e.target.value === '' ? '' : Number(e.target.value))}
-                    required
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button 
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  {editingId && (
+                    <AppButton 
+                      type="button" 
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelEdit} 
+                      disabled={saveAllocationsMutation.isPending}
+                    >
+                      Cancelar
+                    </AppButton>
+                  )}
+                  <AppButton 
                     type="submit" 
-                    className="btn btn-primary" 
-                    style={{ flex: 1, height: '38px', padding: '0 1rem', fontSize: '0.8rem' }}
+                    variant="primary"
+                    size="sm"
+                    icon={saveAllocationsMutation.isPending ? undefined : (editingId ? <Check size={14} /> : <Plus size={14} />)}
+                    isLoading={saveAllocationsMutation.isPending}
                     disabled={saveAllocationsMutation.isPending || (!editingId && departments.length > 0 && departments.every(d => allocations.some(a => a.unitName.trim().toLowerCase() === d.sigla.trim().toLowerCase())))}
                   >
-                    {saveAllocationsMutation.isPending ? (
-                      'Salvando...'
-                    ) : (
-                      <>
-                        {editingId ? <Check size={14} /> : <Plus size={14} />} {editingId ? 'Salvar' : 'Adicionar'}
-                      </>
-                    )}
-                  </button>
-                  {editingId && (
-                    <button type="button" onClick={handleCancelEdit} disabled={saveAllocationsMutation.isPending} className="btn btn-secondary" style={{ height: '38px', padding: '0 0.75rem', borderColor: '#df152a', color: '#df152a' }}>
-                      <X size={14} />
-                    </button>
-                  )}
+                    {editingId ? 'Salvar Alocação' : 'Adicionar Alocação'}
+                  </AppButton>
                 </div>
               </form>
             </div>
@@ -2061,7 +2192,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             adesaoConsumidaPercent={adesaoConsumidaPercent}
           />
         )}
-      </section>
+      </AppCard>
 
       {/* Modal for detailing contract & empenhos */}
       <EmpenhoDetailModal
@@ -2073,20 +2204,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         filteredContracts={selectedEmpenhoDetail ? getFilteredContractsForModal(selectedEmpenhoDetail) : []}
         contractEmpenhos={contractEmpenhos}
         empenhosLoadingMap={empenhosLoadingMap}
-      />
-
-      {/* Modal de Gestão Central de Unidades Oficiais */}
-      <ManageDepartmentsModal
-        isOpen={isManageDepsModalOpen}
-        onClose={() => {
-          setIsManageDepsModalOpen(false);
-          refetchDepartments();
-          refetchAllocations();
-        }}
-        onDepartmentsUpdated={() => {
-          refetchDepartments();
-          refetchAllocations();
-        }}
       />
 
       {/* Modal de Cadastro/Edição de Empenho Manual */}
@@ -2119,6 +2236,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         defaultCnpj={item.niFornecedor}
         availableEmpenhos={allEmpenhos}
         isLoading={saveManualContractMutation.isPending}
+      />
+
+      {/* Modal de Vínculo com Contrato Oficial da UASG (Fase 6.2) */}
+      <LinkContractModal
+        isOpen={isLinkContractModalOpen}
+        onClose={() => setIsLinkContractModalOpen(false)}
+        itemKey={canonicalItemKey}
+        numeroAta={arp.numeroAtaRegistroPreco}
+        numeroItem={item.numeroItem}
+        uasg={arp.codigoUnidadeGerenciadora}
+        quantidadeDisponivelItem={item.quantidadeHomologadaItem}
+        existingLinkedContractKeys={enrichedOfficialLinks.map(l => l.contractKey)}
       />
     </div>
   );

@@ -8,14 +8,14 @@ export interface AppShellContextValue {
   onOpenExportModal: () => void;
   onOpenContractTemplatesModal: () => void;
   onOpenSeiModal: () => void;
-  onOpenDepartmentsModal: () => void;
+  onOpenDepartmentsModal?: () => void;
 }
 
 interface AppShellProps {
   onOpenExportModal: () => void;
   onOpenContractTemplatesModal: () => void;
   onOpenSeiModal: () => void;
-  onOpenDepartmentsModal: () => void;
+  onOpenDepartmentsModal?: () => void;
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'saldoarp:sidebar-collapsed';
@@ -67,12 +67,21 @@ export const AppShell: React.FC<AppShellProps> = ({
       />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <Header
-          onOpenExportModal={onOpenExportModal}
-          onOpenContractTemplatesModal={onOpenContractTemplatesModal}
-        />
-
-        <Breadcrumbs />
+        <div style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          background: '#ffffff',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+          borderBottom: '1px solid #e2e8f0'
+        }}>
+          <Header
+            onOpenExportModal={onOpenExportModal}
+            onOpenContractTemplatesModal={onOpenContractTemplatesModal}
+            onOpenSeiModal={onOpenSeiModal}
+          />
+          <Breadcrumbs />
+        </div>
 
         <main style={{ flex: 1 }}>
           <Outlet context={contextValue} />

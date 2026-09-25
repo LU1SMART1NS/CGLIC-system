@@ -16,7 +16,6 @@ export const AllocationsRoute: React.FC = () => {
 
   return (
     <InternalAllocationsDashboard
-      onBack={() => navigate('/atas')}
       onSelectItem={handleSelectItem}
     />
   );

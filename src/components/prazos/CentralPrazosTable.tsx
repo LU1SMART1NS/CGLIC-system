@@ -97,7 +97,7 @@ export const CentralPrazosTable: React.FC<CentralPrazosTableProps> = ({
   return (
     <div style={{
       background: '#ffffff',
-      borderRadius: '10px',
+      borderRadius: '8px',
       border: '1px solid #e2e8f0',
       overflow: 'hidden',
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
@@ -112,20 +112,18 @@ export const CentralPrazosTable: React.FC<CentralPrazosTableProps> = ({
           <thead>
             <tr style={{
               background: '#f8fafc',
-              borderBottom: '2px solid #e2e8f0',
+              borderBottom: '1px solid #e2e8f0',
               color: '#475569',
               fontWeight: 700,
-              fontSize: '0.75rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.03em'
+              fontSize: '0.78rem'
             }}>
-              <th style={{ padding: '0.85rem 1rem' }}>Tipo</th>
-              <th style={{ padding: '0.85rem 1rem' }}>Identificador & Objeto</th>
-              <th style={{ padding: '0.85rem 1rem' }}>Marco / Ação Requerida</th>
-              <th style={{ padding: '0.85rem 1rem' }}>Regra & Fundamento</th>
-              <th style={{ padding: '0.85rem 1rem' }}>Data-Alvo & Prazo</th>
-              <th style={{ padding: '0.85rem 1rem' }}>Responsável</th>
-              <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Explicabilidade</th>
+              <th style={{ padding: '0.75rem 1rem' }}>Tipo</th>
+              <th style={{ padding: '0.75rem 1rem' }}>Identificador & Objeto</th>
+              <th style={{ padding: '0.75rem 1rem' }}>Marco / Ação Requerida</th>
+              <th style={{ padding: '0.75rem 1rem' }}>Regra & Fundamento</th>
+              <th style={{ padding: '0.75rem 1rem' }}>Data-Alvo & Prazo</th>
+              <th style={{ padding: '0.75rem 1rem' }}>Responsável</th>
+              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Explicabilidade</th>
             </tr>
           </thead>
           <tbody>

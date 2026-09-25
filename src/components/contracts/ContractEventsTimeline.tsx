@@ -28,6 +28,7 @@ import type {
 import { useContractEvents } from '../../hooks/useContractEvents';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { formatCurrencyBRL } from '../../utils/ataGrouping';
+import { buildContractValueEvolutionModel } from '../../services/contractValueEvolutionService';
 
 interface ContractEventsTimelineProps {
   contract: ContractDashboardRecord;
@@ -236,6 +237,20 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
   const rawEvents = eventsOverride || queriedEvents;
   const isLoading = isLoadingOverride ?? loadingEvents;
 
+  // Read Model da Evolução do Valor Contratual (Fase 7.5-C1)
+  const valueEvolution = useMemo(() => {
+    return buildContractValueEvolutionModel(contract, rawEvents);
+  }, [contract, rawEvents]);
+
+  // Mapa rápido de eventos auditados no Read Model
+  const evolutionEventsMap = useMemo(() => {
+    const map = new Map<string, (typeof valueEvolution.eventos)[0]>();
+    for (const item of valueEvolution.eventos) {
+      map.set(item.eventoId, item);
+    }
+    return map;
+  }, [valueEvolution]);
+
   // Ordenação cronológica rigorosa e filtragem
   const sortedEvents = useMemo(() => {
     return sortEventsChronologically(rawEvents);
@@ -290,312 +305,514 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
     );
   }
 
-  // 3. Estado Vazio
-  if (sortedEvents.length === 0) {
-    return (
-      <div
-        style={{
-          background: '#f8fafc',
-          borderRadius: '8px',
-          border: '1px dashed #cbd5e1',
-          padding: '2rem 1.5rem',
-          textAlign: 'center',
-          color: '#64748b'
-        }}
-      >
-        <Calendar size={28} style={{ margin: '0 auto 0.75rem auto', color: '#94a3b8' }} />
-        <h4 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#334155', margin: '0 0 0.25rem 0' }}>
-          Ainda não há eventos contratuais registrados
-        </h4>
-        <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '450px', margin: '0 auto' }}>
-          Eventos oficiais como celebração, prorrogações, reajustes e aditamentos aparecerão aqui conforme sincronizados das fontes governamentais.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div>
-      {/* Barra de Filtros Simples */}
+      {/* Síntese Executiva de Evolução do Valor Contratual (Fase 7.5-C2) */}
       <div
+        data-testid="contract-value-evolution-section"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '1.25rem',
-          paddingBottom: '0.75rem',
-          borderBottom: '1px solid #f1f5f9',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
+          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0',
+          padding: '1.25rem',
+          marginBottom: '1.5rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
-          <Filter size={14} />
-          <span>Filtrar eventos:</span>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-          {(
-            [
-              { key: 'TODOS', label: `Todos (${sortedEvents.length})` },
-              {
-                key: 'OFICIAIS',
-                label: `Fatos Oficiais (${sortedEvents.filter((e) => getOficialidadeInfo(e).level === 'FATO_OFICIAL').length})`
-              },
-              {
-                key: 'INTERNOS',
-                label: `Internos (${sortedEvents.filter((e) => getOficialidadeInfo(e).level !== 'FATO_OFICIAL').length})`
-              }
-            ] as const
-          ).map((btn) => (
-            <button
-              key={btn.key}
-              type="button"
-              onClick={() => setFilter(btn.key)}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '1rem',
+            flexWrap: 'wrap',
+            gap: '0.5rem'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div
               style={{
-                padding: '0.3rem 0.65rem',
-                fontSize: '0.76rem',
-                fontWeight: 700,
-                borderRadius: '6px',
-                border: filter === btn.key ? '1px solid #0c326f' : '1px solid #e2e8f0',
-                backgroundColor: filter === btn.key ? '#0c326f' : '#ffffff',
-                color: filter === btn.key ? '#ffffff' : '#475569',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: '#0c326f',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
-              {btn.label}
-            </button>
-          ))}
+              <TrendingUp size={18} />
+            </div>
+            <div>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Evolução do Valor Contratual
+              </h4>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0 }}>
+                Projeção jurídica determinística (Lei nº 14.133/2021) • Não substitui a execução financeira oficial
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {valueEvolution.totalEventosMonetarios > 0 ? (
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '4px',
+                  backgroundColor: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <CheckCircle2 size={12} />
+                {valueEvolution.totalEventosMonetarios} alteração(ões) com impacto monetário
+              </span>
+            ) : (
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '4px',
+                  backgroundColor: '#f8fafc',
+                  color: '#64748b',
+                  border: '1px solid #e2e8f0'
+                }}
+              >
+                Sem aditamentos de valor registrados
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Grade de 3 Cards: Valor Original -> Variação Acumulada -> Valor Vigente */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '1rem'
+          }}
+        >
+          {/* Card 1: Valor Original */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              padding: '0.85rem 1rem',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+            }}
+          >
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Valor Original (Celebração)
+            </span>
+            <div data-testid="evolution-valor-original" style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0.25rem 0' }}>
+              {formatCurrencyBRL(valueEvolution.valorOriginal)}
+            </div>
+            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+              Pactuação inicial do contrato
+            </span>
+          </div>
+
+          {/* Card 2: Variação Acumulada Aditada */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              padding: '0.85rem 1rem',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+            }}
+          >
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Variação Acumulada
+            </span>
+            <div
+              data-testid="evolution-delta-acumulado"
+              style={{
+                fontSize: '1.2rem',
+                fontWeight: 800,
+                color: valueEvolution.deltaAcumulado > 0 ? '#15803d' : (valueEvolution.deltaAcumulado < 0 ? '#b91c1c' : '#475569'),
+                margin: '0.25rem 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <span>
+                {valueEvolution.deltaAcumulado > 0 ? '+ ' : (valueEvolution.deltaAcumulado < 0 ? '- ' : '')}
+                {formatCurrencyBRL(Math.abs(valueEvolution.deltaAcumulado))}
+              </span>
+              {valueEvolution.valorOriginal > 0 && valueEvolution.deltaAcumulado !== 0 && (
+                <span style={{ fontSize: '0.76rem', fontWeight: 700, opacity: 0.9 }}>
+                  ({valueEvolution.percentualVariacaoAcumulada >= 0 ? '+' : ''}{valueEvolution.percentualVariacaoAcumulada.toFixed(2)}%)
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', fontSize: '0.72rem', color: '#64748b' }}>
+              {valueEvolution.totalReajustes > 0 && <span>Reajustes: +{formatCurrencyBRL(valueEvolution.totalReajustes)}</span>}
+              {valueEvolution.totalRepactuacoes > 0 && <span>Repactuações: +{formatCurrencyBRL(valueEvolution.totalRepactuacoes)}</span>}
+              {valueEvolution.totalAcrescimos > 0 && <span>Acréscimos: +{formatCurrencyBRL(valueEvolution.totalAcrescimos)}</span>}
+              {valueEvolution.totalSupressoes > 0 && <span>Supressões: -{formatCurrencyBRL(valueEvolution.totalSupressoes)}</span>}
+              {valueEvolution.totalReequilibrios !== 0 && <span>Reequilíbrio: +{formatCurrencyBRL(valueEvolution.totalReequilibrios)}</span>}
+              {valueEvolution.totalOutrosAditivos !== 0 && <span>Outros: +{formatCurrencyBRL(valueEvolution.totalOutrosAditivos)}</span>}
+              {valueEvolution.totalEventosMonetarios === 0 && <span>Sem alterações monetárias</span>}
+            </div>
+          </div>
+
+          {/* Card 3: Valor Vigente Projetado */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              padding: '0.85rem 1rem',
+              border: '1px solid #bfdbfe',
+              background: 'linear-gradient(180deg, #ffffff 0%, #eff6ff 100%)',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+            }}
+          >
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1d4ed8', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Valor Vigente Atualizado
+            </span>
+            <div data-testid="evolution-valor-vigente" style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0c326f', margin: '0.25rem 0' }}>
+              {formatCurrencyBRL(valueEvolution.valorVigente)}
+            </div>
+            <span style={{ fontSize: '0.74rem', color: '#3b82f6', fontWeight: 600 }}>
+              {valueEvolution.dataUltimoEventoRelevante
+                ? `Atualizado até ${formatDateBR(valueEvolution.dataUltimoEventoRelevante)}`
+                : 'Valor vigente atual'}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Lista / Timeline de Eventos */}
-      {filteredEvents.length === 0 ? (
-        <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
-          Nenhum evento encontrado para o filtro selecionado.
+      {/* Estado Vazio de Eventos */}
+      {sortedEvents.length === 0 ? (
+        <div
+          style={{
+            background: '#f8fafc',
+            borderRadius: '8px',
+            border: '1px dashed #cbd5e1',
+            padding: '2rem 1.5rem',
+            textAlign: 'center',
+            color: '#64748b'
+          }}
+        >
+          <Calendar size={28} style={{ margin: '0 auto 0.75rem auto', color: '#94a3b8' }} />
+          <h4 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#334155', margin: '0 0 0.25rem 0' }}>
+            Ainda não há eventos contratuais registrados
+          </h4>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '450px', margin: '0 auto' }}>
+            Eventos oficiais como celebração, prorrogações, reajustes e aditamentos aparecerão aqui conforme sincronizados das fontes governamentais.
+          </p>
         </div>
       ) : (
-        <div style={{ position: 'relative', paddingLeft: '1.75rem' }}>
-          {/* Linha Vertical Conectora */}
+        <>
+          {/* Barra de Filtros Simples */}
           <div
             style={{
-              position: 'absolute',
-              top: '12px',
-              bottom: '12px',
-              left: '9px',
-              width: '2px',
-              backgroundColor: '#e2e8f0'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1.25rem',
+              paddingBottom: '0.75rem',
+              borderBottom: '1px solid #f1f5f9',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
             }}
-          />
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+              <Filter size={14} />
+              <span>Filtrar eventos:</span>
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {filteredEvents.map((event) => {
-              const { displayDate } = getEventCanonicalDate(event);
-              const oficialidade = getOficialidadeInfo(event);
-              const tipoDisplay = getEventTypeDisplay(event.tipoEvento);
-              const instrumentoLabel = getInstrumentoDisplay(event.naturezaInstrumento);
-              const impactoDisplay = getImpactoDisplay(event.impacto);
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+              {(
+                [
+                  { key: 'TODOS', label: `Todos (${sortedEvents.length})` },
+                  {
+                    key: 'OFICIAIS',
+                    label: `Fatos Oficiais (${sortedEvents.filter((e) => getOficialidadeInfo(e).level === 'FATO_OFICIAL').length})`
+                  },
+                  {
+                    key: 'INTERNOS',
+                    label: `Internos (${sortedEvents.filter((e) => getOficialidadeInfo(e).level !== 'FATO_OFICIAL').length})`
+                  }
+                ] as const
+              ).map((btn) => (
+                <button
+                  key={btn.key}
+                  type="button"
+                  onClick={() => setFilter(btn.key)}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    border: filter === btn.key ? '1px solid #0c326f' : '1px solid #e2e8f0',
+                    backgroundColor: filter === btn.key ? '#0c326f' : '#ffffff',
+                    color: filter === btn.key ? '#ffffff' : '#475569',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-              const EventIcon = tipoDisplay.icon;
-              const OficialIcon = oficialidade.icon;
+          {/* Lista / Timeline de Eventos */}
+          {filteredEvents.length === 0 ? (
+            <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+              Nenhum evento encontrado para o filtro selecionado.
+            </div>
+          ) : (
+            <div style={{ position: 'relative', paddingLeft: '1.75rem' }}>
+              {/* Linha Vertical Conectora */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  bottom: '12px',
+                  left: '9px',
+                  width: '2px',
+                  backgroundColor: '#e2e8f0'
+                }}
+              />
 
-              const hasExternalLink = Boolean(event.linkPncp);
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {filteredEvents.map((event) => {
+                  const { displayDate } = getEventCanonicalDate(event);
+                  const oficialidade = getOficialidadeInfo(event);
+                  const tipoDisplay = getEventTypeDisplay(event.tipoEvento);
+                  const instrumentoLabel = getInstrumentoDisplay(event.naturezaInstrumento);
+                  const impactoDisplay = getImpactoDisplay(event.impacto);
+                  const evoItem = evolutionEventsMap.get(event.id);
 
-              return (
-                <div key={event.id} style={{ position: 'relative' }}>
-                  {/* Marcador Circular da Timeline */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: '-1.75rem',
-                      top: '6px',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: '#ffffff',
-                      border: `3px solid ${tipoDisplay.dotColor}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 1,
-                      boxShadow: '0 0 0 2px #ffffff'
-                    }}
-                  />
+                  const EventIcon = tipoDisplay.icon;
+                  const OficialIcon = oficialidade.icon;
 
-                  {/* Card do Evento */}
-                  <div
-                    style={{
-                      backgroundColor: oficialidade.level === 'FATO_OFICIAL' ? '#ffffff' : '#f8fafc',
-                      borderRadius: '8px',
-                      border: `1px solid ${oficialidade.level === 'FATO_OFICIAL' ? '#e2e8f0' : '#cbd5e1'}`,
-                      padding: '1rem 1.25rem',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
-                    }}
-                  >
-                    {/* Cabeçalho do Evento: Data, Oficialidade e Tipo */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.75rem',
-                        marginBottom: '0.45rem',
-                        flexWrap: 'wrap'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                        {/* Data Canônica em Destaque */}
-                        <span
-                          style={{
-                            fontSize: '0.85rem',
-                            fontWeight: 800,
-                            color: '#0f172a',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          <Calendar size={13} style={{ color: '#64748b' }} />
-                          {displayDate}
-                        </span>
+                  const hasExternalLink = Boolean(event.linkPncp);
 
-                        {/* Badge de Oficialidade com Texto Explícito */}
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.72rem',
-                            fontWeight: 800,
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: '4px',
-                            backgroundColor: oficialidade.bg,
-                            color: oficialidade.color,
-                            border: `1px solid ${oficialidade.border}`
-                          }}
-                        >
-                          <OficialIcon size={12} />
-                          {oficialidade.label}
-                        </span>
-
-                        {/* Badge do Tipo de Evento */}
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: '4px',
-                            backgroundColor: '#f1f5f9',
-                            color: tipoDisplay.color,
-                            border: '1px solid #e2e8f0'
-                          }}
-                        >
-                          <EventIcon size={12} />
-                          {tipoDisplay.label}
-                        </span>
-                      </div>
-
-                      {/* Link para Fonte Oficial (se existir) */}
-                      {hasExternalLink && (
-                        <a
-                          href={event.linkPncp}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
-                            color: '#0c326f',
-                            backgroundColor: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: '4px',
-                            textDecoration: 'none'
-                          }}
-                          title="Abrir publicação oficial no PNCP"
-                        >
-                          <span>Ver fonte oficial</span>
-                          <ExternalLink size={11} />
-                        </a>
-                      )}
-                    </div>
-
-                    {/* Título / Identificador Oficial e Descrição */}
-                    <h4
-                      style={{
-                        fontSize: '0.96rem',
-                        fontWeight: 700,
-                        color: '#0f172a',
-                        margin: '0 0 0.35rem 0',
-                        lineHeight: '1.4'
-                      }}
-                    >
-                      {event.identificadorOficial ? `${event.identificadorOficial} — ` : ''}
-                      {event.descricao}
-                    </h4>
-
-                    {/* Metadados: Instrumento, Impacto e Variações Formais */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.6rem',
-                        flexWrap: 'wrap',
-                        marginTop: '0.5rem',
-                        fontSize: '0.76rem'
-                      }}
-                    >
-                      {/* Instrumento Formal */}
-                      <span style={{ color: '#475569', backgroundColor: '#f8fafc', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                        <strong>Instrumento:</strong> {instrumentoLabel}
-                      </span>
-
-                      {/* Impacto Formal */}
-                      <span
+                  return (
+                    <div key={event.id} style={{ position: 'relative' }}>
+                      {/* Marcador Circular da Timeline */}
+                      <div
                         style={{
-                          backgroundColor: impactoDisplay.bg,
-                          color: impactoDisplay.color,
-                          border: `1px solid ${impactoDisplay.border}`,
-                          padding: '0.15rem 0.45rem',
-                          borderRadius: '4px',
-                          fontWeight: 700
+                          position: 'absolute',
+                          left: '-1.75rem',
+                          top: '6px',
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          backgroundColor: '#ffffff',
+                          border: `3px solid ${tipoDisplay.dotColor}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 1,
+                          boxShadow: '0 0 0 2px #ffffff'
+                        }}
+                      />
+
+                      {/* Card do Evento */}
+                      <div
+                        style={{
+                          backgroundColor: oficialidade.level === 'FATO_OFICIAL' ? '#ffffff' : '#f8fafc',
+                          borderRadius: '8px',
+                          border: `1px solid ${oficialidade.level === 'FATO_OFICIAL' ? '#e2e8f0' : '#cbd5e1'}`,
+                          padding: '1rem 1.25rem',
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
                         }}
                       >
-                        {impactoDisplay.label}
-                      </span>
+                        {/* Cabeçalho do Evento: Data, Oficialidade e Tipo */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.75rem',
+                            marginBottom: '0.45rem',
+                            flexWrap: 'wrap'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                            {/* Data Canônica em Destaque */}
+                            <span
+                              style={{
+                                fontSize: '0.85rem',
+                                fontWeight: 800,
+                                color: '#0f172a',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Calendar size={13} style={{ color: '#64748b' }} />
+                              {displayDate}
+                            </span>
 
-                      {/* Impacto em Valor (se houver) */}
-                      {typeof event.valorPosterior === 'number' && event.valorPosterior > 0 && (
-                        <span style={{ color: '#166534', backgroundColor: '#f0fdf4', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
-                          <strong>Valor Formal:</strong> {formatCurrencyBRL(event.valorPosterior)}
-                        </span>
-                      )}
+                            {/* Badge de Oficialidade com Texto Explícito */}
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                backgroundColor: oficialidade.bg,
+                                color: oficialidade.color,
+                                border: `1px solid ${oficialidade.border}`
+                              }}
+                            >
+                              <OficialIcon size={12} />
+                              {oficialidade.label}
+                            </span>
 
-                      {/* Impacto em Vigência (se houver) */}
-                      {event.vigenciaPosterior && (
-                        <span style={{ color: '#0369a1', backgroundColor: '#f0f9ff', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #bae6fd' }}>
-                          <strong>Nova Vigência:</strong> {formatDateBR(event.vigenciaPosterior)}
-                        </span>
-                      )}
+                            {/* Badge do Tipo de Evento */}
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                backgroundColor: '#f1f5f9',
+                                color: tipoDisplay.color,
+                                border: '1px solid #e2e8f0'
+                              }}
+                            >
+                              <EventIcon size={12} />
+                              {tipoDisplay.label}
+                            </span>
+                          </div>
 
-                      {/* Fonte da Informação */}
-                      <span style={{ color: '#64748b', marginLeft: 'auto' }}>
-                        Fonte: <strong>{event.fonteOrigem || 'Não Informada'}</strong>
-                        {event.processoSeiNumero && ` • SEI ${event.processoSeiNumero}`}
-                      </span>
+                          {/* Link para Fonte Oficial (se existir) */}
+                          {hasExternalLink && (
+                            <a
+                              href={event.linkPncp}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                color: '#0c326f',
+                                backgroundColor: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                padding: '0.2rem 0.55rem',
+                                borderRadius: '4px',
+                                textDecoration: 'none'
+                              }}
+                              title="Abrir publicação oficial no PNCP"
+                            >
+                              <span>Ver fonte oficial</span>
+                              <ExternalLink size={11} />
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Título / Identificador Oficial e Descrição */}
+                        <h4
+                          style={{
+                            fontSize: '0.96rem',
+                            fontWeight: 700,
+                            color: '#0f172a',
+                            margin: '0 0 0.35rem 0',
+                            lineHeight: '1.4'
+                          }}
+                        >
+                          {event.identificadorOficial ? `${event.identificadorOficial} — ` : ''}
+                          {event.descricao}
+                        </h4>
+
+                        {/* Metadados: Instrumento, Impacto e Variações Formais */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.6rem',
+                            flexWrap: 'wrap',
+                            marginTop: '0.5rem',
+                            fontSize: '0.76rem'
+                          }}
+                        >
+                          {/* Instrumento Formal */}
+                          <span style={{ color: '#475569', backgroundColor: '#f8fafc', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                            <strong>Instrumento:</strong> {instrumentoLabel}
+                          </span>
+
+                          {/* Impacto Formal */}
+                          <span
+                            style={{
+                              backgroundColor: impactoDisplay.bg,
+                              color: impactoDisplay.color,
+                              border: `1px solid ${impactoDisplay.border}`,
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '4px',
+                              fontWeight: 700
+                            }}
+                          >
+                            {impactoDisplay.label}
+                          </span>
+
+                          {/* Delta Monetário Específico do Read Model (se houver impacto) */}
+                          {evoItem && evoItem.impactoMonetario && (
+                            <span
+                              style={{
+                                color: evoItem.deltaValor > 0 ? '#15803d' : '#b91c1c',
+                                backgroundColor: evoItem.deltaValor > 0 ? '#f0fdf4' : '#fef2f2',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                border: `1px solid ${evoItem.deltaValor > 0 ? '#bbf7d0' : '#fecaca'}`,
+                                fontWeight: 800
+                              }}
+                            >
+                              <strong>Delta:</strong> {evoItem.deltaValor > 0 ? '+' : '-'}{formatCurrencyBRL(Math.abs(evoItem.deltaValor))}
+                            </span>
+                          )}
+
+                          {/* Impacto em Valor Formal (se houver) */}
+                          {typeof event.valorPosterior === 'number' && event.valorPosterior > 0 && (
+                            <span style={{ color: '#166534', backgroundColor: '#f0fdf4', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                              <strong>Valor Formal:</strong> {formatCurrencyBRL(event.valorPosterior)}
+                            </span>
+                          )}
+
+                          {/* Impacto em Vigência (se houver) */}
+                          {event.vigenciaPosterior && (
+                            <span style={{ color: '#0369a1', backgroundColor: '#f0f9ff', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #bae6fd' }}>
+                              <strong>Nova Vigência:</strong> {formatDateBR(event.vigenciaPosterior)}
+                            </span>
+                          )}
+
+                          {/* Fonte da Informação */}
+                          <span style={{ color: '#64748b', marginLeft: 'auto' }}>
+                            Fonte: <strong>{event.fonteOrigem || 'Não Informada'}</strong>
+                            {event.processoSeiNumero && ` • SEI ${event.processoSeiNumero}`}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

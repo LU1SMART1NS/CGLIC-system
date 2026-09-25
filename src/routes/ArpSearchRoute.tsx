@@ -23,7 +23,6 @@ export const ArpSearchRoute: React.FC = () => {
     <ArpSearch
       onSelectArp={handleSelectArp}
       onSelectItem={handleSelectItemFromSearch}
-      onOpenAllocationsPanel={() => navigate('/atas/saldos-unidade')}
       onArpsLoaded={(loadedArps, loadedItems) => {
         setGlobalArps(loadedArps);
         if (loadedItems) setGlobalItemsByAta(loadedItems);

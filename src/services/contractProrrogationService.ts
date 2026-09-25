@@ -15,6 +15,7 @@ import type {
   ProrrogationWorkflowStatus,
   ProrrogationDeadlinesPlan,
   ProrrogationReadinessChecklist,
+  ProrrogationReajusteReadiness,
   FornecedorManifestacaoStatus
 } from '../types/contractProrrogation';
 import type {
@@ -24,9 +25,11 @@ import type {
   ContractEvent,
   ContractVigenciaTransition
 } from '../types';
+import type { ReajusteRadarAlert } from '../types/contractReajusteRadar';
 import {
   parseDateBRT,
   formatDateISO,
+  formatDateBR,
   addDays,
   addBusinessDays,
   differenceInDays,
@@ -37,6 +40,7 @@ import {
   generateIdempotentEventId,
   explainVigenciaTransition
 } from './contractEventService';
+import { evaluateContractReajusteRadar } from './contractReajusteRadarService';
 
 /**
  * 1. Gera chave lógica determinística e canônica para o Workflow de Prorrogação.
@@ -168,10 +172,18 @@ export function buildDefaultProrrogationTemplate(): ContractTaskTemplate {
             sistemaDestino: 'SEI'
           },
           {
+            id: 'task-prorr-6b',
+            macrotaskId: 'macro-prorr-3',
+            nome: 'Verificar existência de pedidos pendentes de reajuste/repactuação e incluir cláusula de ressalva na minuta quando aplicável',
+            ordem: 7,
+            executionMode: 'INTERNA',
+            sistemaDestino: 'SEI'
+          },
+          {
             id: 'task-prorr-7',
             macrotaskId: 'macro-prorr-3',
             nome: 'Submeter Processo à Consultoria Jurídica da União (CONJUR/AGU)',
-            ordem: 7,
+            ordem: 8,
             executionMode: 'INTERNA',
             sistemaDestino: 'SEI / CONJUR'
           },
@@ -179,7 +191,7 @@ export function buildDefaultProrrogationTemplate(): ContractTaskTemplate {
             id: 'task-prorr-8',
             macrotaskId: 'macro-prorr-3',
             nome: 'Atender eventuais recomendações constantes do Parecer Jurídico da CONJUR/AGU',
-            ordem: 8,
+            ordem: 9,
             executionMode: 'INTERNA',
             sistemaDestino: 'SEI'
           }
@@ -195,7 +207,7 @@ export function buildDefaultProrrogationTemplate(): ContractTaskTemplate {
             id: 'task-prorr-9',
             macrotaskId: 'macro-prorr-4',
             nome: 'Coletar Assinatura Eletrônica das Partes no SEI antes da expiração da vigência',
-            ordem: 9,
+            ordem: 10,
             executionMode: 'EXTERNA',
             sistemaDestino: 'SEI'
           },
@@ -203,7 +215,7 @@ export function buildDefaultProrrogationTemplate(): ContractTaskTemplate {
             id: 'task-prorr-10',
             macrotaskId: 'macro-prorr-4',
             nome: 'Publicar Termo Aditivo no PNCP e no Diário Oficial da União (DOU)',
-            ordem: 10,
+            ordem: 11,
             executionMode: 'EXTERNA',
             sistemaDestino: 'Contratos.gov.br / PNCP'
           }
@@ -214,12 +226,22 @@ export function buildDefaultProrrogationTemplate(): ContractTaskTemplate {
 }
 
 /**
+ * Opções de contexto para avaliação assistida de prontidão (Fase 7.5-C4)
+ */
+export interface EvaluateProrrogationReadinessOptions {
+  contract?: Partial<ContractDashboardRecord> & { dataBaseProposta?: string };
+  events?: readonly ContractEvent[];
+  radarAlert?: ReajusteRadarAlert | null;
+}
+
+/**
  * 4. Avaliação Assistida de Prontidão e Conformidade Legal para Prorrogação.
  */
 export function evaluateProrrogationReadiness(
   workflow: Partial<ContractProrrogationWorkflow>,
   vigenciaFim?: string,
-  currentDate?: Date
+  currentDate?: Date,
+  options?: EvaluateProrrogationReadinessOptions
 ): ProrrogationReadinessChecklist {
   const itensPendentes: string[] = [];
   const orientacoes: string[] = [];
@@ -274,6 +296,103 @@ export function evaluateProrrogationReadiness(
     }
   }
 
+  // Avaliação Assistida de Reajuste/Repactuação na Prorrogação (Fase 7.5-C4 — Não Bloqueante)
+  let reajusteStatus: ProrrogationReajusteReadiness | undefined;
+
+  if (options) {
+    const events = options.events || [];
+    let radarAlert = options.radarAlert;
+
+    if (radarAlert === undefined && options.contract) {
+      radarAlert = evaluateContractReajusteRadar({
+        contract: options.contract,
+        events,
+        currentDate
+      });
+    }
+
+    if (radarAlert) {
+      const diasRestantes = radarAlert.diasRestantes;
+      const dataAnivBR = formatDateBR(radarAlert.dataAniversario);
+
+      if (diasRestantes >= 0) {
+        // Situação A — Marco temporal próximo (<= 60 dias)
+        const orientacao = `Marco de reajuste/repactuação próximo (${diasRestantes} dias). Avaliar previamente eventual impacto na prorrogação.`;
+        const sugestaoRessalva = `Avaliar a necessidade de consignar ressalva na minuta/ato de prorrogação caso haja pedido de reajuste/repactuação em tramitação.`;
+
+        reajusteStatus = {
+          situacao: 'MARCO_PROXIMO',
+          alertaRadarId: radarAlert.id,
+          dataBaseReferencia: radarAlert.dataBase,
+          dataAniversario: radarAlert.dataAniversario,
+          diasRestantes,
+          possuiEventoSubsequente: false,
+          orientacao,
+          sugestaoRessalva
+        };
+
+        orientacoes.push(
+          `Reajuste/Repactuação: Marco anual em ${dataAnivBR} (${diasRestantes} dias restantes). ${sugestaoRessalva}`
+        );
+      } else {
+        // Situação B — Marco temporal já ultrapassado (< 0 dias)
+        const orientacao = `Verificar eventual pedido de reajuste/repactuação pendente antes da formalização da prorrogação.`;
+        const sugestaoRessalva = `Avaliar a necessidade de consignar ressalva na minuta do Termo Aditivo de Prorrogação para resguardar eventual análise de reajuste/repactuação pendente.`;
+
+        reajusteStatus = {
+          situacao: 'MARCO_ULTRAPASSADO',
+          alertaRadarId: radarAlert.id,
+          dataBaseReferencia: radarAlert.dataBase,
+          dataAniversario: radarAlert.dataAniversario,
+          diasRestantes,
+          possuiEventoSubsequente: false,
+          orientacao,
+          sugestaoRessalva
+        };
+
+        orientacoes.push(
+          `Atenção Preventiva: Marco anual de reajuste/repactuação transcorrido há ${Math.abs(diasRestantes)} dia(s). ${orientacao} ${sugestaoRessalva}`
+        );
+      }
+    } else {
+      const hasFormalSubsequentEvent = events.some(
+        (e) => e.tipoEvento === 'REAJUSTE' || e.tipoEvento === 'REPACTUACAO'
+      );
+
+      if (hasFormalSubsequentEvent) {
+        // Situação C — Evento já formalizado
+        reajusteStatus = {
+          situacao: 'SEM_PENDENCIA',
+          possuiEventoSubsequente: true,
+          orientacao: 'Reajuste/repactuação formalizado em evento registrado. Sem pendência para este ciclo.'
+        };
+      } else if (options.contract) {
+        const contract = options.contract;
+        const hasAnyBase = Boolean(
+          contract.dataBaseProposta ||
+          contract.dataAssinatura ||
+          contract.dataVigenciaInicio
+        );
+
+        if (!hasAnyBase) {
+          // Situação D — Dados insuficientes
+          reajusteStatus = {
+            situacao: 'DADOS_INSUFICIENTES',
+            possuiEventoSubsequente: false,
+            orientacao: 'Dados temporais insuficientes para cálculo do marco anual de reajuste.'
+          };
+        } else {
+          // Contrato com data-base mas fora da janela de alerta (> 60 dias)
+          reajusteStatus = {
+            situacao: 'SEM_PENDENCIA',
+            possuiEventoSubsequente: false,
+            orientacao: 'Fora da janela de proximidade do marco anual de reajuste.'
+          };
+        }
+      }
+    }
+  }
+
   const isProntoParaAssinatura =
     interessePublicoManifesto &&
     fornecedorConcordancia &&
@@ -291,7 +410,8 @@ export function evaluateProrrogationReadiness(
     tempestividadeGarantida,
     itensPendentes,
     isProntoParaAssinatura,
-    orientacoes
+    orientacoes,
+    reajusteStatus
   };
 }
 
@@ -345,8 +465,9 @@ export function assembleProrrogationWorkflow(params: {
   plan?: ContractTaskPlan | null;
   overrideData?: Partial<ContractProrrogationWorkflow>;
   currentDate?: Date;
+  events?: readonly ContractEvent[];
 }): ContractProrrogationWorkflow {
-  const { contract, plan, overrideData = {}, currentDate } = params;
+  const { contract, plan, overrideData = {}, currentDate, events } = params;
   const contractKey = contract.id;
   const anoContrato = typeof contract.ano === 'number' ? contract.ano : (parseInt(String(contract.ano), 10) || 2026);
   const dataVigenciaAtual = contract.dataVigenciaFim || 'Não Informado';
@@ -379,7 +500,12 @@ export function assembleProrrogationWorkflow(params: {
     regularidadeFiscalSicaf
   };
 
-  const readiness = evaluateProrrogationReadiness(mergedPartial, dataVigenciaAtual, currentDate);
+  const readiness = evaluateProrrogationReadiness(
+    mergedPartial,
+    dataVigenciaAtual,
+    currentDate,
+    { contract, events }
+  );
   const status = overrideData.status || deriveProrrogationStatus(mergedPartial, plan);
 
   // Deriva vigência pretendida (+12 meses por padrão se não informada)

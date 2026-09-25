@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Check } from 'lucide-react';
 import type { Empenho } from '../../types';
+import { AppButton } from '../../design-system/components/AppButton';
 
 interface ManualEmpenhoModalProps {
   isOpen: boolean;
@@ -101,14 +102,34 @@ export const ManualEmpenhoModal: React.FC<ManualEmpenhoModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop" style={{ zIndex: 1100 }}>
-      <div className="modal-content" style={{ maxWidth: '550px', padding: '1.5rem' }}>
+    <div
+      className="modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isLoading) onClose();
+      }}
+    >
+      <div
+        className="modal-content"
+        style={{
+          maxWidth: '560px',
+          maxHeight: '92vh',
+          overflowY: 'auto',
+          padding: '1.5rem',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Plus size={20} color="var(--primary)" />
+          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Plus size={20} color="#0c326f" />
             {initialEmpenho ? 'Editar Empenho Manual' : 'Adicionar Empenho Manual'}
           </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLoading}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem' }}
+            title="Fechar"
+          >
             <X size={20} />
           </button>
         </div>
@@ -260,33 +281,25 @@ export const ManualEmpenhoModal: React.FC<ManualEmpenhoModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-            <button
+            <AppButton
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onClose}
               disabled={isLoading}
-              className="btn btn-secondary"
-              style={{ padding: '0.5rem 1rem', borderRadius: '6px' }}
             >
               Cancelar
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="submit"
+              variant="primary"
+              size="sm"
+              icon={isLoading ? undefined : <Check size={16} />}
+              isLoading={isLoading}
               disabled={isLoading}
-              className="btn btn-primary"
-              style={{ padding: '0.5rem 1.25rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
             >
-              {isLoading ? (
-                <>
-                  <div className="spinner" style={{ width: '14px', height: '14px' }} />
-                  <span>Salvando...</span>
-                </>
-              ) : (
-                <>
-                  <Check size={16} />
-                  <span>Salvar Empenho</span>
-                </>
-              )}
-            </button>
+              Salvar Empenho
+            </AppButton>
           </div>
         </form>
       </div>

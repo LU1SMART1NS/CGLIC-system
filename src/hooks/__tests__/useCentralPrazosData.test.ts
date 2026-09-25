@@ -98,26 +98,26 @@ describe('useCentralPrazosData logic - Testes Unitários de Agregação e Filtro
       currentDate: new Date('2026-04-01T00:00:00')
     });
 
-    // 1 tarefa humana + 2 gatilhos de contrato (180d, 60d) + 1 gatilho de ARP (90d)
-    expect(rawItems.length).toBe(4);
+    // 1 tarefa humana + 2 gatilhos de contrato (180d, 60d) + 2 gatilhos de ARP (180d de prorrogação e 90d de exaustão) = 5
+    expect(rawItems.length).toBe(5);
 
     const kpis = calculateCentralPrazosKPIs(rawItems);
-    expect(kpis.total).toBe(4);
+    expect(kpis.total).toBe(5);
 
     // Testar filtro por busca textual
     const filteredSearch = filterCentralPrazosItems(rawItems, {
       ...DEFAULT_CENTRAL_PRAZOS_FILTERS,
       busca: 'Viaturas'
     });
-    expect(filteredSearch.length).toBe(1);
-    expect(filteredSearch[0].entidadeOrigem).toBe('ARP');
+    expect(filteredSearch.length).toBe(2);
+    expect(filteredSearch.every(i => i.entidadeOrigem === 'ARP')).toBe(true);
 
     // Testar filtro por entidadeTipo
     const filteredArps = filterCentralPrazosItems(rawItems, {
       ...DEFAULT_CENTRAL_PRAZOS_FILTERS,
       entidadeTipo: 'ARP'
     });
-    expect(filteredArps.length).toBe(1);
-    expect(filteredArps[0].entidadeOrigem).toBe('ARP');
+    expect(filteredArps.length).toBe(2);
+    expect(filteredArps.every(i => i.entidadeOrigem === 'ARP')).toBe(true);
   });
 });

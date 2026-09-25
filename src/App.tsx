@@ -2,20 +2,28 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { SelectionProvider, useSelection } from './context/SelectionContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { isSupabaseConfigured } from './services/supabaseClient';
 import { HomeRoute } from './routes/HomeRoute';
 import { ArpSearchRoute } from './routes/ArpSearchRoute';
 import { ArpItemsRoute } from './routes/ArpItemsRoute';
 import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
 import { AllocationsRoute } from './routes/AllocationsRoute';
-import { ContractsDashboard } from './components/ContractsDashboard';
+import { ContractsRoute } from './routes/ContractsRoute';
 import { Contract360Route } from './routes/Contract360Route';
+import { ContractTaskTemplatesRoute } from './routes/ContractTaskTemplatesRoute';
 import { CentralPrazosRoute } from './routes/CentralPrazosRoute';
 import { UsersRoute } from './routes/UsersRoute';
 import { RolesRoute } from './routes/RolesRoute';
+import { DepartmentsRoute } from './routes/DepartmentsRoute';
+import { PaymentsRoute } from './routes/PaymentsRoute';
+import { FinancialExecutionRoute } from './routes/FinancialExecutionRoute';
+import { LoginRoute } from './routes/LoginRoute';
+import { DefinirSenhaRoute } from './routes/DefinirSenhaRoute';
+import { RedefinirSenhaRoute } from './routes/RedefinirSenhaRoute';
 import { SeiManagementModal } from './components/SeiManagementModal';
 import { ExportExcelModal } from './components/modals/ExportExcelModal';
 import { ContractTaskTemplatesModal } from './components/modals/ContractTaskTemplatesModal';
-import { ManageDepartmentsModal } from './components/ManageDepartmentsModal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 
@@ -51,24 +59,59 @@ const AppFooter: React.FC = () => (
   </footer>
 );
 
+const ProtectedLayout: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f8fafc',
+        color: '#0c326f',
+        fontSize: '0.9rem',
+        fontWeight: 600
+      }}>
+        Verificando credenciais governamentais...
+      </div>
+    );
+  }
+
+  if (isSupabaseConfigured && !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 const AppContent: React.FC = () => {
   const [isSeiModalOpen, setIsSeiModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isContractTemplatesModalOpen, setIsContractTemplatesModalOpen] = useState<boolean>(false);
-  const [isDepartmentsModalOpen, setIsDepartmentsModalOpen] = useState<boolean>(false);
   const { selectedArp, globalArps, globalItemsByAta } = useSelection();
 
   return (
     <div className="app-container">
       <Routes>
+        {/* Rotas Públicas de Acesso e Credenciamento */}
+        <Route path="/login" element={<LoginRoute />} />
+        <Route path="/definir-senha" element={<DefinirSenhaRoute />} />
+        <Route path="/redefinir-senha" element={<RedefinirSenhaRoute />} />
+
+        {/* Rotas Protegidas do Sistema */}
         <Route
           element={
-            <AppShell
-              onOpenExportModal={() => setIsExportModalOpen(true)}
-              onOpenContractTemplatesModal={() => setIsContractTemplatesModalOpen(true)}
-              onOpenSeiModal={() => setIsSeiModalOpen(true)}
-              onOpenDepartmentsModal={() => setIsDepartmentsModalOpen(true)}
-            />
+            <ProtectedLayout>
+              <AppShell
+                onOpenExportModal={() => setIsExportModalOpen(true)}
+                onOpenContractTemplatesModal={() => setIsContractTemplatesModalOpen(true)}
+                onOpenSeiModal={() => setIsSeiModalOpen(true)}
+              />
+            </ProtectedLayout>
           }
         >
           <Route path="/" element={<HomeRoute />} />
@@ -76,9 +119,13 @@ const AppContent: React.FC = () => {
           <Route path="/atas/itens" element={<ArpItemsRoute />} />
           <Route path="/atas/itens/saldo" element={<ItemBalancesRoute />} />
           <Route path="/atas/saldos-unidade" element={<AllocationsRoute />} />
-          <Route path="/contratos" element={<ContractsDashboard />} />
+          <Route path="/contratos" element={<ContractsRoute />} />
+          <Route path="/contratos/modelos" element={<ContractTaskTemplatesRoute />} />
           <Route path="/contratos/:contractKey" element={<Contract360Route />} />
           <Route path="/prazos" element={<CentralPrazosRoute />} />
+          <Route path="/pagamentos" element={<PaymentsRoute />} />
+          <Route path="/empenhos" element={<FinancialExecutionRoute />} />
+          <Route path="/admin/departamentos" element={<DepartmentsRoute />} />
           <Route path="/admin/usuarios" element={<UsersRoute />} />
           <Route path="/admin/perfis" element={<RolesRoute />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -103,11 +150,6 @@ const AppContent: React.FC = () => {
         onClose={() => setIsContractTemplatesModalOpen(false)}
       />
 
-      <ManageDepartmentsModal
-        isOpen={isDepartmentsModalOpen}
-        onClose={() => setIsDepartmentsModalOpen(false)}
-      />
-
       <AppFooter />
     </div>
   );
@@ -117,9 +159,11 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <SelectionProvider>
-          <AppContent />
-        </SelectionProvider>
+        <AuthProvider>
+          <SelectionProvider>
+            <AppContent />
+          </SelectionProvider>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

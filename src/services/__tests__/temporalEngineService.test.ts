@@ -159,6 +159,27 @@ describe('Fase 2 — Motor de Prazos e Agenda Contratual (temporalEngineService)
       expect(result!.statusTemporal).toBe('VENCE_EM_BREVE');
     });
 
+    it('calcula o marco operacional D-180 de Ata de Registro de Preços através de ARP_PRORROGACAO_180D', () => {
+      const regra = REGRAS_OPERACIONAIS_PADRAO.ARP_PRORROGACAO_180D;
+      expect(regra).toBeDefined();
+      expect(regra.offsetDias).toBe(-180);
+      expect(regra.unidadeContagem).toBe('DIAS_CORRIDOS');
+      expect(regra.tipo).toBe('OPERACIONAL');
+
+      const refDate = parseDateBRT('2026-09-23')!;
+      const result = calculateDeadline({
+        dataBase: '2027-03-31',
+        fonteDataBase: 'PNCP',
+        regra,
+        currentDate: refDate
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.dataAlvo).toBe('2026-10-02');
+      expect(result!.explicabilidade.regraNome).toBe('Planejamento de Prorrogação da Ata (180d)');
+      expect(result!.explicabilidade.descricaoRegra).toContain('Marco operacional de planejamento preventivo');
+    });
+
     it('regras padrão são classificadas como OPERACIONAL e não como obrigação legal compulsória', () => {
       for (const key of Object.keys(REGRAS_OPERACIONAIS_PADRAO)) {
         const r = REGRAS_OPERACIONAIS_PADRAO[key];

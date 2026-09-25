@@ -207,6 +207,14 @@ export const REGRAS_OPERACIONAIS_PADRAO: Record<string, RegraPrazoConfig> = {
     offsetDias: 10,
     descricao: 'Prazo operacional administrativo concedido ao fornecedor para manifestação formal sobre prorrogação.'
   },
+  ARP_PRORROGACAO_180D: {
+    id: 'ARP_PRORROGACAO_180D',
+    nome: 'Planejamento de Prorrogação da Ata (180d)',
+    tipo: 'OPERACIONAL',
+    unidadeContagem: 'DIAS_CORRIDOS',
+    offsetDias: -180,
+    descricao: 'Marco operacional de planejamento preventivo para análise de prorrogação e vantajosidade da Ata de Registro de Preços 180 dias antes do término de sua vigência.'
+  },
   ARP_VIGENCIA_90D: {
     id: 'ARP_VIGENCIA_90D',
     nome: 'Alerta de Exaustão de Vigência da ARP (90d)',

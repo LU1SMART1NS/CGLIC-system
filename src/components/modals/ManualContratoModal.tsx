@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Check, Building2, AlertCircle, DollarSign } from 'lucide-react';
 import type { Contrato, Empenho } from '../../types';
+import { AppButton } from '../../design-system/components/AppButton';
 
 interface ManualContratoModalProps {
   isOpen: boolean;
@@ -104,13 +105,33 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
   const isSaveDisabled = selectedEmpenhoIds.length === 0 || !numero.trim() || isLoading;
 
   return (
-    <div className="modal-backdrop" style={{ zIndex: 1100 }}>
-      <div className="modal-content" style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem' }}>
+    <div
+      className="modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isLoading) onClose();
+      }}
+    >
+      <div
+        className="modal-content"
+        style={{
+          maxWidth: '600px',
+          maxHeight: '92vh',
+          overflowY: 'auto',
+          padding: '1.5rem',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Building2 size={20} color="var(--primary)" /> Adicionar Contrato Manual
+          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Building2 size={20} color="#0c326f" /> Adicionar Contrato Manual
           </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLoading}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem' }}
+            title="Fechar"
+          >
             <X size={20} />
           </button>
         </div>
@@ -319,32 +340,25 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-            <button
+            <AppButton
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onClose}
               disabled={isLoading}
-              className="btn btn-secondary"
-              style={{ padding: '0.5rem 1rem', borderRadius: '6px', cursor: isLoading ? 'not-allowed' : 'pointer' }}
             >
               Cancelar
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="submit"
+              variant="primary"
+              size="sm"
+              icon={isLoading ? undefined : <Check size={16} />}
               disabled={isSaveDisabled}
-              className="btn btn-primary"
-              style={{
-                padding: '0.5rem 1.25rem',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                fontWeight: 700,
-                opacity: isSaveDisabled ? 0.5 : 1,
-                cursor: isSaveDisabled ? 'not-allowed' : 'pointer'
-              }}
+              isLoading={isLoading}
             >
-              {isLoading ? 'Salvando...' : <><Check size={16} /> Salvar Contrato</>}
-            </button>
+              Salvar Contrato
+            </AppButton>
           </div>
         </form>
       </div>

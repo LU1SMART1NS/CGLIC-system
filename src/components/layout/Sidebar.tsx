@@ -12,15 +12,21 @@ interface SidebarProps {
   onOpenDepartmentsModal?: () => void;
 }
 
-function isItemActive(item: NavItem, pathname: string): boolean {
+export function isItemActive(item: NavItem, pathname: string): boolean {
+  if (item.excludePrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return false;
+  }
   if (item.route && item.route === pathname) return true;
-  if (item.matchPrefixes?.some((prefix) => pathname.startsWith(prefix))) return true;
+  if (item.matchPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return true;
   return item.children?.some((child) => isItemActive(child, pathname)) ?? false;
 }
 
-function isExactChildActive(item: NavItem, pathname: string): boolean {
+export function isExactChildActive(item: NavItem, pathname: string): boolean {
+  if (item.excludePrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return false;
+  }
   if (item.route && item.route === pathname) return true;
-  if (item.matchPrefixes?.some((prefix) => pathname.startsWith(prefix))) return true;
+  if (item.matchPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return true;
   return false;
 }
 
@@ -34,7 +40,7 @@ const SidebarLink: React.FC<{
   const navigate = useNavigate();
   const active = isItemActive(item, location.pathname);
   const exactActive = isExactChildActive(item, location.pathname);
-  const [expanded, setExpanded] = useState(active);
+  const [expanded, setExpanded] = useState<boolean>(active || false);
   const hasChildren = !!item.children?.length;
   const Icon = item.icon;
   const planned = item.status === 'planned';
@@ -65,9 +71,6 @@ const SidebarLink: React.FC<{
     ? badgeVariantColors[item.badge.variant || 'neutral']
     : null;
 
-  // Destaque visual:
-  // Se for nível 0 com filhos: destaque suave de categoria ativa
-  // Se for folha (nível 0 sem filhos ou nível 1+): destaque de item selecionado
   const isSelectedLeaf = !hasChildren && exactActive;
   const isSelectedParent = hasChildren && active;
 
@@ -77,13 +80,15 @@ const SidebarLink: React.FC<{
         type="button"
         onClick={handleClick}
         disabled={planned && !hasChildren}
+        aria-current={isSelectedLeaf ? 'page' : undefined}
+        aria-expanded={hasChildren ? expanded : undefined}
         title={collapsed ? item.label : planned ? `${item.label} — em breve` : item.label}
         style={{
           width: '100%',
           display: 'flex',
           alignItems: 'center',
           gap: '0.65rem',
-          padding: depth === 0 ? '0.65rem 0.85rem' : '0.48rem 0.85rem 0.48rem 2.1rem',
+          padding: depth === 0 ? '0.62rem 0.85rem' : '0.48rem 0.85rem 0.48rem 2.1rem',
           background: isSelectedLeaf
             ? 'rgba(12, 50, 111, 0.08)'
             : isSelectedParent && depth === 0
@@ -229,6 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           type="button"
           onClick={onToggleCollapsed}
           title={collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'}
+          aria-label={collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -247,16 +253,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      <nav style={{ flex: 1, padding: '0.75rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-        {navigationConfig.map((item) => (
-          <SidebarLink
-            key={item.id}
-            item={item}
-            depth={0}
-            collapsed={collapsed}
-            onAction={handleAction}
-          />
-        ))}
+      <nav
+        aria-label="Navegação Principal"
+        style={{
+          flex: 1,
+          padding: '0.75rem 0.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.2rem'
+        }}
+      >
+        {navigationConfig.map((item, idx) => {
+          // Linha divisória sutil apenas após os itens de topo (Visão Geral e Central de Atenção)
+          const showTopDivider = idx === 2;
+
+          return (
+            <React.Fragment key={item.id}>
+              {showTopDivider && (
+                <div style={{
+                  height: '1px',
+                  background: '#f1f5f9',
+                  margin: '0.4rem 0.5rem 0.4rem'
+                }} />
+              )}
+              <SidebarLink
+                item={item}
+                depth={0}
+                collapsed={collapsed}
+                onAction={handleAction}
+              />
+            </React.Fragment>
+          );
+        })}
       </nav>
 
       <div style={{

@@ -1,20 +1,24 @@
 import React from 'react';
-import { Building2 } from 'lucide-react';
+import { Building2, FileText, LogOut } from 'lucide-react';
+import { AppButton } from '../design-system/components/AppButton';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   onOpenExportModal?: () => void;
   onOpenContractTemplatesModal?: () => void;
+  onOpenSeiModal?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = () => {
+export const Header: React.FC<HeaderProps> = ({ onOpenSeiModal }) => {
+  const { user, signOut } = useAuth();
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Gov.br Federal Identity Topbar */}
       <div style={{
         background: '#0c326f',
         color: '#ffffff',
-        padding: '0.4rem 3rem',
-        fontSize: '0.75rem',
+        padding: '0.25rem 2rem',
+        fontSize: '0.72rem',
         fontWeight: 600,
         display: 'flex',
         justifyContent: 'space-between',
@@ -36,30 +40,30 @@ export const Header: React.FC<HeaderProps> = () => {
         </div>
       </div>
 
-      {/* Main MJSP Styled Header */}
+      {/* Main MJSP / SENASP Styled Header */}
       <header style={{
         background: '#ffffff',
-        borderBottom: '3px solid #0c326f',
-        padding: '1rem 3rem',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '0.45rem 2rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         fontFamily: 'var(--font-family)',
         flexWrap: 'wrap',
         gap: '1rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
           <div style={{
-            width: '48px',
-            height: '48px',
+            width: '32px',
+            height: '32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}>
             <img 
               src="/logo.png" 
-              alt="Logo Compras SUSP / MJSP" 
+              alt="Logo Compras SUSP / SENASP" 
               style={{ 
                 maxHeight: '100%', 
                 maxWidth: '100%', 
@@ -67,40 +71,82 @@ export const Header: React.FC<HeaderProps> = () => {
               }} 
             />
           </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0c326f', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Ministério da Justiça e Segurança Pública • SENASP
-            </div>
-            <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0.1rem 0 0 0', letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
-              ComprasSUSP <span style={{ fontWeight: 400, fontSize: '1.05rem', color: '#475569' }}>| Gestão Inteligente de Atas e Contratos</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
+              ComprasSUSP
             </h1>
-            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.1rem 0 0 0', fontWeight: 500 }}>
-              Coordenação-Geral de Licitações e Contratos (CGLIC)
-            </p>
+            <span style={{ color: '#cbd5e1' }}>|</span>
+            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
+              SENASP · Gestão Inteligente de Atas e Contratos
+            </span>
           </div>
         </div>
 
-        {/* Identificação Institucional da Unidade Gestora */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          padding: '0.45rem 0.85rem',
-          background: '#f8fafc',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0'
-        }}>
-          <div style={{ padding: '0.35rem', background: '#eff6ff', borderRadius: '6px', color: '#0c326f' }}>
-            <Building2 size={16} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>
-              Unidade Gestora
-            </span>
-            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0c326f' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {onOpenSeiModal && (
+            <AppButton
+              variant="outline"
+              size="sm"
+              icon={<FileText size={14} />}
+              onClick={onOpenSeiModal}
+              title="Acessar painel e consulta de Processos SEI"
+            >
+              Processos SEI
+            </AppButton>
+          )}
+
+          {/* Identificação Institucional da Unidade Gestora */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.25rem 0.6rem',
+            background: '#f1f5f9',
+            borderRadius: '6px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ color: '#0c326f' }}>
+              <Building2 size={13} />
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0c326f' }}>
               UASG 200331
             </span>
           </div>
+
+          {/* Usuário Autenticado & Logout */}
+          {user && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              paddingLeft: '0.5rem',
+              borderLeft: '1px solid #e2e8f0'
+            }}>
+              <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
+                {user.email}
+              </span>
+              <button
+                type="button"
+                onClick={signOut}
+                title="Encerrar sessão no ComprasSUSP"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.25rem 0.5rem',
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  color: '#475569',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <LogOut size={12} /> Sair
+              </button>
+            </div>
+          )}
         </div>
       </header>
     </div>

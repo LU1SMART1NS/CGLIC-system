@@ -32,6 +32,29 @@ export type ProrrogationWorkflowStatus =
 export type FornecedorManifestacaoStatus = 'PENDENTE' | 'CONFIRMADO' | 'RECUSADO';
 
 /**
+ * Situações de Prontidão e Conformidade de Reajuste/Repactuação na Prorrogação (Fase 7.5-C4)
+ */
+export type ProrrogationReajusteSituacao =
+  | 'SEM_PENDENCIA'         // Situação C (evento registrado) ou fora da janela de alerta
+  | 'MARCO_PROXIMO'         // Situação A (aniversário nos próximos 60 dias)
+  | 'MARCO_ULTRAPASSADO'    // Situação B (aniversário vencido sem evento formal subsequente)
+  | 'DADOS_INSUFICIENTES';  // Situação D (sem data-base ou dados para avaliar)
+
+/**
+ * Dimensão de Avaliação Assistida de Reajuste/Repactuação na Prorrogação
+ */
+export interface ProrrogationReajusteReadiness {
+  situacao: ProrrogationReajusteSituacao;
+  alertaRadarId?: string;
+  dataBaseReferencia?: string;
+  dataAniversario?: string;
+  diasRestantes?: number;
+  possuiEventoSubsequente: boolean;
+  orientacao?: string;
+  sugestaoRessalva?: string;
+}
+
+/**
  * Checklist Assistido de Prontidão e Conformidade Legal (Art. 106/107 Lei 14.133/21)
  */
 export interface ProrrogationReadinessChecklist {
@@ -44,6 +67,8 @@ export interface ProrrogationReadinessChecklist {
   itensPendentes: string[];
   isProntoParaAssinatura: boolean;
   orientacoes: string[];
+  // Dimensão assistiva adicionada na Fase 7.5-C4 (não bloqueante)
+  reajusteStatus?: ProrrogationReajusteReadiness;
 }
 
 /**

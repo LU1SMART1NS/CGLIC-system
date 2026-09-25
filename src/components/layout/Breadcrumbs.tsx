@@ -15,7 +15,7 @@ export const Breadcrumbs: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         gap: '0.4rem',
-        padding: '0.75rem 2rem 0',
+        padding: '0.35rem 2rem 0.45rem',
         fontSize: '0.8rem',
         color: 'var(--text-muted)',
         fontFamily: 'var(--font-family)'

@@ -1,14 +1,17 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
+import type { AppShellContextValue } from '../layout/AppShell';
 import {
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
+  DollarSign,
   GitBranch,
   History,
   Layers,
   ListTodo,
   Loader2,
+  Receipt,
   Search
 } from 'lucide-react';
 import { useContract } from '../../hooks/useContract';
@@ -19,6 +22,8 @@ import { Contract360Summary } from './Contract360Summary';
 import { Contract360Section } from './Contract360Section';
 import { ContractAttentionCenter } from './ContractAttentionCenter';
 import { ContractWorkflowsSection } from './ContractWorkflowsSection';
+import { ContractPaymentFollowUpSection } from './ContractPaymentFollowUpSection';
+import { ContractFinancialExecutionSection } from './ContractFinancialExecutionSection';
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
 
@@ -33,6 +38,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
 }) => {
   const { contractKey: paramContractKey } = useParams<{ contractKey: string }>();
   const navigate = useNavigate();
+  const outletCtx = useOutletContext<AppShellContextValue | null>();
   const contractKey = contractKeyOverride || paramContractKey;
 
   const { contract, isLoading, isError, error, refetch } = useContract(contractKey, uasg);
@@ -212,7 +218,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
       {/* Header Executivo com dados de identificação, vigência, valor e status oficial */}
-      <Contract360Header contract={contract} />
+      <Contract360Header contract={contract} onOpenSeiModal={outletCtx?.onOpenSeiModal} />
 
       {/* Bloco 1: Central de Atenção ("O que precisa da minha atenção?") */}
       <Contract360Section
@@ -242,7 +248,33 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
         />
       </Contract360Section>
 
-      {/* Bloco 3: Tarefas e Providências */}
+      {/* Bloco 3: Acompanhamento de Pagamentos e Faturamento */}
+      <Contract360Section
+        id="contract-payment-followup-section"
+        title="Acompanhamento de Pagamentos"
+        subtitle="Controle de SLA, atestos e tramitação perante a CGOFI (SaldoARP acompanha • CGOFI executa o pagamento)"
+        icon={DollarSign}
+      >
+        <ContractPaymentFollowUpSection
+          contract={contract}
+          contractKey={resolvedContractKey}
+        />
+      </Contract360Section>
+
+      {/* Bloco 4: Execução Financeira & Empenhos Vinculados */}
+      <Contract360Section
+        id="contract-financial-execution-section"
+        title="Execução Financeira & Empenhos"
+        subtitle="Lastro orçamentário oficial, empenhos emitidos e saldos de execução (SSOT SIAFI / public.empenhos)"
+        icon={Receipt}
+      >
+        <ContractFinancialExecutionSection
+          contract={contract}
+          contractKey={resolvedContractKey}
+        />
+      </Contract360Section>
+
+      {/* Bloco 5: Tarefas e Providências */}
       <Contract360Section
         id="contract-tasks-section"
         title="Tarefas e Providências"

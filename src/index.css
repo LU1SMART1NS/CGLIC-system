@@ -2,10 +2,10 @@
 
 :root {
   /* Paleta de Cores e Tokens Gov.br Modernos */
-  --primary: #1351b4;
-  --primary-hover: #0f4090;
-  --primary-light: rgba(19, 81, 180, 0.1);
-  --primary-rgb: 19, 81, 180;
+  --primary: #0c326f;
+  --primary-hover: #08214d;
+  --primary-light: rgba(12, 50, 111, 0.1);
+  --primary-rgb: 12, 50, 111;
   
   --success: #10b981;
   --success-bg: #d1fae5;
@@ -397,42 +397,43 @@ h1, h2, h3, h4 {
 /* Custom Table Styles */
 .table-container {
   overflow-x: auto;
-  margin-top: 1.5rem;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
+  margin-top: 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .custom-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.92rem;
+  font-size: 0.82rem;
 }
 
 .custom-table th {
-  background: #f1f3f5;
-  color: var(--text-primary);
-  font-weight: 800;
-  padding: 0.85rem 1.25rem;
-  border-bottom: 2px solid var(--border-color);
-  font-size: 0.8rem;
-  text-transform: uppercase;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.78rem;
+  text-transform: none;
 }
 
 .custom-table td {
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
   vertical-align: middle;
 }
 
 .custom-table tbody tr {
-  transition: var(--transition-smooth);
+  transition: background-color 0.15s ease;
 }
 
 .custom-table tbody tr:hover {
-  background: #f8f9fa;
+  background: #f8fafc;
 }
 
 .custom-table tbody tr:last-child td {
@@ -1149,6 +1150,45 @@ h1, h2, h3, h4 {
   background-color: #f1f5f9 !important;
   border-color: #94a3b8 !important;
   color: var(--primary) !important;
+}
+
+/* --- Modais do Sistema (Padrão Canônico Gov.br) --- */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid #e2e8f0;
+  animation: modalScaleUp 0.15s ease-out;
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 

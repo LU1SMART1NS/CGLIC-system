@@ -304,4 +304,133 @@ describe('Fase 3.1 — Serviço Agregador da Central de Prazos (centralPrazosSer
     });
   });
 
+  describe('5. Fase 6.6 — Integração Temporal de Atas e Instrumentos Substitutivos', () => {
+    const refDate = parseDateBRT('2026-09-23')!;
+
+    it('Ata em D-180: vigência a exatamente 180 dias atinge o marco operacional hoje (VENCE_HOJE)', () => {
+      // 2026-09-23 + 180 dias = 2027-03-22
+      const arpHot: ArpRecord = {
+        ...sampleArp,
+        numeroAtaRegistroPreco: '00180/2026',
+        dataVigenciaFinal: '2027-03-22'
+      };
+
+      const items = buildCentralPrazosItems([], [arpHot], {}, {}, refDate);
+      const trigger180 = items.find(i => i.id.includes('PRORROGACAO_ARP') && i.id.includes('GATILHO_180D'));
+
+      expect(trigger180).toBeDefined();
+      expect(trigger180!.diasRestantes).toBe(0);
+      expect(trigger180!.estadoTemporal).toBe('VENCE_HOJE');
+      expect(trigger180!.dataAlvo).toBe('2026-09-23');
+      expect(trigger180!.acaoDescricao).toContain('Janela preventiva 180d');
+      expect(trigger180!.regraNome).toBe('Planejamento de Prorrogação da Ata (180d)');
+    });
+
+    it('Ata em D-179: marco operacional de 180 dias já foi ultrapassado (diasRestantes < 0)', () => {
+      // 2026-09-23 + 179 dias = 2027-03-21
+      const arp179: ArpRecord = {
+        ...sampleArp,
+        numeroAtaRegistroPreco: '00179/2026',
+        dataVigenciaFinal: '2027-03-21'
+      };
+
+      const items = buildCentralPrazosItems([], [arp179], {}, {}, refDate);
+      const trigger180 = items.find(i => i.id.includes('PRORROGACAO_ARP') && i.id.includes('GATILHO_180D'));
+
+      expect(trigger180).toBeDefined();
+      expect(trigger180!.diasRestantes).toBe(-1);
+      expect(trigger180!.estadoTemporal).toBe('ATRASADO');
+    });
+
+    it('Ata fora da janela de D-180: faltam 20 dias para o início da janela (diasRestantes === 20)', () => {
+      // 2026-09-23 + 200 dias = 2027-04-11
+      const arp200: ArpRecord = {
+        ...sampleArp,
+        numeroAtaRegistroPreco: '00200/2026',
+        dataVigenciaFinal: '2027-04-11'
+      };
+
+      const items = buildCentralPrazosItems([], [arp200], {}, {}, refDate);
+      const trigger180 = items.find(i => i.id.includes('PRORROGACAO_ARP') && i.id.includes('GATILHO_180D'));
+
+      expect(trigger180).toBeDefined();
+      expect(trigger180!.diasRestantes).toBe(20);
+      expect(trigger180!.estadoTemporal).toBe('VENCE_EM_BREVE');
+    });
+
+    it('Ata vencida: NÃO gera gatilho prospectivo de planejamento de prorrogação D-180', () => {
+      const arpVencida: ArpRecord = {
+        ...sampleArp,
+        numeroAtaRegistroPreco: '00001/2025',
+        dataVigenciaFinal: '2026-08-01' // Vencida antes de 2026-09-23
+      };
+
+      const items = buildCentralPrazosItems([], [arpVencida], {}, {}, refDate);
+      const trigger180 = items.find(i => i.id.includes('PRORROGACAO_ARP'));
+
+      expect(trigger180).toBeUndefined(); // Não gera ação prospectiva de planejar prorrogação
+    });
+
+    it('Ata com saldo zero mas com vigência futura: NÃO é tratada como vencida e preserva cálculo cronológico', () => {
+      const arpSaldoZero: ArpRecord = {
+        ...sampleArp,
+        numeroAtaRegistroPreco: '00777/2026',
+        dataVigenciaFinal: '2027-03-22',
+        valorTotal: 0 // Saldo exaurido no contexto
+      };
+
+      const arpSaldoPositivo: ArpRecord = {
+        ...sampleArp,
+        numeroAtaRegistroPreco: '00888/2026',
+        dataVigenciaFinal: '2027-03-22',
+        valorTotal: 500000
+      };
+
+      const itemsZero = buildCentralPrazosItems([], [arpSaldoZero], {}, {}, refDate);
+      const itemsPos = buildCentralPrazosItems([], [arpSaldoPositivo], {}, {}, refDate);
+
+      const triggerZero = itemsZero.find(i => i.id.includes('PRORROGACAO_ARP'))!;
+      const triggerPos = itemsPos.find(i => i.id.includes('PRORROGACAO_ARP'))!;
+
+      expect(triggerZero).toBeDefined();
+      expect(triggerPos).toBeDefined();
+      // O cálculo cronológico é 100% idêntico
+      expect(triggerZero.dataAlvo).toBe(triggerPos.dataAlvo);
+      expect(triggerZero.diasRestantes).toBe(triggerPos.diasRestantes);
+      expect(triggerZero.estadoTemporal).toBe(triggerPos.estadoTemporal);
+    });
+
+    it('Instrumento substitutivo (Art. 95) de entrega imediata não entra no radar D-180 de prorrogação contínua', () => {
+      const contratoNotaEmpenho: ContractDashboardRecord = {
+        ...sampleContract,
+        id: 'ne-imediata-01',
+        tipoInstrumento: 'NOTA_EMPENHO',
+        dataVigenciaInicio: '2026-09-23',
+        dataVigenciaFim: '2026-09-23' // Entrega imediata em data única
+      };
+
+      const items = buildCentralPrazosItems([contratoNotaEmpenho], [], {}, {}, refDate);
+      const trigger180 = items.find(i => i.id.includes('ne-imediata-01') && i.id.includes('GATILHO_180D'));
+
+      expect(trigger180).toBeUndefined(); // Silenciado para instrumentos substitutivos sem obrigações futuras
+    });
+
+    it('Contrato ordinário (TERMO_CONTRATO ou legado sem tipoInstrumento) gera normalmente os gatilhos D-180 e D-60', () => {
+      const contratoOrdinario: ContractDashboardRecord = {
+        ...sampleContract,
+        id: 'termo-contrato-01',
+        tipoInstrumento: 'TERMO_CONTRATO',
+        dataVigenciaInicio: '2026-01-01',
+        dataVigenciaFim: '2027-01-01'
+      };
+
+      const items = buildCentralPrazosItems([contratoOrdinario], [], {}, {}, refDate);
+      const trigger180 = items.find(i => i.id.includes('termo-contrato-01') && i.id.includes('GATILHO_180D'));
+      const trigger60 = items.find(i => i.id.includes('termo-contrato-01') && i.id.includes('GATILHO_60D'));
+
+      expect(trigger180).toBeDefined();
+      expect(trigger60).toBeDefined();
+    });
+  });
+
 });

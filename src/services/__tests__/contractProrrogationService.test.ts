@@ -8,7 +8,7 @@ import {
   assembleProrrogationWorkflow,
   completeProrrogationCycle
 } from '../contractProrrogationService';
-import type { ContractDashboardRecord } from '../../types';
+import type { ContractDashboardRecord, ContractEvent } from '../../types';
 
 describe('contractProrrogationService (Fase 4.2 — Workflow de Prorrogação Contratual)', () => {
   const mockContract: ContractDashboardRecord = {
@@ -68,14 +68,14 @@ describe('contractProrrogationService (Fase 4.2 — Workflow de Prorrogação Co
   });
 
   describe('3. buildDefaultProrrogationTemplate', () => {
-    it('deve retornar o template padrão estruturado em 4 macrotarefas e 10 tarefas da Lei 14.133/21', () => {
+    it('deve retornar o template padrão estruturado em 4 macrotarefas e 11 tarefas da Lei 14.133/21 (incluindo guarda de reajuste)', () => {
       const template = buildDefaultProrrogationTemplate();
 
       expect(template.id).toBe('tpl-prorrogacao-padrao-14133');
       expect(template.macrotarefas.length).toBe(4);
 
       const totalTasks = template.macrotarefas.reduce((acc, m) => acc + m.tarefas.length, 0);
-      expect(totalTasks).toBe(10);
+      expect(totalTasks).toBe(11);
 
       // Validação das macrotarefas sequenciais
       expect(template.macrotarefas[0].nome).toContain('1. Avaliação de Interesse e Consulta');
@@ -89,12 +89,13 @@ describe('contractProrrogationService (Fase 4.2 — Workflow de Prorrogação Co
       expect(taskNames.some(n => n.includes('Ofício de Consulta'))).toBe(true);
       expect(taskNames.some(n => n.includes('Pesquisa de Preços'))).toBe(true);
       expect(taskNames.some(n => n.includes('SICAF'))).toBe(true);
+      expect(taskNames.some(n => n.includes('pedidos pendentes de reajuste/repactuação'))).toBe(true);
       expect(taskNames.some(n => n.includes('CONJUR/AGU'))).toBe(true);
       expect(taskNames.some(n => n.includes('Publicar Termo Aditivo'))).toBe(true);
     });
   });
 
-  describe('4. evaluateProrrogationReadiness', () => {
+  describe('4. evaluateProrrogationReadiness (com dimensão de Reajuste/Repactuação - Fase 7.5-C4)', () => {
     it('deve identificar pendências quando o checklist estiver incompleto', () => {
       const partialWorkflow = {
         manifestacaoFornecedor: 'PENDENTE' as const,
@@ -143,6 +144,186 @@ describe('contractProrrogationService (Fase 4.2 — Workflow de Prorrogação Co
       expect(readiness.isProntoParaAssinatura).toBe(false);
       expect(readiness.tempestividadeGarantida).toBe(false);
       expect(readiness.itensPendentes.some(p => p.includes('expirada'))).toBe(true);
+    });
+
+    it('C4-1: Prorrogação sem questão de reajuste (fora da janela)', () => {
+      const fullWorkflow = {
+        decisaoFinal: 'PRORROGAR' as const,
+        manifestacaoFornecedor: 'CONFIRMADO' as const,
+        vantajosidadeComprovada: true,
+        regularidadeFiscalSicaf: true,
+        parecerConjurFavoravel: true
+      };
+
+      // Contrato com marco em 2027-01-15. Data atual 2026-06-01 (> 60 dias)
+      const readiness = evaluateProrrogationReadiness(
+        fullWorkflow,
+        '2027-01-15',
+        new Date(2026, 5, 1),
+        { contract: mockContract }
+      );
+
+      expect(readiness.reajusteStatus?.situacao).toBe('SEM_PENDENCIA');
+      expect(readiness.reajusteStatus?.possuiEventoSubsequente).toBe(false);
+      expect(readiness.isProntoParaAssinatura).toBe(true);
+    });
+
+    it('C4-2: Marco de reajuste próximo (Situação A - MARCO_PROXIMO) orienta ressalva sem bloquear', () => {
+      const fullWorkflow = {
+        decisaoFinal: 'PRORROGAR' as const,
+        manifestacaoFornecedor: 'CONFIRMADO' as const,
+        vantajosidadeComprovada: true,
+        regularidadeFiscalSicaf: true,
+        parecerConjurFavoravel: true
+      };
+
+      // Contrato com marco em 2027-01-10 (dataAssinatura 2026-01-10). Data atual 2026-12-01 (faltam 40 dias)
+      const readiness = evaluateProrrogationReadiness(
+        fullWorkflow,
+        '2027-01-15',
+        new Date(2026, 11, 1),
+        { contract: mockContract }
+      );
+
+      expect(readiness.reajusteStatus?.situacao).toBe('MARCO_PROXIMO');
+      expect(readiness.reajusteStatus?.diasRestantes).toBe(40);
+      expect(readiness.reajusteStatus?.sugestaoRessalva).toContain('consignar ressalva');
+      expect(readiness.orientacoes.some(o => o.includes('Marco anual'))).toBe(true);
+      // NUNCA bloqueia a prorrogação
+      expect(readiness.isProntoParaAssinatura).toBe(true);
+      expect(readiness.itensPendentes.length).toBe(0);
+    });
+
+    it('C4-3: Marco de reajuste ultrapassado (Situação B - MARCO_ULTRAPASSADO) gera aviso assistivo sem bloquear', () => {
+      const fullWorkflow = {
+        decisaoFinal: 'PRORROGAR' as const,
+        manifestacaoFornecedor: 'CONFIRMADO' as const,
+        vantajosidadeComprovada: true,
+        regularidadeFiscalSicaf: true,
+        parecerConjurFavoravel: true
+      };
+
+      // Contrato com marco em 2027-01-10. Data atual 2027-01-20 (-10 dias)
+      const readiness = evaluateProrrogationReadiness(
+        fullWorkflow,
+        '2027-01-30', // Vigência ainda válida até dia 30
+        new Date(2027, 0, 20),
+        { contract: mockContract }
+      );
+
+      expect(readiness.reajusteStatus?.situacao).toBe('MARCO_ULTRAPASSADO');
+      expect(readiness.reajusteStatus?.diasRestantes).toBe(-10);
+      expect(readiness.reajusteStatus?.orientacao).toContain('Verificar eventual pedido de reajuste/repactuação pendente');
+      expect(readiness.reajusteStatus?.sugestaoRessalva).toContain('consignar ressalva');
+      // Não bloqueia a prorrogação
+      expect(readiness.isProntoParaAssinatura).toBe(true);
+    });
+
+    it('C4-4: Reajuste posterior já registrado formalmente (Situação C - SEM_PENDENCIA)', () => {
+      const fullWorkflow = {
+        decisaoFinal: 'PRORROGAR' as const,
+        manifestacaoFornecedor: 'CONFIRMADO' as const,
+        vantajosidadeComprovada: true,
+        regularidadeFiscalSicaf: true,
+        parecerConjurFavoravel: true
+      };
+
+      const reajusteEvent: ContractEvent = {
+        id: 'EVT-REAJUSTE-01',
+        contractKey: '200331-00015-2026',
+        uasg: '200331',
+        numeroContrato: '00015',
+        anoContrato: 2026,
+        tipoEvento: 'REAJUSTE',
+        naturezaInstrumento: 'TERMO_APOSTILAMENTO',
+        identificadorOficial: 'APOST-01/2026',
+        descricao: 'Reajuste concedido',
+        dataPublicacao: '2026-12-15',
+        impacto: 'ALTERA_VALOR',
+        fonteOrigem: 'PNCP',
+        capturedAt: '2026-12-15T00:00:00Z'
+      };
+
+      // Prorrogação em 2026-12-20 após o reajuste de 2026-12-15
+      const readiness = evaluateProrrogationReadiness(
+        fullWorkflow,
+        '2027-01-15',
+        new Date(2026, 11, 20),
+        { contract: mockContract, events: [reajusteEvent] }
+      );
+
+      expect(readiness.reajusteStatus?.situacao).toBe('SEM_PENDENCIA');
+      expect(readiness.reajusteStatus?.possuiEventoSubsequente).toBe(true);
+      expect(readiness.isProntoParaAssinatura).toBe(true);
+    });
+
+    it('C4-5: Repactuação posterior já registrada formalmente (Situação C - SEM_PENDENCIA)', () => {
+      const fullWorkflow = {
+        decisaoFinal: 'PRORROGAR' as const,
+        manifestacaoFornecedor: 'CONFIRMADO' as const,
+        vantajosidadeComprovada: true,
+        regularidadeFiscalSicaf: true,
+        parecerConjurFavoravel: true
+      };
+
+      const repactuacaoEvent: ContractEvent = {
+        id: 'EVT-REPACT-01',
+        contractKey: '200331-00015-2026',
+        uasg: '200331',
+        numeroContrato: '00015',
+        anoContrato: 2026,
+        tipoEvento: 'REPACTUACAO',
+        naturezaInstrumento: 'TERMO_ADITIVO',
+        identificadorOficial: 'TA-01/2026',
+        descricao: 'Repactuação CCT 2026',
+        dataPublicacao: '2026-12-10',
+        impacto: 'ALTERA_VALOR',
+        fonteOrigem: 'PNCP',
+        capturedAt: '2026-12-10T00:00:00Z'
+      };
+
+      const readiness = evaluateProrrogationReadiness(
+        fullWorkflow,
+        '2027-01-15',
+        new Date(2026, 11, 20),
+        { contract: mockContract, events: [repactuacaoEvent] }
+      );
+
+      expect(readiness.reajusteStatus?.situacao).toBe('SEM_PENDENCIA');
+      expect(readiness.reajusteStatus?.possuiEventoSubsequente).toBe(true);
+    });
+
+    it('C4-6: Ausência total de datas-base gera DADOS_INSUFICIENTES sem inventar pendência impeditiva', () => {
+      const contractSemDatas: Partial<ContractDashboardRecord> = {
+        id: 'CONTRATO-SEM-DATAS',
+        statusVigencia: 'Vigente'
+      };
+
+      const readiness = evaluateProrrogationReadiness(
+        {},
+        undefined,
+        new Date(2026, 11, 20),
+        { contract: contractSemDatas }
+      );
+
+      expect(readiness.reajusteStatus?.situacao).toBe('DADOS_INSUFICIENTES');
+      expect(readiness.reajusteStatus?.possuiEventoSubsequente).toBe(false);
+      // Não cria item no checklist que impeça assinatura só pela falta de data-base de reajuste
+      expect(readiness.itensPendentes.some(p => p.includes('reajuste'))).toBe(false);
+    });
+
+    it('C4-7: Linguagem estritamente assistiva sem juízo categórico de perda de direito', () => {
+      const readiness = evaluateProrrogationReadiness(
+        {},
+        '2027-01-15',
+        new Date(2027, 0, 20),
+        { contract: mockContract }
+      );
+
+      const orientacao = readiness.reajusteStatus?.orientacao || '';
+      expect(orientacao).not.toContain('perdeu o direito');
+      expect(orientacao).not.toContain('preclusão consumada');
+      expect(orientacao).toContain('Verificar eventual pedido');
     });
   });
 

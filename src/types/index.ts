@@ -367,11 +367,33 @@ export interface Empenho {
   atualizadoEm: string;
 }
 
+/**
+ * Tipos de Instrumentos Contratuais e Substitutivos (Art. 95 da Lei 14.133/2021)
+ *
+ * O instrumento de contrato é obrigatório, salvo hipóteses do art. 95 onde pode ser substituído
+ * por carta-contrato, nota de empenho de despesa, autorização de compra ou ordem de execução de serviço.
+ */
+export type TipoInstrumentoContratual =
+  | 'TERMO_CONTRATO'           // Instrumento solene bilateral ordinário
+  | 'CARTA_CONTRATO'           // Instrumento substitutivo simplificado
+  | 'NOTA_EMPENHO'             // Instrumento substitutivo para compras com entrega imediata ou sem obrigações futuras
+  | 'AUTORIZACAO_COMPRA'       // Instrumento substitutivo simplificado
+  | 'ORDEM_EXECUCAO_SERVICO'   // Instrumento substitutivo simplificado
+  | 'OUTRO_INSTRUMENTO_HABIL'; // Demais hipóteses admitidas pelo art. 95
+
+/**
+ * Utilitário puro: identifica se o instrumento contratual é substitutivo (Art. 95, Lei 14.133/2021)
+ */
+export function isInstrumentoSubstitutivo(tipo?: TipoInstrumentoContratual): boolean {
+  return tipo !== undefined && tipo !== 'TERMO_CONTRATO';
+}
+
 export interface Contrato {
   id: string;
   numero: string;
   ano: number;
-  arpId: string;
+  arpId?: string; // Saneamento Fase 6.5: Opcional (contrato pode derivar de compra direta sem Ata)
+  tipoInstrumento?: TipoInstrumentoContratual;
   itemId?: string;
   uasg: string;
   numeroControlePncp?: string;
@@ -432,6 +454,8 @@ export interface ContractDashboardRecord {
   idCompra?: string;
   modalidadeCompra?: string;
   contratoId?: number | string;
+  tipoInstrumento?: TipoInstrumentoContratual;
+  arpId?: string;
   fonteDados: 'Compras.gov.br' | 'Contratos.gov.br' | 'PNCP' | 'Sistema SaldoARP (Manual)' | string;
   // Metadados de Origem e Rastreabilidade de Sincronização (Fase 1)
   sourceSystem?: 'Compras.gov.br' | 'Contratos.gov.br' | 'PNCP' | 'SaldoARP' | string;
@@ -637,9 +661,10 @@ export * from './contractAmendmentWorkflows';
 export * from './contractExtinctions';
 export * from './contractClosureWorkflows';
 export * from './contractRescissionWorkflows';
-
-
-
-
-
-
+export * from './arpContractLinks';
+export * from './ataEvents';
+export * from './financialExecution';
+export * from './paymentFollowUp';
+export * from './contractValueEvolution';
+export * from './contractReajusteRadar';
+export * from './managementDashboard';
