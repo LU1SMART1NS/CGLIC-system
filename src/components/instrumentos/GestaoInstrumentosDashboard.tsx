@@ -268,12 +268,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           flexWrap: 'wrap',
           gap: '0.75rem'
         }}>
-          <GestaoInstrumentosCategoryTabs
-            counts={tabCounts}
-            active={activeTab}
-            onSelect={handleSelectTab}
-          />
-
           <div style={{ flex: '1 1 360px', minWidth: '320px' }}>
             <GestaoInstrumentosCompactFilters
               filters={{ severidade, busca }}
@@ -283,6 +277,12 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
               totalItems={allItems.length}
             />
           </div>
+
+          <GestaoInstrumentosCategoryTabs
+            counts={tabCounts}
+            active={activeTab}
+            onSelect={handleSelectTab}
+          />
         </div>
       </div>
 
