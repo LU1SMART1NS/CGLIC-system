@@ -11,8 +11,7 @@ import {
   Search,
   FileSpreadsheet,
   Receipt,
-  Landmark,
-  AlertTriangle
+  Landmark
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -38,8 +37,8 @@ export interface NavItem {
 
 /**
  * Configuração definitiva de navegação do SaldoARP:
- * - Visão Geral (/)
- * - Central de Atenção (/prazos)
+ * - Gestão de Instrumentos (/instrumentos) — painel unificado de gestão e
+ *   monitoramento (consolida a antiga Visão Geral e a antiga Central de Atenção)
  * - Atas de Registro de Preços (recolhível)
  *     - Consulta e Vigência (/atas)
  *     - Alocações por Unidade (/atas/saldos-unidade)
@@ -55,19 +54,12 @@ export interface NavItem {
  */
 export const navigationConfig: NavItem[] = [
   {
-    id: 'visao-geral',
-    label: 'Visão Geral',
+    id: 'gestao-instrumentos',
+    label: 'Gestão de Instrumentos',
     icon: LayoutDashboard,
-    route: '/',
-    status: 'active'
-  },
-  {
-    id: 'central-atencao',
-    label: 'Central de Atenção',
-    icon: AlertTriangle,
-    route: '/prazos',
+    route: '/instrumentos',
     status: 'active',
-    matchPrefixes: ['/prazos']
+    matchPrefixes: ['/instrumentos', '/prazos']
   },
   {
     id: 'atas',
@@ -175,8 +167,7 @@ export interface BreadcrumbEntry {
 }
 
 const staticRouteLabels: Record<string, string> = {
-  '/': 'Visão Geral',
-  '/prazos': 'Central de Atenção',
+  '/instrumentos': 'Gestão de Instrumentos',
   '/atas': 'Consulta e Vigência',
   '/atas/itens': 'Itens da Ata',
   '/atas/itens/saldo': 'Saldo do Item',
@@ -191,12 +182,12 @@ const staticRouteLabels: Record<string, string> = {
 };
 
 export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
-  if (pathname === '/') {
-    return [{ label: 'Visão Geral' }];
+  if (pathname === '/' || pathname === '/instrumentos') {
+    return [{ label: 'Gestão de Instrumentos' }];
   }
 
   const segments = pathname.split('/').filter(Boolean);
-  const crumbs: BreadcrumbEntry[] = [{ label: 'Visão Geral', route: '/' }];
+  const crumbs: BreadcrumbEntry[] = [{ label: 'Gestão de Instrumentos', route: '/instrumentos' }];
   let accPath = '';
 
   for (let i = 0; i < segments.length; i++) {

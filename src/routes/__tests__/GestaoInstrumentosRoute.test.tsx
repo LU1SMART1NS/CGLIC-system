@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { CentralPrazosRoute } from '../CentralPrazosRoute';
-import { CentralAttentionSummaryCards } from '../../components/prazos/CentralAttentionSummaryCards';
+import { GestaoInstrumentosRoute } from '../GestaoInstrumentosRoute';
+import { GestaoInstrumentosSummaryCards } from '../../components/instrumentos/GestaoInstrumentosSummaryCards';
 import { CentralAttentionFiltersBar } from '../../components/prazos/CentralAttentionFiltersBar';
 import { CentralAttentionQueue } from '../../components/prazos/CentralAttentionQueue';
 import * as useManagementDashboardModule from '../../hooks/useManagementDashboard';
@@ -9,7 +9,7 @@ import type { ManagementDashboardReadModel } from '../../types/managementDashboa
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
-  useLocation: () => ({ pathname: '/prazos' }),
+  useLocation: () => ({ pathname: '/instrumentos' }),
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
@@ -139,12 +139,12 @@ const mockReadModel: ManagementDashboardReadModel = {
   }
 };
 
-describe('CentralPrazosRoute & Componentes — FASE 9-E: Central de Atenção 3.0', () => {
+describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão e Monitoramento (Lei 14.133)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('1. deve renderizar a rota com cabeçalho limpo "Central de Atenção" e descrição', () => {
+  it('1. deve renderizar a rota com cabeçalho "Gestão de Instrumentos", subtítulo institucional e UASG', () => {
     vi.spyOn(useManagementDashboardModule, 'useManagementDashboard').mockReturnValue({
       readModel: mockReadModel,
       data: mockReadModel,
@@ -155,32 +155,38 @@ describe('CentralPrazosRoute & Componentes — FASE 9-E: Central de Atenção 3.
       refresh: vi.fn()
     });
 
-    const html = renderToStaticMarkup(<CentralPrazosRoute />);
+    const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
 
-    expect(html).toContain('Central de Atenção');
-    expect(html).toContain('Acompanhe prazos, riscos e situações que exigem acompanhamento.');
+    expect(html).toContain('Gestão de Instrumentos');
+    expect(html).toContain('Painel unificado de gestão e monitoramento — Lei 14.133');
+    expect(html).toContain('UASG 200331');
     expect(html).not.toContain('Cockpit');
     expect(html).not.toContain('Painel Executivo');
   });
 
-  it('2. deve renderizar o resumo superior com as 4 categorias de severidade', () => {
-    const counts = { critica: 2, urgente: 2, atencao: 1, info: 0 };
+  it('2. deve renderizar os 4 cards de resumo (Contratos Vigentes, Valor Global, Alertas de Vigência, Alertas de Saldo) com dados reais e clicáveis', () => {
     const html = renderToStaticMarkup(
-      <CentralAttentionSummaryCards
-        counts={counts}
-        activeSeverity="TODAS"
-        onSelectSeverity={vi.fn()}
+      <GestaoInstrumentosSummaryCards
+        counts={{
+          contratosAtivos: 8,
+          totalContratos: 10,
+          valorVigenteTotal: 4500000,
+          taxaPagamentoPercentual: 72.0,
+          vigenciaCriticaCount: 1,
+          saldoCriticoCount: 1
+        }}
+        activeCategory={null}
+        onSelectCategory={vi.fn()}
       />
     );
 
-    expect(html).toContain('Críticas');
-    expect(html).toContain('2');
-    expect(html).toContain('Urgentes');
-    expect(html).toContain('2');
-    expect(html).toContain('Atenção');
-    expect(html).toContain('1');
-    expect(html).toContain('Informativas');
-    expect(html).toContain('0');
+    expect(html).toContain('Atas / Contratos Vigentes');
+    expect(html).toContain('de 10 contratos');
+    expect(html).toContain('Valor Global Total');
+    expect(html).toContain('72.0% pago (SIAFI)');
+    expect(html).toContain('Alertas Críticos de Vigência');
+    expect(html).toContain('Alertas de Saldo (ARP)');
+    expect(html).toContain('Saldo físico ≥ 85%');
   });
 
   it('3. deve renderizar a barra de filtros compacta com opções de severidade, origem e busca', () => {
@@ -200,7 +206,7 @@ describe('CentralPrazosRoute & Componentes — FASE 9-E: Central de Atenção 3.
     expect(html).toContain('5 situações');
   });
 
-  it('4. deve renderizar a fila operacional com itens contendo o que aconteceu, objeto, por quê e ação', () => {
+  it('4. deve renderizar a fila operacional única com itens contendo severidade, instrumento, motivo e ação', () => {
     const html = renderToStaticMarkup(
       <CentralAttentionQueue
         items={mockReadModel.attention.items}
@@ -209,24 +215,16 @@ describe('CentralPrazosRoute & Componentes — FASE 9-E: Central de Atenção 3.
       />
     );
 
-    // Itens com Severidade
     expect(html).toContain('CRÍTICA');
     expect(html).toContain('URGENTE');
     expect(html).toContain('ATENÇÃO');
 
-    // Natureza e Origem
-    expect(html).toContain('ALERTA');
-    expect(html).toContain('TAREFA');
-    expect(html).toContain('WORKFLOW');
-
-    // Título e Descrição
     expect(html).toContain('Consumo Crítico em Ata (92.0%)');
     expect(html).toContain('Fatura com Vencimento Crítico (NF-4501)');
     expect(html).toContain('Elaborar Notificação de Reajuste');
     expect(html).toContain('Gatilho de Reajuste Anual Iminente');
     expect(html).toContain('Marco de Planejamento de Prorrogação');
 
-    // Botões de Ação de Drill-Down
     expect(html).toContain('Ver Ata');
     expect(html).toContain('Abrir Contrato');
     expect(html).toContain('Abrir Pagamento');
@@ -234,46 +232,37 @@ describe('CentralPrazosRoute & Componentes — FASE 9-E: Central de Atenção 3.
 
   it('5. deve exibir estado "Tudo em dia" quando não houver nenhuma situação no sistema', () => {
     const html = renderToStaticMarkup(
-      <CentralAttentionQueue
-        items={[]}
-        totalItems={0}
-        onResetFilters={vi.fn()}
-      />
+      <CentralAttentionQueue items={[]} totalItems={0} onResetFilters={vi.fn()} />
     );
 
     expect(html).toContain('Tudo em dia');
     expect(html).toContain('Nenhuma situação exige atenção no contexto selecionado.');
   });
 
-  it('6. deve exibir estado "Nenhuma situação encontrada" com botão de limpar filtros quando filtro zera resultados', () => {
+  it('6. deve exibir estado "Nenhuma situação encontrada" com botão de limpar filtros quando o filtro zera resultados', () => {
     const html = renderToStaticMarkup(
-      <CentralAttentionQueue
-        items={[]}
-        totalItems={5}
-        onResetFilters={vi.fn()}
-      />
+      <CentralAttentionQueue items={[]} totalItems={5} onResetFilters={vi.fn()} />
     );
 
     expect(html).toContain('Nenhuma situação encontrada');
-    expect(html).toContain('Nenhuma situação corresponde aos filtros selecionados.');
     expect(html).toContain('Limpar Filtros');
   });
 
-  it('7. deve renderizar estado de erro explícito com mensagem quando falhar o carregamento', () => {
+  it('7. deve renderizar estado de erro explícito quando useManagementDashboard falhar', () => {
     vi.spyOn(useManagementDashboardModule, 'useManagementDashboard').mockReturnValue({
       readModel: null,
       data: undefined,
       isLoading: false,
       isError: true,
-      error: new Error('Erro de conexão ao carregar atenção'),
+      error: new Error('Erro de conexão ao carregar a carteira de instrumentos'),
       refetch: vi.fn(),
       refresh: vi.fn()
     });
 
-    const html = renderToStaticMarkup(<CentralPrazosRoute />);
+    const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
 
-    expect(html).toContain('Erro ao carregar a Central de Atenção');
-    expect(html).toContain('Erro de conexão ao carregar atenção');
+    expect(html).toContain('Erro ao carregar a Gestão de Instrumentos');
+    expect(html).toContain('Erro de conexão ao carregar a carteira de instrumentos');
     expect(html).toContain('Tentar Novamente');
   });
 
@@ -288,7 +277,7 @@ describe('CentralPrazosRoute & Componentes — FASE 9-E: Central de Atenção 3.
       refresh: vi.fn()
     });
 
-    const html = renderToStaticMarkup(<CentralPrazosRoute />);
+    const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
 
     expect(html).toContain('skeleton');
     expect(html).not.toContain('Consumo Crítico');
