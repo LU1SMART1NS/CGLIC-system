@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GestaoInstrumentosRoute } from '../GestaoInstrumentosRoute';
 import { GestaoInstrumentosSummaryCards } from '../../components/instrumentos/GestaoInstrumentosSummaryCards';
-import { CentralAttentionFiltersBar } from '../../components/prazos/CentralAttentionFiltersBar';
-import { CentralAttentionQueue } from '../../components/prazos/CentralAttentionQueue';
+import { GestaoInstrumentosCategoryTabs } from '../../components/instrumentos/GestaoInstrumentosCategoryTabs';
+import { GestaoInstrumentosTable } from '../../components/instrumentos/GestaoInstrumentosTable';
 import * as useManagementDashboardModule from '../../hooks/useManagementDashboard';
+import * as useAllContractManagersModule from '../../hooks/useAllContractManagers';
 import type { ManagementDashboardReadModel } from '../../types/managementDashboard';
 
 vi.mock('react-router-dom', () => ({
@@ -27,9 +28,9 @@ const mockReadModel: ManagementDashboardReadModel = {
     percentualVariacaoAcumulada: 12.5
   },
   deadlines: {
-    vencendo30Dias: 2,
+    vencendo30Dias: 1,
     vencendo60Dias: 1,
-    vencendo90Dias: 0,
+    vencendo90Dias: 1,
     contratosVencidos: 0,
     prorrogaçõesEmCurso: 2,
     itensVencendo: []
@@ -125,6 +126,7 @@ const mockReadModel: ManagementDashboardReadModel = {
     totalAtas: 4,
     totalItens: 20,
     itensCriticosCount: 1,
+    itensProximosLimiteCount: 1,
     percentualConsumoGlobal: 70.0,
     topItensConsumidos: []
   },
@@ -136,12 +138,21 @@ const mockReadModel: ManagementDashboardReadModel = {
     ciclosAtrasoCgofiCount: 0,
     ciclosRecentes: [],
     tempoMedioCgofiDisponivel: false
+  },
+  availableFilters: {
+    contracts: [{ key: '200331-00015-2026', label: 'Contrato 15/2026', sublabel: 'Tecnologia Segurança Ltda' }],
+    atas: [{ key: '12/2026', label: 'Ata 12/2026', sublabel: 'Aquisição de equipamentos de proteção' }]
   }
 };
 
 describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão e Monitoramento (Lei 14.133)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(useAllContractManagersModule, 'useAllContractManagers').mockReturnValue({
+      data: { '200331-00015-2026': { contractKey: '200331-00015-2026', uasg: '200331', numero: '15', ano: 2026, gestorNome: 'Ana Costa', createdAt: '', updatedAt: '' } },
+      isLoading: false,
+      isError: false
+    } as any);
   });
 
   it('1. deve renderizar a rota com cabeçalho "Gestão de Instrumentos", subtítulo institucional e UASG', () => {
@@ -160,91 +171,133 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).toContain('Gestão de Instrumentos');
     expect(html).toContain('Painel unificado de gestão e monitoramento — Lei 14.133');
     expect(html).toContain('UASG 200331');
-    expect(html).not.toContain('Cockpit');
-    expect(html).not.toContain('Painel Executivo');
+    expect(html).toContain('Ações Imediatas / Pendências da Carteira');
   });
 
-  it('2. deve renderizar os 4 cards de resumo (Contratos Vigentes, Valor Global, Alertas de Vigência, Alertas de Saldo) com dados reais e clicáveis', () => {
+  it('2. deve renderizar os 4 cards de resumo com dados reais (ARP, Contratos, Valor Global, Alertas) e ser clicáveis', () => {
     const html = renderToStaticMarkup(
       <GestaoInstrumentosSummaryCards
         counts={{
+          totalAtas: 4,
+          itensCriticosArp: 1,
+          itensProximosLimiteArp: 1,
           contratosAtivos: 8,
-          totalContratos: 10,
+          contratosEmAtencao60a90d: 2,
+          contratosEmProrrogacao: 2,
+          contratosAVencer30d: 1,
           valorVigenteTotal: 4500000,
-          taxaPagamentoPercentual: 72.0,
-          vigenciaCriticaCount: 1,
-          saldoCriticoCount: 1
+          totalEmpenhado: 2500000,
+          criticalCount: 2,
+          totalAlertasAtivos: 5,
+          urgenteCount: 2,
+          atencaoCount: 1
         }}
-        activeCategory={null}
-        onSelectCategory={vi.fn()}
+        activeCard={null}
+        onSelectCard={vi.fn()}
       />
     );
 
-    expect(html).toContain('Atas / Contratos Vigentes');
-    expect(html).toContain('de 10 contratos');
-    expect(html).toContain('Valor Global Total');
-    expect(html).toContain('72.0% pago (SIAFI)');
-    expect(html).toContain('Alertas Críticos de Vigência');
-    expect(html).toContain('Alertas de Saldo (ARP)');
-    expect(html).toContain('Saldo físico ≥ 85%');
+    expect(html).toContain('Atas de Registro de Preço (ARP)');
+    expect(html).toContain('Contratos Vigentes');
+    expect(html).toContain('Valor Total Global');
+    expect(html).toContain('Alertas Críticos');
+    expect(html).toContain('R$');
+    expect(html).toContain('Saldo disponível');
   });
 
-  it('3. deve renderizar a barra de filtros compacta com opções de severidade, origem e busca', () => {
+  it('3. deve renderizar os tabs de categoria com contagens reais e destacar o ativo', () => {
     const html = renderToStaticMarkup(
-      <CentralAttentionFiltersBar
-        filters={{ severidade: 'TODAS', origem: 'TODAS', busca: '' }}
-        onChangeFilter={vi.fn()}
-        onResetFilters={vi.fn()}
-        totalFiltered={5}
-        totalItems={5}
+      <GestaoInstrumentosCategoryTabs
+        counts={{ TODAS: 5, VENCIMENTOS: 1, SALDOS: 1, REAJUSTES: 1, PAGAMENTOS: 1, TAREFAS: 1 }}
+        active="SALDOS"
+        onSelect={vi.fn()}
       />
     );
 
-    expect(html).toContain('Todas as Severidades');
-    expect(html).toContain('Todas as Origens');
-    expect(html).toContain('Buscar por contrato, ata, descrição...');
-    expect(html).toContain('5 situações');
+    expect(html).toContain('Todas (5)');
+    expect(html).toContain('Vencimentos (1)');
+    expect(html).toContain('Saldos (1)');
+    expect(html).toContain('Reajustes (1)');
+    expect(html).toContain('Pagamentos (1)');
+    expect(html).toContain('Tarefas (1)');
   });
 
-  it('4. deve renderizar a fila operacional única com itens contendo severidade, instrumento, motivo e ação', () => {
+  it('4. deve renderizar a tabela com prioridade, instrumento, motivo, prazo, responsável e ação contextual', () => {
+    const fornecedorByKey = new Map([
+      ['200331-00015-2026', 'Tecnologia Segurança Ltda'],
+      ['12/2026', 'Aquisição de equipamentos de proteção']
+    ]);
+    const responsavelByContractKey = new Map([['200331-00015-2026', 'Ana Costa']]);
+
     const html = renderToStaticMarkup(
-      <CentralAttentionQueue
+      <GestaoInstrumentosTable
         items={mockReadModel.attention.items}
         totalItems={mockReadModel.attention.items.length}
+        fornecedorByKey={fornecedorByKey}
+        responsavelByContractKey={responsavelByContractKey}
         onResetFilters={vi.fn()}
       />
     );
 
+    // Prioridade
     expect(html).toContain('CRÍTICA');
     expect(html).toContain('URGENTE');
     expect(html).toContain('ATENÇÃO');
 
-    expect(html).toContain('Consumo Crítico em Ata (92.0%)');
-    expect(html).toContain('Fatura com Vencimento Crítico (NF-4501)');
-    expect(html).toContain('Elaborar Notificação de Reajuste');
-    expect(html).toContain('Gatilho de Reajuste Anual Iminente');
-    expect(html).toContain('Marco de Planejamento de Prorrogação');
+    // Instrumento + tipo
+    expect(html).toContain('Ata 12/2026');
+    expect(html).toContain('ARP');
+    expect(html).toContain('Contrato 15/2026');
+    expect(html).toContain('Contrato');
 
-    expect(html).toContain('Ver Ata');
-    expect(html).toContain('Abrir Contrato');
+    // Objeto/Fornecedor real (enriquecido via availableFilters/useAllContractManagers)
+    expect(html).toContain('Tecnologia Segurança Ltda');
+    expect(html).toContain('Aquisição de equipamentos de proteção');
+
+    // Motivo da Atenção
+    expect(html).toContain('Saldo em Atenção');
+    expect(html).toContain('Execução / Pagamento');
+    expect(html).toContain('Tarefa Atrasada');
+    expect(html).toContain('Reajuste / Repactuação');
+    expect(html).toContain('Vigência Próxima');
+
+    // Responsável
+    expect(html).toContain('Ana Costa');
+
+    // Ação contextual por motivo (não apenas "Visualizar")
+    expect(html).toContain('Verificar Saldo');
     expect(html).toContain('Abrir Pagamento');
+    expect(html).toContain('Abrir Tarefa');
+    expect(html).toContain('Analisar Reajuste');
+    expect(html).toContain('Prorrogar Vigência');
   });
 
-  it('5. deve exibir estado "Tudo em dia" quando não houver nenhuma situação no sistema', () => {
+  it('5. deve exibir estado "Tudo em dia" quando não houver nenhum instrumento em atenção', () => {
     const html = renderToStaticMarkup(
-      <CentralAttentionQueue items={[]} totalItems={0} onResetFilters={vi.fn()} />
+      <GestaoInstrumentosTable
+        items={[]}
+        totalItems={0}
+        fornecedorByKey={new Map()}
+        responsavelByContractKey={new Map()}
+        onResetFilters={vi.fn()}
+      />
     );
 
     expect(html).toContain('Tudo em dia');
-    expect(html).toContain('Nenhuma situação exige atenção no contexto selecionado.');
   });
 
-  it('6. deve exibir estado "Nenhuma situação encontrada" com botão de limpar filtros quando o filtro zera resultados', () => {
+  it('6. deve exibir estado "Nenhum instrumento encontrado" com botão de limpar filtros quando o filtro zera resultados', () => {
     const html = renderToStaticMarkup(
-      <CentralAttentionQueue items={[]} totalItems={5} onResetFilters={vi.fn()} />
+      <GestaoInstrumentosTable
+        items={[]}
+        totalItems={5}
+        fornecedorByKey={new Map()}
+        responsavelByContractKey={new Map()}
+        onResetFilters={vi.fn()}
+      />
     );
 
-    expect(html).toContain('Nenhuma situação encontrada');
+    expect(html).toContain('Nenhum instrumento encontrado');
     expect(html).toContain('Limpar Filtros');
   });
 

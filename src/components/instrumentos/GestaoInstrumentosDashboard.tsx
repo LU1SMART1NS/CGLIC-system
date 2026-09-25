@@ -1,40 +1,48 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useManagementDashboard } from '../../hooks/useManagementDashboard';
+import { useAllContractManagers } from '../../hooks/useAllContractManagers';
 import { GestaoInstrumentosHeader } from './GestaoInstrumentosHeader';
-import { GestaoInstrumentosSummaryCards } from './GestaoInstrumentosSummaryCards';
-import { CentralAttentionFiltersBar, type CentralAttentionFiltersState } from '../prazos/CentralAttentionFiltersBar';
-import { CentralAttentionQueue } from '../prazos/CentralAttentionQueue';
+import { GestaoInstrumentosSummaryCards, type GestaoInstrumentosCardId } from './GestaoInstrumentosSummaryCards';
+import { GestaoInstrumentosCategoryTabs, type GestaoInstrumentosCategoryTab } from './GestaoInstrumentosCategoryTabs';
+import { GestaoInstrumentosCompactFilters, type GestaoInstrumentosCompactFiltersState } from './GestaoInstrumentosCompactFilters';
+import { GestaoInstrumentosTable } from './GestaoInstrumentosTable';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
-import type { DashboardAttentionCategory, DashboardAttentionSeverity } from '../../types/managementDashboard';
+import type { DashboardAttentionCategory, DashboardAttentionItem } from '../../types/managementDashboard';
+
+const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
+  VENCIMENTOS: ['PRORROGACAO_PROXIMA'],
+  SALDOS: ['ATA_CRITICA'],
+  REAJUSTES: ['REAJUSTE_RADAR'],
+  PAGAMENTOS: ['PAGAMENTO_CRITICO'],
+  TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA']
+};
+
+function matchesTab(item: DashboardAttentionItem, tab: GestaoInstrumentosCategoryTab): boolean {
+  if (tab === 'TODAS') return true;
+  return TAB_CATEGORY_MAP[tab].includes(item.category);
+}
 
 /**
  * Painel Unificado de Gestão e Monitoramento — Lei 14.133.
  *
  * Consolida a antiga "Visão Geral" (/) e "Central de Atenção" (/prazos) numa única
  * camada de apresentação sobre o mesmo Read Model do `useManagementDashboard`
- * (Funil Único de Atenção). Nenhuma nova query, RPC ou regra de negócio é criada aqui.
+ * (Funil Único de Atenção). Nenhuma nova query, RPC ou regra de negócio é criada aqui —
+ * apenas leitura, agregação em memória e formatação do que o dashboardService já calcula.
  */
 export const GestaoInstrumentosDashboard: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const initialSeverity = searchParams.get('severity');
+  const isValidSeverity = (value: string | null): value is GestaoInstrumentosCompactFiltersState['severidade'] =>
+    !!value && ['CRITICA', 'URGENTE', 'ATENCAO', 'INFO'].includes(value);
 
-  const initialSeverity = (searchParams.get('severity') as DashboardAttentionSeverity) || 'TODAS';
-  const initialCategory = (searchParams.get('categoria') as DashboardAttentionCategory) || null;
-
-  const [filters, setFilters] = useState<CentralAttentionFiltersState>({
-    severidade: ['CRITICA', 'URGENTE', 'ATENCAO', 'INFO'].includes(initialSeverity) ? initialSeverity : 'TODAS',
-    origem: 'TODAS',
-    busca: ''
-  });
-
-  const [quickCategory, setQuickCategory] = useState<DashboardAttentionCategory | null>(
-    ['TAREFA_ATRASADA', 'TAREFA_PROXIMA', 'PAGAMENTO_CRITICO', 'REAJUSTE_RADAR', 'ATA_CRITICA', 'PRORROGACAO_PROXIMA'].includes(
-      initialCategory as string
-    )
-      ? initialCategory
-      : null
+  const [activeTab, setActiveTab] = useState<GestaoInstrumentosCategoryTab>('TODAS');
+  const [severidade, setSeveridade] = useState<GestaoInstrumentosCompactFiltersState['severidade']>(
+    isValidSeverity(initialSeverity) ? initialSeverity : 'TODAS'
   );
+  const [busca, setBusca] = useState('');
 
   const {
     readModel,
@@ -46,97 +54,120 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     refetch
   } = useManagementDashboard({ uasg: '200331' });
 
-  const allItems = useMemo(() => {
-    return readModel?.attention?.items || [];
+  const { data: managers } = useAllContractManagers('200331');
+
+  const allItems = useMemo(() => readModel?.attention?.items || [], [readModel]);
+
+  const tabCounts = useMemo(() => {
+    return {
+      TODAS: allItems.length,
+      VENCIMENTOS: allItems.filter((i) => matchesTab(i, 'VENCIMENTOS')).length,
+      SALDOS: allItems.filter((i) => matchesTab(i, 'SALDOS')).length,
+      REAJUSTES: allItems.filter((i) => matchesTab(i, 'REAJUSTES')).length,
+      PAGAMENTOS: allItems.filter((i) => matchesTab(i, 'PAGAMENTOS')).length,
+      TAREFAS: allItems.filter((i) => matchesTab(i, 'TAREFAS')).length
+    };
+  }, [allItems]);
+
+  const fornecedorByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of readModel?.availableFilters?.contracts || []) {
+      if (c.sublabel) map.set(c.key, c.sublabel);
+    }
+    for (const a of readModel?.availableFilters?.atas || []) {
+      if (a.sublabel) map.set(a.key, a.sublabel);
+    }
+    return map;
   }, [readModel]);
 
-  // Contadores reais dos 4 cards superiores (KPIs executivos + saldo físico de ARP)
+  const responsavelByContractKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [key, manager] of Object.entries(managers || {})) {
+      if (manager?.gestorNome) map.set(key, manager.gestorNome);
+    }
+    return map;
+  }, [managers]);
+
   const summaryCounts = useMemo(() => {
-    const vigenciaCriticaCount = allItems.filter((item) => item.category === 'PRORROGACAO_PROXIMA').length;
+    const severityBuckets = {
+      urgente: allItems.filter((i) => i.severity === 'URGENTE').length,
+      atencao: allItems.filter((i) => i.severity === 'ATENCAO').length
+    };
+
     return {
+      totalAtas: readModel?.arp?.totalAtas ?? 0,
+      itensCriticosArp: readModel?.arp?.itensCriticosCount ?? 0,
+      itensProximosLimiteArp: readModel?.arp?.itensProximosLimiteCount ?? 0,
       contratosAtivos: readModel?.executive?.contratosAtivos ?? 0,
-      totalContratos: readModel?.executive?.totalContratos ?? 0,
+      contratosEmAtencao60a90d: (readModel?.deadlines?.vencendo60Dias ?? 0) + (readModel?.deadlines?.vencendo90Dias ?? 0),
+      contratosEmProrrogacao: readModel?.deadlines?.prorrogaçõesEmCurso ?? 0,
+      contratosAVencer30d: readModel?.deadlines?.vencendo30Dias ?? 0,
       valorVigenteTotal: readModel?.executive?.valorVigenteTotal ?? 0,
-      taxaPagamentoPercentual: readModel?.financial?.taxaPagamentoPercentual ?? 0,
-      vigenciaCriticaCount,
-      saldoCriticoCount: readModel?.attention?.atasCriticasCount ?? 0
+      totalEmpenhado: readModel?.financial?.totalEmpenhado ?? 0,
+      criticalCount: readModel?.attention?.criticalCount ?? 0,
+      totalAlertasAtivos: readModel?.attention?.totalAlertasAtivos ?? 0,
+      urgenteCount: severityBuckets.urgente,
+      atencaoCount: severityBuckets.atencao
     };
   }, [readModel, allItems]);
 
-  const handleSelectCategory = useCallback((category: DashboardAttentionCategory | null) => {
-    setQuickCategory(category);
-    if (category) {
-      searchParams.set('categoria', category);
+  const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
+    if (activeTab === 'SALDOS') return 'ARP';
+    if (activeTab === 'VENCIMENTOS') return 'CONTRATOS';
+    if (severidade === 'CRITICA') return 'ALERTAS';
+    return null;
+  }, [activeTab, severidade]);
+
+  const handleSelectCard = useCallback((card: GestaoInstrumentosCardId) => {
+    if (card === 'ARP') {
+      setActiveTab((prev) => (prev === 'SALDOS' ? 'TODAS' : 'SALDOS'));
+    } else if (card === 'CONTRATOS') {
+      setActiveTab((prev) => (prev === 'VENCIMENTOS' ? 'TODAS' : 'VENCIMENTOS'));
+    } else if (card === 'ALERTAS') {
+      setSeveridade((prev) => (prev === 'CRITICA' ? 'TODAS' : 'CRITICA'));
+      setActiveTab('TODAS');
     } else {
-      searchParams.delete('categoria');
+      // VALOR: card de composição da carteira, não é um balde de alerta — apenas limpa os filtros.
+      setActiveTab('TODAS');
+      setSeveridade('TODAS');
     }
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [setActiveTab, setSeveridade]);
 
-  // Filtragem determinística: 1) atalho dos cards superiores, 2) filtros operacionais da fila
   const filteredItems = useMemo(() => {
+    const query = busca.trim().toLowerCase();
     return allItems.filter((item) => {
-      if (quickCategory && item.category !== quickCategory) {
-        return false;
-      }
+      if (!matchesTab(item, activeTab)) return false;
+      if (severidade !== 'TODAS' && item.severity !== severidade) return false;
 
-      if (filters.severidade !== 'TODAS' && item.severity !== filters.severidade) {
-        return false;
-      }
-
-      if (filters.origem !== 'TODAS') {
-        if (filters.origem === 'CONTRATO' && !(item.category === 'PRORROGACAO_PROXIMA' || item.contractKey)) return false;
-        if (filters.origem === 'PAGAMENTO' && item.category !== 'PAGAMENTO_CRITICO') return false;
-        if (filters.origem === 'ATA' && item.category !== 'ATA_CRITICA') return false;
-        if (filters.origem === 'REAJUSTE' && item.category !== 'REAJUSTE_RADAR') return false;
-        if (filters.origem === 'TAREFA' && !(item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA')) return false;
-      }
-
-      if (filters.busca.trim()) {
-        const query = filters.busca.toLowerCase().trim();
-        const matchTitle = item.title?.toLowerCase().includes(query);
-        const matchDesc = item.description?.toLowerCase().includes(query);
-        const matchContract = item.numeroContrato?.toLowerCase().includes(query) || item.contractKey?.toLowerCase().includes(query);
-        const matchAta = item.numeroAta?.toLowerCase().includes(query);
-        if (!matchTitle && !matchDesc && !matchContract && !matchAta) {
-          return false;
-        }
+      if (query) {
+        const fornecedor = (fornecedorByKey.get(item.contractKey || item.numeroAta || '') || '').toLowerCase();
+        const haystack = [item.title, item.description, item.numeroContrato, item.contractKey, item.numeroAta, fornecedor]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(query)) return false;
       }
 
       return true;
     });
-  }, [allItems, filters, quickCategory]);
+  }, [allItems, activeTab, severidade, busca, fornecedorByKey]);
 
-  const handleChangeFilter = useCallback(<K extends keyof CentralAttentionFiltersState>(
+  const handleChangeFilter = useCallback(<K extends keyof GestaoInstrumentosCompactFiltersState>(
     key: K,
-    value: CentralAttentionFiltersState[K]
+    value: GestaoInstrumentosCompactFiltersState[K]
   ) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value
-    }));
-
     if (key === 'severidade') {
-      if (value === 'TODAS') {
-        searchParams.delete('severity');
-      } else {
-        searchParams.set('severity', value as string);
-      }
-      setSearchParams(searchParams, { replace: true });
+      setSeveridade(value as GestaoInstrumentosCompactFiltersState['severidade']);
+    } else {
+      setBusca(value as string);
     }
-  }, [searchParams, setSearchParams]);
+  }, []);
 
   const handleResetFilters = useCallback(() => {
-    setFilters({
-      severidade: 'TODAS',
-      origem: 'TODAS',
-      busca: ''
-    });
-    setQuickCategory(null);
-    searchParams.delete('severity');
-    searchParams.delete('categoria');
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+    setActiveTab('TODAS');
+    setSeveridade('TODAS');
+    setBusca('');
+  }, [setActiveTab, setSeveridade, setBusca]);
 
   if (isError && !readModel) {
     return (
@@ -159,7 +190,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       flexDirection: 'column',
       gap: '1.25rem'
     }}>
-      {/* 1. Cabeçalho Consolidado */}
       <GestaoInstrumentosHeader
         uasg={readModel?.uasg}
         onRefresh={() => refetch()}
@@ -167,23 +197,35 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         lastUpdated={dataUpdatedAt}
       />
 
-      {/* 2. Cards de Visão Geral (KPIs & Alertas) — atalhos que filtram a fila abaixo */}
       <GestaoInstrumentosSummaryCards
         counts={summaryCounts}
-        activeCategory={quickCategory}
-        onSelectCategory={handleSelectCategory}
+        activeCard={activeCard}
+        onSelectCard={handleSelectCard}
       />
 
-      {/* 3. Filtros e Busca */}
-      <CentralAttentionFiltersBar
-        filters={filters}
-        onChangeFilter={handleChangeFilter}
-        onResetFilters={handleResetFilters}
-        totalFiltered={filteredItems.length}
-        totalItems={allItems.length}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+          Ações Imediatas / Pendências da Carteira
+        </h2>
+        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+          Instrumentos que exigem sua atenção e as próximas ações recomendadas.
+        </p>
 
-      {/* 4. Fila Operacional Única de Ações Imediatas */}
+        <GestaoInstrumentosCategoryTabs
+          counts={tabCounts}
+          active={activeTab}
+          onSelect={setActiveTab}
+        />
+
+        <GestaoInstrumentosCompactFilters
+          filters={{ severidade, busca }}
+          onChangeFilter={handleChangeFilter}
+          onResetFilters={handleResetFilters}
+          totalFiltered={filteredItems.length}
+          totalItems={allItems.length}
+        />
+      </div>
+
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <SkeletonLoader variant="card" height="96px" />
@@ -192,9 +234,11 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           <SkeletonLoader variant="card" height="96px" />
         </div>
       ) : (
-        <CentralAttentionQueue
+        <GestaoInstrumentosTable
           items={filteredItems}
           totalItems={allItems.length}
+          fornecedorByKey={fornecedorByKey}
+          responsavelByContractKey={responsavelByContractKey}
           onResetFilters={handleResetFilters}
         />
       )}

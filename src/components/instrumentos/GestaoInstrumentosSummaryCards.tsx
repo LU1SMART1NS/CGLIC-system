@@ -1,20 +1,32 @@
 import React from 'react';
-import { FileText, Coins, Clock, Package } from 'lucide-react';
-import type { DashboardAttentionCategory } from '../../types/managementDashboard';
+import { Package, FileText, Coins, AlertTriangle } from 'lucide-react';
 
 export interface GestaoInstrumentosCounts {
+  // Card 1 — ARP
+  totalAtas: number;
+  itensCriticosArp: number;
+  itensProximosLimiteArp: number;
+  // Card 2 — Contratos
   contratosAtivos: number;
-  totalContratos: number;
+  contratosEmAtencao60a90d: number;
+  contratosEmProrrogacao: number;
+  contratosAVencer30d: number;
+  // Card 3 — Valor Global
   valorVigenteTotal: number;
-  taxaPagamentoPercentual: number;
-  vigenciaCriticaCount: number;
-  saldoCriticoCount: number;
+  totalEmpenhado: number;
+  // Card 4 — Alertas
+  criticalCount: number;
+  totalAlertasAtivos: number;
+  urgenteCount: number;
+  atencaoCount: number;
 }
+
+export type GestaoInstrumentosCardId = 'ARP' | 'CONTRATOS' | 'VALOR' | 'ALERTAS';
 
 interface GestaoInstrumentosSummaryCardsProps {
   counts: GestaoInstrumentosCounts;
-  activeCategory: DashboardAttentionCategory | null;
-  onSelectCategory: (category: DashboardAttentionCategory | null) => void;
+  activeCard: GestaoInstrumentosCardId | null;
+  onSelectCard: (card: GestaoInstrumentosCardId) => void;
 }
 
 function formatCurrency(val: number): string {
@@ -22,161 +34,179 @@ function formatCurrency(val: number): string {
   return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function formatPercent(part: number, total: number): string {
+  if (!total) return '0,0%';
+  return `${((part / total) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}
+
+const cardBaseStyle: React.CSSProperties = {
+  background: '#ffffff',
+  border: '1px solid #e2e8f0',
+  borderRadius: '10px',
+  padding: '1.1rem 1.25rem',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.6rem',
+  cursor: 'pointer',
+  textAlign: 'left',
+  transition: 'all 0.15s ease-in-out',
+  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+};
+
+const rowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  fontSize: '0.78rem',
+  color: '#64748b'
+};
+
 export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryCardsProps> = ({
   counts,
-  activeCategory,
-  onSelectCategory
+  activeCard,
+  onSelectCard
 }) => {
-  const cards: Array<{
-    id: 'PORTFOLIO' | DashboardAttentionCategory;
-    label: string;
-    value: React.ReactNode;
-    badgeText: string;
-    icon: React.ComponentType<{ size?: number; color?: string }>;
-    color: string;
-    bg: string;
-    border: string;
-    activeBorder: string;
-    isTogglable: boolean;
-  }> = [
-    {
-      id: 'PORTFOLIO',
-      label: 'Atas / Contratos Vigentes',
-      value: counts.contratosAtivos,
-      badgeText: `de ${counts.totalContratos} contratos`,
-      icon: FileText,
-      color: '#0c326f',
-      bg: '#eff6ff',
-      border: '#bfdbfe',
-      activeBorder: '#0c326f',
-      isTogglable: false
-    },
-    {
-      id: 'PAGAMENTO_CRITICO',
-      label: 'Valor Global Total',
-      value: formatCurrency(counts.valorVigenteTotal),
-      badgeText: `${counts.taxaPagamentoPercentual.toFixed(1)}% pago (SIAFI)`,
-      icon: Coins,
-      color: '#059669',
-      bg: '#ecfdf5',
-      border: '#a7f3d0',
-      activeBorder: '#059669',
-      isTogglable: true
-    },
-    {
-      id: 'PRORROGACAO_PROXIMA',
-      label: 'Alertas Críticos de Vigência',
-      value: counts.vigenciaCriticaCount,
-      badgeText: 'Prorrogação / Vigência',
-      icon: Clock,
-      color: '#dc2626',
-      bg: '#fef2f2',
-      border: '#fecaca',
-      activeBorder: '#dc2626',
-      isTogglable: true
-    },
-    {
-      id: 'ATA_CRITICA',
-      label: 'Alertas de Saldo (ARP)',
-      value: counts.saldoCriticoCount,
-      badgeText: 'Saldo físico ≥ 85%',
-      icon: Package,
-      color: '#d97706',
-      bg: '#fffbeb',
-      border: '#fde68a',
-      activeBorder: '#d97706',
-      isTogglable: true
-    }
-  ];
+  const saldoDisponivel = counts.valorVigenteTotal - counts.totalEmpenhado;
 
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '0.85rem'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '0.9rem'
       }}
     >
-      {cards.map((card) => {
-        const Icon = card.icon;
-        const isActive = card.isTogglable && activeCategory === card.id;
+      {/* Card 1 — Atas de Registro de Preço (ARP) */}
+      <button
+        type="button"
+        onClick={() => onSelectCard('ARP')}
+        data-testid="instrumentos-card-arp"
+        style={{
+          ...cardBaseStyle,
+          border: activeCard === 'ARP' ? '2px solid #0c326f' : cardBaseStyle.border
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            Atas de Registro de Preço (ARP)
+          </span>
+          <div style={{ background: '#eff6ff', color: '#0c326f', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+            <Package size={16} />
+          </div>
+        </div>
+        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0c326f', letterSpacing: '-0.02em' }}>
+          {counts.totalAtas} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>geridas</span>
+        </div>
+        <div style={rowStyle}>
+          <span>Saldo crítico (≥85%)</span>
+          <strong style={{ color: counts.itensCriticosArp > 0 ? '#dc2626' : '#0f172a' }}>{counts.itensCriticosArp}</strong>
+        </div>
+        <div style={rowStyle}>
+          <span>Próximo do limite (70–84%)</span>
+          <strong style={{ color: counts.itensProximosLimiteArp > 0 ? '#d97706' : '#0f172a' }}>{counts.itensProximosLimiteArp}</strong>
+        </div>
+      </button>
 
-        const handleClick = () => {
-          if (!card.isTogglable) {
-            onSelectCategory(null);
-            return;
-          }
-          onSelectCategory(isActive ? null : (card.id as DashboardAttentionCategory));
-        };
+      {/* Card 2 — Contratos Vigentes */}
+      <button
+        type="button"
+        onClick={() => onSelectCard('CONTRATOS')}
+        data-testid="instrumentos-card-contratos"
+        style={{
+          ...cardBaseStyle,
+          border: activeCard === 'CONTRATOS' ? '2px solid #0c326f' : cardBaseStyle.border
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            Contratos Vigentes
+          </span>
+          <div style={{ background: '#ecfdf5', color: '#059669', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+            <FileText size={16} />
+          </div>
+        </div>
+        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#059669', letterSpacing: '-0.02em' }}>
+          {counts.contratosAtivos} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>ativos</span>
+        </div>
+        <div style={rowStyle}>
+          <span>Em atenção (60–90 dias)</span>
+          <strong style={{ color: counts.contratosEmAtencao60a90d > 0 ? '#d97706' : '#0f172a' }}>{counts.contratosEmAtencao60a90d}</strong>
+        </div>
+        <div style={rowStyle}>
+          <span>Em prorrogação</span>
+          <strong>{counts.contratosEmProrrogacao}</strong>
+        </div>
+        <div style={rowStyle}>
+          <span>A vencer (≤30 dias)</span>
+          <strong style={{ color: counts.contratosAVencer30d > 0 ? '#dc2626' : '#0f172a' }}>{counts.contratosAVencer30d}</strong>
+        </div>
+      </button>
 
-        return (
-          <button
-            key={card.id}
-            type="button"
-            onClick={handleClick}
-            data-testid={`instrumentos-summary-card-${card.id.toLowerCase()}`}
-            style={{
-              background: isActive ? card.bg : '#ffffff',
-              border: `2px solid ${isActive ? card.activeBorder : card.border}`,
-              borderRadius: '10px',
-              padding: '0.95rem 1.1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'all 0.15s ease-in-out',
-              boxShadow: isActive ? '0 4px 6px -1px rgba(0, 0, 0, 0.07)' : '0 1px 2px rgba(0, 0, 0, 0.03)'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <span style={{
-                fontSize: '0.72rem',
-                fontWeight: 800,
-                color: isActive ? card.color : '#475569',
-                textTransform: 'uppercase',
-                letterSpacing: '0.03em'
-              }}>
-                {card.label}
-              </span>
-              <div style={{
-                background: isActive ? '#ffffff' : card.bg,
-                padding: '0.3rem',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: card.color
-              }}>
-                <Icon size={16} />
-              </div>
-            </div>
+      {/* Card 3 — Valor Total Global */}
+      <button
+        type="button"
+        onClick={() => onSelectCard('VALOR')}
+        data-testid="instrumentos-card-valor"
+        style={{
+          ...cardBaseStyle,
+          border: activeCard === 'VALOR' ? '2px solid #0c326f' : cardBaseStyle.border
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            Valor Total Global
+          </span>
+          <div style={{ background: '#fef9c3', color: '#a16207', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+            <Coins size={16} />
+          </div>
+        </div>
+        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#a16207', letterSpacing: '-0.02em' }}>
+          {formatCurrency(counts.valorVigenteTotal)}
+        </div>
+        <div style={rowStyle}>
+          <span>Empenho realizado</span>
+          <strong>{formatCurrency(counts.totalEmpenhado)} ({formatPercent(counts.totalEmpenhado, counts.valorVigenteTotal)})</strong>
+        </div>
+        <div style={rowStyle}>
+          <span>Saldo disponível</span>
+          <strong>{formatCurrency(saldoDisponivel)} ({formatPercent(saldoDisponivel, counts.valorVigenteTotal)})</strong>
+        </div>
+      </button>
 
-            <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span style={{
-                fontSize: '1.4rem',
-                fontWeight: 900,
-                color: card.color,
-                letterSpacing: '-0.02em',
-                lineHeight: 1
-              }}>
-                {card.value}
-              </span>
-              <span style={{
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                color: isActive ? card.color : '#64748b',
-                background: isActive ? 'rgba(255, 255, 255, 0.8)' : '#f1f5f9',
-                padding: '0.15rem 0.45rem',
-                borderRadius: '4px',
-                whiteSpace: 'nowrap'
-              }}>
-                {card.badgeText}
-              </span>
-            </div>
-          </button>
-        );
-      })}
+      {/* Card 4 — Alertas Críticos */}
+      <button
+        type="button"
+        onClick={() => onSelectCard('ALERTAS')}
+        data-testid="instrumentos-card-alertas"
+        style={{
+          ...cardBaseStyle,
+          border: activeCard === 'ALERTAS' ? '2px solid #dc2626' : cardBaseStyle.border
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            Alertas Críticos
+          </span>
+          <div style={{ background: '#fef2f2', color: '#dc2626', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+            <AlertTriangle size={16} />
+          </div>
+        </div>
+        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#dc2626', letterSpacing: '-0.02em' }}>
+          {counts.criticalCount} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>itens críticos</span>
+        </div>
+        <div style={rowStyle}>
+          <span>Pendências totais</span>
+          <strong>{counts.totalAlertasAtivos}</strong>
+        </div>
+        <div style={rowStyle}>
+          <span>Urgentes</span>
+          <strong style={{ color: counts.urgenteCount > 0 ? '#d97706' : '#0f172a' }}>{counts.urgenteCount}</strong>
+        </div>
+        <div style={rowStyle}>
+          <span>Em atenção</span>
+          <strong>{counts.atencaoCount}</strong>
+        </div>
+      </button>
     </div>
   );
 };
