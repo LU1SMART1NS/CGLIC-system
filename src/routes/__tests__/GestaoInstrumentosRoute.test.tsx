@@ -170,8 +170,61 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
 
     expect(html).toContain('Gestão de Instrumentos');
     expect(html).toContain('Painel unificado de gestão e monitoramento — Lei 14.133');
-    expect(html).toContain('UASG 200331');
+    expect(html).toContain('UASGs 200330 · 200331');
     expect(html).toContain('Ações Imediatas / Pendências da Carteira');
+  });
+
+  it('1b. deve consolidar instrumentos das duas UASGs (200330 e 200331) e identificar a origem de cada linha na coluna UASG', () => {
+    const readModel200330: ManagementDashboardReadModel = {
+      ...mockReadModel,
+      uasg: '200330',
+      attention: {
+        ...mockReadModel.attention,
+        items: [
+          {
+            id: 'ATT-200330-1',
+            category: 'ATA_CRITICA',
+            severity: 'CRITICA',
+            title: 'Consumo Crítico em Ata (95.0%)',
+            description: 'Ata 40/2026 — Item 1: Viaturas Operacionais',
+            numeroAta: '40/2026',
+            badgeLabel: '95.0% consumido'
+          }
+        ]
+      },
+      availableFilters: {
+        contracts: [],
+        atas: [{ key: '40/2026', label: 'Ata 40/2026', sublabel: 'Fornecedor UASG 200330 LTDA' }]
+      }
+    };
+
+    vi.spyOn(useManagementDashboardModule, 'useManagementDashboard').mockImplementation((filtersOrUasg) => {
+      const uasg = typeof filtersOrUasg === 'string' ? filtersOrUasg : filtersOrUasg?.uasg;
+      const rm = uasg === '200330' ? readModel200330 : mockReadModel;
+      return {
+        readModel: rm,
+        data: rm,
+        isLoading: false,
+        isFetching: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+        refresh: vi.fn()
+      };
+    });
+
+    const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
+
+    // Instrumento exclusivo da UASG 200330, com fornecedor real dessa unidade
+    expect(html).toContain('Ata 40/2026');
+    expect(html).toContain('Fornecedor UASG 200330 LTDA');
+
+    // Instrumentos da UASG 200331 continuam presentes (consolidação, não substituição)
+    expect(html).toContain('Ata 12/2026');
+    expect(html).toContain('Contrato 15/2026');
+
+    // Tabs somam os itens das duas unidades (1 da 200330 + 5 da 200331 = 6)
+    expect(html).toContain('Todas (6)');
   });
 
   it('2. deve renderizar os 4 cards de resumo com dados reais (ARP, Contratos, Valor Global, Alertas) e ser clicáveis', () => {
@@ -225,14 +278,16 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
   it('4. deve renderizar a tabela com prioridade, instrumento, motivo, prazo, responsável e ação contextual', () => {
     const fornecedorByKey = new Map([
       ['200331-00015-2026', 'Tecnologia Segurança Ltda'],
-      ['12/2026', 'Aquisição de equipamentos de proteção']
+      ['200331-12/2026', 'Aquisição de equipamentos de proteção']
     ]);
     const responsavelByContractKey = new Map([['200331-00015-2026', 'Ana Costa']]);
 
+    const itemsComUasg = mockReadModel.attention.items.map((item) => ({ ...item, uasg: '200331' }));
+
     const html = renderToStaticMarkup(
       <GestaoInstrumentosTable
-        items={mockReadModel.attention.items}
-        totalItems={mockReadModel.attention.items.length}
+        items={itemsComUasg}
+        totalItems={itemsComUasg.length}
         fornecedorByKey={fornecedorByKey}
         responsavelByContractKey={responsavelByContractKey}
         onResetFilters={vi.fn()}
@@ -243,6 +298,9 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).toContain('CRÍTICA');
     expect(html).toContain('URGENTE');
     expect(html).toContain('ATENÇÃO');
+
+    // Coluna UASG
+    expect(html).toContain('200331');
 
     // Instrumento + tipo
     expect(html).toContain('Ata 12/2026');

@@ -9,7 +9,11 @@ import { GestaoInstrumentosCompactFilters, type GestaoInstrumentosCompactFilters
 import { GestaoInstrumentosTable } from './GestaoInstrumentosTable';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
-import type { DashboardAttentionCategory, DashboardAttentionItem } from '../../types/managementDashboard';
+import type { DashboardAttentionCategory } from '../../types/managementDashboard';
+import { getLookupKey, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
+
+/** UASGs consolidadas nesta tela — mesmo padrão de UASG única já usado no resto do sistema, chamado uma vez por unidade. */
+const UASGS: string[] = ['200330', '200331'];
 
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
   VENCIMENTOS: ['PRORROGACAO_PROXIMA'],
@@ -19,7 +23,7 @@ const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, 
   TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA']
 };
 
-function matchesTab(item: DashboardAttentionItem, tab: GestaoInstrumentosCategoryTab): boolean {
+function matchesTab(item: AttentionItemWithUasg, tab: GestaoInstrumentosCategoryTab): boolean {
   if (tab === 'TODAS') return true;
   return TAB_CATEGORY_MAP[tab].includes(item.category);
 }
@@ -44,19 +48,37 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   );
   const [busca, setBusca] = useState('');
 
-  const {
-    readModel,
-    isLoading,
-    isFetching,
-    dataUpdatedAt,
-    isError,
-    error,
-    refetch
-  } = useManagementDashboard({ uasg: '200331' });
+  const dash200330 = useManagementDashboard({ uasg: UASGS[0] });
+  const dash200331 = useManagementDashboard({ uasg: UASGS[1] });
+  const dashboards = [dash200330, dash200331];
 
-  const { data: managers } = useAllContractManagers('200331');
+  const managers200330 = useAllContractManagers(UASGS[0]);
+  const managers200331 = useAllContractManagers(UASGS[1]);
 
-  const allItems = useMemo(() => readModel?.attention?.items || [], [readModel]);
+  const isLoading = dashboards.some((d) => d.isLoading);
+  const isFetching = dashboards.some((d) => d.isFetching);
+  const hasAnyReadModel = dashboards.some((d) => d.readModel);
+  const isError = dashboards.some((d) => d.isError) && !hasAnyReadModel;
+  const error = dashboards.find((d) => d.isError)?.error ?? null;
+  const dataUpdatedAt = Math.max(...dashboards.map((d) => d.dataUpdatedAt || 0)) || undefined;
+  const refetch = useCallback(() => {
+    dash200330.refetch();
+    dash200331.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const allItems = useMemo<AttentionItemWithUasg[]>(() => {
+    const merged: AttentionItemWithUasg[] = [];
+    for (const uasg of UASGS) {
+      const dash = uasg === UASGS[0] ? dash200330 : dash200331;
+      const items = dash.readModel?.attention?.items || [];
+      for (const item of items) {
+        merged.push({ ...item, uasg });
+      }
+    }
+    return merged;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dash200330.readModel, dash200331.readModel]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -71,45 +93,54 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   const fornecedorByKey = useMemo(() => {
     const map = new Map<string, string>();
-    for (const c of readModel?.availableFilters?.contracts || []) {
-      if (c.sublabel) map.set(c.key, c.sublabel);
-    }
-    for (const a of readModel?.availableFilters?.atas || []) {
-      if (a.sublabel) map.set(a.key, a.sublabel);
+    for (const uasg of UASGS) {
+      const dash = uasg === UASGS[0] ? dash200330 : dash200331;
+      for (const c of dash.readModel?.availableFilters?.contracts || []) {
+        if (c.sublabel) map.set(c.key, c.sublabel);
+      }
+      for (const a of dash.readModel?.availableFilters?.atas || []) {
+        if (a.sublabel) map.set(`${uasg}-${a.key}`, a.sublabel);
+      }
     }
     return map;
-  }, [readModel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dash200330.readModel, dash200331.readModel]);
 
   const responsavelByContractKey = useMemo(() => {
     const map = new Map<string, string>();
-    for (const [key, manager] of Object.entries(managers || {})) {
-      if (manager?.gestorNome) map.set(key, manager.gestorNome);
+    for (const managers of [managers200330.data, managers200331.data]) {
+      for (const [key, manager] of Object.entries(managers || {})) {
+        if (manager?.gestorNome) map.set(key, manager.gestorNome);
+      }
     }
     return map;
-  }, [managers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managers200330.data, managers200331.data]);
 
   const summaryCounts = useMemo(() => {
-    const severityBuckets = {
-      urgente: allItems.filter((i) => i.severity === 'URGENTE').length,
-      atencao: allItems.filter((i) => i.severity === 'ATENCAO').length
-    };
+    const urgenteCount = allItems.filter((i) => i.severity === 'URGENTE').length;
+    const atencaoCount = allItems.filter((i) => i.severity === 'ATENCAO').length;
+
+    const sum = (pick: (rm: NonNullable<ReturnType<typeof useManagementDashboard>['readModel']>) => number) =>
+      dashboards.reduce((acc, d) => acc + (d.readModel ? pick(d.readModel) : 0), 0);
 
     return {
-      totalAtas: readModel?.arp?.totalAtas ?? 0,
-      itensCriticosArp: readModel?.arp?.itensCriticosCount ?? 0,
-      itensProximosLimiteArp: readModel?.arp?.itensProximosLimiteCount ?? 0,
-      contratosAtivos: readModel?.executive?.contratosAtivos ?? 0,
-      contratosEmAtencao60a90d: (readModel?.deadlines?.vencendo60Dias ?? 0) + (readModel?.deadlines?.vencendo90Dias ?? 0),
-      contratosEmProrrogacao: readModel?.deadlines?.prorrogaçõesEmCurso ?? 0,
-      contratosAVencer30d: readModel?.deadlines?.vencendo30Dias ?? 0,
-      valorVigenteTotal: readModel?.executive?.valorVigenteTotal ?? 0,
-      totalEmpenhado: readModel?.financial?.totalEmpenhado ?? 0,
-      criticalCount: readModel?.attention?.criticalCount ?? 0,
-      totalAlertasAtivos: readModel?.attention?.totalAlertasAtivos ?? 0,
-      urgenteCount: severityBuckets.urgente,
-      atencaoCount: severityBuckets.atencao
+      totalAtas: sum((rm) => rm.arp.totalAtas),
+      itensCriticosArp: sum((rm) => rm.arp.itensCriticosCount),
+      itensProximosLimiteArp: sum((rm) => rm.arp.itensProximosLimiteCount ?? 0),
+      contratosAtivos: sum((rm) => rm.executive.contratosAtivos),
+      contratosEmAtencao60a90d: sum((rm) => rm.deadlines.vencendo60Dias + rm.deadlines.vencendo90Dias),
+      contratosEmProrrogacao: sum((rm) => rm.deadlines.prorrogaçõesEmCurso),
+      contratosAVencer30d: sum((rm) => rm.deadlines.vencendo30Dias),
+      valorVigenteTotal: sum((rm) => rm.executive.valorVigenteTotal),
+      totalEmpenhado: sum((rm) => rm.financial.totalEmpenhado),
+      criticalCount: sum((rm) => rm.attention.criticalCount),
+      totalAlertasAtivos: sum((rm) => rm.attention.totalAlertasAtivos),
+      urgenteCount,
+      atencaoCount
     };
-  }, [readModel, allItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dash200330.readModel, dash200331.readModel, allItems]);
 
   const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
     if (activeTab === 'SALDOS') return 'ARP';
@@ -140,8 +171,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       if (severidade !== 'TODAS' && item.severity !== severidade) return false;
 
       if (query) {
-        const fornecedor = (fornecedorByKey.get(item.contractKey || item.numeroAta || '') || '').toLowerCase();
-        const haystack = [item.title, item.description, item.numeroContrato, item.contractKey, item.numeroAta, fornecedor]
+        const fornecedor = (fornecedorByKey.get(getLookupKey(item)) || '').toLowerCase();
+        const haystack = [item.title, item.description, item.numeroContrato, item.contractKey, item.numeroAta, item.uasg, fornecedor]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
@@ -169,7 +200,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     setBusca('');
   }, [setActiveTab, setSeveridade, setBusca]);
 
-  if (isError && !readModel) {
+  if (isError) {
     return (
       <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '2rem' }}>
         <ErrorState
@@ -191,8 +222,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       gap: '1.25rem'
     }}>
       <GestaoInstrumentosHeader
-        uasg={readModel?.uasg}
-        onRefresh={() => refetch()}
+        uasgs={UASGS}
+        onRefresh={refetch}
         isRefreshing={isLoading || isFetching}
         lastUpdated={dataUpdatedAt}
       />

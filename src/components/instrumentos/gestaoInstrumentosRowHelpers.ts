@@ -1,5 +1,17 @@
 import type { DashboardAttentionCategory, DashboardAttentionItem } from '../../types/managementDashboard';
 
+/** Item de atenção enriquecido com a UASG de origem (a Gestão de Instrumentos consolida 200330 e 200331). */
+export interface AttentionItemWithUasg extends DashboardAttentionItem {
+  uasg: string;
+}
+
+/** Chave de correlação (fornecedor/responsável) resiliente a colisões entre UASGs distintas. */
+export function getLookupKey(item: AttentionItemWithUasg): string {
+  if (item.contractKey) return item.contractKey;
+  if (item.numeroAta) return `${item.uasg}-${item.numeroAta}`;
+  return item.id;
+}
+
 export interface InstrumentoInfo {
   tipo: 'ARP' | 'Contrato';
   label: string;

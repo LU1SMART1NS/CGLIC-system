@@ -3,17 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import type { DashboardAttentionItem } from '../../types/managementDashboard';
 import {
   getInstrumentoInfo,
   getMotivoInfo,
   getSituacaoAtual,
   getPrazoLabel,
-  getAcaoInfo
+  getAcaoInfo,
+  getLookupKey,
+  type AttentionItemWithUasg
 } from './gestaoInstrumentosRowHelpers';
 
 interface GestaoInstrumentosTableProps {
-  items: DashboardAttentionItem[];
+  items: AttentionItemWithUasg[];
   totalItems: number;
   fornecedorByKey: Map<string, string>;
   responsavelByContractKey: Map<string, string>;
@@ -131,6 +132,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
           <thead>
             <tr>
               <th style={th}>Prioridade</th>
+              <th style={th}>UASG</th>
               <th style={th}>Instrumento</th>
               <th style={th}>Objeto / Fornecedor</th>
               <th style={th}>Situação Atual</th>
@@ -147,14 +149,17 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
               const situacao = getSituacaoAtual(item);
               const prazo = getPrazoLabel(item);
               const acao = getAcaoInfo(item);
-              const fornecedorKey = item.contractKey || item.numeroAta || '';
-              const fornecedor = fornecedorByKey.get(fornecedorKey);
+              const lookupKey = getLookupKey(item);
+              const fornecedor = fornecedorByKey.get(lookupKey);
               const responsavel = item.contractKey ? responsavelByContractKey.get(item.contractKey) : undefined;
 
               return (
                 <tr key={item.id} data-testid={`instrumentos-row-${item.id}`}>
                   <td style={td}>
                     <SeverityBadge severity={item.severity} />
+                  </td>
+                  <td style={{ ...td, fontWeight: 700, color: '#475569' }} data-testid={`instrumentos-uasg-${item.id}`}>
+                    {item.uasg}
                   </td>
                   <td style={td}>
                     <div style={{ fontWeight: 800 }}>{instrumento.label}</div>

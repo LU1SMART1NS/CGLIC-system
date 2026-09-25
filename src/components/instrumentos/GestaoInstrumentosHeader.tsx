@@ -4,14 +4,14 @@ import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 
 interface GestaoInstrumentosHeaderProps {
-  uasg?: string;
+  uasgs?: string[];
   onRefresh: () => void;
   isRefreshing?: boolean;
   lastUpdated?: Date | string | number | null;
 }
 
 export const GestaoInstrumentosHeader: React.FC<GestaoInstrumentosHeaderProps> = ({
-  uasg,
+  uasgs,
   onRefresh,
   isRefreshing = false,
   lastUpdated
@@ -22,7 +22,7 @@ export const GestaoInstrumentosHeader: React.FC<GestaoInstrumentosHeaderProps> =
       subtitle="Painel unificado de gestão e monitoramento — Lei 14.133. Visão geral da carteira de ARPs e contratos e o que exige sua atenção."
       icon={<LayoutDashboard size={26} color="#0c326f" aria-hidden="true" />}
       badge={
-        uasg ? (
+        uasgs && uasgs.length > 0 ? (
           <span
             data-testid="gestao-instrumentos-uasg-badge"
             style={{
@@ -38,7 +38,7 @@ export const GestaoInstrumentosHeader: React.FC<GestaoInstrumentosHeaderProps> =
               letterSpacing: '0.02em'
             }}
           >
-            UASG {uasg}
+            {uasgs.length === 1 ? `UASG ${uasgs[0]}` : `UASGs ${uasgs.join(' · ')}`}
           </span>
         ) : undefined
       }
