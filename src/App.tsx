@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { SelectionProvider, useSelection } from './context/SelectionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { isSupabaseConfigured } from './services/supabaseClient';
-import { HomeRoute } from './routes/HomeRoute';
+import { GestaoInstrumentosRoute } from './routes/GestaoInstrumentosRoute';
 import { ArpSearchRoute } from './routes/ArpSearchRoute';
 import { ArpItemsRoute } from './routes/ArpItemsRoute';
 import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
@@ -12,7 +12,6 @@ import { AllocationsRoute } from './routes/AllocationsRoute';
 import { ContractsRoute } from './routes/ContractsRoute';
 import { Contract360Route } from './routes/Contract360Route';
 import { ContractTaskTemplatesRoute } from './routes/ContractTaskTemplatesRoute';
-import { CentralPrazosRoute } from './routes/CentralPrazosRoute';
 import { UsersRoute } from './routes/UsersRoute';
 import { RolesRoute } from './routes/RolesRoute';
 import { DepartmentsRoute } from './routes/DepartmentsRoute';
@@ -58,6 +57,16 @@ const AppFooter: React.FC = () => (
     </div>
   </footer>
 );
+
+/**
+ * Redirecionamento de compatibilidade para rotas legadas ("/" e "/prazos"),
+ * absorvidas pela Gestão de Instrumentos (/instrumentos). Preserva a query
+ * string (ex.: ?severity=CRITICA) para não quebrar favoritos e links internos.
+ */
+const LegacyRouteRedirect: React.FC<{ to: string }> = ({ to }) => {
+  const location = useLocation();
+  return <Navigate to={`${to}${location.search}`} replace />;
+};
 
 const ProtectedLayout: React.FC<{
   children: React.ReactNode;
@@ -114,7 +123,8 @@ const AppContent: React.FC = () => {
             </ProtectedLayout>
           }
         >
-          <Route path="/" element={<HomeRoute />} />
+          <Route path="/" element={<LegacyRouteRedirect to="/instrumentos" />} />
+          <Route path="/instrumentos" element={<GestaoInstrumentosRoute />} />
           <Route path="/atas" element={<ArpSearchRoute />} />
           <Route path="/atas/itens" element={<ArpItemsRoute />} />
           <Route path="/atas/itens/saldo" element={<ItemBalancesRoute />} />
@@ -122,7 +132,7 @@ const AppContent: React.FC = () => {
           <Route path="/contratos" element={<ContractsRoute />} />
           <Route path="/contratos/modelos" element={<ContractTaskTemplatesRoute />} />
           <Route path="/contratos/:contractKey" element={<Contract360Route />} />
-          <Route path="/prazos" element={<CentralPrazosRoute />} />
+          <Route path="/prazos" element={<LegacyRouteRedirect to="/instrumentos" />} />
           <Route path="/pagamentos" element={<PaymentsRoute />} />
           <Route path="/empenhos" element={<FinancialExecutionRoute />} />
           <Route path="/admin/departamentos" element={<DepartmentsRoute />} />

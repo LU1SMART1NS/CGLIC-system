@@ -9,8 +9,7 @@ import { calculateFinancialBalances } from '../financialExecutionService';
 describe('FASE 9-J — Homologação Integrada do Frontend com Dados Reais', () => {
   describe('1. Fluxo Principal de Navegação e Breadcrumbs', () => {
     const routeFlow = [
-      { path: '/', expectedBreadcrumb: 'Visão Geral' },
-      { path: '/prazos', expectedBreadcrumb: 'Central de Atenção' },
+      { path: '/instrumentos', expectedBreadcrumb: 'Gestão de Instrumentos' },
       { path: '/atas', expectedBreadcrumb: 'Consulta e Vigência' },
       { path: '/atas/saldos-unidade', expectedBreadcrumb: 'Alocações por Unidade' },
       { path: '/contratos', expectedBreadcrumb: 'Acompanhamento e Prazos' },
@@ -25,16 +24,16 @@ describe('FASE 9-J — Homologação Integrada do Frontend com Dados Reais', () 
         expect(crumbs.length).toBeGreaterThan(0);
         const lastCrumb = crumbs[crumbs.length - 1];
         expect(lastCrumb.label).toBe(step.expectedBreadcrumb);
-        // Toda rota filha deve ter a Visão Geral como primeira raiz
-        if (step.path !== '/') {
-          expect(crumbs[0].label).toBe('Visão Geral');
-          expect(crumbs[0].route).toBe('/');
+        // Toda rota filha deve ter a Gestão de Instrumentos como primeira raiz
+        if (step.path !== '/instrumentos') {
+          expect(crumbs[0].label).toBe('Gestão de Instrumentos');
+          expect(crumbs[0].route).toBe('/instrumentos');
         }
       }
     });
 
-    it('deve garantir que todos os 6 pilares de navegação possuam itens ativos e rotas vinculadas', () => {
-      expect(navigationConfig.length).toBe(6);
+    it('deve garantir que todos os 5 pilares de navegação possuam itens ativos e rotas vinculadas', () => {
+      expect(navigationConfig.length).toBe(5);
       for (const nav of navigationConfig) {
         if (nav.children) {
           for (const child of nav.children) {
