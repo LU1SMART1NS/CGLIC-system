@@ -24,6 +24,10 @@ vi.mock('../../../hooks/useUsers', () => ({
   useUsers: () => ({ data: [], isLoading: false })
 }));
 
+vi.mock('../../../hooks/useRoles', () => ({
+  useRoles: () => ({ data: [], isLoading: false })
+}));
+
 const mockContract: ContractDashboardRecord = {
   id: '200331-00015-2026',
   numero: '15/2026',

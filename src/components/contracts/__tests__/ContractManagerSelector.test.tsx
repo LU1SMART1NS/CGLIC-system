@@ -4,6 +4,7 @@ import { ContractManagerSelector } from '../ContractManagerSelector';
 import * as managerHook from '../../../hooks/useContractManager';
 import * as saveHook from '../../../hooks/useSaveContractManager';
 import * as usersHook from '../../../hooks/useUsers';
+import * as rolesHook from '../../../hooks/useRoles';
 import type { ContractDashboardRecord } from '../../../types';
 
 vi.mock('../../../hooks/useContractManager', () => ({
@@ -16,6 +17,10 @@ vi.mock('../../../hooks/useSaveContractManager', () => ({
 
 vi.mock('../../../hooks/useUsers', () => ({
   useUsers: vi.fn()
+}));
+
+vi.mock('../../../hooks/useRoles', () => ({
+  useRoles: vi.fn()
 }));
 
 const mockContract: ContractDashboardRecord = {
@@ -43,8 +48,12 @@ describe('ContractManagerSelector Component', () => {
     } as any);
     vi.mocked(usersHook.useUsers).mockReturnValue({
       data: [
-        { id: '1', nome: 'Carlos Gestor', cargo: 'Analista', departamento: 'CGOFI', ativo: true }
+        { id: '1', nome: 'Carlos Gestor', perfil: 'gestor', ativo: true }
       ],
+      isLoading: false
+    } as any);
+    vi.mocked(rolesHook.useRoles).mockReturnValue({
+      data: [{ id: 'gestor', nome: 'Gestor / Fiscal de Contrato', badgeColor: '#0284c7', descricao: '', isCustom: false, permissoes: {} as any }],
       isLoading: false
     } as any);
   });

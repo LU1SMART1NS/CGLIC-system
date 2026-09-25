@@ -233,6 +233,16 @@ export function saveSystemRole(
   return newRole;
 }
 
+/**
+ * Resolve o rótulo real do perfil operacional de um usuário (ex.: "Gestor / Fiscal de Contrato"),
+ * a partir do catálogo de perfis vigente. Usar sempre que um nome de usuário for exibido junto de
+ * seu papel no sistema — nunca campos de texto livre (cargo/departamento) sem lastro no RBAC.
+ */
+export function resolveRoleLabel(roles: RoleDefinition[], perfil?: string | null): string {
+  if (!perfil) return 'Sem perfil definido';
+  return roles.find((r) => r.id === perfil)?.nome || perfil;
+}
+
 export function deleteSystemRole(id: string): void {
   const roles = fetchSystemRoles();
   // Não permitir exclusão de perfis nativos do sistema

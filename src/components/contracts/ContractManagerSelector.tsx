@@ -13,6 +13,8 @@ import { getContractManagementKey } from '../../services/contractManagementServi
 import { useContractManager } from '../../hooks/useContractManager';
 import { useSaveContractManager } from '../../hooks/useSaveContractManager';
 import { useUsers } from '../../hooks/useUsers';
+import { useRoles } from '../../hooks/useRoles';
+import { resolveRoleLabel } from '../../services/roleService';
 
 interface ContractManagerSelectorProps {
   contract: ContractDashboardRecord;
@@ -32,6 +34,7 @@ export const ContractManagerSelector: React.FC<ContractManagerSelectorProps> = (
   const { data: manager, isLoading: isLoadingManager } = useContractManager(contractKey);
   const saveManagerMutation = useSaveContractManager();
   const { data: users = [] } = useUsers();
+  const { data: roles = [] } = useRoles();
 
   const [editing, setEditing] = useState(false);
   const [gestorNome, setGestorNome] = useState('');
@@ -175,7 +178,7 @@ export const ContractManagerSelector: React.FC<ContractManagerSelectorProps> = (
                 <option value="">Selecione o servidor gestor...</option>
                 {activeUsers.map((u) => (
                   <option key={u.id} value={u.nome}>
-                    {u.nome} ({u.cargo || 'Servidor'}{u.departamento ? ` - ${u.departamento}` : ''})
+                    {u.nome} ({resolveRoleLabel(roles, u.perfil)})
                   </option>
                 ))}
                 <option value="__custom__">➕ Digitar outro nome...</option>
