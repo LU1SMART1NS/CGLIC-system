@@ -1,6 +1,17 @@
-import type { SystemUser, UserRole } from '../types/user';
+import type { SystemUser, UserRole, AllocationScopeType } from '../types/user';
 import { UNASSIGNED_ROLE_ID } from '../types/user';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+
+/** Fase 3A: atribuição de escopo enviada ao backend (manage-user/invite-user). */
+export interface AllocationScopeInput {
+  scopeType: AllocationScopeType;
+  scopeValue: string;
+}
+
+function toScopePayload(scope?: AllocationScopeInput) {
+  if (!scope || !scope.scopeType || !scope.scopeValue?.trim()) return undefined;
+  return { domain: 'allocations', scopeType: scope.scopeType, scopeValue: scope.scopeValue.trim() };
+}
 
 const USERS_STORAGE_KEY = 'saldoarp:system_users';
 
@@ -112,7 +123,11 @@ export async function fetchSystemUsersAsync(): Promise<SystemUser[]> {
             status: (u.status as any) || (u.ativo ? 'ativo' : 'inativo'),
             ativo: u.ativo ?? true,
             createdAt: u.created_at,
-            lastSignInAt: u.last_sign_in_at
+            lastSignInAt: u.last_sign_in_at,
+            // Fase 3A: escopo de alocação (não é departamento/lotação do
+            // usuário — é só o valor de autorização, quando aplicável).
+            allocationScopeType: (u.allocation_scope_type as AllocationScopeType) || undefined,
+            allocationScopeValue: u.allocation_scope_value || undefined
           };
         });
 
@@ -220,7 +235,8 @@ async function callManageUserFunction(body: Record<string, unknown>): Promise<vo
  * desatualizados ou sem efeito no Supabase Auth / RBAC.
  */
 export async function saveSystemUserAsync(
-  user: Partial<SystemUser> & { id: string; nome: string; email: string; perfil: UserRole }
+  user: Partial<SystemUser> & { id: string; nome: string; email: string; perfil: UserRole },
+  scope?: AllocationScopeInput
 ): Promise<SystemUser> {
   if (isRealSupabaseUser(user.id)) {
     try {
@@ -229,7 +245,8 @@ export async function saveSystemUserAsync(
         userId: user.id,
         nome: user.nome.trim(),
         email: user.email.trim(),
-        perfil: user.perfil
+        perfil: user.perfil,
+        scope: toScopePayload(scope)
       });
     } catch (err: any) {
       const msg = err?.message?.toLowerCase() || '';
@@ -294,6 +311,7 @@ export async function inviteSystemUser(params: {
   nome: string;
   perfil: UserRole;
   action?: 'invite' | 'reinvite';
+  scope?: AllocationScopeInput;
 }): Promise<SystemUser> {
   const cleanEmail = params.email.trim().toLowerCase();
   const cleanNome = params.nome.trim();
@@ -306,7 +324,8 @@ export async function inviteSystemUser(params: {
         nome: cleanNome,
         perfil: params.perfil,
         action: params.action || 'invite',
-        origin: typeof window !== 'undefined' ? window.location.origin : undefined
+        origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+        scope: toScopePayload(params.scope)
       },
       headers: session?.access_token
         ? { Authorization: `Bearer ${session.access_token}` }

@@ -32,7 +32,11 @@ import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import type { SystemUser, UserRole } from '../../types/user';
-import { getPerfilDisplayLabel } from '../../types/user';
+import {
+  getPerfilDisplayLabel,
+  GESTOR_SALDO_ROLE_ID,
+  GESTOR_SALDO_PERMISSIONS_DESCRIPTION
+} from '../../types/user';
 
 export const UsersManagement: React.FC = () => {
   const { data: users = [], isLoading } = useUsers();
@@ -55,6 +59,8 @@ export const UsersManagement: React.FC = () => {
   const [formPerfil, setFormPerfil] = useState<UserRole>('gestor');
   const [formError, setFormError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const isGestorSaldoSelecionado = formPerfil === GESTOR_SALDO_ROLE_ID;
 
   const handleOpenCreateModal = () => {
     setEditingUser(null);
@@ -81,18 +87,22 @@ export const UsersManagement: React.FC = () => {
       return;
     }
 
+    // Gestor de Saldo é global no domínio de alocações (administra todas as
+    // Atas) — nenhum escopo individual é configurado ou enviado para ele.
     if (editingUser) {
       // Edição de usuário existente
       saveUserMutation.mutate(
         {
-          id: editingUser.id,
-          nome: formNome.trim(),
-          email: formEmail.trim(),
-          perfil: formPerfil,
-          matricula: editingUser.matricula,
-          cargo: editingUser.cargo,
-          departamento: editingUser.departamento,
-          ativo: editingUser.ativo
+          user: {
+            id: editingUser.id,
+            nome: formNome.trim(),
+            email: formEmail.trim(),
+            perfil: formPerfil,
+            matricula: editingUser.matricula,
+            cargo: editingUser.cargo,
+            departamento: editingUser.departamento,
+            ativo: editingUser.ativo
+          }
         },
         {
           onSuccess: () => {
@@ -440,23 +450,32 @@ export const UsersManagement: React.FC = () => {
 
                       {/* Perfil Operacional */}
                       <td style={{ padding: '0.75rem 1rem' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: '6px',
-                            fontSize: '0.76rem',
-                            fontWeight: 700,
-                            color: roleObj?.badgeColor || '#0c326f',
-                            background: `${roleObj?.badgeColor || '#0c326f'}15`,
-                            border: `1px solid ${roleObj?.badgeColor || '#0c326f'}30`
-                          }}
-                        >
-                          <Shield size={12} />
-                          {getPerfilDisplayLabel(user.perfil, roles)}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span
+                            title={user.perfil === GESTOR_SALDO_ROLE_ID ? `Permissões: ${GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}` : undefined}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '6px',
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              width: 'fit-content',
+                              color: roleObj?.badgeColor || '#0c326f',
+                              background: `${roleObj?.badgeColor || '#0c326f'}15`,
+                              border: `1px solid ${roleObj?.badgeColor || '#0c326f'}30`
+                            }}
+                          >
+                            <Shield size={12} />
+                            {getPerfilDisplayLabel(user.perfil, roles)}
+                          </span>
+                          {user.perfil === GESTOR_SALDO_ROLE_ID && (
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                              Todas as Atas
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status Derivado da Autenticação */}
@@ -688,6 +707,20 @@ export const UsersManagement: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {isGestorSaldoSelecionado && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.85rem', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '8px' }}>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#0f766e', fontWeight: 700 }}>
+                    Gestor de Saldo
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#0f766e' }}>
+                    Gerencia as alocações internas de todas as Atas.
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                    Permissões: {GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}. Nenhum acesso a contratos, financeiro, departamentos ou administração do sistema.
+                  </p>
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.75rem' }}>
                 <button

@@ -6,7 +6,8 @@ import {
   deactivateSystemUser,
   reactivateSystemUser,
   inviteSystemUser,
-  reinviteSystemUser
+  reinviteSystemUser,
+  type AllocationScopeInput
 } from '../services/userService';
 import type { SystemUser, UserRole } from '../types/user';
 
@@ -24,7 +25,7 @@ export function useInviteUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { email: string; nome: string; perfil: UserRole }) => {
+    mutationFn: async (params: { email: string; nome: string; perfil: UserRole; scope?: AllocationScopeInput }) => {
       return inviteSystemUser(params);
     },
     onSuccess: () => {
@@ -50,8 +51,11 @@ export function useSaveUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (user: Partial<SystemUser> & { id: string; nome: string; email: string; perfil: UserRole }) => {
-      return saveSystemUserAsync(user);
+    mutationFn: async (input: {
+      user: Partial<SystemUser> & { id: string; nome: string; email: string; perfil: UserRole };
+      scope?: AllocationScopeInput;
+    }) => {
+      return saveSystemUserAsync(input.user, input.scope);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });

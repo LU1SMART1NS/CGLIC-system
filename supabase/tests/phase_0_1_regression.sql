@@ -73,7 +73,10 @@ END $$;
 -- --------------------------------------------------------------------------
 INSERT INTO public.internal_departments (id, sigla, nome_completo, ativo)
 VALUES
-  ('dep-test-old-phase01', 'DEPT_OLD_P01', 'Unidade de Teste Origem (Fase 0.1)', TRUE),
+  -- DEPT_OLD_P01 é a ORIGEM do merge: precisa estar INATIVA desde a Fase 2B-6
+  -- (regra: merge_internal_department_allocations_atomic só aceita origem
+  -- órfã/legada, nunca a sigla de um departamento ativo).
+  ('dep-test-old-phase01', 'DEPT_OLD_P01', 'Unidade de Teste Origem (Fase 0.1)', FALSE),
   ('dep-test-new-phase01', 'DEPT_NEW_P01', 'Unidade de Teste Destino (Fase 0.1)', TRUE)
 ON CONFLICT (id) DO NOTHING;
 

@@ -1,12 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
-export type DbRole = 'admin' | 'gestor' | 'leitor';
+export type DbRole = 'admin' | 'gestor' | 'leitor' | 'gestor_saldos';
 
 const PERFIL_TO_DB_ROLE: Readonly<Record<string, DbRole>> = Object.freeze({
   coordenador: 'admin',
   gestor: 'gestor',
   consulta: 'leitor',
+  // Fase 3A: perfil funcional novo (public.roles.id = 'gestor_saldos').
+  gestor_saldos: 'gestor_saldos',
 });
 
 export function mapPerfilToDbRole(perfil: unknown): DbRole | null {
@@ -160,10 +162,23 @@ serve(async (req) => {
           );
         }
 
+        // A coluna legada `role` tem CHECK (role IN ('admin','gestor','leitor'))
+        // — não aceita ids de role novos (ex.: 'gestor_saldos'). Para essas
+        // roles usamos exatamente a divergência role/role_id prevista desde a
+        // Fase 1 (trigger trg_user_roles_default_role_id só preenche role_id
+        // quando ele NÃO vem explícito): gravamos um placeholder legado
+        // seguro em `role` e o id real em `role_id`. O placeholder é sempre
+        // 'leitor' — nunca 'gestor'/'admin' — porque nenhuma RPC ainda não
+        // migrada concede escrita a partir de has_role('leitor'); usar
+        // 'gestor'/'admin' aqui vazaria autoridade legada indevida (contratos,
+        // financeiro, SEI) para quem só deveria ter allocations.manage.
+        const LEGACY_CHECK_ROLES = new Set(["admin", "gestor", "leitor"]);
+        const legacyRole = LEGACY_CHECK_ROLES.has(dbRole) ? dbRole : "leitor";
+
         const { error: upsertError } = await supabaseAdmin
           .from("user_roles")
           .upsert(
-            { user_id: userId, role: dbRole },
+            { user_id: userId, role: legacyRole, role_id: dbRole },
             { onConflict: "user_id,role" }
           );
 
@@ -177,12 +192,59 @@ serve(async (req) => {
           }
         }
 
-        // Remove vínculos de papéis antigos que não correspondem mais ao perfil atual
+        // Remove vínculos de papéis antigos que não correspondem mais ao
+        // perfil atual — comparado por role_id (referência canônica), não
+        // por `role` (legado), já que múltiplas roles novas podem
+        // compartilhar o mesmo placeholder legado 'leitor'.
         await supabaseAdmin
           .from("user_roles")
           .delete()
           .eq("user_id", userId)
-          .neq("role", dbRole);
+          .neq("role_id", dbRole);
+
+        // Fase 3A: atribuição opcional de escopo (public.user_scope_assignments).
+        // Só faz sentido quando uma role real foi concedida (dbRole !== null,
+        // já garantido pelo retorno antecipado acima). O frontend só envia
+        // `scope` quando o perfil escolhido usa escopo (ex.: gestor_saldos).
+        // Semântica de substituição: uma nova atribuição para o mesmo domínio
+        // substitui qualquer atribuição anterior desse usuário nesse domínio
+        // — evita acumular escopos obsoletos quando o administrador troca a
+        // unidade/ATA de um Gestor de Saldo.
+        const { scope } = body;
+        if (scope && typeof scope === "object") {
+          const { domain, scopeType, scopeValue } = scope as Record<string, unknown>;
+          if (
+            typeof domain === "string" && domain.trim() &&
+            typeof scopeType === "string" && scopeType.trim() &&
+            typeof scopeValue === "string" && scopeValue.trim()
+          ) {
+            const cleanDomain = domain.trim();
+            const cleanScopeType = scopeType.trim();
+            const cleanScopeValue = scopeValue.trim();
+
+            await supabaseAdmin
+              .from("user_scope_assignments")
+              .delete()
+              .eq("user_id", userId)
+              .eq("domain", cleanDomain);
+
+            const { error: scopeError } = await supabaseAdmin
+              .from("user_scope_assignments")
+              .insert({
+                user_id: userId,
+                domain: cleanDomain,
+                scope_type: cleanScopeType,
+                scope_value: cleanScopeValue
+              });
+
+            if (scopeError) {
+              return new Response(
+                JSON.stringify({ error: scopeError.message || "Falha ao atribuir o escopo do servidor." }),
+                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
+          }
+        }
       }
 
       return new Response(

@@ -68,7 +68,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, nome, perfil, action = "invite", origin } = body;
+    const { email, nome, perfil, action = "invite", origin, scope } = body;
 
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return new Response(
@@ -134,15 +134,44 @@ serve(async (req) => {
     // convite é concluído normalmente, mas o usuário fica sem autoridade
     // de escrita até que um administrador defina o mapeamento.
     if (dbRole !== null) {
+      // A coluna legada `role` só aceita 'admin'/'gestor'/'leitor' (CHECK).
+      // Roles novas (ex.: 'gestor_saldos') usam 'leitor' como placeholder
+      // legado seguro, com o id real em `role_id` — mesma lógica de
+      // manage-user/index.ts (ver comentário lá para a justificativa
+      // completa de por que nunca usar 'gestor'/'admin' como placeholder).
+      const LEGACY_CHECK_ROLES = new Set(["admin", "gestor", "leitor"]);
+      const legacyRole = LEGACY_CHECK_ROLES.has(dbRole) ? dbRole : "leitor";
+
       await supabaseAdmin
         .from("user_roles")
         .upsert(
           {
             user_id: invitedUserId,
-            role: dbRole
+            role: legacyRole,
+            role_id: dbRole
           },
           { onConflict: "user_id,role" }
         );
+
+      // Fase 3A: atribuição opcional de escopo no próprio convite (mesma
+      // semântica de substituição de manage-user/index.ts).
+      if (scope && typeof scope === "object") {
+        const { domain, scopeType, scopeValue } = scope as Record<string, unknown>;
+        if (
+          typeof domain === "string" && domain.trim() &&
+          typeof scopeType === "string" && scopeType.trim() &&
+          typeof scopeValue === "string" && scopeValue.trim()
+        ) {
+          await supabaseAdmin
+            .from("user_scope_assignments")
+            .insert({
+              user_id: invitedUserId,
+              domain: domain.trim(),
+              scope_type: scopeType.trim(),
+              scope_value: scopeValue.trim()
+            });
+        }
+      }
     }
 
     return new Response(
