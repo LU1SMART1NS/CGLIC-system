@@ -17,6 +17,8 @@ import { getContractManagementKey } from '../../services/contractManagementServi
 import { useContractManager } from '../../hooks/useContractManager';
 import { useSaveContractManager } from '../../hooks/useSaveContractManager';
 import { useUsers } from '../../hooks/useUsers';
+import { useRoles } from '../../hooks/useRoles';
+import { resolveRoleLabel } from '../../services/roleService';
 import { useContractTaskTemplates } from '../../hooks/useContractTaskTemplates';
 import { useContractTaskPlan } from '../../hooks/useContractTaskPlan';
 import { useApplyContractTaskTemplate } from '../../hooks/useApplyContractTaskTemplate';
@@ -274,6 +276,7 @@ export const ContractManagementPanel: React.FC<ContractManagementPanelProps> = (
   const ativoTemplates = templates.filter(t => t.ativo);
 
   const { data: users = [] } = useUsers();
+  const { data: roles = [] } = useRoles();
   const [customMode, setCustomMode] = useState(false);
 
   const activeUsers = users.filter(u => u.ativo);
@@ -337,7 +340,7 @@ export const ContractManagementPanel: React.FC<ContractManagementPanelProps> = (
                 <option value="">Selecione o servidor responsável...</option>
                 {activeUsers.map(u => (
                   <option key={u.id} value={u.nome}>
-                    {u.nome} ({u.cargo || 'Servidor'} - {u.departamento || 'SENASP'})
+                    {u.nome} ({resolveRoleLabel(roles, u.perfil)})
                   </option>
                 ))}
                 <option value="__custom__">➕ Digitar outro nome...</option>

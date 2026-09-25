@@ -4,7 +4,8 @@ import {
   saveSystemRole,
   deleteSystemRole,
   resetRolesInMemory,
-  normalizeRolePermissions
+  normalizeRolePermissions,
+  resolveRoleLabel
 } from '../roleService';
 
 describe('roleService — Modelo Canônico de RBAC & Escopo', () => {
@@ -223,6 +224,26 @@ describe('roleService — Modelo Canônico de RBAC & Escopo', () => {
       deleteSystemRole('coordenador');
       all = fetchSystemRoles();
       expect(all.find(r => r.id === 'coordenador')).toBeDefined();
+    });
+  });
+
+  describe('resolveRoleLabel — rótulo real do perfil operacional (bug: Gestor Titular exibia cargo/departamento mock)', () => {
+    it('resolve o nome real do perfil a partir do catálogo (ex.: "gestor" -> "Gestor / Fiscal de Contrato")', () => {
+      const roles = fetchSystemRoles();
+      expect(resolveRoleLabel(roles, 'gestor')).toBe('Gestor / Fiscal de Contrato');
+      expect(resolveRoleLabel(roles, 'coordenador')).toBe('Coordenador / Diretor');
+      expect(resolveRoleLabel(roles, 'consulta')).toBe('Consulta / Auditoria');
+    });
+
+    it('cai para o próprio id do perfil quando ele não existe mais no catálogo (nunca inventa um rótulo)', () => {
+      const roles = fetchSystemRoles();
+      expect(resolveRoleLabel(roles, 'perfil-removido')).toBe('perfil-removido');
+    });
+
+    it('retorna um rótulo neutro quando o usuário não tem perfil definido', () => {
+      const roles = fetchSystemRoles();
+      expect(resolveRoleLabel(roles, undefined)).toBe('Sem perfil definido');
+      expect(resolveRoleLabel(roles, null)).toBe('Sem perfil definido');
     });
   });
 });

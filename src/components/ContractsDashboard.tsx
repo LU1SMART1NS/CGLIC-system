@@ -24,6 +24,8 @@ import { getContractManagementKey } from '../services/contractManagementService'
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
 import { useAllContractManagers } from '../hooks/useAllContractManagers';
 import { useUsers } from '../hooks/useUsers';
+import { useRoles } from '../hooks/useRoles';
+import { resolveRoleLabel } from '../services/roleService';
 import { ContractCard } from './cards/ContractCard';
 import { ContractCardSkeleton } from './cards/ContractCardSkeleton';
 
@@ -44,6 +46,7 @@ export const ContractsDashboard: React.FC = () => {
   });
 
   const { data: systemUsers = [] } = useUsers();
+  const { data: systemRoles = [] } = useRoles();
 
   // Parâmetros de Filtro
   const [filters, setFilters] = useState<ContractFilterParams>({
@@ -250,7 +253,7 @@ export const ContractsDashboard: React.FC = () => {
               <option value="coordenador">👑 Coordenador Geral (Visão 100% da Pasta)</option>
               {systemUsers.filter(u => u.ativo).map(u => (
                 <option key={u.id} value={u.id}>
-                  👤 {u.nome} ({u.cargo || 'Servidor'} - {u.perfil})
+                  👤 {u.nome} ({resolveRoleLabel(systemRoles, u.perfil)})
                 </option>
               ))}
             </select>
