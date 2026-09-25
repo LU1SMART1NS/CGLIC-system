@@ -10,7 +10,9 @@ import { GestaoInstrumentosTable } from './GestaoInstrumentosTable';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import type { DashboardAttentionCategory } from '../../types/managementDashboard';
-import { getLookupKey, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
+import { getLookupKey, getInstrumentoInfo, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
+
+type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 
 /** UASGs consolidadas nesta tela — mesmo padrão de UASG única já usado no resto do sistema, chamado uma vez por unidade. */
 const UASGS: string[] = ['200330', '200331'];
@@ -47,6 +49,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     isValidSeverity(initialSeverity) ? initialSeverity : 'TODAS'
   );
   const [busca, setBusca] = useState('');
+  /** Acionado apenas pelos cards de resumo (ex.: "Contratos Vigentes" deve mostrar só Contratos, não ARPs). */
+  const [tipoFilter, setTipoFilter] = useState<TipoFilter>('TODOS');
 
   const dash200330 = useManagementDashboard({ uasg: UASGS[0] });
   const dash200331 = useManagementDashboard({ uasg: UASGS[1] });
@@ -144,31 +148,45 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
     if (activeTab === 'SALDOS') return 'ARP';
-    if (activeTab === 'VENCIMENTOS') return 'CONTRATOS';
+    if (activeTab === 'VENCIMENTOS' && tipoFilter === 'CONTRATO') return 'CONTRATOS';
     if (severidade === 'CRITICA') return 'ALERTAS';
     return null;
-  }, [activeTab, severidade]);
+  }, [activeTab, severidade, tipoFilter]);
 
   const handleSelectCard = useCallback((card: GestaoInstrumentosCardId) => {
     if (card === 'ARP') {
       setActiveTab((prev) => (prev === 'SALDOS' ? 'TODAS' : 'SALDOS'));
+      setTipoFilter('TODOS');
     } else if (card === 'CONTRATOS') {
-      setActiveTab((prev) => (prev === 'VENCIMENTOS' ? 'TODAS' : 'VENCIMENTOS'));
+      const isActive = activeTab === 'VENCIMENTOS' && tipoFilter === 'CONTRATO';
+      setActiveTab(isActive ? 'TODAS' : 'VENCIMENTOS');
+      setTipoFilter(isActive ? 'TODOS' : 'CONTRATO');
     } else if (card === 'ALERTAS') {
       setSeveridade((prev) => (prev === 'CRITICA' ? 'TODAS' : 'CRITICA'));
       setActiveTab('TODAS');
+      setTipoFilter('TODOS');
     } else {
       // VALOR: card de composição da carteira, não é um balde de alerta — apenas limpa os filtros.
       setActiveTab('TODAS');
       setSeveridade('TODAS');
+      setTipoFilter('TODOS');
     }
-  }, [setActiveTab, setSeveridade]);
+  }, [activeTab, tipoFilter]);
+
+  const handleSelectTab = useCallback((tab: GestaoInstrumentosCategoryTab) => {
+    setActiveTab(tab);
+    setTipoFilter('TODOS');
+  }, []);
 
   const filteredItems = useMemo(() => {
     const query = busca.trim().toLowerCase();
     return allItems.filter((item) => {
       if (!matchesTab(item, activeTab)) return false;
       if (severidade !== 'TODAS' && item.severity !== severidade) return false;
+      if (tipoFilter !== 'TODOS') {
+        const tipo = getInstrumentoInfo(item).tipo === 'ARP' ? 'ARP' : 'CONTRATO';
+        if (tipo !== tipoFilter) return false;
+      }
 
       if (query) {
         const fornecedor = (fornecedorByKey.get(getLookupKey(item)) || '').toLowerCase();
@@ -181,7 +199,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
       return true;
     });
-  }, [allItems, activeTab, severidade, busca, fornecedorByKey]);
+  }, [allItems, activeTab, severidade, tipoFilter, busca, fornecedorByKey]);
 
   const handleChangeFilter = useCallback(<K extends keyof GestaoInstrumentosCompactFiltersState>(
     key: K,
@@ -197,8 +215,9 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const handleResetFilters = useCallback(() => {
     setActiveTab('TODAS');
     setSeveridade('TODAS');
+    setTipoFilter('TODOS');
     setBusca('');
-  }, [setActiveTab, setSeveridade, setBusca]);
+  }, []);
 
   if (isError) {
     return (
@@ -245,7 +264,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         <GestaoInstrumentosCategoryTabs
           counts={tabCounts}
           active={activeTab}
-          onSelect={setActiveTab}
+          onSelect={handleSelectTab}
         />
 
         <GestaoInstrumentosCompactFilters

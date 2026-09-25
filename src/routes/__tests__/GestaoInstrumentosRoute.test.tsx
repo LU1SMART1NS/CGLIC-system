@@ -330,6 +330,38 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).toContain('Prorrogar Vigência');
   });
 
+  it('4b. deve classificar como ARP (não Contrato) um item de vigência próxima cujo numeroContrato traz o texto "ARP ..." (regressão do bug real)', () => {
+    const arpProrrogacaoItem = {
+      id: 'ATT-PRORROG-ARP-1',
+      category: 'PRORROGACAO_PROXIMA' as const,
+      severity: 'ATENCAO' as const,
+      title: 'Marco de Planejamento de Prorrogação',
+      description: 'ARP 00011/2026 — Janela preventiva de análise (8 dias restantes)',
+      arpKey: '00011/2026-200331',
+      numeroContrato: 'ARP 00011/2026',
+      dataAlvo: '2026-10-03',
+      diasRelevantes: 8,
+      uasg: '200331'
+    };
+
+    const html = renderToStaticMarkup(
+      <GestaoInstrumentosTable
+        items={[arpProrrogacaoItem]}
+        totalItems={1}
+        fornecedorByKey={new Map()}
+        responsavelByContractKey={new Map()}
+        onResetFilters={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('ARP 00011/2026');
+    // O rótulo de tipo abaixo do nome do instrumento deve ser ARP, nunca CONTRATO
+    expect(html).not.toContain('>CONTRATO<');
+    expect(html).toContain('>ARP<');
+    // Ação contextual deve levar para /atas (não /contratos), já que não há contrato vinculado
+    expect(html).toContain('Prorrogar Vigência');
+  });
+
   it('5. deve exibir estado "Tudo em dia" quando não houver nenhum instrumento em atenção', () => {
     const html = renderToStaticMarkup(
       <GestaoInstrumentosTable

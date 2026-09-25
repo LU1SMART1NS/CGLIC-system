@@ -17,13 +17,23 @@ export interface InstrumentoInfo {
   label: string;
 }
 
-/** Deriva o instrumento (Ata ou Contrato) e seu tipo a partir dos campos já existentes no item. */
+/**
+ * Deriva o instrumento (Ata ou Contrato) e seu tipo a partir dos campos já existentes no item.
+ *
+ * `arpKey` tem prioridade sobre `contractKey`/`numeroContrato`: alguns itens de vigência de ARP
+ * (categoria PRORROGACAO_PROXIMA) também carregam um `numeroContrato` textual (ex.: "ARP 00011/2026")
+ * porque reaproveitam o mesmo campo de exibição do centralPrazosService — mas o instrumento em
+ * atenção continua sendo a Ata, não um contrato.
+ */
 export function getInstrumentoInfo(item: DashboardAttentionItem): InstrumentoInfo {
-  if (item.contractKey || item.numeroContrato) {
-    return { tipo: 'Contrato', label: item.numeroContrato || item.contractKey || '—' };
+  if (item.arpKey) {
+    return { tipo: 'ARP', label: item.numeroContrato || (item.numeroAta ? `Ata ${item.numeroAta}` : item.title) };
   }
   if (item.numeroAta) {
     return { tipo: 'ARP', label: `Ata ${item.numeroAta}` };
+  }
+  if (item.contractKey || item.numeroContrato) {
+    return { tipo: 'Contrato', label: item.numeroContrato || item.contractKey || '—' };
   }
   return { tipo: 'Contrato', label: item.title };
 }
@@ -86,6 +96,9 @@ export interface AcaoInfo {
 export function getAcaoInfo(item: DashboardAttentionItem): AcaoInfo {
   switch (item.category) {
     case 'PRORROGACAO_PROXIMA':
+      if (item.arpKey && !item.contractKey) {
+        return { label: 'Prorrogar Vigência', targetUrl: '/atas' };
+      }
       return { label: 'Prorrogar Vigência', targetUrl: item.contractKey ? `/contratos/${encodeURIComponent(item.contractKey)}` : '/contratos' };
     case 'ATA_CRITICA':
       return { label: 'Verificar Saldo', targetUrl: '/atas' };
