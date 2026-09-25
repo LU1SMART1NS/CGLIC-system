@@ -298,6 +298,22 @@ export interface RoleDefinition {
   permissoes: RolePermissions;
 }
 
+/**
+ * Sentinel de exibição (Fase 0.2): representa um usuário autenticado sem
+ * nenhuma linha em public.user_roles (fail-closed da Fase 0.1). Nunca é um
+ * perfil atribuível via formulário — não aparece no catálogo de roles.
+ */
+export const UNASSIGNED_ROLE_ID = 'sem_perfil';
+export const UNASSIGNED_ROLE_LABEL = 'Não atribuído';
+
+/** Resolve o rótulo de exibição de um perfil, tratando o sentinel de "sem role" explicitamente. */
+export function getPerfilDisplayLabel(perfil: UserRole, roles: RoleDefinition[]): string {
+  const roleObj = roles.find(r => r.id === perfil);
+  if (roleObj) return roleObj.nome;
+  if (perfil === UNASSIGNED_ROLE_ID) return UNASSIGNED_ROLE_LABEL;
+  return perfil;
+}
+
 export type UserStatus = 'pendente' | 'ativo' | 'inativo';
 
 export interface SystemUser {

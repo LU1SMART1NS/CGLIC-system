@@ -51,6 +51,37 @@ describe('userService - Testes Unitários de Gestão de Usuários e Perfis', () 
     expect(updated.perfil).toBe('coordenador');
   });
 
+  it('deve consolidar por e-mail (não duplicar) ao editar um usuário real cujo único registro local tem outro id', () => {
+    // Simula o cenário de um usuário do Supabase (id em UUID) cujo registro local
+    // preexistente foi salvo com um id diferente (ex.: um id sintético antigo).
+    const legacyLocal = saveSystemUser({
+      nome: 'Nome Antigo',
+      email: 'servidor.real@mj.gov.br',
+      perfil: 'gestor',
+      ativo: true
+    });
+
+    const realSupabaseId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    expect(legacyLocal.id).not.toBe(realSupabaseId);
+
+    const updated = saveSystemUser({
+      id: realSupabaseId,
+      nome: 'Nome Novo',
+      email: 'servidor.real@mj.gov.br',
+      perfil: 'coordenador',
+      ativo: true
+    });
+
+    expect(updated.nome).toBe('Nome Novo');
+    expect(updated.id).toBe(realSupabaseId);
+
+    const list = fetchSystemUsers();
+    const matches = list.filter(u => u.email.toLowerCase() === 'servidor.real@mj.gov.br');
+    expect(matches).toHaveLength(1);
+    expect(matches[0].nome).toBe('Nome Novo');
+    expect(matches[0].id).toBe(realSupabaseId);
+  });
+
   it('deve remover um usuário corretamente', () => {
     const created = saveSystemUser({
       nome: 'Temporario Teste',

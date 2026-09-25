@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+import { mapPerfilToDbRole } from "../_shared/roleMapping.ts";
+import { resolveInviteRedirect } from "../_shared/inviteOrigin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,7 +68,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, nome, perfil, action = "invite" } = body;
+    const { email, nome, perfil, action = "invite", origin } = body;
 
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return new Response(
@@ -75,14 +77,28 @@ serve(async (req) => {
       );
     }
 
+    // Allow-list explícita de origens autorizadas a receber o redirect do convite.
+    // O cliente informa sua própria origem (window.location.origin, sempre confiável);
+    // aqui apenas validamos contra a lista — nunca aceitamos uma origem arbitrária
+    // e nunca caímos silenciosamente em um fallback (ex.: localhost em produção).
+    const redirectResolution = resolveInviteRedirect(origin);
+
+    if (!redirectResolution.ok) {
+      return new Response(
+        JSON.stringify({ error: redirectResolution.error }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const cleanEmail = email.trim().toLowerCase();
     const cleanNome = (nome || cleanEmail.split("@")[0]).trim();
-    const cleanPerfil = perfil || "gestor";
+    // Fase 0.1: não substituir perfil ausente por "gestor". Um perfil vazio
+    // permanece vazio e resultará em dbRole = null (fail-closed) abaixo.
+    const cleanPerfil = typeof perfil === "string" ? perfil.trim() : "";
 
-    // Mapeamento RBAC: coordenador -> admin, gestor -> gestor, consulta -> leitor
-    let dbRole = "gestor";
-    if (cleanPerfil === "coordenador") dbRole = "admin";
-    else if (cleanPerfil === "consulta") dbRole = "leitor";
+    // Mapeamento RBAC explícito (Fase 0.1): perfil sem mapeamento -> null.
+    // NUNCA usar um valor padrão de role aqui.
+    const dbRole = mapPerfilToDbRole(cleanPerfil);
 
     if (dbRole === "admin" && !isCallerAdmin) {
       return new Response(
@@ -91,9 +107,7 @@ serve(async (req) => {
       );
     }
 
-    const appOrigin = req.headers.get("origin") || req.headers.get("referer") || "http://localhost:5173";
-    const cleanOrigin = appOrigin.replace(/\/$/, "");
-    const redirectTo = `${cleanOrigin}/definir-senha`;
+    const redirectTo = redirectResolution.redirectTo;
 
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       cleanEmail,
@@ -115,20 +129,27 @@ serve(async (req) => {
 
     const invitedUserId = inviteData.user.id;
 
-    // Vincula ao RBAC oficial existente
-    await supabaseAdmin
-      .from("user_roles")
-      .upsert(
-        {
-          user_id: invitedUserId,
-          role: dbRole
-        },
-        { onConflict: "user_id,role" }
-      );
+    // Vincula ao RBAC oficial existente. Fail-closed (Fase 0.1): se o
+    // perfil não tem mapeamento explícito, NENHUMA role é concedida — o
+    // convite é concluído normalmente, mas o usuário fica sem autoridade
+    // de escrita até que um administrador defina o mapeamento.
+    if (dbRole !== null) {
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert(
+          {
+            user_id: invitedUserId,
+            role: dbRole
+          },
+          { onConflict: "user_id,role" }
+        );
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
+        roleGranted: dbRole !== null,
+        ...(dbRole === null ? { warning: "PERFIL_SEM_MAPEAMENTO_RBAC" } : {}),
         message: action === "reinvite" ? "Convite reenviado com sucesso." : "Servidor convidado com sucesso.",
         user: {
           id: invitedUserId,
