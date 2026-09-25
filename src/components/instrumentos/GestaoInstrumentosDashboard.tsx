@@ -261,19 +261,29 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           Instrumentos que exigem sua atenção e as próximas ações recomendadas.
         </p>
 
-        <GestaoInstrumentosCategoryTabs
-          counts={tabCounts}
-          active={activeTab}
-          onSelect={handleSelectTab}
-        />
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <GestaoInstrumentosCategoryTabs
+            counts={tabCounts}
+            active={activeTab}
+            onSelect={handleSelectTab}
+          />
 
-        <GestaoInstrumentosCompactFilters
-          filters={{ severidade, busca }}
-          onChangeFilter={handleChangeFilter}
-          onResetFilters={handleResetFilters}
-          totalFiltered={filteredItems.length}
-          totalItems={allItems.length}
-        />
+          <div style={{ flex: '1 1 360px', minWidth: '320px' }}>
+            <GestaoInstrumentosCompactFilters
+              filters={{ severidade, busca }}
+              onChangeFilter={handleChangeFilter}
+              onResetFilters={handleResetFilters}
+              totalFiltered={filteredItems.length}
+              totalItems={allItems.length}
+            />
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
