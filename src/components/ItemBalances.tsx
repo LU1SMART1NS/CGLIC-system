@@ -1227,9 +1227,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             {/* Section 1: Contratos (PNCP, Oficiais e Manuais) */}
             <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                  <Building2 size={16} color="#0c326f" /> Contratos Celebrados
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                    <Building2 size={16} color="#0c326f" /> Contratos Celebrados
+                  </h4>
+                  <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700 }}>
+                    {contracts.length + manualContratos.length + enrichedOfficialLinks.length}{' '}
+                    {contracts.length + manualContratos.length + enrichedOfficialLinks.length === 1 ? 'contrato' : 'contratos'}
+                  </span>
+                </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <AppButton
                     variant="primary"
