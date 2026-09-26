@@ -15,56 +15,13 @@ function toScopePayload(scope?: AllocationScopeInput) {
 
 const USERS_STORAGE_KEY = 'saldoarp:system_users';
 
-const INITIAL_USERS: SystemUser[] = [
-  {
-    id: 'user-1',
-    nome: 'Carlos Silva',
-    email: 'carlos.silva@mj.gov.br',
-    matricula: '1984201',
-    cargo: 'Analista de Planejamento e Orçamento',
-    departamento: 'Coordenação Geral de Licitações e Contratos (CGLIC)',
-    perfil: 'gestor',
-    status: 'ativo',
-    ativo: true,
-    createdAt: '2024-01-15T08:00:00.000Z'
-  },
-  {
-    id: 'user-2',
-    nome: 'Maria Santos',
-    email: 'maria.santos@mj.gov.br',
-    matricula: '2049182',
-    cargo: 'Especialista em Políticas Públicas',
-    departamento: 'Diretoria de Tecnologia e Informação (DTI)',
-    perfil: 'gestor',
-    status: 'ativo',
-    ativo: true,
-    createdAt: '2024-02-10T09:30:00.000Z'
-  },
-  {
-    id: 'user-3',
-    nome: 'Coordenação Geral CGLIC',
-    email: 'cglic.senasp@mj.gov.br',
-    matricula: '1002930',
-    cargo: 'Coordenador-Geral',
-    departamento: 'SENASP / MJSP',
-    perfil: 'coordenador',
-    status: 'ativo',
-    ativo: true,
-    createdAt: '2023-11-01T10:00:00.000Z'
-  },
-  {
-    id: 'user-4',
-    nome: 'Ana Oliveira',
-    email: 'ana.oliveira@mj.gov.br',
-    matricula: '3194820',
-    cargo: 'Auditor Federal de Controle',
-    departamento: 'Assessoria Especial de Controle Interno (AECI)',
-    perfil: 'consulta',
-    status: 'ativo',
-    ativo: true,
-    createdAt: '2024-03-01T14:00:00.000Z'
-  }
-];
+/**
+ * Fallback local usado apenas quando o Supabase não está configurado (ambiente
+ * offline/dev). Não deve conter usuários de demonstração fixos: qualquer
+ * usuário exibido na tela de gestão precisa ser uma conta real do Supabase
+ * Auth (via RPC get_system_users) ou um registro criado pela própria UI.
+ */
+const INITIAL_USERS: SystemUser[] = [];
 
 let inMemoryUsers: SystemUser[] = [...INITIAL_USERS];
 
@@ -131,14 +88,12 @@ export async function fetchSystemUsersAsync(): Promise<SystemUser[]> {
           };
         });
 
-        // Complementa com usuários locais se não estiverem no Supabase
-        const result = [...mappedRemote];
-        for (const local of localList) {
-          if (!result.some(r => r.email.toLowerCase() === local.email.toLowerCase())) {
-            result.push(local);
-          }
-        }
-        return result;
+        // Não complementa com usuários locais que não vieram do Supabase: a RPC
+        // já consulta auth.users diretamente, então qualquer conta real aparece
+        // aqui. Um registro presente só no localStorage é resíduo de uso local
+        // (ex.: convite salvo antes de confirmar) e não deve ser exibido como
+        // se fosse um usuário do sistema.
+        return mappedRemote;
       }
     } catch {
       // Falha graciosa para fallback local

@@ -6,11 +6,9 @@ describe('userService - Testes Unitários de Gestão de Usuários e Perfis', () 
     resetUsersInMemory();
   });
 
-  it('deve retornar lista inicial padrão se storage estiver vazio', () => {
+  it('deve retornar lista vazia (sem usuários de demonstração) quando storage estiver vazio', () => {
     const users = fetchSystemUsers();
-    expect(users.length).toBeGreaterThan(0);
-    expect(users.some(u => u.perfil === 'coordenador')).toBe(true);
-    expect(users.some(u => u.perfil === 'gestor')).toBe(true);
+    expect(users).toEqual([]);
   });
 
   it('deve criar um novo usuário com perfil atribuído corretamente', () => {
