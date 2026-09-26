@@ -1,10 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchSystemUsersAsync,
-  saveSystemUser,
-  deleteSystemUser,
+  saveSystemUserAsync,
+  deleteSystemUserAsync,
+  deactivateSystemUser,
+  reactivateSystemUser,
   inviteSystemUser,
-  reinviteSystemUser
+  reinviteSystemUser,
+  type AllocationScopeInput
 } from '../services/userService';
 import type { SystemUser, UserRole } from '../types/user';
 
@@ -22,7 +25,7 @@ export function useInviteUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { email: string; nome: string; perfil: UserRole }) => {
+    mutationFn: async (params: { email: string; nome: string; perfil: UserRole; scope?: AllocationScopeInput }) => {
       return inviteSystemUser(params);
     },
     onSuccess: () => {
@@ -48,8 +51,11 @@ export function useSaveUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (user: Partial<SystemUser> & { nome: string; email: string }) => {
-      return saveSystemUser(user);
+    mutationFn: async (input: {
+      user: Partial<SystemUser> & { id: string; nome: string; email: string; perfil: UserRole };
+      scope?: AllocationScopeInput;
+    }) => {
+      return saveSystemUserAsync(input.user, input.scope);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
@@ -61,8 +67,34 @@ export function useDeleteUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      deleteSystemUser(id);
+    mutationFn: async (user: SystemUser) => {
+      return deleteSystemUserAsync(user);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+    }
+  });
+}
+
+export function useDeactivateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (user: SystemUser) => {
+      return deactivateSystemUser(user);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+    }
+  });
+}
+
+export function useReactivateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (user: SystemUser) => {
+      return reactivateSystemUser(user);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });

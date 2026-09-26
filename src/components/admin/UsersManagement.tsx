@@ -5,13 +5,15 @@ import {
   Search,
   Filter,
   Edit2,
-  Trash2,
+  UserX,
+  UserCheck,
   Mail,
   Shield,
   RotateCcw,
   XCircle,
   X,
   Send,
+  Trash2,
   CheckCircle2
 } from 'lucide-react';
 import {
@@ -19,7 +21,9 @@ import {
   useInviteUser,
   useReinviteUser,
   useSaveUser,
-  useDeleteUser
+  useDeleteUser,
+  useDeactivateUser,
+  useReactivateUser
 } from '../../hooks/useUsers';
 import { useRoles } from '../../hooks/useRoles';
 import { AppButton } from '../../design-system/components/AppButton';
@@ -28,6 +32,11 @@ import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import type { SystemUser, UserRole } from '../../types/user';
+import {
+  getPerfilDisplayLabel,
+  GESTOR_SALDO_ROLE_ID,
+  GESTOR_SALDO_PERMISSIONS_DESCRIPTION
+} from '../../types/user';
 
 export const UsersManagement: React.FC = () => {
   const { data: users = [], isLoading } = useUsers();
@@ -36,6 +45,8 @@ export const UsersManagement: React.FC = () => {
   const reinviteUserMutation = useReinviteUser();
   const saveUserMutation = useSaveUser();
   const deleteUserMutation = useDeleteUser();
+  const deactivateUserMutation = useDeactivateUser();
+  const reactivateUserMutation = useReactivateUser();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('todos');
@@ -48,6 +59,8 @@ export const UsersManagement: React.FC = () => {
   const [formPerfil, setFormPerfil] = useState<UserRole>('gestor');
   const [formError, setFormError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const isGestorSaldoSelecionado = formPerfil === GESTOR_SALDO_ROLE_ID;
 
   const handleOpenCreateModal = () => {
     setEditingUser(null);
@@ -74,18 +87,22 @@ export const UsersManagement: React.FC = () => {
       return;
     }
 
+    // Gestor de Saldo é global no domínio de alocações (administra todas as
+    // Atas) — nenhum escopo individual é configurado ou enviado para ele.
     if (editingUser) {
       // Edição de usuário existente
       saveUserMutation.mutate(
         {
-          id: editingUser.id,
-          nome: formNome.trim(),
-          email: formEmail.trim(),
-          perfil: formPerfil,
-          matricula: editingUser.matricula,
-          cargo: editingUser.cargo,
-          departamento: editingUser.departamento,
-          ativo: editingUser.ativo
+          user: {
+            id: editingUser.id,
+            nome: formNome.trim(),
+            email: formEmail.trim(),
+            perfil: formPerfil,
+            matricula: editingUser.matricula,
+            cargo: editingUser.cargo,
+            departamento: editingUser.departamento,
+            ativo: editingUser.ativo
+          }
         },
         {
           onSuccess: () => {
@@ -139,9 +156,50 @@ export const UsersManagement: React.FC = () => {
     );
   };
 
-  const handleDelete = (id: string, nome: string) => {
-    if (window.confirm(`Deseja realmente remover o usuário "${nome}"?`)) {
-      deleteUserMutation.mutate(id);
+  const handleDeactivate = (user: SystemUser) => {
+    if (window.confirm(`Deseja realmente desativar o acesso de "${user.nome}"? O servidor não conseguirá mais fazer login até ser reativado.`)) {
+      deactivateUserMutation.mutate(user, {
+        onSuccess: () => {
+          setToastMessage(`Acesso de "${user.nome}" desativado com sucesso.`);
+          setTimeout(() => setToastMessage(null), 4000);
+        },
+        onError: (err: any) => {
+          alert(err.message || 'Falha ao desativar o acesso do servidor.');
+        }
+      });
+    }
+  };
+
+  const handleReactivate = (user: SystemUser) => {
+    reactivateUserMutation.mutate(user, {
+      onSuccess: () => {
+        setToastMessage(`Acesso de "${user.nome}" reativado com sucesso.`);
+        setTimeout(() => setToastMessage(null), 4000);
+      },
+      onError: (err: any) => {
+        alert(err.message || 'Falha ao reativar o acesso do servidor.');
+      }
+    });
+  };
+
+  const handleDelete = (user: SystemUser) => {
+    if (user.status !== 'pendente') {
+      alert('Servidores ativos ou já cadastrados não podem ser excluídos por exigência de auditoria pública. Utilize a opção de desativação.');
+      return;
+    }
+
+    const confirmMessage = `Deseja realmente cancelar e excluir o convite pendente para "${user.nome || user.email}"?`;
+
+    if (window.confirm(confirmMessage)) {
+      deleteUserMutation.mutate(user, {
+        onSuccess: () => {
+          setToastMessage(`Convite para "${user.nome || user.email}" cancelado com sucesso.`);
+          setTimeout(() => setToastMessage(null), 4000);
+        },
+        onError: (err: any) => {
+          alert(err.message || 'Falha ao cancelar o convite.');
+        }
+      });
     }
   };
 
@@ -367,7 +425,6 @@ export const UsersManagement: React.FC = () => {
               <tbody>
                 {filteredUsers.map((user) => {
                   const roleObj = roles.find((r) => r.id === user.perfil);
-                  const isRealOperator = user.email === 'luis.martins@mj.gov.br';
                   const isPending = user.status === 'pendente';
                   const isInactive = user.status === 'inativo' || user.ativo === false;
 
@@ -376,7 +433,6 @@ export const UsersManagement: React.FC = () => {
                       key={user.id}
                       style={{
                         borderBottom: '1px solid #f1f5f9',
-                        background: isRealOperator ? '#f0f9ff' : '#ffffff',
                         transition: 'background 0.15s ease'
                       }}
                     >
@@ -385,21 +441,6 @@ export const UsersManagement: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <span style={{ fontWeight: 700, color: '#0f172a' }}>{user.nome}</span>
-                            {isRealOperator && (
-                              <span
-                                style={{
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  color: '#0369a1',
-                                  background: '#e0f2fe',
-                                  padding: '0.1rem 0.4rem',
-                                  borderRadius: '4px',
-                                  border: '1px solid #bae6fd'
-                                }}
-                              >
-                                Operador Ativo
-                              </span>
-                            )}
                           </div>
                           <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                             <Mail size={12} /> {user.email}
@@ -409,23 +450,32 @@ export const UsersManagement: React.FC = () => {
 
                       {/* Perfil Operacional */}
                       <td style={{ padding: '0.75rem 1rem' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: '6px',
-                            fontSize: '0.76rem',
-                            fontWeight: 700,
-                            color: roleObj?.badgeColor || '#0c326f',
-                            background: `${roleObj?.badgeColor || '#0c326f'}15`,
-                            border: `1px solid ${roleObj?.badgeColor || '#0c326f'}30`
-                          }}
-                        >
-                          <Shield size={12} />
-                          {roleObj?.nome || user.perfil}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span
+                            title={user.perfil === GESTOR_SALDO_ROLE_ID ? `Permissões: ${GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}` : undefined}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '6px',
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              width: 'fit-content',
+                              color: roleObj?.badgeColor || '#0c326f',
+                              background: `${roleObj?.badgeColor || '#0c326f'}15`,
+                              border: `1px solid ${roleObj?.badgeColor || '#0c326f'}30`
+                            }}
+                          >
+                            <Shield size={12} />
+                            {getPerfilDisplayLabel(user.perfil, roles)}
+                          </span>
+                          {user.perfil === GESTOR_SALDO_ROLE_ID && (
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                              Todas as Atas
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status Derivado da Autenticação */}
@@ -485,23 +535,68 @@ export const UsersManagement: React.FC = () => {
                           >
                             <Edit2 size={13} /> Editar
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(user.id, user.nome)}
-                            title="Remover servidor"
-                            style={{
-                              padding: '0.35rem 0.5rem',
-                              background: '#fff1f2',
-                              border: '1px solid #fecdd3',
-                              borderRadius: '4px',
-                              color: '#e11d48',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {isInactive ? (
+                            <button
+                              type="button"
+                              onClick={() => handleReactivate(user)}
+                              disabled={reactivateUserMutation.isPending}
+                              title="Reativar acesso do servidor"
+                              style={{
+                                padding: '0.35rem 0.6rem',
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '4px',
+                                color: '#166534',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                fontSize: '0.76rem',
+                                fontWeight: 600
+                              }}
+                            >
+                              <UserCheck size={13} /> Reativar
+                            </button>
+                          ) : !isPending ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDeactivate(user)}
+                              disabled={deactivateUserMutation.isPending}
+                              title="Desativar acesso do servidor"
+                              style={{
+                                padding: '0.35rem 0.5rem',
+                                background: '#fff1f2',
+                                border: '1px solid #fecdd3',
+                                borderRadius: '4px',
+                                color: '#e11d48',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <UserX size={13} />
+                            </button>
+                          ) : null}
+                          {isPending && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(user)}
+                              disabled={deleteUserMutation.isPending}
+                              title="Cancelar e excluir convite pendente"
+                              style={{
+                                padding: '0.35rem 0.5rem',
+                                background: '#fff1f2',
+                                border: '1px solid #fecdd3',
+                                borderRadius: '4px',
+                                color: '#e11d48',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -511,23 +606,6 @@ export const UsersManagement: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
-
-      {/* 4. Nota de Governança Institucional */}
-      <div
-        style={{
-          padding: '1rem 1.25rem',
-          background: '#f8fafc',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0',
-          fontSize: '0.8rem',
-          color: '#475569',
-          lineHeight: '1.45'
-        }}
-      >
-        <strong>Gestão Soberana de Acesso:</strong> O cadastro convida o servidor diretamente pelo Supabase Auth.
-        O servidor define sua própria senha de acesso de forma segura e autônoma. Nenhuma senha é criada ou conhecida
-        pela administração.
       </div>
 
       {/* Modal Simplificado: Nome + E-mail + Perfil */}
@@ -629,6 +707,20 @@ export const UsersManagement: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {isGestorSaldoSelecionado && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.85rem', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '8px' }}>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#0f766e', fontWeight: 700 }}>
+                    Gestor de Saldo
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#0f766e' }}>
+                    Gerencia as alocações internas de todas as Atas.
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                    Permissões: {GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}. Nenhum acesso a contratos, financeiro, departamentos ou administração do sistema.
+                  </p>
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.75rem' }}>
                 <button

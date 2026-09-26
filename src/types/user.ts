@@ -298,6 +298,22 @@ export interface RoleDefinition {
   permissoes: RolePermissions;
 }
 
+/**
+ * Sentinel de exibição (Fase 0.2): representa um usuário autenticado sem
+ * nenhuma linha em public.user_roles (fail-closed da Fase 0.1). Nunca é um
+ * perfil atribuível via formulário — não aparece no catálogo de roles.
+ */
+export const UNASSIGNED_ROLE_ID = 'sem_perfil';
+export const UNASSIGNED_ROLE_LABEL = 'Não atribuído';
+
+/** Resolve o rótulo de exibição de um perfil, tratando o sentinel de "sem role" explicitamente. */
+export function getPerfilDisplayLabel(perfil: UserRole, roles: RoleDefinition[]): string {
+  const roleObj = roles.find(r => r.id === perfil);
+  if (roleObj) return roleObj.nome;
+  if (perfil === UNASSIGNED_ROLE_ID) return UNASSIGNED_ROLE_LABEL;
+  return perfil;
+}
+
 export type UserStatus = 'pendente' | 'ativo' | 'inativo';
 
 export interface SystemUser {
@@ -313,6 +329,14 @@ export interface SystemUser {
   contratosCount?: number;
   createdAt?: string;
   lastSignInAt?: string;
+  /**
+   * Escopo de atuação sobre o domínio de alocações (public.user_scope_assignments,
+   * domain='allocations'). Não é lotação/departamento do usuário — é só o
+   * valor de autorização (qual unidade ou qual ata) concedido a este perfil.
+   * Só é aplicável a perfis com escopo (hoje: Gestor de Saldo).
+   */
+  allocationScopeType?: AllocationScopeType;
+  allocationScopeValue?: string;
 }
 
 export const SYSTEM_ROLES: RoleDefinition[] = [
@@ -396,5 +420,60 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
       gerenciarUsuarios: false,
       gerenciarPerfis: false
     }
+  },
+  {
+    // Fase 3A — perfil funcional formal, id idêntico ao role_id de backend
+    // (public.roles.id = 'gestor_saldos'). Responsabilidade EXCLUSIVA sobre
+    // o domínio de Saldos/Alocações — nenhuma permissão de contratos,
+    // financeiro, departamentos ou governança. A matriz de 18 flags abaixo
+    // é a mesma usada para contratos (não existe hoje um equivalente para o
+    // domínio de saldo nesta interface local), por isso todas ficam
+    // explicitamente desligadas: a autoridade real deste perfil vem de
+    // allocations.view/allocations.manage no backend (public.role_permissions),
+    // não desta matriz.
+    id: 'gestor_saldos',
+    nome: 'Gestor de Saldo',
+    badgeColor: '#0d9488',
+    descricao: 'Responsável pela gestão de saldos e alocações de itens de atas por unidade ou ata específica. Sem acesso a contratos, financeiro, departamentos ou administração do sistema.',
+    isCustom: false,
+    permissoes: {
+      contractScope: 'ASSIGNED',
+      visualizarTodosContratos: false,
+      visualizarContratos: false,
+      visualizarAtas: false,
+      visualizarItens: false,
+      distribuirContratos: false,
+      editarTarefasContratuais: false,
+      aplicarTemplates: false,
+      visualizarEmpenhos: false,
+      sincronizarEmpenhos: false,
+      visualizarPagamentos: false,
+      registrarPagamentos: false,
+      visualizarPrazos: false,
+      gerenciarEventosContratuais: false,
+      gerenciarDepartamentos: false,
+      exportarRelatorios: false,
+      gerenciarUsuarios: false,
+      gerenciarPerfis: false
+    }
   }
 ];
+
+/** Id do perfil funcional Gestor de Saldo — idêntico ao role_id de backend (public.roles.id). */
+export const GESTOR_SALDO_ROLE_ID = 'gestor_saldos';
+
+/**
+ * Descrição das permissões reais (backend) do Gestor de Saldo, para exibição
+ * na tela de usuários — a matriz de RolePermissions acima não representa o
+ * domínio de saldo, então esta lista serve como a fonte de verdade textual
+ * exibida ao administrador ao atribuir este perfil.
+ */
+export const GESTOR_SALDO_PERMISSIONS_DESCRIPTION = ['allocations.view', 'allocations.manage'] as const;
+
+/** Tipos de escopo suportados hoje pelo domínio de alocações (Fases 1/2A/3A). */
+export type AllocationScopeType = 'UNIT' | 'ARP';
+
+export const ALLOCATION_SCOPE_TYPE_LABELS: Record<AllocationScopeType, string> = {
+  UNIT: 'Unidade específica',
+  ARP: 'Ata específica'
+};

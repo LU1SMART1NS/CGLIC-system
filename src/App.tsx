@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { SelectionProvider, useSelection } from './context/SelectionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { isSupabaseConfigured } from './services/supabaseClient';
+import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { GestaoInstrumentosRoute } from './routes/GestaoInstrumentosRoute';
 import { ArpSearchRoute } from './routes/ArpSearchRoute';
 import { ArpItemsRoute } from './routes/ArpItemsRoute';
@@ -25,6 +25,48 @@ import { ExportExcelModal } from './components/modals/ExportExcelModal';
 import { ContractTaskTemplatesModal } from './components/modals/ContractTaskTemplatesModal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
+
+const AuthRedirectHandler: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Intercepta parâmetros de hash do Supabase Auth nos e-mails de convite e recuperação
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const type = params.get('type');
+      if (type === 'invite') {
+        if (location.pathname !== '/definir-senha') {
+          navigate('/definir-senha', { replace: true });
+          return;
+        }
+      } else if (type === 'recovery') {
+        if (location.pathname !== '/redefinir-senha') {
+          navigate('/redefinir-senha', { replace: true });
+          return;
+        }
+      }
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          if (location.pathname !== '/redefinir-senha' && location.pathname !== '/definir-senha') {
+            navigate('/redefinir-senha', { replace: true });
+          }
+        }
+      });
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [navigate, location.pathname]);
+
+  return null;
+};
 
 const AppFooter: React.FC = () => (
   <footer style={{
@@ -90,6 +132,15 @@ const ProtectedLayout: React.FC<{
     );
   }
 
+  // Intercepta acessos diretos via token de convite ou recuperação na URL
+  if (typeof window !== 'undefined' && window.location.hash?.includes('type=invite')) {
+    return <Navigate to="/definir-senha" replace />;
+  }
+
+  if (typeof window !== 'undefined' && window.location.hash?.includes('type=recovery')) {
+    return <Navigate to="/redefinir-senha" replace />;
+  }
+
   if (isSupabaseConfigured && !user) {
     return <Navigate to="/login" replace />;
   }
@@ -105,6 +156,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="app-container">
+      <AuthRedirectHandler />
       <Routes>
         {/* Rotas Públicas de Acesso e Credenciamento */}
         <Route path="/login" element={<LoginRoute />} />
