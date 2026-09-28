@@ -1,7 +1,8 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertCircle, AlertTriangle, ArrowLeft, Layers, Link2, Loader2, Search } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowLeft, Layers, Link2, ListTodo, Loader2, Search } from 'lucide-react';
 import { useAta, useAtaItemSaldos, useAtaLinkedContracts } from '../../hooks/useAta';
+import { useAtaTaskPlan } from '../../hooks/useAtaTaskPlan';
 import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
 import { useAuth } from '../../context/AuthContext';
 import { Ata360Header } from './Ata360Header';
@@ -9,6 +10,7 @@ import { Ata360Summary } from './Ata360Summary';
 import { AtaAttentionCenter } from './AtaAttentionCenter';
 import { AtaItemsTable } from './AtaItemsTable';
 import { AtaLinkedContracts } from './AtaLinkedContracts';
+import { AtaTasksSection } from './AtaTasksSection';
 import { Contract360Section } from '../contracts/Contract360Section';
 
 interface Ata360PageProps {
@@ -24,6 +26,10 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg = '
   const { arp, itens, isLoading, isError, error, refetch } = useAta(ataKey, uasg);
   const { saldos, isLoading: loadingSaldos } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);
   const { linkedContracts, isLoading: loadingLinks } = useAtaLinkedContracts(arp?.numeroAtaRegistroPreco, uasg);
+  const { data: taskPlan = null, isLoading: loadingTaskPlan } = useAtaTaskPlan(
+    arp?.numeroAtaRegistroPreco || '',
+    Boolean(arp)
+  );
 
   // Escopo ASSIGNED do perfil "gestor" (ata_managers/arp_item_contract_links —
   // ver useAssignedManagementScope.ts), mesma guarda de deep-link já aplicada
@@ -167,6 +173,15 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg = '
         icon={Link2}
       >
         <AtaLinkedContracts linkedContracts={linkedContracts} isLoading={loadingLinks} />
+      </Contract360Section>
+
+      <Contract360Section
+        id="ata-tasks-section"
+        title="Tarefas e Providências"
+        subtitle="Modelo de Gestão aplicado à Ata, com acompanhamento dinâmico das macrotarefas"
+        icon={ListTodo}
+      >
+        <AtaTasksSection ataKey={arp.numeroAtaRegistroPreco} plan={taskPlan} isLoading={loadingTaskPlan} />
       </Contract360Section>
 
       <Ata360Summary arp={arp} />

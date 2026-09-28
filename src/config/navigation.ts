@@ -50,9 +50,10 @@ export interface NavItem {
  * - Atas de Registro de Preços (recolhível)
  *     - Consulta e Vigência (/atas)
  *     - Alocações por Unidade (/atas/saldos-unidade)
+ *     - Modelos de Gestão de Atas (/atas/modelos)
  * - Contratos (recolhível)
  *     - Acompanhamento e Prazos (/contratos)
- *     - Modelos de Gestão (open-contract-templates)
+ *     - Modelos de Gestão de Contratos (/contratos/modelos)
  * - Execução Financeira (recolhível)
  *     - Pagamentos (/pagamentos)
  *     - Empenhos & Execução (/empenhos)
@@ -82,8 +83,8 @@ export const navigationConfig: NavItem[] = [
         icon: Search,
         route: '/atas',
         status: 'active',
-        matchPrefixes: ['/atas', '/atas/itens', '/atas/itens/saldo'],
-        excludePrefixes: ['/atas/saldos-unidade'],
+        matchPrefixes: ['/atas', '/atas/itens', '/atas/itens/saldo', '/atas/detalhe'],
+        excludePrefixes: ['/atas/saldos-unidade', '/atas/modelos'],
         allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
@@ -94,6 +95,15 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/atas/saldos-unidade'],
         allowedRoles: ['admin', 'gestor_saldos', 'leitor']
+      },
+      {
+        id: 'atas-modelos',
+        label: 'Modelos de Gestão de Atas',
+        icon: Sliders,
+        route: '/atas/modelos',
+        status: 'active',
+        matchPrefixes: ['/atas/modelos'],
+        allowedRoles: ['admin', 'gestor']
       },
       {
         id: 'atas-departamentos',
@@ -124,7 +134,7 @@ export const navigationConfig: NavItem[] = [
       },
       {
         id: 'contratos-modelos',
-        label: 'Modelos de Gestão',
+        label: 'Modelos de Gestão de Contratos',
         icon: Sliders,
         route: '/contratos/modelos',
         status: 'active',
@@ -231,8 +241,9 @@ const staticRouteLabels: Record<string, string> = {
   '/atas/itens': 'Itens da Ata',
   '/atas/itens/saldo': 'Saldo do Item',
   '/atas/saldos-unidade': 'Alocações por Unidade',
+  '/atas/modelos': 'Modelos de Gestão de Atas',
   '/contratos': 'Acompanhamento e Prazos',
-  '/contratos/modelos': 'Modelos de Gestão',
+  '/contratos/modelos': 'Modelos de Gestão de Contratos',
   '/pagamentos': 'Pagamentos',
   '/empenhos': 'Empenhos e Execução',
   '/admin/departamentos': 'Unidades Internas',
@@ -257,6 +268,8 @@ export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
       crumbs.push({ label, route: accPath });
     } else if (segments[i - 1] === 'contratos') {
       crumbs.push({ label: `Contrato ${decodeURIComponent(segment)}`, route: accPath });
+    } else if (segments[i - 1] === 'detalhe' && segments[i - 2] === 'atas') {
+      crumbs.push({ label: `Ata ${decodeURIComponent(segment)}`, route: accPath });
     }
   }
 

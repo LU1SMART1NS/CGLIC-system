@@ -29,6 +29,8 @@ export type MutationErrorCode =
   | 'TEMPLATE_TASK_NOT_FOUND'
   | 'CONTRACT_PLAN_ALREADY_EXISTS'
   | 'CONTRACT_TASK_NOT_FOUND'
+  | 'ATA_PLAN_ALREADY_EXISTS'
+  | 'ATA_TASK_NOT_FOUND'
   | 'INVALID_TASK_STATUS'
   | 'PAYMENT_CYCLE_ALREADY_EXISTS'
   | 'PAYMENT_CYCLE_NOT_FOUND'
@@ -374,6 +376,89 @@ export interface RpcContractTaskItem {
 export interface RpcUpdateContractTaskResult {
   success: boolean;
   task: RpcContractTaskItem;
+}
+
+// -------------------------------------------------------------
+// Modelos de Gestão de Atas — espelha os tipos de Gestão de Contratos acima
+// (RpcGenericDeleteResult e ContractTaskStatus são reaproveitados tal e qual).
+// -------------------------------------------------------------
+export interface RpcAtaTaskTemplateItem {
+  id: string;
+  nome: string;
+  descricao?: string | null;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RpcAtaTaskTemplateResult {
+  success: boolean;
+  template: RpcAtaTaskTemplateItem;
+}
+
+export interface RpcDeleteAtaTaskTemplateResult {
+  success: boolean;
+  id: string;
+  nome: string;
+  message: string;
+}
+
+export interface RpcAtaTaskTemplateMacrotaskItem {
+  id: string;
+  template_id: string;
+  nome: string;
+  ordem: number;
+}
+
+export interface RpcAtaTaskTemplateMacrotaskResult {
+  success: boolean;
+  macrotask: RpcAtaTaskTemplateMacrotaskItem;
+}
+
+export interface RpcAtaTaskTemplateTaskItem {
+  id: string;
+  macrotask_id: string;
+  nome: string;
+  ordem: number;
+  execution_mode?: string | null;
+}
+
+export interface RpcAtaTaskTemplateTaskResult {
+  success: boolean;
+  task: RpcAtaTaskTemplateTaskItem;
+}
+
+export interface RpcApplyAtaTaskTemplateResult {
+  success: boolean;
+  plan_id: string;
+  ata_key: string;
+  template_id: string;
+  template_nome: string;
+  macrotasks_count: number;
+  tasks_count: number;
+  timestamp: string;
+}
+
+export interface RpcAtaTaskItem {
+  id: string;
+  macrotask_id: string;
+  nome: string;
+  ordem: number;
+  status: ContractTaskStatus;
+  execution_mode?: string | null;
+  responsavel_nome?: string | null;
+  responsavel_user_id?: string | null;
+  prazo?: string | null;
+  observacao?: string | null;
+  criado_em: string;
+  atualizado_em: string;
+  concluido_em?: string | null;
+  concluido_por?: string | null;
+}
+
+export interface RpcUpdateAtaTaskResult {
+  success: boolean;
+  task: RpcAtaTaskItem;
 }
 
 // ==============================================================================
