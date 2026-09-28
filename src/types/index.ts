@@ -669,6 +669,72 @@ export interface ContractTaskPlan {
 }
 
 // -------------------------------------------------------------
+// Modelos de Gestão de Atas (espelha Modelos de Gestão de Contratos acima,
+// trocando a chave derivada contractKey pela chave natural e estável da
+// própria Ata — numeroAtaRegistroPreco, mesma convenção de AtaManager).
+// -------------------------------------------------------------
+export interface AtaTaskTemplateTask {
+  id: string;
+  macrotaskId: string;
+  nome: string;
+  ordem: number;
+  executionMode?: TaskExecutionMode;
+}
+
+export interface AtaTaskTemplateMacrotask {
+  id: string;
+  templateId: string;
+  nome: string;
+  ordem: number;
+  tarefas: AtaTaskTemplateTask[];
+}
+
+export interface AtaTaskTemplate {
+  id: string;
+  nome: string;
+  descricao?: string;
+  ativo: boolean;
+  createdAt: string;
+  updatedAt: string;
+  macrotarefas: AtaTaskTemplateMacrotask[];
+}
+
+export interface AtaTask {
+  id: string;
+  macrotaskId: string;
+  nome: string;
+  ordem: number;
+  status: ContractTaskStatusValue;
+  executionMode?: TaskExecutionMode;
+  responsavelNome?: string;
+  responsavelUserId?: string;
+  prazo?: string;
+  observacao?: string;
+  criadoEm: string;
+  atualizadoEm: string;
+  concluidoEm?: string;
+  concluidoPor?: string;
+}
+
+export interface AtaTaskMacrotask {
+  id: string;
+  planId: string;
+  nome: string;
+  ordem: number;
+  tarefas: AtaTask[];
+}
+
+export interface AtaTaskPlan {
+  id: string;
+  ataKey: string;
+  templateId?: string;
+  templateNome: string;
+  appliedAt: string;
+  macrotarefas: AtaTaskMacrotask[];
+  progresso: ContractTaskPlanProgress;
+}
+
+// -------------------------------------------------------------
 // Gestão de Eventos e Ciclos Contratuais (Fase 4)
 // -------------------------------------------------------------
 export * from './contractEvents';

@@ -232,6 +232,24 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
     };
   }
 
+  if (message.includes('ATA_PLAN_ALREADY_EXISTS')) {
+    return {
+      code: 'ATA_PLAN_ALREADY_EXISTS',
+      message: 'Esta Ata já possui um plano de gestão aplicado.',
+      sqlState: '23505',
+      details: error
+    };
+  }
+
+  if (message.includes('ATA_TASK_NOT_FOUND')) {
+    return {
+      code: 'ATA_TASK_NOT_FOUND',
+      message: 'Tarefa do plano de gestão da Ata não encontrada.',
+      sqlState: 'P0002',
+      details: error
+    };
+  }
+
   if (message.includes('INVALID_TASK_STATUS')) {
     return {
       code: 'INVALID_TASK_STATUS',
