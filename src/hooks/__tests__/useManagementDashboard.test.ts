@@ -17,16 +17,16 @@ describe('useManagementDashboard Hook / Query Options (SaldoARP 3.0 — Fase 8-B
 
   it('deve gerar queryKey canônica e staleTime padrão de 2 minutos', () => {
     const options = getManagementDashboardQueryOptions('200331');
-    expect(options.queryKey).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL']);
+    expect(options.queryKey).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL', 'GLOBAL', 'GLOBAL']);
     expect(options.staleTime).toBe(120000);
     expect(options.gcTime).toBe(600000);
     expect(options.refetchOnWindowFocus).toBe(false);
   });
 
   it('deve usar UASG 200331 como default quando uasg for vazia ou omitida', () => {
-    expect(MANAGEMENT_DASHBOARD_QUERY_KEY('')).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL']);
+    expect(MANAGEMENT_DASHBOARD_QUERY_KEY('')).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL', 'GLOBAL', 'GLOBAL']);
     const options = getManagementDashboardQueryOptions('');
-    expect(options.queryKey).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL']);
+    expect(options.queryKey).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL', 'GLOBAL', 'GLOBAL']);
   });
 
   it('deve chamar fetchManagementDashboardData ao executar queryFn', async () => {
@@ -51,7 +51,7 @@ describe('useManagementDashboard Hook / Query Options (SaldoARP 3.0 — Fase 8-B
     const result = await options.queryFn();
 
     expect(dashboardService.fetchManagementDashboardData).toHaveBeenCalledWith(
-      { uasg: '200331', contractKey: undefined, numeroAta: undefined, statusContrato: undefined },
+      { uasg: '200331', contractKey: undefined, numeroAta: undefined, statusContrato: undefined, assignedContractKeys: undefined, assignedAtaKeys: undefined },
       undefined
     );
     expect(result).toEqual(mockModel);
@@ -63,8 +63,8 @@ describe('useManagementDashboard Hook / Query Options (SaldoARP 3.0 — Fase 8-B
     const optionsC = getManagementDashboardQueryOptions({ uasg: '200331', contractKey: '1/2026' });
 
     expect(optionsA.queryKey).not.toEqual(optionsB.queryKey);
-    expect(optionsA.queryKey).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL']);
-    expect(optionsB.queryKey).toEqual(['management-dashboard', '200330', 'ALL', 'ALL', 'ALL']);
-    expect(optionsC.queryKey).toEqual(['management-dashboard', '200331', '1/2026', 'ALL', 'ALL']);
+    expect(optionsA.queryKey).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL', 'GLOBAL', 'GLOBAL']);
+    expect(optionsB.queryKey).toEqual(['management-dashboard', '200330', 'ALL', 'ALL', 'ALL', 'GLOBAL', 'GLOBAL']);
+    expect(optionsC.queryKey).toEqual(['management-dashboard', '200331', '1/2026', 'ALL', 'ALL', 'GLOBAL', 'GLOBAL']);
   });
 });

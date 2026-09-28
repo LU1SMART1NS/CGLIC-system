@@ -576,6 +576,19 @@ export interface ContractManager {
   updatedAt: string;
 }
 
+/**
+ * Gestor de uma Ata de Registro de Preços (public.ata_managers). Atribuir um
+ * gestor a uma Ata dá acesso a todos os contratos vinculados a ela via
+ * arp_item_contract_links — ver src/hooks/useAssignedManagementScope.ts.
+ */
+export interface AtaManager {
+  ataKey: string;
+  gestorNome: string;
+  gestorUserId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ContractTaskTemplateTask {
   id: string;
   macrotaskId: string;

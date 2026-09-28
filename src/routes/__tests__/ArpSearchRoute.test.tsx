@@ -12,6 +12,22 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
+// AtaCard renderiza AtaManagerSelector (seletor de "Gestor da Ata"), que
+// depende destes hooks de dados — mockados para o teste 4 continuar sendo um
+// render puro de componente, sem QueryClientProvider.
+vi.mock('../../hooks/useAtaManagers', () => ({
+  useAtaManager: () => ({ data: null, isLoading: false }),
+  useAllAtaManagers: () => ({ data: {}, isLoading: false }),
+  useArpItemContractLinks: () => ({ data: [], isLoading: false }),
+  useSaveAtaManager: () => ({ mutate: vi.fn(), isPending: false, isError: false, reset: vi.fn() })
+}));
+vi.mock('../../hooks/useUsers', () => ({
+  useUsers: () => ({ data: [] })
+}));
+vi.mock('../../hooks/useRoles', () => ({
+  useRoles: () => ({ data: [] })
+}));
+
 const mockArp: ArpRecord = {
   numeroAtaRegistroPreco: '00001/2025',
   codigoUnidadeGerenciadora: '200331',

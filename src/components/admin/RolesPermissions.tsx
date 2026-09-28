@@ -54,14 +54,15 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
   },
   {
     id: 'gestor',
-    label: 'Gestor de Contratos',
-    description: 'Gestão dos contratos e atividades contratuais dentro do escopo atribuído.',
+    label: 'Gestor de Atas e Contratos',
+    description: 'Gestão das Atas atribuídas — e dos contratos vinculados a elas — além dos contratos avulsos atribuídos individualmente.',
     icon: UserCheck,
     areas: [
-      { label: 'Contratos', description: 'Gestão dentro do escopo atribuído' },
+      { label: 'Atas', description: 'Consulta e gestão dentro do escopo atribuído' },
+      { label: 'Contratos', description: 'Gestão dentro do escopo atribuído (via Ata ou atribuição direta)' },
       { label: 'Execução financeira', description: 'Gestão' }
     ],
-    scope: 'Contratos atribuídos ao perfil'
+    scope: 'Atas atribuídas (com os contratos vinculados) e contratos avulsos atribuídos individualmente'
   },
   {
     id: 'gestor_saldos',

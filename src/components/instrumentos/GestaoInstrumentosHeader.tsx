@@ -18,7 +18,7 @@ export const GestaoInstrumentosHeader: React.FC<GestaoInstrumentosHeaderProps> =
 }) => {
   return (
     <PageHeader
-      title="Gestão de Instrumentos"
+      title="Visão Geral"
       subtitle="Painel unificado de gestão e monitoramento — Lei 14.133. Visão geral da carteira de ARPs e contratos e o que exige sua atenção."
       icon={<LayoutDashboard size={26} color="#0c326f" aria-hidden="true" />}
       badge={

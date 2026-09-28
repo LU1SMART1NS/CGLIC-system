@@ -6,6 +6,7 @@ import { GestaoInstrumentosCategoryTabs } from '../../components/instrumentos/Ge
 import { GestaoInstrumentosTable } from '../../components/instrumentos/GestaoInstrumentosTable';
 import * as useManagementDashboardModule from '../../hooks/useManagementDashboard';
 import * as useAllContractManagersModule from '../../hooks/useAllContractManagers';
+import * as useAtaManagersModule from '../../hooks/useAtaManagers';
 import type { ManagementDashboardReadModel } from '../../types/managementDashboard';
 
 vi.mock('react-router-dom', () => ({
@@ -153,9 +154,17 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
       isLoading: false,
       isError: false
     } as any);
+    vi.spyOn(useAtaManagersModule, 'useAllAtaManagers').mockReturnValue({
+      data: {},
+      isLoading: false
+    } as any);
+    vi.spyOn(useAtaManagersModule, 'useArpItemContractLinks').mockReturnValue({
+      data: [],
+      isLoading: false
+    } as any);
   });
 
-  it('1. deve renderizar a rota com cabeçalho "Gestão de Instrumentos", subtítulo institucional e UASG', () => {
+  it('1. deve renderizar a rota com cabeçalho "Visão Geral", subtítulo institucional e UASG', () => {
     vi.spyOn(useManagementDashboardModule, 'useManagementDashboard').mockReturnValue({
       readModel: mockReadModel,
       data: mockReadModel,
@@ -168,7 +177,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
 
     const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
 
-    expect(html).toContain('Gestão de Instrumentos');
+    expect(html).toContain('Visão Geral');
     expect(html).toContain('Painel unificado de gestão e monitoramento — Lei 14.133');
     expect(html).toContain('UASGs 200330 · 200331');
     expect(html).toContain('Ações Imediatas / Pendências da Carteira');
@@ -404,7 +413,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
 
     const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
 
-    expect(html).toContain('Erro ao carregar a Gestão de Instrumentos');
+    expect(html).toContain('Erro ao carregar a Visão Geral');
     expect(html).toContain('Erro de conexão ao carregar a carteira de instrumentos');
     expect(html).toContain('Tentar Novamente');
   });

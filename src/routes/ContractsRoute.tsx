@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
-import { useAllContractManagers } from '../hooks/useAllContractManagers';
+import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
 import { useAuth } from '../context/AuthContext';
 import { ContractsPortfolioHeader } from '../components/contracts/portfolio/ContractsPortfolioHeader';
 import {
@@ -26,27 +26,13 @@ export const ContractsRoute: React.FC = () => {
     dataUpdatedAt
   } = useContractsDashboard('200331');
 
-  const { user, role } = useAuth();
-  const { data: contractManagers = {}, isLoading: isLoadingManagers } = useAllContractManagers('200331');
-
-  // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
-  // migration 20260925000023): só deve ver os contratos onde é o gestor
-  // titular (contract_managers.gestor_user_id = seu próprio auth.users.id).
-  // admin/leitor têm escopo GLOBAL e continuam vendo a carteira inteira.
-  const assignedContractKeys = useMemo(() => {
-    if (role !== 'gestor' || !user) return null;
-    const keys = new Set<string>();
-    for (const manager of Object.values(contractManagers)) {
-      if (manager.gestorUserId === user.id) {
-        keys.add(manager.contractKey);
-      }
-    }
-    return keys;
-  }, [role, user, contractManagers]);
+  const { role } = useAuth();
+  const { contractKeys: assignedContractKeys, isLoading: isLoadingManagers } = useAssignedManagementScope('200331');
 
   const contracts = useMemo(() => {
     if (!assignedContractKeys) return allContracts;
-    return allContracts.filter((contract) => assignedContractKeys.has(contract.id));
+    const scopedKeys = new Set(assignedContractKeys);
+    return allContracts.filter((contract) => scopedKeys.has(contract.id));
   }, [allContracts, assignedContractKeys]);
 
   const [filterState, setFilterState] = useState<ContractsPortfolioFilterState>({

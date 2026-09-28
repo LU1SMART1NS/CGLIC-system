@@ -3,12 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { Banknote } from 'lucide-react';
 import { ManagementFinancialExecution } from '../components/dashboard/ManagementFinancialExecution';
 import { useManagementDashboard } from '../hooks/useManagementDashboard';
+import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
 import { PageHeader } from '../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../design-system/components/HeaderRefreshAction';
 
 export const FinancialExecutionRoute: React.FC = () => {
   const navigate = useNavigate();
-  const { readModel, isLoading, isFetching, isError, error, refresh, dataUpdatedAt } = useManagementDashboard('200331');
+
+  // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
+  // migration 20260925000023), agora derivado também das Atas atribuídas
+  // (ata_managers): mesmo recorte aplicado em ContractsRoute.tsx e na Visão
+  // Geral, agora também na execução financeira agregada aqui.
+  const { contractKeys: assignedContractKeys, ataKeys: assignedAtaKeys, isLoading: isLoadingManagers } =
+    useAssignedManagementScope('200331');
+
+  const { readModel, isLoading: isLoadingDashboard, isFetching, isError, error, refresh, dataUpdatedAt } =
+    useManagementDashboard({ uasg: '200331', assignedContractKeys, assignedAtaKeys });
+  const isLoading = isLoadingDashboard || isLoadingManagers;
 
   const handleNavigateContract = (contractKey: string) => {
     navigate(`/contratos/${encodeURIComponent(contractKey)}`);

@@ -14,6 +14,15 @@ vi.mock('../../hooks/useManagementDashboard', () => ({
   useManagementDashboard: vi.fn()
 }));
 
+vi.mock('../../hooks/useAllContractManagers', () => ({
+  useAllContractManagers: vi.fn(() => ({ data: {}, isLoading: false }))
+}));
+
+vi.mock('../../hooks/useAtaManagers', () => ({
+  useAllAtaManagers: vi.fn(() => ({ data: {}, isLoading: false })),
+  useArpItemContractLinks: vi.fn(() => ({ data: [], isLoading: false }))
+}));
+
 const mockFinancialReadModel: ManagementDashboardReadModel = {
   uasg: '200331',
   dataCalculo: '2026-09-24T12:00:00Z',

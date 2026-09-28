@@ -276,6 +276,19 @@ export interface RpcContractManagerResult {
   manager: RpcContractManagerItem;
 }
 
+export interface RpcAtaManagerItem {
+  ata_key: string;
+  gestor_nome: string;
+  gestor_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RpcAtaManagerResult {
+  success: boolean;
+  manager: RpcAtaManagerItem;
+}
+
 export interface RpcContractTaskTemplateItem {
   id: string;
   nome: string;

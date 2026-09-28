@@ -8,7 +8,7 @@ function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] 
 
 describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', () => {
   describe('Estrutura dos 5 Pilares e Itens de Navegação', () => {
-    it('deve conter exatamente os 5 blocos estruturais no topo (Gestão de Instrumentos + 4 grupos)', () => {
+    it('deve conter exatamente os 5 blocos estruturais no topo (Visão Geral + 4 grupos)', () => {
       const topIds = navigationConfig.map((item) => item.id);
       expect(topIds).toEqual([
         'gestao-instrumentos',
@@ -19,11 +19,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       ]);
     });
 
-    it('deve configurar Gestão de Instrumentos (/instrumentos) no topo, absorvendo Visão Geral e Central de Atenção', () => {
+    it('deve configurar Visão Geral (/instrumentos) no topo, absorvendo Visão Geral e Central de Atenção', () => {
       const gestaoInstrumentos = navigationConfig.find((i) => i.id === 'gestao-instrumentos');
 
       expect(gestaoInstrumentos).toBeDefined();
-      expect(gestaoInstrumentos?.label).toBe('Gestão de Instrumentos');
+      expect(gestaoInstrumentos?.label).toBe('Visão Geral');
       expect(gestaoInstrumentos?.route).toBe('/instrumentos');
       expect(gestaoInstrumentos?.status).toBe('active');
       expect(gestaoInstrumentos?.matchPrefixes).toContain('/instrumentos');
@@ -104,23 +104,23 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
   describe('Geração de Breadcrumbs Hierárquicos', () => {
     it('deve gerar breadcrumb para a rota raiz / (redireciona para /instrumentos)', () => {
       const crumbs = getBreadcrumbs('/');
-      expect(crumbs).toEqual([{ label: 'Gestão de Instrumentos' }]);
+      expect(crumbs).toEqual([{ label: 'Visão Geral' }]);
     });
 
-    it('deve gerar breadcrumb para /instrumentos (Gestão de Instrumentos)', () => {
+    it('deve gerar breadcrumb para /instrumentos (Visão Geral)', () => {
       const crumbs = getBreadcrumbs('/instrumentos');
-      expect(crumbs).toEqual([{ label: 'Gestão de Instrumentos' }]);
+      expect(crumbs).toEqual([{ label: 'Visão Geral' }]);
     });
 
     it('deve gerar breadcrumb para /prazos (rota legada, redireciona para /instrumentos)', () => {
       const crumbs = getBreadcrumbs('/prazos');
-      expect(crumbs).toEqual([{ label: 'Gestão de Instrumentos', route: '/instrumentos' }]);
+      expect(crumbs).toEqual([{ label: 'Visão Geral', route: '/instrumentos' }]);
     });
 
     it('deve gerar breadcrumb para /contratos', () => {
       const crumbs = getBreadcrumbs('/contratos');
       expect(crumbs).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Acompanhamento e Prazos', route: '/contratos' }
       ]);
     });
@@ -128,7 +128,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('deve gerar breadcrumb dinâmico para a rota dedicada /contratos/:contractKey', () => {
       const crumbs = getBreadcrumbs('/contratos/200331-00015-2026');
       expect(crumbs).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Acompanhamento e Prazos', route: '/contratos' },
         { label: 'Contrato 200331-00015-2026', route: '/contratos/200331-00015-2026' }
       ]);
@@ -137,7 +137,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('deve gerar breadcrumb para /pagamentos', () => {
       const crumbs = getBreadcrumbs('/pagamentos');
       expect(crumbs).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Pagamentos', route: '/pagamentos' }
       ]);
     });
@@ -145,23 +145,23 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('deve gerar breadcrumb para /empenhos', () => {
       const crumbs = getBreadcrumbs('/empenhos');
       expect(crumbs).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Empenhos e Execução', route: '/empenhos' }
       ]);
     });
 
     it('deve gerar breadcrumb para /atas, subrotas e alocações', () => {
       expect(getBreadcrumbs('/atas')).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Consulta e Vigência', route: '/atas' }
       ]);
       expect(getBreadcrumbs('/atas/itens')).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Consulta e Vigência', route: '/atas' },
         { label: 'Itens da Ata', route: '/atas/itens' }
       ]);
       expect(getBreadcrumbs('/atas/saldos-unidade')).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Consulta e Vigência', route: '/atas' },
         { label: 'Alocações por Unidade', route: '/atas/saldos-unidade' }
       ]);
@@ -169,11 +169,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
     it('deve gerar breadcrumb para rotas de administração', () => {
       expect(getBreadcrumbs('/admin/usuarios')).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Usuários e Servidores', route: '/admin/usuarios' }
       ]);
       expect(getBreadcrumbs('/admin/perfis')).toEqual([
-        { label: 'Gestão de Instrumentos', route: '/instrumentos' },
+        { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Perfis e Permissões', route: '/admin/perfis' }
       ]);
     });
@@ -238,7 +238,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const visible = filterNavigationByRole(navigationConfig, 'admin');
       const labels = flatLabels(visible);
 
-      expect(labels).toContain('Gestão de Instrumentos');
+      expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Alocações por Unidade');
       expect(labels).toContain('Unidades Internas');
       expect(labels).toContain('Modelos de Gestão');
@@ -250,7 +250,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const visible = filterNavigationByRole(navigationConfig, 'gestor');
       const labels = flatLabels(visible);
 
-      expect(labels).toContain('Gestão de Instrumentos');
+      expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Consulta e Vigência');
       expect(labels).toContain('Acompanhamento e Prazos');
       expect(labels).toContain('Modelos de Gestão');
@@ -273,7 +273,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Alocações por Unidade');
       expect(labels).toContain('Unidades Internas');
 
-      expect(labels).not.toContain('Gestão de Instrumentos');
+      expect(labels).not.toContain('Visão Geral');
       expect(labels).not.toContain('Consulta e Vigência');
       expect(labels).not.toContain('Acompanhamento e Prazos');
       expect(labels).not.toContain('Modelos de Gestão');
@@ -293,7 +293,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const visible = filterNavigationByRole(navigationConfig, 'leitor');
       const labels = flatLabels(visible);
 
-      expect(labels).toContain('Gestão de Instrumentos');
+      expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Consulta e Vigência');
       expect(labels).toContain('Acompanhamento e Prazos');
       expect(labels).toContain('Pagamentos');

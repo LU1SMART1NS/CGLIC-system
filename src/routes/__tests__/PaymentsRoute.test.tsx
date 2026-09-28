@@ -14,6 +14,15 @@ vi.mock('../../hooks/useManagementDashboard', () => ({
   useManagementDashboard: vi.fn()
 }));
 
+vi.mock('../../hooks/useAllContractManagers', () => ({
+  useAllContractManagers: vi.fn(() => ({ data: {}, isLoading: false }))
+}));
+
+vi.mock('../../hooks/useAtaManagers', () => ({
+  useAllAtaManagers: vi.fn(() => ({ data: {}, isLoading: false })),
+  useArpItemContractLinks: vi.fn(() => ({ data: [], isLoading: false }))
+}));
+
 describe('PaymentsRoute — FASE 9-H: Pagamentos / Faturamento & CGOFI', () => {
   beforeEach(() => {
     vi.clearAllMocks();

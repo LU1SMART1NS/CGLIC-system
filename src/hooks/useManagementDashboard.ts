@@ -55,7 +55,9 @@ export function normalizeDashboardFilters(filtersOrUasg?: string | ManagementDas
     uasg: (filtersOrUasg?.uasg || urlFilters.uasg || '200331').trim(),
     contractKey: filtersOrUasg?.contractKey ?? urlFilters.contractKey,
     numeroAta: filtersOrUasg?.numeroAta ?? urlFilters.numeroAta,
-    statusContrato: filtersOrUasg?.statusContrato ?? urlFilters.statusContrato
+    statusContrato: filtersOrUasg?.statusContrato ?? urlFilters.statusContrato,
+    assignedContractKeys: filtersOrUasg?.assignedContractKeys,
+    assignedAtaKeys: filtersOrUasg?.assignedAtaKeys
   };
 }
 
@@ -66,7 +68,11 @@ export const MANAGEMENT_DASHBOARD_QUERY_KEY = (filters?: string | ManagementDash
     norm.uasg || '200331',
     norm.contractKey || 'ALL',
     norm.numeroAta || 'ALL',
-    norm.statusContrato || 'ALL'
+    norm.statusContrato || 'ALL',
+    // Entra na chave para não vazar cache entre usuários/perfis distintos
+    // (ex.: dois gestores com carteiras diferentes na mesma sessão de dev).
+    norm.assignedContractKeys ? [...norm.assignedContractKeys].sort().join(',') : 'GLOBAL',
+    norm.assignedAtaKeys ? [...norm.assignedAtaKeys].sort().join(',') : 'GLOBAL'
   ] as const;
 };
 

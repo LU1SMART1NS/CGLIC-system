@@ -193,6 +193,21 @@ export interface ManagementDashboardFilters {
   contractKey?: string;
   numeroAta?: string;
   statusContrato?: 'TODOS' | 'ATIVO' | 'ENCERRADO' | 'EM_PRORROGACAO';
+  /**
+   * Escopo ASSIGNED do perfil "gestor" (role_domain_scopes.contracts, migration
+   * 20260925000023): quando informado, restringe TODA a base (contratos,
+   * empenhos, ciclos de pagamento, itens de ARP vinculados, planos de tarefa)
+   * às chaves aqui listadas antes de qualquer outro filtro ser aplicado. Não
+   * confundir com `contractKey` (seleção pontual de um único contrato na UI).
+   */
+  assignedContractKeys?: string[];
+  /**
+   * Atas atribuídas ao gestor (public.ata_managers, migration 20260929000038),
+   * já incluindo as Atas dos seus contratos atribuídos diretamente — ver
+   * useAssignedManagementScope. Usado para recortar os itens/saldos físicos
+   * de ARP pela Ata inteira, não só pela fatia ligada a `assignedContractKeys`.
+   */
+  assignedAtaKeys?: string[];
 }
 
 export interface ManagementDashboardFilterOption {

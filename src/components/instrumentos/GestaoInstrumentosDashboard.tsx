@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useManagementDashboard } from '../../hooks/useManagementDashboard';
 import { useAllContractManagers } from '../../hooks/useAllContractManagers';
+import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
 import { GestaoInstrumentosHeader } from './GestaoInstrumentosHeader';
 import { GestaoInstrumentosSummaryCards, type GestaoInstrumentosCardId } from './GestaoInstrumentosSummaryCards';
 import { GestaoInstrumentosCategoryTabs, type GestaoInstrumentosCategoryTab } from './GestaoInstrumentosCategoryTabs';
@@ -52,14 +53,35 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   /** Acionado apenas pelos cards de resumo (ex.: "Contratos Vigentes" deve mostrar só Contratos, não ARPs). */
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('TODOS');
 
-  const dash200330 = useManagementDashboard({ uasg: UASGS[0] });
-  const dash200331 = useManagementDashboard({ uasg: UASGS[1] });
-  const dashboards = [dash200330, dash200331];
-
   const managers200330 = useAllContractManagers(UASGS[0]);
   const managers200331 = useAllContractManagers(UASGS[1]);
 
-  const isLoading = dashboards.some((d) => d.isLoading);
+  // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
+  // migration 20260925000023), agora derivado também das Atas atribuídas
+  // (ata_managers): a Visão Geral consolida 2 UASGs, então o recorte de
+  // contratos é resolvido por UASG e repassado ao Read Model de cada uma —
+  // mesmo princípio já aplicado em ContractsRoute.tsx (aba "Acompanhamento
+  // e Prazos"), agora estendido a todos os blocos agregados (financeiro,
+  // ARP, pagamentos, atenção) via buildManagementDashboardReadModel.
+  const scope200330 = useAssignedManagementScope(UASGS[0]);
+  const scope200331 = useAssignedManagementScope(UASGS[1]);
+
+  const dash200330 = useManagementDashboard({
+    uasg: UASGS[0],
+    assignedContractKeys: scope200330.contractKeys,
+    assignedAtaKeys: scope200330.ataKeys
+  });
+  const dash200331 = useManagementDashboard({
+    uasg: UASGS[1],
+    assignedContractKeys: scope200331.contractKeys,
+    assignedAtaKeys: scope200331.ataKeys
+  });
+  const dashboards = [dash200330, dash200331];
+
+  // Aguarda também os gestores carregarem antes de liberar a tela: evita
+  // que o perfil "gestor" veja, por um instante, os agregados sem nenhum
+  // recorte de escopo (assignedContractKeys ainda vazio por falta de dado).
+  const isLoading = dashboards.some((d) => d.isLoading) || scope200330.isLoading || scope200331.isLoading;
   const isFetching = dashboards.some((d) => d.isFetching);
   const hasAnyReadModel = dashboards.some((d) => d.readModel);
   const isError = dashboards.some((d) => d.isError) && !hasAnyReadModel;
@@ -223,7 +245,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     return (
       <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '2rem' }}>
         <ErrorState
-          title="Erro ao carregar a Gestão de Instrumentos"
+          title="Erro ao carregar a Visão Geral"
           message={error?.message || 'Não foi possível consolidar a carteira de ARPs e contratos.'}
           onRetry={() => refetch()}
         />

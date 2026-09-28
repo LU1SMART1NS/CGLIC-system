@@ -952,6 +952,68 @@ export function buildManagementDashboardReadModel(params: {
   let filteredManagers = rawManagers;
   let filteredPlans = rawPlans;
 
+  // Escopo ASSIGNED do perfil "gestor": recorta a base inteira (contratos,
+  // empenhos, ciclos de pagamento, itens de ARP vinculados, planos e eventos)
+  // para as chaves atribuídas ao usuário logado ANTES de qualquer outro
+  // filtro — assim os blocos agregados abaixo (executive/financial/arp/
+  // payments/attention) já nascem recortados, e não só a lista de exibição.
+  // Mesmo princípio já aplicado à listagem crua em ContractsRoute.tsx.
+  //
+  // `assignedAtaKeys` (Atas atribuídas via ata_managers, já incluindo as Atas
+  // dos contratos atribuídos diretamente — useAssignedManagementScope) recorta
+  // os itens físicos de ARP pela Ata INTEIRA, não só pelos itens ligados ao
+  // contrato do gestor — sem isso, um gestor só via a fatia da Ata que casava
+  // com o seu contrato, nunca os demais itens da mesma Ata.
+  //
+  // Checagem por `!== undefined` (não por `.length > 0`): um gestor sem NENHUM
+  // contrato/Ata atribuído ainda precisa ver a base zerada, nunca a base
+  // inteira sem recorte — só `undefined` (perfil sem escopo, ex. admin/leitor)
+  // pula o bloco.
+  if (f.assignedContractKeys !== undefined || f.assignedAtaKeys !== undefined) {
+    const assignedSet = new Set(f.assignedContractKeys || []);
+    const assignedAtaSet = new Set(f.assignedAtaKeys || []);
+
+    filteredContracts = filteredContracts.filter((c) => assignedSet.has(c.id));
+
+    const scopedContractKeys = new Set(
+      filteredContracts.flatMap((c) => [c.id, c.numero, `${c.numero}/${c.ano}`]).filter(Boolean)
+    );
+
+    filteredEmpenhos = filteredEmpenhos.filter((emp) => {
+      const empContrato = emp.numero_contrato || emp.contrato_id || emp.contratoNumero || emp.contract_key;
+      const contractKeysList: string[] = Array.isArray(emp.contract_keys)
+        ? emp.contract_keys
+        : emp.contract_key ? [emp.contract_key] : [];
+      return (
+        (empContrato && scopedContractKeys.has(empContrato)) ||
+        contractKeysList.some((k: string) => scopedContractKeys.has(k))
+      );
+    });
+
+    filteredPaymentCycles = filteredPaymentCycles.filter((cycle) => scopedContractKeys.has(cycle.contractKey));
+
+    filteredItemsSaldo = filteredItemsSaldo.filter((item) => {
+      const itemContract = item.contract_key || item.contractKey;
+      const itemAta = item.numero_ata || item.numeroAta;
+      return Boolean(
+        (itemContract && scopedContractKeys.has(itemContract)) ||
+        (itemAta && assignedAtaSet.has(itemAta))
+      );
+    });
+
+    filteredArps = filteredArps.filter((arp) => assignedAtaSet.has(arp.numeroAtaRegistroPreco));
+
+    filteredManagers = Object.fromEntries(
+      Object.entries(filteredManagers).filter(([k]) => scopedContractKeys.has(k))
+    );
+    filteredPlans = Object.fromEntries(
+      Object.entries(filteredPlans).filter(([k]) => scopedContractKeys.has(k))
+    );
+    filteredEventsMap = Object.fromEntries(
+      Object.entries(filteredEventsMap).filter(([k]) => scopedContractKeys.has(k))
+    );
+  }
+
   if (f.contractKey) {
     filteredContracts = filteredContracts.filter((c) => {
       const key = c.id || `${c.numero || ''}${c.ano ? `/${c.ano}` : ''}`;
