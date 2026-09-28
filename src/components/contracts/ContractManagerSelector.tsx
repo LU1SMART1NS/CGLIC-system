@@ -38,11 +38,13 @@ export const ContractManagerSelector: React.FC<ContractManagerSelectorProps> = (
 
   const [editing, setEditing] = useState(false);
   const [gestorNome, setGestorNome] = useState('');
+  const [gestorUserId, setGestorUserId] = useState<string | null>(null);
   const [customMode, setCustomMode] = useState(false);
 
   useEffect(() => {
     setGestorNome(manager?.gestorNome || '');
-  }, [manager?.gestorNome]);
+    setGestorUserId(manager?.gestorUserId || null);
+  }, [manager?.gestorNome, manager?.gestorUserId]);
 
   const activeUsers = users.filter((u) => u.ativo);
 
@@ -50,9 +52,11 @@ export const ContractManagerSelector: React.FC<ContractManagerSelectorProps> = (
     if (selectedName === '__custom__') {
       setCustomMode(true);
       setGestorNome('');
+      setGestorUserId(null);
     } else {
       setCustomMode(false);
       setGestorNome(selectedName);
+      setGestorUserId(activeUsers.find((u) => u.nome === selectedName)?.id ?? null);
     }
   };
 
@@ -79,7 +83,8 @@ export const ContractManagerSelector: React.FC<ContractManagerSelectorProps> = (
         uasg: contract.uasg,
         numero: contract.numero,
         ano: anoNum,
-        gestorNome: trimmed
+        gestorNome: trimmed,
+        gestorUserId: customMode ? null : gestorUserId
       },
       {
         onSuccess: () => {
@@ -95,6 +100,7 @@ export const ContractManagerSelector: React.FC<ContractManagerSelectorProps> = (
     setEditing(false);
     setCustomMode(false);
     setGestorNome(manager?.gestorNome || '');
+    setGestorUserId(manager?.gestorUserId || null);
     saveManagerMutation.reset();
   };
 

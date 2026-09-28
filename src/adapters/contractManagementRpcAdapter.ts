@@ -25,6 +25,8 @@ export interface ContractManagerInput {
   numero: string;
   ano: number;
   gestorNome: string;
+  /** Identidade canônica do gestor selecionado da lista de servidores — ponte para auth.users. */
+  gestorUserId?: string | null;
 }
 
 /**
@@ -43,7 +45,8 @@ export async function saveContractManagerRpc(input: ContractManagerInput): Promi
       p_uasg: (input.uasg || '').trim(),
       p_numero: (input.numero || '').trim(),
       p_ano: input.ano,
-      p_gestor_nome: cleanGestor
+      p_gestor_nome: cleanGestor,
+      p_gestor_user_id: input.gestorUserId ?? null
     });
 
     if (error) throw mapPostgresErrorToAppError(error);

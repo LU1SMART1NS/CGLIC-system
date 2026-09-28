@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
+import { useAllContractManagers } from '../hooks/useAllContractManagers';
+import { useAuth } from '../context/AuthContext';
 import { ContractsPortfolioHeader } from '../components/contracts/portfolio/ContractsPortfolioHeader';
 import {
   ContractsPortfolioSummary,
@@ -16,13 +18,36 @@ import { getContractDaysRemaining } from '../services/dashboardService';
 
 export const ContractsRoute: React.FC = () => {
   const {
-    data: contracts = [],
+    data: allContracts = [],
     isLoading,
     isFetching,
     error,
     refresh,
     dataUpdatedAt
   } = useContractsDashboard('200331');
+
+  const { user, role } = useAuth();
+  const { data: contractManagers = {}, isLoading: isLoadingManagers } = useAllContractManagers('200331');
+
+  // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
+  // migration 20260925000023): só deve ver os contratos onde é o gestor
+  // titular (contract_managers.gestor_user_id = seu próprio auth.users.id).
+  // admin/leitor têm escopo GLOBAL e continuam vendo a carteira inteira.
+  const assignedContractKeys = useMemo(() => {
+    if (role !== 'gestor' || !user) return null;
+    const keys = new Set<string>();
+    for (const manager of Object.values(contractManagers)) {
+      if (manager.gestorUserId === user.id) {
+        keys.add(manager.contractKey);
+      }
+    }
+    return keys;
+  }, [role, user, contractManagers]);
+
+  const contracts = useMemo(() => {
+    if (!assignedContractKeys) return allContracts;
+    return allContracts.filter((contract) => assignedContractKeys.has(contract.id));
+  }, [allContracts, assignedContractKeys]);
 
   const [filterState, setFilterState] = useState<ContractsPortfolioFilterState>({
     status: 'TODOS',
@@ -193,7 +218,7 @@ export const ContractsRoute: React.FC = () => {
         lastUpdated={dataUpdatedAt}
       />
 
-      {isLoading && contracts.length === 0 ? (
+      {(isLoading || (role === 'gestor' && isLoadingManagers)) && contracts.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <SkeletonLoader variant="card" height="90px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />

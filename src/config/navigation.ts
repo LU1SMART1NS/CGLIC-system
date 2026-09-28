@@ -93,7 +93,7 @@ export const navigationConfig: NavItem[] = [
         route: '/atas/saldos-unidade',
         status: 'active',
         matchPrefixes: ['/atas/saldos-unidade'],
-        allowedRoles: ['admin', 'gestor_saldos']
+        allowedRoles: ['admin', 'gestor_saldos', 'leitor']
       },
       {
         id: 'atas-departamentos',
@@ -102,7 +102,7 @@ export const navigationConfig: NavItem[] = [
         route: '/admin/departamentos',
         status: 'active',
         matchPrefixes: ['/admin/departamentos'],
-        allowedRoles: ['admin', 'gestor_saldos']
+        allowedRoles: ['admin', 'gestor_saldos', 'leitor']
       }
     ]
   },

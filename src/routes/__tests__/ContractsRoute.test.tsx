@@ -6,6 +6,8 @@ import { ContractsPortfolioSummary } from '../../components/contracts/portfolio/
 import { ContractsPortfolioFilters } from '../../components/contracts/portfolio/ContractsPortfolioFilters';
 import { ContractsPortfolioTable } from '../../components/contracts/portfolio/ContractsPortfolioTable';
 import * as useContractsDashboardModule from '../../hooks/useContractsDashboard';
+import * as useAllContractManagersModule from '../../hooks/useAllContractManagers';
+import * as authContextModule from '../../context/AuthContext';
 import type { ContractDashboardRecord } from '../../types';
 
 vi.mock('react-router-dom', () => ({
@@ -71,6 +73,20 @@ const mockContracts: ContractDashboardRecord[] = [
 describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Perfil "admin" (escopo GLOBAL) por padrão — mantém o comportamento
+    // histórico destes testes (carteira completa, sem filtro por gestor).
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: 'admin-user' } as any,
+      session: null,
+      loading: false,
+      role: 'admin',
+      roleStatus: 'ready',
+      signOut: vi.fn()
+    });
+    vi.spyOn(useAllContractManagersModule, 'useAllContractManagers').mockReturnValue({
+      data: {},
+      isLoading: false
+    } as any);
   });
 
   it('1. deve renderizar a rota com cabeçalho limpo "Acompanhamento e Prazos" e subtítulo', () => {
@@ -226,5 +242,59 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
 
     expect(html).toContain('skeleton');
     expect(html).not.toContain('Empresa Alfa Serviços');
+  });
+
+  it('10. perfil "gestor" deve ver apenas os contratos onde é o gestor titular (escopo ASSIGNED)', () => {
+    vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockReturnValue({
+      data: mockContracts,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      refresh: vi.fn()
+    } as any);
+
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: 'gestor-joao' } as any,
+      session: null,
+      loading: false,
+      role: 'gestor',
+      roleStatus: 'ready',
+      signOut: vi.fn()
+    });
+
+    // Apenas o contrato 200331-00002-2024 tem gestor_user_id = 'gestor-joao'.
+    vi.spyOn(useAllContractManagersModule, 'useAllContractManagers').mockReturnValue({
+      data: {
+        '200331-00001-2025': {
+          contractKey: '200331-00001-2025',
+          uasg: '200331',
+          numero: '00001',
+          ano: 2025,
+          gestorNome: 'Maria Souza',
+          gestorUserId: 'gestor-maria',
+          createdAt: '',
+          updatedAt: ''
+        },
+        '200331-00002-2024': {
+          contractKey: '200331-00002-2024',
+          uasg: '200331',
+          numero: '00002',
+          ano: 2024,
+          gestorNome: 'João Silva',
+          gestorUserId: 'gestor-joao',
+          createdAt: '',
+          updatedAt: ''
+        }
+      },
+      isLoading: false
+    } as any);
+
+    const html = renderToStaticMarkup(<ContractsRoute />);
+
+    expect(html).toContain('Beta Tecnologia e Inovação S/A');
+    expect(html).not.toContain('Empresa Alfa Serviços Ltda');
+    expect(html).not.toContain('Gamma Locações Comerciais Eireli');
   });
 });

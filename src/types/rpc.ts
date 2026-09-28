@@ -266,6 +266,7 @@ export interface RpcContractManagerItem {
   numero: string;
   ano: number;
   gestor_nome: string;
+  gestor_user_id?: string | null;
   created_at: string;
   updated_at: string;
 }
