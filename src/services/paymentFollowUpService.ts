@@ -22,6 +22,8 @@ import type {
   PaymentAlert
 } from '../types/paymentFollowUp';
 import type { FinancialBalances } from '../types/financialExecution';
+import type { RpcContractPaymentCycleRow } from '../types/rpc';
+import { buildPaymentFollowUpTemplate } from './paymentFollowUpTemplateService';
 
 /**
  * Gera a chave canônica determinística do ciclo operacional de pagamento
@@ -281,4 +283,55 @@ export function buildPaymentFollowUpCycle(
     concluidoEm: isConcluido ? (input.dataOrdemBancaria || nowIso) : undefined,
     concluidoPor: isConcluido ? (options?.concluidoPor || input.responsavelNome) : undefined
   };
+}
+
+/**
+ * Reconstrói um PaymentFollowUpCycle completo (prazos/alertas recalculados em
+ * memória) a partir de uma linha persistida em contract_payment_cycles
+ * (Fase 10-A.2/10-A.2.1). Fonte única desta conversão — reutilizada tanto por
+ * useContractPaymentFollowUp.ts (visão por contrato) quanto por
+ * dashboardService.fetchAllPaymentCyclesForDashboard (visão consolidada do
+ * Dashboard Gerencial), para nunca haver duas versões da mesma regra de
+ * mapeamento DB -> domínio.
+ */
+export function rowToPaymentFollowUpCycle(
+  row: RpcContractPaymentCycleRow,
+  options?: { baseDate?: string; empenhoBalances?: Partial<FinancialBalances> }
+): PaymentFollowUpCycle {
+  const input: PaymentCycleInput = {
+    contractKey: row.contract_key,
+    competencia: row.competencia,
+    dataAssinaturaAtesto: row.data_assinatura_atesto,
+    dataVencimentoFatura: row.data_vencimento_fatura,
+    documentoAtestoSei: row.documento_atesto_sei,
+    numeroProcessoPagamentoSei: row.numero_processo_pagamento_sei ?? undefined,
+    numeroProcessoContratoSei: row.numero_processo_contrato_sei ?? undefined,
+    numeroNotasFiscais: row.numero_notas_fiscais ?? undefined,
+    valorAtesto: Number(row.valor_atesto) || 0,
+    empenhoCanonicalKey: row.empenho_canonical_key ?? undefined,
+    titularNome: row.titular_nome ?? undefined,
+    responsavelNome: row.responsavel_nome ?? undefined,
+    responsavelUserId: row.responsavel_user_id ?? undefined,
+    documentoDespachoSei: row.documento_despacho_sei ?? undefined,
+    dataEnvioCgofi: row.data_envio_cgofi ?? undefined,
+    numeroOrdemBancaria: row.numero_ordem_bancaria ?? undefined,
+    dataOrdemBancaria: row.data_ordem_bancaria ?? undefined,
+    observacoes: row.observacoes ?? undefined
+  };
+
+  const cycle = buildPaymentFollowUpCycle(input, {
+    overrideStatus: row.status as PaymentWorkflowStatus,
+    empenhoBalances: options?.empenhoBalances,
+    baseDate: options?.baseDate,
+    concluidoPor: row.concluido_por ?? undefined
+  });
+
+  cycle.id = row.id;
+  cycle.criadoEm = row.criado_em;
+  cycle.atualizadoEm = row.atualizado_em;
+  cycle.concluidoEm = row.concluido_em ?? undefined;
+  cycle.concluidoPor = row.concluido_por ?? undefined;
+  cycle.tasks = buildPaymentFollowUpTemplate(input);
+
+  return cycle;
 }

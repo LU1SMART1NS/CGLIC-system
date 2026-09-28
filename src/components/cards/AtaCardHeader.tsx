@@ -2,6 +2,7 @@ import React from 'react';
 import { CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 import type { ArpRecord, AdesaoStatusType } from '../../types';
 import { AdesaoStatusBadge } from './AdesaoStatusBadge';
+import { getArpVigenciaStatus } from '../../services/temporalEngineService';
 
 interface AtaCardHeaderProps {
   arp: ArpRecord;
@@ -42,13 +43,10 @@ export const AtaCardHeader: React.FC<AtaCardHeaderProps> = ({
 
   const formattedCnpj = formatCnpjDisplay(fornecedorCnpj);
 
-  const today = new Date();
-  const ninetyDaysFromNow = new Date();
-  ninetyDaysFromNow.setDate(today.getDate() + 90);
-
-  const vigenciaFinalDate = arp.dataVigenciaFinal ? new Date(arp.dataVigenciaFinal) : undefined;
-  const isExpired = !!(arp.isCanceladaPncp || (vigenciaFinalDate && vigenciaFinalDate < today));
-  const isExpiringSoon = !isExpired && !!(vigenciaFinalDate && vigenciaFinalDate <= ninetyDaysFromNow);
+  // Regra de vigência de Ata canônica (Fase 10-A.2 — temporalEngineService.getArpVigenciaStatus).
+  const vigenciaStatus = getArpVigenciaStatus(arp.dataVigenciaFinal);
+  const isExpired = !!(arp.isCanceladaPncp || vigenciaStatus?.isExpirada);
+  const isExpiringSoon = !isExpired && !!vigenciaStatus?.isExpirandoEm90Dias;
 
   return (
     <header className="ata-card-header">

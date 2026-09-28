@@ -433,4 +433,49 @@ describe('Fase 3.1 — Serviço Agregador da Central de Prazos (centralPrazosSer
     });
   });
 
+  describe('Fase 10-A.2 — Gatilho de Saldo Físico Crítico de Ata (regra canônica única)', () => {
+    it('gera o gatilho GATILHO_85PCT com id contendo "SALDO_CRITICO" quando o item de ARP tem consumo >= 85%', () => {
+      const refDate = parseDateBRT('2026-09-23')!;
+      const items = buildCentralPrazosItems({
+        contracts: [],
+        arps: [],
+        arpItems: [
+          { item_key: 'ATA-200331-001', numero_ata: '00049/2025', numero_item: 1, percentual_consumido: 90 }
+        ],
+        currentDate: refDate
+      });
+
+      const gatilho = items.find(i => i.id.includes('SALDO_CRITICO'));
+      expect(gatilho).toBeDefined();
+      expect(gatilho?.explicabilidade.regraTipo).toBe('OPERACIONAL');
+      expect(gatilho?.nivelAtencao).toBe('CRITICO');
+      expect(gatilho?.diasRestantes).toBe(0);
+      expect(gatilho?.estadoTemporal).toBe('VENCE_HOJE');
+    });
+
+    it('NÃO gera o gatilho de saldo quando o consumo está abaixo de 85% (regra canônica classifyArpItemSaldo)', () => {
+      const refDate = parseDateBRT('2026-09-23')!;
+      const items = buildCentralPrazosItems({
+        contracts: [],
+        arps: [],
+        arpItems: [
+          { item_key: 'ATA-200331-002', numero_ata: '00050/2025', numero_item: 1, percentual_consumido: 84.99 }
+        ],
+        currentDate: refDate
+      });
+
+      expect(items.find(i => i.id.includes('SALDO_CRITICO'))).toBeUndefined();
+    });
+
+    it('DOCUMENTA o caráter hoje latente deste gatilho: dashboardService.calculateAttentionSummary não repassa arpItems para esta função — confirmado por não haver, no código-fonte de dashboardService.ts, nenhuma chamada a buildCentralPrazosItems passando a chave "arpItems". Este teste apenas fixa o contrato do discriminador de id ("SALDO_CRITICO") do qual a blindagem preventiva em calculateAttentionSummary depende, caso arpItems seja conectado a essa chamada no futuro.', () => {
+      const refDate = parseDateBRT('2026-09-23')!;
+      const items = buildCentralPrazosItems({
+        arpItems: [{ percentual_consumido: 95 }],
+        currentDate: refDate
+      });
+      const gatilho = items.find(i => i.id.includes('SALDO_CRITICO'));
+      expect(gatilho?.id).toContain('SALDO_CRITICO');
+    });
+  });
+
 });

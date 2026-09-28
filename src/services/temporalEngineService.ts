@@ -16,6 +16,8 @@ import type {
   CalculatedDeadline,
   ExplicabilidadePrazo
 } from '../types/temporal';
+import type { SeverityLevel } from '../design-system/tokens';
+import { severityFromAtencaoNivel } from './severityService';
 
 /**
  * Normaliza uma string de data (YYYY-MM-DD ou ISO) para um objeto Date na meia-noite local.
@@ -274,4 +276,48 @@ export function calculateDeadline(params: {
     nivelAtencao,
     explicabilidade
   };
+}
+
+/**
+ * Regra Canônica de Vigência de Ata/ARP (Fase 10-A.2)
+ *
+ * Antes desta fase, a janela operacional de 90 dias era reimplementada com
+ * `new Date()` cru em 3 componentes de UI independentes (ArpSearch.tsx,
+ * AtaCardHeader.tsx, InternalAllocationsDashboard.tsx), fora do motor
+ * temporal oficial — com risco real de divergência de fuso/bissexto em
+ * relação à Central de Prazos/Dashboard Gerencial, que sempre usaram este
+ * mesmo motor (parseDateBRT + differenceInDays, exatamente como já era feito
+ * em centralPrazosService.ts para o gatilho de vigência de Ata).
+ *
+ * Esta função é a ÚNICA fonte da regra "vigência da Ata" — timezone
+ * America/Sao_Paulo (via parseDateBRT) e janela de 90 dias preservados
+ * exatamente como já eram. A UI (useArpVigenciaStatus, ver
+ * src/hooks/useArpVigenciaStatus.ts) é apenas um adaptador fino sobre esta
+ * regra de domínio, nunca uma segunda implementação da regra.
+ */
+export interface ArpVigenciaStatus {
+  diasRestantes: number;
+  isExpirada: boolean;
+  isExpirandoEm90Dias: boolean;
+  nivelAtencao: AtencaoNivel;
+  severity: SeverityLevel;
+}
+
+export function getArpVigenciaStatus(
+  dataVigenciaFinal: string | undefined | null,
+  currentDate?: Date
+): ArpVigenciaStatus | null {
+  if (!dataVigenciaFinal) return null;
+  const targetDate = parseDateBRT(dataVigenciaFinal);
+  if (!targetDate) return null;
+
+  const diasRestantes = differenceInDays(targetDate, currentDate);
+  const isExpirada = diasRestantes < 0;
+  const isExpirandoEm90Dias = !isExpirada && diasRestantes <= 90;
+
+  const statusTemporal = deriveTemporalStatus(diasRestantes);
+  const nivelAtencao = deriveAtencaoNivel(diasRestantes, statusTemporal);
+  const severity = severityFromAtencaoNivel(nivelAtencao, statusTemporal);
+
+  return { diasRestantes, isExpirada, isExpirandoEm90Dias, nivelAtencao, severity };
 }

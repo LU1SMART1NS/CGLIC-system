@@ -109,6 +109,9 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     }));
   };
 
+  const [isSavingCycle, setIsSavingCycle] = useState(false);
+  const [createCycleError, setCreateCycleError] = useState<string | null>(null);
+
   const handleCreateCycle = (e: React.FormEvent) => {
     e.preventDefault();
     if (!competencia || !dataAssinaturaAtesto || !dataVencimentoFatura || !documentoAtestoSei) return;
@@ -123,14 +126,21 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
       responsavelNome: responsavelNome.trim() || undefined
     };
 
-    registerPaymentCycle(input);
-
-    // Reset form & close modal
-    setDocumentoAtestoSei('');
-    setValorAtesto('');
-    setDataVencimentoFatura('');
-    setResponsavelNome('');
-    setIsModalOpen(false);
+    setIsSavingCycle(true);
+    setCreateCycleError(null);
+    registerPaymentCycle(input)
+      .then(() => {
+        // Reset form & close modal
+        setDocumentoAtestoSei('');
+        setValorAtesto('');
+        setDataVencimentoFatura('');
+        setResponsavelNome('');
+        setIsModalOpen(false);
+      })
+      .catch((err: any) => {
+        setCreateCycleError(err?.message || 'Não foi possível registrar o ciclo. Tente novamente.');
+      })
+      .finally(() => setIsSavingCycle(false));
   };
 
   const handleQuickAdvanceStatus = (cycle: PaymentFollowUpCycle) => {
@@ -148,7 +158,9 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
     const updates = nextStatusMap[cycle.status];
     if (updates) {
-      updatePaymentCycle(cycle.cycleKey, updates);
+      updatePaymentCycle(cycle.cycleKey, updates).catch((err: any) => {
+        console.error('[ContractPaymentFollowUpSection] Falha ao avançar status do ciclo:', err);
+      });
     }
   };
 
@@ -752,10 +764,28 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                 </span>
               </div>
 
+              {createCycleError && (
+                <div
+                  role="alert"
+                  style={{
+                    padding: '0.6rem 0.85rem',
+                    backgroundColor: '#fef2f2',
+                    color: '#b91c1c',
+                    border: '1px solid #fecaca',
+                    borderRadius: '6px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600
+                  }}
+                >
+                  {createCycleError}
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
+                  disabled={isSavingCycle}
                   style={{
                     padding: '0.55rem 1rem',
                     backgroundColor: '#f1f5f9',
@@ -764,13 +794,14 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     borderRadius: '6px',
                     fontSize: '0.85rem',
                     fontWeight: 600,
-                    cursor: 'pointer'
+                    cursor: isSavingCycle ? 'not-allowed' : 'pointer'
                   }}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
+                  disabled={isSavingCycle}
                   style={{
                     padding: '0.55rem 1.25rem',
                     backgroundColor: '#0c326f',
@@ -779,10 +810,11 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     borderRadius: '6px',
                     fontSize: '0.85rem',
                     fontWeight: 700,
-                    cursor: 'pointer'
+                    cursor: isSavingCycle ? 'not-allowed' : 'pointer',
+                    opacity: isSavingCycle ? 0.7 : 1
                   }}
                 >
-                  Criar e Instanciar Ciclo
+                  {isSavingCycle ? 'Salvando...' : 'Criar e Instanciar Ciclo'}
                 </button>
               </div>
             </form>

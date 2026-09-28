@@ -1,8 +1,5 @@
 import React from 'react';
 import {
-  AlertTriangle,
-  AlertCircle,
-  Clock,
   Calendar,
   CheckCircle2,
   ExternalLink,
@@ -24,6 +21,13 @@ import { useContractPaymentFollowUp } from '../../hooks/useContractPaymentFollow
 import { useContractEvents } from '../../hooks/useContractEvents';
 import { getContractManagementKey } from '../../services/contractManagementService';
 import { evaluateContractReajusteRadar } from '../../services/contractReajusteRadarService';
+import {
+  severityFromAttentionPriorityLevel,
+  severityFromReajusteRadarNivel,
+  severityFromPaymentAlertNivel
+} from '../../services/severityService';
+import { severityTokens } from '../../design-system/tokens';
+import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 
 interface ContractAttentionCenterProps {
   contract: ContractDashboardRecord;
@@ -253,7 +257,22 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       {/* Alerta de Radar Preditivo de Reajuste / Repactuação (Fase 7.5-C3) */}
-      {computedReajusteAlert && (
+      {computedReajusteAlert && (() => {
+        // Severidade canônica (Fase 10-A.2.1) — a regra de negócio (nivel do
+        // radar) permanece exatamente a mesma; só a representação visual
+        // passa a vir de severityTokens em vez de ternários próprios.
+        const reajusteSeverity = severityFromReajusteRadarNivel(computedReajusteAlert.nivel);
+        const reajusteToken = severityTokens[reajusteSeverity];
+        const reajusteLabel =
+          computedReajusteAlert.nivel === 'VENCIDA'
+            ? 'Marco Transcorrido'
+            : computedReajusteAlert.nivel === 'HOJE'
+            ? 'Marco Atingido Hoje'
+            : computedReajusteAlert.nivel === 'URGENTE'
+            ? `Urgente (${computedReajusteAlert.diasRestantes}d)`
+            : `Próximo (${computedReajusteAlert.diasRestantes}d)`;
+
+        return (
         <div
           data-testid="reajuste-radar-alert-card"
           key={computedReajusteAlert.id}
@@ -264,64 +283,15 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
             gap: '1rem',
             padding: '1rem 1.25rem',
             borderRadius: '8px',
-            backgroundColor:
-              computedReajusteAlert.nivel === 'VENCIDA'
-                ? '#fff8f8'
-                : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
-                ? '#fffbeb'
-                : '#f0f9ff',
-            border: `1px solid ${
-              computedReajusteAlert.nivel === 'VENCIDA'
-                ? '#fecaca'
-                : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
-                ? '#fde68a'
-                : '#bae6fd'
-            }`,
+            backgroundColor: reajusteToken.badgeBg,
+            border: `1px solid ${reajusteToken.badgeBorder}`,
             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
             flexWrap: 'wrap'
           }}
         >
           <div style={{ flex: 1, minWidth: '280px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  padding: '0.15rem 0.5rem',
-                  borderRadius: '4px',
-                  backgroundColor:
-                    computedReajusteAlert.nivel === 'VENCIDA'
-                      ? '#fee2e2'
-                      : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
-                      ? '#ffedd5'
-                      : '#e0f2fe',
-                  color:
-                    computedReajusteAlert.nivel === 'VENCIDA'
-                      ? '#991b1b'
-                      : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
-                      ? '#c2410c'
-                      : '#0369a1',
-                  border: `1px solid ${
-                    computedReajusteAlert.nivel === 'VENCIDA'
-                      ? '#fecaca'
-                      : computedReajusteAlert.nivel === 'HOJE' || computedReajusteAlert.nivel === 'URGENTE'
-                      ? '#fed7aa'
-                      : '#bae6fd'
-                  }`
-                }}
-              >
-                <Clock size={12} />
-                {computedReajusteAlert.nivel === 'VENCIDA'
-                  ? 'Marco Transcorrido'
-                  : computedReajusteAlert.nivel === 'HOJE'
-                  ? 'Marco Atingido Hoje'
-                  : computedReajusteAlert.nivel === 'URGENTE'
-                  ? `Urgente (${computedReajusteAlert.diasRestantes}d)`
-                  : `Próximo (${computedReajusteAlert.diasRestantes}d)`}
-              </span>
+              <SeverityBadge severity={reajusteSeverity} customLabel={reajusteLabel} />
 
               <span
                 style={{
@@ -385,12 +355,17 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Alertas Operacionais de Acompanhamento de Pagamentos */}
       {paymentAlerts && paymentAlerts.map(alert => {
-        const isCritico = alert.nivel === 'CRITICO';
-        const isAtencao = alert.nivel === 'ATENCAO';
+        // Severidade canônica (Fase 10-A.2.1) — mesma regra (alert.nivel),
+        // apenas a representação visual passa a vir de severityTokens.
+        const paymentSeverity = severityFromPaymentAlertNivel(alert.nivel);
+        const paymentToken = severityTokens[paymentSeverity];
+        const paymentLabel =
+          alert.nivel === 'CRITICO' ? 'Crítico / Vencido' : alert.nivel === 'ATENCAO' ? 'Atenção Operacional' : 'Acompanhamento';
 
         return (
           <div
@@ -402,31 +377,15 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
               gap: '1rem',
               padding: '1rem 1.25rem',
               borderRadius: '8px',
-              backgroundColor: isCritico ? '#fff8f8' : isAtencao ? '#fffbeb' : '#f8faff',
-              border: `1px solid ${isCritico ? '#fecaca' : isAtencao ? '#fde68a' : '#bfdbfe'}`,
+              backgroundColor: paymentToken.badgeBg,
+              border: `1px solid ${paymentToken.badgeBorder}`,
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
               flexWrap: 'wrap'
             }}
           >
             <div style={{ flex: 1, minWidth: '280px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    padding: '0.15rem 0.5rem',
-                    borderRadius: '4px',
-                    backgroundColor: isCritico ? '#fee2e2' : isAtencao ? '#ffedd5' : '#e0f2fe',
-                    color: isCritico ? '#991b1b' : isAtencao ? '#c2410c' : '#0369a1',
-                    border: `1px solid ${isCritico ? '#fecaca' : isAtencao ? '#fed7aa' : '#bae6fd'}`
-                  }}
-                >
-                  {isCritico ? <AlertTriangle size={12} /> : <AlertCircle size={12} />}
-                  {isCritico ? 'Crítico / Vencido' : isAtencao ? 'Atenção Operacional' : 'Acompanhamento'}
-                </span>
+                <SeverityBadge severity={paymentSeverity} customLabel={paymentLabel} />
 
                 <span
                   style={{
@@ -488,50 +447,21 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
         const modeInfo = getExecutionModeDisplay(task.executionMode);
         const isConfirmacao = task.executionMode === 'CONFIRMACAO';
 
-        // Estilos e badges por nível de urgência
-        let urgencyBadge = {
-          label: 'Sem prazo fixado',
-          bg: '#f1f5f9',
-          color: '#475569',
-          border: '#cbd5e1',
-          icon: Clock
-        };
-
-        if (level === 'VENCIDA') {
-          urgencyBadge = {
-            label: `${Math.abs(diasRestantes || 0)}d atrasada`,
-            bg: '#fee2e2',
-            color: '#991b1b',
-            border: '#fecaca',
-            icon: AlertTriangle
-          };
-        } else if (level === 'HOJE') {
-          urgencyBadge = {
-            label: 'Vence hoje',
-            bg: '#fef3c7',
-            color: '#b45309',
-            border: '#fde68a',
-            icon: Clock
-          };
-        } else if (level === 'URGENTE') {
-          urgencyBadge = {
-            label: `${diasRestantes}d restantes`,
-            bg: '#ffedd5',
-            color: '#c2410c',
-            border: '#fed7aa',
-            icon: Clock
-          };
-        } else if (level === 'PROXIMA') {
-          urgencyBadge = {
-            label: `${diasRestantes}d restantes`,
-            bg: '#f0f9ff',
-            color: '#0369a1',
-            border: '#bae6fd',
-            icon: Clock
-          };
-        }
-
-        const UrgencyIcon = urgencyBadge.icon;
+        // Severidade canônica (Fase 10-A.2.1) — a classificação de negócio
+        // (level: VENCIDA/HOJE/URGENTE/PROXIMA/SEM_PRAZO, via
+        // classifyTaskAttention) permanece exatamente a mesma; só a
+        // representação visual passa a vir de severityTokens em vez de um
+        // objeto de cores/ícones próprio do componente.
+        const taskSeverity = severityFromAttentionPriorityLevel(level);
+        const taskToken = severityTokens[taskSeverity];
+        const urgencyLabel =
+          level === 'VENCIDA'
+            ? `${Math.abs(diasRestantes || 0)}d atrasada`
+            : level === 'HOJE'
+            ? 'Vence hoje'
+            : level === 'URGENTE' || level === 'PROXIMA'
+            ? `${diasRestantes}d restantes`
+            : 'Sem prazo fixado';
 
         return (
           <div
@@ -543,8 +473,8 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
               gap: '1rem',
               padding: '1rem 1.25rem',
               borderRadius: '8px',
-              backgroundColor: level === 'VENCIDA' ? '#fff8f8' : level === 'HOJE' ? '#fffbeb' : '#ffffff',
-              border: `1px solid ${level === 'VENCIDA' ? '#fecaca' : level === 'HOJE' ? '#fde68a' : '#e2e8f0'}`,
+              backgroundColor: level === 'VENCIDA' || level === 'HOJE' ? taskToken.badgeBg : '#ffffff',
+              border: `1px solid ${level === 'VENCIDA' || level === 'HOJE' ? taskToken.badgeBorder : '#e2e8f0'}`,
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
               flexWrap: 'wrap'
             }}
@@ -553,23 +483,7 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
             <div style={{ flex: 1, minWidth: '280px' }}>
               {/* Badges de Contexto: Nível de Atenção e Semântica de Execução */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    padding: '0.15rem 0.5rem',
-                    borderRadius: '4px',
-                    backgroundColor: urgencyBadge.bg,
-                    color: urgencyBadge.color,
-                    border: `1px solid ${urgencyBadge.border}`
-                  }}
-                >
-                  <UrgencyIcon size={12} />
-                  {urgencyBadge.label}
-                </span>
+                <SeverityBadge severity={taskSeverity} customLabel={urgencyLabel} />
 
                 <span
                   style={{

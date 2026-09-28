@@ -10,6 +10,7 @@ import {
   deriveTemporalStatus,
   deriveAtencaoNivel,
   calculateDeadline,
+  getArpVigenciaStatus,
   REGRAS_OPERACIONAIS_PADRAO
 } from '../temporalEngineService';
 import type { RegraPrazoConfig } from '../../types/temporal';
@@ -186,6 +187,50 @@ describe('Fase 2 — Motor de Prazos e Agenda Contratual (temporalEngineService)
         expect(['OPERACIONAL', 'INTERNA', 'CONFIGURAVEL']).toContain(r.tipo);
         expect(r.descricao).toBeDefined();
       }
+    });
+  });
+
+  describe('getArpVigenciaStatus — Regra Canônica Única de Vigência de Ata (Fase 10-A.2)', () => {
+    const refDate = parseDateBRT('2026-09-23')!;
+
+    it('retorna null quando não há data de vigência final', () => {
+      expect(getArpVigenciaStatus(undefined, refDate)).toBeNull();
+      expect(getArpVigenciaStatus(null, refDate)).toBeNull();
+      expect(getArpVigenciaStatus('', refDate)).toBeNull();
+    });
+
+    it('classifica como expirada (isExpirada=true) quando a vigência já passou', () => {
+      const status = getArpVigenciaStatus('2026-09-01', refDate);
+      expect(status).not.toBeNull();
+      expect(status!.diasRestantes).toBeLessThan(0);
+      expect(status!.isExpirada).toBe(true);
+      expect(status!.isExpirandoEm90Dias).toBe(false);
+      expect(status!.severity).toBe('CRITICA');
+    });
+
+    it('classifica como expirando dentro da janela de 90 dias quando faltam <=90 dias e >=0', () => {
+      // refDate = 2026-09-23; +60 dias corridos
+      const status = getArpVigenciaStatus('2026-11-22', refDate);
+      expect(status).not.toBeNull();
+      expect(status!.isExpirada).toBe(false);
+      expect(status!.isExpirandoEm90Dias).toBe(true);
+      expect(status!.diasRestantes).toBeLessThanOrEqual(90);
+      expect(status!.diasRestantes).toBeGreaterThanOrEqual(0);
+    });
+
+    it('NÃO classifica como expirando quando a vigência está a mais de 90 dias de distância', () => {
+      const status = getArpVigenciaStatus('2028-01-01', refDate);
+      expect(status).not.toBeNull();
+      expect(status!.isExpirada).toBe(false);
+      expect(status!.isExpirandoEm90Dias).toBe(false);
+      expect(status!.severity).toBe('INFO');
+    });
+
+    it('usa parseDateBRT (fuso America/Sao_Paulo) e não Date cru — datas nos limites do dia não sofrem deslocamento de fuso', () => {
+      const status = getArpVigenciaStatus('2026-09-23', refDate);
+      expect(status).not.toBeNull();
+      expect(status!.diasRestantes).toBe(0);
+      expect(status!.isExpirada).toBe(false);
     });
   });
 

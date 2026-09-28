@@ -45,6 +45,10 @@ import { fetchContractsForDashboard } from './contractService';
 import { fetchArpsFromDb } from './dbCacheService';
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { classifyArpItemSaldo } from './balanceService';
+import { severityFromReajusteRadarNivel, severityFromPaymentStatusPrazo } from './severityService';
+import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
+import { fetchPaymentCyclesForContracts } from '../adapters/paymentCycleRpcAdapter';
 
 /**
  * Auxiliar para cálculo de dias restantes de vigência
@@ -256,9 +260,11 @@ export function calculateAttentionSummary(params: {
   );
   const pagamentosCriticosCount = pagamentosCriticos.length;
 
-  // D) Atas Críticas (consumo >= 85%)
+  // D) Atas Críticas — regra canônica única (balanceService.classifyArpItemSaldo,
+  // Fase 10-A.2). Antes desta fase este >=85% era recalculado aqui de forma
+  // independente do restante do sistema.
   const atasCriticas = (arpItems || []).filter(
-    (i: any) => (Number(i.percentual_consumido) || 0) >= 85
+    (i: any) => classifyArpItemSaldo(Number(i.percentual_consumido) || 0).isCritico
   );
   const atasCriticasCount = atasCriticas.length;
 
@@ -272,7 +278,19 @@ export function calculateAttentionSummary(params: {
   const items: import('../types/managementDashboard').DashboardAttentionItem[] = [];
 
   // 1. Tarefas Atrasadas e Próximas da Central de Prazos
-  for (const pItem of prazosItems) {
+  //
+  // CORREÇÃO (Fase 10-A.2 — GAP #3 da Fase 10-A): o gatilho de saldo físico
+  // crítico de Ata (regraId GATILHO_85PCT, id contendo "SALDO_CRITICO") é
+  // emitido por centralPrazosService com diasRestantes=0/estadoTemporal=
+  // VENCE_HOJE — valores usados para MODELAR o gatilho como "urgente", não
+  // porque seja uma tarefa que vence. Antes desta correção, isso fazia esse
+  // MESMO item de Ata cair também no branch "VENCE_HOJE" abaixo e ser
+  // duplicado na lista de atenção com o rótulo incorreto "Tarefa Vencendo
+  // Hoje" — além do item correto já gerado pela Seção 4 (ATA_CRITICA). O
+  // saldo crítico de Ata é representado EXCLUSIVAMENTE pela Seção 4.
+  const prazosItemsSemGatilhoSaldo = prazosItems.filter((pItem) => !pItem.id.includes('SALDO_CRITICO'));
+
+  for (const pItem of prazosItemsSemGatilhoSaldo) {
     if (pItem.estadoTemporal === 'ATRASADO') {
       items.push({
         id: `ATT-TASK-OVERDUE-${pItem.id}`,
@@ -343,7 +361,11 @@ export function calculateAttentionSummary(params: {
     const isAtrasoCgofi = (cycle.prazos?.diasSemRespostaCgofi ?? 0) > 5;
 
     if (isVencido || isCritico || isAtrasoCgofi) {
-      const severity = isVencido ? 'CRITICA' : 'URGENTE';
+      // Severidade canônica (Fase 10-A.2): VENCIDO -> CRITICA; qualquer outro
+      // motivo de entrada nesta lista (crítico por proximidade ou atraso de
+      // CGOFI) -> URGENTE — comportamento idêntico ao ternário anterior,
+      // agora derivado por severityFromPaymentStatusPrazo em vez de inline.
+      const severity = severityFromPaymentStatusPrazo(isVencido ? 'VENCIDO' : 'CRITICO');
       const docSei = cycle.input?.documentoAtestoSei || 'Atesto';
       const valorFmt = (cycle.input?.valorAtesto || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -367,8 +389,9 @@ export function calculateAttentionSummary(params: {
   // 3. Radars de Reajuste / Repactuação
   for (const alert of (radarsReajuste || []).filter(Boolean)) {
     if (!alert) continue;
-    const isUrgente = alert.nivel === 'URGENTE' || alert.nivel === 'HOJE' || alert.nivel === 'VENCIDA';
-    const severity = alert.nivel === 'VENCIDA' ? 'CRITICA' : (isUrgente ? 'URGENTE' : 'ATENCAO');
+    // Severidade canônica (Fase 10-A.2) — mesmo mapeamento de antes, agora via
+    // severityFromReajusteRadarNivel em vez de ternário duplicado inline.
+    const severity = severityFromReajusteRadarNivel(alert.nivel);
     const numDisplay = alert.numeroContrato ? `${alert.numeroContrato}${alert.anoContrato ? `/${alert.anoContrato}` : ''}` : alert.contractKey;
 
     items.push({
@@ -389,9 +412,10 @@ export function calculateAttentionSummary(params: {
   // 4. Atas com Consumo Crítico (>= 85%)
   for (const aItem of atasCriticas as any[]) {
     const rawPerc = aItem.percentual_consumido ?? aItem.percentualConsumido;
-    const perc = Number(rawPerc) || 0;
-    const roundedPerc = Number(perc.toFixed(2));
-    const severity = roundedPerc >= 100 ? 'CRITICA' : (roundedPerc >= 85 ? 'URGENTE' : 'ATENCAO');
+    // Classificação canônica única (Fase 10-A.2) — balanceService.classifyArpItemSaldo.
+    const saldoClass = classifyArpItemSaldo(Number(rawPerc) || 0);
+    const roundedPerc = saldoClass.percentualConsumido;
+    const severity = saldoClass.severity;
     const numAta = aItem.numero_ata || aItem.numeroAta;
     const numItem = aItem.numero_item || aItem.numeroItem;
     const descItem = aItem.descricao_item || aItem.descricaoItem || 'Item de ARP';
@@ -631,9 +655,11 @@ export function calculateArpSummary(
     quantidadeHomologadaTotal += qtdHomologada;
     quantidadeEmpenhadaTotal += qtdConsumida;
 
-    const roundedPercentual = Number(percentual.toFixed(2));
-    const isCritico = roundedPercentual >= 85;
-    const isProximoLimite = roundedPercentual >= 70 && roundedPercentual < 85;
+    // Classificação canônica única (Fase 10-A.2) — balanceService.classifyArpItemSaldo.
+    const saldoClass = classifyArpItemSaldo(percentual);
+    const roundedPercentual = saldoClass.percentualConsumido;
+    const isCritico = saldoClass.isCritico;
+    const isProximoLimite = saldoClass.isProximoLimite;
 
     return {
       itemKey: item.item_key || `ITEM-${idx + 1}`,
@@ -1079,7 +1105,7 @@ export async function fetchManagementDashboardData(
     fetchArpItemSaldosFromDb(cleanUasg)
   ]);
 
-  const paymentCycles = fetchAllPaymentCyclesFromStorage(contracts);
+  const paymentCycles = await fetchAllPaymentCyclesForDashboard(contracts);
 
   return buildManagementDashboardReadModel({
     uasg: cleanUasg,
@@ -1097,61 +1123,30 @@ export async function fetchManagementDashboardData(
 }
 
 /**
- * Consulta síncrona/segura a ciclos de faturamento persistidos no storage
+ * Consulta consolidada dos ciclos de pagamento persistidos (contract_payment_cycles)
+ * para todos os contratos do Dashboard Gerencial.
+ *
+ * Fase 10-A.2.1 — GAP encontrado no fechamento de pendências: a Fase 10-A.2
+ * migrou a visão POR CONTRATO (useContractPaymentFollowUp) para Supabase, mas
+ * esta visão CONSOLIDADA ainda lia exclusivamente de localStorage
+ * (`saldoarp:payment-cycles:*`), o que deixava o Dashboard Gerencial
+ * mostrando dados desatualizados/vazios em relação ao que o Contrato 360 já
+ * exibia corretamente. Corrigido para usar a mesma fonte canônica.
  */
-export function fetchAllPaymentCyclesFromStorage(contracts?: ContractDashboardRecord[]): PaymentFollowUpCycle[] {
-  if (typeof window === 'undefined' || !window.localStorage) return [];
-  const cycles: PaymentFollowUpCycle[] = [];
-  const seenKeys = new Set<string>();
+export async function fetchAllPaymentCyclesForDashboard(contracts?: ContractDashboardRecord[]): Promise<PaymentFollowUpCycle[]> {
+  if (!contracts || contracts.length === 0) return [];
+
+  const contractKeys = contracts
+    .map((c) => c?.id || (c as any)?.contractKey || `${c?.numero || ''}${c?.ano ? `/${c.ano}` : ''}`)
+    .filter(Boolean);
 
   try {
-    if (contracts && contracts.length > 0) {
-      for (const c of contracts) {
-        if (!c) continue;
-        const contractKey = c.id || (c as any).contractKey || `${c.numero || ''}${c.ano ? `/${c.ano}` : ''}`;
-        if (!contractKey) continue;
-        const key = `saldoarp:payment-cycles:${contractKey}`;
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              for (const item of parsed) {
-                if (item && item.cycleKey && !seenKeys.has(item.cycleKey)) {
-                  seenKeys.add(item.cycleKey);
-                  cycles.push(item);
-                }
-              }
-            }
-          } catch {}
-        }
-      }
-    }
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('saldoarp:payment-cycles:')) {
-        const raw = localStorage.getItem(k);
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              for (const item of parsed) {
-                if (item && item.cycleKey && !seenKeys.has(item.cycleKey)) {
-                  seenKeys.add(item.cycleKey);
-                  cycles.push(item);
-                }
-              }
-            }
-          } catch {}
-        }
-      }
-    }
+    const rows = await fetchPaymentCyclesForContracts(contractKeys);
+    return rows.map((row) => rowToPaymentFollowUpCycle(row));
   } catch (err) {
-    console.warn('Erro ao carregar ciclos de pagamento do storage:', err);
+    console.warn('Erro ao carregar ciclos de pagamento persistidos:', err);
+    return [];
   }
-
-  return cycles;
 }
 
 /**

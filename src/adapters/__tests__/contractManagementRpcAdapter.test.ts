@@ -134,9 +134,30 @@ describe('contractManagementRpcAdapter', () => {
         p_id: null,
         p_macrotask_id: 'tplmt-1',
         p_nome: 'Verificar se o Contrato possui Garantia Contratual',
-        p_ordem: 0
+        p_ordem: 0,
+        p_execution_mode: null
       });
       expect(result.task.id).toBe('tplt-1');
+    });
+
+    it('deve encaminhar executionMode (Fase 10-A.2) ao criar uma tarefa de template', async () => {
+      const mockResult = {
+        success: true,
+        task: { id: 'tplt-2', macrotask_id: 'tplmt-1', nome: 'Verificar SICAF', ordem: 1, execution_mode: 'EXTERNA' }
+      };
+      mockRpc.mockResolvedValueOnce({ data: mockResult, error: null });
+
+      const result = await saveContractTaskTemplateTaskRpc({
+        macrotaskId: 'tplmt-1',
+        nome: 'Verificar SICAF',
+        ordem: 1,
+        executionMode: 'EXTERNA'
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith('save_contract_task_template_task_atomic', expect.objectContaining({
+        p_execution_mode: 'EXTERNA'
+      }));
+      expect(result.task.execution_mode).toBe('EXTERNA');
     });
 
     it('deve rejeitar se o nome da tarefa estiver vazio', async () => {
@@ -219,7 +240,8 @@ describe('contractManagementRpcAdapter', () => {
         p_responsavel_nome: null,
         p_prazo: null,
         p_observacao: null,
-        p_concluido_por: null
+        p_concluido_por: null,
+        p_responsavel_user_id: null
       });
       expect(result.task.status).toBe('EM_ANDAMENTO');
     });
@@ -239,6 +261,32 @@ describe('contractManagementRpcAdapter', () => {
 
       expect(result.task.status).toBe('CONCLUIDA');
       expect(result.task.concluido_em).toBeTruthy();
+    });
+
+    it('deve encaminhar responsavelUserId (Fase 10-A.2 — ponte de identidade), preservando responsavelNome legado', async () => {
+      const mockResult = {
+        success: true,
+        task: {
+          id: 'ctt-3', macrotask_id: 'ctmt-1', nome: 'Analisar processo', ordem: 1,
+          status: 'EM_ANDAMENTO', responsavel_nome: 'Maria Souza', responsavel_user_id: 'user-uuid-123',
+          prazo: null, observacao: null, criado_em: 'x', atualizado_em: 'x', concluido_em: null, concluido_por: null
+        }
+      };
+      mockRpc.mockResolvedValueOnce({ data: mockResult, error: null });
+
+      const result = await updateContractTaskRpc({
+        taskId: 'ctt-3',
+        status: 'EM_ANDAMENTO',
+        responsavelNome: 'Maria Souza',
+        responsavelUserId: 'user-uuid-123'
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith('update_contract_task_atomic', expect.objectContaining({
+        p_responsavel_nome: 'Maria Souza',
+        p_responsavel_user_id: 'user-uuid-123'
+      }));
+      expect(result.task.responsavel_user_id).toBe('user-uuid-123');
+      expect(result.task.responsavel_nome).toBe('Maria Souza');
     });
 
     it('deve mapear erro INVALID_TASK_STATUS', async () => {
