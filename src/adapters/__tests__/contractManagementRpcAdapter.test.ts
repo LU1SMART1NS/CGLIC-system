@@ -45,9 +45,43 @@ describe('contractManagementRpcAdapter', () => {
         p_uasg: '200331',
         p_numero: '15',
         p_ano: 2026,
-        p_gestor_nome: 'João Silva'
+        p_gestor_nome: 'João Silva',
+        p_gestor_user_id: null
       });
       expect(result).toEqual(mockResult);
+    });
+
+    it('deve repassar o gestor_user_id quando o gestor for selecionado da lista de servidores', async () => {
+      const mockResult = {
+        success: true,
+        manager: {
+          contract_key: '200331-15-2026',
+          uasg: '200331',
+          numero: '15',
+          ano: 2026,
+          gestor_nome: 'João Silva',
+          gestor_user_id: 'user-123',
+          created_at: '2026-09-22T12:00:00Z',
+          updated_at: '2026-09-22T12:00:00Z'
+        }
+      };
+      mockRpc.mockResolvedValueOnce({ data: mockResult, error: null });
+
+      await saveContractManagerRpc({
+        uasg: '200331',
+        numero: '15',
+        ano: 2026,
+        gestorNome: 'João Silva',
+        gestorUserId: 'user-123'
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith('save_contract_manager_atomic', {
+        p_uasg: '200331',
+        p_numero: '15',
+        p_ano: 2026,
+        p_gestor_nome: 'João Silva',
+        p_gestor_user_id: 'user-123'
+      });
     });
 
     it('deve rejeitar se o nome do gestor estiver vazio', async () => {

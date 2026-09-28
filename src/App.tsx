@@ -212,7 +212,7 @@ const AppContent: React.FC = () => {
           <Route
             path="/atas/saldos-unidade"
             element={
-              <RequireRole allowedRoles={['admin', 'gestor_saldos']}>
+              <RequireRole allowedRoles={['admin', 'gestor_saldos', 'leitor']}>
                 <AllocationsRoute />
               </RequireRole>
             }
@@ -261,7 +261,7 @@ const AppContent: React.FC = () => {
           <Route
             path="/admin/departamentos"
             element={
-              <RequireRole allowedRoles={['admin', 'gestor_saldos']}>
+              <RequireRole allowedRoles={['admin', 'gestor_saldos', 'leitor']}>
                 <DepartmentsRoute />
               </RequireRole>
             }

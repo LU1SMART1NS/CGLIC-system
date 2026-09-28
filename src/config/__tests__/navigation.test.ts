@@ -289,7 +289,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Atas de Registro de Preços');
     });
 
-    it('Consulta/Auditoria (leitor) consulta os módulos permitidos, sem Usuários, Perfis ou Alocações', () => {
+    it('Consulta/Auditoria (leitor) consulta os módulos permitidos, sem Usuários, Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'leitor');
       const labels = flatLabels(visible);
 
@@ -298,9 +298,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Acompanhamento e Prazos');
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos e Execução');
+      expect(labels).toContain('Alocações por Unidade');
+      expect(labels).toContain('Unidades Internas');
 
-      expect(labels).not.toContain('Alocações por Unidade');
-      expect(labels).not.toContain('Unidades Internas');
       expect(labels).not.toContain('Modelos de Gestão');
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');

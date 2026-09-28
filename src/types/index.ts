@@ -570,6 +570,8 @@ export interface ContractManager {
   numero: string;
   ano: number;
   gestorNome: string;
+  /** Identidade canônica do gestor — ponte para auth.users, preenchida quando selecionado da lista de servidores. */
+  gestorUserId?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -106,6 +106,7 @@ export async function fetchContractManager(contractKey: string): Promise<Contrac
     numero: data.numero,
     ano: data.ano,
     gestorNome: data.gestor_nome,
+    gestorUserId: data.gestor_user_id || undefined,
     createdAt: data.created_at,
     updatedAt: data.updated_at
   };
@@ -136,6 +137,7 @@ export async function fetchAllContractManagers(uasg?: string): Promise<Record<st
           numero: item.numero,
           ano: item.ano,
           gestorNome: item.gestor_nome,
+          gestorUserId: item.gestor_user_id || undefined,
           createdAt: item.created_at,
           updatedAt: item.updated_at
         };
