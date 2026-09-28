@@ -690,6 +690,71 @@ describe('dashboardService (SaldoARP 3.0 — Fase 8-B)', () => {
       expect(filteredModel.filtersApplied?.contractKey).toBe('c1');
     });
 
+    it('scopes all dimensions to assignedContractKeys (perfil "gestor", escopo ASSIGNED)', () => {
+      const contracts = [
+        { id: 'c1', numero: '10/2025', ano: 2025, valorGlobal: 100000, status: 'ATIVO', uasg: '200331' } as any,
+        { id: 'c2', numero: '20/2025', ano: 2025, valorGlobal: 200000, status: 'ATIVO', uasg: '200331' } as any
+      ];
+
+      const empenhos = [
+        { numero_empenho: '2026NE000100', numero_contrato: '10/2025', valor_empenhado: 50000, valor_liquidado: 30000, valor_pago: 20000 },
+        { numero_empenho: '2026NE000200', numero_contrato: '20/2025', valor_empenhado: 80000, valor_liquidado: 40000, valor_pago: 10000 }
+      ];
+
+      const itemsSaldo = [
+        { item_key: 'i1', numero_ata: '01/2025', numero_item: 1, contract_key: 'c1', quantidade_homologada: 100, quantidade_consumida: 50 },
+        { item_key: 'i2', numero_ata: '02/2025', numero_item: 1, contract_key: 'c2', quantidade_homologada: 200, quantidade_consumida: 20 }
+      ];
+
+      const paymentCycles = [
+        { cycleKey: 'c1-pgto-1', contractKey: 'c1', status: 'EM_INSTRUCAO', input: { valorAtesto: 15000 }, prazos: { diasUteisAteVencimento: 5, statusPrazo: 'NORMAL' }, alerts: [] } as any,
+        { cycleKey: 'c2-pgto-1', contractKey: 'c2', status: 'CONCLUIDO', input: { valorAtesto: 25000 }, prazos: { diasUteisAteVencimento: 0, statusPrazo: 'NORMAL' }, alerts: [] } as any
+      ];
+
+      const managers = {
+        c1: { contractKey: 'c1', uasg: '200331', numero: '10/2025', ano: 2025, gestorNome: 'Fulano', gestorUserId: 'gestor-1', createdAt: '', updatedAt: '' },
+        c2: { contractKey: 'c2', uasg: '200331', numero: '20/2025', ano: 2025, gestorNome: 'Ciclano', gestorUserId: 'gestor-2', createdAt: '', updatedAt: '' }
+      };
+
+      // Escopo do gestor-1: só enxerga o contrato 'c1' — os agregados
+      // (executive/financial/arp/payments) devem nascer já recortados,
+      // não só a lista de exibição.
+      const scopedModel = buildManagementDashboardReadModel({
+        uasg: '200331',
+        contracts,
+        empenhos,
+        itemsSaldo,
+        paymentCycles,
+        managers,
+        filters: { assignedContractKeys: ['c1'] },
+        currentDate: referenceDate
+      });
+
+      expect(scopedModel.executive.totalContratos).toBe(1);
+      expect(scopedModel.executive.valorVigenteTotal).toBe(100000);
+      expect(scopedModel.financial.totalEmpenhado).toBe(50000);
+      expect(scopedModel.arp.totalItens).toBe(1);
+      expect(scopedModel.payments.totalCiclos).toBe(1);
+      expect(scopedModel.availableFilters?.contracts.length).toBe(2); // catálogo bruto, não usado como lista navegável
+
+      // Um gestor sem nenhum contrato atribuído (conjunto vazio) não deve
+      // enxergar nada — nunca cair de volta para o comportamento GLOBAL.
+      const emptyScopeModel = buildManagementDashboardReadModel({
+        uasg: '200331',
+        contracts,
+        empenhos,
+        itemsSaldo,
+        paymentCycles,
+        managers,
+        filters: { assignedContractKeys: ['contrato-inexistente'] },
+        currentDate: referenceDate
+      });
+
+      expect(emptyScopeModel.executive.totalContratos).toBe(0);
+      expect(emptyScopeModel.financial.totalEmpenhado).toBe(0);
+      expect(emptyScopeModel.payments.totalCiclos).toBe(0);
+    });
+
     it('filters ARP dimension when numeroAta filter is applied', () => {
       const itemsSaldo = [
         {

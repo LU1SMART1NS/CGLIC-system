@@ -9,6 +9,7 @@ import { ArpPortfolioFilters, type ArpPortfolioFilterState } from './atas/ArpPor
 import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { getArpVigenciaStatus } from '../services/temporalEngineService';
+import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
 import type { ArpRecord, ArpItemRecord, FilterParams, SyncMetadata } from '../types';
 
 interface ArpSearchProps {
@@ -50,6 +51,17 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   });
 
   const [arps, setArps] = useState<ArpRecord[]>([]);
+
+  // Perfil "gestor" tem escopo ASSIGNED em Atas (ata_managers, migration
+  // 20260929000038): sem isso, esta tela mostrava TODAS as Atas para
+  // qualquer "gestor", independente do que lhe foi atribuído.
+  const { ataKeys: assignedAtaKeys } = useAssignedManagementScope();
+  const scopedArps = useMemo(() => {
+    if (!assignedAtaKeys) return arps;
+    const scope = new Set(assignedAtaKeys);
+    return arps.filter((a) => scope.has(a.numeroAtaRegistroPreco));
+  }, [arps, assignedAtaKeys]);
+
   const [itemsByAta, setItemsByAta] = useState<Record<string, ArpItemRecord[]>>({});
   const [itemsLoadingByAta, setItemsLoadingByAta] = useState<Record<string, boolean>>({});
   const [empenhosDbSet, setEmpenhosDbSet] = useState<Set<string>>(new Set());
@@ -63,10 +75,10 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   const [syncProgress, setSyncProgress] = useState<{ step: string; percent: number; current?: number; total?: number } | null>(null);
 
   useEffect(() => {
-    if (onArpsLoaded && arps.length > 0) {
-      onArpsLoaded(arps, itemsByAta);
+    if (onArpsLoaded && scopedArps.length > 0) {
+      onArpsLoaded(scopedArps, itemsByAta);
     }
-  }, [arps, itemsByAta, onArpsLoaded]);
+  }, [scopedArps, itemsByAta, onArpsLoaded]);
 
   const loadDbSets = async () => {
     try {
@@ -213,7 +225,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     let aVencer90d = 0;
     let expiradas = 0;
 
-    for (const arp of arps) {
+    for (const arp of scopedArps) {
       total++;
       const { isExpired, isExpiringSoon } = checkArpExpiration(arp);
       if (isExpired) {
@@ -232,11 +244,11 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       aVencer90d,
       expiradas
     };
-  }, [arps]);
+  }, [scopedArps]);
 
   // Filtragem determinística de Atas
   const filteredArps = useMemo(() => {
-    return arps.filter(arp => {
+    return scopedArps.filter(arp => {
       const { isExpired, isExpiringSoon } = checkArpExpiration(arp);
 
       // 1. Filtro de Vigência
@@ -290,7 +302,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       }
       return b.numeroAtaRegistroPreco.localeCompare(a.numeroAtaRegistroPreco);
     });
-  }, [arps, filterState, allocationsDbSet, empenhosDbSet, itemsByAta]);
+  }, [scopedArps, filterState, allocationsDbSet, empenhosDbSet, itemsByAta]);
 
   // Carregar itens para as atas filtradas
   useEffect(() => {
@@ -346,12 +358,12 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         onChangeFilter={handleFilterChange}
         onResetFilters={handleResetFilters}
         totalFiltered={filteredArps.length}
-        totalAtas={arps.length}
+        totalAtas={scopedArps.length}
       />
 
       <ArpPortfolioList
         cards={groupedCards}
-        totalAtas={arps.length}
+        totalAtas={scopedArps.length}
         isLoading={loading}
         itemsLoadingByAta={itemsLoadingByAta}
         onSelectArp={onSelectArp}

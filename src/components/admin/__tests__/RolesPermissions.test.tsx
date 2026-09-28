@@ -19,14 +19,14 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
 
     it('2. renderiza exatamente os quatro perfis nativos', () => {
       expect(html).toContain('Coordenador');
-      expect(html).toContain('Gestor de Contratos');
+      expect(html).toContain('Gestor de Atas e Contratos');
       expect(html).toContain('Gestor de Saldo');
       expect(html).toContain('Consulta / Auditoria');
     });
 
     it('3. exibe as descrições de negócio corretas de cada perfil', () => {
       expect(html).toContain('Administração geral do sistema e gestão de todos os domínios.');
-      expect(html).toContain('Gestão dos contratos e atividades contratuais dentro do escopo atribuído.');
+      expect(html).toContain('Gestão das Atas atribuídas — e dos contratos vinculados a elas — além dos contratos avulsos atribuídos individualmente.');
       expect(html).toContain('Gestão das alocações internas das Atas e das unidades internas.');
       expect(html).toContain('Consulta das informações do sistema, sem funções de administração.');
     });
@@ -54,12 +54,13 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
       expect(html).toContain('Todas as unidades');
     });
 
-    it('6. detalhe do Gestor de Contratos mostra somente Contratos e Execução financeira', () => {
+    it('6. detalhe do Gestor de Atas e Contratos mostra Atas, Contratos e Execução financeira', () => {
       const html = renderToStaticMarkup(<ProfileDetailContent profile={findProfile('gestor')} />);
 
+      expect(html).toContain('Atas');
       expect(html).toContain('Gestão dentro do escopo atribuído');
       expect(html).toContain('Execução financeira');
-      expect(html).toContain('Contratos atribuídos ao perfil');
+      expect(html).toContain('Atas atribuídas (com os contratos vinculados) e contratos avulsos atribuídos individualmente');
 
       expect(html).not.toContain('Alocações');
       expect(html).not.toContain('Unidades internas');

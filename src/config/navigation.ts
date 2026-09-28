@@ -45,7 +45,7 @@ export interface NavItem {
 
 /**
  * Configuração definitiva de navegação do SaldoARP:
- * - Gestão de Instrumentos (/instrumentos) — painel unificado de gestão e
+ * - Visão Geral (/instrumentos) — painel unificado de gestão e
  *   monitoramento (consolida a antiga Visão Geral e a antiga Central de Atenção)
  * - Atas de Registro de Preços (recolhível)
  *     - Consulta e Vigência (/atas)
@@ -63,7 +63,7 @@ export interface NavItem {
 export const navigationConfig: NavItem[] = [
   {
     id: 'gestao-instrumentos',
-    label: 'Gestão de Instrumentos',
+    label: 'Visão Geral',
     icon: LayoutDashboard,
     route: '/instrumentos',
     status: 'active',
@@ -226,7 +226,7 @@ export interface BreadcrumbEntry {
 }
 
 const staticRouteLabels: Record<string, string> = {
-  '/instrumentos': 'Gestão de Instrumentos',
+  '/instrumentos': 'Visão Geral',
   '/atas': 'Consulta e Vigência',
   '/atas/itens': 'Itens da Ata',
   '/atas/itens/saldo': 'Saldo do Item',
@@ -242,11 +242,11 @@ const staticRouteLabels: Record<string, string> = {
 
 export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   if (pathname === '/' || pathname === '/instrumentos') {
-    return [{ label: 'Gestão de Instrumentos' }];
+    return [{ label: 'Visão Geral' }];
   }
 
   const segments = pathname.split('/').filter(Boolean);
-  const crumbs: BreadcrumbEntry[] = [{ label: 'Gestão de Instrumentos', route: '/instrumentos' }];
+  const crumbs: BreadcrumbEntry[] = [{ label: 'Visão Geral', route: '/instrumentos' }];
   let accPath = '';
 
   for (let i = 0; i < segments.length; i++) {

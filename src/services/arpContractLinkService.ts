@@ -102,6 +102,54 @@ export async function deleteArpItemContractLink(linkId: string, itemKey?: string
 }
 
 /**
+ * Extrai o número da Ata (ex. "00037/2026") do item_key de um vínculo
+ * (formato "{numeroAta}-{uasg}-{numeroItem}", validado em
+ * link_contract_to_item_atomic, migration 20260924000015). Retorna null se o
+ * item_key não seguir o formato esperado.
+ */
+export function extractAtaKeyFromItemKey(itemKey: string): string | null {
+  const match = /^(\d{5}\/\d{4})-\d{6}-\d{5}$/.exec((itemKey || '').trim());
+  return match ? match[1] : null;
+}
+
+export interface ArpItemContractLinkPair {
+  ataKey: string;
+  contractKey: string;
+}
+
+/**
+ * Busca TODOS os vínculos item↔contrato (sem filtro por item), já reduzidos
+ * ao par {ataKey, contractKey} — usado só para resolver o escopo de acesso do
+ * perfil "gestor" (useAssignedManagementScope): "de qual(is) Ata(s) este
+ * contrato faz parte" e vice-versa. Vínculos com item_key fora do formato
+ * esperado são ignorados silenciosamente (não têm Ata resolvível).
+ */
+export async function fetchAllArpItemContractLinks(): Promise<ArpItemContractLinkPair[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('arp_item_contract_links')
+      .select('item_key, contract_key');
+
+    if (error) throw error;
+    if (!data || !Array.isArray(data)) return [];
+
+    const pairs: ArpItemContractLinkPair[] = [];
+    for (const row of data) {
+      const ataKey = extractAtaKeyFromItemKey(row.item_key);
+      if (ataKey && row.contract_key) {
+        pairs.push({ ataKey, contractKey: row.contract_key });
+      }
+    }
+    return pairs;
+  } catch (err) {
+    console.warn('Erro ao carregar vínculos item↔contrato', err);
+    return [];
+  }
+}
+
+/**
  * Função Pura: Enriquece os vínculos contextuais com os dados soberanos do catálogo
  * oficial de contratos do SaldoARP (sem duplicar nenhuma regra ou fazer chamada de rede).
  */

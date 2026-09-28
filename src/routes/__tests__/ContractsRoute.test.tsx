@@ -7,6 +7,7 @@ import { ContractsPortfolioFilters } from '../../components/contracts/portfolio/
 import { ContractsPortfolioTable } from '../../components/contracts/portfolio/ContractsPortfolioTable';
 import * as useContractsDashboardModule from '../../hooks/useContractsDashboard';
 import * as useAllContractManagersModule from '../../hooks/useAllContractManagers';
+import * as useAtaManagersModule from '../../hooks/useAtaManagers';
 import * as authContextModule from '../../context/AuthContext';
 import type { ContractDashboardRecord } from '../../types';
 
@@ -85,6 +86,14 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     });
     vi.spyOn(useAllContractManagersModule, 'useAllContractManagers').mockReturnValue({
       data: {},
+      isLoading: false
+    } as any);
+    vi.spyOn(useAtaManagersModule, 'useAllAtaManagers').mockReturnValue({
+      data: {},
+      isLoading: false
+    } as any);
+    vi.spyOn(useAtaManagersModule, 'useArpItemContractLinks').mockReturnValue({
+      data: [],
       isLoading: false
     } as any);
   });

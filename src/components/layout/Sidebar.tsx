@@ -269,9 +269,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           gap: '0.2rem'
         }}
       >
-        {visibleNavigation.map((item, idx) => {
-          // Linha divisória sutil apenas após os itens de topo (Visão Geral e Central de Atenção)
-          const showTopDivider = idx === 2;
+        {visibleNavigation.map((item) => {
+          // Linha divisória sutil separando "Visão Geral" dos módulos de gestão
+          const showTopDivider = item.id === 'atas';
 
           return (
             <React.Fragment key={item.id}>

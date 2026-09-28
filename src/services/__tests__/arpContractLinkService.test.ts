@@ -3,7 +3,8 @@ import {
   enrichContractLinks,
   saveArpItemContractLink,
   deleteArpItemContractLink,
-  fetchArpItemContractLinks
+  fetchArpItemContractLinks,
+  extractAtaKeyFromItemKey
 } from '../arpContractLinkService';
 import * as rpcAdapter from '../../adapters/arpContractLinkRpcAdapter';
 import * as supabaseModule from '../supabaseClient';
@@ -250,5 +251,20 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
     expect(enriched).toHaveLength(1);
     expect(enriched[0].contractKey).toBe('200331-15-2026');
     expect(enriched[0].isOficial).toBe(true);
+  });
+
+  // extractAtaKeyFromItemKey: base do escopo "Gestor de Atas e Contratos"
+  // (useAssignedManagementScope) — precisa extrair o número da Ata do
+  // item_key exatamente no mesmo formato validado no RPC
+  // link_contract_to_item_atomic (migration 20260924000015).
+  describe('extractAtaKeyFromItemKey', () => {
+    it('extrai o número da Ata de um item_key válido', () => {
+      expect(extractAtaKeyFromItemKey('00037/2026-200331-00001')).toBe('00037/2026');
+    });
+
+    it('retorna null para um item_key fora do formato esperado', () => {
+      expect(extractAtaKeyFromItemKey('formato-invalido')).toBeNull();
+      expect(extractAtaKeyFromItemKey('')).toBeNull();
+    });
   });
 });
