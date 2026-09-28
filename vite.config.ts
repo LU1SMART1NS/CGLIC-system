@@ -1,9 +1,22 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/cypress/**',
+      '**/.{idea,git,cache,output,temp}/**',
+      '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
+      // Worktrees isolados criados por sessões de agente (ex.: .claude/worktrees/<nome>)
+      // duplicavam a suíte inteira por estarem aninhados dentro do repositório.
+      '**/.claude/**'
+    ]
+  },
   server: {
     proxy: {
       '/api-arp': {

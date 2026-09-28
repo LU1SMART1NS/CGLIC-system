@@ -10,6 +10,7 @@ import type {
   RpcUpdateContractTaskResult,
   ContractTaskStatus
 } from '../types/rpc';
+import type { TaskExecutionMode } from '../types';
 import { mapPostgresErrorToAppError } from './rpcErrorAdapter';
 
 function requireSupabase() {
@@ -173,6 +174,8 @@ export interface ContractTaskTemplateTaskInput {
   macrotaskId?: string;
   nome: string;
   ordem?: number;
+  /** Semântica de execução canônica (Fase 10-A.2) — INTERNA/EXTERNA/AUTOMATICA/CONFIRMACAO. */
+  executionMode?: TaskExecutionMode;
 }
 
 export async function saveContractTaskTemplateTaskRpc(
@@ -190,7 +193,8 @@ export async function saveContractTaskTemplateTaskRpc(
       p_id: input.id ? input.id.trim() : null,
       p_macrotask_id: input.macrotaskId ? input.macrotaskId.trim() : null,
       p_nome: cleanNome,
-      p_ordem: input.ordem ?? 0
+      p_ordem: input.ordem ?? 0,
+      p_execution_mode: input.executionMode ?? null
     });
 
     if (error) throw mapPostgresErrorToAppError(error);
@@ -265,6 +269,8 @@ export interface UpdateContractTaskInput {
   taskId: string;
   status?: ContractTaskStatus;
   responsavelNome?: string;
+  /** Identidade canônica do responsável (Fase 10-A.2) — opcional, ponte para auth.users. */
+  responsavelUserId?: string;
   prazo?: string | null;
   observacao?: string | null;
   concluidoPor?: string;
@@ -285,7 +291,8 @@ export async function updateContractTaskRpc(input: UpdateContractTaskInput): Pro
       p_responsavel_nome: input.responsavelNome ? input.responsavelNome.trim() : null,
       p_prazo: input.prazo ?? null,
       p_observacao: input.observacao ?? null,
-      p_concluido_por: input.concluidoPor ? input.concluidoPor.trim() : null
+      p_concluido_por: input.concluidoPor ? input.concluidoPor.trim() : null,
+      p_responsavel_user_id: input.responsavelUserId ?? null
     });
 
     if (error) throw mapPostgresErrorToAppError(error);

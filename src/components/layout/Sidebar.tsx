@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Lock } from 'lucide-react';
-import { navigationConfig, type NavItem } from '../../config/navigation';
+import { navigationConfig, filterNavigationByRole, type NavItem } from '../../config/navigation';
+import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -179,6 +180,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSeiModal,
   onOpenDepartmentsModal
 }) => {
+  const { role } = useAuth();
+  // roleStatus 'loading' é tratado como role=null (só itens públicos aparecem
+  // até a role real resolver) — mesmo princípio fail-closed do backend.
+  const visibleNavigation = useMemo(() => filterNavigationByRole(navigationConfig, role), [role]);
+
   const handleAction = (actionId: string) => {
     if (actionId === 'open-contract-templates' && onOpenContractTemplatesModal) {
       onOpenContractTemplatesModal();
@@ -263,7 +269,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           gap: '0.2rem'
         }}
       >
-        {navigationConfig.map((item, idx) => {
+        {visibleNavigation.map((item, idx) => {
           // Linha divisória sutil apenas após os itens de topo (Visão Geral e Central de Atenção)
           const showTopDivider = idx === 2;
 

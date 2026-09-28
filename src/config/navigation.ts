@@ -14,6 +14,7 @@ import {
   Landmark
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { AppRole } from '../types/rbac';
 
 export interface NavItem {
   id: string;
@@ -33,6 +34,13 @@ export interface NavItem {
   excludePrefixes?: string[];
   /** Identificador de ação customizada (ex.: abrir modal global) */
   actionId?: string;
+  /**
+   * Roles (public.roles.id) autorizadas a ver este item. `undefined` = público
+   * para qualquer usuário autenticado (comportamento anterior, preservado).
+   * Um item com `children` só some do menu se NENHUM filho sobrar após o
+   * filtro — ver `filterNavigationByRole`.
+   */
+  allowedRoles?: AppRole[];
 }
 
 /**
@@ -59,7 +67,8 @@ export const navigationConfig: NavItem[] = [
     icon: LayoutDashboard,
     route: '/instrumentos',
     status: 'active',
-    matchPrefixes: ['/instrumentos', '/prazos']
+    matchPrefixes: ['/instrumentos', '/prazos'],
+    allowedRoles: ['admin', 'gestor', 'leitor']
   },
   {
     id: 'atas',
@@ -74,7 +83,8 @@ export const navigationConfig: NavItem[] = [
         route: '/atas',
         status: 'active',
         matchPrefixes: ['/atas', '/atas/itens', '/atas/itens/saldo'],
-        excludePrefixes: ['/atas/saldos-unidade']
+        excludePrefixes: ['/atas/saldos-unidade'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
         id: 'atas-alocacoes',
@@ -82,7 +92,17 @@ export const navigationConfig: NavItem[] = [
         icon: Coins,
         route: '/atas/saldos-unidade',
         status: 'active',
-        matchPrefixes: ['/atas/saldos-unidade']
+        matchPrefixes: ['/atas/saldos-unidade'],
+        allowedRoles: ['admin', 'gestor_saldos']
+      },
+      {
+        id: 'atas-departamentos',
+        label: 'Unidades Internas',
+        icon: Users,
+        route: '/admin/departamentos',
+        status: 'active',
+        matchPrefixes: ['/admin/departamentos'],
+        allowedRoles: ['admin', 'gestor_saldos']
       }
     ]
   },
@@ -99,7 +119,8 @@ export const navigationConfig: NavItem[] = [
         route: '/contratos',
         status: 'active',
         matchPrefixes: ['/contratos'],
-        excludePrefixes: ['/contratos/modelos']
+        excludePrefixes: ['/contratos/modelos'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
         id: 'contratos-modelos',
@@ -107,7 +128,8 @@ export const navigationConfig: NavItem[] = [
         icon: Sliders,
         route: '/contratos/modelos',
         status: 'active',
-        matchPrefixes: ['/contratos/modelos']
+        matchPrefixes: ['/contratos/modelos'],
+        allowedRoles: ['admin', 'gestor']
       }
     ]
   },
@@ -121,9 +143,10 @@ export const navigationConfig: NavItem[] = [
         id: 'execucao-pagamentos',
         label: 'Pagamentos',
         icon: Receipt,
-        route: '/pagamentos',
         status: 'active',
-        matchPrefixes: ['/pagamentos']
+        route: '/pagamentos',
+        matchPrefixes: ['/pagamentos'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
         id: 'execucao-empenhos',
@@ -131,7 +154,8 @@ export const navigationConfig: NavItem[] = [
         icon: FileSpreadsheet,
         route: '/empenhos',
         status: 'active',
-        matchPrefixes: ['/empenhos']
+        matchPrefixes: ['/empenhos'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
       }
     ]
   },
@@ -147,7 +171,8 @@ export const navigationConfig: NavItem[] = [
         icon: Users,
         route: '/admin/usuarios',
         status: 'active',
-        matchPrefixes: ['/admin/usuarios']
+        matchPrefixes: ['/admin/usuarios'],
+        allowedRoles: ['admin']
       },
       {
         id: 'admin-perfis',
@@ -155,11 +180,45 @@ export const navigationConfig: NavItem[] = [
         icon: KeyRound,
         route: '/admin/perfis',
         status: 'active',
-        matchPrefixes: ['/admin/perfis']
+        matchPrefixes: ['/admin/perfis'],
+        allowedRoles: ['admin']
       }
     ]
   }
 ];
+
+/**
+ * Filtra a árvore de navegação pela role real do usuário (fonte: AuthContext,
+ * resolvida do backend). Regras (Fase Frontend RBAC):
+ *   - item sem `allowedRoles` -> público para qualquer usuário autenticado;
+ *   - item com `allowedRoles` -> só aparece se `role` estiver na lista;
+ *   - `role === null` (não resolvida ou ausente) -> só itens públicos aparecem
+ *     (mesmo princípio fail-closed do backend: ausência de role = ausência
+ *     de autoridade);
+ *   - grupo com `children` desaparece inteiramente se, após o filtro, nenhum
+ *     filho sobrar — nunca é exibido um grupo vazio.
+ */
+export function filterNavigationByRole(items: NavItem[], role: AppRole | null): NavItem[] {
+  const isAllowed = (allowedRoles?: AppRole[]): boolean => {
+    if (!allowedRoles) return true;
+    return role !== null && allowedRoles.includes(role);
+  };
+
+  return items.reduce<NavItem[]>((acc, item) => {
+    if (item.children && item.children.length > 0) {
+      const filteredChildren = filterNavigationByRole(item.children, role);
+      if (filteredChildren.length > 0) {
+        acc.push({ ...item, children: filteredChildren });
+      }
+      return acc;
+    }
+
+    if (isAllowed(item.allowedRoles)) {
+      acc.push(item);
+    }
+    return acc;
+  }, []);
+}
 
 export interface BreadcrumbEntry {
   label: string;

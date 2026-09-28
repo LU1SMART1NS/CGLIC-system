@@ -612,6 +612,8 @@ export interface ContractTask {
   sistemaDestino?: string;
   externalLinkUrl?: string;
   responsavelNome?: string;
+  /** Identidade canônica do responsável (Fase 10-A.2), quando resolvida a uma conta ativa do Supabase Auth. Opcional — responsavelNome permanece a informação legada/humana sempre presente. */
+  responsavelUserId?: string;
   prazo?: string;
   observacao?: string;
   criadoEm: string;

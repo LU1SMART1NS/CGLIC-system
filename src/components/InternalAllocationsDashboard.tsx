@@ -9,6 +9,7 @@ import { AllocationsPortfolioSummary } from './atas/allocations/AllocationsPortf
 import { AllocationsPortfolioFilters, type AllocationsPortfolioFilterState } from './atas/allocations/AllocationsPortfolioFilters';
 import { AllocationsPortfolioContent, type EnrichedAllocationRow } from './atas/allocations/AllocationsPortfolioContent';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
+import { getArpVigenciaStatus } from '../services/temporalEngineService';
 import type { ArpRecord, ArpItemRecord } from '../types';
 
 interface InternalAllocationsDashboardProps {
@@ -166,10 +167,6 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
 
   // Enriquecimento completo das alocações
   const enrichedItems = useMemo<EnrichedAllocationRow[]>(() => {
-    const today = new Date();
-    const ninetyDaysFromNow = new Date();
-    ninetyDaysFromNow.setDate(today.getDate() + 90);
-
     return allocations.map(alloc => {
       const { numeroAta, uasg, itemNum } = parseItemKey(alloc.itemKey);
       const ataKey = `${numeroAta}-${uasg}`;
@@ -203,9 +200,10 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
       const allocatedQty = Number(alloc.allocatedQty) || 0;
       const saldoQty = Math.max(0, allocatedQty - empenhadaQty);
 
-      const vigenciaFinalDate = targetArp?.dataVigenciaFinal ? new Date(targetArp.dataVigenciaFinal) : undefined;
-      const isExpired = Boolean(targetArp?.isCanceladaPncp || (vigenciaFinalDate && vigenciaFinalDate < today));
-      const isExpiringSoon = !isExpired && Boolean(vigenciaFinalDate && vigenciaFinalDate <= ninetyDaysFromNow);
+      // Regra de vigência de Ata canônica (Fase 10-A.2 — temporalEngineService.getArpVigenciaStatus).
+      const vigenciaStatus = getArpVigenciaStatus(targetArp?.dataVigenciaFinal);
+      const isExpired = Boolean(targetArp?.isCanceladaPncp || vigenciaStatus?.isExpirada);
+      const isExpiringSoon = !isExpired && Boolean(vigenciaStatus?.isExpirandoEm90Dias);
 
       return {
         id: alloc.id,

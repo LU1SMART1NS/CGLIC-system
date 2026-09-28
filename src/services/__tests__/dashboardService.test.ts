@@ -8,7 +8,8 @@ import {
   calculateArpSummary,
   calculatePaymentsSummary,
   buildManagementDashboardReadModel,
-  fetchManagementDashboardData
+  fetchManagementDashboardData,
+  fetchAllPaymentCyclesForDashboard
 } from '../dashboardService';
 import type {
   ContractDashboardRecord,
@@ -21,10 +22,12 @@ import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 import * as dbCacheService from '../dbCacheService';
 import * as contractService from '../contractService';
 import * as contractManagementService from '../contractManagementService';
+import * as paymentCycleRpcAdapter from '../../adapters/paymentCycleRpcAdapter';
 
 vi.mock('../dbCacheService');
 vi.mock('../contractService');
 vi.mock('../contractManagementService');
+vi.mock('../../adapters/paymentCycleRpcAdapter');
 
 describe('dashboardService (SaldoARP 3.0 — Fase 8-B)', () => {
   const referenceDate = new Date('2026-09-24T12:00:00Z');
@@ -757,6 +760,54 @@ describe('dashboardService (SaldoARP 3.0 — Fase 8-B)', () => {
       expect(result.uasg).toBe('200331');
       expect(result.executive.totalContratos).toBe(1);
       expect(result.arp.totalAtas).toBe(1);
+    });
+  });
+
+  describe('fetchAllPaymentCyclesForDashboard (Fase 10-A.2.1 — GAP corrigido: visão consolidada não lia mais localStorage)', () => {
+    it('retorna array vazio quando não há contratos', async () => {
+      const result = await fetchAllPaymentCyclesForDashboard([]);
+      expect(result).toEqual([]);
+      expect(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).not.toHaveBeenCalled();
+    });
+
+    it('busca ciclos via Supabase (contract_payment_cycles) para as chaves de contrato informadas, nunca via localStorage', async () => {
+      const contracts: ContractDashboardRecord[] = [
+        { id: 'c1', numero: '01/2026', ano: 2026, numeroFormatado: '01/2026', uasg: '200331', objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', fonteDados: 'PNCP' } as any
+      ];
+
+      vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockResolvedValue([
+        {
+          id: 'row-1',
+          cycle_key: 'c1-PGTO-202609-DOC1',
+          contract_key: 'c1',
+          competencia: '2026-09',
+          documento_atesto_sei: 'Doc 1',
+          valor_atesto: 1000,
+          data_assinatura_atesto: '2026-09-01',
+          data_vencimento_fatura: '2026-09-20',
+          status: 'RECEBIDO',
+          origem_dado: 'MANUAL',
+          criado_em: '2026-09-01T00:00:00Z',
+          atualizado_em: '2026-09-01T00:00:00Z'
+        } as any
+      ]);
+
+      const result = await fetchAllPaymentCyclesForDashboard(contracts);
+
+      expect(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).toHaveBeenCalledWith(['c1']);
+      expect(result).toHaveLength(1);
+      expect(result[0].cycleKey).toBe('c1-PGTO-202609-DOC1');
+      expect(result[0].contractKey).toBe('c1');
+    });
+
+    it('retorna array vazio (sem lançar) se a consulta ao Supabase falhar', async () => {
+      const contracts: ContractDashboardRecord[] = [
+        { id: 'c1', numero: '01/2026', ano: 2026, numeroFormatado: '01/2026', uasg: '200331', objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', fonteDados: 'PNCP' } as any
+      ];
+      vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockRejectedValue(new Error('network error'));
+
+      const result = await fetchAllPaymentCyclesForDashboard(contracts);
+      expect(result).toEqual([]);
     });
   });
 });

@@ -62,6 +62,8 @@ export interface PaymentCycleInput {
   empenhoCanonicalKey?: string;         // Chave canônica do empenho de lastro ({uasg}-{ano}-{numeroNormalizado})
   titularNome?: string;                 // Fiscal Titular / Gestor supervisor
   responsavelNome?: string;             // Servidor de confecção atribuído
+  /** Identidade canônica do responsável (Fase 10-A.2), ponte opcional para auth.users. */
+  responsavelUserId?: string;
   documentoDespachoSei?: string;        // Número do documento SEI de despacho
   dataEnvioCgofi?: string;              // Data de envio à CGOFI (YYYY-MM-DD)
   numeroOrdemBancaria?: string;         // Número da Ordem Bancária SIAFI (ex: '2026OB800123')
@@ -85,6 +87,8 @@ export interface PaymentCyclePrazos {
  * Representação completa do Ciclo Operacional de Faturamento / Atesto
  */
 export interface PaymentFollowUpCycle {
+  /** UUID da linha em contract_payment_cycles (Fase 10-A.2). Ausente para ciclos ainda não persistidos. */
+  id?: string;
   cycleKey: string;                     // Identidade canônica: {contractKey}-PGTO-{YYYYMM}-{DocIdNormalizado}
   contractKey: string;
   competencia: string;

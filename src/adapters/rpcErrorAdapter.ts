@@ -250,6 +250,33 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
     };
   }
 
+  if (message.includes('PAYMENT_CYCLE_ALREADY_EXISTS')) {
+    return {
+      code: 'PAYMENT_CYCLE_ALREADY_EXISTS',
+      message: 'Já existe um ciclo de pagamento para este contrato, competência e documento de atesto.',
+      sqlState: '23505',
+      details: error
+    };
+  }
+
+  if (message.includes('PAYMENT_CYCLE_NOT_FOUND')) {
+    return {
+      code: 'PAYMENT_CYCLE_NOT_FOUND',
+      message: 'Ciclo de pagamento não encontrado.',
+      sqlState: 'P0002',
+      details: error
+    };
+  }
+
+  if (message.includes('INVALID_CYCLE_STATUS')) {
+    return {
+      code: 'INVALID_CYCLE_STATUS',
+      message: 'Status de ciclo de pagamento inválido.',
+      sqlState: '22023',
+      details: error
+    };
+  }
+
   if (message.includes('INVALID_PAYLOAD') || sqlState === '22023') {
     return {
       code: 'INVALID_PAYLOAD',

@@ -1,951 +1,259 @@
 import React, { useState } from 'react';
-import {
-  Shield,
-  KeyRound,
-  Check,
-  X,
-  UserCheck,
-  Eye,
-  Plus,
-  Edit2,
-  Trash2,
-  Sparkles,
-  CheckSquare,
-  Square,
-  Lock,
-  Layers
-} from 'lucide-react';
-import {
-  type RoleDefinition,
-  type RolePermissions,
-  type ContractScope,
-  DEFAULT_ROLE_PERMISSIONS,
-  PERMISSION_CATALOG,
-  MACROPROCESS_LIST,
-  getContractScopeDisplay
-} from '../../types/user';
-import { useRoles, useSaveRole, useDeleteRole } from '../../hooks/useRoles';
-import { AppCard } from '../../design-system/components/AppCard';
-import { SectionHeader } from '../../design-system/components/SectionHeader';
-import { AppButton } from '../../design-system/components/AppButton';
+import { KeyRound, Shield, UserCheck, Coins, Eye, X, ChevronRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { PageHeader } from '../../design-system/components/PageHeader';
+import { AppCard } from '../../design-system/components/AppCard';
+import { AppButton } from '../../design-system/components/AppButton';
+import { StatusBadge } from '../../design-system/components/StatusBadge';
+import { SectionHeader } from '../../design-system/components/SectionHeader';
+import { colors, spacing, typography } from '../../design-system/tokens';
+import type { AppRole } from '../../types/rbac';
 
-const PRESET_COLORS = [
-  '#0c326f',
-  '#0284c7',
-  '#059669',
-  '#7c3aed',
-  '#d97706',
-  '#e11d48',
-  '#475569'
-];
+export interface ProfileArea {
+  label: string;
+  description: string;
+}
 
-const SCOPE_OPTIONS: { id: ContractScope; label: string; tag: string; desc: string }[] = [
+export interface ProfileDefinition {
+  /** Role real do backend (public.roles.id) — fonte de verdade da autorização. */
+  id: AppRole;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  /**
+   * Áreas de negócio às quais o perfil tem acesso. A ausência de uma área
+   * aqui já significa "sem acesso" — não listamos negativos explicitamente.
+   */
+  areas: ProfileArea[];
+  /** Abrangência em linguagem de negócio (nunca GLOBAL/ASSIGNED/UNIT crus). */
+  scope: string;
+}
+
+/**
+ * Configuração PRESENCIONAL fixa dos 4 perfis nativos do CGLIC-system.
+ * Isto NÃO é fonte de autorização — é só texto de apresentação em linguagem
+ * de negócio. A autorização real continua inteiramente no backend
+ * (public.role_permissions / role_domain_scopes), já refletida no frontend
+ * por AuthContext/Sidebar/RequireRole (Fase Frontend RBAC).
+ */
+export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
   {
-    id: 'ASSIGNED',
-    label: 'Apenas Contratos Atribuídos',
-    tag: 'Recomendado para Gestores / Fiscais',
-    desc: 'O operador visualiza e executa ações exclusivamente sobre os contratos designados ao seu nome.'
+    id: 'admin',
+    label: 'Coordenador',
+    description: 'Administração geral do sistema e gestão de todos os domínios.',
+    icon: Shield,
+    areas: [
+      { label: 'Contratos', description: 'Gestão completa' },
+      { label: 'Execução financeira', description: 'Gestão' },
+      { label: 'Alocações', description: 'Gestão completa' },
+      { label: 'Unidades internas', description: 'Gestão' },
+      { label: 'Usuários e servidores', description: 'Gestão' },
+      { label: 'Perfis', description: 'Gestão' }
+    ],
+    scope: 'Todas as unidades'
   },
   {
-    id: 'GLOBAL',
-    label: 'Acesso Global',
-    tag: 'Recomendado para Coordenadores / Auditoria',
-    desc: 'Visibilidade ampla sobre todo o acervo de atas e contratos da UASG 200331.'
+    id: 'gestor',
+    label: 'Gestor de Contratos',
+    description: 'Gestão dos contratos e atividades contratuais dentro do escopo atribuído.',
+    icon: UserCheck,
+    areas: [
+      { label: 'Contratos', description: 'Gestão dentro do escopo atribuído' },
+      { label: 'Execução financeira', description: 'Gestão' }
+    ],
+    scope: 'Contratos atribuídos ao perfil'
   },
   {
-    id: 'UNIT',
-    label: 'Unidade / Setorial',
-    tag: 'Gestão por Departamento',
-    desc: 'Acesso restrito aos contratos vinculados à unidade requisitante ou departamento do servidor.'
+    id: 'gestor_saldos',
+    label: 'Gestor de Saldo',
+    description: 'Gestão das alocações internas das Atas e das unidades internas.',
+    icon: Coins,
+    areas: [
+      { label: 'Alocações', description: 'Gestão completa' },
+      { label: 'Unidades internas', description: 'Gestão' }
+    ],
+    scope: 'Todas as Atas'
+  },
+  {
+    id: 'leitor',
+    label: 'Consulta / Auditoria',
+    description: 'Consulta das informações do sistema, sem funções de administração.',
+    icon: Eye,
+    areas: [
+      { label: 'Contratos', description: 'Consulta' },
+      { label: 'Alocações', description: 'Consulta' },
+      { label: 'Unidades internas', description: 'Consulta' },
+      { label: 'Execução financeira', description: 'Consulta, somente onde o frontend já disponibilizar essa consulta' }
+    ],
+    scope: 'Informações disponíveis para consulta'
   }
 ];
 
-function getActivePermissionsCount(permissoes: RolePermissions): number {
-  return Object.entries(permissoes).filter(
-    ([k, v]) => k !== 'contractScope' && k !== 'visualizarTodosContratos' && v === true
-  ).length;
-}
-
-export const RolesPermissions: React.FC = () => {
-  const { data: roles = [] } = useRoles();
-  const saveRoleMutation = useSaveRole();
-  const deleteRoleMutation = useDeleteRole();
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<RoleDefinition | null>(null);
-
-  // Form State
-  const [nome, setNome] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [badgeColor, setBadgeColor] = useState('#0c326f');
-  const [contractScope, setContractScope] = useState<ContractScope>('ASSIGNED');
-  const [permissoes, setPermissoes] = useState<RolePermissions>({
-    ...DEFAULT_ROLE_PERMISSIONS
-  });
-
-  const totalConfigurablePerms = PERMISSION_CATALOG.filter(
-    (p) => p.key !== 'visualizarTodosContratos'
-  ).length;
-
-  const handleOpenCreateModal = () => {
-    setEditingRole(null);
-    setNome('');
-    setDescricao('');
-    setBadgeColor('#7c3aed');
-    setContractScope('ASSIGNED');
-    setPermissoes({
-      ...DEFAULT_ROLE_PERMISSIONS,
-      contractScope: 'ASSIGNED',
-      visualizarTodosContratos: false
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = (role: RoleDefinition) => {
-    setEditingRole(role);
-    setNome(role.nome);
-    setDescricao(role.descricao);
-    setBadgeColor(role.badgeColor);
-    const scope = role.permissoes.contractScope || 'ASSIGNED';
-    setContractScope(scope);
-    setPermissoes({
-      ...role.permissoes,
-      contractScope: scope,
-      visualizarTodosContratos: scope === 'GLOBAL'
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleScopeChange = (newScope: ContractScope) => {
-    setContractScope(newScope);
-    setPermissoes((prev) => ({
-      ...prev,
-      contractScope: newScope,
-      // Sincroniza retrocompatibilidade de visualizarTodosContratos com base no escopo
-      visualizarTodosContratos: newScope === 'GLOBAL'
-    }));
-  };
-
-  const handleTogglePermission = (key: keyof Omit<RolePermissions, 'contractScope'>) => {
-    if (key === 'visualizarTodosContratos') {
-      // Bloqueado para edição direta: derivado deterministicamente do contractScope
-      return;
-    }
-    setPermissoes((prev) => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nome.trim()) return;
-
-    saveRoleMutation.mutate(
-      {
-        id: editingRole ? editingRole.id : undefined,
-        nome: nome.trim(),
-        descricao: descricao.trim(),
-        badgeColor,
-        permissoes: {
-          ...permissoes,
-          contractScope,
-          visualizarTodosContratos: contractScope === 'GLOBAL'
-        }
-      },
-      {
-        onSuccess: () => {
-          setIsModalOpen(false);
-        }
-      }
-    );
-  };
-
-  const handleDelete = (id: string, roleNome: string) => {
-    if (window.confirm(`Deseja realmente remover o perfil customizado "${roleNome}"?`)) {
-      deleteRoleMutation.mutate(id);
-    }
-  };
-
+/**
+ * Conteúdo de detalhe de um perfil ("Acesso por área" + abrangência).
+ * Exportado à parte para ser testável isoladamente, sem depender de
+ * simulação de clique (a suíte de testes deste projeto não usa jsdom).
+ */
+export const ProfileDetailContent: React.FC<{ profile: ProfileDefinition }> = ({ profile }) => {
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      
-      {/* Cabeçalho da Página com PageHeader */}
-      <PageHeader
-        title="Perfis e Permissões"
-        subtitle="Definição dos níveis de acesso, escopos operacionais e regras de governança do ComprasSUSP"
-        icon={<KeyRound size={26} color="#0c326f" aria-hidden="true" />}
-        actions={
-          <AppButton
-            variant="primary"
-            onClick={handleOpenCreateModal}
-            icon={<Plus size={18} />}
-            data-testid="create-role-btn"
-          >
-            Novo Perfil
-          </AppButton>
-        }
-      />
+    <div data-testid={`profile-detail-${profile.id}`} style={{ display: 'flex', flexDirection: 'column', gap: spacing.xl }}>
+      <div>
+        <h2 style={{ margin: 0, fontSize: typography.fontSize.h4, fontWeight: 800, color: colors.text.primary }}>
+          {profile.label}
+        </h2>
+        <p style={{ margin: `${spacing.xs} 0 0 0`, fontSize: typography.fontSize.bodySm, color: colors.text.secondary, lineHeight: 1.5 }}>
+          {profile.description}
+        </p>
+      </div>
 
-      {/* Aviso de Governança e Soberania RBAC */}
-      <div style={{
-        background: '#eff6ff',
-        border: '1px solid #bfdbfe',
-        borderLeft: '5px solid #0c326f',
-        borderRadius: '8px',
-        padding: '1rem 1.25rem',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '0.85rem'
-      }}>
-        <div style={{ color: '#0c326f', marginTop: '0.15rem' }}>
-          <Shield size={20} />
-        </div>
-        <div style={{ fontSize: '0.84rem', color: '#1e3a8a', lineHeight: 1.5 }}>
-          <strong>Aviso de Governança Institucional e Soberania RBAC:</strong>
-          <p style={{ margin: '0.25rem 0 0 0', color: '#1e40af' }}>
-            A matriz exibida nesta tela define o catálogo de perfis operacionais e distribuição de competências no âmbito do ComprasSUSP (UASG 200331). A autoridade estrita de acesso e proteção aos registros reside de forma imutável nas políticas de <strong>Row Level Security (RLS)</strong> e papéis do banco de dados (<em>gestor</em>, <em>authenticated</em>, <em>anon</em>) no Supabase.
-          </p>
+      <div>
+        <SectionHeader title="Acesso por área" testId="profile-detail-areas-header" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+          {profile.areas.map((area) => (
+            <div
+              key={area.label}
+              data-testid={`profile-detail-area-${profile.id}-${area.label}`}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                gap: spacing.md,
+                padding: `${spacing.sm} 0`,
+                borderBottom: `1px solid ${colors.border.subtle}`
+              }}
+            >
+              <span style={{ fontWeight: 700, color: colors.text.primary, fontSize: typography.fontSize.bodySm }}>
+                {area.label}
+              </span>
+              <span style={{ color: colors.text.secondary, fontSize: typography.fontSize.bodySm, textAlign: 'right' }}>
+                {area.description}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Cards de Perfis */}
-      <div
-        data-testid="roles-cards-container"
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}
-      >
-        {roles.map((role) => {
-          const isCoordenador = role.id === 'coordenador';
-          const isGestor = role.id === 'gestor';
-          const isConsulta = role.id === 'consulta';
-          const scopeInfo = getContractScopeDisplay(role.permissoes.contractScope, isConsulta);
-          const activeCount = getActivePermissionsCount(role.permissoes);
+      <div>
+        <SectionHeader title="Abrangência" testId="profile-detail-scope-header" />
+        <p style={{ margin: 0, fontSize: typography.fontSize.bodySm, color: colors.text.primary, fontWeight: 600 }}>
+          {profile.scope}
+        </p>
+      </div>
+    </div>
+  );
+};
 
+const ProfileDrawer: React.FC<{ profile: ProfileDefinition | null; onClose: () => void }> = ({ profile, onClose }) => {
+  if (!profile) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Detalhe do perfil ${profile.label}`}
+      data-testid="profile-drawer"
+      style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
+    >
+      <div
+        onClick={onClose}
+        style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.45)' }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          height: '100%',
+          width: 'min(420px, 100%)',
+          background: colors.background.surface,
+          boxShadow: '-8px 0 24px rgba(15, 23, 42, 0.12)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: spacing.lg,
+            borderBottom: `1px solid ${colors.border.subtle}`
+          }}
+        >
+          <span style={{ fontSize: typography.fontSize.label, fontWeight: 700, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Detalhe do perfil
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            data-testid="profile-drawer-close"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text.secondary, padding: spacing.xs }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div style={{ padding: spacing.lg, overflowY: 'auto', flex: 1 }}>
+          <ProfileDetailContent profile={profile} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const RolesPermissions: React.FC = () => {
+  const [selectedProfileId, setSelectedProfileId] = useState<AppRole | null>(null);
+  const selectedProfile = PROFILE_DEFINITIONS.find((p) => p.id === selectedProfileId) ?? null;
+
+  return (
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: spacing.xl }}>
+      <PageHeader
+        title="Perfis"
+        subtitle="Perfis de acesso ao CGLIC-system"
+        icon={<KeyRound size={26} color={colors.brand.primary} aria-hidden="true" />}
+      />
+
+      <div
+        data-testid="profiles-cards-grid"
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: spacing.lg }}
+      >
+        {PROFILE_DEFINITIONS.map((profile) => {
+          const Icon = profile.icon;
           return (
             <AppCard
-              key={role.id}
-              className="role-card"
-              data-testid={`role-card-${role.id}`}
-              style={{
-                borderTop: `4px solid ${role.badgeColor}`,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                position: 'relative'
-              }}
+              key={profile.id}
+              data-testid={`profile-card-${profile.id}`}
+              style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}
             >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      color: role.badgeColor,
-                      background: `${role.badgeColor}15`,
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px'
-                    }}>
-                      {role.isCustom ? 'Perfil Customizado' : 'Perfil Nativo'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditModal(role)}
-                      title={`Editar Perfil ${role.nome}`}
-                      data-testid={`edit-role-btn-${role.id}`}
-                      style={{
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        padding: '0.3rem',
-                        color: '#475569',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Edit2 size={13} />
-                    </button>
-
-                    {role.isCustom && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(role.id, role.nome)}
-                        title={`Remover Perfil ${role.nome}`}
-                        data-testid={`delete-role-btn-${role.id}`}
-                        style={{
-                          background: '#fff1f2',
-                          border: '1px solid #fecdd3',
-                          borderRadius: '6px',
-                          padding: '0.3rem',
-                          color: '#e11d48',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem' }}>
-                  {isCoordenador ? (
-                    <Shield size={20} color={role.badgeColor} aria-hidden="true" />
-                  ) : isGestor ? (
-                    <UserCheck size={20} color={role.badgeColor} aria-hidden="true" />
-                  ) : isConsulta ? (
-                    <Eye size={20} color={role.badgeColor} aria-hidden="true" />
-                  ) : (
-                    <Sparkles size={20} color={role.badgeColor} aria-hidden="true" />
-                  )}
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    {role.nome}
-                  </h3>
-                </div>
-
-                <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45, margin: '0.6rem 0 0.85rem 0' }}>
-                  {role.descricao}
-                </p>
-
-                {/* Resumo de Permissões Ativas */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  fontSize: '0.74rem',
-                  color: '#475569',
-                  background: '#f8fafc',
-                  padding: '0.35rem 0.65rem',
-                  borderRadius: '6px',
-                  border: '1px solid #f1f5f9',
-                  marginBottom: '1rem'
-                }}>
-                  <Layers size={13} color="#64748b" />
-                  <span>
-                    Operações Autorizadas: <strong>{activeCount} de {totalConfigurablePerms}</strong>
-                  </span>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                <Icon size={20} color={colors.brand.primary} aria-hidden="true" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: colors.text.primary }}>
+                  {profile.label}
+                </h3>
               </div>
 
-              {/* Rodapé do Card: Escopo Contratual */}
-              <div style={{
-                paddingTop: '0.85rem',
-                borderTop: '1px solid #f1f5f9',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.35rem'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: '0.76rem',
-                  fontWeight: 700,
-                  color: '#334155'
-                }}>
-                  <span>Escopo Contratual:</span>
-                  <span
-                    data-testid={`role-scope-badge-${role.id}`}
-                    style={{
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px',
-                      background: scopeInfo.badgeBg,
-                      color: scopeInfo.badgeColor,
-                      border: `1px solid ${scopeInfo.badgeColor}30`
-                    }}
-                  >
-                    {scopeInfo.label}
-                  </span>
-                </div>
-                <div style={{ fontSize: '0.71rem', color: '#64748b', lineHeight: 1.35 }}>
-                  {scopeInfo.description}
-                </div>
-              </div>
+              <p style={{ margin: 0, fontSize: typography.fontSize.bodySm, color: colors.text.secondary, lineHeight: 1.5, flex: 1 }}>
+                {profile.description}
+              </p>
+
+              <StatusBadge label="Perfil do sistema" variant="neutral" size="sm" />
+
+              <AppButton
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedProfileId(profile.id)}
+                data-testid={`ver-detalhes-${profile.id}`}
+                icon={<ChevronRight size={14} />}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                Ver detalhes
+              </AppButton>
             </AppCard>
           );
         })}
       </div>
 
-      {/* Tabela Comparativa de Permissões Agrupada por Macroprocessos */}
-      <AppCard data-testid="matrix-table-card">
-        <div style={{ marginBottom: '1.25rem' }}>
-          <SectionHeader
-            title="Matriz Canônica de Funcionalidades & Escopos"
-            subtitle="Comparativo direto de ações autorizadas por perfil organizadas pelos 5 macroprocessos da gestão pública"
-          />
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            data-testid="roles-permissions-table"
-            style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}
-          >
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1', color: '#334155', fontSize: '0.78rem' }}>
-                <th style={{ textAlign: 'left', padding: '0.85rem 1rem', fontWeight: 800, width: '42%' }}>
-                  Macroprocesso & Operação
-                </th>
-                {roles.map((r) => {
-                  const scopeInfo = getContractScopeDisplay(r.permissoes.contractScope, r.id === 'consulta');
-                  return (
-                    <th
-                      key={r.id}
-                      style={{
-                        textAlign: 'center',
-                        padding: '0.85rem 0.75rem',
-                        fontWeight: 800,
-                        color: r.badgeColor,
-                        minWidth: '150px'
-                      }}
-                    >
-                      <div style={{ fontSize: '0.85rem' }}>{r.nome}</div>
-                      <div style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        color: scopeInfo.badgeColor,
-                        background: scopeInfo.badgeBg,
-                        display: 'inline-block',
-                        padding: '0.15rem 0.45rem',
-                        borderRadius: '4px',
-                        marginTop: '0.2rem'
-                      }}>
-                        {scopeInfo.label}
-                      </div>
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {MACROPROCESS_LIST.map((macro) => {
-                const permsInMacro = PERMISSION_CATALOG.filter((p) => p.macroprocesso === macro.id);
-
-                return (
-                  <React.Fragment key={macro.id}>
-                    {/* Cabeçalho da Seção do Macroprocesso */}
-                    <tr
-                      data-testid={`macroprocess-header-${macro.id}`}
-                      style={{
-                        background: '#f1f5f9',
-                        borderTop: '2px solid #cbd5e1',
-                        borderBottom: '1px solid #cbd5e1'
-                      }}
-                    >
-                      <td colSpan={1 + roles.length} style={{ padding: '0.65rem 1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <strong style={{
-                            fontSize: '0.82rem',
-                            color: '#0c326f',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em'
-                          }}>
-                            {macro.title}
-                          </strong>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                            — {macro.description}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* Linhas de Permissão do Macroprocesso */}
-                    {permsInMacro.map((perm, pIdx) => (
-                      <tr
-                        key={perm.key}
-                        data-testid={`matrix-row-${perm.key}`}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          background: pIdx % 2 === 0 ? '#ffffff' : '#fafafa'
-                        }}
-                      >
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 700, color: '#0f172a' }}>{perm.label}</span>
-                            {perm.readOnly && (
-                              <span style={{
-                                fontSize: '0.66rem',
-                                fontWeight: 700,
-                                background: '#f1f5f9',
-                                color: '#475569',
-                                padding: '0.1rem 0.35rem',
-                                borderRadius: '4px',
-                                textTransform: 'uppercase'
-                              }}>
-                                Leitura
-                              </span>
-                            )}
-                            {perm.key === 'visualizarTodosContratos' && (
-                              <span style={{
-                                fontSize: '0.66rem',
-                                fontWeight: 700,
-                                background: '#fef3c7',
-                                color: '#b45309',
-                                padding: '0.1rem 0.35rem',
-                                borderRadius: '4px',
-                                textTransform: 'uppercase'
-                              }}>
-                                Legado / Escopo
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>
-                            {perm.description}
-                          </div>
-                        </td>
-
-                        {roles.map((r) => {
-                          const isAllowed = Boolean(r.permissoes[perm.key]);
-
-                          // Detalhamento contextual de escopo em permissões críticas
-                          let contextTag: string | null = null;
-                          if (isAllowed) {
-                            if (perm.key === 'visualizarContratos') {
-                              contextTag = r.permissoes.contractScope === 'GLOBAL' ? 'Global' : r.permissoes.contractScope === 'ASSIGNED' ? 'Atribuídos' : 'Unidade';
-                            } else if (perm.key === 'sincronizarEmpenhos') {
-                              contextTag = r.permissoes.contractScope === 'ASSIGNED' ? 'No Contrato' : 'Global';
-                            }
-                          } else if (perm.key === 'visualizarTodosContratos' && r.permissoes.contractScope === 'ASSIGNED') {
-                            contextTag = 'Escopo Delimitado';
-                          }
-
-                          return (
-                            <td
-                              key={r.id}
-                              style={{ textAlign: 'center', padding: '0.75rem 0.75rem', verticalAlign: 'middle' }}
-                              data-testid={`perm-cell-${r.id}-${perm.key}`}
-                            >
-                              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
-                                {isAllowed ? (
-                                  <span
-                                    title={`Autorizado para ${r.nome}`}
-                                    aria-label={`Permitido para ${r.nome}`}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      width: '24px',
-                                      height: '24px',
-                                      borderRadius: '50%',
-                                      background: '#dcfce7',
-                                      color: '#15803d'
-                                    }}
-                                  >
-                                    <Check size={14} strokeWidth={3} />
-                                  </span>
-                                ) : (
-                                  <span
-                                    title={`Não autorizado para ${r.nome}`}
-                                    aria-label={`Não permitido para ${r.nome}`}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      width: '24px',
-                                      height: '24px',
-                                      borderRadius: '50%',
-                                      background: '#f1f5f9',
-                                      color: '#94a3b8'
-                                    }}
-                                  >
-                                    <X size={14} strokeWidth={2} />
-                                  </span>
-                                )}
-
-                                {contextTag && (
-                                  <span style={{
-                                    fontSize: '0.64rem',
-                                    fontWeight: 700,
-                                    color: isAllowed ? '#15803d' : '#64748b',
-                                    background: isAllowed ? '#f0fdf4' : '#f8fafc',
-                                    padding: '0.1rem 0.35rem',
-                                    borderRadius: '4px',
-                                    whiteSpace: 'nowrap'
-                                  }}>
-                                    {contextTag}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </AppCard>
-
-      {/* MODAL DE CRIAÇÃO / EDIÇÃO DE PERFIL */}
-      {isModalOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(3px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem'
-        }}>
-          <div
-            data-testid="role-modal"
-            style={{
-              background: '#ffffff',
-              borderRadius: '14px',
-              width: '100%',
-              maxWidth: '750px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-              border: '1px solid #e2e8f0'
-            }}
-          >
-            {/* Header Modal */}
-            <div style={{
-              padding: '1.25rem 1.5rem',
-              borderBottom: '1px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: '#f8fafc'
-            }}>
-              <div>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  {editingRole ? `Editar Perfil: ${editingRole.nome}` : 'Criar Novo Perfil de Acesso'}
-                </h2>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
-                  Defina o escopo de atuação e as permissões operacionais nos 5 macroprocessos
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                data-testid="modal-close-btn"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#64748b',
-                  cursor: 'pointer',
-                  padding: '0.4rem',
-                  borderRadius: '6px'
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              
-              {/* 1. Nome do Perfil */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                  Nome do Perfil *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Fiscal Técnico Setorial"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  data-testid="role-name-input"
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.75rem',
-                    fontSize: '0.88rem',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              {/* 2. Descrição */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                  Descrição e Finalidade
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Ex: Responsável pela conferência técnica de medições e fiscalização de contratos setoriais."
-                  value={descricao}
-                  onChange={(e) => setDescricao(e.target.value)}
-                  data-testid="role-description-input"
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.75rem',
-                    fontSize: '0.85rem',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    outline: 'none',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-
-              {/* 3. Cor Temática */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.45rem' }}>
-                  Cor Temática do Perfil
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {PRESET_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setBadgeColor(color)}
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: color,
-                        border: badgeColor === color ? '3px solid #0f172a' : '2px solid #ffffff',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                        cursor: 'pointer'
-                      }}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    value={badgeColor}
-                    onChange={(e) => setBadgeColor(e.target.value)}
-                    title="Escolher cor personalizada"
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      padding: 0,
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      background: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* 4. SELEÇÃO DO ESCOPO CONTRATUAL (PERMISSÃO ≠ ESCOPO) */}
-              <div style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                padding: '1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.65rem'
-              }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.86rem', fontWeight: 800, color: '#0c326f' }}>
-                    Escopo Contratual (Universo de Contratos) *
-                  </label>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.2rem 0 0.5rem 0' }}>
-                    Define sobre quais contratos este perfil tem autorização de visualização e operação.
-                  </p>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.65rem' }}>
-                  {SCOPE_OPTIONS.map((opt) => {
-                    const isSelected = contractScope === opt.id;
-                    return (
-                      <div
-                        key={opt.id}
-                        onClick={() => handleScopeChange(opt.id)}
-                        data-testid={`scope-option-${opt.id}`}
-                        style={{
-                          background: isSelected ? '#eff6ff' : '#ffffff',
-                          border: isSelected ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                          borderRadius: '8px',
-                          padding: '0.75rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                          <strong style={{ fontSize: '0.82rem', color: isSelected ? '#0c326f' : '#334155' }}>
-                            {opt.label}
-                          </strong>
-                          {isSelected && <Check size={16} color="#0284c7" strokeWidth={3} />}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700, marginBottom: '0.25rem' }}>
-                          {opt.tag}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35 }}>
-                          {opt.desc}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 5. MATRIZ DE PERMISSÕES AGRUPADA PELOS 5 MACROPROCESSOS */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.2rem' }}>
-                  Permissões Operacionais por Macroprocesso:
-                </label>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 0.75rem 0' }}>
-                  Marque as operações autorizadas para este perfil. O escopo selecionado acima dita a abrangência dos dados.
-                </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  {MACROPROCESS_LIST.map((macro) => {
-                    const permsInMacro = PERMISSION_CATALOG.filter((p) => p.macroprocesso === macro.id);
-
-                    return (
-                      <div
-                        key={macro.id}
-                        style={{
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          background: '#f8fafc',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {/* Header do Macroprocesso */}
-                        <div style={{
-                          padding: '0.5rem 0.85rem',
-                          background: '#e2e8f0',
-                          borderBottom: '1px solid #cbd5e1',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}>
-                          <strong style={{ fontSize: '0.78rem', color: '#0c326f', textTransform: 'uppercase' }}>
-                            {macro.title}
-                          </strong>
-                        </div>
-
-                        {/* Lista de Checkboxes do Macroprocesso */}
-                        <div style={{ padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {permsInMacro.map((perm) => {
-                            const isLegacyScope = perm.key === 'visualizarTodosContratos';
-                            const isChecked = Boolean(permissoes[perm.key]);
-
-                            if (isLegacyScope) {
-                              return (
-                                <div
-                                  key={perm.key}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'flex-start',
-                                    gap: '0.65rem',
-                                    padding: '0.5rem 0.65rem',
-                                    background: '#f1f5f9',
-                                    border: '1px dashed #cbd5e1',
-                                    borderRadius: '6px'
-                                  }}
-                                >
-                                  <div style={{ marginTop: '0.1rem', color: '#64748b' }}>
-                                    <Lock size={16} />
-                                  </div>
-                                  <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                                        {perm.label}
-                                      </span>
-                                      <span style={{ fontSize: '0.66rem', background: '#e2e8f0', color: '#475569', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
-                                        Automático via Escopo ({contractScope})
-                                      </span>
-                                    </div>
-                                    <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '0.1rem' }}>
-                                      Governada pelo seletor de Escopo Contratual acima (Ativa quando Global, Inativa quando Atribuídos/Unidade).
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <div
-                                key={perm.key}
-                                onClick={() => handleTogglePermission(perm.key)}
-                                data-testid={`modal-perm-${perm.key}`}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'flex-start',
-                                  gap: '0.65rem',
-                                  padding: '0.5rem 0.65rem',
-                                  background: '#ffffff',
-                                  border: isChecked ? '1px solid #93c5fd' : '1px solid #e2e8f0',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease'
-                                }}
-                              >
-                                <div style={{ marginTop: '0.1rem', color: isChecked ? '#0284c7' : '#94a3b8' }}>
-                                  {isChecked ? <CheckSquare size={17} /> : <Square size={17} />}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
-                                      {perm.label}
-                                    </span>
-                                    {perm.readOnly && (
-                                      <span style={{ fontSize: '0.66rem', background: '#f1f5f9', color: '#64748b', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
-                                        Leitura
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '0.1rem' }}>
-                                    {perm.description}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Ações do Modal */}
-              <div style={{
-                marginTop: '0.5rem',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '0.75rem',
-                borderTop: '1px solid #f1f5f9',
-                paddingTop: '0.75rem'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.55rem 1.1rem', fontSize: '0.85rem' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saveRoleMutation.isPending || !nome.trim()}
-                  data-testid="submit-role-btn"
-                  className="btn btn-primary"
-                  style={{
-                    padding: '0.55rem 1.3rem',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    background: badgeColor,
-                    borderColor: badgeColor
-                  }}
-                >
-                  {saveRoleMutation.isPending ? 'Salvando...' : editingRole ? 'Atualizar Perfil' : 'Criar Perfil'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      <ProfileDrawer profile={selectedProfile} onClose={() => setSelectedProfileId(null)} />
     </div>
   );
 };

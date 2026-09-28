@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ContractAttentionCenter } from '../ContractAttentionCenter';
-import type { ContractDashboardRecord } from '../../../types';
+import type { ContractDashboardRecord, ContractTaskPlan } from '../../../types';
 import type { ReajusteRadarAlert } from '../../../types/contractReajusteRadar';
+import type { PaymentAlert } from '../../../types/paymentFollowUp';
+import { addDays, formatDateISO } from '../../../services/temporalEngineService';
 
 // Mocks de hooks
 vi.mock('../../../hooks/useUpdateContractTask', () => ({
@@ -76,6 +78,8 @@ describe('ContractAttentionCenter — Radar Preditivo de Reajuste/Repactuação 
     expect(html).toContain('faltam 20 dia(s)');
     expect(html).toContain('Recomenda-se verificar');
     expect(html).toContain('Ver Histórico');
+    // Fase 10-A.2.1: severidade canônica (URGENTE) via SeverityBadge/severityTokens.
+    expect(html).toContain('data-testid="severity-badge-urgente"');
   });
 
   it('2. Não renderiza alerta de radar e exibe estado "Tudo em dia" quando não houver pendências', () => {
@@ -109,6 +113,8 @@ describe('ContractAttentionCenter — Radar Preditivo de Reajuste/Repactuação 
 
     expect(html).toContain('Próximo (50d)');
     expect(html).toContain('faltam 50 dia(s)');
+    // Fase 10-A.2.1: PROXIMA -> severidade canônica ATENCAO.
+    expect(html).toContain('data-testid="severity-badge-atencao"');
   });
 
   it('4. Renderiza alerta com nível VENCIDA quando marco já tiver transcorrido', () => {
@@ -129,5 +135,100 @@ describe('ContractAttentionCenter — Radar Preditivo de Reajuste/Repactuação 
 
     expect(html).toContain('Marco Transcorrido');
     expect(html).toContain('atingido há 5 dia(s)');
+    // Fase 10-A.2.1: VENCIDA -> severidade canônica CRITICA.
+    expect(html).toContain('data-testid="severity-badge-critica"');
+  });
+
+  describe('Fase 10-A.2.1 — Severidade Canônica dos Alertas de Pagamento', () => {
+    it('5. Alerta de pagamento CRITICO usa SeverityBadge com severidade CRITICA e rótulo de domínio preservado', () => {
+      const criticalAlert: PaymentAlert = {
+        id: 'PGTO-ALERT-1',
+        cycleKey: 'cycle-1',
+        contractKey: mockContract.id,
+        nivel: 'CRITICO',
+        tipo: 'PAGAMENTO_FATURA_VENCIDA',
+        mensagem: 'Fatura vencida há 3 dias'
+      };
+
+      const html = renderToStaticMarkup(
+        <ContractAttentionCenter
+          contract={mockContract}
+          plan={null}
+          paymentAlerts={[criticalAlert]}
+          reajusteAlert={null}
+        />
+      );
+
+      expect(html).toContain('data-testid="severity-badge-critica"');
+      expect(html).toContain('Crítico / Vencido');
+      expect(html).toContain('Fatura vencida há 3 dias');
+    });
+
+    it('6. Alerta de pagamento ATENCAO usa SeverityBadge com severidade ATENCAO', () => {
+      const attentionAlert: PaymentAlert = {
+        id: 'PGTO-ALERT-2',
+        cycleKey: 'cycle-2',
+        contractKey: mockContract.id,
+        nivel: 'ATENCAO',
+        tipo: 'CGOFI_SEM_RESPOSTA',
+        mensagem: 'CGOFI sem resposta há 6 dias úteis'
+      };
+
+      const html = renderToStaticMarkup(
+        <ContractAttentionCenter
+          contract={mockContract}
+          plan={null}
+          paymentAlerts={[attentionAlert]}
+          reajusteAlert={null}
+        />
+      );
+
+      expect(html).toContain('data-testid="severity-badge-atencao"');
+      expect(html).toContain('Atenção Operacional');
+    });
+  });
+
+  describe('Fase 10-A.2.1 — Severidade Canônica das Tarefas do Plano de Gestão', () => {
+    it('7. Tarefa VENCIDA usa SeverityBadge com severidade CRITICA e rótulo "Xd atrasada"', () => {
+      const pastDate = formatDateISO(addDays(new Date(), -3));
+      const plan: ContractTaskPlan = {
+        id: 'plan-1',
+        contractKey: mockContract.id,
+        uasg: '200331',
+        numero: '10',
+        ano: 2026,
+        templateNome: 'Template Teste',
+        appliedAt: '2026-01-01T00:00:00Z',
+        macrotarefas: [
+          {
+            id: 'macro-1',
+            planId: 'plan-1',
+            nome: 'Macrotarefa Teste',
+            ordem: 1,
+            tarefas: [
+              {
+                id: 'task-1',
+                macrotaskId: 'macro-1',
+                nome: 'Tarefa vencida de teste',
+                ordem: 1,
+                status: 'PENDENTE',
+                prazo: pastDate,
+                criadoEm: '2026-01-01T00:00:00Z',
+                atualizadoEm: '2026-01-01T00:00:00Z'
+              }
+            ]
+          }
+        ],
+        progresso: { total: 1, concluidas: 0, pendentes: 1, emAndamento: 0, naoAplicaveis: 0, atrasadas: 1, percentual: 0 }
+      };
+
+      const html = renderToStaticMarkup(
+        <ContractAttentionCenter contract={mockContract} plan={plan} reajusteAlert={null} />
+      );
+
+      expect(html).toContain('data-testid="severity-badge-critica"');
+      expect(html).toContain('3d atrasada');
+      expect(html).toContain('Tarefa vencida de teste');
+    });
   });
 });

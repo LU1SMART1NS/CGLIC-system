@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { navigationConfig, getBreadcrumbs } from '../navigation';
+import { navigationConfig, getBreadcrumbs, filterNavigationByRole } from '../navigation';
 import { isExactChildActive, isItemActive } from '../../components/layout/Sidebar';
+
+function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] {
+  return items.flatMap((item) => [item.label, ...(item.children?.map((c) => c.label) || [])]);
+}
 
 describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', () => {
   describe('Estrutura dos 5 Pilares e Itens de Navegação', () => {
@@ -26,7 +30,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(gestaoInstrumentos?.matchPrefixes).toContain('/prazos');
     });
 
-    it('deve configurar Atas de Registro de Preços com Consulta e Vigência e Alocações por Unidade', () => {
+    it('deve configurar Atas de Registro de Preços com Consulta e Vigência, Alocações por Unidade e Unidades Internas', () => {
       const atas = navigationConfig.find((i) => i.id === 'atas');
       expect(atas).toBeDefined();
       expect(atas?.label).toBe('Atas de Registro de Preços');
@@ -34,11 +38,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const children = atas?.children || [];
       expect(children.map((c) => c.label)).toEqual([
         'Consulta e Vigência',
-        'Alocações por Unidade'
+        'Alocações por Unidade',
+        'Unidades Internas'
       ]);
       expect(children.map((c) => c.route)).toEqual([
         '/atas',
-        '/atas/saldos-unidade'
+        '/atas/saldos-unidade',
+        '/admin/departamentos'
       ]);
     });
 
@@ -224,6 +230,103 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(isExactChildActive(contratosAcompanhamento, pathname)).toBe(true);
       expect(isExactChildActive(contratosModelos, pathname)).toBe(false);
       expect(isItemActive(contratosGroup, pathname)).toBe(true);
+    });
+  });
+
+  describe('filterNavigationByRole — Autorização de Navegação por Perfil (Fase Frontend RBAC)', () => {
+    it('Coordenador (admin) vê o menu completo, incluindo Usuários, Perfis e Alocações', () => {
+      const visible = filterNavigationByRole(navigationConfig, 'admin');
+      const labels = flatLabels(visible);
+
+      expect(labels).toContain('Gestão de Instrumentos');
+      expect(labels).toContain('Alocações por Unidade');
+      expect(labels).toContain('Unidades Internas');
+      expect(labels).toContain('Modelos de Gestão');
+      expect(labels).toContain('Usuários e Servidores');
+      expect(labels).toContain('Perfis e Permissões');
+    });
+
+    it('Gestor de Contratos (gestor) NÃO vê Alocações, Unidades Internas, Usuários ou Perfis, mas continua vendo Contratos', () => {
+      const visible = filterNavigationByRole(navigationConfig, 'gestor');
+      const labels = flatLabels(visible);
+
+      expect(labels).toContain('Gestão de Instrumentos');
+      expect(labels).toContain('Consulta e Vigência');
+      expect(labels).toContain('Acompanhamento e Prazos');
+      expect(labels).toContain('Modelos de Gestão');
+      expect(labels).toContain('Pagamentos');
+      expect(labels).toContain('Empenhos e Execução');
+
+      expect(labels).not.toContain('Alocações por Unidade');
+      expect(labels).not.toContain('Unidades Internas');
+      expect(labels).not.toContain('Usuários e Servidores');
+      expect(labels).not.toContain('Perfis e Permissões');
+
+      // O grupo "Administração" não deve sobrar vazio no menu do gestor
+      expect(labels).not.toContain('Administração');
+    });
+
+    it('Gestor de Saldo (gestor_saldos) só vê Alocações e Unidades Internas — nada de Contratos, Financeiro, Usuários ou Perfis', () => {
+      const visible = filterNavigationByRole(navigationConfig, 'gestor_saldos');
+      const labels = flatLabels(visible);
+
+      expect(labels).toContain('Alocações por Unidade');
+      expect(labels).toContain('Unidades Internas');
+
+      expect(labels).not.toContain('Gestão de Instrumentos');
+      expect(labels).not.toContain('Consulta e Vigência');
+      expect(labels).not.toContain('Acompanhamento e Prazos');
+      expect(labels).not.toContain('Modelos de Gestão');
+      expect(labels).not.toContain('Pagamentos');
+      expect(labels).not.toContain('Empenhos e Execução');
+      expect(labels).not.toContain('Usuários e Servidores');
+      expect(labels).not.toContain('Perfis e Permissões');
+
+      // Grupos que ficariam vazios (Contratos, Execução Financeira) somem inteiramente
+      expect(labels).not.toContain('Contratos');
+      expect(labels).not.toContain('Execução Financeira');
+      // "Atas" sobrevive porque Alocações/Unidades Internas são filhos dela
+      expect(labels).toContain('Atas de Registro de Preços');
+    });
+
+    it('Consulta/Auditoria (leitor) consulta os módulos permitidos, sem Usuários, Perfis ou Alocações', () => {
+      const visible = filterNavigationByRole(navigationConfig, 'leitor');
+      const labels = flatLabels(visible);
+
+      expect(labels).toContain('Gestão de Instrumentos');
+      expect(labels).toContain('Consulta e Vigência');
+      expect(labels).toContain('Acompanhamento e Prazos');
+      expect(labels).toContain('Pagamentos');
+      expect(labels).toContain('Empenhos e Execução');
+
+      expect(labels).not.toContain('Alocações por Unidade');
+      expect(labels).not.toContain('Unidades Internas');
+      expect(labels).not.toContain('Modelos de Gestão');
+      expect(labels).not.toContain('Usuários e Servidores');
+      expect(labels).not.toContain('Perfis e Permissões');
+    });
+
+    it('role null (não resolvida ou ausente) só mostra itens públicos, nunca um grupo vazio', () => {
+      const visible = filterNavigationByRole(navigationConfig, null);
+
+      // Todo item hoje declara allowedRoles, então nada restrito deveria aparecer
+      const labels = flatLabels(visible);
+      expect(labels).not.toContain('Usuários e Servidores');
+      expect(labels).not.toContain('Perfis e Permissões');
+      expect(labels).not.toContain('Alocações por Unidade');
+
+      // Nenhum grupo com children deve sobrar vazio
+      visible.forEach((item) => {
+        if (item.children) {
+          expect(item.children.length).toBeGreaterThan(0);
+        }
+      });
+    });
+
+    it('itens sem allowedRoles permanecem públicos para qualquer role autenticada', () => {
+      const semRestricao = { id: 'x', label: 'Público', status: 'active' as const };
+      expect(filterNavigationByRole([semRestricao], 'leitor')).toHaveLength(1);
+      expect(filterNavigationByRole([semRestricao], null)).toHaveLength(1);
     });
   });
 });

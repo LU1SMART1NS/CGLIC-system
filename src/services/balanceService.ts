@@ -1,4 +1,5 @@
 import type { Empenho, Contrato, ContratoEmpenho, ReconciliationReport } from '../types';
+import type { SeverityLevel } from '../design-system/tokens';
 
 /**
  * Normaliza o número do empenho para comparação canônica.
@@ -538,5 +539,48 @@ export function deduceEmpenhoQuantity(
     isReforco: true,
     valorUnitarioAplicado
   };
+}
+
+/**
+ * Regra Canônica de Saldo Crítico de Item de Ata/ARP (Fase 10-A.2)
+ *
+ * Fonte única desta regra — antes desta fase, o mesmo threshold (>=85%) era
+ * recalculado de forma independente em 3 pontos de dashboardService.ts e 1
+ * ponto de centralPrazosService.ts, todos com o número mágico escrito à mão.
+ * A partir de agora, qualquer consumidor (Central de Atenção, Home, Atas e
+ * Saldos) deve chamar esta função — a UI e os read models NÃO devem
+ * recalcular o percentual de consumo.
+ *
+ * Fórmula preservada exatamente como já era (nenhuma mudança de threshold):
+ *   CRÍTICO        >= 85%
+ *   PRÓXIMO LIMITE >= 70% e < 85%
+ */
+export const ARP_SALDO_CRITICO_THRESHOLD = 85;
+export const ARP_SALDO_PROXIMO_LIMITE_THRESHOLD = 70;
+
+export interface ArpItemSaldoClassification {
+  percentualConsumido: number;
+  isCritico: boolean;
+  isProximoLimite: boolean;
+  severity: SeverityLevel;
+}
+
+export function classifyArpItemSaldo(percentualConsumido: number): ArpItemSaldoClassification {
+  const rounded = Number((Number(percentualConsumido) || 0).toFixed(2));
+  const isCritico = rounded >= ARP_SALDO_CRITICO_THRESHOLD;
+  const isProximoLimite = rounded >= ARP_SALDO_PROXIMO_LIMITE_THRESHOLD && rounded < ARP_SALDO_CRITICO_THRESHOLD;
+
+  let severity: SeverityLevel;
+  if (rounded >= 100) {
+    severity = 'CRITICA';
+  } else if (isCritico) {
+    severity = 'URGENTE';
+  } else if (isProximoLimite) {
+    severity = 'ATENCAO';
+  } else {
+    severity = 'INFO';
+  }
+
+  return { percentualConsumido: rounded, isCritico, isProximoLimite, severity };
 }
 

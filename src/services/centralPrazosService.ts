@@ -30,6 +30,7 @@ import {
   calculateDeadline,
   REGRAS_OPERACIONAIS_PADRAO
 } from './temporalEngineService';
+import { classifyArpItemSaldo } from './balanceService';
 
 /**
  * Gera chave lógica determinística e canônica de idempotência.
@@ -441,9 +442,13 @@ export function buildCentralPrazosItems(
           ? rawPerc
           : (qtdHomologada > 0 ? (qtdConsumida / qtdHomologada) * 100 : 0)
       );
-      const roundedPercentual = Number(percentual.toFixed(2));
+      // Classificação canônica única (Fase 10-A.2) — balanceService.classifyArpItemSaldo,
+      // eliminando a duplicação desta mesma regra que antes existia também em
+      // dashboardService.ts (3 pontos independentes).
+      const saldoClass = classifyArpItemSaldo(percentual);
+      const roundedPercentual = saldoClass.percentualConsumido;
 
-      if (roundedPercentual >= 85) {
+      if (saldoClass.isCritico) {
         const numAta = item.numero_ata || item.numeroAta || 'N/D';
         const numItem = item.numero_item || item.numeroItem || 'N/D';
         const uasg = item.codigo_uasg || item.codigoUasg || item.uasg || '200331';

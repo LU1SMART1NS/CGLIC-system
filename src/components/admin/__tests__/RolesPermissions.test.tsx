@@ -1,167 +1,134 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { RolesPermissions } from '../RolesPermissions';
-import * as rolesHook from '../../../hooks/useRoles';
-import {
-  SYSTEM_ROLES,
-  PERMISSION_CATALOG,
-  MACROPROCESS_LIST,
-  type RoleDefinition
-} from '../../../types/user';
+import { RolesPermissions, ProfileDetailContent, PROFILE_DEFINITIONS } from '../RolesPermissions';
 
-vi.mock('../../../hooks/useRoles', () => ({
-  useRoles: vi.fn(),
-  useSaveRole: vi.fn(),
-  useDeleteRole: vi.fn()
-}));
+function findProfile(id: 'admin' | 'gestor' | 'gestor_saldos' | 'leitor') {
+  const profile = PROFILE_DEFINITIONS.find((p) => p.id === id);
+  if (!profile) throw new Error(`Perfil ${id} não encontrado em PROFILE_DEFINITIONS`);
+  return profile;
+}
 
-const mockCustomRole: RoleDefinition = {
-  id: 'custom-fiscal-ti',
-  nome: 'Fiscal Técnico de TI',
-  badgeColor: '#10b981',
-  descricao: 'Fiscal designado para conferência técnica de serviços em nuvem.',
-  isCustom: true,
-  permissoes: {
-    contractScope: 'ASSIGNED',
-    visualizarTodosContratos: false,
-    visualizarContratos: true,
-    visualizarAtas: true,
-    visualizarItens: true,
-    distribuirContratos: false,
-    editarTarefasContratuais: true,
-    aplicarTemplates: false,
-    visualizarEmpenhos: true,
-    sincronizarEmpenhos: true,
-    visualizarPagamentos: true,
-    registrarPagamentos: true,
-    visualizarPrazos: true,
-    gerenciarEventosContratuais: false,
-    gerenciarDepartamentos: false,
-    exportarRelatorios: true,
-    gerenciarUsuarios: false,
-    gerenciarPerfis: false
-  }
-};
+describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio)', () => {
+  describe('1-3. Página e cards dos quatro perfis', () => {
+    const html = renderToStaticMarkup(<RolesPermissions />);
 
-describe('RolesPermissions Component — Interface Visual do Modelo Canônico de RBAC', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(rolesHook.useRoles).mockReturnValue({
-      data: [...SYSTEM_ROLES, mockCustomRole],
-      isLoading: false,
-      error: null
-    } as any);
+    it('1. renderiza o título "Perfis" e a descrição institucional', () => {
+      expect(html).toContain('Perfis');
+      expect(html).toContain('Perfis de acesso ao CGLIC-system');
+    });
 
-    vi.mocked(rolesHook.useSaveRole).mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false
-    } as any);
-
-    vi.mocked(rolesHook.useDeleteRole).mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false
-    } as any);
-  });
-
-  describe('1. Cards de Perfis e Separação de Escopo', () => {
-    it('deve renderizar os cards para coordenador, gestor, consulta e customizado', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('Coordenador / Diretor');
-      expect(html).toContain('Gestor / Fiscal de Contrato');
+    it('2. renderiza exatamente os quatro perfis nativos', () => {
+      expect(html).toContain('Coordenador');
+      expect(html).toContain('Gestor de Contratos');
+      expect(html).toContain('Gestor de Saldo');
       expect(html).toContain('Consulta / Auditoria');
-      expect(html).toContain('Fiscal Técnico de TI');
     });
 
-    it('coordenador deve exibir Escopo Contratual: Global no card', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('role-card-coordenador');
-      expect(html).toContain('role-scope-badge-coordenador');
-      expect(html).toContain('Global');
+    it('3. exibe as descrições de negócio corretas de cada perfil', () => {
+      expect(html).toContain('Administração geral do sistema e gestão de todos os domínios.');
+      expect(html).toContain('Gestão dos contratos e atividades contratuais dentro do escopo atribuído.');
+      expect(html).toContain('Gestão das alocações internas das Atas e das unidades internas.');
+      expect(html).toContain('Consulta das informações do sistema, sem funções de administração.');
     });
 
-    it('gestor deve exibir obrigatoriamente Escopo Contratual: Apenas Contratos Atribuídos', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('role-card-gestor');
-      expect(html).toContain('role-scope-badge-gestor');
-      expect(html).toContain('Apenas Contratos Atribuídos');
-    });
-
-    it('gestor NÃO deve exibir "Todos os Contratos" no card', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      // O badge do gestor não pode conter "Todos os Contratos"
-      const gestorCardSubstring = html.slice(
-        html.indexOf('role-card-gestor'),
-        html.indexOf('role-card-consulta')
-      );
-      expect(gestorCardSubstring).not.toContain('Todos os Contratos');
-    });
-
-    it('consulta/auditoria deve exibir Escopo Contratual: Global · Somente Leitura', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('role-scope-badge-consulta');
-      expect(html).toContain('Global · Somente Leitura');
-    });
-
-    it('deve exibir contador de operações autorizadas nos cards', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('Operações Autorizadas:');
-      expect(html).toContain('de 16');
+    it('4. cada card tem um botão "Ver detalhes" associado à role correta do perfil', () => {
+      expect(html).toContain('data-testid="ver-detalhes-admin"');
+      expect(html).toContain('data-testid="ver-detalhes-gestor"');
+      expect(html).toContain('data-testid="ver-detalhes-gestor_saldos"');
+      expect(html).toContain('data-testid="ver-detalhes-leitor"');
+      expect(html).toContain('Ver detalhes');
     });
   });
 
-  describe('2. Matriz Canônica Agrupada por Macroprocessos', () => {
-    it('deve renderizar os 5 macroprocessos com títulos e descrições na tabela', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
+  describe('5-8. Detalhe por perfil ("Acesso por área") — testado via ProfileDetailContent, sem simulação de clique (suíte não usa jsdom)', () => {
+    it('5. detalhe do Coordenador mostra gestão completa em todas as áreas de negócio', () => {
+      const html = renderToStaticMarkup(<ProfileDetailContent profile={findProfile('admin')} />);
 
-      for (const macro of MACROPROCESS_LIST) {
-        expect(html).toContain(`macroprocess-header-${macro.id}`);
-        expect(html).toContain(macro.title.replace(/&/g, '&amp;'));
-        expect(html).toContain(macro.description.replace(/&/g, '&amp;'));
-      }
+      expect(html).toContain('Contratos');
+      expect(html).toContain('Gestão completa');
+      expect(html).toContain('Execução financeira');
+      expect(html).toContain('Alocações');
+      expect(html).toContain('Unidades internas');
+      expect(html).toContain('Usuários e servidores');
+      expect(html).toContain('Perfis');
+      expect(html).toContain('Todas as unidades');
     });
 
-    it('deve renderizar linhas correspondentes a cada permissão do PERMISSION_CATALOG', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
+    it('6. detalhe do Gestor de Contratos mostra somente Contratos e Execução financeira', () => {
+      const html = renderToStaticMarkup(<ProfileDetailContent profile={findProfile('gestor')} />);
 
-      for (const perm of PERMISSION_CATALOG) {
-        expect(html).toContain(`matrix-row-${perm.key}`);
-        expect(html).toContain(perm.label);
-      }
+      expect(html).toContain('Gestão dentro do escopo atribuído');
+      expect(html).toContain('Execução financeira');
+      expect(html).toContain('Contratos atribuídos ao perfil');
+
+      expect(html).not.toContain('Alocações');
+      expect(html).not.toContain('Unidades internas');
+      expect(html).not.toContain('Usuários e servidores');
     });
 
-    it('deve indicar escopo delimitado para gestor na permissão visualizarTodosContratos', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('perm-cell-gestor-visualizarTodosContratos');
-      expect(html).toContain('Escopo Delimitado');
+    it('7. detalhe do Gestor de Saldo mostra somente Alocações e Unidades internas', () => {
+      const html = renderToStaticMarkup(<ProfileDetailContent profile={findProfile('gestor_saldos')} />);
+
+      expect(html).toContain('Alocações');
+      expect(html).toContain('Unidades internas');
+      expect(html).toContain('Todas as Atas');
+
+      expect(html).not.toContain('Contratos');
+      expect(html).not.toContain('Usuários e servidores');
+      expect(html).not.toContain('Execução financeira');
     });
 
-    it('deve indicar contexto de escopo atribuído para gestor em sincronizarEmpenhos', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('perm-cell-gestor-sincronizarEmpenhos');
-      expect(html).toContain('No Contrato');
+    it('8. detalhe de Consulta/Auditoria mostra suas quatro áreas de consulta', () => {
+      const html = renderToStaticMarkup(<ProfileDetailContent profile={findProfile('leitor')} />);
+
+      expect(html).toContain('Consulta');
+      expect(html).toContain('Informações disponíveis para consulta');
+      expect(html).not.toContain('Usuários e servidores');
+      expect(html).not.toContain('Perfis');
     });
 
-    it('deve renderizar indicadores visuais acessíveis de permitido (check) e não permitido (X)', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('aria-label="Permitido para Coordenador / Diretor"');
-      expect(html).toContain('aria-label="Não permitido para Gestor / Fiscal de Contrato"');
+    it('nunca lista áreas às quais o perfil não tem acesso como "Sem acesso" — a ausência já é a informação', () => {
+      const html = renderToStaticMarkup(<ProfileDetailContent profile={findProfile('gestor_saldos')} />);
+      expect(html).not.toContain('Sem acesso');
     });
   });
 
-  describe('3. Perfis Customizados', () => {
-    it('perfil customizado deve ter botão de exclusão habilitado', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('delete-role-btn-custom-fiscal-ti');
-      // Perfis nativos não devem ter botão de exclusão
-      expect(html).not.toContain('delete-role-btn-coordenador');
-      expect(html).not.toContain('delete-role-btn-gestor');
-      expect(html).not.toContain('delete-role-btn-consulta');
+  describe('9-13. Complexidade legada removida', () => {
+    const html = renderToStaticMarkup(<RolesPermissions />);
+
+    it('9. não existem checkboxes (antiga matriz de 18 flags)', () => {
+      expect(html).not.toContain('type="checkbox"');
     });
 
-    it('perfil customizado deve renderizar badge Perfil Customizado', () => {
-      const html = renderToStaticMarkup(<RolesPermissions />);
-      expect(html).toContain('Perfil Customizado');
-      expect(html).toContain('Perfil Nativo');
+    it('10. não existe tabela comparativa de permissões', () => {
+      expect(html).not.toContain('<table');
+      expect(html).not.toContain('Matriz Canônica');
+      expect(html).not.toContain('Macroprocesso');
+    });
+
+    it('11. não existe opção de criar novo perfil', () => {
+      expect(html).not.toContain('Novo Perfil');
+      expect(html).not.toContain('Criar Perfil');
+    });
+
+    it('12. não existe opção de excluir perfil nativo', () => {
+      expect(html).not.toContain('Remover Perfil');
+      expect(html).not.toContain('excluir');
+    });
+
+    it('13. não expõe contractScope, GLOBAL/ASSIGNED/UNIT ou outra nomenclatura técnica do RBAC', () => {
+      expect(html).not.toContain('contractScope');
+      expect(html).not.toContain('GLOBAL');
+      expect(html).not.toContain('ASSIGNED');
+      expect(html.match(/\bUNIT\b/)).toBeNull();
+      expect(html).not.toContain('role_permissions');
+      expect(html).not.toContain('permission_key');
+    });
+
+    it('não referencia o modelo legado de localStorage/roleService', () => {
+      expect(html).not.toContain('Perfil Customizado');
+      expect(html).not.toContain('Perfil Nativo');
+      expect(html).not.toContain('Governança Institucional e Soberania RBAC');
     });
   });
 });

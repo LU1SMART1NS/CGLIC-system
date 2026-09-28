@@ -30,6 +30,9 @@ export type MutationErrorCode =
   | 'CONTRACT_PLAN_ALREADY_EXISTS'
   | 'CONTRACT_TASK_NOT_FOUND'
   | 'INVALID_TASK_STATUS'
+  | 'PAYMENT_CYCLE_ALREADY_EXISTS'
+  | 'PAYMENT_CYCLE_NOT_FOUND'
+  | 'INVALID_CYCLE_STATUS'
   | 'NETWORK_OR_CONFIG_ERROR'
   | 'UNKNOWN';
 
@@ -310,6 +313,8 @@ export interface RpcContractTaskTemplateTaskItem {
   macrotask_id: string;
   nome: string;
   ordem: number;
+  /** Semântica de execução canônica (Fase 10-A.2), definida no template e copiada às instâncias na aplicação. */
+  execution_mode?: string | null;
 }
 
 export interface RpcContractTaskTemplateTaskResult {
@@ -340,7 +345,10 @@ export interface RpcContractTaskItem {
   nome: string;
   ordem: number;
   status: ContractTaskStatus;
+  execution_mode?: string | null;
   responsavel_nome?: string | null;
+  /** Identidade canônica do responsável (Fase 10-A.2), ponte para auth.users. */
+  responsavel_user_id?: string | null;
   prazo?: string | null;
   observacao?: string | null;
   criado_em: string;
@@ -352,6 +360,78 @@ export interface RpcContractTaskItem {
 export interface RpcUpdateContractTaskResult {
   success: boolean;
   task: RpcContractTaskItem;
+}
+
+// ==============================================================================
+// Fase 10-A.2 — Ciclo Operacional de Pagamentos/CGOFI (contract_payment_cycles)
+// ==============================================================================
+
+export type PaymentCycleStatusValue =
+  | 'RECEBIDO' | 'ATRIBUIDO' | 'EM_INSTRUCAO' | 'PENDENTE_DOCUMENTACAO'
+  | 'DESPACHO_ELABORADO' | 'ENVIADO_CGOFI' | 'AGUARDANDO_CGOFI'
+  | 'DEVOLVIDO_FISCAL' | 'PAGAMENTO_CONFIRMADO' | 'CONCLUIDO' | 'CANCELADO';
+
+export interface RpcContractPaymentCycleRow {
+  id: string;
+  cycle_key: string;
+  contract_key: string;
+  competencia: string;
+  empenho_canonical_key?: string | null;
+  numero_processo_pagamento_sei?: string | null;
+  numero_processo_contrato_sei?: string | null;
+  documento_atesto_sei: string;
+  documento_despacho_sei?: string | null;
+  numero_ordem_bancaria?: string | null;
+  numero_notas_fiscais?: number | null;
+  valor_atesto: number;
+  data_assinatura_atesto: string;
+  data_vencimento_fatura: string;
+  data_envio_cgofi?: string | null;
+  data_ordem_bancaria?: string | null;
+  status: PaymentCycleStatusValue;
+  titular_nome?: string | null;
+  responsavel_nome?: string | null;
+  responsavel_user_id?: string | null;
+  observacoes?: string | null;
+  origem_dado: 'MANUAL' | 'OFICIAL';
+  criado_em: string;
+  atualizado_em: string;
+  concluido_em?: string | null;
+  concluido_por?: string | null;
+}
+
+export interface RpcCreatePaymentCycleResult {
+  success: boolean;
+  cycle: {
+    id: string;
+    cycle_key: string;
+    contract_key: string;
+    competencia: string;
+    status: PaymentCycleStatusValue;
+    criado_em: string;
+  };
+  task_plan: Record<string, unknown> | null;
+}
+
+export interface RpcUpdatePaymentCycleResult {
+  success: boolean;
+  cycle: {
+    id: string;
+    cycle_key: string;
+    contract_key: string;
+    competencia: string;
+    status: PaymentCycleStatusValue;
+    documento_despacho_sei?: string | null;
+    data_envio_cgofi?: string | null;
+    numero_ordem_bancaria?: string | null;
+    data_ordem_bancaria?: string | null;
+    responsavel_nome?: string | null;
+    responsavel_user_id?: string | null;
+    observacoes?: string | null;
+    atualizado_em: string;
+    concluido_em?: string | null;
+    concluido_por?: string | null;
+  };
 }
 
 

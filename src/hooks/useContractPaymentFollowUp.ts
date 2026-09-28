@@ -1,56 +1,52 @@
 /**
- * Hook do React para Acompanhamento Operacional de Pagamentos / Faturamento (SaldoARP 3.0 - Fase 7.4-D)
- * 
+ * Hook do React para Acompanhamento Operacional de Pagamentos / Faturamento
+ * (SaldoARP 3.0 - Fase 7.4-D; persistência canônica desde a Fase 10-A.2)
+ *
  * Responsável por:
- * 1. Consulta e persistência dos ciclos operacionais de faturamento/atesto vinculados a um contrato.
- * 2. Instanciação determinística e idempotente do template de 5 macroetapas e 11 tarefas.
- * 3. Atualização de status e evidências das tarefas operacionais com respeito ao TaskExecutionMode.
- * 4. Cálculo contínuo de prazos e alertas em dias úteis via paymentFollowUpService.
- * 5. Integração transparente com a Central de Atenção e Visão 360° do Contrato.
+ * 1. Consulta e persistência REAL (Supabase — contract_payment_cycles) dos ciclos
+ *    operacionais de faturamento/atesto vinculados a um contrato. Antes da Fase
+ *    10-A.2, este hook persistia exclusivamente em localStorage do navegador —
+ *    ver FASE_10_A_AUDITORIA_AUTOMACAO_NOTIFICACOES.md e
+ *    FASE_10_A1_SANEAMENTO_PRE_REQUISITOS_AUTOMACAO.md para o histórico do GAP.
+ * 2. Instanciação determinística e idempotente do template de 5 macroetapas e 11
+ *    tarefas (agora via contract_task_plans/contract_tasks reais, reaproveitando
+ *    a mesma infraestrutura de tarefas contratuais — nenhum segundo sistema de
+ *    tarefas foi criado).
+ * 3. Cálculo contínuo de prazos e alertas em dias úteis via paymentFollowUpService
+ *    (regra de negócio inalterada — apenas a persistência mudou).
+ * 4. Integração transparente com a Central de Atenção e Visão 360° do Contrato.
+ *
+ * IMPORTANTE (mudança de contrato desta fase): registerPaymentCycle,
+ * updatePaymentCycle e deletePaymentCycle agora são ASSÍNCRONOS (retornam
+ * Promise), pois persistem de fato no servidor. Os dois únicos consumidores
+ * existentes (ContractPaymentFollowUpSection.tsx) já descartavam o retorno
+ * síncrono anterior, então a migração não exigiu mudança de UI além de tratar
+ * a Promise (await/catch).
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   PaymentCycleInput,
   PaymentFollowUpCycle,
-  PaymentAlert
+  PaymentAlert,
+  PaymentWorkflowStatus
 } from '../types/paymentFollowUp';
 import type { FinancialBalances } from '../types/financialExecution';
+import type { RpcContractPaymentCycleRow } from '../types/rpc';
 import {
-  buildPaymentCycleKey,
   buildPaymentFollowUpCycle,
-  calculatePaymentCyclePrazos,
-  derivePaymentCycleAlerts,
-  determinePaymentCycleStatus
+  rowToPaymentFollowUpCycle
 } from '../services/paymentFollowUpService';
-import { buildPaymentFollowUpTemplate } from '../services/paymentFollowUpTemplateService';
+import {
+  fetchPaymentCyclesForContract,
+  createPaymentCycleRpc,
+  updatePaymentCycleRpc,
+  cancelPaymentCycleRpc
+} from '../adapters/paymentCycleRpcAdapter';
 
-const STORAGE_PREFIX = 'saldoarp:payment-cycles:';
-
-function getStorageKey(contractKey: string): string {
-  return `${STORAGE_PREFIX}${contractKey}`;
-}
-
-function loadPersistedCycles(contractKey: string): PaymentFollowUpCycle[] {
-  if (!contractKey || typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(getStorageKey(contractKey));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.warn('[useContractPaymentFollowUp] Erro ao carregar ciclos persistidos:', err);
-    return [];
-  }
-}
-
-function savePersistedCycles(contractKey: string, cycles: PaymentFollowUpCycle[]): void {
-  if (!contractKey || typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(getStorageKey(contractKey), JSON.stringify(cycles));
-  } catch (err) {
-    console.warn('[useContractPaymentFollowUp] Erro ao persistir ciclos:', err);
-  }
+function paymentCyclesQueryKey(contractKey: string) {
+  return ['contract-payment-cycles', contractKey] as const;
 }
 
 export interface UseContractPaymentFollowUpOptions {
@@ -64,9 +60,9 @@ export interface UseContractPaymentFollowUpResult {
   activeCount: number;
   completedCount: number;
   isLoading: boolean;
-  registerPaymentCycle: (input: PaymentCycleInput) => PaymentFollowUpCycle;
-  updatePaymentCycle: (cycleKey: string, updates: Partial<PaymentCycleInput>) => PaymentFollowUpCycle | null;
-  deletePaymentCycle: (cycleKey: string) => void;
+  registerPaymentCycle: (input: PaymentCycleInput) => Promise<PaymentFollowUpCycle | null>;
+  updatePaymentCycle: (cycleKey: string, updates: Partial<PaymentCycleInput> & { status?: PaymentWorkflowStatus }) => Promise<PaymentFollowUpCycle | null>;
+  deletePaymentCycle: (cycleKey: string) => Promise<void>;
   refetch: () => void;
 }
 
@@ -74,167 +70,116 @@ export function useContractPaymentFollowUp(
   contractKey: string,
   options?: UseContractPaymentFollowUpOptions
 ): UseContractPaymentFollowUpResult {
-  const [cycles, setCycles] = useState<PaymentFollowUpCycle[]>(() =>
-    loadPersistedCycles(contractKey)
-  );
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
+  const queryClient = useQueryClient();
   const baseDate = options?.baseDate;
   const financialBalances = options?.financialBalances;
 
-  // Carregar ciclos quando o contractKey mudar
-  const refresh = useCallback(() => {
-    if (!contractKey) {
-      setCycles([]);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const persisted = loadPersistedCycles(contractKey);
-      // Recalcular métricas dinâmicas e alertas para cada ciclo
-      const recalculated = persisted.map(c => {
-        const prazos = calculatePaymentCyclePrazos(c.input, baseDate);
-        const status = determinePaymentCycleStatus(c.input);
-        const alerts = derivePaymentCycleAlerts(
-          c.cycleKey,
-          c.contractKey,
-          status,
-          c.input,
-          prazos,
-          financialBalances,
-          baseDate
-        );
-        return {
-          ...c,
-          prazos,
-          alerts,
-          status,
-          atualizadoEm: c.atualizadoEm
-        };
-      });
-      setCycles(recalculated);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [contractKey, baseDate, financialBalances]);
+  const { data: rows, isLoading, refetch: refetchQuery } = useQuery<RpcContractPaymentCycleRow[], Error>({
+    queryKey: paymentCyclesQueryKey(contractKey),
+    queryFn: () => fetchPaymentCyclesForContract(contractKey),
+    enabled: Boolean(contractKey),
+    staleTime: 60 * 1000
+  });
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  const cycles = useMemo<PaymentFollowUpCycle[]>(() => {
+    if (!rows) return [];
+    return rows.map(row => rowToPaymentFollowUpCycle(row, { baseDate, empenhoBalances: financialBalances }));
+  }, [rows, baseDate, financialBalances]);
+
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: paymentCyclesQueryKey(contractKey) });
+  }, [queryClient, contractKey]);
+
+  const createMutation = useMutation({
+    mutationFn: createPaymentCycleRpc,
+    onSuccess: invalidate
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: updatePaymentCycleRpc,
+    onSuccess: invalidate
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (key: string) => cancelPaymentCycleRpc(key),
+    onSuccess: invalidate
+  });
 
   /**
-   * Registra um novo ciclo de faturamento/atesto (ou atualiza existente) de forma DETERMINÍSTICA e IDEMPOTENTE.
+   * Registra um novo ciclo de faturamento/atesto de forma determinística e
+   * idempotente (cycle_key único no servidor). Uma segunda chamada com o
+   * mesmo contrato+competência+documento é rejeitada pelo servidor
+   * (PAYMENT_CYCLE_ALREADY_EXISTS) em vez de duplicar.
    */
   const registerPaymentCycle = useCallback(
-    (input: PaymentCycleInput): PaymentFollowUpCycle => {
-      const cycleKey = buildPaymentCycleKey(
-        input.contractKey,
-        input.competencia,
-        input.documentoAtestoSei
-      );
-
-      setCycles(prevCycles => {
-        const existingIndex = prevCycles.findIndex(c => c.cycleKey === cycleKey);
-
-        if (existingIndex >= 0) {
-          // Idempotência: Se já existe, atualiza os dados do input sem resetar ou duplicar tarefas
-          const existing = prevCycles[existingIndex];
-          const mergedInput: PaymentCycleInput = {
-            ...existing.input,
-            ...input
-          };
-          const updatedCycle = buildPaymentFollowUpCycle(
-            mergedInput,
-            {
-              baseDate,
-              empenhoBalances: financialBalances
-            }
-          );
-          // Preservar tarefas e template já instanciados
-          updatedCycle.tasks = existing.tasks;
-
-          const nextCycles = [...prevCycles];
-          nextCycles[existingIndex] = updatedCycle;
-          savePersistedCycles(contractKey, nextCycles);
-          return nextCycles;
-        } else {
-          // Criar novo ciclo e instanciar tarefas a partir do template canônico
-          const newCycle = buildPaymentFollowUpCycle(
-            input,
-            {
-              baseDate,
-              empenhoBalances: financialBalances
-            }
-          );
-          const templateTasks = buildPaymentFollowUpTemplate(input);
-          newCycle.tasks = templateTasks;
-
-          const nextCycles = [newCycle, ...prevCycles];
-          savePersistedCycles(contractKey, nextCycles);
-          return nextCycles;
-        }
+    async (input: PaymentCycleInput): Promise<PaymentFollowUpCycle | null> => {
+      const result = await createMutation.mutateAsync({
+        contractKey: input.contractKey,
+        competencia: input.competencia,
+        documentoAtestoSei: input.documentoAtestoSei,
+        dataAssinaturaAtesto: input.dataAssinaturaAtesto,
+        dataVencimentoFatura: input.dataVencimentoFatura,
+        valorAtesto: input.valorAtesto,
+        empenhoCanonicalKey: input.empenhoCanonicalKey,
+        numeroProcessoPagamentoSei: input.numeroProcessoPagamentoSei,
+        numeroProcessoContratoSei: input.numeroProcessoContratoSei,
+        numeroNotasFiscais: input.numeroNotasFiscais,
+        titularNome: input.titularNome,
+        responsavelNome: input.responsavelNome,
+        responsavelUserId: input.responsavelUserId,
+        observacoes: input.observacoes
       });
 
-      // Retornar ciclo construído
-      return buildPaymentFollowUpCycle(input, {
-        baseDate,
-        empenhoBalances: financialBalances
-      });
+      if (!result?.cycle) return null;
+      return buildPaymentFollowUpCycle(input, { baseDate, empenhoBalances: financialBalances, overrideStatus: result.cycle.status as PaymentWorkflowStatus });
     },
-    [contractKey, baseDate, financialBalances]
+    [createMutation, baseDate, financialBalances]
   );
 
   /**
-   * Atualiza dados de um ciclo existente.
+   * Atualiza campos operacionais e/ou status de um ciclo já existente.
    */
   const updatePaymentCycle = useCallback(
-    (cycleKey: string, updates: Partial<PaymentCycleInput>): PaymentFollowUpCycle | null => {
-      let updated: PaymentFollowUpCycle | null = null;
+    async (
+      cycleKey: string,
+      updates: Partial<PaymentCycleInput> & { status?: PaymentWorkflowStatus }
+    ): Promise<PaymentFollowUpCycle | null> => {
+      const current = cycles.find(c => c.cycleKey === cycleKey);
 
-      setCycles(prevCycles => {
-        const index = prevCycles.findIndex(c => c.cycleKey === cycleKey);
-        if (index === -1) return prevCycles;
-
-        const current = prevCycles[index];
-        const mergedInput: PaymentCycleInput = {
-          ...current.input,
-          ...updates
-        };
-
-        const cycle = buildPaymentFollowUpCycle(
-          mergedInput,
-          {
-            baseDate,
-            empenhoBalances: financialBalances
-          }
-        );
-        cycle.tasks = current.tasks;
-        cycle.atualizadoEm = new Date().toISOString();
-
-        updated = cycle;
-        const nextCycles = [...prevCycles];
-        nextCycles[index] = cycle;
-        savePersistedCycles(contractKey, nextCycles);
-        return nextCycles;
+      const result = await updateMutation.mutateAsync({
+        cycleKey,
+        status: updates.status,
+        documentoDespachoSei: updates.documentoDespachoSei,
+        dataEnvioCgofi: updates.dataEnvioCgofi,
+        numeroOrdemBancaria: updates.numeroOrdemBancaria,
+        dataOrdemBancaria: updates.dataOrdemBancaria,
+        responsavelNome: updates.responsavelNome,
+        responsavelUserId: updates.responsavelUserId,
+        observacoes: updates.observacoes
       });
 
-      return updated;
+      if (!result?.cycle || !current) return null;
+
+      const mergedInput: PaymentCycleInput = { ...current.input, ...updates };
+      return buildPaymentFollowUpCycle(mergedInput, {
+        baseDate,
+        empenhoBalances: financialBalances,
+        overrideStatus: result.cycle.status as PaymentWorkflowStatus
+      });
     },
-    [contractKey, baseDate, financialBalances]
+    [cycles, updateMutation, baseDate, financialBalances]
   );
 
   /**
-   * Remove um ciclo.
+   * "Remove" um ciclo — na prática, cancela (status CANCELADO). Ciclos de
+   * pagamento são registros operacionais auditáveis; não existe exclusão
+   * física no servidor (ver cancelPaymentCycleRpc).
    */
   const deletePaymentCycle = useCallback(
-    (cycleKey: string) => {
-      setCycles(prevCycles => {
-        const nextCycles = prevCycles.filter(c => c.cycleKey !== cycleKey);
-        savePersistedCycles(contractKey, nextCycles);
-        return nextCycles;
-      });
+    async (cycleKey: string): Promise<void> => {
+      await cancelMutation.mutateAsync(cycleKey);
     },
-    [contractKey]
+    [cancelMutation]
   );
 
   // Consolidar todos os alertas de todos os ciclos do contrato
@@ -249,10 +194,7 @@ export function useContractPaymentFollowUp(
   }, [cycles]);
 
   const activeCount = useMemo(
-    () =>
-      cycles.filter(
-        c => c.status !== 'CONCLUIDO' && c.status !== 'CANCELADO'
-      ).length,
+    () => cycles.filter(c => c.status !== 'CONCLUIDO' && c.status !== 'CANCELADO').length,
     [cycles]
   );
 
@@ -270,6 +212,6 @@ export function useContractPaymentFollowUp(
     registerPaymentCycle,
     updatePaymentCycle,
     deletePaymentCycle,
-    refetch: refresh
+    refetch: refetchQuery
   };
 }

@@ -115,13 +115,14 @@ BEGIN
   RAISE NOTICE 'OK (Caso 2): leitor -> allocations.view=TRUE, allocations.manage=FALSE.';
 
   -- ============================================================
-  -- Caso 3: gestor -> allocations.manage TRUE
+  -- Caso 3: gestor -> allocations.manage FALSE (Fase 3B: allocations.manage
+  -- passou a ser exclusivo de gestor_saldos; gestor mantém só contracts.*)
   -- ============================================================
   PERFORM set_config('request.jwt.claim.sub', v_gestor_id::text, true);
-  IF NOT public.has_permission('allocations.manage') THEN
-    RAISE EXCEPTION 'FALHA (Caso 3): gestor deveria ter allocations.manage.';
+  IF public.has_permission('allocations.manage') THEN
+    RAISE EXCEPTION 'FALHA (Caso 3): gestor NÃO deveria mais ter allocations.manage (Fase 3B).';
   END IF;
-  RAISE NOTICE 'OK (Caso 3): gestor -> allocations.manage=TRUE.';
+  RAISE NOTICE 'OK (Caso 3): gestor -> allocations.manage=FALSE (Fase 3B).';
 
   -- ============================================================
   -- Caso 4: duas roles -> união de permissões

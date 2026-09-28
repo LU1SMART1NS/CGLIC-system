@@ -12,7 +12,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ContractPaymentFollowUpSection } from '../ContractPaymentFollowUpSection';
+import * as paymentFollowUpHookModule from '../../../hooks/useContractPaymentFollowUp';
 import type { ContractDashboardRecord } from '../../../types';
+
+// Fase 10-A.2: useContractPaymentFollowUp passou a persistir via Supabase/React
+// Query (contract_payment_cycles) em vez de localStorage — precisa de um
+// QueryClientProvider em runtime real. Nos testes de componente (renderização
+// estática, sem interação), mockamos o hook diretamente, no mesmo padrão já
+// usado para outros hooks baseados em React Query neste projeto (ver
+// ManagementPaymentsOverview.test.tsx).
+vi.mock('../../../hooks/useContractPaymentFollowUp', () => ({
+  useContractPaymentFollowUp: vi.fn()
+}));
 
 const mockContract: ContractDashboardRecord = {
   id: '200331-50-2024',
@@ -34,6 +45,17 @@ const mockContract: ContractDashboardRecord = {
 describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(paymentFollowUpHookModule.useContractPaymentFollowUp).mockReturnValue({
+      cycles: [],
+      alerts: [],
+      activeCount: 0,
+      completedCount: 0,
+      isLoading: false,
+      registerPaymentCycle: vi.fn().mockResolvedValue(null),
+      updatePaymentCycle: vi.fn().mockResolvedValue(null),
+      deletePaymentCycle: vi.fn().mockResolvedValue(undefined),
+      refetch: vi.fn()
+    });
   });
 
   it('UI-02: Exibe estado vazio quando o contrato não possui ciclos cadastrados', () => {

@@ -8,6 +8,7 @@ import { ArpPortfolioSummary, type ArpVigenciaFilterOption } from './atas/ArpPor
 import { ArpPortfolioFilters, type ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
 import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
+import { getArpVigenciaStatus } from '../services/temporalEngineService';
 import type { ArpRecord, ArpItemRecord, FilterParams, SyncMetadata } from '../types';
 
 interface ArpSearchProps {
@@ -16,14 +17,15 @@ interface ArpSearchProps {
   onArpsLoaded?: (arps: ArpRecord[], itemsByAta?: Record<string, ArpItemRecord[]>) => void;
 }
 
+/**
+ * Regra de vigência de Ata canônica (Fase 10-A.2 — temporalEngineService.getArpVigenciaStatus).
+ * `isCanceladaPncp` continua sendo um critério adicional de expiração próprio
+ * deste contexto (fonte PNCP), fora da regra de datas em si.
+ */
 function checkArpExpiration(arp: ArpRecord) {
-  const today = new Date();
-  const ninetyDaysFromNow = new Date();
-  ninetyDaysFromNow.setDate(today.getDate() + 90);
-
-  const vigenciaFinalDate = arp.dataVigenciaFinal ? new Date(arp.dataVigenciaFinal) : undefined;
-  const isExpired = Boolean(arp.isCanceladaPncp || (vigenciaFinalDate && vigenciaFinalDate < today));
-  const isExpiringSoon = !isExpired && Boolean(vigenciaFinalDate && vigenciaFinalDate <= ninetyDaysFromNow);
+  const vigenciaStatus = getArpVigenciaStatus(arp.dataVigenciaFinal);
+  const isExpired = Boolean(arp.isCanceladaPncp || vigenciaStatus?.isExpirada);
+  const isExpiringSoon = !isExpired && Boolean(vigenciaStatus?.isExpirandoEm90Dias);
 
   return { isExpired, isExpiringSoon };
 }

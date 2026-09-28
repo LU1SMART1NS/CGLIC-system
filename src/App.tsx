@@ -20,6 +20,7 @@ import { FinancialExecutionRoute } from './routes/FinancialExecutionRoute';
 import { LoginRoute } from './routes/LoginRoute';
 import { DefinirSenhaRoute } from './routes/DefinirSenhaRoute';
 import { RedefinirSenhaRoute } from './routes/RedefinirSenhaRoute';
+import { RequireRole } from './components/auth/RequireRole';
 import { SeiManagementModal } from './components/SeiManagementModal';
 import { ExportExcelModal } from './components/modals/ExportExcelModal';
 import { ContractTaskTemplatesModal } from './components/modals/ContractTaskTemplatesModal';
@@ -176,20 +177,111 @@ const AppContent: React.FC = () => {
           }
         >
           <Route path="/" element={<LegacyRouteRedirect to="/instrumentos" />} />
-          <Route path="/instrumentos" element={<GestaoInstrumentosRoute />} />
-          <Route path="/atas" element={<ArpSearchRoute />} />
-          <Route path="/atas/itens" element={<ArpItemsRoute />} />
-          <Route path="/atas/itens/saldo" element={<ItemBalancesRoute />} />
-          <Route path="/atas/saldos-unidade" element={<AllocationsRoute />} />
-          <Route path="/contratos" element={<ContractsRoute />} />
-          <Route path="/contratos/modelos" element={<ContractTaskTemplatesRoute />} />
-          <Route path="/contratos/:contractKey" element={<Contract360Route />} />
+          <Route
+            path="/instrumentos"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <GestaoInstrumentosRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/atas"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <ArpSearchRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/atas/itens"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <ArpItemsRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/atas/itens/saldo"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <ItemBalancesRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/atas/saldos-unidade"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor_saldos']}>
+                <AllocationsRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/contratos"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <ContractsRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/contratos/modelos"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor']}>
+                <ContractTaskTemplatesRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/contratos/:contractKey"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <Contract360Route />
+              </RequireRole>
+            }
+          />
           <Route path="/prazos" element={<LegacyRouteRedirect to="/instrumentos" />} />
-          <Route path="/pagamentos" element={<PaymentsRoute />} />
-          <Route path="/empenhos" element={<FinancialExecutionRoute />} />
-          <Route path="/admin/departamentos" element={<DepartmentsRoute />} />
-          <Route path="/admin/usuarios" element={<UsersRoute />} />
-          <Route path="/admin/perfis" element={<RolesRoute />} />
+          <Route
+            path="/pagamentos"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <PaymentsRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/empenhos"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <FinancialExecutionRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/departamentos"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor_saldos']}>
+                <DepartmentsRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/usuarios"
+            element={
+              <RequireRole allowedRoles={['admin']}>
+                <UsersRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/perfis"
+            element={
+              <RequireRole allowedRoles={['admin']}>
+                <RolesRoute />
+              </RequireRole>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
