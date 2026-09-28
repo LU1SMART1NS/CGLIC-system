@@ -49,7 +49,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
     return (
       <EmptyState
         title="Nenhum contrato encontrado."
-        description="Não há contratos cadastrados ou sincronizados para a unidade atual."
+        description="Não há contratos cadastrados ou sincronizados para as unidades consolidadas."
       />
     );
   }
