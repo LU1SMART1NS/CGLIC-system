@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 import { mapPerfilToDbRole } from "../_shared/roleMapping.ts";
 import { resolveInviteRedirect } from "../_shared/inviteOrigin.ts";
+import { callerHasPermission } from "../_shared/authorization.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,11 +59,16 @@ serve(async (req) => {
 
     const roles = callerRoles?.map((r: { role: string }) => r.role) || [];
     const isCallerAdmin = roles.includes("admin");
-    const isCallerGestor = roles.includes("gestor");
 
-    if (!isCallerAdmin && !isCallerGestor) {
+    // Autorização via RBAC (role_permissions), não mais hardcoded a
+    // "admin OR gestor" — ver manage-user/index.ts para a mesma mudança e a
+    // justificativa completa. isCallerAdmin permanece à parte para a regra
+    // fina abaixo (só admin convida outro admin).
+    const isCallerAuthorized = await callerHasPermission(authHeader, "governance.manage_users");
+
+    if (!isCallerAuthorized) {
       return new Response(
-        JSON.stringify({ error: "Acesso negado. Apenas gestores e administradores podem convidar usuários." }),
+        JSON.stringify({ error: "Acesso negado. Apenas administradores podem convidar usuários." }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

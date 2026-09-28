@@ -20,6 +20,8 @@ describe('AuthRoutes — Testes Unitários de Acesso e Credenciamento com Supaba
       user: null,
       session: null,
       loading: false,
+      role: null,
+      roleStatus: 'none',
       signOut: vi.fn()
     });
 
@@ -37,6 +39,8 @@ describe('AuthRoutes — Testes Unitários de Acesso e Credenciamento com Supaba
       user: { id: 'user-123', email: 'servidor@mj.gov.br' } as any,
       session: {} as any,
       loading: false,
+      role: 'admin',
+      roleStatus: 'ready',
       signOut: vi.fn()
     });
 

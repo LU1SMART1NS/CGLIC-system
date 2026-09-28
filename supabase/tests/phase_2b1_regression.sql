@@ -63,7 +63,7 @@ INSERT INTO public.role_domain_scopes (role_id, domain, scope_type) VALUES
 DO $$
 DECLARE
   v_leitor_id       UUID := '20000000-0000-0000-0000-000000000001';
-  v_global_id       UUID := '20000000-0000-0000-0000-000000000002'; -- role real 'gestor'
+  v_global_id       UUID := '20000000-0000-0000-0000-000000000002'; -- role real 'gestor_saldos' (Fase 3B: allocations.manage GLOBAL deixou de ser de 'gestor')
   v_unit_cglic_id   UUID := '20000000-0000-0000-0000-000000000003';
   v_arp_a_id        UUID := '20000000-0000-0000-0000-000000000004';
   v_scope_no_perm_id UUID := '20000000-0000-0000-0000-000000000005';
@@ -97,7 +97,11 @@ BEGIN
   ON CONFLICT (id) DO NOTHING;
 
   INSERT INTO public.user_roles (user_id, role) VALUES (v_leitor_id, 'leitor');
-  INSERT INTO public.user_roles (user_id, role) VALUES (v_global_id, 'gestor');
+  -- Fase 3B: allocations.manage + GLOBAL agora é exclusivo de 'gestor_saldos'
+  -- (e 'admin'), não mais de 'gestor'. Placeholder legado 'leitor' em `role`
+  -- porque a coluna CHECK não aceita 'gestor_saldos' — mesma convenção usada
+  -- em manage-user/invite-user (ver comentário lá).
+  INSERT INTO public.user_roles (user_id, role, role_id) VALUES (v_global_id, 'leitor', 'gestor_saldos');
   INSERT INTO public.user_roles (user_id, role) VALUES (v_admin_id, 'admin');
   INSERT INTO public.user_roles (user_id, role, role_id) VALUES (v_unit_cglic_id, 'gestor', 'test_unit_cglic');
   INSERT INTO public.user_roles (user_id, role, role_id) VALUES (v_arp_a_id, 'gestor', 'test_arp_a');

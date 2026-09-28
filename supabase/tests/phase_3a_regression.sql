@@ -7,6 +7,15 @@
 -- UNIT, não ARP. GLOBAL aqui significa exclusivamente "acesso global ao
 -- domínio allocations", nunca acesso a outros domínios.
 --
+-- ATUALIZAÇÃO — FASE 3B (20260926000033_align_gestor_scope_to_contracts.sql):
+-- gestor_saldos passou a ter também departments.manage. internal_departments
+-- é usado exclusivamente como dimensão de arp_allocations.unit_name — nenhuma
+-- tela ou RPC de Contratos depende dele — por isso administrar o catálogo de
+-- departamentos passou a acompanhar quem administra Alocações (gestor_saldos
+-- e admin), não mais 'gestor'. O restrito "só allocations.*" dos Casos 2/5/6
+-- abaixo foi ajustado para "allocations.* + departments.manage, nada de
+-- contratos/financeiro/usuários".
+--
 -- Uso:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/phase_3a_regression.sql
 -- ==============================================================================
@@ -26,31 +35,32 @@ BEGIN
   END IF;
   RAISE NOTICE 'OK (Caso 1): role gestor_saldos existe.';
 
-  -- Caso 2 / 6: EXATAMENTE allocations.view + allocations.manage, nada mais
+  -- Caso 2 / 6 (Fase 3B): EXATAMENTE allocations.view + allocations.manage +
+  -- departments.manage, nada mais
   SELECT COUNT(*) INTO v_count FROM public.role_permissions
-   WHERE role_id = 'gestor_saldos' AND permission_key IN ('allocations.view', 'allocations.manage');
-  IF v_count <> 2 THEN
-    RAISE EXCEPTION 'FALHA (Caso 2): esperado allocations.view + allocations.manage, encontrado % linha(s).', v_count;
+   WHERE role_id = 'gestor_saldos' AND permission_key IN ('allocations.view', 'allocations.manage', 'departments.manage');
+  IF v_count <> 3 THEN
+    RAISE EXCEPTION 'FALHA (Caso 2): esperado allocations.view + allocations.manage + departments.manage, encontrado % linha(s).', v_count;
   END IF;
 
   SELECT COUNT(*) INTO v_count FROM public.role_permissions
    WHERE role_id = 'gestor_saldos'
-     AND permission_key NOT IN ('allocations.view', 'allocations.manage');
+     AND permission_key NOT IN ('allocations.view', 'allocations.manage', 'departments.manage');
   IF v_count <> 0 THEN
-    RAISE EXCEPTION 'FALHA CRÍTICA (Caso 6): gestor_saldos tem % permissão(ões) fora do domínio allocations.', v_count;
+    RAISE EXCEPTION 'FALHA CRÍTICA (Caso 6): gestor_saldos tem % permissão(ões) fora do escopo permitido (allocations.* + departments.manage).', v_count;
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.role_permissions
      WHERE role_id = 'gestor_saldos'
        AND permission_key IN (
          'contracts.view', 'contracts.assign', 'contracts.manage', 'contracts.manage_tasks',
-         'financial.manage', 'departments.view', 'departments.manage',
+         'financial.manage', 'departments.view',
          'governance.manage_users', 'governance.manage_roles', 'reports.export'
        )
   ) THEN
     RAISE EXCEPTION 'FALHA CRÍTICA (Caso 6): gestor_saldos recebeu alguma permissão explicitamente proibida.';
   END IF;
-  RAISE NOTICE 'OK (Caso 2 / 6): gestor_saldos tem exatamente allocations.view + allocations.manage, nada mais.';
+  RAISE NOTICE 'OK (Caso 2 / 6): gestor_saldos tem exatamente allocations.view + allocations.manage + departments.manage, nada mais (Fase 3B).';
 
   -- Caso 3: escopo é GLOBAL, e NÃO UNIT/ARP
   IF NOT EXISTS (
@@ -114,16 +124,20 @@ BEGIN
   -- (Caso 8: Gestor de Saldo não precisa disso).
 
   -- ============================================================
-  -- Caso 4: usuário com apenas gestor_saldos -> tem as duas permissões
+  -- Caso 4 (Fase 3B): usuário com apenas gestor_saldos -> tem as três
+  -- permissões (allocations.view, allocations.manage, departments.manage)
   -- ============================================================
   PERFORM set_config('request.jwt.claim.sub', v_gestor_saldo_id::text, true);
   IF NOT public.has_permission('allocations.view') THEN RAISE EXCEPTION 'FALHA (Caso 4): deveria ter allocations.view.'; END IF;
   IF NOT public.has_permission('allocations.manage') THEN RAISE EXCEPTION 'FALHA (Caso 4): deveria ter allocations.manage.'; END IF;
-  RAISE NOTICE 'OK (Caso 4): usuário com apenas gestor_saldos tem allocations.view e allocations.manage.';
+  IF NOT public.has_permission('departments.manage') THEN RAISE EXCEPTION 'FALHA (Caso 4): deveria ter departments.manage (Fase 3B).'; END IF;
+  RAISE NOTICE 'OK (Caso 4): usuário com apenas gestor_saldos tem allocations.view, allocations.manage e departments.manage (Fase 3B).';
 
   -- ============================================================
   -- Caso 5 / 9 (segurança): acesso global -> UNIT e ARP, qualquer valor,
-  -- retornam TRUE; NENHUMA outra permissão é concedida por isso.
+  -- retornam TRUE; NENHUMA permissão de outro domínio (contratos, financeiro,
+  -- usuários) é concedida por isso. departments.manage é a única exceção
+  -- deliberada desde a Fase 3B (ver cabeçalho do arquivo).
   -- ============================================================
   IF NOT public.has_scope('allocations', 'UNIT', 'UNIDADE_X_3A') THEN RAISE EXCEPTION 'FALHA (Caso 5): GLOBAL deveria autorizar qualquer UNIT.'; END IF;
   IF NOT public.has_scope('allocations', 'UNIT', 'UNIDADE_QUE_NEM_EXISTE') THEN RAISE EXCEPTION 'FALHA (Caso 5): GLOBAL deveria autorizar qualquer UNIT, mesmo uma inexistente.'; END IF;
@@ -131,11 +145,11 @@ BEGIN
   IF NOT public.has_scope('allocations', 'ARP', 'qualquer-ata-inexistente') THEN RAISE EXCEPTION 'FALHA (Caso 5): GLOBAL deveria autorizar qualquer ARP, mesmo uma inexistente.'; END IF;
 
   IF public.has_permission('contracts.manage') OR public.has_permission('financial.manage')
-     OR public.has_permission('departments.manage') OR public.has_permission('governance.manage_users')
+     OR public.has_permission('governance.manage_users')
      OR public.has_permission('governance.manage_roles') OR public.has_permission('reports.export') THEN
-    RAISE EXCEPTION 'FALHA CRÍTICA (segurança): GLOBAL de gestor_saldos concedeu permissão fora do domínio allocations.';
+    RAISE EXCEPTION 'FALHA CRÍTICA (segurança): GLOBAL de gestor_saldos concedeu permissão fora de allocations.*/departments.manage.';
   END IF;
-  RAISE NOTICE 'OK (Caso 5 / segurança): acesso global ao domínio allocations, sem nenhuma permissão de outro domínio.';
+  RAISE NOTICE 'OK (Caso 5 / segurança): acesso global ao domínio allocations + departments.manage, sem nenhuma permissão de contratos/financeiro/usuários.';
 
   -- ============================================================
   -- Caso 7: execução real de save_allocations_atomic em ATA A, ATA B e

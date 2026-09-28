@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+import { callerHasPermission } from "../_shared/authorization.ts";
 
 export type DbRole = 'admin' | 'gestor' | 'leitor' | 'gestor_saldos';
 
@@ -76,11 +77,17 @@ serve(async (req) => {
 
     const roles = callerRoles?.map((r: { role: string }) => r.role) || [];
     const isCallerAdmin = roles.includes("admin");
-    const isCallerGestor = roles.includes("gestor");
 
-    if (!isCallerAdmin && !isCallerGestor) {
+    // Autorização via RBAC (role_permissions), não mais hardcoded a
+    // "admin OR gestor" — reflete o modelo funcional em que a gestão de
+    // usuários é responsabilidade do Coordenador-Geral, não do Gestor de
+    // Contratos. isCallerAdmin é preservado à parte para as regras finas
+    // abaixo (só admin mexe em outro admin), independentes desta permissão.
+    const isCallerAuthorized = await callerHasPermission(authHeader, "governance.manage_users");
+
+    if (!isCallerAuthorized) {
       return new Response(
-        JSON.stringify({ error: "Acesso negado. Apenas gestores e administradores podem gerenciar servidores." }),
+        JSON.stringify({ error: "Acesso negado. Apenas administradores podem gerenciar servidores." }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

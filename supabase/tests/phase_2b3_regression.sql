@@ -90,15 +90,31 @@ BEGIN
   RAISE NOTICE 'OK (Caso 2): departments.manage + role admin -> ALLOW.';
 
   -- ============================================================
-  -- Caso 3: departments.manage + role gestor -> ALLOW
+  -- Caso 3: role gestor -> DENY (Fase 3B: departments.manage deixou de ser
+  -- concedido a 'gestor' — é agora exclusivo de 'admin' e 'gestor_saldos')
   -- ============================================================
   PERFORM set_config('request.jwt.claim.sub', v_gestor_id::text, true);
-  v_result := public.save_internal_department_atomic(NULL, 'DEP_2B3_GESTOR', 'Departamento criado por gestor', NULL, TRUE);
+  v_failed := FALSE;
+  BEGIN
+    PERFORM public.save_internal_department_atomic(NULL, 'DEP_2B3_GESTOR', 'Tentativa via gestor (Fase 3B)', NULL, TRUE);
+  EXCEPTION WHEN OTHERS THEN
+    v_failed := TRUE;
+    GET STACKED DIAGNOSTICS v_sqlstate = RETURNED_SQLSTATE;
+    IF v_sqlstate <> '42501' THEN
+      RAISE EXCEPTION 'FALHA (Caso 3): esperado SQLSTATE 42501, obtido %.', v_sqlstate;
+    END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'FALHA CRÍTICA (Caso 3): gestor conseguiu criar departamento após a Fase 3B revogar departments.manage.'; END IF;
+  RAISE NOTICE 'OK (Caso 3): gestor -> DENY 42501 (Fase 3B).';
+
+  -- Cria o departamento usado pelos Casos 9b/9c via admin, já que gestor não
+  -- pode mais fazê-lo (v_dep_id é reutilizado adiante para update/delete).
+  PERFORM set_config('request.jwt.claim.sub', v_admin_id::text, true);
+  v_result := public.save_internal_department_atomic(NULL, 'DEP_2B3_GESTOR', 'Departamento de apoio ao teste (criado por admin)', NULL, TRUE);
   IF (v_result->>'success')::boolean IS NOT TRUE THEN
-    RAISE EXCEPTION 'FALHA (Caso 3): gestor com departments.manage deveria conseguir criar departamento. Resultado: %', v_result;
+    RAISE EXCEPTION 'FALHA (Caso 3, apoio): admin deveria conseguir criar o departamento de apoio. Resultado: %', v_result;
   END IF;
   v_dep_id := v_result->'department'->>'id';
-  RAISE NOTICE 'OK (Caso 3): departments.manage + role gestor -> ALLOW.';
 
   -- ============================================================
   -- Caso 4: usuário com apenas allocations.manage -> DENY
