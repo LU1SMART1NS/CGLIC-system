@@ -20,10 +20,9 @@ export interface InstrumentoInfo {
 /**
  * Deriva o instrumento (Ata ou Contrato) e seu tipo a partir dos campos já existentes no item.
  *
- * `arpKey` tem prioridade sobre `contractKey`/`numeroContrato`: alguns itens de vigência de ARP
- * (categoria PRORROGACAO_PROXIMA) também carregam um `numeroContrato` textual (ex.: "ARP 00011/2026")
- * porque reaproveitam o mesmo campo de exibição do centralPrazosService — mas o instrumento em
- * atenção continua sendo a Ata, não um contrato.
+ * `arpKey` tem prioridade sobre `contractKey`/`numeroContrato`: itens de Ata também podem carregar
+ * um `numeroContrato` textual (ex.: "ARP 00011/2026") por reaproveitarem o mesmo campo de exibição
+ * do centralPrazosService — mas o instrumento em atenção continua sendo a Ata, não um contrato.
  */
 export function getInstrumentoInfo(item: DashboardAttentionItem): InstrumentoInfo {
   if (item.arpKey) {
@@ -47,7 +46,6 @@ export interface MotivoInfo {
 }
 
 const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
-  PRORROGACAO_PROXIMA: { label: 'Vigência Próxima', color: '#1d4ed8', bg: '#eff6ff', referenciaLegal: 'Art. 106/107' },
   ATA_CRITICA: { label: 'Saldo em Atenção', color: '#059669', bg: '#ecfdf5' },
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: '#dc2626', bg: '#fef2f2' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: '#b45309', bg: '#fffbeb' },
@@ -61,7 +59,7 @@ export function getMotivoInfo(category: DashboardAttentionCategory): MotivoInfo 
 
 /** Situação atual em texto curto, composta apenas de campos reais já calculados (badgeLabel/dataAlvo). */
 export function getSituacaoAtual(item: DashboardAttentionItem): string {
-  if (item.dataAlvo && (item.category === 'PRORROGACAO_PROXIMA' || item.category === 'REAJUSTE_RADAR')) {
+  if (item.dataAlvo && item.category === 'REAJUSTE_RADAR') {
     const formatted = formatDate(item.dataAlvo);
     if (formatted) return `Vence em ${formatted}`;
   }
@@ -95,11 +93,6 @@ export interface AcaoInfo {
 /** Ação contextual em 1 clique, sempre apontando para um fluxo/rota já existente no sistema. */
 export function getAcaoInfo(item: DashboardAttentionItem): AcaoInfo {
   switch (item.category) {
-    case 'PRORROGACAO_PROXIMA':
-      if (item.arpKey && !item.contractKey) {
-        return { label: 'Prorrogar Vigência', targetUrl: '/atas' };
-      }
-      return { label: 'Prorrogar Vigência', targetUrl: item.contractKey ? `/contratos/${encodeURIComponent(item.contractKey)}` : '/contratos' };
     case 'ATA_CRITICA':
       return { label: 'Verificar Saldo', targetUrl: '/atas' };
     case 'PAGAMENTO_CRITICO':

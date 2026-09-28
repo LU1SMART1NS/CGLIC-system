@@ -279,18 +279,16 @@ export function calculateAttentionSummary(params: {
 
   // 1. Tarefas Atrasadas e Próximas da Central de Prazos
   //
-  // CORREÇÃO (Fase 10-A.2 — GAP #3 da Fase 10-A): o gatilho de saldo físico
-  // crítico de Ata (regraId GATILHO_85PCT, id contendo "SALDO_CRITICO") é
-  // emitido por centralPrazosService com diasRestantes=0/estadoTemporal=
-  // VENCE_HOJE — valores usados para MODELAR o gatilho como "urgente", não
-  // porque seja uma tarefa que vence. Antes desta correção, isso fazia esse
-  // MESMO item de Ata cair também no branch "VENCE_HOJE" abaixo e ser
-  // duplicado na lista de atenção com o rótulo incorreto "Tarefa Vencendo
-  // Hoje" — além do item correto já gerado pela Seção 4 (ATA_CRITICA). O
-  // saldo crítico de Ata é representado EXCLUSIVAMENTE pela Seção 4.
-  const prazosItemsSemGatilhoSaldo = prazosItems.filter((pItem) => !pItem.id.includes('SALDO_CRITICO'));
+  // Restrito a tipoItem === 'TAREFA_HUMANA': apenas tarefas e providências
+  // efetivamente cadastradas por um usuário no plano de trabalho do contrato
+  // alimentam o funil de "Ações Imediatas". Os GATILHO_OPERACIONAL (marcos
+  // preventivos de 180d/90d/60d calculados em memória a partir da vigência,
+  // sem qualquer noção de conclusão) NUNCA fecham sozinhos e por isso não
+  // devem virar "Tarefa Atrasada" crítica permanente — eles são exibidos
+  // como lembretes de planejamento na Visão 360 do próprio contrato/ata.
+  const tarefasHumanas = prazosItems.filter((pItem) => pItem.tipoItem === 'TAREFA_HUMANA');
 
-  for (const pItem of prazosItemsSemGatilhoSaldo) {
+  for (const pItem of tarefasHumanas) {
     if (pItem.estadoTemporal === 'ATRASADO') {
       items.push({
         id: `ATT-TASK-OVERDUE-${pItem.id}`,
@@ -328,21 +326,6 @@ export function calculateAttentionSummary(params: {
         severity: 'URGENTE',
         title: pItem.acaoDescricao || pItem.regraNome || 'Tarefa Próxima do Vencimento',
         description: `${pItem.identificadorFormatado} — Vence em ${pItem.diasRestantes} dias (${pItem.marcoEvento})`,
-        contractKey: pItem.contractKey,
-        numeroContrato: pItem.identificadorFormatado,
-        arpKey: pItem.arpKey,
-        diasRelevantes: pItem.diasRestantes,
-        dataAlvo: pItem.dataAlvo,
-        targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
-        badgeLabel: `${pItem.diasRestantes} dias`
-      });
-    } else if (pItem.tipoItem === 'GATILHO_OPERACIONAL' && pItem.diasRestantes > 7 && pItem.diasRestantes <= 60) {
-      items.push({
-        id: `ATT-PRORROG-${pItem.id}`,
-        category: 'PRORROGACAO_PROXIMA',
-        severity: 'ATENCAO',
-        title: pItem.regraNome || 'Marco de Planejamento de Prorrogação',
-        description: `${pItem.identificadorFormatado} — Janela preventiva de análise (${pItem.diasRestantes} dias restantes)`,
         contractKey: pItem.contractKey,
         numeroContrato: pItem.identificadorFormatado,
         arpKey: pItem.arpKey,
