@@ -99,10 +99,10 @@ const mockReadModel: ManagementDashboardReadModel = {
       },
       {
         id: 'ATT-ATEN-1',
-        category: 'PRORROGACAO_PROXIMA',
+        category: 'TAREFA_PROXIMA',
         severity: 'ATENCAO',
-        title: 'Marco de Planejamento de Prorrogação',
-        description: 'Contrato 15/2026 — Janela preventiva de análise (45 dias restantes)',
+        title: 'Emitir Termo de Apostilamento',
+        description: 'Contrato 15/2026 — Vence em 45 dias',
         contractKey: '200331-00015-2026',
         numeroContrato: 'Contrato 15/2026',
         badgeLabel: '45 dias'
@@ -270,14 +270,13 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
   it('3. deve renderizar os tabs de categoria com contagens reais e destacar o ativo', () => {
     const html = renderToStaticMarkup(
       <GestaoInstrumentosCategoryTabs
-        counts={{ TODAS: 5, VENCIMENTOS: 1, SALDOS: 1, REAJUSTES: 1, PAGAMENTOS: 1, TAREFAS: 1 }}
+        counts={{ TODAS: 5, SALDOS: 1, REAJUSTES: 1, PAGAMENTOS: 1, TAREFAS: 1 }}
         active="SALDOS"
         onSelect={vi.fn()}
       />
     );
 
     expect(html).toContain('Todas (5)');
-    expect(html).toContain('Vencimentos (1)');
     expect(html).toContain('Saldos (1)');
     expect(html).toContain('Reajustes (1)');
     expect(html).toContain('Pagamentos (1)');
@@ -326,7 +325,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).toContain('Execução / Pagamento');
     expect(html).toContain('Tarefa Atrasada');
     expect(html).toContain('Reajuste / Repactuação');
-    expect(html).toContain('Vigência Próxima');
+    expect(html).toContain('Tarefa Próxima');
 
     // Responsável
     expect(html).toContain('Ana Costa');
@@ -336,26 +335,23 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).toContain('Abrir Pagamento');
     expect(html).toContain('Abrir Tarefa');
     expect(html).toContain('Analisar Reajuste');
-    expect(html).toContain('Prorrogar Vigência');
   });
 
-  it('4b. deve classificar como ARP (não Contrato) um item de vigência próxima cujo numeroContrato traz o texto "ARP ..." (regressão do bug real)', () => {
-    const arpProrrogacaoItem = {
-      id: 'ATT-PRORROG-ARP-1',
-      category: 'PRORROGACAO_PROXIMA' as const,
-      severity: 'ATENCAO' as const,
-      title: 'Marco de Planejamento de Prorrogação',
-      description: 'ARP 00011/2026 — Janela preventiva de análise (8 dias restantes)',
+  it('4b. deve classificar como ARP (não Contrato) um item de saldo crítico cujo numeroContrato traz o texto "ARP ..." (regressão do bug real)', () => {
+    const arpSaldoCriticoItem = {
+      id: 'ATT-ARP-ITEM-1',
+      category: 'ATA_CRITICA' as const,
+      severity: 'URGENTE' as const,
+      title: 'Consumo Crítico em Ata (92.0%)',
+      description: 'ARP 00011/2026 — Item 1: Consumo crítico',
       arpKey: '00011/2026-200331',
       numeroContrato: 'ARP 00011/2026',
-      dataAlvo: '2026-10-03',
-      diasRelevantes: 8,
       uasg: '200331'
     };
 
     const html = renderToStaticMarkup(
       <GestaoInstrumentosTable
-        items={[arpProrrogacaoItem]}
+        items={[arpSaldoCriticoItem]}
         totalItems={1}
         fornecedorByKey={new Map()}
         responsavelByContractKey={new Map()}
@@ -368,7 +364,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).not.toContain('>CONTRATO<');
     expect(html).toContain('>ARP<');
     // Ação contextual deve levar para /atas (não /contratos), já que não há contrato vinculado
-    expect(html).toContain('Prorrogar Vigência');
+    expect(html).toContain('Verificar Saldo');
   });
 
   it('5. deve exibir estado "Tudo em dia" quando não houver nenhum instrumento em atenção', () => {

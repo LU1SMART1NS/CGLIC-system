@@ -2,7 +2,6 @@ import React from 'react';
 
 export type GestaoInstrumentosCategoryTab =
   | 'TODAS'
-  | 'VENCIMENTOS'
   | 'SALDOS'
   | 'REAJUSTES'
   | 'PAGAMENTOS'
@@ -15,7 +14,6 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'TODAS', label: 'Todas' },
-  { id: 'VENCIMENTOS', label: 'Vencimentos' },
   { id: 'SALDOS', label: 'Saldos' },
   { id: 'REAJUSTES', label: 'Reajustes' },
   { id: 'PAGAMENTOS', label: 'Pagamentos' },

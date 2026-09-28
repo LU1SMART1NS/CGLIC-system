@@ -11,6 +11,7 @@ import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
 import { AllocationsRoute } from './routes/AllocationsRoute';
 import { ContractsRoute } from './routes/ContractsRoute';
 import { Contract360Route } from './routes/Contract360Route';
+import { Ata360Route } from './routes/Ata360Route';
 import { ContractTaskTemplatesRoute } from './routes/ContractTaskTemplatesRoute';
 import { UsersRoute } from './routes/UsersRoute';
 import { RolesRoute } from './routes/RolesRoute';
@@ -214,6 +215,14 @@ const AppContent: React.FC = () => {
             element={
               <RequireRole allowedRoles={['admin', 'gestor_saldos', 'leitor']}>
                 <AllocationsRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/atas/detalhe/:ataKey"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <Ata360Route />
               </RequireRole>
             }
           />

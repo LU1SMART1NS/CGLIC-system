@@ -202,7 +202,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     );
 
     expect(html).toContain('Nenhum contrato encontrado');
-    expect(html).toContain('Não há contratos cadastrados ou sincronizados para a unidade atual.');
+    expect(html).toContain('Não há contratos cadastrados ou sincronizados para as unidades consolidadas.');
   });
 
   it('7. deve exibir estado de filtro sem resultados com botão de limpar filtros', () => {

@@ -1,5 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
+import { buildAtaKey } from '../../hooks/useAta';
 import { AtaCardHeader } from './AtaCardHeader';
 import { AtaItemList } from './AtaItemList';
 import { AtaManagerSelector } from './AtaManagerSelector';
@@ -17,6 +20,7 @@ export const AtaCard: React.FC<AtaCardProps> = ({
   isLoading = false
 }) => {
   const { arp, fornecedorNome, fornecedorCnpj, adesaoStatus, itens } = card;
+  const navigate = useNavigate();
 
   return (
     <article className="ata-card" aria-label={`Ata ${arp.numeroAtaRegistroPreco} - Fornecedor ${fornecedorNome}`}>
@@ -28,8 +32,29 @@ export const AtaCard: React.FC<AtaCardProps> = ({
         adesaoStatus={adesaoStatus}
       />
 
-      <div style={{ padding: '0 1rem 0.75rem' }}>
+      <div style={{ padding: '0 1rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
         <AtaManagerSelector ataKey={arp.numeroAtaRegistroPreco} />
+        <button
+          type="button"
+          onClick={() => navigate(`/atas/detalhe/${encodeURIComponent(buildAtaKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora))}`)}
+          data-testid={`ata-360-link-${arp.numeroAtaRegistroPreco}`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            padding: '0.4rem 0.75rem',
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: '6px',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            color: '#0c326f',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          Ver Detalhes 360° <ArrowRight size={13} />
+        </button>
       </div>
 
       {/* Item List */}

@@ -150,6 +150,42 @@ export async function fetchAllArpItemContractLinks(): Promise<ArpItemContractLin
 }
 
 /**
+ * Busca todos os vínculos item↔contrato de UMA Ata específica (todos os itens
+ * cujo item_key começa com "{numeroAta}-{uasg}-"), já no formato completo
+ * `ArpItemContractLink[]` pronto para `enrichContractLinks`. Usado pela Ata 360
+ * para listar os contratos vinculados a qualquer item da Ata.
+ */
+export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: string): Promise<ArpItemContractLink[]> {
+  const cleanAta = (numeroAta || '').trim();
+  const cleanUasg = (uasg || '').trim();
+  if (!cleanAta || !cleanUasg || !isSupabaseConfigured || !supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('arp_item_contract_links')
+      .select('*')
+      .like('item_key', `${cleanAta}-${cleanUasg}-%`)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    if (!data || !Array.isArray(data)) return [];
+
+    return data.map((d: any) => ({
+      id: String(d.id),
+      itemKey: d.item_key,
+      contractKey: d.contract_key,
+      quantidadeContratada: Number(d.quantidade_contratada) || 0,
+      observacoes: d.observacoes || undefined,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at
+    }));
+  } catch (err) {
+    console.warn('Erro ao carregar contratos vinculados à Ata', err);
+    return [];
+  }
+}
+
+/**
  * Função Pura: Enriquece os vínculos contextuais com os dados soberanos do catálogo
  * oficial de contratos do SaldoARP (sem duplicar nenhuma regra ou fazer chamada de rede).
  */

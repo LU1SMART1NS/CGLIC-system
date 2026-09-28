@@ -4,16 +4,16 @@ import type { DashboardAttentionItem } from '../../../types/managementDashboard'
 import type { AttentionItemWithUasg } from '../gestaoInstrumentosRowHelpers';
 
 describe('gestaoInstrumentosRowHelpers — classificação de tipo ARP × Contrato', () => {
-  it('classifica como ARP um item de vigência de Ata mesmo quando numeroContrato traz o texto "ARP ..." (bug real observado na Gestão de Instrumentos)', () => {
-    // Reproduz exatamente o shape gerado por dashboardService.calculateAttentionSummary
-    // para a categoria PRORROGACAO_PROXIMA de uma ARP: contractKey fica undefined,
-    // mas numeroContrato herda o identificadorFormatado ("ARP 00011/2026") do centralPrazosService.
+  it('classifica como ARP um item cujo numeroContrato traz o texto "ARP ..." (bug real observado na Gestão de Instrumentos)', () => {
+    // getInstrumentoInfo classifica exclusivamente por arpKey/numeroAta/contractKey,
+    // nunca por category — este item reproduz um shape de Ata em que numeroContrato
+    // herda o identificadorFormatado ("ARP 00011/2026") do centralPrazosService.
     const item: DashboardAttentionItem = {
-      id: 'ATT-PRORROG-ARP-1',
-      category: 'PRORROGACAO_PROXIMA',
+      id: 'ATT-ARP-1',
+      category: 'ATA_CRITICA',
       severity: 'ATENCAO',
-      title: 'Marco de Planejamento de Prorrogação',
-      description: 'ARP 00011/2026 — Janela preventiva de análise (45 dias restantes)',
+      title: 'Consumo em Atenção',
+      description: 'ARP 00011/2026 — Consumo físico em atenção',
       arpKey: '00011/2026-200331',
       numeroContrato: 'ARP 00011/2026'
     };
@@ -42,10 +42,10 @@ describe('gestaoInstrumentosRowHelpers — classificação de tipo ARP × Contra
 
   it('classifica como Contrato um item genuíno de contrato (contractKey + numeroContrato, sem arpKey)', () => {
     const item: DashboardAttentionItem = {
-      id: 'ATT-PRORROG-CTR-1',
-      category: 'PRORROGACAO_PROXIMA',
+      id: 'ATT-REAJUSTE-CTR-1',
+      category: 'REAJUSTE_RADAR',
       severity: 'ATENCAO',
-      title: 'Marco de Planejamento de Prorrogação',
+      title: 'Radar de Reajuste / Repactuação',
       contractKey: '200331-00098-2026',
       numeroContrato: 'Contrato 98/2026'
     };
@@ -70,31 +70,31 @@ describe('gestaoInstrumentosRowHelpers — classificação de tipo ARP × Contra
   });
 });
 
-describe('gestaoInstrumentosRowHelpers — ação contextual de Vigência Próxima', () => {
-  it('direciona para /atas quando o instrumento é uma ARP (sem contrato vinculado)', () => {
+describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo crítico', () => {
+  it('direciona para /atas quando o instrumento é uma ARP com saldo crítico', () => {
     const item: DashboardAttentionItem = {
-      id: 'ATT-PRORROG-ARP-1',
-      category: 'PRORROGACAO_PROXIMA',
-      severity: 'ATENCAO',
-      title: 'Marco de Planejamento de Prorrogação',
+      id: 'ATT-ARP-ITEM-1',
+      category: 'ATA_CRITICA',
+      severity: 'URGENTE',
+      title: 'Consumo Crítico em Ata (92.0%)',
       arpKey: '00011/2026-200331',
-      numeroContrato: 'ARP 00011/2026'
+      numeroAta: '00011/2026'
     };
 
-    expect(getAcaoInfo(item)).toEqual({ label: 'Prorrogar Vigência', targetUrl: '/atas' });
+    expect(getAcaoInfo(item)).toEqual({ label: 'Verificar Saldo', targetUrl: '/atas' });
   });
 
-  it('direciona para /contratos/:key quando o instrumento é um contrato', () => {
+  it('direciona para /contratos/:key quando o instrumento é um radar de reajuste de contrato', () => {
     const item: DashboardAttentionItem = {
-      id: 'ATT-PRORROG-CTR-1',
-      category: 'PRORROGACAO_PROXIMA',
+      id: 'ATT-REAJUSTE-CTR-1',
+      category: 'REAJUSTE_RADAR',
       severity: 'ATENCAO',
-      title: 'Marco de Planejamento de Prorrogação',
+      title: 'Radar de Reajuste / Repactuação',
       contractKey: '200331-00098-2026',
       numeroContrato: 'Contrato 98/2026'
     };
 
-    expect(getAcaoInfo(item)).toEqual({ label: 'Prorrogar Vigência', targetUrl: '/contratos/200331-00098-2026' });
+    expect(getAcaoInfo(item)).toEqual({ label: 'Analisar Reajuste', targetUrl: '/contratos/200331-00098-2026' });
   });
 });
 
