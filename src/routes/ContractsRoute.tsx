@@ -16,18 +16,36 @@ import { ErrorState } from '../design-system/components/ErrorState';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
 import { getContractDaysRemaining } from '../services/dashboardService';
 
+/** UASGs consolidadas nesta tela — mesmo escopo já usado na Visão Geral (/instrumentos), para que os dois painéis reportem os mesmos números de carteira de contratos. */
+const UASGS: string[] = ['200330', '200331'];
+
 export const ContractsRoute: React.FC = () => {
-  const {
-    data: allContracts = [],
-    isLoading,
-    isFetching,
-    error,
-    refresh,
-    dataUpdatedAt
-  } = useContractsDashboard('200331');
+  const dash200330 = useContractsDashboard(UASGS[0]);
+  const dash200331 = useContractsDashboard(UASGS[1]);
+
+  const allContracts = useMemo(
+    () => [...(dash200330.data || []), ...(dash200331.data || [])],
+    [dash200330.data, dash200331.data]
+  );
+  const isLoading = dash200330.isLoading || dash200331.isLoading;
+  const isFetching = dash200330.isFetching || dash200331.isFetching;
+  const hasAnyData = allContracts.length > 0;
+  const error = (dash200330.error || dash200331.error) as Error | null;
+  const dataUpdatedAt = Math.max(dash200330.dataUpdatedAt || 0, dash200331.dataUpdatedAt || 0) || undefined;
+  const refresh = useCallback(() => {
+    dash200330.refresh();
+    dash200331.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { role } = useAuth();
-  const { contractKeys: assignedContractKeys, isLoading: isLoadingManagers } = useAssignedManagementScope('200331');
+  const scope200330 = useAssignedManagementScope(UASGS[0]);
+  const scope200331 = useAssignedManagementScope(UASGS[1]);
+  const isLoadingManagers = scope200330.isLoading || scope200331.isLoading;
+  const assignedContractKeys = useMemo(() => {
+    if (!scope200330.contractKeys && !scope200331.contractKeys) return undefined;
+    return [...(scope200330.contractKeys || []), ...(scope200331.contractKeys || [])];
+  }, [scope200330.contractKeys, scope200331.contractKeys]);
 
   const contracts = useMemo(() => {
     if (!assignedContractKeys) return allContracts;
@@ -177,7 +195,7 @@ export const ContractsRoute: React.FC = () => {
     });
   }, [contracts, filterState]);
 
-  if (error && contracts.length === 0) {
+  if (error && !hasAnyData) {
     return (
       <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '2rem' }}>
         <ErrorState
@@ -199,6 +217,7 @@ export const ContractsRoute: React.FC = () => {
       gap: '1.25rem'
     }}>
       <ContractsPortfolioHeader
+        uasgs={UASGS}
         onRefresh={() => refresh()}
         isRefreshing={isFetching}
         lastUpdated={dataUpdatedAt}
