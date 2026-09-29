@@ -23,6 +23,40 @@ vi.mock('../../hooks/useAtaManagers', () => ({
   useArpItemContractLinks: vi.fn(() => ({ data: [], isLoading: false }))
 }));
 
+vi.mock('../../hooks/useContractsDashboard', () => ({
+  useContractsDashboard: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+    refresh: vi.fn()
+  }))
+}));
+
+vi.mock('../../hooks/useBatchSyncContractEmpenhos', () => ({
+  useBatchSyncContractEmpenhos: vi.fn(() => ({
+    run: vi.fn(),
+    cancel: vi.fn(),
+    isRunning: false,
+    progress: null,
+    summary: null,
+    resetSummary: vi.fn()
+  }))
+}));
+
+vi.mock('../../context/AuthContext', () => ({
+  useAuth: vi.fn(() => ({
+    user: { id: 'admin-user' },
+    session: null,
+    loading: false,
+    role: 'admin',
+    roleStatus: 'ready',
+    signOut: vi.fn()
+  }))
+}));
+
 const mockFinancialReadModel: ManagementDashboardReadModel = {
   uasg: '200331',
   dataCalculo: '2026-09-24T12:00:00Z',
