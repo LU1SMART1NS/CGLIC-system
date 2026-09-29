@@ -1146,8 +1146,14 @@ export async function fetchManagementDashboardData(
       console.warn('Erro ao consultar planos de tarefas para o dashboard:', err);
       return {} as Record<string, ContractTaskPlan>;
     }),
-    fetchEmpenhosResumoFromDb(cleanUasg),
-    fetchArpItemSaldosFromDb(cleanUasg)
+    fetchEmpenhosResumoFromDb(cleanUasg).catch((err) => {
+      console.error('Erro ao consultar empenhos para o dashboard:', err);
+      return [] as any[];
+    }),
+    fetchArpItemSaldosFromDb(cleanUasg).catch((err) => {
+      console.error('Erro ao consultar saldos de itens de ARP para o dashboard:', err);
+      return [] as any[];
+    })
   ]);
 
   const paymentCycles = await fetchAllPaymentCyclesForDashboard(contracts);
@@ -1211,7 +1217,11 @@ export async function fetchEmpenhosResumoFromDb(_uasg?: string): Promise<any[]> 
         .select('*')
         .range(from, from + pageSize - 1);
 
-      if (error || !data || data.length === 0) break;
+      if (error) {
+        console.error('Erro ao consultar v_empenhos_resumo:', error);
+        break;
+      }
+      if (!data || data.length === 0) break;
       allEmpenhos.push(...data);
       if (data.length < pageSize) break;
       from += pageSize;
@@ -1230,7 +1240,11 @@ export async function fetchEmpenhosResumoFromDb(_uasg?: string): Promise<any[]> 
           .select('empenho_id, contract_key, valor_vinculado')
           .range(linkFrom, linkFrom + pageSize - 1);
 
-        if (linkErr || !links || links.length === 0) break;
+        if (linkErr) {
+          console.error('Erro ao consultar vínculos contrato_empenhos:', linkErr);
+          break;
+        }
+        if (!links || links.length === 0) break;
 
         for (const l of links) {
           const key = String(l.empenho_id);
@@ -1277,7 +1291,11 @@ export async function fetchArpItemSaldosFromDb(uasg?: string): Promise<any[]> {
       query = query.eq('codigo_uasg', uasg);
     }
     const { data, error } = await query;
-    if (error || !data) return [];
+    if (error) {
+      console.error('Erro ao consultar v_arp_item_saldo_detalhado:', error);
+      return [];
+    }
+    if (!data) return [];
     return data;
   } catch (err) {
     console.warn('Erro ao consultar v_arp_item_saldo_detalhado:', err);

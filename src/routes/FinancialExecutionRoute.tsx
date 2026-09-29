@@ -1,14 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Banknote } from 'lucide-react';
+import { Banknote, RefreshCw, Loader2, CheckCircle2, XCircle, X } from 'lucide-react';
 import { ManagementFinancialExecution } from '../components/dashboard/ManagementFinancialExecution';
 import { useManagementDashboard } from '../hooks/useManagementDashboard';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
+import { useContractsDashboard } from '../hooks/useContractsDashboard';
+import { useBatchSyncContractEmpenhos } from '../hooks/useBatchSyncContractEmpenhos';
+import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../design-system/components/HeaderRefreshAction';
+import { AppButton } from '../design-system/components/AppButton';
+
+// Mesmo critério de autorização de sincronização usado no botão individual
+// de Contract360Header.tsx, aplicado aqui à sincronização em lote.
+const SYNC_AUTHORIZED_ROLES = ['gestor', 'coordenador', 'admin'];
 
 export const FinancialExecutionRoute: React.FC = () => {
   const navigate = useNavigate();
+  const { role } = useAuth();
+  const isAuthorizedToSync = role !== null && SYNC_AUTHORIZED_ROLES.includes(role);
 
   // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
   // migration 20260925000023), agora derivado também das Atas atribuídas
@@ -21,8 +31,23 @@ export const FinancialExecutionRoute: React.FC = () => {
     useManagementDashboard({ uasg: '200331', assignedContractKeys, assignedAtaKeys });
   const isLoading = isLoadingDashboard || isLoadingManagers;
 
+  const { data: allContracts } = useContractsDashboard('200331');
+  const { run: runBatchSync, cancel: cancelBatchSync, isRunning: isSyncingAll, progress: batchProgress, summary: batchSummary, resetSummary } =
+    useBatchSyncContractEmpenhos();
+
+  const [showBatchPanel, setShowBatchPanel] = useState(false);
+
   const handleNavigateContract = (contractKey: string) => {
     navigate(`/contratos/${encodeURIComponent(contractKey)}`);
+  };
+
+  const handleBatchSync = async () => {
+    if (!isAuthorizedToSync || isSyncingAll) return;
+    const contracts = (allContracts || []).filter((c) => c.statusVigencia !== 'Expirado');
+    setShowBatchPanel(true);
+    resetSummary();
+    await runBatchSync(contracts);
+    refresh();
   };
 
   return (
@@ -33,15 +58,95 @@ export const FinancialExecutionRoute: React.FC = () => {
         subtitle="Execução financeira oficial dos empenhos, liquidações e pagamentos."
         icon={<Banknote size={26} color="#0c326f" aria-hidden="true" />}
         actions={
-          <HeaderRefreshAction
-            onRefresh={() => refresh()}
-            isRefreshing={isLoading || isFetching}
-            lastUpdated={dataUpdatedAt}
-            tooltipTitle="Recarregar dados gerenciais de empenhos e execução financeira"
-            dataTestId="financial-execution-refresh-btn"
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <AppButton
+              variant="outline"
+              size="sm"
+              onClick={handleBatchSync}
+              disabled={!isAuthorizedToSync || isSyncingAll || !allContracts?.length}
+              isLoading={isSyncingAll}
+              icon={<RefreshCw size={13} />}
+              title={
+                !isAuthorizedToSync
+                  ? 'Você não possui permissão para sincronizar empenhos.'
+                  : 'Sincronizar empenhos de todos os contratos ativos nas fontes governamentais oficiais (Contratos.gov.br / PNCP)'
+              }
+              data-testid="financial-execution-batch-sync-btn"
+            >
+              {isSyncingAll ? 'Sincronizando...' : 'Sincronizar Todos os Empenhos'}
+            </AppButton>
+
+            <HeaderRefreshAction
+              onRefresh={() => refresh()}
+              isRefreshing={isLoading || isFetching}
+              lastUpdated={dataUpdatedAt}
+              tooltipTitle="Recarregar dados gerenciais de empenhos e execução financeira"
+              dataTestId="financial-execution-refresh-btn"
+            />
+          </div>
         }
       />
+
+      {showBatchPanel && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            padding: '0.75rem 1rem',
+            marginBottom: '1.25rem',
+            borderRadius: '8px',
+            border: `1px solid ${batchSummary?.erro ? '#fde68a' : '#bbf7d0'}`,
+            backgroundColor: batchSummary ? (batchSummary.erro ? '#fffbeb' : '#f0fdf4') : '#f0f9ff'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', fontWeight: 600 }}>
+            {isSyncingAll ? (
+              <>
+                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} color="#0c326f" />
+                <span>
+                  Sincronizando contratos {batchProgress?.current ?? 0}/{batchProgress?.total ?? 0}
+                  {batchProgress?.percent !== undefined ? ` (${batchProgress.percent}%)` : ''}
+                </span>
+              </>
+            ) : batchSummary ? (
+              <>
+                {batchSummary.erro > 0 ? (
+                  <XCircle size={16} color="#92400e" />
+                ) : (
+                  <CheckCircle2 size={16} color="#166534" />
+                )}
+                <span>
+                  Sincronização {batchSummary.cancelado ? 'cancelada' : 'concluída'}:{' '}
+                  {batchSummary.sucesso + batchSummary.parcial + batchSummary.comDivergencias} de {batchSummary.totalContratos}{' '}
+                  contrato(s) com sucesso, {batchSummary.semDados} sem dados nas fontes, {batchSummary.erro} com erro.{' '}
+                  {batchSummary.empenhosPersistidos} empenho(s) persistido(s)/atualizado(s).
+                </span>
+              </>
+            ) : null}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {isSyncingAll && (
+              <AppButton variant="ghost" size="sm" onClick={cancelBatchSync}>
+                Cancelar
+              </AppButton>
+            )}
+            {!isSyncingAll && (
+              <button
+                type="button"
+                onClick={() => setShowBatchPanel(false)}
+                aria-label="Fechar notificação"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6, display: 'flex' }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <ManagementFinancialExecution
         readModel={readModel}
