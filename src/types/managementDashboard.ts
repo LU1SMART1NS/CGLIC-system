@@ -51,8 +51,7 @@ export type DashboardAttentionCategory =
   | 'TAREFA_PROXIMA'
   | 'PAGAMENTO_CRITICO'
   | 'REAJUSTE_RADAR'
-  | 'ATA_CRITICA'
-  | 'PRORROGACAO_PROXIMA';
+  | 'ATA_CRITICA';
 
 export type DashboardAttentionSeverity = 'CRITICA' | 'URGENTE' | 'ATENCAO' | 'INFO';
 

@@ -19,7 +19,6 @@ type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 const UASGS: string[] = ['200330', '200331'];
 
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
-  VENCIMENTOS: ['PRORROGACAO_PROXIMA'],
   SALDOS: ['ATA_CRITICA'],
   REAJUSTES: ['REAJUSTE_RADAR'],
   PAGAMENTOS: ['PAGAMENTO_CRITICO'],
@@ -109,7 +108,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const tabCounts = useMemo(() => {
     return {
       TODAS: allItems.length,
-      VENCIMENTOS: allItems.filter((i) => matchesTab(i, 'VENCIMENTOS')).length,
       SALDOS: allItems.filter((i) => matchesTab(i, 'SALDOS')).length,
       REAJUSTES: allItems.filter((i) => matchesTab(i, 'REAJUSTES')).length,
       PAGAMENTOS: allItems.filter((i) => matchesTab(i, 'PAGAMENTOS')).length,
@@ -170,7 +168,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
     if (activeTab === 'SALDOS') return 'ARP';
-    if (activeTab === 'VENCIMENTOS' && tipoFilter === 'CONTRATO') return 'CONTRATOS';
+    if (tipoFilter === 'CONTRATO') return 'CONTRATOS';
     if (severidade === 'CRITICA') return 'ALERTAS';
     return null;
   }, [activeTab, severidade, tipoFilter]);
@@ -180,8 +178,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       setActiveTab((prev) => (prev === 'SALDOS' ? 'TODAS' : 'SALDOS'));
       setTipoFilter('TODOS');
     } else if (card === 'CONTRATOS') {
-      const isActive = activeTab === 'VENCIMENTOS' && tipoFilter === 'CONTRATO';
-      setActiveTab(isActive ? 'TODAS' : 'VENCIMENTOS');
+      const isActive = tipoFilter === 'CONTRATO';
+      setActiveTab('TODAS');
       setTipoFilter(isActive ? 'TODOS' : 'CONTRATO');
     } else if (card === 'ALERTAS') {
       setSeveridade((prev) => (prev === 'CRITICA' ? 'TODAS' : 'CRITICA'));

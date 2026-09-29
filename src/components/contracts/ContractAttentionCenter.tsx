@@ -5,7 +5,8 @@ import {
   ExternalLink,
   ShieldCheck,
   Check,
-  TrendingUp
+  TrendingUp,
+  Lightbulb
 } from 'lucide-react';
 import type {
   ContractDashboardRecord,
@@ -16,6 +17,7 @@ import type {
 import type { PaymentAlert } from '../../types/paymentFollowUp';
 import type { ReajusteRadarAlert } from '../../types/contractReajusteRadar';
 import { differenceInDays, parseDateBRT, formatDateBR } from '../../services/temporalEngineService';
+import { buildCentralPrazosItems } from '../../services/centralPrazosService';
 import { useUpdateContractTask } from '../../hooks/useUpdateContractTask';
 import { useContractPaymentFollowUp } from '../../hooks/useContractPaymentFollowUp';
 import { useContractEvents } from '../../hooks/useContractEvents';
@@ -124,6 +126,21 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
 
   const paymentAlerts = externalPaymentAlerts || hookPaymentAlerts;
 
+  // Lembretes de Planejamento (Fase 10-B): marcos preventivos de 180d/60d do
+  // motor temporal, calculados exclusivamente em memória a partir da vigência
+  // (sem noção de "concluído"). Não são pendências reais — por isso não
+  // entram mais no funil central de "Ações Imediatas" (Visão Geral), só
+  // aparecem aqui, no contexto do próprio contrato, com tom informativo.
+  const lembretesPlanejamento = React.useMemo(
+    () =>
+      buildCentralPrazosItems({ contracts: [contract] }).filter(
+        (i) =>
+          i.tipoItem === 'GATILHO_OPERACIONAL' &&
+          (i.estadoTemporal === 'ATRASADO' || (i.diasRestantes >= 0 && i.diasRestantes <= 60))
+      ),
+    [contract]
+  );
+
   // Radar Preditivo de Reajuste / Repactuação (Fase 7.5-C3)
   const computedReajusteAlert = React.useMemo(() => {
     if (externalReajusteAlert !== undefined) return externalReajusteAlert;
@@ -196,6 +213,13 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
     }
   };
 
+  const scrollToWorkflowsSection = () => {
+    const el = document.getElementById('contract-workflows-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const scrollToTimelineSection = () => {
     const el = document.getElementById('contract-timeline-section');
     if (el) {
@@ -216,40 +240,121 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
     (!paymentAlerts || paymentAlerts.length === 0) &&
     !computedReajusteAlert;
 
-  // Estado Positivo: Sem pendências que exijam atenção
+  const lembretesSection = lembretesPlanejamento.length > 0 && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>
+        <Lightbulb size={14} />
+        <span>Lembretes de Planejamento</span>
+      </div>
+      {lembretesPlanejamento.map((item) => {
+        const isPast = item.estadoTemporal === 'ATRASADO';
+        const prazoLabel = isPast
+          ? `Janela iniciada há ${Math.abs(item.diasRestantes)} dias`
+          : item.diasRestantes === 0
+          ? 'Janela inicia hoje'
+          : `Janela em ${item.diasRestantes} dias`;
+
+        return (
+          <div
+            key={item.id}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              padding: '0.85rem 1.1rem',
+              borderRadius: '8px',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ flex: 1, minWidth: '260px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    background: '#f1f5f9',
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: '4px'
+                  }}
+                >
+                  {prazoLabel}
+                </span>
+              </div>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', margin: '0 0 0.2rem 0' }}>
+                {item.regraNome}
+              </h4>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                {item.acaoDescricao}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={scrollToWorkflowsSection}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '0.4rem 0.75rem',
+                backgroundColor: '#ffffff',
+                color: '#475569',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <span>Ver Workflow</span>
+              <ExternalLink size={12} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Estado Positivo: Sem pendências que exijam atenção (os lembretes de
+  // planejamento, por não serem pendências reais, seguem exibidos abaixo)
   if (hasNoItems) {
     return (
-      <div
-        style={{
-          background: '#f0fdf4',
-          borderRadius: '10px',
-          border: '1px solid #bbf7d0',
-          padding: '1.5rem',
-          textAlign: 'center',
-          color: '#166534'
-        }}
-      >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
         <div
           style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            backgroundColor: '#dcfce7',
-            color: '#15803d',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 0.75rem auto'
+            background: '#f0fdf4',
+            borderRadius: '10px',
+            border: '1px solid #bbf7d0',
+            padding: '1.5rem',
+            textAlign: 'center',
+            color: '#166534'
           }}
         >
-          <CheckCircle2 size={22} />
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              backgroundColor: '#dcfce7',
+              color: '#15803d',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 0.75rem auto'
+            }}
+          >
+            <CheckCircle2 size={22} />
+          </div>
+          <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 0.35rem 0', color: '#14532d' }}>
+            Tudo em dia com este contrato
+          </h4>
+          <p style={{ fontSize: '0.85rem', color: '#166534', margin: 0 }}>
+            {plan ? 'Todas as tarefas do plano de gestão e ciclos de faturamento estão regulares.' : 'Nenhum plano de tarefas, ciclo de faturamento ou marco de reajuste possui pendências críticas neste momento.'}
+          </p>
         </div>
-        <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 0.35rem 0', color: '#14532d' }}>
-          Tudo em dia com este contrato
-        </h4>
-        <p style={{ fontSize: '0.85rem', color: '#166534', margin: 0 }}>
-          {plan ? 'Todas as tarefas do plano de gestão e ciclos de faturamento estão regulares.' : 'Nenhum plano de tarefas, ciclo de faturamento ou marco de reajuste possui pendências críticas neste momento.'}
-        </p>
+        {lembretesSection}
       </div>
     );
   }
@@ -592,6 +697,8 @@ export const ContractAttentionCenter: React.FC<ContractAttentionCenterProps> = (
           </div>
         );
       })}
+
+      {lembretesSection}
     </div>
   );
 };

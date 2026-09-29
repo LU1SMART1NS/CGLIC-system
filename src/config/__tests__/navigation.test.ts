@@ -30,7 +30,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(gestaoInstrumentos?.matchPrefixes).toContain('/prazos');
     });
 
-    it('deve configurar Atas de Registro de Preços com Consulta e Vigência, Alocações por Unidade e Unidades Internas', () => {
+    it('deve configurar Atas de Registro de Preços com Consulta e Vigência, Alocações por Unidade, Modelos de Gestão de Atas e Unidades Internas', () => {
       const atas = navigationConfig.find((i) => i.id === 'atas');
       expect(atas).toBeDefined();
       expect(atas?.label).toBe('Atas de Registro de Preços');
@@ -39,16 +39,18 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(children.map((c) => c.label)).toEqual([
         'Consulta e Vigência',
         'Alocações por Unidade',
+        'Modelos de Gestão de Atas',
         'Unidades Internas'
       ]);
       expect(children.map((c) => c.route)).toEqual([
         '/atas',
         '/atas/saldos-unidade',
+        '/atas/modelos',
         '/admin/departamentos'
       ]);
     });
 
-    it('deve configurar Contratos com Acompanhamento e Prazos e Modelos de Gestão', () => {
+    it('deve configurar Contratos com Acompanhamento e Prazos e Modelos de Gestão de Contratos', () => {
       const contratos = navigationConfig.find((i) => i.id === 'contratos');
       expect(contratos).toBeDefined();
       expect(contratos?.label).toBe('Contratos');
@@ -56,7 +58,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const children = contratos?.children || [];
       expect(children.map((c) => c.label)).toEqual([
         'Acompanhamento e Prazos',
-        'Modelos de Gestão'
+        'Modelos de Gestão de Contratos'
       ]);
       expect(children[0].route).toBe('/contratos');
       expect(children[1].route).toBe('/contratos/modelos');
@@ -165,6 +167,20 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         { label: 'Consulta e Vigência', route: '/atas' },
         { label: 'Alocações por Unidade', route: '/atas/saldos-unidade' }
       ]);
+      expect(getBreadcrumbs('/atas/modelos')).toEqual([
+        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Consulta e Vigência', route: '/atas' },
+        { label: 'Modelos de Gestão de Atas', route: '/atas/modelos' }
+      ]);
+    });
+
+    it('deve gerar breadcrumb dinâmico para a rota dedicada /atas/detalhe/:ataKey', () => {
+      const crumbs = getBreadcrumbs('/atas/detalhe/00011%2F2026-200331');
+      expect(crumbs).toEqual([
+        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Consulta e Vigência', route: '/atas' },
+        { label: 'Ata 00011/2026-200331', route: '/atas/detalhe/00011%2F2026-200331' }
+      ]);
     });
 
     it('deve gerar breadcrumb para rotas de administração', () => {
@@ -210,6 +226,17 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(isItemActive(atasGroup, pathname)).toBe(true);
     });
 
+    it('não deve selecionar simultaneamente Consulta e Vigência e Modelos de Gestão de Atas em /atas/modelos', () => {
+      const atasGroup = navigationConfig.find((item) => item.id === 'atas')!;
+      const atasConsulta = atasGroup.children!.find((c) => c.id === 'atas-consulta')!;
+      const atasModelos = atasGroup.children!.find((c) => c.id === 'atas-modelos')!;
+
+      const pathname = '/atas/modelos';
+      expect(isExactChildActive(atasModelos, pathname)).toBe(true);
+      expect(isExactChildActive(atasConsulta, pathname)).toBe(false);
+      expect(isItemActive(atasGroup, pathname)).toBe(true);
+    });
+
     it('não deve selecionar simultaneamente Acompanhamento e Modelos de Gestão em /contratos/modelos', () => {
       const contratosGroup = navigationConfig.find((item) => item.id === 'contratos')!;
       const contratosAcompanhamento = contratosGroup.children!.find((c) => c.id === 'contratos-acompanhamento')!;
@@ -241,7 +268,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Alocações por Unidade');
       expect(labels).toContain('Unidades Internas');
-      expect(labels).toContain('Modelos de Gestão');
+      expect(labels).toContain('Modelos de Gestão de Contratos');
+      expect(labels).toContain('Modelos de Gestão de Atas');
       expect(labels).toContain('Usuários e Servidores');
       expect(labels).toContain('Perfis e Permissões');
     });
@@ -253,7 +281,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Consulta e Vigência');
       expect(labels).toContain('Acompanhamento e Prazos');
-      expect(labels).toContain('Modelos de Gestão');
+      expect(labels).toContain('Modelos de Gestão de Contratos');
+      expect(labels).toContain('Modelos de Gestão de Atas');
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos e Execução');
 

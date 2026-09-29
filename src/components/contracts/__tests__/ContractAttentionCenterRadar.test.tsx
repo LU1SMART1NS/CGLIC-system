@@ -188,6 +188,42 @@ describe('ContractAttentionCenter — Radar Preditivo de Reajuste/Repactuação 
     });
   });
 
+  describe('Fase 10-B — Lembretes de Planejamento (gatilhos operacionais 180d/60d)', () => {
+    it('8. Exibe lembrete de planejamento vencido sem tratá-lo como pendência crítica', () => {
+      // Vigência terminando em ~109 dias: o marco de 180d (Início da Análise
+      // de Prorrogação) já foi ultrapassado, mas isso não é uma tarefa
+      // cadastrada nem deve aparecer com severidade crítica — é só um
+      // lembrete informativo no contexto do próprio contrato.
+      const contractPertoDoFim: ContractDashboardRecord = {
+        ...mockContract,
+        dataVigenciaFim: formatDateISO(addDays(new Date(), 109))
+      };
+
+      const html = renderToStaticMarkup(
+        <ContractAttentionCenter contract={contractPertoDoFim} plan={null} reajusteAlert={null} />
+      );
+
+      expect(html).toContain('Lembretes de Planejamento');
+      expect(html).toContain('Início da Análise de Prorrogação');
+      expect(html).toContain('Remessa aos Órgãos de Controle');
+      expect(html).toContain('Ver Workflow');
+    });
+
+    it('9. Não exibe lembretes de planejamento quando a vigência termina em mais de 240 dias', () => {
+      const contractVigenciaLonga: ContractDashboardRecord = {
+        ...mockContract,
+        dataVigenciaFim: formatDateISO(addDays(new Date(), 900))
+      };
+
+      const html = renderToStaticMarkup(
+        <ContractAttentionCenter contract={contractVigenciaLonga} plan={null} reajusteAlert={null} />
+      );
+
+      expect(html).not.toContain('Lembretes de Planejamento');
+      expect(html).toContain('Tudo em dia com este contrato');
+    });
+  });
+
   describe('Fase 10-A.2.1 — Severidade Canônica das Tarefas do Plano de Gestão', () => {
     it('7. Tarefa VENCIDA usa SeverityBadge com severidade CRITICA e rótulo "Xd atrasada"', () => {
       const pastDate = formatDateISO(addDays(new Date(), -3));
