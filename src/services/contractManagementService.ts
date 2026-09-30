@@ -1,3 +1,4 @@
+import { moduleFromRow } from '../utils/taskPlanModules';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { resolveContractKey } from '../utils/contractKeyUtils';
 import type {
@@ -245,6 +246,7 @@ export async function fetchContractTaskPlan(contractKey: string): Promise<Contra
       ordem: t.ordem,
       status: t.status,
       executionMode: t.execution_mode || undefined,
+      origem: t.origem || undefined,
       responsavelNome: t.responsavel_nome || undefined,
       responsavelUserId: t.responsavel_user_id || undefined,
       prazo: t.prazo || undefined,
@@ -262,6 +264,8 @@ export async function fetchContractTaskPlan(contractKey: string): Promise<Contra
     planId: m.plan_id,
     nome: m.nome,
     ordem: m.ordem,
+    origem: m.origem || undefined,
+    modulo: moduleFromRow(m),
     tarefas: tasksByMacrotask.get(m.id) || []
   }));
 
@@ -329,6 +333,7 @@ export async function fetchAllContractTaskPlans(uasg?: string): Promise<Record<s
         ordem: t.ordem,
         status: t.status,
         executionMode: t.execution_mode || undefined,
+        origem: t.origem || undefined,
         responsavelNome: t.responsavel_nome || undefined,
         responsavelUserId: t.responsavel_user_id || undefined,
         prazo: t.prazo || undefined,
@@ -349,6 +354,8 @@ export async function fetchAllContractTaskPlans(uasg?: string): Promise<Record<s
         planId: m.plan_id,
         nome: m.nome,
         ordem: m.ordem,
+        origem: m.origem || undefined,
+        modulo: moduleFromRow(m),
         tarefas: tasksByMacrotask.get(m.id) || []
       });
       macrotasksByPlan.set(m.plan_id, list);
@@ -374,5 +381,26 @@ export async function fetchAllContractTaskPlans(uasg?: string): Promise<Record<s
   } catch (err) {
     console.warn('Erro ao carregar todos os planos de gestão de contratos', err);
     return {};
+  }
+}
+
+/**
+ * Ids dos lembretes de prazo legal que o gestor dispensou para um contrato ou Ata
+ * (tabela reminder_dismissals). O id embute o ciclo de vigência.
+ */
+export async function fetchDismissedReminders(entityType: 'CONTRATO' | 'ATA', entityKey: string): Promise<string[]> {
+  if (!isSupabaseConfigured || !supabase || !entityKey) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('reminder_dismissals')
+      .select('item_id')
+      .eq('entity_type', entityType)
+      .eq('entity_key', entityKey);
+    if (error) throw error;
+    return (data || []).map((row: { item_id: string }) => row.item_id);
+  } catch (err) {
+    console.warn('[contractManagementService] Falha ao consultar lembretes dispensados:', err);
+    return [];
   }
 }

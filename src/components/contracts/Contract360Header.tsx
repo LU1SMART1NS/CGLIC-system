@@ -28,7 +28,6 @@ interface Contract360HeaderProps {
   onBack?: () => void;
   userRole?: string;
   canSync?: boolean;
-  onOpenSeiModal?: () => void;
 }
 
 function formatCnpjDisplay(cnpj?: string): string {
@@ -61,8 +60,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   contract,
   onBack,
   userRole,
-  canSync,
-  onOpenSeiModal
+  canSync
 }) => {
   const navigate = useNavigate();
 
@@ -447,6 +445,33 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
             {contract.objeto}
           </p>
         )}
+
+        <dl
+          data-testid="contract-header-metadata"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.35rem 1.25rem',
+            margin: '0.6rem 0 0 0',
+            fontSize: '0.78rem',
+            color: '#64748b'
+          }}
+        >
+          {[
+            { label: 'Órgão', value: contract.nomeOrgao },
+            { label: 'Unidade gestora', value: contract.nomeUnidadeGestora },
+            { label: 'Modalidade', value: contract.modalidadeCompra },
+            { label: 'Nº PNCP', value: contract.numeroControlePncp },
+            { label: 'Assinatura', value: contract.dataAssinatura ? formatDateBR(contract.dataAssinatura) : undefined }
+          ].map(({ label, value }) => (
+            <div key={label} style={{ display: 'flex', gap: '0.3rem' }}>
+              <dt style={{ fontWeight: 600 }}>{label}:</dt>
+              <dd style={{ margin: 0, color: value ? '#334155' : '#94a3b8', fontWeight: value ? 600 : 400 }}>
+                {value || 'Não informado'}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </div>
 
       {/* Grid de Resumo dos Dados Principais */}
@@ -573,29 +598,6 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
               <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
                 {contract.processo || 'Não informado'}
               </span>
-              {contract.processo && onOpenSeiModal && (
-                <button
-                  type="button"
-                  onClick={onOpenSeiModal}
-                  title={`Consultar processo ${contract.processo} no SEI`}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    padding: '0.15rem 0.45rem',
-                    background: '#eff6ff',
-                    color: '#0c326f',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: '4px',
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <ExternalLink size={10} />
-                  <span>SEI</span>
-                </button>
-              )}
             </div>
             {contract.idCompra && (
               <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Compra: {contract.idCompra}</div>

@@ -1,5 +1,5 @@
 /**
- * Serviço do Radar Preditivo de Reajuste / Repactuação na Central de Atenção (SaldoARP — Fase 7.5-C3)
+ * Serviço do Radar Preditivo de Reajuste / Repactuação na Central de Atenção (CGLIC — Fase 7.5-C3)
  *
  * Princípios Fundamentais:
  * 1. Radar operacional preventivo: avisa a proximidade do marco anual para análise administrativa;

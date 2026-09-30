@@ -7,7 +7,7 @@ import {
   parseItemKey
 } from '../itemKeyUtils';
 
-describe('itemKeyUtils - Normalização Canônica e Business Key (SaldoARP 3.0)', () => {
+describe('itemKeyUtils - Normalização Canônica e Business Key (CGLIC 3.0)', () => {
   describe('normalizeItemNumber', () => {
     it('deve padronizar inteiros e strings para 5 dígitos com zeros à esquerda', () => {
       expect(normalizeItemNumber(1)).toBe('00001');

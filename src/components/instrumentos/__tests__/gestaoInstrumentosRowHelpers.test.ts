@@ -84,7 +84,7 @@ describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo c
     expect(getAcaoInfo(item)).toEqual({ label: 'Verificar Saldo', targetUrl: '/atas' });
   });
 
-  it('direciona para /contratos/:key quando o instrumento é um radar de reajuste de contrato', () => {
+  it('direciona para /contratos/:key com o item destacado quando o instrumento é um radar de reajuste de contrato', () => {
     const item: DashboardAttentionItem = {
       id: 'ATT-REAJUSTE-CTR-1',
       category: 'REAJUSTE_RADAR',
@@ -94,7 +94,25 @@ describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo c
       numeroContrato: 'Contrato 98/2026'
     };
 
-    expect(getAcaoInfo(item)).toEqual({ label: 'Analisar Reajuste', targetUrl: '/contratos/200331-00098-2026' });
+    expect(getAcaoInfo(item)).toEqual({
+      label: 'Analisar Reajuste',
+      targetUrl: '/contratos/200331-00098-2026?item=ATT-REAJUSTE-CTR-1'
+    });
+  });
+
+  it('abre a tarefa no contrato com o id do item no link, para a fila do Contrato 360 destacá-la', () => {
+    const item: DashboardAttentionItem = {
+      id: 'ATT-TASK-OVERDUE-CONTRATO::X::TAREFA',
+      category: 'TAREFA_ATRASADA',
+      severity: 'CRITICA',
+      title: 'Tarefa vencida',
+      contractKey: '200331-00098-2026'
+    };
+
+    expect(getAcaoInfo(item)).toEqual({
+      label: 'Abrir Tarefa',
+      targetUrl: '/contratos/200331-00098-2026?item=ATT-TASK-OVERDUE-CONTRATO%3A%3AX%3A%3ATAREFA'
+    });
   });
 });
 

@@ -50,7 +50,6 @@ const SYNTHETIC_KEYS = {
   ITEM_KEY: '00099/2026-200331-00099',
   DEPT_SIGLA: `${TEST_PREFIX}DEPT-001`,
   DEPT_NAME: 'Departamento de Teste E2E 4.4F',
-  SEI_NUM: '10154.999999/2026-99',
   EMP_NUM: '2026NE999999',
   CONTRATO_NUM: '999/2026'
 };
@@ -174,23 +173,6 @@ export async function runE2E() {
       test: 'TESTE 3 — Departamentos',
       status: (deptCreate?.success && deptUniqueErrCode === '23505') ? 'PASS' : 'WARN',
       details: `Create: ${deptCreate?.success}, Dup SQLSTATE: ${deptUniqueErrCode}`
-    });
-
-    // ------------------------------------------------------------------------
-    // TESTE 4: PROCESSOS SEI — CREATE, UNIQUE E ON DELETE SET NULL
-    // ------------------------------------------------------------------------
-    console.log('[TESTE 4] Validando Processos SEI...');
-    const { data: seiCreate, error: seiCreateErr } = await supabaseAdmin.rpc('save_processo_sei_atomic', {
-      p_id: null,
-      p_numero_processo_sei: SYNTHETIC_KEYS.SEI_NUM,
-      p_descricao_objeto: 'Objeto de teste E2E',
-      p_status_processo: 'Em Instrução'
-    });
-
-    testResults.push({
-      test: 'TESTE 4 — Processos SEI',
-      status: seiCreate?.success ? 'PASS' : 'WARN',
-      details: `SEI ID: ${seiCreate?.processo?.id || 'N/A'}`
     });
 
     // ------------------------------------------------------------------------

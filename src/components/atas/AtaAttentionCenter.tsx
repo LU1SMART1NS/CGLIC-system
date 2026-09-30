@@ -1,9 +1,11 @@
 import React from 'react';
-import { CheckCircle2, Lightbulb, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Check, Lightbulb, AlertTriangle } from 'lucide-react';
 import type { ArpRecord } from '../../types';
 import { buildCentralPrazosItems } from '../../services/centralPrazosService';
 import { classifyArpItemSaldo } from '../../services/balanceService';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
+import { parseDateBRT } from '../../services/temporalEngineService';
+import { useReminderDismissals } from '../../hooks/useReminderDismissals';
 
 interface AtaAttentionCenterProps {
   arp: ArpRecord;
@@ -15,6 +17,20 @@ interface AtaAttentionCenterProps {
   isLoading?: boolean;
 }
 
+const smallButton: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '4px',
+  padding: '0.3rem 0.65rem',
+  backgroundColor: '#ffffff',
+  color: '#0c326f',
+  border: '1px solid #cbd5e1',
+  borderRadius: '6px',
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  cursor: 'pointer'
+};
+
 /** Lembretes de planejamento (180d/90d) + itens com saldo crítico, no mesmo espírito do ContractAttentionCenter. */
 export const AtaAttentionCenter: React.FC<AtaAttentionCenterProps> = ({ arp, saldos, isLoading = false }) => {
   const itensCriticos = React.useMemo(
@@ -25,15 +41,24 @@ export const AtaAttentionCenter: React.FC<AtaAttentionCenterProps> = ({ arp, sal
     [saldos]
   );
 
-  const lembretesPlanejamento = React.useMemo(
-    () =>
-      buildCentralPrazosItems({ arps: [arp] }).filter(
-        (i) =>
-          i.tipoItem === 'GATILHO_OPERACIONAL' &&
-          (i.estadoTemporal === 'ATRASADO' || (i.diasRestantes >= 0 && i.diasRestantes <= 90))
-      ),
-    [arp]
-  );
+  const { dismissedIds, dismiss, restore } = useReminderDismissals('ATA', arp.numeroAtaRegistroPreco);
+
+  const { lembretesPlanejamento, lembretesDispensados } = React.useMemo(() => {
+    // Vigência encerrada: os lembretes de prorrogação/exaustão perdem o sentido.
+    const fim = parseDateBRT(arp.dataVigenciaFinal);
+    if (fim && fim.getTime() < new Date().setHours(0, 0, 0, 0)) {
+      return { lembretesPlanejamento: [], lembretesDispensados: [] };
+    }
+    const todos = buildCentralPrazosItems({ arps: [arp] }).filter(
+      (i) =>
+        i.tipoItem === 'GATILHO_OPERACIONAL' &&
+        (i.estadoTemporal === 'ATRASADO' || (i.diasRestantes >= 0 && i.diasRestantes <= 90))
+    );
+    return {
+      lembretesPlanejamento: todos.filter((i) => !dismissedIds.includes(i.id)),
+      lembretesDispensados: todos.filter((i) => dismissedIds.includes(i.id))
+    };
+  }, [arp, dismissedIds]);
 
   if (isLoading) {
     return (
@@ -151,10 +176,45 @@ export const AtaAttentionCenter: React.FC<AtaAttentionCenterProps> = ({ arp, sal
                 </span>
                 <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', margin: 0 }}>{item.regraNome}</h4>
                 <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>{item.acaoDescricao}</p>
+                <button
+                  type="button"
+                  onClick={() => dismiss.mutate({ itemId: item.id })}
+                  disabled={dismiss.isPending}
+                  title="Já resolvido ou não se aplica: o lembrete some deste ciclo de vigência"
+                  style={{ ...smallButton, alignSelf: 'flex-start', marginTop: '0.3rem' }}
+                >
+                  <Check size={13} />
+                  <span>Resolvido</span>
+                </button>
               </div>
             );
           })}
         </div>
+      )}
+
+      {lembretesDispensados.length > 0 && (
+        <details data-testid="dismissed-reminders" style={{ fontSize: '0.8rem', color: '#475569' }}>
+          <summary style={{ cursor: 'pointer' }}>
+            {lembretesDispensados.length === 1
+              ? '1 lembrete marcado como resolvido'
+              : `${lembretesDispensados.length} lembretes marcados como resolvidos`}
+          </summary>
+          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {lembretesDispensados.map((item) => (
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span style={{ flex: 1, minWidth: '220px' }}>{item.regraNome}</span>
+                <button
+                  type="button"
+                  onClick={() => restore.mutate({ itemId: item.id })}
+                  disabled={restore.isPending}
+                  style={smallButton}
+                >
+                  Reexibir
+                </button>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </div>
   );

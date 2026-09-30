@@ -15,7 +15,7 @@ export interface DepartmentInput {
 }
 
 /**
- * Adapter de Persistência Transacional para Departamentos via RPC save_internal_department_atomic (SaldoARP 3.0)
+ * Adapter de Persistência Transacional para Departamentos via RPC save_internal_department_atomic (CGLIC 3.0)
  */
 export async function saveDepartmentRpc(input: DepartmentInput): Promise<RpcDepartmentResult> {
   if (!isSupabaseConfigured || !supabase) {
@@ -60,7 +60,7 @@ export async function saveDepartmentRpc(input: DepartmentInput): Promise<RpcDepa
 }
 
 /**
- * Adapter de Exclusão / Desativação Segura via RPC delete_internal_department_atomic (SaldoARP 3.0)
+ * Adapter de Exclusão / Desativação Segura via RPC delete_internal_department_atomic (CGLIC 3.0)
  */
 export async function deleteDepartmentRpc(
   id: string, 
@@ -99,7 +99,7 @@ export async function deleteDepartmentRpc(
 }
 
 /**
- * Adapter de Saneamento / Mesclagem Administrativa via RPC merge_internal_department_allocations_atomic (SaldoARP 3.0)
+ * Adapter de Saneamento / Mesclagem Administrativa via RPC merge_internal_department_allocations_atomic (CGLIC 3.0)
  */
 export async function mergeDepartmentAllocationsRpc(
   oldName: string, 

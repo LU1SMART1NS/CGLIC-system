@@ -118,7 +118,7 @@ const mockFinancialReadModel: ManagementDashboardReadModel = {
   }
 };
 
-describe('ManagementFinancialExecution Component (SaldoARP 3.0 — Fase 9-I)', () => {
+describe('ManagementFinancialExecution Component (CGLIC 3.0 — Fase 9-I)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

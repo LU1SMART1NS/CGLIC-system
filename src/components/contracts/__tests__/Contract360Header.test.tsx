@@ -183,4 +183,18 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
 
     expect(html).toContain('Falha de comunicação com a API do PNCP');
   });
+  it('mostra órgão, modalidade, nº PNCP e assinatura, com "Não informado" em vez de valor inventado', () => {
+    vi.mocked(syncHookModule.useSyncContractEmpenhos).mockReturnValue(defaultMockMutation as any);
+
+    const html = renderToStaticMarkup(
+      <Contract360Header contract={{ ...mockContract, dataAssinatura: '2025-12-20' }} userRole="gestor" />
+    );
+
+    expect(html).toContain('data-testid="contract-header-metadata"');
+    expect(html).toContain('200331-2-000015/2026');
+    expect(html).toContain('20/12/2025');
+    expect(html).toContain('Não informado');
+    expect(html).not.toContain('Pregão Eletrônico (SRP)');
+    expect(html).not.toContain('Ministério da Justiça e Segurança Pública');
+  });
 });

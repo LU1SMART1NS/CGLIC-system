@@ -1,14 +1,11 @@
 import React from 'react';
-import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import type { AppShellContextValue } from '../layout/AppShell';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
   DollarSign,
-  GitBranch,
   History,
-  Layers,
   ListTodo,
   Loader2,
   Receipt,
@@ -20,14 +17,16 @@ import { useAssignedManagementScope } from '../../hooks/useAssignedManagementSco
 import { useAuth } from '../../context/AuthContext';
 import { getContractManagementKey } from '../../services/contractManagementService';
 import { Contract360Header } from './Contract360Header';
-import { Contract360Summary } from './Contract360Summary';
 import { Contract360Section } from './Contract360Section';
-import { ContractAttentionCenter } from './ContractAttentionCenter';
-import { ContractWorkflowsSection } from './ContractWorkflowsSection';
+import { ContractActionQueue, type Contract360Tab } from './ContractActionQueue';
+import { ContractHealthStrip } from './ContractHealthStrip';
+import { useContractActionQueue } from '../../hooks/useContractActionQueue';
 import { ContractPaymentFollowUpSection } from './ContractPaymentFollowUpSection';
 import { ContractFinancialExecutionSection } from './ContractFinancialExecutionSection';
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
+
+const TAB_IDS: Contract360Tab[] = ['acoes', 'plano', 'pagamentos', 'financeiro', 'historico'];
 
 interface Contract360PageProps {
   contractKeyOverride?: string;
@@ -36,12 +35,16 @@ interface Contract360PageProps {
 
 export const Contract360Page: React.FC<Contract360PageProps> = ({
   contractKeyOverride,
-  uasg = '200331'
+  uasg: uasgProp
 }) => {
   const { contractKey: paramContractKey } = useParams<{ contractKey: string }>();
   const navigate = useNavigate();
-  const outletCtx = useOutletContext<AppShellContextValue | null>();
   const contractKey = contractKeyOverride || paramContractKey;
+
+  // A chave canônica é "UASG-NUMERO-ANO": quando a UASG não é informada por prop,
+  // usa a do prefixo da chave (ex.: 200330-00065-2021) em vez de assumir 200331.
+  const uasgFromKey = /^(\d{6})-/.exec((contractKey || '').trim())?.[1];
+  const uasg = uasgProp || uasgFromKey || '200331';
 
   const { contract, isLoading, isError, error, refetch } = useContract(contractKey, uasg);
 
@@ -53,6 +56,17 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
     resolvedContractKey,
     Boolean(contract && resolvedContractKey)
   );
+
+  const { queue, isLoading: loadingQueue } = useContractActionQueue(contract, plan);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('aba') as Contract360Tab | null;
+  const activeTab: Contract360Tab = tabParam && TAB_IDS.includes(tabParam) ? tabParam : 'acoes';
+  const tabsRef = React.useRef<HTMLDivElement>(null);
+  const goToTab = (tab: Contract360Tab) => {
+    setSearchParams(tab === 'acoes' ? {} : { aba: tab });
+    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Escopo ASSIGNED do perfil "gestor" (role_domain_scopes.contracts,
   // migration 20260925000023): a listagem em ContractsRoute.tsx já esconde
@@ -311,119 +325,129 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
     );
   }
 
-  // 4. Visualização 360° do Contrato (Fase 5.2)
+  const tabs: { id: Contract360Tab; label: string }[] = [
+    { id: 'acoes', label: queue.items.length > 0 ? `Ações (${queue.items.length})` : 'Ações' },
+    { id: 'plano', label: 'Plano de gestão' },
+    { id: 'pagamentos', label: 'Pagamentos' },
+    { id: 'financeiro', label: 'Financeiro' },
+    { id: 'historico', label: 'Histórico' }
+  ];
+
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
-      {/* Header Executivo com dados de identificação, vigência, valor e status oficial */}
-      <Contract360Header contract={contract} onOpenSeiModal={outletCtx?.onOpenSeiModal} />
+      <Contract360Header contract={contract} />
 
-      {/* Bloco 1: Central de Atenção ("O que precisa da minha atenção?") */}
-      <Contract360Section
-        id="contract-attention-section"
-        title="O que precisa da minha atenção?"
-        subtitle="Pendências impeditivas, prazos do motor temporal e confirmações oficiais aguardadas"
-        icon={AlertTriangle}
+      <ContractHealthStrip
+        contract={contract}
+        contractKey={resolvedContractKey}
+        counts={queue.counts}
+        onOpenActions={() => goToTab('acoes')}
+      />
+
+      <div
+        ref={tabsRef}
+        role="tablist"
+        aria-label="Seções do contrato"
+        style={{
+          display: 'flex',
+          gap: '0.25rem',
+          flexWrap: 'wrap',
+          borderBottom: '1px solid #e2e8f0',
+          marginBottom: '1.25rem',
+          scrollMarginTop: '1rem'
+        }}
       >
-        <ContractAttentionCenter
-          contract={contract}
-          plan={plan}
-          isLoading={loadingPlan}
-        />
-      </Contract360Section>
+        {tabs.map((tab) => {
+          const selected = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              id={`contract-tab-${tab.id}`}
+              aria-selected={selected}
+              aria-controls={`contract-tabpanel-${tab.id}`}
+              onClick={() => goToTab(tab.id)}
+              style={{
+                padding: '0.6rem 1rem',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: `3px solid ${selected ? '#0c326f' : 'transparent'}`,
+                marginBottom: '-1px',
+                color: selected ? '#0c326f' : '#475569',
+                fontWeight: selected ? 800 : 600,
+                fontSize: '0.88rem',
+                cursor: 'pointer'
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Bloco 2: Workflows Operacionais */}
-      <Contract360Section
-        id="contract-workflows-section"
-        title="Workflows do Contrato"
-        subtitle="Instrução e acompanhamento de Prorrogações (4.2), Alterações/Apostilamentos (4.3B) e Rescisões (4.4C)"
-        icon={GitBranch}
-      >
-        <ContractWorkflowsSection
-          contract={contract}
-          plan={plan}
-          isLoading={loadingPlan}
-        />
-      </Contract360Section>
+      <div role="tabpanel" id={`contract-tabpanel-${activeTab}`} aria-labelledby={`contract-tab-${activeTab}`}>
+        {activeTab === 'acoes' && (
+          <Contract360Section
+            id="contract-attention-section"
+            title="Ações do contrato"
+            subtitle="Tarefas, pagamentos, reajustes e prazos legais em ordem de prioridade"
+            icon={AlertTriangle}
+          >
+            <ContractActionQueue
+              queue={queue}
+              contractKey={resolvedContractKey}
+              plan={plan}
+              isLoading={loadingPlan || loadingQueue}
+              onGoTo={goToTab}
+            />
+          </Contract360Section>
+        )}
 
-      {/* Bloco 3: Acompanhamento de Pagamentos e Faturamento */}
-      <Contract360Section
-        id="contract-payment-followup-section"
-        title="Acompanhamento de Pagamentos"
-        subtitle="Controle de SLA, atestos e tramitação perante a CGOFI (SaldoARP acompanha • CGOFI executa o pagamento)"
-        icon={DollarSign}
-      >
-        <ContractPaymentFollowUpSection
-          contract={contract}
-          contractKey={resolvedContractKey}
-        />
-      </Contract360Section>
+        {activeTab === 'plano' && (
+          <Contract360Section
+            id="contract-tasks-section"
+            title="Plano de gestão"
+            subtitle="Todas as tarefas do modelo de gestão aplicado, com responsável, prazo e situação"
+            icon={ListTodo}
+          >
+            <ContractTasksSection contract={contract} plan={plan} isLoading={loadingPlan} />
+          </Contract360Section>
+        )}
 
-      {/* Bloco 4: Execução Financeira & Empenhos Vinculados */}
-      <Contract360Section
-        id="contract-financial-execution-section"
-        title="Execução Financeira & Empenhos"
-        subtitle="Lastro orçamentário oficial, empenhos emitidos e saldos de execução (SSOT SIAFI / public.empenhos)"
-        icon={Receipt}
-      >
-        <ContractFinancialExecutionSection
-          contract={contract}
-          contractKey={resolvedContractKey}
-        />
-      </Contract360Section>
+        {activeTab === 'pagamentos' && (
+          <Contract360Section
+            id="contract-payment-followup-section"
+            title="Acompanhamento de pagamentos"
+            subtitle="Atestos, faturamento e tramitação na CGOFI (o CGLIC acompanha; a CGOFI executa o pagamento)"
+            icon={DollarSign}
+          >
+            <ContractPaymentFollowUpSection contract={contract} contractKey={resolvedContractKey} />
+          </Contract360Section>
+        )}
 
-      {/* Bloco 5: Tarefas e Providências */}
-      <Contract360Section
-        id="contract-tasks-section"
-        title="Tarefas e Providências"
-        subtitle="Acompanhamento dinâmico com semântica de execução (INTERNA, EXTERNA, CONFIRMAÇÃO)"
-        icon={ListTodo}
-      >
-        <ContractTasksSection
-          contract={contract}
-          plan={plan}
-          isLoading={loadingPlan}
-        />
-      </Contract360Section>
+        {activeTab === 'financeiro' && (
+          <Contract360Section
+            id="contract-financial-execution-section"
+            title="Execução financeira e empenhos"
+            subtitle="Empenhos emitidos, liquidação, pagamento e saldos de execução"
+            icon={Receipt}
+          >
+            <ContractFinancialExecutionSection contract={contract} contractKey={resolvedContractKey} />
+          </Contract360Section>
+        )}
 
-      {/* Bloco 4: Linha do Tempo Contratual */}
-      <Contract360Section
-        id="contract-timeline-section"
-        title="Linha do Tempo Contratual"
-        subtitle="Histórico formal de eventos imutáveis com distinção entre Fato Oficial, Decisão Interna e Proposta"
-        icon={History}
-      >
-        <ContractEventsTimeline contract={contract} />
-      </Contract360Section>
-
-      {/* Bloco 5: Dados Cadastrais e Administrativos */}
-      <Contract360Summary contract={contract} />
-
-      {/* Bloco 6: Informações Complementares */}
-      <Contract360Section
-        id="contract-complementary-section"
-        title="Informações Complementares"
-        subtitle="Detalhamento técnico de Itens Contratados, Empenhos Vinculados, Processo SEI e Auditoria"
-        icon={Layers}
-        badge={{ text: 'Fase 5.5', variant: 'neutral' }}
-      >
-        <div
-          style={{
-            padding: '1.5rem',
-            background: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px dashed #cbd5e1',
-            textAlign: 'center',
-            color: '#475569'
-          }}
-        >
-          <p style={{ fontSize: '0.9rem', fontWeight: 600, margin: '0 0 0.35rem 0' }}>
-            Abas de itens, empenhos e processo SEI serão unificadas nesta seção na Fase 5.5.
-          </p>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
-            Todos os dados já disponíveis na visualização clássica serão incorporados sem duplicidade.
-          </p>
-        </div>
-      </Contract360Section>
+        {activeTab === 'historico' && (
+          <Contract360Section
+            id="contract-timeline-section"
+            title="Linha do tempo contratual"
+            subtitle="Histórico de eventos, separando fato oficial, decisão interna e proposta"
+            icon={History}
+          >
+            <ContractEventsTimeline contract={contract} />
+          </Contract360Section>
+        )}
+      </div>
     </div>
   );
 };

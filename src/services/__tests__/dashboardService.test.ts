@@ -29,7 +29,7 @@ vi.mock('../contractService');
 vi.mock('../contractManagementService');
 vi.mock('../../adapters/paymentCycleRpcAdapter');
 
-describe('dashboardService (SaldoARP 3.0 — Fase 8-B)', () => {
+describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
   const referenceDate = new Date('2026-09-24T12:00:00Z');
 
   beforeEach(() => {

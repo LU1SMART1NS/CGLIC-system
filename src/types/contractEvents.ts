@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio de Gestão de Eventos e Ciclos Contratuais (SaldoARP — Fase 4)
+ * Tipos de Domínio de Gestão de Eventos e Ciclos Contratuais (CGLIC — Fase 4)
  *
  * Princípios Fundamentais:
  * 1. FATO OFICIAL ≠ EVENTO ≠ WORKFLOW ≠ TAREFA

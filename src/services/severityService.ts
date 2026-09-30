@@ -97,13 +97,7 @@ export function severityFromPaymentStatusPrazo(
 
 /**
  * AttentionPriorityLevel (VENCIDA/HOJE/URGENTE/PROXIMA/SEM_PRAZO) — taxonomia
- * local de ContractAttentionCenter.tsx (Contrato 360). Fornecida aqui como
- * função canônica reutilizável para qualquer consumidor futuro (ex.: uma
- * eventual automação de notificação) que precise da severidade unificada a
- * partir desse nível de prioridade — sem exigir que o componente em si seja
- * reescrito nesta fase (ver relatório de homologação, Seção 6, sobre a
- * decisão de não migrar a apresentação visual de ContractAttentionCenter.tsx
- * nesta execução).
+ * de classifyTaskAttention (components/contracts/taskAttentionDisplay.ts).
  */
 export function severityFromAttentionPriorityLevel(
   level: 'VENCIDA' | 'HOJE' | 'URGENTE' | 'PROXIMA' | 'SEM_PRAZO'

@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio do Workflow de Prorrogação Contratual (SaldoARP — Fase 4.2)
+ * Tipos de Domínio do Workflow de Prorrogação Contratual (CGLIC — Fase 4.2)
  *
  * Princípios Fundamentais:
  * 1. FATO OFICIAL ≠ EVENTO ≠ WORKFLOW ≠ TAREFA

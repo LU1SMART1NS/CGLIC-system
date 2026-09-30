@@ -9,7 +9,7 @@ import {
 } from '../centralPrazosService';
 import type { ArpRecord } from '../../types';
 
-describe('FASE 9-D1 — Integração do Funil Único de Atenção (SaldoARP)', () => {
+describe('FASE 9-D1 — Integração do Funil Único de Atenção (CGLIC)', () => {
   const referenceDate = new Date('2026-09-24T12:00:00Z');
 
   const mockArp = {

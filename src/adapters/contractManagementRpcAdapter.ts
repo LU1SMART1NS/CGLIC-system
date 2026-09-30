@@ -8,6 +8,9 @@ import type {
   RpcGenericDeleteResult,
   RpcApplyContractTaskTemplateResult,
   RpcUpdateContractTaskResult,
+  RpcStartTaskPlanResult,
+  RpcTaskPlanMacrotaskResult,
+  RpcCreateTaskResult,
   ContractTaskStatus
 } from '../types/rpc';
 import type { TaskExecutionMode } from '../types';
@@ -30,7 +33,7 @@ export interface ContractManagerInput {
 }
 
 /**
- * Adapter de Persistência Transacional para o Gestor do Contrato via RPC save_contract_manager_atomic (SaldoARP 3.0)
+ * Adapter de Persistência Transacional para o Gestor do Contrato via RPC save_contract_manager_atomic (CGLIC 3.0)
  */
 export async function saveContractManagerRpc(input: ContractManagerInput): Promise<RpcContractManagerResult> {
   const client = requireSupabase();
@@ -277,6 +280,8 @@ export interface UpdateContractTaskInput {
   prazo?: string | null;
   observacao?: string | null;
   concluidoPor?: string;
+  /** Renomeia a tarefa (tarefas do plano são editáveis pelo gestor). */
+  nome?: string;
 }
 
 export async function updateContractTaskRpc(input: UpdateContractTaskInput): Promise<RpcUpdateContractTaskResult> {
@@ -291,11 +296,13 @@ export async function updateContractTaskRpc(input: UpdateContractTaskInput): Pro
     const { data, error } = await client.rpc('update_contract_task_atomic', {
       p_task_id: cleanTaskId,
       p_status: input.status ?? null,
-      p_responsavel_nome: input.responsavelNome ? input.responsavelNome.trim() : null,
+      // undefined mantém o valor; string vazia limpa (volta a herdar o gestor do contrato).
+      p_responsavel_nome: input.responsavelNome !== undefined ? input.responsavelNome.trim() : null,
       p_prazo: input.prazo ?? null,
       p_observacao: input.observacao ?? null,
       p_concluido_por: input.concluidoPor ? input.concluidoPor.trim() : null,
-      p_responsavel_user_id: input.responsavelUserId ?? null
+      p_responsavel_user_id: input.responsavelUserId ?? null,
+      p_nome: input.nome !== undefined ? input.nome.trim() : null
     });
 
     if (error) throw mapPostgresErrorToAppError(error);
@@ -307,4 +314,125 @@ export async function updateContractTaskRpc(input: UpdateContractTaskInput): Pro
     if (err && err.code && typeof err.code === 'string') throw err;
     throw mapPostgresErrorToAppError(err);
   }
+}
+
+// -------------------------------------------------------------
+// Plano de gestão editável pelo gestor (criar/renomear/excluir etapas e tarefas)
+// -------------------------------------------------------------
+async function callPlanRpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const client = requireSupabase();
+  try {
+    const { data, error } = await client.rpc(fn, args);
+    if (error) throw mapPostgresErrorToAppError(error);
+    if (!data || typeof data !== 'object') {
+      throw mapPostgresErrorToAppError(new Error(`INVALID_PAYLOAD: Resposta inválida da RPC ${fn}`));
+    }
+    return data as T;
+  } catch (err: any) {
+    if (err && err.code && typeof err.code === 'string') throw err;
+    throw mapPostgresErrorToAppError(err);
+  }
+}
+
+function requireField(value: string | undefined, message: string): string {
+  const clean = (value || '').trim();
+  if (!clean) throw mapPostgresErrorToAppError(new Error(`INVALID_PAYLOAD: ${message}`));
+  return clean;
+}
+
+export interface StartContractTaskPlanInput {
+  uasg: string;
+  numero: string;
+  ano: number;
+}
+
+export async function startContractTaskPlanRpc(input: StartContractTaskPlanInput): Promise<RpcStartTaskPlanResult> {
+  return callPlanRpc<RpcStartTaskPlanResult>('start_contract_task_plan_atomic', {
+    p_uasg: (input.uasg || '').trim(),
+    p_numero: (input.numero || '').trim(),
+    p_ano: input.ano
+  });
+}
+
+export interface SaveContractTaskMacrotaskInput {
+  id?: string;
+  planId?: string;
+  nome: string;
+}
+
+export async function saveContractTaskMacrotaskRpc(input: SaveContractTaskMacrotaskInput): Promise<RpcTaskPlanMacrotaskResult> {
+  return callPlanRpc<RpcTaskPlanMacrotaskResult>('save_contract_task_macrotask_atomic', {
+    p_id: input.id ? input.id.trim() : null,
+    p_plan_id: input.planId ? input.planId.trim() : null,
+    p_nome: requireField(input.nome, 'O nome da etapa é obrigatório.')
+  });
+}
+
+export async function deleteContractTaskMacrotaskRpc(id: string): Promise<RpcGenericDeleteResult> {
+  return callPlanRpc<RpcGenericDeleteResult>('delete_contract_task_macrotask_atomic', {
+    p_id: requireField(id, 'O ID da etapa é obrigatório.')
+  });
+}
+
+export interface DeleteTaskPlanModuleInput {
+  planId: string;
+  moduloId: string;
+}
+
+export async function deleteContractTaskModuleRpc(input: DeleteTaskPlanModuleInput): Promise<RpcGenericDeleteResult> {
+  return callPlanRpc<RpcGenericDeleteResult>('delete_contract_task_module_atomic', {
+    p_plan_id: requireField(input.planId, 'O plano é obrigatório.'),
+    p_modulo_id: requireField(input.moduloId, 'O módulo é obrigatório.')
+  });
+}
+
+export interface CreateContractTaskInput {
+  macrotaskId: string;
+  nome: string;
+  prazo?: string | null;
+  observacao?: string | null;
+  responsavelNome?: string;
+}
+
+export async function createContractTaskRpc(input: CreateContractTaskInput): Promise<RpcCreateTaskResult> {
+  return callPlanRpc<RpcCreateTaskResult>('create_contract_task_atomic', {
+    p_macrotask_id: requireField(input.macrotaskId, 'A etapa da tarefa é obrigatória.'),
+    p_nome: requireField(input.nome, 'O nome da tarefa é obrigatório.'),
+    p_prazo: input.prazo || null,
+    p_observacao: input.observacao || null,
+    p_responsavel_nome: input.responsavelNome ? input.responsavelNome.trim() : null
+  });
+}
+
+export async function deleteContractTaskRpc(id: string): Promise<RpcGenericDeleteResult> {
+  return callPlanRpc<RpcGenericDeleteResult>('delete_contract_task_atomic', {
+    p_id: requireField(id, 'O ID da tarefa é obrigatório.')
+  });
+}
+
+// -------------------------------------------------------------
+// Lembretes de prazo legal dispensados pelo gestor (Contrato 360 e Ata 360)
+// -------------------------------------------------------------
+export type ReminderEntityType = 'CONTRATO' | 'ATA';
+
+export interface ReminderDismissalInput {
+  entityType: ReminderEntityType;
+  entityKey: string;
+  itemId: string;
+}
+
+function reminderArgs(input: ReminderDismissalInput) {
+  return {
+    p_entity_type: input.entityType,
+    p_entity_key: requireField(input.entityKey, 'O contrato ou a Ata é obrigatório.'),
+    p_item_id: requireField(input.itemId, 'O lembrete é obrigatório.')
+  };
+}
+
+export async function dismissReminderRpc(input: ReminderDismissalInput): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('dismiss_reminder_atomic', reminderArgs(input));
+}
+
+export async function restoreReminderRpc(input: ReminderDismissalInput): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('restore_reminder_atomic', reminderArgs(input));
 }

@@ -187,7 +187,7 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
 
 /**
  * Função Pura: Enriquece os vínculos contextuais com os dados soberanos do catálogo
- * oficial de contratos do SaldoARP (sem duplicar nenhuma regra ou fazer chamada de rede).
+ * oficial de contratos do CGLIC (sem duplicar nenhuma regra ou fazer chamada de rede).
  */
 export function enrichContractLinks(
   links: ArpItemContractLink[],

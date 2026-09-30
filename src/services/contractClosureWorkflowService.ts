@@ -1,9 +1,9 @@
 /**
- * Serviço de Gestão do Workflow Operacional de Encerramento Contratual Regular (SaldoARP — Fase 4.4B)
+ * Serviço de Gestão do Workflow Operacional de Encerramento Contratual Regular (CGLIC — Fase 4.4B)
  *
  * Princípios Fundamentais:
  * 1. FIM DA VIGÊNCIA ≠ ENCERRAMENTO OPERACIONAL ≠ EXTINÇÃO CONTRATUAL ≠ FATO OFICIAL CONFIRMADO
- * 2. PRINCÍPIO "DIGITE UMA VEZ, USE EM TODO LUGAR": Gestão de pendências e contexto no SaldoARP; fatos oficiais nas APIs.
+ * 2. PRINCÍPIO "DIGITE UMA VEZ, USE EM TODO LUGAR": Gestão de pendências e contexto no CGLIC; fatos oficiais nas APIs.
  * 3. TEMPLATE CONDICIONAL: Apenas tarefas para pendências reais e aplicáveis (não cria tarefas artificiais).
  * 4. CONCLUSÃO INTERNA ≠ ENCERRAMENTO OFICIAL SOBERANO.
  */
@@ -272,7 +272,7 @@ export function assembleClosureWorkflow(params: {
     isFatoSoberano: Boolean(confirmacaoOficial.confirmado),
     explicabilidade: confirmacaoOficial.confirmado
       ? `Encerramento confirmado oficialmente pela fonte soberana (${confirmacaoOficial.fonteOficial || 'PNCP'}).`
-      : 'Processo operacional de encerramento em andamento no SaldoARP.'
+      : 'Processo operacional de encerramento em andamento no CGLIC.'
   };
 
   return {

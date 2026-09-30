@@ -9,7 +9,7 @@ export interface DeleteManualContractVariables {
 }
 
 /**
- * Hook canônico do React Query para exclusão transacional de contratos manuais (SaldoARP 3.0).
+ * Hook canônico do React Query para exclusão transacional de contratos manuais (CGLIC 3.0).
  *
  * Arquitetura:
  * UI -> useDeleteManualContract() -> executeDeleteContratoRpc() -> delete_manual_contrato_atomic()

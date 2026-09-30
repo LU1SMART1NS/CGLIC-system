@@ -23,7 +23,6 @@ import { LoginRoute } from './routes/LoginRoute';
 import { DefinirSenhaRoute } from './routes/DefinirSenhaRoute';
 import { RedefinirSenhaRoute } from './routes/RedefinirSenhaRoute';
 import { RequireRole } from './components/auth/RequireRole';
-import { SeiManagementModal } from './components/SeiManagementModal';
 import { ExportExcelModal } from './components/modals/ExportExcelModal';
 import { ContractTaskTemplatesModal } from './components/modals/ContractTaskTemplatesModal';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -78,7 +77,7 @@ const AppFooter: React.FC = () => (
     padding: '2.5rem 3rem',
     fontSize: '0.82rem',
     fontFamily: 'var(--font-family)',
-    marginTop: '5rem',
+    marginTop: 0,
     borderTop: '4px solid #00cc55'
   }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', maxWidth: '1800px', margin: '0 auto' }}>
@@ -152,10 +151,11 @@ const ProtectedLayout: React.FC<{
 };
 
 const AppContent: React.FC = () => {
-  const [isSeiModalOpen, setIsSeiModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isContractTemplatesModalOpen, setIsContractTemplatesModalOpen] = useState<boolean>(false);
   const { selectedArp, globalArps, globalItemsByAta } = useSelection();
+  const { pathname } = useLocation();
+  const isPublicAuthRoute = ['/login', '/definir-senha', '/redefinir-senha'].includes(pathname);
 
   return (
     <div className="app-container">
@@ -173,7 +173,6 @@ const AppContent: React.FC = () => {
               <AppShell
                 onOpenExportModal={() => setIsExportModalOpen(true)}
                 onOpenContractTemplatesModal={() => setIsContractTemplatesModalOpen(true)}
-                onOpenSeiModal={() => setIsSeiModalOpen(true)}
               />
             </ProtectedLayout>
           }
@@ -304,11 +303,6 @@ const AppContent: React.FC = () => {
         </Route>
       </Routes>
 
-      <SeiManagementModal
-        isOpen={isSeiModalOpen}
-        onClose={() => setIsSeiModalOpen(false)}
-      />
-
       <ExportExcelModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
@@ -322,7 +316,7 @@ const AppContent: React.FC = () => {
         onClose={() => setIsContractTemplatesModalOpen(false)}
       />
 
-      <AppFooter />
+      {!isPublicAuthRoute && <AppFooter />}
     </div>
   );
 };

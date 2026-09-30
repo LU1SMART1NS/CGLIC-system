@@ -1,5 +1,5 @@
 /**
- * Serviço de Domínio para Acompanhamento de Pagamentos e Faturamento (SaldoARP 3.0 - Fase 7.4-C)
+ * Serviço de Domínio para Acompanhamento de Pagamentos e Faturamento (CGLIC 3.0 - Fase 7.4-C)
  * 
  * Responsabilidades:
  * 1. Geração determinística e estável de cycleKey para ciclos de faturamento/atesto.

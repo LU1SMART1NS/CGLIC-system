@@ -18,7 +18,7 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
   if (message.includes('UNAUTHORIZED') || sqlState === '42501') {
     return {
       code: 'UNAUTHORIZED',
-      message: 'Acesso negado: operação restrita a gestores e administradores do SaldoARP.',
+      message: 'Acesso negado: operação restrita a gestores e administradores do CGLIC.',
       sqlState: '42501',
       details: error
     };

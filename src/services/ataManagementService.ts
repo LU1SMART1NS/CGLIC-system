@@ -1,3 +1,4 @@
+import { moduleFromRow } from '../utils/taskPlanModules';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type {
   AtaTaskTemplate,
@@ -161,6 +162,7 @@ export async function fetchAtaTaskPlan(ataKey: string): Promise<AtaTaskPlan | nu
       ordem: t.ordem,
       status: t.status,
       executionMode: t.execution_mode || undefined,
+      origem: t.origem || undefined,
       responsavelNome: t.responsavel_nome || undefined,
       responsavelUserId: t.responsavel_user_id || undefined,
       prazo: t.prazo || undefined,
@@ -178,6 +180,8 @@ export async function fetchAtaTaskPlan(ataKey: string): Promise<AtaTaskPlan | nu
     planId: m.plan_id,
     nome: m.nome,
     ordem: m.ordem,
+    origem: m.origem || undefined,
+    modulo: moduleFromRow(m),
     tarefas: tasksByMacrotask.get(m.id) || []
   }));
 
@@ -237,6 +241,7 @@ export async function fetchAllAtaTaskPlans(): Promise<Record<string, AtaTaskPlan
         ordem: t.ordem,
         status: t.status,
         executionMode: t.execution_mode || undefined,
+        origem: t.origem || undefined,
         responsavelNome: t.responsavel_nome || undefined,
         responsavelUserId: t.responsavel_user_id || undefined,
         prazo: t.prazo || undefined,
@@ -257,6 +262,8 @@ export async function fetchAllAtaTaskPlans(): Promise<Record<string, AtaTaskPlan
         planId: m.plan_id,
         nome: m.nome,
         ordem: m.ordem,
+        origem: m.origem || undefined,
+        modulo: moduleFromRow(m),
         tarefas: tasksByMacrotask.get(m.id) || []
       });
       macrotasksByPlan.set(m.plan_id, list);

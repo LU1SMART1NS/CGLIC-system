@@ -84,7 +84,7 @@ export function getWorkflowStatusDisplay(status: PaymentWorkflowStatus): {
 }
 
 /**
- * Seção de Faturamento e Acompanhamento de Pagamentos do Dashboard Gerencial (SaldoARP 3.0 — Fase 9-H)
+ * Seção de Faturamento e Acompanhamento de Pagamentos do Dashboard Gerencial (CGLIC 3.0 — Fase 9-H)
  * 
  * Princípios Fundamentais:
  * 1. Separação explícita entre Acompanhamento Operacional (Atesto, Instrução, CGOFI, OB) e Execução Financeira Oficial (SIAFI);

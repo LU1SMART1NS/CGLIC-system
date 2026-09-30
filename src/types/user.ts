@@ -20,7 +20,7 @@ export type PermissionMacroprocess =
   | 'GOVERNANCA_SISTEMA';
 
 /**
- * Matriz canônica de permissões operacionais do SaldoARP.
+ * Matriz canônica de permissões operacionais do CGLIC.
  * Preserva retrocompatibilidade total com as 7 propriedades originais,
  * separando explicitamente a dimensão de escopo (contractScope).
  */

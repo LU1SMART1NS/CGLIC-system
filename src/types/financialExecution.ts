@@ -1,5 +1,5 @@
 /**
- * Tipos Canônicos para Execução Financeira, Liquidações, Pagamentos e Restos a Pagar (SaldoARP 3.0)
+ * Tipos Canônicos para Execução Financeira, Liquidações, Pagamentos e Restos a Pagar (CGLIC 3.0)
  * Conforme especificado na FASE 7.3-B e implementado na FASE 7.3-C.
  */
 

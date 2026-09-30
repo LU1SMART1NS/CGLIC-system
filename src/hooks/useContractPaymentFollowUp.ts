@@ -1,6 +1,6 @@
 /**
  * Hook do React para Acompanhamento Operacional de Pagamentos / Faturamento
- * (SaldoARP 3.0 - Fase 7.4-D; persistência canônica desde a Fase 10-A.2)
+ * (CGLIC 3.0 - Fase 7.4-D; persistência canônica desde a Fase 10-A.2)
  *
  * Responsável por:
  * 1. Consulta e persistência REAL (Supabase — contract_payment_cycles) dos ciclos

@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio de Extinção, Encerramento e Rescisão Contratual (SaldoARP — Fase 4.4A)
+ * Tipos de Domínio de Extinção, Encerramento e Rescisão Contratual (CGLIC — Fase 4.4A)
  *
  * Princípios Fundamentais:
  * 1. FIM DA VIGÊNCIA ≠ ENCERRAMENTO FORMAL ≠ EXTINÇÃO CONTRATUAL
@@ -36,7 +36,7 @@ export type ContractExtinctionInstrument =
 
 /**
  * 3. Situações Operacionais Assistivas do Domínio (Ciclo de Encerramento e Extinção)
- * Representa o estado fático do contrato no SaldoARP sem sobrescrever o lifecycle global soberano.
+ * Representa o estado fático do contrato no CGLIC sem sobrescrever o lifecycle global soberano.
  */
 export type ContractClosureOperationalState =
   | 'VIGENTE'

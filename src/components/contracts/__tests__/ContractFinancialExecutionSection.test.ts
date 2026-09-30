@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  prepareContractEmpenhosList
-} from '../ContractFinancialExecutionSection';
+import { prepareContractEmpenhosList } from '../../../hooks/useContractFinancialSummary';
 import { aggregateContractFinancialExecution } from '../../../services/financialExecutionService';
 import type { ContractDashboardRecord } from '../../../types';
 

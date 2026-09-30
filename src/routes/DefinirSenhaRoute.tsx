@@ -118,7 +118,7 @@ export const DefinirSenhaRoute: React.FC = () => {
               <KeyRound size={26} />
             </div>
             <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0c326f', margin: '0 0 0.25rem 0' }}>
-              Primeiro Acesso ao SaldoARP
+              Primeiro Acesso ao CGLIC
             </h1>
             <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, fontWeight: 500 }}>
               Crie sua senha pessoal para ativar sua conta institucional.

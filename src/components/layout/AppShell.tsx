@@ -2,19 +2,16 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Header } from '../Header';
 import { Sidebar } from './Sidebar';
-import { Breadcrumbs } from './Breadcrumbs';
 
 export interface AppShellContextValue {
   onOpenExportModal: () => void;
   onOpenContractTemplatesModal: () => void;
-  onOpenSeiModal: () => void;
   onOpenDepartmentsModal?: () => void;
 }
 
 interface AppShellProps {
   onOpenExportModal: () => void;
   onOpenContractTemplatesModal: () => void;
-  onOpenSeiModal: () => void;
   onOpenDepartmentsModal?: () => void;
 }
 
@@ -31,7 +28,6 @@ function readStoredCollapsed(): boolean {
 export const AppShell: React.FC<AppShellProps> = ({
   onOpenExportModal,
   onOpenContractTemplatesModal,
-  onOpenSeiModal,
   onOpenDepartmentsModal
 }) => {
   const [collapsed, setCollapsed] = useState<boolean>(readStoredCollapsed);
@@ -51,7 +47,6 @@ export const AppShell: React.FC<AppShellProps> = ({
   const contextValue: AppShellContextValue = {
     onOpenExportModal,
     onOpenContractTemplatesModal,
-    onOpenSeiModal,
     onOpenDepartmentsModal
   };
 
@@ -62,7 +57,6 @@ export const AppShell: React.FC<AppShellProps> = ({
         onToggleCollapsed={toggleCollapsed}
         onOpenContractTemplatesModal={onOpenContractTemplatesModal}
         onOpenExportModal={onOpenExportModal}
-        onOpenSeiModal={onOpenSeiModal}
         onOpenDepartmentsModal={onOpenDepartmentsModal}
       />
 
@@ -78,9 +72,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           <Header
             onOpenExportModal={onOpenExportModal}
             onOpenContractTemplatesModal={onOpenContractTemplatesModal}
-            onOpenSeiModal={onOpenSeiModal}
           />
-          <Breadcrumbs />
         </div>
 
         <main style={{ flex: 1 }}>

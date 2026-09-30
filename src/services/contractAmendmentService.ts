@@ -1,5 +1,5 @@
 /**
- * Serviço de Domínio para Alterações Contratuais e Apostilamentos (SaldoARP — Fase 4.3A)
+ * Serviço de Domínio para Alterações Contratuais e Apostilamentos (CGLIC — Fase 4.3A)
  *
  * Funções Puras e Determinísticas:
  * 1. Classificação de Tipos e Categorias de Alterações e Instrumentos;
@@ -383,7 +383,7 @@ export function classifyOfficiality(params: {
       dataPublicacaoOficial: params.dataPublicacaoOficial,
       numeroPublicacaoOficial: params.numeroPublicacaoOficial,
       isFatoSoberano: false,
-      explicabilidade: 'Ato formalizado internamente (SEI/SaldoARP), aguardando sincronização oficial das APIs.'
+      explicabilidade: 'Ato formalizado internamente (SEI/CGLIC), aguardando sincronização oficial das APIs.'
     };
   }
 

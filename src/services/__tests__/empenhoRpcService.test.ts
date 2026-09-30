@@ -283,7 +283,7 @@ describe('MIGRATION 17: RPCs Transacionais Atômicas de Empenhos (Fase 7.2-C)', 
     it('deve mapear violação de RBAC para código SQLSTATE 42501', () => {
       const executeRpc = (role: string | null) => {
         if (!checkAuthorization(role)) {
-          const err = new Error('UNAUTHORIZED: Acesso restrito a gestores e administradores do SaldoARP.');
+          const err = new Error('UNAUTHORIZED: Acesso restrito a gestores e administradores do CGLIC.');
           (err as unknown as { code: string }).code = '42501';
           throw err;
         }

@@ -50,17 +50,6 @@ export interface DbAta {
   ultimo_sync_em?: string;
 }
 
-export interface DbProcessoSei {
-  id: string;
-  numero_processo_sei: string;
-  descricao_objeto?: string;
-  unidade_requisitante?: string;
-  responsavel_nome?: string;
-  status_processo?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
 export interface DbItemAta {
   id: string;
   ata_id: string;

@@ -215,7 +215,8 @@ describe('ataManagementRpcAdapter', () => {
         p_prazo: null,
         p_observacao: null,
         p_concluido_por: null,
-        p_responsavel_user_id: null
+        p_responsavel_user_id: null,
+        p_nome: null
       });
       expect(result.task.status).toBe('EM_ANDAMENTO');
     });

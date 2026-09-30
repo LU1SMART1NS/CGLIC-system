@@ -261,7 +261,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       gap: '1.25rem'
     }}>
       <GestaoInstrumentosHeader
-        uasgs={UASGS}
         onRefresh={refetch}
         isRefreshing={isLoading || isFetching}
         lastUpdated={dataUpdatedAt}

@@ -172,7 +172,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
           preset === 'ALLOCATIONS' ? 'Alocacoes_Setoriais' :
           preset === 'PURCHASES' ? 'Catalogo_Compras' : 'Personalizado';
 
-        const filename = `SaldoARP_${presetSuffix}_${dateStr}`;
+        const filename = `CGLIC_${presetSuffix}_${dateStr}`;
         downloadExcelFile(blob, filename);
 
         setSuccessMsg('Planilha Excel gerada e transferida com sucesso!');

@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio da Central de Prazos e Tarefas (SaldoARP — Fase 3)
+ * Tipos de Domínio da Central de Prazos e Tarefas (CGLIC — Fase 3)
  */
 
 import type { TemporalStatus, AtencaoNivel, RegraOrigemTipo, ExplicabilidadePrazo } from './temporal';

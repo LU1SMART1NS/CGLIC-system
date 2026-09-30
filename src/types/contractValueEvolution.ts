@@ -1,5 +1,5 @@
 /**
- * Tipos e Modelos de Read Model para Evolução do Valor Contratual (SaldoARP — Fase 7.5-C1)
+ * Tipos e Modelos de Read Model para Evolução do Valor Contratual (CGLIC — Fase 7.5-C1)
  *
  * Princípios Fundamentais:
  * 1. Projeção determinística em memória e imutável (ValorVigente = ValorOriginal + Σ DeltaValor);

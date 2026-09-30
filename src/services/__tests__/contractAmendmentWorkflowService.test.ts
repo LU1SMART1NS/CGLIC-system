@@ -262,7 +262,7 @@ describe('contractAmendmentWorkflowService — Fase 4.3B', () => {
         }
       });
       expect(wfDecidido.status).toBe('AGUARDANDO_FORMALIZACAO');
-      // Mesmo aprovado pelo ordenador, o valor oficial do contrato no SaldoARP permanece R$ 1.000.000,00
+      // Mesmo aprovado pelo ordenador, o valor oficial do contrato no CGLIC permanece R$ 1.000.000,00
       expect(wfDecidido.valores.isOficial).toBe(false);
       expect(mockContract.valorGlobal).toBe(1000000.0);
 

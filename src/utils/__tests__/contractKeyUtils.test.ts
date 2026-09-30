@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveContractKey } from '../contractKeyUtils';
 
-describe('contractKeyUtils.resolveContractKey - Identidade Canônica de Gestão de Contrato (SaldoARP 3.0)', () => {
+describe('contractKeyUtils.resolveContractKey - Identidade Canônica de Gestão de Contrato (CGLIC 3.0)', () => {
   describe('Formato 1 — contrato administrativo (NNNNN/AAAA)', () => {
     it('deve derivar a chave para "00012/2016"', () => {
       const r = resolveContractKey('200331', '00012/2016');

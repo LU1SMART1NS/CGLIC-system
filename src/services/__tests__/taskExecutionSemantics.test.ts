@@ -56,7 +56,7 @@ describe('taskExecutionSemantics — Fase 4.3C (Semântica de Execução e Não 
     expect(taskExterna.externalLinkUrl).toBeDefined();
   });
 
-  it('Teste 4: Uma tarefa pode ser AUTOMATICA (processamento do SaldoARP)', () => {
+  it('Teste 4: Uma tarefa pode ser AUTOMATICA (processamento do CGLIC)', () => {
     const taskAutomatica: ContractTaskTemplateTask = {
       id: 'task-auto-01',
       macrotaskId: 'macro-01',

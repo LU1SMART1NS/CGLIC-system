@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio do Dashboard Gerencial (SaldoARP 3.0 — Fase 8-B)
+ * Tipos de Domínio do Dashboard Gerencial (CGLIC 3.0 — Fase 8-B)
  *
  * Princípios Fundamentais:
  * 1. O Dashboard é uma camada de leitura e agregação determinística — nunca uma nova fonte de dados.
@@ -66,6 +66,7 @@ export interface DashboardAttentionItem {
   arpKey?: string;
   numeroAta?: string;
   cycleKey?: string;
+  taskId?: string;
   diasRelevantes?: number;
   dataAlvo?: string;
   targetUrl?: string;

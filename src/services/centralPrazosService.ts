@@ -1,5 +1,5 @@
 /**
- * Serviço Agregador da Central de Prazos e Tarefas (SaldoARP — Fase 3)
+ * Serviço Agregador da Central de Prazos e Tarefas (CGLIC — Fase 3)
  *
  * Responsável por:
  * 1. Unificar dados oficiais (Contratos.gov.br, Compras.gov.br, PNCP) com governança interna (gestores e tarefas);

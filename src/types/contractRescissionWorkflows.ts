@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio do Workflow Operacional de Extinção Antecipada / Rescisão Contratual (SaldoARP — Fase 4.4C)
+ * Tipos de Domínio do Workflow Operacional de Extinção Antecipada / Rescisão Contratual (CGLIC — Fase 4.4C)
  *
  * Princípios Fundamentais:
  * 1. FATO/MOTIVO → INSTRUÇÃO INTERNA → DECISÃO/FORMALIZAÇÃO → CONFIRMAÇÃO OFICIAL → EVENTO OFICIAL SOBERANO

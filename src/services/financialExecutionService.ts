@@ -1,5 +1,5 @@
 /**
- * Serviço de Domínio para Execução Financeira (SaldoARP 3.0 - Fase 7.3-C)
+ * Serviço de Domínio para Execução Financeira (CGLIC 3.0 - Fase 7.3-C)
  * 
  * Responsabilidades:
  * 1. Cálculo puro dos saldos financeiros canônicos (saldo a liquidar, saldo a pagar, saldo não executado, saldo RP).

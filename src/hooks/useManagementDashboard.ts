@@ -92,7 +92,7 @@ export function getManagementDashboardQueryOptions(
 
 /**
  * Hook do React Query para carregamento determinístico do Read Model do Dashboard Gerencial
- * (SaldoARP 3.0 — Fase 8-B/8-I)
+ * (CGLIC 3.0 — Fase 8-B/8-I)
  */
 export function useManagementDashboard(
   filtersOrUasg?: string | ManagementDashboardFilters

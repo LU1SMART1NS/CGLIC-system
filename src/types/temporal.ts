@@ -1,5 +1,5 @@
 /**
- * Tipos Canônicos do Motor de Prazos e Agenda Contratual (SaldoARP — Fase 2)
+ * Tipos Canônicos do Motor de Prazos e Agenda Contratual (CGLIC — Fase 2)
  */
 
 export type TemporalStatus = 'FUTURO' | 'VENCE_EM_BREVE' | 'VENCE_HOJE' | 'ATRASADO' | 'CONCLUIDO';

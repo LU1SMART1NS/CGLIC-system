@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio de Gestão de Eventos e Ciclos de Atas de Registro de Preços (SaldoARP — Fase 6.5)
+ * Tipos de Domínio de Gestão de Eventos e Ciclos de Atas de Registro de Preços (CGLIC — Fase 6.5)
  *
  * Princípios Fundamentais:
  * 1. FATO OFICIAL ≠ EVENTO ≠ WORKFLOW ≠ TAREFA
@@ -68,7 +68,7 @@ export type AtaEventOficialidade =
   | 'FATO_OFICIAL'            // Publicado no PNCP, DOU ou sistema oficial soberano
   | 'DECISAO_INTERNA'         // Despacho de autoridade, parecer jurídico aprovado
   | 'PROPOSTA_ADMINISTRATIVA' // Pedido de reequilíbrio por fornecedor, ofício de remanejamento
-  | 'DADO_INTERNO';           // Anotação operacional de controle do SaldoARP
+  | 'DADO_INTERNO';           // Anotação operacional de controle do CGLIC
 
 /**
  * 6. Estados do Ciclo de Vida da Ata de Registro de Preços

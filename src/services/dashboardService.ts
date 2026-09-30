@@ -1,5 +1,5 @@
 /**
- * Serviço de Orquestração e Agregação do Dashboard Gerencial (SaldoARP 3.0 — Fase 8-B)
+ * Serviço de Orquestração e Agregação do Dashboard Gerencial (CGLIC 3.0 — Fase 8-B)
  *
  * Princípios Fundamentais:
  * 1. O Dashboard é uma camada de leitura e agregação determinística — nunca uma nova fonte de dados.
@@ -299,6 +299,7 @@ export function calculateAttentionSummary(params: {
         contractKey: pItem.contractKey,
         numeroContrato: pItem.identificadorFormatado,
         arpKey: pItem.arpKey,
+        taskId: pItem.tarefaId,
         diasRelevantes: pItem.diasRestantes,
         dataAlvo: pItem.dataAlvo,
         targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
@@ -314,12 +315,13 @@ export function calculateAttentionSummary(params: {
         contractKey: pItem.contractKey,
         numeroContrato: pItem.identificadorFormatado,
         arpKey: pItem.arpKey,
+        taskId: pItem.tarefaId,
         diasRelevantes: 0,
         dataAlvo: pItem.dataAlvo,
         targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
         badgeLabel: 'Vence Hoje'
       });
-    } else if (pItem.diasRestantes > 0 && pItem.diasRestantes <= 7) {
+    } else if (pItem.estadoTemporal !== 'CONCLUIDO' && pItem.diasRestantes > 0 && pItem.diasRestantes <= 7) {
       items.push({
         id: `ATT-TASK-UPCOMING-${pItem.id}`,
         category: 'TAREFA_PROXIMA',
@@ -329,6 +331,7 @@ export function calculateAttentionSummary(params: {
         contractKey: pItem.contractKey,
         numeroContrato: pItem.identificadorFormatado,
         arpKey: pItem.arpKey,
+        taskId: pItem.tarefaId,
         diasRelevantes: pItem.diasRestantes,
         dataAlvo: pItem.dataAlvo,
         targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,

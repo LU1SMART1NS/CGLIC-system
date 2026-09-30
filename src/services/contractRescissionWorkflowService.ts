@@ -1,5 +1,5 @@
 /**
- * Serviço de Gestão do Workflow Operacional de Extinção Antecipada / Rescisão Contratual (SaldoARP — Fase 4.4C)
+ * Serviço de Gestão do Workflow Operacional de Extinção Antecipada / Rescisão Contratual (CGLIC — Fase 4.4C)
  *
  * Princípios Fundamentais:
  * 1. FATO/MOTIVO → INSTRUÇÃO INTERNA → DECISÃO/FORMALIZAÇÃO → CONFIRMAÇÃO OFICIAL → EVENTO OFICIAL SOBERANO
@@ -392,7 +392,7 @@ export function assembleRescissionWorkflow(params: {
     isFatoSoberano: Boolean(confirmacaoOficial.confirmado),
     explicabilidade: confirmacaoOficial.confirmado
       ? `Extinção/Rescisão contratual confirmada oficialmente pela fonte soberana (${confirmacaoOficial.fonteOficial || 'PNCP'}).`
-      : 'Processo administrativo de rescisão/extinção em instrução no SaldoARP.'
+      : 'Processo administrativo de rescisão/extinção em instrução no CGLIC.'
   };
 
   return {

@@ -1,5 +1,5 @@
 /**
- * Tipos Canônicos para o Workflow de Acompanhamento de Pagamentos / Faturamento (SaldoARP 3.0 - Fase 7.4-C)
+ * Tipos Canônicos para o Workflow de Acompanhamento de Pagamentos / Faturamento (CGLIC 3.0 - Fase 7.4-C)
  * Conforme especificado na FASE 7.4-B.
  */
 

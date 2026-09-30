@@ -14,7 +14,7 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
 
     it('1. renderiza o título "Perfis" e a descrição institucional', () => {
       expect(html).toContain('Perfis');
-      expect(html).toContain('Perfis de acesso ao CGLIC-system');
+      expect(html).toContain('Perfis de acesso ao CGLIC e o que cada um pode consultar e gerir');
     });
 
     it('2. renderiza exatamente os quatro perfis nativos', () => {

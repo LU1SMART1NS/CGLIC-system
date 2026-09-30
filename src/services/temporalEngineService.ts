@@ -1,5 +1,5 @@
 /**
- * Motor de Prazos e Agenda Contratual (SaldoARP — Fase 2)
+ * Motor de Prazos e Agenda Contratual (CGLIC — Fase 2)
  *
  * Centraliza e unifica todas as regras temporais do sistema:
  * - Cálculos em dias corridos e dias úteis (com suporte opcional a feriados);

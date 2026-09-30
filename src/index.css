@@ -1,4 +1,4 @@
-/* CSS System for SaldoARP - Gov.br Standard Layout (Light Theme) */
+/* CSS System for CGLIC - Gov.br Standard Layout (Light Theme) */
 
 :root {
   /* Paleta de Cores e Tokens Gov.br Modernos */
@@ -792,6 +792,17 @@ h1, h2, h3, h4 {
   align-items: center;
 }
 
+/* Linha do Gestor da Ata */
+.ata-card-manager-row {
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+
 /* Adesão Status Badges (Pill Style) */
 .adesao-status-badge {
   display: inline-flex;
@@ -1105,6 +1116,10 @@ h1, h2, h3, h4 {
 
   .ata-card-header-right {
     align-self: flex-start;
+  }
+
+  .ata-card-manager-row {
+    padding: 0.85rem 1rem;
   }
 
   .ata-item-left {

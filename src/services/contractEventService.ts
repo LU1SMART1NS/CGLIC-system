@@ -1,5 +1,5 @@
 /**
- * Serviço Puro de Gestão de Eventos e Ciclos Contratuais (SaldoARP — Fase 4.1)
+ * Serviço Puro de Gestão de Eventos e Ciclos Contratuais (CGLIC — Fase 4.1)
  *
  * Funções Puras e Determinísticas:
  * 1. Identidade Canônica de Eventos (Idempotência e linhagem);

@@ -1,5 +1,5 @@
 /**
- * Contratos de Tipos para RPCs Transacionais do PostgreSQL (SaldoARP 3.0)
+ * Contratos de Tipos para RPCs Transacionais do PostgreSQL (CGLIC 3.0)
  */
 
 export type MutationErrorCode =
@@ -234,29 +234,6 @@ export interface RpcMergeDepartmentResult {
   message?: string;
 }
 
-export interface RpcProcessoSeiItem {
-  id: string;
-  numero_processo_sei: string;
-  descricao_objeto?: string | null;
-  unidade_requisitante?: string | null;
-  responsavel_nome?: string | null;
-  status_processo: 'Em Instrução' | 'Aprovado' | 'Empenhado' | 'Concluído' | string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface RpcProcessoSeiResult {
-  success: boolean;
-  processo: RpcProcessoSeiItem;
-}
-
-export interface RpcDeleteProcessoSeiResult {
-  success: boolean;
-  id: string;
-  numero_processo_sei: string;
-  message: string;
-}
-
 // -------------------------------------------------------------
 // Gestão de Contratos: Gestor, Templates e Plano de Tarefas
 // -------------------------------------------------------------
@@ -376,6 +353,23 @@ export interface RpcContractTaskItem {
 export interface RpcUpdateContractTaskResult {
   success: boolean;
   task: RpcContractTaskItem;
+}
+
+// Plano de gestão editável pelo gestor (contratos e Atas compartilham o formato).
+export interface RpcStartTaskPlanResult {
+  success: boolean;
+  plan_id: string;
+  template_nome: string;
+}
+
+export interface RpcTaskPlanMacrotaskResult {
+  success: boolean;
+  macrotask: { id: string; plan_id: string; nome: string; ordem: number; origem: string };
+}
+
+export interface RpcCreateTaskResult {
+  success: boolean;
+  task: { id: string; macrotask_id: string; nome: string; ordem: number; status: string; origem: string };
 }
 
 // -------------------------------------------------------------

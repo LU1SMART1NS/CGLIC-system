@@ -5,7 +5,7 @@ import { mapPostgresErrorToAppError } from './rpcErrorAdapter';
 import { normalizeItemKey, parseItemKey } from '../utils/itemKeyUtils';
 
 /**
- * Adapter de Persistência Transacional para Empenhos Manuais via RPC save_manual_empenhos_atomic (SaldoARP 3.0)
+ * Adapter de Persistência Transacional para Empenhos Manuais via RPC save_manual_empenhos_atomic (CGLIC 3.0)
  */
 export async function executeSaveManualEmpenhosRpc(
   itemKey: string,

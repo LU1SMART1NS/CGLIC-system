@@ -1,5 +1,5 @@
 /**
- * Serviço do Read Model de Evolução do Valor Contratual (SaldoARP — Fase 7.5-C1)
+ * Serviço do Read Model de Evolução do Valor Contratual (CGLIC — Fase 7.5-C1)
  *
  * Princípios Fundamentais:
  * 1. Projeção determinística em memória e 100% pura: ValorVigente = ValorOriginal + Σ DeltaValor;

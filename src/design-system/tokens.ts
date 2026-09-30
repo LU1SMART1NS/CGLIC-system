@@ -1,5 +1,5 @@
 /**
- * SaldoARP 3.0 — Design Tokens
+ * CGLIC 3.0 — Design Tokens
  * 
  * Camada centralizada de design tokens para garantir consistência visual,
  * contraste WCAG 2.1 AA, responsividade e separação semântica de domínios.
@@ -130,7 +130,7 @@ export const severityTokens: Record<SeverityLevel, {
   }
 };
 
-// Semântica Operacional do SaldoARP (Fases 1–9)
+// Semântica Operacional do CGLIC (Fases 1–9)
 export type OperationalCategory =
   | 'FATO_OFICIAL'
   | 'ALERTA'

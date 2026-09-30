@@ -1,5 +1,5 @@
 /**
- * Serviço Puro de Domínio de Gestão de Eventos e Ciclos de Atas (SaldoARP — Fase 6.5)
+ * Serviço Puro de Domínio de Gestão de Eventos e Ciclos de Atas (CGLIC — Fase 6.5)
  *
  * Funções Puras e Determinísticas:
  * 1. Identidade Canônica de Eventos de Ata (Idempotência e linhagem);

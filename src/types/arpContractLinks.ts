@@ -26,7 +26,7 @@ export interface LinkContractToItemParams {
 
 /**
  * Vínculo enriquecido pronto para apresentação na UI, unindo os metadados do vínculo
- * ao registro oficial do Contrato proveniente do catálogo do SaldoARP.
+ * ao registro oficial do Contrato proveniente do catálogo do CGLIC.
  */
 export interface EnrichedArpItemContract {
   linkId: string;

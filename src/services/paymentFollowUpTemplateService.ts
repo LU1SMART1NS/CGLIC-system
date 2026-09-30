@@ -1,5 +1,5 @@
 /**
- * Serviço Gerador de Templates para Workflow de Acompanhamento de Pagamentos (SaldoARP 3.0 - Fase 7.4-C)
+ * Serviço Gerador de Templates para Workflow de Acompanhamento de Pagamentos (CGLIC 3.0 - Fase 7.4-C)
  * 
  * Reutiliza a infraestrutura canônica de ContractTaskTemplate com 5 macrotarefas e 11 tarefas atômicas.
  */
@@ -19,7 +19,7 @@ export function buildPaymentFollowUpTemplate(
 ): ContractTaskTemplate {
   const templateId = 'tpl-acompanhamento-pagamento-14133';
 
-  // 1. Recepção e Atribuição do Atesto
+  // 1. Recepção do Atesto
   const macro1Tasks: ContractTaskTemplateTask[] = [
     {
       id: 'task-pgto-1-1',
@@ -132,7 +132,7 @@ export function buildPaymentFollowUpTemplate(
     {
       id: 'macro-pgto-1',
       templateId,
-      nome: '1. Recepção e Atribuição do Atesto',
+      nome: '1. Recepção do Atesto',
       ordem: 1,
       tarefas: macro1Tasks
     },
