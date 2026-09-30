@@ -179,7 +179,6 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
 
     expect(html).toContain('Visão Geral');
     expect(html).toContain('Painel unificado de gestão e monitoramento — Lei 14.133');
-    expect(html).toContain('UASGs 200330 · 200331');
     expect(html).toContain('Ações Imediatas / Pendências da Carteira');
   });
 

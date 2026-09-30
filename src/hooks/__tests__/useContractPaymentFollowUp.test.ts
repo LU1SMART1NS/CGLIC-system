@@ -1,5 +1,5 @@
 /**
- * Testes Unitários para a Lógica e Ciclo de Vida do Acompanhamento de Pagamentos (SaldoARP 3.0 - Fase 7.4-D)
+ * Testes Unitários para a Lógica e Ciclo de Vida do Acompanhamento de Pagamentos (CGLIC 3.0 - Fase 7.4-D)
  * 
  * Cobre:
  * - TASK-01: Instanciação das 5 macroetapas e 11 tarefas a partir do template canônico.
@@ -54,7 +54,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     expect(totalTasks).toBe(11);
 
     const macroNames = template.macrotarefas.map(m => m.nome);
-    expect(macroNames).toContain('1. Recepção e Atribuição do Atesto');
+    expect(macroNames).toContain('1. Recepção do Atesto');
     expect(macroNames).toContain('2. Instrução Processual e Conformidade Fiscal');
     expect(macroNames).toContain('3. Encaminhamento à CGOFI');
     expect(macroNames).toContain('4. Acompanhamento e Controle de Prazos');

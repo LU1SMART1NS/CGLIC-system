@@ -217,7 +217,6 @@ export const ContractsRoute: React.FC = () => {
       gap: '1.25rem'
     }}>
       <ContractsPortfolioHeader
-        uasgs={UASGS}
         onRefresh={() => refresh()}
         isRefreshing={isFetching}
         lastUpdated={dataUpdatedAt}

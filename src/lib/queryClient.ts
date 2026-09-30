@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 
 /**
- * Centralized React Query client configuration for SaldoARP 3.0.
+ * Centralized React Query client configuration for CGLIC 3.0.
  *
  * Policies:
  * - staleTime: 5 minutes (data from external government APIs is relatively static during browsing)

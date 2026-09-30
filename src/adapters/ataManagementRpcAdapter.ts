@@ -7,6 +7,9 @@ import type {
   RpcGenericDeleteResult,
   RpcApplyAtaTaskTemplateResult,
   RpcUpdateAtaTaskResult,
+  RpcStartTaskPlanResult,
+  RpcTaskPlanMacrotaskResult,
+  RpcCreateTaskResult,
   ContractTaskStatus
 } from '../types/rpc';
 import type { TaskExecutionMode } from '../types';
@@ -236,6 +239,8 @@ export interface UpdateAtaTaskInput {
   prazo?: string | null;
   observacao?: string | null;
   concluidoPor?: string;
+  /** Renomeia a tarefa (tarefas do plano são editáveis pelo gestor). */
+  nome?: string;
 }
 
 export async function updateAtaTaskRpc(input: UpdateAtaTaskInput): Promise<RpcUpdateAtaTaskResult> {
@@ -250,11 +255,13 @@ export async function updateAtaTaskRpc(input: UpdateAtaTaskInput): Promise<RpcUp
     const { data, error } = await client.rpc('update_ata_task_atomic', {
       p_task_id: cleanTaskId,
       p_status: input.status ?? null,
-      p_responsavel_nome: input.responsavelNome ? input.responsavelNome.trim() : null,
+      // undefined mantém o valor; string vazia limpa (volta a herdar o gestor da Ata).
+      p_responsavel_nome: input.responsavelNome !== undefined ? input.responsavelNome.trim() : null,
       p_prazo: input.prazo ?? null,
       p_observacao: input.observacao ?? null,
       p_concluido_por: input.concluidoPor ? input.concluidoPor.trim() : null,
-      p_responsavel_user_id: input.responsavelUserId ?? null
+      p_responsavel_user_id: input.responsavelUserId ?? null,
+      p_nome: input.nome !== undefined ? input.nome.trim() : null
     });
 
     if (error) throw mapPostgresErrorToAppError(error);
@@ -266,4 +273,90 @@ export async function updateAtaTaskRpc(input: UpdateAtaTaskInput): Promise<RpcUp
     if (err && err.code && typeof err.code === 'string') throw err;
     throw mapPostgresErrorToAppError(err);
   }
+}
+
+// -------------------------------------------------------------
+// Plano de gestão editável pelo gestor (criar/renomear/excluir etapas e tarefas)
+// -------------------------------------------------------------
+async function callPlanRpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const client = requireSupabase();
+  try {
+    const { data, error } = await client.rpc(fn, args);
+    if (error) throw mapPostgresErrorToAppError(error);
+    if (!data || typeof data !== 'object') {
+      throw mapPostgresErrorToAppError(new Error(`INVALID_PAYLOAD: Resposta inválida da RPC ${fn}`));
+    }
+    return data as T;
+  } catch (err: any) {
+    if (err && err.code && typeof err.code === 'string') throw err;
+    throw mapPostgresErrorToAppError(err);
+  }
+}
+
+function requireField(value: string | undefined, message: string): string {
+  const clean = (value || '').trim();
+  if (!clean) throw mapPostgresErrorToAppError(new Error(`INVALID_PAYLOAD: ${message}`));
+  return clean;
+}
+
+export async function startAtaTaskPlanRpc(input: { ataKey: string }): Promise<RpcStartTaskPlanResult> {
+  return callPlanRpc<RpcStartTaskPlanResult>('start_ata_task_plan_atomic', {
+    p_ata_key: requireField(input.ataKey, 'O número da Ata é obrigatório.')
+  });
+}
+
+export interface SaveAtaTaskMacrotaskInput {
+  id?: string;
+  planId?: string;
+  nome: string;
+}
+
+export async function saveAtaTaskMacrotaskRpc(input: SaveAtaTaskMacrotaskInput): Promise<RpcTaskPlanMacrotaskResult> {
+  return callPlanRpc<RpcTaskPlanMacrotaskResult>('save_ata_task_macrotask_atomic', {
+    p_id: input.id ? input.id.trim() : null,
+    p_plan_id: input.planId ? input.planId.trim() : null,
+    p_nome: requireField(input.nome, 'O nome da etapa é obrigatório.')
+  });
+}
+
+export interface DeleteAtaTaskModuleInput {
+  planId: string;
+  moduloId: string;
+}
+
+export async function deleteAtaTaskModuleRpc(input: DeleteAtaTaskModuleInput): Promise<RpcGenericDeleteResult> {
+  return callPlanRpc<RpcGenericDeleteResult>('delete_ata_task_module_atomic', {
+    p_plan_id: requireField(input.planId, 'O plano é obrigatório.'),
+    p_modulo_id: requireField(input.moduloId, 'O módulo é obrigatório.')
+  });
+}
+
+export async function deleteAtaTaskMacrotaskRpc(id: string): Promise<RpcGenericDeleteResult> {
+  return callPlanRpc<RpcGenericDeleteResult>('delete_ata_task_macrotask_atomic', {
+    p_id: requireField(id, 'O ID da etapa é obrigatório.')
+  });
+}
+
+export interface CreateAtaTaskInput {
+  macrotaskId: string;
+  nome: string;
+  prazo?: string | null;
+  observacao?: string | null;
+  responsavelNome?: string;
+}
+
+export async function createAtaTaskRpc(input: CreateAtaTaskInput): Promise<RpcCreateTaskResult> {
+  return callPlanRpc<RpcCreateTaskResult>('create_ata_task_atomic', {
+    p_macrotask_id: requireField(input.macrotaskId, 'A etapa da tarefa é obrigatória.'),
+    p_nome: requireField(input.nome, 'O nome da tarefa é obrigatório.'),
+    p_prazo: input.prazo || null,
+    p_observacao: input.observacao || null,
+    p_responsavel_nome: input.responsavelNome ? input.responsavelNome.trim() : null
+  });
+}
+
+export async function deleteAtaTaskRpc(id: string): Promise<RpcGenericDeleteResult> {
+  return callPlanRpc<RpcGenericDeleteResult>('delete_ata_task_atomic', {
+    p_id: requireField(id, 'O ID da tarefa é obrigatório.')
+  });
 }

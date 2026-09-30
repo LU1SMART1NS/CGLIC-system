@@ -1,5 +1,5 @@
 /**
- * Módulo Canônico de Reconciliação Determinística de Empenhos (SaldoARP 3.0)
+ * Módulo Canônico de Reconciliação Determinística de Empenhos (CGLIC 3.0)
  * Implementa o algoritmo de fusão por campo, matriz de precedência oficial
  * e detecção rigorosa de divergências conforme FASE 7.2-F e FASE 7.2-G.
  *

@@ -1,5 +1,5 @@
 /**
- * Serviço de Gestão de Workflows Operacionais de Alteração Contratual e Apostilamento (SaldoARP — Fase 4.3B)
+ * Serviço de Gestão de Workflows Operacionais de Alteração Contratual e Apostilamento (CGLIC — Fase 4.3B)
  *
  * Princípios Fundamentais:
  * 1. PROPOSTA ≠ DECISÃO ≠ INSTRUMENTO FORMAL ≠ FATO OFICIAL

@@ -9,7 +9,6 @@ interface SidebarProps {
   onToggleCollapsed: () => void;
   onOpenContractTemplatesModal?: () => void;
   onOpenExportModal?: () => void;
-  onOpenSeiModal?: () => void;
   onOpenDepartmentsModal?: () => void;
 }
 
@@ -177,7 +176,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapsed,
   onOpenContractTemplatesModal,
   onOpenExportModal,
-  onOpenSeiModal,
   onOpenDepartmentsModal
 }) => {
   const { role } = useAuth();
@@ -190,8 +188,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       onOpenContractTemplatesModal();
     } else if (actionId === 'open-export-modal' && onOpenExportModal) {
       onOpenExportModal();
-    } else if (actionId === 'open-sei-modal' && onOpenSeiModal) {
-      onOpenSeiModal();
     } else if (actionId === 'open-departments-modal' && onOpenDepartmentsModal) {
       onOpenDepartmentsModal();
     }
@@ -292,21 +288,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
       </nav>
-
-      <div style={{
-        padding: '0.75rem',
-        borderTop: '1px solid #f1f5f9',
-        fontSize: '0.7rem',
-        color: '#94a3b8',
-        textAlign: collapsed ? 'center' : 'left'
-      }}>
-        {!collapsed && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-            <span style={{ fontWeight: 700, color: '#475569' }}>ComprasSUSP • v2.0</span>
-            <span>SENASP / MJSP • UASG 200331</span>
-          </div>
-        )}
-      </div>
     </aside>
   );
 };

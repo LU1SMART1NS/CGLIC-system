@@ -297,17 +297,6 @@ export interface PncpContractEmpenho {
   sequencialEmpenho: number;
 }
 
-export interface ProcessoSei {
-  id: string;
-  numeroProcessoSei: string;
-  descricaoObjeto?: string;
-  unidadeRequisitante?: string;
-  responsavelNome?: string;
-  statusProcesso?: 'Em Instrução' | 'Aprovado' | 'Empenhado' | 'Concluído';
-  createdAt?: string;
-  updatedAt?: string;
-}
-
 export interface SyncMetadata {
   isCachedInDb: boolean;
   ultimoSyncEm?: string;
@@ -456,7 +445,7 @@ export interface ContractDashboardRecord {
   contratoId?: number | string;
   tipoInstrumento?: TipoInstrumentoContratual;
   arpId?: string;
-  fonteDados: 'Compras.gov.br' | 'Contratos.gov.br' | 'PNCP' | 'Sistema SaldoARP (Manual)' | string;
+  fonteDados: 'Compras.gov.br' | 'Contratos.gov.br' | 'PNCP' | 'Sistema CGLIC (Manual)' | string;
   // Metadados de Origem e Rastreabilidade de Sincronização (Fase 1)
   sourceSystem?: 'Compras.gov.br' | 'Contratos.gov.br' | 'PNCP' | 'SaldoARP' | string;
   sourceRecordId?: string | number;
@@ -494,7 +483,7 @@ export const OFFICIAL_CONTRACT_FIELDS = [
   'linkPncp'
 ] as const;
 
-/** Campos de gestão operacional interna do SaldoARP (preservados em sincronizações oficiais) */
+/** Campos de gestão operacional interna do CGLIC (preservados em sincronizações oficiais) */
 export const INTERNAL_CONTRACT_FIELDS = [
   'gestorNome',
   'planoTarefas',
@@ -555,13 +544,13 @@ export interface ContractDetailEmpenho {
 export type ContractTaskStatusValue = 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'NAO_APLICAVEL';
 
 /**
- * Semântica de Execução de Tarefas (SaldoARP — Fase 4.3C)
+ * Semântica de Execução de Tarefas (CGLIC — Fase 4.3C)
  * Princípio: "DIGITE UMA VEZ, USE EM TODO LUGAR"
  */
 export type TaskExecutionMode =
-  | 'INTERNA'       // Trabalho intelectual/administrativo executado pela equipe no SaldoARP ou no SEI
+  | 'INTERNA'       // Trabalho intelectual/administrativo executado pela equipe no CGLIC ou no SEI
   | 'EXTERNA'       // Ação necessária em sistema governamental terceiro (Contratos.gov.br, SICAF, Mediador MTE, SEI)
-  | 'AUTOMATICA'    // Processamento computado diretamente pelo SaldoARP (limites 25%/50%, índices, prazos)
+  | 'AUTOMATICA'    // Processamento computado diretamente pelo CGLIC (limites 25%/50%, índices, prazos)
   | 'CONFIRMACAO';  // Conciliação e captura de fato oficial retornado pelas APIs governamentais soberanas
 
 export interface ContractManager {
@@ -617,6 +606,8 @@ export interface ContractTaskTemplate {
   macrotarefas: ContractTaskTemplateMacrotask[];
 }
 
+export type TaskOrigin = 'MODELO' | 'PERSONALIZADA';
+
 export interface ContractTask {
   id: string;
   macrotaskId: string;
@@ -626,6 +617,9 @@ export interface ContractTask {
   executionMode?: TaskExecutionMode;
   sistemaDestino?: string;
   externalLinkUrl?: string;
+  /** MODELO = copiada de um Modelo de Gestão; PERSONALIZADA = criada pelo gestor. */
+  origem?: TaskOrigin;
+  /** Vazio = responsável herdado do gestor do contrato (resolvido na exibição). */
   responsavelNome?: string;
   /** Identidade canônica do responsável (Fase 10-A.2), quando resolvida a uma conta ativa do Supabase Auth. Opcional — responsavelNome permanece a informação legada/humana sempre presente. */
   responsavelUserId?: string;
@@ -637,11 +631,21 @@ export interface ContractTask {
   concluidoPor?: string;
 }
 
+/** Módulo do plano: conjunto de etapas criadas por uma mesma aplicação de Modelo de Gestão. */
+export interface TaskPlanModuleRef {
+  id: string;
+  templateId?: string;
+  nome: string;
+  appliedAt?: string;
+}
+
 export interface ContractTaskMacrotask {
   id: string;
   planId: string;
   nome: string;
   ordem: number;
+  origem?: TaskOrigin;
+  modulo?: TaskPlanModuleRef;
   tarefas: ContractTask[];
 }
 
@@ -706,6 +710,7 @@ export interface AtaTask {
   ordem: number;
   status: ContractTaskStatusValue;
   executionMode?: TaskExecutionMode;
+  origem?: TaskOrigin;
   responsavelNome?: string;
   responsavelUserId?: string;
   prazo?: string;
@@ -721,6 +726,8 @@ export interface AtaTaskMacrotask {
   planId: string;
   nome: string;
   ordem: number;
+  origem?: TaskOrigin;
+  modulo?: TaskPlanModuleRef;
   tarefas: AtaTask[];
 }
 

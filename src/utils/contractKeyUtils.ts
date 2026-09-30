@@ -1,5 +1,5 @@
 /**
- * Módulo Canônico de Identidade de Contrato Administrativo (SaldoARP 3.0)
+ * Módulo Canônico de Identidade de Contrato Administrativo (CGLIC 3.0)
  *
  * CONTEXTO (auditoria FASE 0.1/0.2 do módulo Contratos):
  * antes desta implementação existiam QUATRO fórmulas diferentes de identidade
@@ -13,7 +13,7 @@
  *
  * Esta é a ÚNICA função de derivação da identidade de GESTÃO de contrato
  * (contract_key usada por contract_managers / contract_task_plans) do
- * SaldoARP. Nenhum outro módulo deve montar essa chave inline
+ * CGLIC. Nenhum outro módulo deve montar essa chave inline
  * (`${uasg}-${numero}-${ano}`) nem reaproveitar `ano` derivado de datas
  * quando o `numero` já contém essa informação.
  *
@@ -82,7 +82,7 @@ const REGEX_CONTRATO = /^0*(\d{1,5})\/(\d{2}|\d{4})$/;
 /**
  * Expande ano de 2 dígitos para o século XXI (20XX).
  *
- * REGRA ADOTADA EXPLICITAMENTE: o SaldoARP opera exclusivamente sobre atas,
+ * REGRA ADOTADA EXPLICITAMENTE: o CGLIC opera exclusivamente sobre atas,
  * contratos e empenhos da faixa 2000–2099. Um `numero` como "12/16" é
  * SEMPRE interpretado como 2016, nunca 1916 — não há (e não haverá) suporte
  * a contratos do século XX nesta base. Esta é a mesma convenção já usada em

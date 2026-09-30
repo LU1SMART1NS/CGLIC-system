@@ -1,9 +1,9 @@
 /**
- * Tipos de Domínio do Workflow Operacional de Encerramento Contratual Regular (SaldoARP — Fase 4.4B)
+ * Tipos de Domínio do Workflow Operacional de Encerramento Contratual Regular (CGLIC — Fase 4.4B)
  *
  * Princípios Fundamentais:
  * 1. FIM DA VIGÊNCIA ≠ ENCERRAMENTO OPERACIONAL ≠ EXTINÇÃO CONTRATUAL ≠ FATO OFICIAL CONFIRMADO
- * 2. PRINCÍPIO DA NÃO DUPLICAÇÃO: O SaldoARP gerencia pendências, contexto e decisões; sistemas oficiais são a fonte soberana.
+ * 2. PRINCÍPIO DA NÃO DUPLICAÇÃO: O CGLIC gerencia pendências, contexto e decisões; sistemas oficiais são a fonte soberana.
  * 3. TEMPLATE CONDICIONAL: Tarefas só existem se houver trabalho real (não cria tarefas para o que não se aplica).
  * 4. CONCLUSÃO INTERNA ≠ ENCERRAMENTO OFICIAL SOBERANO
  */

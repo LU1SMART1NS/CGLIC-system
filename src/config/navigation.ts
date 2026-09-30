@@ -44,7 +44,7 @@ export interface NavItem {
 }
 
 /**
- * Configuração definitiva de navegação do SaldoARP:
+ * Configuração definitiva de navegação do CGLIC:
  * - Visão Geral (/instrumentos) — painel unificado de gestão e
  *   monitoramento (consolida a antiga Visão Geral e a antiga Central de Atenção)
  * - Atas de Registro de Preços (recolhível)
@@ -93,7 +93,7 @@ export const navigationConfig: NavItem[] = [
         icon: Coins,
         route: '/atas/saldos-unidade',
         status: 'active',
-        matchPrefixes: ['/atas/saldos-unidade'],
+        matchPrefixes: ['/atas/saldos-unidade', '/admin/departamentos'],
         allowedRoles: ['admin', 'gestor_saldos', 'leitor']
       },
       {
@@ -104,15 +104,6 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/atas/modelos'],
         allowedRoles: ['admin', 'gestor']
-      },
-      {
-        id: 'atas-departamentos',
-        label: 'Unidades Internas',
-        icon: Users,
-        route: '/admin/departamentos',
-        status: 'active',
-        matchPrefixes: ['/admin/departamentos'],
-        allowedRoles: ['admin', 'gestor_saldos', 'leitor']
       }
     ]
   },

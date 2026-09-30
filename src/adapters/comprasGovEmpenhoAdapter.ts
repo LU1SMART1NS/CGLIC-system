@@ -1,5 +1,5 @@
 /**
- * Adapter Oficial Compras.gov.br para Empenhos (SaldoARP 3.0)
+ * Adapter Oficial Compras.gov.br para Empenhos (CGLIC 3.0)
  * Responsável por consultar a API /modulo-arp/4_consultarEmpenhosSaldoItem
  * e delegar para a normalização determinística em NormalizedEmpenho[].
  *

@@ -164,7 +164,7 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
     // Ao vincular contrato com quantidade 200:
     const qtdVinculoContrato = 200;
 
-    // Invariante Contábil do SaldoARP: Saldo = Qtd Homologada - Soma(Empenhos)
+    // Invariante Contábil do CGLIC: Saldo = Qtd Homologada - Soma(Empenhos)
     const saldoAtaAposVinculo = qtdHomologada - somaEmpenhos;
 
     expect(saldoAtaAposVinculo).toBe(350);

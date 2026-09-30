@@ -10,9 +10,7 @@ import {
   Loader2
 } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
-import { useContractDetails } from '../../hooks/useContractDetails';
-import { useManagementDashboard } from '../../hooks/useManagementDashboard';
-import { aggregateContractFinancialExecution } from '../../services/financialExecutionService';
+import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
 
 interface ContractFinancialExecutionSectionProps {
   contract: ContractDashboardRecord;
@@ -35,82 +33,14 @@ const formatDate = (val?: string | null) => {
   }
 };
 
-export interface NormalizedContractEmpenho {
-  canonical_key: string;
-  numero_oficial: string;
-  credor_nome: string;
-  data_emissao: string;
-  valor_empenhado: number;
-  valor_liquidado: number;
-  valor_pago: number;
-  valor_rpinscrito: number;
-  situacao: string;
-}
-
-export function prepareContractEmpenhosList(
-  contract: Partial<ContractDashboardRecord>,
-  detailsEmpenhos: any[] = [],
-  dashboardEmpenhos: any[] = []
-): NormalizedContractEmpenho[] {
-  const rawEmpenhosFromDetails = (detailsEmpenhos || []).map((e) => ({
-    canonical_key: e.canonical_key || `${contract.uasg || '200331'}-${e.ano || '2026'}-${e.numero_empenho || e.numeroEmpenho || e.numero || ''}`,
-    numero_oficial: e.numero_oficial || e.numero_empenho || e.numeroEmpenho || e.numero || '',
-    credor_nome: e.credor_nome || e.credor || e.fornecedor_nome || '',
-    data_emissao: e.data_emissao || e.dataEmissao || '',
-    valor_empenhado: Number(e.valor_empenhado ?? e.valorEmpenhado ?? e.valor ?? 0),
-    valor_liquidado: Number(e.valor_liquidado ?? e.valorLiquidado ?? 0),
-    valor_pago: Number(e.valor_pago ?? e.valorPago ?? 0),
-    valor_rpinscrito: Number(e.valor_rpinscrito ?? 0),
-    situacao: e.situacao || 'EMITIDO'
-  }));
-
-  const rawEmpenhosFromDashboard = (dashboardEmpenhos || []).map((e: any) => ({
-    canonical_key: e.canonical_key || e.id || `${e.uasg || contract.uasg || '200331'}-${e.ano || '2026'}-${e.numero || ''}`,
-    numero_oficial: e.numero_oficial || e.numero || '',
-    credor_nome: e.credor_nome || e.credor || '',
-    data_emissao: e.data_emissao || e.dataEmissao || '',
-    valor_empenhado: Number(e.valor_empenhado ?? e.valor ?? 0),
-    valor_liquidado: Number(e.valor_liquidado ?? 0),
-    valor_pago: Number(e.valor_pago ?? 0),
-    valor_rpinscrito: Number(e.valor_rpinscrito ?? 0),
-    situacao: e.situacao || 'EMITIDO'
-  }));
-
-  // Mescla e deduplica por canonical_key (prevenção rigorosa contra double counting)
-  const empenhoMap = new Map<string, NormalizedContractEmpenho>();
-  for (const emp of [...rawEmpenhosFromDashboard, ...rawEmpenhosFromDetails]) {
-    const key = emp.canonical_key || emp.numero_oficial;
-    if (key && !empenhoMap.has(key)) {
-      empenhoMap.set(key, emp);
-    }
-  }
-  return Array.from(empenhoMap.values());
-}
-
 export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecutionSectionProps> = ({
   contract,
   contractKey
 }) => {
   const navigate = useNavigate();
 
-  // Consulta detalhes sob demanda (Contratos.gov / Compras.gov)
-  const { data: details, isLoading: loadingDetails, isError: errorDetails, refetch: refetchDetails } = useContractDetails(contract, true);
-
-  // Consulta read model consolidado do dashboard para o contrato (v_empenhos_resumo via Supabase)
-  const { readModel, isLoading: loadingDashboard, isError: errorDashboard, refetch: refetchDashboard } = useManagementDashboard({
-    uasg: contract.uasg || '200331',
-    contractKey
-  });
-
-  const isLoading = loadingDetails || loadingDashboard;
-  const isError = Boolean((errorDetails || errorDashboard) && !details?.empenhos?.length && !readModel?.financial?.topEmpenhos?.length);
-
-  // Unifica e normaliza a lista de empenhos do contrato sem duplicidade
-  const empenhosList = prepareContractEmpenhosList(
-    contract,
-    details?.empenhos,
-    readModel?.financial?.topEmpenhos
-  );
+  // Empenhos de Contratos.gov/Compras.gov + v_empenhos_resumo, deduplicados por canonical_key
+  const { empenhosList, summary: financialSummary, isLoading, isError, refetch } = useContractFinancialSummary(contract, contractKey);
 
   // 1. Estado de Carregamento
   if (isLoading && empenhosList.length === 0) {
@@ -155,10 +85,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
           <button
             type="button"
-            onClick={() => {
-              refetchDetails();
-              refetchDashboard();
-            }}
+            onClick={refetch}
             style={{
               padding: '0.45rem 0.9rem',
               backgroundColor: '#991b1b',
@@ -194,7 +121,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   }
 
   // 3. Estado Sem Empenhos Vinculados (EmptyState Semântico)
-  if (empenhosList.length === 0) {
+  if (empenhosList.length === 0 || !financialSummary) {
     return (
       <div
         style={{
@@ -239,7 +166,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   }
 
   // 4. Calcula o sumário agregado usando o motor canônico de execução financeira
-  const summary = aggregateContractFinancialExecution(contractKey, empenhosList);
+  const summary = financialSummary;
 
   const totalEmpenhado = summary.totalValorEmpenhadoGlobal;
   const totalLiquidado = summary.totalValorLiquidadoGlobal;

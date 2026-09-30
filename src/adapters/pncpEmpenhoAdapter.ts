@@ -1,5 +1,5 @@
 /**
- * Adapter Oficial PNCP para Empenhos (SaldoARP 3.0)
+ * Adapter Oficial PNCP para Empenhos (CGLIC 3.0)
  * Responsável por consultar a API /api/pncp/v1/orgaos/{cnpj}/contratos/{ano}/{seq}/empenhos
  * e delegar para a normalização determinística em NormalizedEmpenho[].
  *

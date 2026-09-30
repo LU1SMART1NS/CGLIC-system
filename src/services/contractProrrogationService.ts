@@ -1,5 +1,5 @@
 /**
- * Serviço de Gestão do Workflow de Prorrogação Contratual (SaldoARP — Fase 4.2)
+ * Serviço de Gestão do Workflow de Prorrogação Contratual (CGLIC — Fase 4.2)
  *
  * Funções Puras e Determinísticas:
  * 1. Identidade Canônica de Workflow de Prorrogação (Idempotência por Ciclo);

@@ -565,7 +565,7 @@ export function formatCnpjBr(cnpj?: string): string {
 }
 
 /**
- * Converte a árvore de dados do SaldoARP em linhas tabulares planas (Flattened Rows)
+ * Converte a árvore de dados do CGLIC em linhas tabulares planas (Flattened Rows)
  */
 export async function buildFlattenedReportData(
   payload: ReportDataPayload,
@@ -792,7 +792,7 @@ export async function generateCustomExcelReport(
       config.granularity === 'BY_ALLOCATION' ? 'Alocações Departamentais' : 'Itens e Saldos';
 
     const data = await buildFlattenedReportData(payload, config.granularity);
-    renderWorksheet(workbook, sheetTitle, selectedColDefs, data, config, `Relatório SaldoARP - ${sheetTitle}`);
+    renderWorksheet(workbook, sheetTitle, selectedColDefs, data, config, `Relatório CGLIC - ${sheetTitle}`);
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
@@ -840,7 +840,7 @@ function renderWorksheet(
     ws.mergeCells(currentRowIdx, 1, currentRowIdx, Math.max(columns.length, 6));
     const metaCell = ws.getCell(currentRowIdx, 1);
     const dataHoraStr = new Date().toLocaleString('pt-BR');
-    metaCell.value = `Emitido em: ${dataHoraStr} | Total de Registros: ${dataRows.length} | Sistema Oficial SaldoARP (Compras.gov.br & PNCP)`;
+    metaCell.value = `Emitido em: ${dataHoraStr} | Total de Registros: ${dataRows.length} | Sistema Oficial CGLIC (Compras.gov.br & PNCP)`;
     metaCell.font = { name: 'Segoe UI', size: 8.5, italic: true, color: { argb: 'FF64748B' } };
     metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
     ws.getRow(currentRowIdx).height = 18;
@@ -996,7 +996,7 @@ function renderWorksheet(
  */
 export function downloadExcelFile(blob: Blob, filename?: string) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const finalName = filename ? `${filename}.xlsx` : `SaldoARP_Relatorio_${timestamp}.xlsx`;
+  const finalName = filename ? `${filename}.xlsx` : `CGLIC_Relatorio_${timestamp}.xlsx`;
 
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');

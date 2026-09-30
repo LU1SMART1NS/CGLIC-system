@@ -30,7 +30,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(gestaoInstrumentos?.matchPrefixes).toContain('/prazos');
     });
 
-    it('deve configurar Atas de Registro de Preços com Consulta e Vigência, Alocações por Unidade, Modelos de Gestão de Atas e Unidades Internas', () => {
+    it('deve configurar Atas de Registro de Preços com Consulta e Vigência, Alocações por Unidade, e Modelos de Gestão de Atas (Unidades Internas fica na tela de Alocações)', () => {
       const atas = navigationConfig.find((i) => i.id === 'atas');
       expect(atas).toBeDefined();
       expect(atas?.label).toBe('Atas de Registro de Preços');
@@ -39,14 +39,12 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(children.map((c) => c.label)).toEqual([
         'Consulta e Vigência',
         'Alocações por Unidade',
-        'Modelos de Gestão de Atas',
-        'Unidades Internas'
+        'Modelos de Gestão de Atas'
       ]);
       expect(children.map((c) => c.route)).toEqual([
         '/atas',
         '/atas/saldos-unidade',
-        '/atas/modelos',
-        '/admin/departamentos'
+        '/atas/modelos'
       ]);
     });
 
@@ -267,14 +265,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
       expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Alocações por Unidade');
-      expect(labels).toContain('Unidades Internas');
       expect(labels).toContain('Modelos de Gestão de Contratos');
       expect(labels).toContain('Modelos de Gestão de Atas');
       expect(labels).toContain('Usuários e Servidores');
       expect(labels).toContain('Perfis e Permissões');
     });
 
-    it('Gestor de Contratos (gestor) NÃO vê Alocações, Unidades Internas, Usuários ou Perfis, mas continua vendo Contratos', () => {
+    it('Gestor de Contratos (gestor) NÃO vê Alocações, Usuários ou Perfis, mas continua vendo Contratos', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor');
       const labels = flatLabels(visible);
 
@@ -287,7 +284,6 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Empenhos e Execução');
 
       expect(labels).not.toContain('Alocações por Unidade');
-      expect(labels).not.toContain('Unidades Internas');
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
 
@@ -295,12 +291,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).not.toContain('Administração');
     });
 
-    it('Gestor de Saldo (gestor_saldos) só vê Alocações e Unidades Internas — nada de Contratos, Financeiro, Usuários ou Perfis', () => {
+    it('Gestor de Saldo (gestor_saldos) só vê Alocações — nada de Contratos, Financeiro, Usuários ou Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor_saldos');
       const labels = flatLabels(visible);
 
       expect(labels).toContain('Alocações por Unidade');
-      expect(labels).toContain('Unidades Internas');
 
       expect(labels).not.toContain('Visão Geral');
       expect(labels).not.toContain('Consulta e Vigência');
@@ -314,7 +309,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       // Grupos que ficariam vazios (Contratos, Execução Financeira) somem inteiramente
       expect(labels).not.toContain('Contratos');
       expect(labels).not.toContain('Execução Financeira');
-      // "Atas" sobrevive porque Alocações/Unidades Internas são filhos dela
+      // "Atas" sobrevive porque Alocações é filho dela
       expect(labels).toContain('Atas de Registro de Preços');
     });
 
@@ -328,7 +323,6 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos e Execução');
       expect(labels).toContain('Alocações por Unidade');
-      expect(labels).toContain('Unidades Internas');
 
       expect(labels).not.toContain('Modelos de Gestão');
       expect(labels).not.toContain('Usuários e Servidores');

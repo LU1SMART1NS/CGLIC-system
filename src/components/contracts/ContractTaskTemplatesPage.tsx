@@ -31,6 +31,8 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: ContractTaskTemplat
   const [open, setOpen] = useState(true);
   const [newTaskNome, setNewTaskNome] = useState('');
   const [editingMacroNome, setEditingMacroNome] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskNome, setEditingTaskNome] = useState('');
 
   const saveMacrotask = useSaveContractTaskTemplateMacrotask();
   const deleteMacrotask = useDeleteContractTaskTemplateMacrotask();
@@ -42,6 +44,19 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: ContractTaskTemplat
     saveTask.mutate(
       { macrotaskId: macro.id, nome: newTaskNome.trim(), ordem: macro.tarefas.length },
       { onSuccess: () => setNewTaskNome('') }
+    );
+  };
+
+  const handleRenameTask = (task: (typeof macro.tarefas)[number]) => {
+    const nome = editingTaskNome.trim();
+    if (!nome) return;
+    if (nome === task.nome) {
+      setEditingTaskId(null);
+      return;
+    }
+    saveTask.mutate(
+      { id: task.id, macrotaskId: macro.id, nome, ordem: task.ordem, executionMode: task.executionMode },
+      { onSuccess: () => setEditingTaskId(null) }
     );
   };
 
@@ -147,7 +162,46 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: ContractTaskTemplat
                     {idx + 1}.
                   </span>
                   <CheckSquare size={13} color="#0c326f" />
-                  <span style={{ flex: 1, fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
+                  {editingTaskId === task.id ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editingTaskNome}
+                        onChange={e => setEditingTaskNome(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleRenameTask(task);
+                          if (e.key === 'Escape') setEditingTaskId(null);
+                        }}
+                        autoFocus
+                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.25rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRenameTask(task)}
+                        disabled={saveTask.isPending}
+                        style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', padding: '2px' }}
+                        title="Salvar"
+                      >
+                        <Check size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ flex: 1, fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          saveTask.reset();
+                          setEditingTaskNome(task.nome);
+                          setEditingTaskId(task.id);
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}
+                        title="Renomear tarefa"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -207,6 +261,9 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: ContractTaskTemplat
 const TemplateCard: React.FC<{ template: ContractTaskTemplate }> = ({ template }) => {
   const [expanded, setExpanded] = useState(true);
   const [newMacroNome, setNewMacroNome] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editNome, setEditNome] = useState('');
+  const [editDescricao, setEditDescricao] = useState('');
   const saveTemplate = useSaveContractTaskTemplate();
   const deleteTemplate = useDeleteContractTaskTemplate();
   const saveMacrotask = useSaveContractTaskTemplateMacrotask();
@@ -221,6 +278,20 @@ const TemplateCard: React.FC<{ template: ContractTaskTemplate }> = ({ template }
 
   const handleToggleAtivo = () => {
     saveTemplate.mutate({ id: template.id, nome: template.nome, descricao: template.descricao, ativo: !template.ativo });
+  };
+
+  const startEdit = () => {
+    setEditNome(template.nome);
+    setEditDescricao(template.descricao ?? '');
+    setEditing(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editNome.trim()) return;
+    saveTemplate.mutate(
+      { id: template.id, nome: editNome.trim(), descricao: editDescricao.trim() || undefined, ativo: template.ativo },
+      { onSuccess: () => setEditing(false) }
+    );
   };
 
   const totalTarefas = template.macrotarefas.reduce((acc, m) => acc + m.tarefas.length, 0);
@@ -238,15 +309,41 @@ const TemplateCard: React.FC<{ template: ContractTaskTemplate }> = ({ template }
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                {template.nome}
-              </h3>
+              {editing ? (
+                <input
+                  type="text"
+                  value={editNome}
+                  onChange={e => setEditNome(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveEdit();
+                    if (e.key === 'Escape') setEditing(false);
+                  }}
+                  autoFocus
+                  style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.3rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none', minWidth: '260px' }}
+                />
+              ) : (
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  {template.nome}
+                </h3>
+              )}
               <StatusBadge
                 variant={template.ativo ? 'success' : 'neutral'}
                 label={template.ativo ? 'ATIVO' : 'INATIVO'}
               />
             </div>
-            {template.descricao && (
+            {editing ? (
+              <input
+                type="text"
+                placeholder="Descrição (opcional)"
+                value={editDescricao}
+                onChange={e => setEditDescricao(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleSaveEdit();
+                  if (e.key === 'Escape') setEditing(false);
+                }}
+                style={{ width: '100%', marginTop: '0.35rem', fontSize: '0.82rem', padding: '0.3rem 0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
+              />
+            ) : template.descricao && (
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
                 {template.descricao}
               </p>
@@ -258,6 +355,35 @@ const TemplateCard: React.FC<{ template: ContractTaskTemplate }> = ({ template }
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {editing ? (
+            <>
+              <AppButton
+                type="button"
+                variant="primary"
+                size="sm"
+                icon={<Check size={14} />}
+                onClick={handleSaveEdit}
+                disabled={!editNome.trim() || saveTemplate.isPending}
+                isLoading={saveTemplate.isPending}
+              >
+                Salvar
+              </AppButton>
+              <AppButton type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
+                Cancelar
+              </AppButton>
+            </>
+          ) : (
+            <AppButton
+              type="button"
+              variant="outline"
+              size="sm"
+              icon={<Edit2 size={14} />}
+              onClick={startEdit}
+              title="Editar nome e descrição"
+            >
+              Editar
+            </AppButton>
+          )}
           <AppButton
             type="button"
             variant="secondary"

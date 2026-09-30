@@ -207,11 +207,11 @@ export const RolesPermissions: React.FC = () => {
   const selectedProfile = PROFILE_DEFINITIONS.find((p) => p.id === selectedProfileId) ?? null;
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: spacing.xl }}>
+    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Perfis"
-        subtitle="Perfis de acesso ao CGLIC-system"
-        icon={<KeyRound size={26} color={colors.brand.primary} aria-hidden="true" />}
+        subtitle="Perfis de acesso ao CGLIC e o que cada um pode consultar e gerir"
+        icon={<KeyRound size={26} color="#0c326f" aria-hidden="true" />}
       />
 
       <div
@@ -227,7 +227,7 @@ export const RolesPermissions: React.FC = () => {
               style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                <Icon size={20} color={colors.brand.primary} aria-hidden="true" />
+                <Icon size={20} color="#0c326f" aria-hidden="true" />
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: colors.text.primary }}>
                   {profile.label}
                 </h3>
@@ -237,7 +237,9 @@ export const RolesPermissions: React.FC = () => {
                 {profile.description}
               </p>
 
-              <StatusBadge label="Perfil do sistema" variant="neutral" size="sm" />
+              <div style={{ alignSelf: 'flex-start' }}>
+                <StatusBadge label="Perfil do sistema" variant="neutral" size="sm" />
+              </div>
 
               <AppButton
                 variant="outline"

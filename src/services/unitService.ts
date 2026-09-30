@@ -68,7 +68,7 @@ export const DEFAULT_DEPARTMENTS: InternalDepartment[] = [
 const STORAGE_KEY = 'saldoarp-internal-departments';
 
 /**
- * Consulta o catálogo canônico de departamentos internos no PostgreSQL (SaldoARP 3.0)
+ * Consulta o catálogo canônico de departamentos internos no PostgreSQL (CGLIC 3.0)
  */
 export async function fetchDepartments(): Promise<InternalDepartment[]> {
   if (isSupabaseConfigured && supabase) {

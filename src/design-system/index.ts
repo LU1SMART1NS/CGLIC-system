@@ -1,5 +1,5 @@
 /**
- * SaldoARP 3.0 — Design System
+ * CGLIC 3.0 — Design System
  * 
  * Barrel export com todos os design tokens, tipos e componentes base reutilizáveis.
  */

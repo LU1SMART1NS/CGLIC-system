@@ -8,7 +8,7 @@ vi.mock('../../../hooks/useManagementDashboard', () => ({
   useManagementDashboard: vi.fn()
 }));
 
-describe('ManagementPaymentsOverview Component (SaldoARP 3.0 — Fase 8-H)', () => {
+describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

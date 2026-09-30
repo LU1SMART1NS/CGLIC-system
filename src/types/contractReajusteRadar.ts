@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio para o Radar Preditivo de Reajuste / Repactuação (SaldoARP — Fase 7.5-C3)
+ * Tipos de Domínio para o Radar Preditivo de Reajuste / Repactuação (CGLIC — Fase 7.5-C3)
  *
  * Princípios Fundamentais:
  * 1. Radar operacional preventivo, NUNCA decisão jurídica automática;

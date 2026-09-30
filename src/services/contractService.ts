@@ -283,7 +283,7 @@ export async function fetchContractsForDashboard(
               valorInicial: parseMoney(m.valor_total),
               statusVigencia: 'Vigente',
               numeroControlePncp: m.numero_controle_pncp,
-              fonteDados: 'Sistema SaldoARP (Manual)',
+              fonteDados: 'Sistema CGLIC (Manual)',
               sourceSystem: 'SaldoARP DB',
               sourceRecordId: m.id || canKey,
               sourceUpdatedAt: m.atualizado_em || m.criado_em || new Date().toISOString(),
@@ -457,7 +457,7 @@ export interface MergedContractRecord extends ContractDashboardRecord {
 /**
  * Regra Arquitetural Fundamental — Sincronização Não-Destrutiva:
  * Unifica dados oficiais obtidos de APIs (Compras.gov / Contratos.gov / PNCP) com
- * informações operacionais internas cadastradas no SaldoARP (gestor, tarefas, observações),
+ * informações operacionais internas cadastradas no CGLIC (gestor, tarefas, observações),
  * garantindo que atualizações oficiais NUNCA sobrescrevam ou apaguem dados gerenciais da equipe.
  */
 export function mergeOfficialAndInternalContractData(

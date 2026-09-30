@@ -48,15 +48,12 @@ describe('ContractEventsTimeline — Integração da Evolução do Valor Contrat
     ...partial
   });
 
-  it('1. Contrato sem eventos deve renderizar o painel executivo com valor original e indicação de ausência de aditamentos', () => {
+  it('1. Contrato sem eventos não mostra o painel de evolução de valor (repetiria o valor global do cabeçalho)', () => {
     const html = renderToStaticMarkup(
       <ContractEventsTimeline contract={baseContract} eventsOverride={[]} />
     );
 
-    expect(html).toContain('Evolução do Valor Contratual');
-    expect(html).toContain('Valor Original (Celebração)');
-    expect(html).toContain(formatCurrencyBRL(100000.0));
-    expect(html).toContain('Sem aditamentos de valor registrados');
+    expect(html).not.toContain('Evolução do Valor Contratual');
     expect(html).toContain('Ainda não há eventos contratuais registrados');
   });
 
@@ -159,16 +156,15 @@ describe('ContractEventsTimeline — Integração da Evolução do Valor Contrat
       <ContractEventsTimeline contract={baseContract} eventsOverride={[prorrogacao]} />
     );
 
-    expect(html).toContain(formatCurrencyBRL(100000.0)); // Original
-    expect(html).toContain(formatCurrencyBRL(100000.0)); // Vigente
-    expect(html).toContain('Sem aditamentos de valor registrados');
+    expect(html).not.toContain('data-testid="contract-value-evolution-section"');
     expect(html).not.toContain('Delta:</strong>');
     expect(html).toContain('Altera Vigência');
   });
 
   it('6. Renderização responsiva e sem duplicidade de timeline', () => {
+    const reajuste = createEvent({ id: 'EVT-06', dataPublicacao: '2026-06-01', variacaoValor: 5500.0 });
     const html = renderToStaticMarkup(
-      <ContractEventsTimeline contract={baseContract} eventsOverride={[]} />
+      <ContractEventsTimeline contract={baseContract} eventsOverride={[reajuste]} />
     );
 
     // Deve conter exatamente uma única seção de evolução de valor

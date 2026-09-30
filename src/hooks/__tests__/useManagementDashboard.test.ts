@@ -10,7 +10,7 @@ vi.mock('../../services/dashboardService', () => ({
   fetchManagementDashboardData: vi.fn()
 }));
 
-describe('useManagementDashboard Hook / Query Options (SaldoARP 3.0 — Fase 8-B)', () => {
+describe('useManagementDashboard Hook / Query Options (CGLIC 3.0 — Fase 8-B)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

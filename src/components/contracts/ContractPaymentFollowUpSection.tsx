@@ -12,7 +12,8 @@ import {
   Info
 } from 'lucide-react';
 import type {
-  ContractDashboardRecord
+  ContractDashboardRecord,
+  ContractTask
 } from '../../types';
 import type {
   PaymentFollowUpCycle,
@@ -20,7 +21,13 @@ import type {
   PaymentWorkflowStatus
 } from '../../types/paymentFollowUp';
 import { useContractPaymentFollowUp } from '../../hooks/useContractPaymentFollowUp';
-import { getExecutionModeDisplay } from './ContractAttentionCenter';
+import { useContractManager } from '../../hooks/useContractManager';
+import { describeResponsavel } from './planTaskEditing';
+import { TaskItemRow } from './ContractTasksSection';
+import { useContractTaskPlan } from '../../hooks/useContractTaskPlan';
+import { useCreateContractTask } from '../../hooks/useContractTaskPlanEditing';
+import { AddTaskForm, MutationError } from './planTaskEditing';
+import { ResponsavelField, type ResponsavelValue } from './ResponsavelField';
 
 interface ContractPaymentFollowUpSectionProps {
   contract: ContractDashboardRecord;
@@ -44,13 +51,13 @@ const STATUS_CONFIG: Record<
   CANCELADO: { label: 'Cancelado', bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' }
 };
 
+// Etapas espelham as 5 macroetapas do template canônico (paymentFollowUpTemplateService).
 const WORKFLOW_STEPS = [
-  { id: 'RECEPCAO', label: '1. Atesto / Fatura' },
-  { id: 'INSTRUCAO', label: '2. Instrução' },
-  { id: 'DESPACHO', label: '3. Despacho' },
-  { id: 'ENVIO_CGOFI', label: '4. Envio CGOFI' },
-  { id: 'ACOMPANHAMENTO', label: '5. Acompanhamento' },
-  { id: 'PAGAMENTO', label: '6. Pagamento (OB)' }
+  { id: 'macro-pgto-1', label: 'Recepção do Atesto' },
+  { id: 'macro-pgto-2', label: 'Instrução Processual e Conformidade Fiscal' },
+  { id: 'macro-pgto-3', label: 'Encaminhamento à CGOFI' },
+  { id: 'macro-pgto-4', label: 'Acompanhamento e Controle de Prazos' },
+  { id: 'macro-pgto-5', label: 'Confirmação e Encerramento' }
 ];
 
 function getActiveStepIndex(status: PaymentWorkflowStatus): number {
@@ -60,21 +67,90 @@ function getActiveStepIndex(status: PaymentWorkflowStatus): number {
       return 0;
     case 'EM_INSTRUCAO':
     case 'PENDENTE_DOCUMENTACAO':
-      return 1;
     case 'DESPACHO_ELABORADO':
-      return 2;
+      return 1;
     case 'ENVIADO_CGOFI':
-      return 3;
+      return 2;
     case 'AGUARDANDO_CGOFI':
     case 'DEVOLVIDO_FISCAL':
-      return 4;
+      return 3;
     case 'PAGAMENTO_CONFIRMADO':
     case 'CONCLUIDO':
-      return 5;
+      return 4;
     default:
       return 0;
   }
 }
+
+/**
+ * Checklist real do ciclo: o servidor instancia um plano de tarefas por ciclo
+ * (contract_task_plans, chave = cycleKey). Reutiliza a linha de tarefa do plano
+ * de gestão, com seletor de status (Pendente / Em andamento / Concluída / N/A).
+ * As 5 etapas são fixas (alimentam o stepper): só as tarefas são editáveis.
+ * Enquanto o plano não existe, mostra o template canônico somente-leitura.
+ */
+const CyclePaymentTaskList: React.FC<{
+  cycle: PaymentFollowUpCycle;
+  gestorNome?: string;
+}> = ({ cycle, gestorNome }) => {
+  const { data: plan } = useContractTaskPlan(cycle.cycleKey);
+  const macros = plan?.macrotarefas ?? null;
+  const createTaskMutation = useCreateContractTask(cycle.cycleKey);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {(macros ?? cycle.tasks?.macrotarefas ?? []).map(macro => (
+        <div key={macro.id} style={{ borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div
+            style={{
+              padding: '0.5rem 0.85rem',
+              backgroundColor: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#334155'
+            }}
+          >
+            {macro.nome}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', padding: '0 0.85rem' }}>
+            {macro.tarefas.map(task =>
+              macros ? (
+                <TaskItemRow
+                  key={task.id}
+                  task={task as ContractTask}
+                  contractKey={cycle.cycleKey}
+                  gestorNome={gestorNome}
+                />
+              ) : (
+                <div key={task.id} style={{ padding: '0.65rem 0', borderBottom: '1px solid #f1f5f9', fontSize: '0.82rem', color: '#1e293b', fontWeight: 600 }}>
+                  {task.nome}
+                </div>
+              )
+            )}
+            {macros && (
+              <AddTaskForm
+                gestorNome={gestorNome}
+                isPending={createTaskMutation.isPending}
+                onSubmit={(values) =>
+                  createTaskMutation.mutate({
+                    macrotaskId: macro.id,
+                    nome: values.nome,
+                    prazo: values.prazo || null,
+                    observacao: values.observacao || null
+                  })
+                }
+              />
+            )}
+          </div>
+        </div>
+      ))}
+      <MutationError
+        error={createTaskMutation.error}
+      />
+    </div>
+  );
+};
 
 export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSectionProps> = ({
   contractKey
@@ -85,6 +161,9 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     registerPaymentCycle,
     updatePaymentCycle
   } = useContractPaymentFollowUp(contractKey);
+
+  const { data: manager } = useContractManager(contractKey);
+  const gestorNome = manager?.gestorNome || undefined;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [expandedCycles, setExpandedCycles] = useState<Record<string, boolean>>({});
@@ -100,7 +179,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     return new Date().toISOString().split('T')[0];
   });
   const [dataVencimentoFatura, setDataVencimentoFatura] = useState('');
-  const [responsavelNome, setResponsavelNome] = useState('');
+  const [responsavel, setResponsavel] = useState<ResponsavelValue>({ nome: '' });
+  const responsavelNome = responsavel.nome;
 
   const toggleExpand = (cycleKey: string) => {
     setExpandedCycles(prev => ({
@@ -123,7 +203,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
       dataVencimentoFatura: dataVencimentoFatura,
       documentoAtestoSei: documentoAtestoSei.trim(),
       valorAtesto: valorAtesto ? parseFloat(valorAtesto.replace(/\./g, '').replace(',', '.')) : 0,
-      responsavelNome: responsavelNome.trim() || undefined
+      responsavelNome: responsavelNome.trim() || undefined,
+      responsavelUserId: responsavelNome.trim() ? responsavel.userId : undefined
     };
 
     setIsSavingCycle(true);
@@ -134,7 +215,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
         setDocumentoAtestoSei('');
         setValorAtesto('');
         setDataVencimentoFatura('');
-        setResponsavelNome('');
+        setResponsavel({ nome: '' });
         setIsModalOpen(false);
       })
       .catch((err: any) => {
@@ -145,7 +226,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
   const handleQuickAdvanceStatus = (cycle: PaymentFollowUpCycle) => {
     const nextStatusMap: Partial<Record<PaymentWorkflowStatus, Partial<PaymentCycleInput>>> = {
-      RECEBIDO: { responsavelNome: responsavelNome || 'Servidor Designado' },
+      RECEBIDO: { responsavelNome: responsavelNome || gestorNome || 'Servidor Designado' },
       ATRIBUIDO: { documentoDespachoSei: 'Despacho SEI Gerado' },
       EM_INSTRUCAO: { documentoDespachoSei: 'Despacho SEI Gerado' },
       DESPACHO_ELABORADO: { dataEnvioCgofi: new Date().toISOString().split('T')[0] },
@@ -215,7 +296,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
               </span>
             </div>
             <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-              Acompanhamento operacional perante a CGOFI (SaldoARP acompanha • CGOFI executa o pagamento)
+              Acompanhamento operacional perante a CGOFI (CGLIC acompanha • CGOFI executa o pagamento)
             </span>
           </div>
         </div>
@@ -351,13 +432,13 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.8rem', color: '#64748b', flexWrap: 'wrap' }}>
-                  {cycle.input.responsavelNome ? (
+                  {describeResponsavel(cycle.input.responsavelNome, gestorNome) ? (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <User size={13} /> Responsável: <strong>{cycle.input.responsavelNome}</strong>
+                      <User size={13} /> Responsável: <strong>{describeResponsavel(cycle.input.responsavelNome, gestorNome)}</strong>
                     </span>
                   ) : (
                     <span style={{ color: '#c2410c', fontWeight: 600 }}>
-                      ⚠ Servidor de instrução não atribuído
+                      ⚠ Gestor do contrato não cadastrado
                     </span>
                   )}
                   {cycle.input.valorAtesto !== undefined && (
@@ -463,7 +544,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                       >
                         {isDone ? <Check size={12} /> : idx + 1}
                       </div>
-                      <span>{step.label}</span>
+                      <span>{cycle.tasks?.macrotarefas?.[idx]?.nome.replace(/^\d+\.\s*/, '') ?? step.label}</span>
                       {idx < WORKFLOW_STEPS.length - 1 && (
                         <div style={{ width: '16px', height: '1px', backgroundColor: isDone ? '#86efac' : '#cbd5e1', margin: '0 0.15rem' }} />
                       )}
@@ -500,85 +581,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
             {/* Conteúdo Expandido: 5 Macroetapas e 11 Tarefas */}
             {isExpanded && cycle.tasks && (
               <div style={{ padding: '1.25rem', backgroundColor: '#ffffff' }}>
-                <h5 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.75rem 0' }}>
-                  Macroetapas e Tarefas Operacionais (Template Canônico 14.133)
-                </h5>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {cycle.tasks.macrotarefas.map(macro => (
-                    <div
-                      key={macro.id}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <div
-                        style={{
-                          padding: '0.5rem 0.85rem',
-                          backgroundColor: '#f8fafc',
-                          borderBottom: '1px solid #e2e8f0',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          color: '#334155'
-                        }}
-                      >
-                        {macro.nome}
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        {macro.tarefas.map(task => {
-                          const modeInfo = getExecutionModeDisplay(task.executionMode);
-
-                          return (
-                            <div
-                              key={task.id}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '0.65rem 0.85rem',
-                                borderBottom: '1px solid #f1f5f9',
-                                backgroundColor: '#ffffff',
-                                gap: '0.75rem',
-                                flexWrap: 'wrap'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: '240px' }}>
-                                <span
-                                  style={{
-                                    fontSize: '0.82rem',
-                                    color: '#1e293b',
-                                    fontWeight: 600
-                                  }}
-                                >
-                                  {task.nome}
-                                </span>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span
-                                  style={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: 700,
-                                    padding: '0.1rem 0.4rem',
-                                    borderRadius: '4px',
-                                    backgroundColor: modeInfo.bg,
-                                    color: modeInfo.color,
-                                    border: `1px solid ${modeInfo.border}`
-                                  }}
-                                >
-                                  {modeInfo.label}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <CyclePaymentTaskList cycle={cycle} gestorNome={gestorNome} />
               </div>
             )}
           </div>
@@ -729,19 +732,18 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
                     Servidor Designado
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Servidor de confecção"
-                    value={responsavelNome}
-                    onChange={e => setResponsavelNome(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.55rem',
-                      borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.88rem'
-                    }}
+                  <ResponsavelField
+                    id="payment-cycle-responsavel"
+                    value={responsavel}
+                    onChange={setResponsavel}
+                    gestorNome={gestorNome}
+                    gestorLabel="gestor do contrato"
                   />
+                  <div style={{ fontSize: '0.72rem', color: gestorNome ? '#64748b' : '#b45309', marginTop: '0.3rem' }}>
+                    {gestorNome
+                      ? 'Com o gestor do contrato selecionado, o ciclo acompanha automaticamente uma troca de Gestor Titular.'
+                      : 'Este contrato ainda não tem Gestor Titular. Defina-o no topo da página (o ciclo passa a segui-lo) ou informe um responsável aqui.'}
+                  </div>
                 </div>
               </div>
 

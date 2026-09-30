@@ -27,7 +27,7 @@ describe('AuthRoutes — Testes Unitários de Acesso e Credenciamento com Supaba
 
     const html = renderToStaticMarkup(<LoginRoute />);
 
-    expect(html).toContain('ComprasSUSP');
+    expect(html).toContain('CGLIC');
     expect(html).toContain('E-mail Institucional');
     expect(html).toContain('Senha de Acesso');
     expect(html).toContain('Entrar no sistema');
@@ -51,7 +51,7 @@ describe('AuthRoutes — Testes Unitários de Acesso e Credenciamento com Supaba
   it('3. deve renderizar a DefinirSenhaRoute para primeiro acesso após convite', () => {
     const html = renderToStaticMarkup(<DefinirSenhaRoute />);
 
-    expect(html).toContain('Primeiro Acesso ao SaldoARP');
+    expect(html).toContain('Primeiro Acesso ao CGLIC');
     expect(html).toContain('Nova senha');
     expect(html).toContain('Confirmar nova senha');
     expect(html).toContain('Definir senha');

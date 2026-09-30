@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { resetUserPassword } from '../services/userService';
@@ -11,6 +11,7 @@ export const LoginRoute: React.FC = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -24,7 +25,7 @@ export const LoginRoute: React.FC = () => {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
-        <span style={{ fontSize: '0.9rem', color: '#0c326f', fontWeight: 600 }}>Carregando ComprasSUSP...</span>
+        <span style={{ fontSize: '0.9rem', color: '#0c326f', fontWeight: 600 }}>Carregando CGLIC...</span>
       </div>
     );
   }
@@ -100,12 +101,33 @@ export const LoginRoute: React.FC = () => {
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      background: 'linear-gradient(135deg, #0c326f 0%, #061b3d 100%)',
+      position: 'relative',
+      background: "#0c326f url('/login-bg.png') center / cover no-repeat",
       fontFamily: 'var(--font-family, system-ui, sans-serif)',
       color: '#0f172a'
     }}>
+      <style>{`
+        .cglic-login-input { transition: border-color .15s, box-shadow .15s; background: #fff; }
+        .cglic-login-input:focus { border-color: #0c326f !important; box-shadow: 0 0 0 3px rgba(12, 50, 111, 0.18); }
+        .cglic-login-btn { transition: background .15s, transform .1s, box-shadow .15s; }
+        .cglic-login-btn:hover:not(:disabled) { background: #0a2a5e !important; box-shadow: 0 6px 14px rgba(12, 50, 111, 0.35) !important; }
+        .cglic-login-btn:active:not(:disabled) { transform: translateY(1px); }
+        .cglic-login-link:hover { text-decoration: underline; }
+        @keyframes cglic-card-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+      `}</style>
+
+      {/* Filtro sobre a imagem: escurece, desfoca levemente e mantém o foco no card de login */}
+      <div aria-hidden="true" style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'linear-gradient(135deg, rgba(6, 27, 61, 0.78) 0%, rgba(12, 50, 111, 0.55) 55%, rgba(6, 27, 61, 0.8) 100%)',
+        backdropFilter: 'blur(2px)',
+        WebkitBackdropFilter: 'blur(2px)'
+      }} />
       {/* Gov.br Top Bar */}
       <div style={{
+        position: 'relative',
+        zIndex: 1,
         background: 'rgba(0, 0, 0, 0.25)',
         color: '#ffffff',
         padding: '0.4rem 2rem',
@@ -124,6 +146,8 @@ export const LoginRoute: React.FC = () => {
 
       {/* Main Container */}
       <div style={{
+        position: 'relative',
+        zIndex: 1,
         flex: 1,
         display: 'flex',
         alignItems: 'center',
@@ -134,35 +158,23 @@ export const LoginRoute: React.FC = () => {
           width: '100%',
           maxWidth: '440px',
           background: '#ffffff',
-          borderRadius: '12px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-          overflow: 'hidden'
+          borderRadius: '16px',
+          boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12)',
+          overflow: 'hidden',
+          animation: 'cglic-card-in .35s ease-out'
         }}>
           {/* Header do Card */}
           <div style={{
-            padding: '1.75rem 2rem 1.25rem',
-            background: '#f8fafc',
+            padding: '2rem 2rem 1.5rem',
+            background: 'linear-gradient(180deg, #f1f5fb 0%, #ffffff 100%)',
             borderBottom: '1px solid #e2e8f0',
             textAlign: 'center'
           }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '48px',
-              height: '48px',
-              borderRadius: '10px',
-              background: '#0c326f',
-              color: '#ffffff',
-              marginBottom: '0.75rem'
-            }}>
-              <ShieldCheck size={26} />
-            </div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0c326f', margin: '0 0 0.25rem 0' }}>
-              ComprasSUSP
+            <h1 style={{ fontSize: '1.7rem', fontWeight: 800, color: '#0c326f', margin: '0 0 0.3rem 0', letterSpacing: '0.04em' }}>
+              CGLIC
             </h1>
-            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, fontWeight: 500 }}>
-              Gestão de Atas e Contratos · UASG 200331
+            <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, fontWeight: 500 }}>
+              Gestão Inteligente de Atas e Contratos
             </p>
           </div>
 
@@ -187,12 +199,15 @@ export const LoginRoute: React.FC = () => {
               )}
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                <label htmlFor="login-email" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
                   E-mail Institucional
                 </label>
                 <div style={{ position: 'relative' }}>
                   <Mail size={15} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
+                    id="login-email"
+                    className="cglic-login-input"
+                    autoComplete="username"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -200,10 +215,10 @@ export const LoginRoute: React.FC = () => {
                     required
                     style={{
                       width: '100%',
-                      padding: '0.55rem 0.75rem 0.55rem 2.25rem',
+                      padding: '0.65rem 0.75rem 0.65rem 2.25rem',
                       border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      fontSize: '0.85rem',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem',
                       outline: 'none'
                     }}
                   />
@@ -212,11 +227,12 @@ export const LoginRoute: React.FC = () => {
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                  <label htmlFor="login-password" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
                     Senha de Acesso
                   </label>
                   <button
                     type="button"
+                    className="cglic-login-link"
                     onClick={() => {
                       setShowForgot(true);
                       setForgotEmail(email);
@@ -239,36 +255,60 @@ export const LoginRoute: React.FC = () => {
                 <div style={{ position: 'relative' }}>
                   <Lock size={15} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
-                    type="password"
+                    id="login-password"
+                    className="cglic-login-input"
+                    autoComplete="current-password"
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
                     style={{
                       width: '100%',
-                      padding: '0.55rem 0.75rem 0.55rem 2.25rem',
+                      padding: '0.65rem 2.5rem 0.65rem 2.25rem',
                       border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      fontSize: '0.85rem',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem',
                       outline: 'none'
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    style={{
+                      position: 'absolute',
+                      right: '0.5rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      padding: '0.25rem',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      display: 'flex'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
               <button
                 type="submit"
+                className="cglic-login-btn"
                 disabled={isSubmitting}
                 style={{
                   marginTop: '0.5rem',
-                  padding: '0.65rem 1rem',
+                  padding: '0.75rem 1rem',
                   background: '#0c326f',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.88rem',
+                  borderRadius: '8px',
+                  fontSize: '0.92rem',
                   fontWeight: 700,
                   cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.7 : 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -330,6 +370,8 @@ export const LoginRoute: React.FC = () => {
                       E-mail Institucional
                     </label>
                     <input
+                      className="cglic-login-input"
+                      autoComplete="email"
                       type="email"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
@@ -384,19 +426,18 @@ export const LoginRoute: React.FC = () => {
               )}
             </form>
           )}
-
-          {/* Rodapé Informativo */}
-          <div style={{
-            padding: '0.85rem 1.5rem',
-            background: '#f8fafc',
-            borderTop: '1px solid #e2e8f0',
-            textAlign: 'center',
-            fontSize: '0.72rem',
-            color: '#64748b'
-          }}>
-            Acesso soberano protegido por Gov.br / Supabase Auth · Padrão BR-DS
-          </div>
         </div>
+      </div>
+
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        textAlign: 'center',
+        padding: '0.75rem 1rem 1.25rem',
+        fontSize: '0.72rem',
+        color: 'rgba(255, 255, 255, 0.65)'
+      }}>
+        CGLIC · Ministério da Justiça e Segurança Pública · SENASP
       </div>
     </div>
   );

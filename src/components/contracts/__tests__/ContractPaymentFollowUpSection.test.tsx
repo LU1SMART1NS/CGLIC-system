@@ -1,5 +1,5 @@
 /**
- * Testes Unitários de Componente para ContractPaymentFollowUpSection (SaldoARP 3.0 - Fase 7.4-D)
+ * Testes Unitários de Componente para ContractPaymentFollowUpSection (CGLIC 3.0 - Fase 7.4-D)
  * 
  * Cobre:
  * - UI-01: Renderização dos ciclos e seus metadados (competência, atesto, status, responsável).
@@ -23,6 +23,14 @@ import type { ContractDashboardRecord } from '../../../types';
 // ManagementPaymentsOverview.test.tsx).
 vi.mock('../../../hooks/useContractPaymentFollowUp', () => ({
   useContractPaymentFollowUp: vi.fn()
+}));
+
+vi.mock('../../../hooks/useContractManager', () => ({
+  useContractManager: vi.fn(() => ({ data: { gestorNome: 'Gestora Titular' } }))
+}));
+
+vi.mock('../../../hooks/useUsers', () => ({
+  useUsers: () => ({ data: [], isLoading: false })
 }));
 
 const mockContract: ContractDashboardRecord = {
@@ -80,8 +88,8 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
       />
     );
 
-    // Deve deixar claro: SaldoARP acompanha • CGOFI executa o pagamento
-    expect(html).toContain('SaldoARP acompanha • CGOFI executa o pagamento');
+    // Deve deixar claro: CGLIC acompanha • CGOFI executa o pagamento
+    expect(html).toContain('CGLIC acompanha • CGOFI executa o pagamento');
     expect(html).toContain('contract-payment-followup-section');
   });
 });

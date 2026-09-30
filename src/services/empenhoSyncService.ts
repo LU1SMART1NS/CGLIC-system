@@ -1,5 +1,5 @@
 /**
- * Serviço Soberano de Sincronização e Reconciliação de Empenhos (SaldoARP 3.0)
+ * Serviço Soberano de Sincronização e Reconciliação de Empenhos (CGLIC 3.0)
  * Orquestra o fluxo completo: Adapters -> Normalização -> Reconciliação -> M17 RPCs -> M16 SSOT.
  *
  * Invariante Inviolável: Toda persistência é realizada EXCLUSIVAMENTE via RPCs M17

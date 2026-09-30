@@ -90,6 +90,11 @@ export interface AcaoInfo {
   targetUrl: string;
 }
 
+function contractItemUrl(item: DashboardAttentionItem): string {
+  if (!item.contractKey) return '/contratos';
+  return `/contratos/${encodeURIComponent(item.contractKey)}?item=${encodeURIComponent(item.id)}`;
+}
+
 /** Ação contextual em 1 clique, sempre apontando para um fluxo/rota já existente no sistema. */
 export function getAcaoInfo(item: DashboardAttentionItem): AcaoInfo {
   switch (item.category) {
@@ -98,10 +103,10 @@ export function getAcaoInfo(item: DashboardAttentionItem): AcaoInfo {
     case 'PAGAMENTO_CRITICO':
       return { label: 'Abrir Pagamento', targetUrl: '/pagamentos' };
     case 'REAJUSTE_RADAR':
-      return { label: 'Analisar Reajuste', targetUrl: item.contractKey ? `/contratos/${encodeURIComponent(item.contractKey)}` : '/contratos' };
+      return { label: 'Analisar Reajuste', targetUrl: contractItemUrl(item) };
     case 'TAREFA_ATRASADA':
     case 'TAREFA_PROXIMA':
-      return { label: 'Abrir Tarefa', targetUrl: item.contractKey ? `/contratos/${encodeURIComponent(item.contractKey)}` : '/contratos' };
+      return { label: 'Abrir Tarefa', targetUrl: contractItemUrl(item) };
     default:
       return { label: 'Visualizar', targetUrl: item.targetUrl || '/contratos' };
   }

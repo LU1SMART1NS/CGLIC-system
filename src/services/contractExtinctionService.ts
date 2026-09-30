@@ -1,5 +1,5 @@
 /**
- * Serviço de Domínio Puro de Extinção, Encerramento e Rescisão Contratual (SaldoARP — Fase 4.4A)
+ * Serviço de Domínio Puro de Extinção, Encerramento e Rescisão Contratual (CGLIC — Fase 4.4A)
  *
  * Funções Puras e Determinísticas:
  * 1. Geração de Identidade Canônica de Extinção (`generateExtinctionDomainId`);
@@ -318,7 +318,7 @@ export function buildContractExtinctionDomain(params: {
       nivelOficialidade: 'PROPOSTA_ADMINISTRATIVA',
       fonte: contract.fonteDados || 'SaldoARP',
       isFatoSoberano: false,
-      explicabilidade: 'Instrução do encerramento/extinção em andamento no SaldoARP.'
+      explicabilidade: 'Instrução do encerramento/extinção em andamento no CGLIC.'
     },
     processoSeiId,
     processoSeiNumero,

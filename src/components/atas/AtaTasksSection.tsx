@@ -1,4 +1,6 @@
+import { groupMacrotasksByModule } from '../../utils/taskPlanModules';
 import React, { useState } from 'react';
+import { ResponsavelField, type ResponsavelValue } from '../contracts/ResponsavelField';
 import {
   Check,
   Circle,
@@ -17,8 +19,26 @@ import type {
 import { useAtaTaskTemplates } from '../../hooks/useAtaTaskTemplates';
 import { useApplyAtaTaskTemplate } from '../../hooks/useApplyAtaTaskTemplate';
 import { useUpdateAtaTask } from '../../hooks/useUpdateAtaTask';
+import { useAtaManager } from '../../hooks/useAtaManagers';
+import {
+  useStartAtaTaskPlan,
+  useSaveAtaTaskMacrotask,
+  useDeleteAtaTaskMacrotask,
+  useDeleteAtaTaskModule,
+  useCreateAtaTask,
+  useDeleteAtaTask
+} from '../../hooks/useAtaTaskPlanEditing';
+import {
+  AddTaskForm,
+  AddMacrotaskForm,
+  MacrotaskHeader,
+  ModuleGroupHeader,
+  ConfirmDeleteButton,
+  MutationError,
+  PERSONALIZADA_BADGE_STYLE,
+  describeResponsavel
+} from '../contracts/planTaskEditing';
 import { formatDateBR } from '../../services/temporalEngineService';
-import { getExecutionModeDisplay } from '../contracts/ContractAttentionCenter';
 import { AppButton } from '../../design-system/components/AppButton';
 
 interface AtaTasksSectionProps {
@@ -37,14 +57,20 @@ const STATUS_OPTIONS: { value: ContractTaskStatusValue; label: string; icon: Rea
 const TaskItemRow: React.FC<{
   task: AtaTask;
   ataKey: string;
-}> = ({ task, ataKey }) => {
+  /** Gestor da Ata: responsável herdado quando a tarefa não tem responsável próprio. */
+  gestorNome?: string;
+}> = ({ task, ataKey, gestorNome }) => {
   const updateMutation = useUpdateAtaTask(ataKey);
+  const deleteMutation = useDeleteAtaTask(ataKey);
   const [expanded, setExpanded] = useState(false);
-  const [responsavelNome, setResponsavelNome] = useState(task.responsavelNome || '');
+  const [nome, setNome] = useState(task.nome);
+  const [responsavel, setResponsavel] = useState<ResponsavelValue>({
+    nome: task.responsavelNome || '',
+    userId: task.responsavelUserId
+  });
   const [prazo, setPrazo] = useState(task.prazo || '');
   const [observacao, setObservacao] = useState(task.observacao || '');
 
-  const modeInfo = getExecutionModeDisplay(task.executionMode);
 
   const handleStatusChange = (status: ContractTaskStatusValue) => {
     if (status === task.status) return;
@@ -56,7 +82,10 @@ const TaskItemRow: React.FC<{
     updateMutation.mutate({
       taskId: task.id,
       status: task.status,
-      responsavelNome: responsavelNome || undefined,
+      nome: nome.trim() || task.nome,
+      // Vazio limpa o responsável próprio e a tarefa volta a herdar o gestor da Ata.
+      responsavelNome: responsavel.nome.trim(),
+      responsavelUserId: responsavel.nome.trim() ? responsavel.userId : undefined,
       prazo: prazo || null,
       observacao: observacao || null
     });
@@ -108,25 +137,15 @@ const TaskItemRow: React.FC<{
               {task.nome}
             </span>
 
-            {/* Badge Semântica de Execução */}
-            <span
-              style={{
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                padding: '0.1rem 0.4rem',
-                borderRadius: '4px',
-                backgroundColor: modeInfo.bg,
-                color: modeInfo.color,
-                border: `1px solid ${modeInfo.border}`
-              }}
-            >
-              {modeInfo.label}
-            </span>
+
+            {task.origem === 'PERSONALIZADA' && <span style={PERSONALIZADA_BADGE_STYLE}>Personalizada</span>}
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
             {task.prazo && <span>Prazo: {formatDateBR(task.prazo)}</span>}
-            {task.responsavelNome && <span>Resp: {task.responsavelNome}</span>}
+            {describeResponsavel(task.responsavelNome, gestorNome) && (
+              <span>Resp: {describeResponsavel(task.responsavelNome, gestorNome)}</span>
+            )}
           </div>
         </div>
 
@@ -145,6 +164,13 @@ const TaskItemRow: React.FC<{
         >
           {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
+
+        <ConfirmDeleteButton
+          label="Excluir tarefa"
+          confirmMessage={task.status === 'CONCLUIDA' ? 'Excluir tarefa já concluída?' : 'Excluir tarefa?'}
+          disabled={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(task.id)}
+        />
       </div>
 
       {/* Painel Expansível de Detalhes da Tarefa */}
@@ -162,15 +188,14 @@ const TaskItemRow: React.FC<{
             gap: '0.75rem'
           }}
         >
-          <div>
+          <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
-              Responsável
+              Nome da tarefa
             </label>
             <input
               type="text"
-              value={responsavelNome}
-              onChange={(e) => setResponsavelNome(e.target.value)}
-              placeholder="Nome do servidor"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
               style={{
                 width: '100%',
                 padding: '0.35rem 0.5rem',
@@ -182,8 +207,21 @@ const TaskItemRow: React.FC<{
           </div>
 
           <div>
+            <label htmlFor={`responsavel-${task.id}`} style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+              Responsável
+            </label>
+            <ResponsavelField
+              id={`responsavel-${task.id}`}
+              value={responsavel}
+              onChange={setResponsavel}
+              gestorNome={gestorNome}
+              gestorLabel="gestor da Ata"
+            />
+          </div>
+
+          <div>
             <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
-              Prazo limite (YYYY-MM-DD)
+              Prazo limite
             </label>
             <input
               type="date"
@@ -197,6 +235,12 @@ const TaskItemRow: React.FC<{
                 border: '1px solid #cbd5e1'
               }}
             />
+          </div>
+
+          <div style={{ gridColumn: '1 / -1', fontSize: '0.72rem', color: gestorNome ? '#64748b' : '#b45309', marginTop: '-0.4rem' }}>
+            {gestorNome
+              ? 'Com o gestor da Ata selecionado, a tarefa acompanha automaticamente uma troca de gestor.'
+              : 'Esta Ata ainda não tem gestor. Defina-o no topo da página (a tarefa passa a segui-lo) ou informe um responsável aqui.'}
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
@@ -240,6 +284,7 @@ const TaskItemRow: React.FC<{
           </div>
         </form>
       )}
+      <MutationError error={deleteMutation.error} />
     </div>
   );
 };
@@ -251,11 +296,33 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
 }) => {
   const { data: templates = [], isLoading: loadingTemplates } = useAtaTaskTemplates();
   const applyTemplateMutation = useApplyAtaTaskTemplate();
+  const startPlanMutation = useStartAtaTaskPlan(ataKey);
+  const saveMacrotaskMutation = useSaveAtaTaskMacrotask(ataKey);
+  const deleteMacrotaskMutation = useDeleteAtaTaskMacrotask(ataKey);
+  const deleteModuleMutation = useDeleteAtaTaskModule(ataKey);
+  const createTaskMutation = useCreateAtaTask(ataKey);
+  const { data: manager } = useAtaManager(ataKey);
+  const gestorNome = manager?.gestorNome || undefined;
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [showApplyModel, setShowApplyModel] = useState(false);
 
   const handleApplyTemplate = () => {
     if (!selectedTemplateId) return;
-    applyTemplateMutation.mutate({ ataKey, templateId: selectedTemplateId });
+    const alreadyApplied = plan
+      ? groupMacrotasksByModule(plan.macrotarefas, plan).some((g) => g.modulo?.templateId === selectedTemplateId)
+      : false;
+    if (alreadyApplied && !window.confirm('Este modelo já foi aplicado a este plano. Acrescentar novamente vai duplicar as etapas e tarefas em um novo módulo. Deseja continuar?')) {
+      return;
+    }
+    applyTemplateMutation.mutate(
+      { ataKey, templateId: selectedTemplateId },
+      {
+        onSuccess: () => {
+          setSelectedTemplateId('');
+          setShowApplyModel(false);
+        }
+      }
+    );
   };
 
   if (isLoading) {
@@ -319,12 +386,32 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
             Aplicar Modelo
           </AppButton>
         </div>
+
+        <div style={{ marginTop: '0.9rem', fontSize: '0.8rem', color: '#64748b' }}>
+          ou{' '}
+          <AppButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => startPlanMutation.mutate({ ataKey })}
+            disabled={startPlanMutation.isPending}
+            isLoading={startPlanMutation.isPending}
+          >
+            Começar do zero
+          </AppButton>
+          {' '}e criar as tarefas manualmente.
+        </div>
+        <MutationError error={applyTemplateMutation.error || startPlanMutation.error} />
       </div>
     );
   }
 
   // 2. Plano Aplicado: Progresso e Lista de Macrotarefas
   const progresso = plan.progresso;
+  const moduleGroups = groupMacrotasksByModule(plan.macrotarefas, plan);
+  const appliedModelNames = Array.from(
+    new Set(moduleGroups.filter((g) => g.modulo).map((g) => g.modulo!.nome))
+  );
 
   return (
     <div>
@@ -345,13 +432,17 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
       >
         <div>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
-            Modelo: {plan.templateNome}
+            {appliedModelNames.length > 0 ? `Modelos aplicados: ${appliedModelNames.join(', ')}` : plan.templateNome}
           </div>
           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
             {progresso.concluidas} de {progresso.total - progresso.naoAplicaveis} tarefas concluídas ({progresso.percentual}%)
             {progresso.atrasadas > 0 && <span style={{ color: '#dc2626', fontWeight: 700, marginLeft: '6px' }}>• {progresso.atrasadas} atrasada(s)</span>}
           </div>
         </div>
+
+        <AppButton type="button" variant="outline" size="sm" onClick={() => setShowApplyModel((v) => !v)}>
+          {showApplyModel ? 'Fechar' : 'Aplicar modelo'}
+        </AppButton>
 
         {/* Mini Barra de Progresso */}
         <div style={{ width: '160px', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
@@ -366,9 +457,84 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
         </div>
       </div>
 
+      {showApplyModel && (
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            marginBottom: '1rem',
+            padding: '0.75rem 1rem',
+            background: '#f8fafc',
+            border: '1px dashed #cbd5e1',
+            borderRadius: '8px'
+          }}
+        >
+          <span style={{ fontSize: '0.78rem', color: '#64748b', flexBasis: '100%' }}>
+            As etapas e tarefas do modelo são acrescentadas ao plano atual; nada do que já existe é alterado.
+          </span>
+          <select
+            aria-label="Modelo de gestão a acrescentar"
+            value={selectedTemplateId}
+            onChange={(e) => setSelectedTemplateId(e.target.value)}
+            disabled={loadingTemplates || applyTemplateMutation.isPending}
+            style={{ padding: '0.4rem 0.6rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1', minWidth: '240px' }}
+          >
+            <option value="">Selecione um Modelo de Gestão...</option>
+            {templates.map((tpl) => (
+              <option key={tpl.id} value={tpl.id}>
+                {tpl.nome}
+              </option>
+            ))}
+          </select>
+          <AppButton
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={handleApplyTemplate}
+            disabled={!selectedTemplateId || applyTemplateMutation.isPending}
+            isLoading={applyTemplateMutation.isPending}
+          >
+            Acrescentar ao plano
+          </AppButton>
+        </div>
+      )}
+
+      <MutationError
+        error={
+          applyTemplateMutation.error ||
+          saveMacrotaskMutation.error ||
+          deleteMacrotaskMutation.error ||
+          deleteModuleMutation.error ||
+          createTaskMutation.error
+        }
+      />
+
       {/* Lista de Macrotarefas e Tarefas */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {plan.macrotarefas.map((macro) => (
+        {moduleGroups.map((group) => (
+          <div key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {group.modulo ? (
+              <ModuleGroupHeader
+                nome={group.modulo.nome}
+                appliedAt={group.modulo.appliedAt}
+                concluidas={group.concluidas}
+                aplicaveis={group.aplicaveis}
+                etapas={group.macrotarefas.length}
+                isPending={deleteModuleMutation.isPending}
+                onDelete={() => {
+                  if (window.confirm(`Excluir o módulo "${group.modulo!.nome}" e todas as suas etapas e tarefas?`)) {
+                    deleteModuleMutation.mutate({ planId: plan.id, moduloId: group.modulo!.id });
+                  }
+                }}
+              />
+            ) : (
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', padding: '0.25rem 0.25rem 0' }}>
+                Etapas personalizadas
+              </div>
+            )}
+        {group.macrotarefas.map((macro) => (
           <div
             key={macro.id}
             style={{
@@ -378,9 +544,13 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
               padding: '1rem'
             }}
           >
-            <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0c326f', margin: '0 0 0.5rem 0', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.4rem' }}>
-              {macro.nome}
-            </h4>
+            <MacrotaskHeader
+              nome={macro.nome}
+              taskCount={macro.tarefas.length}
+              isPending={saveMacrotaskMutation.isPending || deleteMacrotaskMutation.isPending}
+              onRename={(nome) => saveMacrotaskMutation.mutate({ id: macro.id, nome })}
+              onDelete={() => deleteMacrotaskMutation.mutate(macro.id)}
+            />
 
             <div>
               {macro.tarefas.map((tarefa) => (
@@ -388,11 +558,31 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
                   key={tarefa.id}
                   task={tarefa}
                   ataKey={ataKey}
+                  gestorNome={gestorNome}
                 />
               ))}
+              <AddTaskForm
+                gestorNome={gestorNome}
+                isPending={createTaskMutation.isPending}
+                onSubmit={(values) =>
+                  createTaskMutation.mutate({
+                    macrotaskId: macro.id,
+                    nome: values.nome,
+                    prazo: values.prazo || null,
+                    observacao: values.observacao || null
+                  })
+                }
+              />
             </div>
           </div>
         ))}
+          </div>
+        ))}
+
+        <AddMacrotaskForm
+          isPending={saveMacrotaskMutation.isPending}
+          onSubmit={(nome) => saveMacrotaskMutation.mutate({ planId: plan.id, nome })}
+        />
       </div>
     </div>
   );

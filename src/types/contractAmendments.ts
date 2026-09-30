@@ -1,5 +1,5 @@
 /**
- * Tipos de Domínio de Alterações Contratuais e Apostilamentos (SaldoARP — Fase 4.3A)
+ * Tipos de Domínio de Alterações Contratuais e Apostilamentos (CGLIC — Fase 4.3A)
  *
  * Princípios Fundamentais:
  * 1. TERMO ADITIVO ≠ APOSTILAMENTO

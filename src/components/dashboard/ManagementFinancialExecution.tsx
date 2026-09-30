@@ -35,7 +35,7 @@ function formatCurrency(val?: number): string {
 }
 
 /**
- * Seção de Execução Financeira Detalhada do Dashboard Gerencial (SaldoARP 3.0 — Fase 9-I)
+ * Seção de Execução Financeira Detalhada do Dashboard Gerencial (CGLIC 3.0 — Fase 9-I)
  * 
  * Princípios Fundamentais:
  * 1. Projeção estrita dos fatos financeiros oficiais (Empenhos, Liquidações, Pagamentos, RP);

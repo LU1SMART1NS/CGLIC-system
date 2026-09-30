@@ -307,7 +307,8 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
 
   return (
     <div>
-      {/* Síntese Executiva de Evolução do Valor Contratual (Fase 7.5-C2) */}
+      {/* Só aparece quando há aditamento com impacto no valor; sem isso, repetiria o valor global do cabeçalho */}
+      {valueEvolution.totalEventosMonetarios > 0 && (
       <div
         data-testid="contract-value-evolution-section"
         style={{
@@ -355,8 +356,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {valueEvolution.totalEventosMonetarios > 0 ? (
-              <span
+            <span
                 style={{
                   fontSize: '0.72rem',
                   fontWeight: 700,
@@ -373,21 +373,6 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                 <CheckCircle2 size={12} />
                 {valueEvolution.totalEventosMonetarios} alteração(ões) com impacto monetário
               </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  padding: '0.2rem 0.6rem',
-                  borderRadius: '4px',
-                  backgroundColor: '#f8fafc',
-                  color: '#64748b',
-                  border: '1px solid #e2e8f0'
-                }}
-              >
-                Sem aditamentos de valor registrados
-              </span>
-            )}
           </div>
         </div>
 
@@ -462,7 +447,6 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
               {valueEvolution.totalSupressoes > 0 && <span>Supressões: -{formatCurrencyBRL(valueEvolution.totalSupressoes)}</span>}
               {valueEvolution.totalReequilibrios !== 0 && <span>Reequilíbrio: +{formatCurrencyBRL(valueEvolution.totalReequilibrios)}</span>}
               {valueEvolution.totalOutrosAditivos !== 0 && <span>Outros: +{formatCurrencyBRL(valueEvolution.totalOutrosAditivos)}</span>}
-              {valueEvolution.totalEventosMonetarios === 0 && <span>Sem alterações monetárias</span>}
             </div>
           </div>
 
@@ -491,6 +475,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* Estado Vazio de Eventos */}
       {sortedEvents.length === 0 ? (

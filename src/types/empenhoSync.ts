@@ -1,6 +1,6 @@
 /**
  * Tipos Canônicos para Normalização, Reconciliação, Sincronização e Orquestração de Empenhos
- * Conforme especificado nas FASES 7.2-F, 7.2-G, 7.2-H e implementado na FASE 7.2-I (SaldoARP 3.0).
+ * Conforme especificado nas FASES 7.2-F, 7.2-G, 7.2-H e implementado na FASE 7.2-I (CGLIC 3.0).
  */
 
 export type EmpenhoFonteOrigem = 'COMPRASNET' | 'CONTRATOSNET' | 'PNCP' | 'MANUAL' | 'SINCRONIZADO';

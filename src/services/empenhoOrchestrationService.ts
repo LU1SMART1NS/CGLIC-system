@@ -1,5 +1,5 @@
 /**
- * Serviço de Orquestração On-Demand de Sincronização de Empenhos (SaldoARP 3.0)
+ * Serviço de Orquestração On-Demand de Sincronização de Empenhos (CGLIC 3.0)
  * Coordenador central do fluxo: Alvo -> Fontes Oficiais -> Adapters -> Normalização -> Reconciliação -> M17 -> M16.
  *
  * Invariantes Invioláveis:

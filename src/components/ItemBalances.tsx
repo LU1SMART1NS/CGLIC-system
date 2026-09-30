@@ -163,7 +163,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
   const canonicalItemKey = normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
 
-  // Vínculos Oficiais com Contratos do SaldoARP (Fase 6.2)
+  // Vínculos Oficiais com Contratos do CGLIC (Fase 6.2)
   const { data: contractLinks = [] } = useItemContractLinks(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
@@ -291,7 +291,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
         alert('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
       } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-        alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+        alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
       } else {
         alert(`Erro ao salvar empenho manual: ${err?.message || 'Erro desconhecido'}`);
       }
@@ -313,7 +313,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
           alert('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
         } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+          alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
         } else {
           alert(`Erro ao excluir empenho manual: ${err?.message || 'Erro desconhecido'}`);
         }
@@ -343,7 +343,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       if (err?.code === 'INVALID_CONTRACT_LINK' || err?.sqlState === '23514') {
         alert('Regra RN-07: Todo contrato exige vinculação a pelo menos um empenho como lastro orçamentário.');
       } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-        alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+        alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
       } else {
         alert(`Erro ao salvar contrato manual: ${err?.message || 'Erro desconhecido'}`);
       }
@@ -361,7 +361,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       } catch (err: any) {
         console.error('Erro ao excluir contrato manual:', err);
         if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+          alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
         } else if (err?.code === 'CONTRACT_NOT_FOUND' || err?.sqlState === 'P0002') {
           alert('Contrato manual não encontrado ou já excluído.');
         } else {
@@ -381,7 +381,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       } catch (err: any) {
         console.error('Erro ao desvincular contrato oficial:', err);
         if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          alert('Acesso negado: operação restrita a gestores e administradores do SaldoARP.');
+          alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
         } else {
           alert(`Erro ao desvincular contrato oficial: ${err?.message || 'Erro desconhecido'}`);
         }
@@ -1482,7 +1482,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                       </td>
                                       <td>
                                         {c._isOfficialLink ? (
-                                          <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }} title="Contrato Oficial vinculado do SaldoARP">
+                                          <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }} title="Contrato Oficial vinculado do CGLIC">
                                             🟢 Oficial
                                           </span>
                                         ) : c._isManual ? (

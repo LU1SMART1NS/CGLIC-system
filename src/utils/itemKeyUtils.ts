@@ -1,5 +1,5 @@
 /**
- * Módulo Canônico de Identidade e Normalização de item_key (SaldoARP 3.0)
+ * Módulo Canônico de Identidade e Normalização de item_key (CGLIC 3.0)
  * 
  * Regra Arquitetural:
  * - PK Técnica: itens_ata.id (UUID)

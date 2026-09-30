@@ -32,7 +32,7 @@ export const AtaCard: React.FC<AtaCardProps> = ({
         adesaoStatus={adesaoStatus}
       />
 
-      <div style={{ padding: '0 1rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+      <div className="ata-card-manager-row">
         <AtaManagerSelector ataKey={arp.numeroAtaRegistroPreco} />
         <button
           type="button"

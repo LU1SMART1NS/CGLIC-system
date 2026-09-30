@@ -1,5 +1,5 @@
 /**
- * Módulo Canônico de Normalização de Empenhos (SaldoARP 3.0)
+ * Módulo Canônico de Normalização de Empenhos (CGLIC 3.0)
  * Responsável por higienizar dados de fontes externas (Compras.gov, Contratos.gov, PNCP)
  * e produzir representações transitórias NormalizedEmpenho conforme FASE 7.2-F / FASE 7.2-G.
  *

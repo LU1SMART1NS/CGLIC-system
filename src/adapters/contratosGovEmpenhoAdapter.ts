@@ -1,5 +1,5 @@
 /**
- * Adapter Oficial Contratos.gov.br para Empenhos (SaldoARP 3.0)
+ * Adapter Oficial Contratos.gov.br para Empenhos (CGLIC 3.0)
  * Responsável por consultar a API /api/contrato/{id}/empenhos e /consultar/{id}
  * e delegar para a normalização determinística em NormalizedEmpenho[].
  *
