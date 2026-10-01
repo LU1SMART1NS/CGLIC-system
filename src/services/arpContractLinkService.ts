@@ -2,12 +2,18 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type {
   ArpItemContractLink,
   LinkContractToItemParams,
-  EnrichedArpItemContract
+  LinkContractToItemsParams,
+  EnrichedArpItemContract,
+  ArpItemContractDismissal,
+  DismissContractSuggestionParams
 } from '../types/arpContractLinks';
 import type { ContractDashboardRecord } from '../types';
 import {
   linkContractToItemRpc,
-  unlinkContractFromItemRpc
+  linkContractToItemsRpc,
+  unlinkContractFromItemRpc,
+  dismissContractSuggestionRpc,
+  restoreContractSuggestionRpc
 } from '../adapters/arpContractLinkRpcAdapter';
 
 /**
@@ -84,6 +90,21 @@ export async function saveArpItemContractLink(
 }
 
 /**
+ * Vincula um mesmo contrato oficial a vários itens da ARP numa única transação.
+ * Retorna quantos itens foram vinculados.
+ */
+export async function saveArpContractItemLinks(params: LinkContractToItemsParams): Promise<number> {
+  if (!(params.contractKey || '').trim()) throw new Error('A chave canônica do contrato oficial é obrigatória.');
+  if (!params.links || params.links.length === 0) throw new Error('Selecione ao menos um item para vincular.');
+  if (params.links.some((l) => !(l.quantidadeContratada > 0))) {
+    throw new Error('A quantidade contratada de cada item deve ser maior que zero.');
+  }
+
+  const res = await linkContractToItemsRpc(params);
+  return res.count;
+}
+
+/**
  * Remove o vínculo de um contrato oficial com o item da ARP de forma atômica no PostgreSQL.
  * FASE 6.2-C: Operação estrita na SSOT.
  */
@@ -99,6 +120,45 @@ export async function deleteArpItemContractLink(linkId: string, itemKey?: string
       localStorage.removeItem(`saldoarp-arp-item-contract-links-${itemKey.trim()}`);
     } catch {}
   }
+}
+
+/**
+ * Consulta as sugestões de contrato descartadas para um item de ARP.
+ */
+export async function fetchDismissedContractSuggestions(itemKey: string): Promise<ArpItemContractDismissal[]> {
+  const cleanItemKey = (itemKey || '').trim();
+  if (!cleanItemKey) return [];
+
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('CONFIG_ERROR: Supabase não está configurado.');
+  }
+
+  const { data, error } = await supabase
+    .from('arp_item_contract_dismissals')
+    .select('item_key, contract_key, dismissed_at')
+    .eq('item_key', cleanItemKey)
+    .order('dismissed_at', { ascending: true });
+
+  if (error) {
+    console.error('Erro ao consultar sugestões descartadas:', error);
+    throw error;
+  }
+
+  return (data || []).map((d: any) => ({
+    itemKey: d.item_key,
+    contractKey: d.contract_key,
+    dismissedAt: d.dismissed_at
+  }));
+}
+
+/** Descarta a sugestão de um contrato para o item (idempotente). */
+export async function dismissContractSuggestion(params: DismissContractSuggestionParams): Promise<void> {
+  await dismissContractSuggestionRpc(params);
+}
+
+/** Restaura uma sugestão descartada, fazendo-a voltar a ser sugerida. */
+export async function restoreContractSuggestion(params: DismissContractSuggestionParams): Promise<void> {
+  await restoreContractSuggestionRpc(params);
 }
 
 /**

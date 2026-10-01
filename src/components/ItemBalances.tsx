@@ -19,19 +19,28 @@ import { useSaveManualEmpenhos } from '../hooks/useSaveManualEmpenhos';
 import { useItemManualQuantities } from '../hooks/useItemManualQuantities';
 import { useSaveManualQuantities } from '../hooks/useSaveManualQuantities';
 import { useItemManualContracts } from '../hooks/useItemManualContracts';
-import { useSaveManualContract } from '../hooks/useSaveManualContract';
 import { useDeleteManualContract } from '../hooks/useDeleteManualContract';
 import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLinks';
 import { useItemContractLinks } from '../hooks/useItemContractLinks';
 import { useUnlinkContractFromItem } from '../hooks/useUnlinkContractFromItem';
+import { useDismissedContractSuggestions } from '../hooks/useDismissedContractSuggestions';
+import { useDismissContractSuggestion } from '../hooks/useDismissContractSuggestion';
+import { useRestoreContractSuggestion } from '../hooks/useRestoreContractSuggestion';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
 import { enrichContractLinks } from '../services/arpContractLinkService';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
+import { cnpjDaUasg } from '../config/unidadesGestoras';
+import {
+  buildItemContractSuggestions,
+  buildItemSuggestionCriteria,
+  suggestionToContractRecord,
+  type ItemContractSuggestion
+} from '../utils/itemContractSuggestions';
 import { AppButton, AppCard, EmptyState } from '../design-system';
 
 import { ManualEmpenhoModal } from './modals/ManualEmpenhoModal';
-import { ManualContratoModal } from './modals/ManualContratoModal';
 import { LinkContractModal } from './modals/LinkContractModal';
+import { ContractSuggestionsPanel } from './item-balances/ContractSuggestionsPanel';
 import { ItemHero, type ItemTab } from './item-balances/ItemHero';
 import { ItemReconciliationPanel } from './item-balances/ItemReconciliationPanel';
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
@@ -41,7 +50,7 @@ import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { EmpenhoDetailModal } from './item-balances/EmpenhoDetailModal';
 import { formatNumber, formatDate, getProgressColorClass, isGerenciadoraUasg, isAllowedEmpenhoUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
-import type { ArpRecord, ArpItemRecord, EmpenhoSaldoItemRecord, InternalAllocation, PncpContract, PncpContractEmpenho, ContratosGovEmpenhoRecord, Empenho, Contrato, ReconciliationReport } from '../types';
+import type { ArpRecord, ArpItemRecord, EmpenhoSaldoItemRecord, InternalAllocation, PncpContract, PncpContractEmpenho, ContratosGovEmpenhoRecord, Empenho, ReconciliationReport } from '../types';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -163,7 +172,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const manualQuantitiesVersion = manualQuantitiesState?.version ?? 1;
 
   const saveManualQuantitiesMutation = useSaveManualQuantities();
-  const saveManualContractMutation = useSaveManualContract();
   const deleteManualContractMutation = useDeleteManualContract();
 
   const { data: manualContratos = [], refetch: refetchManualContracts } = useItemManualContracts(
@@ -192,15 +200,16 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const { data: officialDashboardContracts = [] } = useContractsDashboard(arp.codigoUnidadeGerenciadora);
   const unlinkContractMutation = useUnlinkContractFromItem();
   const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
+  const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
 
   const enrichedOfficialLinks = useMemo(() => {
     return enrichContractLinks(contractLinks, officialDashboardContracts);
   }, [contractLinks, officialDashboardContracts]);
 
+
   const [editingEmpenhoKey, setEditingEmpenhoKey] = useState<string | null>(null);
   const [editingEmpenhoQty, setEditingEmpenhoQty] = useState<string>('');
   const [isManualEmpenhoModalOpen, setIsManualEmpenhoModalOpen] = useState<boolean>(false);
-  const [isManualContratoModalOpen, setIsManualContratoModalOpen] = useState<boolean>(false);
   const [editingManualEmpenho, setEditingManualEmpenho] = useState<Empenho | null>(null);
 
   const loadManualData = async () => {
@@ -340,36 +349,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     }
   };
 
-  const handleSaveManualContrato = async (
-    contratoData: Omit<Contrato, 'id' | 'criadoEm' | 'atualizadoEm'>,
-    selectedEmpenhoIds: string[]
-  ) => {
-    const newContratoId = `manual-contrato-${Date.now()}`;
-    const newContrato: Contrato = {
-      ...contratoData,
-      id: newContratoId,
-      criadoEm: new Date().toISOString(),
-      atualizadoEm: new Date().toISOString()
-    };
-
-    try {
-      await saveManualContractMutation.mutateAsync({
-        contrato: newContrato,
-        empenhoIds: selectedEmpenhoIds
-      });
-    } catch (err: any) {
-      console.error('Erro ao salvar contrato manual:', err);
-      if (err?.code === 'INVALID_CONTRACT_LINK' || err?.sqlState === '23514') {
-        toast.error('Regra RN-07: Todo contrato exige vinculação a pelo menos um empenho como lastro orçamentário.');
-      } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-        toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
-      } else {
-        toast.error(`Erro ao salvar contrato manual: ${err?.message || 'Erro desconhecido'}`);
-      }
-      throw err;
-    }
-  };
-
   const handleDeleteManualContrato = async (contratoId: string) => {
     if (await confirm({ title: 'Excluir contrato manual', message: 'Tem certeza que deseja excluir este contrato manual?', tone: 'danger', confirmLabel: 'Excluir' })) {
       try {
@@ -461,11 +440,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     // Extrai sequencial da ata diretamente (ex: "00003/2026" -> sequencialAta = "3")
     const ataMatch = (arp.numeroAtaRegistroPreco || '').split('/');
     if (ataMatch.length === 2 && !isNaN(parseInt(ataMatch[0], 10))) {
-      const isSenasp = arp.codigoUnidadeGerenciadora === '200331';
       return {
-        cnpj: isSenasp ? '00394494000136' : '',
-        ano: ataMatch[1] || arp.anoCompra || '2026',
-        sequencial: arp.numeroCompra || '1',
+        cnpj: cnpjDaUasg(arp.codigoUnidadeGerenciadora),
+        ano: ataMatch[1] || arp.anoCompra || '',
+        sequencial: arp.numeroCompra || '',
         sequencialAta: parseInt(ataMatch[0], 10).toString()
       };
     }
@@ -507,6 +485,55 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     arp.numeroAtaRegistroPreco
   );
   const contractsError = contractsQueryError ? (contractsQueryError.message || 'Falha ao buscar contratos do PNCP.') : null;
+
+  // Sugestões de contrato (PNCP + catálogo), sem os já vinculados nem os descartados
+  const { data: dismissedSuggestions = [] } = useDismissedContractSuggestions(canonicalItemKey);
+  const dismissSuggestionMutation = useDismissContractSuggestion();
+  const restoreSuggestionMutation = useRestoreContractSuggestion();
+  const { suggestions: contractSuggestions, dismissed: dismissedContractSuggestions } = useMemo(
+    () => buildItemContractSuggestions({
+      pncpContracts: contracts,
+      officialContracts: officialDashboardContracts,
+      criteria: buildItemSuggestionCriteria(arp, item),
+      linkedContractKeys: contractLinks.map((l) => l.contractKey),
+      dismissedContractKeys: dismissedSuggestions.map((d) => d.contractKey)
+    }),
+    [contracts, officialDashboardContracts, arp, item, contractLinks, dismissedSuggestions]
+  );
+
+  const handleSuggestionMutationError = (action: string, err: any) => {
+    if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
+      toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
+    } else {
+      toast.error(`Erro ao ${action}: ${err?.message || 'Erro desconhecido'}`);
+    }
+  };
+
+  const handleDismissSuggestion = async (s: ItemContractSuggestion) => {
+    try {
+      await dismissSuggestionMutation.mutateAsync({ itemKey: canonicalItemKey, contractKey: s.contractKey });
+    } catch (err: any) {
+      handleSuggestionMutationError('descartar sugestão', err);
+    }
+  };
+
+  const handleRestoreSuggestion = async (s: ItemContractSuggestion) => {
+    try {
+      await restoreSuggestionMutation.mutateAsync({ itemKey: canonicalItemKey, contractKey: s.contractKey });
+    } catch (err: any) {
+      handleSuggestionMutationError('restaurar sugestão', err);
+    }
+  };
+
+  const handleLinkSuggestion = (s: ItemContractSuggestion) => {
+    setLinkingSuggestion(s);
+    setIsLinkContractModalOpen(true);
+  };
+
+  const handleCloseLinkContractModal = () => {
+    setIsLinkContractModalOpen(false);
+    setLinkingSuggestion(null);
+  };
 
   // Carrega empenhos em background para todos os contratos e enriquece com dados oficiais
   useEffect(() => {
@@ -736,12 +763,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     const match = emp.unidade.match(/^(\d+)/);
     const uasg = match ? match[1] : '';
     
-    const uasgToCnpj: Record<string, string> = {
-      '200331': '00394494000136', // SENASP
-      '154080': '34792077000163', // UFSC
-    };
-
-    const targetCnpj = uasgToCnpj[uasg];
+    const targetCnpj = cnpjDaUasg(uasg);
 
     if (!targetCnpj) return contracts;
 
@@ -938,9 +960,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
     empenhos.forEach((emp, idx) => {
       const num = emp.numeroEmpenho || `EMP-${idx + 1}`;
-      const ano = parseInt(arp.anoCompra || '2026', 10);
-      const rawUasg = emp.unidade || arp.codigoUnidadeGerenciadora || '200331';
-      const cleanUasg = rawUasg.replace(/\D/g, '') || '200331';
+      const ano = parseInt(arp.anoCompra, 10) || new Date().getFullYear();
+      const cleanUasg = (emp.unidade || arp.codigoUnidadeGerenciadora || '').replace(/\D/g, '');
 
       // Filtra estritamente apenas empenhos das UASGs 200331 e 200330
       if (!isAllowedEmpenhoUasg(cleanUasg)) return;
@@ -973,9 +994,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       emps.forEach(emp => {
         const num = emp.numero;
         if (!num) return;
-        const ano = parseInt(arp.anoCompra || '2026', 10);
-        const rawUasg = emp.unidade_gestora || arp.codigoUnidadeGerenciadora || '200331';
-        const cleanUasg = rawUasg.replace(/\D/g, '') || '200331';
+        const ano = parseInt(arp.anoCompra, 10) || new Date().getFullYear();
+        const cleanUasg = (emp.unidade_gestora || arp.codigoUnidadeGerenciadora || '').replace(/\D/g, '');
 
         // Filtra estritamente apenas empenhos das UASGs 200331 e 200330
         if (!isAllowedEmpenhoUasg(cleanUasg)) return;
@@ -1095,7 +1115,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     return (a.codigoUnidade || '').localeCompare(b.codigoUnidade || '');
   });
 
-  const contractsCount = contracts.length + manualContratos.length + enrichedOfficialLinks.length;
+  const linkedContractsCount = manualContratos.length + enrichedOfficialLinks.length;
+  const contractsCount = linkedContractsCount;
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
@@ -1159,8 +1180,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                     <Building2 size={16} color="#0c326f" /> Contratos Celebrados
                   </h4>
                   <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700 }}>
-                    {contracts.length + manualContratos.length + enrichedOfficialLinks.length}{' '}
-                    {contracts.length + manualContratos.length + enrichedOfficialLinks.length === 1 ? 'contrato' : 'contratos'}
+                    {linkedContractsCount}{' '}
+                    {linkedContractsCount === 1 ? 'contrato vinculado' : 'contratos vinculados'}
                   </span>
                 </div>
                 {canEditData && (
@@ -1169,37 +1190,31 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                     variant="primary"
                     size="sm"
                     icon={<Plus size={14} />}
-                    onClick={() => setIsLinkContractModalOpen(true)}
+                    onClick={() => { setLinkingSuggestion(null); setIsLinkContractModalOpen(true); }}
                     title="Vincular contrato oficial existente da UASG a este item da ata"
                   >
                     Vincular Contrato Oficial
-                  </AppButton>
-                  <AppButton
-                    variant="outline"
-                    size="sm"
-                    icon={<Plus size={14} />}
-                    onClick={() => setIsManualContratoModalOpen(true)}
-                    title="Cadastrar contrato manual (legado)"
-                  >
-                    Adicionar Manual
                   </AppButton>
                   </div>
                 )}
               </div>
 
-              {contractsLoading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', justifyContent: 'center' }}>
-                  <div className="spinner" style={{ width: '20px', height: '20px' }}></div>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Buscando contratos no PNCP...</span>
-                </div>
-              ) : contractsError ? (
-                <div style={{ padding: '1rem', color: 'var(--danger)', fontSize: '0.85rem', textAlign: 'center' }}>
-                  {contractsError}
-                </div>
-              ) : (contracts.length === 0 && manualContratos.length === 0 && enrichedOfficialLinks.length === 0) ? (
+              <ContractSuggestionsPanel
+                suggestions={contractSuggestions}
+                dismissed={dismissedContractSuggestions}
+                loading={contractsLoading}
+                error={contractsError}
+                canEdit={canEditData}
+                busy={dismissSuggestionMutation.isPending || restoreSuggestionMutation.isPending}
+                onLink={handleLinkSuggestion}
+                onDismiss={handleDismissSuggestion}
+                onRestore={handleRestoreSuggestion}
+              />
+
+              {linkedContractsCount === 0 ? (
                 <EmptyState
-                  title="Nenhum contrato localizado"
-                  description="Nenhum contrato localizado no PNCP, vinculado oficialmente ou adicionado manualmente para esta Ata."
+                  title="Nenhum contrato vinculado"
+                  description="Vincule um contrato sugerido acima ou escolha um contrato oficial da UASG."
                   icon={<Building2 size={32} color="#94a3b8" />}
                 />
               ) : (
@@ -1260,12 +1275,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                         title: 'Unidade Gestora (Gerenciadora)',
                         icon: <Building2 size={16} color="var(--primary)" />,
                         list: deduplicateContractsList([
-                          ...contracts.filter(c => {
-                            const u = String(c.uasg || '').trim();
-                            if (isGerenciadora(u)) return true;
-                            if (c.tipoUnidade === 'GERENCIADORA') return true;
-                            return false;
-                          }),
                           ...officialContractsList.filter(oc => isGerenciadora(oc.uasg)),
                           ...manualContratos
                             .filter(mc => isGerenciadora(mc.uasg))
@@ -1290,12 +1299,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                         title: 'Participantes',
                         icon: <Users size={16} color="#0f766e" />,
                         list: deduplicateContractsList([
-                          ...contracts.filter(c => {
-                            const u = String(c.uasg || '').trim();
-                            if (isGerenciadora(u)) return false;
-                            if (c.tipoUnidade === 'GERENCIADORA') return false;
-                            return true;
-                          }),
                           ...officialContractsList.filter(oc => !isGerenciadora(oc.uasg)),
                           ...manualContratos
                             .filter(mc => !isGerenciadora(mc.uasg))
@@ -2152,24 +2155,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         isLoading={saveManualEmpenhosMutation.isPending}
       />
 
-      {/* Modal de Cadastro de Contrato Manual com Vínculo Obrigatório */}
-      <ManualContratoModal
-        isOpen={isManualContratoModalOpen}
-        onClose={() => setIsManualContratoModalOpen(false)}
-        onSave={handleSaveManualContrato}
-        arpId={arp.numeroAtaRegistroPreco}
-        itemId={item.numeroItem}
-        defaultUasg={arp.codigoUnidadeGerenciadora || '200331'}
-        defaultFornecedor={item.nomeRazaoSocialFornecedor}
-        defaultCnpj={item.niFornecedor}
-        availableEmpenhos={allEmpenhos}
-        isLoading={saveManualContractMutation.isPending}
-      />
-
       {/* Modal de Vínculo com Contrato Oficial da UASG (Fase 6.2) */}
       <LinkContractModal
         isOpen={isLinkContractModalOpen}
-        onClose={() => setIsLinkContractModalOpen(false)}
+        onClose={handleCloseLinkContractModal}
+        initialContract={linkingSuggestion ? suggestionToContractRecord(linkingSuggestion) : null}
+        initialQuantidade={linkingSuggestion?.quantidadeContratada}
         itemKey={canonicalItemKey}
         numeroAta={arp.numeroAtaRegistroPreco}
         numeroItem={item.numeroItem}

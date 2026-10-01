@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   linkContractToItemRpc,
-  unlinkContractFromItemRpc
+  unlinkContractFromItemRpc,
+  dismissContractSuggestionRpc,
+  restoreContractSuggestionRpc,
+  linkContractToItemsRpc
 } from '../arpContractLinkRpcAdapter';
 import * as supabaseModule from '../../services/supabaseClient';
 
@@ -137,6 +140,80 @@ describe('arpContractLinkRpcAdapter (Fase 6.2 - RPCs de Vínculo)', () => {
       await expect(unlinkContractFromItemRpc('link-uuid-123')).rejects.toMatchObject({
         code: 'UNKNOWN'
       });
+    });
+  });
+  describe('descarte de sugestão de contrato', () => {
+    const params = { itemKey: '00037/2026-200331-00001', contractKey: '200331-15-2026' };
+    const rpcArgs = { p_item_key: params.itemKey, p_contract_key: params.contractKey };
+
+    it('dismissContractSuggestionRpc chama a RPC de descarte', async () => {
+      (supabaseModule.supabase!.rpc as any).mockResolvedValueOnce({
+        data: { success: true, item_key: params.itemKey, contract_key: params.contractKey, timestamp: 't' },
+        error: null
+      });
+
+      const result = await dismissContractSuggestionRpc(params);
+
+      expect(supabaseModule.supabase!.rpc).toHaveBeenCalledWith('dismiss_contract_suggestion_atomic', rpcArgs);
+      expect(result.success).toBe(true);
+    });
+
+    it('restoreContractSuggestionRpc chama a RPC de restauração', async () => {
+      (supabaseModule.supabase!.rpc as any).mockResolvedValueOnce({
+        data: { success: true, item_key: params.itemKey, contract_key: params.contractKey, timestamp: 't' },
+        error: null
+      });
+
+      await restoreContractSuggestionRpc(params);
+
+      expect(supabaseModule.supabase!.rpc).toHaveBeenCalledWith('restore_contract_suggestion_atomic', rpcArgs);
+    });
+
+    it('rejeita payload sem chave de contrato antes de chamar a RPC', async () => {
+      await expect(dismissContractSuggestionRpc({ itemKey: params.itemKey, contractKey: ' ' })).rejects.toBeTruthy();
+      expect(supabaseModule.supabase!.rpc).not.toHaveBeenCalled();
+    });
+
+    it('propaga erro de autorização (42501)', async () => {
+      (supabaseModule.supabase!.rpc as any).mockResolvedValueOnce({
+        data: null,
+        error: { code: '42501', message: 'UNAUTHORIZED' }
+      });
+
+      await expect(dismissContractSuggestionRpc(params)).rejects.toBeTruthy();
+    });
+  });
+  describe('linkContractToItemsRpc (vínculo em lote)', () => {
+    const links = [
+      { itemKey: '00037/2026-200331-00001', quantidadeContratada: 50 },
+      { itemKey: '00037/2026-200331-00002', quantidadeContratada: 10 }
+    ];
+
+    it('envia todos os itens numa única chamada da RPC', async () => {
+      (supabaseModule.supabase!.rpc as any).mockResolvedValueOnce({
+        data: { success: true, contract_key: '200331-15-2026', count: 2, links: [], timestamp: 't' },
+        error: null
+      });
+
+      const result = await linkContractToItemsRpc({ contractKey: '200331-15-2026', links, observacoes: ' nota ' });
+
+      expect(supabaseModule.supabase!.rpc).toHaveBeenCalledTimes(1);
+      expect(supabaseModule.supabase!.rpc).toHaveBeenCalledWith('link_contract_to_items_atomic', {
+        p_contract_key: '200331-15-2026',
+        p_links: [
+          { item_key: '00037/2026-200331-00001', quantidade_contratada: 50, observacoes: 'nota' },
+          { item_key: '00037/2026-200331-00002', quantidade_contratada: 10, observacoes: 'nota' }
+        ]
+      });
+      expect(result.count).toBe(2);
+    });
+
+    it('rejeita lista vazia e quantidade inválida antes de chamar a RPC', async () => {
+      await expect(linkContractToItemsRpc({ contractKey: '200331-15-2026', links: [] })).rejects.toBeTruthy();
+      await expect(
+        linkContractToItemsRpc({ contractKey: '200331-15-2026', links: [{ itemKey: links[0].itemKey, quantidadeContratada: 0 }] })
+      ).rejects.toBeTruthy();
+      expect(supabaseModule.supabase!.rpc).not.toHaveBeenCalled();
     });
   });
 });

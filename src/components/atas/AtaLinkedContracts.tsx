@@ -48,7 +48,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
         title="Nenhum contrato vinculado."
         description={
           emptyAction
-            ? 'Ainda não há contratos oficiais vinculados a itens desta Ata. Vincule um contrato indicando o item e a quantidade contratada.'
+            ? 'Ainda não há contratos oficiais vinculados a itens desta Ata. Vincule um contrato indicando os itens que ele cobre e a quantidade contratada em cada um.'
             : 'Ainda não há contratos oficiais vinculados a itens desta Ata.'
         }
         action={emptyAction}

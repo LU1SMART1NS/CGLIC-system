@@ -50,3 +50,31 @@ export interface EnrichedArpItemContract {
   objeto?: string;
   isOficial: boolean;
 }
+
+/**
+ * Sugestão de contrato descartada pelo gestor para um item da ARP.
+ * Não é vínculo: serve só para a sugestão não voltar a aparecer.
+ */
+export interface ArpItemContractDismissal {
+  itemKey: string;
+  contractKey: string;
+  dismissedAt?: string;
+}
+
+export interface DismissContractSuggestionParams {
+  itemKey: string;
+  contractKey: string;
+}
+
+/** Um item da Ata e a quantidade que o contrato cobre nele (vínculo em lote). */
+export interface ContractItemLinkInput {
+  itemKey: string;
+  quantidadeContratada: number;
+}
+
+/** Parâmetros para vincular um mesmo contrato a vários itens de uma só vez. */
+export interface LinkContractToItemsParams {
+  contractKey: string;
+  links: ContractItemLinkInput[];
+  observacoes?: string;
+}
