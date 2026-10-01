@@ -3,13 +3,15 @@ import { fetchAllAllocationsGlobal, fetchEmpenhoLinks, fetchManualEmpenhos, type
 import { fetchArps, fetchArpItems, fetchEmpenhosSaldoItem } from '../services/api';
 import { fetchArpsFromDb } from '../services/dbCacheService';
 import { ExportExcelModal } from './modals/ExportExcelModal';
-import { InternalUnitsModal } from './modals/InternalUnitsModal';
+import { useNavigate } from 'react-router-dom';
 import { AllocationsPortfolioHeader } from './atas/allocations/AllocationsPortfolioHeader';
 import { AllocationsPortfolioSummary } from './atas/allocations/AllocationsPortfolioSummary';
 import { AllocationsPortfolioFilters, type AllocationsPortfolioFilterState } from './atas/allocations/AllocationsPortfolioFilters';
 import { AllocationsPortfolioContent, type EnrichedAllocationRow } from './atas/allocations/AllocationsPortfolioContent';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
 import { getArpVigenciaStatus } from '../services/temporalEngineService';
+import { classifyPrazo } from './carteira/carteiraPrazo';
+import { useAuth } from '../context/AuthContext';
 import type { ArpRecord, ArpItemRecord } from '../types';
 
 interface InternalAllocationsDashboardProps {
@@ -32,6 +34,10 @@ function parseItemKey(key: string): { numeroAta: string; uasg: string; itemNum: 
 export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboardProps> = ({
   onSelectItem
 }) => {
+  // Catálogo de unidades internas: mesma permissão do backend (departments.manage → admin e gestor de saldos).
+  const navigate = useNavigate();
+  const { role } = useAuth();
+  const canManageUnits = role === 'admin' || role === 'gestor_saldos';
   const [allocations, setAllocations] = useState<GlobalAllocationRecord[]>([]);
   const [arps, setArps] = useState<ArpRecord[]>([]);
   const [itemsByAta, setItemsByAta] = useState<Record<string, ArpItemRecord[]>>({});
@@ -46,7 +52,6 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
   });
 
   const [isExportExcelModalOpen, setIsExportExcelModalOpen] = useState<boolean>(false);
-  const [isUnitsModalOpen, setIsUnitsModalOpen] = useState<boolean>(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -204,6 +209,8 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
       const vigenciaStatus = getArpVigenciaStatus(targetArp?.dataVigenciaFinal);
       const isExpired = Boolean(targetArp?.isCanceladaPncp || vigenciaStatus?.isExpirada);
       const isExpiringSoon = !isExpired && Boolean(vigenciaStatus?.isExpirandoEm90Dias);
+      const diasRestantes = vigenciaStatus ? vigenciaStatus.diasRestantes : null;
+      const faixa = classifyPrazo(diasRestantes, isExpired);
 
       return {
         id: alloc.id,
@@ -223,6 +230,8 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
         dataVigenciaFinal: targetArp?.dataVigenciaFinal,
         isExpired,
         isExpiringSoon,
+        diasRestantes,
+        faixa,
         arp: targetArp,
         item: targetItem
       };
@@ -325,7 +334,7 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
       gap: '1.25rem'
     }}>
       <AllocationsPortfolioHeader
-        onOpenManageUnits={() => setIsUnitsModalOpen(true)}
+        onOpenManageUnits={canManageUnits ? () => navigate('/admin/departamentos') : undefined}
         onOpenExportExcel={() => setIsExportExcelModalOpen(true)}
       />
 
@@ -374,12 +383,6 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
         onClose={() => setIsExportExcelModalOpen(false)}
         atas={arps}
         itemsByAta={itemsByAta}
-      />
-
-      <InternalUnitsModal
-        isOpen={isUnitsModalOpen}
-        onClose={() => setIsUnitsModalOpen(false)}
-        onUnitsUpdated={loadData}
       />
     </div>
   );

@@ -91,6 +91,8 @@ const mockRows: EnrichedAllocationRow[] = [
     dataVigenciaFinal: '2026-12-31',
     isExpired: false,
     isExpiringSoon: false,
+    diasRestantes: 120,
+    faixa: 'REGULAR',
     arp: mockArp,
     item: mockItem
   }
@@ -128,13 +130,13 @@ describe('AllocationsPortfolio & Componentes — FASE 9-G: Alocações por Unida
       />
     );
 
-    expect(html).toContain('Total Alocado em Cotas');
+    expect(html).toContain('Total alocado em cotas');
     expect(html).toContain('100 un');
-    expect(html).toContain('Empenhado por Unidades');
+    expect(html).toContain('Empenhado pelas unidades');
     expect(html).toContain('60 un');
-    expect(html).toContain('Saldo Disponível de Cota');
+    expect(html).toContain('Saldo disponível de cota');
     expect(html).toContain('40 un');
-    expect(html).toContain('Unidades com Cota');
+    expect(html).toContain('Unidades com cota');
     expect(html).toContain('3');
   });
 
@@ -176,7 +178,9 @@ describe('AllocationsPortfolio & Componentes — FASE 9-G: Alocações por Unida
     expect(html).toContain('20 un');
     expect(html).toContain('12 un');
     expect(html).toContain('8 un');
-    expect(html).toContain('Ver Saldo');
+    expect(html).toContain('Abrir item');
+    // Vigência da Ata na mesma faixa de prazo da Carteira
+    expect(html).toContain('120');
   });
 
   it('5. deve exibir estado vazio quando não há alocações cadastradas', () => {
@@ -203,6 +207,13 @@ describe('AllocationsPortfolio & Componentes — FASE 9-G: Alocações por Unida
     );
 
     expect(html).toContain('Nenhuma alocação corresponde aos filtros aplicados.');
-    expect(html).toContain('Limpar Filtros');
+    expect(html).toContain('Limpar filtros');
+  });
+
+  it('7. sem permissão para gerir unidades, o botão "Unidades Internas" não aparece', () => {
+    const html = renderToStaticMarkup(<AllocationsPortfolioHeader onOpenExportExcel={vi.fn()} />);
+
+    expect(html).not.toContain('Unidades Internas');
+    expect(html).toContain('Exportar Relatório');
   });
 });
