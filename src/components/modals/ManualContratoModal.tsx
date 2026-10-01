@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Check, Building2, AlertCircle, DollarSign } from 'lucide-react';
+import { Check, AlertCircle, DollarSign } from 'lucide-react';
 import type { Contrato, Empenho } from '../../types';
 import { AppButton } from '../../design-system/components/AppButton';
+import { Modal, AlertCard } from '../../design-system';
 
 interface ManualContratoModalProps {
   isOpen: boolean;
@@ -105,42 +106,19 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
   const isSaveDisabled = selectedEmpenhoIds.length === 0 || !numero.trim() || isLoading;
 
   return (
-    <div
-      className="modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isLoading) onClose();
-      }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={'Adicionar contrato manual'}
+      size="lg"
+      dismissible={!isLoading}
+      testId="manualcontratomodal"
     >
-      <div
-        className="modal-content"
-        style={{
-          maxWidth: '600px',
-          maxHeight: '92vh',
-          overflowY: 'auto',
-          padding: '1.5rem',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Building2 size={20} color="#0c326f" /> Adicionar Contrato Manual
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem' }}
-            title="Fechar"
-          >
-            <X size={20} />
-          </button>
+      {error && (
+        <div style={{ marginBottom: '1rem' }}>
+          <AlertCard severity="CRITICA" title={error} />
         </div>
-
-        {error && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '0.6rem 0.75rem', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            ⚠️ {error}
-          </div>
-        )}
+      )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
@@ -334,7 +312,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
 
             {selectedEmpenhoIds.length === 0 && availableEmpenhos.length > 0 && (
               <div style={{ color: '#b91c1c', fontSize: '0.75rem', fontWeight: 600, marginTop: '0.5rem' }}>
-                🔒 Selecione pelo menos 1 empenho para liberar o salvamento.
+                Selecione pelo menos 1 empenho para liberar o salvamento.
               </div>
             )}
           </div>
@@ -361,7 +339,6 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
             </AppButton>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };

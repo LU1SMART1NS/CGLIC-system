@@ -50,6 +50,7 @@ import { classifyTaskAttention } from './taskAttentionDisplay';
 import { severityFromAttentionPriorityLevel } from '../../services/severityService';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { AppButton } from '../../design-system/components/AppButton';
+import { useConfirmDialog } from '../../design-system';
 
 interface ContractTasksSectionProps {
   contract: ContractDashboardRecord;
@@ -344,6 +345,7 @@ export const ContractTasksSection: React.FC<ContractTasksSectionProps> = ({
   plan,
   isLoading = false
 }) => {
+  const confirm = useConfirmDialog();
   const contractKey = contract.id || getContractManagementKey(contract.uasg, contract.numero, contract.ano);
   const { data: templates = [], isLoading: loadingTemplates } = useContractTaskTemplates();
   const applyTemplateMutation = useApplyContractTaskTemplate();
@@ -367,13 +369,18 @@ export const ContractTasksSection: React.FC<ContractTasksSectionProps> = ({
 
   const anoNum = typeof contract.ano === 'number' ? contract.ano : (parseInt(String(contract.ano), 10) || 2026);
 
-  const handleApplyTemplate = () => {
+  const handleApplyTemplate = async () => {
     if (!selectedTemplateId) return;
     const alreadyApplied = plan
       ? groupMacrotasksByModule(plan.macrotarefas, plan).some((g) => g.modulo?.templateId === selectedTemplateId)
       : false;
-    if (alreadyApplied && !window.confirm('Este modelo já foi aplicado a este plano. Acrescentar novamente vai duplicar as etapas e tarefas em um novo módulo. Deseja continuar?')) {
-      return;
+    if (alreadyApplied) {
+      const ok = await confirm({
+        title: 'Aplicar modelo novamente',
+        message: 'Este modelo já foi aplicado a este plano. Acrescentar novamente vai duplicar as etapas e tarefas em um novo módulo. Deseja continuar?',
+        confirmLabel: 'Aplicar mesmo assim'
+      });
+      if (!ok) return;
     }
     applyTemplateMutation.mutate(
       { uasg: contract.uasg, numero: contract.numero, ano: anoNum, templateId: selectedTemplateId },
@@ -631,10 +638,14 @@ export const ContractTasksSection: React.FC<ContractTasksSectionProps> = ({
               isPending={deleteModuleMutation.isPending}
               onDelete={
                 group.modulo
-                  ? () => {
-                      if (window.confirm(`Excluir o módulo "${group.modulo!.nome}" e todas as suas etapas e tarefas?`)) {
-                        deleteModuleMutation.mutate({ planId: plan.id, moduloId: group.modulo!.id });
-                      }
+                  ? async () => {
+                      const ok = await confirm({
+                        title: 'Excluir módulo',
+                        message: `Excluir o módulo "${group.modulo!.nome}" e todas as suas etapas e tarefas?`,
+                        confirmLabel: 'Excluir',
+                        tone: 'danger'
+                      });
+                      if (ok) deleteModuleMutation.mutate({ planId: plan.id, moduloId: group.modulo!.id });
                     }
                   : undefined
               }

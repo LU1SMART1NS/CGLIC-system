@@ -196,10 +196,13 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
 
     const html = renderToStaticMarkup(<ManagementPaymentsOverview uasg="200331" />);
 
-    expect(html).toContain('Acompanhamento de Faturamento e Pagamentos');
-    expect(html).toContain('4 Ciclos Totais');
-    expect(html).toContain('Em Andamento');
-    expect(html).toContain('Concluído');
+    // Sem cabeçalho nem botão de atualizar próprios (ficam no cabeçalho da página)
+    expect(html).not.toContain('Acompanhamento de Faturamento e Pagamentos');
+    expect(html).not.toContain('paymentFollowUpService');
+    expect(html).not.toContain('data-testid="payments-refresh-btn"');
+    expect(html).toContain('4 ciclos');
+    expect(html).toContain('em andamento');
+    expect(html).toContain('concluído');
 
     // Cards de KPI
     expect(html).toContain('Ciclos em Tramitação');
@@ -251,9 +254,11 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
   it('4. deve assegurar a separação explícita de domínios (PAGAMENTO_CONFIRMADO != totalPago)', () => {
     const html = renderToStaticMarkup(<ManagementPaymentsOverview readModel={mockPaymentsReadModel} />);
 
-    expect(html).toContain('Nota de Conformidade:');
-    expect(html).toContain('PAGAMENTO_CONFIRMADO');
-    expect(html).toContain('v_empenhos_resumo');
+    expect(html).toContain('data-testid="payments-footnote"');
+    expect(html).toContain('SIAFI');
+    // Nomes internos não aparecem para o usuário
+    expect(html).not.toContain('PAGAMENTO_CONFIRMADO');
+    expect(html).not.toContain('v_empenhos_resumo');
   });
 
   it('5. deve renderizar skeleton no estado de loading', () => {
@@ -294,5 +299,24 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
 
     expect(html).toContain('data-testid="management-payments-overview-empty"');
     expect(html).toContain('Nenhum ciclo de pagamento registrado');
+  });
+
+  it('8. deve mostrar contagem zerada (não a de ciclosRecentes) quando não há ciclos abertos', () => {
+    const allClosedModel: ManagementDashboardReadModel = {
+      ...mockPaymentsReadModel,
+      payments: {
+        ...mockPaymentsReadModel.payments,
+        totalCiclos: 1,
+        ciclosAbertosCount: 0,
+        ciclosAbertosDetalhe: [],
+        ciclosRecentes: mockPaymentsReadModel.payments.ciclosAbertosDetalhe ?? []
+      }
+    };
+
+    const html = renderToStaticMarkup(<ManagementPaymentsOverview readModel={allClosedModel} />);
+
+    expect(html).toContain('data-testid="payments-filter-empty"');
+    expect(html).toContain('Todos os ciclos (0)');
+    expect(html).not.toContain('Todos os ciclos (3)');
   });
 });

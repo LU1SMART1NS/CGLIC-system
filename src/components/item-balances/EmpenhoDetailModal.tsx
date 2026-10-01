@@ -1,7 +1,8 @@
 import React from 'react';
-import { X, ArrowRightLeft, Building2, ExternalLink, DollarSign } from 'lucide-react';
+import { ArrowRightLeft, Building2, ExternalLink, DollarSign } from 'lucide-react';
 import { formatNumber, formatCurrency, formatDate, getContractPncpUrl } from './itemBalanceUtils';
 import type { EmpenhoSaldoItemRecord, PncpContract, PncpContractEmpenho } from '../../types';
+import { Modal } from '../../design-system';
 
 export interface EmpenhoDetailModalProps {
   selectedEmpenhoDetail: EmpenhoSaldoItemRecord | null;
@@ -30,66 +31,24 @@ export const EmpenhoDetailModal: React.FC<EmpenhoDetailModalProps> = ({
   const unidadeNome = selectedEmpenhoDetail.unidade.replace(/^\d+\s*-\s*/, '');
 
   return (
-    <div className="modal-backdrop" style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100%',
-      background: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-    }}>
-      <div className="glass-card" style={{
-        width: '90%',
-        maxWidth: '800px',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        background: '#ffffff',
-        padding: '2rem',
-        borderRadius: '8px',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.5rem',
-        position: 'relative'
-      }}>
-        {/* Close Button */}
-        <button 
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--text-secondary)'
-          }}
-        >
-          <X size={20} />
-        </button>
-
-        {/* Modal Header */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-            <span className="badge badge-info" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
-              {selectedEmpenhoDetail.tipo}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={unidadeNome}
+      subtitle={`Ata n.º ${arpNumeroAta} | Item ${itemNumeroItem}`}
+      size="lg"
+      testId="empenho-detail-modal"
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span className="badge badge-info" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
+            {selectedEmpenhoDetail.tipo}
+          </span>
+          {beneficiariaUasg && (
+            <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>
+              UASG Beneficiária: {beneficiariaUasg}
             </span>
-            {beneficiariaUasg && (
-              <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>
-                UASG Beneficiária: {beneficiariaUasg}
-              </span>
-            )}
-          </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-            {unidadeNome}
-          </h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0.25rem 0 0 0' }}>
-            Ata n.º {arpNumeroAta} | Item {itemNumeroItem}
-          </p>
+          )}
         </div>
 
         {/* Section 1: Balanço de Saldos do SIASG */}
@@ -229,6 +188,6 @@ export const EmpenhoDetailModal: React.FC<EmpenhoDetailModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

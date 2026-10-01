@@ -5,6 +5,7 @@ import { buildContractLifeline } from '../../services/contractLifelineService';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { HealthTile, HealthTileGrid, LifelineBar, PendenciasTile } from '../instrument360/HealthStripParts';
+import { formatCnpj } from '../../utils/format';
 
 interface ContractHealthStripProps {
   contract: ContractDashboardRecord;
@@ -17,12 +18,6 @@ interface ContractHealthStripProps {
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
 
-function formatCnpj(cnpj?: string): string {
-  const digits = (cnpj || '').replace(/\D/g, '');
-  if (digits.length === 14) return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-  if (digits.length === 11) return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
-  return cnpj || '';
-}
 
 /**
  * Indicadores e linha da vida do Contrato 360 — conteúdo do cartão único do

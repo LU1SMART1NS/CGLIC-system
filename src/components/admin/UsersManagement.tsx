@@ -2,19 +2,13 @@ import React, { useState, useMemo } from 'react';
 import {
   UserPlus,
   Users,
-  Search,
-  Filter,
   Edit2,
   UserX,
   UserCheck,
   Mail,
   Shield,
-  RotateCcw,
-  XCircle,
-  X,
   Send,
-  Trash2,
-  CheckCircle2
+  Trash2
 } from 'lucide-react';
 import {
   useUsers,
@@ -31,6 +25,11 @@ import { PageHeader } from '../../design-system/components/PageHeader';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
+import { FilterBar } from '../../design-system/components/FilterBar';
+import { Modal } from '../../design-system/components/Modal';
+import { useConfirm } from '../../design-system/components/ConfirmDialog';
+import { useToast } from '../../design-system/components/Toast';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import type { SystemUser, UserRole } from '../../types/user';
 import {
   getPerfilDisplayLabel,
@@ -58,7 +57,8 @@ export const UsersManagement: React.FC = () => {
   const [formEmail, setFormEmail] = useState('');
   const [formPerfil, setFormPerfil] = useState<UserRole>('gestor');
   const [formError, setFormError] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
 
   const isGestorSaldoSelecionado = formPerfil === GESTOR_SALDO_ROLE_ID;
 
@@ -107,8 +107,7 @@ export const UsersManagement: React.FC = () => {
         {
           onSuccess: () => {
             setIsModalOpen(false);
-            setToastMessage(`Usuário "${formNome}" atualizado com sucesso.`);
-            setTimeout(() => setToastMessage(null), 4000);
+            toast.success(`Usuário "${formNome}" atualizado com sucesso.`);
           },
           onError: (err: any) => {
             setFormError(err.message || 'Erro ao atualizar dados do servidor.');
@@ -126,8 +125,7 @@ export const UsersManagement: React.FC = () => {
         {
           onSuccess: () => {
             setIsModalOpen(false);
-            setToastMessage(`Convite oficial enviado com sucesso para ${formEmail.trim()}.`);
-            setTimeout(() => setToastMessage(null), 5000);
+            toast.success(`Convite oficial enviado com sucesso para ${formEmail.trim()}.`);
           },
           onError: (err: any) => {
             setFormError(err.message || 'Erro ao convidar servidor.');
@@ -146,61 +144,57 @@ export const UsersManagement: React.FC = () => {
       },
       {
         onSuccess: () => {
-          setToastMessage(`Convite reenviado com sucesso para ${user.email}.`);
-          setTimeout(() => setToastMessage(null), 4000);
+          toast.success(`Convite reenviado com sucesso para ${user.email}.`);
         },
         onError: (err: any) => {
-          alert(err.message || 'Falha ao reenviar convite.');
+          toast.error(err.message || 'Falha ao reenviar convite.');
         }
       }
     );
   };
 
-  const handleDeactivate = (user: SystemUser) => {
-    if (window.confirm(`Deseja realmente desativar o acesso de "${user.nome}"? O servidor não conseguirá mais fazer login até ser reativado.`)) {
-      deactivateUserMutation.mutate(user, {
-        onSuccess: () => {
-          setToastMessage(`Acesso de "${user.nome}" desativado com sucesso.`);
-          setTimeout(() => setToastMessage(null), 4000);
-        },
-        onError: (err: any) => {
-          alert(err.message || 'Falha ao desativar o acesso do servidor.');
-        }
-      });
-    }
+  const handleDeactivate = async (user: SystemUser) => {
+    const ok = await confirm({
+      title: 'Desativar acesso',
+      message: `Deseja realmente desativar o acesso de "${user.nome}"? O servidor não conseguirá mais fazer login até ser reativado.`,
+      confirmLabel: 'Desativar',
+      tone: 'danger'
+    });
+    if (!ok) return;
+    deactivateUserMutation.mutate(user, {
+      onSuccess: () => toast.success(`Acesso de "${user.nome}" desativado com sucesso.`),
+      onError: (err: any) => toast.error(err.message || 'Falha ao desativar o acesso do servidor.')
+    });
   };
 
   const handleReactivate = (user: SystemUser) => {
     reactivateUserMutation.mutate(user, {
       onSuccess: () => {
-        setToastMessage(`Acesso de "${user.nome}" reativado com sucesso.`);
-        setTimeout(() => setToastMessage(null), 4000);
+        toast.success(`Acesso de "${user.nome}" reativado com sucesso.`);
       },
       onError: (err: any) => {
-        alert(err.message || 'Falha ao reativar o acesso do servidor.');
+        toast.error(err.message || 'Falha ao reativar o acesso do servidor.');
       }
     });
   };
 
-  const handleDelete = (user: SystemUser) => {
+  const handleDelete = async (user: SystemUser) => {
     if (user.status !== 'pendente') {
-      alert('Servidores ativos ou já cadastrados não podem ser excluídos por exigência de auditoria pública. Utilize a opção de desativação.');
+      toast.error('Servidores ativos ou já cadastrados não podem ser excluídos por exigência de auditoria pública. Utilize a opção de desativação.');
       return;
     }
 
-    const confirmMessage = `Deseja realmente cancelar e excluir o convite pendente para "${user.nome || user.email}"?`;
-
-    if (window.confirm(confirmMessage)) {
-      deleteUserMutation.mutate(user, {
-        onSuccess: () => {
-          setToastMessage(`Convite para "${user.nome || user.email}" cancelado com sucesso.`);
-          setTimeout(() => setToastMessage(null), 4000);
-        },
-        onError: (err: any) => {
-          alert(err.message || 'Falha ao cancelar o convite.');
-        }
-      });
-    }
+    const ok = await confirm({
+      title: 'Cancelar convite',
+      message: `Deseja realmente cancelar e excluir o convite pendente para "${user.nome || user.email}"?`,
+      confirmLabel: 'Excluir convite',
+      tone: 'danger'
+    });
+    if (!ok) return;
+    deleteUserMutation.mutate(user, {
+      onSuccess: () => toast.success(`Convite para "${user.nome || user.email}" cancelado com sucesso.`),
+      onError: (err: any) => toast.error(err.message || 'Falha ao cancelar o convite.')
+    });
   };
 
   const filteredUsers = useMemo(() => {
@@ -226,26 +220,6 @@ export const UsersManagement: React.FC = () => {
         gap: '1.25rem'
       }}
     >
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          padding: '0.75rem 1.25rem',
-          background: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          borderRadius: '8px',
-          color: '#166534',
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          boxShadow: '0 2px 5px rgba(0, 0, 0, 0.05)'
-        }}>
-          <CheckCircle2 size={18} color="#16a34a" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* 1. Header Padronizado */}
       <PageHeader
         title="Usuários e Servidores"
@@ -263,141 +237,37 @@ export const UsersManagement: React.FC = () => {
         }
       />
 
-      {/* 2. Barra de Filtros */}
-      <div
-        data-testid="users-filter-bar"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '0.75rem',
-          padding: '0.65rem 0.95rem',
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#475569', fontSize: '0.78rem', fontWeight: 700 }}>
-            <Filter size={13} color="#64748b" />
-            <span>Filtros:</span>
-          </div>
-
-          <select
-            data-testid="users-filter-role-select"
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-            style={{
-              padding: '0.35rem 0.65rem',
-              borderRadius: '6px',
-              border: '1px solid #cbd5e1',
-              background: '#f8fafc',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              color: '#0f172a',
-              cursor: 'pointer',
-              outline: 'none'
-            }}
-          >
-            <option value="todos">Todos os Perfis ({roles.length})</option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nome}
-              </option>
-            ))}
-          </select>
-
-          <div style={{ position: 'relative', minWidth: '240px', flex: '1', maxWidth: '380px' }}>
-            <Search
-              size={14}
-              color="#94a3b8"
-              style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)' }}
-              aria-hidden="true"
-            />
-            <input
-              type="text"
-              placeholder="Buscar por nome ou e-mail..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.35rem 0.65rem 0.35rem 2rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                background: '#f8fafc',
-                fontSize: '0.78rem',
-                color: '#0f172a',
-                outline: 'none'
-              }}
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                title="Limpar busca"
-                style={{
-                  position: 'absolute',
-                  right: '0.5rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#94a3b8',
-                  padding: 0
-                }}
-              >
-                <XCircle size={14} aria-hidden="true" />
-              </button>
-            )}
-          </div>
-
-          {(searchTerm || filterRole !== 'todos') && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm('');
-                setFilterRole('todos');
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                padding: '0.35rem 0.6rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                background: '#f8fafc',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                color: '#475569',
-                cursor: 'pointer'
-              }}
-            >
-              <RotateCcw size={12} /> Limpar
-            </button>
-          )}
-        </div>
-
-        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b' }}>
+      {/* Filtros */}
+      <div>
+        <FilterBar
+          testId="users-filter-bar"
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por nome ou e-mail..."
+          selects={[
+            {
+              id: 'users-filter-role-select',
+              label: 'Perfil',
+              value: filterRole,
+              onChange: setFilterRole,
+              options: [{ value: 'todos', label: `Todos os Perfis (${roles.length})` }, ...roles.map((r) => ({ value: r.id, label: r.nome }))]
+            }
+          ]}
+          hasActiveFilters={Boolean(searchTerm) || filterRole !== 'todos'}
+          onClearFilters={() => {
+            setSearchTerm('');
+            setFilterRole('todos');
+          }}
+        />
+        <div data-testid="users-counter" style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', margin: '0.5rem 0.25rem 0' }}>
           {filteredUsers.length === users.length
-            ? `${users.length} usuários`
+            ? `${users.length} ${users.length === 1 ? 'usuário' : 'usuários'}`
             : `${filteredUsers.length} de ${users.length} usuários`}
         </div>
       </div>
 
       {/* 3. Tabela de Usuários */}
-      <div
-        data-testid="users-table-container"
-        style={{
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          background: '#ffffff',
-          overflow: 'hidden',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
-        }}
-      >
+      <div data-testid="users-table-container" style={carteiraTableShell}>
         {isLoading ? (
           <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <SkeletonLoader variant="card" height="48px" />
@@ -413,13 +283,13 @@ export const UsersManagement: React.FC = () => {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.78rem', fontWeight: 700 }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Servidor / Usuário</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Perfil Operacional</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Status</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Ações</th>
+                <tr>
+                  <th style={carteiraTh}>Servidor / Usuário</th>
+                  <th style={carteiraTh}>Perfil operacional</th>
+                  <th style={{ ...carteiraTh, textAlign: 'center' }}>Situação</th>
+                  <th style={{ ...carteiraTh, textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -429,15 +299,9 @@ export const UsersManagement: React.FC = () => {
                   const isInactive = user.status === 'inativo' || user.ativo === false;
 
                   return (
-                    <tr
-                      key={user.id}
-                      style={{
-                        borderBottom: '1px solid #f1f5f9',
-                        transition: 'background 0.15s ease'
-                      }}
-                    >
+                    <tr key={user.id}>
                       {/* Servidor / Usuário */}
-                      <td style={{ padding: '0.75rem 1rem' }}>
+                      <td style={carteiraTd}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <span style={{ fontWeight: 700, color: '#0f172a' }}>{user.nome}</span>
@@ -449,7 +313,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Perfil Operacional */}
-                      <td style={{ padding: '0.75rem 1rem' }}>
+                      <td style={carteiraTd}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <span
                             title={user.perfil === GESTOR_SALDO_ROLE_ID ? `Permissões: ${GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}` : undefined}
@@ -479,7 +343,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Status Derivado da Autenticação */}
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ ...carteiraTd, textAlign: 'center' }}>
                         {isPending ? (
                           <StatusBadge variant="warning" label="Convite pendente" />
                         ) : isInactive ? (
@@ -490,7 +354,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Ações */}
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                      <td style={{ ...carteiraTd, textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                           {isPending && (
                             <button
@@ -608,55 +472,26 @@ export const UsersManagement: React.FC = () => {
         )}
       </div>
 
-      {/* Modal Simplificado: Nome + E-mail + Perfil */}
-      {isModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}
-          onClick={() => setIsModalOpen(false)}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '480px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              overflow: 'hidden'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '1.1rem 1.5rem',
-                borderBottom: '1px solid #e2e8f0',
-                background: '#f8fafc'
-              }}
-            >
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                {editingUser ? 'Editar Servidor' : 'Novo Servidor'}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveOrInvite} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingUser ? 'Editar servidor' : 'Novo servidor'}
+        size="md"
+        testId="user-modal"
+        footer={
+          <>
+            <AppButton type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+              Cancelar
+            </AppButton>
+            <AppButton type="submit" form="user-form" isLoading={inviteUserMutation.isPending || saveUserMutation.isPending}>
+              {editingUser
+                ? (saveUserMutation.isPending ? 'Salvando...' : 'Salvar alterações')
+                : (inviteUserMutation.isPending ? 'Enviando convite...' : 'Criar e convidar servidor')}
+            </AppButton>
+          </>
+        }
+      >
+            <form id="user-form" onSubmit={handleSaveOrInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {formError && (
                 <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#991b1b', fontSize: '0.8rem', fontWeight: 600 }}>
                   {formError}
@@ -722,37 +557,9 @@ export const UsersManagement: React.FC = () => {
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.75rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  style={{ padding: '0.55rem 1rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={inviteUserMutation.isPending || saveUserMutation.isPending}
-                  style={{
-                    padding: '0.55rem 1.15rem',
-                    background: '#0c326f',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    cursor: (inviteUserMutation.isPending || saveUserMutation.isPending) ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {editingUser
-                    ? (saveUserMutation.isPending ? 'Salvando...' : 'Salvar alterações')
-                    : (inviteUserMutation.isPending ? 'Enviando convite...' : 'Criar e convidar servidor')}
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
+      {dialog}
     </div>
   );
 };
