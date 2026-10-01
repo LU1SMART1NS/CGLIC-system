@@ -36,6 +36,15 @@ export const Modal: React.FC<ModalProps> = ({
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
 
+  // onClose costuma ser recriada a cada render do chamador (arrow function inline).
+  // Mantida numa ref para não disparar o efeito abaixo a cada tecla digitada no
+  // modal — do contrário, o cleanup rouba o foco de volta para o elemento que
+  // abriu o modal a cada re-render, interrompendo a digitação nos campos.
+  const onCloseRef = React.useRef(onClose);
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   React.useEffect(() => {
     if (!isOpen) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -43,7 +52,7 @@ export const Modal: React.FC<ModalProps> = ({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dismissible) onClose();
+      if (e.key === 'Escape' && dismissible) onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
     return () => {
@@ -51,7 +60,7 @@ export const Modal: React.FC<ModalProps> = ({
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [isOpen, dismissible, onClose]);
+  }, [isOpen, dismissible]);
 
   if (!isOpen) return null;
 
