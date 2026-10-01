@@ -11,7 +11,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ContractPaymentFollowUpSection, formatCurrencyInputBR } from '../ContractPaymentFollowUpSection';
+import {
+  ContractPaymentFollowUpSection,
+  formatCurrencyInputBR,
+  maskDateInputBR,
+  parseDateInputBR
+} from '../ContractPaymentFollowUpSection';
 import * as paymentFollowUpHookModule from '../../../hooks/useContractPaymentFollowUp';
 import type { ContractDashboardRecord } from '../../../types';
 import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
@@ -161,6 +166,29 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
     it('retorna string vazia quando não há dígitos', () => {
       expect(formatCurrencyInputBR('')).toBe('');
       expect(formatCurrencyInputBR('R$ ')).toBe('');
+    });
+  });
+
+  describe('maskDateInputBR / parseDateInputBR (data digitada como texto, sem depender do seletor nativo)', () => {
+    it('insere as barras conforme os dígitos são digitados', () => {
+      expect(maskDateInputBR('0')).toBe('0');
+      expect(maskDateInputBR('01')).toBe('01');
+      expect(maskDateInputBR('0110')).toBe('01/10');
+      expect(maskDateInputBR('01102026')).toBe('01/10/2026');
+    });
+
+    it('ignora dígitos além dos 8 esperados (dd mm aaaa)', () => {
+      expect(maskDateInputBR('011020269999')).toBe('01/10/2026');
+    });
+
+    it('converte dd/mm/aaaa completa para yyyy-mm-dd', () => {
+      expect(parseDateInputBR('01/10/2026')).toBe('2026-10-01');
+      expect(parseDateInputBR('01102026')).toBe('2026-10-01');
+    });
+
+    it('retorna string vazia para datas incompletas', () => {
+      expect(parseDateInputBR('01/10')).toBe('');
+      expect(parseDateInputBR('')).toBe('');
     });
   });
 });
