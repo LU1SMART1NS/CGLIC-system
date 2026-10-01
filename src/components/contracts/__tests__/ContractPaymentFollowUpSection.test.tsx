@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ContractPaymentFollowUpSection } from '../ContractPaymentFollowUpSection';
+import { ContractPaymentFollowUpSection, formatCurrencyInputBR } from '../ContractPaymentFollowUpSection';
 import * as paymentFollowUpHookModule from '../../../hooks/useContractPaymentFollowUp';
 import type { ContractDashboardRecord } from '../../../types';
 import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
@@ -144,5 +144,23 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
     expect(html).toContain('Id. SEI:');
     expect(html).toContain('12345678');
     expect(html).toContain('Instrumento de cobrança: Nota Fiscal Eletrônica - Nº 1234');
+  });
+
+  describe('formatCurrencyInputBR (máscara de moeda BR)', () => {
+    it('acumula dígitos como centavos, no padrão BR (milhar com ponto, decimal com vírgula)', () => {
+      expect(formatCurrencyInputBR('1')).toBe('0,01');
+      expect(formatCurrencyInputBR('150')).toBe('1,50');
+      expect(formatCurrencyInputBR('150000')).toBe('1.500,00');
+      expect(formatCurrencyInputBR('12321654')).toBe('123.216,54');
+    });
+
+    it('ignora caracteres não numéricos já presentes no valor mascarado', () => {
+      expect(formatCurrencyInputBR('1.500,00')).toBe('1.500,00');
+    });
+
+    it('retorna string vazia quando não há dígitos', () => {
+      expect(formatCurrencyInputBR('')).toBe('');
+      expect(formatCurrencyInputBR('R$ ')).toBe('');
+    });
   });
 });

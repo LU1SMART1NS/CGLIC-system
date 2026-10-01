@@ -151,6 +151,14 @@ const TIPOS_INSTRUMENTO_COBRANCA = [
   'RPA'
 ];
 
+/** Máscara de moeda BR em tempo real: cada dígito digitado é tratado como centavo (ex.: 150000 -> 1.500,00). */
+export function formatCurrencyInputBR(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  const cents = parseInt(digits, 10);
+  return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSectionProps> = ({
   contractKey
 }) => {
@@ -608,7 +616,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Registrar Ciclo de Instrumentos de Cobrança"
-        size="md"
+        size="lg"
         dismissible={!isSavingCycle}
         testId="payment-cycle-modal"
       >
@@ -723,9 +731,10 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: 15450,00"
+                    inputMode="numeric"
+                    placeholder="Ex: 15.450,00"
                     value={valorAtesto}
-                    onChange={e => setValorAtesto(e.target.value)}
+                    onChange={e => setValorAtesto(formatCurrencyInputBR(e.target.value))}
                     style={{
                       width: '100%',
                       padding: '0.55rem',
