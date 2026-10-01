@@ -1,4 +1,4 @@
-import type { ContractDashboardRecord } from '../types';
+import type { ArpRecord, ContractDashboardRecord } from '../types';
 import { buildCentralPrazosItems } from './centralPrazosService';
 import { addYears } from './contractReajusteRadarService';
 import { differenceInDays, formatDateISO, parseDateBRT } from './temporalEngineService';
@@ -65,6 +65,46 @@ export function buildContractLifeline(contract: ContractDashboardRecord, current
     if (d && d >= start && d <= end) push(item.id, item.regraNome, d);
   }
 
+  milestones.sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    start: formatDateISO(start),
+    end: formatDateISO(end),
+    todayPct: pctOf(today),
+    diasParaFim: differenceInDays(end, currentDate),
+    milestones
+  };
+}
+
+/**
+ * Linha da vida da Ata: vigência inicial → final, com os marcos de planejamento
+ * (prorrogação 180d, exaustão 90d) do mesmo motor dos lembretes da Ata 360.
+ */
+export function buildAtaLifeline(arp: ArpRecord, currentDate?: Date): ContractLifeline | null {
+  const start = parseDateBRT(arp.dataVigenciaInicial || arp.dataAssinatura);
+  const end = parseDateBRT(arp.dataVigenciaFinal);
+  if (!start || !end || end <= start) return null;
+
+  const span = end.getTime() - start.getTime();
+  const pctOf = (d: Date) => Math.min(100, Math.max(0, ((d.getTime() - start.getTime()) / span) * 100));
+  const today = currentDate ? new Date(currentDate) : new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const milestones: LifelineMilestone[] = [];
+  for (const item of buildCentralPrazosItems({ arps: [arp], currentDate })) {
+    if (item.tipoItem !== 'GATILHO_OPERACIONAL') continue;
+    const d = parseDateBRT(item.dataAlvo);
+    if (!d || d < start || d > end) continue;
+    const diasRestantes = differenceInDays(d, currentDate);
+    milestones.push({
+      id: item.id,
+      label: item.regraNome,
+      date: formatDateISO(d),
+      pct: pctOf(d),
+      diasRestantes,
+      state: diasRestantes < 0 ? 'PASSADO' : diasRestantes <= PROXIMO_DIAS ? 'PROXIMO' : 'FUTURO'
+    });
+  }
   milestones.sort((a, b) => a.date.localeCompare(b.date));
 
   return {

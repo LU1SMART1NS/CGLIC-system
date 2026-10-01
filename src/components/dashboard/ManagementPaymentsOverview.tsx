@@ -961,7 +961,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                               transition: 'all 0.15s ease'
                             }}
                           >
-                            <span>Contrato 360°</span>
+                            <span>Ver Detalhes</span>
                             <ExternalLink size={12} aria-hidden="true" />
                           </button>
                         )}

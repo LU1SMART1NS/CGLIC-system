@@ -129,7 +129,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
           {counts.contratosAtivos} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>ativos</span>
         </div>
         <div style={rowStyle}>
-          <span>Em atenção (60–90 dias)</span>
+          <span>Em atenção (31–90 dias)</span>
           <strong style={{ color: counts.contratosEmAtencao60a90d > 0 ? '#d97706' : '#0f172a' }}>{counts.contratosEmAtencao60a90d}</strong>
         </div>
         <div style={rowStyle}>

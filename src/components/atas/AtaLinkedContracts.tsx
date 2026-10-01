@@ -1,12 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, FileText } from 'lucide-react';
+import { ArrowRight, FileText, Loader2, Unlink } from 'lucide-react';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 
 interface AtaLinkedContractsProps {
   linkedContracts: EnrichedArpItemContract[];
   isLoading?: boolean;
+  /** Botão "Vincular contrato" exibido no estado vazio (quando o usuário pode editar). */
+  emptyAction?: React.ReactNode;
+  /** Desvincula o contrato do item; ausente = sem permissão de edição. */
+  onUnlink?: (link: EnrichedArpItemContract) => void;
+  /** linkId do vínculo sendo removido no momento. */
+  unlinkingId?: string | null;
 }
 
 function formatCurrency(val?: number): string {
@@ -14,7 +20,18 @@ function formatCurrency(val?: number): string {
   return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({ linkedContracts, isLoading = false }) => {
+/** Número do item a partir do item_key ("00050/2024-200331-00002" → "00002"). */
+function itemNumberFromKey(itemKey: string): string {
+  return itemKey.split('-').pop() || itemKey;
+}
+
+export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
+  linkedContracts,
+  isLoading = false,
+  emptyAction,
+  onUnlink,
+  unlinkingId
+}) => {
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -29,7 +46,12 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({ linkedCo
     return (
       <EmptyState
         title="Nenhum contrato vinculado."
-        description="Ainda não há contratos oficiais vinculados a itens desta Ata."
+        description={
+          emptyAction
+            ? 'Ainda não há contratos oficiais vinculados a itens desta Ata. Vincule um contrato indicando o item e a quantidade contratada.'
+            : 'Ainda não há contratos oficiais vinculados a itens desta Ata.'
+        }
+        action={emptyAction}
       />
     );
   }
@@ -39,6 +61,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({ linkedCo
       {linkedContracts.map((link) => (
         <div
           key={link.linkId}
+          data-testid="ata-linked-contract"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -60,30 +83,65 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({ linkedCo
               <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
                 {link.fornecedorNome} {link.valorGlobal ? `• ${formatCurrency(link.valorGlobal)}` : ''}
               </p>
+              <p style={{ fontSize: '0.74rem', color: '#475569', margin: '0.15rem 0 0 0' }}>
+                Item {itemNumberFromKey(link.itemKey)} • {link.quantidadeContratada.toLocaleString('pt-BR')} contratado(s)
+                {link.observacoes ? ` • ${link.observacoes}` : ''}
+              </p>
             </div>
           </div>
 
-          {link.isOficial && (
-            <button
-              type="button"
-              onClick={() => navigate(`/contratos/${encodeURIComponent(link.contractKey)}`)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.45rem 0.85rem',
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: '#0c326f',
-                cursor: 'pointer'
-              }}
-            >
-              Abrir 360° <ArrowRight size={13} />
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {onUnlink && (
+              <button
+                type="button"
+                onClick={() => onUnlink(link)}
+                disabled={unlinkingId === link.linkId}
+                title="Desvincular este contrato do item da ata"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.45rem 0.75rem',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#b91c1c',
+                  cursor: unlinkingId === link.linkId ? 'wait' : 'pointer'
+                }}
+              >
+                {unlinkingId === link.linkId ? (
+                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <Unlink size={13} />
+                )}
+                Desvincular
+              </button>
+            )}
+
+            {link.isOficial && (
+              <button
+                type="button"
+                onClick={() => navigate(`/contratos/${encodeURIComponent(link.contractKey)}`)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.45rem 0.85rem',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#0c326f',
+                  cursor: 'pointer'
+                }}
+              >
+                Ver Detalhes <ArrowRight size={13} />
+              </button>
+            )}
+          </div>
         </div>
       ))}
     </div>

@@ -4,11 +4,14 @@ import { ContractsRoute } from '../ContractsRoute';
 import { ContractsPortfolioHeader } from '../../components/contracts/portfolio/ContractsPortfolioHeader';
 import { ContractsPortfolioSummary } from '../../components/contracts/portfolio/ContractsPortfolioSummary';
 import { ContractsPortfolioFilters } from '../../components/contracts/portfolio/ContractsPortfolioFilters';
-import { ContractsPortfolioTable } from '../../components/contracts/portfolio/ContractsPortfolioTable';
+import { ContractsPortfolioTable, type ContractPortfolioRow } from '../../components/contracts/portfolio/ContractsPortfolioTable';
 import * as useContractsDashboardModule from '../../hooks/useContractsDashboard';
+import * as useManagementDashboardModule from '../../hooks/useManagementDashboard';
 import * as useAllContractManagersModule from '../../hooks/useAllContractManagers';
 import * as useAtaManagersModule from '../../hooks/useAtaManagers';
 import * as authContextModule from '../../context/AuthContext';
+import { classifyPrazo } from '../../components/carteira/carteiraPrazo';
+import { getContractDaysRemaining } from '../../services/dashboardService';
 import type { ContractDashboardRecord } from '../../types';
 
 vi.mock('react-router-dom', () => ({
@@ -71,6 +74,18 @@ const mockContracts: ContractDashboardRecord[] = [
   }
 ];
 
+const toRows = (contracts: ContractDashboardRecord[]): ContractPortfolioRow[] =>
+  contracts.map((contract) => {
+    const diasRestantes = getContractDaysRemaining(contract.dataVigenciaFim);
+    return {
+      contract,
+      contractKey: contract.id,
+      diasRestantes,
+      faixa: classifyPrazo(diasRestantes, contract.statusVigencia === 'Expirado'),
+      pendencias: []
+    };
+  });
+
 describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -88,6 +103,15 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
       data: {},
       isLoading: false
     } as any);
+    vi.spyOn(useManagementDashboardModule, 'useManagementDashboard').mockReturnValue({
+      readModel: null,
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      refresh: vi.fn()
+    } as any);
     vi.spyOn(useAtaManagersModule, 'useAllAtaManagers').mockReturnValue({
       data: {},
       isLoading: false
@@ -98,7 +122,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     } as any);
   });
 
-  it('1. deve renderizar a rota com cabeçalho limpo "Acompanhamento e Prazos" e subtítulo', () => {
+  it('1. deve renderizar a rota com cabeçalho "Carteira de Contratos" e subtítulo', () => {
     vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockReturnValue({
       data: mockContracts,
       isLoading: false,
@@ -111,8 +135,8 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
 
     const html = renderToStaticMarkup(<ContractsRoute />);
 
-    expect(html).toContain('Acompanhamento e Prazos');
-    expect(html).toContain('Carteira de contratos, vigências, valores e situações de acompanhamento.');
+    expect(html).toContain('Carteira de Contratos');
+    expect(html).toContain('Todos os contratos, com vigência, valor, gestor e pendências em aberto.');
     expect(html).not.toContain('Cockpit');
   });
 
@@ -121,35 +145,36 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
       <ContractsPortfolioHeader onRefresh={vi.fn()} isRefreshing={false} />
     );
 
-    expect(html).toContain('Acompanhamento e Prazos');
+    expect(html).toContain('Carteira de Contratos');
     expect(html).toContain('Atualizar');
   });
 
   it('3. deve renderizar os 4 cards de resumo com os contadores corretos', () => {
     const html = renderToStaticMarkup(
       <ContractsPortfolioSummary
-        total={3}
+        totalContratos={7}
         vigentes={2}
-        aVencer60d={1}
-        expirados={1}
-        activeStatus="TODOS"
+        criticos={1}
+        atencao={1}
+        historico={5}
+        activeStatus="VIGENTES"
         onSelectStatus={vi.fn()}
       />
     );
 
-    expect(html).toContain('Total de Contratos');
-    expect(html).toContain('3');
-    expect(html).toContain('Contratos Vigentes');
-    expect(html).toContain('2');
-    expect(html).toContain('Próximos do Vencimento');
-    expect(html).toContain('1');
-    expect(html).toContain('Expirados / Encerrados');
+    expect(html).toContain('Vigentes');
+    expect(html).toContain('Crítico (≤30 dias)');
+    expect(html).toContain('Atenção (31–90 dias)');
+    expect(html).toContain('Histórico');
+    expect(html).toContain('>5<');
+    expect(html).toContain('de 7 contratos');
   });
 
-  it('4. deve renderizar a barra de filtros com opções de situação, tipo e busca', () => {
+  it('4. deve renderizar a barra de filtros com situação, pendência, gestor e busca', () => {
     const html = renderToStaticMarkup(
       <ContractsPortfolioFilters
-        filters={{ status: 'TODOS', tipoInstrumento: 'TODOS', busca: '' }}
+        filters={{ status: 'TODOS', pendencia: 'TODOS', gestor: 'TODOS', busca: '' }}
+        gestores={['Maria Souza']}
         onChangeFilter={vi.fn()}
         onResetFilters={vi.fn()}
         totalFiltered={3}
@@ -158,44 +183,47 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     );
 
     expect(html).toContain('Todas as Situações');
-    expect(html).toContain('Todos os Instrumentos');
+    expect(html).toContain('Todas as Pendências');
+    expect(html).toContain('Todos os Gestores');
+    expect(html).toContain('Maria Souza');
     expect(html).toContain('Buscar por contrato, fornecedor, CNPJ...');
     expect(html).toContain('3 contratos');
+    expect(html).not.toContain('Todos os Instrumentos');
   });
 
   it('5. deve renderizar a tabela com colunas operacionais e linhas de contratos', () => {
     const html = renderToStaticMarkup(
       <ContractsPortfolioTable
-        contracts={mockContracts}
+        rows={toRows(mockContracts)}
         totalContracts={3}
         onResetFilters={vi.fn()}
       />
     );
 
     // Cabeçalhos de coluna
-    expect(html).toContain('Contrato &amp; Objeto');
-    expect(html).toContain('Situação');
+    expect(html).toContain('Fornecedor / Objeto');
     expect(html).toContain('Vigência');
     expect(html).toContain('Valor Vigente');
-    expect(html).toContain('Acompanhamento');
-    expect(html).toContain('Ações');
+    expect(html).toContain('Pendências');
+    expect(html).toContain('Gestor');
+    expect(html).not.toContain('Acompanhamento');
 
     // Registros
-    expect(html).toContain('Contrato nº 01/2025');
+    expect(html).toContain('01/2025');
     expect(html).toContain('Empresa Alfa Serviços Ltda');
-    expect(html).toContain('Contrato nº 02/2024');
+    expect(html).toContain('02/2024');
     expect(html).toContain('Beta Tecnologia e Inovação S/A');
-    expect(html).toContain('Contrato nº 03/2023');
+    expect(html).toContain('03/2023');
     expect(html).toContain('Gamma Locações Comerciais Eireli');
 
     // Botões de Drill-down
-    expect(html).toContain('Abrir 360°');
+    expect(html).toContain('Ver Detalhes');
   });
 
   it('6. deve exibir estado vazio quando não há contratos na base', () => {
     const html = renderToStaticMarkup(
       <ContractsPortfolioTable
-        contracts={[]}
+        rows={[]}
         totalContracts={0}
         onResetFilters={vi.fn()}
       />
@@ -208,7 +236,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
   it('7. deve exibir estado de filtro sem resultados com botão de limpar filtros', () => {
     const html = renderToStaticMarkup(
       <ContractsPortfolioTable
-        contracts={[]}
+        rows={[]}
         totalContracts={3}
         onResetFilters={vi.fn()}
       />
@@ -251,6 +279,23 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
 
     expect(html).toContain('skeleton');
     expect(html).not.toContain('Empresa Alfa Serviços');
+  });
+
+  it('9b. admin pode atribuir gestor na própria carteira (botão "Atribuir")', () => {
+    vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockReturnValue({
+      data: mockContracts,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      refresh: vi.fn()
+    } as any);
+
+    const html = renderToStaticMarkup(<ContractsRoute />);
+
+    expect(html).not.toContain('type="checkbox"');
+    expect(html).toContain('Atribuir');
   });
 
   it('10. perfil "gestor" deve ver apenas os contratos onde é o gestor titular (escopo ASSIGNED)', () => {

@@ -1,15 +1,28 @@
 import React from 'react';
-import { Search, Filter, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
+import { carteiraSelect } from '../../carteira/carteiraStyles';
 import type { ContractStatusFilterOption } from './ContractsPortfolioSummary';
 
 export interface ContractsPortfolioFilterState {
   status: ContractStatusFilterOption;
-  tipoInstrumento: string;
+  pendencia: 'TODOS' | 'COM_PENDENCIA';
+  /** Nome do gestor ('TODOS' = sem filtro; '__SEM_GESTOR__' = contratos sem gestor atribuído). */
+  gestor: string;
   busca: string;
 }
 
+export const SEM_GESTOR = '__SEM_GESTOR__';
+
+export const DEFAULT_CONTRACTS_FILTERS: ContractsPortfolioFilterState = {
+  status: 'VIGENTES',
+  pendencia: 'TODOS',
+  gestor: 'TODOS',
+  busca: ''
+};
+
 interface ContractsPortfolioFiltersProps {
   filters: ContractsPortfolioFilterState;
+  gestores: string[];
   onChangeFilter: <K extends keyof ContractsPortfolioFilterState>(key: K, value: ContractsPortfolioFilterState[K]) => void;
   onResetFilters: () => void;
   totalFiltered: number;
@@ -18,101 +31,23 @@ interface ContractsPortfolioFiltersProps {
 
 export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps> = ({
   filters,
+  gestores,
   onChangeFilter,
   onResetFilters,
   totalFiltered,
   totalContracts
 }) => {
   const hasActiveFilters = Boolean(
-    filters.status !== 'TODOS' ||
-    filters.tipoInstrumento !== 'TODOS' ||
+    filters.status !== DEFAULT_CONTRACTS_FILTERS.status ||
+    filters.pendencia !== 'TODOS' ||
+    filters.gestor !== 'TODOS' ||
     filters.busca.trim().length > 0
   );
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      flexWrap: 'wrap',
-      gap: '0.75rem',
-      padding: '0.65rem 0.95rem',
-      background: '#ffffff',
-      border: '1px solid #e2e8f0',
-      borderRadius: '8px',
-      fontSize: '0.8rem'
-    }}>
-      {/* Controles de Filtro em Linha */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '0.65rem',
-        flex: 1
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.35rem',
-          color: '#64748b',
-          fontWeight: 700,
-          fontSize: '0.76rem',
-          flexShrink: 0
-        }}>
-          <Filter size={13} /> Filtros:
-        </div>
-
-        {/* 1. Situação Contratual */}
-        <select
-          value={filters.status}
-          onChange={(e) => onChangeFilter('status', e.target.value as any)}
-          data-testid="contracts-filter-status"
-          style={{
-            maxWidth: '180px',
-            minWidth: '140px',
-            padding: '0.35rem 0.6rem',
-            borderRadius: '6px',
-            border: '1px solid #cbd5e1',
-            background: '#f8fafc',
-            fontSize: '0.78rem',
-            color: '#0f172a',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          <option value="TODOS">Todas as Situações</option>
-          <option value="VIGENTE">Vigentes</option>
-          <option value="A_VENCER_60D">A Vencer (≤60d)</option>
-          <option value="EXPIRADO">Expirados / Encerrados</option>
-        </select>
-
-        {/* 2. Tipo de Instrumento */}
-        <select
-          value={filters.tipoInstrumento}
-          onChange={(e) => onChangeFilter('tipoInstrumento', e.target.value)}
-          data-testid="contracts-filter-type"
-          style={{
-            maxWidth: '190px',
-            minWidth: '140px',
-            padding: '0.35rem 0.6rem',
-            borderRadius: '6px',
-            border: '1px solid #cbd5e1',
-            background: '#f8fafc',
-            fontSize: '0.78rem',
-            color: '#0f172a',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          <option value="TODOS">Todos os Instrumentos</option>
-          <option value="CONTRATO">Contrato</option>
-          <option value="TERMO_ADITIVO">Termo Aditivo</option>
-          <option value="APOSTILAMENTO">Apostilamento</option>
-          <option value="CARTA_CONTRATO">Carta Contrato</option>
-        </select>
-
-        {/* 3. Busca Textual */}
-        <div style={{ position: 'relative', minWidth: '220px', flex: 1, maxWidth: '360px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem', flex: 1 }}>
+        <div style={{ position: 'relative', minWidth: '260px', flex: 1, maxWidth: '400px' }}>
           <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
@@ -122,18 +57,53 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
             data-testid="contracts-filter-search"
             style={{
               width: '100%',
-              padding: '0.35rem 0.65rem 0.35rem 2rem',
+              padding: '0.4rem 0.7rem 0.4rem 2rem',
               borderRadius: '6px',
               border: '1px solid #cbd5e1',
               background: '#f8fafc',
-              fontSize: '0.78rem',
+              fontSize: '0.8rem',
               color: '#0f172a',
               outline: 'none'
             }}
           />
         </div>
 
-        {/* 4. Limpar Filtros */}
+        <select
+          value={filters.status}
+          onChange={(e) => onChangeFilter('status', e.target.value as ContractStatusFilterOption)}
+          data-testid="contracts-filter-status"
+          style={carteiraSelect}
+        >
+          <option value="TODOS">Todas as Situações</option>
+          <option value="VIGENTES">Vigentes</option>
+          <option value="CRITICO">Crítico (≤30 dias)</option>
+          <option value="ATENCAO">Atenção (31–90 dias)</option>
+          <option value="HISTORICO">Histórico</option>
+        </select>
+
+        <select
+          value={filters.pendencia}
+          onChange={(e) => onChangeFilter('pendencia', e.target.value as ContractsPortfolioFilterState['pendencia'])}
+          data-testid="contracts-filter-pendencia"
+          style={carteiraSelect}
+        >
+          <option value="TODOS">Todas as Pendências</option>
+          <option value="COM_PENDENCIA">Com pendência</option>
+        </select>
+
+        <select
+          value={filters.gestor}
+          onChange={(e) => onChangeFilter('gestor', e.target.value)}
+          data-testid="contracts-filter-gestor"
+          style={carteiraSelect}
+        >
+          <option value="TODOS">Todos os Gestores</option>
+          <option value={SEM_GESTOR}>Sem gestor</option>
+          {gestores.map((nome) => (
+            <option key={nome} value={nome}>{nome}</option>
+          ))}
+        </select>
+
         {hasActiveFilters && (
           <button
             type="button"
@@ -143,11 +113,11 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.25rem',
-              padding: '0.3rem 0.6rem',
+              padding: '0.35rem 0.65rem',
               background: '#fee2e2',
               border: '1px solid #fecaca',
               borderRadius: '6px',
-              fontSize: '0.74rem',
+              fontSize: '0.76rem',
               fontWeight: 700,
               color: '#991b1b',
               cursor: 'pointer'
@@ -158,9 +128,8 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
         )}
       </div>
 
-      {/* Contagem */}
       <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
-        {hasActiveFilters
+        {hasActiveFilters || totalFiltered !== totalContracts
           ? `Exibindo ${totalFiltered} de ${totalContracts} contratos`
           : `${totalContracts} ${totalContracts === 1 ? 'contrato' : 'contratos'}`}
       </div>

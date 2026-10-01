@@ -1502,9 +1502,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                               to={`/contratos/${encodeURIComponent(c.contractKey)}`}
                                               className="btn btn-secondary"
                                               style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', height: 'auto', border: '1px solid #93c5fd', color: '#1d4ed8', background: '#eff6ff', textDecoration: 'none', fontWeight: 600 }}
-                                              title="Abrir Contrato 360°"
+                                              title="Ver detalhes do contrato"
                                             >
-                                              <Eye size={13} /> Visão 360°
+                                              <Eye size={13} /> Ver Detalhes
                                             </Link>
                                           )}
                                           {contractUrl ? (

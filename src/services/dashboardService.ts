@@ -13,6 +13,7 @@
  * 3. Funções puras para cálculos em memória e orquestração assíncrona paralela (Promise.all).
  */
 
+import { formatContractNumber } from '../utils/contractNumber';
 import type {
   ContractDashboardRecord,
   ArpRecord,
@@ -168,7 +169,7 @@ export function calculateDeadlinesSummary(
       const anoNum = typeof contract.ano === 'number' ? contract.ano : (parseInt(String(contract.ano || '0'), 10) || undefined);
       itensVencendo.push({
         contractKey,
-        numeroContrato: contract.numeroFormatado || `${contract.numero}/${contract.ano}`,
+        numeroContrato: formatContractNumber(contract),
         anoContrato: anoNum,
         fornecedorNome: contract.fornecedorNome,
         dataVigenciaFim: contract.dataVigenciaFim || '',
@@ -378,7 +379,9 @@ export function calculateAttentionSummary(params: {
     // Severidade canônica (Fase 10-A.2) — mesmo mapeamento de antes, agora via
     // severityFromReajusteRadarNivel em vez de ternário duplicado inline.
     const severity = severityFromReajusteRadarNivel(alert.nivel);
-    const numDisplay = alert.numeroContrato ? `${alert.numeroContrato}${alert.anoContrato ? `/${alert.anoContrato}` : ''}` : alert.contractKey;
+    const numDisplay = alert.numeroContrato
+      ? formatContractNumber({ numero: alert.numeroContrato, ano: alert.anoContrato })
+      : alert.contractKey;
 
     items.push({
       id: `ATT-REAJUSTE-${alert.contractKey}-${alert.ciclo}`,

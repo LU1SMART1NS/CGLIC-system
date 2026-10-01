@@ -1,16 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, ArrowRight, RotateCcw } from 'lucide-react';
-import { StatusBadge } from '../../../design-system/components/StatusBadge';
+import { ArrowRight, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { EmptyState } from '../../../design-system/components/EmptyState';
+import { SeverityBadge } from '../../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../../services/temporalEngineService';
-import { getContractDaysRemaining } from '../../../services/dashboardService';
+import { formatContractNumber } from '../../../utils/contractNumber';
+import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
+import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../../carteira/CarteiraDetailLabel';
+import { CarteiraPagination } from '../../carteira/CarteiraPagination';
+import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import type { PrazoFaixa } from '../../carteira/carteiraPrazo';
+import { ManagerCell, type ManagerAssignContext } from '../../carteira/ManagerAssign';
+import { getAcaoInfo, getMotivoInfo } from '../../instrumentos/gestaoInstrumentosRowHelpers';
+import type { DashboardAttentionItem } from '../../../types/managementDashboard';
 import type { ContractDashboardRecord } from '../../../types';
 
+/** Contrato já enriquecido com o que a tabela precisa exibir (prazo, gestor e pendências). */
+export interface ContractPortfolioRow {
+  contract: ContractDashboardRecord;
+  contractKey: string;
+  diasRestantes: number | null;
+  faixa: PrazoFaixa;
+  gestorNome?: string;
+  pendencias: DashboardAttentionItem[];
+}
+
 interface ContractsPortfolioTableProps {
-  contracts: ContractDashboardRecord[];
+  rows: ContractPortfolioRow[];
   totalContracts: number;
   onResetFilters: () => void;
+  pageSize?: number;
+  /** Atribuição de gestor na própria carteira (admin e gestor). */
+  canAssign?: boolean;
+  assignContext?: ManagerAssignContext;
 }
 
 function formatCurrency(val?: number): string {
@@ -19,8 +41,9 @@ function formatCurrency(val?: number): string {
 }
 
 function formatTipoInstrumento(tipo?: string): string {
-  if (!tipo) return 'Contrato';
   switch (tipo) {
+    case undefined:
+    case '':
     case 'TERMO_CONTRATO':
       return 'Contrato';
     case 'CARTA_CONTRATO':
@@ -38,12 +61,46 @@ function formatTipoInstrumento(tipo?: string): string {
   }
 }
 
+/** Severidade mais alta entre as pendências do contrato (para colorir o contador). */
+const SEVERITY_ORDER = ['CRITICA', 'URGENTE', 'ATENCAO', 'INFO'] as const;
+function worstSeverity(pendencias: DashboardAttentionItem[]): DashboardAttentionItem['severity'] {
+  for (const sev of SEVERITY_ORDER) {
+    if (pendencias.some((p) => p.severity === sev)) return sev;
+  }
+  return 'INFO';
+}
+const PENDENCIA_COLORS: Record<string, { color: string; bg: string }> = {
+  CRITICA: { color: '#b91c1c', bg: '#fef2f2' },
+  URGENTE: { color: '#c2410c', bg: '#fff7ed' },
+  ATENCAO: { color: '#b45309', bg: '#fffbeb' },
+  INFO: { color: '#1d4ed8', bg: '#eff6ff' }
+};
+
 export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = ({
-  contracts,
+  rows,
   totalContracts,
-  onResetFilters
+  onResetFilters,
+  pageSize = 15,
+  canAssign = false,
+  assignContext = { links: [] }
 }) => {
   const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  // Só volta à página 1 quando o conjunto listado muda (filtro/busca), não quando
+  // um gestor é atribuído e a linha é recalculada.
+  const rowsSignature = useMemo(() => rows.map((r) => r.contractKey).join('|'), [rows]);
+  useEffect(() => {
+    setPage(1);
+    setExpandedKey(null);
+  }, [rowsSignature]);
+
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / pageSize)));
+  const pageRows = useMemo(
+    () => rows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [rows, currentPage, pageSize]
+  );
 
   if (totalContracts === 0) {
     return (
@@ -54,7 +111,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
     );
   }
 
-  if (contracts.length === 0) {
+  if (rows.length === 0) {
     return (
       <div style={{
         background: '#ffffff',
@@ -98,248 +155,200 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   }
 
   return (
-    <div
-      data-testid="contracts-portfolio-table"
-      style={{
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
-      }}
-    >
+    <div data-testid="contracts-portfolio-table" style={carteiraTableShell}>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          fontSize: '0.82rem',
-          textAlign: 'left'
-        }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{
-              background: '#f8fafc',
-              borderBottom: '1px solid #e2e8f0',
-              color: '#475569',
-              fontSize: '0.78rem',
-              fontWeight: 700
-            }}>
-              <th style={{ padding: '0.75rem 1rem' }}>Contrato & Objeto</th>
-              <th style={{ padding: '0.75rem 1rem' }}>Situação</th>
-              <th style={{ padding: '0.75rem 1rem' }}>Vigência</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Valor Vigente</th>
-              <th style={{ padding: '0.75rem 1rem' }}>Acompanhamento</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Ações</th>
+            <tr>
+              <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
+              <th style={carteiraTh}>Nº do contrato</th>
+              <th style={carteiraTh}>Fornecedor / Objeto</th>
+              <th style={carteiraTh}>Vigência</th>
+              <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor Vigente</th>
+              <th style={carteiraTh}>Pendências</th>
+              <th style={carteiraTh}>Gestor</th>
+              <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>
             </tr>
           </thead>
           <tbody>
-            {contracts.map((contract) => {
-              const contractKey = contract.id || `${contract.uasg || '200331'}-${contract.numero}-${contract.ano}`;
-              const diasRestantes = getContractDaysRemaining(contract.dataVigenciaFim);
-              const numDisplay = contract.numeroFormatado || `${contract.numero}/${contract.ano}`;
-              const isVigente = contract.statusVigencia === 'Vigente';
-              const isExpirado = contract.statusVigencia === 'Expirado' || (diasRestantes !== null && diasRestantes < 0);
-              const isAVencer60d = contract.statusVigencia === 'A Vencer (60d)' || (diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 60);
-
-              // StatusBadge variant
-              const statusVariant = isExpirado
-                ? 'danger'
-                : isAVencer60d
-                  ? 'warning'
-                  : isVigente
-                    ? 'success'
-                    : 'neutral';
-
-              const statusLabel = isExpirado
-                ? 'Expirado'
-                : isAVencer60d
-                  ? 'A Vencer (≤60d)'
-                  : isVigente
-                    ? 'Vigente'
-                    : 'Não Informado';
+            {pageRows.map((row) => {
+              const { contract, contractKey, diasRestantes, faixa, gestorNome, pendencias } = row;
+              const isExpanded = expandedKey === contractKey;
+              const numDisplay = formatContractNumber(contract);
+              const valorVigente = contract.valorGlobal || contract.valorInicial;
+              const tipoLabel = formatTipoInstrumento(contract.tipoInstrumento);
+              const acrescimoPct =
+                contract.valorInicial && contract.valorGlobal && contract.valorInicial > 0
+                  ? ((contract.valorGlobal - contract.valorInicial) / contract.valorInicial) * 100
+                  : 0;
+              const worst = pendencias.length > 0 ? PENDENCIA_COLORS[worstSeverity(pendencias)] : null;
 
               return (
-                <tr
-                  key={contractKey}
-                  data-testid={`contract-row-${contractKey}`}
-                  style={{
-                    borderBottom: '1px solid #f1f5f9',
-                    transition: 'background 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  {/* 1. Contrato, Fornecedor & Objeto */}
-                  <td style={{ padding: '0.85rem 1rem', maxWidth: '380px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
-                      <div style={{ padding: '0.3rem', background: '#eff6ff', borderRadius: '6px', color: '#0c326f', marginTop: '0.1rem' }}>
-                        <FileText size={15} />
+                <React.Fragment key={contractKey}>
+                  <tr data-testid={`contracts-row-${contractKey}`}>
+                    <td style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedKey(isExpanded ? null : contractKey)}
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? 'Recolher detalhes do contrato' : 'Expandir detalhes do contrato'}
+                        data-testid={`contracts-expand-${contractKey}`}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.2rem' }}
+                      >
+                        {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      </button>
+                    </td>
+                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                      <div style={{ fontWeight: 800 }}>{numDisplay}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>
+                        {tipoLabel === 'Contrato' ? `UASG ${contract.uasg}` : `${tipoLabel} · UASG ${contract.uasg}`}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                        <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 800 }}>
-                          Contrato nº {numDisplay}
-                        </strong>
-
-                        {contract.fornecedorNome && (
-                          <span style={{ fontSize: '0.78rem', color: '#334155', fontWeight: 600 }}>
-                            {contract.fornecedorNome}
-                            {contract.fornecedorCnpjCpf && (
-                              <span style={{ color: '#64748b', fontWeight: 400, marginLeft: '0.35rem' }}>
-                                • {contract.fornecedorCnpjCpf}
-                              </span>
-                            )}
-                          </span>
-                        )}
-
-                        {contract.objeto && (
-                          <p style={{
-                            fontSize: '0.75rem',
-                            color: '#64748b',
-                            margin: '0.15rem 0 0 0',
-                            lineHeight: 1.35,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden'
-                          }}>
-                            {contract.objeto}
-                          </p>
-                        )}
+                    </td>
+                    <td style={{ ...carteiraTd, maxWidth: '220px', minWidth: '170px' }}>
+                      {contract.fornecedorNome && (
+                        <div title={contract.fornecedorNome} style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contract.fornecedorNome}</div>
+                      )}
+                      {contract.objeto && (
+                        <div
+                          title={contract.objeto}
+                          style={{ fontSize: '0.75rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        >
+                          {contract.objeto}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                      <CarteiraPrazoPill faixa={faixa} diasRestantes={diasRestantes} />
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        até {formatDateBR(contract.dataVigenciaFim)}
                       </div>
-                    </div>
-                  </td>
-
-                  {/* 2. Situação & Instrumento */}
-                  <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-start' }}>
-                      <StatusBadge
-                        label={statusLabel}
-                        variant={statusVariant}
-                        size="sm"
+                    </td>
+                    <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800 }}>
+                      {formatCurrency(valorVigente)}
+                    </td>
+                    <td style={carteiraTd}>
+                      {worst ? (
+                        <span
+                          data-testid={`contracts-pendencias-${contractKey}`}
+                          style={{ fontSize: '0.74rem', fontWeight: 800, color: worst.color, background: worst.bg, padding: '0.2rem 0.55rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
+                        >
+                          {pendencias.length} {pendencias.length === 1 ? 'pendência' : 'pendências'}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                      <ManagerCell
+                        target={{ tipo: 'CONTRATO', contractKey }}
+                        gestorNome={gestorNome}
+                        canAssign={canAssign}
+                        testId={`contracts-manager-${contractKey}`}
+                        links={assignContext.links}
+                        contractsByKey={assignContext.contractsByKey}
                       />
-                      <span style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        color: '#475569',
-                        background: '#f1f5f9',
-                        padding: '0.1rem 0.4rem',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase'
-                      }}>
-                        {formatTipoInstrumento(contract.tipoInstrumento)}
-                      </span>
-                    </div>
-                  </td>
+                    </td>
+                    <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/contratos/${encodeURIComponent(contractKey)}`)}
+                        data-testid={`open-contract-360-btn-${contractKey}`}
+                        style={carteiraButton}
+                      >
+                        Ver Detalhes <ArrowRight size={13} />
+                      </button>
+                    </td>
+                  </tr>
 
-                  {/* 3. Vigência */}
-                  <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>
-                        {formatDateBR(contract.dataVigenciaFim)}
-                      </span>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        Início: {formatDateBR(contract.dataVigenciaInicio)}
-                      </span>
-                      {diasRestantes !== null && (
-                        <span style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          color: diasRestantes <= 30 ? '#dc2626' : diasRestantes <= 60 ? '#d97706' : '#15803d'
-                        }}>
-                          {diasRestantes < 0
-                            ? `Vencido há ${Math.abs(diasRestantes)}d`
-                            : diasRestantes === 0
-                              ? 'Vence hoje'
-                              : `${diasRestantes} dias restantes`}
-                        </span>
-                      )}
-                    </div>
-                  </td>
+                  {isExpanded && (
+                    <tr data-testid={`contracts-expanded-${contractKey}`}>
+                      <td colSpan={8} style={CARTEIRA_EXPANDED_CELL_STYLE}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem', fontSize: '0.82rem' }}>
+                          <div>
+                            <CarteiraDetailLabel>Processo</CarteiraDetailLabel>
+                            <div>{contract.processo || '—'}</div>
+                          </div>
+                          <div>
+                            <CarteiraDetailLabel>Modalidade</CarteiraDetailLabel>
+                            <div>{contract.modalidadeCompra || '—'}</div>
+                          </div>
+                          <div>
+                            <CarteiraDetailLabel>Valor</CarteiraDetailLabel>
+                            <div>{formatCurrency(valorVigente)}</div>
+                            {contract.valorInicial && contract.valorGlobal && contract.valorInicial !== contract.valorGlobal && (
+                              <div style={{ color: '#64748b' }}>
+                                Inicial: {formatCurrency(contract.valorInicial)}
+                                {acrescimoPct > 0.05 && (
+                                  <span style={{ color: '#b45309', fontWeight: 700 }}>
+                                    {' '}(+{acrescimoPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% em aditivos)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <CarteiraDetailLabel>Vigência</CarteiraDetailLabel>
+                            <div>{formatDateBR(contract.dataVigenciaInicio)} a {formatDateBR(contract.dataVigenciaFim)}</div>
+                          </div>
+                          <div>
+                            <CarteiraDetailLabel>Empenhos</CarteiraDetailLabel>
+                            <div>
+                              {typeof contract.empenhosCount === 'number'
+                                ? `${contract.empenhosCount} ${contract.empenhosCount === 1 ? 'vinculado' : 'vinculados'}`
+                                : '—'}
+                            </div>
+                          </div>
+                        </div>
 
-                  {/* 4. Valor Global / Vigente */}
-                  <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'flex-end' }}>
-                      <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
-                        {formatCurrency(contract.valorGlobal || contract.valorInicial)}
-                      </span>
-                      {contract.valorInicial && contract.valorGlobal && contract.valorGlobal !== contract.valorInicial && (
-                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                          Inicial: {formatCurrency(contract.valorInicial)}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* 5. Acompanhamento */}
-                  <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
-                    {diasRestantes !== null && diasRestantes <= 30 && diasRestantes >= 0 ? (
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#b91c1c',
-                        background: '#fef2f2',
-                        border: '1px solid #fecaca',
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '4px'
-                      }}>
-                        Vencimento Crítico (≤30d)
-                      </span>
-                    ) : diasRestantes !== null && diasRestantes <= 60 && diasRestantes > 30 ? (
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#b45309',
-                        background: '#fffbeb',
-                        border: '1px solid #fde68a',
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '4px'
-                      }}>
-                        Atenção Vigência (≤60d)
-                      </span>
-                    ) : (
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        color: '#475569',
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        padding: '0.15rem 0.45rem',
-                        borderRadius: '4px'
-                      }}>
-                        Regular
-                      </span>
-                    )}
-                  </td>
-
-                  {/* 6. Ação Principal */}
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/contratos/${encodeURIComponent(contractKey)}`)}
-                      data-testid={`open-contract-360-btn-${contractKey}`}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        padding: '0.45rem 0.85rem',
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        color: '#0c326f',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      Abrir 360° <ArrowRight size={13} />
-                    </button>
-                  </td>
-                </tr>
+                        <div style={{ marginTop: '0.9rem' }}>
+                          <CarteiraDetailLabel>Pendências abertas</CarteiraDetailLabel>
+                          {pendencias.length === 0 ? (
+                            <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Nenhuma pendência em aberto.</div>
+                          ) : (
+                            pendencias.map((p) => {
+                              const motivo = getMotivoInfo(p.category);
+                              const acao = getAcaoInfo(p);
+                              return (
+                                <div
+                                  key={p.id}
+                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.45rem 0', borderTop: '1px solid #e2e8f0' }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                    <SeverityBadge severity={p.severity} />
+                                    <span style={{ fontWeight: 700, color: motivo.color }}>{motivo.label}</span>
+                                    <span style={{ color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {p.badgeLabel || p.description || p.title}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => navigate(acao.targetUrl)}
+                                    style={carteiraButton}
+                                  >
+                                    {acao.label} <ArrowRight size={13} />
+                                  </button>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      <CarteiraPagination
+        page={currentPage}
+        pageSize={pageSize}
+        total={rows.length}
+        onChange={setPage}
+        testIdPrefix="contracts"
+      />
     </div>
   );
 };

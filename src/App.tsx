@@ -6,7 +6,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { GestaoInstrumentosRoute } from './routes/GestaoInstrumentosRoute';
 import { ArpSearchRoute } from './routes/ArpSearchRoute';
-import { ArpItemsRoute } from './routes/ArpItemsRoute';
 import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
 import { AllocationsRoute } from './routes/AllocationsRoute';
 import { ContractsRoute } from './routes/ContractsRoute';
@@ -195,22 +194,6 @@ const AppContent: React.FC = () => {
             }
           />
           <Route
-            path="/atas/itens"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
-                <ArpItemsRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/atas/itens/saldo"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
-                <ItemBalancesRoute />
-              </RequireRole>
-            }
-          />
-          <Route
             path="/atas/saldos-unidade"
             element={
               <RequireRole allowedRoles={['admin', 'gestor_saldos', 'leitor']}>
@@ -231,6 +214,14 @@ const AppContent: React.FC = () => {
             element={
               <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                 <Ata360Route />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/atas/detalhe/:ataKey/itens/:numeroItem"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <ItemBalancesRoute />
               </RequireRole>
             }
           />

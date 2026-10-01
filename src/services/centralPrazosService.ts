@@ -9,6 +9,7 @@
  * 5. Calcular KPIs executivos e aplicar filtros operacionais em tempo de execução.
  */
 
+import { formatContractNumber } from '../utils/contractNumber';
 import type {
   CentralPrazosItem,
   CentralPrazosKPIs,
@@ -122,7 +123,7 @@ export function buildCentralPrazosItems(
     const manager = managersMap[contractKey];
     const plan = taskPlansMap[contractKey];
     const gestorNome = manager?.gestorNome || undefined;
-    const numDisplay = contract.numeroFormatado ? `Contrato ${contract.numeroFormatado}` : `Contrato ${contract.numero}/${contract.ano}`;
+    const numDisplay = `Contrato ${formatContractNumber(contract)}`;
 
     // A) Tarefas Humanas Persistidas (do plano aplicado ao contrato)
     if (plan && plan.macrotarefas) {

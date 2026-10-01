@@ -134,7 +134,7 @@ export const ItemBalancesHeader: React.FC<ItemBalancesHeaderProps> = ({
               icon={<ChevronLeft size={14} />}
               onClick={onBack}
             >
-              Voltar para Itens
+              Voltar para a ata
             </AppButton>
             <AppButton
               variant="outline"

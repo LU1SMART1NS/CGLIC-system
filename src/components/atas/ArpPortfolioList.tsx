@@ -1,8 +1,17 @@
-import React from 'react';
-import { RotateCcw } from 'lucide-react';
-import { AtaCard } from '../cards/AtaCard';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { AtaCardSkeleton } from '../cards/AtaCardSkeleton';
 import { EmptyState } from '../../design-system/components/EmptyState';
+import { buildAtaKey } from '../../hooks/useAta';
+import { getArpVigenciaStatus } from '../../services/temporalEngineService';
+import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
+import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/CarteiraDetailLabel';
+import { CarteiraPagination } from '../carteira/CarteiraPagination';
+import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { classifyPrazo } from '../carteira/carteiraPrazo';
+import { ManagerCell, type ManagerAssignContext } from '../carteira/ManagerAssign';
+import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
 
 interface ArpPortfolioListProps {
@@ -10,20 +19,81 @@ interface ArpPortfolioListProps {
   totalAtas: number;
   isLoading?: boolean;
   itemsLoadingByAta?: Record<string, boolean>;
+  /** Resumo de consumo de saldo por número de ata. */
+  saldoStatsByAta?: Record<string, AtaSaldoStats>;
+  /** Nome do gestor por número de ata. */
+  gestorByAta?: Record<string, string>;
+  /** Texto da busca — quando algum item da ata casa com ela, a linha abre já mostrando esse item. */
+  busca?: string;
   onSelectArp: (arp: ArpRecord) => void;
   onSelectItem: (arp: ArpRecord, item: ArpItemRecord) => void;
+  onExpandAta?: (arp: ArpRecord) => void;
   onResetFilters: () => void;
+  pageSize?: number;
+  /** Atribuição de gestor na própria carteira (admin e gestor). */
+  canAssign?: boolean;
+  assignContext?: ManagerAssignContext;
 }
+
+const MAX_ITENS_EXPANDIDOS = 5;
+
+function formatCurrency(val?: number): string {
+  if (typeof val !== 'number' || isNaN(val)) return '—';
+  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatDateBR(dateStr?: string): string {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('T')[0].split('-');
+  return y && m && d ? `${d}/${m}/${y}` : dateStr;
+}
+
+const SaldoBar: React.FC<{ pct: number | null }> = ({ pct }) => {
+  if (pct === null) return <span style={{ color: '#94a3b8' }}>—</span>;
+  return (
+    <div style={{ minWidth: '84px' }}>
+      <span style={{ fontWeight: 800 }}>{pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%</span>
+      <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', marginTop: '0.2rem', overflow: 'hidden' }}>
+        <div style={{ width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%', background: saldoBarColor(pct) }} />
+      </div>
+    </div>
+  );
+};
 
 export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   cards,
   totalAtas,
   isLoading = false,
   itemsLoadingByAta = {},
-  onSelectArp,
+  saldoStatsByAta = {},
+  gestorByAta = {},
+  busca = '',
   onSelectItem,
-  onResetFilters
+  onExpandAta,
+  onResetFilters,
+  pageSize = 15,
+  canAssign = false,
+  assignContext = { links: [] }
 }) => {
+  const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  /** Escolha explícita do usuário por linha; sem escolha vale o padrão (abrir só se a busca casar com algum item). */
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+
+  // Só volta à página 1 quando o conjunto listado muda (filtro/busca).
+  const cardsSignature = useMemo(() => cards.map((c) => c.key).join('|'), [cards]);
+  useEffect(() => {
+    setPage(1);
+    setOverrides({});
+  }, [cardsSignature]);
+
+  const query = busca.trim().toLowerCase();
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(cards.length / pageSize)));
+  const pageCards = useMemo(
+    () => cards.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [cards, currentPage, pageSize]
+  );
+
   if (isLoading && totalAtas === 0) {
     return (
       <div className="ata-cards-container" aria-busy="true" aria-label="Carregando atas...">
@@ -87,21 +157,182 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   }
 
   return (
-    <div className="ata-cards-container" role="feed" aria-label="Lista de Atas de Registro de Preços">
-      {cards.map((card) => {
-        const ataKey = `${card.arp.numeroAtaRegistroPreco}-${card.arp.codigoUnidadeGerenciadora}`;
-        const isCardLoading = Boolean(itemsLoadingByAta[ataKey]);
+    <div data-testid="arp-portfolio-table" role="feed" aria-label="Lista de Atas de Registro de Preços" style={carteiraTableShell}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
+              <th style={carteiraTh}>Ata</th>
+              <th style={carteiraTh}>Fornecedor / Objeto</th>
+              <th style={carteiraTh}>Vigência</th>
+              <th style={carteiraTh}>Itens</th>
+              <th style={carteiraTh}>Maior consumo</th>
+              <th style={carteiraTh}>Gestor</th>
+              <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageCards.map((card) => {
+              const { arp } = card;
+              const numeroAta = arp.numeroAtaRegistroPreco;
+              const ataKey = `${numeroAta}-${arp.codigoUnidadeGerenciadora}`;
+              const vigencia = getArpVigenciaStatus(arp.dataVigenciaFinal);
+              const dias = vigencia ? vigencia.diasRestantes : null;
+              const faixa = classifyPrazo(dias, Boolean(arp.isCanceladaPncp));
+              const stats = saldoStatsByAta[numeroAta];
+              const gestor = gestorByAta[numeroAta];
+              const totalItens = card.itens.length || arp.quantidadeItens || 0;
+              const isItemsLoading = Boolean(itemsLoadingByAta[ataKey]);
 
-        return (
-          <AtaCard
-            key={card.key}
-            card={card}
-            isLoading={isCardLoading}
-            onSelectArp={onSelectArp}
-            onSelectItem={onSelectItem}
-          />
-        );
-      })}
+              const matchedItems = query
+                ? card.itens.filter((item) =>
+                    (item.descricaoItem || '').toLowerCase().includes(query) ||
+                    (item.nomeRazaoSocialFornecedor || '').toLowerCase().includes(query)
+                  )
+                : [];
+              const autoExpand = matchedItems.length > 0;
+              const isExpanded = overrides[card.key] ?? autoExpand;
+
+              // Itens de maior consumo primeiro; os que casaram com a busca vêm antes de tudo.
+              const pctOf = (item: ArpItemRecord): number | null => stats?.pctByItem[normalizeItemNumber(item.numeroItem)] ?? null;
+              const orderedItems = [...card.itens].sort((a, b) => {
+                const aHit = matchedItems.includes(a) ? 1 : 0;
+                const bHit = matchedItems.includes(b) ? 1 : 0;
+                if (aHit !== bHit) return bHit - aHit;
+                return (pctOf(b) ?? -1) - (pctOf(a) ?? -1);
+              });
+              const visibleItems = orderedItems.slice(0, MAX_ITENS_EXPANDIDOS);
+              const hiddenCount = orderedItems.length - visibleItems.length;
+
+              return (
+                <React.Fragment key={card.key}>
+                  <tr data-testid={`arp-row-${numeroAta}`}>
+                    <td style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isExpanded) onExpandAta?.(arp);
+                          setOverrides((prev) => ({ ...prev, [card.key]: !isExpanded }));
+                        }}
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? 'Recolher itens da ata' : 'Expandir itens da ata'}
+                        data-testid={`arp-expand-${numeroAta}`}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.2rem' }}
+                      >
+                        {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      </button>
+                    </td>
+                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                      <div style={{ fontWeight: 800 }}>ATA {numeroAta}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>UASG {arp.codigoUnidadeGerenciadora}</div>
+                    </td>
+                    <td style={{ ...carteiraTd, maxWidth: '220px', minWidth: '170px' }}>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{card.fornecedorNome}</div>
+                      {arp.objeto && (
+                        <div
+                          title={arp.objeto}
+                          style={{ fontSize: '0.75rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        >
+                          {arp.objeto}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                      <CarteiraPrazoPill faixa={faixa} diasRestantes={dias} />
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        até {formatDateBR(arp.dataVigenciaFinal)}
+                      </div>
+                    </td>
+                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                      <div style={{ fontWeight: 700 }}>{totalItens} {totalItens === 1 ? 'item' : 'itens'}</div>
+                      {stats && (stats.criticos > 0 || stats.atencao > 0) ? (
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: stats.criticos > 0 ? '#b91c1c' : '#b45309' }}>
+                          {[
+                            stats.criticos > 0 ? `${stats.criticos} ${stats.criticos === 1 ? 'crítico' : 'críticos'}` : null,
+                            stats.atencao > 0 ? `${stats.atencao} em atenção` : null
+                          ].filter(Boolean).join(' · ')}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td style={carteiraTd}>
+                      <SaldoBar pct={stats?.maxPct ?? null} />
+                    </td>
+                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                      <ManagerCell
+                        target={{ tipo: 'ATA', ataKey: numeroAta }}
+                        gestorNome={gestor}
+                        canAssign={canAssign}
+                        testId={`arp-manager-${numeroAta}`}
+                        links={assignContext.links}
+                        contractsByKey={assignContext.contractsByKey}
+                      />
+                    </td>
+                    <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, arp.codigoUnidadeGerenciadora))}`)}
+                        data-testid={`ata-360-link-${numeroAta}`}
+                        style={carteiraButton}
+                      >
+                        Ver Detalhes <ArrowRight size={13} />
+                      </button>
+                    </td>
+                  </tr>
+
+                  {isExpanded && (
+                    <tr data-testid={`arp-expanded-${numeroAta}`}>
+                      <td colSpan={8} style={CARTEIRA_EXPANDED_CELL_STYLE}>
+                        {isItemsLoading ? (
+                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Carregando itens…</div>
+                        ) : orderedItems.length === 0 ? (
+                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Nenhum item disponível.</div>
+                        ) : (
+                          <>
+                            <CarteiraDetailLabel>Itens da ata</CarteiraDetailLabel>
+                            {visibleItems.map((item, idx) => (
+                              <div
+                                key={`${item.numeroItem}-${item.codigoItem}-${idx}`}
+                                style={{ display: 'grid', gridTemplateColumns: '56px minmax(0, 1fr) 120px 110px auto', gap: '0.75rem', alignItems: 'center', fontSize: '0.82rem', padding: '0.45rem 0', borderTop: '1px solid #e2e8f0' }}
+                              >
+                                <span style={{ fontWeight: 700 }}>{item.numeroItem}</span>
+                                <span title={item.descricaoItem} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.descricaoItem}</span>
+                                <span>{formatCurrency(item.valorUnitario)}</span>
+                                <SaldoBar pct={pctOf(item)} />
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectItem(arp, item)}
+                                  data-testid={`arp-item-${numeroAta}-${item.numeroItem}`}
+                                  style={carteiraButton}
+                                >
+                                  Ver saldo <ArrowRight size={13} />
+                                </button>
+                              </div>
+                            ))}
+                            {hiddenCount > 0 && (
+                              <div style={{ fontSize: '0.76rem', color: '#0c326f', fontWeight: 700, paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+                                + {hiddenCount} {hiddenCount === 1 ? 'item' : 'itens'} · veja todos em Ver Detalhes
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <CarteiraPagination
+        page={currentPage}
+        pageSize={pageSize}
+        total={cards.length}
+        onChange={setPage}
+        testIdPrefix="arp"
+      />
     </div>
   );
 };
