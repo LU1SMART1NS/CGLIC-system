@@ -198,7 +198,7 @@ describe('ManagementFinancialExecution Component (CGLIC 3.0 — Fase 9-I)', () =
     expect(html).toContain('50%');
 
     // Botões de drill-down para Contrato 360°
-    expect(html).toContain('Contrato 360°');
+    expect(html).toContain('Ver Detalhes');
   });
 
   it('4. deve renderizar skeleton de loading sem exibir números 0 artificiais', () => {

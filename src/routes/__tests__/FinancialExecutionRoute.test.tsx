@@ -198,6 +198,6 @@ describe('FinancialExecutionRoute — FASE 9-I: Empenhos & Execução', () => {
     expect(html).toContain('2026NE000500');
     expect(html).toContain('Empresa Delta Serviços Ltda');
     expect(html).toContain('Contrato 12/2025');
-    expect(html).toContain('Contrato 360°');
+    expect(html).toContain('Ver Detalhes');
   });
 });

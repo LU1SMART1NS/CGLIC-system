@@ -767,7 +767,7 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
                             padding: '0.35rem 0.65rem'
                           }}
                         >
-                          <span>Contrato 360°</span>
+                          <span>Ver Detalhes</span>
                           <ExternalLink size={12} aria-hidden="true" />
                         </button>
                       ) : (
