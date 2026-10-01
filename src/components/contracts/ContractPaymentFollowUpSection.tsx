@@ -138,6 +138,19 @@ const CyclePaymentTaskList: React.FC<{
   );
 };
 
+const TIPOS_INSTRUMENTO_COBRANCA = [
+  'Nota Fiscal Eletrônica',
+  'Nota Fiscal',
+  'Fatura',
+  'Apólice de Seguro',
+  'Boleto Bancário',
+  'Guia de Recolhimento',
+  'Multa',
+  'Ofício',
+  'Recibo',
+  'RPA'
+];
+
 export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSectionProps> = ({
   contractKey
 }) => {
@@ -159,6 +172,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [tipoInstrumento, setTipoInstrumento] = useState('');
+  const [numeroInstrumento, setNumeroInstrumento] = useState('');
   const [documentoAtestoSei, setDocumentoAtestoSei] = useState('');
   const [valorAtesto, setValorAtesto] = useState('');
   const [dataAssinaturaAtesto, setDataAssinaturaAtesto] = useState(() => {
@@ -180,14 +195,19 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
   const handleCreateCycle = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!competencia || !dataAssinaturaAtesto || !dataVencimentoFatura || !documentoAtestoSei) return;
+    if (!competencia || !dataAssinaturaAtesto || !dataVencimentoFatura || !tipoInstrumento || !documentoAtestoSei) return;
 
     const input: PaymentCycleInput = {
       contractKey,
       competencia: competencia,
       dataAssinaturaAtesto: dataAssinaturaAtesto,
       dataVencimentoFatura: dataVencimentoFatura,
+      // Id. SEI do instrumento segue como identificador do ciclo (campo persistido existente)
       documentoAtestoSei: documentoAtestoSei.trim(),
+      observacoes: [
+        `Instrumento de cobrança: ${tipoInstrumento}`,
+        numeroInstrumento.trim() ? `Nº ${numeroInstrumento.trim()}` : ''
+      ].filter(Boolean).join(' - '),
       valorAtesto: valorAtesto ? parseFloat(valorAtesto.replace(/\./g, '').replace(',', '.')) : 0,
       responsavelNome: responsavelNome.trim() || undefined,
       responsavelUserId: responsavelNome.trim() ? responsavel.userId : undefined
@@ -198,6 +218,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     registerPaymentCycle(input)
       .then(() => {
         // Reset form & close modal
+        setTipoInstrumento('');
+        setNumeroInstrumento('');
         setDocumentoAtestoSei('');
         setValorAtesto('');
         setDataVencimentoFatura('');
@@ -412,10 +434,17 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                   </strong>
                   {cycle.input.documentoAtestoSei && (
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                      • Doc SEI: <strong>{cycle.input.documentoAtestoSei}</strong>
+                      • Id. SEI: <strong>{cycle.input.documentoAtestoSei}</strong>
                     </span>
                   )}
                 </div>
+
+                {cycle.input.observacoes && (
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.35rem' }}>
+                    <Info size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+                    {cycle.input.observacoes}
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.8rem', color: '#64748b', flexWrap: 'wrap' }}>
                   {describeResponsavel(cycle.input.responsavelNome, gestorNome) ? (
@@ -578,7 +607,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Registrar ciclo de atesto / faturamento"
+        title="Registrar Ciclo de Instrumentos de Cobrança"
         size="md"
         dismissible={!isSavingCycle}
         testId="payment-cycle-modal"
@@ -603,24 +632,48 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
-                  Nº Documento Atesto (SEI) *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Doc 12345678"
-                  value={documentoAtestoSei}
-                  onChange={e => setDocumentoAtestoSei(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.55rem',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.88rem'
-                  }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Tipo de Instrumento de Cobrança *
+                  </label>
+                  <select
+                    value={tipoInstrumento}
+                    onChange={e => setTipoInstrumento(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  >
+                    <option value="">Selecione...</option>
+                    {TIPOS_INSTRUMENTO_COBRANCA.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Nº do Instrumento
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 1234"
+                    value={numeroInstrumento}
+                    onChange={e => setNumeroInstrumento(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Id. SEI *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 12345678"
+                    value={documentoAtestoSei}
+                    onChange={e => setDocumentoAtestoSei(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

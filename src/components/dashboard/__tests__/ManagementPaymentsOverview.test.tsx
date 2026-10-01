@@ -309,7 +309,7 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
         totalCiclos: 1,
         ciclosAbertosCount: 0,
         ciclosAbertosDetalhe: [],
-        ciclosRecentes: mockPaymentsReadModel.payments.ciclosAbertosDetalhe
+        ciclosRecentes: mockPaymentsReadModel.payments.ciclosAbertosDetalhe ?? []
       }
     };
 
