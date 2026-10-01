@@ -28,28 +28,14 @@ import { useContractTaskPlan } from '../../hooks/useContractTaskPlan';
 import { useCreateContractTask } from '../../hooks/useContractTaskPlanEditing';
 import { AddTaskForm, MutationError } from './planTaskEditing';
 import { ResponsavelField, type ResponsavelValue } from './ResponsavelField';
+import { getPaymentStatusDisplay } from '../../utils/paymentStatusDisplay';
+import { Modal } from '../../design-system';
 
 interface ContractPaymentFollowUpSectionProps {
   contract: ContractDashboardRecord;
   contractKey: string;
 }
 
-const STATUS_CONFIG: Record<
-  PaymentWorkflowStatus,
-  { label: string; bg: string; color: string; border: string }
-> = {
-  RECEBIDO: { label: 'Atesto Recebido', bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' },
-  ATRIBUIDO: { label: 'Atribuído para Instrução', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
-  EM_INSTRUCAO: { label: 'Em Instrução', bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
-  PENDENTE_DOCUMENTACAO: { label: 'Pendente Documentação', bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' },
-  DESPACHO_ELABORADO: { label: 'Despacho Elaborado', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
-  ENVIADO_CGOFI: { label: 'Enviado à CGOFI', bg: '#e0e7ff', color: '#4338ca', border: '#c7d2fe' },
-  AGUARDANDO_CGOFI: { label: 'Aguardando CGOFI', bg: '#fdf4ff', color: '#86198f', border: '#f5d0fe' },
-  DEVOLVIDO_FISCAL: { label: 'Devolvido ao Fiscal', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
-  PAGAMENTO_CONFIRMADO: { label: 'Pagamento Confirmado (OB)', bg: '#dcfce7', color: '#14532d', border: '#86efac' },
-  CONCLUIDO: { label: 'Ciclo Concluído', bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' },
-  CANCELADO: { label: 'Cancelado', bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' }
-};
 
 // Etapas espelham as 5 macroetapas do template canônico (paymentFollowUpTemplateService).
 const WORKFLOW_STEPS = [
@@ -380,7 +366,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
       {/* Listagem de Ciclos de Faturamento */}
       {cycles.map(cycle => {
         const isExpanded = Boolean(expandedCycles[cycle.cycleKey]);
-        const statusStyle = STATUS_CONFIG[cycle.status] || STATUS_CONFIG.RECEBIDO;
+        const statusStyle = getPaymentStatusDisplay(cycle.status);
         const currentStepIdx = getActiveStepIndex(cycle.status);
 
         return (
@@ -438,7 +424,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     </span>
                   ) : (
                     <span style={{ color: '#c2410c', fontWeight: 600 }}>
-                      ⚠ Gestor do contrato não cadastrado
+                      Gestor do contrato não cadastrado
                     </span>
                   )}
                   {cycle.input.valorAtesto !== undefined && (
@@ -589,47 +575,14 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
       })}
 
       {/* Modal de Registro de Novo Ciclo de Atesto */}
-      {isModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}
-          onClick={() => setIsModalOpen(false)}
-        >
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '1.75rem',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Registrar Ciclo de Atesto / Faturamento
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#64748b', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Registrar ciclo de atesto / faturamento"
+        size="md"
+        dismissible={!isSavingCycle}
+        testId="payment-cycle-modal"
+      >
             <form onSubmit={handleCreateCycle} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
@@ -820,9 +773,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 };

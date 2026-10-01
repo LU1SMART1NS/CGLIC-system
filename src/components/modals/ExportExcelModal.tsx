@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FileSpreadsheet, 
-  X, 
   Check, 
   FileText, 
   Building2, 
@@ -12,6 +10,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import type { ArpRecord, ArpItemRecord } from '../../types';
+import { Modal, AppButton, useToast } from '../../design-system';
 import type { 
   ReportExportConfig, 
   ReportPreset, 
@@ -48,6 +47,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
   activeFiltersDesc,
   defaultGranularity = 'BY_ITEM'
 }) => {
+  const toast = useToast();
   const [preset, setPreset] = useState<ReportPreset>('BALANCES');
   const [granularity, setGranularity] = useState<ReportGranularity>(defaultGranularity);
   const [scope, setScope] = useState<ReportScope>(selectedAta ? 'SELECTED_ATA' : 'CURRENT_FILTERED');
@@ -136,7 +136,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
 
   const handleGenerateReport = () => {
     if (selectedColumnIds.length === 0 && granularity !== 'MULTI_SHEET') {
-      alert('Por favor, selecione pelo menos 1 coluna para gerar o relatório.');
+      toast.error('Selecione pelo menos 1 coluna para gerar o relatório.');
       return;
     }
 
@@ -179,7 +179,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
         setIsExporting(false);
       } catch (err: any) {
         console.error('Erro ao gerar relatório Excel:', err);
-        alert('Ocorreu um erro ao compilar a planilha Excel: ' + (err.message || err));
+        toast.error('Ocorreu um erro ao compilar a planilha Excel: ' + (err.message || err));
         setIsExporting(false);
       }
     }, 50);
@@ -194,85 +194,32 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
   const totalAtasCount = selectedAta ? 1 : atas.length;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.7)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-      padding: '1rem',
-      backdropFilter: 'blur(4px)',
-      fontFamily: 'var(--font-family)'
-    }}>
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '12px',
-        width: '100%',
-        maxWidth: '920px',
-        maxHeight: '92vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        overflow: 'hidden',
-        border: '1px solid #e2e8f0'
-      }}>
-        
-        {/* HEADER MODAL */}
-        <div style={{
-          padding: '1.2rem 1.5rem',
-          borderBottom: '1px solid #e2e8f0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: 'linear-gradient(135deg, #0c326f 0%, #1e3a8a 100%)',
-          color: '#ffffff'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              padding: '0.5rem',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <FileSpreadsheet size={24} color="#00cc55" />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#ffffff', letterSpacing: '-0.01em' }}>
-                Exportar Relatório Excel Parametrizável (.xlsx)
-              </h2>
-              <p style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: '0.15rem 0 0 0' }}>
-                Personalize campos, escopos e granularidade contábil oficial da SENASP / MJSP
-              </p>
-            </div>
-          </div>
-          <button 
-            type="button" 
-            onClick={onClose} 
-            style={{ 
-              background: 'rgba(255,255,255,0.1)', 
-              border: 'none', 
-              cursor: 'pointer', 
-              color: '#ffffff', 
-              borderRadius: '6px',
-              padding: '0.35rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Exportar relatório Excel parametrizável (.xlsx)"
+      subtitle="Personalize campos, escopos e granularidade contábil oficial da SENASP / MJSP"
+      size="xl"
+      dismissible={!isExporting}
+      testId="export-excel-modal"
+      footer={
+        <>
+          <AppButton type="button" variant="outline" onClick={onClose} disabled={isExporting}>
+            Cancelar
+          </AppButton>
+          <AppButton
+            type="button"
+            onClick={handleGenerateReport}
+            isLoading={isExporting}
+            disabled={isExporting || (selectedColumnIds.length === 0 && granularity !== 'MULTI_SHEET')}
+            icon={isExporting ? undefined : <Download size={16} />}
           >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* BODY SCROLLABLE */}
-        <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {isExporting ? 'Gerando planilha...' : 'Gerar e baixar planilha Excel (.xlsx)'}
+          </AppButton>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* SUCESSO / NOTIFICAÇÃO */}
           {successMsg && (
@@ -432,10 +379,10 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 onChange={(e) => setGranularity(e.target.value as ReportGranularity)}
                 style={{ width: '100%', fontSize: '0.82rem', padding: '0.45rem 0.6rem', fontWeight: 600 }}
               >
-                <option value="BY_ITEM">📄 1 Linha por Item (Detalhado com Saldos)</option>
-                <option value="BY_ATA">📊 1 Linha por Ata (Resumo Gerencial)</option>
-                <option value="BY_ALLOCATION">🏢 1 Linha por Alocação Setorial (Diretorias)</option>
-                <option value="MULTI_SHEET">📑 Pasta Completa com Múltiplas Abas</option>
+                <option value="BY_ITEM">1 Linha por Item (Detalhado com Saldos)</option>
+                <option value="BY_ATA">1 Linha por Ata (Resumo Gerencial)</option>
+                <option value="BY_ALLOCATION">1 Linha por Alocação Setorial (Diretorias)</option>
+                <option value="MULTI_SHEET">Pasta Completa com Múltiplas Abas</option>
               </select>
             </div>
 
@@ -451,10 +398,10 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 style={{ width: '100%', fontSize: '0.82rem', padding: '0.45rem 0.6rem', fontWeight: 600 }}
               >
                 {selectedAta && (
-                  <option value="SELECTED_ATA">🎯 Somente a Ata Selecionada ({selectedAta.numeroAtaRegistroPreco})</option>
+                  <option value="SELECTED_ATA">Somente a Ata Selecionada ({selectedAta.numeroAtaRegistroPreco})</option>
                 )}
-                <option value="CURRENT_FILTERED">🔍 Atas Filtradas Atualmente ({totalAtasCount} atas)</option>
-                <option value="ALL_ATAS">🌐 Todas as Atas Cadastradas ({atas.length} atas)</option>
+                <option value="CURRENT_FILTERED">Atas Filtradas Atualmente ({totalAtasCount} atas)</option>
+                <option value="ALL_ATAS">Todas as Atas Cadastradas ({atas.length} atas)</option>
               </select>
             </div>
 
@@ -618,62 +565,10 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
             </label>
           </div>
 
+        <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+          Arquivo nativo Microsoft Excel (.xlsx) com formatação contábil
         </div>
-
-        {/* FOOTER MODAL */}
-        <div style={{
-          padding: '1rem 1.5rem',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: '#f8fafc',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
-        }}>
-          <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-            Arquivo nativo Microsoft Excel (.xlsx) com formatação contábil
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-secondary"
-              style={{ padding: '0.55rem 1rem', fontSize: '0.85rem' }}
-              disabled={isExporting}
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="button"
-              onClick={handleGenerateReport}
-              className="btn btn-primary"
-              disabled={isExporting || (selectedColumnIds.length === 0 && granularity !== 'MULTI_SHEET')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.55rem 1.4rem',
-                fontSize: '0.88rem',
-                fontWeight: 800,
-                background: '#0c326f',
-                boxShadow: '0 2px 4px rgba(12, 50, 111, 0.2)'
-              }}
-            >
-              {isExporting ? (
-                <>⏳ Gerando Planilha...</>
-              ) : (
-                <>
-                  <Download size={16} /> Gerar e Baixar Planilha Excel (.xlsx)
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
       </div>
-    </div>
+    </Modal>
   );
 };
