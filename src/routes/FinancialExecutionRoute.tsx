@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../design-system/components/HeaderRefreshAction';
 import { AppButton } from '../design-system/components/AppButton';
+import { colors, shapes } from '../design-system/tokens';
 
 // Mesmo critério de autorização de sincronização usado no botão individual
 // de Contract360Header.tsx, aplicado aqui à sincronização em lote.
@@ -49,6 +50,8 @@ export const FinancialExecutionRoute: React.FC = () => {
     await runBatchSync(contracts);
     refresh();
   };
+
+  const batchTone = !batchSummary ? colors.semantic.info : batchSummary.erro ? colors.semantic.warning : colors.semantic.success;
 
   return (
     <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem' }}>
@@ -90,6 +93,7 @@ export const FinancialExecutionRoute: React.FC = () => {
       {showBatchPanel && (
         <div
           role="status"
+          data-testid="financial-execution-batch-panel"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -97,15 +101,16 @@ export const FinancialExecutionRoute: React.FC = () => {
             gap: '0.75rem',
             padding: '0.75rem 1rem',
             marginBottom: '1.25rem',
-            borderRadius: '8px',
-            border: `1px solid ${batchSummary?.erro ? '#fde68a' : '#bbf7d0'}`,
-            backgroundColor: batchSummary ? (batchSummary.erro ? '#fffbeb' : '#f0fdf4') : '#f0f9ff'
+            borderRadius: shapes.radius.md,
+            border: `1px solid ${batchTone.border}`,
+            backgroundColor: batchTone.bg,
+            color: batchTone.text
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', fontWeight: 600 }}>
             {isSyncingAll ? (
               <>
-                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} color="#0c326f" />
+                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
                 <span>
                   Sincronizando contratos {batchProgress?.current ?? 0}/{batchProgress?.total ?? 0}
                   {batchProgress?.percent !== undefined ? ` (${batchProgress.percent}%)` : ''}
@@ -114,9 +119,9 @@ export const FinancialExecutionRoute: React.FC = () => {
             ) : batchSummary ? (
               <>
                 {batchSummary.erro > 0 ? (
-                  <XCircle size={16} color="#92400e" />
+                  <XCircle size={16} />
                 ) : (
-                  <CheckCircle2 size={16} color="#166534" />
+                  <CheckCircle2 size={16} />
                 )}
                 <span>
                   Sincronização {batchSummary.cancelado ? 'cancelada' : 'concluída'}:{' '}
