@@ -17,7 +17,8 @@ interface Instrument360HeroProps {
   notice?: React.ReactNode;
   icon: React.ReactNode;
   title: string;
-  status: { faixa: PrazoFaixa; label: string };
+  /** Situação ao lado do título (omitida quando não se aplica). */
+  status?: { faixa: PrazoFaixa; label: string };
   /** Gestor titular, à direita do título. */
   manager?: React.ReactNode;
   /** Linha logo abaixo do título (ex.: fornecedor do contrato). */
@@ -54,7 +55,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
 }) => {
   const [objetoAberto, setObjetoAberto] = React.useState(false);
   const objetoLongo = Boolean(objeto && objeto.length > OBJETO_LIMITE);
-  const statusColors = PRAZO_COLORS[status.faixa];
+  const statusColors = status ? PRAZO_COLORS[status.faixa] : null;
 
   return (
     <header
@@ -98,6 +99,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
           {icon}
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{title}</h1>
         </div>
+        {status && statusColors && (
         <span
           data-testid="instrument-360-status"
           style={{
@@ -113,6 +115,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
         >
           {status.label}
         </span>
+        )}
         {manager && <div style={{ marginLeft: 'auto' }}>{manager}</div>}
       </div>
 

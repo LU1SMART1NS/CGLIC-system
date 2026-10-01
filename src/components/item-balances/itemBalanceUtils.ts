@@ -1,23 +1,7 @@
 import type { PncpContract } from '../../types';
 import { formatPncpContractUrl } from '../../utils/pncpUtils';
 
-export function formatCurrency(val: number): string {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
-}
-
-export function formatNumber(val: number): string {
-  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val || 0);
-}
-
-export function formatDate(dateStr?: string): string {
-  if (!dateStr) return '-';
-  const cleanDate = dateStr.split('T')[0];
-  const parts = cleanDate.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return dateStr;
-}
+export { formatCurrency, formatNumber, formatDateBR as formatDate } from '../../utils/format';
 
 export function getProgressColorClass(percent: number): string {
   if (percent < 20) return 'fill-danger';

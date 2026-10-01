@@ -1,15 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import {
-  X,
-  Building2,
   Search,
-  AlertCircle,
   Loader2,
   Sparkles
 } from 'lucide-react';
 import { useContractsDashboard } from '../../hooks/useContractsDashboard';
 import { useLinkContractToItem } from '../../hooks/useLinkContractToItem';
 import type { ContractDashboardRecord } from '../../types';
+import { formatCnpj } from '../../utils/format';
+import { Modal, AlertCard } from '../../design-system';
 import {
   rankContractsBySuggestion,
   type ContractSuggestionCriteria,
@@ -50,15 +49,6 @@ const SUGGESTION_LABEL: Record<ContractSuggestionReason, string> = {
 };
 
 const onlyDigits = (v?: string) => (v || '').replace(/\D/g, '');
-
-function formatCnpjDisplay(cnpj?: string): string {
-  if (!cnpj) return '';
-  const digits = cnpj.replace(/\D/g, '');
-  if (digits.length === 14) {
-    return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-  }
-  return cnpj;
-}
 
 function formatDateBR(dateStr?: string): string {
   if (!dateStr) return 'Não informada';
@@ -208,47 +198,18 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop" style={{ zIndex: 1100, position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div
-        className="modal-content"
-        style={{
-          backgroundColor: '#ffffff',
-          borderRadius: '12px',
-          width: '100%',
-          maxWidth: '720px',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Cabeçalho do Modal */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Building2 size={20} color="#0c326f" /> {isAtaMode ? 'Vincular Contrato Oficial à Ata' : 'Vincular Contrato Oficial ao Item'}
-            </h3>
-            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-              Ata {numeroAta}{isAtaMode ? '' : ` • Item ${numeroItem}`} • UASG {cleanUasg}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
-            title="Fechar"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Corpo do Modal (com scroll) */}
-        <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={isAtaMode ? 'Vincular contrato oficial à Ata' : 'Vincular contrato oficial ao item'}
+      subtitle={`Ata ${numeroAta}${isAtaMode ? '' : ` • Item ${numeroItem}`} • UASG ${cleanUasg}`}
+      size="lg"
+      testId="link-contract-modal"
+    >
+        <div>
           {formError && (
-            <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '0.65rem 0.85rem', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <AlertCircle size={16} color="#dc2626" />
-              <span>{formError}</span>
+            <div style={{ marginBottom: '1rem' }}>
+              <AlertCard severity="CRITICA" title={formError} />
             </div>
           )}
 
@@ -348,7 +309,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                           {c.fornecedorNome || 'Fornecedor não informado'}
                           {c.fornecedorCnpjCpf && (
                             <span style={{ color: '#64748b', marginLeft: '0.4rem' }}>
-                              ({formatCnpjDisplay(c.fornecedorCnpjCpf)})
+                              ({formatCnpj(c.fornecedorCnpjCpf)})
                             </span>
                           )}
                         </div>
@@ -398,7 +359,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                     <strong>Fornecedor:</strong> {selectedContract.fornecedorNome || 'N/A'}
                   </div>
                   <div>
-                    <strong>CNPJ:</strong> {formatCnpjDisplay(selectedContract.fornecedorCnpjCpf)}
+                    <strong>CNPJ:</strong> {formatCnpj(selectedContract.fornecedorCnpjCpf)}
                   </div>
                   <div>
                     <strong>Vigência até:</strong> {formatDateBR(selectedContract.dataVigenciaFim)}
@@ -432,7 +393,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                           Item {i.numeroItem}
                           {i.descricao ? ` — ${i.descricao.slice(0, 60)}` : ''}
                           {i.fornecedorNome ? ` (${i.fornecedorNome})` : ''}
-                          {sameSupplier ? ' ★ mesmo fornecedor' : ''}
+                          {sameSupplier ? ' · mesmo fornecedor' : ''}
                         </option>
                       );
                     })}
@@ -540,7 +501,6 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
             </form>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

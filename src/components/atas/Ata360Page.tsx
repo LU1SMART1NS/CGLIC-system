@@ -1,10 +1,11 @@
 import React from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, AlertTriangle, ArrowLeft, Layers, Link2, ListTodo, Loader2, Plus, Search } from 'lucide-react';
+import { AlertTriangle, Layers, Link2, ListTodo, Plus } from 'lucide-react';
 import { buildAtaItemPath, uasgFromAtaKey, useAta, useAtaItemSaldos, useAtaLinkedContracts } from '../../hooks/useAta';
 import { useAtaTaskPlan } from '../../hooks/useAtaTaskPlan';
 import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
 import { useAuth } from '../../context/AuthContext';
+import { InstrumentPageState } from '../instrument360/InstrumentPageState';
 import { Ata360Header } from './Ata360Header';
 import { AtaActionQueue, type Ata360Tab } from './AtaActionQueue';
 import { useAtaActionQueue } from '../../hooks/useAtaActionQueue';
@@ -15,6 +16,7 @@ import { AtaTasksSection } from './AtaTasksSection';
 import { Contract360Section } from '../contracts/Contract360Section';
 import { LinkContractModal, type LinkableAtaItemOption } from '../modals/LinkContractModal';
 import { useUnlinkContractFromItem } from '../../hooks/useUnlinkContractFromItem';
+import { useToast, useConfirmDialog } from '../../design-system';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 
@@ -63,18 +65,26 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   const [isLinkModalOpen, setIsLinkModalOpen] = React.useState(false);
   const unlinkMutation = useUnlinkContractFromItem();
+  const toast = useToast();
+  const confirm = useConfirmDialog();
   const [unlinkingId, setUnlinkingId] = React.useState<string | null>(null);
 
   const handleUnlink = async (link: EnrichedArpItemContract) => {
-    if (!window.confirm(`Desvincular o ${link.numeroContratoFormatado} do item ${link.itemKey.split('-').pop()} desta ata?`)) return;
+    const ok = await confirm({
+      title: 'Desvincular contrato',
+      message: `Desvincular o ${link.numeroContratoFormatado} do item ${link.itemKey.split('-').pop()} desta ata?`,
+      confirmLabel: 'Desvincular',
+      tone: 'danger'
+    });
+    if (!ok) return;
     setUnlinkingId(link.linkId);
     try {
       await unlinkMutation.mutateAsync({ linkId: link.linkId, itemKey: link.itemKey });
     } catch (err: any) {
       if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-        alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
+        toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
       } else {
-        alert(`Erro ao desvincular contrato: ${err?.message || 'Erro desconhecido'}`);
+        toast.error(`Erro ao desvincular contrato: ${err?.message || 'Erro desconhecido'}`);
       }
     } finally {
       setUnlinkingId(null);
@@ -82,107 +92,47 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   };
 
   if (isLoading) {
-    return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
-        <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '2.5rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)' }}>
-          <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: '#0c326f', margin: '0 auto 1rem auto' }} />
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
-            Carregando Visão 360° da Ata...
-          </h2>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
-            Sincronizando dados oficiais da Ata de Registro de Preços.
-          </p>
-        </div>
-      </div>
-    );
+    return <InstrumentPageState kind="loading" title="Carregando Visão 360° da Ata..." message="Sincronizando dados oficiais da Ata de Registro de Preços." />;
   }
 
   if (isError) {
     return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #fecaca', padding: '2.5rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
-            <AlertCircle size={24} />
-          </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#991b1b', margin: '0 0 0.5rem 0' }}>
-            Falha ao carregar a Ata
-          </h2>
-          <p style={{ fontSize: '0.88rem', color: '#64748b', maxWidth: '500px', margin: '0 auto 1.5rem auto' }}>
-            {error instanceof Error ? error.message : 'Não foi possível recuperar as informações da Ata.'}
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-            <button type="button" onClick={() => refetch()} style={{ padding: '0.5rem 1rem', backgroundColor: '#0c326f', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>
-              Tentar novamente
-            </button>
-            <button type="button" onClick={() => navigate('/atas')} style={{ padding: '0.5rem 1rem', backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
-              Voltar para Atas
-            </button>
-          </div>
-        </div>
-      </div>
+      <InstrumentPageState
+        kind="error"
+        title="Falha ao carregar a Ata"
+        message={error instanceof Error ? error.message : 'Não foi possível recuperar as informações da Ata.'}
+        onRetry={() => refetch()}
+        backLabel="Voltar para Atas"
+        onBack={() => navigate('/atas')}
+      />
     );
   }
 
   if (!arp) {
     return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
-        <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '3rem 2rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem auto' }}>
-            <Search size={26} />
-          </div>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
-            Ata não encontrada
-          </h2>
-          <p style={{ fontSize: '0.9rem', color: '#64748b', maxWidth: '550px', margin: '0 auto 1.75rem auto' }}>
-            A chave informada (<code style={{ backgroundColor: '#f1f5f9', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>{ataKey || 'N/A'}</code>) não corresponde a nenhuma Ata sincronizada na UASG {uasg}.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate('/atas')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', backgroundColor: '#0c326f', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
-          >
-            <ArrowLeft size={16} /> Voltar para lista de Atas
-          </button>
-        </div>
-      </div>
+      <InstrumentPageState
+        kind="notFound"
+        title="Ata não encontrada"
+        message={<>A chave informada (<code>{ataKey || 'N/A'}</code>) não corresponde a nenhuma Ata sincronizada na UASG {uasg}.</>}
+        backLabel="Voltar para lista de Atas"
+        onBack={() => navigate('/atas')}
+      />
     );
   }
 
   if (isScopedRole && loadingScope) {
-    return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
-        <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '2.5rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)' }}>
-          <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: '#0c326f', margin: '0 auto 1rem auto' }} />
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
-            Verificando permissão de acesso...
-          </h2>
-        </div>
-      </div>
-    );
+    return <InstrumentPageState kind="loading" title="Verificando permissão de acesso..." />;
   }
 
   if (isScopedRole && !isOwnAta) {
     return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #fecaca', padding: '2.5rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
-            <AlertCircle size={24} />
-          </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#991b1b', margin: '0 0 0.5rem 0' }}>
-            Acesso não autorizado
-          </h2>
-          <p style={{ fontSize: '0.88rem', color: '#64748b', maxWidth: '500px', margin: '0 auto 1.5rem auto' }}>
-            Esta Ata não está atribuída a você. Seu perfil de gestor só permite visualizar a Visão 360° das Atas onde você é o gestor titular.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate('/atas')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', backgroundColor: '#0c326f', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
-          >
-            <ArrowLeft size={16} /> Voltar para lista de Atas
-          </button>
-        </div>
-      </div>
+      <InstrumentPageState
+        kind="forbidden"
+        title="Acesso não autorizado"
+        message="Esta Ata não está atribuída a você. Seu perfil de gestor só permite visualizar a Visão 360° das Atas onde você é o gestor titular."
+        backLabel="Voltar para lista de Atas"
+        onBack={() => navigate('/atas')}
+      />
     );
   }
 

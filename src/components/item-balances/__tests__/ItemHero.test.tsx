@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ItemBalancesHeader } from '../ItemBalancesHeader';
+import { ItemHero, itemSaldoStatus } from '../ItemHero';
 import * as syncHookModule from '../../../hooks/useSyncItemEmpenhos';
 import type { ArpRecord, ArpItemRecord } from '../../../types';
 
@@ -54,7 +54,40 @@ const mockItem: ArpItemRecord = {
   nomeRazaoSocialFornecedor: 'TECNOLOGIA AVANCADA S/A'
 } as any;
 
-describe('ItemBalancesHeader Component — Integração UI de Sincronização de Empenhos no Item da Ata', () => {
+const report = {
+  quantidadeRegistrada: 100,
+  totalEmpenhadoApi: 30,
+  totalEmpenhadoManual: 0,
+  totalEmpenhado: 30,
+  saldoCalculado: 70,
+  saldoApi: 70,
+  divergencia: 0,
+  status: 'CONSISTENTE',
+  mensagem: ''
+} as any;
+
+const baseProps = {
+  arp: mockArp,
+  item: mockItem,
+  onBack: vi.fn(),
+  onRefresh: vi.fn(),
+  onGoTo: vi.fn(),
+  canSync: true,
+  report,
+  metrics: {
+    officialSaldo: 70,
+    itemTotalQty: 100,
+    totalEmpenhado: 30,
+    empenhoConsumidoPercent: 30,
+    rawEmpenhoPercentRestante: 70,
+    saldoAdesoes: 200,
+    limiteAdesao: 200,
+    valorFinanceiroDisponivel: 1750000,
+    valorFinanceiroConsumido: 750000
+  }
+};
+
+describe('ItemHero — topo do Item da Ata: indicadores, conferência e sincronização', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -70,41 +103,39 @@ describe('ItemBalancesHeader Component — Integração UI de Sincronização de
     reset: vi.fn()
   };
 
-  it('1. deve renderizar o botão "Sincronizar Empenhos" habilitado para perfil gestor', () => {
+  it('1. gestor e admin veem "Sincronizar empenhos" habilitado', () => {
     vi.mocked(syncHookModule.useSyncItemEmpenhos).mockReturnValue(defaultMockMutation as any);
 
     const html = renderToStaticMarkup(
-      <ItemBalancesHeader arp={mockArp} item={mockItem} onBack={vi.fn()} userRole="gestor" />
+      <ItemHero {...baseProps} canSync={true} />
     );
 
-    expect(html).toContain('Sincronizar Empenhos');
+    expect(html).toContain('Sincronizar empenhos');
     expect(html).not.toContain('disabled=""');
-    expect(html).not.toContain('Sincronizando...');
+    expect(html).not.toContain('Atualizando...');
   });
 
-  it('2. deve renderizar o botão desabilitado com tooltip para perfil consulta (RBAC)', () => {
+  it('2. quem não sincroniza vê apenas "Atualizar" (uma única ação, habilitada)', () => {
     vi.mocked(syncHookModule.useSyncItemEmpenhos).mockReturnValue(defaultMockMutation as any);
 
-    const html = renderToStaticMarkup(
-      <ItemBalancesHeader arp={mockArp} item={mockItem} onBack={vi.fn()} userRole="consulta" />
-    );
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} canSync={false} />);
 
-    expect(html).toContain('Sincronizar Empenhos');
-    expect(html).toContain('disabled=""');
-    expect(html).toContain('Você não possui permissão para sincronizar empenhos deste item.');
+    expect(html).toContain('Atualizar');
+    expect(html).not.toContain('Sincronizar empenhos');
+    expect(html).not.toContain('disabled=""');
   });
 
-  it('3. deve exibir spinner e estado "Sincronizando..." quando a mutação estiver pendente', () => {
+  it('3. deve exibir spinner e estado "Atualizando..." quando a mutação estiver pendente', () => {
     vi.mocked(syncHookModule.useSyncItemEmpenhos).mockReturnValue({
       ...defaultMockMutation,
       isPending: true
     } as any);
 
     const html = renderToStaticMarkup(
-      <ItemBalancesHeader arp={mockArp} item={mockItem} onBack={vi.fn()} userRole="gestor" />
+      <ItemHero {...baseProps} canSync={true} />
     );
 
-    expect(html).toContain('Sincronizando...');
+    expect(html).toContain('Atualizando...');
     expect(html).toContain('disabled=""');
   });
 
@@ -122,11 +153,11 @@ describe('ItemBalancesHeader Component — Integração UI de Sincronização de
     } as any);
 
     const html = renderToStaticMarkup(
-      <ItemBalancesHeader arp={mockArp} item={mockItem} onBack={vi.fn()} userRole="gestor" />
+      <ItemHero {...baseProps} canSync={true} />
     );
 
-    expect(html).toContain('Sincronização concluída. 4 empenho(s) processado(s) e saldo quantitativo do item atualizado com sucesso.');
-    expect(html).toContain('role="alert"');
+    expect(html).toContain('Sincronização concluída. 4 empenho(s) processado(s) e saldo do item atualizado.');
+    expect(html).toContain('item-sync-notice');
   });
 
   it('5. deve exibir banner de feedback SEM_DADOS quando nenhum empenho de consumo for localizado', () => {
@@ -143,7 +174,7 @@ describe('ItemBalancesHeader Component — Integração UI de Sincronização de
     } as any);
 
     const html = renderToStaticMarkup(
-      <ItemBalancesHeader arp={mockArp} item={mockItem} onBack={vi.fn()} userRole="gestor" />
+      <ItemHero {...baseProps} canSync={true} />
     );
 
     expect(html).toContain('Nenhum empenho de consumo localizado nas bases oficiais para este item da Ata.');
@@ -171,7 +202,7 @@ describe('ItemBalancesHeader Component — Integração UI de Sincronização de
     } as any);
 
     const html = renderToStaticMarkup(
-      <ItemBalancesHeader arp={mockArp} item={mockItem} onBack={vi.fn()} userRole="gestor" />
+      <ItemHero {...baseProps} canSync={true} />
     );
 
     expect(html).toContain('Dados sincronizados com 1 divergência(s) entre fontes.');
@@ -185,9 +216,39 @@ describe('ItemBalancesHeader Component — Integração UI de Sincronização de
     } as any);
 
     const html = renderToStaticMarkup(
-      <ItemBalancesHeader arp={mockArp} item={mockItem} onBack={vi.fn()} userRole="gestor" />
+      <ItemHero {...baseProps} canSync={true} />
     );
 
     expect(html).toContain('Falha de comunicação com a API Compras.gov.br');
+  });
+
+  it('8. mostra os indicadores uma única vez, com a conferência consistente', () => {
+    vi.mocked(syncHookModule.useSyncItemEmpenhos).mockReturnValue(defaultMockMutation as any);
+
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} />);
+
+    expect(html).toContain('Item 1');
+    expect(html).toContain('Saldo disponível');
+    expect(html).toContain('item-health-saldo');
+    expect(html).toContain('Consistente');
+    expect(html).toContain('Aceita adesão');
+    expect(html).toContain('TECNOLOGIA AVANCADA S/A');
+  });
+
+  it('9. conferência divergente destaca a diferença', () => {
+    vi.mocked(syncHookModule.useSyncItemEmpenhos).mockReturnValue(defaultMockMutation as any);
+
+    const html = renderToStaticMarkup(
+      <ItemHero {...baseProps} report={{ ...report, status: 'DIVERGENTE', saldoApi: 63, divergencia: 7 }} />
+    );
+
+    expect(html).toContain('Divergência +7 un');
+  });
+
+  it('10. situação do saldo segue as faixas das barras de progresso', () => {
+    expect(itemSaldoStatus(0, 0).label).toBe('Saldo esgotado');
+    expect(itemSaldoStatus(10, 10).label).toBe('Saldo crítico');
+    expect(itemSaldoStatus(40, 40).label).toBe('Saldo em atenção');
+    expect(itemSaldoStatus(80, 80).label).toBe('Saldo disponível');
   });
 });

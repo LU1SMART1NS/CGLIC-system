@@ -14,7 +14,7 @@ export const AllocationsPortfolioHeader: React.FC<AllocationsPortfolioHeaderProp
   onOpenManageDepartments,
   onOpenExportExcel
 }) => {
-  const handleOpenUnits = onOpenManageUnits || onOpenManageDepartments || (() => {});
+  const handleOpenUnits = onOpenManageUnits || onOpenManageDepartments;
 
   return (
     <PageHeader
@@ -23,14 +23,16 @@ export const AllocationsPortfolioHeader: React.FC<AllocationsPortfolioHeaderProp
       icon={<Coins size={26} color="#0c326f" aria-hidden="true" />}
       actions={
         <>
-          <AppButton
-            variant="outline"
-            icon={<Building2 size={14} />}
-            onClick={handleOpenUnits}
-            data-testid="allocations-manage-units-btn"
-          >
-            Unidades Internas
-          </AppButton>
+          {handleOpenUnits && (
+            <AppButton
+              variant="outline"
+              icon={<Building2 size={14} />}
+              onClick={handleOpenUnits}
+              data-testid="allocations-manage-units-btn"
+            >
+              Unidades Internas
+            </AppButton>
+          )}
           <AppButton
             variant="outline"
             icon={<FileSpreadsheet size={14} />}

@@ -136,8 +136,9 @@ describe('ManagementFinancialExecution Component (CGLIC 3.0 — Fase 9-I)', () =
 
     const html = renderToStaticMarkup(<ManagementFinancialExecution uasg="200331" />);
 
-    expect(html).toContain('Execução Orçamentária e Financeira Oficial');
-    expect(html).toContain('SIAFI / Contratos.gov');
+    // Sem cabeçalho nem botão de atualizar próprios (ficam no cabeçalho da página)
+    expect(html).not.toContain('Execução Orçamentária e Financeira Oficial');
+    expect(html).not.toContain('data-testid="empenhos-refresh-btn"');
 
     // Funil
     expect(html).toContain('5.000.000,00'); // Empenhado
@@ -198,7 +199,7 @@ describe('ManagementFinancialExecution Component (CGLIC 3.0 — Fase 9-I)', () =
     expect(html).toContain('50%');
 
     // Botões de drill-down para Contrato 360°
-    expect(html).toContain('Ver Detalhes');
+    expect(html).toContain('Ver contrato');
   });
 
   it('4. deve renderizar skeleton de loading sem exibir números 0 artificiais', () => {
@@ -260,20 +261,21 @@ describe('ManagementFinancialExecution Component (CGLIC 3.0 — Fase 9-I)', () =
       <ManagementFinancialExecution readModel={mockFinancialReadModel} isLoading={false} isError={false} />
     );
 
-    expect(html).toContain('data-testid="empenhos-search-input"');
+    expect(html).toContain('data-testid="empenhos-filter-bar"');
     expect(html).toContain('Buscar empenho, credor, contrato...');
-    expect(html).toContain('data-testid="empenhos-filter-todos"');
-    expect(html).toContain('data-testid="empenhos-filter-com-saldo"');
-    expect(html).toContain('data-testid="empenhos-filter-executados"');
+    expect(html).toContain('Todas as Situações');
+    expect(html).toContain('Com Saldo a Executar');
+    expect(html).toContain('100% Executados');
   });
 
-  it('8. deve conter nota de conformidade contábil e referência a v_empenhos_resumo', () => {
+  it('8. deve conter nota de conformidade sem expor nomes internos de views', () => {
     const html = renderToStaticMarkup(
       <ManagementFinancialExecution readModel={mockFinancialReadModel} isLoading={false} isError={false} />
     );
 
-    expect(html).toContain('Nota de Conformidade Contábil:');
-    expect(html).toContain('v_empenhos_resumo');
-    expect(html).toContain('v_arp_item_saldo_detalhado');
+    expect(html).toContain('data-testid="empenhos-footnote"');
+    expect(html).toContain('SIAFI');
+    expect(html).not.toContain('v_empenhos_resumo');
+    expect(html).not.toContain('v_arp_item_saldo_detalhado');
   });
 });

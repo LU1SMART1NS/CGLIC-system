@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { AppShell } from './components/layout/AppShell';
 import { SelectionProvider, useSelection } from './context/SelectionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider, ConfirmProvider } from './design-system';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { GestaoInstrumentosRoute } from './routes/GestaoInstrumentosRoute';
 import { ArpSearchRoute } from './routes/ArpSearchRoute';
@@ -23,7 +24,6 @@ import { DefinirSenhaRoute } from './routes/DefinirSenhaRoute';
 import { RedefinirSenhaRoute } from './routes/RedefinirSenhaRoute';
 import { RequireRole } from './components/auth/RequireRole';
 import { ExportExcelModal } from './components/modals/ExportExcelModal';
-import { ContractTaskTemplatesModal } from './components/modals/ContractTaskTemplatesModal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 
@@ -151,7 +151,6 @@ const ProtectedLayout: React.FC<{
 
 const AppContent: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
-  const [isContractTemplatesModalOpen, setIsContractTemplatesModalOpen] = useState<boolean>(false);
   const { selectedArp, globalArps, globalItemsByAta } = useSelection();
   const { pathname } = useLocation();
   const isPublicAuthRoute = ['/login', '/definir-senha', '/redefinir-senha'].includes(pathname);
@@ -171,7 +170,6 @@ const AppContent: React.FC = () => {
             <ProtectedLayout>
               <AppShell
                 onOpenExportModal={() => setIsExportModalOpen(true)}
-                onOpenContractTemplatesModal={() => setIsContractTemplatesModalOpen(true)}
               />
             </ProtectedLayout>
           }
@@ -220,7 +218,7 @@ const AppContent: React.FC = () => {
           <Route
             path="/atas/detalhe/:ataKey/itens/:numeroItem"
             element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
                 <ItemBalancesRoute />
               </RequireRole>
             }
@@ -302,11 +300,6 @@ const AppContent: React.FC = () => {
         selectedAta={selectedArp}
       />
 
-      <ContractTaskTemplatesModal
-        isOpen={isContractTemplatesModalOpen}
-        onClose={() => setIsContractTemplatesModalOpen(false)}
-      />
-
       {!isPublicAuthRoute && <AppFooter />}
     </div>
   );
@@ -317,9 +310,13 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <SelectionProvider>
-            <AppContent />
-          </SelectionProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <SelectionProvider>
+                <AppContent />
+              </SelectionProvider>
+            </ConfirmProvider>
+          </ToastProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

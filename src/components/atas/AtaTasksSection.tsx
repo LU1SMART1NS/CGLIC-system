@@ -40,6 +40,7 @@ import {
 } from '../contracts/planTaskEditing';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { AppButton } from '../../design-system/components/AppButton';
+import { useConfirmDialog } from '../../design-system';
 
 interface AtaTasksSectionProps {
   ataKey: string;
@@ -294,6 +295,7 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
   plan,
   isLoading = false
 }) => {
+  const confirm = useConfirmDialog();
   const { data: templates = [], isLoading: loadingTemplates } = useAtaTaskTemplates();
   const applyTemplateMutation = useApplyAtaTaskTemplate();
   const startPlanMutation = useStartAtaTaskPlan(ataKey);
@@ -306,13 +308,18 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [showApplyModel, setShowApplyModel] = useState(false);
 
-  const handleApplyTemplate = () => {
+  const handleApplyTemplate = async () => {
     if (!selectedTemplateId) return;
     const alreadyApplied = plan
       ? groupMacrotasksByModule(plan.macrotarefas, plan).some((g) => g.modulo?.templateId === selectedTemplateId)
       : false;
-    if (alreadyApplied && !window.confirm('Este modelo já foi aplicado a este plano. Acrescentar novamente vai duplicar as etapas e tarefas em um novo módulo. Deseja continuar?')) {
-      return;
+    if (alreadyApplied) {
+      const ok = await confirm({
+        title: 'Aplicar modelo novamente',
+        message: 'Este modelo já foi aplicado a este plano. Acrescentar novamente vai duplicar as etapas e tarefas em um novo módulo. Deseja continuar?',
+        confirmLabel: 'Aplicar mesmo assim'
+      });
+      if (!ok) return;
     }
     applyTemplateMutation.mutate(
       { ataKey, templateId: selectedTemplateId },
@@ -523,10 +530,14 @@ export const AtaTasksSection: React.FC<AtaTasksSectionProps> = ({
                 aplicaveis={group.aplicaveis}
                 etapas={group.macrotarefas.length}
                 isPending={deleteModuleMutation.isPending}
-                onDelete={() => {
-                  if (window.confirm(`Excluir o módulo "${group.modulo!.nome}" e todas as suas etapas e tarefas?`)) {
-                    deleteModuleMutation.mutate({ planId: plan.id, moduloId: group.modulo!.id });
-                  }
+                onDelete={async () => {
+                  const ok = await confirm({
+                    title: 'Excluir módulo',
+                    message: `Excluir o módulo "${group.modulo!.nome}" e todas as suas etapas e tarefas?`,
+                    confirmLabel: 'Excluir',
+                    tone: 'danger'
+                  });
+                  if (ok) deleteModuleMutation.mutate({ planId: plan.id, moduloId: group.modulo!.id });
                 }}
               />
             ) : (
