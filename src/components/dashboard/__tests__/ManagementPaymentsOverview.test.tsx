@@ -300,4 +300,23 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
     expect(html).toContain('data-testid="management-payments-overview-empty"');
     expect(html).toContain('Nenhum ciclo de pagamento registrado');
   });
+
+  it('8. deve mostrar contagem zerada (não a de ciclosRecentes) quando não há ciclos abertos', () => {
+    const allClosedModel: ManagementDashboardReadModel = {
+      ...mockPaymentsReadModel,
+      payments: {
+        ...mockPaymentsReadModel.payments,
+        totalCiclos: 1,
+        ciclosAbertosCount: 0,
+        ciclosAbertosDetalhe: [],
+        ciclosRecentes: mockPaymentsReadModel.payments.ciclosAbertosDetalhe ?? []
+      }
+    };
+
+    const html = renderToStaticMarkup(<ManagementPaymentsOverview readModel={allClosedModel} />);
+
+    expect(html).toContain('data-testid="payments-filter-empty"');
+    expect(html).toContain('Todos os ciclos (0)');
+    expect(html).not.toContain('Todos os ciclos (3)');
+  });
 });

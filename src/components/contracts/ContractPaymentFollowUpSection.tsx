@@ -138,6 +138,50 @@ const CyclePaymentTaskList: React.FC<{
   );
 };
 
+const TIPOS_INSTRUMENTO_COBRANCA = [
+  'Nota Fiscal Eletrônica',
+  'Nota Fiscal',
+  'Fatura',
+  'Apólice de Seguro',
+  'Boleto Bancário',
+  'Guia de Recolhimento',
+  'Multa',
+  'Ofício',
+  'Recibo',
+  'RPA'
+];
+
+/** Máscara de moeda BR em tempo real: cada dígito digitado é tratado como centavo (ex.: 150000 -> 1.500,00). */
+export function formatCurrencyInputBR(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  const cents = parseInt(digits, 10);
+  return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Máscara de data dd/mm/aaaa digitada como texto livre (sem depender do seletor
+ * nativo de calendário do navegador, que em alguns ambientes não permite
+ * escolher o dia). Insere as barras automaticamente conforme os dígitos.
+ */
+export function maskDateInputBR(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+  return [day, month, year].filter(Boolean).join('/');
+}
+
+/** Converte dd/mm/aaaa (completo) para yyyy-mm-dd; retorna '' se incompleta. */
+export function parseDateInputBR(display: string): string {
+  const digits = display.replace(/\D/g, '');
+  if (digits.length !== 8) return '';
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+  return `${year}-${month}-${day}`;
+}
+
 export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSectionProps> = ({
   contractKey
 }) => {
@@ -159,10 +203,13 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [tipoInstrumento, setTipoInstrumento] = useState('');
+  const [numeroInstrumento, setNumeroInstrumento] = useState('');
   const [documentoAtestoSei, setDocumentoAtestoSei] = useState('');
   const [valorAtesto, setValorAtesto] = useState('');
   const [dataAssinaturaAtesto, setDataAssinaturaAtesto] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   });
   const [dataVencimentoFatura, setDataVencimentoFatura] = useState('');
   const [responsavel, setResponsavel] = useState<ResponsavelValue>({ nome: '' });
@@ -180,14 +227,21 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
   const handleCreateCycle = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!competencia || !dataAssinaturaAtesto || !dataVencimentoFatura || !documentoAtestoSei) return;
+    const isoAssinatura = parseDateInputBR(dataAssinaturaAtesto);
+    const isoVencimento = parseDateInputBR(dataVencimentoFatura);
+    if (!competencia || !isoAssinatura || !isoVencimento || !tipoInstrumento || !documentoAtestoSei) return;
 
     const input: PaymentCycleInput = {
       contractKey,
       competencia: competencia,
-      dataAssinaturaAtesto: dataAssinaturaAtesto,
-      dataVencimentoFatura: dataVencimentoFatura,
+      dataAssinaturaAtesto: isoAssinatura,
+      dataVencimentoFatura: isoVencimento,
+      // Id. SEI do instrumento segue como identificador do ciclo (campo persistido existente)
       documentoAtestoSei: documentoAtestoSei.trim(),
+      observacoes: [
+        `Instrumento de cobrança: ${tipoInstrumento}`,
+        numeroInstrumento.trim() ? `Nº ${numeroInstrumento.trim()}` : ''
+      ].filter(Boolean).join(' - '),
       valorAtesto: valorAtesto ? parseFloat(valorAtesto.replace(/\./g, '').replace(',', '.')) : 0,
       responsavelNome: responsavelNome.trim() || undefined,
       responsavelUserId: responsavelNome.trim() ? responsavel.userId : undefined
@@ -198,6 +252,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     registerPaymentCycle(input)
       .then(() => {
         // Reset form & close modal
+        setTipoInstrumento('');
+        setNumeroInstrumento('');
         setDocumentoAtestoSei('');
         setValorAtesto('');
         setDataVencimentoFatura('');
@@ -412,10 +468,17 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                   </strong>
                   {cycle.input.documentoAtestoSei && (
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                      • Doc SEI: <strong>{cycle.input.documentoAtestoSei}</strong>
+                      • Id. SEI: <strong>{cycle.input.documentoAtestoSei}</strong>
                     </span>
                   )}
                 </div>
+
+                {cycle.input.observacoes && (
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.35rem' }}>
+                    <Info size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+                    {cycle.input.observacoes}
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.8rem', color: '#64748b', flexWrap: 'wrap' }}>
                   {describeResponsavel(cycle.input.responsavelNome, gestorNome) ? (
@@ -578,8 +641,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Registrar ciclo de atesto / faturamento"
-        size="md"
+        title="Registrar Ciclo de Instrumentos de Cobrança"
+        size="lg"
         dismissible={!isSavingCycle}
         testId="payment-cycle-modal"
       >
@@ -605,22 +668,47 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
-                  Nº Documento Atesto (SEI) *
+                  Tipo de Instrumento de Cobrança *
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Doc 12345678"
-                  value={documentoAtestoSei}
-                  onChange={e => setDocumentoAtestoSei(e.target.value)}
+                <select
+                  value={tipoInstrumento}
+                  onChange={e => setTipoInstrumento(e.target.value)}
                   required
-                  style={{
-                    width: '100%',
-                    padding: '0.55rem',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.88rem'
-                  }}
-                />
+                  style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                >
+                  <option value="">Selecione...</option>
+                  {TIPOS_INSTRUMENTO_COBRANCA.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Nº do Instrumento
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 1234"
+                    value={numeroInstrumento}
+                    onChange={e => setNumeroInstrumento(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Id. SEI *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 12345678"
+                    value={documentoAtestoSei}
+                    onChange={e => setDocumentoAtestoSei(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -629,9 +717,12 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     Data Assinatura Atesto *
                   </label>
                   <input
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="dd/mm/aaaa"
+                    maxLength={10}
                     value={dataAssinaturaAtesto}
-                    onChange={e => setDataAssinaturaAtesto(e.target.value)}
+                    onChange={e => setDataAssinaturaAtesto(maskDateInputBR(e.target.value))}
                     required
                     style={{
                       width: '100%',
@@ -647,9 +738,12 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     Vencimento da Fatura *
                   </label>
                   <input
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="dd/mm/aaaa"
+                    maxLength={10}
                     value={dataVencimentoFatura}
-                    onChange={e => setDataVencimentoFatura(e.target.value)}
+                    onChange={e => setDataVencimentoFatura(maskDateInputBR(e.target.value))}
                     required
                     style={{
                       width: '100%',
@@ -669,9 +763,10 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: 15450,00"
+                    inputMode="numeric"
+                    placeholder="Ex: 15.450,00"
                     value={valorAtesto}
-                    onChange={e => setValorAtesto(e.target.value)}
+                    onChange={e => setValorAtesto(formatCurrencyInputBR(e.target.value))}
                     style={{
                       width: '100%',
                       padding: '0.55rem',

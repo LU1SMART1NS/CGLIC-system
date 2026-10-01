@@ -11,9 +11,15 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ContractPaymentFollowUpSection } from '../ContractPaymentFollowUpSection';
+import {
+  ContractPaymentFollowUpSection,
+  formatCurrencyInputBR,
+  maskDateInputBR,
+  parseDateInputBR
+} from '../ContractPaymentFollowUpSection';
 import * as paymentFollowUpHookModule from '../../../hooks/useContractPaymentFollowUp';
 import type { ContractDashboardRecord } from '../../../types';
+import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 
 // Fase 10-A.2: useContractPaymentFollowUp passou a persistir via Supabase/React
 // Query (contract_payment_cycles) em vez de localStorage — precisa de um
@@ -91,5 +97,98 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
     // Deve deixar claro: CGLIC acompanha • CGOFI executa o pagamento
     expect(html).toContain('CGLIC acompanha • CGOFI executa o pagamento');
     expect(html).toContain('contract-payment-followup-section');
+  });
+
+  it('exibe o Id. SEI e o instrumento de cobrança (tipo/número) informados no ciclo', () => {
+    const mockCycle: PaymentFollowUpCycle = {
+      cycleKey: '200331-50-2024-PGTO-202609-NF100',
+      contractKey: '200331-50-2024',
+      competencia: '2026-09',
+      status: 'RECEBIDO',
+      input: {
+        contractKey: '200331-50-2024',
+        competencia: '2026-09',
+        dataAssinaturaAtesto: '2026-09-10',
+        dataVencimentoFatura: '2026-09-20',
+        documentoAtestoSei: '12345678',
+        observacoes: 'Instrumento de cobrança: Nota Fiscal Eletrônica - Nº 1234',
+        valorAtesto: 45000
+      },
+      prazos: {
+        diasUteisAteVencimento: 5,
+        janelaTotalDiasUteis: 10,
+        diasSemRespostaCgofi: 0,
+        margemEnvioDiasUteis: 5,
+        isVencida: false,
+        statusPrazo: 'NORMAL'
+      },
+      alerts: [],
+      criadoEm: '2026-09-10T09:00:00Z',
+      atualizadoEm: '2026-09-10T09:00:00Z'
+    };
+
+    vi.mocked(paymentFollowUpHookModule.useContractPaymentFollowUp).mockReturnValue({
+      cycles: [mockCycle],
+      alerts: [],
+      activeCount: 1,
+      completedCount: 0,
+      isLoading: false,
+      registerPaymentCycle: vi.fn().mockResolvedValue(null),
+      updatePaymentCycle: vi.fn().mockResolvedValue(null),
+      deletePaymentCycle: vi.fn().mockResolvedValue(undefined),
+      refetch: vi.fn()
+    });
+
+    const html = renderToStaticMarkup(
+      <ContractPaymentFollowUpSection
+        contract={mockContract}
+        contractKey="200331-50-2024"
+      />
+    );
+
+    expect(html).toContain('Id. SEI:');
+    expect(html).toContain('12345678');
+    expect(html).toContain('Instrumento de cobrança: Nota Fiscal Eletrônica - Nº 1234');
+  });
+
+  describe('formatCurrencyInputBR (máscara de moeda BR)', () => {
+    it('acumula dígitos como centavos, no padrão BR (milhar com ponto, decimal com vírgula)', () => {
+      expect(formatCurrencyInputBR('1')).toBe('0,01');
+      expect(formatCurrencyInputBR('150')).toBe('1,50');
+      expect(formatCurrencyInputBR('150000')).toBe('1.500,00');
+      expect(formatCurrencyInputBR('12321654')).toBe('123.216,54');
+    });
+
+    it('ignora caracteres não numéricos já presentes no valor mascarado', () => {
+      expect(formatCurrencyInputBR('1.500,00')).toBe('1.500,00');
+    });
+
+    it('retorna string vazia quando não há dígitos', () => {
+      expect(formatCurrencyInputBR('')).toBe('');
+      expect(formatCurrencyInputBR('R$ ')).toBe('');
+    });
+  });
+
+  describe('maskDateInputBR / parseDateInputBR (data digitada como texto, sem depender do seletor nativo)', () => {
+    it('insere as barras conforme os dígitos são digitados', () => {
+      expect(maskDateInputBR('0')).toBe('0');
+      expect(maskDateInputBR('01')).toBe('01');
+      expect(maskDateInputBR('0110')).toBe('01/10');
+      expect(maskDateInputBR('01102026')).toBe('01/10/2026');
+    });
+
+    it('ignora dígitos além dos 8 esperados (dd mm aaaa)', () => {
+      expect(maskDateInputBR('011020269999')).toBe('01/10/2026');
+    });
+
+    it('converte dd/mm/aaaa completa para yyyy-mm-dd', () => {
+      expect(parseDateInputBR('01/10/2026')).toBe('2026-10-01');
+      expect(parseDateInputBR('01102026')).toBe('2026-10-01');
+    });
+
+    it('retorna string vazia para datas incompletas', () => {
+      expect(parseDateInputBR('01/10')).toBe('');
+      expect(parseDateInputBR('')).toBe('');
+    });
   });
 });
