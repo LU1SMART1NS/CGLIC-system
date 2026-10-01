@@ -11,6 +11,21 @@ export function buildAtaKey(numeroAta: string, uasg: string): string {
   return `${numeroAta}-${uasg}`;
 }
 
+/** Endereço da Ata 360 (opcionalmente numa aba). */
+export function buildAtaPath(numeroAta: string, uasg: string, aba?: string): string {
+  return `/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, uasg))}${aba ? `?aba=${aba}` : ''}`;
+}
+
+/** Endereço próprio do detalhe (saldo) de um item da Ata — compartilhável e resistente a recarregar a página. */
+export function buildAtaItemPath(numeroAta: string, uasg: string, numeroItem: string | number): string {
+  return `/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, uasg))}/itens/${encodeURIComponent(String(numeroItem))}`;
+}
+
+/** UASG embutida na chave da Ata ("00059/2025-200331" → "200331"). */
+export function uasgFromAtaKey(ataKey?: string): string | undefined {
+  return /-(\d{6})$/.exec((ataKey || '').trim())?.[1];
+}
+
 /**
  * Hook canônico para recuperar uma única Ata (+ seus itens) por ataKey
  * (`${numeroAta}-${uasg}`), no mesmo espírito de useContract.ts: reaproveita
@@ -49,6 +64,17 @@ export function useAta(ataKey?: string, uasg: string = '200331') {
 }
 
 /** Saldo físico (homologado/consumido/percentual) dos itens de UMA Ata, via v_arp_item_saldo_detalhado. */
+/** Saldos por item de todas as Atas da UASG (mesmo cache de useAtaItemSaldos). */
+export function useAllAtaItemSaldos(uasg: string = '200331') {
+  const cleanUasg = uasg?.trim() || '200331';
+
+  return useQuery({
+    queryKey: ['ata-item-saldos', cleanUasg] as const,
+    queryFn: () => fetchArpItemSaldosFromDb(cleanUasg),
+    staleTime: 5 * 60 * 1000
+  });
+}
+
 export function useAtaItemSaldos(numeroAta?: string, uasg: string = '200331') {
   const cleanUasg = uasg?.trim() || '200331';
 

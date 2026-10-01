@@ -12,7 +12,7 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
-// AtaCard renderiza AtaManagerSelector (seletor de "Gestor da Ata"), que
+// A coluna Gestor (ManagerCell) usa hooks de gestores/usuários/perfis, que
 // depende destes hooks de dados — mockados para o teste 4 continuar sendo um
 // render puro de componente, sem QueryClientProvider.
 vi.mock('../../hooks/useAtaManagers', () => ({
@@ -98,12 +98,12 @@ const mockCard: AtaGroupedCard = {
   totalItens: 1
 };
 
-describe('ArpSearch & Componentes — FASE 9-G: Consulta e Vigência de Atas', () => {
+describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('1. deve renderizar o cabeçalho padronizado "Consulta e Vigência"', () => {
+  it('1. deve renderizar o cabeçalho padronizado "Carteira de Atas"', () => {
     const html = renderToStaticMarkup(
       <ArpPortfolioHeader
         syncInfo={{ isCachedInDb: true, status: 'IDLE' }}
@@ -111,8 +111,8 @@ describe('ArpSearch & Componentes — FASE 9-G: Consulta e Vigência de Atas', (
       />
     );
 
-    expect(html).toContain('Consulta e Vigência');
-    expect(html).toContain('Acompanhe atas de registro de preços, vigências, fornecedores e saldos físicos.');
+    expect(html).toContain('Carteira de Atas');
+    expect(html).toContain('Todas as atas de registro de preços, com vigência, consumo de saldo e gestor.');
     expect(html).toContain('Atualizar');
     expect(html).not.toContain('totalUGRegisteredValue');
   });
@@ -122,26 +122,27 @@ describe('ArpSearch & Componentes — FASE 9-G: Consulta e Vigência de Atas', (
       <ArpPortfolioSummary
         totalAtas={10}
         vigentes={8}
-        aVencer90d={2}
-        expiradas={2}
-        activeStatus="TODAS"
+        criticos={1}
+        atencao={2}
+        historico={2}
+        activeStatus="VIGENTES"
         onSelectStatus={vi.fn()}
       />
     );
 
-    expect(html).toContain('Total de Atas');
-    expect(html).toContain('10');
-    expect(html).toContain('Atas Vigentes');
-    expect(html).toContain('8');
-    expect(html).toContain('Próximas do Vencimento');
-    expect(html).toContain('2');
-    expect(html).toContain('Expiradas / Canceladas');
+    expect(html).toContain('de 10 atas');
+    expect(html).toContain('Vigentes');
+    expect(html).toContain('>8<');
+    expect(html).toContain('Crítico (≤30 dias)');
+    expect(html).toContain('Atenção (31–90 dias)');
+    expect(html).toContain('Histórico');
+    expect(html).toContain('Expiradas / canceladas');
   });
 
   it('3. deve renderizar a barra de filtros em linha com busca textual e opções', () => {
     const html = renderToStaticMarkup(
       <ArpPortfolioFilters
-        filters={{ statusVigencia: 'TODAS', filtroAlocacao: 'TODAS', filtroEmpenho: 'TODAS', busca: '' }}
+        filters={{ statusVigencia: 'TODOS', filtroAlocacao: 'TODAS', filtroEmpenho: 'TODAS', busca: '' }}
         onChangeFilter={vi.fn()}
         onResetFilters={vi.fn()}
         totalFiltered={5}
@@ -156,7 +157,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Consulta e Vigência de Atas', (
     expect(html).toContain('5 Atas');
   });
 
-  it('4. deve renderizar a lista de cards de Atas com itens e fornecedor', () => {
+  it('4. deve renderizar a tabela de Atas com fornecedor, itens e ação de detalhes', () => {
     const html = renderToStaticMarkup(
       <ArpPortfolioList
         cards={[mockCard]}
@@ -169,6 +170,24 @@ describe('ArpSearch & Componentes — FASE 9-G: Consulta e Vigência de Atas', (
 
     expect(html).toContain('ATA 00001/2025');
     expect(html).toContain('Proteção Tática Brasil Ltda');
+    expect(html).toContain('1 item');
+    expect(html).toContain('Ver Detalhes');
+    // Itens ficam recolhidos por padrão: só aparecem ao expandir a linha.
+    expect(html).not.toContain('Colete Balístico Nível III-A');
+  });
+
+  it('4b. deve abrir a linha já mostrando o item quando a busca casa apenas por item', () => {
+    const html = renderToStaticMarkup(
+      <ArpPortfolioList
+        cards={[mockCard]}
+        totalAtas={1}
+        busca="colete"
+        onSelectArp={vi.fn()}
+        onSelectItem={vi.fn()}
+        onResetFilters={vi.fn()}
+      />
+    );
+
     expect(html).toContain('Colete Balístico Nível III-A');
   });
 

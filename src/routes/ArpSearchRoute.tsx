@@ -2,21 +2,19 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArpSearch } from '../components/ArpSearch';
 import { useSelection } from '../context/SelectionContext';
+import { buildAtaItemPath, buildAtaPath } from '../hooks/useAta';
 import type { ArpRecord, ArpItemRecord } from '../types';
 
 export const ArpSearchRoute: React.FC = () => {
   const navigate = useNavigate();
-  const { setSelectedArp, setSelectedItem, setGlobalArps, setGlobalItemsByAta } = useSelection();
+  const { setGlobalArps, setGlobalItemsByAta } = useSelection();
 
   const handleSelectArp = (arp: ArpRecord) => {
-    setSelectedArp(arp);
-    navigate('/atas/itens');
+    navigate(buildAtaPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora));
   };
 
   const handleSelectItemFromSearch = (arp: ArpRecord, item: ArpItemRecord) => {
-    setSelectedArp(arp);
-    setSelectedItem(item);
-    navigate('/atas/itens/saldo');
+    navigate(buildAtaItemPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem));
   };
 
   return (

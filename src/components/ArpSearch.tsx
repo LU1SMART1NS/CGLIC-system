@@ -5,7 +5,13 @@ import { runFullSync, checkAndTriggerAutoSync, getLastSyncMetadata } from '../se
 import { groupArpsAndItems } from '../utils/ataGrouping';
 import { ArpPortfolioHeader } from './atas/ArpPortfolioHeader';
 import { ArpPortfolioSummary, type ArpVigenciaFilterOption } from './atas/ArpPortfolioSummary';
-import { ArpPortfolioFilters, type ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
+import { buildAtaSaldoStats } from './atas/ataSaldoStats';
+import { classifyPrazo, matchesStatusFilter, comparePrazo } from './carteira/carteiraPrazo';
+import { useAllAtaItemSaldos } from '../hooks/useAta';
+import { useAllAtaManagers, useArpItemContractLinks } from '../hooks/useAtaManagers';
+import { useAuth } from '../context/AuthContext';
+import { canAssignManager } from './carteira/ManagerAssign';
+import { ArpPortfolioFilters, DEFAULT_ARP_FILTERS, type ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
 import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { getArpVigenciaStatus } from '../services/temporalEngineService';
@@ -19,16 +25,14 @@ interface ArpSearchProps {
 }
 
 /**
- * Regra de vigência de Ata canônica (Fase 10-A.2 — temporalEngineService.getArpVigenciaStatus).
- * `isCanceladaPncp` continua sendo um critério adicional de expiração próprio
- * deste contexto (fonte PNCP), fora da regra de datas em si.
+ * Faixa de prazo da Ata (mesmas faixas da Visão Geral: crítico ≤30 dias, atenção 31–90).
+ * Vigência vem do motor temporal canônico (temporalEngineService.getArpVigenciaStatus);
+ * `isCanceladaPncp` continua sendo um critério adicional de encerramento (fonte PNCP).
  */
-function checkArpExpiration(arp: ArpRecord) {
-  const vigenciaStatus = getArpVigenciaStatus(arp.dataVigenciaFinal);
-  const isExpired = Boolean(arp.isCanceladaPncp || vigenciaStatus?.isExpirada);
-  const isExpiringSoon = !isExpired && Boolean(vigenciaStatus?.isExpirandoEm90Dias);
-
-  return { isExpired, isExpiringSoon };
+function getArpPrazo(arp: ArpRecord) {
+  const dias = getArpVigenciaStatus(arp.dataVigenciaFinal)?.diasRestantes ?? null;
+  const faixa = classifyPrazo(dias, Boolean(arp.isCanceladaPncp));
+  return { dias, faixa };
 }
 
 export const ArpSearch: React.FC<ArpSearchProps> = ({
@@ -43,12 +47,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     numeroAtaRegistroPreco: ''
   });
 
-  const [filterState, setFilterState] = useState<ArpPortfolioFilterState>({
-    statusVigencia: 'TODAS',
-    filtroAlocacao: 'TODAS',
-    filtroEmpenho: 'TODAS',
-    busca: ''
-  });
+  const [filterState, setFilterState] = useState<ArpPortfolioFilterState>(DEFAULT_ARP_FILTERS);
 
   const [arps, setArps] = useState<ArpRecord[]>([]);
 
@@ -210,51 +209,46 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   }, []);
 
   const handleResetFilters = useCallback(() => {
-    setFilterState({
-      statusVigencia: 'TODAS',
-      filtroAlocacao: 'TODAS',
-      filtroEmpenho: 'TODAS',
-      busca: ''
-    });
+    setFilterState(DEFAULT_ARP_FILTERS);
   }, []);
 
   // Summary Metrics
   const summaryMetrics = useMemo(() => {
-    let total = 0;
     let vigentes = 0;
-    let aVencer90d = 0;
-    let expiradas = 0;
+    let criticos = 0;
+    let atencao = 0;
+    let historico = 0;
+    let valorVigenteTotal = 0;
+    let valorCritico = 0;
+    let valorAtencao = 0;
 
     for (const arp of scopedArps) {
-      total++;
-      const { isExpired, isExpiringSoon } = checkArpExpiration(arp);
-      if (isExpired) {
-        expiradas++;
-      } else if (isExpiringSoon) {
-        aVencer90d++;
-        vigentes++; // Próximas do vencimento ainda são vigentes
-      } else {
-        vigentes++;
+      const { faixa } = getArpPrazo(arp);
+      if (faixa === 'EXPIRADO') {
+        historico++;
+        continue;
+      }
+      if (faixa === 'SEM_DATA') continue;
+      vigentes++;
+      const valor = Number(arp.valorTotal) || 0;
+      valorVigenteTotal += valor;
+      if (faixa === 'CRITICO') {
+        criticos++;
+        valorCritico += valor;
+      } else if (faixa === 'ATENCAO') {
+        atencao++;
+        valorAtencao += valor;
       }
     }
 
-    return {
-      total,
-      vigentes,
-      aVencer90d,
-      expiradas
-    };
+    return { total: scopedArps.length, vigentes, criticos, atencao, historico, valorVigenteTotal, valorCritico, valorAtencao };
   }, [scopedArps]);
 
   // Filtragem determinística de Atas
   const filteredArps = useMemo(() => {
     return scopedArps.filter(arp => {
-      const { isExpired, isExpiringSoon } = checkArpExpiration(arp);
-
       // 1. Filtro de Vigência
-      if (filterState.statusVigencia === 'VIGENTE' && isExpired) return false;
-      if (filterState.statusVigencia === 'A_VENCER_90D' && !isExpiringSoon) return false;
-      if (filterState.statusVigencia === 'EXPIRADA' && !isExpired) return false;
+      if (!matchesStatusFilter(getArpPrazo(arp).faixa, filterState.statusVigencia)) return false;
 
       // 2. Filtro de Alocação
       const cleanAta = (arp.numeroAtaRegistroPreco || '').replace(/^0+/, '');
@@ -270,6 +264,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       // 4. Busca Textual
       if (filterState.busca.trim().length > 0) {
         const query = filterState.busca.trim().toLowerCase();
+        const queryDigits = query.replace(/\D/g, '');
         const numAta = (arp.numeroAtaRegistroPreco || '').toLowerCase();
         const objeto = (arp.objeto || '').toLowerCase();
         const ataKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
@@ -280,7 +275,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
           objeto.includes(query) ||
           items.some(item =>
             (item.nomeRazaoSocialFornecedor || '').toLowerCase().includes(query) ||
-            (item.niFornecedor || '').includes(query.replace(/\D/g, '')) ||
+            (queryDigits.length >= 3 && (item.niFornecedor || '').replace(/\D/g, '').includes(queryDigits)) ||
             (item.descricaoItem || '').toLowerCase().includes(query)
           );
 
@@ -288,20 +283,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       }
 
       return true;
-    }).sort((a, b) => {
-      // Ordenação decrescente: ano/número
-      const partsA = a.numeroAtaRegistroPreco.split('/');
-      const partsB = b.numeroAtaRegistroPreco.split('/');
-      if (partsA.length === 2 && partsB.length === 2) {
-        const numA = parseInt(partsA[0], 10);
-        const yearA = parseInt(partsA[1], 10);
-        const numB = parseInt(partsB[0], 10);
-        const yearB = parseInt(partsB[1], 10);
-        if (yearA !== yearB) return yearB - yearA;
-        return numB - numA;
-      }
-      return b.numeroAtaRegistroPreco.localeCompare(a.numeroAtaRegistroPreco);
-    });
+    }).sort((a, b) => comparePrazo(getArpPrazo(a).dias, getArpPrazo(b).dias));
   }, [scopedArps, filterState, allocationsDbSet, empenhosDbSet, itemsByAta]);
 
   // Carregar itens para as atas filtradas
@@ -310,6 +292,26 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       loadItemsForArps(filteredArps.slice(0, 15));
     }
   }, [filteredArps, loadItemsForArps]);
+
+  // Consumo de saldo por item e gestor por ata (mesmas fontes do detalhe da Ata e da Visão Geral).
+  const { data: saldosData } = useAllAtaItemSaldos(params.codigoUnidadeGerenciadora);
+  const saldoStatsByAta = useMemo(() => buildAtaSaldoStats(saldosData || []), [saldosData]);
+  const { data: ataManagers } = useAllAtaManagers();
+  const gestorByAta = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [ataKey, manager] of Object.entries(ataManagers || {})) {
+      if (manager?.gestorNome) map[ataKey] = manager.gestorNome;
+    }
+    return map;
+  }, [ataManagers]);
+
+  // Atribuição de gestor na própria carteira (admin e gestor), com propagação
+  // Ata ↔ contratos vinculados — ver managerAssignmentService.
+  const { role } = useAuth();
+  const canAssign = canAssignManager(role);
+  const { data: links = [] } = useArpItemContractLinks(canAssign);
+  const assignContext = useMemo(() => ({ links }), [links]);
+
 
   // Agrupamento de cards
   const groupedCards = useMemo(() => {
@@ -347,8 +349,12 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       <ArpPortfolioSummary
         totalAtas={summaryMetrics.total}
         vigentes={summaryMetrics.vigentes}
-        aVencer90d={summaryMetrics.aVencer90d}
-        expiradas={summaryMetrics.expiradas}
+        criticos={summaryMetrics.criticos}
+        atencao={summaryMetrics.atencao}
+        historico={summaryMetrics.historico}
+        valorVigenteTotal={summaryMetrics.valorVigenteTotal}
+        valorCritico={summaryMetrics.valorCritico}
+        valorAtencao={summaryMetrics.valorAtencao}
         activeStatus={filterState.statusVigencia}
         onSelectStatus={handleSelectStatus}
       />
@@ -362,10 +368,16 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       />
 
       <ArpPortfolioList
+        canAssign={canAssign}
+        assignContext={assignContext}
         cards={groupedCards}
         totalAtas={scopedArps.length}
         isLoading={loading}
         itemsLoadingByAta={itemsLoadingByAta}
+        saldoStatsByAta={saldoStatsByAta}
+        gestorByAta={gestorByAta}
+        busca={filterState.busca}
+        onExpandAta={loadItemsForArp}
         onSelectArp={onSelectArp}
         onSelectItem={(arp, item) => {
           if (onSelectItem) {

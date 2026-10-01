@@ -7,9 +7,19 @@ import * as useAssignedManagementScopeModule from '../../../hooks/useAssignedMan
 import * as authContextModule from '../../../context/AuthContext';
 import type { ArpRecord, ArpItemRecord } from '../../../types';
 
+let mockSearch = '';
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ ataKey: '00011%2F2026-200331' }),
-  useNavigate: () => vi.fn()
+  useNavigate: () => vi.fn(),
+  useSearchParams: () => [new URLSearchParams(mockSearch), vi.fn()]
+}));
+
+vi.mock('../../../hooks/useAtaTaskPlan', () => ({
+  useAtaTaskPlan: () => ({ data: null, isLoading: false })
+}));
+
+vi.mock('../../../context/SelectionContext', () => ({
+  useSelection: () => ({ setSelectedArp: vi.fn(), setSelectedItem: vi.fn() })
 }));
 
 const mockArp: ArpRecord = {
@@ -81,6 +91,7 @@ function renderPage() {
 describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearch = '';
     vi.spyOn(useAtaModule, 'useAta').mockReturnValue({
       arp: mockArp,
       itens: mockItens,
@@ -109,7 +120,7 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
     } as any);
   });
 
-  it('1. renderiza header, saldo do item e dados cadastrais para perfil "admin" (escopo global)', () => {
+  it('1. renderiza cabeçalho com dados cadastrais, faixa de saúde e abas para perfil "admin" (escopo global)', () => {
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
       user: { id: 'admin-user' } as any,
       session: null,
@@ -127,9 +138,46 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
     const html = renderPage();
 
     expect(html).toContain('Ata 00011/2026');
-    expect(html).toContain('Colete Balístico Nível III-A');
-    expect(html).toContain('Saldo físico sob controle');
+    // Dados cadastrais agora no cabeçalho, como no Contrato 360
+    expect(html).toContain('data-testid="ata-header-metadata"');
+    expect(html).toContain('Pregão Eletrônico');
+    // Faixa de saúde e abas no padrão do Contrato 360
+    expect(html).toContain('data-testid="ata-health-strip"');
+    expect(html).toContain('Maior consumo de saldo');
+    expect(html).toContain('40%');
+    expect(html).toContain('Plano de gestão');
+    expect(html).toContain('Itens (1)');
+    expect(html).toContain('Contratos vinculados');
+    // Aba padrão = Ações; itens ficam na aba própria
+    expect(html).toContain('data-testid="ata-action-queue"');
+    // Gestor é só informação no 360 (atribuição fica na Carteira)
+    expect(html).toContain('data-testid="ata-manager-info"');
+    expect(html).not.toContain('>Atribuir<');
+    expect(html).not.toContain('Colete Balístico Nível III-A');
     expect(html).not.toContain('Acesso não autorizado');
+  });
+
+  it('1b. aba "Itens" mostra a tabela de saldo com ação para abrir o item', () => {
+    mockSearch = 'aba=itens';
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: 'admin-user' } as any,
+      session: null,
+      loading: false,
+      role: 'admin',
+      roleStatus: 'ready',
+      signOut: vi.fn()
+    });
+    vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({
+      contractKeys: undefined,
+      ataKeys: undefined,
+      isLoading: false
+    });
+
+    const html = renderPage();
+
+    expect(html).toContain('data-testid="ata-items-table"');
+    expect(html).toContain('Colete Balístico Nível III-A');
+    expect(html).toContain('Ver saldo');
   });
 
   it('2. bloqueia o acesso quando o gestor logado não é o gestor titular da Ata', () => {
@@ -174,7 +222,7 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
     expect(html).toContain('Ata 00011/2026');
   });
 
-  it('4. exibe item com saldo crítico (≥70%) na Central de Atenção', () => {
+  it('4. exibe item com saldo crítico na fila de Ações da ata', () => {
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
       user: { id: 'admin-user' } as any,
       session: null,
@@ -204,8 +252,9 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
 
     const html = renderPage();
 
-    expect(html).not.toContain('Saldo físico sob controle');
+    expect(html).not.toContain('Tudo em dia com esta ata');
     expect(html).toContain('92.0% consumido');
+    expect(html).toContain('Ações (');
   });
 
   it('5. exibe estado "Ata não encontrada" quando a busca não retorna resultado', () => {
@@ -235,5 +284,102 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
     const html = renderPage();
 
     expect(html).toContain('Ata não encontrada');
+  });
+});
+
+describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () => {
+  const asRole = (role: 'admin' | 'leitor') => {
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: `${role}-user` } as any,
+      session: null,
+      loading: false,
+      role,
+      roleStatus: 'ready',
+      signOut: vi.fn()
+    });
+    vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({
+      contractKeys: undefined,
+      ataKeys: undefined,
+      isLoading: false
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearch = 'aba=contratos';
+    vi.spyOn(useAtaModule, 'useAta').mockReturnValue({
+      arp: mockArp,
+      itens: mockItens,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn()
+    } as any);
+    vi.spyOn(useAtaModule, 'useAtaItemSaldos').mockReturnValue({ saldos: [], isLoading: false } as any);
+  });
+
+  it('estado vazio oferece "Vincular contrato" para admin', () => {
+    asRole('admin');
+    vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({ linkedContracts: [], isLoading: false } as any);
+
+    const html = renderPage();
+    expect(html).toContain('Nenhum contrato vinculado.');
+    expect(html).toContain('Vincular contrato');
+  });
+
+  it('leitor não vê ações de vincular/desvincular', () => {
+    asRole('leitor');
+    vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({
+      linkedContracts: [
+        {
+          linkId: 'l1',
+          itemKey: '00011/2026-200331-00001',
+          contractKey: '200331-00005-2026',
+          quantidadeContratada: 10,
+          numeroContratoFormatado: '00005/2026',
+          uasg: '200331',
+          orgaoNome: 'SENASP',
+          fornecedorNome: 'Equipamentos de Proteção Ltda',
+          fornecedorCnpjCpf: '',
+          fornecedorCnpj: '',
+          isOficial: true
+        }
+      ],
+      isLoading: false
+    } as any);
+
+    const html = renderPage();
+    expect(html).toContain('00005/2026');
+    expect(html).toContain('Item 00001');
+    expect(html).not.toContain('Vincular contrato');
+    expect(html).not.toContain('Desvincular');
+  });
+
+  it('admin vê "Desvincular" em cada vínculo e "Vincular contrato" no cabeçalho da seção', () => {
+    asRole('admin');
+    vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({
+      linkedContracts: [
+        {
+          linkId: 'l1',
+          itemKey: '00011/2026-200331-00001',
+          contractKey: '200331-00005-2026',
+          quantidadeContratada: 10,
+          numeroContratoFormatado: '00005/2026',
+          uasg: '200331',
+          orgaoNome: 'SENASP',
+          fornecedorNome: 'Equipamentos de Proteção Ltda',
+          fornecedorCnpjCpf: '',
+          fornecedorCnpj: '',
+          isOficial: true
+        }
+      ],
+      isLoading: false
+    } as any);
+
+    const html = renderPage();
+    expect(html).toContain('Desvincular');
+    expect(html).toContain('Vincular contrato');
+    expect(html).toContain('Contratos vinculados (1)');
   });
 });

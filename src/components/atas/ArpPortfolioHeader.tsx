@@ -19,8 +19,8 @@ export const ArpPortfolioHeader: React.FC<ArpPortfolioHeaderProps> = ({
 }) => {
   return (
     <PageHeader
-      title="Consulta e Vigência"
-      subtitle="Acompanhe atas de registro de preços, vigências, fornecedores e saldos físicos."
+      title="Carteira de Atas"
+      subtitle="Todas as atas de registro de preços, com vigência, consumo de saldo e gestor."
       icon={<Package size={26} color="#0c326f" aria-hidden="true" />}
       actions={
         onTriggerSync && (
