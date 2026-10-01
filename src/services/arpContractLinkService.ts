@@ -15,6 +15,7 @@ import {
   dismissContractSuggestionRpc,
   restoreContractSuggestionRpc
 } from '../adapters/arpContractLinkRpcAdapter';
+import { displayContractNumber } from '../utils/contractNumber';
 
 /**
  * Consulta os vínculos de um item de ARP com contratos oficiais diretamente da SSOT (PostgreSQL).
@@ -54,8 +55,10 @@ export async function fetchArpItemContractLinks(itemKey: string): Promise<ArpIte
     id: String(d.id),
     itemKey: d.item_key,
     contractKey: d.contract_key,
-    quantidadeContratada: Number(d.quantidade_contratada) || 0,
     observacoes: d.observacoes || undefined,
+    quantidadeContratadaApi: d.quantidade_contratada_api == null ? null : Number(d.quantidade_contratada_api),
+    valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
+    quantidadeLidaEm: d.quantidade_lida_em || undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at
   }));
@@ -73,9 +76,6 @@ export async function saveArpItemContractLink(
 
   if (!cleanItemKey) throw new Error('A chave do item da ata é obrigatória.');
   if (!cleanContractKey) throw new Error('A chave canônica do contrato oficial é obrigatória.');
-  if (params.quantidadeContratada <= 0) {
-    throw new Error('A quantidade contratada deve ser estritamente maior que zero.');
-  }
 
   const res = await linkContractToItemRpc(params);
 
@@ -83,7 +83,6 @@ export async function saveArpItemContractLink(
     id: res.id,
     itemKey: res.item_key,
     contractKey: res.contract_key,
-    quantidadeContratada: res.quantidade_contratada,
     observacoes: params.observacoes,
     updatedAt: res.timestamp
   };
@@ -95,10 +94,7 @@ export async function saveArpItemContractLink(
  */
 export async function saveArpContractItemLinks(params: LinkContractToItemsParams): Promise<number> {
   if (!(params.contractKey || '').trim()) throw new Error('A chave canônica do contrato oficial é obrigatória.');
-  if (!params.links || params.links.length === 0) throw new Error('Selecione ao menos um item para vincular.');
-  if (params.links.some((l) => !(l.quantidadeContratada > 0))) {
-    throw new Error('A quantidade contratada de cada item deve ser maior que zero.');
-  }
+  if (!params.itemKeys || params.itemKeys.length === 0) throw new Error('Selecione ao menos um item para vincular.');
 
   const res = await linkContractToItemsRpc(params);
   return res.count;
@@ -234,8 +230,10 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
       id: String(d.id),
       itemKey: d.item_key,
       contractKey: d.contract_key,
-      quantidadeContratada: Number(d.quantidade_contratada) || 0,
       observacoes: d.observacoes || undefined,
+      quantidadeContratadaApi: d.quantidade_contratada_api == null ? null : Number(d.quantidade_contratada_api),
+      valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
+      quantidadeLidaEm: d.quantidade_lida_em || undefined,
       createdAt: d.created_at,
       updatedAt: d.updated_at
     }));
@@ -251,7 +249,9 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
  */
 export function enrichContractLinks(
   links: ArpItemContractLink[],
-  officialContracts: ContractDashboardRecord[]
+  officialContracts: ContractDashboardRecord[],
+  /** Quantidade do item em cada contrato (API oficial), por chave de contrato em maiúsculas. */
+  quantidades?: ReadonlyMap<string, number>
 ): EnrichedArpItemContract[] {
   if (!links || links.length === 0) return [];
 
@@ -275,10 +275,11 @@ export function enrichContractLinks(
         linkId: link.id,
         itemKey: link.itemKey,
         contractKey: link.contractKey,
-        quantidadeContratada: link.quantidadeContratada,
+        quantidadeContratada: quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined,
+        quantidadeLidaEm: link.quantidadeLidaEm,
         observacoes: link.observacoes,
         contract,
-        numeroContratoFormatado: contract.numeroFormatado || `Contrato ${contract.numero}/${contract.ano}`,
+        numeroContratoFormatado: displayContractNumber(contract) || `Contrato ${contract.numero}/${contract.ano}`,
         uasg,
         orgaoNome,
         fornecedorNome: contract.fornecedorNome || 'Não informado',
@@ -301,7 +302,8 @@ export function enrichContractLinks(
       linkId: link.id,
       itemKey: link.itemKey,
       contractKey: link.contractKey,
-      quantidadeContratada: link.quantidadeContratada,
+      quantidadeContratada: quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined,
+        quantidadeLidaEm: link.quantidadeLidaEm,
       observacoes: link.observacoes,
       numeroContratoFormatado: `Contrato ${numeroDisplay}`,
       uasg,

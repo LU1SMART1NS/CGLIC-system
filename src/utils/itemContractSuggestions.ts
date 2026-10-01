@@ -9,8 +9,13 @@ import {
 export type ItemContractSuggestionSource = 'pncp' | 'catalogo';
 
 export interface ItemContractSuggestion {
-  /** Chave gravada em arp_item_contract_links.contract_key ao vincular. */
+  /**
+   * Chave gravada em arp_item_contract_links.contract_key ao vincular. Quando `linkable` é falso é só
+   * um identificador estável para descartar a sugestão (prefixo "PNCP:"), nunca uma chave de contrato.
+   */
   contractKey: string;
+  /** Falso quando a API não informa a UASG do contrato: dá para ver e descartar, não para vincular. */
+  linkable: boolean;
   sources: ItemContractSuggestionSource[];
   /** Registro do catálogo oficial, quando o contrato foi encontrado nele. */
   contract?: ContractDashboardRecord;
@@ -77,9 +82,47 @@ function findOfficialMatch(
 function fallbackKeyFromPncp(pncp: PncpContract): string {
   const uasg = digits(pncp.uasg);
   const numeroAno = numeroAnoKey(pncp.numeroContrato, pncp.anoContrato, pncp.numeroControlePncp);
-  if (!uasg || !numeroAno) return '';
+  if (uasg.length !== 6 || !numeroAno) return '';
   const [numero, ano] = numeroAno.split('/');
   return numero && ano ? `${uasg}-${numero}-${ano}` : '';
+}
+
+/** Identificador estável (não vinculável) de um contrato do PNCP sem UASG válida. */
+function unlinkableKeyFromPncp(pncp: PncpContract): string {
+  const controle = (pncp.numeroControlePncp || '').trim();
+  if (controle) return `PNCP:${controle}`;
+  const numeroAno = numeroAnoKey(pncp.numeroContrato, pncp.anoContrato, pncp.numeroControlePncp);
+  return numeroAno ? `PNCP:${numeroAno}` : '';
+}
+
+/** Chave de vínculo (e registro do catálogo, se houver) de um contrato do PNCP/Compras.gov. */
+export function resolvePncpContract(
+  pncp: PncpContract,
+  official: ContractDashboardRecord[]
+): { key: string; match?: ContractDashboardRecord } {
+  const match = findOfficialMatch(pncp, official);
+  return { key: match ? contractKeyOf(match) : fallbackKeyFromPncp(pncp), match };
+}
+
+const quantidadeDoPncp = (pncp: PncpContract): number | undefined =>
+  typeof pncp.quantidadeContratada === 'number' && pncp.quantidadeContratada > 0 ? pncp.quantidadeContratada : undefined;
+
+/**
+ * Quantidade do item em cada contrato, como informada pela API oficial, por chave de
+ * contrato em maiúsculas. A quantidade não é gravada no vínculo: é lida daqui.
+ */
+export function quantidadesPorContrato(
+  pncpContracts: PncpContract[] | undefined,
+  officialContracts: ContractDashboardRecord[] | undefined
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const pncp of pncpContracts || []) {
+    const qtd = quantidadeDoPncp(pncp);
+    if (qtd === undefined) continue;
+    const { key } = resolvePncpContract(pncp, officialContracts || []);
+    if (key) map.set(norm(key), qtd);
+  }
+  return map;
 }
 
 /**
@@ -109,13 +152,14 @@ export function buildItemContractSuggestions(input: ItemContractSuggestionInput)
   const add = (
     key: string,
     source: ItemContractSuggestionSource,
-    patch: Partial<ItemContractSuggestion>
+    patch: Partial<ItemContractSuggestion>,
+    linkable = true
   ) => {
     if (!key) return;
     const id = norm(key);
     const existing = byKey.get(id);
     if (!existing) {
-      byKey.set(id, { contractKey: key, sources: [source], ...patch });
+      byKey.set(id, { contractKey: key, linkable, sources: [source], ...patch });
       return;
     }
     if (!existing.sources.includes(source)) existing.sources.push(source);
@@ -125,12 +169,12 @@ export function buildItemContractSuggestions(input: ItemContractSuggestionInput)
   };
 
   for (const pncp of input.pncpContracts || []) {
-    const match = findOfficialMatch(pncp, official);
-    const key = match ? contractKeyOf(match) : fallbackKeyFromPncp(pncp);
-    const quantidade = typeof pncp.quantidadeContratada === 'number' && pncp.quantidadeContratada > 0
-      ? pncp.quantidadeContratada
-      : undefined;
-    add(key, 'pncp', { contract: match, pncp, quantidadeContratada: quantidade });
+    const { key, match } = resolvePncpContract(pncp, official);
+    if (key) {
+      add(key, 'pncp', { contract: match, pncp, quantidadeContratada: quantidadeDoPncp(pncp) });
+    } else {
+      add(unlinkableKeyFromPncp(pncp), 'pncp', { pncp, quantidadeContratada: quantidadeDoPncp(pncp) }, false);
+    }
   }
 
   for (const contract of official) {

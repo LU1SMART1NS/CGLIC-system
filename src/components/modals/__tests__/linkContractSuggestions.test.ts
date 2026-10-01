@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   contractMatchesCompra,
   getContractSuggestionReasons,
-  rankContractsBySuggestion
+  rankContractsBySuggestion,
+  ataLinkCoverage
 } from '../linkContractSuggestions';
 import type { ContractDashboardRecord } from '../../../types';
 
@@ -44,5 +45,24 @@ describe('linkContractSuggestions', () => {
     const ranked = rankContractsBySuggestion([a, b, c, d], { compra, fornecedorCnpjs: ['11222333000144'] });
     expect(ranked.map((r) => r.contract.id)).toEqual(['C', 'B', 'A', 'D']);
     expect(ranked[0].reasons).toEqual(['compra']);
+  });
+});
+
+describe('ataLinkCoverage', () => {
+  const itens = [
+    { linkedContractKeys: ['200331-00160-2026'] },
+    { linkedContractKeys: ['200331-00160-2026', '200331-00230-2026'] },
+    { linkedContractKeys: [] }
+  ];
+
+  it('conta em quantos itens da ata o contrato já está vinculado, ignorando maiúsculas', () => {
+    expect(ataLinkCoverage('200331-00160-2026', itens)).toEqual({ vinculados: 2, total: 3, completo: false });
+    expect(ataLinkCoverage('200331-00230-2026'.toLowerCase(), itens)).toEqual({ vinculados: 1, total: 3, completo: false });
+    expect(ataLinkCoverage('200331-00999-2026', itens)).toEqual({ vinculados: 0, total: 3, completo: false });
+  });
+
+  it('só é completo quando todos os itens já têm o contrato', () => {
+    expect(ataLinkCoverage('200331-00160-2026', [{ linkedContractKeys: ['200331-00160-2026'] }])).toMatchObject({ completo: true });
+    expect(ataLinkCoverage('200331-00160-2026', [])).toMatchObject({ completo: false });
   });
 });

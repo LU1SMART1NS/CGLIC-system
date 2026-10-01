@@ -319,13 +319,13 @@ describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () =
     vi.spyOn(useAtaModule, 'useAtaItemSaldos').mockReturnValue({ saldos: [], isLoading: false } as any);
   });
 
-  it('estado vazio oferece "Vincular contrato" para admin', () => {
+  it('estado vazio oferece "Vincular Contrato" para admin', () => {
     asRole('admin');
     vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({ linkedContracts: [], isLoading: false } as any);
 
     const html = renderPage();
     expect(html).toContain('Nenhum contrato vinculado.');
-    expect(html).toContain('Vincular contrato');
+    expect(html).toContain('Vincular Contrato');
   });
 
   it('leitor não vê ações de vincular/desvincular', () => {
@@ -352,11 +352,11 @@ describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () =
     const html = renderPage();
     expect(html).toContain('00005/2026');
     expect(html).toContain('Item 00001');
-    expect(html).not.toContain('Vincular contrato');
+    expect(html).not.toContain('Vincular Contrato');
     expect(html).not.toContain('Desvincular');
   });
 
-  it('admin vê "Desvincular" em cada vínculo e "Vincular contrato" no cabeçalho da seção', () => {
+  it('admin vê "Desvincular" em cada vínculo e "Vincular Contrato" no cabeçalho da seção', () => {
     asRole('admin');
     vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({
       linkedContracts: [
@@ -379,7 +379,7 @@ describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () =
 
     const html = renderPage();
     expect(html).toContain('Desvincular');
-    expect(html).toContain('Vincular contrato');
+    expect(html).toContain('Vincular Contrato');
     expect(html).toContain('Contratos vinculados (1)');
   });
 });

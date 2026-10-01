@@ -65,7 +65,6 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
     const params = {
       itemKey: '00037/2026-200331-00001',
       contractKey: '200331-15-2026',
-      quantidadeContratada: 100,
       observacoes: 'Vínculo oficial de fornecimento'
     };
 
@@ -73,7 +72,6 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
       id: 'uuid-link-real-pgsql',
       item_key: params.itemKey,
       contract_key: params.contractKey,
-      quantidade_contratada: 100,
       success: true,
       timestamp: '2026-09-24T12:00:00Z'
     });
@@ -82,7 +80,6 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
 
     expect(rpcAdapter.linkContractToItemRpc).toHaveBeenCalledWith(params);
     expect(result.id).toBe('uuid-link-real-pgsql');
-    expect(result.quantidadeContratada).toBe(100);
     expect(localStorage.setItem).not.toHaveBeenCalled();
   });
 
@@ -95,8 +92,7 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
     await expect(
       saveArpItemContractLink({
         itemKey: '00037/2026-200331-00001',
-        contractKey: '200331-15-2026',
-        quantidadeContratada: 50
+        contractKey: '200331-15-2026'
       })
     ).rejects.toThrow('CONNECTION_TIMEOUT: Falha de conexão com PostgreSQL');
 
@@ -113,8 +109,7 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
     await expect(
       saveArpItemContractLink({
         itemKey: '00037/2026-200331-00001',
-        contractKey: '200331-15-2026',
-        quantidadeContratada: 20
+        contractKey: '200331-15-2026'
       })
     ).rejects.toThrow();
 
@@ -134,7 +129,6 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
                 id: 'uuid-1',
                 item_key: '00037/2026-200331-00001',
                 contract_key: '200331-15-2026',
-                quantidade_contratada: 50,
                 created_at: '2026-09-24T10:00:00Z',
                 updated_at: '2026-09-24T10:00:00Z'
               }
@@ -205,8 +199,7 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
     const link: ArpItemContractLink = {
       id: 'link-1',
       itemKey: '00037/2026-200331-00001',
-      contractKey: '200331-15-2026',
-      quantidadeContratada: 80
+      contractKey: '200331-15-2026'
     };
 
     const enriched = enrichContractLinks([link], mockOfficialContracts);
@@ -216,14 +209,39 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
     expect(rotaEsperadaContrato360).toBe('/contratos/200331-15-2026');
   });
 
+  it('TC-08c: sem leitura da lista do PNCP, usa a cópia da quantidade lida da API gravada no vínculo', () => {
+    const link: ArpItemContractLink = {
+      id: 'link-1',
+      itemKey: '00037/2026-200331-00001',
+      contractKey: '200331-15-2026',
+      quantidadeContratadaApi: 400,
+      quantidadeLidaEm: '2026-10-01T20:00:00Z'
+    };
+    const [e] = enrichContractLinks([link], mockOfficialContracts);
+    expect(e.quantidadeContratada).toBe(400);
+    expect(e.quantidadeLidaEm).toBe('2026-10-01T20:00:00Z');
+
+    const [semCopia] = enrichContractLinks([{ ...link, quantidadeContratadaApi: null, quantidadeLidaEm: undefined }], mockOfficialContracts);
+    expect(semCopia.quantidadeContratada).toBeUndefined();
+  });
+
+  it('TC-08b: a quantidade do item no contrato vem da API, não do vínculo', () => {
+    const link: ArpItemContractLink = { id: 'link-1', itemKey: '00037/2026-200331-00001', contractKey: '200331-15-2026' };
+
+    const semApi = enrichContractLinks([link], mockOfficialContracts);
+    expect(semApi[0].quantidadeContratada).toBeUndefined();
+
+    const comApi = enrichContractLinks([link], mockOfficialContracts, new Map([['200331-15-2026', 80]]));
+    expect(comApi[0].quantidadeContratada).toBe(80);
+  });
+
   // TC-09: Dados oficiais continuam derivados do catálogo soberano em memória
   it('TC-09: deriva dados oficiais exclusivamente do catálogo em memória sem duplicação', () => {
     const links: ArpItemContractLink[] = [
       {
         id: 'link-1',
         itemKey: '00037/2026-200331-00001',
-        contractKey: '200331-15-2026',
-        quantidadeContratada: 50
+        contractKey: '200331-15-2026'
       }
     ];
 
@@ -242,8 +260,7 @@ describe('arpContractLinkService (Fase 6.2-C — Saneamento e Pureza Arquitetura
       {
         id: 'link-oficial-1',
         itemKey: '00037/2026-200331-00001',
-        contractKey: '200331-15-2026',
-        quantidadeContratada: 50
+        contractKey: '200331-15-2026'
       }
     ];
 

@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildItemContractSuggestions,
   buildItemSuggestionCriteria,
-  contractKeyOf
+  contractKeyOf,
+  quantidadesPorContrato
 } from '../itemContractSuggestions';
 import type { ContractDashboardRecord, PncpContract } from '../../types';
 
@@ -25,7 +26,7 @@ describe('itemContractSuggestions', () => {
       officialContracts: [cat]
     });
     expect(suggestions).toHaveLength(1);
-    expect(suggestions[0]).toMatchObject({ contractKey: 'CAT-1', sources: ['pncp'], quantidadeContratada: 40 });
+    expect(suggestions[0]).toMatchObject({ contractKey: 'CAT-1', sources: ['pncp'], quantidadeContratada: 40, linkable: true });
     expect(suggestions[0].contract).toBe(cat);
   });
 
@@ -47,9 +48,29 @@ describe('itemContractSuggestions', () => {
     expect(suggestions[0].contract).toBeUndefined();
   });
 
-  it('ignora contrato do PNCP sem UASG, pois não dá para montar a chave', () => {
-    const { suggestions } = buildItemContractSuggestions({ pncpContracts: [pncp({ uasg: undefined })] });
+  it('mostra, sem permitir vincular, o contrato do PNCP sem UASG válida', () => {
+    for (const uasg of [undefined, '', '76']) {
+      const { suggestions } = buildItemContractSuggestions({
+        pncpContracts: [pncp({ uasg, numeroContrato: '2252/2026', numeroControlePncp: '00394494000136-2-002252/2026' })]
+      });
+      expect(suggestions).toHaveLength(1);
+      expect(suggestions[0].linkable).toBe(false);
+      expect(suggestions[0].contractKey).toBe('PNCP:00394494000136-2-002252/2026');
+    }
+  });
+
+  it('sem UASG válida e sem número de controle, usa número/ano como identificador', () => {
+    const { suggestions } = buildItemContractSuggestions({ pncpContracts: [pncp({ uasg: '76', numeroContrato: '2252/2026' })] });
+    expect(suggestions[0]).toMatchObject({ contractKey: 'PNCP:2252/2026', linkable: false });
+  });
+
+  it('o descarte de uma sugestão não vinculável usa o mesmo identificador', () => {
+    const { suggestions, dismissed } = buildItemContractSuggestions({
+      pncpContracts: [pncp({ uasg: '76', numeroContrato: '2252/2026' })],
+      dismissedContractKeys: ['PNCP:2252/2026']
+    });
     expect(suggestions).toEqual([]);
+    expect(dismissed).toHaveLength(1);
   });
 
   it('sugere do catálogo só quando a compra E o fornecedor do item casam', () => {
@@ -114,5 +135,22 @@ describe('itemContractSuggestions', () => {
       officialContracts: [official({ id: 'A', idCompra: '20033105900452024' })]
     });
     expect(suggestions).toEqual([]);
+  });
+});
+
+describe('quantidadesPorContrato', () => {
+  it('lê a quantidade da API por chave de contrato, sem inventar a que não vem', () => {
+    const cat = official({ id: 'CAT-1', numeroControlePncp: '00394494000136-2-000015/2026' });
+    const map = quantidadesPorContrato(
+      [
+        pncp({ numeroControlePncp: '00394494000136-2-000015/2026', quantidadeContratada: 40 }),
+        pncp({ uasg: '160001', numeroContrato: '7/2026', quantidadeContratada: null }),
+        pncp({ uasg: '160001', numeroContrato: '8/2026', quantidadeContratada: 12 })
+      ],
+      [cat]
+    );
+    expect(map.get('CAT-1')).toBe(40);
+    expect(map.has('160001-7-2026')).toBe(false);
+    expect(map.get('160001-8-2026')).toBe(12);
   });
 });

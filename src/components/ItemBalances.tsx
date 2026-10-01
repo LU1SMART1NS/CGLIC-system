@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Building2, Users, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, RotateCcw, Eye } from 'lucide-react';
+import { Building2, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, RotateCcw, Eye } from 'lucide-react';
 import { fetchPncpContractEmpenhos, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateTotalEmpenhado, reconcileBalances, matchAndMergeEmpenhos, normalizeEmpenhoNumero, calculateAllocationsWithEmpenhos, calculateItemCardMetrics, deduceEmpenhoQuantity, getEmpenhoEffectiveValue } from '../services/balanceService';
 import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
@@ -24,6 +24,7 @@ import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLink
 import { useItemContractLinks } from '../hooks/useItemContractLinks';
 import { useUnlinkContractFromItem } from '../hooks/useUnlinkContractFromItem';
 import { useDismissedContractSuggestions } from '../hooks/useDismissedContractSuggestions';
+import { useSyncContractItemQuantity } from '../hooks/useSyncContractItemQuantity';
 import { useDismissContractSuggestion } from '../hooks/useDismissContractSuggestion';
 import { useRestoreContractSuggestion } from '../hooks/useRestoreContractSuggestion';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
@@ -33,10 +34,11 @@ import { cnpjDaUasg } from '../config/unidadesGestoras';
 import {
   buildItemContractSuggestions,
   buildItemSuggestionCriteria,
+  quantidadesPorContrato,
   suggestionToContractRecord,
   type ItemContractSuggestion
 } from '../utils/itemContractSuggestions';
-import { AppButton, AppCard, EmptyState } from '../design-system';
+import { AppButton, AppCard, EmptyState, SectionHeader } from '../design-system';
 
 import { ManualEmpenhoModal } from './modals/ManualEmpenhoModal';
 import { LinkContractModal } from './modals/LinkContractModal';
@@ -202,10 +204,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
 
-  const enrichedOfficialLinks = useMemo(() => {
-    return enrichContractLinks(contractLinks, officialDashboardContracts);
-  }, [contractLinks, officialDashboardContracts]);
-
 
   const [editingEmpenhoKey, setEditingEmpenhoKey] = useState<string | null>(null);
   const [editingEmpenhoQty, setEditingEmpenhoQty] = useState<string>('');
@@ -369,12 +367,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     }
   };
 
-  const handleUnlinkOfficialContract = async (linkId: string) => {
+  const handleUnlinkOfficialContract = async (linkId: string, contractKey?: string) => {
     if (await confirm({ title: 'Desvincular contrato', message: 'Tem certeza que deseja desvincular este contrato oficial deste item da ata?', tone: 'danger', confirmLabel: 'Desvincular' })) {
       try {
         await unlinkContractMutation.mutateAsync({
           linkId,
-          itemKey: canonicalItemKey
+          itemKey: canonicalItemKey,
+          contractKey
         });
       } catch (err: any) {
         console.error('Erro ao desvincular contrato oficial:', err);
@@ -485,6 +484,37 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     arp.numeroAtaRegistroPreco
   );
   const contractsError = contractsQueryError ? (contractsQueryError.message || 'Falha ao buscar contratos do PNCP.') : null;
+
+  // Vínculos confirmados; a quantidade do item no contrato vem da API, não do vínculo
+  const enrichedOfficialLinks = useMemo(() => {
+    return enrichContractLinks(contractLinks, officialDashboardContracts, quantidadesPorContrato(contracts, officialDashboardContracts));
+  }, [contractLinks, officialDashboardContracts, contracts]);
+
+  // A quantidade contratada do item em cada contrato vem da API e entra no saldo (view da Ata/dashboards).
+  // Ao abrir o item, quem pode editar atualiza a cópia dos vínculos nunca lidos ou lidos há mais de 6 horas.
+  const syncContractQuantityMutation = useSyncContractItemQuantity();
+  const quantitySyncAttempted = React.useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!canEditData) return;
+    const sixHours = 6 * 60 * 60 * 1000;
+    enrichedOfficialLinks.forEach((l) => {
+      if (!l.contract || quantitySyncAttempted.current.has(l.linkId)) return;
+      const lastRead = l.quantidadeLidaEm ? Date.parse(l.quantidadeLidaEm) : NaN;
+      if (!Number.isNaN(lastRead) && Date.now() - lastRead < sixHours) return;
+      quantitySyncAttempted.current.add(l.linkId);
+      syncContractQuantityMutation.mutate(
+        {
+          numeroAta: arp.numeroAtaRegistroPreco,
+          uasg: arp.codigoUnidadeGerenciadora,
+          numeroItem: item.numeroItem,
+          contractKey: l.contractKey,
+          contract: l.contract
+        },
+        { onError: (err) => console.warn('Quantidade contratada não sincronizada ao abrir o item:', err) }
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrichedOfficialLinks, canEditData, arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem]);
 
   // Sugestões de contrato (PNCP + catálogo), sem os já vinculados nem os descartados
   const { data: dismissedSuggestions = [] } = useDismissedContractSuggestions(canonicalItemKey);
@@ -1174,31 +1204,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             {/* Contratos (PNCP, oficiais e manuais) */}
             <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                    <Building2 size={16} color="#0c326f" /> Contratos Celebrados
-                  </h4>
-                  <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700 }}>
-                    {linkedContractsCount}{' '}
-                    {linkedContractsCount === 1 ? 'contrato vinculado' : 'contratos vinculados'}
-                  </span>
-                </div>
-                {canEditData && (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <AppButton
-                    variant="primary"
-                    size="sm"
-                    icon={<Plus size={14} />}
-                    onClick={() => { setLinkingSuggestion(null); setIsLinkContractModalOpen(true); }}
-                    title="Vincular contrato oficial existente da UASG a este item da ata"
-                  >
-                    Vincular Contrato Oficial
-                  </AppButton>
-                  </div>
-                )}
-              </div>
-
               <ContractSuggestionsPanel
                 suggestions={contractSuggestions}
                 dismissed={dismissedContractSuggestions}
@@ -1211,6 +1216,23 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                 onRestore={handleRestoreSuggestion}
               />
 
+              <SectionHeader
+                title="Vinculados"
+                icon={<Building2 size={16} />}
+                countBadge={linkedContractsCount}
+                actions={canEditData ? (
+                  <AppButton
+                    variant="primary"
+                    size="sm"
+                    icon={<Plus size={14} />}
+                    onClick={() => { setLinkingSuggestion(null); setIsLinkContractModalOpen(true); }}
+                    title="Vincular a este item um contrato oficial existente da UASG"
+                  >
+                    Vincular Contrato
+                  </AppButton>
+                ) : undefined}
+              />
+
               {linkedContractsCount === 0 ? (
                 <EmptyState
                   title="Nenhum contrato vinculado"
@@ -1220,10 +1242,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   {(() => {
-                    const isGerenciadora = (u: string) => {
-                      const trimmed = String(u || '').trim();
-                      return trimmed === '200331' || trimmed === '200330' || (arp.codigoUnidadeGerenciadora && trimmed === String(arp.codigoUnidadeGerenciadora).trim());
-                    };
+                    const isGerenciadora = (u: string) => isGerenciadoraUasg(u, arp.codigoUnidadeGerenciadora);
 
                     const officialContractsList = enrichedOfficialLinks.map(oc => {
                       const parts = oc.contractKey.split('-');
@@ -1239,6 +1258,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                         linkVisualizacao: oc.linkPncp,
                         tipoUnidade: isGerenciadora(oc.uasg) ? 'GERENCIADORA' : 'PARTICIPANTE',
                         quantidadeContratada: oc.quantidadeContratada,
+                        dataVigenciaFim: oc.dataVigenciaFim,
+                        statusVigencia: oc.statusVigencia,
                         _isManual: false,
                         _isOfficialLink: true,
                         _linkId: oc.linkId,
@@ -1272,65 +1293,27 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
                     return [
                       {
-                        title: 'Unidade Gestora (Gerenciadora)',
-                        icon: <Building2 size={16} color="var(--primary)" />,
+                        title: 'Contratos vinculados',
                         list: deduplicateContractsList([
-                          ...officialContractsList.filter(oc => isGerenciadora(oc.uasg)),
-                          ...manualContratos
-                            .filter(mc => isGerenciadora(mc.uasg))
-                            .map(mc => ({
-                              numeroContrato: mc.numero,
-                              anoContrato: mc.ano,
-                              uasg: mc.uasg,
-                              orgaoNome: 'SENASP / MJSP',
-                              nomeRazaoSocialFornecedor: mc.fornecedor || item.nomeRazaoSocialFornecedor,
-                              niFornecedor: mc.cnpjFornecedor || item.niFornecedor,
-                              numeroControlePncp: mc.numeroControlePncp,
-                              linkVisualizacao: mc.linkPncp,
-                              tipoUnidade: 'GERENCIADORA',
-                              _isManual: true,
-                              _manualId: mc.id
-                            } as any))
-                        ]),
-                        badgeClass: 'badge-info',
-                        badgeLabel: 'Órgão Gerenciador'
-                      },
-                      {
-                        title: 'Participantes',
-                        icon: <Users size={16} color="#0f766e" />,
-                        list: deduplicateContractsList([
-                          ...officialContractsList.filter(oc => !isGerenciadora(oc.uasg)),
-                          ...manualContratos
-                            .filter(mc => !isGerenciadora(mc.uasg))
-                            .map(mc => ({
-                              numeroContrato: mc.numero,
-                              anoContrato: mc.ano,
-                              uasg: mc.uasg,
-                              orgaoNome: `UASG ${mc.uasg}`,
-                              nomeRazaoSocialFornecedor: mc.fornecedor || item.nomeRazaoSocialFornecedor,
-                              niFornecedor: mc.cnpjFornecedor || item.niFornecedor,
-                              numeroControlePncp: mc.numeroControlePncp,
-                              linkVisualizacao: mc.linkPncp,
-                              tipoUnidade: 'PARTICIPANTE',
-                              _isManual: true,
-                              _manualId: mc.id
-                            } as any))
-                        ]),
-                        badgeClass: 'badge-success',
-                        badgeLabel: 'Órgãos Participantes'
+                          ...officialContractsList,
+                          ...manualContratos.map(mc => ({
+                            numeroContrato: mc.numero,
+                            anoContrato: mc.ano,
+                            uasg: mc.uasg,
+                            orgaoNome: isGerenciadora(mc.uasg) ? 'SENASP / MJSP' : `UASG ${mc.uasg}`,
+                            nomeRazaoSocialFornecedor: mc.fornecedor || item.nomeRazaoSocialFornecedor,
+                            niFornecedor: mc.cnpjFornecedor || item.niFornecedor,
+                            numeroControlePncp: mc.numeroControlePncp,
+                            linkVisualizacao: mc.linkPncp,
+                            tipoUnidade: isGerenciadora(mc.uasg) ? 'GERENCIADORA' : 'PARTICIPANTE',
+                            _isManual: true,
+                            _manualId: mc.id
+                          } as any))
+                        ])
                       }
                     ];
                   })().map((section, sidx) => (
                     <div key={`contract-sec-${sidx}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f1f5f9', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                          {section.icon} {section.title}
-                        </div>
-                        <span className={`badge ${section.badgeClass}`} style={{ fontSize: '0.72rem' }}>
-                          {section.list.length} {section.list.length === 1 ? 'contrato' : 'contratos'}
-                        </span>
-                      </div>
-
                       {section.list.length === 0 ? (
                         <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
                           Nenhum contrato localizado para este grupo.
@@ -1342,10 +1325,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                               <tr>
                                 <th style={{ width: '40px' }}></th>
                                 <th>Número do contrato</th>
-                                <th>Órgão / UASG</th>
+                                <th>Unidade</th>
                                 <th>Fornecedor</th>
-                                <th>Quantidade contratada</th>
-                                <th>Origem</th>
+                                <th>Qtd. contratada</th>
+                                <th>Vigência</th>
                                 <th style={{ textAlign: 'center' }}>Ação</th>
                               </tr>
                             </thead>
@@ -1365,7 +1348,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                   return c.anoContrato ? `${num}/${c.anoContrato}` : num;
                                 })();
 
-                                const isGer = section.title.includes('Gerenciadora');
+                                const isGer = isGerenciadoraUasg(c.uasg, arp.codigoUnidadeGerenciadora) || c.tipoUnidade === 'GERENCIADORA';
                                 const contractUasg = c.uasg || (isGer ? (arp.codigoUnidadeGerenciadora || '200331') : '');
                                 const matchedUnit = unidades.find(u => String(u.codigoUnidade).trim() === String(contractUasg).trim());
                                 const resolvedOrgaoName = isGer
@@ -1396,6 +1379,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                             </span>
                                           ) : null}
                                         </div>
+                                        {!isGer && (
+                                          <div style={{ marginTop: '0.25rem' }}>
+                                            <StatusBadge label="Participante" variant="neutral" size="sm" dot={false} />
+                                          </div>
+                                        )}
                                       </td>
                                       <td style={{ fontSize: '0.82rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.nomeRazaoSocialFornecedor}</div>
@@ -1412,14 +1400,25 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                           </span>
                                         )}
                                       </td>
-                                      <td>
-                                        {c._isOfficialLink ? (
-                                          <StatusBadge label="Oficial" variant="success" size="sm" />
-                                        ) : c._isManual ? (
-                                          <StatusBadge label="Manual" variant="warning" size="sm" />
-                                        ) : (
-                                          <StatusBadge label="Oficial" variant="success" size="sm" />
+                                      <td style={{ fontSize: '0.8rem' }}>
+                                        {c._isManual && (
+                                          <StatusBadge label="Manual" variant="warning" size="sm" dot={false} />
                                         )}
+                                        {c.dataVigenciaFim ? (
+                                          <>
+                                            <div style={{ color: 'var(--text-secondary)' }}>até {formatDate(c.dataVigenciaFim)}</div>
+                                            {c.statusVigencia && c.statusVigencia !== 'Não Informado' && (
+                                              <StatusBadge
+                                                label={c.statusVigencia}
+                                                variant={c.statusVigencia === 'Vigente' ? 'success' : c.statusVigencia === 'Expirado' ? 'danger' : 'warning'}
+                                                size="sm"
+                                                dot={false}
+                                              />
+                                            )}
+                                          </>
+                                        ) : !c._isManual ? (
+                                          <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                        ) : null}
                                       </td>
                                       <td style={{ textAlign: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
@@ -1446,26 +1445,28 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                             </a>
                                           ) : null}
                                           {canEditData && c._isOfficialLink && c._linkId && (
-                                            <button
-                                              onClick={() => handleUnlinkOfficialContract(c._linkId)}
+                                            <AppButton
+                                              variant="danger"
+                                              size="sm"
+                                              icon={<Trash2 size={13} />}
+                                              onClick={() => handleUnlinkOfficialContract(c._linkId, c.contractKey)}
                                               disabled={unlinkContractMutation.isPending}
-                                              className="btn btn-secondary"
-                                              style={{ padding: '0.3rem 0.5rem', color: '#b91c1c', border: '1px solid #fecaca', background: '#fef2f2', borderRadius: '4px' }}
                                               title="Desvincular contrato oficial deste item"
                                             >
-                                              <Trash2 size={13} />
-                                            </button>
+                                              Desvincular
+                                            </AppButton>
                                           )}
                                           {canEditData && c._isManual && c._manualId && (
-                                            <button
+                                            <AppButton
+                                              variant="danger"
+                                              size="sm"
+                                              icon={<Trash2 size={13} />}
                                               onClick={() => handleDeleteManualContrato(c._manualId)}
                                               disabled={deleteManualContractMutation.isPending}
-                                              className="btn btn-secondary"
-                                              style={{ padding: '0.3rem 0.5rem', color: '#b91c1c', border: '1px solid #fecaca', background: '#fef2f2', borderRadius: '4px' }}
                                               title="Excluir contrato manual"
                                             >
-                                              <Trash2 size={13} />
-                                            </button>
+                                              Excluir
+                                            </AppButton>
                                           )}
                                         </div>
                                       </td>
@@ -2160,12 +2161,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         isOpen={isLinkContractModalOpen}
         onClose={handleCloseLinkContractModal}
         initialContract={linkingSuggestion ? suggestionToContractRecord(linkingSuggestion) : null}
-        initialQuantidade={linkingSuggestion?.quantidadeContratada}
         itemKey={canonicalItemKey}
         numeroAta={arp.numeroAtaRegistroPreco}
         numeroItem={item.numeroItem}
         uasg={arp.codigoUnidadeGerenciadora}
-        quantidadeDisponivelItem={item.quantidadeHomologadaItem}
+        itemUnitPrice={item.valorUnitario}
         existingLinkedContractKeys={enrichedOfficialLinks.map(l => l.contractKey)}
       />
     </div>

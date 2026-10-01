@@ -8,8 +8,12 @@ export interface ArpItemContractLink {
   id: string;
   itemKey: string;
   contractKey: string;
-  quantidadeContratada: number;
   observacoes?: string;
+  /** Cópia da quantidade do item no contrato lida da API (nunca digitada); nulo = a API não listou o item. */
+  quantidadeContratadaApi?: number | null;
+  valorUnitarioApi?: number | null;
+  /** Quando a quantidade foi lida da API; ausente = ainda não sincronizada. */
+  quantidadeLidaEm?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -20,7 +24,6 @@ export interface ArpItemContractLink {
 export interface LinkContractToItemParams {
   itemKey: string;
   contractKey: string;
-  quantidadeContratada: number;
   observacoes?: string;
 }
 
@@ -32,7 +35,10 @@ export interface EnrichedArpItemContract {
   linkId: string;
   itemKey: string;
   contractKey: string;
-  quantidadeContratada: number;
+  /** Quantidade do item no contrato, lida da API oficial (não é gravada no vínculo). */
+  quantidadeContratada?: number;
+  /** Quando a quantidade foi lida da API pela última vez; ausente = ainda não sincronizada. */
+  quantidadeLidaEm?: string;
   observacoes?: string;
   // Dados oficiais derivados diretamente do catálogo governamental
   contract?: ContractDashboardRecord;
@@ -66,15 +72,9 @@ export interface DismissContractSuggestionParams {
   contractKey: string;
 }
 
-/** Um item da Ata e a quantidade que o contrato cobre nele (vínculo em lote). */
-export interface ContractItemLinkInput {
-  itemKey: string;
-  quantidadeContratada: number;
-}
-
 /** Parâmetros para vincular um mesmo contrato a vários itens de uma só vez. */
 export interface LinkContractToItemsParams {
   contractKey: string;
-  links: ContractItemLinkInput[];
+  itemKeys: string[];
   observacoes?: string;
 }

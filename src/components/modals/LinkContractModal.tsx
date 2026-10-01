@@ -7,11 +7,16 @@ import {
 import { useContractsDashboard } from '../../hooks/useContractsDashboard';
 import { useLinkContractToItem } from '../../hooks/useLinkContractToItem';
 import { useLinkContractToItems } from '../../hooks/useLinkContractToItems';
+import { useContractItemQuantities } from '../../hooks/useContractItemQuantities';
+import { useSyncItemContractEmpenhos } from '../../hooks/useSyncItemContractEmpenhos';
+import { useSyncContractItemQuantity } from '../../hooks/useSyncContractItemQuantity';
 import type { ContractDashboardRecord } from '../../types';
 import { formatCnpj } from '../../utils/format';
-import { Modal, AlertCard } from '../../design-system';
+import { displayContractNumber } from '../../utils/contractNumber';
+import { Modal, AlertCard, useToast } from '../../design-system';
 import {
   rankContractsBySuggestion,
+  ataLinkCoverage,
   type ContractSuggestionCriteria,
   type ContractSuggestionReason
 } from './linkContractSuggestions';
@@ -24,6 +29,8 @@ export interface LinkableAtaItemOption {
   fornecedorNome?: string;
   fornecedorCnpj?: string;
   quantidadeHomologada?: number;
+  /** Preço unitário do item (base da estimativa de quantidade dos empenhos). */
+  valorUnitario?: number;
   /** Contratos já vinculados a este item (contractKey). */
   linkedContractKeys?: string[];
 }
@@ -36,16 +43,15 @@ interface LinkContractModalProps {
   numeroAta: string;
   numeroItem?: number | string;
   uasg?: string;
-  quantidadeDisponivelItem?: number;
   existingLinkedContractKeys?: string[];
+  /** Preço unitário do item no modo Item. */
+  itemUnitPrice?: number;
   /** Modo Ata: o usuário escolhe a qual item da Ata o contrato será vinculado. */
   itemOptions?: LinkableAtaItemOption[];
   /** Destaca e ordena primeiro os contratos da mesma compra / mesmos fornecedores. */
   suggestionCriteria?: ContractSuggestionCriteria;
   /** Abre direto no passo 2 com este contrato (vindo de uma sugestão). */
   initialContract?: ContractDashboardRecord | null;
-  /** Quantidade sugerida para pré-preencher o passo 2. */
-  initialQuantidade?: number;
 }
 
 const SUGGESTION_LABEL: Record<ContractSuggestionReason, string> = {
@@ -75,12 +81,11 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   numeroAta,
   numeroItem,
   uasg,
-  quantidadeDisponivelItem,
   existingLinkedContractKeys = [],
+  itemUnitPrice,
   itemOptions,
   suggestionCriteria,
-  initialContract,
-  initialQuantidade
+  initialContract
 }) => {
   const isAtaMode = Boolean(itemOptions && itemOptions.length > 0);
   const cleanUasg = (uasg || '').trim();
@@ -89,25 +94,26 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   const { data: officialContracts = [], isLoading: loadingContracts } = useContractsDashboard(cleanUasg);
   const linkMutation = useLinkContractToItem();
   const linkItemsMutation = useLinkContractToItems();
+  const syncEmpenhosMutation = useSyncItemContractEmpenhos();
+  const syncQuantityMutation = useSyncContractItemQuantity();
+  const toast = useToast();
 
   // Estados locais do formulário
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContract, setSelectedContract] = useState<ContractDashboardRecord | null>(null);
-  const [quantidadeContratada, setQuantidadeContratada] = useState<string>('');
   const [observacoes, setObservacoes] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  // Modo Ata: itens marcados e a quantidade do contrato em cada um
-  const [itemRows, setItemRows] = useState<Record<string, { checked: boolean; qty: string }>>({});
+  // Modo Ata: marcações feitas pelo usuário (sobrescrevem a marcação sugerida pela API)
+  const [checkedOverrides, setCheckedOverrides] = useState<Record<string, boolean>>({});
+  const itemQuantities = useContractItemQuantities(isAtaMode ? selectedContract : null);
 
   useEffect(() => {
     if (!isOpen || !initialContract) return;
     setSelectedContract(initialContract);
-    setQuantidadeContratada(initialQuantidade != null ? String(initialQuantidade) : '');
     setFormError(null);
-  }, [isOpen, initialContract, initialQuantidade]);
+  }, [isOpen, initialContract]);
 
   const targetItemKey = itemKey || '';
-  const targetQuantidadeDisponivel = quantidadeDisponivelItem;
 
   // 2. Filtragem dos contratos oficiais disponíveis da UASG
   const filteredContracts = useMemo(() => {
@@ -115,10 +121,13 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     const existingSet = new Set(existingLinkedContractKeys.map(k => k.toUpperCase()));
 
     const filtered = officialContracts.filter(c => {
-      // Ignorar contratos já vinculados a este mesmo item (no modo Ata o mesmo
-      // contrato pode ser vinculado a outros itens, então não filtra aqui)
+      // Modo Item: ignora o contrato já vinculado ao item. Modo Ata: um contrato pode cobrir vários itens,
+      // então só some quando já está vinculado a todos os itens da ata.
       const canKey = (c.id || `${c.uasg}-${c.numero}-${c.ano}`).toUpperCase();
       if (!isAtaMode && existingSet.has(canKey) && (!selectedContract || selectedContract.id?.toUpperCase() !== canKey)) {
+        return false;
+      }
+      if (isAtaMode && ataLinkCoverage(canKey, itemOptions!).completo) {
         return false;
       }
 
@@ -147,35 +156,86 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   const handleClose = () => {
     setSearchTerm('');
     setSelectedContract(null);
-    setQuantidadeContratada('');
     setObservacoes('');
     setFormError(null);
-    setItemRows({});
+    setCheckedOverrides({});
     onClose();
   };
 
   const handleSelectContract = (contract: ContractDashboardRecord) => {
     setSelectedContract(contract);
+    setCheckedOverrides({});
     setFormError(null);
-
-    if (isAtaMode) {
-      // Pré-marca os itens do mesmo fornecedor do contrato que ainda não o têm vinculado
-      const cnpj = onlyDigits(contract.fornecedorCnpjCpf);
-      const key = contractKeyOf(contract).toUpperCase();
-      const rows: Record<string, { checked: boolean; qty: string }> = {};
-      itemOptions!.forEach((i) => {
-        const linked = i.linkedContractKeys?.some((k) => k.toUpperCase() === key);
-        const sameSupplier = cnpj !== '' && onlyDigits(i.fornecedorCnpj) === cnpj;
-        rows[i.itemKey] = { checked: !linked && sameSupplier, qty: '' };
-      });
-      setItemRows(rows);
-    }
   };
 
   const isItemLinked = (i: LinkableAtaItemOption) =>
     Boolean(selectedContract && i.linkedContractKeys?.some((k) => k.toUpperCase() === contractKeyOf(selectedContract).toUpperCase()));
 
-  const checkedItems = isAtaMode ? itemOptions!.filter((i) => itemRows[i.itemKey]?.checked && !isItemLinked(i)) : [];
+  // Itens do contrato segundo a API oficial (número do item da compra = número do item da ata)
+  const apiQuantities = itemQuantities.data;
+  const apiListsItems = Boolean(apiQuantities && apiQuantities.size > 0);
+  const itemNumber = (i: LinkableAtaItemOption) => parseInt(i.numeroItem, 10);
+  const isListedByApi = (i: LinkableAtaItemOption) => apiListsItems && apiQuantities!.has(itemNumber(i));
+  const apiQuantityOf = (i: LinkableAtaItemOption) => apiQuantities?.get(itemNumber(i)) ?? null;
+  const isSameSupplier = (i: LinkableAtaItemOption) =>
+    Boolean(selectedContract) &&
+    onlyDigits(i.fornecedorCnpj) !== '' &&
+    onlyDigits(i.fornecedorCnpj) === onlyDigits(selectedContract!.fornecedorCnpjCpf);
+
+  // Marcação inicial: os itens que a API lista; sem dados da API, os do mesmo fornecedor
+  const isItemChecked = (i: LinkableAtaItemOption) =>
+    !isItemLinked(i) && (checkedOverrides[i.itemKey] ?? (apiListsItems ? isListedByApi(i) : isSameSupplier(i)));
+
+  const checkedItems = isAtaMode && !itemQuantities.isLoading ? itemOptions!.filter(isItemChecked) : [];
+
+  // Depois de vincular, lê da API a quantidade contratada (que entra no saldo do item) e os empenhos
+  // do contrato, para cada item, sem travar o fechamento do modal.
+  const syncEmpenhosInBackground = (
+    contract: ContractDashboardRecord,
+    targets: Array<{ numeroItem: string; unitPrice?: number }>
+  ) => {
+    void (async () => {
+      let failedQty = 0;
+      let failedEmp = 0;
+      for (const t of targets) {
+        try {
+          await syncQuantityMutation.mutateAsync({
+            numeroAta,
+            uasg: cleanUasg,
+            numeroItem: t.numeroItem,
+            contractKey: contractKeyOf(contract),
+            contract
+          });
+        } catch (err) {
+          failedQty++;
+          console.warn('Quantidade contratada não sincronizada para o item', t.numeroItem, err);
+        }
+        try {
+          await syncEmpenhosMutation.mutateAsync({
+            numeroAta,
+            uasg: cleanUasg,
+            numeroItem: t.numeroItem,
+            contract: {
+              contractKey: contractKeyOf(contract),
+              uasg: contract.uasg,
+              numero: contract.numero,
+              ano: contract.ano,
+              contratoId: contract.contratoId
+            },
+            unitPrice: t.unitPrice
+          });
+        } catch (err) {
+          failedEmp++;
+          console.warn('Empenhos do contrato não sincronizados para o item', t.numeroItem, err);
+        }
+      }
+      if (failedQty > 0) {
+        toast.error(`Contrato vinculado, mas a quantidade contratada de ${failedQty} ${failedQty === 1 ? 'item' : 'itens'} não pôde ser lida da API; o saldo só considera o contrato depois disso. Ela é lida de novo ao abrir o item.`);
+      } else if (failedEmp > 0) {
+        toast.error(`Contrato vinculado, mas os empenhos de ${failedEmp} ${failedEmp === 1 ? 'item' : 'itens'} não puderam ser lidos da API. Tente novamente mais tarde.`);
+      }
+    })();
+  };
 
   const handleSubmitBatch = async () => {
     if (!selectedContract) return;
@@ -185,26 +245,16 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
       return;
     }
 
-    const links: { itemKey: string; quantidadeContratada: number }[] = [];
-    for (const i of checkedItems) {
-      const qtd = parseFloat((itemRows[i.itemKey]?.qty || '').replace(',', '.'));
-      if (isNaN(qtd) || qtd <= 0) {
-        setFormError(`Informe uma quantidade válida e maior que zero para o item ${i.numeroItem}.`);
-        return;
-      }
-      if (i.quantidadeHomologada && qtd > i.quantidadeHomologada) {
-        setFormError(`A quantidade do item ${i.numeroItem} (${qtd}) excede a quantidade homologada (${i.quantidadeHomologada}).`);
-        return;
-      }
-      links.push({ itemKey: i.itemKey, quantidadeContratada: qtd });
-    }
-
     try {
       await linkItemsMutation.mutateAsync({
         contractKey: contractKeyOf(selectedContract),
-        links,
+        itemKeys: checkedItems.map((i) => i.itemKey),
         observacoes: observacoes.trim() || undefined
       });
+      syncEmpenhosInBackground(
+        selectedContract,
+        checkedItems.map((i) => ({ numeroItem: i.numeroItem, unitPrice: i.valorUnitario }))
+      );
       handleClose();
     } catch (err: any) {
       setFormError(err?.message || 'Falha ao vincular contrato oficial.');
@@ -230,28 +280,17 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
       return;
     }
 
-    const qtdNum = parseFloat(quantidadeContratada.replace(',', '.'));
-    if (isNaN(qtdNum) || qtdNum <= 0) {
-      setFormError('Informe uma quantidade contratada válida e maior que zero.');
-      return;
-    }
-
-    if (targetQuantidadeDisponivel && qtdNum > targetQuantidadeDisponivel) {
-      setFormError(
-        `A quantidade contratada (${qtdNum}) excede a quantidade homologada disponível do item (${targetQuantidadeDisponivel}).`
-      );
-      return;
-    }
-
     const contractKey = contractKeyOf(selectedContract);
 
     try {
       await linkMutation.mutateAsync({
         itemKey: targetItemKey,
         contractKey,
-        quantidadeContratada: qtdNum,
         observacoes: observacoes.trim() || undefined
       });
+      if (numeroItem != null) {
+        syncEmpenhosInBackground(selectedContract, [{ numeroItem: String(numeroItem), unitPrice: itemUnitPrice }]);
+      }
       handleClose();
     } catch (err: any) {
       setFormError(err?.message || 'Falha ao vincular contrato oficial.');
@@ -262,7 +301,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isAtaMode ? 'Vincular contrato oficial à Ata' : 'Vincular contrato oficial ao item'}
+      title="Vincular Contrato"
       subtitle={`Ata ${numeroAta}${isAtaMode ? '' : ` • Item ${numeroItem}`} • UASG ${cleanUasg}`}
       size="lg"
       testId="link-contract-modal"
@@ -352,11 +391,19 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
                           <strong style={{ fontSize: '0.92rem', color: '#0c326f' }}>
-                            {c.numeroFormatado || `Contrato ${c.numero}/${c.ano}`}
+                            {displayContractNumber(c) || `Contrato ${c.numero}/${c.ano}`}
                           </strong>
                           <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
                             {c.statusVigencia || 'Vigente'}
                           </span>
+                          {isAtaMode && (() => {
+                            const cov = ataLinkCoverage(contractKeyOf(c), itemOptions!);
+                            return cov.vinculados > 0 ? (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
+                                Vinculado a {cov.vinculados} de {cov.total} itens
+                              </span>
+                            ) : null;
+                          })()}
                           {reasons.map((r) => (
                             <span
                               key={r}
@@ -403,7 +450,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       Contrato Oficial Selecionado
                     </span>
                     <h4 style={{ margin: '0.15rem 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: '#0c326f' }}>
-                      {selectedContract.numeroFormatado || `Contrato ${selectedContract.numero}/${selectedContract.ano}`}
+                      {displayContractNumber(selectedContract) || `Contrato ${selectedContract.numero}/${selectedContract.ano}`}
                     </h4>
                   </div>
                   <button
@@ -431,6 +478,13 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                 </div>
               </div>
 
+              {/* Item fixo (modo Item) */}
+              {!isAtaMode && (
+                <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.8rem', color: '#475569' }}>
+                  Este contrato será vinculado ao <strong>item {numeroItem}</strong> da ata {numeroAta}. A quantidade contratada é lida da API oficial.
+                </p>
+              )}
+
               {/* Itens da Ata cobertos pelo contrato (modo Ata) */}
               {isAtaMode && (
                 <div style={{ marginBottom: '1.25rem' }}>
@@ -438,95 +492,62 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                     Itens cobertos por este contrato <span style={{ color: '#dc2626' }}>*</span>
                   </div>
                   <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.76rem', color: '#64748b' }}>
-                    Marque cada item que o contrato atende e informe a quantidade contratada nele.
+                    {itemQuantities.isLoading
+                      ? 'Consultando os itens deste contrato na API oficial...'
+                      : apiListsItems
+                        ? 'Os itens que a API oficial lista neste contrato já vêm marcados. A quantidade contratada é lida da API.'
+                        : 'A API oficial não retornou os itens deste contrato. Marque os itens que ele atende; a quantidade será lida da API quando estiver disponível.'}
                   </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto' }}>
-                    {itemOptions!.map((i) => {
-                      const linked = isItemLinked(i);
-                      const row = itemRows[i.itemKey] || { checked: false, qty: '' };
-                      const sameSupplier =
-                        onlyDigits(i.fornecedorCnpj) !== '' &&
-                        onlyDigits(i.fornecedorCnpj) === onlyDigits(selectedContract.fornecedorCnpjCpf);
-                      return (
-                        <div
-                          key={i.itemKey}
-                          data-testid="link-contract-item-row"
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.65rem', border: '1px solid #e2e8f0', borderRadius: '6px', background: linked ? '#f8fafc' : '#ffffff', opacity: linked ? 0.7 : 1 }}
-                        >
-                          <input
-                            type="checkbox"
-                            aria-label={`Item ${i.numeroItem}`}
-                            checked={linked ? false : row.checked}
-                            disabled={linked}
-                            onChange={(e) => setItemRows((prev) => ({ ...prev, [i.itemKey]: { ...row, checked: e.target.checked } }))}
-                          />
-                          <div style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}>
-                            <div style={{ fontWeight: 700, color: '#0c326f' }}>
-                              Item {i.numeroItem}
-                              {sameSupplier && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', color: '#b45309' }}>mesmo fornecedor</span>}
-                              {linked && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', color: '#64748b' }}>já vinculado</span>}
-                            </div>
-                            <div style={{ color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {i.descricao || 'Sem descrição'}
-                              {i.fornecedorNome ? ` (${i.fornecedorNome})` : ''}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
+                  {itemQuantities.isLoading ? (
+                    <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>
+                      <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: '#0c326f' }} />
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto' }}>
+                      {itemOptions!.map((i) => {
+                        const linked = isItemLinked(i);
+                        const checked = isItemChecked(i);
+                        const listed = isListedByApi(i);
+                        const apiQty = apiQuantityOf(i);
+                        return (
+                          <div
+                            key={i.itemKey}
+                            data-testid="link-contract-item-row"
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.65rem', border: '1px solid #e2e8f0', borderRadius: '6px', background: linked ? '#f8fafc' : '#ffffff', opacity: linked ? 0.7 : 1 }}
+                          >
                             <input
-                              type="number"
-                              step="any"
-                              min="0.0001"
-                              placeholder="Qtd"
-                              aria-label={`Quantidade do item ${i.numeroItem}`}
-                              value={row.qty}
-                              disabled={linked || !row.checked}
-                              onChange={(e) => setItemRows((prev) => ({ ...prev, [i.itemKey]: { ...row, qty: e.target.value } }))}
-                              style={{ width: '110px', padding: '0.35rem 0.5rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                              type="checkbox"
+                              aria-label={`Item ${i.numeroItem}`}
+                              checked={checked}
+                              disabled={linked}
+                              onChange={(e) => setCheckedOverrides((prev) => ({ ...prev, [i.itemKey]: e.target.checked }))}
                             />
-                            {i.quantidadeHomologada != null && (
-                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>de {i.quantidadeHomologada}</span>
-                            )}
+                            <div style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}>
+                              <div style={{ fontWeight: 700, color: '#0c326f' }}>
+                                Item {i.numeroItem}
+                                {isSameSupplier(i) && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', color: '#b45309' }}>mesmo fornecedor</span>}
+                                {linked && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', color: '#64748b' }}>já vinculado</span>}
+                              </div>
+                              <div style={{ color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {i.descricao || 'Sem descrição'}
+                                {i.fornecedorNome ? ` (${i.fornecedorNome})` : ''}
+                              </div>
+                              {!linked && checked && apiListsItems && !listed && (
+                                <div style={{ color: '#b45309', fontSize: '0.72rem' }}>A API oficial não lista este item neste contrato.</div>
+                              )}
+                            </div>
+                            <div style={{ textAlign: 'right', whiteSpace: 'nowrap', fontSize: '0.78rem', color: '#64748b' }}>
+                              Qtd contratada
+                              <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, color: listed && apiQty != null ? '#0c326f' : '#94a3b8' }}>
+                                {listed && apiQty != null ? apiQty.toLocaleString('pt-BR') : 'N/D'}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Campo Quantidade Contratada deste Item */}
-              {!isAtaMode && (
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
-                  Quantidade Contratada deste Item <span style={{ color: '#dc2626' }}>*</span>
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0.0001"
-                    placeholder="Ex: 50"
-                    value={quantidadeContratada}
-                    onChange={(e) => setQuantidadeContratada(e.target.value)}
-                    required
-                    style={{
-                      width: '200px',
-                      padding: '0.55rem 0.75rem',
-                      fontSize: '0.9rem',
-                      borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
-                      outline: 'none',
-                      fontWeight: 700
-                    }}
-                    autoFocus
-                  />
-                  {targetQuantidadeDisponivel != null && (
-                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                      (Total registrado na ata: <strong>{targetQuantidadeDisponivel}</strong>)
-                    </span>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              </div>
               )}
 
               {/* Campo Observações */}
@@ -569,7 +590,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isPending || (isAtaMode ? checkedItems.length === 0 : !quantidadeContratada)}
+                  disabled={isPending || (isAtaMode && checkedItems.length === 0)}
                   style={{
                     padding: '0.5rem 1.25rem',
                     fontSize: '0.85rem',
@@ -585,7 +606,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   }}
                 >
                   {isPending ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-                  {isAtaMode && checkedItems.length > 1 ? `Vincular a ${checkedItems.length} itens` : 'Vincular Contrato Oficial'}
+                  {isAtaMode && checkedItems.length > 1 ? `Vincular a ${checkedItems.length} itens` : 'Vincular Contrato'}
                 </button>
               </div>
             </form>

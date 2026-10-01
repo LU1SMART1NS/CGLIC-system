@@ -4,7 +4,8 @@ import {
   unlinkContractFromItemRpc,
   dismissContractSuggestionRpc,
   restoreContractSuggestionRpc,
-  linkContractToItemsRpc
+  linkContractToItemsRpc,
+  syncContractItemQuantityRpc
 } from '../arpContractLinkRpcAdapter';
 import * as supabaseModule from '../../services/supabaseClient';
 
@@ -27,7 +28,6 @@ describe('arpContractLinkRpcAdapter (Fase 6.2 - RPCs de Vínculo)', () => {
           id: 'link-uuid-123',
           item_key: '00037/2026-200331-00001',
           contract_key: '200331-15-2026',
-          quantidade_contratada: 50,
           success: true,
           timestamp: '2026-09-24T12:00:00Z'
         },
@@ -39,14 +39,12 @@ describe('arpContractLinkRpcAdapter (Fase 6.2 - RPCs de Vínculo)', () => {
       const result = await linkContractToItemRpc({
         itemKey: '00037/2026-200331-00001',
         contractKey: '200331-15-2026',
-        quantidadeContratada: 50,
         observacoes: 'Observação teste'
       });
 
       expect(supabaseModule.supabase!.rpc).toHaveBeenCalledWith('link_contract_to_item_atomic', {
         p_item_key: '00037/2026-200331-00001',
         p_contract_key: '200331-15-2026',
-        p_quantidade_contratada: 50,
         p_observacoes: 'Observação teste'
       });
 
@@ -67,24 +65,23 @@ describe('arpContractLinkRpcAdapter (Fase 6.2 - RPCs de Vínculo)', () => {
       await expect(
         linkContractToItemRpc({
           itemKey: '00037/2026-200331-00001',
-          contractKey: '200331-15-2026',
-          quantidadeContratada: 50
+          contractKey: '200331-15-2026'
         })
       ).rejects.toMatchObject({
         code: 'UNAUTHORIZED'
       });
     });
 
-    it('valida localmente se a quantidade contratada é maior que zero', async () => {
+    it('valida localmente a chave do contrato antes de chamar a RPC', async () => {
       await expect(
         linkContractToItemRpc({
           itemKey: '00037/2026-200331-00001',
-          contractKey: '200331-15-2026',
-          quantidadeContratada: 0
+          contractKey: '  '
         })
       ).rejects.toMatchObject({
         code: 'INVALID_PAYLOAD'
       });
+      expect(supabaseModule.supabase!.rpc).not.toHaveBeenCalled();
     });
 
     it('converte erro 23514 do Postgres em AppError de validação ou payload', async () => {
@@ -92,16 +89,15 @@ describe('arpContractLinkRpcAdapter (Fase 6.2 - RPCs de Vínculo)', () => {
         data: null,
         error: {
           code: '23514',
-          message: 'check constraint violation: chk_link_quantidade_positiva',
-          details: 'chk_link_quantidade_positiva'
+          message: 'check constraint violation',
+          details: 'chk_arp_item_contract_link'
         }
       });
 
       await expect(
         linkContractToItemRpc({
           itemKey: '00037/2026-200331-00001',
-          contractKey: '200331-15-2026',
-          quantidadeContratada: 10
+          contractKey: '200331-15-2026'
         })
       ).rejects.toHaveProperty('code');
     });
@@ -184,35 +180,54 @@ describe('arpContractLinkRpcAdapter (Fase 6.2 - RPCs de Vínculo)', () => {
     });
   });
   describe('linkContractToItemsRpc (vínculo em lote)', () => {
-    const links = [
-      { itemKey: '00037/2026-200331-00001', quantidadeContratada: 50 },
-      { itemKey: '00037/2026-200331-00002', quantidadeContratada: 10 }
-    ];
+    const itemKeys = ['00037/2026-200331-00001', '00037/2026-200331-00002'];
 
     it('envia todos os itens numa única chamada da RPC', async () => {
       (supabaseModule.supabase!.rpc as any).mockResolvedValueOnce({
-        data: { success: true, contract_key: '200331-15-2026', count: 2, links: [], timestamp: 't' },
+        data: { success: true, contract_key: '200331-15-2026', count: 2, timestamp: 't' },
         error: null
       });
 
-      const result = await linkContractToItemsRpc({ contractKey: '200331-15-2026', links, observacoes: ' nota ' });
+      const result = await linkContractToItemsRpc({ contractKey: '200331-15-2026', itemKeys, observacoes: ' nota ' });
 
       expect(supabaseModule.supabase!.rpc).toHaveBeenCalledTimes(1);
       expect(supabaseModule.supabase!.rpc).toHaveBeenCalledWith('link_contract_to_items_atomic', {
         p_contract_key: '200331-15-2026',
-        p_links: [
-          { item_key: '00037/2026-200331-00001', quantidade_contratada: 50, observacoes: 'nota' },
-          { item_key: '00037/2026-200331-00002', quantidade_contratada: 10, observacoes: 'nota' }
-        ]
+        p_item_keys: itemKeys,
+        p_observacoes: 'nota'
       });
       expect(result.count).toBe(2);
     });
 
-    it('rejeita lista vazia e quantidade inválida antes de chamar a RPC', async () => {
-      await expect(linkContractToItemsRpc({ contractKey: '200331-15-2026', links: [] })).rejects.toBeTruthy();
-      await expect(
-        linkContractToItemsRpc({ contractKey: '200331-15-2026', links: [{ itemKey: links[0].itemKey, quantidadeContratada: 0 }] })
-      ).rejects.toBeTruthy();
+    it('rejeita lista vazia e chave de item vazia antes de chamar a RPC', async () => {
+      await expect(linkContractToItemsRpc({ contractKey: '200331-15-2026', itemKeys: [] })).rejects.toBeTruthy();
+      await expect(linkContractToItemsRpc({ contractKey: '200331-15-2026', itemKeys: [' '] })).rejects.toBeTruthy();
+      expect(supabaseModule.supabase!.rpc).not.toHaveBeenCalled();
+    });
+  });
+  describe('syncContractItemQuantityRpc', () => {
+    const base = { itemKey: '00037/2026-200331-00001', contractKey: '200331-15-2026' };
+
+    it('grava a quantidade e o preço lidos da API', async () => {
+      (supabaseModule.supabase!.rpc as any).mockResolvedValueOnce({ data: { success: true, quantidade_contratada: 400 }, error: null });
+      await syncContractItemQuantityRpc({ ...base, quantidade: 400, valorUnitario: 1394 });
+      expect(supabaseModule.supabase!.rpc).toHaveBeenCalledWith('sync_contract_item_quantity_atomic', {
+        p_item_key: base.itemKey,
+        p_contract_key: base.contractKey,
+        p_quantidade: 400,
+        p_valor_unitario: 1394
+      });
+    });
+
+    it('aceita quantidade nula (API lida, item não listado)', async () => {
+      (supabaseModule.supabase!.rpc as any).mockResolvedValueOnce({ data: { success: true }, error: null });
+      await syncContractItemQuantityRpc({ ...base, quantidade: null });
+      expect(supabaseModule.supabase!.rpc).toHaveBeenCalledWith('sync_contract_item_quantity_atomic', expect.objectContaining({ p_quantidade: null, p_valor_unitario: null }));
+    });
+
+    it('rejeita chaves vazias e quantidade negativa antes de chamar a RPC', async () => {
+      await expect(syncContractItemQuantityRpc({ itemKey: '', contractKey: base.contractKey, quantidade: 1 })).rejects.toBeTruthy();
+      await expect(syncContractItemQuantityRpc({ ...base, quantidade: -2 })).rejects.toBeTruthy();
       expect(supabaseModule.supabase!.rpc).not.toHaveBeenCalled();
     });
   });

@@ -35,6 +35,72 @@ export interface SyncItemEmpenhosOptions {
   }>;
 }
 
+/** Campos mínimos de um empenho para a persistência soberana (M17: save_empenho_soberano_atomic). */
+export interface EmpenhoSoberanoInput {
+  uasg: string;
+  ano: number;
+  numero_oficial: string;
+  numero_normalizado: string;
+  data_emissao?: string;
+  fonte_origem: NormalizedEmpenho['fonte_origem'];
+  valor_empenhado?: number;
+  valor_liquidado?: number;
+  valor_pago?: number;
+  valor_rpinscrito?: number;
+  credor_nome?: string;
+  credor_cnpj_cpf?: string;
+  situacao?: string;
+  identificador_fonte?: string;
+  url_oficial?: string;
+}
+
+/**
+ * Grava (ou atualiza) a Nota de Empenho soberana e devolve seu UUID.
+ * Não cria nenhum vínculo com item ou contrato.
+ */
+export async function saveEmpenhoSoberanoM17(empenho: EmpenhoSoberanoInput): Promise<{ empenhoId: string; isNew: boolean }> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw mapPostgresErrorToAppError(
+      new Error('NETWORK_OR_CONFIG_ERROR: Supabase não está configurado para persistência M17')
+    );
+  }
+
+  const p_empenho = {
+    uasg_emitente: empenho.uasg,
+    ano_exercicio: empenho.ano,
+    numero_oficial: empenho.numero_oficial,
+    numero_normalizado: empenho.numero_normalizado,
+    data_emissao: empenho.data_emissao,
+    fonte_origem: empenho.fonte_origem,
+    valor_empenhado: empenho.valor_empenhado ?? 0,
+    valor_liquidado: empenho.valor_liquidado ?? 0,
+    valor_pago: empenho.valor_pago ?? 0,
+    valor_rpinscrito: empenho.valor_rpinscrito ?? 0,
+    credor_nome: empenho.credor_nome || null,
+    credor_cnpj_cpf: empenho.credor_cnpj_cpf || null,
+    situacao: empenho.situacao || null,
+    identificador_fonte: empenho.identificador_fonte || null,
+    url_oficial: empenho.url_oficial || null
+  };
+
+  const { data: saveResult, error: saveError } = await supabase.rpc('save_empenho_soberano_atomic', {
+    p_empenho
+  });
+
+  if (saveError) {
+    throw mapPostgresErrorToAppError(saveError);
+  }
+
+  const empenhoId = saveResult?.empenho?.id;
+  if (!empenhoId) {
+    throw mapPostgresErrorToAppError(
+      new Error('INVALID_PAYLOAD: save_empenho_soberano_atomic não retornou o UUID do empenho')
+    );
+  }
+
+  return { empenhoId, isNew: Boolean(saveResult?.is_new) };
+}
+
 /**
  * Persiste um único empenho reconciliado utilizando exclusivamente as RPCs M17
  */
@@ -54,45 +120,14 @@ export async function persistReconciledEmpenhoM17(
   }
 
   // 1. Persistência Soberana da Nota de Empenho (M17: save_empenho_soberano_atomic)
-  const p_empenho = {
-    uasg_emitente: reconciled.uasg,
-    ano_exercicio: reconciled.ano,
-    numero_oficial: reconciled.numero_oficial,
-    numero_normalizado: reconciled.numero_normalizado,
-    data_emissao: reconciled.data_emissao,
-    fonte_origem: reconciled.fonte_origem,
-    valor_empenhado: reconciled.valor_empenhado,
-    valor_liquidado: reconciled.valor_liquidado,
-    valor_pago: reconciled.valor_pago,
-    valor_rpinscrito: reconciled.valor_rpinscrito,
-    credor_nome: reconciled.credor_nome || null,
-    credor_cnpj_cpf: reconciled.credor_cnpj_cpf || null,
-    situacao: reconciled.situacao || null,
-    identificador_fonte: reconciled.identificador_fonte || null,
-    url_oficial: reconciled.url_oficial || null
-  };
-
-  const { data: saveResult, error: saveError } = await supabase.rpc('save_empenho_soberano_atomic', {
-    p_empenho
-  });
-
-  if (saveError) {
-    throw mapPostgresErrorToAppError(saveError);
-  }
-
-  const empenhoId = saveResult?.empenho?.id;
-  if (!empenhoId) {
-    throw mapPostgresErrorToAppError(
-      new Error('INVALID_PAYLOAD: save_empenho_soberano_atomic não retornou o UUID do empenho')
-    );
-  }
-
-  const isNew = Boolean(saveResult?.is_new);
+  const { empenhoId, isNew } = await saveEmpenhoSoberanoM17(reconciled);
   let itemsLinked = 0;
   let contractsLinked = 0;
 
   // 2. Vínculo Físico Quantitativo com Itens de Ata (M17: link_empenho_to_item_atomic)
   for (const itemLink of reconciled.item_links) {
+    // Quantidade deduzida por valor é estimativa: não vira consumo oficial do item (fica como sugestão no fluxo por contrato).
+    if (itemLink.is_deduzido) continue;
     const { error: linkItemError } = await supabase.rpc('link_empenho_to_item_atomic', {
       p_item_key: itemLink.item_key,
       p_empenho_id: empenhoId,

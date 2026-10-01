@@ -14,7 +14,6 @@ export interface RpcLinkContractToItemResult {
   id: string;
   item_key: string;
   contract_key: string;
-  quantidade_contratada: number;
   timestamp: string;
 }
 
@@ -41,15 +40,11 @@ export async function linkContractToItemRpc(
   if (!cleanContractKey) {
     throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A chave do contrato (contractKey) é obrigatória.'));
   }
-  if (typeof params.quantidadeContratada !== 'number' || params.quantidadeContratada <= 0) {
-    throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A quantidade contratada deve ser estritamente maior que zero.'));
-  }
 
   try {
     const { data, error } = await client.rpc('link_contract_to_item_atomic', {
       p_item_key: cleanItemKey,
       p_contract_key: cleanContractKey,
-      p_quantidade_contratada: params.quantidadeContratada,
       p_observacoes: params.observacoes?.trim() || null
     });
 
@@ -154,7 +149,6 @@ export interface RpcLinkContractToItemsResult {
   success: boolean;
   contract_key: string;
   count: number;
-  links: Array<{ id: string; item_key: string; quantidade_contratada: number }>;
   timestamp: string;
 }
 
@@ -171,26 +165,20 @@ export async function linkContractToItemsRpc(
   if (!cleanContractKey) {
     throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A chave do contrato (contractKey) é obrigatória.'));
   }
-  if (!Array.isArray(params.links) || params.links.length === 0) {
+  if (!Array.isArray(params.itemKeys) || params.itemKeys.length === 0) {
     throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: Informe ao menos um item para vincular.'));
   }
 
-  const observacoes = params.observacoes?.trim() || null;
-  const payload = params.links.map((l) => {
-    const itemKey = (l.itemKey || '').trim();
-    if (!itemKey) {
-      throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A chave do item (itemKey) é obrigatória.'));
-    }
-    if (typeof l.quantidadeContratada !== 'number' || !(l.quantidadeContratada > 0)) {
-      throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A quantidade contratada deve ser estritamente maior que zero.'));
-    }
-    return { item_key: itemKey, quantidade_contratada: l.quantidadeContratada, observacoes };
-  });
+  const itemKeys = params.itemKeys.map((k) => (k || '').trim());
+  if (itemKeys.some((k) => !k)) {
+    throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A chave do item (itemKey) é obrigatória.'));
+  }
 
   try {
     const { data, error } = await client.rpc('link_contract_to_items_atomic', {
       p_contract_key: cleanContractKey,
-      p_links: payload
+      p_item_keys: itemKeys,
+      p_observacoes: params.observacoes?.trim() || null
     });
 
     if (error) throw mapPostgresErrorToAppError(error);
@@ -199,6 +187,60 @@ export async function linkContractToItemsRpc(
     }
 
     return data as RpcLinkContractToItemsResult;
+  } catch (err: any) {
+    if (err && err.code && typeof err.code === 'string') throw err;
+    throw mapPostgresErrorToAppError(err);
+  }
+}
+
+export interface SyncContractItemQuantityParams {
+  itemKey: string;
+  contractKey: string;
+  /** Quantidade do item no contrato segundo a API; nulo = a API foi lida e não listou o item. */
+  quantidade: number | null;
+  valorUnitario?: number | null;
+}
+
+export interface RpcSyncContractItemQuantityResult {
+  success: boolean;
+  id: string;
+  item_key: string;
+  contract_key: string;
+  quantidade_contratada: number | null;
+  valor_unitario: number | null;
+  timestamp: string;
+}
+
+/**
+ * Grava a cópia da quantidade contratada lida da API para o vínculo (item, contrato)
+ * via RPC sync_contract_item_quantity_atomic.
+ */
+export async function syncContractItemQuantityRpc(
+  params: SyncContractItemQuantityParams
+): Promise<RpcSyncContractItemQuantityResult> {
+  const client = requireSupabase();
+
+  const itemKey = (params.itemKey || '').trim();
+  const contractKey = (params.contractKey || '').trim();
+  if (!itemKey) throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A chave do item (itemKey) é obrigatória.'));
+  if (!contractKey) throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A chave do contrato (contractKey) é obrigatória.'));
+  if (params.quantidade != null && !(params.quantidade >= 0)) {
+    throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A quantidade contratada não pode ser negativa.'));
+  }
+
+  try {
+    const { data, error } = await client.rpc('sync_contract_item_quantity_atomic', {
+      p_item_key: itemKey,
+      p_contract_key: contractKey,
+      p_quantidade: params.quantidade,
+      p_valor_unitario: params.valorUnitario ?? null
+    });
+
+    if (error) throw mapPostgresErrorToAppError(error);
+    if (!data || typeof data !== 'object') {
+      throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: Resposta inválida da RPC sync_contract_item_quantity_atomic'));
+    }
+    return data as RpcSyncContractItemQuantityResult;
   } catch (err: any) {
     if (err && err.code && typeof err.code === 'string') throw err;
     throw mapPostgresErrorToAppError(err);

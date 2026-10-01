@@ -1,7 +1,7 @@
 import type { ArpResponse, ArpItemsResponse, ArpItemRecord, UnidadesItemResponse, FilterParams, ArpRecord, EmpenhosSaldoItemResponse, EmpenhoSaldoItemRecord, PncpContract, PncpContractEmpenho, AdesoesItemResponse, AdesaoItemRecord, ComprasGovContratoItemRecord, ComprasGovContratosItemResponse, ContratosGovEmpenhoRecord } from '../types';
 import { cacheArpsInDb, cacheArpItemsInDb, fetchArpsFromDb } from './dbCacheService';
 import { formatPncpContractUrl } from '../utils/pncpUtils';
-import { CNPJ_SENASP, cnpjDaUasg, codigoOrgaoDaUasg } from '../config/unidadesGestoras';
+import { CNPJ_SENASP, cnpjDaUasg, codigoOrgaoDaUasg, isUasgCglic } from '../config/unidadesGestoras';
 
 const BASE_URL = '/api-arp/modulo-arp';
 
@@ -1467,19 +1467,24 @@ export async function fetchPncpContracts(
     const linkVisualizacao = formatPncpContractUrl(numeroControlePncp, rawLinkVisualizacao);
 
     // Identificação precisa da UASG e classificação (200331 e 200330 são Gerenciadoras)
-    const rawUasg = c.codigoUnidadeGestora || 
-                    c.codigoUnidadeGestoraOrigemContrato || 
-                    detail?.unidadeOrgao?.codigoUnidade || 
-                    detail?.unidadeExecutora?.codigoUnidade || 
-                    c.unidadeExecutora?.codigo || 
-                    c.unidadeExecutora?.codigoUnidade || 
-                    c.unidadeOrgao?.codigoUnidade || 
-                    c.unidadeGestora || 
-                    (c.unidadeNome?.match(/(\d{5,6})/)?.[1]) || 
-                    fallbackParams?.codigoUnidadeGestora || 
-                    '200331';
-    const resolvedUasg = String(rawUasg).trim();
-    const isGerenciadora = resolvedUasg === String(fallbackParams?.codigoUnidadeGestora || '200331') || resolvedUasg === '200331' || resolvedUasg === '200330';
+    // Só vale valor de 6 dígitos: campos como o código do órgão ou da unidade executora também
+    // aparecem nessa fila e não são UASG. Se o contrato informa um código mas nenhum é válido, a UASG
+    // fica vazia (não identificada) em vez de assumir a da ata. Sem nenhum campo, vale a UASG da ata.
+    const uasgCandidates = [
+      c.codigoUnidadeGestora,
+      c.codigoUnidadeGestoraOrigemContrato,
+      detail?.unidadeOrgao?.codigoUnidade,
+      detail?.unidadeExecutora?.codigoUnidade,
+      c.unidadeExecutora?.codigo,
+      c.unidadeExecutora?.codigoUnidade,
+      c.unidadeOrgao?.codigoUnidade,
+      c.unidadeGestora,
+      c.unidadeNome?.match(/(\d{6})/)?.[1]
+    ].map((v) => String(v ?? '').trim()).filter(Boolean);
+    const ataUasg = String(fallbackParams?.codigoUnidadeGestora ?? '').trim();
+    const resolvedUasg = uasgCandidates.find((v) => /^\d{6}$/.test(v))
+      || (uasgCandidates.length === 0 && /^\d{6}$/.test(ataUasg) ? ataUasg : '');
+    const isGerenciadora = resolvedUasg !== '' && (resolvedUasg === String(fallbackParams?.codigoUnidadeGestora || '') || isUasgCglic(resolvedUasg));
     const tipoUnidade: 'GERENCIADORA' | 'PARTICIPANTE' = isGerenciadora ? 'GERENCIADORA' : 'PARTICIPANTE';
 
     const numContrato = c.numeroContrato || c.numeroContratoEmpenho || c.numero || detail?.numeroContratoEmpenho || '';
@@ -1496,8 +1501,10 @@ export async function fetchPncpContracts(
     let contratoId: number | undefined = undefined;
     let orgaoNomeGov: string | undefined = undefined;
 
-    if (numContrato && resolvedUasg) {
-      const govData = await fetchContratosGovData(resolvedUasg, numContrato, anoContrato);
+    // Sem UASG identificada, a consulta usa a UASG gerenciadora da ata (fetchContratosGovData ainda tenta as do CGLIC)
+    const lookupUasg = resolvedUasg || ataUasg;
+    if (numContrato && lookupUasg) {
+      const govData = await fetchContratosGovData(lookupUasg, numContrato, anoContrato);
       contratoId = govData.contratoId;
       orgaoNomeGov = govData.orgaoNome;
 
