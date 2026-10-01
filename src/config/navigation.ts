@@ -48,11 +48,11 @@ export interface NavItem {
  * - Visão Geral (/instrumentos) — painel unificado de gestão e
  *   monitoramento (consolida a antiga Visão Geral e a antiga Central de Atenção)
  * - Atas de Registro de Preços (recolhível)
- *     - Consulta e Vigência (/atas)
+ *     - Carteira de Atas (/atas)
  *     - Alocações por Unidade (/atas/saldos-unidade)
  *     - Modelos de Gestão de Atas (/atas/modelos)
  * - Contratos (recolhível)
- *     - Acompanhamento e Prazos (/contratos)
+ *     - Carteira de Contratos (/contratos)
  *     - Modelos de Gestão de Contratos (/contratos/modelos)
  * - Execução Financeira (recolhível)
  *     - Pagamentos (/pagamentos)
@@ -79,11 +79,11 @@ export const navigationConfig: NavItem[] = [
     children: [
       {
         id: 'atas-consulta',
-        label: 'Consulta e Vigência',
+        label: 'Carteira de Atas',
         icon: Search,
         route: '/atas',
         status: 'active',
-        matchPrefixes: ['/atas', '/atas/itens', '/atas/itens/saldo', '/atas/detalhe'],
+        matchPrefixes: ['/atas', '/atas/detalhe'],
         excludePrefixes: ['/atas/saldos-unidade', '/atas/modelos'],
         allowedRoles: ['admin', 'gestor', 'leitor']
       },
@@ -115,7 +115,7 @@ export const navigationConfig: NavItem[] = [
     children: [
       {
         id: 'contratos-acompanhamento',
-        label: 'Acompanhamento e Prazos',
+        label: 'Carteira de Contratos',
         icon: Clock,
         route: '/contratos',
         status: 'active',
@@ -228,12 +228,10 @@ export interface BreadcrumbEntry {
 
 const staticRouteLabels: Record<string, string> = {
   '/instrumentos': 'Visão Geral',
-  '/atas': 'Consulta e Vigência',
-  '/atas/itens': 'Itens da Ata',
-  '/atas/itens/saldo': 'Saldo do Item',
+  '/atas': 'Carteira de Atas',
   '/atas/saldos-unidade': 'Alocações por Unidade',
   '/atas/modelos': 'Modelos de Gestão de Atas',
-  '/contratos': 'Acompanhamento e Prazos',
+  '/contratos': 'Carteira de Contratos',
   '/contratos/modelos': 'Modelos de Gestão de Contratos',
   '/pagamentos': 'Pagamentos',
   '/empenhos': 'Empenhos e Execução',
@@ -260,7 +258,10 @@ export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
     } else if (segments[i - 1] === 'contratos') {
       crumbs.push({ label: `Contrato ${decodeURIComponent(segment)}`, route: accPath });
     } else if (segments[i - 1] === 'detalhe' && segments[i - 2] === 'atas') {
-      crumbs.push({ label: `Ata ${decodeURIComponent(segment)}`, route: accPath });
+      // Chave "00059/2025-200331": o rótulo mostra só o número da Ata.
+      crumbs.push({ label: `Ata ${decodeURIComponent(segment).replace(/-\d{6}$/, '')}`, route: accPath });
+    } else if (segments[i - 1] === 'itens' && segments[i - 3] === 'detalhe' && segments[i - 4] === 'atas') {
+      crumbs.push({ label: `Item ${decodeURIComponent(segment)}`, route: accPath });
     }
   }
 
