@@ -16,8 +16,8 @@ export const ContractsPortfolioHeader: React.FC<ContractsPortfolioHeaderProps> =
 }) => {
   return (
     <PageHeader
-      title="Acompanhamento e Prazos"
-      subtitle="Carteira de contratos, vigências, valores e situações de acompanhamento."
+      title="Carteira de Contratos"
+      subtitle="Todos os contratos, com vigência, valor, gestor e pendências em aberto."
       icon={<FileText size={26} color="#0c326f" aria-hidden="true" />}
       actions={
         <HeaderRefreshAction

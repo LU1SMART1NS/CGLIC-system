@@ -25,6 +25,7 @@ import { ContractPaymentFollowUpSection } from './ContractPaymentFollowUpSection
 import { ContractFinancialExecutionSection } from './ContractFinancialExecutionSection';
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
+import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
 
 const TAB_IDS: Contract360Tab[] = ['acoes', 'plano', 'pagamentos', 'financeiro', 'historico'];
 
@@ -335,56 +336,24 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
-      <Contract360Header contract={contract} />
+      <Contract360Header contract={contract}>
+        <ContractHealthStrip
+          contract={contract}
+          contractKey={resolvedContractKey}
+          counts={queue.counts}
+          onOpenActions={() => goToTab('acoes')}
+          onOpenFinanceiro={() => goToTab('financeiro')}
+        />
+      </Contract360Header>
 
-      <ContractHealthStrip
-        contract={contract}
-        contractKey={resolvedContractKey}
-        counts={queue.counts}
-        onOpenActions={() => goToTab('acoes')}
-      />
-
-      <div
+      <Instrument360Tabs
         ref={tabsRef}
-        role="tablist"
-        aria-label="Seções do contrato"
-        style={{
-          display: 'flex',
-          gap: '0.25rem',
-          flexWrap: 'wrap',
-          borderBottom: '1px solid #e2e8f0',
-          marginBottom: '1.25rem',
-          scrollMarginTop: '1rem'
-        }}
-      >
-        {tabs.map((tab) => {
-          const selected = tab.id === activeTab;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              id={`contract-tab-${tab.id}`}
-              aria-selected={selected}
-              aria-controls={`contract-tabpanel-${tab.id}`}
-              onClick={() => goToTab(tab.id)}
-              style={{
-                padding: '0.6rem 1rem',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: `3px solid ${selected ? '#0c326f' : 'transparent'}`,
-                marginBottom: '-1px',
-                color: selected ? '#0c326f' : '#475569',
-                fontWeight: selected ? 800 : 600,
-                fontSize: '0.88rem',
-                cursor: 'pointer'
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+        tabs={tabs}
+        active={activeTab}
+        onSelect={goToTab}
+        idPrefix="contract"
+        ariaLabel="Seções do contrato"
+      />
 
       <div role="tabpanel" id={`contract-tabpanel-${activeTab}`} aria-labelledby={`contract-tab-${activeTab}`}>
         {activeTab === 'acoes' && (

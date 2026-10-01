@@ -1,20 +1,28 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
+import { useAllContractManagers } from '../hooks/useAllContractManagers';
+import { useManagementDashboard } from '../hooks/useManagementDashboard';
+import { useArpItemContractLinks } from '../hooks/useAtaManagers';
+import { canAssignManager } from '../components/carteira/ManagerAssign';
 import { useAuth } from '../context/AuthContext';
 import { ContractsPortfolioHeader } from '../components/contracts/portfolio/ContractsPortfolioHeader';
-import {
-  ContractsPortfolioSummary,
-  type ContractStatusFilterOption
-} from '../components/contracts/portfolio/ContractsPortfolioSummary';
+import { ContractsPortfolioSummary } from '../components/contracts/portfolio/ContractsPortfolioSummary';
 import {
   ContractsPortfolioFilters,
+  DEFAULT_CONTRACTS_FILTERS,
+  SEM_GESTOR,
   type ContractsPortfolioFilterState
 } from '../components/contracts/portfolio/ContractsPortfolioFilters';
-import { ContractsPortfolioTable } from '../components/contracts/portfolio/ContractsPortfolioTable';
+import {
+  ContractsPortfolioTable,
+  type ContractPortfolioRow
+} from '../components/contracts/portfolio/ContractsPortfolioTable';
+import { classifyPrazo, comparePrazo, matchesStatusFilter } from '../components/carteira/carteiraPrazo';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
 import { getContractDaysRemaining } from '../services/dashboardService';
+import type { DashboardAttentionItem } from '../types/managementDashboard';
 
 /** UASGs consolidadas nesta tela — mesmo escopo já usado na Visão Geral (/instrumentos), para que os dois painéis reportem os mesmos números de carteira de contratos. */
 const UASGS: string[] = ['200330', '200331'];
@@ -53,11 +61,46 @@ export const ContractsRoute: React.FC = () => {
     return allContracts.filter((contract) => scopedKeys.has(contract.id));
   }, [allContracts, assignedContractKeys]);
 
-  const [filterState, setFilterState] = useState<ContractsPortfolioFilterState>({
-    status: 'TODOS',
-    tipoInstrumento: 'TODOS',
-    busca: ''
+  // Gestor (nome) e pendências (Funil Único de Atenção) por contrato — mesmas
+  // consultas da Visão Geral (mesmos parâmetros, logo mesmo cache do React Query).
+  const managers200330 = useAllContractManagers(UASGS[0]);
+  const managers200331 = useAllContractManagers(UASGS[1]);
+  const mgmt200330 = useManagementDashboard({
+    uasg: UASGS[0],
+    assignedContractKeys: scope200330.contractKeys,
+    assignedAtaKeys: scope200330.ataKeys
   });
+  const mgmt200331 = useManagementDashboard({
+    uasg: UASGS[1],
+    assignedContractKeys: scope200331.contractKeys,
+    assignedAtaKeys: scope200331.ataKeys
+  });
+
+  const gestorByContractKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const managers of [managers200330.data, managers200331.data]) {
+      for (const [key, manager] of Object.entries(managers || {})) {
+        if (manager?.gestorNome) map.set(key, manager.gestorNome);
+      }
+    }
+    return map;
+  }, [managers200330.data, managers200331.data]);
+
+  const pendenciasByContractKey = useMemo(() => {
+    const map = new Map<string, DashboardAttentionItem[]>();
+    for (const mgmt of [mgmt200330, mgmt200331]) {
+      for (const item of mgmt.readModel?.attention?.items || []) {
+        if (!item.contractKey) continue;
+        const list = map.get(item.contractKey) || [];
+        list.push(item);
+        map.set(item.contractKey, list);
+      }
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mgmt200330.readModel, mgmt200331.readModel]);
+
+  const [filterState, setFilterState] = useState<ContractsPortfolioFilterState>(DEFAULT_CONTRACTS_FILTERS);
 
   const handleFilterChange = useCallback(
     <K extends keyof ContractsPortfolioFilterState>(
@@ -72,128 +115,100 @@ export const ContractsRoute: React.FC = () => {
     []
   );
 
-  const handleSelectStatus = useCallback((status: ContractStatusFilterOption) => {
-    setFilterState((prev) => ({
-      ...prev,
-      status
-    }));
+  const handleSelectStatus = useCallback((status: ContractsPortfolioFilterState['status']) => {
+    setFilterState((prev) => ({ ...prev, status }));
   }, []);
 
   const handleResetFilters = useCallback(() => {
-    setFilterState({
-      status: 'TODOS',
-      tipoInstrumento: 'TODOS',
-      busca: ''
-    });
+    setFilterState(DEFAULT_CONTRACTS_FILTERS);
   }, []);
 
-  // KPIs de Resumo calculados sobre todos os contratos carregados
-  const summaryMetrics = useMemo(() => {
-    let total = 0;
-    let vigentes = 0;
-    let aVencer60d = 0;
-    let expirados = 0;
+  // Atribuição de gestor na própria carteira (admin e gestor), com propagação
+  // Ata ↔ contratos vinculados — ver managerAssignmentService.
+  const canAssign = canAssignManager(role);
+  const { data: links = [] } = useArpItemContractLinks(canAssign);
+  const contractsByKey = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
+  const assignContext = useMemo(() => ({ links, contractsByKey }), [links, contractsByKey]);
 
-    for (const contract of contracts) {
-      total++;
+
+  // Contratos enriquecidos com prazo, gestor e pendências (base única para cards, filtros e tabela).
+  const allRows = useMemo<ContractPortfolioRow[]>(() => {
+    return contracts.map((contract) => {
+      const contractKey = contract.id || `${contract.uasg || '200331'}-${contract.numero}-${contract.ano}`;
       const diasRestantes = getContractDaysRemaining(contract.dataVigenciaFim);
-      const isVig = contract.statusVigencia === 'Vigente';
-      const isExp = contract.statusVigencia === 'Expirado' || (diasRestantes !== null && diasRestantes < 0);
-      const isAv60 = contract.statusVigencia === 'A Vencer (60d)' || (diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 60);
+      const faixa = classifyPrazo(diasRestantes, contract.statusVigencia === 'Expirado');
+      return {
+        contract,
+        contractKey,
+        diasRestantes,
+        faixa,
+        gestorNome: gestorByContractKey.get(contractKey),
+        pendencias: pendenciasByContractKey.get(contractKey) || []
+      };
+    });
+  }, [contracts, gestorByContractKey, pendenciasByContractKey]);
 
-      if (isExp) {
-        expirados++;
-      } else if (isAv60) {
-        aVencer60d++;
-        vigentes++; // Contratos a vencer ainda são vigentes na carteira
-      } else if (isVig) {
-        vigentes++;
-      } else {
-        // Fallback baseado em dias restantes
-        if (diasRestantes !== null && diasRestantes >= 0) {
-          vigentes++;
-        } else if (diasRestantes !== null && diasRestantes < 0) {
-          expirados++;
-        }
+  // KPIs dos cards, sobre toda a carteira visível ao usuário (independentes dos filtros).
+  const summaryMetrics = useMemo(() => {
+    let vigentes = 0;
+    let criticos = 0;
+    let atencao = 0;
+    let historico = 0;
+    let valorVigenteTotal = 0;
+    let valorCritico = 0;
+    let valorAtencao = 0;
+    for (const { contract, faixa } of allRows) {
+      if (faixa === 'EXPIRADO') {
+        historico++;
+        continue;
+      }
+      if (faixa === 'SEM_DATA') continue;
+      vigentes++;
+      const valor = contract.valorGlobal || contract.valorInicial || 0;
+      valorVigenteTotal += valor;
+      if (faixa === 'CRITICO') {
+        criticos++;
+        valorCritico += valor;
+      } else if (faixa === 'ATENCAO') {
+        atencao++;
+        valorAtencao += valor;
       }
     }
+    return { vigentes, criticos, atencao, historico, valorVigenteTotal, valorCritico, valorAtencao };
+  }, [allRows]);
 
-    return {
-      total,
-      vigentes,
-      aVencer60d,
-      expirados
-    };
-  }, [contracts]);
+  const gestoresDisponiveis = useMemo(
+    () => Array.from(new Set(allRows.map((r) => r.gestorNome).filter((n): n is string => Boolean(n)))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [allRows]
+  );
 
-  // Contratos filtrados
-  const filteredContracts = useMemo(() => {
-    return contracts.filter((contract) => {
-      const diasRestantes = getContractDaysRemaining(contract.dataVigenciaFim);
-      const isExp = contract.statusVigencia === 'Expirado' || (diasRestantes !== null && diasRestantes < 0);
-      const isAv60 = contract.statusVigencia === 'A Vencer (60d)' || (diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 60);
-      const isVig = (contract.statusVigencia === 'Vigente' || isAv60) && !isExp;
+  const filteredRows = useMemo(() => {
+    const query = filterState.busca.trim().toLowerCase();
+    const queryDigits = query.replace(/\D/g, '');
 
-      // 1. Filtro por Situação
-      if (filterState.status === 'VIGENTE' && !isVig) {
-        return false;
-      }
-      if (filterState.status === 'A_VENCER_60D' && !isAv60) {
-        return false;
-      }
-      if (filterState.status === 'EXPIRADO' && !isExp) {
-        return false;
-      }
+    return allRows
+      .filter(({ contract, faixa, gestorNome, pendencias }) => {
+        if (!matchesStatusFilter(faixa, filterState.status)) return false;
+        if (filterState.pendencia === 'COM_PENDENCIA' && pendencias.length === 0) return false;
+        if (filterState.gestor === SEM_GESTOR && gestorNome) return false;
+        if (filterState.gestor !== 'TODOS' && filterState.gestor !== SEM_GESTOR && gestorNome !== filterState.gestor) return false;
 
-      // 2. Filtro por Tipo de Instrumento
-      if (filterState.tipoInstrumento !== 'TODOS') {
-        const tipoInstNorm = (contract.tipoInstrumento || '').toUpperCase();
-        if (filterState.tipoInstrumento === 'CONTRATO') {
-          if (tipoInstNorm.includes('TERMO ADITIVO') || tipoInstNorm.includes('APOSTILAMENTO') || tipoInstNorm.includes('CARTA')) {
-            return false;
-          }
-        } else if (filterState.tipoInstrumento === 'TERMO_ADITIVO') {
-          if (!tipoInstNorm.includes('TERMO ADITIVO') && !tipoInstNorm.includes('ADITIVO')) {
-            return false;
-          }
-        } else if (filterState.tipoInstrumento === 'APOSTILAMENTO') {
-          if (!tipoInstNorm.includes('APOSTILAMENTO')) {
-            return false;
-          }
-        } else if (filterState.tipoInstrumento === 'CARTA_CONTRATO') {
-          if (!tipoInstNorm.includes('CARTA')) {
-            return false;
-          }
+        if (query) {
+          const fornCnpj = String(contract.fornecedorCnpjCpf || '').replace(/\D/g, '');
+          const matchesQuery =
+            String(contract.numero || '').toLowerCase().includes(query) ||
+            String(contract.ano || '').toLowerCase().includes(query) ||
+            String(contract.numeroFormatado || '').toLowerCase().includes(query) ||
+            String(contract.fornecedorNome || '').toLowerCase().includes(query) ||
+            (queryDigits.length >= 3 && fornCnpj.includes(queryDigits)) ||
+            String(contract.objeto || '').toLowerCase().includes(query);
+          if (!matchesQuery) return false;
         }
-      }
+        return true;
+      })
+      .sort((a, b) => comparePrazo(a.diasRestantes, b.diasRestantes));
+  }, [allRows, filterState]);
 
-      // 3. Filtro por Busca Textual
-      if (filterState.busca.trim().length > 0) {
-        const query = filterState.busca.trim().toLowerCase();
-        const num = String(contract.numero || '').toLowerCase();
-        const ano = String(contract.ano || '').toLowerCase();
-        const numFormatado = String(contract.numeroFormatado || '').toLowerCase();
-        const fornNome = String(contract.fornecedorNome || '').toLowerCase();
-        const fornCnpj = String(contract.fornecedorCnpjCpf || '').toLowerCase().replace(/\D/g, '');
-        const queryDigits = query.replace(/\D/g, '');
-        const objeto = String(contract.objeto || '').toLowerCase();
-
-        const matchesQuery =
-          num.includes(query) ||
-          ano.includes(query) ||
-          numFormatado.includes(query) ||
-          fornNome.includes(query) ||
-          (queryDigits.length >= 3 && fornCnpj.includes(queryDigits)) ||
-          objeto.includes(query);
-
-        if (!matchesQuery) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [contracts, filterState]);
 
   if (error && !hasAnyData) {
     return (
@@ -206,6 +221,10 @@ export const ContractsRoute: React.FC = () => {
       </div>
     );
   }
+
+  // Os cards só aparecem com todos os dados carregados: evita mostrar totais
+  // parciais (ex.: "1 vigente") enquanto a segunda UASG ainda está chegando.
+  const isBusy = isLoading || (role === 'gestor' && isLoadingManagers);
 
   return (
     <div style={{
@@ -222,35 +241,42 @@ export const ContractsRoute: React.FC = () => {
         lastUpdated={dataUpdatedAt}
       />
 
-      {(isLoading || (role === 'gestor' && isLoadingManagers)) && contracts.length === 0 ? (
+      {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <SkeletonLoader variant="card" height="90px" count={1} />
+          <SkeletonLoader variant="card" height="96px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
         </div>
       ) : (
         <>
           <ContractsPortfolioSummary
-            total={summaryMetrics.total}
             vigentes={summaryMetrics.vigentes}
-            aVencer60d={summaryMetrics.aVencer60d}
-            expirados={summaryMetrics.expirados}
+            criticos={summaryMetrics.criticos}
+            atencao={summaryMetrics.atencao}
+            historico={summaryMetrics.historico}
+            totalContratos={allRows.length}
+            valorVigenteTotal={summaryMetrics.valorVigenteTotal}
+            valorCritico={summaryMetrics.valorCritico}
+            valorAtencao={summaryMetrics.valorAtencao}
             activeStatus={filterState.status}
             onSelectStatus={handleSelectStatus}
           />
 
           <ContractsPortfolioFilters
             filters={filterState}
+            gestores={gestoresDisponiveis}
             onChangeFilter={handleFilterChange}
             onResetFilters={handleResetFilters}
-            totalFiltered={filteredContracts.length}
-            totalContracts={contracts.length}
+            totalFiltered={filteredRows.length}
+            totalContracts={allRows.length}
           />
 
           <ContractsPortfolioTable
-            contracts={filteredContracts}
-            totalContracts={contracts.length}
+            rows={filteredRows}
+            totalContracts={allRows.length}
             onResetFilters={handleResetFilters}
+            canAssign={canAssign}
+            assignContext={assignContext}
           />
         </>
       )}

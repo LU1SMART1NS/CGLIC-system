@@ -20,6 +20,10 @@ export function useLinkContractToItem() {
       queryClient.invalidateQueries({
         queryKey: ['item-contract-links']
       });
+      // Aba "Contratos vinculados" da Ata 360 (useAtaLinkedContracts)
+      queryClient.invalidateQueries({
+        queryKey: ['ata-linked-contracts']
+      });
     }
   });
 }

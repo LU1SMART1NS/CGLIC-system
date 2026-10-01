@@ -1,17 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
-  Building2,
-  Calendar,
-  Clock,
   ExternalLink,
   FileText,
-  DollarSign,
   AlertTriangle,
   CheckCircle2,
-  HelpCircle,
-  ShieldCheck,
   RefreshCw,
   Loader2,
   Info,
@@ -21,24 +14,20 @@ import {
 import type { ContractDashboardRecord } from '../../types';
 import { useSyncContractEmpenhos } from '../../hooks/useSyncContractEmpenhos';
 import type { OrchestrationStatus } from '../../types/empenhoSync';
-import { ContractManagerSelector } from './ContractManagerSelector';
+import { useContractManager } from '../../hooks/useContractManager';
+import { ManagerInfo } from '../instrument360/ManagerInfo';
+import { getContractDaysRemaining } from '../../services/dashboardService';
+import { formatContractNumber } from '../../utils/contractNumber';
+import { classifyPrazo } from '../carteira/carteiraPrazo';
+import { Instrument360Hero, instrumentStatusLabel } from '../instrument360/Instrument360Hero';
 
 interface Contract360HeaderProps {
   contract: ContractDashboardRecord;
   onBack?: () => void;
   userRole?: string;
   canSync?: boolean;
-}
-
-function formatCnpjDisplay(cnpj?: string): string {
-  if (!cnpj) return '';
-  const digits = cnpj.replace(/\D/g, '');
-  if (digits.length === 14) {
-    return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-  } else if (digits.length === 11) {
-    return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
-  }
-  return cnpj;
+  /** Indicadores e linha da vida (ContractHealthStrip), dentro do mesmo cartão. */
+  children?: React.ReactNode;
 }
 
 function formatDateBR(dateStr?: string): string {
@@ -51,16 +40,12 @@ function formatDateBR(dateStr?: string): string {
   return dateStr;
 }
 
-function formatCurrency(val?: number): string {
-  if (typeof val !== 'number' || isNaN(val)) return 'R$ 0,00';
-  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
 export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   contract,
   onBack,
   userRole,
-  canSync
+  canSync,
+  children
 }) => {
   const navigate = useNavigate();
 
@@ -79,6 +64,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       : contract.numeroControlePncp || 'unknown-contract');
 
   const syncMutation = useSyncContractEmpenhos(contractKey);
+  const { data: manager, isLoading: loadingManager } = useContractManager(contractKey);
 
   // RBAC: gestor, coordenador e admin possuem permissão
   const isAuthorized =
@@ -105,11 +91,6 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
     });
   };
 
-  const displayNum = contract.numeroFormatado
-    ? `CONTRATO ${contract.numeroFormatado}`
-    : `CONTRATO ${contract.numero}/${contract.ano}`;
-
-  const formattedCnpj = formatCnpjDisplay(contract.fornecedorCnpjCpf);
   const pncpUrl =
     contract.linkPncp ||
     (contract.numeroControlePncp
@@ -174,85 +155,27 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
     ? getFeedbackConfig(syncMutation.data?.status || (syncMutation.isError ? 'ERRO' : undefined))
     : null;
 
+  const dias = getContractDaysRemaining(contract.dataVigenciaFim);
+  const faixa = classifyPrazo(dias, contract.statusVigencia === 'Expirado');
+  const numDisplay = formatContractNumber(contract);
+
   return (
-    <header
-      style={{
-        background: '#ffffff',
-        borderRadius: '12px',
-        border: '1px solid #e2e8f0',
-        padding: '1.5rem',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-        marginBottom: '1.5rem'
-      }}
-    >
-      {/* Barra Superior de Ações e Retorno */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '1.25rem',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleBack}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            padding: '0.45rem 0.85rem',
-            background: '#f8fafc',
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            color: '#0c326f',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <ArrowLeft size={16} /> Voltar para Contratos
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {/* Badge de Procedência / Fonte Oficial */}
-          <span
-            title={
-              contract.lastSyncedAt
-                ? `Fonte oficial governamental (${contract.fonteDados}) • Sincronizado em ${new Date(
-                    contract.lastSyncedAt
-                  ).toLocaleString('pt-BR')}`
-                : `Fonte oficial governamental: ${contract.fonteDados}`
-            }
-            style={{
-              fontSize: '0.75rem',
-              padding: '0.25rem 0.65rem',
-              borderRadius: '6px',
-              backgroundColor: '#f8fafc',
-              color: '#334155',
-              border: '1px solid #cbd5e1',
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            <ShieldCheck size={14} color="#0c326f" /> Fonte: {contract.fonteDados || 'PNCP'}
-          </span>
-
-          {/* Botão de Sincronização On-Demand de Empenhos */}
+    <Instrument360Hero
+      backLabel="Voltar para Contratos"
+      onBack={handleBack}
+      actions={
+        <>
+          {/* Empenhos de contrato não são atualizados automaticamente: este é o único
+              gatilho por contrato (o lote fica em Execução Financeira). */}
           <button
             type="button"
-            aria-label="Sincronizar Empenhos"
+            aria-label="Atualizar empenhos"
             disabled={!isAuthorized || syncMutation.isPending}
             onClick={handleSync}
             title={
               !isAuthorized
-                ? 'Você não possui permissão para sincronizar empenhos.'
-                : 'Sincronizar empenhos deste contrato nas fontes governamentais oficiais'
+                ? 'Você não possui permissão para atualizar empenhos.'
+                : `Buscar empenhos deste contrato nas fontes oficiais (fonte do contrato: ${contract.fonteDados || 'PNCP'})`
             }
             style={{
               display: 'inline-flex',
@@ -265,19 +188,18 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
               padding: '0.25rem 0.65rem',
               borderRadius: '6px',
               border: `1px solid ${!isAuthorized ? '#cbd5e1' : '#86efac'}`,
-              cursor: !isAuthorized || syncMutation.isPending ? 'not-allowed' : 'pointer',
-              transition: 'all 0.15s ease'
+              cursor: !isAuthorized || syncMutation.isPending ? 'not-allowed' : 'pointer'
             }}
           >
             {syncMutation.isPending ? (
               <>
                 <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                <span>Sincronizando...</span>
+                <span>Atualizando...</span>
               </>
             ) : (
               <>
                 <RefreshCw size={13} />
-                <span>Sincronizar Empenhos</span>
+                <span>Atualizar empenhos</span>
               </>
             )}
           </button>
@@ -297,314 +219,66 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
                 backgroundColor: 'rgba(2, 132, 199, 0.08)',
                 padding: '0.25rem 0.65rem',
                 borderRadius: '6px',
-                textDecoration: 'none',
-                border: '1px solid rgba(2, 132, 199, 0.2)'
+                textDecoration: 'none'
               }}
             >
-              Visualizar no PNCP <ExternalLink size={13} />
+              <ExternalLink size={13} /> Contrato no PNCP
             </a>
           )}
-        </div>
-      </div>
-
-      {/* Banner de Feedback Operacional da Sincronização */}
-      {showFeedback && feedback && (
-        <div
-          role="alert"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '0.75rem',
-            padding: '0.65rem 0.85rem',
-            backgroundColor: feedback.bg,
-            border: `1px solid ${feedback.border}`,
-            borderRadius: '8px',
-            color: feedback.color,
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            marginBottom: '1.25rem'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {feedback.icon}
-            <span>{feedback.message}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => syncMutation.reset()}
-            aria-label="Fechar notificação"
+        </>
+      }
+      notice={
+        showFeedback && feedback ? (
+          <div
+            role="alert"
             style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              padding: '0.6rem 0.85rem',
+              marginBottom: '1rem',
+              borderRadius: '8px',
+              background: feedback.bg,
+              border: `1px solid ${feedback.border}`,
               color: feedback.color,
-              padding: '2px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: 0.75
+              fontSize: '0.82rem',
+              fontWeight: 600
             }}
           >
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* Identificação Principal do Contrato */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileText size={26} color="#0c326f" aria-hidden="true" />
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              {displayNum}
-            </h1>
-          </div>
-
-          {/* Badge de Status Oficial de Vigência */}
-          {contract.statusVigencia === 'Expirado' ? (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '0.25rem 0.65rem',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                color: '#dc2626',
-                border: '1px solid rgba(239, 68, 68, 0.25)'
-              }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {feedback.icon}
+              <span>{feedback.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => syncMutation.reset()}
+              aria-label="Fechar notificação"
+              style={{ background: 'none', border: 'none', color: feedback.color, cursor: 'pointer', display: 'flex', opacity: 0.75 }}
             >
-              <AlertTriangle size={14} /> EXPIRADO
-            </span>
-          ) : contract.statusVigencia === 'A Vencer (60d)' ? (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '0.25rem 0.65rem',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                color: '#d97706',
-                border: '1px solid rgba(245, 158, 11, 0.25)'
-              }}
-            >
-              <Clock size={14} /> VENCE EM &lt; 60 DIAS
-            </span>
-          ) : contract.statusVigencia === 'Vigente' ? (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '0.25rem 0.65rem',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                color: '#059669',
-                border: '1px solid rgba(16, 185, 129, 0.25)'
-              }}
-            >
-              <CheckCircle2 size={14} /> VIGENTE
-            </span>
-          ) : (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '0.25rem 0.65rem',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                backgroundColor: '#f1f5f9',
-                color: '#64748b'
-              }}
-            >
-              <HelpCircle size={14} /> VIGÊNCIA NÃO INFORMADA
-            </span>
-          )}
-        </div>
-
-        {contract.objeto && (
-          <p
-            style={{
-              fontSize: '0.92rem',
-              color: '#334155',
-              margin: '0.5rem 0 0 0',
-              lineHeight: '1.45',
-              maxWidth: '1200px'
-            }}
-          >
-            {contract.objeto}
-          </p>
-        )}
-
-        <dl
-          data-testid="contract-header-metadata"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.35rem 1.25rem',
-            margin: '0.6rem 0 0 0',
-            fontSize: '0.78rem',
-            color: '#64748b'
-          }}
-        >
-          {[
-            { label: 'Órgão', value: contract.nomeOrgao },
-            { label: 'Unidade gestora', value: contract.nomeUnidadeGestora },
-            { label: 'Modalidade', value: contract.modalidadeCompra },
-            { label: 'Nº PNCP', value: contract.numeroControlePncp },
-            { label: 'Assinatura', value: contract.dataAssinatura ? formatDateBR(contract.dataAssinatura) : undefined }
-          ].map(({ label, value }) => (
-            <div key={label} style={{ display: 'flex', gap: '0.3rem' }}>
-              <dt style={{ fontWeight: 600 }}>{label}:</dt>
-              <dd style={{ margin: 0, color: value ? '#334155' : '#94a3b8', fontWeight: value ? 600 : 400 }}>
-                {value || 'Não informado'}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-
-      {/* Grid de Resumo dos Dados Principais */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '1rem',
-          paddingTop: '1rem',
-          borderTop: '1px solid #f1f5f9'
-        }}
-      >
-        {/* Gestor Titular */}
-        <ContractManagerSelector contract={contract} />
-
-        {/* Fornecedor */}
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#0c326f',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <Building2 size={18} />
+              <X size={14} />
+            </button>
           </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Fornecedor / Contratada</div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
-              {contract.fornecedorNome || 'Não informado'}
-            </div>
-            {formattedCnpj && (
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>CNPJ: {formattedCnpj}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Vigência */}
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#0c326f',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <Calendar size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Vigência Oficial</div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
-              {formatDateBR(contract.dataVigenciaInicio)} a {formatDateBR(contract.dataVigenciaFim)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>UASG: {contract.uasg}</div>
-          </div>
-        </div>
-
-        {/* Valor Global */}
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#059669',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <DollarSign size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Valor Global Atualizado</div>
-            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#059669' }}>
-              {formatCurrency(contract.valorGlobal || contract.valorInicial)}
-            </div>
-            {contract.valorInicial && contract.valorGlobal && contract.valorInicial !== contract.valorGlobal && (
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                Inicial: {formatCurrency(contract.valorInicial)}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Processo Administrativo */}
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#0c326f',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <FileText size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Processo Administrativo</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
-                {contract.processo || 'Não informado'}
-              </span>
-            </div>
-            {contract.idCompra && (
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Compra: {contract.idCompra}</div>
-            )}
-          </div>
-        </div>
-      </div>
-    </header>
+        ) : null
+      }
+      icon={<FileText size={26} color="#0c326f" aria-hidden="true" />}
+      title={`Contrato ${numDisplay}`}
+      status={{ faixa, label: instrumentStatusLabel(faixa, dias) }}
+      manager={<ManagerInfo label="Gestor titular" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="contract-manager-info" />}
+      objeto={contract.objeto}
+      metaTestId="contract-header-metadata"
+      meta={[
+        { label: 'Processo', value: contract.processo },
+        { label: 'Órgão', value: contract.nomeOrgao },
+        ...(contract.nomeUnidadeGestora && contract.nomeUnidadeGestora.trim().toUpperCase() !== (contract.nomeOrgao || '').trim().toUpperCase()
+          ? [{ label: 'Unidade gestora', value: `${contract.nomeUnidadeGestora} (${contract.uasg})` }]
+          : [{ label: 'UASG', value: contract.uasg }]),
+        { label: 'Modalidade', value: contract.modalidadeCompra },
+        { label: 'Nº PNCP', value: contract.numeroControlePncp },
+        { label: 'Assinatura', value: contract.dataAssinatura ? formatDateBR(contract.dataAssinatura) : undefined }
+      ]}
+    >
+      {children}
+    </Instrument360Hero>
   );
 };

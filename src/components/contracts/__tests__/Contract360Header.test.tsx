@@ -63,16 +63,37 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
     reset: vi.fn()
   };
 
-  it('1. deve renderizar o botão "Sincronizar Empenhos" habilitado para perfil gestor', () => {
+  it('1. deve renderizar o botão "Atualizar empenhos" habilitado para perfil gestor', () => {
     vi.mocked(syncHookModule.useSyncContractEmpenhos).mockReturnValue(defaultMockMutation as any);
 
     const html = renderToStaticMarkup(
       <Contract360Header contract={mockContract} userRole="gestor" />
     );
 
-    expect(html).toContain('Sincronizar Empenhos');
+    expect(html).toContain('Atualizar empenhos');
     expect(html).not.toContain('disabled=""');
-    expect(html).not.toContain('Sincronizando...');
+    expect(html).not.toContain('Atualizando...');
+  });
+
+  it('1b. mostra situação no padrão da Carteira e dados cadastrais num só cartão', () => {
+    vi.mocked(syncHookModule.useSyncContractEmpenhos).mockReturnValue(defaultMockMutation as any);
+
+    const html = renderToStaticMarkup(
+      <Contract360Header contract={mockContract} userRole="gestor">
+        <div data-testid="indicadores-filho" />
+      </Contract360Header>
+    );
+
+    expect(html).toContain('data-testid="instrument-360-status"');
+    expect(html).toMatch(/Crítico · vence|Atenção · vence|Vigente · \d+ dias restantes|Encerrada/);
+    expect(html).toContain('23000.001234/2026-11');
+    expect(html).toContain('data-testid="indicadores-filho"');
+    // Gestor é só informação no 360 (atribuição fica na Carteira)
+    expect(html).toContain('data-testid="contract-manager-info"');
+    expect(html).not.toContain('Atribuir');
+    // Vigência não é mais repetida em bloco próprio no cabeçalho
+    expect(html).not.toContain('Vigência Oficial');
+    expect(html).not.toContain('Fonte: PNCP');
   });
 
   it('2. deve renderizar o botão desabilitado com tooltip para perfil consulta (RBAC)', () => {
@@ -82,12 +103,12 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
       <Contract360Header contract={mockContract} userRole="consulta" />
     );
 
-    expect(html).toContain('Sincronizar Empenhos');
+    expect(html).toContain('Atualizar empenhos');
     expect(html).toContain('disabled=""');
-    expect(html).toContain('Você não possui permissão para sincronizar empenhos.');
+    expect(html).toContain('Você não possui permissão para atualizar empenhos.');
   });
 
-  it('3. deve exibir spinner e estado "Sincronizando..." quando a mutação estiver pendente', () => {
+  it('3. deve exibir spinner e estado "Atualizando..." quando a mutação estiver pendente', () => {
     vi.mocked(syncHookModule.useSyncContractEmpenhos).mockReturnValue({
       ...defaultMockMutation,
       isPending: true
@@ -97,7 +118,7 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
       <Contract360Header contract={mockContract} userRole="gestor" />
     );
 
-    expect(html).toContain('Sincronizando...');
+    expect(html).toContain('Atualizando...');
     expect(html).toContain('disabled=""');
   });
 
