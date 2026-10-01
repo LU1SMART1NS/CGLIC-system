@@ -6,6 +6,7 @@ import type {
 } from '../../types/managementDashboard';
 import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 import { getPaymentStatusDisplay } from '../../utils/paymentStatusDisplay';
+import { formatCurrency, formatDateBR } from '../../utils/format';
 import { AppButton, EmptyState, ErrorState, FilterBar, StatusBadge } from '../../design-system';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
@@ -22,21 +23,6 @@ export interface ManagementPaymentsOverviewProps {
 }
 
 export type PaymentFilter = 'TODOS' | 'CRITICOS' | 'CGOFI' | 'INSTRUCAO' | 'CONFIRMADOS';
-
-function formatCurrency(val?: number): string {
-  if (typeof val !== 'number' || isNaN(val)) return 'R$ 0,00';
-  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-function formatDateBR(dateStr?: string): string {
-  if (!dateStr) return 'N/D';
-  const clean = dateStr.split('T')[0];
-  const parts = clean.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return dateStr;
-}
 
 export const getWorkflowStatusDisplay = getPaymentStatusDisplay;
 
@@ -196,7 +182,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
     tempoMedioCgofiDias
   } = payments;
 
-  const totalLista = payments.ciclosAbertosDetalhe?.length || payments.ciclosRecentes?.length || 0;
+  const totalLista = (payments.ciclosAbertosDetalhe || payments.ciclosRecentes || []).length;
 
   return (
     <section
