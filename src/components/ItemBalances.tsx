@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Building2, Users, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, RotateCcw, Eye } from 'lucide-react';
 import { fetchPncpContractEmpenhos, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateTotalEmpenhado, reconcileBalances, matchAndMergeEmpenhos, normalizeEmpenhoNumero, calculateAllocationsWithEmpenhos, calculateItemCardMetrics, deduceEmpenhoQuantity, getEmpenhoEffectiveValue } from '../services/balanceService';
@@ -32,9 +32,11 @@ import { AppButton, AppCard, EmptyState } from '../design-system';
 import { ManualEmpenhoModal } from './modals/ManualEmpenhoModal';
 import { ManualContratoModal } from './modals/ManualContratoModal';
 import { LinkContractModal } from './modals/LinkContractModal';
-import { ItemReconciliationCard } from './ItemReconciliationCard';
-import { ItemBalancesHeader } from './item-balances/ItemBalancesHeader';
-import { ItemBalancesSummaryCards } from './item-balances/ItemBalancesSummaryCards';
+import { ItemHero, type ItemTab } from './item-balances/ItemHero';
+import { ItemReconciliationPanel } from './item-balances/ItemReconciliationPanel';
+import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
+import { useAuth } from '../context/AuthContext';
+import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { EmpenhoDetailModal } from './item-balances/EmpenhoDetailModal';
@@ -47,6 +49,7 @@ interface ItemBalancesProps {
   onBack: () => void;
 }
 
+const ITEM_TABS: ItemTab[] = ['unidades', 'empenhos', 'contratos', 'alocacao', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 const EMPTY_RECORD_NUM: Record<string, number> = {};
@@ -86,7 +89,23 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     arp.codigoUnidadeGerenciadora,
     item.numeroItem
   );
-  const [activeTab, setActiveTab] = useState<'unidades' | 'empenhos' | 'alocacao' | 'adesoes'>('unidades');
+  // Aba no endereço (?aba=), como nas telas 360: sobrevive a recarregar e pode ser compartilhada.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('aba') as ItemTab | null;
+  const activeTab: ItemTab = tabParam && ITEM_TABS.includes(tabParam) ? tabParam : 'unidades';
+  const tabsRef = React.useRef<HTMLDivElement>(null);
+  const setActiveTab = (tab: ItemTab) => {
+    setSearchParams(tab === 'unidades' ? {} : { aba: tab }, { replace: true });
+    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Mesmas regras do backend: alocações e vínculo empenho→unidade exigem allocations.manage
+  // (admin e gestor de saldos); contratos e empenhos manuais, admin e gestor.
+  const { role } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirmDialog();
+  const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
+  const canEditData = role === 'admin' || role === 'gestor';
 
   const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
   const [contractEmpenhos, setContractEmpenhos] = useState<Record<string, PncpContractEmpenho[]>>({});
@@ -205,7 +224,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const handleSaveEmpenhoQty = async (empKey: string) => {
     const parsed = parseFloat(editingEmpenhoQty);
     if (isNaN(parsed) || parsed < 0) {
-      alert('Por favor, informe uma quantidade válida maior ou igual a 0.');
+      toast.error('Por favor, informe uma quantidade válida maior ou igual a 0.');
       return;
     }
     const updated = { ...empenhoManualQuantities, [empKey]: parsed };
@@ -218,9 +237,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       setEditingEmpenhoKey(null);
     } catch (err: any) {
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        alert('Conflito de concorrência: as quantidades manuais foram modificadas por outro usuário. Os dados serão recarregados.');
+        toast.error('Conflito de concorrência: as quantidades manuais foram modificadas por outro usuário. Os dados serão recarregados.');
       } else {
-        alert(`Erro ao salvar quantidade manual: ${err?.message || 'Erro desconhecido'}`);
+        toast.error(`Erro ao salvar quantidade manual: ${err?.message || 'Erro desconhecido'}`);
       }
     }
   };
@@ -239,9 +258,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       }
     } catch (err: any) {
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        alert('Conflito de concorrência: as quantidades manuais foram modificadas por outro usuário. Os dados serão recarregados.');
+        toast.error('Conflito de concorrência: as quantidades manuais foram modificadas por outro usuário. Os dados serão recarregados.');
       } else {
-        alert(`Erro ao restaurar quantidade manual: ${err?.message || 'Erro desconhecido'}`);
+        toast.error(`Erro ao restaurar quantidade manual: ${err?.message || 'Erro desconhecido'}`);
       }
     }
   };
@@ -289,18 +308,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     } catch (err: any) {
       console.error('Erro ao persistir empenhos manuais:', err);
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        alert('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
+        toast.error('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
       } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-        alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
+        toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
       } else {
-        alert(`Erro ao salvar empenho manual: ${err?.message || 'Erro desconhecido'}`);
+        toast.error(`Erro ao salvar empenho manual: ${err?.message || 'Erro desconhecido'}`);
       }
       throw err;
     }
   };
 
   const handleDeleteManualEmpenho = async (empenhoId: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este empenho manual?')) {
+    if (await confirm({ title: 'Excluir empenho manual', message: 'Tem certeza que deseja excluir este empenho manual?', tone: 'danger', confirmLabel: 'Excluir' })) {
       const updated = manualEmpenhos.filter(e => e.id !== empenhoId);
       try {
         await saveManualEmpenhosMutation.mutateAsync({
@@ -311,11 +330,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       } catch (err: any) {
         console.error('Erro ao excluir empenho manual:', err);
         if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-          alert('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
+          toast.error('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
         } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
+          toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
         } else {
-          alert(`Erro ao excluir empenho manual: ${err?.message || 'Erro desconhecido'}`);
+          toast.error(`Erro ao excluir empenho manual: ${err?.message || 'Erro desconhecido'}`);
         }
       }
     }
@@ -341,18 +360,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     } catch (err: any) {
       console.error('Erro ao salvar contrato manual:', err);
       if (err?.code === 'INVALID_CONTRACT_LINK' || err?.sqlState === '23514') {
-        alert('Regra RN-07: Todo contrato exige vinculação a pelo menos um empenho como lastro orçamentário.');
+        toast.error('Regra RN-07: Todo contrato exige vinculação a pelo menos um empenho como lastro orçamentário.');
       } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-        alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
+        toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
       } else {
-        alert(`Erro ao salvar contrato manual: ${err?.message || 'Erro desconhecido'}`);
+        toast.error(`Erro ao salvar contrato manual: ${err?.message || 'Erro desconhecido'}`);
       }
       throw err;
     }
   };
 
   const handleDeleteManualContrato = async (contratoId: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este contrato manual?')) {
+    if (await confirm({ title: 'Excluir contrato manual', message: 'Tem certeza que deseja excluir este contrato manual?', tone: 'danger', confirmLabel: 'Excluir' })) {
       try {
         await deleteManualContractMutation.mutateAsync({
           id: contratoId,
@@ -361,18 +380,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       } catch (err: any) {
         console.error('Erro ao excluir contrato manual:', err);
         if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
+          toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
         } else if (err?.code === 'CONTRACT_NOT_FOUND' || err?.sqlState === 'P0002') {
-          alert('Contrato manual não encontrado ou já excluído.');
+          toast.error('Contrato manual não encontrado ou já excluído.');
         } else {
-          alert(`Erro ao excluir contrato manual: ${err?.message || 'Erro desconhecido'}`);
+          toast.error(`Erro ao excluir contrato manual: ${err?.message || 'Erro desconhecido'}`);
         }
       }
     }
   };
 
   const handleUnlinkOfficialContract = async (linkId: string) => {
-    if (window.confirm('Tem certeza que deseja desvincular este contrato oficial deste item da ata?')) {
+    if (await confirm({ title: 'Desvincular contrato', message: 'Tem certeza que deseja desvincular este contrato oficial deste item da ata?', tone: 'danger', confirmLabel: 'Desvincular' })) {
       try {
         await unlinkContractMutation.mutateAsync({
           linkId,
@@ -381,9 +400,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       } catch (err: any) {
         console.error('Erro ao desvincular contrato oficial:', err);
         if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          alert('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
+          toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
         } else {
-          alert(`Erro ao desvincular contrato oficial: ${err?.message || 'Erro desconhecido'}`);
+          toast.error(`Erro ao desvincular contrato oficial: ${err?.message || 'Erro desconhecido'}`);
         }
       }
     }
@@ -1045,13 +1064,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     itemTotalQty,
     empenhoConsumidoPercent,
     rawEmpenhoPercentRestante,
-    empenhoPercentClamped,
     limiteAdesao: totalLimiteAdesao,
-    totalConsumidoAdesao,
     saldoAdesoes: totalSaldoAdesoes,
-    adsPercVal,
-    adsConsPercVal,
-    adsPercValClamped,
     valorFinanceiroDisponivel,
     valorFinanceiroConsumido
   } = cardMetrics;
@@ -1081,139 +1095,53 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     return (a.codigoUnidade || '').localeCompare(b.codigoUnidade || '');
   });
 
+  const contractsCount = contracts.length + manualContratos.length + enrichedOfficialLinks.length;
+
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Navigation Breadcrumb & Item Info Overview */}
-      <ItemBalancesHeader arp={arp} item={item} onBack={onBack} />
+    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
+      <ItemHero
+        arp={arp}
+        item={item}
+        onBack={onBack}
+        backLabel={role === 'gestor_saldos' ? 'Voltar para Alocações' : undefined}
+        canSync={canEditData}
+        isRefreshing={loading || contractsLoading}
+        onRefresh={() => {
+          refetchEmpenhos();
+          refetchContracts();
+          loadManualData();
+        }}
+        metrics={{
+          officialSaldo: officialCalculatedSaldo,
+          itemTotalQty,
+          totalEmpenhado: totalConsumidoEmpenho,
+          empenhoConsumidoPercent,
+          rawEmpenhoPercentRestante,
+          saldoAdesoes: totalSaldoAdesoes,
+          limiteAdesao: totalLimiteAdesao,
+          valorFinanceiroDisponivel,
+          valorFinanceiroConsumido
+        }}
+        report={reconciliationReport}
+        onGoTo={setActiveTab}
+      />
 
-      {/* Executive Item Reconciliation Audit Card */}
-      {!loading && (
-        <ItemReconciliationCard
-          report={reconciliationReport}
-          onRefresh={() => {
-            refetchEmpenhos();
-            refetchContracts();
-            loadManualData();
-          }}
-          isLoading={loading || contractsLoading}
-        />
-      )}
+      <Instrument360Tabs
+        ref={tabsRef}
+        tabs={[
+          { id: 'unidades', label: `Órgãos participantes (${sortedUnidades.length})` },
+          { id: 'empenhos', label: `Empenhos (${allEmpenhos.length})` },
+          { id: 'contratos', label: `Contratos (${contractsCount})` },
+          { id: 'alocacao', label: `Alocação interna (${allocations.length})` },
+          { id: 'adesoes', label: `Adesões (${adesoes.length})` }
+        ]}
+        active={activeTab}
+        onSelect={setActiveTab}
+        idPrefix="item"
+        ariaLabel="Seções do item"
+      />
 
-      {/* Global item balance metrics */}
-      {!loading && !error && (
-        <ItemBalancesSummaryCards
-          officialCalculatedSaldo={officialCalculatedSaldo}
-          itemTotalQty={itemTotalQty}
-          quantidadeEstimadaEdital={item.quantidadeEstimadaEdital}
-          empenhoPercentClamped={empenhoPercentClamped}
-          totalConsumidoEmpenho={totalConsumidoEmpenho}
-          empenhoConsumidoPercent={empenhoConsumidoPercent}
-          rawEmpenhoPercentRestante={rawEmpenhoPercentRestante}
-          totalSaldoAdesoes={totalSaldoAdesoes}
-          totalLimiteAdesao={totalLimiteAdesao}
-          adsPercValClamped={adsPercValClamped}
-          totalConsumidoAdesao={totalConsumidoAdesao}
-          adsConsPercVal={adsConsPercVal}
-          adsPercVal={adsPercVal}
-          valorFinanceiroDisponivel={valorFinanceiroDisponivel}
-          valorFinanceiroConsumido={valorFinanceiroConsumido}
-          onAdesoesClick={() => setActiveTab('adesoes')}
-        />
-      )}
-
-      {/* Granular unit breakdown */}
-      <AppCard style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
-        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0c326f', margin: 0, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Building2 size={18} color="#0c326f" /> Detalhamento de Saldos e Empenhos por Órgão
-        </h3>
-
-        {/* Tab navigation (Gov.br segmented / pill style) */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
-          <button 
-            type="button"
-            onClick={() => setActiveTab('unidades')}
-            style={{
-              padding: '0.45rem 1rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: activeTab === 'unidades' ? 700 : 500,
-              background: activeTab === 'unidades' ? '#0c326f' : '#f1f5f9',
-              color: activeTab === 'unidades' ? '#ffffff' : '#475569',
-              border: activeTab === 'unidades' ? '1px solid #0c326f' : '1px solid #e2e8f0',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            Saldos dos Órgãos
-          </button>
-          <button 
-            type="button"
-            onClick={() => setActiveTab('alocacao')}
-            style={{
-              padding: '0.45rem 1rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: activeTab === 'alocacao' ? 700 : 500,
-              background: activeTab === 'alocacao' ? '#0c326f' : '#f1f5f9',
-              color: activeTab === 'alocacao' ? '#ffffff' : '#475569',
-              border: activeTab === 'alocacao' ? '1px solid #0c326f' : '1px solid #e2e8f0',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            Alocação Interna
-          </button>
-          <button 
-            type="button"
-            onClick={() => setActiveTab('empenhos')}
-            style={{
-              padding: '0.45rem 1rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: activeTab === 'empenhos' ? 700 : 500,
-              background: activeTab === 'empenhos' ? '#0c326f' : '#f1f5f9',
-              color: activeTab === 'empenhos' ? '#ffffff' : '#475569',
-              border: activeTab === 'empenhos' ? '1px solid #0c326f' : '1px solid #e2e8f0',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            Contratos e Empenhos
-          </button>
-          <button 
-            type="button"
-            onClick={() => setActiveTab('adesoes')}
-            style={{
-              padding: '0.45rem 1rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: activeTab === 'adesoes' ? 700 : 500,
-              background: activeTab === 'adesoes' ? '#0c326f' : '#f1f5f9',
-              color: activeTab === 'adesoes' ? '#ffffff' : '#475569',
-              border: activeTab === 'adesoes' ? '1px solid #0c326f' : '1px solid #e2e8f0',
-              transition: 'all 0.15s ease',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem'
-            }}
-          >
-            Adesões e Caronas
-            {adesoes.length > 0 && (
-              <span style={{
-                background: activeTab === 'adesoes' ? 'rgba(255,255,255,0.25)' : '#0c326f',
-                color: '#fff',
-                fontSize: '0.7rem',
-                padding: '0.1rem 0.45rem',
-                borderRadius: '10px',
-                fontWeight: 800
-              }}>
-                {adesoes.length}
-              </span>
-            )}
-          </button>
-        </div>
-
+      <div role="tabpanel" id={`item-tabpanel-${activeTab}`} aria-labelledby={`item-tab-${activeTab}`}>
         {activeTab === 'unidades' ? (
           <UnidadesTab
             loading={loading}
@@ -1221,10 +1149,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             sortedUnidades={sortedUnidades}
             allEmpenhos={allEmpenhos}
           />
-        ) : activeTab === 'empenhos' ? (
+        ) : activeTab === 'contratos' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            
-            {/* Section 1: Contratos (PNCP, Oficiais e Manuais) */}
+            {/* Contratos (PNCP, oficiais e manuais) */}
             <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1236,7 +1163,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                     {contracts.length + manualContratos.length + enrichedOfficialLinks.length === 1 ? 'contrato' : 'contratos'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {canEditData && (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <AppButton
                     variant="primary"
                     size="sm"
@@ -1255,7 +1183,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                   >
                     Adicionar Manual
                   </AppButton>
-                </div>
+                  </div>
+                )}
               </div>
 
               {contractsLoading ? (
@@ -1265,7 +1194,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                 </div>
               ) : contractsError ? (
                 <div style={{ padding: '1rem', color: 'var(--danger)', fontSize: '0.85rem', textAlign: 'center' }}>
-                  ⚠️ {contractsError}
+                  {contractsError}
                 </div>
               ) : (contracts.length === 0 && manualContratos.length === 0 && enrichedOfficialLinks.length === 0) ? (
                 <EmptyState
@@ -1482,17 +1411,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                       </td>
                                       <td>
                                         {c._isOfficialLink ? (
-                                          <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }} title="Contrato Oficial vinculado do CGLIC">
-                                            🟢 Oficial
-                                          </span>
+                                          <StatusBadge label="Oficial" variant="success" size="sm" />
                                         ) : c._isManual ? (
-                                          <span style={{ background: '#fefce8', color: '#a16207', border: '1px solid #fde047', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }}>
-                                            🟡 Manual
-                                          </span>
+                                          <StatusBadge label="Manual" variant="warning" size="sm" />
                                         ) : (
-                                          <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }}>
-                                            🟢 Oficial
-                                          </span>
+                                          <StatusBadge label="Oficial" variant="success" size="sm" />
                                         )}
                                       </td>
                                       <td style={{ textAlign: 'center' }}>
@@ -1519,7 +1442,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                               <ExternalLink size={14} /> Visualizar
                                             </a>
                                           ) : null}
-                                          {c._isOfficialLink && c._linkId && (
+                                          {canEditData && c._isOfficialLink && c._linkId && (
                                             <button
                                               onClick={() => handleUnlinkOfficialContract(c._linkId)}
                                               disabled={unlinkContractMutation.isPending}
@@ -1530,7 +1453,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                               <Trash2 size={13} />
                                             </button>
                                           )}
-                                          {c._isManual && c._manualId && (
+                                          {canEditData && c._isManual && c._manualId && (
                                             <button
                                               onClick={() => handleDeleteManualContrato(c._manualId)}
                                               disabled={deleteManualContractMutation.isPending}
@@ -1570,19 +1493,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 700 }}>
                                                       <span>Total Empenhado: <strong>{formatNumber(totalEmpenhadoContrato)}</strong> de <strong>{formatNumber(qtdContratada)} un</strong></span>
                                                       {isFechado && (
-                                                        <span style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '12px' }}>
-                                                          ✓ 100% Empenhado
-                                                        </span>
+                                                        <StatusBadge label="100% empenhado" variant="success" size="sm" dot={false} />
                                                       )}
                                                       {isParcial && (
-                                                        <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '12px' }}>
-                                                          🔵 Empenhamento Parcial (Saldo: {formatNumber(qtdContratada - totalEmpenhadoContrato)} un)
-                                                        </span>
+                                                        <StatusBadge label={`Empenhamento parcial (saldo: ${formatNumber(qtdContratada - totalEmpenhadoContrato)} un)`} variant="info" size="sm" dot={false} />
                                                       )}
                                                       {isExcesso && (
-                                                        <span style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '2px 8px', borderRadius: '12px' }}>
-                                                          ⚠️ Excesso (+{formatNumber(totalEmpenhadoContrato - qtdContratada)} un)
-                                                        </span>
+                                                        <StatusBadge label={`Excesso (+${formatNumber(totalEmpenhadoContrato - qtdContratada)} un)`} variant="danger" size="sm" dot={false} />
                                                       )}
                                                     </div>
                                                   )}
@@ -1623,7 +1540,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                               <select
                                                                 value={currentLinkId}
                                                                 onChange={(e) => handleLinkEmpenho(emp.numero, e.target.value)}
-                                                                disabled={saveEmpenhoLinksMutation.isPending}
+                                                                disabled={saveEmpenhoLinksMutation.isPending || !canManageAllocations}
                                                                 className="form-input"
                                                                 style={{
                                                                   padding: '0.2rem 0.4rem',
@@ -1711,6 +1628,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                           </td>
                                                           <td style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{formatDate(emp.data_emissao)}</td>
                                                           <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                                            {canEditData && (
                                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                                               <button
                                                                 type="button"
@@ -1734,6 +1652,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                                 </button>
                                                               )}
                                                             </div>
+                                                            )}
                                                           </td>
                                                         </tr>
                                                       );
@@ -1763,7 +1682,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
               )}
             </AppCard>
 
-            {/* Section 2: Todas as Notas de Empenho Conhecidas (Consumo Real de Saldo) */}
+          </div>
+        ) : activeTab === 'empenhos' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <ItemReconciliationPanel report={reconciliationReport} />
+
+            {/* Todas as Notas de Empenho Conhecidas (Consumo Real de Saldo) */}
             <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1774,17 +1698,19 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                     {allEmpenhos.length} {allEmpenhos.length === 1 ? 'empenho' : 'empenhos'}
                   </span>
                 </div>
-                <AppButton
-                  variant="primary"
-                  size="sm"
-                  icon={<Plus size={14} />}
-                  onClick={() => {
-                    setEditingManualEmpenho(null);
-                    setIsManualEmpenhoModalOpen(true);
-                  }}
-                >
-                  Adicionar Empenho
-                </AppButton>
+                {canEditData && (
+                  <AppButton
+                    variant="primary"
+                    size="sm"
+                    icon={<Plus size={14} />}
+                    onClick={() => {
+                      setEditingManualEmpenho(null);
+                      setIsManualEmpenhoModalOpen(true);
+                    }}
+                  >
+                    Adicionar Empenho
+                  </AppButton>
+                )}
               </div>
 
               {allEmpenhos.length === 0 ? (
@@ -1833,7 +1759,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 <select
                                   value={currentLinkId}
                                   onChange={(e) => handleLinkEmpenho(emp.numero, e.target.value)}
-                                  disabled={saveEmpenhoLinksMutation.isPending}
+                                  disabled={saveEmpenhoLinksMutation.isPending || !canManageAllocations}
                                   className="form-input"
                                   style={{
                                     padding: '0.2rem 0.4rem',
@@ -1861,25 +1787,17 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               {isDivergente ? (
-                                <span style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }}>
-                                  🔴 Divergente
-                                </span>
+                                <StatusBadge label="Divergente" variant="danger" size="sm" />
                               ) : isSincronizado ? (
-                                <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }}>
-                                  🔵 Sincronizado
-                                </span>
+                                <StatusBadge label="Sincronizado" variant="info" size="sm" />
                               ) : isManual ? (
-                                <span style={{ background: '#fefce8', color: '#a16207', border: '1px solid #fde047', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }}>
-                                  🟡 Manual
-                                </span>
+                                <StatusBadge label="Manual" variant="warning" size="sm" />
                               ) : (
-                                <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }}>
-                                  🟢 Oficial
-                                </span>
+                                <StatusBadge label="Oficial" variant="success" size="sm" />
                               )}
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              {isManual ? (
+                              {isManual && canEditData ? (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
                                   <button
                                     onClick={() => {
@@ -1986,11 +1904,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                 fontWeight: 600,
                 fontFamily: 'var(--font-family)'
               }}>
-                ⚠️ {allocationError}
+                {allocationError}
               </div>
             )}
 
-            {/* Allocation Form */}
+            {/* Allocation Form (somente admin e gestor de saldos) */}
+            {canManageAllocations && (
             <div style={{
               background: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -2094,6 +2013,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                 </div>
               </form>
             </div>
+            )}
 
             {/* Department Table */}
             <div>
@@ -2102,7 +2022,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
               </h4>
               {allocations.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem', border: '1px dashed var(--border-color)', borderRadius: '4px', color: 'var(--text-secondary)' }}>
-                  Nenhuma alocação interna efetuada para este item ainda. Use o formulário acima para cadastrar unidades.
+                  {canManageAllocations ? 'Nenhuma alocação interna efetuada para este item ainda. Use o formulário acima para cadastrar unidades.' : 'Nenhuma alocação interna efetuada para este item ainda.'}
                 </div>
               ) : (
                 <div className="table-container" style={{ marginTop: 0 }}>
@@ -2114,7 +2034,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                         <th>Qtd Empenhada (Uso)</th>
                         <th>Saldo a Empenhar</th>
                         <th style={{ width: '220px' }}>% Consumido</th>
-                        <th style={{ width: '120px', textAlign: 'center' }}>Ações</th>
+                        {canManageAllocations && <th style={{ width: '120px', textAlign: 'center' }}>Ações</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -2154,6 +2074,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 </div>
                               </div>
                             </td>
+                            {canManageAllocations && (
                             <td>
                               <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
                                 <button 
@@ -2176,6 +2097,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 </button>
                               </div>
                             </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -2198,7 +2120,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             adesaoConsumidaPercent={adesaoConsumidaPercent}
           />
         )}
-      </AppCard>
+      </div>
 
       {/* Modal for detailing contract & empenhos */}
       <EmpenhoDetailModal

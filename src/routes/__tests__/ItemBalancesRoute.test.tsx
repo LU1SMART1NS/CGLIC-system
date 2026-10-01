@@ -56,4 +56,10 @@ describe('ItemBalancesRoute — endereço próprio do item', () => {
     expect(html).toContain('Acesso não autorizado');
     expect(html).not.toContain('item-balances');
   });
+
+  it('gestor de saldos abre o item (para alocar) sem passar pelo escopo de Atas do gestor', () => {
+    setRole('gestor_saldos');
+    const html = renderToStaticMarkup(<ItemBalancesRoute />);
+    expect(html).toContain('00059/2025|00003');
+  });
 });
