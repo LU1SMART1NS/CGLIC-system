@@ -228,7 +228,7 @@ export const RolesPermissions: React.FC = () => {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
                 <Icon size={20} color="#0c326f" aria-hidden="true" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: colors.text.primary }}>
+                <h3 style={{ margin: 0, fontSize: typography.fontSize.h4, fontWeight: 800, color: colors.text.primary }}>
                   {profile.label}
                 </h3>
               </div>

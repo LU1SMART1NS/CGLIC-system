@@ -7,7 +7,6 @@ import { useAuth } from '../../context/AuthContext';
 interface SidebarProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
-  onOpenContractTemplatesModal?: () => void;
   onOpenExportModal?: () => void;
   onOpenDepartmentsModal?: () => void;
 }
@@ -174,7 +173,6 @@ const SidebarLink: React.FC<{
 export const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   onToggleCollapsed,
-  onOpenContractTemplatesModal,
   onOpenExportModal,
   onOpenDepartmentsModal
 }) => {
@@ -184,9 +182,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const visibleNavigation = useMemo(() => filterNavigationByRole(navigationConfig, role), [role]);
 
   const handleAction = (actionId: string) => {
-    if (actionId === 'open-contract-templates' && onOpenContractTemplatesModal) {
-      onOpenContractTemplatesModal();
-    } else if (actionId === 'open-export-modal' && onOpenExportModal) {
+    if (actionId === 'open-export-modal' && onOpenExportModal) {
       onOpenExportModal();
     } else if (actionId === 'open-departments-modal' && onOpenDepartmentsModal) {
       onOpenDepartmentsModal();

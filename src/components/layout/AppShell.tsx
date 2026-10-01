@@ -5,13 +5,11 @@ import { Sidebar } from './Sidebar';
 
 export interface AppShellContextValue {
   onOpenExportModal: () => void;
-  onOpenContractTemplatesModal: () => void;
   onOpenDepartmentsModal?: () => void;
 }
 
 interface AppShellProps {
   onOpenExportModal: () => void;
-  onOpenContractTemplatesModal: () => void;
   onOpenDepartmentsModal?: () => void;
 }
 
@@ -27,7 +25,6 @@ function readStoredCollapsed(): boolean {
 
 export const AppShell: React.FC<AppShellProps> = ({
   onOpenExportModal,
-  onOpenContractTemplatesModal,
   onOpenDepartmentsModal
 }) => {
   const [collapsed, setCollapsed] = useState<boolean>(readStoredCollapsed);
@@ -46,7 +43,6 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   const contextValue: AppShellContextValue = {
     onOpenExportModal,
-    onOpenContractTemplatesModal,
     onOpenDepartmentsModal
   };
 
@@ -55,7 +51,6 @@ export const AppShell: React.FC<AppShellProps> = ({
       <Sidebar
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
-        onOpenContractTemplatesModal={onOpenContractTemplatesModal}
         onOpenExportModal={onOpenExportModal}
         onOpenDepartmentsModal={onOpenDepartmentsModal}
       />
@@ -71,7 +66,6 @@ export const AppShell: React.FC<AppShellProps> = ({
         }}>
           <Header
             onOpenExportModal={onOpenExportModal}
-            onOpenContractTemplatesModal={onOpenContractTemplatesModal}
           />
         </div>
 

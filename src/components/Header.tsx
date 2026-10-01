@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   onOpenExportModal?: () => void;
-  onOpenContractTemplatesModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = () => {
