@@ -632,23 +632,24 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
-                    Tipo de Instrumento de Cobrança *
-                  </label>
-                  <select
-                    value={tipoInstrumento}
-                    onChange={e => setTipoInstrumento(e.target.value)}
-                    required
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
-                  >
-                    <option value="">Selecione...</option>
-                    {TIPOS_INSTRUMENTO_COBRANCA.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                  Tipo de Instrumento de Cobrança *
+                </label>
+                <select
+                  value={tipoInstrumento}
+                  onChange={e => setTipoInstrumento(e.target.value)}
+                  required
+                  style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                >
+                  <option value="">Selecione...</option>
+                  {TIPOS_INSTRUMENTO_COBRANCA.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
                     Nº do Instrumento
