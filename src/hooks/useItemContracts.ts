@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchPncpContracts } from '../services/api';
 import type { PncpContract } from '../types';
+import { cnpjDaUasg } from '../config/unidadesGestoras';
 
 /**
  * Constrói as opções canônicas de query para consulta de contratos PNCP de um item de ARP.
@@ -28,9 +29,10 @@ export function getItemContractsQueryOptions(
         return [];
       }
 
-      const cleanCnpj = cnpj || (uasg === '200331' || uasg === '200330' ? '00394494000136' : '');
-      const cleanAno = ano || '2026';
-      const cleanSeq = sequencial || '1';
+      // Sem ano ou sequencial da compra a consulta hierárquica do PNCP é pulada e vale o fallback por compra.
+      const cleanCnpj = cnpj || cnpjDaUasg(uasg);
+      const cleanAno = ano || '';
+      const cleanSeq = sequencial || '';
       const cleanSeqAta = sequencialAta || '';
 
       const contracts = await fetchPncpContracts(

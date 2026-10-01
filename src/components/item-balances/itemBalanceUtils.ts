@@ -1,5 +1,6 @@
 import type { PncpContract } from '../../types';
 import { formatPncpContractUrl } from '../../utils/pncpUtils';
+import { isUasgCglic } from '../../config/unidadesGestoras';
 
 export { formatCurrency, formatNumber, formatDateBR as formatDate } from '../../utils/format';
 
@@ -12,12 +13,12 @@ export function getProgressColorClass(percent: number): string {
 export function isGerenciadoraUasg(uasg?: string | number, gerenciadoraUasg?: string | number): boolean {
   const clean = String(uasg || '').replace(/\D/g, '');
   const cleanGer = gerenciadoraUasg ? String(gerenciadoraUasg).replace(/\D/g, '') : '';
-  return clean === '200331' || clean === '200330' || (cleanGer !== '' && clean === cleanGer);
+  return isUasgCglic(clean) || (cleanGer !== '' && clean === cleanGer);
 }
 
 export function isAllowedEmpenhoUasg(uasg?: string | number): boolean {
   const clean = String(uasg || '').replace(/\D/g, '');
-  return clean === '200331' || clean === '200330';
+  return isUasgCglic(clean);
 }
 
 export function getContractPncpUrl(contrato: PncpContract): string {

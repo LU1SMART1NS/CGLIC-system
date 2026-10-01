@@ -1,6 +1,7 @@
 import type { ArpResponse, ArpItemsResponse, ArpItemRecord, UnidadesItemResponse, FilterParams, ArpRecord, EmpenhosSaldoItemResponse, EmpenhoSaldoItemRecord, PncpContract, PncpContractEmpenho, AdesoesItemResponse, AdesaoItemRecord, ComprasGovContratoItemRecord, ComprasGovContratosItemResponse, ContratosGovEmpenhoRecord } from '../types';
 import { cacheArpsInDb, cacheArpItemsInDb, fetchArpsFromDb } from './dbCacheService';
 import { formatPncpContractUrl } from '../utils/pncpUtils';
+import { CNPJ_SENASP, cnpjDaUasg, codigoOrgaoDaUasg } from '../config/unidadesGestoras';
 
 const BASE_URL = '/api-arp/modulo-arp';
 
@@ -337,7 +338,7 @@ export async function fetchSupplementalPncpArps(targetUasg?: string): Promise<Ar
     return supplementalPncpArpsCache;
   }
 
-  const cnpj = '00394494000136';
+  const cnpj = CNPJ_SENASP;
   const supplemental: ArpRecord[] = [];
 
   await Promise.all(
@@ -419,7 +420,7 @@ export async function fetchPncpCompraItems(
   customCnpj?: string
 ): Promise<ArpItemRecord[]> {
   const cleanTargetCnpj = (targetSupplierCnpj || '').replace(/\D/g, '');
-  const cnpj = (customCnpj || '00394494000136').replace(/\D/g, '');
+  const cnpj = (customCnpj || CNPJ_SENASP).replace(/\D/g, '');
   const cacheKey = `${cnpj}-${anoCompra}-${seqCompra}-${numeroAta}-${uasg}-${cleanTargetCnpj}`;
   if (pncpCompraItemsCache.has(cacheKey)) {
     return pncpCompraItemsCache.get(cacheKey)!;
@@ -1111,7 +1112,7 @@ export async function fetchComprasGovContratosByPurchase(
 
   // 2. Buscar em 1_consultarContratos para as UGs gerenciadoras nos anos relevantes
   for (const uasg of candidateUasgs) {
-    const orgao = params.codigoOrgao || (uasg === '200331' || uasg === '200330' ? '30911' : '');
+    const orgao = params.codigoOrgao || codigoOrgaoDaUasg(uasg);
     for (const yr of yearsToSearch) {
       try {
         const url = `${BASE_URL.replace('/modulo-arp', '/modulo-contratos')}/1_consultarContratos?pagina=1&tamanhoPagina=500&codigoOrgao=${orgao}&codigoUnidadeGestora=${uasg}&dataVigenciaInicialMin=${yr}-01-01&dataVigenciaInicialMax=${yr}-12-31`;
@@ -1299,9 +1300,7 @@ export function parsePncpIdentifiers(arp?: Partial<ArpRecord> | any): ParsedPncp
 
   // 5. Fallback por UASG Gerenciadora conhecida
   if (!cnpj) {
-    if (arp.codigoUnidadeGerenciadora === '200331' || arp.codigoUnidadeGerenciadora === '200330') {
-      cnpj = '00394494000136';
-    }
+    cnpj = cnpjDaUasg(arp.codigoUnidadeGerenciadora);
   }
 
   if (!ano && arp.anoCompra) {

@@ -19,6 +19,7 @@ import { useUnlinkContractFromItem } from '../../hooks/useUnlinkContractFromItem
 import { useToast, useConfirmDialog } from '../../design-system';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
+import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos'];
 
@@ -32,7 +33,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const navigate = useNavigate();
   const ataKey = ataKeyOverride || (paramAtaKey ? decodeURIComponent(paramAtaKey) : undefined);
   // A chave canônica é "NUMERO-UASG" (ex.: 00059/2025-200331): sem prop, usa a UASG da chave.
-  const uasg = uasgProp || uasgFromAtaKey(ataKey) || '200331';
+  const uasg = uasgProp || uasgFromAtaKey(ataKey) || UASG_LINK_LEGADO;
 
   const { arp, itens, isLoading, isError, error, refetch } = useAta(ataKey, uasg);
   const { saldos, isLoading: loadingSaldos } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);

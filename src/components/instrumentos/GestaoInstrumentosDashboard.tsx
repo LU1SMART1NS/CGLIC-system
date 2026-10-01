@@ -12,11 +12,12 @@ import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import type { DashboardAttentionCategory } from '../../types/managementDashboard';
 import { getLookupKey, getInstrumentoInfo, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
+import { UASGS_CGLIC } from '../../config/unidadesGestoras';
 
 type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 
 /** UASGs consolidadas nesta tela — mesmo padrão de UASG única já usado no resto do sistema, chamado uma vez por unidade. */
-const UASGS: string[] = ['200330', '200331'];
+const UASGS = UASGS_CGLIC;
 
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
   SALDOS: ['ATA_CRITICA'],

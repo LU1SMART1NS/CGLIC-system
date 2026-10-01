@@ -9,8 +9,8 @@ import type { ContractDashboardRecord } from '../types';
  * Reutiliza a mesma query cacheada do Dashboard de Contratos ['contracts-dashboard', uasg]
  * sem disparar requisições duplicadas ou criar novas rotas de API.
  */
-export function useContract(contractKey?: string, uasg: string = '200331') {
-  const cleanUasg = uasg?.trim() || '200331';
+export function useContract(contractKey?: string, uasg?: string) {
+  const cleanUasg = (uasg || '').trim();
   const {
     data: contracts = [],
     isLoading,

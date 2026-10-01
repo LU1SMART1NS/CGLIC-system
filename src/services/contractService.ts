@@ -3,6 +3,7 @@ import { formatNumeroAnoContrato, fetchContratosGovData, fetchContratosGovEmpenh
 import { resolveContractKey } from '../utils/contractKeyUtils';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { parseDateBRT, differenceInDays } from './temporalEngineService';
+import { codigoOrgaoDaUasg } from '../config/unidadesGestoras';
 
 const BASE_URL = '/api-arp/modulo-contratos';
 const CONTRATOS_CACHE = new Map<string, { timestamp: number; data: ContractDashboardRecord[] }>();
@@ -83,7 +84,7 @@ export async function fetchContractsForDashboard(
   }
 
   const contractsMap = new Map<string, ContractDashboardRecord>();
-  const orgao = (cleanUasg === '200331' || cleanUasg === '200330') ? '30911' : '';
+  const orgao = codigoOrgaoDaUasg(cleanUasg);
 
   // 1. Tentar buscar da API Contratos.gov.br (diretamente pela UG)
   try {

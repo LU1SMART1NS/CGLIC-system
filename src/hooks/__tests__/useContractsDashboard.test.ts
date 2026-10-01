@@ -18,10 +18,12 @@ describe('useContractsDashboard Hook / Query Options - Testes Unitários do Dash
     expect(options.staleTime).toBe(300000);
   });
 
-  it('deve usar UASG 200331 como default quando uasg for vazia ou omitida', () => {
-    const options = getContractsDashboardQueryOptions('');
-    expect(options.queryKey).toEqual(['contracts-dashboard', '200331']);
-    expect(options.enabled).toBe(true);
+  it('não assume UASG quando ela for vazia ou omitida: consulta desabilitada', () => {
+    for (const uasg of ['', '  ', undefined]) {
+      const options = getContractsDashboardQueryOptions(uasg);
+      expect(options.queryKey).toEqual(['contracts-dashboard', '']);
+      expect(options.enabled).toBe(false);
+    }
   });
 
   it('deve chamar fetchContractsForDashboard com a uasg especificada', async () => {
