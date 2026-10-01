@@ -448,10 +448,17 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                   </strong>
                   {cycle.input.documentoAtestoSei && (
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                      • Doc SEI: <strong>{cycle.input.documentoAtestoSei}</strong>
+                      • Id. SEI: <strong>{cycle.input.documentoAtestoSei}</strong>
                     </span>
                   )}
                 </div>
+
+                {cycle.input.observacoes && (
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.35rem' }}>
+                    <Info size={13} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
+                    {cycle.input.observacoes}
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.8rem', color: '#64748b', flexWrap: 'wrap' }}>
                   {describeResponsavel(cycle.input.responsavelNome, gestorNome) ? (

@@ -14,6 +14,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ContractPaymentFollowUpSection } from '../ContractPaymentFollowUpSection';
 import * as paymentFollowUpHookModule from '../../../hooks/useContractPaymentFollowUp';
 import type { ContractDashboardRecord } from '../../../types';
+import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 
 // Fase 10-A.2: useContractPaymentFollowUp passou a persistir via Supabase/React
 // Query (contract_payment_cycles) em vez de localStorage — precisa de um
@@ -91,5 +92,57 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
     // Deve deixar claro: CGLIC acompanha • CGOFI executa o pagamento
     expect(html).toContain('CGLIC acompanha • CGOFI executa o pagamento');
     expect(html).toContain('contract-payment-followup-section');
+  });
+
+  it('exibe o Id. SEI e o instrumento de cobrança (tipo/número) informados no ciclo', () => {
+    const mockCycle: PaymentFollowUpCycle = {
+      cycleKey: '200331-50-2024-PGTO-202609-NF100',
+      contractKey: '200331-50-2024',
+      competencia: '2026-09',
+      status: 'RECEBIDO',
+      input: {
+        contractKey: '200331-50-2024',
+        competencia: '2026-09',
+        dataAssinaturaAtesto: '2026-09-10',
+        dataVencimentoFatura: '2026-09-20',
+        documentoAtestoSei: '12345678',
+        observacoes: 'Instrumento de cobrança: Nota Fiscal Eletrônica - Nº 1234',
+        valorAtesto: 45000
+      },
+      prazos: {
+        diasUteisAteVencimento: 5,
+        janelaTotalDiasUteis: 10,
+        diasSemRespostaCgofi: 0,
+        margemEnvioDiasUteis: 5,
+        isVencida: false,
+        statusPrazo: 'NORMAL'
+      },
+      alerts: [],
+      criadoEm: '2026-09-10T09:00:00Z',
+      atualizadoEm: '2026-09-10T09:00:00Z'
+    };
+
+    vi.mocked(paymentFollowUpHookModule.useContractPaymentFollowUp).mockReturnValue({
+      cycles: [mockCycle],
+      alerts: [],
+      activeCount: 1,
+      completedCount: 0,
+      isLoading: false,
+      registerPaymentCycle: vi.fn().mockResolvedValue(null),
+      updatePaymentCycle: vi.fn().mockResolvedValue(null),
+      deletePaymentCycle: vi.fn().mockResolvedValue(undefined),
+      refetch: vi.fn()
+    });
+
+    const html = renderToStaticMarkup(
+      <ContractPaymentFollowUpSection
+        contract={mockContract}
+        contractKey="200331-50-2024"
+      />
+    );
+
+    expect(html).toContain('Id. SEI:');
+    expect(html).toContain('12345678');
+    expect(html).toContain('Instrumento de cobrança: Nota Fiscal Eletrônica - Nº 1234');
   });
 });
