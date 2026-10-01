@@ -152,6 +152,19 @@ const CyclePaymentTaskList: React.FC<{
   );
 };
 
+const TIPOS_INSTRUMENTO_COBRANCA = [
+  'Nota Fiscal Eletrônica',
+  'Nota Fiscal',
+  'Fatura',
+  'Apólice de Seguro',
+  'Boleto Bancário',
+  'Guia de Recolhimento',
+  'Multa',
+  'Ofício',
+  'Recibo',
+  'RPA'
+];
+
 export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSectionProps> = ({
   contractKey
 }) => {
@@ -173,6 +186,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [tipoInstrumento, setTipoInstrumento] = useState('');
+  const [numeroInstrumento, setNumeroInstrumento] = useState('');
   const [documentoAtestoSei, setDocumentoAtestoSei] = useState('');
   const [valorAtesto, setValorAtesto] = useState('');
   const [dataAssinaturaAtesto, setDataAssinaturaAtesto] = useState(() => {
@@ -194,14 +209,19 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
   const handleCreateCycle = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!competencia || !dataAssinaturaAtesto || !dataVencimentoFatura || !documentoAtestoSei) return;
+    if (!competencia || !dataAssinaturaAtesto || !dataVencimentoFatura || !tipoInstrumento || !documentoAtestoSei) return;
 
     const input: PaymentCycleInput = {
       contractKey,
       competencia: competencia,
       dataAssinaturaAtesto: dataAssinaturaAtesto,
       dataVencimentoFatura: dataVencimentoFatura,
+      // Id. SEI do instrumento segue como identificador do ciclo (campo persistido existente)
       documentoAtestoSei: documentoAtestoSei.trim(),
+      observacoes: [
+        `Instrumento de cobrança: ${tipoInstrumento}`,
+        numeroInstrumento.trim() ? `Nº ${numeroInstrumento.trim()}` : ''
+      ].filter(Boolean).join(' - '),
       valorAtesto: valorAtesto ? parseFloat(valorAtesto.replace(/\./g, '').replace(',', '.')) : 0,
       responsavelNome: responsavelNome.trim() || undefined,
       responsavelUserId: responsavelNome.trim() ? responsavel.userId : undefined
@@ -212,6 +232,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     registerPaymentCycle(input)
       .then(() => {
         // Reset form & close modal
+        setTipoInstrumento('');
+        setNumeroInstrumento('');
         setDocumentoAtestoSei('');
         setValorAtesto('');
         setDataVencimentoFatura('');
@@ -619,7 +641,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Registrar Ciclo de Atesto / Faturamento
+                Registrar Ciclo de Instrumentos de Cobrança
               </h3>
               <button
                 type="button"
@@ -650,24 +672,48 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
-                  Nº Documento Atesto (SEI) *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Doc 12345678"
-                  value={documentoAtestoSei}
-                  onChange={e => setDocumentoAtestoSei(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.55rem',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.88rem'
-                  }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Tipo de Instrumento de Cobrança *
+                  </label>
+                  <select
+                    value={tipoInstrumento}
+                    onChange={e => setTipoInstrumento(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  >
+                    <option value="">Selecione...</option>
+                    {TIPOS_INSTRUMENTO_COBRANCA.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Nº do Instrumento
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 1234"
+                    value={numeroInstrumento}
+                    onChange={e => setNumeroInstrumento(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Id. SEI *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 12345678"
+                    value={documentoAtestoSei}
+                    onChange={e => setDocumentoAtestoSei(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
