@@ -23,9 +23,10 @@ import { ErrorState } from '../design-system/components/ErrorState';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
 import { getContractDaysRemaining } from '../services/dashboardService';
 import type { DashboardAttentionItem } from '../types/managementDashboard';
+import { UASGS_CGLIC } from '../config/unidadesGestoras';
 
 /** UASGs consolidadas nesta tela — mesmo escopo já usado na Visão Geral (/instrumentos), para que os dois painéis reportem os mesmos números de carteira de contratos. */
-const UASGS: string[] = ['200330', '200331'];
+const UASGS = UASGS_CGLIC;
 
 export const ContractsRoute: React.FC = () => {
   const dash200330 = useContractsDashboard(UASGS[0]);

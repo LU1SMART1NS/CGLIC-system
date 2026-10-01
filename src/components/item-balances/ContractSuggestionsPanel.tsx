@@ -1,0 +1,168 @@
+import React, { useState } from 'react';
+import { Sparkles, RotateCcw, X, Link2 } from 'lucide-react';
+import { AppButton, StatusBadge, SectionHeader, DataTable, type Column } from '../../design-system';
+import { formatCnpj } from '../../utils/format';
+import { formatNumber } from './itemBalanceUtils';
+import { formatNumeroContrato, displayContractNumber } from '../../utils/contractNumber';
+import type { ItemContractSuggestion } from '../../utils/itemContractSuggestions';
+
+interface ContractSuggestionsPanelProps {
+  suggestions: ItemContractSuggestion[];
+  dismissed: ItemContractSuggestion[];
+  loading: boolean;
+  error?: string | null;
+  canEdit: boolean;
+  busy: boolean;
+  onLink: (s: ItemContractSuggestion) => void;
+  onDismiss: (s: ItemContractSuggestion) => void;
+  onRestore: (s: ItemContractSuggestion) => void;
+}
+
+const displayNumero = (s: ItemContractSuggestion): string => {
+  if (s.contract) return displayContractNumber(s.contract);
+  const num = s.pncp?.numeroContrato || '';
+  return num ? formatNumeroContrato(num, s.pncp?.anoContrato) : s.contractKey;
+};
+
+const fornecedorOf = (s: ItemContractSuggestion) => ({
+  nome: s.contract?.fornecedorNome || s.pncp?.nomeRazaoSocialFornecedor || 'Fornecedor não informado',
+  cnpj: s.contract?.fornecedorCnpjCpf || s.pncp?.niFornecedor || ''
+});
+
+const SOURCE_LABEL = { pncp: 'PNCP', catalogo: 'Mesma compra e fornecedor' } as const;
+
+export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> = ({
+  suggestions,
+  dismissed,
+  loading,
+  error,
+  canEdit,
+  busy,
+  onLink,
+  onDismiss,
+  onRestore
+}) => {
+  const [showDismissed, setShowDismissed] = useState(false);
+
+  const buildColumns = (isDismissed: boolean): Column<ItemContractSuggestion>[] => [
+    {
+      key: 'numero',
+      header: 'Número do contrato',
+      render: (s) => <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: '#0c326f' }}>{displayNumero(s)}</span>
+    },
+    {
+      key: 'unidade',
+      header: 'Unidade',
+      render: (s) => (s.linkable ? (s.contract?.uasg || s.pncp?.uasg || s.contractKey.split('-')[0] || '-') : '-')
+    },
+    {
+      key: 'fornecedor',
+      header: 'Fornecedor',
+      render: (s) => {
+        const f = fornecedorOf(s);
+        return (
+          <>
+            <div style={{ fontWeight: 600 }}>{f.nome}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>CNPJ: {f.cnpj ? formatCnpj(f.cnpj) : '-'}</div>
+          </>
+        );
+      }
+    },
+    {
+      key: 'quantidade',
+      header: 'Qtd. contratada',
+      render: (s) =>
+        s.quantidadeContratada != null ? (
+          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatNumber(s.quantidadeContratada)}</span>
+        ) : (
+          <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>N/D</span>
+        )
+    },
+    {
+      key: 'origem',
+      header: 'Origem',
+      render: (s) => (
+        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+          {s.sources.map((src) => (
+            <StatusBadge key={src} label={SOURCE_LABEL[src]} variant="info" size="sm" dot={false} />
+          ))}
+          {!s.linkable && <StatusBadge label="UASG não identificada na API" variant="warning" size="sm" dot={false} />}
+        </div>
+      )
+    },
+    {
+      key: 'acao',
+      header: 'Ação',
+      align: 'center',
+      render: (s) =>
+        canEdit ? (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}>
+            {isDismissed ? (
+              <AppButton variant="outline" size="sm" icon={<RotateCcw size={13} />} onClick={() => onRestore(s)} disabled={busy} title="Voltar a sugerir este contrato">
+                Restaurar
+              </AppButton>
+            ) : (
+              <>
+                {s.linkable && (
+                  <AppButton variant="primary" size="sm" icon={<Link2 size={13} />} onClick={() => onLink(s)} disabled={busy} title="Vincular este contrato ao item">
+                    Vincular
+                  </AppButton>
+                )}
+                <AppButton variant="outline" size="sm" icon={<X size={13} />} onClick={() => onDismiss(s)} disabled={busy} title="Este contrato não pertence a este item">
+                  Descartar
+                </AppButton>
+              </>
+            )}
+          </div>
+        ) : null
+    }
+  ];
+
+  const renderTable = (list: ItemContractSuggestion[], isDismissed: boolean) => (
+    <DataTable
+      columns={buildColumns(isDismissed)}
+      data={list}
+      keyExtractor={(s) => s.contractKey}
+      testId={isDismissed ? 'contract-dismissed-table' : 'contract-suggestions-table'}
+    />
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '1.5rem' }} data-testid="contract-suggestions-panel">
+      <SectionHeader
+        title="Sugeridos"
+        subtitle="Encontrados nas APIs oficiais e ainda não vinculados a este item. Confirme antes de vincular ou descarte os que não pertencem a ele."
+        icon={<Sparkles size={16} />}
+        countBadge={suggestions.length}
+      />
+
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', justifyContent: 'center' }}>
+          <div className="spinner" style={{ width: '20px', height: '20px' }}></div>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Buscando contratos no PNCP...</span>
+        </div>
+      ) : error ? (
+        <div style={{ padding: '0.75rem', color: 'var(--danger)', fontSize: '0.85rem', textAlign: 'center' }}>{error}</div>
+      ) : suggestions.length === 0 ? (
+        <div style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
+          Nenhum contrato sugerido para este item.
+        </div>
+      ) : (
+        renderTable(suggestions, false)
+      )}
+
+      {dismissed.length > 0 && (
+        <div style={{ marginTop: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={() => setShowDismissed((v) => !v)}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)' }}
+          >
+            {showDismissed ? 'Ocultar descartados' : `Ver descartados (${dismissed.length})`}
+          </button>
+          {showDismissed && <div style={{ marginTop: '0.5rem' }}>{renderTable(dismissed, true)}</div>}
+        </div>
+      )}
+    </div>
+  );
+};

@@ -7,7 +7,7 @@ import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 interface AtaLinkedContractsProps {
   linkedContracts: EnrichedArpItemContract[];
   isLoading?: boolean;
-  /** Botão "Vincular contrato" exibido no estado vazio (quando o usuário pode editar). */
+  /** Botão "Vincular Contrato" exibido no estado vazio (quando o usuário pode editar). */
   emptyAction?: React.ReactNode;
   /** Desvincula o contrato do item; ausente = sem permissão de edição. */
   onUnlink?: (link: EnrichedArpItemContract) => void;
@@ -48,7 +48,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
         title="Nenhum contrato vinculado."
         description={
           emptyAction
-            ? 'Ainda não há contratos oficiais vinculados a itens desta Ata. Vincule um contrato indicando o item e a quantidade contratada.'
+            ? 'Ainda não há contratos oficiais vinculados a itens desta Ata. Vincule um contrato indicando os itens que ele cobre.'
             : 'Ainda não há contratos oficiais vinculados a itens desta Ata.'
         }
         action={emptyAction}
@@ -84,7 +84,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
                 {link.fornecedorNome} {link.valorGlobal ? `• ${formatCurrency(link.valorGlobal)}` : ''}
               </p>
               <p style={{ fontSize: '0.74rem', color: '#475569', margin: '0.15rem 0 0 0' }}>
-                Item {itemNumberFromKey(link.itemKey)} • {link.quantidadeContratada.toLocaleString('pt-BR')} contratado(s)
+                Item {itemNumberFromKey(link.itemKey)}
                 {link.observacoes ? ` • ${link.observacoes}` : ''}
               </p>
             </div>

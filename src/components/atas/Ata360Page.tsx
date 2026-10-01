@@ -19,6 +19,7 @@ import { useUnlinkContractFromItem } from '../../hooks/useUnlinkContractFromItem
 import { useToast, useConfirmDialog } from '../../design-system';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
+import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos'];
 
@@ -32,7 +33,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const navigate = useNavigate();
   const ataKey = ataKeyOverride || (paramAtaKey ? decodeURIComponent(paramAtaKey) : undefined);
   // A chave canônica é "NUMERO-UASG" (ex.: 00059/2025-200331): sem prop, usa a UASG da chave.
-  const uasg = uasgProp || uasgFromAtaKey(ataKey) || '200331';
+  const uasg = uasgProp || uasgFromAtaKey(ataKey) || UASG_LINK_LEGADO;
 
   const { arp, itens, isLoading, isError, error, refetch } = useAta(ataKey, uasg);
   const { saldos, isLoading: loadingSaldos } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);
@@ -79,7 +80,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
     if (!ok) return;
     setUnlinkingId(link.linkId);
     try {
-      await unlinkMutation.mutateAsync({ linkId: link.linkId, itemKey: link.itemKey });
+      await unlinkMutation.mutateAsync({ linkId: link.linkId, itemKey: link.itemKey, contractKey: link.contractKey });
     } catch (err: any) {
       if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
         toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
@@ -145,6 +146,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
       descricao: item.descricaoItem,
       fornecedorNome: item.nomeRazaoSocialFornecedor,
       fornecedorCnpj: item.niFornecedor,
+      valorUnitario: item.valorUnitario,
       quantidadeHomologada:
         saldoByItem.get(String(Number(item.numeroItem)))?.quantidade_homologada ??
         item.quantidadeHomologadaVencedor ??
@@ -167,7 +169,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
       onClick={() => setIsLinkModalOpen(true)}
       style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.85rem', backgroundColor: '#0c326f', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
     >
-      <Plus size={14} /> Vincular contrato
+      <Plus size={14} /> Vincular Contrato
     </button>
   ) : null;
 

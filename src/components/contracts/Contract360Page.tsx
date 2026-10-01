@@ -23,6 +23,7 @@ import { ContractFinancialExecutionSection } from './ContractFinancialExecutionS
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
 import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
+import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 
 const TAB_IDS: Contract360Tab[] = ['acoes', 'plano', 'pagamentos', 'financeiro', 'historico'];
 
@@ -40,9 +41,9 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   const contractKey = contractKeyOverride || paramContractKey;
 
   // A chave canônica é "UASG-NUMERO-ANO": quando a UASG não é informada por prop,
-  // usa a do prefixo da chave (ex.: 200330-00065-2021) em vez de assumir 200331.
+  // usa a do prefixo da chave (ex.: 200330-00065-2021) em vez de assumir uma UASG fixa.
   const uasgFromKey = /^(\d{6})-/.exec((contractKey || '').trim())?.[1];
-  const uasg = uasgProp || uasgFromKey || '200331';
+  const uasg = uasgProp || uasgFromKey || UASG_LINK_LEGADO;
 
   const { contract, isLoading, isError, error, refetch } = useContract(contractKey, uasg);
 

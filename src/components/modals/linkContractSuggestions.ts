@@ -87,3 +87,17 @@ export function rankContractsBySuggestion(
     .sort((a, b) => score(b.reasons) - score(a.reasons) || a.index - b.index)
     .map(({ contract, reasons }) => ({ contract, reasons }));
 }
+
+/**
+ * Em quantos dos itens da ata o contrato já está vinculado. Serve ao modo Ata do modal de vínculo:
+ * o contrato só deixa de ser oferecido quando já cobre todos os itens (`completo`).
+ */
+export function ataLinkCoverage(
+  contractKey: string,
+  itemOptions: Array<{ linkedContractKeys?: string[] }>
+): { vinculados: number; total: number; completo: boolean } {
+  const key = contractKey.toUpperCase();
+  const total = itemOptions.length;
+  const vinculados = itemOptions.filter((i) => i.linkedContractKeys?.some((k) => k.toUpperCase() === key)).length;
+  return { vinculados, total, completo: total > 0 && vinculados === total };
+}

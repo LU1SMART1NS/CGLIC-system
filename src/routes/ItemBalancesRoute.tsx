@@ -6,6 +6,7 @@ import { useSelection } from '../context/SelectionContext';
 import { useAuth } from '../context/AuthContext';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
 import { buildAtaPath, uasgFromAtaKey, useAta } from '../hooks/useAta';
+import { UASG_LINK_LEGADO } from '../config/unidadesGestoras';
 
 /**
  * Detalhe (saldo) de um item da Ata em /atas/detalhe/:ataKey/itens/:numeroItem.
@@ -17,7 +18,7 @@ export const ItemBalancesRoute: React.FC = () => {
   const params = useParams<{ ataKey: string; numeroItem: string }>();
   const ataKey = params.ataKey ? decodeURIComponent(params.ataKey) : undefined;
   const numeroItem = params.numeroItem ? decodeURIComponent(params.numeroItem) : '';
-  const uasg = uasgFromAtaKey(ataKey) || '200331';
+  const uasg = uasgFromAtaKey(ataKey) || UASG_LINK_LEGADO;
 
   const { arp, itens, isLoading } = useAta(ataKey, uasg);
   const item = itens.find((i) => Number(i.numeroItem) === Number(numeroItem) || i.numeroItem === numeroItem) || null;

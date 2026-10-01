@@ -19,8 +19,7 @@ describe('Hooks de Vínculo ARP ↔ Contratos Oficiais (Fase 6.2)', () => {
       {
         id: 'link-1',
         itemKey: '00037/2026-200331-00001',
-        contractKey: '200331-15-2026',
-        quantidadeContratada: 50
+        contractKey: '200331-15-2026'
       }
     ];
 
@@ -32,11 +31,10 @@ describe('Hooks de Vínculo ARP ↔ Contratos Oficiais (Fase 6.2)', () => {
     expect(result).toEqual(mockLinks);
   });
 
-  it('saveArpItemContractLink persiste um novo vínculo contextual com quantidade', async () => {
+  it('saveArpItemContractLink persiste um novo vínculo contextual', async () => {
     const params = {
       itemKey: '00037/2026-200331-00001',
-      contractKey: '200331-15-2026',
-      quantidadeContratada: 50
+      contractKey: '200331-15-2026'
     };
 
     const mockCreated: ArpItemContractLink = {
@@ -50,7 +48,6 @@ describe('Hooks de Vínculo ARP ↔ Contratos Oficiais (Fase 6.2)', () => {
 
     expect(arpContractLinkService.saveArpItemContractLink).toHaveBeenCalledWith(params);
     expect(result.id).toBe('link-uuid-abc');
-    expect(result.quantidadeContratada).toBe(50);
   });
 
   it('deleteArpItemContractLink remove o vínculo sem afetar dados do contrato oficial', async () => {

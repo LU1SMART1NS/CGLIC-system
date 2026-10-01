@@ -7,8 +7,8 @@ import type { ContractDashboardRecord } from '../types';
  *
  * Query Key Canônica: ['contracts-dashboard', uasg]
  */
-export function getContractsDashboardQueryOptions(uasg: string = '200331') {
-  const cleanUasg = uasg?.trim() || '200331';
+export function getContractsDashboardQueryOptions(uasg?: string) {
+  const cleanUasg = (uasg || '').trim();
 
   return {
     queryKey: ['contracts-dashboard', cleanUasg] as const,
@@ -26,9 +26,9 @@ export function getContractsDashboardQueryOptions(uasg: string = '200331') {
  * Arquitetura:
  * UI / ContractsDashboard -> useContractsDashboard(uasg) -> fetchContractsForDashboard() -> APIs Federais
  */
-export function useContractsDashboard(uasg: string = '200331') {
+export function useContractsDashboard(uasg?: string) {
   const queryClient = useQueryClient();
-  const cleanUasg = uasg?.trim() || '200331';
+  const cleanUasg = (uasg || '').trim();
 
   const query = useQuery<ContractDashboardRecord[], Error>(
     getContractsDashboardQueryOptions(cleanUasg)

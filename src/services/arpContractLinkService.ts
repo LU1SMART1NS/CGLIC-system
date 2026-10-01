@@ -2,13 +2,20 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type {
   ArpItemContractLink,
   LinkContractToItemParams,
-  EnrichedArpItemContract
+  LinkContractToItemsParams,
+  EnrichedArpItemContract,
+  ArpItemContractDismissal,
+  DismissContractSuggestionParams
 } from '../types/arpContractLinks';
 import type { ContractDashboardRecord } from '../types';
 import {
   linkContractToItemRpc,
-  unlinkContractFromItemRpc
+  linkContractToItemsRpc,
+  unlinkContractFromItemRpc,
+  dismissContractSuggestionRpc,
+  restoreContractSuggestionRpc
 } from '../adapters/arpContractLinkRpcAdapter';
+import { displayContractNumber } from '../utils/contractNumber';
 
 /**
  * Consulta os vínculos de um item de ARP com contratos oficiais diretamente da SSOT (PostgreSQL).
@@ -48,8 +55,10 @@ export async function fetchArpItemContractLinks(itemKey: string): Promise<ArpIte
     id: String(d.id),
     itemKey: d.item_key,
     contractKey: d.contract_key,
-    quantidadeContratada: Number(d.quantidade_contratada) || 0,
     observacoes: d.observacoes || undefined,
+    quantidadeContratadaApi: d.quantidade_contratada_api == null ? null : Number(d.quantidade_contratada_api),
+    valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
+    quantidadeLidaEm: d.quantidade_lida_em || undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at
   }));
@@ -67,9 +76,6 @@ export async function saveArpItemContractLink(
 
   if (!cleanItemKey) throw new Error('A chave do item da ata é obrigatória.');
   if (!cleanContractKey) throw new Error('A chave canônica do contrato oficial é obrigatória.');
-  if (params.quantidadeContratada <= 0) {
-    throw new Error('A quantidade contratada deve ser estritamente maior que zero.');
-  }
 
   const res = await linkContractToItemRpc(params);
 
@@ -77,10 +83,21 @@ export async function saveArpItemContractLink(
     id: res.id,
     itemKey: res.item_key,
     contractKey: res.contract_key,
-    quantidadeContratada: res.quantidade_contratada,
     observacoes: params.observacoes,
     updatedAt: res.timestamp
   };
+}
+
+/**
+ * Vincula um mesmo contrato oficial a vários itens da ARP numa única transação.
+ * Retorna quantos itens foram vinculados.
+ */
+export async function saveArpContractItemLinks(params: LinkContractToItemsParams): Promise<number> {
+  if (!(params.contractKey || '').trim()) throw new Error('A chave canônica do contrato oficial é obrigatória.');
+  if (!params.itemKeys || params.itemKeys.length === 0) throw new Error('Selecione ao menos um item para vincular.');
+
+  const res = await linkContractToItemsRpc(params);
+  return res.count;
 }
 
 /**
@@ -99,6 +116,45 @@ export async function deleteArpItemContractLink(linkId: string, itemKey?: string
       localStorage.removeItem(`saldoarp-arp-item-contract-links-${itemKey.trim()}`);
     } catch {}
   }
+}
+
+/**
+ * Consulta as sugestões de contrato descartadas para um item de ARP.
+ */
+export async function fetchDismissedContractSuggestions(itemKey: string): Promise<ArpItemContractDismissal[]> {
+  const cleanItemKey = (itemKey || '').trim();
+  if (!cleanItemKey) return [];
+
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('CONFIG_ERROR: Supabase não está configurado.');
+  }
+
+  const { data, error } = await supabase
+    .from('arp_item_contract_dismissals')
+    .select('item_key, contract_key, dismissed_at')
+    .eq('item_key', cleanItemKey)
+    .order('dismissed_at', { ascending: true });
+
+  if (error) {
+    console.error('Erro ao consultar sugestões descartadas:', error);
+    throw error;
+  }
+
+  return (data || []).map((d: any) => ({
+    itemKey: d.item_key,
+    contractKey: d.contract_key,
+    dismissedAt: d.dismissed_at
+  }));
+}
+
+/** Descarta a sugestão de um contrato para o item (idempotente). */
+export async function dismissContractSuggestion(params: DismissContractSuggestionParams): Promise<void> {
+  await dismissContractSuggestionRpc(params);
+}
+
+/** Restaura uma sugestão descartada, fazendo-a voltar a ser sugerida. */
+export async function restoreContractSuggestion(params: DismissContractSuggestionParams): Promise<void> {
+  await restoreContractSuggestionRpc(params);
 }
 
 /**
@@ -174,8 +230,10 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
       id: String(d.id),
       itemKey: d.item_key,
       contractKey: d.contract_key,
-      quantidadeContratada: Number(d.quantidade_contratada) || 0,
       observacoes: d.observacoes || undefined,
+      quantidadeContratadaApi: d.quantidade_contratada_api == null ? null : Number(d.quantidade_contratada_api),
+      valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
+      quantidadeLidaEm: d.quantidade_lida_em || undefined,
       createdAt: d.created_at,
       updatedAt: d.updated_at
     }));
@@ -191,7 +249,9 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
  */
 export function enrichContractLinks(
   links: ArpItemContractLink[],
-  officialContracts: ContractDashboardRecord[]
+  officialContracts: ContractDashboardRecord[],
+  /** Quantidade do item em cada contrato (API oficial), por chave de contrato em maiúsculas. */
+  quantidades?: ReadonlyMap<string, number>
 ): EnrichedArpItemContract[] {
   if (!links || links.length === 0) return [];
 
@@ -215,10 +275,11 @@ export function enrichContractLinks(
         linkId: link.id,
         itemKey: link.itemKey,
         contractKey: link.contractKey,
-        quantidadeContratada: link.quantidadeContratada,
+        quantidadeContratada: quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined,
+        quantidadeLidaEm: link.quantidadeLidaEm,
         observacoes: link.observacoes,
         contract,
-        numeroContratoFormatado: contract.numeroFormatado || `Contrato ${contract.numero}/${contract.ano}`,
+        numeroContratoFormatado: displayContractNumber(contract) || `Contrato ${contract.numero}/${contract.ano}`,
         uasg,
         orgaoNome,
         fornecedorNome: contract.fornecedorNome || 'Não informado',
@@ -241,7 +302,8 @@ export function enrichContractLinks(
       linkId: link.id,
       itemKey: link.itemKey,
       contractKey: link.contractKey,
-      quantidadeContratada: link.quantidadeContratada,
+      quantidadeContratada: quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined,
+        quantidadeLidaEm: link.quantidadeLidaEm,
       observacoes: link.observacoes,
       numeroContratoFormatado: `Contrato ${numeroDisplay}`,
       uasg,
