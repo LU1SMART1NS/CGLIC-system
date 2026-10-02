@@ -14,7 +14,9 @@ describe('UnidadesTab', () => {
   it('usa o mesmo resumo e tabela das outras abas', () => {
     const out = html();
     expect(out).toContain('unidades-summary');
-    expect(out).toContain('690 de 871');
+    expect(out).toContain('690 de 801');
+    expect(out).toContain('Ata completa');
+    expect(out).toContain('871 registrados');
     expect(out).toContain('unidades-table');
     expect(out).toContain('Órgãos participantes');
   });

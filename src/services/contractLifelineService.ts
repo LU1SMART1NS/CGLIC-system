@@ -2,6 +2,7 @@ import type { ArpRecord, ContractDashboardRecord } from '../types';
 import { buildCentralPrazosItems } from './centralPrazosService';
 import { addYears } from './contractReajusteRadarService';
 import { differenceInDays, formatDateISO, parseDateBRT } from './temporalEngineService';
+import { VIGENCIA_RULES } from '../config/alertRules';
 
 export type LifelineMilestoneState = 'PASSADO' | 'PROXIMO' | 'FUTURO';
 
@@ -22,7 +23,6 @@ export interface ContractLifeline {
   milestones: LifelineMilestone[];
 }
 
-const PROXIMO_DIAS = 60;
 
 export function buildContractLifeline(contract: ContractDashboardRecord, currentDate?: Date): ContractLifeline | null {
   const startStr = contract.dataVigenciaInicio || contract.dataAssinatura;
@@ -45,7 +45,7 @@ export function buildContractLifeline(contract: ContractDashboardRecord, current
       date: formatDateISO(date),
       pct: pctOf(date),
       diasRestantes,
-      state: diasRestantes < 0 ? 'PASSADO' : diasRestantes <= PROXIMO_DIAS ? 'PROXIMO' : 'FUTURO'
+      state: diasRestantes < 0 ? 'PASSADO' : diasRestantes <= VIGENCIA_RULES.aVencerAteDias ? 'PROXIMO' : 'FUTURO'
     });
   };
 
@@ -102,7 +102,7 @@ export function buildAtaLifeline(arp: ArpRecord, currentDate?: Date): ContractLi
       date: formatDateISO(d),
       pct: pctOf(d),
       diasRestantes,
-      state: diasRestantes < 0 ? 'PASSADO' : diasRestantes <= PROXIMO_DIAS ? 'PROXIMO' : 'FUTURO'
+      state: diasRestantes < 0 ? 'PASSADO' : diasRestantes <= VIGENCIA_RULES.aVencerAteDias ? 'PROXIMO' : 'FUTURO'
     });
   }
   milestones.sort((a, b) => a.date.localeCompare(b.date));

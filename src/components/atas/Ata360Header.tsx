@@ -14,6 +14,7 @@ import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { Instrument360Hero, instrumentStatusLabel } from '../instrument360/Instrument360Hero';
 import { HealthTile, HealthTileGrid, LifelineBar, PendenciasTile } from '../instrument360/HealthStripParts';
+import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 
 interface Ata360HeaderProps {
   arp: ArpRecord;
@@ -81,7 +82,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
     let pior: { pct: number; numeroItem: string } | null = null;
     for (const s of saldos) {
       const preco = precoPorItem.get(Number(s.numero_item)) ?? 0;
-      const homologada = Number(s.quantidade_homologada || 0);
+      const homologada = quantidadeBaseSenasp(s);
       const consumida = Number(s.quantidade_consumida || 0);
       total += homologada * preco;
       livre += Math.max(homologada - consumida, 0) * preco;

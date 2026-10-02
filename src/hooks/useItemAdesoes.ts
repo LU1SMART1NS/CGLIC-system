@@ -21,20 +21,9 @@ export function getItemAdesoesQueryOptions(
         return [];
       }
 
-      const cleanAta = numeroAta.trim();
-      const cleanUasg = uasg.trim();
-      const cleanItem = numeroItem.trim();
-
-      const response = await fetchAdesoesItem(cleanAta, cleanUasg, cleanItem);
-      const records = response.resultado || [];
-
-      const targetItemNum = parseInt(cleanItem, 10);
-      const filtered = records.filter(rec => {
-        const recItemNum = parseInt(rec.numeroItem, 10);
-        return recItemNum === targetItemNum || rec.numeroItem === cleanItem || !rec.numeroItem;
-      });
-
-      return filtered;
+      // A API já filtra pelo item e não devolve numeroItem nos registros.
+      const response = await fetchAdesoesItem(numeroAta.trim(), uasg.trim(), numeroItem.trim());
+      return response.resultado || [];
     },
     enabled: isEnabled,
     staleTime: 5 * 60 * 1000 // 5 minutos

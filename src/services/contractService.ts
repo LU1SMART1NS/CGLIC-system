@@ -1,9 +1,10 @@
 import type { ContractDashboardRecord, ContractFilterParams, ContractDashboardKPIs, StatusVigenciaContrato, ContractDetailItem, ContractDetailEmpenho } from '../types';
 import { formatNumeroAnoContrato, fetchContratosGovData, fetchContratosGovEmpenhos, fetchContratoItensComprasGov, splitDateRange } from './api';
 import { resolveContractKey } from '../utils/contractKeyUtils';
-import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { parseDateBRT, differenceInDays } from './temporalEngineService';
 import { codigoOrgaoDaUasg } from '../config/unidadesGestoras';
+import { VIGENCIA_RULES } from '../config/alertRules';
+import { STATUS_A_VENCER } from '../utils/statusVigencia';
 
 const BASE_URL = '/api-arp/modulo-contratos';
 const CONTRATOS_CACHE = new Map<string, { timestamp: number; data: ContractDashboardRecord[] }>();
@@ -44,8 +45,8 @@ export function calculateStatusVigencia(dataFim?: string): StatusVigenciaContrat
   const diffDays = differenceInDays(target);
   if (diffDays < 0) {
     return 'Expirado';
-  } else if (diffDays <= 60) {
-    return 'A Vencer (60d)';
+  } else if (diffDays <= VIGENCIA_RULES.aVencerAteDias) {
+    return STATUS_A_VENCER;
   } else {
     return 'Vigente';
   }
@@ -251,55 +252,8 @@ export async function fetchContractsForDashboard(
     console.warn(`[contractService] Falha ao consultar Compras.gov.br módulo-contratos para UG ${cleanUasg}:`, err);
   }
 
-  // 3. Fallback e consolidação com contratos manuais registrados no Supabase
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data: manualList, error: manualErr } = await supabase
-        .from('contratos_manuais')
-        .select('*');
-
-      if (!manualErr && Array.isArray(manualList)) {
-        for (const m of manualList) {
-          const mUasg = String(m.uasg || '').trim();
-          const matchesUasg = !cleanUasg || mUasg === cleanUasg || (m.item_key && m.item_key.includes(`-${cleanUasg}-`));
-          if (!matchesUasg) continue;
-
-          const numRaw = m.numero ? String(m.numero).trim() : '';
-          const anoRaw = m.ano ? String(m.ano).trim() : '2025';
-          const keyResolution = resolveContractKey(m.uasg || cleanUasg, numRaw, anoRaw);
-          const canKey = keyResolution.tipo !== 'INVALIDO' ? keyResolution.key : `${m.uasg || cleanUasg}-${numRaw}-${anoRaw}`;
-
-          const existing = contractsMap.get(canKey);
-          if (!existing) {
-            const record: ContractDashboardRecord = {
-              id: canKey,
-              numero: numRaw,
-              ano: anoRaw,
-              numeroFormatado: formatNumeroAnoContrato(numRaw, anoRaw) || `${numRaw}/${anoRaw}`,
-              uasg: String(m.uasg || cleanUasg),
-              objeto: m.objeto || 'Contrato Manual SaldoARP',
-              fornecedorNome: m.fornecedor || 'Fornecedor Cadastrado',
-              fornecedorCnpjCpf: m.cnpj_fornecedor,
-              valorGlobal: parseMoney(m.valor_total),
-              valorInicial: parseMoney(m.valor_total),
-              statusVigencia: 'Vigente',
-              numeroControlePncp: m.numero_controle_pncp,
-              fonteDados: 'Sistema CGLIC (Manual)',
-              sourceSystem: 'SaldoARP DB',
-              sourceRecordId: m.id || canKey,
-              sourceUpdatedAt: m.atualizado_em || m.criado_em || new Date().toISOString(),
-              lastSyncedAt: new Date().toISOString(),
-              origem: 'MANUAL',
-              raw: m
-            };
-            contractsMap.set(canKey, record);
-          }
-        }
-      }
-    } catch (dbErr) {
-      console.warn(`[contractService] Falha ao consultar contratos manuais do Supabase:`, dbErr);
-    }
-  }
+  // Contratos manuais (tabela contratos_manuais) deixaram de ser carregados: o cadastro manual
+  // foi retirado e o resíduo aparecia como "Vigente" sem data de fim, divergindo das carteiras.
 
   const result = Array.from(contractsMap.values());
   result.sort((a, b) => {
@@ -340,7 +294,7 @@ export function calculateContractKPIs(contracts: ContractDashboardRecord[]): Con
       vigentes++;
     } else if (c.statusVigencia === 'Expirado') {
       expirados++;
-    } else if (c.statusVigencia === 'A Vencer (60d)') {
+    } else if (c.statusVigencia === STATUS_A_VENCER) {
       aVencer++;
     }
   }
@@ -392,13 +346,13 @@ export function filterContracts(
 
     // 5. Filtro por Status de Vigência
     if (filters.statusVigencia && filters.statusVigencia !== 'todos') {
-      if (filters.statusVigencia === 'vigente' && c.statusVigencia !== 'Vigente' && c.statusVigencia !== 'A Vencer (60d)') {
+      if (filters.statusVigencia === 'vigente' && c.statusVigencia !== 'Vigente' && c.statusVigencia !== STATUS_A_VENCER) {
         return false;
       }
       if (filters.statusVigencia === 'expirado' && c.statusVigencia !== 'Expirado') {
         return false;
       }
-      if (filters.statusVigencia === 'a_vencer' && c.statusVigencia !== 'A Vencer (60d)') {
+      if (filters.statusVigencia === 'a_vencer' && c.statusVigencia !== STATUS_A_VENCER) {
         return false;
       }
     }

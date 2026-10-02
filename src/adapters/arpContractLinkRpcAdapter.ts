@@ -246,3 +246,44 @@ export async function syncContractItemQuantityRpc(
     throw mapPostgresErrorToAppError(err);
   }
 }
+
+export interface RpcSyncItemSenaspQuantityResult {
+  success: boolean;
+  id: string;
+  item_key: string;
+  quantidade_senasp: number;
+  timestamp: string;
+}
+
+/**
+ * Grava o quantitativo SENASP do item (cópia lida das unidades do Compras.gov)
+ * via RPC sync_item_senasp_quantity_atomic.
+ */
+export async function syncItemSenaspQuantityRpc(params: {
+  itemKey: string;
+  quantidade: number;
+}): Promise<RpcSyncItemSenaspQuantityResult> {
+  const client = requireSupabase();
+
+  const itemKey = (params.itemKey || '').trim();
+  if (!itemKey) throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: A chave do item (itemKey) é obrigatória.'));
+  if (!(params.quantidade >= 0)) {
+    throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: O quantitativo SENASP não pode ser negativo.'));
+  }
+
+  try {
+    const { data, error } = await client.rpc('sync_item_senasp_quantity_atomic', {
+      p_item_key: itemKey,
+      p_quantidade: params.quantidade
+    });
+
+    if (error) throw mapPostgresErrorToAppError(error);
+    if (!data || typeof data !== 'object') {
+      throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: Resposta inválida da RPC sync_item_senasp_quantity_atomic'));
+    }
+    return data as RpcSyncItemSenaspQuantityResult;
+  } catch (err: any) {
+    if (err && err.code && typeof err.code === 'string') throw err;
+    throw mapPostgresErrorToAppError(err);
+  }
+}

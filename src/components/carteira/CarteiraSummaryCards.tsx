@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle2, AlertTriangle, Clock, Archive } from 'lucide-react';
 import type { CarteiraStatusFilter } from './carteiraPrazo';
+import { VIGENCIA_RULES } from '../../config/alertRules';
 
 export interface CarteiraSummaryCardsProps {
   /** Prefixo dos data-testid (ex.: "contracts" → "contracts-summary-card-vigentes"). */
@@ -51,8 +52,8 @@ export const CarteiraSummaryCards: React.FC<CarteiraSummaryCardsProps> = ({
     border: string;
   }> = [
     { id: 'VIGENTES', label: 'Vigentes', count: vigentes, hint: vigentesHint || 'Em vigência', hint2: vigentesValorHint, icon: CheckCircle2, color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
-    { id: 'CRITICO', label: 'Crítico (≤30 dias)', count: criticos, hint: 'Vencem em até 30 dias', hint2: criticoValorHint, icon: AlertTriangle, color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
-    { id: 'ATENCAO', label: 'Atenção (31–90 dias)', count: atencao, hint: 'Vencem entre 31 e 90 dias', hint2: atencaoValorHint, icon: Clock, color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+    { id: 'CRITICO', label: `Crítico (≤${VIGENCIA_RULES.faixaCriticoAteDias} dias)`, count: criticos, hint: `Vencem em até ${VIGENCIA_RULES.faixaCriticoAteDias} dias`, hint2: criticoValorHint, icon: AlertTriangle, color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+    { id: 'ATENCAO', label: `Atenção (${VIGENCIA_RULES.faixaCriticoAteDias + 1}–${VIGENCIA_RULES.faixaAtencaoAteDias} dias)`, count: atencao, hint: `Vencem entre ${VIGENCIA_RULES.faixaCriticoAteDias + 1} e ${VIGENCIA_RULES.faixaAtencaoAteDias} dias`, hint2: atencaoValorHint, icon: Clock, color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
     { id: 'HISTORICO', label: 'Histórico', count: historico, hint: historicoHint, icon: Archive, color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' }
   ];
 

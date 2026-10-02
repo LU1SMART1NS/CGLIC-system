@@ -219,6 +219,142 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
     });
   });
 
+  describe('buildManagementDashboardReadModel — empenhos por UASG', () => {
+    it('não conta o empenho de outra UASG (evita somar em dobro entre as duas UASGs)', () => {
+      const empenhos = [
+        { empenho_id: 'a', uasg_emitente: '200331', valor_empenhado: 100, valor_liquidado: 0, valor_pago: 0 },
+        { empenho_id: 'b', uasg_emitente: '200330', valor_empenhado: 50, valor_liquidado: 0, valor_pago: 0 },
+        { empenho_id: 'c', valor_empenhado: 10, valor_liquidado: 0, valor_pago: 0 }
+      ];
+      const rm = buildManagementDashboardReadModel({ uasg: '200331', empenhos, currentDate: new Date('2026-10-02T12:00:00-03:00') });
+      expect(rm.financial.totalEmpenhado).toBe(110);
+    });
+  });
+
+  describe('buildManagementDashboardReadModel — só Atas vigentes', () => {
+    it('ignora Ata vencida no total, no saldo crítico e nas tarefas', () => {
+      const now = new Date('2026-10-02T12:00:00-03:00');
+      const vigente = { numeroAtaRegistroPreco: '00001/2026', codigoUnidadeGerenciadora: '200331', dataVigenciaFinal: '2027-06-30' } as ArpRecord;
+      const vencida = { numeroAtaRegistroPreco: '00002/2025', codigoUnidadeGerenciadora: '200331', dataVigenciaFinal: '2026-01-01' } as ArpRecord;
+      const atrasada = { id: 't', nome: 'Atrasada', prazo: '2026-09-01', status: 'PENDENTE' };
+      const plan = (key: string) => ({ id: key, ataKey: key, templateNome: 'T', appliedAt: '', progresso: {}, macrotarefas: [{ id: `m${key}`, planId: key, nome: 'M', ordem: 1, tarefas: [{ ...atrasada, id: `t${key}` }] }] }) as any;
+      const rm = buildManagementDashboardReadModel({
+        uasg: '200331',
+        arps: [vigente, vencida],
+        ataPlans: { '00001/2026': plan('00001/2026'), '00002/2025': plan('00002/2025') },
+        itemsSaldo: [
+          { item_key: 'a', numero_ata: '00001/2026', numero_item: 1, percentual_consumido: 90 },
+          { item_key: 'b', numero_ata: '00002/2025', numero_item: 1, percentual_consumido: 95 }
+        ],
+        currentDate: now
+      });
+      expect(rm.arp.totalAtas).toBe(1);
+      const ids = rm.attention.items.map((i) => i.id);
+      expect(ids).toContain('ATT-ATA-TASK-t00001/2026');
+      expect(ids).not.toContain('ATT-ATA-TASK-t00002/2025');
+      expect(rm.attention.items.filter((i) => i.category === 'ATA_CRITICA')).toHaveLength(1);
+    });
+  });
+
+  describe('calculateAttentionSummary — prazo da etapa da CGLIC nos ciclos de pagamento', () => {
+    const cicloComEtapa = (etapaAtual: PaymentFollowUpCycle['etapaAtual'], status: PaymentFollowUpCycle['status'] = 'RECEBIDO'): PaymentFollowUpCycle => ({
+      cycleKey: 'c1-PGTO-202610-12345678',
+      contractKey: 'c1',
+      competencia: '2026-10',
+      status,
+      input: {
+        contractKey: 'c1',
+        competencia: '2026-10',
+        dataRecebimento: '2026-10-01',
+        dataAssinaturaAtesto: '2026-10-01',
+        dataVencimentoFatura: '2026-12-30',
+        documentoAtestoSei: '12345678',
+        valorAtesto: 1000
+      },
+      prazos: { diasUteisAteVencimento: 60, janelaTotalDiasUteis: 60, diasSemRespostaCgofi: 0, margemEnvioDiasUteis: 0, isVencida: false, statusPrazo: 'NORMAL' },
+      etapaAtual,
+      alerts: [],
+      criadoEm: '2026-10-01T00:00:00Z',
+      atualizadoEm: '2026-10-01T00:00:00Z'
+    });
+    const itensDoCiclo = (cycle: PaymentFollowUpCycle) =>
+      calculateAttentionSummary({ paymentCycles: [cycle] }).items.filter((i) => i.cycleKey === cycle.cycleKey);
+
+    it('conferência atrasada aparece como urgente, com o atraso em dias úteis', () => {
+      const [item] = itensDoCiclo(cicloComEtapa({ etapa: 'CONFERENCIA', dono: 'CGLIC', dataAlvo: '2026-10-07', diasUteisRestantes: -2, atrasado: true }));
+      expect(item).toMatchObject({ category: 'PAGAMENTO_CRITICO', severity: 'URGENTE', badgeLabel: '2d úteis de atraso', contractKey: 'c1' });
+      expect(item.title).toContain('Conferir a documentação (12345678): atrasada há 2 dias úteis');
+    });
+
+    it('prazo da etapa dentro da janela de aviso vira atenção; fora dela não aparece', () => {
+      const [aviso] = itensDoCiclo(cicloComEtapa({ etapa: 'ENVIO', dono: 'CGLIC', dataAlvo: '2026-10-09', diasUteisRestantes: 1, atrasado: false }, 'CONFERIDO'));
+      expect(aviso).toMatchObject({ severity: 'ATENCAO' });
+      expect(aviso.title).toContain('Enviar à CGOFI (12345678): prazo em 1 dia útil');
+
+      const longe = itensDoCiclo(cicloComEtapa({ etapa: 'CONFERENCIA', dono: 'CGLIC', dataAlvo: '2026-10-20', diasUteisRestantes: 9, atrasado: false }));
+      expect(longe).toEqual([]);
+    });
+
+    it('na CGOFI o prazo é de cobrança e não gera item de atraso da CGLIC; sem prazo de etapa também não', () => {
+      const naCgofi = itensDoCiclo(cicloComEtapa({ etapa: 'COBRANCA_CGOFI', dono: 'CGOFI', dataAlvo: '2026-10-07', diasUteisRestantes: -3, atrasado: true }, 'ENVIADO_CGOFI'));
+      expect(naCgofi).toEqual([]);
+      expect(itensDoCiclo(cicloComEtapa(undefined))).toEqual([]);
+    });
+  });
+
+  describe('calculateAttentionSummary — Atas', () => {
+    const now = new Date('2026-10-02T12:00:00-03:00');
+    const arp = { numeroAtaRegistroPreco: '00041/2026', codigoUnidadeGerenciadora: '200331' } as ArpRecord;
+    const task = (id: string, prazo: string, status = 'PENDENTE') => ({ id, nome: `Tarefa ${id}`, prazo, status });
+    const ataPlans: any = {
+      '00041/2026': {
+        id: 'p', ataKey: '00041/2026', templateNome: 'T', appliedAt: '2026-01-01', progresso: {},
+        macrotarefas: [{
+          id: 'm', planId: 'p', nome: 'Atividades Preliminares', ordem: 1,
+          tarefas: [task('hoje', '2026-10-02'), task('em2dias', '2026-10-04'), task('longe', '2026-12-01'), task('feita', '2026-10-02', 'CONCLUIDA')]
+        }]
+      }
+    };
+
+    it('inclui tarefas de plano de Ata vencendo em até 7 dias e ignora distantes e concluídas', () => {
+      const { items } = calculateAttentionSummary({ arps: [arp], ataPlans, currentDate: now });
+      const ids = items.map((i) => i.id);
+      expect(ids).toEqual(expect.arrayContaining(['ATT-ATA-TASK-hoje', 'ATT-ATA-TASK-em2dias']));
+      expect(ids).not.toContain('ATT-ATA-TASK-longe');
+      expect(ids).not.toContain('ATT-ATA-TASK-feita');
+      expect(items.find((i) => i.id === 'ATT-ATA-TASK-hoje')).toMatchObject({ severity: 'URGENTE', numeroAta: '00041/2026' });
+    });
+
+    it('inclui tarefa de Ata entre 8 e 30 dias como atenção', () => {
+      const plans: any = { '00041/2026': { ...ataPlans['00041/2026'], macrotarefas: [{ ...ataPlans['00041/2026'].macrotarefas[0], tarefas: [task('em15', '2026-10-17')] }] } };
+      const { items } = calculateAttentionSummary({ arps: [arp], ataPlans: plans, currentDate: now });
+      expect(items.find((i) => i.id === 'ATT-ATA-TASK-em15')).toMatchObject({ severity: 'ATENCAO' });
+    });
+
+    it('inclui lembretes de vigência da Ata e respeita os dispensados', () => {
+      const vigente = { ...arp, dataVigenciaFinal: '2026-12-15' } as ArpRecord;
+      const base = calculateAttentionSummary({ arps: [vigente], currentDate: now }).items.filter((i) => i.category === 'LEMBRETE');
+      expect(base.length).toBeGreaterThan(0);
+      expect(base.every((i) => i.severity === 'INFO' && i.numeroAta === '00041/2026')).toBe(true);
+      const dismissedIds = base.map((i) => i.id.replace('ATT-LEMBRETE-', ''));
+      const after = calculateAttentionSummary({
+        arps: [vigente],
+        dismissedReminders: { CONTRATO: {}, ATA: { '00041/2026': dismissedIds } },
+        currentDate: now
+      }).items.filter((i) => i.category === 'LEMBRETE');
+      expect(after).toEqual([]);
+    });
+
+    it('inclui saldo de item entre 70% e 85% como atenção', () => {
+      const { items } = calculateAttentionSummary({
+        arps: [arp],
+        arpItems: [{ percentual_consumido: 75, numero_ata: '00041/2026', numero_item: 1, codigo_uasg: '200331' } as any],
+        currentDate: now
+      });
+      expect(items.find((i) => i.category === 'ATA_CRITICA')).toMatchObject({ severity: 'ATENCAO' });
+    });
+  });
+
   describe('calculateAttentionSummary', () => {
     it('evaluates radar, central de prazos, and critical counts', () => {
       const contracts: ContractDashboardRecord[] = [
@@ -245,10 +381,11 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
           cycleKey: 'cy1',
           contractKey: 'c1',
           competencia: '2026-09',
-          status: 'EM_INSTRUCAO',
+          status: 'RECEBIDO',
           input: {
             contractKey: 'c1',
             competencia: '2026-09',
+            dataRecebimento: '2026-09-01',
             dataAssinaturaAtesto: '2026-09-01',
             dataVencimentoFatura: '2026-09-20',
             documentoAtestoSei: 'Doc 100',
@@ -424,10 +561,11 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
           cycleKey: 'cy1',
           contractKey: 'c1',
           competencia: '2026-09',
-          status: 'EM_INSTRUCAO',
+          status: 'ENVIADO_CGOFI',
           input: {
             contractKey: 'c1',
             competencia: '2026-09',
+            dataRecebimento: '2026-09-01',
             dataAssinaturaAtesto: '2026-09-01',
             dataVencimentoFatura: '2026-09-20',
             documentoAtestoSei: 'Doc 100',
@@ -441,7 +579,9 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
             isVencida: true,
             statusPrazo: 'CRITICO'
           },
-          alerts: [],
+          alerts: [
+            { id: 'a1', cycleKey: 'cy1', contractKey: 'c1', nivel: 'ATENCAO', tipo: 'CGOFI_SEM_RESPOSTA', mensagem: 'Cobrar a CGOFI', diasRelevantes: 7 }
+          ],
           criadoEm: '2026-09-01T00:00:00Z',
           atualizadoEm: '2026-09-20T10:00:00Z'
         },
@@ -449,10 +589,11 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
           cycleKey: 'cy2',
           contractKey: 'c1',
           competencia: '2026-08',
-          status: 'CONCLUIDO',
+          status: 'PAGO',
           input: {
             contractKey: 'c1',
             competencia: '2026-08',
+            dataRecebimento: '2026-08-01',
             dataAssinaturaAtesto: '2026-08-01',
             dataVencimentoFatura: '2026-08-20',
             documentoAtestoSei: 'Doc 90',
@@ -479,8 +620,8 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(summary.ciclosCriticosCount).toBe(1);
       expect(summary.ciclosAtrasoCgofiCount).toBe(1);
       expect(summary.faturasVencidasCount).toBe(1);
-      expect(summary.distribuicaoPorEstado?.['EM_INSTRUCAO']).toBe(1);
-      expect(summary.distribuicaoPorEstado?.['CONCLUIDO']).toBe(1);
+      expect(summary.distribuicaoPorEstado?.['ENVIADO_CGOFI']).toBe(1);
+      expect(summary.distribuicaoPorEstado?.['PAGO']).toBe(1);
       expect(summary.tempoMedioCgofiDisponivel).toBe(false);
       expect(summary.ciclosRecentes.length).toBe(2);
       expect(summary.ciclosRecentes[0].cycleKey).toBe('cy2');
@@ -494,10 +635,11 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
           cycleKey: 'c-ob-1',
           contractKey: 'c1',
           competencia: '2026-07',
-          status: 'PAGAMENTO_CONFIRMADO',
+          status: 'PAGO',
           input: {
             contractKey: 'c1',
             competencia: '2026-07',
+            dataRecebimento: '2026-07-01',
             dataAssinaturaAtesto: '2026-07-01',
             dataVencimentoFatura: '2026-07-25',
             documentoAtestoSei: 'Doc 80',
@@ -522,10 +664,11 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
           cycleKey: 'c-ob-2',
           contractKey: 'c1',
           competencia: '2026-08',
-          status: 'CONCLUIDO',
+          status: 'PAGO',
           input: {
             contractKey: 'c1',
             competencia: '2026-08',
+            dataRecebimento: '2026-08-01',
             dataAssinaturaAtesto: '2026-08-01',
             dataVencimentoFatura: '2026-08-25',
             documentoAtestoSei: 'Doc 85',
@@ -638,7 +781,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
         {
           cycleKey: 'c1-pgto-1',
           contractKey: 'c1',
-          status: 'EM_INSTRUCAO',
+          status: 'RECEBIDO',
           input: { valorAtesto: 15000 },
           prazos: { diasUteisAteVencimento: 5, statusPrazo: 'NORMAL' },
           alerts: []
@@ -646,7 +789,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
         {
           cycleKey: 'c2-pgto-1',
           contractKey: 'c2',
-          status: 'CONCLUIDO',
+          status: 'PAGO',
           input: { valorAtesto: 25000 },
           prazos: { diasUteisAteVencimento: 0, statusPrazo: 'NORMAL' },
           alerts: []
@@ -707,8 +850,8 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       ];
 
       const paymentCycles = [
-        { cycleKey: 'c1-pgto-1', contractKey: 'c1', status: 'EM_INSTRUCAO', input: { valorAtesto: 15000 }, prazos: { diasUteisAteVencimento: 5, statusPrazo: 'NORMAL' }, alerts: [] } as any,
-        { cycleKey: 'c2-pgto-1', contractKey: 'c2', status: 'CONCLUIDO', input: { valorAtesto: 25000 }, prazos: { diasUteisAteVencimento: 0, statusPrazo: 'NORMAL' }, alerts: [] } as any
+        { cycleKey: 'c1-pgto-1', contractKey: 'c1', status: 'RECEBIDO', input: { valorAtesto: 15000 }, prazos: { diasUteisAteVencimento: 5, statusPrazo: 'NORMAL' }, alerts: [] } as any,
+        { cycleKey: 'c2-pgto-1', contractKey: 'c2', status: 'PAGO', input: { valorAtesto: 25000 }, prazos: { diasUteisAteVencimento: 0, statusPrazo: 'NORMAL' }, alerts: [] } as any
       ];
 
       const managers = {
@@ -812,7 +955,8 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
             id: 'a1',
             numero: '01/2026',
             ano: 2026,
-            objeto: 'Ata Teste'
+            objeto: 'Ata Teste',
+            dataVigenciaFinal: '2027-06-30'
           } as any
         ],
         syncInfo: { lastSync: '2026-09-24T00:00:00Z', totalAtas: 1 } as any

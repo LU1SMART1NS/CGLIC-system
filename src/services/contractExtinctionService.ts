@@ -33,6 +33,7 @@ import type {
 } from '../types';
 import type { AmendmentOfficialityClassification } from '../types/contractAmendments';
 import { generateIdempotentEventId } from './contractEventService';
+import { STATUS_A_VENCER } from '../utils/statusVigencia';
 
 /**
  * 1. Gera chave lógica determinística e canônica para a entidade de Extinção / Encerramento.
@@ -334,7 +335,7 @@ export function buildContractExtinctionDomain(params: {
 
   const id = generateExtinctionDomainId(contractKey, tipoExtincao, cycleRef, identificador);
 
-  const contractVigente = contract.statusVigencia === 'Vigente' || contract.statusVigencia === 'A Vencer (60d)';
+  const contractVigente = contract.statusVigencia === 'Vigente' || contract.statusVigencia === STATUS_A_VENCER;
   const vigenciaExpirada = contract.statusVigencia === 'Expirado' || (contract.dataVigenciaFim ? new Date(contract.dataVigenciaFim) < new Date() : false);
 
   const situacaoOperacional = deriveContractExtinctionState({

@@ -11,7 +11,9 @@ import {
   Search,
   FileSpreadsheet,
   Receipt,
-  Landmark
+  Landmark,
+  BellRing,
+  CalendarOff
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -60,6 +62,8 @@ export interface NavItem {
  * - Administração (recolhível)
  *     - Usuários e Servidores (/admin/usuarios)
  *     - Perfis e Permissões (/admin/perfis)
+ *     - Regras de Alertas (/admin/regras-alertas)
+ *     - Feriados (/admin/feriados)
  */
 export const navigationConfig: NavItem[] = [
   {
@@ -69,7 +73,7 @@ export const navigationConfig: NavItem[] = [
     route: '/instrumentos',
     status: 'active',
     matchPrefixes: ['/instrumentos', '/prazos'],
-    allowedRoles: ['admin', 'gestor', 'leitor']
+    allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
   },
   {
     id: 'atas',
@@ -85,7 +89,7 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/atas', '/atas/detalhe'],
         excludePrefixes: ['/atas/saldos-unidade', '/atas/modelos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
         id: 'atas-alocacoes',
@@ -182,6 +186,24 @@ export const navigationConfig: NavItem[] = [
         route: '/admin/perfis',
         status: 'active',
         matchPrefixes: ['/admin/perfis'],
+        allowedRoles: ['admin']
+      },
+      {
+        id: 'admin-regras-alertas',
+        label: 'Regras de Alertas',
+        icon: BellRing,
+        route: '/admin/regras-alertas',
+        status: 'active',
+        matchPrefixes: ['/admin/regras-alertas'],
+        allowedRoles: ['admin']
+      },
+      {
+        id: 'admin-feriados',
+        label: 'Feriados',
+        icon: CalendarOff,
+        route: '/admin/feriados',
+        status: 'active',
+        matchPrefixes: ['/admin/feriados'],
         allowedRoles: ['admin']
       }
     ]

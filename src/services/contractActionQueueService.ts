@@ -5,6 +5,7 @@ import type { SeverityLevel } from '../design-system/tokens';
 import { calculateAttentionSummary } from './dashboardService';
 import { buildCentralPrazosItems } from './centralPrazosService';
 import { parseDateBRT } from './temporalEngineService';
+import { isLembreteNaJanela } from '../config/alertRules';
 
 export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE' | 'EMPENHO';
 
@@ -135,24 +136,11 @@ export function buildContractActionQueue(params: {
 
   const prazos = buildCentralPrazosItems({ contracts: [contract], plans, currentDate });
   for (const p of prazos) {
-    if (p.tipoItem === 'TAREFA_HUMANA') {
-      if (!isTaskOpen(p.tarefaStatus) || p.diasRestantes < 8 || p.diasRestantes > 30) continue;
-      items.push(
-        withTaskDetails({
-          id: `ACT-TASK-ATENCAO-${p.id}`,
-          kind: 'TAREFA',
-          severity: 'ATENCAO',
-          title: p.acaoDescricao,
-          badgeLabel: `${p.diasRestantes} dias`,
-          diasRelevantes: p.diasRestantes,
-          dataAlvo: p.dataAlvo,
-          taskId: p.tarefaId
-        })
-      );
-    } else if (p.tipoItem === 'GATILHO_OPERACIONAL') {
+    // Tarefas de 8 a 30 dias já vêm do funil (calculateAttentionSummary) como ATENÇÃO.
+    if (p.tipoItem === 'GATILHO_OPERACIONAL') {
       const atrasado = p.estadoTemporal === 'ATRASADO';
       if (vigenciaEncerrada) continue;
-      if (!atrasado && (p.diasRestantes < 0 || p.diasRestantes > 60)) continue;
+      if (!isLembreteNaJanela({ diasRestantes: p.diasRestantes, atrasado, isAta: false })) continue;
       const lembrete: ContractActionItem = {
         id: `ACT-LEMBRETE-${p.id}`,
         kind: 'LEMBRETE',

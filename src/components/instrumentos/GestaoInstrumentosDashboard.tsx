@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useManagementDashboard } from '../../hooks/useManagementDashboard';
 import { useAllContractManagers } from '../../hooks/useAllContractManagers';
 import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
+import { useRefreshItemSaldos } from '../../hooks/useRefreshItemSaldos';
+import { useAuth } from '../../context/AuthContext';
 import { GestaoInstrumentosHeader } from './GestaoInstrumentosHeader';
 import { GestaoInstrumentosSummaryCards, type GestaoInstrumentosCardId } from './GestaoInstrumentosSummaryCards';
 import { GestaoInstrumentosCategoryTabs, type GestaoInstrumentosCategoryTab } from './GestaoInstrumentosCategoryTabs';
@@ -23,7 +25,8 @@ const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, 
   SALDOS: ['ATA_CRITICA'],
   REAJUSTES: ['REAJUSTE_RADAR'],
   PAGAMENTOS: ['PAGAMENTO_CRITICO'],
-  TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA']
+  TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA'],
+  LEMBRETES: ['LEMBRETE']
 };
 
 function matchesTab(item: AttentionItemWithUasg, tab: GestaoInstrumentosCategoryTab): boolean {
@@ -87,11 +90,18 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const isError = dashboards.some((d) => d.isError) && !hasAnyReadModel;
   const error = dashboards.find((d) => d.isError)?.error ?? null;
   const dataUpdatedAt = Math.max(...dashboards.map((d) => d.dataUpdatedAt || 0)) || undefined;
+  // Mantém em dia a quantidade contratada dos itens (base do saldo SENASP) que este painel lê do banco.
+  const itemSaldos = useRefreshItemSaldos();
   const refetch = useCallback(() => {
+    void itemSaldos.refresh();
     dash200330.refetch();
     dash200331.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Gestor de Saldo (domínio de alocações, sem contratos): enxerga só os alertas de saldo das Atas.
+  const { role } = useAuth();
+  const saldosOnly = role === 'gestor_saldos';
 
   const allItems = useMemo<AttentionItemWithUasg[]>(() => {
     const merged: AttentionItemWithUasg[] = [];
@@ -99,12 +109,13 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       const dash = uasg === UASGS[0] ? dash200330 : dash200331;
       const items = dash.readModel?.attention?.items || [];
       for (const item of items) {
+        if (saldosOnly && item.category !== 'ATA_CRITICA') continue;
         merged.push({ ...item, uasg });
       }
     }
     return merged;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel]);
+  }, [dash200330.readModel, dash200331.readModel, saldosOnly]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -112,7 +123,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       SALDOS: allItems.filter((i) => matchesTab(i, 'SALDOS')).length,
       REAJUSTES: allItems.filter((i) => matchesTab(i, 'REAJUSTES')).length,
       PAGAMENTOS: allItems.filter((i) => matchesTab(i, 'PAGAMENTOS')).length,
-      TAREFAS: allItems.filter((i) => matchesTab(i, 'TAREFAS')).length
+      TAREFAS: allItems.filter((i) => matchesTab(i, 'TAREFAS')).length,
+      LEMBRETES: allItems.filter((i) => matchesTab(i, 'LEMBRETES')).length
     };
   }, [allItems]);
 
@@ -159,7 +171,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       contratosAVencer30d: sum((rm) => rm.deadlines.vencendo30Dias),
       valorVigenteTotal: sum((rm) => rm.executive.valorVigenteTotal),
       totalEmpenhado: sum((rm) => rm.financial.totalEmpenhado),
-      criticalCount: sum((rm) => rm.attention.criticalCount),
+      // Só CRITICA: é o que o clique no card filtra. Urgentes aparecem na linha própria do card.
+      criticalCount: allItems.filter((i) => i.severity === 'CRITICA').length,
       totalAlertasAtivos: sum((rm) => rm.attention.totalAlertasAtivos),
       urgenteCount,
       atencaoCount
@@ -211,7 +224,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
       if (query) {
         const fornecedor = (fornecedorByKey.get(getLookupKey(item)) || '').toLowerCase();
-        const haystack = [item.title, item.description, item.numeroContrato, item.contractKey, item.numeroAta, item.uasg, fornecedor]
+        const haystack = [item.title, item.description, item.numeroContrato, item.contractKey, item.numeroAta, item.uasg, fornecedor, item.objetoItem, item.fornecedorNome]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
@@ -263,7 +276,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     }}>
       <GestaoInstrumentosHeader
         onRefresh={refetch}
-        isRefreshing={isLoading || isFetching}
+        isRefreshing={isLoading || isFetching || itemSaldos.isRefreshing}
         lastUpdated={dataUpdatedAt}
       />
 
@@ -271,6 +284,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         counts={summaryCounts}
         activeCard={activeCard}
         onSelectCard={handleSelectCard}
+        saldosOnly={saldosOnly}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -298,11 +312,13 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
             />
           </div>
 
-          <GestaoInstrumentosCategoryTabs
-            counts={tabCounts}
-            active={activeTab}
-            onSelect={handleSelectTab}
-          />
+          {!saldosOnly && (
+            <GestaoInstrumentosCategoryTabs
+              counts={tabCounts}
+              active={activeTab}
+              onSelect={handleSelectTab}
+            />
+          )}
         </div>
       </div>
 

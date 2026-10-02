@@ -91,7 +91,7 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     const html = renderToStaticMarkup(<ItemHero {...baseProps} />);
 
     expect(html).toContain('Item 1');
-    expect(html).toContain('Saldo da ata');
+    expect(html).toContain('Saldo SENASP');
     expect(html).toContain('item-health-saldo');
     expect(html).not.toContain('item-health-reconciliacao');
     expect(html).toContain('Saldo para adesões');

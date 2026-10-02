@@ -1,3 +1,4 @@
+import { buildAtaPath } from '../../hooks/useAta';
 import type { DashboardAttentionCategory, DashboardAttentionItem } from '../../types/managementDashboard';
 
 /** Item de atenção enriquecido com a UASG de origem (a Gestão de Instrumentos consolida 200330 e 200331). */
@@ -50,7 +51,8 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: '#dc2626', bg: '#fef2f2' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: '#b45309', bg: '#fffbeb' },
   TAREFA_ATRASADA: { label: 'Tarefa Atrasada', color: '#991b1b', bg: '#fef2f2' },
-  TAREFA_PROXIMA: { label: 'Tarefa Próxima', color: '#b45309', bg: '#fffbeb' }
+  TAREFA_PROXIMA: { label: 'Tarefa Próxima', color: '#b45309', bg: '#fffbeb' },
+  LEMBRETE: { label: 'Planejamento da Vigência', color: '#475569', bg: '#f1f5f9' }
 };
 
 export function getMotivoInfo(category: DashboardAttentionCategory): MotivoInfo {
@@ -95,11 +97,23 @@ function contractItemUrl(item: DashboardAttentionItem): string {
   return `/contratos/${encodeURIComponent(item.contractKey)}?item=${encodeURIComponent(item.id)}`;
 }
 
+/** Detalhe da Ata (Ata 360, aba Ações) quando o alerta é de Ata e a UASG é conhecida. */
+function ataItemUrl(item: DashboardAttentionItem & { uasg?: string }): string {
+  if (!item.numeroAta || !item.uasg) return '/atas';
+  return buildAtaPath(item.numeroAta, item.uasg, 'acoes');
+}
+
 /** Ação contextual em 1 clique, sempre apontando para um fluxo/rota já existente no sistema. */
-export function getAcaoInfo(item: DashboardAttentionItem): AcaoInfo {
+export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo {
+  if (item.arpKey && item.numeroAta && (item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA')) {
+    return { label: 'Abrir Tarefa', targetUrl: ataItemUrl(item) };
+  }
+  if (item.category === 'LEMBRETE') {
+    return { label: 'Abrir Planejamento', targetUrl: item.numeroAta ? ataItemUrl(item) : contractItemUrl(item) };
+  }
   switch (item.category) {
     case 'ATA_CRITICA':
-      return { label: 'Verificar Saldo', targetUrl: '/atas' };
+      return { label: 'Verificar Saldo', targetUrl: ataItemUrl(item) };
     case 'PAGAMENTO_CRITICO':
       return { label: 'Abrir Pagamento', targetUrl: '/pagamentos' };
     case 'REAJUSTE_RADAR':

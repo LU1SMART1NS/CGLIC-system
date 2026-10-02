@@ -1,5 +1,6 @@
 import React from 'react';
 import { FilterBar } from '../../../design-system';
+import { VIGENCIA_RULES } from '../../../config/alertRules';
 
 export interface AllocationsPortfolioFilterState {
   unit: string;
@@ -49,7 +50,7 @@ export const AllocationsPortfolioFilters: React.FC<AllocationsPortfolioFiltersPr
             options: [
               { value: 'TODAS', label: 'Todas as Vigências' },
               { value: 'VIGENTE', label: 'Atas Vigentes' },
-              { value: 'ALERTAS', label: 'Vencendo em ≤90 dias' },
+              { value: 'ALERTAS', label: `Vencendo em ≤${VIGENCIA_RULES.ataExpirandoAteDias} dias` },
               { value: 'EXPIRADA', label: 'Expiradas / Canceladas' }
             ]
           }

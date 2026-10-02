@@ -2,9 +2,8 @@
  * Testes Unitários para a Lógica e Ciclo de Vida do Acompanhamento de Pagamentos (CGLIC 3.0 - Fase 7.4-D)
  * 
  * Cobre:
- * - TASK-01: Instanciação das 5 macroetapas e 11 tarefas a partir do template canônico.
- * - TASK-02: Idempotência na criação/instanciação repetida (zero duplicações).
- * - TASK-03: Mudança de estado e registro de observação/evidência nas tarefas.
+ * - STATUS-01: Situação do ciclo deduzida dos marcos; o acompanhamento não depende de checklist de tarefas.
+ * - KEY-01: Idempotência da chave do ciclo (zero duplicações).
  * - ALERT-01: Alerta de fatura vencida sem envio / pendência.
  * - ALERT-02: Alerta de CGOFI sem resposta (> 5 dias úteis).
  * - ALERT-03: Alerta de vencimento iminente ou vencido.
@@ -22,7 +21,6 @@ import {
   calculatePaymentCyclePrazos,
   derivePaymentCycleAlerts
 } from '../../services/paymentFollowUpService';
-import { buildPaymentFollowUpTemplate } from '../../services/paymentFollowUpTemplateService';
 
 describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 7.4-D)', () => {
   const contractKey = '200331-50-2024';
@@ -30,6 +28,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
   const sampleInput: PaymentCycleInput = {
     contractKey,
     competencia: '2026-08',
+    dataRecebimento: '2026-08-10',
     dataAssinaturaAtesto: '2026-08-10',
     dataVencimentoFatura: '2026-08-25',
     documentoAtestoSei: 'Doc 1234567',
@@ -46,60 +45,27 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     taxaPagamentoPercentual: 35
   };
 
-  it('TASK-01: Instancia tarefas do template canônico com 5 macroetapas e 11 tarefas', () => {
-    const template = buildPaymentFollowUpTemplate(sampleInput);
-
-    expect(template.macrotarefas).toHaveLength(5);
-    const totalTasks = template.macrotarefas.reduce((acc, m) => acc + m.tarefas.length, 0);
-    expect(totalTasks).toBe(11);
-
-    const macroNames = template.macrotarefas.map(m => m.nome);
-    expect(macroNames).toContain('1. Recepção do Atesto');
-    expect(macroNames).toContain('2. Instrução Processual e Conformidade Fiscal');
-    expect(macroNames).toContain('3. Encaminhamento à CGOFI');
-    expect(macroNames).toContain('4. Acompanhamento e Controle de Prazos');
-    expect(macroNames).toContain('5. Confirmação e Encerramento');
-
+  it('STATUS-01: A situação vem dos marcos e o ciclo não carrega checklist de tarefas', () => {
     const cycle = buildPaymentFollowUpCycle(sampleInput, {
       baseDate: '2026-08-15',
       empenhoBalances: sampleFinancialBalances
     });
-    cycle.tasks = template;
 
-    expect(cycle.tasks.macrotarefas).toHaveLength(5);
-    expect(cycle.status).toBe('EM_INSTRUCAO');
+    expect(cycle.status).toBe('RECEBIDO');
+    expect('tasks' in cycle).toBe(false);
   });
 
-  it('TASK-02: Geração de ciclo e template é estritamente idempotente (0 duplicações)', () => {
+  it('KEY-01: Geração da chave do ciclo é estritamente idempotente (0 duplicações)', () => {
     const key1 = buildPaymentCycleKey(contractKey, '2026-08', 'Doc 1234567');
     const key2 = buildPaymentCycleKey(contractKey, '2026-08', 'Doc 1234567');
     expect(key1).toBe(key2);
-
-    const template1 = buildPaymentFollowUpTemplate(sampleInput);
-    const template2 = buildPaymentFollowUpTemplate(sampleInput);
-
-    expect(template1.macrotarefas.length).toBe(template2.macrotarefas.length);
-    expect(template1.macrotarefas[0].tarefas.length).toBe(template2.macrotarefas[0].tarefas.length);
-  });
-
-  it('TASK-03: Permite gerenciar tarefas preservando sua semântica de execução', () => {
-    const template = buildPaymentFollowUpTemplate(sampleInput);
-    const firstTask = template.macrotarefas[0].tarefas[0];
-    expect(firstTask.executionMode).toBe('INTERNA');
-
-    const sicafTask = template.macrotarefas[1].tarefas[0];
-    expect(sicafTask.executionMode).toBe('EXTERNA');
-    expect(sicafTask.sistemaDestino).toBe('SICAF');
-
-    const empenhoTask = template.macrotarefas[1].tarefas[1];
-    expect(empenhoTask.executionMode).toBe('AUTOMATICA');
-    expect(empenhoTask.sistemaDestino).toBe('SaldoARP');
   });
 
   it('ALERT-01: Emite alerta de vencimento iminente ou pendente de envio à CGOFI', () => {
     const input: PaymentCycleInput = {
       contractKey,
       competencia: '2026-08',
+      dataRecebimento: '2026-08-03',
       dataAssinaturaAtesto: '2026-08-03',
       dataVencimentoFatura: '2026-08-10',
       documentoAtestoSei: 'Doc 1234567',
@@ -112,7 +78,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     const alerts = derivePaymentCycleAlerts(
       cycleKey,
       contractKey,
-      'EM_INSTRUCAO',
+      'RECEBIDO',
       input,
       prazos,
       sampleFinancialBalances,
@@ -128,6 +94,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     const input: PaymentCycleInput = {
       contractKey,
       competencia: '2026-08',
+      dataRecebimento: '2026-08-03',
       dataAssinaturaAtesto: '2026-08-03',
       dataVencimentoFatura: '2026-08-30',
       documentoAtestoSei: 'Doc 1234567',
@@ -142,7 +109,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     const alerts = derivePaymentCycleAlerts(
       cycleKey,
       contractKey,
-      'AGUARDANDO_CGOFI',
+      'ENVIADO_CGOFI',
       input,
       prazos,
       sampleFinancialBalances,
@@ -159,6 +126,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     const input: PaymentCycleInput = {
       contractKey,
       competencia: '2026-08',
+      dataRecebimento: '2026-08-01',
       dataAssinaturaAtesto: '2026-08-01',
       dataVencimentoFatura: '2026-08-10',
       documentoAtestoSei: 'Doc 1234567',
@@ -171,7 +139,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     const alerts = derivePaymentCycleAlerts(
       cycleKey,
       contractKey,
-      'EM_INSTRUCAO',
+      'RECEBIDO',
       input,
       prazos,
       sampleFinancialBalances,
@@ -188,6 +156,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     const input1: PaymentCycleInput = {
       contractKey,
       competencia: '2026-07',
+      dataRecebimento: '2026-07-10',
       dataAssinaturaAtesto: '2026-07-10',
       dataVencimentoFatura: '2026-07-25',
       documentoAtestoSei: 'DOC-01',
@@ -197,6 +166,7 @@ describe('Acompanhamento de Pagamentos — Domínio e Operacionalização (Fase 
     const input2: PaymentCycleInput = {
       contractKey,
       competencia: '2026-08',
+      dataRecebimento: '2026-08-01',
       dataAssinaturaAtesto: '2026-08-01',
       dataVencimentoFatura: '2026-08-15',
       documentoAtestoSei: 'DOC-02',

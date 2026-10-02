@@ -64,7 +64,10 @@ export interface FlattenedReportRow {
   classificacaoFornecedor: string;
   tipoItem: string;
   valorUnitario: number;
+  /** Total da ata (todos os órgãos participantes): referência. */
   quantidadeHomologada: number;
+  /** Quantitativo SENASP (UASGs 200330 e 200331): base do saldo. */
+  quantidadeSenasp: number;
   valorTotalHomologado: number;
   maximoAdesao: number;
   statusAdesao: string;

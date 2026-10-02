@@ -22,6 +22,7 @@ import {
   differenceInDays
 } from './temporalEngineService';
 import { getEventCanonicalDate } from './contractValueEvolutionService';
+import { REAJUSTE_RULES } from '../config/alertRules';
 
 /**
  * 1. Gera chave determinística e idempotente para o alerta de radar de reajuste.
@@ -163,13 +164,13 @@ export function evaluateContractReajusteRadar(params: {
   const diasRestantes = differenceInDays(nextMilestoneDate, currentDate);
 
   // Janela ativa: de 60 dias antes até 30 dias após o marco
-  if (diasRestantes > 60 || diasRestantes < -30) {
+  if (diasRestantes > REAJUSTE_RULES.janelaAntesDias || diasRestantes < -REAJUSTE_RULES.janelaDepoisDias) {
     return null;
   }
 
   // 5. Classificação do Nível de Severidade
   let nivel: ReajusteRadarPriorityLevel;
-  if (diasRestantes > 30) {
+  if (diasRestantes > REAJUSTE_RULES.urgenteAteDias) {
     nivel = 'PROXIMA';
   } else if (diasRestantes >= 1) {
     nivel = 'URGENTE';

@@ -177,7 +177,8 @@ describe('Fase 3.1 — Serviço Agregador da Central de Prazos (centralPrazosSer
       expect(task101!.tipoItem).toBe('TAREFA_HUMANA');
       expect(task101!.responsavelNome).toBe('Maria Fiscal');
       expect(task101!.estadoTemporal).toBe('ATRASADO');
-      expect(task101!.diasRestantes).toBe(-3);
+      // Prazo de tarefa em dias úteis: domingo 20/09 -> seg 21 e ter 22 contam até qua 23/09.
+      expect(task101!.diasRestantes).toBe(-2);
 
       // Tarefa 102 (Vence hoje, herda gestor)
       const task102 = items.find(i => i.tarefaId === 'task-102');
@@ -434,7 +435,7 @@ describe('Fase 3.1 — Serviço Agregador da Central de Prazos (centralPrazosSer
   });
 
   describe('Fase 10-A.2 — Gatilho de Saldo Físico Crítico de Ata (regra canônica única)', () => {
-    it('gera o gatilho GATILHO_85PCT com id contendo "SALDO_CRITICO" quando o item de ARP tem consumo >= 85%', () => {
+    it('gera o gatilho GATILHO_85PCT com id contendo "SALDO_CRITICO" quando o item de ARP tem consumo > 80%', () => {
       const refDate = parseDateBRT('2026-09-23')!;
       const items = buildCentralPrazosItems({
         contracts: [],
@@ -453,13 +454,13 @@ describe('Fase 3.1 — Serviço Agregador da Central de Prazos (centralPrazosSer
       expect(gatilho?.estadoTemporal).toBe('VENCE_HOJE');
     });
 
-    it('NÃO gera o gatilho de saldo quando o consumo está abaixo de 85% (regra canônica classifyArpItemSaldo)', () => {
+    it('NÃO gera o gatilho de saldo quando o consumo está em 80% ou menos (regra canônica classifyArpItemSaldo)', () => {
       const refDate = parseDateBRT('2026-09-23')!;
       const items = buildCentralPrazosItems({
         contracts: [],
         arps: [],
         arpItems: [
-          { item_key: 'ATA-200331-002', numero_ata: '00050/2025', numero_item: 1, percentual_consumido: 84.99 }
+          { item_key: 'ATA-200331-002', numero_ata: '00050/2025', numero_item: 1, percentual_consumido: 80 }
         ],
         currentDate: refDate
       });

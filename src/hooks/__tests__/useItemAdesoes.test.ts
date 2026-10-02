@@ -27,59 +27,36 @@ describe('useItemAdesoes Hook / Query Options - Testes Unitários de Contrato e 
     expect(options.staleTime).toBe(300000); // 5 min
   });
 
-  it('deve chamar fetchAdesoesItem com parâmetros normalizados e filtrar registros do item correspondente', async () => {
+  it('deve chamar fetchAdesoesItem com parâmetros normalizados e devolver as adesões do item', async () => {
     const mockResultado = [
       {
         numeroAta: '00041/2025',
         unidadeGerenciadora: '200331',
-        numeroItem: '1',
-        unidade: '158123 - POLÍCIA FEDERAL - SR/DF',
-        orgaoAdesao: 'POLÍCIA FEDERAL',
-        quantidadeRegistrada: 50,
-        quantidadeEmpenhada: 20,
-        saldoEmpenho: 30,
-        dataHoraInclusao: '2026-01-01T00:00:00.000Z',
-        dataHoraAtualizacao: '2026-01-01T00:00:00.000Z'
+        unidadeNaoParticipante: '158123 - POLÍCIA FEDERAL - SR/DF',
+        dataAprovacaoAnalise: '2026-01-01T10:00:00',
+        quantidadeAprovadaAdesao: 50
       },
       {
         numeroAta: '00041/2025',
         unidadeGerenciadora: '200331',
-        numeroItem: '00001',
-        unidade: '158124 - POLÍCIA RODOVIÁRIA FEDERAL',
-        orgaoAdesao: 'POLÍCIA RODOVIÁRIA FEDERAL',
-        quantidadeRegistrada: 30,
-        quantidadeEmpenhada: 10,
-        saldoEmpenho: 20,
-        dataHoraInclusao: '2026-01-01T00:00:00.000Z',
-        dataHoraAtualizacao: '2026-01-01T00:00:00.000Z'
-      },
-      {
-        numeroAta: '00041/2025',
-        unidadeGerenciadora: '200331',
-        numeroItem: '2', // Item diferente, deve ser filtrado
-        unidade: '158125 - IBAMA',
-        orgaoAdesao: 'IBAMA',
-        quantidadeRegistrada: 100,
-        quantidadeEmpenhada: 0,
-        saldoEmpenho: 100,
-        dataHoraInclusao: '2026-01-01T00:00:00.000Z',
-        dataHoraAtualizacao: '2026-01-01T00:00:00.000Z'
+        unidadeNaoParticipante: '158124 - POLÍCIA RODOVIÁRIA FEDERAL',
+        dataAprovacaoAnalise: '2026-02-01T10:00:00',
+        quantidadeAprovadaAdesao: null
       }
     ];
 
     vi.mocked(api.fetchAdesoesItem).mockResolvedValueOnce({
       resultado: mockResultado,
-      totalRegistros: 3,
+      totalRegistros: 2,
       totalPaginas: 1,
       paginasRestantes: 0
     });
 
-    const options = getItemAdesoesQueryOptions('00041/2025', '200331', '1');
+    const options = getItemAdesoesQueryOptions(' 00041/2025 ', '200331', '1');
     const result = await options.queryFn();
 
     expect(api.fetchAdesoesItem).toHaveBeenCalledWith('00041/2025', '200331', '1');
-    expect(result.length).toBe(2);
-    expect(result.map(r => r.unidade)).toEqual([
+    expect(result.map(r => r.unidadeNaoParticipante)).toEqual([
       '158123 - POLÍCIA FEDERAL - SR/DF',
       '158124 - POLÍCIA RODOVIÁRIA FEDERAL'
     ]);

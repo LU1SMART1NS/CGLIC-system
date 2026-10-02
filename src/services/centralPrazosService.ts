@@ -26,12 +26,14 @@ import {
 import {
   parseDateBRT,
   differenceInDays,
+  differenceInBusinessDays,
   deriveTemporalStatus,
   deriveAtencaoNivel,
   calculateDeadline,
   REGRAS_OPERACIONAIS_PADRAO
 } from './temporalEngineService';
 import { classifyArpItemSaldo } from './balanceService';
+import { SALDO_RULES, TAREFA_RULES, VIGENCIA_RULES } from '../config/alertRules';
 
 /**
  * Gera chave lógica determinística e canônica de idempotência.
@@ -68,6 +70,8 @@ export interface BuildCentralPrazosOptions {
     descricao_item?: string;
     descricaoItem?: string;
     quantidade_homologada?: number;
+    quantidade_senasp?: number | null;
+    quantidade_base_senasp?: number | null;
     quantidadeHomologada?: number;
     quantidade_consumida?: number;
     quantidadeConsumida?: number;
@@ -135,7 +139,8 @@ export function buildCentralPrazosItems(
           if (!targetDate) continue;
 
           const isConcluido = task.status === 'CONCLUIDA' || task.status === 'NAO_APLICAVEL';
-          const diasRestantes = differenceInDays(targetDate, currentDate);
+          // Prazo de tarefa em dias úteis; gatilhos de vigência abaixo seguem em dias corridos.
+          const diasRestantes = differenceInBusinessDays(targetDate, currentDate);
           const estadoTemporal = deriveTemporalStatus(diasRestantes, isConcluido);
           const nivelAtencao = isConcluido ? 'NORMAL' : deriveAtencaoNivel(diasRestantes, estadoTemporal);
 
@@ -184,7 +189,7 @@ export function buildCentralPrazosItems(
                 fonteDataBase: 'SaldoARP (Plano de Trabalho)',
                 regraNome: 'Deadline Operacional de Tarefa',
                 regraTipo: 'INTERNA',
-                unidadeContagem: 'DIAS_CORRIDOS',
+                unidadeContagem: 'DIAS_UTEIS',
                 offsetDias: 0,
                 dataCalculada: task.prazo,
                 diasRestantes,
@@ -374,7 +379,7 @@ export function buildCentralPrazosItems(
 
             responsavelNome: 'Coordenação de Compras / Gestor da Ata',
             isGestorContrato: false,
-            acaoDescricao: 'Planejamento e análise de vantajosidade de prorrogação da Ata (Janela preventiva 180d)',
+            acaoDescricao: `Planejamento e análise de vantajosidade de prorrogação da Ata (Janela preventiva ${VIGENCIA_RULES.gatilhoDias.arpProrrogacao}d)`,
 
             explicabilidade: calc180.explicabilidade
           });
@@ -432,10 +437,10 @@ export function buildCentralPrazosItems(
       }
     }
 
-  // 3. Processar Itens de Ata com Saldo Físico Crítico (>= 85%)
+  // 3. Processar Itens de Ata com Saldo Físico Crítico (> 80%)
   if (arpItems && arpItems.length > 0) {
     for (const item of arpItems) {
-      const qtdHomologada = Number(item.quantidade_homologada ?? item.quantidadeHomologada ?? 0);
+      const qtdHomologada = Number(item.quantidade_base_senasp ?? item.quantidade_senasp ?? item.quantidade_homologada ?? item.quantidadeHomologada ?? 0);
       const qtdConsumida = Number(item.quantidade_consumida ?? item.quantidadeConsumida ?? 0);
       const rawPerc = item.percentual_consumido ?? item.percentualConsumido;
       const percentual = Number(
@@ -480,7 +485,7 @@ export function buildCentralPrazosItems(
             marcoEvento: 'Saldo Físico de Ata',
             dataBase: currentDate ? currentDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
             fonteDataBase: 'v_arp_item_saldo_detalhado',
-            regraNome: 'Consumo Físico em Nível Crítico (≥85%)',
+            regraNome: `Consumo Físico em Nível Crítico (>${SALDO_RULES.criticoAcimaDePct}%)`,
             regraTipo: 'OPERACIONAL',
             dataAlvo: '-',
             diasRestantes: 0,
@@ -494,7 +499,7 @@ export function buildCentralPrazosItems(
             explicabilidade: {
               dataBase: currentDate ? currentDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
               fonteDataBase: 'v_arp_item_saldo_detalhado',
-              regraNome: 'Consumo Físico em Nível Crítico (≥85%)',
+              regraNome: `Consumo Físico em Nível Crítico (>${SALDO_RULES.criticoAcimaDePct}%)`,
               regraTipo: 'OPERACIONAL',
               unidadeContagem: 'DIAS_CORRIDOS',
               offsetDias: 0,
@@ -502,7 +507,7 @@ export function buildCentralPrazosItems(
               diasRestantes: 0,
               statusTemporal: 'VENCE_HOJE',
               nivelAtencao: 'CRITICO',
-              descricaoRegra: `Item com consumo de ${roundedPercentual}% (≥85% do saldo homologado). Alerta operacional preventivo.`
+              descricaoRegra: `Item com consumo de ${roundedPercentual}% (>${SALDO_RULES.criticoAcimaDePct}% do quantitativo SENASP). Alerta operacional preventivo.`
             }
           });
         }
@@ -542,9 +547,9 @@ export function calculateCentralPrazosKPIs(items: CentralPrazosItem[]): CentralP
       atrasadas++;
     } else if (item.estadoTemporal === 'VENCE_HOJE') {
       venceHoje++;
-    } else if (item.diasRestantes > 0 && item.diasRestantes <= 7) {
+    } else if (item.diasRestantes > 0 && item.diasRestantes <= TAREFA_RULES.urgenteAteDias) {
       proximos7Dias++;
-    } else if (item.diasRestantes > 7 && item.diasRestantes <= 30) {
+    } else if (item.diasRestantes > TAREFA_RULES.urgenteAteDias && item.diasRestantes <= TAREFA_RULES.atencaoAteDias) {
       proximos30Dias++;
     } else {
       futuras++;
@@ -575,14 +580,14 @@ export function filterCentralPrazosItems(
     if (filters.tab === 'HOJE' && item.estadoTemporal !== 'VENCE_HOJE') return false;
     if (filters.tab === 'SETE_DIAS') {
       if (item.estadoTemporal === 'CONCLUIDO' || item.estadoTemporal === 'ATRASADO') return false;
-      if (item.diasRestantes < 0 || item.diasRestantes > 7) return false;
+      if (item.diasRestantes < 0 || item.diasRestantes > TAREFA_RULES.urgenteAteDias) return false;
     }
     if (filters.tab === 'TRINTA_DIAS') {
       if (item.estadoTemporal === 'CONCLUIDO' || item.estadoTemporal === 'ATRASADO') return false;
-      if (item.diasRestantes < 0 || item.diasRestantes > 30) return false;
+      if (item.diasRestantes < 0 || item.diasRestantes > TAREFA_RULES.atencaoAteDias) return false;
     }
     if (filters.tab === 'FUTURAS') {
-      if (item.estadoTemporal === 'CONCLUIDO' || item.diasRestantes <= 30) return false;
+      if (item.estadoTemporal === 'CONCLUIDO' || item.diasRestantes <= TAREFA_RULES.atencaoAteDias) return false;
     }
     if (filters.tab === 'MINHAS') {
       if (!filters.usuarioAtual || !item.responsavelNome) return false;

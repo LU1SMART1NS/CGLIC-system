@@ -2,8 +2,10 @@
  * Faixas de prazo únicas para as carteiras de Contratos e de Atas — as mesmas
  * usadas na Visão Geral: crítico (até 30 dias) e atenção (31 a 90 dias).
  */
-export const PRAZO_CRITICO_DIAS = 30;
-export const PRAZO_ATENCAO_DIAS = 90;
+import { VIGENCIA_RULES } from '../../config/alertRules';
+/** Faixas lidas no momento do uso, para valerem as regras ajustadas na Administração. */
+export const prazoCriticoDias = () => VIGENCIA_RULES.faixaCriticoAteDias;
+export const prazoAtencaoDias = () => VIGENCIA_RULES.faixaAtencaoAteDias;
 
 export type PrazoFaixa = 'EXPIRADO' | 'CRITICO' | 'ATENCAO' | 'REGULAR' | 'SEM_DATA';
 
@@ -13,8 +15,8 @@ export type CarteiraStatusFilter = 'VIGENTES' | 'CRITICO' | 'ATENCAO' | 'HISTORI
 export function classifyPrazo(diasRestantes: number | null, expirado = false): PrazoFaixa {
   if (expirado || (diasRestantes !== null && diasRestantes < 0)) return 'EXPIRADO';
   if (diasRestantes === null) return 'SEM_DATA';
-  if (diasRestantes <= PRAZO_CRITICO_DIAS) return 'CRITICO';
-  if (diasRestantes <= PRAZO_ATENCAO_DIAS) return 'ATENCAO';
+  if (diasRestantes <= prazoCriticoDias()) return 'CRITICO';
+  if (diasRestantes <= prazoAtencaoDias()) return 'ATENCAO';
   return 'REGULAR';
 }
 

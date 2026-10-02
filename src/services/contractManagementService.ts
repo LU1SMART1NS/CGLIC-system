@@ -404,3 +404,29 @@ export async function fetchDismissedReminders(entityType: 'CONTRATO' | 'ATA', en
     return [];
   }
 }
+
+/** Lembretes dispensados de todos os contratos e Atas, indexados por tipo e chave da entidade. */
+export interface AllDismissedReminders {
+  CONTRATO: Record<string, string[]>;
+  ATA: Record<string, string[]>;
+}
+
+export async function fetchAllDismissedReminders(): Promise<AllDismissedReminders> {
+  const result: AllDismissedReminders = { CONTRATO: {}, ATA: {} };
+  if (!isSupabaseConfigured || !supabase) return result;
+
+  try {
+    const { data, error } = await supabase
+      .from('reminder_dismissals')
+      .select('entity_type, entity_key, item_id');
+    if (error) throw error;
+    for (const row of (data || []) as Array<{ entity_type: 'CONTRATO' | 'ATA'; entity_key: string; item_id: string }>) {
+      const bucket = result[row.entity_type];
+      if (!bucket) continue;
+      (bucket[row.entity_key] ||= []).push(row.item_id);
+    }
+  } catch (err) {
+    console.warn('[contractManagementService] Falha ao consultar lembretes dispensados:', err);
+  }
+  return result;
+}

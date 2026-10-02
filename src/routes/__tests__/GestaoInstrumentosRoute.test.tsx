@@ -15,6 +15,10 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
+vi.mock('../../hooks/useRefreshItemSaldos', () => ({
+  useRefreshItemSaldos: () => ({ refresh: vi.fn(), isRefreshing: false })
+}));
+
 const mockReadModel: ManagementDashboardReadModel = {
   uasg: '200331',
   dataCalculo: '2026-09-24T12:00:00Z',
@@ -269,7 +273,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
   it('3. deve renderizar os tabs de categoria com contagens reais e destacar o ativo', () => {
     const html = renderToStaticMarkup(
       <GestaoInstrumentosCategoryTabs
-        counts={{ TODAS: 5, SALDOS: 1, REAJUSTES: 1, PAGAMENTOS: 1, TAREFAS: 1 }}
+        counts={{ TODAS: 5, SALDOS: 1, REAJUSTES: 1, PAGAMENTOS: 1, TAREFAS: 1, LEMBRETES: 0 }}
         active="SALDOS"
         onSelect={vi.fn()}
       />

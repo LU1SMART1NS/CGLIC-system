@@ -1,4 +1,6 @@
 import ExcelJS from 'exceljs';
+import { fetchArpItemSaldosFromDb } from './dashboardService';
+import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import type { 
   ReportExportConfig, 
   ReportDataPayload, 
@@ -7,6 +9,8 @@ import type {
   FlattenedReportRow, 
   ReportPreset 
 } from '../types/reportTypes';
+import { SALDO_RULES, VIGENCIA_RULES } from '../config/alertRules';
+import { classifyArpItemSaldo } from './balanceService';
 
 // ============================================================================
 // METADADOS DE GRUPOS DE COLUNAS
@@ -238,14 +242,25 @@ export const ALL_REPORT_COLUMNS: ReportColumnDef[] = [
   },
   {
     id: 'quantidadeHomologada',
-    label: 'Qtd. Registrada',
+    label: 'Qtd. Registrada (Ata)',
     group: 'item',
     defaultInPresets: ['BALANCES', 'ALLOCATIONS', 'PURCHASES'],
-    description: 'Quantidade total homologada na Ata',
+    description: 'Quantidade total homologada na Ata (todos os órgãos participantes)',
     type: 'number',
-    width: 18,
+    width: 20,
     align: 'right',
     getValue: (r) => r.quantidadeHomologada
+  },
+  {
+    id: 'quantidadeSenasp',
+    label: 'Qtd. Registrada (SENASP)',
+    group: 'item',
+    defaultInPresets: ['BALANCES', 'ALLOCATIONS', 'PURCHASES'],
+    description: 'Quantidade registrada para as UASGs 200330 e 200331: base do saldo e do percentual executado',
+    type: 'number',
+    width: 22,
+    align: 'right',
+    getValue: (r) => r.quantidadeSenasp
   },
   {
     id: 'valorTotalHomologado',
@@ -331,7 +346,7 @@ export const ALL_REPORT_COLUMNS: ReportColumnDef[] = [
     label: 'Status do Saldo',
     group: 'balance',
     defaultInPresets: ['BALANCES'],
-    description: 'Disponível, Atenção (>80% consumido) ou Esgotado',
+    description: `Disponível, Atenção (>${SALDO_RULES.atencaoAcimaDePct}% consumido), Crítico (>${SALDO_RULES.criticoAcimaDePct}%) ou Esgotado`,
     type: 'string',
     width: 18,
     align: 'center',
@@ -600,6 +615,16 @@ export async function buildFlattenedReportData(
     }
   } catch {}
 
+  // Quantitativo SENASP por item, lido da view de saldo (uma consulta por UASG).
+  const saldosPorItem = new Map<string, any>();
+  if (granularity !== 'BY_ATA') {
+    const uasgs = [...new Set(atasToProcess.map((a) => a.codigoUnidadeGerenciadora).filter(Boolean))];
+    const porUasg = await Promise.all(uasgs.map((u) => fetchArpItemSaldosFromDb(u).catch(() => [] as any[])));
+    for (const s of porUasg.flat()) {
+      saldosPorItem.set(`${s.numero_ata}|${s.codigo_uasg}|${Number(s.numero_item)}`, s);
+    }
+  }
+
   for (const arp of atasToProcess) {
     const key = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
     const items = itemsByAta[key] || [];
@@ -607,8 +632,8 @@ export async function buildFlattenedReportData(
     let statusVig = 'Vigente';
     if (diasRestantes !== null) {
       if (diasRestantes < 0) statusVig = 'Expirada';
-      else if (diasRestantes <= 30) statusVig = 'Crítica (≤30 dias)';
-      else if (diasRestantes <= 60) statusVig = 'Atenção (≤60 dias)';
+      else if (diasRestantes <= VIGENCIA_RULES.faixaCriticoAteDias) statusVig = `Crítica (≤${VIGENCIA_RULES.faixaCriticoAteDias} dias)`;
+      else if (diasRestantes <= VIGENCIA_RULES.faixaIntermediariaDias) statusVig = `Atenção (≤${VIGENCIA_RULES.faixaIntermediariaDias} dias)`;
     }
 
     const baseAtaInfo = {
@@ -642,6 +667,7 @@ export async function buildFlattenedReportData(
         tipoItem: '-',
         valorUnitario: 0,
         quantidadeHomologada: 0,
+        quantidadeSenasp: 0,
         valorTotalHomologado: Number(arp.valorTotal) || 0,
         maximoAdesao: 0,
         statusAdesao: '-',
@@ -667,18 +693,25 @@ export async function buildFlattenedReportData(
 
       const totalEmpenhadoQtd = storedEmpenhos.reduce((acc, e) => acc + (Number(e.quantidade) || 0), 0);
       const qtdHomologada = Number(item.quantidadeHomologadaItem) || 0;
+      // Base do saldo: quantitativo SENASP gravado; sem ele (item ainda não sincronizado), o homologado da ata.
+      const saldoView = saldosPorItem.get(`${arp.numeroAtaRegistroPreco}|${arp.codigoUnidadeGerenciadora}|${Number(item.numeroItem)}`);
+      const qtdSenasp = saldoView ? quantidadeBaseSenasp(saldoView) : qtdHomologada;
       const valorUnit = Number(item.valorUnitario) || 0;
       const valorTotalItem = Number(item.valorTotal) || (qtdHomologada * valorUnit);
 
-      // Invariante Contábil Oficial: Saldo = Quantidade Homologada - Soma(Empenhos)
-      const saldoQtd = qtdHomologada - totalEmpenhadoQtd;
+      // Invariante Contábil Oficial: Saldo = Quantitativo SENASP - Soma(Empenhos)
+      const saldoQtd = qtdSenasp - totalEmpenhadoQtd;
       const valorEmpenhado = totalEmpenhadoQtd * valorUnit;
       const saldoValor = saldoQtd * valorUnit;
-      const percentualExec = qtdHomologada > 0 ? (totalEmpenhadoQtd / qtdHomologada) * 100 : 0;
+      const percentualExec = qtdSenasp > 0 ? (totalEmpenhadoQtd / qtdSenasp) * 100 : 0;
 
       let statusSaldo = 'Disponível';
       if (saldoQtd <= 0) statusSaldo = 'Esgotado';
-      else if (percentualExec >= 80) statusSaldo = 'Alerta (>80%)';
+      else {
+        const classe = classifyArpItemSaldo(percentualExec);
+        if (classe.isCritico) statusSaldo = `Crítico (>${SALDO_RULES.criticoAcimaDePct}%)`;
+        else if (classe.isProximoLimite) statusSaldo = `Atenção (>${SALDO_RULES.atencaoAcimaDePct}%)`;
+      }
 
       const baseItemInfo = {
         ...baseAtaInfo,
@@ -691,6 +724,7 @@ export async function buildFlattenedReportData(
         tipoItem: item.tipoItem || 'Material',
         valorUnitario: valorUnit,
         quantidadeHomologada: qtdHomologada,
+        quantidadeSenasp: qtdSenasp,
         valorTotalHomologado: valorTotalItem,
         maximoAdesao: Number(item.maximoAdesao) || 0,
         statusAdesao: (Number(item.maximoAdesao) || 0) > 0 ? 'Aceita Adesão' : 'Não Informada',

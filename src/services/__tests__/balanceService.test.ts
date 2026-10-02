@@ -841,12 +841,13 @@ describe('balanceService - Suíte de 20 Testes Obrigatórios e Invariantes Cont�
 });
 
 describe('classifyArpItemSaldo — Regra Canônica de Saldo Crítico (Fase 10-A.2)', () => {
-  it('classifica como crítico (>=85%) com severidade URGENTE entre 85% e 99.99%', async () => {
+  it('classifica como crítico (>80%) com severidade URGENTE até 99.99%', async () => {
     const { classifyArpItemSaldo } = await import('../balanceService');
-    const result = classifyArpItemSaldo(85);
+    const result = classifyArpItemSaldo(80.01);
     expect(result.isCritico).toBe(true);
     expect(result.isProximoLimite).toBe(false);
     expect(result.severity).toBe('URGENTE');
+    expect(classifyArpItemSaldo(80).isCritico).toBe(false);
   });
 
   it('classifica como CRITICA quando o consumo é >= 100%', async () => {
@@ -856,20 +857,20 @@ describe('classifyArpItemSaldo — Regra Canônica de Saldo Crítico (Fase 10-A.
     expect(result.severity).toBe('CRITICA');
   });
 
-  it('classifica como próximo do limite (70% a <85%) com severidade ATENCAO', async () => {
+  it('classifica como em atenção (>50% até 80%) com severidade ATENCAO', async () => {
     const { classifyArpItemSaldo } = await import('../balanceService');
-    const result = classifyArpItemSaldo(70);
+    const result = classifyArpItemSaldo(50.01);
     expect(result.isCritico).toBe(false);
     expect(result.isProximoLimite).toBe(true);
     expect(result.severity).toBe('ATENCAO');
 
-    const result2 = classifyArpItemSaldo(84.99);
+    const result2 = classifyArpItemSaldo(80);
     expect(result2.isProximoLimite).toBe(true);
   });
 
-  it('classifica como regular (<70%) com severidade INFO', async () => {
+  it('classifica como regular (até 50%) com severidade INFO', async () => {
     const { classifyArpItemSaldo } = await import('../balanceService');
-    const result = classifyArpItemSaldo(69.99);
+    const result = classifyArpItemSaldo(50);
     expect(result.isCritico).toBe(false);
     expect(result.isProximoLimite).toBe(false);
     expect(result.severity).toBe('INFO');
@@ -877,9 +878,10 @@ describe('classifyArpItemSaldo — Regra Canônica de Saldo Crítico (Fase 10-A.
 
   it('arredonda o percentual para 2 casas decimais de forma consistente', async () => {
     const { classifyArpItemSaldo } = await import('../balanceService');
-    const result = classifyArpItemSaldo(84.999);
-    expect(result.percentualConsumido).toBe(85);
+    const result = classifyArpItemSaldo(80.006);
+    expect(result.percentualConsumido).toBe(80.01);
     expect(result.isCritico).toBe(true);
+    expect(classifyArpItemSaldo(80.004).isCritico).toBe(false);
   });
 });
 

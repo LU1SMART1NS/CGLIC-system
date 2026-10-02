@@ -52,7 +52,7 @@ const mockContracts: ContractDashboardRecord[] = [
     dataVigenciaFim: '2026-10-15', // a vencer em ~21 dias a partir de 24/09/2026
     valorInicial: 800000,
     valorGlobal: 950000,
-    statusVigencia: 'A Vencer (60d)',
+    statusVigencia: 'A Vencer',
     fonteDados: 'Compras.gov.br'
   },
   {

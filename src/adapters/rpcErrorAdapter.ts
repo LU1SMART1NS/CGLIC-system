@@ -271,10 +271,38 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
     };
   }
 
+  if (message.includes('PRAZO_JUSTIFICATIVA_REQUIRED')) {
+    return {
+      code: 'PRAZO_JUSTIFICATIVA_REQUIRED',
+      message: 'Prazo além do padrão exige justificativa.',
+      sqlState: '22023',
+      details: error
+    };
+  }
+
+  if (message.includes('INVALID_TRANSITION')) {
+    // O servidor já explica a situação atual do ciclo; mostra a mensagem dele.
+    return {
+      code: 'INVALID_TRANSITION',
+      message: message.replace(/^.*INVALID_TRANSITION:\s*/, '').trim() || 'Esta etapa não pode ser registrada na situação atual do ciclo.',
+      sqlState: '22023',
+      details: error
+    };
+  }
+
+  if (message.includes('DOCUMENT_ALREADY_EXISTS')) {
+    return {
+      code: 'DOCUMENT_ALREADY_EXISTS',
+      message: 'Este número de SEI já está registrado neste ciclo.',
+      sqlState: '23505',
+      details: error
+    };
+  }
+
   if (message.includes('PAYMENT_CYCLE_ALREADY_EXISTS')) {
     return {
       code: 'PAYMENT_CYCLE_ALREADY_EXISTS',
-      message: 'Já existe um ciclo de pagamento para este contrato, competência e documento de atesto.',
+      message: 'Já existe um ciclo de pagamento para este contrato, competência e Termo de Atesto.',
       sqlState: '23505',
       details: error
     };
@@ -301,7 +329,8 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
   if (message.includes('INVALID_PAYLOAD') || sqlState === '22023') {
     return {
       code: 'INVALID_PAYLOAD',
-      message: 'Dados inválidos fornecidos para a operação.',
+      // O servidor já explica o que está inválido; mostra a mensagem dele quando houver.
+      message: message.match(/INVALID_PAYLOAD:\s*(.+)/)?.[1]?.trim() || 'Dados inválidos fornecidos para a operação.',
       sqlState: '22023',
       details: error
     };

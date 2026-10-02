@@ -1,4 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const { fetchSaldos } = vi.hoisted(() => ({ fetchSaldos: vi.fn(async (): Promise<any[]> => []) }));
+vi.mock('../dashboardService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../dashboardService')>()),
+  fetchArpItemSaldosFromDb: fetchSaldos
+}));
 
 // Polyfill de localStorage para ambiente Node no vitest
 const createLocalStorageMock = () => {
@@ -212,6 +218,21 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
     expect(rowItem1?.valorEmpenhadoTotal).toBe(30 * 4000);
     expect(rowItem1?.saldoValor).toBe(70 * 4000);
     expect(rowItem1?.percentualExecutado).toBe(30);
+  });
+
+  it('5b. Saldo e percentual usam o quantitativo SENASP; o total da ata fica como referência', async () => {
+    fetchSaldos.mockResolvedValueOnce([
+      { numero_ata: '00001/2026', codigo_uasg: '200331', numero_item: 1, quantidade_homologada: 100, quantidade_senasp: 40, quantidade_base_senasp: 40 }
+    ]);
+    const payload: ReportDataPayload = { atas: [mockAta], itemsByAta: { '00001/2026-200331': mockItems } };
+
+    const rows = await buildFlattenedReportData(payload, 'BY_ITEM');
+    const row = rows.find(r => r.numeroItem === '1');
+
+    expect(row?.quantidadeHomologada).toBe(100);
+    expect(row?.quantidadeSenasp).toBe(40);
+    expect(row?.saldoQuantidade).toBe(40 - (row?.quantidadeEmpenhada ?? 0));
+    expect(COLUMNS_MAP.get('quantidadeSenasp')?.label).toBe('Qtd. Registrada (SENASP)');
   });
 
   it('6. Deve gerar planilha Excel .xlsx válida via ExcelJS', async () => {

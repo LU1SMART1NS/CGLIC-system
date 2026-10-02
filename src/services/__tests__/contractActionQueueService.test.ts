@@ -96,8 +96,9 @@ describe('buildContractActionQueue', () => {
     expect(pgto).toMatchObject({ severity: 'CRITICA' });
   });
 
-  it('classifica tarefa entre 8 e 30 dias como ATENÇÃO e deixa de fora as de prazo distante', () => {
-    expect(queue.items.find((i) => i.taskId === 'em15dias')).toMatchObject({ severity: 'ATENCAO', badgeLabel: '15 dias' });
+  it('classifica tarefa entre 8 e 30 dias úteis como ATENÇÃO e deixa de fora as de prazo distante', () => {
+    // 15 dias corridos = 8 a 11 dias úteis, conforme o dia da semana e os feriados do período.
+    expect(queue.items.find((i) => i.taskId === 'em15dias')).toMatchObject({ severity: 'ATENCAO', badgeLabel: expect.stringMatching(/^\d+ dias úteis$/) });
     expect(queue.items.find((i) => i.taskId === 'em60dias')).toBeUndefined();
   });
 

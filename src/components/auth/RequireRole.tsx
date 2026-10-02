@@ -14,8 +14,8 @@ export interface RequireRoleProps {
 
 /**
  * Área segura para onde redirecionar um usuário autenticado mas não
- * autorizado a ver a rota atual. gestor_saldos não tem acesso a
- * /instrumentos (fora do seu domínio), por isso ganha um destino próprio.
+ * autorizado a ver a rota atual. gestor_saldos não tem acesso a Contratos,
+ * Financeiro nem Administração (fora do seu domínio), por isso ganha um destino próprio.
  */
 function getSafeFallbackRoute(role: AppRole | null): string {
   if (role === 'gestor_saldos') return '/atas/saldos-unidade';

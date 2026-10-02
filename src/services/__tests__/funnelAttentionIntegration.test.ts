@@ -17,10 +17,10 @@ describe('FASE 9-D1 — Integração do Funil Único de Atenção (CGLIC)', () =
     codigoUnidadeGerenciadora: '200331',
     objeto: 'Aquisição de equipamentos de TI',
     dataVigenciaInicial: '2025-01-01',
-    dataVigenciaFinal: '2026-01-01'
+    dataVigenciaFinal: '2027-01-01'
   } as unknown as ArpRecord;
 
-  it('1. item abaixo de 70% de consumo não deve gerar alerta no funil de atenção crítica', () => {
+  it('1. item até 50% de consumo não deve gerar alerta no funil de atenção crítica', () => {
     const items = [
       {
         item_key: '00049/2025-200331-1',
@@ -29,9 +29,9 @@ describe('FASE 9-D1 — Integração do Funil Único de Atenção (CGLIC)', () =
         numero_item: 1,
         descricao_item: 'Servidor Rack',
         quantidade_homologada: 100,
-        quantidade_consumida: 60, // 60%
-        saldo_disponivel: 40,
-        percentual_consumido: 60
+        quantidade_consumida: 40, // 40%
+        saldo_disponivel: 60,
+        percentual_consumido: 40
       }
     ];
 
@@ -344,6 +344,6 @@ describe('FASE 9-D1 — Integração do Funil Único de Atenção (CGLIC)', () =
     expect(arpCriticalItem?.nivelAtencao).toBe('CRITICO');
     expect(arpCriticalItem?.identificadorFormatado).toBe('Ata 00049/2025 — Item 1');
     expect(arpCriticalItem?.fornecedorNome).toBe('Tech Solutions LTDA');
-    expect(arpCriticalItem?.explicabilidade.descricaoRegra).toContain('≥85% do saldo homologado');
+    expect(arpCriticalItem?.explicabilidade.descricaoRegra).toContain('>80% do quantitativo SENASP');
   });
 });

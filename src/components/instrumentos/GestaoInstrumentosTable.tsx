@@ -168,7 +168,14 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                     </div>
                   </td>
                   <td style={{ ...td, maxWidth: '220px' }}>
-                    {fornecedor ? (
+                    {item.objetoItem ? (
+                      <>
+                        <div title={item.objetoItem} style={{ fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.objetoItem}</div>
+                        {item.fornecedorNome && (
+                          <div title={item.fornecedorNome} style={{ fontSize: '0.72rem', color: '#64748b' }}>{item.fornecedorNome}</div>
+                        )}
+                      </>
+                    ) : fornecedor ? (
                       <span title={fornecedor}>{fornecedor}</span>
                     ) : (
                       <span style={{ color: '#94a3b8' }}>—</span>

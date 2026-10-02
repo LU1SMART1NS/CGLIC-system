@@ -36,7 +36,7 @@ const mockContracts: ContractDashboardRecord[] = [
     fornecedorNome: 'SERVICOS GERAIS S/A',
     fornecedorCnpjCpf: '98.765.432/0001-10',
     valorGlobal: 450000,
-    statusVigencia: 'A Vencer (60d)',
+    statusVigencia: 'A Vencer',
     fonteDados: 'Compras.gov.br'
   }
 ];

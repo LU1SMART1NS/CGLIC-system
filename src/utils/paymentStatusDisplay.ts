@@ -12,16 +12,12 @@ export interface PaymentStatusDisplay {
 
 /** Fonte única de rótulo e cor da situação do ciclo de pagamento (tela do contrato e /pagamentos). */
 const MAP: Record<PaymentWorkflowStatus, { label: string; variant: StatusBadgeVariant }> = {
-  RECEBIDO: { label: 'Atesto Recebido', variant: 'neutral' },
-  ATRIBUIDO: { label: 'Atribuído para Instrução', variant: 'info' },
-  EM_INSTRUCAO: { label: 'Em Instrução', variant: 'info' },
-  PENDENTE_DOCUMENTACAO: { label: 'Pendência Documental', variant: 'warning' },
-  DESPACHO_ELABORADO: { label: 'Despacho Elaborado', variant: 'purple' },
-  ENVIADO_CGOFI: { label: 'Enviado à CGOFI', variant: 'info' },
-  AGUARDANDO_CGOFI: { label: 'Aguardando CGOFI', variant: 'warning' },
-  DEVOLVIDO_FISCAL: { label: 'Devolvido pela CGOFI', variant: 'danger' },
-  PAGAMENTO_CONFIRMADO: { label: 'Pagamento Confirmado (OB)', variant: 'success' },
-  CONCLUIDO: { label: 'Ciclo Concluído', variant: 'success' },
+  RECEBIDO: { label: 'Em conferência', variant: 'info' },
+  COM_PENDENCIA: { label: 'Com pendência', variant: 'warning' },
+  CONFERIDO: { label: 'Conferido', variant: 'purple' },
+  ENVIADO_CGOFI: { label: 'Na CGOFI', variant: 'info' },
+  DEVOLVIDO: { label: 'Devolvido pela CGOFI', variant: 'danger' },
+  PAGO: { label: 'Pago (OB emitida)', variant: 'success' },
   CANCELADO: { label: 'Cancelado', variant: 'neutral' }
 };
 

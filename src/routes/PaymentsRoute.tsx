@@ -22,7 +22,7 @@ export const PaymentsRoute: React.FC = () => {
   const isLoading = isLoadingDashboard || isLoadingManagers;
 
   const handleNavigateContract = (contractKey: string) => {
-    navigate(`/contratos/${encodeURIComponent(contractKey)}`);
+    navigate(`/contratos/${encodeURIComponent(contractKey)}?aba=pagamentos`);
   };
 
   return (
