@@ -422,3 +422,19 @@ describe('RPC Persistence Adapters & Error Mapping (Fase 3 & Fase 4.3C.3)', () =
   });
 });
 
+describe('mapPostgresErrorToAppError: departamento recusado pelo catálogo', () => {
+  it('nomeia o departamento e orienta o cadastro quando o banco informa qual foi recusado', () => {
+    const err = mapPostgresErrorToAppError({
+      code: '23503',
+      message: 'INVALID_DEPARTMENT: Departamento "DSUSP" não existe ou está inativo no catálogo oficial.'
+    });
+    expect(err.code).toBe('INVALID_DEPARTMENT');
+    expect(err.message).toContain('"DSUSP"');
+    expect(err.message).toContain('Unidades Internas');
+  });
+
+  it('mantém a mensagem genérica quando não há nome no texto do erro', () => {
+    const err = mapPostgresErrorToAppError({ code: '23503', message: 'INVALID_DEPARTMENT' });
+    expect(err.message).toBe('Departamento inválido ou inativo no catálogo oficial.');
+  });
+});

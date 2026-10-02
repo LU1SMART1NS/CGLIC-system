@@ -52,9 +52,12 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
   }
 
   if (message.includes('INVALID_DEPARTMENT') || (sqlState === '23503' && message.includes('department'))) {
+    const nome = /Departamento "([^"]+)"/.exec(message)?.[1];
     return {
       code: 'INVALID_DEPARTMENT',
-      message: 'Departamento inválido ou inativo no catálogo oficial.',
+      message: nome
+        ? `O departamento "${nome}" não existe ou está inativo no catálogo oficial. Cadastre-o em Unidades Internas e tente de novo.`
+        : 'Departamento inválido ou inativo no catálogo oficial.',
       sqlState: '23503',
       details: error
     };
