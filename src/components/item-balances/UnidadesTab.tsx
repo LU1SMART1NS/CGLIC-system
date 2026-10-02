@@ -1,121 +1,111 @@
 import React from 'react';
-import { HelpCircle } from 'lucide-react';
-import { formatNumber, getProgressColorClass, isGerenciadoraUasg, isAllowedEmpenhoUasg } from './itemBalanceUtils';
-import { calculateTotalEmpenhado } from '../../services/balanceService';
-import type { UnidadeItemRecord, Empenho } from '../../types';
+import { Users } from 'lucide-react';
+import { DataTable, EmptyState, ErrorState, ProgressBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
+import { formatNumber } from './itemBalanceUtils';
+import { summarizeParticipantes, type ParticipanteRow } from '../../utils/participantesSummary';
+import type { UnidadeItemRecord } from '../../types';
 
 export interface UnidadesTabProps {
   loading: boolean;
   error: string | null;
   sortedUnidades: UnidadeItemRecord[];
-  allEmpenhos: Empenho[];
+  /** UASG gerenciadora da ata. */
+  ugUasg: string;
+  /** Contratado nos contratos vinculados ao item (consumo do órgão gerenciador). */
+  contratadoUG: number;
 }
 
-export const UnidadesTab: React.FC<UnidadesTabProps> = ({
-  loading,
-  error,
-  sortedUnidades,
-  allEmpenhos
-}) => {
-  if (loading) {
-    return (
-      <div className="spinner-container">
-        <div className="spinner spinner-glow"></div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Buscando saldos individuais por unidade...</p>
-      </div>
-    );
-  }
+const FONTE_LABEL = { CONTRATOS: 'contratos vinculados', COMPRASGOV: 'Compras.gov' } as const;
+
+export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sortedUnidades, ugUasg, contratadoUG }) => {
+  const summary = summarizeParticipantes(sortedUnidades, { ugUasg, contratadoUG });
+
+  const columns: Column<ParticipanteRow>[] = [
+    {
+      key: 'orgao',
+      header: 'Órgão',
+      render: (r) => (
+        <>
+          <div style={{ fontWeight: 700 }}>{r.nome}</div>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.15rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>UASG {r.codigo}</span>
+            <StatusBadge label={r.gerenciadora ? 'Gerenciadora' : 'Participante'} variant={r.gerenciadora ? 'info' : 'neutral'} size="sm" dot={false} />
+          </div>
+        </>
+      )
+    },
+    {
+      key: 'registrado',
+      header: 'Registrado',
+      align: 'right',
+      render: (r) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.registrado)}</span>
+    },
+    {
+      key: 'consumido',
+      header: 'Consumido',
+      align: 'right',
+      render: (r) => (
+        <>
+          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.consumido)}</span>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{FONTE_LABEL[r.fonte]}</div>
+        </>
+      )
+    },
+    {
+      key: 'saldo',
+      header: 'Saldo',
+      align: 'right',
+      render: (r) => (
+        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: r.saldo < 0 ? 'var(--danger)' : 'var(--success)' }}>
+          {formatNumber(r.saldo)}
+        </span>
+      )
+    },
+    {
+      key: 'consumo',
+      header: 'Consumo',
+      width: '180px',
+      render: (r) => <ProgressBar value={r.consumido} max={r.registrado || 1} height="6px" testId={`consumo-${r.codigo}`} />
+    }
+  ];
 
   if (error) {
     return (
-      <div className="empty-state">
-        <HelpCircle size={40} className="empty-state-icon" />
-        <p style={{ fontSize: '0.95rem' }}>{error}</p>
+      <div>
+        <ErrorState title="Não foi possível carregar os órgãos participantes" message={error} />
       </div>
     );
   }
 
   return (
-    <div className="table-container" style={{ marginTop: 0 }}>
-      <table className="custom-table">
-        <thead>
-          <tr>
-            <th>Órgão Participante / UASG</th>
-            <th>Tipo</th>
-            <th>Original Registrado</th>
-            <th>Qtd Empenhada</th>
-            <th style={{ width: '220px' }}>Saldo p/ Empenho</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedUnidades.map((uni, idx) => {
-            const cleanUasg = String(uni.codigoUnidade || '').replace(/\D/g, '');
-            const isUG = uni.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(cleanUasg);
-            const hasMultipleUgRows = sortedUnidades.filter(u => isGerenciadoraUasg(u.codigoUnidade)).length > 1;
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="unidades-tab">
+      <SummaryBar
+        testId="unidades-summary"
+        loading={loading}
+        loadingLabel="Buscando os órgãos participantes no Compras.gov..."
+        items={[
+          {
+            label: 'Consumido',
+            value: `${formatNumber(summary.consumido)} de ${formatNumber(summary.registrado)} (${formatNumber(summary.registrado > 0 ? (summary.consumido / summary.registrado) * 100 : 0)}%)`
+          },
+          { label: 'Saldo', value: formatNumber(summary.saldo), tone: summary.saldo < 0 ? 'danger' : 'default' }
+        ]}
+        progress={{ value: summary.consumido, max: summary.registrado || 1 }}
+      />
 
-            const empsForUnit = allEmpenhos.filter(e => {
-              const eUasg = String(e.uasg || '').replace(/\D/g, '');
-              if (isUG) {
-                if (hasMultipleUgRows) {
-                  return eUasg === cleanUasg;
-                }
-                return isAllowedEmpenhoUasg(eUasg);
-              }
-              return eUasg === cleanUasg;
-            });
-
-            const empenhadoUnitQty = calculateTotalEmpenhado(empsForUnit);
-            const effectiveSaldo = isUG 
-              ? (uni.quantidadeRegistrada - empenhadoUnitQty)
-              : (uni.saldoRemanejamentoEmpenho !== undefined && uni.saldoRemanejamentoEmpenho !== null 
-                  ? uni.saldoRemanejamentoEmpenho 
-                  : (uni.quantidadeRegistrada - empenhadoUnitQty));
-
-            const empPerc = uni.quantidadeRegistrada > 0 ? (effectiveSaldo / uni.quantidadeRegistrada) * 100 : 0;
-            const clampedPerc = Math.max(0, Math.min(100, empPerc));
-
-            return (
-              <tr key={`${uni.codigoUnidade}-${idx}`}>
-                <td style={{ fontSize: '0.88rem' }}>
-                  <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {uni.nomeUnidade}
-                  </div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 500 }}>
-                    UASG: {uni.codigoUnidade}
-                  </div>
-                </td>
-                <td>
-                  <span className={`badge ${isUG ? 'badge-info' : 'badge-success'}`}>
-                    {isUG ? 'GERENCIADORA' : 'PARTICIPANTE'}
-                  </span>
-                </td>
-                <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                  {formatNumber(uni.quantidadeRegistrada)}
-                </td>
-                <td style={{ fontWeight: 700, fontFamily: 'monospace', color: empenhadoUnitQty > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                  {formatNumber(empenhadoUnitQty)} un
-                </td>
-                <td>
-                  <div className="progress-container">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                      <span style={{ fontWeight: 700, color: effectiveSaldo < 0 ? 'var(--danger)' : 'var(--text-primary)' }}>
-                        {formatNumber(effectiveSaldo)}
-                      </span>
-                      <span style={{ color: 'var(--text-muted)' }}>{formatNumber(empPerc)}%</span>
-                    </div>
-                    <div className="progress-track" style={{ height: '6px' }}>
-                      <div 
-                        className={`progress-fill ${getProgressColorClass(clampedPerc)}`}
-                        style={{ width: `${clampedPerc}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div>
+        <SectionHeader
+          title="Órgãos participantes"
+          subtitle="Quantitativo registrado por órgão. O gerenciador consome o contratado nos contratos vinculados; os demais, o que o Compras.gov registra."
+          icon={<Users size={16} />}
+          countBadge={summary.rows.length}
+        />
+        {!loading && summary.rows.length === 0 ? (
+          <EmptyState title="Nenhum órgão encontrado" description="O Compras.gov não devolveu os órgãos deste item." />
+        ) : (
+          <DataTable columns={columns} data={summary.rows} keyExtractor={(r) => r.codigo} isLoading={loading} testId="unidades-table" />
+        )}
+      </div>
     </div>
   );
 };

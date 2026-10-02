@@ -19,9 +19,9 @@ describe('ItemExecutionSummaryStrip', () => {
     expect(out).toContain('Contratado');
     expect(out).toContain('Empenhado');
     expect(out).toContain('A empenhar');
-    expect(out).toContain('690');
+    expect(out).toContain('690 de 4.863');
+    expect(out).toContain('role="progressbar"');
     expect(out).not.toContain('kpi-card');
-    expect(out).not.toContain('Homologado');
   });
 
   it('avisa as pendências do item e oferece aceitar todas as sugestões a quem edita', () => {

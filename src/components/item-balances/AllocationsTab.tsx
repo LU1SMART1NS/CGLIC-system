@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Check, Edit2, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Building2, Edit2, Plus, Trash2 } from 'lucide-react';
 import {
   AlertCard,
   AppButton,
-  AppCard,
   DataTable,
   EmptyState,
+  Modal,
+  NoticeBar,
   ProgressBar,
   SectionHeader,
-  StatusBadge,
+  SummaryBar,
   type Column
 } from '../../design-system';
 import { formatNumber } from './itemBalanceUtils';
@@ -43,7 +44,11 @@ interface AllocationsTabProps {
   onUnitChange: (sigla: string) => void;
   qty: number | '';
   onQtyChange: (qty: number | '') => void;
-  onSubmit: (e: React.FormEvent) => void;
+  /** Valida e grava; resolve verdadeiro quando gravou (a janela fecha só nesse caso). */
+  onSubmit: () => Promise<boolean>;
+  /** Prepara o formulário para uma nova alocação (limpa edição, quantidade e erro). */
+  onStartNew: () => void;
+  /** Descarta a edição em andamento. */
   onCancelEdit: () => void;
   saving: boolean;
   error: string | null;
@@ -55,10 +60,18 @@ interface AllocationsTabProps {
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-const Item: React.FC<{ label: string; value: string; tone?: string }> = ({ label, value, tone }) => (
-  <span>
-    {label} <strong style={{ color: tone }}>{value}</strong> <span style={{ color: 'var(--text-muted)' }}>un</span>
-  </span>
+/** Explica, dentro da janela, por que não há unidade disponível para alocar (e como resolver). */
+export const AllocationUnavailableNotice: React.FC<{ catalogEmpty: boolean }> = ({ catalogEmpty }) => (
+  <div data-testid="allocation-unavailable" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.88rem', color: '#334155' }}>
+    <p style={{ margin: 0 }}>
+      {catalogEmpty
+        ? 'O catálogo de Unidades Internas está vazio. Cadastre as unidades para poder alocar quantitativo.'
+        : 'Todas as unidades do catálogo já têm alocação neste item. Para alocar a outra unidade, cadastre-a em Unidades Internas; para mudar a quantidade de uma já alocada, use o lápis na tabela.'}
+    </p>
+    <Link to="/admin/departamentos" style={{ fontWeight: 700, color: '#0c326f', textDecoration: 'none' }}>
+      Abrir Unidades Internas
+    </Link>
+  </div>
 );
 
 export const AllocationsTab: React.FC<AllocationsTabProps> = ({
@@ -78,6 +91,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
   qty,
   onQtyChange,
   onSubmit,
+  onStartNew,
   onCancelEdit,
   saving,
   error,
@@ -85,9 +99,32 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
   onDelete,
   onGoToContracts
 }) => {
+  const [modalOpen, setModalOpen] = useState(false);
+
   const allocatedNames = new Set(rows.filter((r) => r.id !== editingId).map((r) => norm(r.unitName)));
   const allUnitsAllocated = departments.length > 0 && departments.every((d) => allocatedNames.has(norm(d.sigla)));
   const catalogoVazio = !departmentsLoading && departments.length === 0;
+  const semUnidadeDisponivel = catalogoVazio || (allUnitsAllocated && !editingId);
+  const editingRow = editingId ? rows.find((r) => r.id === editingId) : undefined;
+  const disponivelParaAlocar = remaining + (editingRow?.allocatedQty ?? 0);
+
+  const openNew = () => {
+    onStartNew();
+    setModalOpen(true);
+  };
+  const openEdit = (id: string) => {
+    onEdit(id);
+    setModalOpen(true);
+  };
+  const closeModal = () => {
+    if (saving) return;
+    setModalOpen(false);
+    onCancelEdit();
+  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (await onSubmit()) setModalOpen(false);
+  };
 
   const columns: Column<AllocationRow>[] = [
     {
@@ -147,7 +184,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
             width: '110px',
             render: (r: AllocationRow) => (
               <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
-                <AppButton variant="outline" size="sm" iconOnly icon={<Edit2 size={14} />} onClick={() => onEdit(r.id)} disabled={saving} title={`Editar a alocação de ${r.unitName}`} />
+                <AppButton variant="outline" size="sm" iconOnly icon={<Edit2 size={14} />} onClick={() => openEdit(r.id)} disabled={saving} title={`Editar a alocação de ${r.unitName}`} />
                 <AppButton variant="ghostDanger" size="sm" iconOnly icon={<Trash2 size={14} />} onClick={() => onDelete(r.id)} disabled={saving} title={`Excluir a alocação de ${r.unitName}`} />
               </div>
             )
@@ -157,17 +194,31 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0.5rem 1rem' }} data-testid="allocations-tab">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem', fontSize: '0.9rem' }} data-testid="allocations-summary">
-          <Item label={`Disponível da UG ${ugUasg}`} value={formatNumber(totalUG)} />
-          <Item label="Alocado" value={`${formatNumber(totalAllocated)} (${formatNumber(percentAllocated)}%)`} />
-          <Item label="A alocar" value={formatNumber(remaining)} tone={remaining < 0 ? 'var(--danger)' : undefined} />
-        </div>
-        <ProgressBar value={percentAllocated} showPercent={false} height="6px" colorScheme="success" testId="allocations-progress" />
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="allocations-tab">
+      <SummaryBar
+        testId="allocations-summary"
+        items={[
+          { label: 'Alocado', value: `${formatNumber(totalAllocated)} de ${formatNumber(totalUG)} (${formatNumber(percentAllocated)}%)` },
+          { label: 'A alocar', value: formatNumber(remaining), tone: remaining < 0 ? 'danger' : 'default' }
+        ]}
+        progress={{ value: totalAllocated, max: totalUG }}
+      >
+        {semUnidade.count > 0 && (
+          <NoticeBar
+            testId="empenhos-sem-unidade"
+            action={
+              <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
+                Vincular em Contratos e empenhos
+              </AppButton>
+            }
+          >
+            <strong>{semUnidade.count}</strong> {semUnidade.count === 1 ? 'empenho confirmado' : 'empenhos confirmados'} ({formatNumber(semUnidade.empenhado)} un)
+            ainda sem unidade interna. Não entram no empenhado das unidades até serem vinculados.
+          </NoticeBar>
+        )}
+      </SummaryBar>
 
-      {error && <AlertCard severity="CRITICA" title={error} testId="allocation-error" />}
+      {error && !modalOpen && <AlertCard severity="CRITICA" title={error} testId="allocation-error" />}
 
       {canManage && catalogoVazio && (
         <EmptyState
@@ -178,99 +229,103 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
         />
       )}
 
-      {canManage && departments.length > 0 && (
-        <AppCard padding="lg" variant="subtle">
-          <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.9rem', color: '#0c326f' }}>
-                {editingId ? <Edit2 size={15} /> : <Plus size={15} />}
-                {editingId ? 'Editar alocação' : 'Alocar quantitativo'}
-              </span>
-              <Link to="/admin/departamentos" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0c326f', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} title="Abrir a gestão de Unidades Internas em nova aba">
-                Unidades Internas <ExternalLink size={11} />
-              </Link>
-            </div>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <label style={{ flex: '2 1 280px', display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
-                Unidade
-                <select
-                  className="form-input"
-                  value={unitName}
-                  onChange={(e) => onUnitChange(e.target.value)}
-                  required
-                  style={{ fontWeight: 700, color: '#0c326f', fontSize: '0.82rem', padding: '0.45rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
-                >
-                  {departments.map((d) => {
-                    const isAllocated = allocatedNames.has(norm(d.sigla));
-                    return (
-                      <option key={d.id} value={d.sigla} disabled={isAllocated}>
-                        {d.sigla} — {d.nomeCompleto}{isAllocated ? ' (já alocada)' : ''}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-              <label style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
-                Quantidade
-                <input
-                  type="number"
-                  className="form-input"
-                  min="1"
-                  placeholder="Ex: 50"
-                  value={qty}
-                  onChange={(e) => onQtyChange(e.target.value === '' ? '' : Number(e.target.value))}
-                  required
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
-                />
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {editingId && (
-                  <AppButton type="button" variant="outline" size="sm" onClick={onCancelEdit} disabled={saving}>
-                    Cancelar
-                  </AppButton>
-                )}
-                <AppButton
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  icon={saving ? undefined : editingId ? <Check size={14} /> : <Plus size={14} />}
-                  isLoading={saving}
-                  disabled={saving || (!editingId && allUnitsAllocated)}
-                  title={!editingId && allUnitsAllocated ? 'Todas as unidades do catálogo já têm alocação neste item' : undefined}
-                >
-                  {editingId ? 'Salvar' : 'Alocar'}
-                </AppButton>
-              </div>
-            </div>
-          </form>
-        </AppCard>
-      )}
-
       <div>
-        <SectionHeader title="Alocações" icon={<Building2 size={16} />} countBadge={rows.length} />
+        <SectionHeader
+          title="Alocações"
+          subtitle={`Quantitativo da UG ${ugUasg} distribuído às unidades internas.`}
+          icon={<Building2 size={16} />}
+          countBadge={rows.length}
+          actions={
+            canManage ? (
+              <AppButton
+                variant="primary"
+                size="sm"
+                icon={<Plus size={14} />}
+                onClick={openNew}
+                disabled={departmentsLoading}
+                title="Alocar quantitativo a uma unidade interna"
+              >
+                Alocar
+              </AppButton>
+            ) : undefined
+          }
+        />
         {rows.length === 0 ? (
           <EmptyState
             title="Nenhuma alocação interna neste item"
-            description={canManage ? 'Use o formulário acima para alocar o quantitativo às unidades internas.' : 'Ainda não há quantitativo alocado às unidades internas.'}
+            description={canManage ? 'Use o botão Alocar para distribuir o quantitativo às unidades internas.' : 'Ainda não há quantitativo alocado às unidades internas.'}
           />
         ) : (
           <DataTable columns={columns} data={rows} keyExtractor={(r) => r.id} testId="allocations-table" />
         )}
       </div>
 
-      {semUnidade.count > 0 && (
-        <div
-          data-testid="empenhos-sem-unidade"
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', padding: '0.6rem 0.9rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem' }}
+      {canManage && (
+        <Modal
+          isOpen={modalOpen}
+          onClose={closeModal}
+          title={editingId ? 'Editar alocação' : 'Alocar quantitativo'}
+          subtitle={`UG ${ugUasg} • disponível para alocar: ${formatNumber(disponivelParaAlocar)} un`}
+          size="md"
+          dismissible={!saving}
+          testId="allocation-modal"
+          footer={
+            <>
+              <AppButton type="button" variant="outline" size="sm" onClick={closeModal} disabled={saving}>
+                {semUnidadeDisponivel ? 'Fechar' : 'Cancelar'}
+              </AppButton>
+              {!semUnidadeDisponivel && (
+                <AppButton type="submit" form="allocation-form" variant="primary" size="sm" isLoading={saving} disabled={saving}>
+                  {editingId ? 'Salvar' : 'Alocar'}
+                </AppButton>
+              )}
+            </>
+          }
         >
-          <span>
-            <StatusBadge label={`${semUnidade.count} ${semUnidade.count === 1 ? 'empenho' : 'empenhos'}`} variant="info" size="sm" dot={false} />{' '}
-            confirmados ({formatNumber(semUnidade.empenhado)} un) ainda sem unidade interna.
-          </span>
-          <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
-            Vincular em Contratos e empenhos
-          </AppButton>
-        </div>
+          {semUnidadeDisponivel ? (
+            <AllocationUnavailableNotice catalogEmpty={catalogoVazio} />
+          ) : (
+          <form id="allocation-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {error && <AlertCard severity="CRITICA" title={error} testId="allocation-modal-error" />}
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
+              Unidade interna
+              <select
+                className="form-input"
+                value={unitName}
+                onChange={(e) => onUnitChange(e.target.value)}
+                required
+                style={{ fontWeight: 700, color: '#0c326f', fontSize: '0.85rem', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
+              >
+                {departments.map((d) => {
+                  const isAllocated = allocatedNames.has(norm(d.sigla));
+                  return (
+                    <option key={d.id} value={d.sigla} disabled={isAllocated}>
+                      {d.sigla} — {d.nomeCompleto}{isAllocated ? ' (já alocada)' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
+              Quantidade
+              <input
+                type="number"
+                className="form-input"
+                min="1"
+                max={Math.max(disponivelParaAlocar, 1)}
+                placeholder="Ex: 50"
+                value={qty}
+                onChange={(e) => onQtyChange(e.target.value === '' ? '' : Number(e.target.value))}
+                required
+                style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
+              />
+            </label>
+            <Link to="/admin/departamentos" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0c326f', textDecoration: 'none' }}>
+              Gerenciar Unidades Internas
+            </Link>
+          </form>
+          )}
+        </Modal>
       )}
     </div>
   );

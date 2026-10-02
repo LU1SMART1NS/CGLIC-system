@@ -129,7 +129,7 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '1.5rem' }} data-testid="contract-suggestions-panel">
+    <div style={{ display: 'flex', flexDirection: 'column' }} data-testid="contract-suggestions-panel">
       {vazio ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
           <Sparkles size={16} aria-hidden="true" />

@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Plus, Trash2, ExternalLink, ChevronRight, ChevronDown, Eye } from 'lucide-react';
-import { fetchPncpContractEmpenhos, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
-import { normalizeEmpenhoNumero, calculateItemCardMetrics, deduceEmpenhoQuantity, getEmpenhoEffectiveValue } from '../services/balanceService';
+import { getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
+import { calculateItemCardMetrics } from '../services/balanceService';
 import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
 import { type InternalDepartment } from '../services/unitService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
 import { useItemAdesoes } from '../hooks/useItemAdesoes';
 import { useDepartments } from '../hooks/useDepartments';
-import { useItemEmpenhos } from '../hooks/useItemEmpenhos';
 import { useItemContracts } from '../hooks/useItemContracts';
 import { useItemAllocations } from '../hooks/useItemAllocations';
 import { useSaveAllocations } from '../hooks/useSaveAllocations';
 import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
 import { useSaveEmpenhoLinks } from '../hooks/useSaveEmpenhoLinks';
-import { useItemManualQuantities } from '../hooks/useItemManualQuantities';
 import { useItemManualContracts } from '../hooks/useItemManualContracts';
 import { useDeleteManualContract } from '../hooks/useDeleteManualContract';
 import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLinks';
@@ -45,12 +43,13 @@ import {
   suggestionToContractRecord,
   type ItemContractSuggestion
 } from '../utils/itemContractSuggestions';
-import { AppButton, AppCard, EmptyState, SectionHeader } from '../design-system';
+import { AppButton, EmptyState, SectionHeader } from '../design-system';
 
 import { LinkContractModal } from './modals/LinkContractModal';
 import { ContractSuggestionsPanel } from './item-balances/ContractSuggestionsPanel';
 import { ItemHero, type ItemTab } from './item-balances/ItemHero';
 import { ContractEmpenhosPanel } from './item-balances/ContractEmpenhosPanel';
+import { ItemTabPanel } from './item-balances/ItemTabPanel';
 import { AllocationsTab, type AllocationRow } from './item-balances/AllocationsTab';
 import { summarizeAllocationExecution } from '../utils/allocationExecution';
 import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryStrip';
@@ -59,9 +58,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
-import { EmpenhoDetailModal } from './item-balances/EmpenhoDetailModal';
-import { formatNumber, formatDate, isGerenciadoraUasg, isAllowedEmpenhoUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
-import type { ArpRecord, ArpItemRecord, EmpenhoSaldoItemRecord, InternalAllocation, PncpContract, PncpContractEmpenho, ContratosGovEmpenhoRecord, Empenho } from '../types';
+import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
+import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract } from '../types';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -72,7 +70,6 @@ interface ItemBalancesProps {
 const ITEM_TABS: ItemTab[] = ['unidades', 'contratos', 'alocacao', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
-const EMPTY_RECORD_NUM: Record<string, number> = {};
 
 export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack }) => {
 
@@ -100,14 +97,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   );
   const adesoesError = adesoesQueryError ? (adesoesQueryError.message || 'Falha ao buscar as adesões do item.') : null;
 
-  const {
-    data: empenhos = [],
-    refetch: refetchEmpenhos
-  } = useItemEmpenhos(
-    arp.numeroAtaRegistroPreco,
-    arp.codigoUnidadeGerenciadora,
-    item.numeroItem
-  );
   // Aba no endereço (?aba=), como nas telas 360: sobrevive a recarregar e pode ser compartilhada.
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -116,9 +105,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const tabParam = (rawTabParam === 'empenhos' ? 'contratos' : rawTabParam) as ItemTab | null;
   const activeTab: ItemTab = tabParam && ITEM_TABS.includes(tabParam) ? tabParam : 'unidades';
   const tabsRef = React.useRef<HTMLDivElement>(null);
-  const setActiveTab = (tab: ItemTab) => {
+  // Clicar na aba só troca o conteúdo, sem mover a tela. Os atalhos de fora das abas (cartões do topo, avisos)
+  // passam `scroll` para levar o olhar até a aba aberta.
+  const setActiveTab = (tab: ItemTab, scroll = false) => {
     setSearchParams(tab === 'unidades' ? {} : { aba: tab }, { replace: true });
-    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (scroll) tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // Mesmas regras do backend: alocações e vínculo empenho→unidade exigem allocations.manage
@@ -130,10 +121,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const canEditData = role === 'admin' || role === 'gestor';
 
   const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
-  const [contractEmpenhos, setContractEmpenhos] = useState<Record<string, PncpContractEmpenho[]>>({});
-  const [contractGovEmpenhos, setContractGovEmpenhos] = useState<Record<string, ContratosGovEmpenhoRecord[]>>({});
-  const [empenhosLoadingMap, setEmpenhosLoadingMap] = useState<Record<string, boolean>>({});
-  const [selectedEmpenhoDetail, setSelectedEmpenhoDetail] = useState<EmpenhoSaldoItemRecord | null>(null);
 
   const {
     data: allocationsState
@@ -164,14 +151,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const [newAllocatedQty, setNewAllocatedQty] = useState<number | ''>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [allocationError, setAllocationError] = useState<string | null>(null);
-
-  // Hooks Canônicos de Leitura para Dados Manuais (React Query)
-  const { data: manualQuantitiesState, refetch: refetchManualQuantities } = useItemManualQuantities(
-    arp.numeroAtaRegistroPreco,
-    arp.codigoUnidadeGerenciadora,
-    item.numeroItem
-  );
-  const empenhoManualQuantities = manualQuantitiesState?.quantities ?? EMPTY_RECORD_NUM;
 
   const deleteManualContractMutation = useDeleteManualContract();
 
@@ -208,7 +187,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const loadManualData = async () => {
     try {
       await Promise.all([
-        refetchManualQuantities(),
         refetchManualContracts(),
         refetchContractEmpenhoLinks()
       ]);
@@ -434,7 +412,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   }, [enrichedOfficialLinks, canEditData, arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem]);
 
   const handleRefresh = async () => {
-    refetchEmpenhos();
     refetchContracts();
     loadManualData();
     if (!canEditData || enrichedOfficialLinks.length === 0) return;
@@ -501,247 +478,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     setLinkingSuggestion(null);
   };
 
-  // Carrega empenhos em background para todos os contratos e enriquece com dados oficiais
-  useEffect(() => {
-    if (!contracts || contracts.length === 0) return;
-    contracts.forEach(async (c) => {
-      const canKey = getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp);
-      if (c.contratoId) {
-        try {
-          const rawGovEmps = await fetchContratosGovEmpenhos(c.contratoId);
-          if (rawGovEmps && rawGovEmps.length > 0) {
-            const govEmps = await enrichGovEmpenhosWithDetails(rawGovEmps, c.contratoId, c);
-            setContractGovEmpenhos(prev => ({ 
-              ...prev, 
-              [c.numeroContrato]: govEmps,
-              [canKey]: govEmps
-            }));
-          }
-        } catch (e) {
-          console.warn('Erro ao carregar empenhos do Contratos.gov.br:', e);
-        }
-      }
-      if (c.cnpj && c.anoContrato && c.sequencialContrato) {
-        try {
-          const emps = await fetchPncpContractEmpenhos(c.cnpj, String(c.anoContrato), String(c.sequencialContrato));
-          if (emps && emps.length > 0) {
-            setContractEmpenhos(prev => ({
-              ...prev,
-              [c.numeroContrato]: emps,
-              [canKey]: emps
-            }));
-          }
-        } catch (e) {
-          console.warn('Erro ao carregar empenhos do PNCP:', e);
-        }
-      }
-    });
-  }, [contracts, item]);
-
-  const enrichGovEmpenhosWithDetails = async (
-    govEmps: ContratosGovEmpenhoRecord[],
-    _contratoId?: number,
-    contratoObj?: PncpContract
-  ): Promise<ContratosGovEmpenhoRecord[]> => {
-    const targetItemNum = parseInt(item.numeroItem, 10);
-    const unitPrice = contratoObj?.valorUnitarioItem ?? item.valorUnitario;
-
-    const enriched = await Promise.all(
-      govEmps.map(async (emp) => {
-        if (!emp.id && !emp.numero) return emp;
-        let quantidadeFisica: number | undefined = undefined;
-        let itensMinuta: any[] | undefined = undefined;
-
-        // Fonte Única Oficial Direta: Consulta a minuta individual do empenho (/consultar/{id})
-        if (emp.id) {
-          try {
-            const detalhe = await fetchContratoEmpenhoDetalhe(emp.id);
-            if (detalhe && detalhe.itens_minuta) {
-              itensMinuta = detalhe.itens_minuta;
-              const matchedMinuta = detalhe.itens_minuta.find((i: any) => parseInt(i.numero_item_compra || '0', 10) === targetItemNum);
-              if (matchedMinuta && typeof matchedMinuta.quantidade === 'number') {
-                quantidadeFisica = matchedMinuta.quantidade;
-              }
-            }
-          } catch (e) {
-            // Ignora exceções de acesso à minuta
-          }
-        }
-
-        // Fonte Oficial Deduzida: Se a minuta não está disponível, calcula determinística e temporalmente
-        let quantidadeDeduzida: number | undefined = undefined;
-        let isDeduzido = false;
-        let isReforco = false;
-
-        const effectiveEmpValue = getEmpenhoEffectiveValue(emp.empenhado, emp.rpinscrito);
-        if (quantidadeFisica === undefined && unitPrice && effectiveEmpValue > 0) {
-          const deduction = deduceEmpenhoQuantity(
-            effectiveEmpValue,
-            unitPrice,
-            emp.data_emissao,
-            contratoObj?.historicoPrecos
-          );
-          if (deduction.quantidade > 0 || deduction.isReforco) {
-            quantidadeDeduzida = deduction.quantidade;
-            isDeduzido = true;
-            isReforco = deduction.isReforco;
-          }
-        }
-
-        return {
-          ...emp,
-          itens_minuta: itensMinuta,
-          quantidadeFisicaOriginal: quantidadeFisica,
-          quantidadeDeduzida,
-          isDeduzido,
-          isReforco
-        };
-      })
-    );
-    return enriched;
-  };
-
-  const getEmpenhoQuantityInfo = (
-    empKey: string, 
-    emp?: ContratosGovEmpenhoRecord,
-    manualQtdsMap: Record<string, number> = empenhoManualQuantities,
-    contratoObj?: PncpContract
-  ): { qty: number; isManual: boolean; isOfficial: boolean; isDeduzido?: boolean; isReforco?: boolean } => {
-    // Prioridade 1: Quantidade Oficial retornada pela API (itens_minuta)
-    if (emp?.quantidadeFisicaOriginal !== undefined && emp.quantidadeFisicaOriginal !== null) {
-      return { qty: emp.quantidadeFisicaOriginal, isManual: false, isOfficial: true, isDeduzido: false, isReforco: false };
-    }
-    if (emp?.itens_minuta && emp.itens_minuta.length > 0) {
-      const targetItemNum = parseInt(item.numeroItem, 10);
-      const match = emp.itens_minuta.find((i: any) => parseInt(i.numero_item_compra || '0', 10) === targetItemNum);
-      if (match && typeof match.quantidade === 'number') {
-        return { qty: match.quantidade, isManual: false, isOfficial: true, isDeduzido: false, isReforco: false };
-      }
-    }
-    // Prioridade 2: Preenchimento manual pelo usuário se a API não retornou dados
-    if (manualQtdsMap[empKey] !== undefined) {
-      return { qty: manualQtdsMap[empKey], isManual: true, isOfficial: false, isDeduzido: false, isReforco: false };
-    }
-    // Prioridade 3: Dedução Temporal Oficial via Valor Unitário do Contrato
-    if (emp?.quantidadeDeduzida !== undefined) {
-      return { qty: emp.quantidadeDeduzida, isManual: false, isOfficial: true, isDeduzido: true, isReforco: !!emp.isReforco };
-    }
-    // Fallback on-the-fly se emp ainda não foi enriquecido mas temos valor unitário
-    const unitPrice = contratoObj?.valorUnitarioItem ?? item.valorUnitario;
-    const effectiveEmpValue = getEmpenhoEffectiveValue(emp?.empenhado, emp?.rpinscrito);
-    if (effectiveEmpValue > 0 && unitPrice) {
-      const deduction = deduceEmpenhoQuantity(effectiveEmpValue, unitPrice, emp?.data_emissao, contratoObj?.historicoPrecos);
-      if (deduction.quantidade > 0 || deduction.isReforco) {
-        return { qty: deduction.quantidade, isManual: false, isOfficial: true, isDeduzido: true, isReforco: deduction.isReforco };
-      }
-    }
-
-    return { qty: 0, isManual: false, isOfficial: false, isDeduzido: false, isReforco: false };
-  };
-
-  const toggleContractExpansion = async (contrato: PncpContract) => {
+  // Expande ou recolhe um contrato na tabela Vinculados; os empenhos dele vêm de arp_item_empenhos.
+  const toggleContractExpansion = (contrato: PncpContract) => {
     const key = contrato.numeroContrato;
     const canKey = getCanonicalContractKey(contrato.numeroContrato, contrato.anoContrato, contrato.numeroControlePncp);
     const isCurrentlyExpanded = !!expandedContracts[key] || !!expandedContracts[canKey];
-    
-    setExpandedContracts(prev => ({ 
-      ...prev, 
-      [key]: !isCurrentlyExpanded,
-      [canKey]: !isCurrentlyExpanded 
-    }));
-
-    if (!isCurrentlyExpanded && !contractGovEmpenhos[key] && !contractGovEmpenhos[canKey] && !contractEmpenhos[key] && !contractEmpenhos[canKey]) {
-      setEmpenhosLoadingMap(prev => ({ ...prev, [key]: true, [canKey]: true }));
-      try {
-        let govEmpsLoaded = false;
-        if (contrato.contratoId) {
-          const rawGovEmps = await fetchContratosGovEmpenhos(contrato.contratoId);
-          if (rawGovEmps && rawGovEmps.length > 0) {
-            const govEmps = await enrichGovEmpenhosWithDetails(rawGovEmps, contrato.contratoId, contrato);
-            setContractGovEmpenhos(prev => ({ ...prev, [key]: govEmps, [canKey]: govEmps }));
-            govEmpsLoaded = true;
-          }
-        }
-        if (!govEmpsLoaded && contrato.uasg) {
-          const govData = await fetchContratosGovData(contrato.uasg, contrato.numeroContrato, contrato.anoContrato);
-          if (govData.contratoId) {
-            contrato.contratoId = govData.contratoId;
-            const rawGovEmps = await fetchContratosGovEmpenhos(govData.contratoId);
-            if (rawGovEmps && rawGovEmps.length > 0) {
-              const govEmps = await enrichGovEmpenhosWithDetails(rawGovEmps, govData.contratoId, contrato);
-              setContractGovEmpenhos(prev => ({ ...prev, [key]: govEmps, [canKey]: govEmps }));
-              govEmpsLoaded = true;
-            }
-          }
-        }
-        if (contrato.cnpj && contrato.anoContrato && contrato.sequencialContrato) {
-          const emps = await fetchPncpContractEmpenhos(contrato.cnpj, String(contrato.anoContrato), String(contrato.sequencialContrato));
-          if (emps && emps.length > 0) {
-            setContractEmpenhos(prev => ({ ...prev, [key]: emps, [canKey]: emps }));
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching contract empenhos:', err);
-      } finally {
-        setEmpenhosLoadingMap(prev => ({ ...prev, [key]: false, [canKey]: false }));
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (selectedEmpenhoDetail) {
-      const filtered = getFilteredContractsForModal(selectedEmpenhoDetail);
-      filtered.forEach(c => {
-        const canKey = getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp);
-        if (!contractGovEmpenhos[c.numeroContrato] && !contractGovEmpenhos[canKey] && !contractEmpenhos[c.numeroContrato] && !contractEmpenhos[canKey] && !empenhosLoadingMap[c.numeroContrato] && !empenhosLoadingMap[canKey]) {
-          fetchContractEmpenhosForModal(c);
-        }
-      });
-    }
-  }, [selectedEmpenhoDetail]);
-
-  const fetchContractEmpenhosForModal = async (contrato: PncpContract) => {
-    const key = contrato.numeroContrato;
-    const canKey = getCanonicalContractKey(contrato.numeroContrato, contrato.anoContrato, contrato.numeroControlePncp);
-    setEmpenhosLoadingMap(prev => ({ ...prev, [key]: true, [canKey]: true }));
-    try {
-      if (contrato.contratoId) {
-        const rawGovEmps = await fetchContratosGovEmpenhos(contrato.contratoId);
-        if (rawGovEmps && rawGovEmps.length > 0) {
-          const govEmps = await enrichGovEmpenhosWithDetails(rawGovEmps, contrato.contratoId, contrato);
-          setContractGovEmpenhos(prev => ({ ...prev, [key]: govEmps, [canKey]: govEmps }));
-        }
-      }
-      if (contrato.cnpj && contrato.anoContrato && contrato.sequencialContrato) {
-        const emps = await fetchPncpContractEmpenhos(contrato.cnpj, String(contrato.anoContrato), String(contrato.sequencialContrato));
-        if (emps && emps.length > 0) {
-          setContractEmpenhos(prev => ({ ...prev, [key]: emps, [canKey]: emps }));
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching contract empenhos for modal:', err);
-    } finally {
-      setEmpenhosLoadingMap(prev => ({ ...prev, [key]: false, [canKey]: false }));
-    }
-  };
-
-  const getFilteredContractsForModal = (emp: EmpenhoSaldoItemRecord) => {
-    const match = emp.unidade.match(/^(\d+)/);
-    const uasg = match ? match[1] : '';
-    
-    const targetCnpj = cnpjDaUasg(uasg);
-
-    if (!targetCnpj) return contracts;
-
-    return contracts.filter(c => {
-      if (c.cnpj === targetCnpj) {
-        return true;
-      }
-      if (c.cnpj && c.cnpj.includes(targetCnpj)) {
-        return true;
-      }
-      return false;
-    });
+    setExpandedContracts(prev => ({ ...prev, [key]: !isCurrentlyExpanded, [canKey]: !isCurrentlyExpanded }));
   };
 
   useEffect(() => {
@@ -754,7 +496,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     } catch {}
   }, [item]);
 
-  const saveAllocationsToStorage = async (newAllocations: InternalAllocation[]) => {
+  const saveAllocationsToStorage = async (newAllocations: InternalAllocation[]): Promise<boolean> => {
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
     try {
       setAllocationError(null);
@@ -763,12 +505,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         allocations: newAllocations,
         expectedVersion: allocationVersion
       });
+      return true;
     } catch (err: any) {
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
         setAllocationError('Conflito de concorrência: as alocações foram modificadas por outro usuário. Recarregue a página antes de salvar novamente.');
       } else {
         setAllocationError(err?.message || 'Erro ao salvar alocações.');
       }
+      return false;
     }
   };
 
@@ -777,8 +521,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     ? gerenciadoraUnits.reduce((sum, u) => sum + (Number(u.quantidadeRegistrada) || 0), 0)
     : (Number(item.quantidadeHomologadaItem) || 0);
 
-  const handleAddAllocation = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleStartNewAllocation = () => {
+    setEditingId(null);
+    setNewUnitName(getFirstAvailableUnitSigla(departments, allocations, null));
+    setNewAllocatedQty('');
+    setAllocationError(null);
+  };
+
+  const handleAddAllocation = async (): Promise<boolean> => {
     setAllocationError(null);
 
     const fallbackUnit = getFirstAvailableUnitSigla(departments, allocations, editingId);
@@ -786,7 +536,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
     if (!chosenUnit) {
       setAllocationError('Selecione uma unidade interna oficial.');
-      return;
+      return false;
     }
 
     // Validação de duplicidade: não permitir alocar a mesma unidade mais de uma vez
@@ -796,14 +546,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
     if (isDuplicate) {
       setAllocationError(`A unidade "${chosenUnit}" já possui uma alocação cadastrada para este item. Edite a alocação existente na tabela abaixo ou selecione outra unidade.`);
-      return;
+      return false;
     }
 
     const allocQty = Number(newAllocatedQty);
 
     if (isNaN(allocQty) || allocQty <= 0) {
       setAllocationError('A quantidade alocada deve ser um número maior que zero.');
-      return;
+      return false;
     }
 
     const currentAllocatedSum = allocations
@@ -813,7 +563,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     if (currentAllocatedSum + allocQty > totalUGQty) {
       const available = totalUGQty - currentAllocatedSum;
       setAllocationError(`Limite excedido! O quantitativo total da Unidade Gerenciadora para este item é de ${formatNumber(totalUGQty)} unidades. Você só pode alocar mais ${formatNumber(available)} unidades.`);
-      return;
+      return false;
     }
 
     let updatedList: InternalAllocation[];
@@ -823,7 +573,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           ? { ...a, unitName: chosenUnit, allocatedQty: allocQty }
           : a
       );
-      setEditingId(null);
     } else {
       const newAlloc: InternalAllocation = {
         id: Date.now().toString(),
@@ -834,11 +583,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       updatedList = [...allocations, newAlloc];
     }
 
-    saveAllocationsToStorage(updatedList);
-    
-    const nextAvailable = getFirstAvailableUnitSigla(departments, updatedList, null);
-    setNewUnitName(nextAvailable);
-    setNewAllocatedQty('');
+    const saved = await saveAllocationsToStorage(updatedList);
+    if (saved) {
+      setEditingId(null);
+      setNewUnitName(getFirstAvailableUnitSigla(departments, updatedList, null));
+      setNewAllocatedQty('');
+    }
+    return saved;
   };
 
   const handleEditAllocation = (alloc: InternalAllocation) => {
@@ -944,90 +695,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
 
 
-  // Mapeia empenhos oficiais da API (SIASG e Contratos.gov/PNCP) para a entidade canônica Empenho
-  // FILTRAGEM OBRIGATÓRIA: Apresentar apenas empenhos das UASGs 200331 e 200330
-  const officialApiEmpenhos: Empenho[] = React.useMemo(() => {
-    const list: Empenho[] = [];
-    const seen = new Set<string>();
-
-    empenhos.forEach((emp, idx) => {
-      const num = emp.numeroEmpenho || `EMP-${idx + 1}`;
-      const ano = parseInt(arp.anoCompra, 10) || new Date().getFullYear();
-      const cleanUasg = (emp.unidade || arp.codigoUnidadeGerenciadora || '').replace(/\D/g, '');
-
-      // Filtra estritamente apenas empenhos das UASGs 200331 e 200330
-      if (!isAllowedEmpenhoUasg(cleanUasg)) return;
-
-      const key = `${normalizeEmpenhoNumero(num)}-${ano}-${cleanUasg}-${item.numeroItem}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        list.push({
-          id: `api-siasg-${key}`,
-          numero: num,
-          ano,
-          arpId: item.numeroAtaRegistroPreco,
-          itemId: item.numeroItem,
-          uasg: cleanUasg,
-          quantidade: Number(emp.quantidadeEmpenhada) || 0,
-          valorUnitario: Number(item.valorUnitario) || undefined,
-          valorTotal: Number(emp.valorEmpenhado) || (Number(emp.quantidadeEmpenhada) * Number(item.valorUnitario || 0)) || undefined,
-          data: emp.dataEmpenho || emp.dataHoraInclusao?.split('T')[0],
-          fornecedor: emp.fornecedorNome || item.nomeRazaoSocialFornecedor,
-          unidadeInternaId: empenhoLinks[num],
-          origem: 'API',
-          status: 'CONFIRMADO',
-          criadoEm: emp.dataHoraInclusao || new Date().toISOString(),
-          atualizadoEm: emp.dataHoraAtualizacao || new Date().toISOString()
-        });
-      }
-    });
-
-    Object.entries(contractGovEmpenhos).forEach(([, emps]) => {
-      emps.forEach(emp => {
-        const num = emp.numero;
-        if (!num) return;
-        const ano = parseInt(arp.anoCompra, 10) || new Date().getFullYear();
-        const cleanUasg = (emp.unidade_gestora || arp.codigoUnidadeGerenciadora || '').replace(/\D/g, '');
-
-        // Filtra estritamente apenas empenhos das UASGs 200331 e 200330
-        if (!isAllowedEmpenhoUasg(cleanUasg)) return;
-
-        const key = `${normalizeEmpenhoNumero(num)}-${ano}-${cleanUasg}-${item.numeroItem}`;
-        
-        const empKey = emp.numero || String(emp.id);
-        const qtdDetail = getEmpenhoQuantityInfo(empKey, emp, empenhoManualQuantities);
-        const effectiveQty = qtdDetail.qty;
-
-        if (!seen.has(key) && effectiveQty > 0) {
-          seen.add(key);
-          const rawVal = typeof emp.empenhado === 'number' ? emp.empenhado : parseFloat(String(emp.empenhado || '0').replace(/\./g, '').replace(',', '.'));
-          list.push({
-            id: `api-gov-${key}`,
-            numero: num,
-            ano,
-            arpId: item.numeroAtaRegistroPreco,
-            itemId: item.numeroItem,
-            uasg: cleanUasg,
-            quantidade: effectiveQty,
-            valorUnitario: Number(item.valorUnitario) || undefined,
-            valorTotal: !isNaN(rawVal) && rawVal > 0 ? rawVal : (effectiveQty * Number(item.valorUnitario || 0)),
-            data: emp.data_emissao,
-            fornecedor: emp.credor || item.nomeRazaoSocialFornecedor,
-            unidadeInternaId: empenhoLinks[num],
-            origem: 'API',
-            status: 'CONFIRMADO',
-            criadoEm: new Date().toISOString(),
-            atualizadoEm: new Date().toISOString()
-          });
-        }
-      });
-    });
-
-    return list;
-  }, [empenhos, contractGovEmpenhos, empenhoLinks, item, arp, empenhoManualQuantities]);
-
-  // Empenhos lidos das APIs oficiais (alimentam a Alocação interna); o empenho do item por contrato vem de arp_item_empenhos.
-  const allEmpenhos: Empenho[] = officialApiEmpenhos;
 
   // Calculate totals
   const totalRegistrado = unidades.reduce((acc, curr) => acc + curr.quantidadeRegistrada, 0);
@@ -1144,7 +811,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           valorFinanceiroConsumido
         }}
         referencia={comprasGovReferencia}
-        onGoTo={setActiveTab}
+        onGoTo={(tab) => setActiveTab(tab, true)}
       />
 
       <Instrument360Tabs
@@ -1156,24 +823,23 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           { id: 'adesoes', label: `Adesões (${adesoes.length})` }
         ]}
         active={activeTab}
-        onSelect={setActiveTab}
+        onSelect={(tab) => setActiveTab(tab)}
         idPrefix="item"
         ariaLabel="Seções do item"
       />
 
-      <div role="tabpanel" id={`item-tabpanel-${activeTab}`} aria-labelledby={`item-tab-${activeTab}`}>
+      <ItemTabPanel activeTab={activeTab}>
         {activeTab === 'unidades' ? (
           <UnidadesTab
             loading={loading}
             error={error}
             sortedUnidades={sortedUnidades}
-            allEmpenhos={allEmpenhos}
+            ugUasg={arp.codigoUnidadeGerenciadora}
+            contratadoUG={executionSummary.contratado}
           />
         ) : activeTab === 'contratos' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {/* Contratos (PNCP, oficiais e manuais) */}
-            <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
-              <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="contratos-tab">
+              <div>
                 <ItemExecutionSummaryStrip
                   summary={executionSummary}
                   referencia={comprasGovReferencia}
@@ -1515,8 +1181,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                   ))}
                 </div>
               )}
-            </AppCard>
-
           </div>
         ) : activeTab === 'alocacao' ? (
           <AllocationsTab
@@ -1536,6 +1200,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             qty={newAllocatedQty}
             onQtyChange={setNewAllocatedQty}
             onSubmit={handleAddAllocation}
+            onStartNew={handleStartNewAllocation}
             onCancelEdit={handleCancelEdit}
             saving={saveAllocationsMutation.isPending || saveEmpenhoLinksMutation.isPending}
             error={allocationError}
@@ -1544,7 +1209,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
               if (alloc) handleEditAllocation(alloc);
             }}
             onDelete={handleDeleteAllocation}
-            onGoToContracts={() => setActiveTab('contratos')}
+            onGoToContracts={() => setActiveTab('contratos', true)}
           />
         ) : (
           <AdesoesTab
@@ -1558,22 +1223,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             adesaoConsumidaPercent={adesaoConsumidaPercent}
           />
         )}
-      </div>
-
-      {/* Modal for detailing contract & empenhos */}
-      <EmpenhoDetailModal
-        selectedEmpenhoDetail={selectedEmpenhoDetail}
-        onClose={() => setSelectedEmpenhoDetail(null)}
-        arpNumeroAta={arp.numeroAtaRegistroPreco}
-        itemNumeroItem={item.numeroItem}
-        contractsLoading={contractsLoading}
-        filteredContracts={selectedEmpenhoDetail ? getFilteredContractsForModal(selectedEmpenhoDetail) : []}
-        contractEmpenhos={contractEmpenhos}
-        empenhosLoadingMap={empenhosLoadingMap}
-      />
-
-      {/* Modal de Cadastro/Edição de Empenho Manual */}
-
+      </ItemTabPanel>
 
       {/* Modal de Vínculo com Contrato Oficial da UASG (Fase 6.2) */}
       <LinkContractModal
