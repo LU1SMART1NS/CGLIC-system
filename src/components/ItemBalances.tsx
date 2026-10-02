@@ -114,6 +114,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const { role } = useAuth();
   const toast = useToast();
   const confirm = useConfirmDialog();
+  const canLinkEmpenhos = canManageAllocations || role === 'gestor';
   const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
   const canEditData = role === 'admin' || role === 'gestor';
 
@@ -1141,7 +1142,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                               vinculos={empenhoVinculos}
                                               loading={vinculosLoading}
                                               canEdit={canEditData}
-                                              canManageAllocations={canManageAllocations}
+                                              canLinkEmpenhos={canLinkEmpenhos}
                                               allocationOptions={allocationRows.map((a) => ({
                                                 id: a.id,
                                                 unitName: a.unitName,
