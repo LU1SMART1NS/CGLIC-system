@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, FileText, Loader2, Unlink } from 'lucide-react';
+import { Eye, FileText, Loader2, Trash2 } from 'lucide-react';
+import { AppButton } from '../../design-system/components/AppButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 
@@ -90,56 +91,27 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+            {link.isOficial && (
+              <AppButton
+                variant="outline"
+                size="sm"
+                iconOnly
+                icon={<Eye size={15} />}
+                onClick={() => navigate(`/contratos/${encodeURIComponent(link.contractKey)}`)}
+                title="Ver detalhes do contrato"
+              />
+            )}
             {onUnlink && (
-              <button
-                type="button"
+              <AppButton
+                variant="ghostDanger"
+                size="sm"
+                iconOnly
+                icon={unlinkingId === link.linkId ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={15} />}
                 onClick={() => onUnlink(link)}
                 disabled={unlinkingId === link.linkId}
-                title="Desvincular este contrato do item da ata"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.45rem 0.75rem',
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: '#b91c1c',
-                  cursor: unlinkingId === link.linkId ? 'wait' : 'pointer'
-                }}
-              >
-                {unlinkingId === link.linkId ? (
-                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <Unlink size={13} />
-                )}
-                Desvincular
-              </button>
-            )}
-
-            {link.isOficial && (
-              <button
-                type="button"
-                onClick={() => navigate(`/contratos/${encodeURIComponent(link.contractKey)}`)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.45rem 0.85rem',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: '#0c326f',
-                  cursor: 'pointer'
-                }}
-              >
-                Ver Detalhes <ArrowRight size={13} />
-              </button>
+                title="Desvincular contrato deste item da ata"
+              />
             )}
           </div>
         </div>

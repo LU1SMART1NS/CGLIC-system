@@ -117,7 +117,11 @@ describe('useSyncContractEmpenhos Hook — Integração UI Contrato 360°', () =
     expect(mockQueryClient.invalidateQueries).not.toHaveBeenCalledWith({
       queryKey: ['v_arp_item_saldo_detalhado']
     });
-    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(4);
+    // O Financeiro do Contrato lê o dashboard gerencial: precisa recarregar após a sincronização
+    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['management-dashboard']
+    });
+    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(10);
   });
 
   it('3. deve propagar erros de execução se o orquestrador falhar', async () => {

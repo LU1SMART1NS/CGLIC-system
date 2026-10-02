@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   DollarSign,
@@ -14,7 +14,10 @@ import { useAssignedManagementScope } from '../../hooks/useAssignedManagementSco
 import { useAuth } from '../../context/AuthContext';
 import { getContractManagementKey } from '../../services/contractManagementService';
 import { Contract360Header } from './Contract360Header';
-import { Contract360Section } from './Contract360Section';
+import { InstrumentSection } from '../instrument360/InstrumentSection';
+import { Instrument360Page } from '../instrument360/Instrument360Page';
+import { Instrument360TabPanel } from '../instrument360/Instrument360TabPanel';
+import { useInstrumentTab } from '../instrument360/useInstrumentTab';
 import { ContractActionQueue, type Contract360Tab } from './ContractActionQueue';
 import { ContractHealthStrip } from './ContractHealthStrip';
 import { useContractActionQueue } from '../../hooks/useContractActionQueue';
@@ -58,14 +61,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
 
   const { queue, isLoading: loadingQueue } = useContractActionQueue(contract, plan);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('aba') as Contract360Tab | null;
-  const activeTab: Contract360Tab = tabParam && TAB_IDS.includes(tabParam) ? tabParam : 'acoes';
-  const tabsRef = React.useRef<HTMLDivElement>(null);
-  const goToTab = (tab: Contract360Tab) => {
-    setSearchParams(tab === 'acoes' ? {} : { aba: tab });
-    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const { activeTab, goToTab, tabsRef } = useInstrumentTab<Contract360Tab>({ tabs: TAB_IDS, defaultTab: 'acoes' });
 
   // Escopo ASSIGNED do perfil "gestor" (role_domain_scopes.contracts,
   // migration 20260925000023): a listagem em ContractsRoute.tsx já esconde
@@ -139,14 +135,14 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   ];
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
+    <Instrument360Page>
       <Contract360Header contract={contract}>
         <ContractHealthStrip
           contract={contract}
           contractKey={resolvedContractKey}
           counts={queue.counts}
-          onOpenActions={() => goToTab('acoes')}
-          onOpenFinanceiro={() => goToTab('financeiro')}
+          onOpenActions={() => goToTab('acoes', true)}
+          onOpenFinanceiro={() => goToTab('financeiro', true)}
         />
       </Contract360Header>
 
@@ -154,14 +150,14 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
         ref={tabsRef}
         tabs={tabs}
         active={activeTab}
-        onSelect={goToTab}
+        onSelect={(tab) => goToTab(tab)}
         idPrefix="contract"
         ariaLabel="Seções do contrato"
       />
 
-      <div role="tabpanel" id={`contract-tabpanel-${activeTab}`} aria-labelledby={`contract-tab-${activeTab}`}>
+      <Instrument360TabPanel idPrefix="contract" activeTab={activeTab}>
         {activeTab === 'acoes' && (
-          <Contract360Section
+          <InstrumentSection
             id="contract-attention-section"
             title="Ações do contrato"
             subtitle="Tarefas, pagamentos, reajustes e prazos legais em ordem de prioridade"
@@ -172,55 +168,55 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
               contractKey={resolvedContractKey}
               plan={plan}
               isLoading={loadingPlan || loadingQueue}
-              onGoTo={goToTab}
+              onGoTo={(tab) => goToTab(tab, true)}
             />
-          </Contract360Section>
+          </InstrumentSection>
         )}
 
         {activeTab === 'plano' && (
-          <Contract360Section
+          <InstrumentSection
             id="contract-tasks-section"
             title="Plano de gestão"
             subtitle="Todas as tarefas do modelo de gestão aplicado, com responsável, prazo e situação"
             icon={ListTodo}
           >
             <ContractTasksSection contract={contract} plan={plan} isLoading={loadingPlan} />
-          </Contract360Section>
+          </InstrumentSection>
         )}
 
         {activeTab === 'pagamentos' && (
-          <Contract360Section
+          <InstrumentSection
             id="contract-payment-followup-section"
             title="Acompanhamento de pagamentos"
             subtitle="Atestos, faturamento e tramitação na CGOFI (o CGLIC acompanha; a CGOFI executa o pagamento)"
             icon={DollarSign}
           >
             <ContractPaymentFollowUpSection contract={contract} contractKey={resolvedContractKey} />
-          </Contract360Section>
+          </InstrumentSection>
         )}
 
         {activeTab === 'financeiro' && (
-          <Contract360Section
+          <InstrumentSection
             id="contract-financial-execution-section"
             title="Execução financeira e empenhos"
             subtitle="Empenhos emitidos, liquidação, pagamento e saldos de execução"
             icon={Receipt}
           >
             <ContractFinancialExecutionSection contract={contract} contractKey={resolvedContractKey} />
-          </Contract360Section>
+          </InstrumentSection>
         )}
 
         {activeTab === 'historico' && (
-          <Contract360Section
+          <InstrumentSection
             id="contract-timeline-section"
             title="Linha do tempo contratual"
             subtitle="Histórico de eventos, separando fato oficial, decisão interna e proposta"
             icon={History}
           >
             <ContractEventsTimeline contract={contract} />
-          </Contract360Section>
+          </InstrumentSection>
         )}
-      </div>
-    </div>
+      </Instrument360TabPanel>
+    </Instrument360Page>
   );
 };

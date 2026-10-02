@@ -1,24 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ExternalLink,
-  FileText,
-  AlertTriangle,
-  CheckCircle2,
-  RefreshCw,
-  Loader2,
-  Info,
-  XCircle,
-  X
-} from 'lucide-react';
+import { ExternalLink, FileText, RefreshCw } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import { useSyncContractEmpenhos } from '../../hooks/useSyncContractEmpenhos';
+import { useAuth } from '../../context/AuthContext';
 import type { OrchestrationStatus } from '../../types/empenhoSync';
 import { useContractManager } from '../../hooks/useContractManager';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
 import { getContractDaysRemaining } from '../../services/dashboardService';
 import { formatContractNumber } from '../../utils/contractNumber';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
+import { AppButton, NoticeBar, type NoticeBarTone } from '../../design-system';
+import { pncpLinkStyle } from '../atas/Ata360Header';
 import { Instrument360Hero, instrumentStatusLabel } from '../instrument360/Instrument360Hero';
 
 interface Contract360HeaderProps {
@@ -64,6 +57,9 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       : contract.numeroControlePncp || 'unknown-contract');
 
   const syncMutation = useSyncContractEmpenhos(contractKey);
+  // Itens da ata são gravados por RPCs de gestor/admin: só esses perfis refazem a parte dos itens.
+  const { role } = useAuth();
+  const canRefreshItems = role === 'gestor' || role === 'admin';
   const { data: manager, isLoading: loadingManager } = useContractManager(contractKey);
 
   // RBAC: gestor, coordenador e admin possuem permissão
@@ -87,7 +83,8 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
 
     syncMutation.mutate({
       contratoId: contract.contratoId || contract.id,
-      pncpParams
+      pncpParams,
+      refreshItems: canRefreshItems ? contract : undefined
     });
   };
 
@@ -97,50 +94,44 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       ? `https://pncp.gov.br/app/contratos/${contract.numeroControlePncp}`
       : undefined);
 
-  // Mapeamento de Feedback Operacional
-  const getFeedbackConfig = (status?: OrchestrationStatus) => {
+  // Resumo da parte dos itens da ata (só quando o perfil refaz os itens e há itens ligados)
+  const itensRefresh = syncMutation.data?.itens_refresh;
+  const itensResumo = (() => {
+    if (!itensRefresh || (itensRefresh.itens === 0 && itensRefresh.falhas.length === 0)) return '';
+    const ok = itensRefresh.itens - itensRefresh.falhas.length;
+    const partes = [`${ok} ${ok === 1 ? 'item da ata atualizado' : 'itens da ata atualizados'}`];
+    if (itensRefresh.pendentes > 0) {
+      partes.push(`${itensRefresh.pendentes} ${itensRefresh.pendentes === 1 ? 'quantidade pendente' : 'quantidades pendentes'} de confirmação`);
+    }
+    if (itensRefresh.falhas.length > 0) {
+      partes.push(`${itensRefresh.falhas.length} ${itensRefresh.falhas.length === 1 ? 'item não pôde ser atualizado' : 'itens não puderam ser atualizados'}`);
+    }
+    return ` ${partes.join(' · ')}.`;
+  })();
+
+  // Feedback operacional da sincronização de empenhos
+  const getFeedbackConfig = (status?: OrchestrationStatus): { tone: NoticeBarTone; message: string } => {
     switch (status) {
       case 'SUCESSO':
         return {
-          bg: '#f0fdf4',
-          border: '#bbf7d0',
-          color: '#166534',
-          icon: <CheckCircle2 size={16} color="#166534" />,
+          tone: itensRefresh && itensRefresh.falhas.length > 0 ? 'warning' : 'success',
           message: `Sincronização concluída. ${
             syncMutation.data?.empenhos_persistidos ?? syncMutation.data?.empenhos_encontrados ?? 0
-          } empenho(s) processado(s) e atualizado(s) com sucesso.`
+          } empenho(s) processado(s) e atualizado(s) com sucesso.${itensResumo}`
         };
       case 'SEM_DADOS':
-        return {
-          bg: '#f0f9ff',
-          border: '#bae6fd',
-          color: '#075985',
-          icon: <Info size={16} color="#075985" />,
-          message: 'Nenhum empenho encontrado nas bases oficiais para este contrato.'
-        };
+        return { tone: 'info', message: `Nenhum empenho encontrado nas bases oficiais para este contrato.${itensResumo}` };
       case 'SUCESSO_PARCIAL':
-        return {
-          bg: '#fffbeb',
-          border: '#fde68a',
-          color: '#92400e',
-          icon: <AlertTriangle size={16} color="#92400e" />,
-          message: 'Sincronização concluída parcialmente. Algumas bases externas estavam temporariamente indisponíveis.'
-        };
+        return { tone: 'warning', message: `Sincronização concluída parcialmente. Algumas bases externas estavam temporariamente indisponíveis.${itensResumo}` };
       case 'COM_DIVERGENCIAS':
         return {
-          bg: '#fffbeb',
-          border: '#fde68a',
-          color: '#92400e',
-          icon: <AlertTriangle size={16} color="#92400e" />,
-          message: `Dados sincronizados com ${syncMutation.data?.divergencias?.length ?? 0} divergência(s) entre fontes oficiais. Detalhes registrados no histórico.`
+          tone: 'warning',
+          message: `Dados sincronizados com ${syncMutation.data?.divergencias?.length ?? 0} divergência(s) entre fontes oficiais. Detalhes registrados no histórico.${itensResumo}`
         };
       case 'ERRO':
       default:
         return {
-          bg: '#fef2f2',
-          border: '#fecaca',
-          color: '#991b1b',
-          icon: <XCircle size={16} color="#991b1b" />,
+          tone: 'danger',
           message:
             syncMutation.data?.erros?.[0]?.erro ||
             (syncMutation.error instanceof Error
@@ -165,100 +156,35 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       onBack={handleBack}
       actions={
         <>
+          {pncpUrl && (
+            <a href={pncpUrl} target="_blank" rel="noopener noreferrer" style={pncpLinkStyle}>
+              <ExternalLink size={13} /> Contrato no PNCP
+            </a>
+          )}
           {/* Empenhos de contrato não são atualizados automaticamente: este é o único
               gatilho por contrato (o lote fica em Execução Financeira). */}
-          <button
-            type="button"
-            aria-label="Atualizar empenhos"
-            disabled={!isAuthorized || syncMutation.isPending}
+          <AppButton
+            variant="outline"
+            size="sm"
+            icon={<RefreshCw size={14} className={syncMutation.isPending ? 'spin-animation' : ''} />}
             onClick={handleSync}
+            disabled={!isAuthorized || syncMutation.isPending}
+            isLoading={syncMutation.isPending}
             title={
               !isAuthorized
                 ? 'Você não possui permissão para atualizar empenhos.'
                 : `Buscar empenhos deste contrato nas fontes oficiais (fonte do contrato: ${contract.fonteDados || 'PNCP'})`
             }
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              color: !isAuthorized ? '#94a3b8' : '#0c326f',
-              backgroundColor: !isAuthorized ? '#f1f5f9' : '#f0fdf4',
-              padding: '0.25rem 0.65rem',
-              borderRadius: '6px',
-              border: `1px solid ${!isAuthorized ? '#cbd5e1' : '#86efac'}`,
-              cursor: !isAuthorized || syncMutation.isPending ? 'not-allowed' : 'pointer'
-            }}
           >
-            {syncMutation.isPending ? (
-              <>
-                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                <span>Atualizando...</span>
-              </>
-            ) : (
-              <>
-                <RefreshCw size={13} />
-                <span>Atualizar empenhos</span>
-              </>
-            )}
-          </button>
-
-          {pncpUrl && (
-            <a
-              href={pncpUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                color: '#0284c7',
-                backgroundColor: 'rgba(2, 132, 199, 0.08)',
-                padding: '0.25rem 0.65rem',
-                borderRadius: '6px',
-                textDecoration: 'none'
-              }}
-            >
-              <ExternalLink size={13} /> Contrato no PNCP
-            </a>
-          )}
+            {syncMutation.isPending ? 'Atualizando...' : 'Atualizar empenhos'}
+          </AppButton>
         </>
       }
       notice={
         showFeedback && feedback ? (
-          <div
-            role="alert"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.75rem',
-              padding: '0.6rem 0.85rem',
-              marginBottom: '1rem',
-              borderRadius: '8px',
-              background: feedback.bg,
-              border: `1px solid ${feedback.border}`,
-              color: feedback.color,
-              fontSize: '0.82rem',
-              fontWeight: 600
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {feedback.icon}
-              <span>{feedback.message}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => syncMutation.reset()}
-              aria-label="Fechar notificação"
-              style={{ background: 'none', border: 'none', color: feedback.color, cursor: 'pointer', display: 'flex', opacity: 0.75 }}
-            >
-              <X size={14} />
-            </button>
-          </div>
+          <NoticeBar tone={feedback.tone} testId="contract-sync-feedback" onDismiss={() => syncMutation.reset()}>
+            {feedback.message}
+          </NoticeBar>
         ) : null
       }
       icon={<FileText size={26} color="#0c326f" aria-hidden="true" />}

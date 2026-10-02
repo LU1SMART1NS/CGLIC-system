@@ -72,22 +72,32 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
 
   const fornecedores = new Set(itens.map((i) => i.nomeRazaoSocialFornecedor).filter(Boolean)).size;
 
-  // Maior consumo entre os itens: um item a 91% já é alerta, independente da média da Ata.
-  const maiorConsumo = React.useMemo(() => {
-    let best: { pct: number; numeroItem: string } | null = null;
+  // Saldo ainda contratável, em valor (itens têm unidades diferentes, então não se somam quantidades).
+  // O tom segue o item mais consumido: um item a 91% já é alerta, independente do conjunto da Ata.
+  const saldoContratavel = React.useMemo(() => {
+    const precoPorItem = new Map(itens.map((i) => [Number(i.numeroItem), Number(i.valorUnitario) || 0]));
+    let total = 0;
+    let livre = 0;
+    let pior: { pct: number; numeroItem: string } | null = null;
     for (const s of saldos) {
+      const preco = precoPorItem.get(Number(s.numero_item)) ?? 0;
       const homologada = Number(s.quantidade_homologada || 0);
+      const consumida = Number(s.quantidade_consumida || 0);
+      total += homologada * preco;
+      livre += Math.max(homologada - consumida, 0) * preco;
       const raw = typeof s.percentual_consumido === 'number'
         ? s.percentual_consumido
-        : homologada > 0 ? (Number(s.quantidade_consumida || 0) / homologada) * 100 : 0;
+        : homologada > 0 ? (consumida / homologada) * 100 : 0;
       const pct = classifyArpItemSaldo(raw).percentualConsumido;
-      if (!best || pct > best.pct) best = { pct, numeroItem: String(s.numero_item ?? '') };
+      if (!pior || pct > pior.pct) pior = { pct, numeroItem: String(s.numero_item ?? '') };
     }
-    return best;
-  }, [saldos]);
-  const consumoClass = maiorConsumo ? classifyArpItemSaldo(maiorConsumo.pct) : null;
-  const consumoTone: SeverityLevel | undefined =
-    consumoClass && (consumoClass.isCritico || consumoClass.isProximoLimite) ? consumoClass.severity : undefined;
+    return { total, livre, pior };
+  }, [itens, saldos]);
+  const piorClass = saldoContratavel.pior ? classifyArpItemSaldo(saldoContratavel.pior.pct) : null;
+  const saldoTone: SeverityLevel | undefined =
+    piorClass && (piorClass.isCritico || piorClass.isProximoLimite) ? piorClass.severity : undefined;
+  const temSaldo = saldos.length > 0 && saldoContratavel.total > 0;
+  const livrePct = temSaldo ? Math.round((saldoContratavel.livre / saldoContratavel.total) * 100) : 0;
 
   // Órgão só aparece quando for diferente da unidade gerenciadora (evita "SENASP" repetido).
   const orgaoDiferente = arp.nomeOrgao && arp.nomeOrgao.trim().toUpperCase() !== (arp.nomeUnidadeGerenciadora || '').trim().toUpperCase();
@@ -140,12 +150,18 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
             testId="ata-health-valor"
           />
           <HealthTile
-            label="Maior consumo de saldo"
-            value={isLoadingSaldos && !maiorConsumo ? '…' : maiorConsumo ? `${Math.round(maiorConsumo.pct)}%` : '—'}
-            hint={maiorConsumo ? `item ${maiorConsumo.numeroItem}` : isLoadingSaldos ? 'Carregando saldos' : 'Sem saldo registrado'}
-            tone={consumoTone}
+            label="Saldo contratável"
+            value={isLoadingSaldos && !temSaldo ? '…' : temSaldo ? formatCurrencyCompact(saldoContratavel.livre) : '—'}
+            hint={
+              temSaldo
+                ? saldoTone && saldoContratavel.pior
+                  ? `item ${saldoContratavel.pior.numeroItem} a ${Math.round(saldoContratavel.pior.pct)}% contratado`
+                  : `${livrePct}% do valor registrado`
+                : isLoadingSaldos ? 'Carregando saldos' : 'Sem saldo registrado'
+            }
+            tone={saldoTone}
             onClick={onOpenItens}
-            testId="ata-health-consumo"
+            testId="ata-health-saldo"
           />
           <HealthTile
             label="Contratos vinculados"

@@ -1,8 +1,9 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { Eye } from 'lucide-react';
+import { AppButton } from '../../design-system/components/AppButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { classifyArpItemSaldo } from '../../services/balanceService';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { saldoBarColor } from './ataSaldoStats';
 import type { ArpItemRecord } from '../../types';
 
@@ -90,14 +91,15 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
                   </td>
                   {onSelectItem && (
                     <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
+                      <AppButton
+                        variant="outline"
+                        size="sm"
+                        iconOnly
+                        icon={<Eye size={15} />}
                         onClick={() => onSelectItem(item)}
                         data-testid={`ata-item-open-${item.numeroItem}`}
-                        style={carteiraButton}
-                      >
-                        Ver saldo <ArrowRight size={13} />
-                      </button>
+                        title="Ver saldo do item"
+                      />
                     </td>
                   )}
                 </tr>

@@ -12,6 +12,7 @@ import { fetchContratosGovData, fetchContratosGovEmpenhos, fetchContratoEmpenhoD
 import { normalizeFromContratosGov } from './empenhoNormalizationService';
 import { deduceEmpenhoQuantity } from './balanceService';
 import { saveEmpenhoSoberanoM17 } from './empenhoSyncService';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 import {
   syncItemContractEmpenhosRpc,
   type ItemContractEmpenhoInput
@@ -83,6 +84,16 @@ export function classifyContractEmpenhosForItem(
   }
 
   return decisions;
+}
+
+async function linkEmpenhoToContract(contractKey: string, empenhoId: string, valor?: number): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const { error } = await supabase.rpc('link_empenho_to_contract_atomic', {
+    p_contract_key: contractKey,
+    p_empenho_id: empenhoId,
+    p_valor_vinculado: valor && valor > 0 ? valor : null
+  });
+  if (error) console.warn(`[itemContractEmpenhoService] Falha ao vincular o empenho ${empenhoId} ao contrato ${contractKey}:`, error);
 }
 
 export interface SyncItemContractEmpenhosParams {
@@ -169,6 +180,8 @@ export async function syncItemContractEmpenhos(params: SyncItemContractEmpenhosP
       // Não envia lista parcial: a RPC substitui o conjunto do par e removeria empenhos já gravados.
       throw new Error(`Empenho ${d.empenho.numero_oficial} não pôde ser gravado (${inputs.length} de ${decisions.length} gravados): ${err?.message || err}`);
     }
+    // O empenho também é do contrato: o vínculo faz a aba Financeiro do Contrato ler o mesmo registro gravado aqui.
+    await linkEmpenhoToContract(contract.contractKey, empenhoId, d.empenho.valor_empenhado);
     inputs.push({
       empenhoId,
       quantidade: d.quantidade,

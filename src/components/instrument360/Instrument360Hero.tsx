@@ -92,7 +92,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
         {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
       </div>
 
-      {notice}
+      {notice && <div style={{ marginBottom: '1rem' }}>{notice}</div>}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

@@ -3,7 +3,6 @@ import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { formatDateBR } from '../../services/temporalEngineService';
 import type { ContractLifeline, LifelineMilestone } from '../../services/contractLifelineService';
-import { PRAZO_COLORS, classifyPrazo } from '../carteira/carteiraPrazo';
 
 /**
  * Peças do cabeçalho das telas 360 (Contrato e Ata): cartões de indicador,
@@ -94,11 +93,10 @@ export const PendenciasTile: React.FC<{
 }> = ({ counts, onClick, testId }) => {
   const severities = (['CRITICA', 'URGENTE', 'ATENCAO'] as const).filter((s) => counts[s] > 0);
   const total = severities.reduce((acc, s) => acc + counts[s], 0);
-  const lembretes = counts.INFO;
-  const lembretesHint = lembretes > 0 ? `${lembretes} ${lembretes === 1 ? 'lembrete de prazo' : 'lembretes de prazo'}` : 'tudo em dia';
 
+  // Lembretes de prazo (INFO) não exigem ação agora; ficam na aba Ações, fora do indicador.
   if (total === 0) {
-    return <HealthTile label="Pendências" value="Nenhuma" hint={lembretesHint} positive onClick={onClick} testId={testId} />;
+    return <HealthTile label="Pendências" value="Nenhuma" hint="tudo em dia" positive onClick={onClick} testId={testId} />;
   }
   const hint = severities.map((s) => `${counts[s]} ${PENDENCIA_LABELS[s][counts[s] === 1 ? 0 : 1]}`).join(' · ');
   return <HealthTile label="Pendências" value={String(total)} hint={hint} tone={severities[0]} onClick={onClick} testId={testId} />;
@@ -151,15 +149,15 @@ function labelPosition(pct: number): React.CSSProperties {
 }
 
 /**
- * Linha da vida: vigência e dias restantes em cima; marcos nomeados embaixo
+ * Linha da vida: vigência em cima (os dias restantes ficam no selo do título); marcos nomeados embaixo
  * (em duas faixas quando ficam próximos) e o "Hoje" marcado sobre a barra.
  */
 export const LifelineBar: React.FC<{
   lifeline: ContractLifeline | null;
   testId: string;
-  /** Força a situação "cancelada" (Ata cancelada no PNCP). */
+  /** Mantido por compatibilidade: a situação (prazo, cancelada) vive no selo do título, não na barra. */
   cancelada?: boolean;
-}> = ({ lifeline, testId, cancelada = false }) => {
+}> = ({ lifeline, testId }) => {
   if (!lifeline) {
     return (
       <div data-testid={testId} style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '1rem' }}>
@@ -167,15 +165,6 @@ export const LifelineBar: React.FC<{
       </div>
     );
   }
-
-  const faixa = classifyPrazo(lifeline.diasParaFim, cancelada);
-  const restanteLabel = cancelada
-    ? 'Cancelada no PNCP'
-    : lifeline.diasParaFim < 0
-      ? `Encerrada há ${Math.abs(lifeline.diasParaFim)} dias`
-      : lifeline.diasParaFim === 0
-        ? 'Vence hoje'
-        : `${lifeline.diasParaFim} ${lifeline.diasParaFim === 1 ? 'dia restante' : 'dias restantes'}`;
 
   const placed = placeMilestoneLabels(lifeline.milestones);
   const hasSecondRow = placed.some((p) => p.row === 1);
@@ -186,9 +175,6 @@ export const LifelineBar: React.FC<{
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.78rem', marginBottom: showToday ? '1.1rem' : '0.5rem' }}>
         <span style={{ color: '#475569' }}>
           <strong style={{ color: '#0f172a' }}>Vigência</strong> · {formatDateBR(lifeline.start)} a {formatDateBR(lifeline.end)}
-        </span>
-        <span data-testid={`${testId}-restante`} style={{ fontWeight: 800, color: PRAZO_COLORS[faixa].color }}>
-          {restanteLabel}
         </span>
       </div>
 

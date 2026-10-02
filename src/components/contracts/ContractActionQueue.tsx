@@ -1,9 +1,10 @@
 import React from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
 import type { ContractTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
+import { AppButton } from '../../design-system/components/AppButton';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { useUpdateContractTask } from '../../hooks/useUpdateContractTask';
@@ -31,7 +32,8 @@ const KIND_LABELS: Record<ContractActionItem['kind'], string> = {
   TAREFA: 'Tarefa',
   PAGAMENTO: 'Pagamento',
   REAJUSTE: 'Reajuste / repactuação',
-  LEMBRETE: 'Prazo legal'
+  LEMBRETE: 'Prazo legal',
+  EMPENHO: 'Execução do contrato'
 };
 
 const secondaryButton: React.CSSProperties = {
@@ -52,6 +54,7 @@ const secondaryButton: React.CSSProperties = {
 export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue, contractKey, plan, isLoading = false, onGoTo }) => {
   const updateMutation = useUpdateContractTask(contractKey);
   const { dismiss, restore } = useReminderDismissals('CONTRATO', contractKey);
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const highlightedId = searchParams.get('item');
 
@@ -74,48 +77,57 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
       case 'TAREFA': {
         if (!item.taskId) return null;
         return (
-          <button
-            type="button"
+          <AppButton
+            variant="outline"
+            size="sm"
+            iconOnly
+            icon={<Check size={15} />}
             onClick={() => updateMutation.mutate({ taskId: item.taskId!, status: 'CONCLUIDA' })}
             disabled={updateMutation.isPending}
-            style={{ ...secondaryButton, cursor: updateMutation.isPending ? 'not-allowed' : 'pointer' }}
-          >
-            <Check size={13} />
-            <span>Concluir</span>
-          </button>
+            title="Concluir"
+          />
         );
       }
       case 'PAGAMENTO':
         return (
-          <button type="button" onClick={() => onGoTo('pagamentos')} style={secondaryButton}>
-            <span>Abrir ciclo</span>
-            <ArrowRight size={13} />
-          </button>
+          <AppButton variant="outline" size="sm" iconOnly icon={<ArrowRight size={15} />} onClick={() => onGoTo('pagamentos')} title="Abrir ciclo" />
+        );
+      case 'EMPENHO':
+        if (!item.href) return null;
+        return (
+          <AppButton
+            variant="outline"
+            size="sm"
+            iconOnly
+            icon={<ArrowRight size={15} />}
+            onClick={() => navigate(item.href!)}
+            title="Confirmar a quantidade no item da ata"
+          />
         );
       case 'REAJUSTE':
         return (
-          <button type="button" onClick={() => onGoTo('historico')} style={secondaryButton}>
-            <span>Ver histórico</span>
-            <ArrowRight size={13} />
-          </button>
+          <AppButton variant="outline" size="sm" iconOnly icon={<ArrowRight size={15} />} onClick={() => onGoTo('historico')} title="Ver histórico" />
         );
       case 'LEMBRETE':
         return (
           <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <button
-              type="button"
+            <AppButton
+              variant="outline"
+              size="sm"
+              iconOnly
+              icon={<Check size={15} />}
               onClick={() => dismiss.mutate({ itemId: item.id })}
               disabled={dismiss.isPending}
-              title="Já resolvido ou não se aplica: o lembrete some deste ciclo de vigência"
-              style={{ ...secondaryButton, cursor: dismiss.isPending ? 'not-allowed' : 'pointer' }}
-            >
-              <Check size={13} />
-              <span>Resolvido</span>
-            </button>
-            <button type="button" onClick={() => onGoTo('plano')} style={secondaryButton}>
-              <span>{plan ? 'Ver plano' : 'Aplicar modelo'}</span>
-              <ArrowRight size={13} />
-            </button>
+              title="Resolvido: já resolvido ou não se aplica, o lembrete some deste ciclo de vigência"
+            />
+            <AppButton
+              variant="outline"
+              size="sm"
+              iconOnly
+              icon={<ArrowRight size={15} />}
+              onClick={() => onGoTo('plano')}
+              title={plan ? 'Ver plano' : 'Aplicar modelo'}
+            />
           </div>
         );
     }
