@@ -114,8 +114,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const { role } = useAuth();
   const toast = useToast();
   const confirm = useConfirmDialog();
-  const canLinkEmpenhos = canManageAllocations || role === 'gestor';
   const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
+  const canLinkEmpenhos = canManageAllocations || role === 'gestor';
   const canEditData = role === 'admin' || role === 'gestor';
 
   const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
