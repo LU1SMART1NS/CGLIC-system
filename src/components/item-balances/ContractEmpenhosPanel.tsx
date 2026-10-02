@@ -21,7 +21,7 @@ interface ContractEmpenhosPanelProps {
   loading: boolean;
   /** Gestor ou admin: pode confirmar quantidade. */
   canEdit: boolean;
-  canManageAllocations: boolean;
+  canLinkEmpenhos: boolean;
   allocationOptions: AllocationOption[];
   /** Id da unidade interna a que o empenho (pelo número) está vinculado. */
   linkedAllocationId: (numeroEmpenho: string) => string;
@@ -80,7 +80,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
   vinculos,
   loading,
   canEdit,
-  canManageAllocations,
+  canLinkEmpenhos,
   allocationOptions,
   linkedAllocationId,
   onConfirm,
@@ -146,7 +146,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
           <select
             value={current}
             onChange={(e) => onLinkAllocation(v.empenho.numero, e.target.value)}
-            disabled={busy || !canManageAllocations}
+            disabled={busy || !canLinkEmpenhos}
             className="form-input"
             aria-label={`Unidade interna do empenho ${v.empenho.numero}`}
             style={{

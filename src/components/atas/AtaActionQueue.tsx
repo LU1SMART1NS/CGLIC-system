@@ -3,6 +3,7 @@ import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
 import type { AtaTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
+import { AppButton } from '../../design-system/components/AppButton';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { useUpdateAtaTask } from '../../hooks/useUpdateAtaTask';
@@ -64,41 +65,41 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
     switch (item.kind) {
       case 'SALDO':
         return (
-          <button type="button" onClick={() => onGoTo('itens')} style={secondaryButton}>
-            <span>Ver itens</span>
-            <ArrowRight size={13} />
-          </button>
+          <AppButton variant="outline" size="sm" iconOnly icon={<ArrowRight size={15} />} onClick={() => onGoTo('itens')} title="Ver itens" />
         );
       case 'TAREFA':
         if (!item.taskId) return null;
         return (
-          <button
-            type="button"
+          <AppButton
+            variant="outline"
+            size="sm"
+            iconOnly
+            icon={<Check size={15} />}
             onClick={() => updateMutation.mutate({ taskId: item.taskId!, status: 'CONCLUIDA' })}
             disabled={updateMutation.isPending}
-            style={{ ...secondaryButton, cursor: updateMutation.isPending ? 'not-allowed' : 'pointer' }}
-          >
-            <Check size={13} />
-            <span>Concluir</span>
-          </button>
+            title="Concluir"
+          />
         );
       case 'LEMBRETE':
         return (
           <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <button
-              type="button"
+            <AppButton
+              variant="outline"
+              size="sm"
+              iconOnly
+              icon={<Check size={15} />}
               onClick={() => dismiss.mutate({ itemId: item.id })}
               disabled={dismiss.isPending}
-              title="Já resolvido ou não se aplica: o lembrete some deste ciclo de vigência"
-              style={{ ...secondaryButton, cursor: dismiss.isPending ? 'not-allowed' : 'pointer' }}
-            >
-              <Check size={13} />
-              <span>Resolvido</span>
-            </button>
-            <button type="button" onClick={() => onGoTo('plano')} style={secondaryButton}>
-              <span>{plan ? 'Ver plano' : 'Aplicar modelo'}</span>
-              <ArrowRight size={13} />
-            </button>
+              title="Resolvido: já resolvido ou não se aplica, o lembrete some deste ciclo de vigência"
+            />
+            <AppButton
+              variant="outline"
+              size="sm"
+              iconOnly
+              icon={<ArrowRight size={15} />}
+              onClick={() => onGoTo('plano')}
+              title={plan ? 'Ver plano' : 'Aplicar modelo'}
+            />
           </div>
         );
     }

@@ -6,7 +6,18 @@ import { calculateAttentionSummary } from './dashboardService';
 import { buildCentralPrazosItems } from './centralPrazosService';
 import { parseDateBRT } from './temporalEngineService';
 
-export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE';
+export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE' | 'EMPENHO';
+
+/** Empenho do contrato cuja quantidade ainda espera confirmação em um item da ata. */
+export interface PendingEmpenhoQuantity {
+  empenhoId: string;
+  numeroEmpenho: string;
+  itemKey: string;
+  /** Texto do item para a lista (ex.: "Ata 00059/2025 · Item 1"). */
+  itemLabel: string;
+  /** Tela do item, onde a quantidade é confirmada. */
+  href: string;
+}
 
 export interface ContractActionItem {
   id: string;
@@ -21,6 +32,8 @@ export interface ContractActionItem {
   macrotaskName?: string;
   executionMode?: TaskExecutionMode;
   sistemaDestino?: string;
+  /** Destino da ação quando ela leva a outra tela (empenho pendente → item da ata). */
+  href?: string;
 }
 
 export interface ContractActionQueue {
@@ -61,10 +74,11 @@ export function buildContractActionQueue(params: {
   contractKey: string;
   plan: ContractTaskPlan | null;
   paymentCycles?: PaymentFollowUpCycle[];
+  pendingEmpenhos?: PendingEmpenhoQuantity[];
   dismissedReminderIds?: string[];
   currentDate?: Date;
 }): ContractActionQueue {
-  const { contractKey, plan, paymentCycles = [], dismissedReminderIds = [], currentDate } = params;
+  const { contractKey, plan, paymentCycles = [], pendingEmpenhos = [], dismissedReminderIds = [], currentDate } = params;
   const dismissed = new Set(dismissedReminderIds);
   const dispensados: ContractActionItem[] = [];
   // Vigência encerrada: os lembretes de prorrogação (D-180/D-60) perdem o sentido.
@@ -151,6 +165,19 @@ export function buildContractActionQueue(params: {
       };
       (dismissed.has(lembrete.id) ? dispensados : items).push(lembrete);
     }
+  }
+
+  // Quantidade de empenho pendente: a execução do contrato depende de o gestor confirmar no item da ata.
+  for (const e of pendingEmpenhos) {
+    items.push({
+      id: `ACT-EMPENHO-${e.empenhoId}-${e.itemKey}`,
+      kind: 'EMPENHO',
+      severity: 'ATENCAO',
+      title: `Confirmar a quantidade do empenho ${e.numeroEmpenho}`,
+      description: e.itemLabel,
+      badgeLabel: 'Pendente',
+      href: e.href
+    });
   }
 
   items.sort((a, b) => {

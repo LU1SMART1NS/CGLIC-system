@@ -75,8 +75,8 @@ function planWith(prazo: string | undefined, executionMode?: 'CONFIRMACAO'): Con
   } as ContractTaskPlan;
 }
 
-function render(contract: ContractDashboardRecord, plan: ContractTaskPlan | null, url = '/') {
-  const queue = buildContractActionQueue({ contract, contractKey: contract.id, plan, paymentCycles: mockCycles });
+function render(contract: ContractDashboardRecord, plan: ContractTaskPlan | null, url = '/', pendingEmpenhos: Parameters<typeof buildContractActionQueue>[0]['pendingEmpenhos'] = []) {
+  const queue = buildContractActionQueue({ contract, contractKey: contract.id, plan, paymentCycles: mockCycles, pendingEmpenhos });
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[url]}>
       <ContractActionQueue queue={queue} contractKey={contract.id} plan={plan} onGoTo={() => {}} />
@@ -149,5 +149,15 @@ describe('ContractActionQueue', () => {
     const id = /data-action-id="([^"]+)"/.exec(first)![1];
     const html = render(baseContract, plan, `/?item=${encodeURIComponent(id)}`);
     expect(html).toContain('background-color:#eff6ff');
+  });
+
+  it('mostra o empenho com quantidade pendente e o botão que leva ao item da ata', () => {
+    mockCycles = [];
+    const html = render(baseContract, null, '/', [{ empenhoId: 'e1', numeroEmpenho: '2026NE000262', itemKey: '00059/2025-200331-00001', itemLabel: 'Ata 00059/2025 · Item 1', href: '/atas/detalhe/x/itens/1?aba=contratos' }]);
+    expect(html).toContain('Confirmar a quantidade do empenho 2026NE000262');
+    expect(html).toContain('Execução do contrato');
+    expect(html).toContain('Ata 00059/2025 · Item 1');
+    expect(html).toContain('title="Confirmar a quantidade no item da ata"');
+    expect(html).not.toContain('Tudo em dia com este contrato');
   });
 });

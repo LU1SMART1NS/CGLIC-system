@@ -25,7 +25,7 @@ const base: React.ComponentProps<typeof ContractEmpenhosPanel> = {
   vinculos,
   loading: false,
   canEdit: true,
-  canManageAllocations: true,
+  canLinkEmpenhos: true,
   allocationOptions: [],
   linkedAllocationId: () => '',
   onConfirm: vi.fn(),

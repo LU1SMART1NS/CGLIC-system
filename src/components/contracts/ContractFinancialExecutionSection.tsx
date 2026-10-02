@@ -1,16 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  CreditCard,
-  CheckCircle2,
-  Clock,
-  Receipt,
-  Layers,
-  ArrowRight,
-  Loader2
-} from 'lucide-react';
+import { ArrowRight, Layers, Receipt } from 'lucide-react';
+import { useAutoSyncContractEmpenhos } from '../../hooks/useAutoSyncContractEmpenhos';
+import { useContractEmpenhoItemLinks } from '../../hooks/useContractEmpenhoItemLinks';
+import { buildAtaItemPath } from '../../hooks/useAta';
+import { formatItemKeyLabel, parseItemKey } from '../../utils/itemKeyParts';
+import type { ContractEmpenhoItemLink } from '../../services/contractEmpenhoItemLinksService';
 import type { ContractDashboardRecord } from '../../types';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
+import { AppButton, DataTable, EmptyState, ErrorState, NoticeBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
 
 interface ContractFinancialExecutionSectionProps {
   contract: ContractDashboardRecord;
@@ -33,486 +31,170 @@ const formatDate = (val?: string | null) => {
   }
 };
 
+type EmpenhoRow = ReturnType<typeof useContractFinancialSummary>['empenhosList'][number];
+
+/** Situação da quantidade do empenho nos itens da ata: pendente se algum item ainda espera confirmação. */
+function quantidadeEstado(links: ContractEmpenhoItemLink[]): { label: string; variant: 'success' | 'info' | 'warning' } {
+  if (links.some((l) => l.quantidade == null)) return { label: 'Pendente', variant: 'warning' };
+  if (links.every((l) => l.fonte !== 'USUARIO')) return { label: 'Oficial', variant: 'success' };
+  return { label: 'Confirmada', variant: 'info' };
+}
+
+function itemPath(itemKey: string): string | null {
+  const p = parseItemKey(itemKey);
+  return p ? `${buildAtaItemPath(p.numeroAta, p.uasg, parseInt(p.numeroItem, 10))}?aba=contratos` : null;
+}
+
 export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecutionSectionProps> = ({
   contract,
   contractKey
 }) => {
   const navigate = useNavigate();
+  const { data: itemLinks = [] } = useContractEmpenhoItemLinks(contractKey);
+  const linksByEmpenho = new Map<string, ContractEmpenhoItemLink[]>();
+  for (const l of itemLinks) linksByEmpenho.set(l.empenhoId, [...(linksByEmpenho.get(l.empenhoId) ?? []), l]);
+  const pendentes = itemLinks.filter((l) => l.quantidade == null);
+  const empenhosUrl = `/empenhos?contractKey=${encodeURIComponent(contractKey)}`;
 
   // Empenhos de Contratos.gov/Compras.gov + v_empenhos_resumo, deduplicados por canonical_key
   const { empenhosList, summary: financialSummary, isLoading, isError, refetch } = useContractFinancialSummary(contract, contractKey);
 
-  // 1. Estado de Carregamento
-  if (isLoading && empenhosList.length === 0) {
-    return (
-      <div
-        style={{
-          padding: '2.5rem',
-          textAlign: 'center',
-          background: '#f8fafc',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0',
-          color: '#64748b'
-        }}
-      >
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#0c326f', margin: '0 auto 0.75rem auto' }} />
-        <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>
-          Carregando lastro orçamentário e empenhos vinculados...
-        </p>
-      </div>
-    );
+  const { isSyncing } = useAutoSyncContractEmpenhos(contract, contractKey, {
+    isLoading,
+    isError,
+    empenhosCount: empenhosList.length
+  });
+
+  if ((isLoading || isSyncing) && empenhosList.length === 0) {
+    return <DataTable columns={[]} data={[]} keyExtractor={() => ''} isLoading testId="contract-financial-loading" />;
   }
 
-  // 2. Estado de Erro / Indisponibilidade de Dados Financeiros
   if (isError && empenhosList.length === 0) {
     return (
-      <div
-        style={{
-          padding: '2rem 1.5rem',
-          textAlign: 'center',
-          background: '#fef2f2',
-          borderRadius: '8px',
-          border: '1px solid #fecaca',
-          color: '#991b1b'
-        }}
-      >
-        <p style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0 0 0.35rem 0' }}>
-          Indisponibilidade na consulta de dados financeiros
-        </p>
-        <p style={{ fontSize: '0.8rem', color: '#7f1d1d', maxWidth: '520px', margin: '0 auto 1rem auto' }}>
-          Não foi possível conectar aos serviços de consulta de empenhos oficiais neste momento. Isto não indica ausência de empenhos, mas uma indisponibilidade temporária de consulta.
-        </p>
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-          <button
-            type="button"
-            onClick={refetch}
-            style={{
-              padding: '0.45rem 0.9rem',
-              backgroundColor: '#991b1b',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            Tentar novamente
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/empenhos')}
-            style={{
-              padding: '0.45rem 0.9rem',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Ver Painel Geral de Empenhos
-          </button>
-        </div>
-      </div>
+      <ErrorState
+        title="Indisponibilidade na consulta de dados financeiros"
+        message="Não foi possível conectar aos serviços de consulta de empenhos oficiais neste momento. Isto não indica ausência de empenhos, mas uma indisponibilidade temporária de consulta."
+        onRetry={() => refetch()}
+        testId="contract-financial-error"
+      />
     );
   }
 
-  // 3. Estado Sem Empenhos Vinculados (EmptyState Semântico)
   if (empenhosList.length === 0 || !financialSummary) {
     return (
-      <div
-        style={{
-          padding: '2.5rem 1.5rem',
-          textAlign: 'center',
-          background: '#f8fafc',
-          borderRadius: '8px',
-          border: '1px dashed #cbd5e1',
-          color: '#64748b'
-        }}
-      >
-        <Receipt size={32} style={{ margin: '0 auto 0.75rem auto', color: '#94a3b8' }} />
-        <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#334155', margin: '0 0 0.35rem 0' }}>
-          Não há empenhos vinculados disponíveis para este contrato
-        </p>
-        <p style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '500px', margin: '0 auto 1.25rem auto' }}>
-          Nenhuma Nota de Empenho foi vinculada a este contrato nas bases oficiais ou no cadastro manual.
-        </p>
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-          <button
-            type="button"
-            onClick={() => navigate(`/empenhos?contractKey=${encodeURIComponent(contractKey)}`)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#0c326f',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            Consultar em Empenhos <ArrowRight size={14} />
-          </button>
-        </div>
-      </div>
+      <EmptyState
+        icon={<Receipt size={28} />}
+        title="Nenhum empenho vinculado a este contrato"
+        description="Nenhum empenho deste contrato está gravado no sistema. Use Atualizar empenhos, no topo, para buscar nas bases oficiais."
+        action={
+          <AppButton variant="outline" size="sm" icon={<ArrowRight size={14} />} onClick={() => navigate(empenhosUrl)}>
+            Consultar em Empenhos
+          </AppButton>
+        }
+        testId="contract-financial-empty"
+      />
     );
   }
 
-  // 4. Calcula o sumário agregado usando o motor canônico de execução financeira
   const summary = financialSummary;
-
   const totalEmpenhado = summary.totalValorEmpenhadoGlobal;
   const totalLiquidado = summary.totalValorLiquidadoGlobal;
   const totalPago = summary.totalValorPagoGlobal;
-  const saldoNaoExecutado = summary.saldoNaoExecutadoGlobal;
-  const saldoALiquidar = summary.saldoALiquidarGlobal;
-  const saldoAPagar = summary.saldoAPagarGlobal;
-
-  const pctLiquidado = totalEmpenhado > 0 ? (totalLiquidado / totalEmpenhado) * 100 : 0;
   const pctPago = totalEmpenhado > 0 ? (totalPago / totalEmpenhado) * 100 : 0;
+  const pctLiquidado = totalEmpenhado > 0 ? (totalLiquidado / totalEmpenhado) * 100 : 0;
+
+  const linksOf = (e: EmpenhoRow) => (e.empenho_id ? linksByEmpenho.get(e.empenho_id) ?? [] : []);
+
+  const columns: Column<EmpenhoRow>[] = [
+    { key: 'numero', header: 'Empenho', render: (e) => <strong style={{ color: '#0c326f' }}>{e.numero_oficial || 'N/A'}</strong> },
+    { key: 'credor', header: 'Credor', render: (e) => e.credor_nome || '—' },
+    { key: 'data', header: 'Emissão', render: (e) => formatDate(e.data_emissao) },
+    { key: 'empenhado', header: 'Empenhado', align: 'right', render: (e) => formatCurrency(e.valor_empenhado) },
+    { key: 'liquidado', header: 'Liquidado', align: 'right', render: (e) => formatCurrency(e.valor_liquidado) },
+    { key: 'pago', header: 'Pago', align: 'right', render: (e) => formatCurrency(e.valor_pago) },
+    { key: 'saldo', header: 'Saldo a executar', align: 'right', render: (e) => formatCurrency(Math.max(0, e.valor_empenhado - e.valor_pago)) },
+    {
+      key: 'item',
+      header: 'Item da ata',
+      render: (e) => {
+        const links = linksOf(e);
+        if (links.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+            {links.map((l) => (
+              <span key={l.itemKey}>{formatItemKeyLabel(l.itemKey)}</span>
+            ))}
+          </div>
+        );
+      }
+    },
+    {
+      key: 'quantidade',
+      header: 'Quantidade',
+      render: (e) => {
+        const links = linksOf(e);
+        if (links.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+        const estado = quantidadeEstado(links);
+        return <StatusBadge label={estado.label} variant={estado.variant} size="sm" dot={false} />;
+      }
+    },
+    {
+      key: 'acao',
+      header: 'Ação',
+      align: 'right',
+      render: (e) => {
+        const pendente = linksOf(e).find((l) => l.quantidade == null);
+        const path = pendente ? itemPath(pendente.itemKey) : null;
+        if (!path) return null;
+        return (
+          <AppButton
+            variant="outline"
+            size="sm"
+            iconOnly
+            icon={<ArrowRight size={15} />}
+            onClick={() => navigate(path)}
+            title="Confirmar a quantidade no item da ata"
+          />
+        );
+      }
+    }
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* 1. KPIs da Execução Financeira Oficial */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem'
-        }}
-      >
-        {/* Total Empenhado */}
-        <div
-          style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            padding: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.25rem'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-              Total Empenhado
-            </span>
-            <Receipt size={16} color="#0c326f" />
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0c326f' }}>
-            {formatCurrency(totalEmpenhado)}
-          </div>
-          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            {summary.totalEmpenhosVinculados} {summary.totalEmpenhosVinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}
-          </span>
-        </div>
-
-        {/* Total Liquidado */}
-        <div
-          style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            padding: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.25rem'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-              Total Liquidado
-            </span>
-            <CreditCard size={16} color="#0369a1" />
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0369a1' }}>
-            {formatCurrency(totalLiquidado)}
-          </div>
-          <span style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 600 }}>
-            {pctLiquidado.toFixed(1)}% do empenhado
-          </span>
-        </div>
-
-        {/* Total Pago */}
-        <div
-          style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            padding: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.25rem'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-              Total Pago (SIAFI)
-            </span>
-            <CheckCircle2 size={16} color="#059669" />
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#059669' }}>
-            {formatCurrency(totalPago)}
-          </div>
-          <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>
-            {pctPago.toFixed(1)}% do empenhado
-          </span>
-        </div>
-
-        {/* Saldo Não Executado */}
-        <div
-          style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            padding: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.25rem'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-              Saldo Não Executado
-            </span>
-            <Clock size={16} color="#d97706" />
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#d97706' }}>
-            {formatCurrency(saldoNaoExecutado)}
-          </div>
-          <span style={{ fontSize: '0.72rem', color: '#b45309' }}>
-            Empenhado − Pago
-          </span>
-        </div>
-      </div>
-
-      {/* 2. Barra de Progresso / Funil de Execução */}
-      {totalEmpenhado > 0 && (
-        <div
-          style={{
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            padding: '1rem 1.25rem'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>
-              Funil de Execução Financeira
-            </span>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              A Liquidar: <strong>{formatCurrency(saldoALiquidar)}</strong> • A Pagar: <strong>{formatCurrency(saldoAPagar)}</strong>
-            </span>
-          </div>
-
-          <div
-            style={{
-              height: '10px',
-              width: '100%',
-              backgroundColor: '#e2e8f0',
-              borderRadius: '999px',
-              overflow: 'hidden',
-              display: 'flex'
-            }}
-          >
-            <div
-              title={`Pago: ${pctPago.toFixed(1)}%`}
-              style={{
-                width: `${Math.min(pctPago, 100)}%`,
-                backgroundColor: '#059669',
-                transition: 'width 0.3s ease'
-              }}
-            />
-            <div
-              title={`Liquidado a Pagar: ${(pctLiquidado - pctPago).toFixed(1)}%`}
-              style={{
-                width: `${Math.max(0, Math.min(pctLiquidado - pctPago, 100 - pctPago))}%`,
-                backgroundColor: '#0284c7',
-                transition: 'width 0.3s ease'
-              }}
-            />
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: '1.5rem',
-              marginTop: '0.6rem',
-              fontSize: '0.72rem',
-              color: '#64748b'
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#059669' }} />
-              Pago: {formatCurrency(totalPago)} ({pctPago.toFixed(1)}%)
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0284c7' }} />
-              Liquidado a Pagar: {formatCurrency(saldoAPagar)}
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#cbd5e1' }} />
-              A Liquidar: {formatCurrency(saldoALiquidar)}
-            </span>
-          </div>
-        </div>
+      {pendentes.length > 0 && (
+        <NoticeBar testId="contract-financial-pending">
+          <strong>{pendentes.length}</strong>{' '}
+          {pendentes.length === 1 ? 'empenho com quantidade pendente' : 'empenhos com quantidade pendente'} de confirmação no item da ata. Use a seta da linha para abrir o item.
+        </NoticeBar>
       )}
-
-      {/* 3. Tabela de Empenhos Vinculados ou Empty State */}
-      <div
-        style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          overflow: 'hidden'
-        }}
+      <SummaryBar
+        testId="contract-financial-summary"
+        items={[
+          { label: 'Empenhado', value: formatCurrency(totalEmpenhado), unit: '' },
+          { label: 'Liquidado', value: `${formatCurrency(totalLiquidado)} (${pctLiquidado.toFixed(1)}%)`, unit: '' },
+          { label: 'Pago', value: `${formatCurrency(totalPago)} (${pctPago.toFixed(1)}%)`, unit: '', tone: 'success' },
+          { label: 'Saldo não executado', value: formatCurrency(summary.saldoNaoExecutadoGlobal), unit: '', tone: 'warning' }
+        ]}
+        progress={{ value: totalPago, max: totalEmpenhado, label: 'Pago do empenhado' }}
       >
-        <div
-          style={{
-            padding: '0.85rem 1.25rem',
-            background: '#f8fafc',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Layers size={16} color="#0c326f" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
-              Notas de Empenho Vinculadas ao Contrato
-            </span>
-            <span
-              style={{
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                backgroundColor: '#e2e8f0',
-                color: '#475569',
-                padding: '0.1rem 0.45rem',
-                borderRadius: '999px'
-              }}
-            >
-              {empenhosList.length}
-            </span>
-          </div>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          A liquidar <strong>{formatCurrency(summary.saldoALiquidarGlobal)}</strong> · A pagar <strong>{formatCurrency(summary.saldoAPagarGlobal)}</strong>
+        </span>
+      </SummaryBar>
 
-          <button
-            type="button"
-            onClick={() => navigate(`/empenhos?contractKey=${encodeURIComponent(contractKey)}`)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.35rem 0.75rem',
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              color: '#0c326f',
-              cursor: 'pointer'
-            }}
-          >
-            Abrir em Empenhos <ArrowRight size={13} />
-          </button>
-        </div>
-
-        {empenhosList.length === 0 ? (
-          <div
-            style={{
-              padding: '2.5rem 1.5rem',
-              textAlign: 'center',
-              color: '#64748b'
-            }}
-          >
-            <Receipt size={32} style={{ margin: '0 auto 0.75rem auto', color: '#94a3b8' }} />
-            <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', margin: '0 0 0.25rem 0' }}>
-              Não há empenhos vinculados disponíveis para este contrato
-            </p>
-            <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '480px', margin: '0 auto 1rem auto' }}>
-              Nenhum empenho foi associado a este contrato nas bases oficiais ou no cadastro manual.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/empenhos')}
-              style={{
-                padding: '0.45rem 0.9rem',
-                backgroundColor: '#0c326f',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              Consultar Painel Geral de Empenhos
-            </button>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                  <th style={{ padding: '0.65rem 1rem', fontWeight: 700 }}>Número do Empenho</th>
-                  <th style={{ padding: '0.65rem 1rem', fontWeight: 700 }}>Credor</th>
-                  <th style={{ padding: '0.65rem 1rem', fontWeight: 700 }}>Data Emissão</th>
-                  <th style={{ padding: '0.65rem 1rem', fontWeight: 700, textAlign: 'right' }}>Empenhado</th>
-                  <th style={{ padding: '0.65rem 1rem', fontWeight: 700, textAlign: 'right' }}>Liquidado</th>
-                  <th style={{ padding: '0.65rem 1rem', fontWeight: 700, textAlign: 'right' }}>Pago</th>
-                  <th style={{ padding: '0.65rem 1rem', fontWeight: 700, textAlign: 'right' }}>Saldo a Executar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {empenhosList.map((emp, index) => {
-                  const empSaldo = Math.max(0, emp.valor_empenhado - emp.valor_pago);
-                  return (
-                    <tr
-                      key={emp.canonical_key || emp.numero_oficial || index}
-                      style={{
-                        borderBottom: index < empenhosList.length - 1 ? '1px solid #f1f5f9' : 'none',
-                        transition: 'background-color 0.15s'
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    >
-                      <td style={{ padding: '0.65rem 1rem', fontWeight: 700, color: '#0c326f' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          {emp.numero_oficial || 'N/A'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', color: '#334155' }}>
-                        {emp.credor_nome || '—'}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', color: '#64748b' }}>
-                        {formatDate(emp.data_emissao)}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'right', fontWeight: 700, color: '#0c326f' }}>
-                        {formatCurrency(emp.valor_empenhado)}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'right', fontWeight: 600, color: '#0369a1' }}>
-                        {formatCurrency(emp.valor_liquidado)}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'right', fontWeight: 700, color: '#059669' }}>
-                        {formatCurrency(emp.valor_pago)}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'right', fontWeight: 700, color: '#d97706' }}>
-                        {formatCurrency(empSaldo)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div>
+        <SectionHeader
+          title="Notas de empenho vinculadas"
+          icon={<Layers size={16} />}
+          countBadge={empenhosList.length}
+        />
+        <DataTable
+          columns={columns}
+          data={empenhosList}
+          keyExtractor={(e, i) => e.canonical_key || e.numero_oficial || String(i)}
+          testId="contract-financial-table"
+        />
       </div>
     </div>
   );

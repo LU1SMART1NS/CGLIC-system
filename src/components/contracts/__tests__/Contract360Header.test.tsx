@@ -140,7 +140,7 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
     );
 
     expect(html).toContain('Sincronização concluída. 3 empenho(s) processado(s) e atualizado(s) com sucesso.');
-    expect(html).toContain('role="alert"');
+    expect(html).toContain('data-testid="contract-sync-feedback"');
   });
 
   it('5. deve exibir banner de feedback SEM_DADOS quando nenhum empenho for localizado', () => {

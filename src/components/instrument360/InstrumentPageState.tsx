@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertCircle, ArrowLeft, Loader2, Search } from 'lucide-react';
 import { AppButton } from '../../design-system';
 import { colors, shapes, typography } from '../../design-system/tokens';
+import { Instrument360Page } from './Instrument360Page';
 
 type InstrumentPageStateKind = 'loading' | 'error' | 'notFound' | 'forbidden';
 
@@ -35,7 +36,7 @@ export const InstrumentPageState: React.FC<InstrumentPageStateProps> = ({
 }) => {
   const isDanger = kind === 'error' || kind === 'forbidden';
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
+    <Instrument360Page>
       <div
         role={kind === 'loading' ? 'status' : undefined}
         data-testid={`instrument-state-${kind}`}
@@ -92,6 +93,6 @@ export const InstrumentPageState: React.FC<InstrumentPageStateProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </Instrument360Page>
   );
 };

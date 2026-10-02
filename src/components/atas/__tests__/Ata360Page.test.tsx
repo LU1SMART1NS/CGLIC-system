@@ -143,8 +143,8 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
     expect(html).toContain('Pregão Eletrônico');
     // Faixa de saúde e abas no padrão do Contrato 360
     expect(html).toContain('data-testid="ata-health-strip"');
-    expect(html).toContain('Maior consumo de saldo');
-    expect(html).toContain('40%');
+    expect(html).toContain('Saldo contratável');
+    expect(html).not.toContain('Maior consumo de saldo');
     expect(html).toContain('Plano de gestão');
     expect(html).toContain('Itens (1)');
     expect(html).toContain('Contratos vinculados');

@@ -9,6 +9,7 @@ export function useConfirmEmpenhoItemQuantity() {
     onSuccess: (_, v) => {
       queryClient.invalidateQueries({ queryKey: ['item-empenho-vinculos', v.itemKey] });
       queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
+      queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links'] });
     }
   });
 }

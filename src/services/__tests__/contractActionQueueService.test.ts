@@ -145,4 +145,23 @@ describe('buildContractActionQueue', () => {
       expect(q.dispensados).toEqual([]);
     });
   });
+
+  describe('quantidade de empenho pendente', () => {
+    it('vira ação de atenção que leva ao item da ata', () => {
+      const q = buildContractActionQueue({ contract, contractKey: KEY, plan: null, pendingEmpenhos: [{ empenhoId: 'e1', numeroEmpenho: '2026NE000262', itemKey: '00059/2025-200331-00001', itemLabel: 'Ata 00059/2025 · Item 1', href: '/atas/detalhe/x/itens/1?aba=contratos' }] });
+      const item = q.items.find((i) => i.kind === 'EMPENHO');
+      expect(item).toMatchObject({
+        severity: 'ATENCAO',
+        title: 'Confirmar a quantidade do empenho 2026NE000262',
+        description: 'Ata 00059/2025 · Item 1',
+        href: '/atas/detalhe/x/itens/1?aba=contratos'
+      });
+      expect(q.counts.ATENCAO).toBeGreaterThanOrEqual(1);
+    });
+
+    it('não gera ação quando não há empenho pendente', () => {
+      const q = buildContractActionQueue({ contract, contractKey: KEY, plan: null });
+      expect(q.items.some((i) => i.kind === 'EMPENHO')).toBe(false);
+    });
+  });
 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Building2, Plus, Trash2, ExternalLink, ChevronRight, ChevronDown, Eye } from 'lucide-react';
 import { getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
@@ -49,7 +49,9 @@ import { LinkContractModal } from './modals/LinkContractModal';
 import { ContractSuggestionsPanel } from './item-balances/ContractSuggestionsPanel';
 import { ItemHero, type ItemTab } from './item-balances/ItemHero';
 import { ContractEmpenhosPanel } from './item-balances/ContractEmpenhosPanel';
-import { ItemTabPanel } from './item-balances/ItemTabPanel';
+import { Instrument360Page } from './instrument360/Instrument360Page';
+import { Instrument360TabPanel } from './instrument360/Instrument360TabPanel';
+import { useInstrumentTab } from './instrument360/useInstrumentTab';
 import { AllocationsTab, type AllocationRow } from './item-balances/AllocationsTab';
 import { summarizeAllocationExecution } from '../utils/allocationExecution';
 import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryStrip';
@@ -97,26 +99,22 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   );
   const adesoesError = adesoesQueryError ? (adesoesQueryError.message || 'Falha ao buscar as adesões do item.') : null;
 
-  // Aba no endereço (?aba=), como nas telas 360: sobrevive a recarregar e pode ser compartilhada.
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Aba no endereço (?aba=), com o mesmo comportamento das telas de Ata e Contrato.
   // 'empenhos' era uma aba própria; os empenhos agora ficam dentro de cada contrato.
-  const rawTabParam = searchParams.get('aba');
-  const tabParam = (rawTabParam === 'empenhos' ? 'contratos' : rawTabParam) as ItemTab | null;
-  const activeTab: ItemTab = tabParam && ITEM_TABS.includes(tabParam) ? tabParam : 'unidades';
-  const tabsRef = React.useRef<HTMLDivElement>(null);
-  // Clicar na aba só troca o conteúdo, sem mover a tela. Os atalhos de fora das abas (cartões do topo, avisos)
-  // passam `scroll` para levar o olhar até a aba aberta.
-  const setActiveTab = (tab: ItemTab, scroll = false) => {
-    setSearchParams(tab === 'unidades' ? {} : { aba: tab }, { replace: true });
-    if (scroll) tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const navigate = useNavigate();
+  const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
+    tabs: ITEM_TABS,
+    defaultTab: 'unidades',
+    aliases: { empenhos: 'contratos' }
+  });
 
-  // Mesmas regras do backend: alocações e vínculo empenho→unidade exigem allocations.manage
-  // (admin e gestor de saldos); contratos e empenhos manuais, admin e gestor.
+  // Mesmas regras do backend: alocações exigem allocations.manage (admin e gestor de saldos);
+  // o vínculo empenho→unidade, allocations.link_empenho (também o gestor); contratos e
+  // empenhos manuais, admin e gestor.
   const { role } = useAuth();
   const toast = useToast();
   const confirm = useConfirmDialog();
+  const canLinkEmpenhos = canManageAllocations || role === 'gestor';
   const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
   const canEditData = role === 'admin' || role === 'gestor';
 
@@ -791,7 +789,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const contractsCount = linkedContractsCount;
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
+    <Instrument360Page>
       <ItemHero
         arp={arp}
         item={item}
@@ -828,7 +826,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         ariaLabel="Seções do item"
       />
 
-      <ItemTabPanel activeTab={activeTab}>
+      <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'unidades' ? (
           <UnidadesTab
             loading={loading}
@@ -977,7 +975,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 <th>Qtd. contratada</th>
                                 <th>Empenhado</th>
                                 <th>A empenhar</th>
-                                <th>Vigência</th>
+                                <th style={{ whiteSpace: 'nowrap' }}>Vigência até</th>
                                 <th style={{ textAlign: 'center' }}>Ação</th>
                               </tr>
                             </thead>
@@ -1065,25 +1063,26 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                           </>
                                         );
                                       })()}
-                                      <td style={{ fontSize: '0.8rem' }}>
-                                        {c._isManual && (
-                                          <StatusBadge label="Manual" variant="warning" size="sm" dot={false} />
-                                        )}
-                                        {c.dataVigenciaFim ? (
-                                          <>
-                                            <div style={{ color: 'var(--text-secondary)' }}>até {formatDate(c.dataVigenciaFim)}</div>
-                                            {c.statusVigencia && c.statusVigencia !== 'Não Informado' && (
-                                              <StatusBadge
-                                                label={c.statusVigencia}
-                                                variant={c.statusVigencia === 'Vigente' ? 'success' : c.statusVigencia === 'Expirado' ? 'danger' : 'warning'}
-                                                size="sm"
-                                                dot={false}
-                                              />
-                                            )}
-                                          </>
-                                        ) : !c._isManual ? (
-                                          <span style={{ color: 'var(--text-muted)' }}>-</span>
-                                        ) : null}
+                                      <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
+                                          {c.dataVigenciaFim ? (
+                                            <span style={{ color: c.statusVigencia === 'Expirado' ? 'var(--danger)' : 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatDate(c.dataVigenciaFim)}</span>
+                                          ) : !c._isManual ? (
+                                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                          ) : null}
+                                          {/* Só alertas: contrato vigente mostra apenas a data. */}
+                                          {c.dataVigenciaFim && (c.statusVigencia === 'Expirado' || c.statusVigencia === 'A Vencer (60d)') && (
+                                            <StatusBadge
+                                              label={c.statusVigencia === 'Expirado' ? 'Expirado' : 'A vencer (60d)'}
+                                              variant={c.statusVigencia === 'Expirado' ? 'danger' : 'warning'}
+                                              size="sm"
+                                              dot={false}
+                                            />
+                                          )}
+                                          {c._isManual && (
+                                            <StatusBadge label="Manual" variant="warning" size="sm" dot={false} />
+                                          )}
+                                        </div>
                                       </td>
                                       <td style={{ textAlign: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
@@ -1143,7 +1142,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                               vinculos={empenhoVinculos}
                                               loading={vinculosLoading}
                                               canEdit={canEditData}
-                                              canManageAllocations={canManageAllocations}
+                                              canLinkEmpenhos={canLinkEmpenhos}
                                               allocationOptions={allocationRows.map((a) => ({
                                                 id: a.id,
                                                 unitName: a.unitName,
@@ -1223,7 +1222,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             adesaoConsumidaPercent={adesaoConsumidaPercent}
           />
         )}
-      </ItemTabPanel>
+      </Instrument360TabPanel>
 
       {/* Modal de Vínculo com Contrato Oficial da UASG (Fase 6.2) */}
       <LinkContractModal
@@ -1237,6 +1236,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         itemUnitPrice={item.valorUnitario}
         existingLinkedContractKeys={enrichedOfficialLinks.map(l => l.contractKey)}
       />
-    </div>
+    </Instrument360Page>
   );
 };

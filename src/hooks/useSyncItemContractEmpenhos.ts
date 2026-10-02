@@ -13,6 +13,10 @@ function useInvalidateEmpenhoQueries() {
     queryClient.invalidateQueries({ queryKey: ['item-empenho-vinculos', itemKey] });
     // Saldos de item lidos da view v_arp_item_saldo_detalhado (Ata, busca de atas, dashboards)
     queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
+    // Financeiro do Contrato lê os mesmos empenhos gravados
+    queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['contract-empenhos'] });
+    queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links'] });
   };
 }
 

@@ -41,6 +41,7 @@ export function useUnlinkContractFromItem() {
         queryKey: ['ata-linked-contracts']
       });
       queryClient.invalidateQueries({ queryKey: ['item-empenho-vinculos'] });
+      queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links'] });
       queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
     }
   });

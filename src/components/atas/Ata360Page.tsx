@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layers, Link2, ListTodo, Plus } from 'lucide-react';
 import { buildAtaItemPath, uasgFromAtaKey, useAta, useAtaItemSaldos, useAtaLinkedContracts } from '../../hooks/useAta';
 import { useAtaTaskPlan } from '../../hooks/useAtaTaskPlan';
@@ -13,7 +13,10 @@ import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
 import { AtaItemsTable } from './AtaItemsTable';
 import { AtaLinkedContracts } from './AtaLinkedContracts';
 import { AtaTasksSection } from './AtaTasksSection';
-import { Contract360Section } from '../contracts/Contract360Section';
+import { InstrumentSection } from '../instrument360/InstrumentSection';
+import { Instrument360Page } from '../instrument360/Instrument360Page';
+import { Instrument360TabPanel } from '../instrument360/Instrument360TabPanel';
+import { useInstrumentTab } from '../instrument360/useInstrumentTab';
 import { LinkContractModal, type LinkableAtaItemOption } from '../modals/LinkContractModal';
 import { useUnlinkContractFromItem } from '../../hooks/useUnlinkContractFromItem';
 import { useToast, useConfirmDialog } from '../../design-system';
@@ -48,14 +51,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   // no Contract360Page para /contratos/:contractKey.
   const queue = useAtaActionQueue(arp, saldos, taskPlan);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('aba') as Ata360Tab | null;
-  const activeTab: Ata360Tab = tabParam && TAB_IDS.includes(tabParam) ? tabParam : 'acoes';
-  const tabsRef = React.useRef<HTMLDivElement>(null);
-  const goToTab = (tab: Ata360Tab) => {
-    setSearchParams(tab === 'acoes' ? {} : { aba: tab });
-    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const { activeTab, goToTab, tabsRef } = useInstrumentTab<Ata360Tab>({ tabs: TAB_IDS, defaultTab: 'acoes' });
 
   const { role } = useAuth();
   const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(uasg);
@@ -181,7 +177,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   ];
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
+    <Instrument360Page>
       <Ata360Header
         arp={arp}
         itens={itens}
@@ -189,23 +185,23 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         counts={queue.counts}
         linkedContractsCount={linkedContracts.length}
         isLoadingSaldos={loadingSaldos}
-        onOpenActions={() => goToTab('acoes')}
-        onOpenItens={() => goToTab('itens')}
-        onOpenContratos={() => goToTab('contratos')}
+        onOpenActions={() => goToTab('acoes', true)}
+        onOpenItens={() => goToTab('itens', true)}
+        onOpenContratos={() => goToTab('contratos', true)}
       />
 
       <Instrument360Tabs
         ref={tabsRef}
         tabs={tabs}
         active={activeTab}
-        onSelect={goToTab}
+        onSelect={(tab) => goToTab(tab)}
         idPrefix="ata"
         ariaLabel="Seções da ata"
       />
 
-      <div role="tabpanel" id={`ata-tabpanel-${activeTab}`} aria-labelledby={`ata-tab-${activeTab}`}>
+      <Instrument360TabPanel idPrefix="ata" activeTab={activeTab}>
         {activeTab === 'acoes' && (
-          <Contract360Section
+          <InstrumentSection
             id="ata-attention-section"
             title="Ações da ata"
             subtitle="Saldo dos itens, tarefas do plano e prazos de planejamento em ordem de prioridade"
@@ -216,24 +212,24 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
               ataKey={arp.numeroAtaRegistroPreco}
               plan={taskPlan}
               isLoading={loadingSaldos || loadingTaskPlan}
-              onGoTo={goToTab}
+              onGoTo={(tab) => goToTab(tab, true)}
             />
-          </Contract360Section>
+          </InstrumentSection>
         )}
 
         {activeTab === 'plano' && (
-          <Contract360Section
+          <InstrumentSection
             id="ata-tasks-section"
             title="Plano de gestão"
             subtitle="Todas as tarefas do modelo de gestão aplicado, com responsável, prazo e situação"
             icon={ListTodo}
           >
             <AtaTasksSection ataKey={arp.numeroAtaRegistroPreco} plan={taskPlan} isLoading={loadingTaskPlan} />
-          </Contract360Section>
+          </InstrumentSection>
         )}
 
         {activeTab === 'itens' && (
-          <Contract360Section
+          <InstrumentSection
             id="ata-items-section"
             title="Itens da ata"
             subtitle="Saldo físico por item: quantidade homologada, consumida e disponível"
@@ -246,11 +242,11 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
                 navigate(buildAtaItemPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem))
               }
             />
-          </Contract360Section>
+          </InstrumentSection>
         )}
 
         {activeTab === 'contratos' && (
-          <Contract360Section
+          <InstrumentSection
             id="ata-linked-contracts-section"
             title="Contratos vinculados"
             subtitle="Contratos oficiais que usam itens desta ata"
@@ -264,9 +260,9 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
               onUnlink={canEditLinks ? handleUnlink : undefined}
               unlinkingId={unlinkingId}
             />
-          </Contract360Section>
+          </InstrumentSection>
         )}
-      </div>
+      </Instrument360TabPanel>
 
       {canEditLinks && (
         <LinkContractModal
@@ -278,6 +274,6 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
           suggestionCriteria={linkSuggestionCriteria}
         />
       )}
-    </div>
+    </Instrument360Page>
   );
 };

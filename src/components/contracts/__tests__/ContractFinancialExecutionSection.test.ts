@@ -107,4 +107,13 @@ describe('ContractFinancialExecutionSection — Testes de Domínio e Integraçã
     expect(summary.totalValorPagoGlobal).toBe(40000);
     expect(summary.saldoNaoExecutadoGlobal).toBe(60000);
   });
+
+  it('converte o registro cru do Contratos.gov (valores em texto) em números', () => {
+    const cru = [{ id: 1, numero: '2026NE000262', data_emissao: '2026-06-26', empenhado: '2.788,00', liquidado: '0,00', pago: '1.000,50', rpinscrito: '0,00', credor: '27.975.551/0003-99 - VANGUARDA' }];
+    const list = prepareContractEmpenhosList({ ...mockContract, uasg: '200330' }, cru, []);
+    expect(list).toHaveLength(1);
+    expect(list[0].valor_empenhado).toBe(2788);
+    expect(list[0].valor_pago).toBe(1000.5);
+    expect(list[0].canonical_key).toBe('200330-2026-2026NE262');
+  });
 });
