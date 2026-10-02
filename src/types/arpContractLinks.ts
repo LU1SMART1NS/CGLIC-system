@@ -39,6 +39,8 @@ export interface EnrichedArpItemContract {
   quantidadeContratada?: number;
   /** Quando a quantidade foi lida da API pela última vez; ausente = ainda não sincronizada. */
   quantidadeLidaEm?: string;
+  /** Preço unitário do item no contrato (cópia lida da API); base da estimativa de quantidade dos empenhos. */
+  valorUnitarioContrato?: number;
   observacoes?: string;
   // Dados oficiais derivados diretamente do catálogo governamental
   contract?: ContractDashboardRecord;

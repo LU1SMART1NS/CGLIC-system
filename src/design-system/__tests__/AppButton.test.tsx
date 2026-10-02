@@ -15,6 +15,33 @@ describe('AppButton Component', () => {
     expect(html).toContain('disabled=""');
   });
 
+  it('renders ghostDanger variant: só texto em vermelho, sem fundo cheio', () => {
+    const html = renderToStaticMarkup(<AppButton variant="ghostDanger">Desvincular</AppButton>);
+    expect(html).toContain('Desvincular');
+    expect(html).toContain('color:#b91c1c');
+    expect(html).toContain('background-color:transparent');
+    expect(html).not.toContain('background-color:#ef4444');
+  });
+
+  it('iconOnly: botão quadrado sem texto, com nome acessível vindo do title ou do aria-label', () => {
+    const icon = <svg data-testid="ico" />;
+    const comTitle = renderToStaticMarkup(<AppButton iconOnly size="sm" icon={icon} title="Desvincular contrato">Texto oculto</AppButton>);
+    expect(comTitle).toContain('aria-label="Desvincular contrato"');
+    expect(comTitle).toContain('width:32px');
+    expect(comTitle).toContain('height:32px');
+    expect(comTitle).toContain('data-testid="ico"');
+    expect(comTitle).not.toContain('Texto oculto');
+
+    const comAria = renderToStaticMarkup(<AppButton iconOnly icon={icon} title="Dica" aria-label="Nome explícito" />);
+    expect(comAria).toContain('aria-label="Nome explícito"');
+  });
+
+  it('sem iconOnly o texto aparece e não há aria-label forçado', () => {
+    const html = renderToStaticMarkup(<AppButton>Salvar</AppButton>);
+    expect(html).toContain('Salvar');
+    expect(html).not.toContain('aria-label');
+  });
+
   it('renders outline variant', () => {
     const html = renderToStaticMarkup(<AppButton variant="outline">Outline</AppButton>);
     expect(html).toContain('Outline');

@@ -14,114 +14,35 @@ export interface InternalDepartment {
   criadoEm?: string;
 }
 
-export const DEFAULT_DEPARTMENTS: InternalDepartment[] = [
-  {
-    id: 'dep-dfnsp',
-    sigla: 'DFNSP',
-    nomeCompleto: 'Diretoria da Força Nacional de Segurança Pública',
-    ativo: true
-  },
-  {
-    id: 'dep-dsusp',
-    sigla: 'DSUSP',
-    nomeCompleto: 'Diretoria do Sistema Único de Segurança Pública',
-    ativo: true
-  },
-  {
-    id: 'dep-dpoa',
-    sigla: 'DPOA',
-    nomeCompleto: 'Diretoria de Operações Integradas e de Inteligência',
-    ativo: true
-  },
-  {
-    id: 'dep-dge',
-    sigla: 'DGE',
-    nomeCompleto: 'Diretoria de Gestão e Ensino em Segurança Pública',
-    ativo: true
-  },
-  {
-    id: 'dep-cgoe',
-    sigla: 'CGOE',
-    nomeCompleto: 'Coordenação-Geral de Operações Especiais',
-    ativo: true
-  },
-  {
-    id: 'dep-cgpo',
-    sigla: 'CGPO',
-    nomeCompleto: 'Coordenação-Geral de Planejamento e Orçamento',
-    ativo: true
-  },
-  {
-    id: 'dep-emendas',
-    sigla: 'Emendas Parlamentares',
-    nomeCompleto: 'Alocação para Emendas Parlamentares e Convênios',
-    ativo: true
-  },
-  {
-    id: 'dep-gabinete',
-    sigla: 'Gabinete / SENASP',
-    nomeCompleto: 'Gabinete da Secretaria Nacional de Segurança Pública',
-    ativo: true
-  }
-];
-
-const STORAGE_KEY = 'saldoarp-internal-departments';
-
 /**
- * Consulta o catálogo canônico de departamentos internos no PostgreSQL (CGLIC 3.0)
+ * Consulta o catálogo de departamentos internos no PostgreSQL (CGLIC 3.0).
+ *
+ * É a única fonte: o catálogo vazio devolve lista vazia (nada é inventado) e falha de leitura ou de configuração
+ * vira erro, para a tela mostrar o problema em vez de oferecer unidades que o banco não conhece.
  */
 export async function fetchDepartments(): Promise<InternalDepartment[]> {
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('internal_departments')
-        .select('*')
-        .order('sigla');
-
-      if (!error && data && data.length > 0) {
-        const departments = data.map((d: any) => ({
-          id: d.id,
-          sigla: d.sigla,
-          nomeCompleto: d.nome_completo || d.nomeCompleto || '',
-          descricao: d.descricao || '',
-          ativo: d.ativo !== false,
-          criadoEm: d.created_at
-        }));
-
-        // Atualiza espelhamento local pós-sucesso
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(departments));
-        } catch {}
-
-        return departments;
-      }
-    } catch (e) {
-      console.warn('Erro ao carregar departamentos do Supabase, usando fallback', e);
-    }
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('CONFIG_ERROR: Supabase não está configurado.');
   }
 
-  // LocalStorage Fallback
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch {}
+  const { data, error } = await supabase
+    .from('internal_departments')
+    .select('*')
+    .order('sigla');
 
-  return DEFAULT_DEPARTMENTS;
-}
+  if (error) {
+    console.error('Erro ao carregar o catálogo de departamentos internos:', error);
+    throw error;
+  }
 
-/**
- * @deprecated [LEGACY COMPATIBILITY] Utilize `useSaveDepartment` via React Query / `saveDepartmentRpc`
- */
-export async function saveDepartments(departments: InternalDepartment[]): Promise<void> {
-  console.warn('[DEPRECATED] saveDepartments em lote é obsoleto. Utilize useSaveDepartment individual.');
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(departments));
-  } catch {}
+  return (data || []).map((d: any) => ({
+    id: d.id,
+    sigla: d.sigla,
+    nomeCompleto: d.nome_completo || d.nomeCompleto || '',
+    descricao: d.descricao || '',
+    ativo: d.ativo !== false,
+    criadoEm: d.created_at
+  }));
 }
 
 /**

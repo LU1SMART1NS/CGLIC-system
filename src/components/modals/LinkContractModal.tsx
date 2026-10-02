@@ -198,14 +198,17 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
       let failedQty = 0;
       let failedEmp = 0;
       for (const t of targets) {
+        // O preço unitário do próprio contrato (lido junto com a quantidade) é a base certa da estimativa dos empenhos.
+        let unitPrice = t.unitPrice;
         try {
-          await syncQuantityMutation.mutateAsync({
+          const q = await syncQuantityMutation.mutateAsync({
             numeroAta,
             uasg: cleanUasg,
             numeroItem: t.numeroItem,
             contractKey: contractKeyOf(contract),
             contract
           });
+          if (q.valorUnitario) unitPrice = q.valorUnitario;
         } catch (err) {
           failedQty++;
           console.warn('Quantidade contratada não sincronizada para o item', t.numeroItem, err);
@@ -222,7 +225,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
               ano: contract.ano,
               contratoId: contract.contratoId
             },
-            unitPrice: t.unitPrice
+            unitPrice
           });
         } catch (err) {
           failedEmp++;

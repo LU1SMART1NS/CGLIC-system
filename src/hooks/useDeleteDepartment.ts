@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteDepartmentRpc } from '../adapters/departmentRpcAdapter';
 import type { RpcDeleteDepartmentResult, AppMutationError } from '../types/rpc';
-import { fetchDepartments } from '../services/unitService';
 
 export interface DeleteDepartmentVariables {
   id: string;
@@ -17,7 +16,6 @@ export interface DeleteDepartmentVariables {
  * Invariantes:
  * - retry: 0
  * - Invalidação canônica de ['internal-departments']
- * - Espelhamento secundário seguro em LocalStorage somente pós-sucesso
  */
 export function useDeleteDepartment() {
   const queryClient = useQueryClient();
@@ -27,17 +25,12 @@ export function useDeleteDepartment() {
       return deleteDepartmentRpc(id, forceDeactivate);
     },
     retry: 0,
-    onSuccess: async () => {
+    onSuccess: () => {
       // Invalidação canônica do catálogo de departamentos
       queryClient.invalidateQueries({
         queryKey: ['internal-departments']
       });
 
-      // Espelhamento secundário defensivo em LocalStorage somente após confirmação do backend
-      try {
-        const updated = await fetchDepartments();
-        localStorage.setItem('saldoarp-internal-departments', JSON.stringify(updated));
-      } catch {}
     }
   });
 }

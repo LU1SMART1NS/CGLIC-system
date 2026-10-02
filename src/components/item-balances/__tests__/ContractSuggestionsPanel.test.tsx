@@ -57,7 +57,9 @@ describe('ContractSuggestionsPanel', () => {
   });
 
   it('mostra mensagem quando não há sugestões', () => {
-    expect(html({ suggestions: [], dismissed: [] })).toContain('Nenhum contrato sugerido para este item.');
+    const out = html({ suggestions: [], dismissed: [] });
+    expect(out).toContain('Sugeridos (0): nenhum contrato sugerido para este item.');
+    expect(out).not.toContain('Encontrados nas APIs oficiais');
   });
 
   it('mostra carregamento e erro no lugar da lista', () => {

@@ -1,7 +1,7 @@
 import React, { type ButtonHTMLAttributes } from 'react';
 import { shapes, spacing, typography } from '../tokens';
 
-export type AppButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+export type AppButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'ghostDanger';
 export type AppButtonSize = 'sm' | 'md' | 'lg';
 
 export interface AppButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -9,10 +9,15 @@ export interface AppButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> 
   size?: AppButtonSize;
   icon?: React.ReactNode;
   isLoading?: boolean;
+  /**
+   * Botão quadrado só com ícone, para linhas densas de tabela. Sem texto visível, o nome acessível vem de
+   * `aria-label` (ou, na falta dele, de `title`); informe sempre um dos dois.
+   */
+  iconOnly?: boolean;
 }
 
 export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
-  ({ variant = 'primary', size = 'md', icon, isLoading, disabled, children, className, style, ...rest }, ref) => {
+  ({ variant = 'primary', size = 'md', icon, isLoading, iconOnly = false, disabled, children, className, style, ...rest }, ref) => {
     
     const [isHovered, setIsHovered] = React.useState(false);
     const [isFocused, setIsFocused] = React.useState(false);
@@ -37,6 +42,13 @@ export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
             color: '#475569',
             border: '1px solid transparent'
           };
+        case 'ghostDanger':
+          // Ação destrutiva discreta: só texto em vermelho; ganha fundo avermelhado ao passar o mouse.
+          return {
+            backgroundColor: isHovered && !disabled ? '#fef2f2' : 'transparent',
+            color: '#b91c1c',
+            border: '1px solid transparent'
+          };
         case 'danger':
           return {
             backgroundColor: isHovered && !disabled ? '#dc2626' : '#ef4444',
@@ -54,6 +66,10 @@ export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
     };
 
     const getSizeStyles = (): React.CSSProperties => {
+      if (iconOnly) {
+        const side = size === 'lg' ? '44px' : size === 'sm' ? '32px' : '36px';
+        return { width: side, height: side, padding: 0, fontSize: size === 'sm' ? '0.75rem' : '0.85rem' };
+      }
       switch (size) {
         case 'sm':
           return {
@@ -110,6 +126,7 @@ export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
         aria-disabled={disabled || isLoading}
         aria-busy={isLoading}
         {...rest}
+        aria-label={rest['aria-label'] ?? (iconOnly ? rest.title : undefined)}
       >
         {isLoading && (
           <span style={{ 
@@ -125,7 +142,7 @@ export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
           </span>
         )}
         {!isLoading && icon && <span style={{ display: 'inline-flex' }}>{icon}</span>}
-        {children}
+        {!iconOnly && children}
       </button>
     );
   }

@@ -101,6 +101,22 @@ describe('syncItemContractEmpenhos', () => {
     expect(summary).toMatchObject({ lidos: 2, sincronizados: 1, ignorados: 1 });
   });
 
+  it('se a minuta não vem (exige token), não repete a consulta para os demais empenhos', async () => {
+    vi.mocked(api.fetchContratosGovEmpenhos).mockResolvedValueOnce([emp({ id: 10 }), emp({ id: 11, numero: '2026NE000300' }), emp({ id: 12, numero: '2026NE000301' })]);
+    vi.mocked(api.fetchContratoEmpenhoDetalhe).mockResolvedValue(null);
+    vi.mocked(sync.saveEmpenhoSoberanoM17).mockResolvedValue({ empenhoId: 'uuid', isNew: true });
+    vi.mocked(rpcAdapter.syncItemContractEmpenhosRpc).mockResolvedValueOnce({
+      success: true, item_key: 'x', contract_key: 'y', sincronizados: 3, removidos: 0, pendentes: 3, timestamp: 't'
+    });
+
+    await syncItemContractEmpenhos({ ...params, unitPrice: 1394 });
+
+    expect(api.fetchContratoEmpenhoDetalhe).toHaveBeenCalledTimes(1);
+    const call = vi.mocked(rpcAdapter.syncItemContractEmpenhosRpc).mock.calls[0][0];
+    expect(call.empenhos).toHaveLength(3);
+    expect(call.empenhos.every((e) => e.quantidade === null)).toBe(true);
+  });
+
   it('descobre o id do contrato no Contratos.gov quando não é informado', async () => {
     vi.mocked(api.fetchContratosGovData).mockResolvedValueOnce({ contratoId: 555, items: [] });
     vi.mocked(api.fetchContratosGovEmpenhos).mockResolvedValueOnce([]);

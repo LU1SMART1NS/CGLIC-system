@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppButton } from '../../design-system/components/AppButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
+import { ErrorState } from '../../design-system/components/ErrorState';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
@@ -17,7 +18,7 @@ import { fetchAllAllocationsGlobal } from '../../services/allocationService';
 import type { InternalDepartment } from '../../services/unitService';
 
 export const DepartmentsManagementPage: React.FC = () => {
-  const { data: departments = [], isLoading: isDepartmentsLoading, refetch } = useDepartments();
+  const { data: departments = [], isLoading: isDepartmentsLoading, isError: isDepartmentsError, error: departmentsError, refetch } = useDepartments();
   const saveMutation = useSaveDepartment();
   const deleteMutation = useDeleteDepartment();
   const mergeMutation = useMergeDepartment();
@@ -270,8 +271,17 @@ export const DepartmentsManagementPage: React.FC = () => {
         <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
           Unidades e departamentos oficiais ({departments.length})
         </div>
-        {departments.length === 0 && !isDepartmentsLoading ? (
-          <EmptyState title="Nenhuma unidade cadastrada." />
+        {isDepartmentsError ? (
+          <ErrorState
+            title="Não foi possível carregar as unidades internas"
+            message={(departmentsError as Error | null)?.message || 'Falha ao consultar o catálogo de unidades internas.'}
+            onRetry={() => refetch()}
+          />
+        ) : departments.length === 0 && !isDepartmentsLoading ? (
+          <EmptyState
+            title="Nenhuma unidade cadastrada."
+            description="Use o formulário acima para cadastrar as unidades oficiais. As alocações internas só aceitam unidades deste catálogo."
+          />
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>

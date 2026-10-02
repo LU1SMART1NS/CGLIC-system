@@ -2,7 +2,7 @@ import React from 'react';
 import { Share2 } from 'lucide-react';
 import { formatNumber, formatCurrency, formatDate } from './itemBalanceUtils';
 import type { AdesaoItemRecord, ArpItemRecord } from '../../types';
-import { AppCard, DataTable, EmptyState, KpiCard, ProgressBar, SectionHeader, StatusBadge, type Column } from '../../design-system';
+import { AppCard, DataTable, EmptyState, ProgressBar, SectionHeader, StatusBadge, type Column } from '../../design-system';
 
 export interface AdesoesTabProps {
   adesoesLoading: boolean;
@@ -94,53 +94,31 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
     }
   ];
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0.5rem 1rem' }}>
-      <AppCard variant="subtle" padding="lg">
-        <SectionHeader
-          title="Adesões e Caronas de Órgãos Não Participantes"
-          actions={
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <StatusBadge label="Compras.gov.br Oficial" variant="neutral" size="sm" dot={false} />
-              <StatusBadge label="Art. 86 da Lei 14.133/21" variant="success" size="sm" dot={false} />
-            </div>
-          }
-        />
-        <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
-          Este painel detalha as solicitações e autorizações de adesão (caronas) formalizadas por órgãos e entidades externas que não integraram inicialmente o processo licitatório.
-          Os limites da Lei 14.133/2021 estabelecem teto de até <strong>50%</strong> do quantitativo do item por órgão não participante e <strong>200% (2x)</strong> no total cumulativo da Ata.
-        </p>
-      </AppCard>
+  const Resumo: React.FC<{ label: string; value: string; unit?: string; tone?: string }> = ({ label, value, unit = 'un', tone }) => (
+    <span>
+      {label} <strong style={{ color: tone }}>{value}</strong> <span style={{ color: 'var(--text-muted)' }}>{unit}</span>
+    </span>
+  );
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-        <KpiCard
-          title="Órgãos Solicitantes (Caronas)"
-          value={adesoes.length}
-          unit="órgãos"
-          description="Entidades com carona autorizada/registrada"
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0.5rem 1rem' }} data-testid="adesoes-tab">
+      <div>
+        <SectionHeader
+          title="Adesões e caronas"
+          subtitle="Órgãos não participantes que aderiram à ata (Art. 86 da Lei 14.133/2021): até 50% do quantitativo do item por órgão e 200% no total da ata."
+          icon={<Share2 size={16} />}
+          countBadge={adesoes.length}
+          actions={<StatusBadge label="Compras.gov.br" variant="neutral" size="sm" dot={false} />}
         />
-        <KpiCard
-          title="Total Autorizado para Caronas"
-          value={formatNumber(totalAdesaoRegistrada)}
-          unit={`de ${formatNumber(maximoAdesaoPermitido)} máx`}
-          description={`Limite máximo global permitido: ${formatNumber(maximoAdesaoPermitido)} un`}
-          subContent={<ProgressBar value={percentAdesaoRegistrada} showPercent={false} height="5px" testId="adesao-total-progress" />}
-          variant="info"
-        />
-        <KpiCard
-          title="Total Empenhado por Caronas"
-          value={formatNumber(totalAdesaoEmpenhada)}
-          unit="un"
-          description={`Consumo: ${formatNumber(adesaoConsumidaPercent)}% da cota concedida`}
-          variant="warning"
-        />
-        <KpiCard
-          title="Saldo Concedido Não Empenhado"
-          value={formatNumber(saldoNaoEmpenhado)}
-          unit="un"
-          description={`Equivalente a ${formatCurrency(saldoNaoEmpenhado * item.valorUnitario)}`}
-          variant="success"
-        />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem', fontSize: '0.9rem' }} data-testid="adesoes-summary">
+            <Resumo label="Autorizado" value={`${formatNumber(totalAdesaoRegistrada)} de ${formatNumber(maximoAdesaoPermitido)}`} />
+            <Resumo label="Empenhado" value={`${formatNumber(totalAdesaoEmpenhada)} (${formatNumber(adesaoConsumidaPercent)}%)`} tone={totalAdesaoEmpenhada > 0 ? 'var(--warning)' : undefined} />
+            <Resumo label="Saldo concedido" value={`${formatNumber(saldoNaoEmpenhado)} (${formatCurrency(saldoNaoEmpenhado * item.valorUnitario)})`} tone="var(--success)" unit="un" />
+          </div>
+          <ProgressBar value={percentAdesaoRegistrada} showPercent={false} height="6px" testId="adesao-total-progress" />
+        </div>
       </div>
 
       {adesoesLoading ? (
@@ -151,7 +129,7 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
       ) : adesoes.length === 0 ? (
         <AppCard variant="default" padding="md">
           <EmptyState
-            title="Nenhuma Carona Externa Registrada"
+            title="Nenhuma carona externa registrada"
             description={adesoesError || `Nenhum órgão não participante solicitou ou teve autorização de adesão registrada para o Item ${item.numeroItem} no módulo oficial do Compras.gov.br.`}
             icon={<Share2 size={36} color="#94a3b8" />}
           />
