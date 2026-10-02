@@ -33,6 +33,9 @@ export type MutationErrorCode =
   | 'ATA_TASK_NOT_FOUND'
   | 'INVALID_TASK_STATUS'
   | 'PAYMENT_CYCLE_ALREADY_EXISTS'
+  | 'PRAZO_JUSTIFICATIVA_REQUIRED'
+  | 'INVALID_TRANSITION'
+  | 'DOCUMENT_ALREADY_EXISTS'
   | 'PAYMENT_CYCLE_NOT_FOUND'
   | 'INVALID_CYCLE_STATUS'
   | 'NETWORK_OR_CONFIG_ERROR'
@@ -460,9 +463,7 @@ export interface RpcUpdateAtaTaskResult {
 // ==============================================================================
 
 export type PaymentCycleStatusValue =
-  | 'RECEBIDO' | 'ATRIBUIDO' | 'EM_INSTRUCAO' | 'PENDENTE_DOCUMENTACAO'
-  | 'DESPACHO_ELABORADO' | 'ENVIADO_CGOFI' | 'AGUARDANDO_CGOFI'
-  | 'DEVOLVIDO_FISCAL' | 'PAGAMENTO_CONFIRMADO' | 'CONCLUIDO' | 'CANCELADO';
+  | 'RECEBIDO' | 'COM_PENDENCIA' | 'CONFERIDO' | 'ENVIADO_CGOFI' | 'DEVOLVIDO' | 'PAGO' | 'CANCELADO';
 
 export interface RpcContractPaymentCycleRow {
   id: string;
@@ -478,6 +479,11 @@ export interface RpcContractPaymentCycleRow {
   numero_notas_fiscais?: number | null;
   valor_atesto: number;
   data_assinatura_atesto: string;
+  data_recebimento: string;
+  data_conferencia?: string | null;
+  prazo_conferencia_ate?: string | null;
+  prazo_envio_ate?: string | null;
+  cobrar_cgofi_ate?: string | null;
   data_vencimento_fatura: string;
   data_envio_cgofi?: string | null;
   data_ordem_bancaria?: string | null;
@@ -493,6 +499,34 @@ export interface RpcContractPaymentCycleRow {
   concluido_por?: string | null;
 }
 
+export interface RpcPaymentCycleDocumentRow {
+  id: string;
+  cycle_id: string;
+  tipo: string;
+  numero?: string | null;
+  sei: string;
+  valor?: number | string | null;
+  data_recebimento?: string | null;
+  created_at: string;
+}
+
+export interface RpcPaymentCycleEventRow {
+  id: string;
+  cycle_id: string;
+  tipo: string;
+  data_evento: string;
+  sei?: string | null;
+  numero_ob?: string | null;
+  motivo?: string | null;
+  origem_pendencia?: 'FORNECEDOR' | 'FISCAL' | null;
+  prazo_anterior?: string | null;
+  prazo_novo?: string | null;
+  justificativa?: string | null;
+  regularidade_verificada?: boolean | null;
+  registrado_por_nome?: string | null;
+  created_at: string;
+}
+
 export interface RpcCreatePaymentCycleResult {
   success: boolean;
   cycle: {
@@ -506,25 +540,26 @@ export interface RpcCreatePaymentCycleResult {
   task_plan: Record<string, unknown> | null;
 }
 
-export interface RpcUpdatePaymentCycleResult {
+/** Resposta de register_payment_cycle_marco_atomic. */
+export interface RpcPaymentCycleMarcoResult {
   success: boolean;
   cycle: {
     id: string;
     cycle_key: string;
-    contract_key: string;
-    competencia: string;
     status: PaymentCycleStatusValue;
-    documento_despacho_sei?: string | null;
+    data_conferencia?: string | null;
     data_envio_cgofi?: string | null;
+    documento_despacho_sei?: string | null;
     numero_ordem_bancaria?: string | null;
     data_ordem_bancaria?: string | null;
-    responsavel_nome?: string | null;
-    responsavel_user_id?: string | null;
-    observacoes?: string | null;
+    prazo_conferencia_ate?: string | null;
+    prazo_envio_ate?: string | null;
+    cobrar_cgofi_ate?: string | null;
     atualizado_em: string;
-    concluido_em?: string | null;
-    concluido_por?: string | null;
   };
 }
 
-
+export interface RpcPaymentCycleInfoResult {
+  success: boolean;
+  cycle_key: string;
+}

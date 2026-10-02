@@ -23,6 +23,10 @@ describe('summarizeParticipantes', () => {
     expect(r).toMatchObject({ registrado: 921, consumido: 710, saldo: 211 });
   });
 
+  it('o quantitativo SENASP considera só as UASGs do CGLIC', () => {
+    expect(r.senasp).toEqual({ registrado: 801, consumido: 690, saldo: 111 });
+  });
+
   it('outra unidade marcada como gerenciadora segue o Compras.gov', () => {
     const r2 = summarizeParticipantes(
       [{ codigoUnidade: '200330', nomeUnidade: 'SENASP 2', tipoUnidade: 'GERENCIADORA', quantidadeRegistrada: 10, saldoRemanejamentoEmpenho: 4 }],

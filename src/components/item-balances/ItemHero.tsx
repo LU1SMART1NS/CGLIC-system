@@ -1,3 +1,4 @@
+import { classifyArpItemSaldo } from '../../services/balanceService';
 import React from 'react';
 import { ExternalLink, Package, RefreshCw } from 'lucide-react';
 import { Instrument360Hero } from '../instrument360/Instrument360Hero';
@@ -39,11 +40,12 @@ export interface ItemHeroProps {
   onGoTo: (tab: ItemTab) => void;
 }
 
-/** Situação do saldo na mesma escala de cores das barras de progresso (<20% crítico, <50% atenção). */
+/** Situação do saldo pela régua única do sistema (balanceService.classifyArpItemSaldo): resta <20% crítico, <50% atenção. */
 export function itemSaldoStatus(officialSaldo: number, restantePct: number): { faixa: PrazoFaixa; label: string } {
   if (officialSaldo <= 0) return { faixa: 'EXPIRADO', label: 'Saldo esgotado' };
-  if (restantePct < 20) return { faixa: 'CRITICO', label: 'Saldo crítico' };
-  if (restantePct < 50) return { faixa: 'ATENCAO', label: 'Saldo em atenção' };
+  const { isCritico, isProximoLimite } = classifyArpItemSaldo(100 - restantePct);
+  if (isCritico) return { faixa: 'CRITICO', label: 'Saldo crítico' };
+  if (isProximoLimite) return { faixa: 'ATENCAO', label: 'Saldo em atenção' };
   return { faixa: 'REGULAR', label: 'Saldo disponível' };
 }
 
@@ -133,7 +135,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
       <div data-testid="item-health-strip">
         <HealthTileGrid>
           <HealthTile
-            label="Saldo da ata"
+            label="Saldo SENASP"
             value={`${formatNumber(metrics.officialSaldo)} un`}
             hint={`de ${formatNumber(metrics.itemTotalQty)} · contratado ${formatNumber(metrics.totalEmpenhado)} (${formatNumber(metrics.empenhoConsumidoPercent)}%)`}
             tone={status.faixa === 'CRITICO' || status.faixa === 'EXPIRADO' ? 'CRITICA' : status.faixa === 'ATENCAO' ? 'ATENCAO' : undefined}

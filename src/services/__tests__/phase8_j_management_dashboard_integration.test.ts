@@ -49,7 +49,7 @@ describe('FASE 8-J — HOMOLOGAÇÃO INTEGRADA DO DASHBOARD GERENCIAL', () => {
     dataAssinatura: '2025-10-15',
     dataVigenciaInicio: '2025-10-15',
     dataVigenciaFim: '2026-10-15', // A vencer em < 30 dias a partir de 2026-09-24
-    statusVigencia: 'A Vencer (60d)',
+    statusVigencia: 'A Vencer',
     fonteDados: 'Contratos.gov.br'
   };
 
@@ -136,6 +136,7 @@ describe('FASE 8-J — HOMOLOGAÇÃO INTEGRADA DO DASHBOARD GERENCIAL', () => {
       input: {
         contractKey,
         competencia: rest.competencia || '2026-08',
+        dataRecebimento: '2026-08-15',
         dataAssinaturaAtesto: '2026-08-15',
         dataVencimentoFatura: '2026-09-15',
         documentoAtestoSei: 'Doc 12345',
@@ -265,14 +266,15 @@ describe('FASE 8-J — HOMOLOGAÇÃO INTEGRADA DO DASHBOARD GERENCIAL', () => {
   // 3. CENÁRIO INTEGRADO C: CONTRATO + PAGAMENTO OPERACIONAL (SSOT SEPARATION)
   // --------------------------------------------------------------------------
   describe('3. CENÁRIO INTEGRADO C: CONTRATO + PAGAMENTO OPERACIONAL', () => {
-    it('deve garantir que PAGAMENTO_CONFIRMADO no fluxo operacional NÃO altera sozinho o totalPago financeiro oficial', () => {
+    it('deve garantir que o ciclo PAGO no fluxo operacional NÃO altera sozinho o totalPago financeiro oficial', () => {
       const paymentCycleConfirmado = createMockPaymentCycle({
         cycleKey: 'CYCLE-01',
         contractKey: 'CONTRATO::200331::00010::2026',
-        status: 'PAGAMENTO_CONFIRMADO',
+        status: 'PAGO',
         input: {
           contractKey: 'CONTRATO::200331::00010::2026',
           competencia: '2026-08',
+          dataRecebimento: '2026-08-15',
           dataAssinaturaAtesto: '2026-08-15',
           dataVencimentoFatura: '2026-09-15',
           documentoAtestoSei: 'Doc 9988',
@@ -307,7 +309,7 @@ describe('FASE 8-J — HOMOLOGAÇÃO INTEGRADA DO DASHBOARD GERENCIAL', () => {
       // Acompanhamento operacional: registra o ciclo como confirmado
       expect(readModel.payments.totalCiclos).toBe(1);
       expect(readModel.payments.ciclosConcluidosCount).toBe(1);
-      expect(readModel.payments.distribuicaoPorEstado?.PAGAMENTO_CONFIRMADO).toBe(1);
+      expect(readModel.payments.distribuicaoPorEstado?.PAGO).toBe(1);
 
       // Fato financeiro oficial: permanece rigorosamente 0.00 (SSOT preservation)
       expect(readModel.financial.totalPago).toBe(0.0);
@@ -450,10 +452,11 @@ describe('FASE 8-J — HOMOLOGAÇÃO INTEGRADA DO DASHBOARD GERENCIAL', () => {
         createMockPaymentCycle({
           cycleKey: 'CYCLE-F1',
           contractKey: 'CONTRATO::200331::00010::2026',
-          status: 'EM_INSTRUCAO',
+          status: 'RECEBIDO',
           input: {
             contractKey: 'CONTRATO::200331::00010::2026',
             competencia: '2026-08',
+            dataRecebimento: '2026-08-20',
             dataAssinaturaAtesto: '2026-08-20',
             dataVencimentoFatura: '2026-09-20',
             documentoAtestoSei: 'Doc NF-1',
@@ -463,10 +466,11 @@ describe('FASE 8-J — HOMOLOGAÇÃO INTEGRADA DO DASHBOARD GERENCIAL', () => {
         createMockPaymentCycle({
           cycleKey: 'CYCLE-F2',
           contractKey: 'CONTRATO::200331::00020::2026',
-          status: 'PAGAMENTO_CONFIRMADO',
+          status: 'PAGO',
           input: {
             contractKey: 'CONTRATO::200331::00020::2026',
             competencia: '2026-08',
+            dataRecebimento: '2026-08-10',
             dataAssinaturaAtesto: '2026-08-10',
             dataVencimentoFatura: '2026-09-10',
             documentoAtestoSei: 'Doc NF-2',
@@ -503,8 +507,8 @@ describe('FASE 8-J — HOMOLOGAÇÃO INTEGRADA DO DASHBOARD GERENCIAL', () => {
 
       // Pagamentos: Apenas o ciclo do contrato 10/2026
       expect(filteredModel.payments.totalCiclos).toBe(1);
-      expect(filteredModel.payments.distribuicaoPorEstado?.EM_INSTRUCAO).toBe(1);
-      expect(filteredModel.payments.distribuicaoPorEstado?.PAGAMENTO_CONFIRMADO).toBe(0);
+      expect(filteredModel.payments.distribuicaoPorEstado?.RECEBIDO).toBe(1);
+      expect(filteredModel.payments.distribuicaoPorEstado?.PAGO).toBe(0);
     });
 
     it('deve filtrar corretamente por statusContrato: ENCERRADO', () => {
@@ -567,10 +571,11 @@ describe('FASE 8-J — HOMOLOGAÇÃO INTEGRADA DO DASHBOARD GERENCIAL', () => {
           createMockPaymentCycle({
             cycleKey: 'CYCLE-ATTN',
             contractKey: 'CONTRATO::200331::00010::2026',
-            status: 'EM_INSTRUCAO',
+            status: 'RECEBIDO',
             input: {
               contractKey: 'CONTRATO::200331::00010::2026',
               competencia: '2026-08',
+              dataRecebimento: '2026-08-01',
               dataAssinaturaAtesto: '2026-08-01', // > 20 dias atrás
               dataVencimentoFatura: '2026-09-01',
               documentoAtestoSei: 'Doc NF-100',

@@ -82,16 +82,12 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
       documentacaoPendenteCount: 1,
       margemEnvioEstreitaCount: 0,
       distribuicaoPorEstado: {
-        RECEBIDO: 0,
-        ATRIBUIDO: 0,
-        EM_INSTRUCAO: 1,
-        PENDENTE_DOCUMENTACAO: 1,
-        DESPACHO_ELABORADO: 0,
-        ENVIADO_CGOFI: 0,
-        AGUARDANDO_CGOFI: 1,
-        DEVOLVIDO_FISCAL: 0,
-        PAGAMENTO_CONFIRMADO: 1,
-        CONCLUIDO: 1,
+        RECEBIDO: 1,
+        COM_PENDENCIA: 1,
+        CONFERIDO: 0,
+        ENVIADO_CGOFI: 1,
+        DEVOLVIDO: 0,
+        PAGO: 1,
         CANCELADO: 0
       },
       ciclosRecentes: [],
@@ -100,10 +96,11 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
           cycleKey: '102025-PGTO-202609-NF100',
           contractKey: '102025',
           competencia: '2026-09',
-          status: 'PENDENTE_DOCUMENTACAO',
+          status: 'COM_PENDENCIA',
           input: {
             contractKey: '102025',
             competencia: '2026-09',
+            dataRecebimento: '2026-09-10',
             dataAssinaturaAtesto: '2026-09-10',
             dataVencimentoFatura: '2026-09-20',
             documentoAtestoSei: 'Doc SEI 100200',
@@ -127,10 +124,11 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
           cycleKey: '202025-PGTO-202609-NF200',
           contractKey: '202025',
           competencia: '2026-09',
-          status: 'AGUARDANDO_CGOFI',
+          status: 'ENVIADO_CGOFI',
           input: {
             contractKey: '202025',
             competencia: '2026-09',
+            dataRecebimento: '2026-09-01',
             dataAssinaturaAtesto: '2026-09-01',
             dataVencimentoFatura: '2026-09-30',
             documentoAtestoSei: 'Doc SEI 200300',
@@ -145,7 +143,9 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
             isVencida: false,
             statusPrazo: 'NORMAL'
           },
-          alerts: [],
+          alerts: [
+            { id: 'a-cgofi', cycleKey: '202025-PGTO-202609-NF200', contractKey: '202025', nivel: 'ATENCAO', tipo: 'CGOFI_SEM_RESPOSTA', mensagem: 'Cobrar a CGOFI', diasRelevantes: 8 }
+          ],
           criadoEm: '2026-09-01T09:00:00Z',
           atualizadoEm: '2026-09-24T09:00:00Z'
         },
@@ -153,10 +153,11 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
           cycleKey: '302025-PGTO-202608-NF300',
           contractKey: '302025',
           competencia: '2026-08',
-          status: 'PAGAMENTO_CONFIRMADO',
+          status: 'PAGO',
           input: {
             contractKey: '302025',
             competencia: '2026-08',
+            dataRecebimento: '2026-08-01',
             dataAssinaturaAtesto: '2026-08-01',
             dataVencimentoFatura: '2026-08-25',
             documentoAtestoSei: 'Doc SEI 300400',
@@ -216,11 +217,11 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
     const html = renderToStaticMarkup(<ManagementPaymentsOverview readModel={mockPaymentsReadModel} />);
 
     expect(html).toContain('Fluxo Operacional de Tramitação (Estágios do Workflow)');
-    expect(html).toContain('1. Recebido');
-    expect(html).toContain('2. Em Instrução');
-    expect(html).toContain('3. Despacho');
-    expect(html).toContain('4. CGOFI');
-    expect(html).toContain('5. Pago / Concluído');
+    expect(html).toContain('1. Em conferência');
+    expect(html).toContain('Com pendência');
+    expect(html).toContain('2. Conferido');
+    expect(html).toContain('3. Na CGOFI');
+    expect(html).toContain('4. Pago');
     expect(html).toContain('Tempo Médio CGOFI: 4.5 dias úteis');
   });
 
@@ -237,13 +238,13 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
     expect(html).toContain('Competência: 2026-09');
     expect(html).toContain('Doc SEI 100200');
     expect(html).toContain('45.000,00');
-    expect(html).toContain('Pendência Documental');
+    expect(html).toContain('Com pendência');
     expect(html).toContain('FATURA VENCIDA');
 
     // Ciclo 2 (Aguardando CGOFI)
     expect(html).toContain('Contrato 202025');
-    expect(html).toContain('Aguardando CGOFI');
-    expect(html).toContain('CGOFI: 8 dias sem resposta');
+    expect(html).toContain('Na CGOFI');
+    expect(html).toContain('Cobrar a CGOFI: 8 dias úteis sem resposta');
 
     // Ciclo 3 (OB Confirmada)
     expect(html).toContain('Contrato 302025');
@@ -251,7 +252,7 @@ describe('ManagementPaymentsOverview Component (CGLIC 3.0 — Fase 8-H)', () => 
     expect(html).toContain('20/08/2026');
   });
 
-  it('4. deve assegurar a separação explícita de domínios (PAGAMENTO_CONFIRMADO != totalPago)', () => {
+  it('4. deve assegurar a separação explícita de domínios (Pago != totalPago do SIAFI)', () => {
     const html = renderToStaticMarkup(<ManagementPaymentsOverview readModel={mockPaymentsReadModel} />);
 
     expect(html).toContain('data-testid="payments-footnote"');

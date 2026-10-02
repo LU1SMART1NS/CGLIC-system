@@ -1,5 +1,6 @@
 import type { Empenho, Contrato, ContratoEmpenho, ReconciliationReport } from '../types';
 import type { SeverityLevel } from '../design-system/tokens';
+import { SALDO_RULES } from '../config/alertRules';
 
 /**
  * Normaliza o número do empenho para comparação canônica.
@@ -366,7 +367,10 @@ export function matchAndMergeEmpenhos(
  * - Saldo e Consumo para Adesões / Caronas (respeitando o teto do item e evitando duplicação por número de unidades)
  */
 export function calculateItemCardMetrics(params: {
+  /** Quantitativo SENASP do item (base do saldo). */
   quantidadeHomologada: number;
+  /** Total da ata; base do limite de adesão, que é global. Padrão: o quantitativo SENASP. */
+  quantidadeTotalAta?: number;
   totalEmpenhado: number;
   maximoAdesaoItem?: number;
   totalAdesaoConsumida?: number;
@@ -375,6 +379,7 @@ export function calculateItemCardMetrics(params: {
 }) {
   const {
     quantidadeHomologada,
+    quantidadeTotalAta,
     totalEmpenhado,
     maximoAdesaoItem = 0,
     totalAdesaoConsumida = 0,
@@ -383,6 +388,7 @@ export function calculateItemCardMetrics(params: {
   } = params;
 
   const itemTotalQty = Number(quantidadeHomologada) || 0;
+  const totalAta = Number(quantidadeTotalAta) || itemTotalQty;
   const officialSaldo = itemTotalQty - totalEmpenhado;
   const empenhoConsumidoPercent = itemTotalQty > 0 ? (totalEmpenhado / itemTotalQty) * 100 : 0;
   const rawEmpenhoPercentRestante = itemTotalQty > 0 ? (officialSaldo / itemTotalQty) * 100 : 0;
@@ -393,7 +399,7 @@ export function calculateItemCardMetrics(params: {
     ? maximoAdesaoItem
     : (gerenciadoraLimiteAdesao > 0
         ? gerenciadoraLimiteAdesao
-        : (itemTotalQty > 0 ? itemTotalQty * 2 : 0));
+        : (totalAta > 0 ? totalAta * 2 : 0));
 
   const totalConsumidoAdesao = Number(totalAdesaoConsumida) || 0;
   const saldoAdesoes = Math.max(0, limiteAdesao - totalConsumidoAdesao);
@@ -551,12 +557,12 @@ export function deduceEmpenhoQuantity(
  * Saldos) deve chamar esta função — a UI e os read models NÃO devem
  * recalcular o percentual de consumo.
  *
- * Fórmula preservada exatamente como já era (nenhuma mudança de threshold):
- *   CRÍTICO        >= 85%
- *   PRÓXIMO LIMITE >= 70% e < 85%
+ * Régua única do saldo SENASP do item, a mesma da tela do Item (resta menos de 20% = crítico,
+ * menos de 50% = em atenção, saldo zerado = esgotado):
+ *   ESGOTADO       >= 100% consumido
+ *   CRÍTICO        >  80% consumido
+ *   ATENÇÃO        >  50% e <= 80% consumido (`isProximoLimite`)
  */
-export const ARP_SALDO_CRITICO_THRESHOLD = 85;
-export const ARP_SALDO_PROXIMO_LIMITE_THRESHOLD = 70;
 
 export interface ArpItemSaldoClassification {
   percentualConsumido: number;
@@ -567,11 +573,11 @@ export interface ArpItemSaldoClassification {
 
 export function classifyArpItemSaldo(percentualConsumido: number): ArpItemSaldoClassification {
   const rounded = Number((Number(percentualConsumido) || 0).toFixed(2));
-  const isCritico = rounded >= ARP_SALDO_CRITICO_THRESHOLD;
-  const isProximoLimite = rounded >= ARP_SALDO_PROXIMO_LIMITE_THRESHOLD && rounded < ARP_SALDO_CRITICO_THRESHOLD;
+  const isCritico = rounded > SALDO_RULES.criticoAcimaDePct;
+  const isProximoLimite = rounded > SALDO_RULES.atencaoAcimaDePct && rounded <= SALDO_RULES.criticoAcimaDePct;
 
   let severity: SeverityLevel;
-  if (rounded >= 100) {
+  if (rounded >= SALDO_RULES.esgotadoAPartirDePct) {
     severity = 'CRITICA';
   } else if (isCritico) {
     severity = 'URGENTE';

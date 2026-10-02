@@ -19,6 +19,7 @@ const FONTE_LABEL = { CONTRATOS: 'contratos vinculados', COMPRASGOV: 'Compras.go
 
 export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sortedUnidades, ugUasg, contratadoUG }) => {
   const summary = summarizeParticipantes(sortedUnidades, { ugUasg, contratadoUG });
+  const { senasp } = summary;
 
   const columns: Column<ParticipanteRow>[] = [
     {
@@ -85,18 +86,19 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
         loadingLabel="Buscando os órgãos participantes no Compras.gov..."
         items={[
           {
-            label: 'Consumido',
-            value: `${formatNumber(summary.consumido)} de ${formatNumber(summary.registrado)} (${formatNumber(summary.registrado > 0 ? (summary.consumido / summary.registrado) * 100 : 0)}%)`
+            label: 'Consumido SENASP',
+            value: `${formatNumber(senasp.consumido)} de ${formatNumber(senasp.registrado)} (${formatNumber(senasp.registrado > 0 ? (senasp.consumido / senasp.registrado) * 100 : 0)}%)`
           },
-          { label: 'Saldo', value: formatNumber(summary.saldo), tone: summary.saldo < 0 ? 'danger' : 'default' }
+          { label: 'Saldo SENASP', value: formatNumber(senasp.saldo), tone: senasp.saldo < 0 ? 'danger' : 'default' },
+          { label: 'Ata completa', value: `${formatNumber(summary.registrado)} registrados` }
         ]}
-        progress={{ value: summary.consumido, max: summary.registrado || 1 }}
+        progress={{ value: senasp.consumido, max: senasp.registrado || 1 }}
       />
 
       <div>
         <SectionHeader
           title="Órgãos participantes"
-          subtitle="Quantitativo registrado por órgão. O gerenciador consome o contratado nos contratos vinculados; os demais, o que o Compras.gov registra."
+          subtitle="Quantitativo registrado por órgão; a régua acima considera só o quantitativo SENASP (UASGs 200330 e 200331). O gerenciador consome o contratado nos contratos vinculados; os demais, o que o Compras.gov registra."
           icon={<Users size={16} />}
           countBadge={summary.rows.length}
         />

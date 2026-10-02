@@ -2,17 +2,23 @@ import React from 'react';
 import { Share2 } from 'lucide-react';
 import { formatNumber, formatCurrency, formatDate } from './itemBalanceUtils';
 import type { AdesaoItemRecord, ArpItemRecord } from '../../types';
-import { AppCard, DataTable, EmptyState, ProgressBar, SectionHeader, StatusBadge, type Column } from '../../design-system';
+import { DataTable, EmptyState, ErrorState, ProgressBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
 
 export interface AdesoesTabProps {
   adesoesLoading: boolean;
   adesoesError: string | null;
   adesoes: AdesaoItemRecord[];
   item: ArpItemRecord;
-  totalAdesaoRegistrada: number;
-  totalAdesaoEmpenhada: number;
-  totalAdesaoSaldo: number;
-  adesaoConsumidaPercent: number;
+  /** Soma das quantidades aprovadas nas adesões. */
+  totalAdesaoAprovada: number;
+  /** Teto de adesões do item (maximoAdesao, limite da gerenciadora ou 2× o homologado). */
+  limiteAdesao: number;
+}
+
+/** Separa "929777 - SECRETARIA ..." em código da UASG e nome do órgão. */
+export function splitUnidade(unidade: string): { codigo: string; nome: string } {
+  const match = /^\s*(\d+)\s*-\s*(.+)$/.exec(unidade || '');
+  return match ? { codigo: match[1], nome: match[2].trim() } : { codigo: '', nome: (unidade || '').trim() };
 }
 
 export const AdesoesTab: React.FC<AdesoesTabProps> = ({
@@ -20,128 +26,122 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
   adesoesError,
   adesoes,
   item,
-  totalAdesaoRegistrada,
-  totalAdesaoEmpenhada,
-  totalAdesaoSaldo,
-  adesaoConsumidaPercent
+  totalAdesaoAprovada,
+  limiteAdesao
 }) => {
-  const maximoAdesaoPermitido = item.maximoAdesao || (item.quantidadeHomologadaItem * 2);
-  const percentAdesaoRegistrada = Math.min((totalAdesaoRegistrada / (maximoAdesaoPermitido || 1)) * 100, 100);
-  const saldoNaoEmpenhado = totalAdesaoSaldo || (totalAdesaoRegistrada - totalAdesaoEmpenhada);
+  const saldoAdesoes = Math.max(0, limiteAdesao - totalAdesaoAprovada);
+  const semQuantidade = adesoes.filter((a) => a.quantidadeAprovadaAdesao == null).length;
+  const quantidadeItem = Number(item.quantidadeHomologadaItem) || 0;
+
+  const ordenadas = [...adesoes].sort((a, b) =>
+    (b.dataAprovacaoAnalise || '').localeCompare(a.dataAprovacaoAnalise || '')
+  );
 
   const columns: Column<AdesaoItemRecord>[] = [
     {
       key: 'orgao',
-      header: 'Órgão Não Participante (Carona)',
-      render: (ade) => (
-        <>
-          <div style={{ fontWeight: 700, color: '#0c326f' }}>
-            {ade.orgaoAdesao || (ade.unidade ? `UASG ${ade.unidade}` : 'Órgão Solicitante')}
-          </div>
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{ade.unidade ? `UASG: ${ade.unidade}` : ''}</div>
-        </>
-      )
-    },
-    {
-      key: 'tipo',
-      header: 'Tipo de Vínculo',
-      render: (ade) => <StatusBadge label={ade.tipo || 'NÃO PARTICIPANTE (CARONA)'} variant="info" size="sm" dot={false} />
-    },
-    {
-      key: 'registrada',
-      header: 'Qtd. Concedida / Registrada',
-      render: (ade) => <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>{formatNumber(ade.quantidadeRegistrada || 0)} un</span>
-    },
-    {
-      key: 'empenhada',
-      header: 'Qtd. Empenhada',
-      width: '220px',
+      header: 'Órgão não participante',
       render: (ade) => {
-        const empQtd = ade.quantidadeEmpenhada || 0;
-        const regQtd = ade.quantidadeRegistrada || 0;
-        const consPerc = regQtd > 0 ? (empQtd / regQtd) * 100 : 0;
+        const { codigo, nome } = splitUnidade(ade.unidadeNaoParticipante);
         return (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontFamily: 'monospace', marginBottom: '0.2rem' }}>
-              <span style={{ fontWeight: 700 }}>{formatNumber(empQtd)}</span>
-              <span style={{ color: 'var(--text-muted)' }}>{formatNumber(consPerc)}%</span>
-            </div>
-            <ProgressBar value={consPerc} showPercent={false} height="6px" testId="adesao-empenho-progress" />
+            <div style={{ fontWeight: 700, color: '#0c326f' }}>{nome || 'Órgão não informado'}</div>
+            {codigo && <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>UASG: {codigo}</div>}
           </>
         );
       }
     },
     {
-      key: 'saldo',
-      header: 'Saldo p/ Empenho',
+      key: 'aprovada',
+      header: 'Qtd. aprovada',
+      align: 'right',
+      render: (ade) =>
+        ade.quantidadeAprovadaAdesao == null ? (
+          <StatusBadge label="Não informada" variant="warning" size="sm" dot={false} />
+        ) : (
+          <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>{formatNumber(ade.quantidadeAprovadaAdesao)} un</span>
+        )
+    },
+    {
+      // Art. 86, § 4º: cada órgão não participante pode aderir a até 50% do quantitativo do item.
+      key: 'percentual',
+      header: 'Do item (máx. 50%)',
+      width: '200px',
       render: (ade) => {
-        const saldoQtd = ade.saldoEmpenho ?? ((ade.quantidadeRegistrada || 0) - (ade.quantidadeEmpenhada || 0));
+        if (ade.quantidadeAprovadaAdesao == null || quantidadeItem <= 0) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
+        const perc = (ade.quantidadeAprovadaAdesao / quantidadeItem) * 100;
         return (
-          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: saldoQtd > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
-            {formatNumber(saldoQtd)} un
-          </span>
+          <>
+            <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', marginBottom: '0.2rem', color: perc > 50 ? 'var(--danger)' : undefined }}>
+              {formatNumber(perc)}%
+            </div>
+            <ProgressBar value={Math.min(perc * 2, 100)} showPercent={false} height="6px" testId="adesao-percentual-progress" />
+          </>
         );
       }
     },
     {
       key: 'data',
-      header: 'Data do Registro',
+      header: 'Aprovação',
       render: (ade) => (
         <span style={{ color: 'var(--text-secondary)' }}>
-          {ade.dataHoraInclusao ? formatDate(ade.dataHoraInclusao) : ade.dataHoraAtualizacao ? formatDate(ade.dataHoraAtualizacao) : '-'}
+          {ade.dataAprovacaoAnalise ? formatDate(ade.dataAprovacaoAnalise) : '-'}
         </span>
       )
     }
   ];
 
-  const Resumo: React.FC<{ label: string; value: string; unit?: string; tone?: string }> = ({ label, value, unit = 'un', tone }) => (
-    <span>
-      {label} <strong style={{ color: tone }}>{value}</strong> <span style={{ color: 'var(--text-muted)' }}>{unit}</span>
-    </span>
-  );
+  if (adesoesError) {
+    return (
+      <div>
+        <ErrorState title="Não foi possível carregar as adesões" message={adesoesError} />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0.5rem 1rem' }} data-testid="adesoes-tab">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="adesoes-tab">
+      <SummaryBar
+        testId="adesoes-summary"
+        loading={adesoesLoading}
+        loadingLabel="Consultando adesões de carona no Compras.gov..."
+        items={[
+          { label: 'Aprovado', value: `${formatNumber(totalAdesaoAprovada)} de ${formatNumber(limiteAdesao)}` },
+          {
+            label: 'Saldo para adesões',
+            value: `${formatNumber(saldoAdesoes)} (${formatCurrency(saldoAdesoes * item.valorUnitario)})`,
+            tone: 'success'
+          },
+          ...(semQuantidade > 0
+            ? [{ label: 'Sem quantidade informada', value: formatNumber(semQuantidade), unit: semQuantidade === 1 ? 'adesão' : 'adesões', tone: 'warning' as const }]
+            : [])
+        ]}
+        progress={{ value: totalAdesaoAprovada, max: limiteAdesao || 1 }}
+      />
+
       <div>
         <SectionHeader
           title="Adesões e caronas"
           subtitle="Órgãos não participantes que aderiram à ata (Art. 86 da Lei 14.133/2021): até 50% do quantitativo do item por órgão e 200% no total da ata."
           icon={<Share2 size={16} />}
           countBadge={adesoes.length}
-          actions={<StatusBadge label="Compras.gov.br" variant="neutral" size="sm" dot={false} />}
         />
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem', fontSize: '0.9rem' }} data-testid="adesoes-summary">
-            <Resumo label="Autorizado" value={`${formatNumber(totalAdesaoRegistrada)} de ${formatNumber(maximoAdesaoPermitido)}`} />
-            <Resumo label="Empenhado" value={`${formatNumber(totalAdesaoEmpenhada)} (${formatNumber(adesaoConsumidaPercent)}%)`} tone={totalAdesaoEmpenhada > 0 ? 'var(--warning)' : undefined} />
-            <Resumo label="Saldo concedido" value={`${formatNumber(saldoNaoEmpenhado)} (${formatCurrency(saldoNaoEmpenhado * item.valorUnitario)})`} tone="var(--success)" unit="un" />
-          </div>
-          <ProgressBar value={percentAdesaoRegistrada} showPercent={false} height="6px" testId="adesao-total-progress" />
-        </div>
-      </div>
-
-      {adesoesLoading ? (
-        <div className="spinner-container" style={{ padding: '2rem' }}>
-          <div className="spinner spinner-glow"></div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Consultando adesões de carona no Compras.gov.br...</p>
-        </div>
-      ) : adesoes.length === 0 ? (
-        <AppCard variant="default" padding="md">
+        {!adesoesLoading && adesoes.length === 0 ? (
           <EmptyState
             title="Nenhuma carona externa registrada"
-            description={adesoesError || `Nenhum órgão não participante solicitou ou teve autorização de adesão registrada para o Item ${item.numeroItem} no módulo oficial do Compras.gov.br.`}
+            description={`Nenhum órgão não participante teve adesão aprovada para o Item ${item.numeroItem} no Compras.gov.br.`}
             icon={<Share2 size={36} color="#94a3b8" />}
           />
-        </AppCard>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={adesoes}
-          keyExtractor={(ade, idx) => `ade-${ade.unidade}-${idx}`}
-          testId="adesoes-table"
-        />
-      )}
+        ) : (
+          <DataTable
+            columns={columns}
+            data={ordenadas}
+            keyExtractor={(ade, idx) => `ade-${ade.unidadeNaoParticipante}-${idx}`}
+            isLoading={adesoesLoading}
+            testId="adesoes-table"
+          />
+        )}
+      </div>
     </div>
   );
 };

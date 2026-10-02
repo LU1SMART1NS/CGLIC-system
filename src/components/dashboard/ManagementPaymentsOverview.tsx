@@ -11,6 +11,7 @@ import { AppButton, EmptyState, ErrorState, FilterBar, StatusBadge } from '../..
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { PAGAMENTO_RULES } from '../../config/alertRules';
 
 export interface ManagementPaymentsOverviewProps {
   readModel?: ManagementDashboardReadModel | null;
@@ -72,15 +73,15 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
       );
     } else if (filter === 'CGOFI') {
       list = baseList.filter(
-        (c) => c.status === 'AGUARDANDO_CGOFI' || c.status === 'ENVIADO_CGOFI' || (c.prazos?.diasSemRespostaCgofi ?? 0) > 5
+        (c) => c.status === 'ENVIADO_CGOFI' || c.alerts?.some((a) => a.tipo === 'CGOFI_SEM_RESPOSTA')
       );
     } else if (filter === 'INSTRUCAO') {
       list = baseList.filter(
-        (c) => c.status === 'RECEBIDO' || c.status === 'ATRIBUIDO' || c.status === 'EM_INSTRUCAO' || c.status === 'PENDENTE_DOCUMENTACAO' || c.status === 'DESPACHO_ELABORADO'
+        (c) => c.status === 'RECEBIDO' || c.status === 'COM_PENDENCIA' || c.status === 'CONFERIDO' || c.status === 'DEVOLVIDO'
       );
     } else if (filter === 'CONFIRMADOS') {
       list = baseList.filter(
-        (c) => c.status === 'PAGAMENTO_CONFIRMADO' || c.status === 'CONCLUIDO' || Boolean(c.input?.numeroOrdemBancaria)
+        (c) => c.status === 'PAGO' || Boolean(c.input?.numeroOrdemBancaria)
       );
     }
 
@@ -206,9 +207,9 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
             value={`${faturasVencidasCount} vencidas`}
             hint={
               faturasVencidasCount > 0
-                ? `Risco de juros e mora${faturasVenceHojeCount + faturasProximasVencimentoCount > 0 ? ` · +${faturasVenceHojeCount + faturasProximasVencimentoCount} em ≤3d` : ''}`
+                ? `Risco de juros e mora${faturasVenceHojeCount + faturasProximasVencimentoCount > 0 ? ` · +${faturasVenceHojeCount + faturasProximasVencimentoCount} em ≤${PAGAMENTO_RULES.criticoAteDiasUteis}d` : ''}`
                 : faturasVenceHojeCount + faturasProximasVencimentoCount > 0
-                  ? `${faturasVenceHojeCount + faturasProximasVencimentoCount} vencem em ≤3 dias`
+                  ? `${faturasVenceHojeCount + faturasProximasVencimentoCount} vencem em ≤${PAGAMENTO_RULES.criticoAteDiasUteis} dias`
                   : 'Nenhuma fatura vencida no momento'
             }
             tone={faturasVencidasCount > 0 || ciclosCriticosCount > 0 ? 'CRITICA' : faturasVenceHojeCount + faturasProximasVencimentoCount > 0 ? 'ATENCAO' : undefined}
@@ -218,7 +219,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
           <HealthTile
             label="Gargalo CGOFI"
             value={String(ciclosAtrasoCgofiCount)}
-            hint={ciclosAtrasoCgofiCount === 1 ? 'processo > 5 dias úteis sem resposta' : 'processos > 5 dias úteis sem resposta'}
+            hint={ciclosAtrasoCgofiCount === 1 ? `processo > ${PAGAMENTO_RULES.cgofiSemRespostaAcimaDeDiasUteis} dias úteis sem resposta` : `processos > ${PAGAMENTO_RULES.cgofiSemRespostaAcimaDeDiasUteis} dias úteis sem resposta`}
             tone={ciclosAtrasoCgofiCount > 0 ? 'URGENTE' : undefined}
             onClick={() => setFilter('CGOFI')}
             testId="payments-kpi-cgofi"
@@ -277,51 +278,45 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
             gap: '0.5rem'
           }}
         >
-          {/* Estágio 1: Recebido / Atribuído */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>1. Recebido</span>
+            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>1. Em conferência</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#334155', marginTop: '0.2rem' }}>
-              {(distribuicaoPorEstado['RECEBIDO'] || 0) + (distribuicaoPorEstado['ATRIBUIDO'] || 0)}
+              {distribuicaoPorEstado['RECEBIDO'] || 0}
             </div>
           </div>
 
-          {/* Estágio 2: Em Instrução */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>2. Em Instrução</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#15803d', marginTop: '0.2rem' }}>
-              {(distribuicaoPorEstado['EM_INSTRUCAO'] || 0) + (distribuicaoPorEstado['PENDENTE_DOCUMENTACAO'] || 0)}
+            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Com pendência</span>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#d97706', marginTop: '0.2rem' }}>
+              {distribuicaoPorEstado['COM_PENDENCIA'] || 0}
             </div>
           </div>
 
-          {/* Estágio 3: Despacho Elaborado */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>3. Despacho</span>
+            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>2. Conferido</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#7e22ce', marginTop: '0.2rem' }}>
-              {distribuicaoPorEstado['DESPACHO_ELABORADO'] || 0}
+              {distribuicaoPorEstado['CONFERIDO'] || 0}
             </div>
           </div>
 
-          {/* Estágio 4: CGOFI */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>4. CGOFI</span>
+            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>3. Na CGOFI</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ea580c', marginTop: '0.2rem' }}>
-              {(distribuicaoPorEstado['ENVIADO_CGOFI'] || 0) + (distribuicaoPorEstado['AGUARDANDO_CGOFI'] || 0)}
+              {distribuicaoPorEstado['ENVIADO_CGOFI'] || 0}
             </div>
           </div>
 
-          {/* Estágio 5: Pagamento / Concluído */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>5. Pago / Concluído</span>
+            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>4. Pago</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#166534', marginTop: '0.2rem' }}>
-              {(distribuicaoPorEstado['PAGAMENTO_CONFIRMADO'] || 0) + (distribuicaoPorEstado['CONCLUIDO'] || 0)}
+              {distribuicaoPorEstado['PAGO'] || 0}
             </div>
           </div>
 
-          {/* Exceções: Devolvido / Cancelado */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
             <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Exceções</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#b91c1c', marginTop: '0.2rem' }}>
-              {(distribuicaoPorEstado['DEVOLVIDO_FISCAL'] || 0) + (distribuicaoPorEstado['CANCELADO'] || 0)}
+              {(distribuicaoPorEstado['DEVOLVIDO'] || 0) + (distribuicaoPorEstado['CANCELADO'] || 0)}
             </div>
           </div>
         </div>
@@ -344,7 +339,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                 { value: 'TODOS', label: `Todos os ciclos (${totalLista})` },
                 { value: 'CRITICOS', label: 'Críticos / Vencidos' },
                 { value: 'CGOFI', label: 'Gargalo CGOFI' },
-                { value: 'INSTRUCAO', label: 'Em Instrução' },
+                { value: 'INSTRUCAO', label: 'Com a CGLIC' },
                 { value: 'CONFIRMADOS', label: 'Confirmados (OB)' }
               ]
             }
@@ -403,8 +398,8 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                   const isVencida = cycle.prazos?.statusPrazo === 'VENCIDO' || cycle.prazos?.isVencida;
                   const diasVenc = cycle.prazos?.diasUteisAteVencimento ?? 0;
                   const diasCgofi = cycle.prazos?.diasSemRespostaCgofi ?? 0;
-                  const cgofiAtrasado = diasCgofi > 5 && (cycle.status === 'AGUARDANDO_CGOFI' || cycle.status === 'ENVIADO_CGOFI');
-                  const encerrado = cycle.status === 'PAGAMENTO_CONFIRMADO' || cycle.status === 'CONCLUIDO' || cycle.status === 'CANCELADO';
+                  const cgofiAtrasado = cycle.status === 'ENVIADO_CGOFI' && Boolean(cycle.alerts?.some((a) => a.tipo === 'CGOFI_SEM_RESPOSTA'));
+                  const encerrado = cycle.status === 'PAGO' || cycle.status === 'CANCELADO';
 
                   return (
                     <tr key={cycle.cycleKey} data-testid={`payment-row-${cycle.cycleKey}`}>
@@ -445,7 +440,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                         )}
                         {cgofiAtrasado && (
                           <div style={{ fontSize: '0.72rem', color: '#ea580c', fontWeight: 700, marginTop: '0.2rem' }}>
-                            CGOFI: {diasCgofi} dias sem resposta
+                            Cobrar a CGOFI: {diasCgofi} dias úteis sem resposta
                           </div>
                         )}
                       </td>

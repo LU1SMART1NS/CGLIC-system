@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, X } from 'lucide-react';
 import { carteiraSelect } from '../../carteira/carteiraStyles';
 import type { ContractStatusFilterOption } from './ContractsPortfolioSummary';
+import { VIGENCIA_RULES } from '../../../config/alertRules';
 
 export interface ContractsPortfolioFilterState {
   status: ContractStatusFilterOption;
@@ -76,8 +77,8 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
         >
           <option value="TODOS">Todas as Situações</option>
           <option value="VIGENTES">Vigentes</option>
-          <option value="CRITICO">Crítico (≤30 dias)</option>
-          <option value="ATENCAO">Atenção (31–90 dias)</option>
+          <option value="CRITICO">Crítico (≤{VIGENCIA_RULES.faixaCriticoAteDias} dias)</option>
+          <option value="ATENCAO">Atenção ({VIGENCIA_RULES.faixaCriticoAteDias + 1}–{VIGENCIA_RULES.faixaAtencaoAteDias} dias)</option>
           <option value="HISTORICO">Histórico</option>
         </select>
 

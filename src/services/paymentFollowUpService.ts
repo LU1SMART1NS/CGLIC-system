@@ -12,18 +12,23 @@
 import {
   parseDateBRT,
   formatDateISO,
-  differenceInBusinessDays
+  differenceInBusinessDays,
+  addBusinessDays
 } from './temporalEngineService';
 import type {
+  PaymentCycleDocument,
+  PaymentCycleEvent,
+  PaymentCycleEventTipo,
   PaymentCycleInput,
   PaymentCyclePrazos,
+  PaymentEtapaPrazo,
   PaymentFollowUpCycle,
   PaymentWorkflowStatus,
   PaymentAlert
 } from '../types/paymentFollowUp';
 import type { FinancialBalances } from '../types/financialExecution';
-import type { RpcContractPaymentCycleRow } from '../types/rpc';
-import { buildPaymentFollowUpTemplate } from './paymentFollowUpTemplateService';
+import type { RpcContractPaymentCycleRow, RpcPaymentCycleDocumentRow, RpcPaymentCycleEventRow } from '../types/rpc';
+import { PAGAMENTO_RULES } from '../config/alertRules';
 
 /**
  * Gera a chave canônica determinística do ciclo operacional de pagamento
@@ -44,6 +49,20 @@ export function buildPaymentCycleKey(
   return `${cleanContract}-PGTO-${cleanComp}-${cleanDoc}`;
 }
 
+const ETAPAS_ENCERRADAS: PaymentWorkflowStatus[] = ['PAGO', 'CANCELADO'];
+
+export function isPaymentCycleEncerrado(status: PaymentWorkflowStatus): boolean {
+  return ETAPAS_ENCERRADAS.includes(status);
+}
+
+function startOfToday(baseDate?: Date | string): Date {
+  const hoje = baseDate
+    ? (typeof baseDate === 'string' ? parseDateBRT(baseDate) || new Date() : new Date(baseDate))
+    : new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return hoje;
+}
+
 /**
  * Calcula os prazos e indicadores dinâmicos do ciclo em dias úteis utilizando o temporalEngineService
  */
@@ -51,12 +70,9 @@ export function calculatePaymentCyclePrazos(
   input: PaymentCycleInput,
   baseDate?: Date | string
 ): PaymentCyclePrazos {
-  const hoje = baseDate 
-    ? (typeof baseDate === 'string' ? parseDateBRT(baseDate) || new Date() : new Date(baseDate))
-    : new Date();
-  hoje.setHours(0, 0, 0, 0);
+  const hoje = startOfToday(baseDate);
 
-  const dataAtesto = parseDateBRT(input.dataAssinaturaAtesto) || hoje;
+  const dataInicio = parseDateBRT(input.dataRecebimento) || parseDateBRT(input.dataAssinaturaAtesto) || hoje;
   const dataVencimento = parseDateBRT(input.dataVencimentoFatura) || hoje;
   const dataEnvio = input.dataEnvioCgofi ? parseDateBRT(input.dataEnvioCgofi) : null;
   const dataOb = input.dataOrdemBancaria ? parseDateBRT(input.dataOrdemBancaria) : null;
@@ -65,8 +81,8 @@ export function calculatePaymentCyclePrazos(
   const isVencida = dataVencimento.getTime() < hoje.getTime();
   const diasUteisAteVencimento = differenceInBusinessDays(dataVencimento, hoje);
 
-  // 2. Janela total de trabalho (dataVencimento - dataAtesto)
-  const janelaTotalDiasUteis = Math.max(0, differenceInBusinessDays(dataVencimento, dataAtesto));
+  // 2. Janela total de trabalho (dataVencimento - recebimento)
+  const janelaTotalDiasUteis = Math.max(0, differenceInBusinessDays(dataVencimento, dataInicio));
 
   // 3. Dias sem resposta da CGOFI (dataFinalComparacao - dataEnvio)
   let diasSemRespostaCgofi = 0;
@@ -85,9 +101,9 @@ export function calculatePaymentCyclePrazos(
   let statusPrazo: PaymentCyclePrazos['statusPrazo'] = 'NORMAL';
   if (isVencida) {
     statusPrazo = 'VENCIDO';
-  } else if (diasUteisAteVencimento <= 3) {
+  } else if (diasUteisAteVencimento <= PAGAMENTO_RULES.criticoAteDiasUteis) {
     statusPrazo = 'CRITICO';
-  } else if (diasUteisAteVencimento <= 7) {
+  } else if (diasUteisAteVencimento <= PAGAMENTO_RULES.atencaoAteDiasUteis) {
     statusPrazo = 'ATENCAO';
   }
 
@@ -102,6 +118,63 @@ export function calculatePaymentCyclePrazos(
 }
 
 /**
+ * Prazo da etapa em curso e quem responde por ele. Conferir e enviar são da CGLIC; depois do envio a CGOFI
+ * é quem paga e a CGLIC só cobra: o alvo é a data de cobrança (ou, se não foi definida, o padrão a partir do envio).
+ */
+export function calculateEtapaPrazo(
+  status: PaymentWorkflowStatus,
+  input: PaymentCycleInput,
+  baseDate?: Date | string
+): PaymentEtapaPrazo | undefined {
+  const hoje = startOfToday(baseDate);
+  let etapa: PaymentEtapaPrazo['etapa'];
+  let dono: PaymentEtapaPrazo['dono'];
+  let alvo: string | undefined;
+
+  if (status === 'RECEBIDO' || status === 'COM_PENDENCIA' || status === 'DEVOLVIDO') {
+    etapa = 'CONFERENCIA';
+    dono = 'CGLIC';
+    alvo = input.prazoConferenciaAte;
+  } else if (status === 'CONFERIDO') {
+    etapa = 'ENVIO';
+    dono = 'CGLIC';
+    alvo = input.prazoEnvioAte;
+  } else if (status === 'ENVIADO_CGOFI') {
+    etapa = 'COBRANCA_CGOFI';
+    dono = 'CGOFI';
+    alvo = input.cobrarCgofiAte;
+    if (!alvo && input.dataEnvioCgofi) {
+      const envio = parseDateBRT(input.dataEnvioCgofi);
+      if (envio) alvo = formatDateISO(addBusinessDays(envio, PAGAMENTO_RULES.cgofiSemRespostaAcimaDeDiasUteis));
+    }
+  } else {
+    return undefined;
+  }
+  if (!alvo) return undefined;
+
+  const dataAlvo = parseDateBRT(alvo);
+  if (!dataAlvo) return undefined;
+  const atrasado = dataAlvo.getTime() < hoje.getTime();
+  const diasUteis = differenceInBusinessDays(dataAlvo, hoje);
+  return { etapa, dono, dataAlvo: alvo, diasUteisRestantes: atrasado ? -Math.abs(diasUteis) : diasUteis, atrasado };
+}
+
+/**
+ * Prazo padrão de uma etapa a partir de uma data (usado para sugerir a data-alvo nos formulários).
+ */
+export function suggestPrazoPadrao(etapa: 'CONFERENCIA' | 'ENVIO', aPartirDe: string | Date): string {
+  const base = typeof aPartirDe === 'string' ? parseDateBRT(aPartirDe) || new Date() : aPartirDe;
+  const dias = etapa === 'CONFERENCIA' ? PAGAMENTO_RULES.conferirPadraoDiasUteis : PAGAMENTO_RULES.enviarPadraoDiasUteis;
+  return formatDateISO(addBusinessDays(base, dias));
+}
+
+const ETAPA_LABEL: Record<PaymentEtapaPrazo['etapa'], string> = {
+  CONFERENCIA: 'Conferência',
+  ENVIO: 'Envio à CGOFI',
+  COBRANCA_CGOFI: 'Cobrança da CGOFI'
+};
+
+/**
  * Emite os alertas operacionais do ciclo de faturamento/pagamento para a Central de Atenção
  */
 export function derivePaymentCycleAlerts(
@@ -111,20 +184,15 @@ export function derivePaymentCycleAlerts(
   input: PaymentCycleInput,
   prazos: PaymentCyclePrazos,
   empenhoBalances?: Partial<FinancialBalances>,
-  baseDate?: Date | string
+  baseDate?: Date | string,
+  etapaAtual?: PaymentEtapaPrazo
 ): PaymentAlert[] {
   const alerts: PaymentAlert[] = [];
-  const hoje = baseDate 
-    ? (typeof baseDate === 'string' ? parseDateBRT(baseDate) || new Date() : new Date(baseDate))
-    : new Date();
-  hoje.setHours(0, 0, 0, 0);
+  const hoje = startOfToday(baseDate);
 
-  const dataAtesto = parseDateBRT(input.dataAssinaturaAtesto) || hoje;
-  const isFinalizado = status === 'CONCLUIDO' || status === 'PAGAMENTO_CONFIRMADO' || status === 'CANCELADO';
-
-  if (!isFinalizado) {
-    // 1. Alerta Crítico / Vencido: Fatura com vencimento próximo ou ultrapassado
-    if (status !== 'ENVIADO_CGOFI' && status !== 'AGUARDANDO_CGOFI') {
+  if (!isPaymentCycleEncerrado(status)) {
+    // 1. Fatura com vencimento próximo ou ultrapassado, ainda na CGLIC (depois do envio o processo é da CGOFI)
+    if (status !== 'ENVIADO_CGOFI') {
       if (prazos.isVencida) {
         alerts.push({
           id: `${cycleKey}-ALERT-VENCIDA`,
@@ -136,7 +204,7 @@ export function derivePaymentCycleAlerts(
           diasRelevantes: Math.abs(prazos.diasUteisAteVencimento),
           dataReferencia: input.dataVencimentoFatura
         });
-      } else if (prazos.diasUteisAteVencimento <= 3) {
+      } else if (prazos.diasUteisAteVencimento <= PAGAMENTO_RULES.criticoAteDiasUteis) {
         alerts.push({
           id: `${cycleKey}-ALERT-VENCIMENTO-IMINENTE`,
           cycleKey,
@@ -150,40 +218,39 @@ export function derivePaymentCycleAlerts(
       }
     }
 
-    // 2. Alerta de Atenção: Atesto recebido há mais de 2 dias úteis sem atribuição
-    if (status === 'RECEBIDO' && !input.responsavelNome) {
-      const diasSemAtribuicao = differenceInBusinessDays(hoje, dataAtesto);
-      if (diasSemAtribuicao > 2) {
-        alerts.push({
-          id: `${cycleKey}-ALERT-PENDENTE-ATRIBUICAO`,
-          cycleKey,
-          contractKey,
-          nivel: 'ATENCAO',
-          tipo: 'ATESTO_PENDENTE_ATRIBUICAO',
-          mensagem: `Atesto recebido há ${diasSemAtribuicao} dias úteis sem servidor atribuído para confecção.`,
-          diasRelevantes: diasSemAtribuicao,
-          dataReferencia: input.dataAssinaturaAtesto
-        });
-      }
+    // 2. Etapa da CGLIC (conferir ou enviar) com a data-alvo vencida
+    if (etapaAtual && etapaAtual.dono === 'CGLIC' && etapaAtual.atrasado) {
+      const dias = Math.abs(etapaAtual.diasUteisRestantes);
+      alerts.push({
+        id: `${cycleKey}-ALERT-ETAPA-${etapaAtual.etapa}`,
+        cycleKey,
+        contractKey,
+        nivel: 'ATENCAO',
+        tipo: 'PRAZO_ETAPA_VENCIDO',
+        mensagem: `${ETAPA_LABEL[etapaAtual.etapa]} atrasada há ${dias} ${dias === 1 ? 'dia útil' : 'dias úteis'} (prazo ${formatDateISO(parseDateBRT(etapaAtual.dataAlvo) || hoje).split('-').reverse().join('/')}).`,
+        diasRelevantes: dias,
+        dataReferencia: etapaAtual.dataAlvo
+      });
     }
 
-    // 3. Alerta de Acompanhamento: Processo na CGOFI há mais de 5 dias úteis sem confirmação de OB
-    if (status === 'AGUARDANDO_CGOFI' || (status === 'ENVIADO_CGOFI' && !input.numeroOrdemBancaria)) {
-      if (prazos.diasSemRespostaCgofi > 5) {
+    // 3. Processo na CGOFI além da data de cobrança, sem Ordem Bancária: a CGLIC cobra, não está em atraso
+    if (status === 'ENVIADO_CGOFI' && !input.numeroOrdemBancaria) {
+      const passouCobranca = etapaAtual ? etapaAtual.atrasado : prazos.diasSemRespostaCgofi > PAGAMENTO_RULES.cgofiSemRespostaAcimaDeDiasUteis;
+      if (passouCobranca) {
         alerts.push({
           id: `${cycleKey}-ALERT-CGOFI-SEM-RESPOSTA`,
           cycleKey,
           contractKey,
           nivel: 'ATENCAO',
           tipo: 'CGOFI_SEM_RESPOSTA',
-          mensagem: `Processo remetido à CGOFI há ${prazos.diasSemRespostaCgofi} dias úteis sem confirmação de Ordem Bancária.`,
+          mensagem: `Cobrar a CGOFI: processo enviado há ${prazos.diasSemRespostaCgofi} dias úteis sem confirmação de Ordem Bancária.`,
           diasRelevantes: prazos.diasSemRespostaCgofi,
           dataReferencia: input.dataEnvioCgofi
         });
       }
     }
 
-    // 4. Alerta Informativo / Verificação: Saldo de empenho insuficiente para o atesto
+    // 4. Saldo de empenho insuficiente para o atesto
     if (empenhoBalances && empenhoBalances.saldoALiquidar !== undefined) {
       if (empenhoBalances.saldoALiquidar < input.valorAtesto) {
         alerts.push({
@@ -203,7 +270,8 @@ export function derivePaymentCycleAlerts(
 }
 
 /**
- * Determina o estado global do workflow do ciclo a partir dos dados e evidências registradas
+ * Situação do ciclo a partir dos marcos registrados. Quando o servidor já informa a situação
+ * (linha persistida), ela prevalece: pendência, devolução e cancelamento não se deduzem só das datas.
  */
 export function determinePaymentCycleStatus(
   input: PaymentCycleInput,
@@ -212,28 +280,9 @@ export function determinePaymentCycleStatus(
   if (overrideStatus) {
     return overrideStatus;
   }
-
-  // 1. Conclusão por confirmação de OB oficial
-  if (input.numeroOrdemBancaria && input.dataOrdemBancaria) {
-    return 'PAGAMENTO_CONFIRMADO';
-  }
-
-  // 2. Remessa enviada à CGOFI
-  if (input.dataEnvioCgofi) {
-    return 'AGUARDANDO_CGOFI';
-  }
-
-  // 3. Despacho elaborado no SEI
-  if (input.documentoDespachoSei) {
-    return 'DESPACHO_ELABORADO';
-  }
-
-  // 4. Servidor atribuído para confecção
-  if (input.responsavelNome) {
-    return 'EM_INSTRUCAO';
-  }
-
-  // 5. Estado inicial: Atesto assinado recebido
+  if (input.numeroOrdemBancaria && input.dataOrdemBancaria) return 'PAGO';
+  if (input.dataEnvioCgofi) return 'ENVIADO_CGOFI';
+  if (input.dataConferencia) return 'CONFERIDO';
   return 'RECEBIDO';
 }
 
@@ -247,6 +296,8 @@ export function buildPaymentFollowUpCycle(
     empenhoBalances?: Partial<FinancialBalances>;
     baseDate?: Date | string;
     concluidoPor?: string;
+    documentos?: PaymentCycleDocument[];
+    eventos?: PaymentCycleEvent[];
   }
 ): PaymentFollowUpCycle {
   const cycleKey = buildPaymentCycleKey(
@@ -257,6 +308,7 @@ export function buildPaymentFollowUpCycle(
 
   const status = determinePaymentCycleStatus(input, options?.overrideStatus);
   const prazos = calculatePaymentCyclePrazos(input, options?.baseDate);
+  const etapaAtual = calculateEtapaPrazo(status, input, options?.baseDate);
   const alerts = derivePaymentCycleAlerts(
     cycleKey,
     input.contractKey,
@@ -264,11 +316,12 @@ export function buildPaymentFollowUpCycle(
     input,
     prazos,
     options?.empenhoBalances,
-    options?.baseDate
+    options?.baseDate,
+    etapaAtual
   );
 
   const nowIso = new Date().toISOString();
-  const isConcluido = status === 'CONCLUIDO' || status === 'PAGAMENTO_CONFIRMADO';
+  const isConcluido = status === 'PAGO';
 
   return {
     cycleKey,
@@ -277,6 +330,9 @@ export function buildPaymentFollowUpCycle(
     status,
     input,
     prazos,
+    etapaAtual,
+    documentos: options?.documentos ?? [],
+    eventos: options?.eventos ?? [],
     alerts,
     criadoEm: nowIso,
     atualizadoEm: nowIso,
@@ -285,22 +341,54 @@ export function buildPaymentFollowUpCycle(
   };
 }
 
+export function rowToPaymentDocument(row: RpcPaymentCycleDocumentRow): PaymentCycleDocument {
+  return {
+    id: row.id,
+    tipo: row.tipo,
+    numero: row.numero ?? undefined,
+    sei: row.sei,
+    valor: row.valor == null ? undefined : Number(row.valor),
+    dataRecebimento: row.data_recebimento ?? undefined
+  };
+}
+
+export function rowToPaymentEvent(row: RpcPaymentCycleEventRow): PaymentCycleEvent {
+  return {
+    id: row.id,
+    tipo: row.tipo as PaymentCycleEventTipo,
+    dataEvento: row.data_evento,
+    sei: row.sei ?? undefined,
+    numeroOb: row.numero_ob ?? undefined,
+    motivo: row.motivo ?? undefined,
+    origemPendencia: row.origem_pendencia ?? undefined,
+    prazoAnterior: row.prazo_anterior ?? undefined,
+    prazoNovo: row.prazo_novo ?? undefined,
+    justificativa: row.justificativa ?? undefined,
+    regularidadeVerificada: row.regularidade_verificada ?? undefined,
+    registradoPorNome: row.registrado_por_nome ?? undefined,
+    criadoEm: row.created_at
+  };
+}
+
 /**
  * Reconstrói um PaymentFollowUpCycle completo (prazos/alertas recalculados em
- * memória) a partir de uma linha persistida em contract_payment_cycles
- * (Fase 10-A.2/10-A.2.1). Fonte única desta conversão — reutilizada tanto por
- * useContractPaymentFollowUp.ts (visão por contrato) quanto por
- * dashboardService.fetchAllPaymentCyclesForDashboard (visão consolidada do
- * Dashboard Gerencial), para nunca haver duas versões da mesma regra de
- * mapeamento DB -> domínio.
+ * memória) a partir de uma linha persistida em contract_payment_cycles. Fonte única desta conversão —
+ * reutilizada pela visão por contrato (useContractPaymentFollowUp) e pela visão consolidada do
+ * Dashboard Gerencial (dashboardService.fetchAllPaymentCyclesForDashboard).
  */
 export function rowToPaymentFollowUpCycle(
   row: RpcContractPaymentCycleRow,
-  options?: { baseDate?: string; empenhoBalances?: Partial<FinancialBalances> }
+  options?: {
+    baseDate?: string;
+    empenhoBalances?: Partial<FinancialBalances>;
+    documentos?: RpcPaymentCycleDocumentRow[];
+    eventos?: RpcPaymentCycleEventRow[];
+  }
 ): PaymentFollowUpCycle {
   const input: PaymentCycleInput = {
     contractKey: row.contract_key,
     competencia: row.competencia,
+    dataRecebimento: row.data_recebimento,
     dataAssinaturaAtesto: row.data_assinatura_atesto,
     dataVencimentoFatura: row.data_vencimento_fatura,
     documentoAtestoSei: row.documento_atesto_sei,
@@ -312,6 +400,10 @@ export function rowToPaymentFollowUpCycle(
     titularNome: row.titular_nome ?? undefined,
     responsavelNome: row.responsavel_nome ?? undefined,
     responsavelUserId: row.responsavel_user_id ?? undefined,
+    dataConferencia: row.data_conferencia ?? undefined,
+    prazoConferenciaAte: row.prazo_conferencia_ate ?? undefined,
+    prazoEnvioAte: row.prazo_envio_ate ?? undefined,
+    cobrarCgofiAte: row.cobrar_cgofi_ate ?? undefined,
     documentoDespachoSei: row.documento_despacho_sei ?? undefined,
     dataEnvioCgofi: row.data_envio_cgofi ?? undefined,
     numeroOrdemBancaria: row.numero_ordem_bancaria ?? undefined,
@@ -323,7 +415,11 @@ export function rowToPaymentFollowUpCycle(
     overrideStatus: row.status as PaymentWorkflowStatus,
     empenhoBalances: options?.empenhoBalances,
     baseDate: options?.baseDate,
-    concluidoPor: row.concluido_por ?? undefined
+    concluidoPor: row.concluido_por ?? undefined,
+    documentos: (options?.documentos ?? []).map(rowToPaymentDocument),
+    eventos: (options?.eventos ?? [])
+      .map(rowToPaymentEvent)
+      .sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
   });
 
   cycle.id = row.id;
@@ -331,7 +427,5 @@ export function rowToPaymentFollowUpCycle(
   cycle.atualizadoEm = row.atualizado_em;
   cycle.concluidoEm = row.concluido_em ?? undefined;
   cycle.concluidoPor = row.concluido_por ?? undefined;
-  cycle.tasks = buildPaymentFollowUpTemplate(input);
-
   return cycle;
 }

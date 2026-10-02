@@ -58,10 +58,14 @@ import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryS
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
+import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
+import { quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract } from '../types';
+import { SINCRONIZACAO_RULES } from '../config/alertRules';
+import { STATUS_A_VENCER, formatStatusVigencia } from '../utils/statusVigencia';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -69,7 +73,7 @@ interface ItemBalancesProps {
   onBack: () => void;
 }
 
-const ITEM_TABS: ItemTab[] = ['unidades', 'contratos', 'alocacao', 'adesoes'];
+const ITEM_TABS: ItemTab[] = ['unidades', 'alocacao', 'contratos', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 
@@ -108,15 +112,20 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     aliases: { empenhos: 'contratos' }
   });
 
-  // Mesmas regras do backend: alocações exigem allocations.manage (admin e gestor de saldos);
-  // o vínculo empenho→unidade, allocations.link_empenho (também o gestor); contratos e
-  // empenhos manuais, admin e gestor.
+  // Mesmas regras do backend: alocações e vínculo empenho→unidade exigem allocations.manage
+  // (admin e gestor de saldos); contratos e empenhos manuais, admin e gestor.
   const { role } = useAuth();
   const toast = useToast();
   const confirm = useConfirmDialog();
   const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
   const canLinkEmpenhos = canManageAllocations || role === 'gestor';
   const canEditData = role === 'admin' || role === 'gestor';
+  // Mantém gravado o quantitativo SENASP do item (base do saldo na Ata, nos dashboards e na central de prazos).
+  const { mutate: syncSenasp } = useSyncItemSenasp();
+  React.useEffect(() => {
+    if (!canEditData) return;
+    syncSenasp({ numeroAta: arp.numeroAtaRegistroPreco, uasg: arp.codigoUnidadeGerenciadora, numeroItem: item.numeroItem });
+  }, [canEditData, syncSenasp, arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem]);
 
   const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
 
@@ -350,7 +359,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const [syncingContracts, setSyncingContracts] = useState(false);
 
   const syncLinkedContracts = async (force: boolean): Promise<{ total: number; falhas: number }> => {
-    const sixHours = 6 * 60 * 60 * 1000;
+    const sixHours = SINCRONIZACAO_RULES.quantidadeContratadaVencidaEmHoras * 60 * 60 * 1000;
     const targets = enrichedOfficialLinks.filter(
       (l) => l.contract && (force || !contractSyncAttempted.current.has(l.linkId))
     );
@@ -514,10 +523,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     }
   };
 
-  const gerenciadoraUnits = unidades.filter(uni => uni.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(uni.codigoUnidade, arp.codigoUnidadeGerenciadora));
-  const totalUGQty = gerenciadoraUnits.length > 0 
-    ? gerenciadoraUnits.reduce((sum, u) => sum + (Number(u.quantidadeRegistrada) || 0), 0)
-    : (Number(item.quantidadeHomologadaItem) || 0);
+  // Quantitativo SENASP: base única de saldo, régua e alocação (o total da ata é só referência).
+  const totalUGQty = quantitativoSenasp(unidades, arp.codigoUnidadeGerenciadora, Number(item.quantidadeHomologadaItem) || 0);
 
   const handleStartNewAllocation = () => {
     setEditingId(null);
@@ -698,10 +705,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const totalRegistrado = unidades.reduce((acc, curr) => acc + curr.quantidadeRegistrada, 0);
   const gerenciadoraUnit = unidades.find(u => u.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(u.codigoUnidade));
 
-  const totalAdesaoRegistrada = adesoes.reduce((acc, a) => acc + (Number(a.quantidadeRegistrada) || 0), 0);
-  const totalAdesaoEmpenhada = adesoes.reduce((acc, a) => acc + (Number(a.quantidadeEmpenhada) || 0), 0);
-  const totalAdesaoSaldo = adesoes.reduce((acc, a) => acc + (Number(a.saldoEmpenho) || 0), 0);
-  const adesaoConsumidaPercent = totalAdesaoRegistrada > 0 ? (totalAdesaoEmpenhada / totalAdesaoRegistrada) * 100 : 0;
+  const totalAdesaoAprovada = adesoes.reduce((acc, a) => acc + (Number(a.quantidadeAprovadaAdesao) || 0), 0);
 
   // Fórmula Oficial do Saldo: Saldo = QuantidadeRegistrada - ∑ Empenhos
 
@@ -709,11 +713,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   // o empenho é a execução desse contratado. O Compras.gov é só referência.
   const executionSummary = React.useMemo(
     () => summarizeItemExecution({
-      homologado: Number(item.quantidadeHomologadaItem) || totalRegistrado,
+      homologado: totalUGQty,
       contratados: enrichedOfficialLinks.map((l) => l.quantidadeContratada ?? null),
       vinculos: empenhoVinculos
     }),
-    [item.quantidadeHomologadaItem, totalRegistrado, enrichedOfficialLinks, empenhoVinculos]
+    [totalUGQty, enrichedOfficialLinks, empenhoVinculos]
   );
   // Empenhos pendentes que já têm quantidade sugerida: podem ser confirmados de uma vez, no item inteiro.
   const empenhosAceitaveis = React.useMemo(
@@ -727,10 +731,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
   // Cálculo seguro e sem duplicidade das métricas dos cards de resumo
   const cardMetrics = calculateItemCardMetrics({
-    quantidadeHomologada: item.quantidadeHomologadaItem || totalRegistrado,
+    quantidadeHomologada: totalUGQty,
+    quantidadeTotalAta: item.quantidadeHomologadaItem || totalRegistrado,
     totalEmpenhado: executionSummary.contratado,
     maximoAdesaoItem: item.maximoAdesao,
-    totalAdesaoConsumida: totalAdesaoEmpenhada || totalAdesaoRegistrada,
+    totalAdesaoConsumida: totalAdesaoAprovada,
     valorUnitario: item.valorUnitario,
     gerenciadoraLimiteAdesao: gerenciadoraUnit?.qtdLimiteAdesao
   });
@@ -816,8 +821,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         ref={tabsRef}
         tabs={[
           { id: 'unidades', label: `Órgãos participantes (${sortedUnidades.length})` },
-          { id: 'contratos', label: `Contratos e empenhos (${contractsCount})` },
           { id: 'alocacao', label: `Alocação interna (${allocations.length})` },
+          { id: 'contratos', label: `Contratos e empenhos (${contractsCount})` },
           { id: 'adesoes', label: `Adesões (${adesoes.length})` }
         ]}
         active={activeTab}
@@ -1071,9 +1076,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                             <span style={{ color: 'var(--text-muted)' }}>-</span>
                                           ) : null}
                                           {/* Só alertas: contrato vigente mostra apenas a data. */}
-                                          {c.dataVigenciaFim && (c.statusVigencia === 'Expirado' || c.statusVigencia === 'A Vencer (60d)') && (
+                                          {c.dataVigenciaFim && (c.statusVigencia === 'Expirado' || c.statusVigencia === STATUS_A_VENCER) && (
                                             <StatusBadge
-                                              label={c.statusVigencia === 'Expirado' ? 'Expirado' : 'A vencer (60d)'}
+                                              label={c.statusVigencia === 'Expirado' ? 'Expirado' : formatStatusVigencia(STATUS_A_VENCER)}
                                               variant={c.statusVigencia === 'Expirado' ? 'danger' : 'warning'}
                                               size="sm"
                                               dot={false}
@@ -1216,10 +1221,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             adesoesError={adesoesError}
             adesoes={adesoes}
             item={item}
-            totalAdesaoRegistrada={totalAdesaoRegistrada}
-            totalAdesaoEmpenhada={totalAdesaoEmpenhada}
-            totalAdesaoSaldo={totalAdesaoSaldo}
-            adesaoConsumidaPercent={adesaoConsumidaPercent}
+            totalAdesaoAprovada={totalAdesaoAprovada}
+            limiteAdesao={totalLimiteAdesao}
           />
         )}
       </Instrument360TabPanel>

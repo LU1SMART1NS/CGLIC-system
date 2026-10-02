@@ -160,7 +160,7 @@ describe('Fase 1 — Fundação do Modelo Gerencial, Data Lineage e Sincronizaç
       // Data próxima (<= 60 dias)
       const dataProxima = new Date();
       dataProxima.setDate(dataProxima.getDate() + 25);
-      expect(calculateStatusVigencia(dataProxima.toISOString().split('T')[0])).toBe('A Vencer (60d)');
+      expect(calculateStatusVigencia(dataProxima.toISOString().split('T')[0])).toBe('A Vencer');
 
       // Data passada (< 0 dias)
       const dataPassada = new Date();

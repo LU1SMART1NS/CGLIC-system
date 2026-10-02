@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildPaymentCycleKey,
+  calculateEtapaPrazo,
   calculatePaymentCyclePrazos,
   derivePaymentCycleAlerts,
   determinePaymentCycleStatus,
   buildPaymentFollowUpCycle
 } from '../paymentFollowUpService';
-import { buildPaymentFollowUpTemplate } from '../paymentFollowUpTemplateService';
 import type { PaymentCycleInput } from '../../types/paymentFollowUp';
 
 describe('PaymentFollowUpService — Suíte Canônica do Workflow de Pagamentos (Fase 7.4-C)', () => {
   const sampleInput: PaymentCycleInput = {
     contractKey: '200331-12-2024',
     competencia: '2026-03',
+    dataRecebimento: '2026-03-02',
     dataAssinaturaAtesto: '2026-03-02',
     dataVencimentoFatura: '2026-03-20',
     documentoAtestoSei: 'Doc 143589236',
@@ -48,60 +49,20 @@ describe('PaymentFollowUpService — Suíte Canônica do Workflow de Pagamentos 
   });
 
   // ---------------------------------------------------------------------------
-  // C3: Atesto recebido -> Atribuição
+  // C3: Situação deduzida dos marcos (ninguém escolhe a situação à mão)
   // ---------------------------------------------------------------------------
-  it('C3: Deve transicionar para EM_INSTRUCAO quando o responsável for atribuído', () => {
-    const inputWithResp: PaymentCycleInput = {
-      ...sampleInput,
-      responsavelNome: 'Maria Silva'
-    };
-
-    const status = determinePaymentCycleStatus(inputWithResp);
-    expect(status).toBe('EM_INSTRUCAO');
+  it('C3: Sem marcos além do recebimento, o ciclo está em conferência (RECEBIDO)', () => {
+    expect(determinePaymentCycleStatus({ ...sampleInput, responsavelNome: 'Maria Silva' })).toBe('RECEBIDO');
   });
 
-  // ---------------------------------------------------------------------------
-  // C4: Atesto sem atribuição por >2 dias úteis
-  // ---------------------------------------------------------------------------
-  it('C4: Deve emitir alerta de ATENCAO se atesto recebido não for atribuído em mais de 2 dias úteis', () => {
-    const prazos = calculatePaymentCyclePrazos(sampleInput, '2026-03-06'); // 4 dias úteis após 02/03
-    const alerts = derivePaymentCycleAlerts(
-      'cycle-1',
-      sampleInput.contractKey,
-      'RECEBIDO',
-      sampleInput,
-      prazos,
-      undefined,
-      '2026-03-06'
-    );
-
-    const alertAtrib = alerts.find(a => a.tipo === 'ATESTO_PENDENTE_ATRIBUICAO');
-    expect(alertAtrib).toBeDefined();
-    expect(alertAtrib?.nivel).toBe('ATENCAO');
-    expect(alertAtrib?.diasRelevantes).toBe(4);
+  it('C4: A conferência registrada leva o ciclo a CONFERIDO', () => {
+    expect(determinePaymentCycleStatus({ ...sampleInput, dataConferencia: '2026-03-05' })).toBe('CONFERIDO');
   });
 
-  // ---------------------------------------------------------------------------
-  // C5 & C6: Instrução concluída e Despacho elaborado
-  // ---------------------------------------------------------------------------
-  it('C5/C6: Deve transicionar para DESPACHO_ELABORADO quando documento do despacho for informado', () => {
-    const inputWithDespacho: PaymentCycleInput = {
-      ...sampleInput,
-      responsavelNome: 'Maria Silva',
-      documentoDespachoSei: 'Doc 145998120'
-    };
-
-    const status = determinePaymentCycleStatus(inputWithDespacho);
-    expect(status).toBe('DESPACHO_ELABORADO');
-  });
-
-  // ---------------------------------------------------------------------------
-  // C7 & C8: Envio à CGOFI e Processo Aguardando
-  // ---------------------------------------------------------------------------
-  it('C7/C8: Deve transicionar para AGUARDANDO_CGOFI e calcular margem para vencimento', () => {
+  it('C5/C6: O envio à CGOFI (despacho + data) leva o ciclo a ENVIADO_CGOFI e calcula a margem', () => {
     const inputEnviado: PaymentCycleInput = {
       ...sampleInput,
-      responsavelNome: 'Maria Silva',
+      dataConferencia: '2026-03-06',
       documentoDespachoSei: 'Doc 145998120',
       dataEnvioCgofi: '2026-03-10'
     };
@@ -109,46 +70,15 @@ describe('PaymentFollowUpService — Suíte Canônica do Workflow de Pagamentos 
     const status = determinePaymentCycleStatus(inputEnviado);
     const prazos = calculatePaymentCyclePrazos(inputEnviado, '2026-03-10');
 
-    expect(status).toBe('AGUARDANDO_CGOFI');
+    expect(status).toBe('ENVIADO_CGOFI');
     expect(prazos.margemEnvioDiasUteis).toBe(8); // 10/03 a 20/03 em dias úteis
     expect(prazos.diasSemRespostaCgofi).toBe(0);
   });
 
-  // ---------------------------------------------------------------------------
-  // C9: CGOFI sem resposta por >5 dias úteis
-  // ---------------------------------------------------------------------------
-  it('C9: Deve emitir alerta de CGOFI_SEM_RESPOSTA quando decorridos mais de 5 dias úteis', () => {
-    const inputEnviado: PaymentCycleInput = {
-      ...sampleInput,
-      responsavelNome: 'Maria Silva',
-      documentoDespachoSei: 'Doc 145998120',
-      dataEnvioCgofi: '2026-03-05'
-    };
-
-    const prazos = calculatePaymentCyclePrazos(inputEnviado, '2026-03-16'); // 7 dias úteis após envio
-    const alerts = derivePaymentCycleAlerts(
-      'cycle-1',
-      inputEnviado.contractKey,
-      'AGUARDANDO_CGOFI',
-      inputEnviado,
-      prazos,
-      undefined,
-      '2026-03-16'
-    );
-
-    const alertCgofi = alerts.find(a => a.tipo === 'CGOFI_SEM_RESPOSTA');
-    expect(alertCgofi).toBeDefined();
-    expect(alertCgofi?.nivel).toBe('ATENCAO');
-    expect(alertCgofi?.diasRelevantes).toBe(7);
-  });
-
-  // ---------------------------------------------------------------------------
-  // C10: Pagamento Confirmado mediante Ordem Bancária oficial
-  // ---------------------------------------------------------------------------
-  it('C10: Deve transicionar para PAGAMENTO_CONFIRMADO ao registrar a OB oficial', () => {
+  it('C7: A ordem bancária leva o ciclo a PAGO e congela os dias da CGOFI na data da OB', () => {
     const inputPago: PaymentCycleInput = {
       ...sampleInput,
-      responsavelNome: 'Maria Silva',
+      dataConferencia: '2026-03-04',
       documentoDespachoSei: 'Doc 145998120',
       dataEnvioCgofi: '2026-03-05',
       numeroOrdemBancaria: '2026OB800123',
@@ -158,29 +88,70 @@ describe('PaymentFollowUpService — Suíte Canônica do Workflow de Pagamentos 
     const status = determinePaymentCycleStatus(inputPago);
     const cycle = buildPaymentFollowUpCycle(inputPago, { baseDate: '2026-03-15' });
 
-    expect(status).toBe('PAGAMENTO_CONFIRMADO');
-    expect(cycle.status).toBe('PAGAMENTO_CONFIRMADO');
+    expect(status).toBe('PAGO');
+    expect(cycle.status).toBe('PAGO');
     expect(cycle.concluidoEm).toBe('2026-03-12');
+    expect(cycle.etapaAtual).toBeUndefined();
     expect(cycle.prazos.diasSemRespostaCgofi).toBe(5); // 05/03 a 12/03 (congelado na data da OB)
   });
 
   // ---------------------------------------------------------------------------
-  // C11: Ciclo Concluído
+  // C8: Prazo da etapa em curso e quem responde por ele
   // ---------------------------------------------------------------------------
-  it('C11: Permite override formal de status para CONCLUIDO', () => {
-    const cycle = buildPaymentFollowUpCycle(sampleInput, { overrideStatus: 'CONCLUIDO' });
-    expect(cycle.status).toBe('CONCLUIDO');
+  it('C8: Conferência é da CGLIC; sem a data-alvo definida não há prazo de etapa', () => {
+    const comPrazo = { ...sampleInput, prazoConferenciaAte: '2026-03-09' };
+    const etapa = calculateEtapaPrazo('RECEBIDO', comPrazo, '2026-03-04');
+    expect(etapa).toMatchObject({ etapa: 'CONFERENCIA', dono: 'CGLIC', dataAlvo: '2026-03-09', atrasado: false, diasUteisRestantes: 3 });
+    expect(calculateEtapaPrazo('RECEBIDO', sampleInput, '2026-03-04')).toBeUndefined();
+  });
+
+  it('C9: Etapa da CGLIC com a data-alvo vencida emite alerta de prazo da etapa', () => {
+    const input = { ...sampleInput, prazoConferenciaAte: '2026-03-04' };
+    const prazos = calculatePaymentCyclePrazos(input, '2026-03-09');
+    const etapa = calculateEtapaPrazo('RECEBIDO', input, '2026-03-09');
+    const alerts = derivePaymentCycleAlerts('cycle-1', input.contractKey, 'RECEBIDO', input, prazos, undefined, '2026-03-09', etapa);
+
+    const alerta = alerts.find(a => a.tipo === 'PRAZO_ETAPA_VENCIDO');
+    expect(alerta).toBeDefined();
+    expect(alerta?.nivel).toBe('ATENCAO');
+    expect(alerta?.diasRelevantes).toBe(3);
+  });
+
+  it('C10: Depois do envio o dono é a CGOFI: a CGLIC só cobra, a partir da data de cobrança', () => {
+    const inputEnviado: PaymentCycleInput = {
+      ...sampleInput,
+      dataConferencia: '2026-03-04',
+      documentoDespachoSei: 'Doc 145998120',
+      dataEnvioCgofi: '2026-03-05'
+    };
+
+    const prazos = calculatePaymentCyclePrazos(inputEnviado, '2026-03-16'); // 7 dias úteis após o envio
+    const etapa = calculateEtapaPrazo('ENVIADO_CGOFI', inputEnviado, '2026-03-16');
+    expect(etapa).toMatchObject({ etapa: 'COBRANCA_CGOFI', dono: 'CGOFI', atrasado: true });
+
+    const alerts = derivePaymentCycleAlerts('cycle-1', inputEnviado.contractKey, 'ENVIADO_CGOFI', inputEnviado, prazos, undefined, '2026-03-16', etapa);
+    const alertCgofi = alerts.find(a => a.tipo === 'CGOFI_SEM_RESPOSTA');
+    expect(alertCgofi).toBeDefined();
+    expect(alertCgofi?.nivel).toBe('ATENCAO');
+    expect(alertCgofi?.mensagem).toContain('Cobrar a CGOFI');
+    expect(alertCgofi?.diasRelevantes).toBe(7);
+    // Na CGOFI o processo não é da CGLIC: não há alerta de fatura vencida nem de etapa da CGLIC
+    expect(alerts.some(a => a.tipo === 'PRAZO_ETAPA_VENCIDO')).toBe(false);
+  });
+
+  it('C11: A data de cobrança definida pelo gestor prevalece sobre o padrão', () => {
+    const input: PaymentCycleInput = { ...sampleInput, dataEnvioCgofi: '2026-03-05', cobrarCgofiAte: '2026-03-19' };
+    const etapa = calculateEtapaPrazo('ENVIADO_CGOFI', input, '2026-03-16');
+    expect(etapa).toMatchObject({ dataAlvo: '2026-03-19', atrasado: false });
   });
 
   // ---------------------------------------------------------------------------
-  // C12: Exceções operacionais (DEVOLVIDO_FISCAL, CANCELADO)
+  // C12: Exceções (override do servidor: pendência, devolução, cancelamento)
   // ---------------------------------------------------------------------------
-  it('C12: Suporta estados de exceção como DEVOLVIDO_FISCAL e CANCELADO', () => {
-    const cycleDevolvido = buildPaymentFollowUpCycle(sampleInput, { overrideStatus: 'DEVOLVIDO_FISCAL' });
-    const cycleCancelado = buildPaymentFollowUpCycle(sampleInput, { overrideStatus: 'CANCELADO' });
-
-    expect(cycleDevolvido.status).toBe('DEVOLVIDO_FISCAL');
-    expect(cycleCancelado.status).toBe('CANCELADO');
+  it('C12: A situação informada pelo servidor prevalece (COM_PENDENCIA, DEVOLVIDO, CANCELADO)', () => {
+    expect(buildPaymentFollowUpCycle(sampleInput, { overrideStatus: 'COM_PENDENCIA' }).status).toBe('COM_PENDENCIA');
+    expect(buildPaymentFollowUpCycle(sampleInput, { overrideStatus: 'DEVOLVIDO' }).status).toBe('DEVOLVIDO');
+    expect(buildPaymentFollowUpCycle(sampleInput, { overrideStatus: 'CANCELADO' }).status).toBe('CANCELADO');
   });
 
   // ---------------------------------------------------------------------------
@@ -201,7 +172,7 @@ describe('PaymentFollowUpService — Suíte Canônica do Workflow de Pagamentos 
     const alerts = derivePaymentCycleAlerts(
       'cycle-1',
       sampleInput.contractKey,
-      'EM_INSTRUCAO',
+      'RECEBIDO',
       sampleInput,
       prazos,
       { saldoALiquidar: 10000 }, // Empenho com apenas 10.000 para atesto de 15.400,50
@@ -232,18 +203,4 @@ describe('PaymentFollowUpService — Suíte Canônica do Workflow de Pagamentos 
   // ---------------------------------------------------------------------------
   // Validação do Template Gerador de Tarefas
   // ---------------------------------------------------------------------------
-  it('Template: Deve gerar 5 macrotarefas e 11 tarefas com ExecutionMode correto', () => {
-    const tpl = buildPaymentFollowUpTemplate(sampleInput);
-
-    expect(tpl.macrotarefas).toHaveLength(5);
-    const totalTarefas = tpl.macrotarefas.reduce((acc, m) => acc + m.tarefas.length, 0);
-    expect(totalTarefas).toBe(11);
-
-    // Validação dos modos de execução
-    const executionModes = tpl.macrotarefas.flatMap(m => m.tarefas.map(t => t.executionMode));
-    expect(executionModes.filter(m => m === 'INTERNA')).toHaveLength(4);
-    expect(executionModes.filter(m => m === 'EXTERNA')).toHaveLength(3);
-    expect(executionModes.filter(m => m === 'AUTOMATICA')).toHaveLength(3);
-    expect(executionModes.filter(m => m === 'CONFIRMACAO')).toHaveLength(1);
-  });
 });

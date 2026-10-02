@@ -23,6 +23,9 @@ import { LoginRoute } from './routes/LoginRoute';
 import { DefinirSenhaRoute } from './routes/DefinirSenhaRoute';
 import { RedefinirSenhaRoute } from './routes/RedefinirSenhaRoute';
 import { RequireRole } from './components/auth/RequireRole';
+import { AlertRulesGate } from './components/layout/AlertRulesGate';
+import { AlertRulesRoute } from './routes/AlertRulesRoute';
+import { HolidaysRoute } from './routes/HolidaysRoute';
 import { ExportExcelModal } from './components/modals/ExportExcelModal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
@@ -146,7 +149,7 @@ const ProtectedLayout: React.FC<{
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return <AlertRulesGate>{children}</AlertRulesGate>;
 };
 
 const AppContent: React.FC = () => {
@@ -178,7 +181,7 @@ const AppContent: React.FC = () => {
           <Route
             path="/instrumentos"
             element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
                 <GestaoInstrumentosRoute />
               </RequireRole>
             }
@@ -186,7 +189,7 @@ const AppContent: React.FC = () => {
           <Route
             path="/atas"
             element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
                 <ArpSearchRoute />
               </RequireRole>
             }
@@ -210,7 +213,7 @@ const AppContent: React.FC = () => {
           <Route
             path="/atas/detalhe/:ataKey"
             element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
                 <Ata360Route />
               </RequireRole>
             }
@@ -285,6 +288,22 @@ const AppContent: React.FC = () => {
             element={
               <RequireRole allowedRoles={['admin']}>
                 <RolesRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/regras-alertas"
+            element={
+              <RequireRole allowedRoles={['admin']}>
+                <AlertRulesRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/feriados"
+            element={
+              <RequireRole allowedRoles={['admin']}>
+                <HolidaysRoute />
               </RequireRole>
             }
           />

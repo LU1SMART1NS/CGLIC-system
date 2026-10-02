@@ -2,7 +2,9 @@ import type { ArpRecord, AtaTaskPlan } from '../types';
 import type { SeverityLevel } from '../design-system/tokens';
 import { buildCentralPrazosItems } from './centralPrazosService';
 import { classifyArpItemSaldo } from './balanceService';
-import { differenceInDays, parseDateBRT } from './temporalEngineService';
+import { differenceInBusinessDays, parseDateBRT } from './temporalEngineService';
+import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
+import { classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 
 export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE';
 
@@ -33,6 +35,8 @@ export interface AtaItemSaldoInput {
   descricao_item?: string;
   percentual_consumido?: number;
   quantidade_homologada?: number;
+  quantidade_senasp?: number | null;
+  quantidade_base_senasp?: number | null;
   quantidade_consumida?: number;
 }
 
@@ -50,13 +54,13 @@ function lembreteLabel(diasRestantes: number, atrasado: boolean): string {
 
 function percentualDoSaldo(s: AtaItemSaldoInput): number {
   if (typeof s.percentual_consumido === 'number') return s.percentual_consumido;
-  const homologada = Number(s.quantidade_homologada || 0);
+  const homologada = quantidadeBaseSenasp(s);
   return homologada > 0 ? (Number(s.quantidade_consumida || 0) / homologada) * 100 : 0;
 }
 
 /**
  * Fila única da Ata 360, no mesmo formato da fila do Contrato 360
- * (contractActionQueueService): saldo de item (≥70%), tarefas do plano com prazo
+ * (contractActionQueueService): saldo de item (>50%), tarefas do plano com prazo
  * e lembretes de planejamento da vigência, em ordem de gravidade.
  *
  * Gravidade das tarefas segue o contrato: vencida = crítica, até 7 dias =
@@ -100,15 +104,16 @@ export function buildAtaActionQueue(params: {
         tarefasSemPrazo++;
         continue;
       }
-      const dias = differenceInDays(prazo, currentDate);
-      const severity: SeverityLevel | null = dias < 0 ? 'CRITICA' : dias <= 7 ? 'URGENTE' : dias <= 30 ? 'ATENCAO' : null;
+      const dias = differenceInBusinessDays(prazo, currentDate);
+      const nivelPrazo = classifyTarefaPrazo(dias);
+      const severity: SeverityLevel | null = nivelPrazo === 'VENCIDA' ? 'CRITICA' : nivelPrazo === 'URGENTE' ? 'URGENTE' : nivelPrazo === 'PROXIMA' ? 'ATENCAO' : null;
       if (!severity) continue;
       items.push({
         id: `ATA-TASK-${task.id}`,
         kind: 'TAREFA',
         severity,
         title: task.nome,
-        badgeLabel: dias < 0 ? `Vencida há ${Math.abs(dias)} dias` : dias === 0 ? 'Vence hoje' : `${dias} dias`,
+        badgeLabel: dias < 0 ? `Vencida há ${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'dia útil' : 'dias úteis'}` : dias === 0 ? 'Vence hoje' : `${dias} ${dias === 1 ? 'dia útil' : 'dias úteis'}`,
         diasRelevantes: dias,
         dataAlvo: task.prazo,
         taskId: task.id,
@@ -124,7 +129,7 @@ export function buildAtaActionQueue(params: {
     for (const p of buildCentralPrazosItems({ arps: [arp], currentDate })) {
       if (p.tipoItem !== 'GATILHO_OPERACIONAL') continue;
       const atrasado = p.estadoTemporal === 'ATRASADO';
-      if (!atrasado && (p.diasRestantes < 0 || p.diasRestantes > 90)) continue;
+      if (!isLembreteNaJanela({ diasRestantes: p.diasRestantes, atrasado, isAta: true })) continue;
       // Mesmo id do lembrete usado na dispensa ("Resolvido"), para preservar o que já foi marcado.
       const lembrete: AtaActionItem = {
         id: p.id,

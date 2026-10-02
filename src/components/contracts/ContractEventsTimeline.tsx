@@ -9,14 +9,12 @@ import {
   TrendingUp,
   TrendingDown,
   Layers,
-  AlertCircle,
   FileSignature,
   FileSpreadsheet,
   FileCheck2,
   FileX2,
   Clock,
-  Filter,
-  Loader2
+  Filter
 } from 'lucide-react';
 import type {
   ContractDashboardRecord,
@@ -29,6 +27,8 @@ import { useContractEvents } from '../../hooks/useContractEvents';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { formatCurrencyBRL } from '../../utils/ataGrouping';
 import { buildContractValueEvolutionModel } from '../../services/contractValueEvolutionService';
+import { AppButton, DataTable, EmptyState, ErrorState, SectionHeader, StatusBadge } from '../../design-system';
+import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 
 interface ContractEventsTimelineProps {
   contract: ContractDashboardRecord;
@@ -273,35 +273,17 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
 
   // 1. Estado de Carregamento
   if (isLoading) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.5rem auto', color: '#0c326f' }} />
-        <p style={{ fontSize: '0.88rem', margin: 0 }}>Carregando linha do tempo de eventos formais do contrato...</p>
-      </div>
-    );
+    return <DataTable columns={[]} data={[]} keyExtractor={() => ''} isLoading testId="contract-events-loading" />;
   }
 
   // 2. Estado de Erro
   if (isError && !eventsOverride) {
     return (
-      <div
-        style={{
-          background: '#fef2f2',
-          borderRadius: '8px',
-          border: '1px solid #fecaca',
-          padding: '1.5rem',
-          textAlign: 'center',
-          color: '#991b1b'
-        }}
-      >
-        <AlertCircle size={24} style={{ margin: '0 auto 0.5rem auto', color: '#dc2626' }} />
-        <h4 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 0.25rem 0' }}>
-          Não foi possível carregar a linha do tempo contratual
-        </h4>
-        <p style={{ fontSize: '0.82rem', color: '#7f1d1d', margin: 0 }}>
-          {error instanceof Error ? error.message : 'Ocorreu uma instabilidade ao recuperar o histórico formal de eventos.'}
-        </p>
-      </div>
+      <ErrorState
+        title="Não foi possível carregar a linha do tempo contratual"
+        message={error instanceof Error ? error.message : 'Ocorreu uma instabilidade ao recuperar o histórico formal de eventos.'}
+        testId="contract-events-error"
+      />
     );
   }
 
@@ -309,194 +291,75 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
     <div>
       {/* Só aparece quando há aditamento com impacto no valor; sem isso, repetiria o valor global do cabeçalho */}
       {valueEvolution.totalEventosMonetarios > 0 && (
-      <div
-        data-testid="contract-value-evolution-section"
-        style={{
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          borderRadius: '10px',
-          border: '1px solid #e2e8f0',
-          padding: '1.25rem',
-          marginBottom: '1.5rem',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
-        }}
-      >
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '1rem',
-            flexWrap: 'wrap',
-            gap: '0.5rem'
-          }}
+          data-testid="contract-value-evolution-section"
+          style={{ background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '1rem 1.25rem', marginBottom: '1.5rem' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#0c326f',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <TrendingUp size={18} />
-            </div>
-            <div>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Evolução do Valor Contratual
-              </h4>
-              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0 }}>
-                Projeção jurídica determinística (Lei nº 14.133/2021) • Não substitui a execução financeira oficial
-              </p>
-            </div>
-          </div>
+          <SectionHeader
+            title="Evolução do Valor Contratual"
+            subtitle="Projeção jurídica determinística (Lei nº 14.133/2021) • Não substitui a execução financeira oficial"
+            icon={<TrendingUp size={16} />}
+            actions={
+              <StatusBadge
+                label={`${valueEvolution.totalEventosMonetarios} alteração(ões) com impacto monetário`}
+                variant="info"
+                size="sm"
+                dot={false}
+              />
+            }
+          />
 
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <span
-                style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  padding: '0.2rem 0.6rem',
-                  borderRadius: '4px',
-                  backgroundColor: '#eff6ff',
-                  color: '#1d4ed8',
-                  border: '1px solid #bfdbfe',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <CheckCircle2 size={12} />
-                {valueEvolution.totalEventosMonetarios} alteração(ões) com impacto monetário
-              </span>
-          </div>
+          <HealthTileGrid>
+            <HealthTile
+              label="Valor original (celebração)"
+              value={formatCurrencyBRL(valueEvolution.valorOriginal)}
+              hint="Pactuação inicial do contrato"
+              testId="evolution-valor-original"
+            />
+            <HealthTile
+              label="Variação acumulada"
+              value={`${valueEvolution.deltaAcumulado > 0 ? '+ ' : valueEvolution.deltaAcumulado < 0 ? '- ' : ''}${formatCurrencyBRL(Math.abs(valueEvolution.deltaAcumulado))}${
+                valueEvolution.valorOriginal > 0 && valueEvolution.deltaAcumulado !== 0
+                  ? ` (${valueEvolution.percentualVariacaoAcumulada >= 0 ? '+' : ''}${valueEvolution.percentualVariacaoAcumulada.toFixed(2)}%)`
+                  : ''
+              }`}
+              hint={
+                [
+                  valueEvolution.totalReajustes > 0 && `Reajustes: +${formatCurrencyBRL(valueEvolution.totalReajustes)}`,
+                  valueEvolution.totalRepactuacoes > 0 && `Repactuações: +${formatCurrencyBRL(valueEvolution.totalRepactuacoes)}`,
+                  valueEvolution.totalAcrescimos > 0 && `Acréscimos: +${formatCurrencyBRL(valueEvolution.totalAcrescimos)}`,
+                  valueEvolution.totalSupressoes > 0 && `Supressões: -${formatCurrencyBRL(valueEvolution.totalSupressoes)}`,
+                  valueEvolution.totalReequilibrios !== 0 && `Reequilíbrio: +${formatCurrencyBRL(valueEvolution.totalReequilibrios)}`,
+                  valueEvolution.totalOutrosAditivos !== 0 && `Outros: +${formatCurrencyBRL(valueEvolution.totalOutrosAditivos)}`
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              }
+              tone={valueEvolution.deltaAcumulado < 0 ? 'ATENCAO' : undefined}
+              testId="evolution-delta-acumulado"
+            />
+            <HealthTile
+              label="Valor vigente atualizado"
+              value={formatCurrencyBRL(valueEvolution.valorVigente)}
+              hint={
+                valueEvolution.dataUltimoEventoRelevante
+                  ? `Atualizado até ${formatDateBR(valueEvolution.dataUltimoEventoRelevante)}`
+                  : 'Valor vigente atual'
+              }
+              testId="evolution-valor-vigente"
+            />
+          </HealthTileGrid>
         </div>
-
-        {/* Grade de 3 Cards: Valor Original -> Variação Acumulada -> Valor Vigente */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '1rem'
-          }}
-        >
-          {/* Card 1: Valor Original */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              padding: '0.85rem 1rem',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-            }}
-          >
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              Valor Original (Celebração)
-            </span>
-            <div data-testid="evolution-valor-original" style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0.25rem 0' }}>
-              {formatCurrencyBRL(valueEvolution.valorOriginal)}
-            </div>
-            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-              Pactuação inicial do contrato
-            </span>
-          </div>
-
-          {/* Card 2: Variação Acumulada Aditada */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              padding: '0.85rem 1rem',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-            }}
-          >
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              Variação Acumulada
-            </span>
-            <div
-              data-testid="evolution-delta-acumulado"
-              style={{
-                fontSize: '1.2rem',
-                fontWeight: 800,
-                color: valueEvolution.deltaAcumulado > 0 ? '#15803d' : (valueEvolution.deltaAcumulado < 0 ? '#b91c1c' : '#475569'),
-                margin: '0.25rem 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem'
-              }}
-            >
-              <span>
-                {valueEvolution.deltaAcumulado > 0 ? '+ ' : (valueEvolution.deltaAcumulado < 0 ? '- ' : '')}
-                {formatCurrencyBRL(Math.abs(valueEvolution.deltaAcumulado))}
-              </span>
-              {valueEvolution.valorOriginal > 0 && valueEvolution.deltaAcumulado !== 0 && (
-                <span style={{ fontSize: '0.76rem', fontWeight: 700, opacity: 0.9 }}>
-                  ({valueEvolution.percentualVariacaoAcumulada >= 0 ? '+' : ''}{valueEvolution.percentualVariacaoAcumulada.toFixed(2)}%)
-                </span>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', fontSize: '0.72rem', color: '#64748b' }}>
-              {valueEvolution.totalReajustes > 0 && <span>Reajustes: +{formatCurrencyBRL(valueEvolution.totalReajustes)}</span>}
-              {valueEvolution.totalRepactuacoes > 0 && <span>Repactuações: +{formatCurrencyBRL(valueEvolution.totalRepactuacoes)}</span>}
-              {valueEvolution.totalAcrescimos > 0 && <span>Acréscimos: +{formatCurrencyBRL(valueEvolution.totalAcrescimos)}</span>}
-              {valueEvolution.totalSupressoes > 0 && <span>Supressões: -{formatCurrencyBRL(valueEvolution.totalSupressoes)}</span>}
-              {valueEvolution.totalReequilibrios !== 0 && <span>Reequilíbrio: +{formatCurrencyBRL(valueEvolution.totalReequilibrios)}</span>}
-              {valueEvolution.totalOutrosAditivos !== 0 && <span>Outros: +{formatCurrencyBRL(valueEvolution.totalOutrosAditivos)}</span>}
-            </div>
-          </div>
-
-          {/* Card 3: Valor Vigente Projetado */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              padding: '0.85rem 1rem',
-              border: '1px solid #bfdbfe',
-              background: 'linear-gradient(180deg, #ffffff 0%, #eff6ff 100%)',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-            }}
-          >
-            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1d4ed8', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              Valor Vigente Atualizado
-            </span>
-            <div data-testid="evolution-valor-vigente" style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0c326f', margin: '0.25rem 0' }}>
-              {formatCurrencyBRL(valueEvolution.valorVigente)}
-            </div>
-            <span style={{ fontSize: '0.74rem', color: '#3b82f6', fontWeight: 600 }}>
-              {valueEvolution.dataUltimoEventoRelevante
-                ? `Atualizado até ${formatDateBR(valueEvolution.dataUltimoEventoRelevante)}`
-                : 'Valor vigente atual'}
-            </span>
-          </div>
-        </div>
-      </div>
       )}
 
       {/* Estado Vazio de Eventos */}
       {sortedEvents.length === 0 ? (
-        <div
-          style={{
-            background: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px dashed #cbd5e1',
-            padding: '2rem 1.5rem',
-            textAlign: 'center',
-            color: '#64748b'
-          }}
-        >
-          <Calendar size={28} style={{ margin: '0 auto 0.75rem auto', color: '#94a3b8' }} />
-          <h4 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#334155', margin: '0 0 0.25rem 0' }}>
-            Ainda não há eventos contratuais registrados
-          </h4>
-          <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '450px', margin: '0 auto' }}>
-            Eventos oficiais como celebração, prorrogações, reajustes e aditamentos aparecerão aqui conforme sincronizados das fontes governamentais.
-          </p>
-        </div>
+        <EmptyState
+          icon={<Calendar size={28} />}
+          title="Ainda não há eventos contratuais registrados"
+          description="Eventos oficiais como celebração, prorrogações, reajustes e aditamentos aparecerão aqui conforme sincronizados das fontes governamentais."
+          testId="contract-events-empty"
+        />
       ) : (
         <>
           {/* Barra de Filtros Simples */}
@@ -531,24 +394,15 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                   }
                 ] as const
               ).map((btn) => (
-                <button
+                <AppButton
                   key={btn.key}
                   type="button"
+                  size="sm"
+                  variant={filter === btn.key ? 'primary' : 'outline'}
                   onClick={() => setFilter(btn.key)}
-                  style={{
-                    padding: '0.3rem 0.65rem',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    borderRadius: '6px',
-                    border: filter === btn.key ? '1px solid #0c326f' : '1px solid #e2e8f0',
-                    backgroundColor: filter === btn.key ? '#0c326f' : '#ffffff',
-                    color: filter === btn.key ? '#ffffff' : '#475569',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
                 >
                   {btn.label}
-                </button>
+                </AppButton>
               ))}
             </div>
           </div>
@@ -610,11 +464,10 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                       {/* Card do Evento */}
                       <div
                         style={{
-                          backgroundColor: oficialidade.level === 'FATO_OFICIAL' ? '#ffffff' : '#f8fafc',
+                          backgroundColor: '#ffffff',
                           borderRadius: '8px',
-                          border: `1px solid ${oficialidade.level === 'FATO_OFICIAL' ? '#e2e8f0' : '#cbd5e1'}`,
-                          padding: '1rem 1.25rem',
-                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+                          border: `1px ${oficialidade.level === 'FATO_OFICIAL' ? 'solid' : 'dashed'} ${oficialidade.level === 'FATO_OFICIAL' ? '#e2e8f0' : '#cbd5e1'}`,
+                          padding: '1rem 1.25rem'
                         }}
                       >
                         {/* Cabeçalho do Evento: Data, Oficialidade e Tipo */}
@@ -736,7 +589,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                           }}
                         >
                           {/* Instrumento Formal */}
-                          <span style={{ color: '#475569', backgroundColor: '#f8fafc', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ color: '#475569', backgroundColor: '#f1f5f9', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
                             <strong>Instrumento:</strong> {instrumentoLabel}
                           </span>
 

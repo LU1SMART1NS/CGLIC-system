@@ -2,7 +2,8 @@
  * Motor de Prazos e Agenda Contratual (CGLIC — Fase 2)
  *
  * Centraliza e unifica todas as regras temporais do sistema:
- * - Cálculos em dias corridos e dias úteis (com suporte opcional a feriados);
+ * - Cálculos em dias corridos e dias úteis (descontando feriados e pontos facultativos do
+ *   calendário em src/config/holidayCalendar.ts);
  * - Normalização estrita para fuso horário America/Sao_Paulo (sem derivações incorretas por UTC);
  * - Explicabilidade completa de cada prazo calculado (Data-Base -> Regra -> Data Alvo -> Status);
  * - Separação formal entre Estado Temporal (FUTURO, VENCE_EM_BREVE, VENCE_HOJE, ATRASADO, CONCLUIDO)
@@ -18,6 +19,8 @@ import type {
 } from '../types/temporal';
 import type { SeverityLevel } from '../design-system/tokens';
 import { severityFromAtencaoNivel } from './severityService';
+import { ATENCAO_NIVEL_RULES, VIGENCIA_RULES } from '../config/alertRules';
+import { isHolidayISO } from '../config/holidayCalendar';
 
 /**
  * Normaliza uma string de data (YYYY-MM-DD ou ISO) para um objeto Date na meia-noite local.
@@ -78,10 +81,20 @@ export function isWeekend(date: Date): boolean {
 }
 
 /**
- * Adiciona ou subtrai dias úteis de uma data, considerando finais de semana e feriados opcionais.
+ * Dia com expediente: não é fim de semana nem feriado/ponto facultativo de dia inteiro.
+ * Sem `holidays`, usa o calendário do sistema (calculado + Administração > Feriados);
+ * com `holidays`, usa só a lista informada.
  */
-export function addBusinessDays(date: Date, days: number, holidays: string[] = []): Date {
-  const holidaySet = new Set(holidays.map(h => h.split('T')[0].trim()));
+export function isBusinessDay(date: Date, holidays?: string[]): boolean {
+  if (isWeekend(date)) return false;
+  const dateStr = formatDateISO(date);
+  return holidays ? !holidays.some(h => h.split('T')[0].trim() === dateStr) : !isHolidayISO(dateStr);
+}
+
+/**
+ * Adiciona ou subtrai dias úteis de uma data, descontando finais de semana e feriados.
+ */
+export function addBusinessDays(date: Date, days: number, holidays?: string[]): Date {
   const current = new Date(date);
   current.setHours(0, 0, 0, 0);
 
@@ -90,8 +103,7 @@ export function addBusinessDays(date: Date, days: number, holidays: string[] = [
 
   while (remaining > 0) {
     current.setDate(current.getDate() + step);
-    const dateStr = formatDateISO(current);
-    if (!isWeekend(current) && !holidaySet.has(dateStr)) {
+    if (isBusinessDay(current, holidays)) {
       remaining--;
     }
   }
@@ -116,7 +128,7 @@ export function differenceInDays(targetDate: Date, fromDate?: Date): number {
 /**
  * Calcula a diferença em dias úteis entre targetDate e fromDate.
  */
-export function differenceInBusinessDays(targetDate: Date, fromDate?: Date, holidays: string[] = []): number {
+export function differenceInBusinessDays(targetDate: Date, fromDate?: Date, holidays?: string[]): number {
   const base = fromDate ? new Date(fromDate) : new Date();
   base.setHours(0, 0, 0, 0);
 
@@ -128,13 +140,11 @@ export function differenceInBusinessDays(targetDate: Date, fromDate?: Date, holi
   const isForward = target > base;
   const step = isForward ? 1 : -1;
   const current = new Date(base);
-  const holidaySet = new Set(holidays.map(h => h.split('T')[0].trim()));
   let count = 0;
 
   while (isForward ? current < target : current > target) {
     current.setDate(current.getDate() + step);
-    const dateStr = formatDateISO(current);
-    if (!isWeekend(current) && !holidaySet.has(dateStr)) {
+    if (isBusinessDay(current, holidays)) {
       count++;
     }
   }
@@ -148,7 +158,7 @@ export function differenceInBusinessDays(targetDate: Date, fromDate?: Date, holi
 export function deriveTemporalStatus(
   diasRestantes: number,
   isConcluido: boolean = false,
-  thresholdVenceEmBreve: number = 30
+  thresholdVenceEmBreve: number = ATENCAO_NIVEL_RULES.venceEmBreveAteDias
 ): TemporalStatus {
   if (isConcluido) return 'CONCLUIDO';
   if (diasRestantes < 0) return 'ATRASADO';
@@ -167,8 +177,8 @@ export function deriveAtencaoNivel(
   if (statusTemporal === 'CONCLUIDO') return 'NORMAL';
   if (statusTemporal === 'ATRASADO') return 'CRITICO';
   if (statusTemporal === 'VENCE_HOJE') return 'CRITICO';
-  if (diasRestantes <= 15) return 'CRITICO';
-  if (diasRestantes <= 60) return 'ATENCAO';
+  if (diasRestantes <= ATENCAO_NIVEL_RULES.criticoAteDias) return 'CRITICO';
+  if (diasRestantes <= ATENCAO_NIVEL_RULES.atencaoAteDias) return 'ATENCAO';
   return 'NORMAL';
 }
 
@@ -179,50 +189,50 @@ export function deriveAtencaoNivel(
 export const REGRAS_OPERACIONAIS_PADRAO: Record<string, RegraPrazoConfig> = {
   PRORROGACAO_180D: {
     id: 'PRORROGACAO_180D',
-    nome: 'Início da Análise de Prorrogação (180d)',
+    get nome() { return `Início da Análise de Prorrogação (${VIGENCIA_RULES.gatilhoDias.contratoProrrogacao}d)`; },
     tipo: 'OPERACIONAL',
     unidadeContagem: 'DIAS_CORRIDOS',
-    offsetDias: -180,
+    get offsetDias() { return -VIGENCIA_RULES.gatilhoDias.contratoProrrogacao; },
     descricao: 'Regra operacional de planejamento para iniciar estudo de prorrogação 180 dias antes do término da vigência.'
   },
   CONSULTA_FORNECEDOR_120D: {
     id: 'CONSULTA_FORNECEDOR_120D',
-    nome: 'Consulta de Interesse ao Fornecedor (120d)',
+    get nome() { return `Consulta de Interesse ao Fornecedor (${VIGENCIA_RULES.gatilhoDias.consultaFornecedor}d)`; },
     tipo: 'OPERACIONAL',
     unidadeContagem: 'DIAS_CORRIDOS',
-    offsetDias: -120,
+    get offsetDias() { return -VIGENCIA_RULES.gatilhoDias.consultaFornecedor; },
     descricao: 'Regra operacional para enviar ofício de interesse na prorrogação 120 dias antes da vigência final.'
   },
   REMESSA_JURIDICA_60D: {
     id: 'REMESSA_JURIDICA_60D',
-    nome: 'Remessa aos Órgãos de Controle (60d)',
+    get nome() { return `Remessa aos Órgãos de Controle (${VIGENCIA_RULES.gatilhoDias.contratoRemessaJuridica}d)`; },
     tipo: 'OPERACIONAL',
     unidadeContagem: 'DIAS_CORRIDOS',
-    offsetDias: -60,
+    get offsetDias() { return -VIGENCIA_RULES.gatilhoDias.contratoRemessaJuridica; },
     descricao: 'Regra operacional interna para encaminhar processo instruído para análise jurídica 60 dias antes do vencimento.'
   },
   RESPOSTA_FORNECEDOR_10DU: {
     id: 'RESPOSTA_FORNECEDOR_10DU',
-    nome: 'Limite de Resposta da Empresa (10 dias úteis)',
+    get nome() { return `Limite de Resposta da Empresa (${VIGENCIA_RULES.respostaFornecedorDiasUteis} dias úteis)`; },
     tipo: 'OPERACIONAL',
     unidadeContagem: 'DIAS_UTEIS',
-    offsetDias: 10,
+    get offsetDias() { return VIGENCIA_RULES.respostaFornecedorDiasUteis; },
     descricao: 'Prazo operacional administrativo concedido ao fornecedor para manifestação formal sobre prorrogação.'
   },
   ARP_PRORROGACAO_180D: {
     id: 'ARP_PRORROGACAO_180D',
-    nome: 'Planejamento de Prorrogação da Ata (180d)',
+    get nome() { return `Planejamento de Prorrogação da Ata (${VIGENCIA_RULES.gatilhoDias.arpProrrogacao}d)`; },
     tipo: 'OPERACIONAL',
     unidadeContagem: 'DIAS_CORRIDOS',
-    offsetDias: -180,
+    get offsetDias() { return -VIGENCIA_RULES.gatilhoDias.arpProrrogacao; },
     descricao: 'Marco operacional de planejamento preventivo para análise de prorrogação e vantajosidade da Ata de Registro de Preços 180 dias antes do término de sua vigência.'
   },
   ARP_VIGENCIA_90D: {
     id: 'ARP_VIGENCIA_90D',
-    nome: 'Alerta de Exaustão de Vigência da ARP (90d)',
+    get nome() { return `Alerta de Exaustão de Vigência da ARP (${VIGENCIA_RULES.gatilhoDias.arpExaustao}d)`; },
     tipo: 'OPERACIONAL',
     unidadeContagem: 'DIAS_CORRIDOS',
-    offsetDias: -90,
+    get offsetDias() { return -VIGENCIA_RULES.gatilhoDias.arpExaustao; },
     descricao: 'Regra operacional de planejamento para novos certames ou contratações 90 dias antes do fim da vigência da ARP.'
   }
 };
@@ -242,7 +252,7 @@ export function calculateDeadline(params: {
   const baseDate = parseDateBRT(params.dataBase);
   if (!baseDate) return null;
 
-  const { regra, fonteDataBase = 'Contratos.gov.br', currentDate, holidays = [], isConcluido = false } = params;
+  const { regra, fonteDataBase = 'Contratos.gov.br', currentDate, holidays, isConcluido = false } = params;
 
   const targetDate = regra.unidadeContagem === 'DIAS_UTEIS'
     ? addBusinessDays(baseDate, regra.offsetDias, holidays)
@@ -313,7 +323,7 @@ export function getArpVigenciaStatus(
 
   const diasRestantes = differenceInDays(targetDate, currentDate);
   const isExpirada = diasRestantes < 0;
-  const isExpirandoEm90Dias = !isExpirada && diasRestantes <= 90;
+  const isExpirandoEm90Dias = !isExpirada && diasRestantes <= VIGENCIA_RULES.ataExpirandoAteDias;
 
   const statusTemporal = deriveTemporalStatus(diasRestantes);
   const nivelAtencao = deriveAtencaoNivel(diasRestantes, statusTemporal);

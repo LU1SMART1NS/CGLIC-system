@@ -51,7 +51,8 @@ export type DashboardAttentionCategory =
   | 'TAREFA_PROXIMA'
   | 'PAGAMENTO_CRITICO'
   | 'REAJUSTE_RADAR'
-  | 'ATA_CRITICA';
+  | 'ATA_CRITICA'
+  | 'LEMBRETE';
 
 export type DashboardAttentionSeverity = 'CRITICA' | 'URGENTE' | 'ATENCAO' | 'INFO';
 
@@ -71,6 +72,9 @@ export interface DashboardAttentionItem {
   dataAlvo?: string;
   targetUrl?: string;
   badgeLabel?: string;
+  /** Alertas de saldo: descrição do item da Ata e seu fornecedor (a coluna Objeto/Fornecedor prefere estes). */
+  objetoItem?: string;
+  fornecedorNome?: string;
 }
 
 /**
@@ -146,8 +150,8 @@ export interface ManagementDashboardArpItemSummary {
   quantidadeConsumida: number;
   saldoDisponivel: number;
   percentualConsumido: number;
-  isCritico: boolean; // percentualConsumido >= 85%
-  isProximoLimite?: boolean; // 70% <= percentualConsumido < 85%
+  isCritico: boolean; // percentualConsumido > 80%
+  isProximoLimite?: boolean; // 50% < percentualConsumido <= 80%
   totalEmpenhosVinculados?: number;
   contractKey?: string;
 }
@@ -155,8 +159,8 @@ export interface ManagementDashboardArpItemSummary {
 export interface ManagementDashboardArpSummary {
   totalAtas: number;
   totalItens: number;
-  itensCriticosCount: number; // Consumo >= 85%
-  itensProximosLimiteCount?: number; // 70% <= Consumo < 85%
+  itensCriticosCount: number; // Consumo > 80%
+  itensProximosLimiteCount?: number; // 50% < Consumo <= 80%
   quantidadeHomologadaTotal?: number;
   quantidadeEmpenhadaTotal?: number;
   saldoFisicoTotal?: number;

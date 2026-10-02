@@ -19,6 +19,7 @@ import type {
   ArpRecord,
   ContractManager,
   ContractTaskPlan,
+  AtaTaskPlan,
   ContractEvent,
   SyncMetadata
 } from '../types';
@@ -40,16 +41,20 @@ import { buildContractValueEvolutionModel } from './contractValueEvolutionServic
 import { evaluateContractReajusteRadar } from './contractReajusteRadarService';
 import { calculateFinancialBalances } from './financialExecutionService';
 import { buildCentralPrazosItems, calculateCentralPrazosKPIs } from './centralPrazosService';
-import { parseDateBRT, differenceInDays } from './temporalEngineService';
+import { parseDateBRT, differenceInDays, differenceInBusinessDays, getArpVigenciaStatus } from './temporalEngineService';
+import { classifyPrazo } from '../components/carteira/carteiraPrazo';
 import { buildContractEventsFromOfficialData } from './contractEventService';
 import { fetchContractsForDashboard } from './contractService';
 import { fetchArpsFromDb } from './dbCacheService';
-import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
+import { fetchAllContractManagers, fetchAllContractTaskPlans, fetchAllDismissedReminders, type AllDismissedReminders } from './contractManagementService';
+import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
 import { severityFromReajusteRadarNivel, severityFromPaymentStatusPrazo } from './severityService';
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
 import { fetchPaymentCyclesForContracts } from '../adapters/paymentCycleRpcAdapter';
+import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
+import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 
 /**
  * Auxiliar para cálculo de dias restantes de vigência
@@ -79,7 +84,7 @@ export function calculateExecutiveKPIs(
 
   for (const contract of contracts) {
     const statusVig = (contract.statusVigencia || '').toUpperCase();
-    const isAtivo = statusVig === 'VIGENTE' || statusVig.includes('VENCER') || statusVig.includes('60D');
+    const isAtivo = statusVig === 'VIGENTE' || statusVig.includes('VENCER');
     const isEncerrado = statusVig === 'EXPIRADO' || statusVig === 'NÃO INFORMADO' || statusVig.includes('ENCERRAD') || statusVig.includes('RESCINDID');
 
     if (isAtivo) {
@@ -154,13 +159,13 @@ export function calculateDeadlinesSummary(
     if (dias < 0) {
       contratosVencidos++;
       faixa = 'VENCIDO';
-    } else if (dias <= 30) {
+    } else if (dias <= VIGENCIA_RULES.faixaCriticoAteDias) {
       vencendo30Dias++;
       faixa = '30D';
-    } else if (dias <= 60) {
+    } else if (dias <= VIGENCIA_RULES.faixaIntermediariaDias) {
       vencendo60Dias++;
       faixa = '60D';
-    } else if (dias <= 90) {
+    } else if (dias <= VIGENCIA_RULES.faixaAtencaoAteDias) {
       vencendo90Dias++;
       faixa = '90D';
     }
@@ -179,7 +184,7 @@ export function calculateDeadlinesSummary(
     }
 
     // Indicador aproximado de prorrogação em curso
-    if (dias >= 0 && dias <= 180) {
+    if (dias >= 0 && dias <= VIGENCIA_RULES.prorrogacaoAproximadaAteDias) {
       prorrogaçõesEmCurso++;
     }
   }
@@ -204,6 +209,10 @@ export function calculateAttentionSummary(params: {
   arps?: ArpRecord[];
   managers?: Record<string, ContractManager>;
   plans?: Record<string, ContractTaskPlan>;
+  /** Planos de gestão das Atas, indexados por número da ata (ata_task_plans.ata_key). */
+  ataPlans?: Record<string, AtaTaskPlan>;
+  /** Lembretes marcados como "Resolvido" na Visão 360 do contrato/ata: não entram na lista. */
+  dismissedReminders?: AllDismissedReminders;
   eventsMap?: Record<string, ContractEvent[]>;
   paymentCycles?: PaymentFollowUpCycle[];
   arpItems?: Array<{ percentual_consumido?: number }>;
@@ -214,6 +223,8 @@ export function calculateAttentionSummary(params: {
     arps = [],
     managers = {},
     plans = {},
+    ataPlans = {},
+    dismissedReminders = { CONTRATO: {}, ATA: {} },
     eventsMap = {},
     paymentCycles = [],
     arpItems = [],
@@ -257,7 +268,7 @@ export function calculateAttentionSummary(params: {
 
   // C) Pagamentos Críticos
   const pagamentosCriticos = paymentCycles.filter(
-    (c) => c.prazos?.statusPrazo === 'CRITICO' || c.prazos?.statusPrazo === 'VENCIDO' || (c.prazos?.diasSemRespostaCgofi ?? 0) > 5
+    (c) => c.prazos?.statusPrazo === 'CRITICO' || c.prazos?.statusPrazo === 'VENCIDO' || precisaCobrarCgofi(c)
   );
   const pagamentosCriticosCount = pagamentosCriticos.length;
 
@@ -296,7 +307,7 @@ export function calculateAttentionSummary(params: {
         category: 'TAREFA_ATRASADA',
         severity: 'CRITICA',
         title: pItem.acaoDescricao || pItem.regraNome || 'Tarefa Contratual Vencida',
-        description: `${pItem.identificadorFormatado}${pItem.fornecedorNome ? ` (${pItem.fornecedorNome})` : ''} — Vencida há ${Math.abs(pItem.diasRestantes)} dias`,
+        description: `${pItem.identificadorFormatado}${pItem.fornecedorNome ? ` (${pItem.fornecedorNome})` : ''} — Vencida há ${Math.abs(pItem.diasRestantes)} ${Math.abs(pItem.diasRestantes) === 1 ? 'dia útil' : 'dias úteis'}`,
         contractKey: pItem.contractKey,
         numeroContrato: pItem.identificadorFormatado,
         arpKey: pItem.arpKey,
@@ -304,7 +315,7 @@ export function calculateAttentionSummary(params: {
         diasRelevantes: pItem.diasRestantes,
         dataAlvo: pItem.dataAlvo,
         targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
-        badgeLabel: `Vencida (${pItem.diasRestantes}d)`
+        badgeLabel: `Vencida (${pItem.diasRestantes} d.u.)`
       });
     } else if (pItem.estadoTemporal === 'VENCE_HOJE') {
       items.push({
@@ -322,13 +333,13 @@ export function calculateAttentionSummary(params: {
         targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
         badgeLabel: 'Vence Hoje'
       });
-    } else if (pItem.estadoTemporal !== 'CONCLUIDO' && pItem.diasRestantes > 0 && pItem.diasRestantes <= 7) {
+    } else if (pItem.estadoTemporal !== 'CONCLUIDO' && pItem.diasRestantes > 0 && pItem.diasRestantes <= TAREFA_RULES.urgenteAteDias) {
       items.push({
         id: `ATT-TASK-UPCOMING-${pItem.id}`,
         category: 'TAREFA_PROXIMA',
         severity: 'URGENTE',
         title: pItem.acaoDescricao || pItem.regraNome || 'Tarefa Próxima do Vencimento',
-        description: `${pItem.identificadorFormatado} — Vence em ${pItem.diasRestantes} dias (${pItem.marcoEvento})`,
+        description: `${pItem.identificadorFormatado} — Vence em ${pItem.diasRestantes} ${pItem.diasRestantes === 1 ? 'dia útil' : 'dias úteis'} (${pItem.marcoEvento})`,
         contractKey: pItem.contractKey,
         numeroContrato: pItem.identificadorFormatado,
         arpKey: pItem.arpKey,
@@ -336,16 +347,75 @@ export function calculateAttentionSummary(params: {
         diasRelevantes: pItem.diasRestantes,
         dataAlvo: pItem.dataAlvo,
         targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
-        badgeLabel: `${pItem.diasRestantes} dias`
+        badgeLabel: `${pItem.diasRestantes} ${pItem.diasRestantes === 1 ? 'dia útil' : 'dias úteis'}`
       });
     }
+  }
+
+  // 1.1 Tarefas de contrato entre 8 e 30 dias (atenção) — mesma regra da fila do Contrato 360.
+  for (const pItem of tarefasHumanas) {
+    if (pItem.estadoTemporal === 'CONCLUIDO' || pItem.tarefaStatus === 'CONCLUIDA' || pItem.tarefaStatus === 'NAO_APLICAVEL') continue;
+    if (pItem.diasRestantes <= TAREFA_RULES.urgenteAteDias || pItem.diasRestantes > TAREFA_RULES.atencaoAteDias) continue;
+    items.push({
+      id: `ATT-TASK-ATENCAO-${pItem.id}`,
+      category: 'TAREFA_PROXIMA',
+      severity: 'ATENCAO',
+      title: pItem.acaoDescricao || pItem.regraNome || 'Tarefa Próxima do Vencimento',
+      description: `${pItem.identificadorFormatado} — Vence em ${pItem.diasRestantes} ${pItem.diasRestantes === 1 ? 'dia útil' : 'dias úteis'} (${pItem.marcoEvento})`,
+      contractKey: pItem.contractKey,
+      numeroContrato: pItem.identificadorFormatado,
+      taskId: pItem.tarefaId,
+      diasRelevantes: pItem.diasRestantes,
+      dataAlvo: pItem.dataAlvo,
+      targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
+      badgeLabel: `${pItem.diasRestantes} ${pItem.diasRestantes === 1 ? 'dia útil' : 'dias úteis'}`
+    });
+  }
+
+  // 1.2 Lembretes de planejamento da vigência (prorrogação/exaustão) — mesma janela e
+  // mesma dispensa ("Resolvido") das filas do Contrato 360 (60d) e da Ata 360 (90d).
+  const today = new Date(currentDate ?? new Date()).setHours(0, 0, 0, 0);
+  const contractsByKey = new Map(contracts.map((c) => [c.id, c]));
+  const arpsByKey = new Map(arps.map((a) => [`${a.numeroAtaRegistroPreco}-${a.codigoUnidadeGerenciadora}`, a]));
+  for (const pItem of prazosItems) {
+    if (pItem.tipoItem !== 'GATILHO_OPERACIONAL') continue;
+    const atrasado = pItem.estadoTemporal === 'ATRASADO';
+    const isAta = pItem.entidadeOrigem === 'ARP';
+    const arpRec = isAta && pItem.arpKey ? arpsByKey.get(pItem.arpKey) : undefined;
+    const contractRec = !isAta && pItem.contractKey ? contractsByKey.get(pItem.contractKey) : undefined;
+    const fimRaw = isAta ? arpRec?.dataVigenciaFinal : contractRec?.dataVigenciaFim;
+    const fim = fimRaw ? parseDateBRT(fimRaw) : null;
+    if (fim && fim.getTime() < today) continue; // vigência encerrada: lembrete perde o sentido
+    if (!isLembreteNaJanela({ diasRestantes: pItem.diasRestantes, atrasado, isAta })) continue;
+
+    const entityKey = isAta ? arpRec?.numeroAtaRegistroPreco : pItem.contractKey;
+    if (!entityKey) continue;
+    // Ids de dispensa gravados pelas filas 360 (Ata: id puro; Contrato: prefixo ACT-LEMBRETE-).
+    const dismissedId = isAta ? pItem.id : `ACT-LEMBRETE-${pItem.id}`;
+    if (dismissedReminders[isAta ? 'ATA' : 'CONTRATO'][entityKey]?.includes(dismissedId)) continue;
+
+    const dias = pItem.diasRestantes;
+    items.push({
+      id: `ATT-LEMBRETE-${pItem.id}`,
+      category: 'LEMBRETE',
+      severity: 'INFO',
+      title: pItem.regraNome,
+      description: `${pItem.identificadorFormatado} — ${pItem.acaoDescricao}`,
+      contractKey: isAta ? undefined : pItem.contractKey,
+      numeroContrato: pItem.identificadorFormatado,
+      arpKey: isAta ? pItem.arpKey : undefined,
+      numeroAta: isAta ? arpRec?.numeroAtaRegistroPreco : undefined,
+      diasRelevantes: dias,
+      dataAlvo: pItem.dataAlvo,
+      badgeLabel: atrasado ? `Janela iniciada há ${Math.abs(dias)} dias` : dias === 0 ? 'Janela inicia hoje' : `Janela em ${dias} dias`
+    });
   }
 
   // 2. Pagamentos com Atenção
   for (const cycle of paymentCycles) {
     const isVencido = cycle.prazos?.statusPrazo === 'VENCIDO' || cycle.prazos?.isVencida;
     const isCritico = cycle.prazos?.statusPrazo === 'CRITICO';
-    const isAtrasoCgofi = (cycle.prazos?.diasSemRespostaCgofi ?? 0) > 5;
+    const isAtrasoCgofi = precisaCobrarCgofi(cycle);
 
     if (isVencido || isCritico || isAtrasoCgofi) {
       // Severidade canônica (Fase 10-A.2): VENCIDO -> CRITICA; qualquer outro
@@ -373,6 +443,35 @@ export function calculateAttentionSummary(params: {
     }
   }
 
+  // 2b. Prazo da etapa da CGLIC (conferir ou enviar à CGOFI): o prazo que o gestor define em cada ciclo
+  // aparece nas Ações e na Central de Atenção. A etapa da CGOFI não entra aqui: é só cobrança (acima).
+  for (const cycle of paymentCycles) {
+    const etapa = cycle.etapaAtual;
+    if (!etapa || etapa.dono !== 'CGLIC') continue;
+    const dias = etapa.diasUteisRestantes;
+    const atrasada = etapa.atrasado;
+    if (!atrasada && dias > PAGAMENTO_RULES.etapaAvisoAteDiasUteis) continue;
+
+    const docSei = cycle.input?.documentoAtestoSei || 'Atesto';
+    const acao = etapa.etapa === 'ENVIO' ? 'Enviar à CGOFI' : cycle.status === 'COM_PENDENCIA' ? 'Retomar a conferência' : 'Conferir a documentação';
+    const abs = Math.abs(dias);
+    const unidade = abs === 1 ? 'dia útil' : 'dias úteis';
+
+    items.push({
+      id: `ATT-PGTO-ETAPA-${cycle.cycleKey || cycle.contractKey}-${etapa.etapa}`,
+      category: 'PAGAMENTO_CRITICO',
+      severity: atrasada ? 'URGENTE' : 'ATENCAO',
+      title: `${acao} (${docSei}): ${atrasada ? `atrasada há ${abs} ${unidade}` : dias === 0 ? 'prazo é hoje' : `prazo em ${abs} ${unidade}`}`,
+      description: `Contrato ${cycle.contractKey} — prazo da etapa ${etapa.dataAlvo.split('-').reverse().join('/')}`,
+      contractKey: cycle.contractKey,
+      cycleKey: cycle.cycleKey,
+      diasRelevantes: dias,
+      dataAlvo: etapa.dataAlvo,
+      targetUrl: `/contratos/${cycle.contractKey}`,
+      badgeLabel: atrasada ? `${abs}d úteis de atraso` : dias === 0 ? 'Vence hoje' : `${abs} ${unidade}`
+    });
+  }
+
   // 3. Radars de Reajuste / Repactuação
   for (const alert of (radarsReajuste || []).filter(Boolean)) {
     if (!alert) continue;
@@ -398,7 +497,7 @@ export function calculateAttentionSummary(params: {
     });
   }
 
-  // 4. Atas com Consumo Crítico (>= 85%)
+  // 4. Atas com Consumo Crítico (> 80%)
   for (const aItem of atasCriticas as any[]) {
     const rawPerc = aItem.percentual_consumido ?? aItem.percentualConsumido;
     // Classificação canônica única (Fase 10-A.2) — balanceService.classifyArpItemSaldo.
@@ -419,11 +518,75 @@ export function calculateAttentionSummary(params: {
       description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}`,
       arpKey: itemKey,
       numeroAta: numAta,
+      objetoItem: descItem,
+      fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
       contractKey: aItem.contract_key || aItem.contractKey,
       diasRelevantes: 0,
       targetUrl: numAta ? `/atas/${numAta}` : undefined,
       badgeLabel: `${roundedPerc.toFixed(1)}% consumido`
     });
+  }
+
+  // 5. Saldo de item de Ata em atenção (50% a 80%) — mesmo critério da
+  // fila da Ata 360 (classifyArpItemSaldo), que já mostra esses itens como "atenção".
+  for (const aItem of (arpItems || []) as any[]) {
+    const rawPerc = aItem.percentual_consumido ?? aItem.percentualConsumido;
+    const saldoClass = classifyArpItemSaldo(Number(rawPerc) || 0);
+    if (!saldoClass.isProximoLimite) continue;
+    const numAta = aItem.numero_ata || aItem.numeroAta;
+    const numItem = aItem.numero_item || aItem.numeroItem;
+    const descItem = aItem.descricao_item || aItem.descricaoItem || 'Item de ARP';
+    const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
+    const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : aItem.id || `ITEM-${Math.random()}`);
+
+    items.push({
+      id: `ATT-ARP-ITEM-${itemKey}`,
+      category: 'ATA_CRITICA',
+      severity: saldoClass.severity,
+      title: `Saldo em atenção em Ata (${saldoClass.percentualConsumido.toFixed(1)}%)`,
+      description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}`,
+      arpKey: itemKey,
+      numeroAta: numAta,
+      objetoItem: descItem,
+      fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
+      contractKey: aItem.contract_key || aItem.contractKey,
+      diasRelevantes: 0,
+      badgeLabel: `${saldoClass.percentualConsumido.toFixed(1)}% consumido`
+    });
+  }
+
+  // 6. Tarefas do plano de gestão das Atas — mesma regra das tarefas de contrato
+  // (vencida = crítica, vence hoje ou em até 7 dias = urgente). Sem isso, o que a
+  // Ata 360 mostra na aba "Ações" nunca chegava à visão global.
+  for (const arp of arps) {
+    const numAta = arp.numeroAtaRegistroPreco;
+    const plan = numAta ? ataPlans[numAta] : undefined;
+    if (!plan) continue;
+    for (const macro of plan.macrotarefas) {
+      for (const task of macro.tarefas) {
+        if (task.status === 'CONCLUIDA' || task.status === 'NAO_APLICAVEL') continue;
+        const prazo = task.prazo ? parseDateBRT(task.prazo) : null;
+        if (!prazo) continue;
+        const dias = differenceInBusinessDays(prazo, currentDate);
+        const nivelPrazo = classifyTarefaPrazo(dias);
+        if (nivelPrazo === 'DISTANTE') continue;
+        const du = (n: number) => `${n} ${n === 1 ? 'dia útil' : 'dias úteis'}`;
+        items.push({
+          id: `ATT-ATA-TASK-${task.id}`,
+          category: nivelPrazo === 'VENCIDA' ? 'TAREFA_ATRASADA' : 'TAREFA_PROXIMA',
+          severity: nivelPrazo === 'VENCIDA' ? 'CRITICA' : nivelPrazo === 'URGENTE' ? 'URGENTE' : 'ATENCAO',
+          title: task.nome,
+          description: `ARP ${numAta} — ${macro.nome}${dias < 0 ? ` — Vencida há ${du(Math.abs(dias))}` : dias === 0 ? ' — Vence hoje!' : ` — Vence em ${du(dias)}`}`,
+          arpKey: `${numAta}-${arp.codigoUnidadeGerenciadora}`,
+          numeroAta: numAta,
+          numeroContrato: `ARP ${numAta}`,
+          taskId: task.id,
+          diasRelevantes: dias,
+          dataAlvo: task.prazo,
+          badgeLabel: dias < 0 ? `Vencida (${dias} d.u.)` : dias === 0 ? 'Vence Hoje' : du(dias)
+        });
+      }
+    }
   }
 
   // Deduplicação determinística rigorosa
@@ -618,6 +781,8 @@ export function calculateArpSummary(
     descricao_item?: string;
     fornecedor_razao_social?: string;
     quantidade_homologada?: number;
+    quantidade_senasp?: number | null;
+    quantidade_base_senasp?: number | null;
     quantidade_consumida?: number;
     saldo_disponivel?: number;
     percentual_consumido?: number;
@@ -632,7 +797,7 @@ export function calculateArpSummary(
   let quantidadeEmpenhadaTotal = 0;
 
   const itemSummaries: ManagementDashboardArpItemSummary[] = itemsSaldo.map((item, idx) => {
-    const qtdHomologada = Number(item.quantidade_homologada || 0);
+    const qtdHomologada = quantidadeBaseSenasp(item);
     const qtdConsumida = Number(item.quantidade_consumida || 0);
     const saldo = Number(typeof item.saldo_disponivel === 'number' ? item.saldo_disponivel : (qtdHomologada - qtdConsumida));
     const percentual = Number(
@@ -707,6 +872,11 @@ export function calculateArpSummary(
   };
 }
 
+/** Processo na CGOFI além da data de cobrança, sem ordem bancária: a CGLIC deve cobrar. */
+function precisaCobrarCgofi(cycle: PaymentFollowUpCycle): boolean {
+  return cycle.alerts?.some((a) => a.tipo === 'CGOFI_SEM_RESPOSTA') ?? false;
+}
+
 /**
  * 6. Cálculo puro do Acompanhamento de Faturamento e Pagamentos
  */
@@ -727,15 +897,11 @@ export function calculatePaymentsSummary(
 
   const distribuicaoPorEstado: Record<string, number> = {
     RECEBIDO: 0,
-    ATRIBUIDO: 0,
-    EM_INSTRUCAO: 0,
-    PENDENTE_DOCUMENTACAO: 0,
-    DESPACHO_ELABORADO: 0,
+    COM_PENDENCIA: 0,
+    CONFERIDO: 0,
     ENVIADO_CGOFI: 0,
-    AGUARDANDO_CGOFI: 0,
-    DEVOLVIDO_FISCAL: 0,
-    PAGAMENTO_CONFIRMADO: 0,
-    CONCLUIDO: 0,
+    DEVOLVIDO: 0,
+    PAGO: 0,
     CANCELADO: 0
   };
 
@@ -746,10 +912,9 @@ export function calculatePaymentsSummary(
     const status = cycle.status || 'RECEBIDO';
     distribuicaoPorEstado[status] = (distribuicaoPorEstado[status] || 0) + 1;
 
-    const isFinalizado =
-      status === 'CONCLUIDO' ||
-      status === 'PAGAMENTO_CONFIRMADO' ||
-      status === 'CANCELADO';
+    const isFinalizado = status === 'PAGO' || status === 'CANCELADO';
+    // Enquanto o ciclo está com a CGLIC (conferir ou enviar); depois do envio o processo é da CGOFI.
+    const comACglic = status === 'RECEBIDO' || status === 'COM_PENDENCIA' || status === 'CONFERIDO' || status === 'DEVOLVIDO';
 
     if (isFinalizado) {
       ciclosConcluidosCount++;
@@ -757,7 +922,7 @@ export function calculatePaymentsSummary(
       ciclosAbertosCount++;
     }
 
-    if (status === 'PENDENTE_DOCUMENTACAO') {
+    if (status === 'COM_PENDENCIA') {
       documentacaoPendenteCount++;
     }
 
@@ -769,7 +934,7 @@ export function calculatePaymentsSummary(
         faturasVencidasCount++;
       } else if (diasUteisAteVencimento === 0) {
         faturasVenceHojeCount++;
-      } else if (diasUteisAteVencimento !== undefined && diasUteisAteVencimento > 0 && diasUteisAteVencimento <= 3) {
+      } else if (diasUteisAteVencimento !== undefined && diasUteisAteVencimento > 0 && diasUteisAteVencimento <= PAGAMENTO_RULES.criticoAteDiasUteis) {
         faturasProximasVencimentoCount++;
       }
 
@@ -777,23 +942,17 @@ export function calculatePaymentsSummary(
         ciclosCriticosCount++;
       }
 
-      if ((cycle.prazos?.diasSemRespostaCgofi ?? 0) > 5) {
+      if (precisaCobrarCgofi(cycle)) {
         ciclosAtrasoCgofiCount++;
       }
 
-      if (
-        (status === 'EM_INSTRUCAO' || status === 'DESPACHO_ELABORADO' || status === 'RECEBIDO') &&
-        ((cycle.prazos?.margemEnvioDiasUteis ?? 99) < 0 || isVencida)
-      ) {
+      // Etapa da CGLIC (conferir ou enviar) fora do prazo, ou fatura já vencida sem ter ido à CGOFI
+      if (comACglic && (cycle.etapaAtual?.atrasado || isVencida)) {
         envioCgofiAtrasadoCount++;
       }
 
-      if (
-        (status === 'EM_INSTRUCAO' || status === 'DESPACHO_ELABORADO') &&
-        cycle.prazos?.margemEnvioDiasUteis !== undefined &&
-        cycle.prazos.margemEnvioDiasUteis >= 0 &&
-        cycle.prazos.margemEnvioDiasUteis <= 2
-      ) {
+      // Ainda na CGLIC e a fatura vence em até 2 dias úteis
+      if (comACglic && !isVencida && diasUteisAteVencimento !== undefined && diasUteisAteVencimento >= 0 && diasUteisAteVencimento <= 2) {
         margemEnvioEstreitaCount++;
       }
     }
@@ -825,7 +984,7 @@ export function calculatePaymentsSummary(
   };
 
   const openCycles = cycles.filter(
-    (c) => c.status !== 'CONCLUIDO' && c.status !== 'CANCELADO'
+    (c) => c.status !== 'PAGO' && c.status !== 'CANCELADO'
   );
 
   const ciclosAbertosDetalhe = [...openCycles].sort((a, b) => {
@@ -873,6 +1032,8 @@ export function buildManagementDashboardReadModel(params: {
   arps?: ArpRecord[];
   managers?: Record<string, ContractManager>;
   plans?: Record<string, ContractTaskPlan>;
+  ataPlans?: Record<string, AtaTaskPlan>;
+  dismissedReminders?: AllDismissedReminders;
   eventsMap?: Record<string, ContractEvent[]>;
   empenhos?: Array<any>;
   itemsSaldo?: Array<any>;
@@ -894,6 +1055,7 @@ export function buildManagementDashboardReadModel(params: {
   const rawEventsMap = params.eventsMap || {};
   const rawManagers = params.managers || {};
   const rawPlans = params.plans || {};
+  const rawAtaPlans = params.ataPlans || {};
 
   const availableContracts: ManagementDashboardFilterOption[] = rawContracts.map((c) => {
     const key = c.id || `${c.numero || ''}${c.ano ? `/${c.ano}` : ''}`;
@@ -935,7 +1097,25 @@ export function buildManagementDashboardReadModel(params: {
   let filteredContracts = rawContracts;
   let filteredArps = rawArps;
   let filteredItemsSaldo = rawItemsSaldo;
-  let filteredEmpenhos = rawEmpenhos;
+  // v_empenhos_resumo é global (não filtra por UASG) e a Visão Geral soma os read models
+  // das duas UASGs: sem este recorte, cada empenho entrava uma vez por UASG (valor em dobro).
+  // Fica o que a UASG emitiu OU o que está ligado a um contrato/ata dela; sem
+  // `uasg_emitente` informado (dado legado), mantém — nunca descarta o que não sabe classificar.
+  const uasgContractKeys = new Set(
+    rawContracts.flatMap((c) => [c.id, c.numero, `${c.numero}/${c.ano}`]).filter(Boolean)
+  );
+  const uasgAtaNumbers = new Set(rawArps.map((a) => a.numeroAtaRegistroPreco));
+  let filteredEmpenhos = rawEmpenhos.filter((emp) => {
+    const emitente = String(emp.uasg_emitente ?? '').trim();
+    if (!emitente || emitente === uasg) return true;
+    const contractKeysList: string[] = Array.isArray(emp.contract_keys) ? emp.contract_keys : emp.contract_key ? [emp.contract_key] : [];
+    const empContrato = emp.numero_contrato || emp.contrato_id || emp.contratoNumero;
+    return (
+      contractKeysList.some((k) => uasgContractKeys.has(k)) ||
+      Boolean(empContrato && uasgContractKeys.has(empContrato)) ||
+      Boolean((emp.numero_ata || emp.arp_id) && uasgAtaNumbers.has(emp.numero_ata || emp.arp_id))
+    );
+  });
   let filteredPaymentCycles = rawPaymentCycles;
   let filteredEventsMap = rawEventsMap;
   let filteredManagers = rawManagers;
@@ -1065,7 +1245,7 @@ export function buildManagementDashboardReadModel(params: {
   if (f.statusContrato && f.statusContrato !== 'TODOS') {
     filteredContracts = filteredContracts.filter((c) => {
       const statusVig = (c.statusVigencia || (c as any).status || '').toUpperCase();
-      const isAtivo = statusVig === 'VIGENTE' || statusVig.includes('VENCER') || statusVig.includes('60D') || statusVig === 'ATIVO' || !statusVig;
+      const isAtivo = statusVig === 'VIGENTE' || statusVig.includes('VENCER') || statusVig === 'ATIVO' || !statusVig;
       const isEncerrado = statusVig === 'EXPIRADO' || statusVig === 'NÃO INFORMADO' || statusVig.includes('ENCERRAD') || statusVig.includes('RESCINDID') || statusVig === 'CONCLUIDO';
 
       if (f.statusContrato === 'ATIVO') return isAtivo && !isEncerrado;
@@ -1080,6 +1260,24 @@ export function buildManagementDashboardReadModel(params: {
   }
 
   // 3. Recalcula todos os blocos determinísticos sobre os dados filtrados
+  // Só Atas vigentes entram na Visão Geral (mesma definição da Carteira de Atas): Atas vencidas,
+  // canceladas ou sem data não contam no total, nem no saldo, nem nas tarefas e lembretes.
+  const encerradasAtaNumbers = new Set<string>();
+  filteredArps = filteredArps.filter((arp) => {
+    const dias = getArpVigenciaStatus(arp.dataVigenciaFinal, currentDate)?.diasRestantes ?? null;
+    const faixa = classifyPrazo(dias, Boolean(arp.isCanceladaPncp));
+    const vigente = faixa !== 'EXPIRADO' && faixa !== 'SEM_DATA';
+    if (!vigente) encerradasAtaNumbers.add(arp.numeroAtaRegistroPreco);
+    return vigente;
+  });
+  filteredItemsSaldo = filteredItemsSaldo.filter((item) => !encerradasAtaNumbers.has(item.numero_ata || item.numeroAta));
+
+  // Planos de Ata só dos instrumentos que sobraram após escopo e filtros.
+  const visibleAtaNumbers = new Set(filteredArps.map((a) => a.numeroAtaRegistroPreco));
+  const filteredAtaPlans = Object.fromEntries(
+    Object.entries(rawAtaPlans).filter(([k]) => visibleAtaNumbers.has(k))
+  );
+
   const executive = calculateExecutiveKPIs(filteredContracts, filteredEventsMap);
   const deadlines = calculateDeadlinesSummary(filteredContracts, currentDate);
   const attention = calculateAttentionSummary({
@@ -1087,6 +1285,8 @@ export function buildManagementDashboardReadModel(params: {
     arps: filteredArps,
     managers: filteredManagers,
     plans: filteredPlans,
+    ataPlans: filteredAtaPlans,
+    dismissedReminders: params.dismissedReminders,
     eventsMap: filteredEventsMap,
     paymentCycles: filteredPaymentCycles,
     arpItems: filteredItemsSaldo,
@@ -1133,6 +1333,8 @@ export async function fetchManagementDashboardData(
     arpsRes,
     managers,
     plans,
+    ataPlans,
+    dismissedReminders,
     empenhosResumo,
     arpItemsSaldo
   ] = await Promise.all([
@@ -1152,6 +1354,11 @@ export async function fetchManagementDashboardData(
       console.warn('Erro ao consultar planos de tarefas para o dashboard:', err);
       return {} as Record<string, ContractTaskPlan>;
     }),
+    fetchAllAtaTaskPlans().catch((err) => {
+      console.warn('Erro ao consultar planos de gestão das atas para o dashboard:', err);
+      return {} as Record<string, AtaTaskPlan>;
+    }),
+    fetchAllDismissedReminders(),
     fetchEmpenhosResumoFromDb(cleanUasg).catch((err) => {
       console.error('Erro ao consultar empenhos para o dashboard:', err);
       return [] as any[];
@@ -1170,6 +1377,8 @@ export async function fetchManagementDashboardData(
     arps: arpsRes.arps,
     managers,
     plans,
+    ataPlans,
+    dismissedReminders,
     empenhos: empenhosResumo,
     itemsSaldo: arpItemsSaldo,
     paymentCycles,

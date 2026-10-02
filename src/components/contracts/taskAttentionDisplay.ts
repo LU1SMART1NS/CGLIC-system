@@ -1,5 +1,6 @@
 import type { ContractTask, TaskExecutionMode } from '../../types';
-import { differenceInDays, parseDateBRT } from '../../services/temporalEngineService';
+import { differenceInBusinessDays, parseDateBRT } from '../../services/temporalEngineService';
+import { classifyTarefaPrazo } from '../../config/alertRules';
 
 export type AttentionPriorityLevel = 'VENCIDA' | 'HOJE' | 'URGENTE' | 'PROXIMA' | 'SEM_PRAZO';
 
@@ -20,12 +21,14 @@ export function classifyTaskAttention(task: ContractTask): { level: AttentionPri
     return { level: 'SEM_PRAZO', diasRestantes: null };
   }
 
-  const dias = differenceInDays(prazoDate);
+  // Prazos de tarefa em dias úteis (sem fins de semana, feriados e pontos facultativos).
+  const dias = differenceInBusinessDays(prazoDate);
 
   if (dias < 0) return { level: 'VENCIDA', diasRestantes: dias };
   if (dias === 0) return { level: 'HOJE', diasRestantes: 0 };
-  if (dias <= 7) return { level: 'URGENTE', diasRestantes: dias };
-  if (dias <= 30) return { level: 'PROXIMA', diasRestantes: dias };
+  const nivel = classifyTarefaPrazo(dias);
+  if (nivel === 'URGENTE') return { level: 'URGENTE', diasRestantes: dias };
+  if (nivel === 'PROXIMA') return { level: 'PROXIMA', diasRestantes: dias };
   return { level: 'SEM_PRAZO', diasRestantes: dias };
 }
 

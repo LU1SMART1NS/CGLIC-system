@@ -5,6 +5,8 @@
  *   saldo da ata), porque o Compras.gov costuma registrar o consumo com atraso.
  * - Demais órgãos: consumo informado pelo Compras.gov (registrado menos o saldo para empenho).
  */
+import { quantitativoSenasp } from './quantitativoSenasp';
+
 export type ConsumoFonte = 'CONTRATOS' | 'COMPRASGOV';
 
 export interface ParticipanteRow {
@@ -19,9 +21,12 @@ export interface ParticipanteRow {
 
 export interface ParticipantesSummary {
   rows: ParticipanteRow[];
+  /** Total da ata (todos os órgãos): só referência. */
   registrado: number;
   consumido: number;
   saldo: number;
+  /** Quantitativo SENASP (UASGs do CGLIC): o que o sistema gerencia. Consumo = contratado nos contratos vinculados. */
+  senasp: { registrado: number; consumido: number; saldo: number };
 }
 
 const digits = (v?: string | number | null) => String(v ?? '').replace(/\D/g, '');
@@ -59,5 +64,12 @@ export function summarizeParticipantes(
 
   const registrado = rows.reduce((s, r) => s + r.registrado, 0);
   const consumido = rows.reduce((s, r) => s + r.consumido, 0);
-  return { rows, registrado, consumido, saldo: registrado - consumido };
+  const senaspRegistrado = quantitativoSenasp(unidades, ug);
+  return {
+    rows,
+    registrado,
+    consumido,
+    saldo: registrado - consumido,
+    senasp: { registrado: senaspRegistrado, consumido: params.contratadoUG, saldo: senaspRegistrado - params.contratadoUG }
+  };
 }

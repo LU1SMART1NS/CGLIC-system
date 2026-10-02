@@ -16,6 +16,7 @@ import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { getArpVigenciaStatus } from '../services/temporalEngineService';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
+import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import type { ArpRecord, ArpItemRecord, FilterParams, SyncMetadata } from '../types';
 
 interface ArpSearchProps {
@@ -54,12 +55,21 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   // Perfil "gestor" tem escopo ASSIGNED em Atas (ata_managers, migration
   // 20260929000038): sem isso, esta tela mostrava TODAS as Atas para
   // qualquer "gestor", independente do que lhe foi atribuído.
-  const { ataKeys: assignedAtaKeys } = useAssignedManagementScope();
+  // A carteira consolida as duas UASGs; o escopo é resolvido por UASG (como na Carteira de
+  // Contratos), senão as Atas herdadas pelos contratos atribuídos nunca eram derivadas.
+  const scope200330 = useAssignedManagementScope(UASGS_CGLIC[0]);
+  const scope200331 = useAssignedManagementScope(UASGS_CGLIC[1]);
+  const scopeLoading = scope200330.isLoading || scope200331.isLoading;
   const scopedArps = useMemo(() => {
-    if (!assignedAtaKeys) return arps;
-    const scope = new Set(assignedAtaKeys);
-    return arps.filter((a) => scope.has(a.numeroAtaRegistroPreco));
-  }, [arps, assignedAtaKeys]);
+    const scopeByUasg: Record<string, string[] | undefined> = {
+      [UASGS_CGLIC[0]]: scope200330.ataKeys,
+      [UASGS_CGLIC[1]]: scope200331.ataKeys
+    };
+    return arps.filter((a) => {
+      const keys = scopeByUasg[a.codigoUnidadeGerenciadora];
+      return !keys || keys.includes(a.numeroAtaRegistroPreco);
+    });
+  }, [arps, scope200330.ataKeys, scope200331.ataKeys]);
 
   const [itemsByAta, setItemsByAta] = useState<Record<string, ArpItemRecord[]>>({});
   const [itemsLoadingByAta, setItemsLoadingByAta] = useState<Record<string, boolean>>({});
@@ -92,26 +102,30 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     }
   };
 
-  const loadFromDatabase = useCallback(async (uasgToLoad?: string): Promise<boolean> => {
-    const targetUasg = uasgToLoad || params.codigoUnidadeGerenciadora || '200331';
+  // Carrega as duas UASGs da CGLIC; falha de uma não derruba a outra.
+  const loadFromDatabase = useCallback(async (): Promise<boolean> => {
     setLoading(true);
     setError(null);
 
-    try {
-      const dbResult = await fetchArpsWithItemsFromDb(targetUasg);
-      if (dbResult.arps && dbResult.arps.length > 0) {
-        setArps(dbResult.arps);
-        setItemsByAta(dbResult.itemsByAta || {});
-        setSyncInfo(dbResult.syncInfo);
-        setLoading(false);
-        return true;
-      }
-    } catch (e) {
-      console.warn('Erro ao consultar banco local:', e);
+    const results = await Promise.all(
+      UASGS_CGLIC.map((uasg) =>
+        fetchArpsWithItemsFromDb(uasg).catch((e) => {
+          console.warn(`Erro ao consultar banco local (UASG ${uasg}):`, e);
+          return null;
+        })
+      )
+    );
+    const loaded = results.filter((r) => r && r.arps && r.arps.length > 0);
+    if (loaded.length > 0) {
+      setArps(loaded.flatMap((r) => r!.arps));
+      setItemsByAta(Object.assign({}, ...loaded.map((r) => r!.itemsByAta || {})));
+      setSyncInfo(loaded[0]!.syncInfo);
+      setLoading(false);
+      return true;
     }
     setLoading(false);
     return false;
-  }, [params.codigoUnidadeGerenciadora]);
+  }, []);
 
   const handleTriggerSync = async () => {
     setIsSyncing(true);
@@ -119,17 +133,16 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     setSyncProgress({ step: 'Iniciando sincronização...', percent: 5 });
 
     try {
-      const result = await runFullSync(params, (p) => setSyncProgress(p));
-      if (result.success) {
-        if (result.arps && result.arps.length > 0) {
-          setArps(result.arps);
-          setItemsByAta(result.itemsByAta || {});
-        }
-        setSyncInfo(getLastSyncMetadata());
-        await loadDbSets();
-      } else {
-        setError(result.error || 'Erro durante sincronização');
+      let firstError: string | undefined;
+      for (const uasg of UASGS_CGLIC) {
+        const result = await runFullSync({ ...params, codigoUnidadeGerenciadora: uasg }, (p) => setSyncProgress(p));
+        if (!result.success) firstError ||= result.error || 'Erro durante sincronização';
       }
+      // Recarrega do banco: junta as duas UASGs em vez de sobrescrever com a última sincronizada.
+      await loadFromDatabase();
+      setSyncInfo(getLastSyncMetadata());
+      await loadDbSets();
+      if (firstError) setError(firstError);
     } catch (err: any) {
       setError(err.message || 'Falha ao sincronizar com APIs governamentais');
     } finally {
@@ -145,9 +158,11 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       await loadDbSets();
       const hasCached = await loadFromDatabase();
       if (!hasCached && isMounted) {
-        checkAndTriggerAutoSync(params.codigoUnidadeGerenciadora || '200331', () => {
-          if (isMounted) loadFromDatabase();
-        });
+        for (const uasg of UASGS_CGLIC) {
+          checkAndTriggerAutoSync(uasg, () => {
+            if (isMounted) loadFromDatabase();
+          });
+        }
       }
     }
 
@@ -294,8 +309,23 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   }, [filteredArps, loadItemsForArps]);
 
   // Consumo de saldo por item e gestor por ata (mesmas fontes do detalhe da Ata e da Visão Geral).
-  const { data: saldosData } = useAllAtaItemSaldos(params.codigoUnidadeGerenciadora);
-  const saldoStatsByAta = useMemo(() => buildAtaSaldoStats(saldosData || []), [saldosData]);
+  const { data: saldos200330 } = useAllAtaItemSaldos(UASGS_CGLIC[0]);
+  const { data: saldos200331 } = useAllAtaItemSaldos(UASGS_CGLIC[1]);
+  // Atas vencidas, canceladas ou sem data não geram alerta de saldo (mesma regra da Visão Geral).
+  const saldoStatsByAta = useMemo(() => {
+    const encerradas = new Set(
+      arps
+        .filter((arp) => {
+          const faixa = getArpPrazo(arp).faixa;
+          return faixa === 'EXPIRADO' || faixa === 'SEM_DATA';
+        })
+        .map((arp) => `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`)
+    );
+    const saldos = [...(saldos200330 || []), ...(saldos200331 || [])].filter(
+      (saldo: any) => !encerradas.has(`${saldo.numero_ata || saldo.numeroAta}-${saldo.codigo_uasg || saldo.codigoUasg}`)
+    );
+    return buildAtaSaldoStats(saldos);
+  }, [arps, saldos200330, saldos200331]);
   const { data: ataManagers } = useAllAtaManagers();
   const gestorByAta = useMemo(() => {
     const map: Record<string, string> = {};
@@ -343,7 +373,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         syncInfo={syncInfo}
         isSyncing={isSyncing}
         syncProgress={syncProgress}
-        onTriggerSync={handleTriggerSync}
+        onTriggerSync={role === 'gestor_saldos' ? undefined : handleTriggerSync}
       />
 
       <ArpPortfolioSummary
@@ -372,7 +402,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         assignContext={assignContext}
         cards={groupedCards}
         totalAtas={scopedArps.length}
-        isLoading={loading}
+        isLoading={loading || scopeLoading}
         itemsLoadingByAta={itemsLoadingByAta}
         saldoStatsByAta={saldoStatsByAta}
         gestorByAta={gestorByAta}

@@ -6,12 +6,15 @@ import { classifyArpItemSaldo } from '../../services/balanceService';
 import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { saldoBarColor } from './ataSaldoStats';
 import type { ArpItemRecord } from '../../types';
+import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 
 interface AtaItemsTableProps {
   itens: ArpItemRecord[];
   saldos: Array<{
     numero_item?: number | string;
     quantidade_homologada?: number;
+    quantidade_senasp?: number | null;
+    quantidade_base_senasp?: number | null;
     quantidade_consumida?: number;
     saldo_disponivel?: number;
     percentual_consumido?: number;
@@ -47,7 +50,7 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
             <tr>
               <th style={carteiraTh}>Item / Fornecedor</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor unitário</th>
-              <th style={{ ...carteiraTh, textAlign: 'right' }}>Homologado</th>
+              <th style={{ ...carteiraTh, textAlign: 'right' }} title="Quantitativo registrado para as UASGs 200330 e 200331">Qtd. SENASP</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Consumido</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Saldo</th>
               <th style={carteiraTh}>Saldo usado</th>
@@ -57,7 +60,7 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
           <tbody>
             {itens.map((item) => {
               const saldo = saldoByItem.get(String(Number(item.numeroItem)));
-              const qtdHomologada = saldo?.quantidade_homologada ?? item.quantidadeHomologadaVencedor ?? item.quantidadeHomologadaItem;
+              const qtdHomologada = (saldo ? quantidadeBaseSenasp(saldo) : undefined) ?? item.quantidadeHomologadaVencedor ?? item.quantidadeHomologadaItem;
               const qtdConsumida = saldo?.quantidade_consumida ?? 0;
               const saldoDisponivel = saldo?.saldo_disponivel ?? (qtdHomologada - qtdConsumida);
               const percentual = saldo?.percentual_consumido ?? (qtdHomologada > 0 ? (qtdConsumida / qtdHomologada) * 100 : 0);

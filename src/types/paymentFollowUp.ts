@@ -3,23 +3,23 @@
  * Conforme especificado na FASE 7.4-B.
  */
 
-import type { TaskExecutionMode, ContractTaskTemplate } from './index';
+import type { TaskExecutionMode } from './index';
 
 /**
- * Estados do ciclo de acompanhamento de pagamento / faturamento
+ * Situação do ciclo, deduzida do último marco registrado (ninguém a escolhe à mão):
+ * Recebido -> Conferido -> Enviado à CGOFI -> Pago.
  */
 export type PaymentWorkflowStatus =
-  | 'RECEBIDO'               // Atesto assinado no SEI registrado no sistema
-  | 'ATRIBUIDO'              // Servidor de confecção designado para instrução
-  | 'EM_INSTRUCAO'           // Análise de regularidade fiscal, saldo de empenho e conformidade
-  | 'PENDENTE_DOCUMENTACAO'  // Suspensão por pendência documental do credor (ex: CND vencida)
-  | 'DESPACHO_ELABORADO'     // Minuta do despacho de pagamento assinada no SEI
-  | 'ENVIADO_CGOFI'          // Processo remetido formalmente à CGOFI
-  | 'AGUARDANDO_CGOFI'       // Em processamento no setor financeiro (contagem de SLA/dias sem resposta)
-  | 'DEVOLVIDO_FISCAL'       // Devolvido pela CGOFI para complementação
-  | 'PAGAMENTO_CONFIRMADO'   // Ordem Bancária emitida no SIAFI / Contratos.gov
-  | 'CONCLUIDO'              // Ciclo finalizado com evidência arquivada
-  | 'CANCELADO';             // Cancelado por anulação do atesto ou rescisão
+  | 'RECEBIDO'        // Documentos recebidos, em conferência pela CGLIC
+  | 'COM_PENDENCIA'   // Conferência suspensa por pendência (do fornecedor ou do fiscal)
+  | 'CONFERIDO'       // Conferência concluída, pronto para enviar à CGOFI
+  | 'ENVIADO_CGOFI'   // Processo na CGOFI; a CGLIC só acompanha
+  | 'DEVOLVIDO'       // Devolvido pela CGOFI; volta à conferência
+  | 'PAGO'            // Ordem Bancária emitida
+  | 'CANCELADO';      // Cancelado por anulação do atesto ou rescisão
+
+/** Etapa em curso e quem responde pelo prazo dela. */
+export type PaymentEtapa = 'CONFERENCIA' | 'ENVIO' | 'COBRANCA_CGOFI';
 
 /**
  * Nível de atenção/urgência do ciclo para a Central de Atenção
@@ -37,7 +37,7 @@ export interface PaymentAlert {
   tipo:
     | 'PAGAMENTO_VENCIMENTO_IMINENTE'
     | 'PAGAMENTO_FATURA_VENCIDA'
-    | 'ATESTO_PENDENTE_ATRIBUICAO'
+    | 'PRAZO_ETAPA_VENCIDO'
     | 'CGOFI_SEM_RESPOSTA'
     | 'EMPENHO_SEM_SALDO_SUFICIENTE'
     | 'INFO';
@@ -51,7 +51,8 @@ export interface PaymentAlert {
  */
 export interface PaymentCycleInput {
   contractKey: string;
-  competencia: string;                  // Formato YYYY-MM (ex: '2026-03')
+  competencia: string;                  // YYYY-MM, derivada da data de recebimento; compõe a chave do ciclo e não aparece na tela
+  dataRecebimento: string;              // Quando a CGLIC recebeu os documentos (YYYY-MM-DD): início da contagem
   dataAssinaturaAtesto: string;         // Data no formato YYYY-MM-DD
   dataVencimentoFatura: string;         // Data no formato YYYY-MM-DD
   documentoAtestoSei: string;           // Identificador ou número do Doc SEI (ex: 'Doc 143589236')
@@ -64,6 +65,10 @@ export interface PaymentCycleInput {
   responsavelNome?: string;             // Servidor de confecção atribuído
   /** Identidade canônica do responsável (Fase 10-A.2), ponte opcional para auth.users. */
   responsavelUserId?: string;
+  dataConferencia?: string;             // Quando a conferência foi concluída (YYYY-MM-DD)
+  prazoConferenciaAte?: string;         // Data-alvo vigente da conferência (CGLIC)
+  prazoEnvioAte?: string;               // Data-alvo vigente do envio à CGOFI (CGLIC)
+  cobrarCgofiAte?: string;              // A partir daqui a CGLIC cobra a CGOFI
   documentoDespachoSei?: string;        // Número do documento SEI de despacho
   dataEnvioCgofi?: string;              // Data de envio à CGOFI (YYYY-MM-DD)
   numeroOrdemBancaria?: string;         // Número da Ordem Bancária SIAFI (ex: '2026OB800123')
@@ -83,6 +88,47 @@ export interface PaymentCyclePrazos {
   statusPrazo: 'NORMAL' | 'ATENCAO' | 'CRITICO' | 'VENCIDO';
 }
 
+/** Documento recebido no ciclo (atesto, nota fiscal, fatura...), com o número no SEI. */
+export interface PaymentCycleDocument {
+  id: string;
+  tipo: string;
+  numero?: string;
+  sei: string;
+  valor?: number;
+  dataRecebimento?: string;
+}
+
+export type PaymentCycleEventTipo =
+  | 'RECEBIDO' | 'CONFERIDO' | 'PENDENCIA' | 'ENVIADO_CGOFI' | 'DEVOLVIDO' | 'PAGO' | 'CANCELADO' | 'PRAZO_ALONGADO';
+
+/** Registro do histórico do ciclo: marcos, pendências e prazos alongados. */
+export interface PaymentCycleEvent {
+  id: string;
+  tipo: PaymentCycleEventTipo;
+  dataEvento: string;
+  sei?: string;
+  numeroOb?: string;
+  motivo?: string;
+  origemPendencia?: 'FORNECEDOR' | 'FISCAL';
+  prazoAnterior?: string;
+  prazoNovo?: string;
+  justificativa?: string;
+  /** Na conferência: SICAF / CNDs do credor verificados. */
+  regularidadeVerificada?: boolean;
+  registradoPorNome?: string;
+  criadoEm: string;
+}
+
+/** Prazo da etapa em curso. Na cobrança da CGOFI o dono é a CGOFI e a CGLIC só acompanha. */
+export interface PaymentEtapaPrazo {
+  etapa: PaymentEtapa;
+  dono: 'CGLIC' | 'CGOFI';
+  dataAlvo: string;
+  /** Dias úteis até a data-alvo; negativo = atrasado. */
+  diasUteisRestantes: number;
+  atrasado: boolean;
+}
+
 /**
  * Representação completa do Ciclo Operacional de Faturamento / Atesto
  */
@@ -95,8 +141,12 @@ export interface PaymentFollowUpCycle {
   status: PaymentWorkflowStatus;
   input: PaymentCycleInput;
   prazos: PaymentCyclePrazos;
+  /** Prazo da etapa em curso; ausente quando o ciclo está encerrado. */
+  etapaAtual?: PaymentEtapaPrazo;
+  /** Documentos recebidos e histórico; ausentes nas listas consolidadas do painel. */
+  documentos?: PaymentCycleDocument[];
+  eventos?: PaymentCycleEvent[];
   alerts: PaymentAlert[];
-  tasks?: ContractTaskTemplate;
   criadoEm: string;
   atualizadoEm: string;
   concluidoEm?: string;

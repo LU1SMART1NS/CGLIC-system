@@ -20,6 +20,7 @@ import {
   type ContractSuggestionCriteria,
   type ContractSuggestionReason
 } from './linkContractSuggestions';
+import { formatStatusVigencia } from '../../utils/statusVigencia';
 
 /** Item da Ata selecionável quando o modal é aberto a partir da Ata 360 (vários itens). */
 export interface LinkableAtaItemOption {
@@ -397,7 +398,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                             {displayContractNumber(c) || `Contrato ${c.numero}/${c.ano}`}
                           </strong>
                           <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
-                            {c.statusVigencia || 'Vigente'}
+                            {formatStatusVigencia(c.statusVigencia)}
                           </span>
                           {isAtaMode && (() => {
                             const cov = ataLinkCoverage(contractKeyOf(c), itemOptions!);

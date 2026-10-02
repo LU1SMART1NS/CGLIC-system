@@ -41,6 +41,7 @@ import {
   explainVigenciaTransition
 } from './contractEventService';
 import { evaluateContractReajusteRadar } from './contractReajusteRadarService';
+import { PRORROGACAO_RULES, VIGENCIA_RULES } from '../config/alertRules';
 
 /**
  * 1. Gera chave lógica determinística e canônica para o Workflow de Prorrogação.
@@ -118,7 +119,7 @@ export function buildDefaultProrrogationTemplate(): ContractTaskTemplate {
           {
             id: 'task-prorr-2',
             macrotaskId: 'macro-prorr-1',
-            nome: 'Expedir Ofício de Consulta de Interesse à Contratada (Prazo 10 dias úteis)',
+            nome: `Expedir Ofício de Consulta de Interesse à Contratada (Prazo ${VIGENCIA_RULES.respostaFornecedorDiasUteis} dias úteis)`,
             ordem: 2,
             executionMode: 'INTERNA',
             sistemaDestino: 'SEI'
@@ -290,8 +291,8 @@ export function evaluateProrrogationReadiness(
         tempestividadeGarantida = false;
         itensPendentes.push('Vigência contratual expirada — preclusão de prorrogação');
         orientacoes.push('Alerta Crítico: Termos aditivos de prorrogação celebrados após o término da vigência são nulos de pleno direito.');
-      } else if (diff <= 15) {
-        orientacoes.push('Atenção: Prazo crítico de vigência (< 15 dias). Priorize a coleta de assinaturas e publicação imediata.');
+      } else if (diff <= PRORROGACAO_RULES.prazoCriticoAteDias) {
+        orientacoes.push(`Atenção: Prazo crítico de vigência (< ${PRORROGACAO_RULES.prazoCriticoAteDias} dias). Priorize a coleta de assinaturas e publicação imediata.`);
       }
     }
   }

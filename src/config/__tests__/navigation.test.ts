@@ -79,7 +79,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(children.every((c) => c.status === 'active')).toBe(true);
     });
 
-    it('deve configurar Administração com Usuários e Perfis (sem Departamentos, que agora fica em Alocações)', () => {
+    it('deve configurar Administração com Usuários, Perfis e Regras de Alertas (sem Departamentos, que agora fica em Alocações)', () => {
       const admin = navigationConfig.find((i) => i.id === 'administracao');
       expect(admin).toBeDefined();
       expect(admin?.label).toBe('Administração');
@@ -87,7 +87,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const children = admin?.children || [];
       expect(children.map((c) => c.label)).toEqual([
         'Usuários e Servidores',
-        'Perfis e Permissões'
+        'Perfis e Permissões',
+        'Regras de Alertas',
+        'Feriados'
       ]);
       expect(children[0].route).toBe('/admin/usuarios');
       expect(children[1].route).toBe('/admin/perfis');
@@ -295,14 +297,14 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).not.toContain('Administração');
     });
 
-    it('Gestor de Saldo (gestor_saldos) só vê Alocações — nada de Contratos, Financeiro, Usuários ou Perfis', () => {
+    it('Gestor de Saldo (gestor_saldos) vê Visão Geral (restrita a saldos), Carteira de Atas e Alocações — nada de Contratos, Financeiro, Usuários ou Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor_saldos');
       const labels = flatLabels(visible);
 
       expect(labels).toContain('Alocações por Unidade');
 
-      expect(labels).not.toContain('Visão Geral');
-      expect(labels).not.toContain('Carteira de Atas');
+      expect(labels).toContain('Visão Geral');
+      expect(labels).toContain('Carteira de Atas');
       expect(labels).not.toContain('Carteira de Contratos');
       expect(labels).not.toContain('Modelos de Gestão');
       expect(labels).not.toContain('Pagamentos');

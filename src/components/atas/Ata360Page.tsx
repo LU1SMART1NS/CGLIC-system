@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layers, Link2, ListTodo, Plus } from 'lucide-react';
 import { buildAtaItemPath, uasgFromAtaKey, useAta, useAtaItemSaldos, useAtaLinkedContracts } from '../../hooks/useAta';
+import { useBackfillItemSenasp } from '../../hooks/useSyncItemSenasp';
 import { useAtaTaskPlan } from '../../hooks/useAtaTaskPlan';
 import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
 import { useAuth } from '../../context/AuthContext';
@@ -23,8 +24,11 @@ import { useToast, useConfirmDialog } from '../../design-system';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
+import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos'];
+// Gestor de Saldo (domínio de alocações) só precisa chegar aos itens da ata.
+const SALDOS_TAB_IDS: Ata360Tab[] = ['itens'];
 
 interface Ata360PageProps {
   ataKeyOverride?: string;
@@ -51,14 +55,24 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   // no Contract360Page para /contratos/:contractKey.
   const queue = useAtaActionQueue(arp, saldos, taskPlan);
 
-  const { activeTab, goToTab, tabsRef } = useInstrumentTab<Ata360Tab>({ tabs: TAB_IDS, defaultTab: 'acoes' });
-
   const { role } = useAuth();
+  const saldosOnly = role === 'gestor_saldos';
+  const { activeTab, goToTab, tabsRef } = useInstrumentTab<Ata360Tab>({
+    tabs: saldosOnly ? SALDOS_TAB_IDS : TAB_IDS,
+    defaultTab: saldosOnly ? 'itens' : 'acoes'
+  });
   const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(uasg);
   const isScopedRole = role === 'gestor';
   const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(arp.numeroAtaRegistroPreco));
   // Mesma regra das RPCs link/unlink_contract_to_item_atomic (has_role gestor/admin)
   const canEditLinks = role === 'admin' || role === 'gestor';
+  // Grava o quantitativo SENASP dos itens que ainda usam o homologado da ata como base.
+  useBackfillItemSenasp({
+    enabled: canEditLinks && !loadingSaldos,
+    numeroAta: arp?.numeroAtaRegistroPreco,
+    uasg: arp?.codigoUnidadeGerenciadora,
+    numerosItem: saldos.filter((s: any) => s.quantidade_senasp == null && s.numero_item != null).map((s: any) => String(s.numero_item))
+  });
 
   const [isLinkModalOpen, setIsLinkModalOpen] = React.useState(false);
   const unlinkMutation = useUnlinkContractFromItem();
@@ -144,7 +158,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
       fornecedorCnpj: item.niFornecedor,
       valorUnitario: item.valorUnitario,
       quantidadeHomologada:
-        saldoByItem.get(String(Number(item.numeroItem)))?.quantidade_homologada ??
+        (saldoByItem.has(String(Number(item.numeroItem))) ? quantidadeBaseSenasp(saldoByItem.get(String(Number(item.numeroItem)))) : undefined) ??
         item.quantidadeHomologadaVencedor ??
         item.quantidadeHomologadaItem,
       linkedContractKeys: linkedContracts.filter((l) => l.itemKey === itemKey).map((l) => l.contractKey)
@@ -169,12 +183,13 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
     </button>
   ) : null;
 
-  const tabs: { id: Ata360Tab; label: string }[] = [
+  const allTabs: { id: Ata360Tab; label: string }[] = [
     { id: 'acoes', label: queue.items.length > 0 ? `Ações (${queue.items.length})` : 'Ações' },
     { id: 'plano', label: 'Plano de gestão' },
     { id: 'itens', label: `Itens (${itens.length})` },
     { id: 'contratos', label: linkedContracts.length > 0 ? `Contratos vinculados (${linkedContracts.length})` : 'Contratos vinculados' }
   ];
+  const tabs = saldosOnly ? allTabs.filter((t) => SALDOS_TAB_IDS.includes(t.id)) : allTabs;
 
   return (
     <Instrument360Page>

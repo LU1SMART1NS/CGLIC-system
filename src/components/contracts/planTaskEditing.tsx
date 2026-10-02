@@ -51,16 +51,17 @@ export const ConfirmDeleteButton: React.FC<{
 
   if (!confirming) {
     return (
-      <button
+      <AppButton
         type="button"
+        variant="ghostDanger"
+        size="sm"
+        iconOnly
+        icon={<Trash2 size={15} />}
         title={label}
         aria-label={label}
         onClick={() => setConfirming(true)}
         disabled={disabled}
-        style={{ padding: '0.25rem 0.4rem', background: 'transparent', border: 'none', color: '#b91c1c', cursor: 'pointer' }}
-      >
-        <Trash2 size={15} />
-      </button>
+      />
     );
   }
 
@@ -229,19 +230,20 @@ export const MacrotaskHeader: React.FC<{
             onChange={(e) => setDraft(e.target.value)}
             style={{ ...inputStyle, maxWidth: '360px' }}
           />
-          <button type="submit" title="Salvar nome" aria-label="Salvar nome" style={iconButtonStyle}><Check size={15} /></button>
-          <button
+          <AppButton type="submit" variant="ghost" size="sm" iconOnly icon={<Check size={15} />} title="Salvar nome" aria-label="Salvar nome" />
+          <AppButton
             type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={15} />}
             title="Cancelar"
             aria-label="Cancelar edição do nome"
             onClick={() => {
               setDraft(nome);
               setEditing(false);
             }}
-            style={iconButtonStyle}
-          >
-            <X size={15} />
-          </button>
+          />
         </form>
       ) : (
         <h4 style={headingStyle}>{nome}</h4>
@@ -249,18 +251,19 @@ export const MacrotaskHeader: React.FC<{
 
       {!editing && (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
-          <button
+          <AppButton
             type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<Pencil size={14} />}
             title="Renomear etapa"
             aria-label="Renomear etapa"
             onClick={() => {
               setDraft(nome);
               setEditing(true);
             }}
-            style={iconButtonStyle}
-          >
-            <Pencil size={14} />
-          </button>
+          />
           <ConfirmDeleteButton
             label="Excluir etapa"
             confirmMessage={taskCount > 0 ? `Excluir a etapa e suas ${taskCount} tarefa(s)?` : 'Excluir a etapa?'}
@@ -273,13 +276,6 @@ export const MacrotaskHeader: React.FC<{
   );
 };
 
-const iconButtonStyle: React.CSSProperties = {
-  padding: '0.25rem 0.4rem',
-  background: 'transparent',
-  border: 'none',
-  color: '#64748b',
-  cursor: 'pointer'
-};
 
 /** "+ Nova etapa" no rodapé do plano. */
 export const AddMacrotaskForm: React.FC<{
@@ -424,16 +420,17 @@ export const ModuleGroupHeader: React.FC<{
         summary
       )}
       {onDelete && (
-        <button
+        <AppButton
           type="button"
+          variant="ghostDanger"
+          size="sm"
+          iconOnly
+          icon={<Trash2 size={15} />}
           onClick={onDelete}
           disabled={isPending}
           title="Excluir módulo"
           aria-label={`Excluir módulo ${nome}`}
-          style={{ ...iconButtonStyle, color: '#dc2626' }}
-        >
-          <Trash2 size={15} />
-        </button>
+        />
       )}
     </div>
   );

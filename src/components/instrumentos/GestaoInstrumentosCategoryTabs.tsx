@@ -5,7 +5,8 @@ export type GestaoInstrumentosCategoryTab =
   | 'SALDOS'
   | 'REAJUSTES'
   | 'PAGAMENTOS'
-  | 'TAREFAS';
+  | 'TAREFAS'
+  | 'LEMBRETES';
 
 interface TabDef {
   id: GestaoInstrumentosCategoryTab;
@@ -17,7 +18,8 @@ const TABS: TabDef[] = [
   { id: 'SALDOS', label: 'Saldos' },
   { id: 'REAJUSTES', label: 'Reajustes' },
   { id: 'PAGAMENTOS', label: 'Pagamentos' },
-  { id: 'TAREFAS', label: 'Tarefas' }
+  { id: 'TAREFAS', label: 'Tarefas' },
+  { id: 'LEMBRETES', label: 'Lembretes' }
 ];
 
 interface GestaoInstrumentosCategoryTabsProps {

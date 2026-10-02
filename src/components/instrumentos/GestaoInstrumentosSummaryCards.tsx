@@ -1,5 +1,6 @@
 import React from 'react';
 import { Package, FileText, Coins, AlertTriangle } from 'lucide-react';
+import { SALDO_RULES, VIGENCIA_RULES } from '../../config/alertRules';
 
 export interface GestaoInstrumentosCounts {
   // Card 1 — ARP
@@ -27,6 +28,8 @@ interface GestaoInstrumentosSummaryCardsProps {
   counts: GestaoInstrumentosCounts;
   activeCard: GestaoInstrumentosCardId | null;
   onSelectCard: (card: GestaoInstrumentosCardId) => void;
+  /** Gestor de Saldo: só o card de Atas (saldo dos itens); contratos, valor e alertas ficam fora. */
+  saldosOnly?: boolean;
 }
 
 function formatCurrency(val: number): string {
@@ -64,7 +67,8 @@ const rowStyle: React.CSSProperties = {
 export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryCardsProps> = ({
   counts,
   activeCard,
-  onSelectCard
+  onSelectCard,
+  saldosOnly = false
 }) => {
   const saldoDisponivel = counts.valorVigenteTotal - counts.totalEmpenhado;
 
@@ -98,15 +102,16 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
           {counts.totalAtas} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>geridas</span>
         </div>
         <div style={rowStyle}>
-          <span>Saldo crítico (≥85%)</span>
+          <span>Saldo crítico ({'>'}{SALDO_RULES.criticoAcimaDePct}%)</span>
           <strong style={{ color: counts.itensCriticosArp > 0 ? '#dc2626' : '#0f172a' }}>{counts.itensCriticosArp}</strong>
         </div>
         <div style={rowStyle}>
-          <span>Próximo do limite (70–84%)</span>
+          <span>Saldo em atenção ({SALDO_RULES.atencaoAcimaDePct}–{SALDO_RULES.criticoAcimaDePct}%)</span>
           <strong style={{ color: counts.itensProximosLimiteArp > 0 ? '#d97706' : '#0f172a' }}>{counts.itensProximosLimiteArp}</strong>
         </div>
       </button>
 
+      {!saldosOnly && (<>
       {/* Card 2 — Contratos Vigentes */}
       <button
         type="button"
@@ -129,7 +134,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
           {counts.contratosAtivos} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>ativos</span>
         </div>
         <div style={rowStyle}>
-          <span>Em atenção (31–90 dias)</span>
+          <span>Em atenção ({VIGENCIA_RULES.faixaCriticoAteDias + 1}–{VIGENCIA_RULES.faixaAtencaoAteDias} dias)</span>
           <strong style={{ color: counts.contratosEmAtencao60a90d > 0 ? '#d97706' : '#0f172a' }}>{counts.contratosEmAtencao60a90d}</strong>
         </div>
         <div style={rowStyle}>
@@ -137,7 +142,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
           <strong>{counts.contratosEmProrrogacao}</strong>
         </div>
         <div style={rowStyle}>
-          <span>A vencer (≤30 dias)</span>
+          <span>A vencer (≤{VIGENCIA_RULES.faixaCriticoAteDias} dias)</span>
           <strong style={{ color: counts.contratosAVencer30d > 0 ? '#dc2626' : '#0f172a' }}>{counts.contratosAVencer30d}</strong>
         </div>
       </button>
@@ -207,6 +212,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
           <strong>{counts.atencaoCount}</strong>
         </div>
       </button>
+      </>)}
     </div>
   );
 };

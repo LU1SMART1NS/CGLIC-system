@@ -1,4 +1,5 @@
 import { classifyArpItemSaldo } from '../../services/balanceService';
+import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 
 /** Resumo do consumo de saldo dos itens de uma Ata (a partir de arp_item_saldos). */
 export interface AtaSaldoStats {
@@ -23,7 +24,7 @@ export function buildAtaSaldoStats(saldos: Array<any> = []): Record<string, AtaS
     const numeroAta: string | undefined = saldo.numero_ata || saldo.numeroAta;
     if (!numeroAta) continue;
 
-    const qtdHomologada = Number(saldo.quantidade_homologada || 0);
+    const qtdHomologada = quantidadeBaseSenasp(saldo);
     const qtdConsumida = Number(saldo.quantidade_consumida || 0);
     const rawPct =
       typeof saldo.percentual_consumido === 'number'

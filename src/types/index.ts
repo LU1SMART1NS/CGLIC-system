@@ -141,19 +141,15 @@ export interface EmpenhoSaldoItemRecord {
   valorEmpenhado?: number;
 }
 
+/** Adesão (carona) de um item de ARP, como vem de `5_consultarAdesoesItem`. */
 export interface AdesaoItemRecord {
-  numeroItem: string;
-  unidade: string;
-  tipo?: string;
-  quantidadeRegistrada: number;
-  quantidadeEmpenhada: number;
-  saldoEmpenho: number;
-  dataHoraInclusao: string | null;
-  dataHoraAtualizacao: string;
-  numeroAta?: string;
-  unidadeGerenciadora?: string;
-  orgaoAdesao?: string;
-  statusAdesao?: string;
+  numeroAta: string;
+  unidadeGerenciadora: string;
+  /** "código - nome" da UASG não participante, ex.: "929777 - SECRETARIA DE ..." */
+  unidadeNaoParticipante: string;
+  dataAprovacaoAnalise: string | null;
+  /** Nula quando a API ainda não informa a quantidade aprovada. */
+  quantidadeAprovadaAdesao: number | null;
 }
 
 export interface AdesoesItemResponse {
@@ -418,7 +414,7 @@ export interface ReconciliationReport {
   mensagem: string;
 }
 
-export type StatusVigenciaContrato = 'Vigente' | 'Expirado' | 'A Vencer (60d)' | 'Não Informado';
+export type StatusVigenciaContrato = 'Vigente' | 'Expirado' | 'A Vencer' | 'Não Informado';
 
 export interface ContractDashboardRecord {
   id: string;
