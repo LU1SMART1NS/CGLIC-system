@@ -43,6 +43,7 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
   onRestore
 }) => {
   const [showDismissed, setShowDismissed] = useState(false);
+  const vazio = !loading && !error && suggestions.length === 0;
 
   const buildColumns = (isDismissed: boolean): Column<ItemContractSuggestion>[] => [
     {
@@ -129,12 +130,19 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '1.5rem' }} data-testid="contract-suggestions-panel">
+      {vazio ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+          <Sparkles size={16} aria-hidden="true" />
+          <span>Sugeridos (0): nenhum contrato sugerido para este item.</span>
+        </div>
+      ) : (
       <SectionHeader
         title="Sugeridos"
         subtitle="Encontrados nas APIs oficiais e ainda não vinculados a este item. Confirme antes de vincular ou descarte os que não pertencem a ele."
         icon={<Sparkles size={16} />}
         countBadge={suggestions.length}
       />
+      )}
 
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', justifyContent: 'center' }}>
@@ -143,11 +151,7 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
         </div>
       ) : error ? (
         <div style={{ padding: '0.75rem', color: 'var(--danger)', fontSize: '0.85rem', textAlign: 'center' }}>{error}</div>
-      ) : suggestions.length === 0 ? (
-        <div style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
-          Nenhum contrato sugerido para este item.
-        </div>
-      ) : (
+      ) : vazio ? null : (
         renderTable(suggestions, false)
       )}
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Building2, DollarSign, Plus, Edit2, Trash2, ExternalLink, ChevronRight, ChevronDown, Check, X, RotateCcw, Eye } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Building2, Plus, Trash2, ExternalLink, ChevronRight, ChevronDown, Eye } from 'lucide-react';
 import { fetchPncpContractEmpenhos, fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe, fetchContratosGovData, getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
-import { calculateTotalEmpenhado, reconcileBalances, matchAndMergeEmpenhos, normalizeEmpenhoNumero, calculateAllocationsWithEmpenhos, calculateItemCardMetrics, deduceEmpenhoQuantity, getEmpenhoEffectiveValue } from '../services/balanceService';
+import { normalizeEmpenhoNumero, calculateItemCardMetrics, deduceEmpenhoQuantity, getEmpenhoEffectiveValue } from '../services/balanceService';
 import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
 import { type InternalDepartment } from '../services/unitService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
@@ -14,10 +14,7 @@ import { useItemAllocations } from '../hooks/useItemAllocations';
 import { useSaveAllocations } from '../hooks/useSaveAllocations';
 import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
 import { useSaveEmpenhoLinks } from '../hooks/useSaveEmpenhoLinks';
-import { useItemManualEmpenhos } from '../hooks/useItemManualEmpenhos';
-import { useSaveManualEmpenhos } from '../hooks/useSaveManualEmpenhos';
 import { useItemManualQuantities } from '../hooks/useItemManualQuantities';
-import { useSaveManualQuantities } from '../hooks/useSaveManualQuantities';
 import { useItemManualContracts } from '../hooks/useItemManualContracts';
 import { useDeleteManualContract } from '../hooks/useDeleteManualContract';
 import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLinks';
@@ -25,6 +22,16 @@ import { useItemContractLinks } from '../hooks/useItemContractLinks';
 import { useUnlinkContractFromItem } from '../hooks/useUnlinkContractFromItem';
 import { useDismissedContractSuggestions } from '../hooks/useDismissedContractSuggestions';
 import { useSyncContractItemQuantity } from '../hooks/useSyncContractItemQuantity';
+import { useSyncItemContractEmpenhos } from '../hooks/useSyncItemContractEmpenhos';
+import { useItemEmpenhoVinculos } from '../hooks/useItemEmpenhoVinculos';
+import { useConfirmEmpenhoItemQuantity } from '../hooks/useConfirmEmpenhoItemQuantity';
+import {
+  summarizeContractExecution,
+  summarizeItemExecution,
+  comprasGovConsumido,
+  compareWithComprasGov
+} from '../utils/itemExecutionSummary';
+import type { ItemEmpenhoVinculo } from '../types/itemEmpenhoVinculo';
 import { useDismissContractSuggestion } from '../hooks/useDismissContractSuggestion';
 import { useRestoreContractSuggestion } from '../hooks/useRestoreContractSuggestion';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
@@ -40,19 +47,21 @@ import {
 } from '../utils/itemContractSuggestions';
 import { AppButton, AppCard, EmptyState, SectionHeader } from '../design-system';
 
-import { ManualEmpenhoModal } from './modals/ManualEmpenhoModal';
 import { LinkContractModal } from './modals/LinkContractModal';
 import { ContractSuggestionsPanel } from './item-balances/ContractSuggestionsPanel';
 import { ItemHero, type ItemTab } from './item-balances/ItemHero';
-import { ItemReconciliationPanel } from './item-balances/ItemReconciliationPanel';
+import { ContractEmpenhosPanel } from './item-balances/ContractEmpenhosPanel';
+import { AllocationsTab, type AllocationRow } from './item-balances/AllocationsTab';
+import { summarizeAllocationExecution } from '../utils/allocationExecution';
+import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryStrip';
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { EmpenhoDetailModal } from './item-balances/EmpenhoDetailModal';
-import { formatNumber, formatDate, getProgressColorClass, isGerenciadoraUasg, isAllowedEmpenhoUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
-import type { ArpRecord, ArpItemRecord, EmpenhoSaldoItemRecord, InternalAllocation, PncpContract, PncpContractEmpenho, ContratosGovEmpenhoRecord, Empenho, ReconciliationReport } from '../types';
+import { formatNumber, formatDate, isGerenciadoraUasg, isAllowedEmpenhoUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
+import type { ArpRecord, ArpItemRecord, EmpenhoSaldoItemRecord, InternalAllocation, PncpContract, PncpContractEmpenho, ContratosGovEmpenhoRecord, Empenho } from '../types';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -60,11 +69,10 @@ interface ItemBalancesProps {
   onBack: () => void;
 }
 
-const ITEM_TABS: ItemTab[] = ['unidades', 'empenhos', 'contratos', 'alocacao', 'adesoes'];
+const ITEM_TABS: ItemTab[] = ['unidades', 'contratos', 'alocacao', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 const EMPTY_RECORD_NUM: Record<string, number> = {};
-const EMPTY_MANUAL_EMPENHOS: Empenho[] = [];
 
 export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack }) => {
 
@@ -101,8 +109,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     item.numeroItem
   );
   // Aba no endereço (?aba=), como nas telas 360: sobrevive a recarregar e pode ser compartilhada.
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('aba') as ItemTab | null;
+  // 'empenhos' era uma aba própria; os empenhos agora ficam dentro de cada contrato.
+  const rawTabParam = searchParams.get('aba');
+  const tabParam = (rawTabParam === 'empenhos' ? 'contratos' : rawTabParam) as ItemTab | null;
   const activeTab: ItemTab = tabParam && ITEM_TABS.includes(tabParam) ? tabParam : 'unidades';
   const tabsRef = React.useRef<HTMLDivElement>(null);
   const setActiveTab = (tab: ItemTab) => {
@@ -155,25 +166,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const [allocationError, setAllocationError] = useState<string | null>(null);
 
   // Hooks Canônicos de Leitura para Dados Manuais (React Query)
-  const { data: manualEmpenhosState, refetch: refetchManualEmpenhos } = useItemManualEmpenhos(
-    arp.numeroAtaRegistroPreco,
-    arp.codigoUnidadeGerenciadora,
-    item.numeroItem
-  );
-  const manualEmpenhos = manualEmpenhosState?.empenhos ?? EMPTY_MANUAL_EMPENHOS;
-  const manualEmpenhosVersion = manualEmpenhosState?.version ?? 1;
-
-  const saveManualEmpenhosMutation = useSaveManualEmpenhos();
-
   const { data: manualQuantitiesState, refetch: refetchManualQuantities } = useItemManualQuantities(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
     item.numeroItem
   );
   const empenhoManualQuantities = manualQuantitiesState?.quantities ?? EMPTY_RECORD_NUM;
-  const manualQuantitiesVersion = manualQuantitiesState?.version ?? 1;
 
-  const saveManualQuantitiesMutation = useSaveManualQuantities();
   const deleteManualContractMutation = useDeleteManualContract();
 
   const { data: manualContratos = [], refetch: refetchManualContracts } = useItemManualContracts(
@@ -205,145 +204,16 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
 
 
-  const [editingEmpenhoKey, setEditingEmpenhoKey] = useState<string | null>(null);
-  const [editingEmpenhoQty, setEditingEmpenhoQty] = useState<string>('');
-  const [isManualEmpenhoModalOpen, setIsManualEmpenhoModalOpen] = useState<boolean>(false);
-  const [editingManualEmpenho, setEditingManualEmpenho] = useState<Empenho | null>(null);
 
   const loadManualData = async () => {
     try {
       await Promise.all([
-        refetchManualEmpenhos(),
         refetchManualQuantities(),
         refetchManualContracts(),
         refetchContractEmpenhoLinks()
       ]);
     } catch (e) {
       console.warn('Erro ao recarregar dados manuais:', e);
-    }
-  };
-
-  const handleStartEditEmpenhoQty = (empKey: string, currentQty: number) => {
-    setEditingEmpenhoKey(empKey);
-    setEditingEmpenhoQty(String(currentQty ?? 0));
-  };
-
-  const handleSaveEmpenhoQty = async (empKey: string) => {
-    const parsed = parseFloat(editingEmpenhoQty);
-    if (isNaN(parsed) || parsed < 0) {
-      toast.error('Por favor, informe uma quantidade válida maior ou igual a 0.');
-      return;
-    }
-    const updated = { ...empenhoManualQuantities, [empKey]: parsed };
-    try {
-      await saveManualQuantitiesMutation.mutateAsync({
-        itemKey,
-        quantities: updated,
-        expectedVersion: manualQuantitiesVersion
-      });
-      setEditingEmpenhoKey(null);
-    } catch (err: any) {
-      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        toast.error('Conflito de concorrência: as quantidades manuais foram modificadas por outro usuário. Os dados serão recarregados.');
-      } else {
-        toast.error(`Erro ao salvar quantidade manual: ${err?.message || 'Erro desconhecido'}`);
-      }
-    }
-  };
-
-  const handleRestoreEmpenhoQty = async (empKey: string) => {
-    const updated = { ...empenhoManualQuantities };
-    delete updated[empKey];
-    try {
-      await saveManualQuantitiesMutation.mutateAsync({
-        itemKey,
-        quantities: updated,
-        expectedVersion: manualQuantitiesVersion
-      });
-      if (editingEmpenhoKey === empKey) {
-        setEditingEmpenhoKey(null);
-      }
-    } catch (err: any) {
-      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        toast.error('Conflito de concorrência: as quantidades manuais foram modificadas por outro usuário. Os dados serão recarregados.');
-      } else {
-        toast.error(`Erro ao restaurar quantidade manual: ${err?.message || 'Erro desconhecido'}`);
-      }
-    }
-  };
-
-  // Handlers para Empenhos Manuais (Migrado para React Query na Fase 4.3D.2B)
-  const handleSaveManualEmpenho = async (empenhoData: Partial<Empenho>) => {
-    let updatedList: Empenho[];
-    if (editingManualEmpenho) {
-      updatedList = manualEmpenhos.map(e =>
-        e.id === editingManualEmpenho.id
-          ? ({ ...e, ...empenhoData, atualizadoEm: new Date().toISOString() } as Empenho)
-          : e
-      );
-    } else {
-      const newEmp: Empenho = {
-        id: `manual-emp-${Date.now()}`,
-        numero: empenhoData.numero || '',
-        ano: empenhoData.ano || new Date().getFullYear(),
-        arpId: arp.numeroAtaRegistroPreco,
-        itemId: item.numeroItem,
-        uasg: empenhoData.uasg || arp.codigoUnidadeGerenciadora || '200331',
-        quantidade: empenhoData.quantidade || 0,
-        valorUnitario: empenhoData.valorUnitario || Number(item.valorUnitario) || undefined,
-        valorTotal: empenhoData.valorTotal || (Number(empenhoData.quantidade || 0) * Number(item.valorUnitario || 0)),
-        data: empenhoData.data || new Date().toISOString().split('T')[0],
-        fornecedor: empenhoData.fornecedor || item.nomeRazaoSocialFornecedor,
-        cnpjFornecedor: empenhoData.cnpjFornecedor || item.niFornecedor,
-        unidadeInternaId: empenhoData.unidadeInternaId,
-        observacao: empenhoData.observacao,
-        origem: 'MANUAL',
-        status: empenhoData.status || 'CONFIRMADO',
-        criadoEm: new Date().toISOString(),
-        atualizadoEm: new Date().toISOString()
-      };
-      updatedList = [...manualEmpenhos, newEmp];
-    }
-
-    try {
-      await saveManualEmpenhosMutation.mutateAsync({
-        itemKey,
-        empenhos: updatedList,
-        expectedVersion: manualEmpenhosVersion
-      });
-      setEditingManualEmpenho(null);
-    } catch (err: any) {
-      console.error('Erro ao persistir empenhos manuais:', err);
-      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        toast.error('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
-      } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-        toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
-      } else {
-        toast.error(`Erro ao salvar empenho manual: ${err?.message || 'Erro desconhecido'}`);
-      }
-      throw err;
-    }
-  };
-
-  const handleDeleteManualEmpenho = async (empenhoId: string) => {
-    if (await confirm({ title: 'Excluir empenho manual', message: 'Tem certeza que deseja excluir este empenho manual?', tone: 'danger', confirmLabel: 'Excluir' })) {
-      const updated = manualEmpenhos.filter(e => e.id !== empenhoId);
-      try {
-        await saveManualEmpenhosMutation.mutateAsync({
-          itemKey,
-          empenhos: updated,
-          expectedVersion: manualEmpenhosVersion
-        });
-      } catch (err: any) {
-        console.error('Erro ao excluir empenho manual:', err);
-        if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-          toast.error('Atenção: Os empenhos manuais deste item foram modificados por outro usuário. Por favor, recarregue e tente novamente.');
-        } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
-        } else {
-          toast.error(`Erro ao excluir empenho manual: ${err?.message || 'Erro desconhecido'}`);
-        }
-      }
     }
   };
 
@@ -388,7 +258,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
   // Cadastro de Unidades Oficiais
   const {
-    data: departments = []
+    data: departments = [],
+    isLoading: departmentsLoading
   } = useDepartments();
 
   const getFirstAvailableUnitSigla = (
@@ -490,31 +361,96 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     return enrichContractLinks(contractLinks, officialDashboardContracts, quantidadesPorContrato(contracts, officialDashboardContracts));
   }, [contractLinks, officialDashboardContracts, contracts]);
 
-  // A quantidade contratada do item em cada contrato vem da API e entra no saldo (view da Ata/dashboards).
-  // Ao abrir o item, quem pode editar atualiza a cópia dos vínculos nunca lidos ou lidos há mais de 6 horas.
+  // Empenhos do item que vieram dos contratos vinculados (arp_item_empenhos), com a quantidade de cada um.
+  const { data: empenhoVinculos = [], isLoading: vinculosLoading } = useItemEmpenhoVinculos(canonicalItemKey);
+  const confirmQuantityMutation = useConfirmEmpenhoItemQuantity();
+  const syncEmpenhosMutation = useSyncItemContractEmpenhos();
+
+  // Relê da API, para cada contrato vinculado, a quantidade contratada (que entra no saldo) e os empenhos do
+  // contrato, estimados pelo preço unitário do próprio contrato. Ao abrir o item roda uma vez por contrato
+  // (a quantidade só se nunca lida ou com mais de 6 horas); o botão Atualizar força tudo de novo.
   const syncContractQuantityMutation = useSyncContractItemQuantity();
-  const quantitySyncAttempted = React.useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (!canEditData) return;
+  const contractSyncAttempted = React.useRef<Set<string>>(new Set());
+  const [syncingContracts, setSyncingContracts] = useState(false);
+
+  const syncLinkedContracts = async (force: boolean): Promise<{ total: number; falhas: number }> => {
     const sixHours = 6 * 60 * 60 * 1000;
-    enrichedOfficialLinks.forEach((l) => {
-      if (!l.contract || quantitySyncAttempted.current.has(l.linkId)) return;
+    const targets = enrichedOfficialLinks.filter(
+      (l) => l.contract && (force || !contractSyncAttempted.current.has(l.linkId))
+    );
+    // Marca todos de uma vez: uma nova passagem do efeito não repete contratos que já estão na fila.
+    targets.forEach((l) => contractSyncAttempted.current.add(l.linkId));
+
+    let falhas = 0;
+    for (const l of targets) {
+      const contract = l.contract!;
       const lastRead = l.quantidadeLidaEm ? Date.parse(l.quantidadeLidaEm) : NaN;
-      if (!Number.isNaN(lastRead) && Date.now() - lastRead < sixHours) return;
-      quantitySyncAttempted.current.add(l.linkId);
-      syncContractQuantityMutation.mutate(
-        {
+      const quantityStale = force || Number.isNaN(lastRead) || Date.now() - lastRead >= sixHours;
+      let unitPrice = l.valorUnitarioContrato ?? (Number(item.valorUnitario) || undefined);
+      let falhou = false;
+
+      if (quantityStale) {
+        try {
+          const q = await syncContractQuantityMutation.mutateAsync({
+            numeroAta: arp.numeroAtaRegistroPreco,
+            uasg: arp.codigoUnidadeGerenciadora,
+            numeroItem: item.numeroItem,
+            contractKey: l.contractKey,
+            contract
+          });
+          if (q.valorUnitario) unitPrice = q.valorUnitario;
+        } catch (err) {
+          falhou = true;
+          console.warn('Quantidade contratada não sincronizada:', l.contractKey, err);
+        }
+      }
+      try {
+        await syncEmpenhosMutation.mutateAsync({
           numeroAta: arp.numeroAtaRegistroPreco,
           uasg: arp.codigoUnidadeGerenciadora,
           numeroItem: item.numeroItem,
-          contractKey: l.contractKey,
-          contract: l.contract
-        },
-        { onError: (err) => console.warn('Quantidade contratada não sincronizada ao abrir o item:', err) }
-      );
-    });
+          contract: {
+            contractKey: l.contractKey,
+            uasg: contract.uasg,
+            numero: contract.numero,
+            ano: contract.ano,
+            contratoId: contract.contratoId
+          },
+          unitPrice
+        });
+      } catch (err) {
+        falhou = true;
+        console.warn('Empenhos do contrato não sincronizados:', l.contractKey, err);
+      }
+      if (falhou) falhas++;
+    }
+    return { total: targets.length, falhas };
+  };
+
+  useEffect(() => {
+    if (!canEditData) return;
+    void syncLinkedContracts(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enrichedOfficialLinks, canEditData, arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem]);
+
+  const handleRefresh = async () => {
+    refetchEmpenhos();
+    refetchContracts();
+    loadManualData();
+    if (!canEditData || enrichedOfficialLinks.length === 0) return;
+    setSyncingContracts(true);
+    try {
+      const { total, falhas } = await syncLinkedContracts(true);
+      if (total === 0) return;
+      if (falhas > 0) {
+        toast.error(`${falhas} de ${total} ${total === 1 ? 'contrato não pôde ser atualizado' : 'contratos não puderam ser atualizados'} a partir da API. Tente novamente em instantes.`);
+      } else {
+        toast.success(total === 1 ? 'Contrato e empenhos atualizados.' : `${total} contratos e seus empenhos atualizados.`);
+      }
+    } finally {
+      setSyncingContracts(false);
+    }
+  };
 
   // Sugestões de contrato (PNCP + catálogo), sem os já vinculados nem os descartados
   const { data: dismissedSuggestions = [] } = useDismissedContractSuggestions(canonicalItemKey);
@@ -954,6 +890,32 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     setAllocationError(null);
   };
 
+  const handleConfirmEmpenhoQuantity = async (v: ItemEmpenhoVinculo, quantidade: number | null) => {
+    try {
+      await confirmQuantityMutation.mutateAsync({ itemKey: canonicalItemKey, empenhoId: v.empenhoId, quantidade });
+    } catch (err: any) {
+      if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
+        toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
+      } else {
+        toast.error(`Erro ao confirmar a quantidade do empenho ${v.empenho.numero}: ${err?.message || 'Erro desconhecido'}`);
+      }
+    }
+  };
+
+  const handleConfirmAllEmpenhoQuantities = async (vinculos: ItemEmpenhoVinculo[]) => {
+    let falhas = 0;
+    for (const v of vinculos) {
+      if (v.quantidadeSugerida == null) continue;
+      try {
+        await confirmQuantityMutation.mutateAsync({ itemKey: canonicalItemKey, empenhoId: v.empenhoId, quantidade: v.quantidadeSugerida });
+      } catch (err) {
+        falhas++;
+        console.warn('Quantidade do empenho não confirmada:', v.empenho.numero, err);
+      }
+    }
+    if (falhas > 0) toast.error(`${falhas} ${falhas === 1 ? 'empenho não pôde' : 'empenhos não puderam'} ser confirmado${falhas === 1 ? '' : 's'}.`);
+  };
+
   const handleLinkEmpenho = async (empenhoUnidade: string, departmentId: string) => {
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
     const updatedLinks = {
@@ -1064,21 +1026,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     return list;
   }, [empenhos, contractGovEmpenhos, empenhoLinks, item, arp, empenhoManualQuantities]);
 
-  const filteredManualEmpenhos = React.useMemo(() => {
-    return manualEmpenhos.filter(me => {
-      const u = (me.uasg || '200331').replace(/\D/g, '');
-      return isAllowedEmpenhoUasg(u);
-    });
-  }, [manualEmpenhos]);
-
-  // Lista Unificada de Empenhos com Matching e Promoção Inteligente (exclusiva das UASGs 200331 e 200330)
-  const allEmpenhos: Empenho[] = React.useMemo(() => {
-    return matchAndMergeEmpenhos(officialApiEmpenhos, filteredManualEmpenhos);
-  }, [officialApiEmpenhos, filteredManualEmpenhos]);
+  // Empenhos lidos das APIs oficiais (alimentam a Alocação interna); o empenho do item por contrato vem de arp_item_empenhos.
+  const allEmpenhos: Empenho[] = officialApiEmpenhos;
 
   // Calculate totals
   const totalRegistrado = unidades.reduce((acc, curr) => acc + curr.quantidadeRegistrada, 0);
-  const totalSaldoRemanejamento = unidades.reduce((acc, curr) => acc + curr.saldoRemanejamentoEmpenho, 0);
   const gerenciadoraUnit = unidades.find(u => u.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(u.codigoUnidade));
 
   const totalAdesaoRegistrada = adesoes.reduce((acc, a) => acc + (Number(a.quantidadeRegistrada) || 0), 0);
@@ -1086,22 +1038,32 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
   const totalAdesaoSaldo = adesoes.reduce((acc, a) => acc + (Number(a.saldoEmpenho) || 0), 0);
   const adesaoConsumidaPercent = totalAdesaoRegistrada > 0 ? (totalAdesaoEmpenhada / totalAdesaoRegistrada) * 100 : 0;
 
-  // Relatório de Reconciliação Contábil Oficial do Item
-  const reconciliationReport: ReconciliationReport = React.useMemo(() => {
-    return reconcileBalances(
-      item.quantidadeHomologadaItem,
-      allEmpenhos,
-      totalSaldoRemanejamento > 0 ? totalSaldoRemanejamento : null
-    );
-  }, [item.quantidadeHomologadaItem, allEmpenhos, totalSaldoRemanejamento]);
-
   // Fórmula Oficial do Saldo: Saldo = QuantidadeRegistrada - ∑ Empenhos
-  const totalCalculatedEmpenhado = calculateTotalEmpenhado(allEmpenhos);
+
+  // Execução do item: o consumo da ata é o contratado (quantidade lida da API nos contratos vinculados);
+  // o empenho é a execução desse contratado. O Compras.gov é só referência.
+  const executionSummary = React.useMemo(
+    () => summarizeItemExecution({
+      homologado: Number(item.quantidadeHomologadaItem) || totalRegistrado,
+      contratados: enrichedOfficialLinks.map((l) => l.quantidadeContratada ?? null),
+      vinculos: empenhoVinculos
+    }),
+    [item.quantidadeHomologadaItem, totalRegistrado, enrichedOfficialLinks, empenhoVinculos]
+  );
+  // Empenhos pendentes que já têm quantidade sugerida: podem ser confirmados de uma vez, no item inteiro.
+  const empenhosAceitaveis = React.useMemo(
+    () => empenhoVinculos.filter((v) => v.quantidade == null && v.quantidadeSugerida != null && v.quantidadeSugerida > 0),
+    [empenhoVinculos]
+  );
+  const comprasGovReferencia = React.useMemo(() => {
+    const consumido = comprasGovConsumido(unidades);
+    return { ...compareWithComprasGov(consumido, executionSummary.contratado), consumido };
+  }, [unidades, executionSummary.contratado]);
 
   // Cálculo seguro e sem duplicidade das métricas dos cards de resumo
   const cardMetrics = calculateItemCardMetrics({
     quantidadeHomologada: item.quantidadeHomologadaItem || totalRegistrado,
-    totalEmpenhado: totalCalculatedEmpenhado,
+    totalEmpenhado: executionSummary.contratado,
     maximoAdesaoItem: item.maximoAdesao,
     totalAdesaoConsumida: totalAdesaoEmpenhada || totalAdesaoRegistrada,
     valorUnitario: item.valorUnitario,
@@ -1120,14 +1082,27 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
     valorFinanceiroConsumido
   } = cardMetrics;
 
-  // Dynamic Internal UG allocation calculations
-  // Cálculo seguro e sem duplicidade de consumo por Alocação Interna a partir da lista canônica unificada de empenhos
-  const allocationsWithEmpenho = React.useMemo(() => {
-    return calculateAllocationsWithEmpenhos(allocations, allEmpenhos, empenhoLinks);
-  }, [allocations, allEmpenhos, empenhoLinks]);
+  // Alocação interna: o empenhado de cada unidade vem das quantidades confirmadas dos empenhos vinculados a ela.
+  const allocationExecution = React.useMemo(
+    () => summarizeAllocationExecution(allocations, empenhoVinculos, empenhoLinks),
+    [allocations, empenhoVinculos, empenhoLinks]
+  );
+  const allocationRows: AllocationRow[] = React.useMemo(
+    () => allocations.map((a) => {
+      const exec = allocationExecution.porAlocacao.get(a.id);
+      return {
+        id: a.id,
+        unitName: a.unitName,
+        allocatedQty: a.allocatedQty,
+        empenhado: exec?.empenhado ?? 0,
+        pendentes: exec?.pendentes ?? 0,
+        pendentesSugerido: exec?.pendentesSugerido ?? 0
+      };
+    }),
+    [allocations, allocationExecution]
+  );
 
-  const totalAllocatedSum = allocationsWithEmpenho.reduce((acc, curr) => acc + curr.allocatedQty, 0);
-  const totalEmpenhadaSum = allocationsWithEmpenho.reduce((acc, curr) => acc + curr.empenhadaQty, 0);
+  const totalAllocatedSum = allocations.reduce((acc, curr) => acc + curr.allocatedQty, 0);
   const remainingUGQty = totalUGQty - totalAllocatedSum;
   const percentAllocated = totalUGQty > 0 ? (totalAllocatedSum / totalUGQty) * 100 : 0;
 
@@ -1155,13 +1130,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         item={item}
         onBack={onBack}
         backLabel={role === 'gestor_saldos' ? 'Voltar para Alocações' : undefined}
-        canSync={canEditData}
-        isRefreshing={loading || contractsLoading}
-        onRefresh={() => {
-          refetchEmpenhos();
-          refetchContracts();
-          loadManualData();
-        }}
+        isRefreshing={loading || contractsLoading || syncingContracts}
+        onRefresh={handleRefresh}
         metrics={{
           officialSaldo: officialCalculatedSaldo,
           itemTotalQty,
@@ -1173,7 +1143,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           valorFinanceiroDisponivel,
           valorFinanceiroConsumido
         }}
-        report={reconciliationReport}
+        referencia={comprasGovReferencia}
         onGoTo={setActiveTab}
       />
 
@@ -1181,8 +1151,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         ref={tabsRef}
         tabs={[
           { id: 'unidades', label: `Órgãos participantes (${sortedUnidades.length})` },
-          { id: 'empenhos', label: `Empenhos (${allEmpenhos.length})` },
-          { id: 'contratos', label: `Contratos (${contractsCount})` },
+          { id: 'contratos', label: `Contratos e empenhos (${contractsCount})` },
           { id: 'alocacao', label: `Alocação interna (${allocations.length})` },
           { id: 'adesoes', label: `Adesões (${adesoes.length})` }
         ]}
@@ -1204,6 +1173,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             {/* Contratos (PNCP, oficiais e manuais) */}
             <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <ItemExecutionSummaryStrip
+                  summary={executionSummary}
+                  referencia={comprasGovReferencia}
+                  loading={contractsLoading && enrichedOfficialLinks.length === 0}
+                  canEdit={canEditData}
+                  aceitaveis={empenhosAceitaveis.length}
+                  onAcceptAll={() => handleConfirmAllEmpenhoQuantities(empenhosAceitaveis)}
+                  busy={confirmQuantityMutation.isPending}
+                />
+              </div>
+
               <ContractSuggestionsPanel
                 suggestions={contractSuggestions}
                 dismissed={dismissedContractSuggestions}
@@ -1328,6 +1309,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 <th>Unidade</th>
                                 <th>Fornecedor</th>
                                 <th>Qtd. contratada</th>
+                                <th>Empenhado</th>
+                                <th>A empenhar</th>
                                 <th>Vigência</th>
                                 <th style={{ textAlign: 'center' }}>Ação</th>
                               </tr>
@@ -1337,8 +1320,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 const contractUrl = c.linkVisualizacao || getContractPncpUrl(c);
                                 const canKey = c.contractKey || getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncp);
                                 const isExpanded = !!expandedContracts[c.numeroContrato] || !!expandedContracts[canKey];
-                                const govEmps = contractGovEmpenhos[c.numeroContrato] || contractGovEmpenhos[canKey];
-                                const pncpEmps = contractEmpenhos[c.numeroContrato] || contractEmpenhos[canKey];
 
                                 const displayNumeroContrato = (() => {
                                   const num = c.numeroContrato;
@@ -1400,6 +1381,24 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                           </span>
                                         )}
                                       </td>
+                                      {(() => {
+                                        const exec = summarizeContractExecution(c.contractKey || '', c.quantidadeContratada ?? null, empenhoVinculos);
+                                        return (
+                                          <>
+                                            <td style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700 }}>
+                                              {formatNumber(exec.empenhado)}
+                                              {exec.pendentes > 0 && (
+                                                <div style={{ fontFamily: 'inherit', fontWeight: 500, fontSize: '0.7rem', color: 'var(--warning)' }}>
+                                                  {exec.pendentes} {exec.pendentes === 1 ? 'pendente' : 'pendentes'}
+                                                </div>
+                                              )}
+                                            </td>
+                                            <td style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700, color: exec.aEmpenhar != null && exec.aEmpenhar < 0 ? 'var(--danger)' : undefined }}>
+                                              {exec.aEmpenhar != null ? formatNumber(exec.aEmpenhar) : <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>N/D</span>}
+                                            </td>
+                                          </>
+                                        );
+                                      })()}
                                       <td style={{ fontSize: '0.8rem' }}>
                                         {c._isManual && (
                                           <StatusBadge label="Manual" variant="warning" size="sm" dot={false} />
@@ -1421,254 +1420,75 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                         ) : null}
                                       </td>
                                       <td style={{ textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
                                           {c.contractKey && (
-                                            <Link
-                                              to={`/contratos/${encodeURIComponent(c.contractKey)}`}
-                                              className="btn btn-secondary"
-                                              style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', height: 'auto', border: '1px solid #93c5fd', color: '#1d4ed8', background: '#eff6ff', textDecoration: 'none', fontWeight: 600 }}
+                                            <AppButton
+                                              variant="outline"
+                                              size="sm"
+                                              iconOnly
+                                              icon={<Eye size={15} />}
+                                              onClick={() => navigate(`/contratos/${encodeURIComponent(c.contractKey)}`)}
                                               title="Ver detalhes do contrato"
-                                            >
-                                              <Eye size={13} /> Ver Detalhes
-                                            </Link>
+                                            />
                                           )}
                                           {contractUrl ? (
-                                            <a 
-                                              href={contractUrl} 
-                                              target="_blank" 
-                                              rel="noopener noreferrer" 
-                                              className="btn btn-secondary"
-                                              style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', height: 'auto', border: '1px solid var(--border-color)', color: 'var(--primary)' }}
-                                              title="Visualizar contrato no portal oficial"
-                                            >
-                                              <ExternalLink size={14} /> Visualizar
-                                            </a>
+                                            <AppButton
+                                              variant="ghost"
+                                              size="sm"
+                                              iconOnly
+                                              icon={<ExternalLink size={15} />}
+                                              onClick={() => window.open(contractUrl, '_blank', 'noopener,noreferrer')}
+                                              title="Abrir o contrato no portal oficial"
+                                            />
                                           ) : null}
                                           {canEditData && c._isOfficialLink && c._linkId && (
                                             <AppButton
-                                              variant="danger"
+                                              variant="ghostDanger"
                                               size="sm"
-                                              icon={<Trash2 size={13} />}
+                                              iconOnly
+                                              icon={<Trash2 size={15} />}
                                               onClick={() => handleUnlinkOfficialContract(c._linkId, c.contractKey)}
                                               disabled={unlinkContractMutation.isPending}
-                                              title="Desvincular contrato oficial deste item"
-                                            >
-                                              Desvincular
-                                            </AppButton>
+                                              title="Desvincular contrato deste item"
+                                            />
                                           )}
                                           {canEditData && c._isManual && c._manualId && (
                                             <AppButton
-                                              variant="danger"
+                                              variant="ghostDanger"
                                               size="sm"
-                                              icon={<Trash2 size={13} />}
+                                              iconOnly
+                                              icon={<Trash2 size={15} />}
                                               onClick={() => handleDeleteManualContrato(c._manualId)}
                                               disabled={deleteManualContractMutation.isPending}
                                               title="Excluir contrato manual"
-                                            >
-                                              Excluir
-                                            </AppButton>
+                                            />
                                           )}
                                         </div>
                                       </td>
                                     </tr>
                                     
-                                    {/* Nested Expandable Commitments (Empenhos) Row */}
                                     {isExpanded && (
                                       <tr>
-                                        <td colSpan={7} style={{ padding: '0 0 1rem 0', background: '#f8fafc' }}>
-                                          <div style={{ padding: '1rem', marginLeft: '2.5rem', marginRight: '1rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
-                                            {(() => {
-                                              const totalEmpenhadoContrato = (govEmps || []).reduce((sum, emp) => {
-                                                const k = emp.numero || String(emp.id);
-                                                const info = getEmpenhoQuantityInfo(k, emp, empenhoManualQuantities, c);
-                                                return sum + (info.qty || 0);
-                                              }, 0);
-                                              const qtdContratada = c.quantidadeContratada ?? null;
-                                              const isFechado = qtdContratada !== null && totalEmpenhadoContrato === qtdContratada;
-                                              const isParcial = qtdContratada !== null && totalEmpenhadoContrato < qtdContratada;
-                                              const isExcesso = qtdContratada !== null && totalEmpenhadoContrato > qtdContratada;
-
-                                              return (
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                                  <h5 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                                    <DollarSign size={14} color="var(--primary)" /> Empenhos Vinculados a este Contrato ({govEmps?.length || pncpEmps?.length || 0})
-                                                  </h5>
-                                                  {qtdContratada !== null && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 700 }}>
-                                                      <span>Total Empenhado: <strong>{formatNumber(totalEmpenhadoContrato)}</strong> de <strong>{formatNumber(qtdContratada)} un</strong></span>
-                                                      {isFechado && (
-                                                        <StatusBadge label="100% empenhado" variant="success" size="sm" dot={false} />
-                                                      )}
-                                                      {isParcial && (
-                                                        <StatusBadge label={`Empenhamento parcial (saldo: ${formatNumber(qtdContratada - totalEmpenhadoContrato)} un)`} variant="info" size="sm" dot={false} />
-                                                      )}
-                                                      {isExcesso && (
-                                                        <StatusBadge label={`Excesso (+${formatNumber(totalEmpenhadoContrato - qtdContratada)} un)`} variant="danger" size="sm" dot={false} />
-                                                      )}
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              );
-                                            })()}
-                                            
-                                            {(govEmps && govEmps.length > 0) ? (
-                                              <div className="table-container" style={{ marginTop: 0, overflowX: 'auto' }}>
-                                                <table className="custom-table" style={{ fontSize: '0.78rem' }}>
-                                                  <thead>
-                                                    <tr style={{ background: '#f1f5f9' }}>
-                                                      <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>N.º Empenho</th>
-                                                      <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Órgão / UG</th>
-                                                      <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Unidade Interna</th>
-                                                      <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Qtd Física (Item)</th>
-                                                      <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Data de Emissão</th>
-                                                      <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 700, color: 'var(--text-secondary)', width: '100px' }}>Ação</th>
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody>
-                                                    {govEmps.map((emp, eidx) => {
-                                                      const currentLinkId = empenhoLinks[emp.numero] || (emp.id ? empenhoLinks[String(emp.id)] : '') || '';
-                                                      const empKey = emp.numero || String(emp.id);
-                                                      const qtyInfo = getEmpenhoQuantityInfo(empKey, emp, empenhoManualQuantities, c);
-                                                      const isEditing = editingEmpenhoKey === empKey;
-
-                                                      return (
-                                                        <tr key={`${emp.numero}-${eidx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                          <td style={{ padding: '6px 8px', fontWeight: 700, color: '#0c326f', fontFamily: 'monospace' }}>{emp.numero}</td>
-                                                          <td style={{ padding: '6px 8px', color: 'var(--text-primary)', fontWeight: 500 }}>
-                                                            {isGer ? (arp.nomeOrgao || 'SENASP / MJSP') : resolvedOrgaoName}
-                                                          </td>
-                                                          <td style={{ padding: '6px 8px' }}>
-                                                            {allocations.length === 0 ? (
-                                                              <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Sem unidades cadastradas</span>
-                                                            ) : (
-                                                              <select
-                                                                value={currentLinkId}
-                                                                onChange={(e) => handleLinkEmpenho(emp.numero, e.target.value)}
-                                                                disabled={saveEmpenhoLinksMutation.isPending || !canManageAllocations}
-                                                                className="form-input"
-                                                                style={{
-                                                                  padding: '0.2rem 0.4rem',
-                                                                  fontSize: '0.75rem',
-                                                                  height: 'auto',
-                                                                  width: '100%',
-                                                                  maxWidth: '220px',
-                                                                  borderColor: currentLinkId ? 'var(--primary)' : '#cbd5e1',
-                                                                  background: currentLinkId ? '#eff6ff' : '#ffffff',
-                                                                  fontWeight: currentLinkId ? 600 : 400
-                                                                }}
-                                                              >
-
-                                                                <option value="">Não vinculado</option>
-                                                                {allocationsWithEmpenho.map(a => (
-                                                                  <option key={a.id} value={a.id}>
-                                                                    {a.unitName} (Saldo: {formatNumber(a.saldoQty != null ? a.saldoQty : (a.allocatedQty - a.empenhadaQty))} un)
-                                                                  </option>
-                                                                ))}
-                                                              </select>
-                                                            )}
-                                                          </td>
-                                                          <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700 }}>
-                                                            {isEditing ? (
-                                                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                                                <input
-                                                                  type="number"
-                                                                  className="form-input"
-                                                                  value={editingEmpenhoQty}
-                                                                  onChange={(e) => setEditingEmpenhoQty(e.target.value)}
-                                                                  disabled={saveManualQuantitiesMutation.isPending}
-                                                                  style={{ width: '65px', padding: '2px 4px', fontSize: '0.78rem', height: '24px', textAlign: 'center', fontWeight: 700 }}
-                                                                  autoFocus
-                                                                  onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') handleSaveEmpenhoQty(empKey);
-                                                                    if (e.key === 'Escape') setEditingEmpenhoKey(null);
-                                                                  }}
-                                                                />
-                                                                <button
-                                                                  type="button"
-                                                                  onClick={() => handleSaveEmpenhoQty(empKey)}
-                                                                  disabled={saveManualQuantitiesMutation.isPending}
-                                                                  style={{ background: '#22c55e', color: '#ffffff', border: 'none', borderRadius: '3px', padding: '2px 5px', cursor: 'pointer', height: '24px', display: 'flex', alignItems: 'center' }}
-                                                                  title="Salvar quantidade manual"
-                                                                >
-                                                                  <Check size={12} />
-                                                                </button>
-                                                                <button
-                                                                  type="button"
-                                                                  onClick={() => setEditingEmpenhoKey(null)}
-                                                                  disabled={saveManualQuantitiesMutation.isPending}
-                                                                  style={{ background: '#94a3b8', color: '#ffffff', border: 'none', borderRadius: '3px', padding: '2px 5px', cursor: 'pointer', height: '24px', display: 'flex', alignItems: 'center' }}
-                                                                  title="Cancelar"
-                                                                >
-                                                                  <X size={12} />
-                                                                </button>
-                                                              </div>
-                                                            ) : (
-                                                              qtyInfo.isOfficial ? (
-                                                                qtyInfo.isReforco ? (
-                                                                  <span style={{ color: 'var(--warning)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                                                    {formatNumber(qtyInfo.qty)} un
-                                                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px' }} title="Empenho complementar de reforço financeiro">
-                                                                      Reforço
-                                                                    </span>
-                                                                  </span>
-                                                                ) : (
-                                                                  <span style={{ color: 'var(--success)' }}>
-                                                                    {formatNumber(qtyInfo.qty)} un
-                                                                  </span>
-                                                                )
-                                                              ) : qtyInfo.isManual ? (
-                                                                <span style={{ color: 'var(--warning)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                                                  {formatNumber(qtyInfo.qty)} un
-                                                                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px' }}>
-                                                                    Auditado
-                                                                  </span>
-                                                                </span>
-                                                              ) : (
-                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
-                                                                  N/D
-                                                                </span>
-                                                              )
-                                                            )}
-                                                          </td>
-                                                          <td style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{formatDate(emp.data_emissao)}</td>
-                                                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                                                            {canEditData && (
-                                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                                              <button
-                                                                type="button"
-                                                                onClick={() => handleStartEditEmpenhoQty(empKey, qtyInfo.qty)}
-                                                                disabled={saveManualQuantitiesMutation.isPending}
-                                                                className="btn btn-secondary"
-                                                                style={{ padding: '2px 6px', fontSize: '0.72rem', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
-                                                                title="Ajustar quantidade física deste empenho"
-                                                              >
-                                                                <Edit2 size={11} /> Ajustar
-                                                              </button>
-                                                              {qtyInfo.isManual && (
-                                                                <button
-                                                                  type="button"
-                                                                  onClick={() => handleRestoreEmpenhoQty(empKey)}
-                                                                  disabled={saveManualQuantitiesMutation.isPending}
-                                                                  style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px', display: 'inline-flex', alignItems: 'center' }}
-                                                                  title="Restaurar para o valor oficial deduzido da API"
-                                                                >
-                                                                  <RotateCcw size={12} />
-                                                                </button>
-                                                              )}
-                                                            </div>
-                                                            )}
-                                                          </td>
-                                                        </tr>
-                                                      );
-                                                    })}
-                                                  </tbody>
-                                                </table>
-                                              </div>
-                                            ) : (
-                                              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '0.5rem 0' }}>
-                                                Nenhum empenho detalhado para este contrato.
-                                              </div>
-                                            )}
+                                        <td colSpan={9} style={{ padding: '0 0 1rem 0', background: '#f8fafc' }}>
+                                          <div style={{ padding: '1rem', marginLeft: '2.5rem', marginRight: '1rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                                            <ContractEmpenhosPanel
+                                              contractKey={c.contractKey || ''}
+                                              contratado={c.quantidadeContratada ?? null}
+                                              vinculos={empenhoVinculos}
+                                              loading={vinculosLoading}
+                                              canEdit={canEditData}
+                                              canManageAllocations={canManageAllocations}
+                                              allocationOptions={allocationRows.map((a) => ({
+                                                id: a.id,
+                                                unitName: a.unitName,
+                                                saldoQty: a.allocatedQty - a.empenhado
+                                              }))}
+                                              linkedAllocationId={(numero) => empenhoLinks[numero] || ''}
+                                              onConfirm={handleConfirmEmpenhoQuantity}
+                                              onConfirmAll={handleConfirmAllEmpenhoQuantities}
+                                              onLinkAllocation={handleLinkEmpenho}
+                                              busy={confirmQuantityMutation.isPending || saveEmpenhoLinksMutation.isPending}
+                                            />
                                           </div>
                                         </td>
                                       </tr>
@@ -1677,6 +1497,17 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 );
                               })}
                             </tbody>
+                            <tfoot>
+                              <tr style={{ background: '#f8fafc', fontWeight: 700 }} data-testid="vinculados-total">
+                                <td colSpan={4} style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total</td>
+                                <td style={{ fontFamily: 'monospace' }}>{formatNumber(executionSummary.contratado)}</td>
+                                <td style={{ fontFamily: 'monospace' }}>{formatNumber(executionSummary.empenhado)}</td>
+                                <td style={{ fontFamily: 'monospace', color: executionSummary.aEmpenhar < 0 ? 'var(--danger)' : undefined }}>
+                                  {formatNumber(executionSummary.aEmpenhar)}
+                                </td>
+                                <td colSpan={2}></td>
+                              </tr>
+                            </tfoot>
                           </table>
                         </div>
                       )}
@@ -1687,431 +1518,34 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
             </AppCard>
 
           </div>
-        ) : activeTab === 'empenhos' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <ItemReconciliationPanel report={reconciliationReport} />
-
-            {/* Todas as Notas de Empenho Conhecidas (Consumo Real de Saldo) */}
-            <AppCard style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0c326f', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                    <DollarSign size={16} color="#0c326f" /> Notas de Empenho Conhecidas (Consumo de Saldo)
-                  </h4>
-                  <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700 }}>
-                    {allEmpenhos.length} {allEmpenhos.length === 1 ? 'empenho' : 'empenhos'}
-                  </span>
-                </div>
-                {canEditData && (
-                  <AppButton
-                    variant="primary"
-                    size="sm"
-                    icon={<Plus size={14} />}
-                    onClick={() => {
-                      setEditingManualEmpenho(null);
-                      setIsManualEmpenhoModalOpen(true);
-                    }}
-                  >
-                    Adicionar Empenho
-                  </AppButton>
-                )}
-              </div>
-
-              {allEmpenhos.length === 0 ? (
-                <EmptyState
-                  title="Nenhum empenho registrado"
-                  description="Nenhum empenho localizado na API ou cadastrado manualmente para este item."
-                  icon={<DollarSign size={32} color="#94a3b8" />}
-                />
-              ) : (
-                <div className="table-container" style={{ marginTop: 0, overflowX: 'auto', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                  <table className="custom-table" style={{ margin: 0 }}>
-                    <thead>
-                      <tr>
-                        <th>N.º do Empenho</th>
-                        <th>Ano</th>
-                        <th>UASG / Órgão</th>
-                        <th>Unidade Interna (Alocação)</th>
-                        <th style={{ textAlign: 'center' }}>Qtd Física (Item)</th>
-                        <th style={{ textAlign: 'center' }}>Origem & Confiança</th>
-                        <th style={{ textAlign: 'center' }}>Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allEmpenhos.map((emp) => {
-                        const currentLinkId = emp.unidadeInternaId || empenhoLinks[emp.numero] || '';
-                        const isManual = emp.origem === 'MANUAL';
-                        const isSincronizado = emp.origem === 'SINCRONIZADO';
-                        const isDivergente = emp.status === 'DIVERGENTE';
-
-                        return (
-                          <tr key={emp.id}>
-                            <td style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0c326f', fontSize: '0.85rem' }}>
-                              {emp.numero}
-                            </td>
-                            <td style={{ fontSize: '0.82rem' }}>{emp.ano}</td>
-                            <td style={{ fontSize: '0.82rem' }}>
-                              <span style={{ fontWeight: 600 }}>UASG {emp.uasg}</span>
-                              {emp.fornecedor && (
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{emp.fornecedor}</div>
-                              )}
-                            </td>
-                            <td>
-                              {allocations.length === 0 ? (
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Sem unidades cadastradas</span>
-                              ) : (
-                                <select
-                                  value={currentLinkId}
-                                  onChange={(e) => handleLinkEmpenho(emp.numero, e.target.value)}
-                                  disabled={saveEmpenhoLinksMutation.isPending || !canManageAllocations}
-                                  className="form-input"
-                                  style={{
-                                    padding: '0.2rem 0.4rem',
-                                    fontSize: '0.75rem',
-                                    height: 'auto',
-                                    width: '100%',
-                                    maxWidth: '220px',
-                                    borderColor: currentLinkId ? 'var(--primary)' : '#cbd5e1',
-                                    background: currentLinkId ? '#eff6ff' : '#ffffff',
-                                    fontWeight: currentLinkId ? 600 : 400
-                                  }}
-                                >
-
-                                  <option value="">Não vinculado</option>
-                                  {allocationsWithEmpenho.map(a => (
-                                    <option key={a.id} value={a.id}>
-                                      {a.unitName} (Saldo: {formatNumber(a.saldoQty != null ? a.saldoQty : (a.allocatedQty - a.empenhadaQty))} un)
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
-                            </td>
-                            <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--success)', fontFamily: 'monospace', fontSize: '0.88rem' }}>
-                              {formatNumber(emp.quantidade)} un
-                            </td>
-                            <td style={{ textAlign: 'center' }}>
-                              {isDivergente ? (
-                                <StatusBadge label="Divergente" variant="danger" size="sm" />
-                              ) : isSincronizado ? (
-                                <StatusBadge label="Sincronizado" variant="info" size="sm" />
-                              ) : isManual ? (
-                                <StatusBadge label="Manual" variant="warning" size="sm" />
-                              ) : (
-                                <StatusBadge label="Oficial" variant="success" size="sm" />
-                              )}
-                            </td>
-                            <td style={{ textAlign: 'center' }}>
-                              {isManual && canEditData ? (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
-                                  <button
-                                    onClick={() => {
-                                      setEditingManualEmpenho(emp);
-                                      setIsManualEmpenhoModalOpen(true);
-                                    }}
-                                    disabled={saveManualEmpenhosMutation.isPending}
-                                    className="btn btn-secondary"
-                                    style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem' }}
-                                    title="Editar empenho manual"
-                                  >
-                                    <Edit2 size={13} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteManualEmpenho(emp.id)}
-                                    disabled={saveManualEmpenhosMutation.isPending}
-                                    className="btn btn-secondary"
-                                    style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem', color: '#b91c1c', border: '1px solid #fecaca', background: '#fef2f2' }}
-                                    title="Excluir empenho manual"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </AppCard>
-
-          </div>
         ) : activeTab === 'alocacao' ? (
-          /* INTERNAL ALLOCATION TAB CONTENT */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '0.5rem 1rem' }}>
-            
-            {/* Stat Cards for Allocations */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-              <div style={{ padding: '1rem 1.25rem', background: 'var(--bg-primary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                <span className="meta-label" style={{ fontSize: '0.7rem' }}>Total Disponível da UG</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                  {formatNumber(totalUGQty)} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>un</span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Quantitativo original registrado para a UASG {arp.codigoUnidadeGerenciadora}
-                </div>
-              </div>
-
-              <div style={{ padding: '1rem 1.25rem', background: 'var(--bg-primary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                <span className="meta-label" style={{ fontSize: '0.7rem' }}>Total Alocado Interno</span>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '0.2rem' }}>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'monospace' }}>
-                    {formatNumber(totalAllocatedSum)}
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    de {formatNumber(totalUGQty)} un
-                  </span>
-                </div>
-                {/* Progress bar */}
-                <div className="progress-track" style={{ height: '5px', marginTop: '0.4rem', background: '#e9ecef' }}>
-                  <div className="progress-fill fill-success" style={{ width: `${Math.min(percentAllocated, 100)}%` }}></div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  <span>Alocado: {formatNumber(percentAllocated)}%</span>
-                  <span>Restam {formatNumber(remainingUGQty)} un</span>
-                </div>
-              </div>
-
-              <div style={{ padding: '1rem 1.25rem', background: 'var(--bg-primary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                <span className="meta-label" style={{ fontSize: '0.7rem' }}>Total Empenhado Interno</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--warning)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                  {formatNumber(totalEmpenhadaSum)} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>un</span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Total de empenhos vinculados pelas unidades internas
-                </div>
-              </div>
-
-              <div style={{ padding: '1rem 1.25rem', background: 'var(--bg-primary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                <span className="meta-label" style={{ fontSize: '0.7rem' }}>Saldo Disponível Líquido</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
-                  {formatNumber(totalAllocatedSum - totalEmpenhadaSum)} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>un</span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Saldo líquido a empenhar somando as divisões
-                </div>
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {allocationError && (
-              <div style={{ 
-                padding: '0.75rem 1rem', 
-                background: '#f8d7da', 
-                color: '#721c24', 
-                border: '1px solid #f5c6cb', 
-                borderRadius: '4px', 
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                fontFamily: 'var(--font-family)'
-              }}>
-                {allocationError}
-              </div>
-            )}
-
-            {/* Allocation Form (somente admin e gestor de saldos) */}
-            {canManageAllocations && (
-            <div style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              padding: '1.25rem',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', fontWeight: 800, color: '#0c326f' }}>
-                {editingId ? <Edit2 size={16} color="#0c326f" /> : <Plus size={16} color="#0c326f" />}
-                <span>{editingId ? 'Editar Alocação de Unidade Interna' : 'Alocar Novo Quantitativo para Unidade Interna'}</span>
-              </div>
-              <form onSubmit={handleAddAllocation} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', margin: 0 }}>
-                        <Building2 size={13} style={{ marginRight: '4px', verticalAlign: '-1px' }} /> Unidade / Departamento Interno *
-                      </label>
-                      <Link
-                        to="/admin/departamentos"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#0c326f',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          textDecoration: 'none'
-                        }}
-                        title="Abrir gestão de Unidades Internas em nova aba"
-                      >
-                        Unidades Internas <ExternalLink size={11} />
-                      </Link>
-                    </div>
-                    <select 
-                      className="form-input" 
-                      value={newUnitName || getFirstAvailableUnitSigla(departments, allocations, editingId)}
-                      onChange={(e) => setNewUnitName(e.target.value)}
-                      style={{ fontWeight: 700, color: '#0c326f', cursor: 'pointer', fontSize: '0.82rem', padding: '0.45rem 0.75rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
-                      required
-                    >
-                      {departments.map(d => {
-                        const isAllocated = allocations.some(
-                          a => a.id !== editingId && a.unitName.trim().toLowerCase() === d.sigla.trim().toLowerCase()
-                        );
-                        return (
-                          <option key={d.id} value={d.sigla} disabled={isAllocated}>
-                            {d.sigla} — {d.nomeCompleto} {isAllocated ? ' (Já alocada)' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem', display: 'block' }}>
-                      Qtd Alocada *
-                    </label>
-                    <input 
-                      type="number" 
-                      className="form-input" 
-                      min="1"
-                      placeholder="Ex: 50"
-                      value={newAllocatedQty}
-                      onChange={(e) => setNewAllocatedQty(e.target.value === '' ? '' : Number(e.target.value))}
-                      required
-                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.75rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  {editingId && (
-                    <AppButton 
-                      type="button" 
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancelEdit} 
-                      disabled={saveAllocationsMutation.isPending}
-                    >
-                      Cancelar
-                    </AppButton>
-                  )}
-                  <AppButton 
-                    type="submit" 
-                    variant="primary"
-                    size="sm"
-                    icon={saveAllocationsMutation.isPending ? undefined : (editingId ? <Check size={14} /> : <Plus size={14} />)}
-                    isLoading={saveAllocationsMutation.isPending}
-                    disabled={saveAllocationsMutation.isPending || (!editingId && departments.length > 0 && departments.every(d => allocations.some(a => a.unitName.trim().toLowerCase() === d.sigla.trim().toLowerCase())))}
-                  >
-                    {editingId ? 'Salvar Alocação' : 'Adicionar Alocação'}
-                  </AppButton>
-                </div>
-              </form>
-            </div>
-            )}
-
-            {/* Department Table */}
-            <div>
-              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0c326f', marginBottom: '0.75rem', borderBottom: 'none', paddingBottom: 0 }}>
-                Unidades Internas Cadastradas ({allocations.length})
-              </h4>
-              {allocations.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', border: '1px dashed var(--border-color)', borderRadius: '4px', color: 'var(--text-secondary)' }}>
-                  {canManageAllocations ? 'Nenhuma alocação interna efetuada para este item ainda. Use o formulário acima para cadastrar unidades.' : 'Nenhuma alocação interna efetuada para este item ainda.'}
-                </div>
-              ) : (
-                <div className="table-container" style={{ marginTop: 0 }}>
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Unidade / Departamento Interno</th>
-                        <th>Qtd Alocada</th>
-                        <th>Qtd Empenhada (Uso)</th>
-                        <th>Saldo a Empenhar</th>
-                        <th style={{ width: '220px' }}>% Consumido</th>
-                        {canManageAllocations && <th style={{ width: '120px', textAlign: 'center' }}>Ações</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allocationsWithEmpenho.map((alloc) => {
-                        const balance = alloc.allocatedQty - alloc.empenhadaQty;
-                        const usePercent = alloc.allocatedQty > 0 ? (alloc.empenhadaQty / alloc.allocatedQty) * 100 : 0;
-                        const isOver = balance < 0;
-
-                        return (
-                          <tr key={alloc.id}>
-                            <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                              {alloc.unitName}
-                            </td>
-                            <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                              {formatNumber(alloc.allocatedQty)}
-                            </td>
-                            <td style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--warning)' }}>
-                              {formatNumber(alloc.empenhadaQty)}
-                            </td>
-                            <td style={{ 
-                              fontFamily: 'monospace', 
-                              fontWeight: 700, 
-                              color: isOver ? 'var(--danger)' : 'var(--success)' 
-                            }}>
-                              {formatNumber(balance)}
-                            </td>
-                            <td>
-                              <div className="progress-container">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontFamily: 'monospace' }}>
-                                  <span style={{ color: 'var(--text-muted)' }}>{formatNumber(usePercent)}%</span>
-                                </div>
-                                <div className="progress-track" style={{ height: '6px', background: '#e9ecef' }}>
-                                  <div 
-                                    className={`progress-fill ${getProgressColorClass(100 - usePercent)}`}
-                                    style={{ width: `${Math.min(usePercent, 100)}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                            </td>
-                            {canManageAllocations && (
-                            <td>
-                              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                <button 
-                                  onClick={() => handleEditAllocation(alloc)}
-                                  className="btn btn-secondary" 
-                                  style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', borderColor: 'var(--border-color)', color: 'var(--text-secondary)', textTransform: 'none', height: 'auto', border: '1px solid var(--border-color)' }}
-                                  title="Editar"
-                                >
-                                  <Edit2 size={12} />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteAllocation(alloc.id)}
-                                  disabled={saveAllocationsMutation.isPending || saveEmpenhoLinksMutation.isPending}
-                                  className="btn btn-secondary" 
-                                  style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', borderColor: '#f5c6cb', color: 'var(--danger)', textTransform: 'none', height: 'auto', border: '1px solid #f5c6cb' }}
-                                  title="Excluir"
-                                >
-
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                            </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-          </div>
+          <AllocationsTab
+            ugUasg={arp.codigoUnidadeGerenciadora}
+            totalUG={totalUGQty}
+            totalAllocated={totalAllocatedSum}
+            remaining={remainingUGQty}
+            percentAllocated={percentAllocated}
+            rows={allocationRows}
+            semUnidade={allocationExecution.semUnidade}
+            departments={departments}
+            departmentsLoading={departmentsLoading}
+            canManage={canManageAllocations}
+            editingId={editingId}
+            unitName={newUnitName || getFirstAvailableUnitSigla(departments, allocations, editingId)}
+            onUnitChange={setNewUnitName}
+            qty={newAllocatedQty}
+            onQtyChange={setNewAllocatedQty}
+            onSubmit={handleAddAllocation}
+            onCancelEdit={handleCancelEdit}
+            saving={saveAllocationsMutation.isPending || saveEmpenhoLinksMutation.isPending}
+            error={allocationError}
+            onEdit={(id) => {
+              const alloc = allocations.find((a) => a.id === id);
+              if (alloc) handleEditAllocation(alloc);
+            }}
+            onDelete={handleDeleteAllocation}
+            onGoToContracts={() => setActiveTab('contratos')}
+          />
         ) : (
           <AdesoesTab
             adesoesLoading={adesoesLoading}
@@ -2139,22 +1573,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
       />
 
       {/* Modal de Cadastro/Edição de Empenho Manual */}
-      <ManualEmpenhoModal
-        isOpen={isManualEmpenhoModalOpen}
-        onClose={() => {
-          setIsManualEmpenhoModalOpen(false);
-          setEditingManualEmpenho(null);
-        }}
-        onSave={handleSaveManualEmpenho}
-        arpId={arp.numeroAtaRegistroPreco}
-        itemId={item.numeroItem}
-        defaultUasg={arp.codigoUnidadeGerenciadora || '200331'}
-        defaultFornecedor={item.nomeRazaoSocialFornecedor}
-        defaultCnpj={item.niFornecedor}
-        defaultValorUnitario={item.valorUnitario}
-        initialEmpenho={editingManualEmpenho}
-        isLoading={saveManualEmpenhosMutation.isPending}
-      />
+
 
       {/* Modal de Vínculo com Contrato Oficial da UASG (Fase 6.2) */}
       <LinkContractModal

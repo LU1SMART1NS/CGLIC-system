@@ -130,13 +130,18 @@ export async function syncItemContractEmpenhos(params: SyncItemContractEmpenhosP
 
   const rawEmpenhos = await fetchContratosGovEmpenhos(contratoId);
   const records: ContratosGovEmpenhoRecord[] = [];
+  // A minuta (itens do empenho) exige token no Contratos.gov. Se a primeira consulta não a devolve,
+  // não repete a chamada para os demais empenhos do contrato.
+  let minutaDisponivel = true;
   for (const emp of Array.isArray(rawEmpenhos) ? rawEmpenhos : []) {
     let enriched: ContratosGovEmpenhoRecord = { ...emp };
-    if (emp.id) {
+    if (emp.id && minutaDisponivel) {
       try {
         const detalhe = await fetchContratoEmpenhoDetalhe(emp.id);
         if (detalhe?.itens_minuta) enriched = { ...enriched, itens_minuta: detalhe.itens_minuta };
+        else if (!detalhe) minutaDisponivel = false;
       } catch (err) {
+        minutaDisponivel = false;
         console.warn(`[itemContractEmpenhoService] Minuta do empenho ${emp.id} não obtida:`, err);
       }
     }
