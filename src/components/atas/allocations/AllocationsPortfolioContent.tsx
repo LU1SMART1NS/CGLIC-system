@@ -104,7 +104,7 @@ const UnitSection: React.FC<UnitSectionProps> = ({ unitName, rows, onSelectItem 
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={carteiraTh}>Ata e item</th>
@@ -144,21 +144,21 @@ const UnitSection: React.FC<UnitSectionProps> = ({ unitName, rows, onSelectItem 
                     {row.fornecedorNome && <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>{row.fornecedorNome}</span>}
                   </td>
 
-                  <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                  <td data-label="Vigência da Ata" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                     <CarteiraPrazoPill faixa={row.faixa} diasRestantes={row.diasRestantes} />
                   </td>
 
-                  <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <td data-label="Cota alocada" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <div style={{ fontWeight: 800 }}>{formatNumber(row.allocatedQty)} un</div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{formatCurrency(row.allocatedValue)}</div>
                   </td>
 
-                  <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <td data-label="Empenhado" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <div style={{ fontWeight: 800, color: '#b45309' }}>{formatNumber(row.empenhadaQty)} un</div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{formatCurrency(row.empenhadaValue)}</div>
                   </td>
 
-                  <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <td data-label="Saldo da cota" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', justifyContent: 'flex-end' }}>
                       <span style={{ fontWeight: 800, color: row.saldoQty > 0 ? '#15803d' : '#dc2626' }}>{formatNumber(row.saldoQty)} un</span>
                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>({percLivre}% livre)</span>
@@ -174,7 +174,7 @@ const UnitSection: React.FC<UnitSectionProps> = ({ unitName, rows, onSelectItem 
                     </div>
                   </td>
 
-                  <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {row.arp && row.item ? (
                       <button
                         type="button"
