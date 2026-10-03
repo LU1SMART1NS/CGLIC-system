@@ -54,13 +54,18 @@ export function measureLayout(page: Page): Promise<LayoutMetrics> {
   });
 }
 
-/** Espera os indicadores de carregamento sumirem (as telas 360 chegam a levar ~15s em desenvolvimento). */
+/**
+ * Espera o carregamento da tela terminar (as telas 360 chegam a levar ~15s em desenvolvimento).
+ * Só conta o carregamento da PÁGINA (texto "Carregando" ou esqueletos). Atualizações em segundo plano
+ * ("Atualizando...", ícone girando) não bloqueiam: na tela do Item elas duram enquanto as APIs
+ * externas de empenhos respondem, e o conteúdo já está na tela.
+ */
 export async function waitForSettled(page: Page): Promise<void> {
   await page.waitForSelector('main', { timeout: 60_000 });
   await page.waitForFunction(
     () => {
       const text = (document.querySelector('main') as HTMLElement | null)?.innerText ?? '';
-      const loading = /Carregando|Atualizando\.\.\.|Sincronizando/.test(text) || document.querySelector('.animate-pulse, .spinner, [data-testid$="-loading"]');
+      const loading = /Carregando/.test(text) || document.querySelector('.animate-pulse, [data-testid$="-loading"]');
       return !loading;
     },
     undefined,
