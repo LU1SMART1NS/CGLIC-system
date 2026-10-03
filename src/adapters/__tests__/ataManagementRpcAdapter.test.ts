@@ -7,6 +7,7 @@ import {
   saveAtaTaskTemplateTaskRpc,
   deleteAtaTaskTemplateTaskRpc,
   applyAtaTaskTemplateRpc,
+  renameAtaTaskModuleRpc,
   updateAtaTaskRpc
 } from '../ataManagementRpcAdapter';
 import * as supabaseClientModule from '../../services/supabaseClient';
@@ -162,10 +163,29 @@ describe('ataManagementRpcAdapter', () => {
 
       expect(mockRpc).toHaveBeenCalledWith('apply_ata_task_template_atomic', {
         p_ata_key: '00011/2026',
-        p_template_id: 'atatpl-1'
+        p_template_id: 'atatpl-1',
+        p_modulo_nome: null
       });
       expect(result.macrotasks_count).toBe(4);
       expect(result.tasks_count).toBe(12);
+    });
+
+    it('envia o nome do módulo quando informado e renomeia um módulo', async () => {
+      mockRpc.mockResolvedValueOnce({ data: { success: true }, error: null });
+      await applyAtaTaskTemplateRpc({ ataKey: '00011/2026', templateId: 'atatpl-1', moduloNome: ' 2º Termo aditivo ' });
+      expect(mockRpc).toHaveBeenCalledWith('apply_ata_task_template_atomic', {
+        p_ata_key: '00011/2026',
+        p_template_id: 'atatpl-1',
+        p_modulo_nome: '2º Termo aditivo'
+      });
+
+      mockRpc.mockResolvedValueOnce({ data: { success: true }, error: null });
+      await renameAtaTaskModuleRpc({ planId: 'ataplan-1', moduloId: 'mod-1', nome: ' 1º Termo aditivo ' });
+      expect(mockRpc).toHaveBeenLastCalledWith('rename_ata_task_module_atomic', {
+        p_plan_id: 'ataplan-1',
+        p_modulo_id: 'mod-1',
+        p_nome: '1º Termo aditivo'
+      });
     });
 
     it('deve rejeitar aplicação sem template selecionado', async () => {

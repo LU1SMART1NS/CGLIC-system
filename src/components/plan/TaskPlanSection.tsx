@@ -22,6 +22,7 @@ import type {
   ContractTaskStatusValue
 } from '../../types';
 import { groupMacrotasksByModule } from '../../utils/taskPlanModules';
+import { sugerirNomeModulo } from '../../utils/planModuleNaming';
 import { numeroEtapa, numeroTarefa, stripNumeracaoManual } from '../../utils/planNumbering';
 import { ResponsavelField, type ResponsavelValue } from '../contracts/ResponsavelField';
 import {
@@ -32,13 +33,14 @@ import {
   ConfirmDeleteButton,
   MutationError,
   PERSONALIZADA_BADGE_STYLE,
-  describeResponsavel
+  describeResponsavel,
+  planFormStyles
 } from '../contracts/planTaskEditing';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { classifyTaskAttention } from '../contracts/taskAttentionDisplay';
 import { severityFromAttentionPriorityLevel } from '../../services/severityService';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
-import { AppButton, DataTable, EmptyState, NoticeBar, SummaryBar, useConfirmDialog } from '../../design-system';
+import { AppButton, DataTable, EmptyState, Modal, NoticeBar, SummaryBar, useConfirmDialog } from '../../design-system';
 
 /**
  * Plano de gestão: mesma tela para Contrato e Ata. O componente só desenha; quem usa informa por
@@ -91,11 +93,12 @@ export interface TaskPlanController {
   useDeleteTask: (key: string) => PlanMutation<string>;
   templates: Array<{ id: string; nome: string }>;
   loadingTemplates: boolean;
-  applyTemplate: PlanAction<[templateId: string, onSuccess: () => void]>;
+  applyTemplate: PlanAction<[templateId: string, onSuccess: () => void, moduloNome?: string]>;
   startPlan: PlanAction<[]>;
   saveMacrotask: PlanAction<[vars: { id?: string; planId?: string; nome: string }]>;
   deleteMacrotask: PlanAction<[id: string]>;
   deleteModule: PlanAction<[vars: { planId: string; moduloId: string }]>;
+  renameModule: PlanAction<[vars: { planId: string; moduloId: string; nome: string }]>;
   createTask: PlanAction<[vars: { macrotaskId: string; nome: string; prazo: string | null; observacao: string | null }]>;
 }
 
@@ -391,6 +394,7 @@ export const TaskPlanSection: React.FC<{
   const confirm = useConfirmDialog();
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [showApplyModel, setShowApplyModel] = useState(false);
+  const [nomeNovoModulo, setNomeNovoModulo] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const toggleGroup = (key: string) =>
     setCollapsedGroups((prev) => {
@@ -400,25 +404,35 @@ export const TaskPlanSection: React.FC<{
       return next;
     });
 
-  const handleApplyTemplate = async () => {
+  const finishApply = () => {
+    setSelectedTemplateId('');
+    setShowApplyModel(false);
+    setNomeNovoModulo(null);
+  };
+
+  /** Módulos já aplicados a partir do modelo escolhido (para sugerir o nome do próximo). */
+  const modulosDoModelo = (templateId: string) =>
+    plan
+      ? groupMacrotasksByModule(plan.macrotarefas as Parameters<typeof groupMacrotasksByModule>[0], plan)
+          .filter((g) => g.modulo?.templateId === templateId)
+          .map((g) => g.modulo!.nome)
+      : [];
+
+  const handleApplyTemplate = () => {
     if (!selectedTemplateId) return;
-    const alreadyApplied = plan
-      ? groupMacrotasksByModule(plan.macrotarefas as Parameters<typeof groupMacrotasksByModule>[0], plan).some(
-          (g) => g.modulo?.templateId === selectedTemplateId
-        )
-      : false;
-    if (alreadyApplied) {
-      const ok = await confirm({
-        title: 'Aplicar modelo novamente',
-        message: 'Este modelo já foi aplicado a este plano. Acrescentar novamente vai duplicar as etapas e tarefas em um novo módulo. Deseja continuar?',
-        confirmLabel: 'Aplicar mesmo assim'
-      });
-      if (!ok) return;
+    const existentes = modulosDoModelo(selectedTemplateId);
+    if (existentes.length > 0) {
+      // Mesmo modelo outra vez: o usuário confirma (ou troca) o nome do novo módulo.
+      const nomeModelo = c.templates.find((t) => t.id === selectedTemplateId)?.nome ?? '';
+      setNomeNovoModulo(sugerirNomeModulo(nomeModelo, existentes));
+      return;
     }
-    c.applyTemplate.run(selectedTemplateId, () => {
-      setSelectedTemplateId('');
-      setShowApplyModel(false);
-    });
+    c.applyTemplate.run(selectedTemplateId, finishApply);
+  };
+
+  const confirmarNovoModulo = () => {
+    if (!selectedTemplateId || !nomeNovoModulo?.trim()) return;
+    c.applyTemplate.run(selectedTemplateId, finishApply, nomeNovoModulo.trim());
   };
 
   if (isLoading) {
@@ -507,6 +521,48 @@ export const TaskPlanSection: React.FC<{
 
   return (
     <div>
+      <Modal
+        isOpen={nomeNovoModulo !== null}
+        onClose={() => setNomeNovoModulo(null)}
+        title="Aplicar modelo novamente"
+        subtitle="Este modelo já foi aplicado a este plano. Acrescentar vai criar um novo módulo com as mesmas etapas e tarefas."
+        size="sm"
+        dismissible={!c.applyTemplate.isPending}
+        testId="apply-again-modal"
+        footer={
+          <>
+            <AppButton type="button" variant="outline" onClick={() => setNomeNovoModulo(null)} disabled={c.applyTemplate.isPending}>
+              Cancelar
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="primary"
+              onClick={confirmarNovoModulo}
+              disabled={!nomeNovoModulo?.trim() || c.applyTemplate.isPending}
+              isLoading={c.applyTemplate.isPending}
+            >
+              Aplicar
+            </AppButton>
+          </>
+        }
+      >
+        <label style={planFormStyles.labelStyle} htmlFor="nome-novo-modulo">Nome do novo módulo</label>
+        <input
+          id="nome-novo-modulo"
+          className="form-input"
+          value={nomeNovoModulo ?? ''}
+          onChange={(e) => setNomeNovoModulo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              confirmarNovoModulo();
+            }
+          }}
+          maxLength={200}
+          style={{ width: '100%' }}
+        />
+      </Modal>
+
       {/* Resumo do plano: progresso à esquerda, ações à direita */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div style={{ flex: '1 1 320px', minWidth: 0 }}>
@@ -586,6 +642,7 @@ export const TaskPlanSection: React.FC<{
           c.saveMacrotask.error ||
           c.deleteMacrotask.error ||
           c.deleteModule.error ||
+          c.renameModule.error ||
           c.createTask.error
         }
       />
@@ -605,7 +662,12 @@ export const TaskPlanSection: React.FC<{
               atrasadas={countOverdue(group)}
               collapsed={collapsed}
               onToggleCollapsed={() => toggleGroup(group.key)}
-              isPending={c.deleteModule.isPending}
+              isPending={c.deleteModule.isPending || c.renameModule.isPending}
+              onRename={
+                group.modulo
+                  ? (nome) => c.renameModule.run({ planId: plan.id, moduloId: group.modulo!.id, nome })
+                  : undefined
+              }
               onDelete={
                 group.modulo
                   ? async () => {

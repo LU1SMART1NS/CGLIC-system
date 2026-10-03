@@ -363,12 +363,16 @@ export const ModuleGroupHeader: React.FC<{
   etapas: number;
   /** Ausente para etapas personalizadas (não há módulo a excluir). */
   onDelete?: () => void;
+  /** Ausente para etapas personalizadas (não há módulo a renomear). */
+  onRename?: (nome: string) => void;
   isPending?: boolean;
   atrasadas?: number;
   /** Quando informado, o cabeçalho vira um botão de recolher/expandir o módulo. */
   onToggleCollapsed?: () => void;
   collapsed?: boolean;
-}> = ({ nome, appliedAt, concluidas, aplicaveis, etapas, onDelete, isPending, atrasadas = 0, onToggleCollapsed, collapsed = false }) => {
+}> = ({ nome, appliedAt, concluidas, aplicaveis, etapas, onDelete, onRename, isPending, atrasadas = 0, onToggleCollapsed, collapsed = false }) => {
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(nome);
   const appliedLabel = appliedAt ? new Date(appliedAt).toLocaleDateString('pt-BR') : null;
   const percentual = aplicaveis > 0 ? Math.round((concluidas / aplicaveis) * 100) : 0;
   const summary = (
@@ -398,7 +402,39 @@ export const ModuleGroupHeader: React.FC<{
         borderRadius: '6px'
       }}
     >
-      {onToggleCollapsed ? (
+      {renaming ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!draft.trim()) return;
+            if (draft.trim() !== nome) onRename?.(draft.trim());
+            setRenaming(false);
+          }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flex: 1 }}
+        >
+          <input
+            autoFocus
+            aria-label="Nome do módulo"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            style={{ ...inputStyle, maxWidth: '360px' }}
+          />
+          <AppButton type="submit" variant="ghost" size="sm" iconOnly icon={<Check size={15} />} title="Salvar nome" aria-label="Salvar nome do módulo" />
+          <AppButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={15} />}
+            title="Cancelar"
+            aria-label="Cancelar edição do nome do módulo"
+            onClick={() => {
+              setDraft(nome);
+              setRenaming(false);
+            }}
+          />
+        </form>
+      ) : onToggleCollapsed ? (
         <button
           type="button"
           onClick={onToggleCollapsed}
@@ -422,6 +458,22 @@ export const ModuleGroupHeader: React.FC<{
         </button>
       ) : (
         summary
+      )}
+      {onRename && !renaming && (
+        <AppButton
+          type="button"
+          variant="ghost"
+          size="sm"
+          iconOnly
+          icon={<Pencil size={14} />}
+          onClick={() => {
+            setDraft(nome);
+            setRenaming(true);
+          }}
+          disabled={isPending}
+          title="Renomear módulo"
+          aria-label={`Renomear módulo ${nome}`}
+        />
       )}
       {onDelete && (
         <AppButton
