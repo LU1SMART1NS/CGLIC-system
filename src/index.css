@@ -1640,3 +1640,26 @@ h1, h2, h3, h4 {
 @media (min-width: 768px) { .payment-action-label { display: none; } }
 @media (max-width: 767px) { .payment-cycle-actions > .ds-btn { justify-content: center; } }
 .ds-table-cards__actions:empty { display: none; }
+
+
+/* ==========================================================================
+   Telas 360 (Fase 3 / L3)
+   ========================================================================== */
+@media (max-width: 767px) {
+  /* Plano de gestão: seletor de status com alvos de 44px e espaço entre eles */
+  .plan-status-group { gap: 8px !important; }
+  .plan-status-btn { width: 44px !important; height: 44px !important; }
+  /* Links do PNCP: alvo de toque */
+  .pncp-link { min-height: 44px; display: inline-flex !important; align-items: center; }
+  /* Descrição longa dentro do cartão: até 3 linhas, sem reticências só no hover */
+  .carteira-stack td > div[title] {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    white-space: normal !important; overflow: hidden; text-overflow: clip !important;
+  }
+  /* Linha do tempo: cartão do evento mais compacto */
+  .timeline-card { padding: 0.75rem !important; }
+}
+/* No desktop o botão com rótulo oculto mantém o formato quadrado compacto de antes */
+@media (min-width: 768px) {
+  .ds-btn:has(.payment-action-label) { min-width: 32px; min-height: 32px; padding: 0 0.4rem !important; }
+}

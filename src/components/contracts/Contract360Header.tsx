@@ -190,7 +190,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       actions={
         <>
           {pncpUrl && (
-            <a href={pncpUrl} target="_blank" rel="noopener noreferrer" style={pncpLinkStyle}>
+            <a href={pncpUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
               <ExternalLink size={13} /> Contrato no PNCP
             </a>
           )}

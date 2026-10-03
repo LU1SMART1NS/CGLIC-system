@@ -130,12 +130,12 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
       actions={
         <>
           {ataUrl && (
-            <a href={ataUrl} target="_blank" rel="noopener noreferrer" style={pncpLinkStyle}>
+            <a href={ataUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
               <ExternalLink size={13} /> Ata no PNCP
             </a>
           )}
           {compraUrl && (
-            <a href={compraUrl} target="_blank" rel="noopener noreferrer" style={pncpLinkStyle}>
+            <a href={compraUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
               <ExternalLink size={13} /> Edital no PNCP
             </a>
           )}

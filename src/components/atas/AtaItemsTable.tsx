@@ -45,7 +45,7 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
   return (
     <div data-testid="ata-items-table" style={carteiraTableShell}>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={carteiraTh}>Item / Fornecedor</th>
@@ -80,11 +80,11 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
                       {item.descricaoItem}
                     </div>
                   </td>
-                  <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.valorUnitario)}</td>
-                  <td style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdHomologada)}</td>
-                  <td style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdConsumida)}</td>
-                  <td style={{ ...carteiraTd, textAlign: 'right', fontWeight: 800 }}>{formatQtd(saldoDisponivel)}</td>
-                  <td style={carteiraTd}>
+                  <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.valorUnitario)}</td>
+                  <td data-label="Qtd. SENASP" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdHomologada)}</td>
+                  <td data-label="Consumido" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdConsumida)}</td>
+                  <td data-label="Saldo" style={{ ...carteiraTd, textAlign: 'right', fontWeight: 800 }}>{formatQtd(saldoDisponivel)}</td>
+                  <td data-label="Saldo usado" style={carteiraTd}>
                     <div style={{ minWidth: '84px' }}>
                       <span style={{ fontWeight: 800 }}>{percentualConsumido.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</span>
                       <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', marginTop: '0.2rem', overflow: 'hidden' }}>
@@ -93,16 +93,17 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
                     </div>
                   </td>
                   {onSelectItem && (
-                    <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <AppButton
                         variant="outline"
                         size="sm"
-                        iconOnly
                         icon={<Eye size={15} />}
                         onClick={() => onSelectItem(item)}
                         data-testid={`ata-item-open-${item.numeroItem}`}
                         title="Ver saldo do item"
-                      />
+                      >
+                        <span className="payment-action-label">Ver saldo do item</span>
+                      </AppButton>
                     </td>
                   )}
                 </tr>

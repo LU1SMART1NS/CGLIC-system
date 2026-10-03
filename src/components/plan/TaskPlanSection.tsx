@@ -161,12 +161,15 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
     <div style={{ borderBottom: '1px solid #f1f5f9', padding: '0.65rem 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         {/* Seletor Rápido de Status */}
-        <div style={{ display: 'flex', gap: '2px' }}>
+        <div className="plan-status-group" style={{ display: 'flex', gap: '2px' }}>
           {STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               title={opt.label}
+              aria-label={opt.label}
+              aria-pressed={task.status === opt.value}
+              className="plan-status-btn"
               onClick={() => handleStatusChange(opt.value)}
               disabled={updateMutation.isPending}
               style={{
@@ -189,7 +192,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
         </div>
 
         {/* Informações da Tarefa */}
-        <div style={{ flex: 1, minWidth: '240px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
+        <div style={{ flex: '1 1 240px', minWidth: 0, cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span
               style={{
@@ -437,7 +440,7 @@ export const TaskPlanSection: React.FC<{
                 value={selectedTemplateId}
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
                 disabled={c.loadingTemplates || c.applyTemplate.isPending}
-                style={{ minWidth: '260px', width: 'auto' }}
+                style={{ minWidth: 0, width: '100%', maxWidth: '360px' }}
               >
                 <option value="">Selecione um Modelo de Gestão...</option>
                 {c.templates.map((tpl) => (
@@ -552,7 +555,7 @@ export const TaskPlanSection: React.FC<{
               value={selectedTemplateId}
               onChange={(e) => setSelectedTemplateId(e.target.value)}
               disabled={c.loadingTemplates || c.applyTemplate.isPending}
-              style={{ minWidth: '240px', width: 'auto' }}
+              style={{ minWidth: 0, width: '100%', maxWidth: '360px' }}
             >
               <option value="">Selecione um Modelo de Gestão...</option>
               {c.templates.map((tpl) => (

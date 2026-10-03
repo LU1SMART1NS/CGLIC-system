@@ -413,7 +413,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
               Nenhum evento encontrado para o filtro selecionado.
             </div>
           ) : (
-            <div style={{ position: 'relative', paddingLeft: '1.75rem' }}>
+            <div className="timeline-track" style={{ position: 'relative', paddingLeft: '1.75rem' }}>
               {/* Linha Vertical Conectora */}
               <div
                 style={{
@@ -463,6 +463,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
 
                       {/* Card do Evento */}
                       <div
+                        className="timeline-card"
                         style={{
                           backgroundColor: '#ffffff',
                           borderRadius: '8px',
