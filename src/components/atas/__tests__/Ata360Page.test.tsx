@@ -137,13 +137,19 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
 
     const html = renderPage();
 
-    expect(html).toContain('Ata 00011/2026');
+    expect(html).toContain('Ata nº 00011/2026');
+    expect(html).toContain('UASG 200331');
     // Dados cadastrais agora no cabeçalho, como no Contrato 360
     expect(html).toContain('data-testid="ata-header-metadata"');
     expect(html).toContain('Pregão Eletrônico');
     // Faixa de saúde e abas no padrão do Contrato 360
     expect(html).toContain('data-testid="ata-health-strip"');
     expect(html).toContain('Saldo contratável');
+    // Quatro indicadores: vigência (com a régua), saldo, itens em risco e ações
+    expect(html).toContain('data-testid="ata-health-vigencia"');
+    expect(html).toContain('data-testid="ata-lifeline"');
+    expect(html).toContain('Itens em risco');
+    expect(html).toContain('data-testid="ata-health-acoes"');
     expect(html).not.toContain('Maior consumo de saldo');
     expect(html).toContain('Plano de gestão');
     expect(html).toContain('Itens (1)');
@@ -219,7 +225,7 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
     const html = renderPage();
 
     expect(html).not.toContain('Acesso não autorizado');
-    expect(html).toContain('Ata 00011/2026');
+    expect(html).toContain('Ata nº 00011/2026');
   });
 
   it('4. exibe item com saldo crítico na fila de Ações da ata', () => {

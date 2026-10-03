@@ -1,6 +1,8 @@
 import type { ArpResponse, ArpItemsResponse, ArpItemRecord, UnidadesItemResponse, FilterParams, ArpRecord, EmpenhosSaldoItemResponse, EmpenhoSaldoItemRecord, PncpContract, PncpContractEmpenho, AdesoesItemResponse, AdesaoItemRecord, ComprasGovContratoItemRecord, ComprasGovContratosItemResponse, ContratosGovEmpenhoRecord } from '../types';
 import { cacheArpsInDb, cacheArpItemsInDb, fetchArpsFromDb } from './dbCacheService';
 import { formatPncpContractUrl } from '../utils/pncpUtils';
+import type { ContratosGovHistoricoRecord } from '../types/contractHistorico';
+import type { ContratosGovResponsavelRecord, ContratosGovGarantiaRecord } from '../types/contractResponsaveis';
 import { CNPJ_SENASP, cnpjDaUasg, codigoOrgaoDaUasg, isUasgCglic } from '../config/unidadesGestoras';
 
 const BASE_URL = '/api-arp/modulo-arp';
@@ -209,6 +211,15 @@ export interface PncpAtaVigenciaInfo {
   cancelado?: boolean;
   dataCancelamento?: string | null;
   dataAtualizacao?: string;
+  /** Data em que a ata foi divulgada no PNCP (YYYY-MM-DDTHH:mm:ss). */
+  dataPublicacaoPncp?: string;
+  /** Número da ata como o PNCP o guarda ("00059"); com `anoAta` forma "00059/2025". */
+  numeroAtaRegistroPreco?: string;
+  anoAta?: number | string;
+  /** UASG da unidade gerenciadora da ata. */
+  codigoUnidade?: string;
+  /** Se a ata aceita adesão (carona). Ausente quando o PNCP não informa. */
+  possibilidadeAdesao?: boolean;
 }
 
 const pncpVigenciaCache = new Map<string, PncpAtaVigenciaInfo>();
@@ -242,7 +253,12 @@ export async function fetchPncpAtaVigencia(numeroControlePncpAta?: string): Prom
         dataVigenciaFim: data.dataVigenciaFim,
         cancelado: data.cancelado,
         dataCancelamento: data.dataCancelamento,
-        dataAtualizacao: data.dataAtualizacao || data.dataAtualizacaoGlobal
+        dataAtualizacao: data.dataAtualizacao || data.dataAtualizacaoGlobal,
+        dataPublicacaoPncp: data.dataPublicacaoPncp,
+        numeroAtaRegistroPreco: data.numeroAtaRegistroPreco,
+        anoAta: data.anoAta,
+        codigoUnidade: data.unidadeOrgao?.codigoUnidade,
+        possibilidadeAdesao: typeof data.possibilidadeAdesao === 'boolean' ? data.possibilidadeAdesao : undefined
       };
       pncpVigenciaCache.set(numeroControlePncpAta, info);
       return info;
@@ -985,6 +1001,63 @@ export async function fetchContratosGovEmpenhos(
     }
   } catch (e) {
     console.warn(`Falha na consulta de empenhos do contrato no Contratos.gov.br (id=${contratoId})`, e);
+  }
+  return [];
+}
+
+/**
+ * Consulta o histórico do contrato (celebração, termos aditivos e apostilamentos) no Contratos.gov.br
+ * Endpoint: GET /api/contrato/{contrato_id}/historico
+ */
+export async function fetchContratosGovHistorico(
+  contratoId: string | number
+): Promise<ContratosGovHistoricoRecord[]> {
+  try {
+    const res = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/historico`);
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+  } catch (e) {
+    console.warn(`Falha na consulta do histórico do contrato no Contratos.gov.br (id=${contratoId})`, e);
+  }
+  return [];
+}
+
+/**
+ * Consulta os responsáveis do contrato (gestor, fiscais e substitutos) no Contratos.gov.br
+ * Endpoint: GET /api/contrato/{contrato_id}/responsaveis
+ */
+export async function fetchContratosGovResponsaveis(
+  contratoId: string | number
+): Promise<ContratosGovResponsavelRecord[]> {
+  try {
+    const res = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/responsaveis`);
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+  } catch (e) {
+    console.warn(`Falha na consulta dos responsáveis do contrato no Contratos.gov.br (id=${contratoId})`, e);
+  }
+  return [];
+}
+
+/**
+ * Consulta as garantias do contrato no Contratos.gov.br
+ * Endpoint: GET /api/contrato/{contrato_id}/garantias
+ */
+export async function fetchContratosGovGarantias(
+  contratoId: string | number
+): Promise<ContratosGovGarantiaRecord[]> {
+  try {
+    const res = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/garantias`);
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+  } catch (e) {
+    console.warn(`Falha na consulta das garantias do contrato no Contratos.gov.br (id=${contratoId})`, e);
   }
   return [];
 }

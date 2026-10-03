@@ -1,13 +1,18 @@
 import { classifyArpItemSaldo } from '../../services/balanceService';
 import React from 'react';
-import { ExternalLink, Package, RefreshCw } from 'lucide-react';
+import { ExternalLink, RefreshCw } from 'lucide-react';
 import { Instrument360Hero } from '../instrument360/Instrument360Hero';
+import { ManagerInfo } from '../instrument360/ManagerInfo';
+import { useAtaManager } from '../../hooks/useAtaManagers';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { AppButton } from '../../design-system';
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
 import { formatCnpj, formatCurrency, formatCurrencyCompact, formatNumber } from '../../utils/format';
+import { differenceInDays, formatDateBR, parseDateBRT } from '../../services/temporalEngineService';
+import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { pncpLinkStyle } from '../atas/Ata360Header';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
+import type { SeverityLevel } from '../../design-system/tokens';
 import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { ComprasGovReferencia } from './ItemExecutionSummaryStrip';
 
@@ -23,6 +28,8 @@ export interface ItemHeroMetrics {
   limiteAdesao: number;
   valorFinanceiroDisponivel: number;
   valorFinanceiroConsumido: number;
+  /** Vínculos de empenho ainda sem quantidade confirmada. */
+  empenhosPendentes?: number;
 }
 
 export interface ItemHeroProps {
@@ -38,6 +45,8 @@ export interface ItemHeroProps {
   /** Consumo informado pelo Compras.gov comparado ao contratado (só referência). */
   referencia: ComprasGovReferencia;
   onGoTo: (tab: ItemTab) => void;
+  /** Abre a Ata 360. Sem ele, o número da ata aparece como texto. */
+  onOpenAta?: () => void;
 }
 
 /** Situação do saldo pela régua única do sistema (balanceService.classifyArpItemSaldo): resta <20% crítico, <50% atenção. */
@@ -62,8 +71,12 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   isRefreshing = false,
   metrics,
   referencia,
-  onGoTo
+  onGoTo,
+  onOpenAta
 }) => {
+  // O item não tem gestor próprio: vale o da ata. Se a consulta falhar, o bloco some (não vira "Não atribuído").
+  const { data: gestorAta, isLoading: carregandoGestor, isError: erroGestor } = useAtaManager(arp.numeroAtaRegistroPreco);
+
   const ataUrl = formatPncpAtaUrl(arp.linkAtaPNCP, arp.numeroControlePncpAta, arp.numeroAtaRegistroPreco);
   const compraUrl = formatPncpCompraUrl(arp.linkCompraPNCP, arp.numeroControlePncpCompra, arp.numeroControlePncpAta);
 
@@ -77,6 +90,24 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   const delta = referencia.delta > 0 ? `+${formatNumber(referencia.delta)}` : formatNumber(referencia.delta);
 
   const status = itemSaldoStatus(metrics.officialSaldo, metrics.rawEmpenhoPercentRestante);
+  const saldoTone: SeverityLevel | undefined =
+    status.faixa === 'CRITICO' || status.faixa === 'EXPIRADO' ? 'CRITICA' : status.faixa === 'ATENCAO' ? 'ATENCAO' : undefined;
+  const saldoBadge = status.faixa === 'EXPIRADO' ? 'Esgotado' : undefined;
+  const empenhosPendentes = metrics.empenhosPendentes ?? 0;
+
+  // O item não tem vigência própria: vale a da ata, com o fim corrigido pelo PNCP quando existir.
+  const fimAta = arp.dataVigenciaFinalPncp || arp.dataVigenciaFinal;
+  const fimAtaData = fimAta ? parseDateBRT(fimAta) : null;
+  const diasAta = fimAtaData ? differenceInDays(fimAtaData) : null;
+  const faixaAta = classifyPrazo(diasAta, Boolean(arp.isCanceladaPncp));
+  const avisoAta =
+    diasAta === null
+      ? undefined
+      : diasAta < 0
+        ? `encerrada há ${Math.abs(diasAta)} ${Math.abs(diasAta) === 1 ? 'dia' : 'dias'}`
+        : faixaAta === 'CRITICO'
+          ? `vence em ${diasAta} ${diasAta === 1 ? 'dia' : 'dias'}`
+          : undefined;
 
   return (
     <Instrument360Hero
@@ -108,62 +139,96 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           </AppButton>
         </>
       }
-      icon={<Package size={26} color="#0c326f" aria-hidden="true" />}
+      eyebrow={[`UASG ${arp.codigoUnidadeGerenciadora}`, arp.nomeUnidadeGerenciadora].filter(Boolean).join(' · ')}
       title={`Item ${item.numeroItem}`}
-      status={status}
+      manager={
+        erroGestor ? undefined : (
+          <ManagerInfo label="Gestor da ata" gestorNome={gestorAta?.gestorNome} isLoading={carregandoGestor} testId="item-manager-info" />
+        )
+      }
+      status={{ ...status, neutral: status.faixa === 'REGULAR' }}
       subtitle={
         <>
           <strong>{item.nomeRazaoSocialFornecedor || 'Fornecedor não informado'}</strong>
-          {item.niFornecedor && <span style={{ color: '#64748b' }}> · {formatCnpj(item.niFornecedor)}</span>}
+          {item.niFornecedor && <span style={{ color: '#64748b' }}> · CNPJ {formatCnpj(item.niFornecedor)}</span>}
         </>
       }
       objeto={item.descricaoItem}
-      metaTestId="item-header-metadata"
-      meta={[
-        { label: 'Ata', value: arp.numeroAtaRegistroPreco },
-        {
-          label: 'Unidade gerenciadora',
-          value: arp.nomeUnidadeGerenciadora
-            ? `${arp.nomeUnidadeGerenciadora} (${arp.codigoUnidadeGerenciadora})`
-            : arp.codigoUnidadeGerenciadora
-        },
+      origin={
+        <>
+          Ata:{' '}
+          {onOpenAta ? (
+            <button
+              type="button"
+              onClick={onOpenAta}
+              style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: '#075985', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              nº {arp.numeroAtaRegistroPreco}
+            </button>
+          ) : (
+            <span>nº {arp.numeroAtaRegistroPreco}</span>
+          )}
+        </>
+      }
+      dates={fimAtaData ? [{ label: 'Vigência da ata', value: `até ${formatDateBR(fimAta)}`, emphasis: true, risk: avisoAta }] : []}
+      identifiersTestId="item-header-metadata"
+      identifiers={[
         { label: 'Tipo', value: item.tipoItem },
-        { label: 'Preço unitário', value: formatCurrency(item.valorUnitario) },
-        { label: 'Valor total do item', value: formatCurrency(item.valorTotal) }
+        { label: 'Código do item', value: item.codigoItem ? String(item.codigoItem) : undefined },
+        { label: 'PDM', value: item.codigoPdm ? String(item.codigoPdm) : undefined }
       ]}
     >
       <div data-testid="item-health-strip">
-        <HealthTileGrid>
+        <HealthTileGrid columns={4}>
           <HealthTile
             label="Saldo SENASP"
             value={`${formatNumber(metrics.officialSaldo)} un`}
-            hint={`de ${formatNumber(metrics.itemTotalQty)} · contratado ${formatNumber(metrics.totalEmpenhado)} (${formatNumber(metrics.empenhoConsumidoPercent)}%)`}
-            tone={status.faixa === 'CRITICO' || status.faixa === 'EXPIRADO' ? 'CRITICA' : status.faixa === 'ATENCAO' ? 'ATENCAO' : undefined}
+            hint={[
+              `${formatCurrencyCompact(metrics.valorFinanceiroDisponivel)} · ${formatCurrency(item.valorUnitario)} por un`,
+              `contratado ${formatNumber(metrics.totalEmpenhado)} (${formatNumber(metrics.empenhoConsumidoPercent)}%)`
+            ]}
+            tone={saldoTone}
+            badge={saldoBadge}
             onClick={() => onGoTo('contratos')}
             testId="item-health-saldo"
           />
           <HealthTile
             label="Saldo para adesões"
             value={aceitaAdesao ? `${formatNumber(metrics.saldoAdesoes)} un` : 'Não aceita'}
-            hint={aceitaAdesao ? `de ${formatNumber(metrics.limiteAdesao)} · ver caronas` : 'adesão não prevista no item'}
+            hint={
+              aceitaAdesao
+                ? metrics.saldoAdesoes === metrics.limiteAdesao
+                  ? 'ver caronas'
+                  : `de ${formatNumber(metrics.limiteAdesao)} · ver caronas`
+                : 'adesão não prevista no item'
+            }
             onClick={aceitaAdesao ? () => onGoTo('adesoes') : undefined}
             testId="item-health-adesoes"
           />
           <HealthTile
-            label="Valor disponível"
-            value={formatCurrencyCompact(metrics.valorFinanceiroDisponivel)}
-            hint={`consumido ${formatCurrencyCompact(metrics.valorFinanceiroConsumido)}`}
-            tone={metrics.valorFinanceiroDisponivel < 0 ? 'CRITICA' : undefined}
-            testId="item-health-valor"
+            label="Empenhos pendentes"
+            value={String(empenhosPendentes)}
+            hint="de confirmação de quantidade"
+            tone={empenhosPendentes > 0 ? 'ATENCAO' : undefined}
+            onClick={() => onGoTo('contratos')}
+            testId="item-health-empenhos"
           />
-          {acima && (
+          {acima ? (
             <HealthTile
-              label="Referência Compras.gov"
-              value={`Diferença ${delta} un`}
-              hint="consumo sem contrato vinculado?"
+              label="Pendências"
+              value="1"
+              hint={[`Diferença ${delta} un`, 'consumo sem contrato vinculado?']}
               tone="ATENCAO"
               onClick={() => onGoTo('contratos')}
               testId="item-health-reconciliacao"
+            />
+          ) : (
+            <HealthTile
+              label="Pendências"
+              value="Nenhuma"
+              hint="consumo confere com o Compras.gov"
+              positive
+              testId="item-health-pendencias"
             />
           )}
         </HealthTileGrid>

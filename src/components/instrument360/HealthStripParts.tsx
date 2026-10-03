@@ -1,79 +1,186 @@
 import React from 'react';
+import { AlertTriangle, Check, Circle } from 'lucide-react';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { formatDateBR } from '../../services/temporalEngineService';
-import type { ContractLifeline, LifelineMilestone } from '../../services/contractLifelineService';
+import { clusterLifelineEvents, type ContractLifeline, type LifelineMilestone } from '../../services/contractLifelineService';
 
 /**
- * Peças do cabeçalho das telas 360 (Contrato e Ata): cartões de indicador,
- * indicador único de pendências e linha da vida com marcos nomeados.
+ * Peças do topo das telas 360 (Ata, Contrato e Item): cartões de indicador, indicador único de
+ * pendências e a régua de prazos, que mora dentro do cartão de vigência.
+ *
+ * Cartão em 4 camadas: rótulo, valor, conteúdo extra (a régua) e dica. A gravidade aparece só no
+ * selo (ícone e texto) e na borda esquerda; o fundo e o número continuam neutros.
  */
 
-const tileBase: React.CSSProperties = {
-  borderRadius: '8px',
-  padding: '0.7rem 0.9rem',
-  background: '#f8fafc',
-  border: '1px solid #e2e8f0',
-  textAlign: 'left'
+const COLORS = {
+  ink: '#0f172a',
+  inkSoft: '#334155',
+  muted: '#64748b',
+  line: '#e2e8f0',
+  surface: '#f8fafc',
+  ok: '#166534',
+  tick: '#94a3b8',
+  brand: '#0c326f',
+  warn: '#d97706'
 };
 
-const POSITIVE = { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534' };
+/** Texto do selo por tom. INFO não tem selo. */
+const BADGE_LABEL: Record<SeverityLevel, string | null> = {
+  CRITICA: 'Crítico',
+  URGENTE: 'Urgente',
+  ATENCAO: 'Atenção',
+  INFO: null
+};
+
+/** Dica de no máximo 2 linhas: o cartão tem altura fixa nos cabeçalhos 360, e o texto cortado aparece inteiro na dica do mouse. */
+const HINT_CLAMP: React.CSSProperties = {
+  fontSize: '0.78rem',
+  color: COLORS.inkSoft,
+  lineHeight: 1.3,
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden'
+};
 
 export const HealthTile: React.FC<{
   label: string;
   value: string;
-  hint?: string;
+  /** Uma ou mais linhas de dica, ancoradas na base do cartão. */
+  hint?: string | string[];
   tone?: SeverityLevel;
-  /** Estado "tudo certo" (verde), usado pelo indicador de pendências quando não há nenhuma. */
+  /** Substitui o texto do selo (ex.: "Atenção" no tom âmbar usado pela vigência). */
+  badge?: string;
+  /** Estado "tudo certo": a dica ganha um visto verde. O cartão continua neutro. */
   positive?: boolean;
   /** Valor textual longo (ex.: nome do fornecedor) em fonte menor. */
   compact?: boolean;
+  /** Ocupa 2 colunas do grid (cartão que leva a régua). */
+  wide?: boolean;
+  /** Conteúdo abaixo das dicas (a régua de prazos). */
+  children?: React.ReactNode;
   onClick?: () => void;
   testId?: string;
-}> = ({ label, value, hint, tone, positive = false, compact = false, onClick, testId }) => {
-  const token = tone ? severityTokens[tone] : null;
-  const colors = token
-    ? { bg: token.badgeBg, border: token.badgeBorder, text: token.badgeText }
-    : positive
-      ? POSITIVE
-      : null;
+}> = ({ label, value, hint, tone, badge, positive = false, compact = false, wide = false, children, onClick, testId }) => {
+  const token = tone && tone !== 'INFO' ? severityTokens[tone] : null;
+  const badgeText = token ? (badge ?? BADGE_LABEL[tone as SeverityLevel]) : null;
+  const hints = (Array.isArray(hint) ? hint : hint ? [hint] : []).filter(Boolean);
+  // Cartão com a régua: a dica vai ao lado do valor, para o cartão ter a altura dos demais.
+  const inlineHints = wide && Boolean(children);
+
   const style: React.CSSProperties = {
-    ...tileBase,
-    ...(colors ? { background: colors.bg, border: `1px solid ${colors.border}` } : {}),
+    display: 'grid',
+    gridTemplateRows: 'auto auto 1fr',
+    alignContent: 'start',
+    gap: '4px',
+    minWidth: 0,
+    padding: '12px 14px',
+    borderRadius: '10px',
+    border: `1px solid ${COLORS.line}`,
+    borderLeft: `3px solid ${token ? token.borderLeft : COLORS.line}`,
+    background: COLORS.surface,
+    color: COLORS.ink,
+    textAlign: 'left',
     ...(onClick ? { cursor: 'pointer', font: 'inherit' } : {})
   };
+
   const content = (
     <>
-      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors ? colors.text : '#64748b' }}>{label}</div>
-      <div
-        title={compact ? value : undefined}
-        style={{
-          fontSize: compact ? '0.92rem' : '1.3rem',
-          fontWeight: 800,
-          color: colors ? colors.text : '#0f172a',
-          lineHeight: 1.3,
-          margin: compact ? '0.2rem 0' : 0,
-          ...(compact ? { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } : {})
-        }}
-      >
-        {value}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+        <span
+          title={label}
+          style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.72rem', fontWeight: 700, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+        >
+          {label}
+        </span>
+        {token && badgeText && (
+          <span
+            style={{
+              flex: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '1px 7px',
+              borderRadius: '999px',
+              fontSize: '0.68rem',
+              fontWeight: 700,
+              background: token.badgeBg,
+              color: token.badgeText,
+              border: `1px solid ${token.badgeBorder}`
+            }}
+          >
+            {tone === 'CRITICA' ? <AlertTriangle size={11} aria-hidden="true" /> : <Circle size={9} fill="currentColor" aria-hidden="true" />}
+            {badgeText}
+          </span>
+        )}
       </div>
-      {hint && <div style={{ fontSize: '0.72rem', color: colors ? colors.text : '#64748b' }}>{hint}</div>}
+      <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'nowrap', gap: '0 10px', minWidth: 0 }}>
+        <div
+          title={compact ? value : undefined}
+          style={{
+            fontSize: compact ? '0.92rem' : '1.4rem',
+            fontWeight: 800,
+            color: COLORS.ink,
+            lineHeight: 1.2,
+            fontVariantNumeric: 'tabular-nums',
+            flex: 'none',
+            ...(compact ? { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '0 1 auto' } : {})
+          }}
+        >
+          {value}
+        </div>
+        {inlineHints &&
+          hints.map((line) => (
+            <span key={line} title={line} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.78rem', color: COLORS.inkSoft, lineHeight: 1.3 }}>
+              {line}
+            </span>
+          ))}
+      </div>
+      <div
+        title={inlineHints ? undefined : hints.join(' · ') || undefined}
+        style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, minHeight: 0, overflow: 'hidden' }}
+      >
+        {(inlineHints ? [] : hints).map((line, index) =>
+          positive && index === 0 ? (
+            <div key={line} style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', fontWeight: 600, color: COLORS.ok, lineHeight: 1.3 }}>
+              <Check size={12} aria-hidden="true" />
+              {line}
+            </div>
+          ) : (
+            <div key={line} style={{ ...HINT_CLAMP, ...(index === 0 ? { marginTop: 'auto' } : {}) }}>
+              {line}
+            </div>
+          )
+        )}
+        {children}
+      </div>
     </>
   );
+
+  const className = wide ? 'health-tile health-tile--wide' : 'health-tile';
   return onClick ? (
-    <button type="button" onClick={onClick} style={style} data-testid={testId}>
+    <button type="button" onClick={onClick} style={style} className={className} data-testid={testId}>
       {content}
     </button>
   ) : (
-    <div style={style} data-testid={testId}>
+    <div style={style} className={className} data-testid={testId}>
       {content}
     </div>
   );
 };
 
-export const HealthTileGrid: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem' }}>{children}</div>
+/**
+ * Grade dos indicadores. Com `columns`, o número de colunas depende da largura do CARTÃO (não da janela,
+ * que perde cerca de 350px para o menu lateral e as margens): até 890px são 2 por linha e até 420px, 1.
+ * Sem `columns`, o número de colunas se ajusta sozinho ao espaço.
+ */
+export const HealthTileGrid: React.FC<{ children: React.ReactNode; columns?: 4 | 5 }> = ({ children, columns }) => (
+  <div className="health-tiles-wrap">
+    <div className="health-tile-grid" data-columns={columns}>
+      {children}
+    </div>
+  </div>
 );
 
 const PENDENCIA_LABELS: Record<Exclude<SeverityLevel, 'INFO'>, [string, string]> = {
@@ -84,7 +191,7 @@ const PENDENCIA_LABELS: Record<Exclude<SeverityLevel, 'INFO'>, [string, string]>
 
 /**
  * Indicador único de pendências: junta crítica/urgente/atenção num só cartão
- * (verde quando não há nenhuma; na cor da mais grave quando há).
+ * (neutro com visto quando não há nenhuma; com o selo da mais grave quando há).
  */
 export const PendenciasTile: React.FC<{
   counts: Record<SeverityLevel, number>;
@@ -102,21 +209,16 @@ export const PendenciasTile: React.FC<{
   return <HealthTile label="Pendências" value={String(total)} hint={hint} tone={severities[0]} onClick={onClick} testId={testId} />;
 };
 
-const MILESTONE_COLORS: Record<LifelineMilestone['state'], string> = {
-  PASSADO: '#94a3b8',
-  PROXIMO: '#d97706',
-  FUTURO: '#64748b'
-};
-
-/** Nome curto do marco para caber sob a linha da vida (o nome completo fica no tooltip). */
+/**
+ * Nome do marco na régua. Os marcos de 180 e 90 dias são gatilhos de PLANEJAMENTO, não a
+ * prorrogação nem a licitação em si; o nome diz isso. Os demais mantêm o nome do motor de prazos.
+ */
 export function shortMilestoneLabel(label: string): string {
-  const reajuste = /Reajuste \((\d+) meses\)/.exec(label);
-  if (reajuste) return `Reajuste ${reajuste[1]}m`;
-  if (/Prorroga/i.test(label)) return 'Prorrogação';
-  if (/Exaust/i.test(label)) return 'Nova licitação';
+  if (/Prorroga/i.test(label)) return /\bAta\b/.test(label) ? 'Planejamento de prorrogação' : 'Início da análise de prorrogação';
+  if (/Exaust/i.test(label)) return 'Planejar nova licitação';
   if (/Interesse/i.test(label)) return 'Consulta ao fornecedor';
-  if (/Controle/i.test(label)) return 'Órgãos de controle';
-  return label.replace(/\s*\(.*\)\s*$/, '');
+  if (/Controle/i.test(label)) return 'Remessa aos órgãos de controle';
+  return label.replace(/\s*\((?!\d+ meses).*\)\s*$/, '');
 }
 
 function relativeDays(dias: number): string {
@@ -125,120 +227,166 @@ function relativeDays(dias: number): string {
   return `há ${Math.abs(dias)} dia${dias === -1 ? '' : 's'}`;
 }
 
-function shortDate(iso: string): string {
-  const [, m, d] = iso.split('-');
-  return d && m ? `${d}/${m}` : iso;
-}
-
-/** Duas faixas de rótulos: um marco vai para a segunda faixa quando fica perto do anterior da primeira. */
-function placeMilestoneLabels(milestones: LifelineMilestone[]): Array<{ m: LifelineMilestone; row: 0 | 1 }> {
-  return milestones.reduce<{ placed: Array<{ m: LifelineMilestone; row: 0 | 1 }>; lastRow0: number }>(
-    (acc, m) => {
-      const row: 0 | 1 = m.pct - acc.lastRow0 < 14 ? 1 : 0;
-      return { placed: [...acc.placed, { m, row }], lastRow0: row === 0 ? m.pct : acc.lastRow0 };
-    },
-    { placed: [], lastRow0: -100 }
-  ).placed;
-}
-
-/** Posição do rótulo sem estourar as bordas da barra. */
-function labelPosition(pct: number): React.CSSProperties {
-  if (pct < 8) return { left: 0 };
-  if (pct > 92) return { right: 0, textAlign: 'right' };
-  return { left: `${pct}%`, transform: 'translateX(-50%)', textAlign: 'center' };
-}
+/** Marco mais perto do fim que isso (em % da vigência) é desenhado junto do marcador de fim. */
+const MERGE_WITH_END_PCT = 3;
 
 /**
- * Linha da vida: vigência em cima (os dias restantes ficam no selo do título); marcos nomeados embaixo
- * (em duas faixas quando ficam próximos) e o "Hoje" marcado sobre a barra.
+ * Régua de prazos, dentro do cartão de vigência: barra do tempo consumido, "Hoje" e fim.
+ * Só o PRÓXIMO marco tem texto; os que já passaram e os futuros além dele viram traços cinza, com nome e
+ * data na dica. Termos do histórico (aditivos, apostilamentos) são losangos numa faixa abaixo da barra.
+ * O motor só sabe se a data passou, está próxima ou é futura: não sabe se o ato foi cumprido.
  */
-export const LifelineBar: React.FC<{
+export const LifelineRule: React.FC<{
   lifeline: ContractLifeline | null;
   testId: string;
-  /** Mantido por compatibilidade: a situação (prazo, cancelada) vive no selo do título, não na barra. */
-  cancelada?: boolean;
-}> = ({ lifeline, testId }) => {
+  /** Tom do cartão; colore o preenchimento da barra. */
+  tone?: SeverityLevel;
+}> = ({ lifeline, testId, tone }) => {
   if (!lifeline) {
     return (
-      <div data-testid={testId} style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '1rem' }}>
+      <div data-testid={testId} style={{ fontSize: '0.78rem', color: COLORS.muted, marginTop: '0.75rem' }}>
         Vigência não informada.
       </div>
     );
   }
 
-  const placed = placeMilestoneLabels(lifeline.milestones);
-  const hasSecondRow = placed.some((p) => p.row === 1);
+  const milestones = lifeline.milestones;
+  const passed = milestones.filter((m) => m.state === 'PASSADO');
+  const ahead = milestones.filter((m) => m.state !== 'PASSADO');
+  const next: LifelineMilestone | undefined = ahead[0];
+  const ticks = [...passed, ...ahead.slice(1)];
+  const mergedWithEnd = Boolean(next && 100 - next.pct <= MERGE_WITH_END_PCT);
+  const termos = clusterLifelineEvents(lifeline.events ?? []);
+  const totalTermos = lifeline.events?.length ?? 0;
+
   const showToday = lifeline.todayPct > 0 && lifeline.todayPct < 100;
+  const fillColor = tone && tone !== 'INFO' ? severityTokens[tone].borderLeft : COLORS.brand;
+  const nextColor = next?.state === 'PROXIMO' ? COLORS.warn : COLORS.tick;
+
+  const leftNote =
+    totalTermos > 0
+      ? `${totalTermos} ${totalTermos === 1 ? 'termo registrado' : 'termos registrados'}`
+      : passed.length > 0
+        ? `${passed.length} ${passed.length === 1 ? 'marco já passou' : 'marcos já passaram'}`
+        : null;
+  const nextText = next ? `${shortMilestoneLabel(next.label)} · ${formatDateBR(next.date)}` : null;
+  const markerTitle = (m: LifelineMilestone) => `${m.label} · ${formatDateBR(m.date)} · ${relativeDays(m.diasRestantes)}`;
 
   return (
-    <div data-testid={testId} style={{ marginTop: '1.1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.78rem', marginBottom: showToday ? '1.1rem' : '0.5rem' }}>
-        <span style={{ color: '#475569' }}>
-          <strong style={{ color: '#0f172a' }}>Vigência</strong> · {formatDateBR(lifeline.start)} a {formatDateBR(lifeline.end)}
-        </span>
-      </div>
+    <div data-testid={testId} style={{ position: 'relative', margin: '22px 12px 0 8px' }}>
+      <div
+        role="img"
+        aria-label={`${Math.round(lifeline.todayPct)}% da vigência consumida.${nextText ? ` Próximo marco: ${nextText}.` : ''}${totalTermos ? ` ${totalTermos} termos registrados.` : ''}`}
+        style={{ position: 'relative', height: '6px', borderRadius: '3px', background: '#dfe5ee' }}
+      >
+        <i style={{ position: 'absolute', inset: '0 auto 0 0', width: `${lifeline.todayPct}%`, background: fillColor, borderRadius: '3px' }} />
 
-      <div style={{ position: 'relative', height: '10px', background: '#e2e8f0', borderRadius: '5px', margin: '0 7px' }}>
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${lifeline.todayPct}%`, background: '#0c326f', borderRadius: '5px' }} />
-        {lifeline.milestones.map((m) => (
+        {ticks.map((m) => (
           <span
             key={m.id}
-            title={`${m.label} — ${formatDateBR(m.date)} (${relativeDays(m.diasRestantes)})`}
-            style={{
-              position: 'absolute',
-              left: `${m.pct}%`,
-              top: '50%',
-              width: '12px',
-              height: '12px',
-              transform: 'translate(-50%, -50%)',
-              borderRadius: '50%',
-              background: m.state === 'PASSADO' ? MILESTONE_COLORS.PASSADO : '#ffffff',
-              border: `2px solid ${MILESTONE_COLORS[m.state]}`
-            }}
+            tabIndex={0}
+            title={markerTitle(m)}
+            aria-label={markerTitle(m)}
+            style={{ position: 'absolute', left: `${m.pct}%`, top: '50%', width: '3px', height: '14px', transform: 'translate(-50%, -50%)', background: COLORS.tick, borderRadius: '1px' }}
           />
         ))}
+
+        {next && !mergedWithEnd && (
+          <span
+            tabIndex={0}
+            title={markerTitle(next)}
+            aria-label={markerTitle(next)}
+            style={{
+              position: 'absolute',
+              left: `${next.pct}%`,
+              top: '50%',
+              width: '14px',
+              height: '14px',
+              boxSizing: 'border-box',
+              transform: 'translate(-50%, -50%)',
+              borderRadius: '50%',
+              border: `3px solid ${nextColor}`,
+              background: '#ffffff',
+              zIndex: 2
+            }}
+          />
+        )}
+
+        {termos.map((cluster) => (
+          <span
+            key={`${cluster.date}-${cluster.pct}`}
+            role="img"
+            tabIndex={0}
+            title={cluster.labels.join('\n')}
+            aria-label={cluster.labels.join('; ')}
+            style={{
+              position: 'absolute',
+              left: `${cluster.pct}%`,
+              top: '50%',
+              width: '9px',
+              height: '9px',
+              zIndex: 1,
+              boxSizing: 'border-box',
+              transform: 'translate(-50%, -50%) rotate(45deg)',
+              background: COLORS.brand,
+              border: '1.5px solid #ffffff'
+            }}
+          >
+            {cluster.count > 1 && (
+              <span style={{ position: 'absolute', left: '9px', top: '-12px', transform: 'rotate(-45deg)', fontSize: '0.6rem', fontWeight: 800, color: COLORS.brand }}>
+                {cluster.count}
+              </span>
+            )}
+          </span>
+        ))}
+
+        <span
+          tabIndex={mergedWithEnd ? 0 : undefined}
+          title={mergedWithEnd && next ? `Fim da vigência · ${formatDateBR(lifeline.end)}. ${markerTitle(next)}` : `Fim da vigência · ${formatDateBR(lifeline.end)}`}
+          style={{
+            position: 'absolute',
+            right: mergedWithEnd ? '-12px' : '-10px',
+            top: '50%',
+            width: mergedWithEnd ? '14px' : '10px',
+            height: mergedWithEnd ? '14px' : '10px',
+            boxSizing: 'border-box',
+            transform: 'translateY(-50%)',
+            background: COLORS.ink,
+            borderRadius: '2px',
+            ...(mergedWithEnd ? { border: `3px solid ${nextColor}` } : {})
+          }}
+        />
+
         {showToday && (
-          <>
-            <span style={{ position: 'absolute', left: `${lifeline.todayPct}%`, top: '-5px', width: '2px', height: '20px', transform: 'translateX(-50%)', background: '#0f172a' }} />
-            <span
+          <span style={{ position: 'absolute', left: `${lifeline.todayPct}%`, top: '-7px', width: '2px', height: '20px', transform: 'translateX(-50%)', background: COLORS.ink }}>
+            <b
               style={{
                 position: 'absolute',
-                bottom: '16px',
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                color: '#0f172a',
+                bottom: '22px',
+                fontSize: '0.7rem',
+                fontWeight: 700,
                 whiteSpace: 'nowrap',
-                ...labelPosition(lifeline.todayPct)
+                color: COLORS.ink,
+                ...(lifeline.todayPct > 85 ? { right: '-2px' } : { left: '50%', transform: 'translateX(-50%)' })
               }}
             >
               Hoje
-            </span>
-          </>
+            </b>
+          </span>
         )}
       </div>
 
-      {placed.length > 0 && (
-        <div style={{ position: 'relative', height: hasSecondRow ? '3.6rem' : '1.9rem', margin: '0.35rem 7px 0' }}>
-          {placed.map(({ m, row }) => (
+      {(leftNote || nextText) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '4px', fontSize: '0.74rem', lineHeight: 1.2, color: COLORS.muted }}>
+          {leftNote && <span style={{ flex: 'none', whiteSpace: 'nowrap' }}>{leftNote}</span>}
+          {nextText && (
             <span
-              key={m.id}
-              title={`${m.label} — ${formatDateBR(m.date)} (${relativeDays(m.diasRestantes)})`}
-              style={{
-                position: 'absolute',
-                top: row === 0 ? 0 : '1.75rem',
-                fontSize: '0.68rem',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-                color: m.state === 'PROXIMO' ? '#92400e' : m.state === 'PASSADO' ? '#94a3b8' : '#475569',
-                fontWeight: m.state === 'PROXIMO' ? 800 : 600,
-                ...labelPosition(m.pct)
-              }}
+              title={nextText}
+              style={{ minWidth: 0, marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', fontWeight: 700, color: next?.state === 'PROXIMO' ? '#b45309' : COLORS.inkSoft }}
             >
-              {shortMilestoneLabel(m.label)}
-              <br />
-              {shortDate(m.date)}
+              {nextText}
             </span>
-          ))}
+          )}
         </div>
       )}
     </div>

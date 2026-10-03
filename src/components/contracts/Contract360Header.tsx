@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, FileText, RefreshCw } from 'lucide-react';
+import { ExternalLink, RefreshCw } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import { useSyncContractEmpenhos } from '../../hooks/useSyncContractEmpenhos';
 import { useAuth } from '../../context/AuthContext';
@@ -12,7 +12,17 @@ import { formatContractNumber } from '../../utils/contractNumber';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { AppButton, NoticeBar, type NoticeBarTone } from '../../design-system';
 import { pncpLinkStyle } from '../atas/Ata360Header';
-import { Instrument360Hero, instrumentStatusLabel } from '../instrument360/Instrument360Hero';
+import { Instrument360Hero, instrumentSituationLabel } from '../instrument360/Instrument360Hero';
+import { formatCnpj, formatCurrency } from '../../utils/format';
+import { formatDateISO } from '../../services/temporalEngineService';
+import { useContractResponsaveis } from '../../hooks/useContractResponsaveis';
+import { useContractGarantias } from '../../hooks/useContractGarantias';
+import { useContractPncp } from '../../hooks/useContractPncp';
+import { useAtaPncp } from '../../hooks/useAtaPncp';
+import { buildAtaPath } from '../../hooks/useAta';
+import { ataDeOrigem } from '../../services/pncpContratoService';
+import { isUasgCglic } from '../../config/unidadesGestoras';
+import { fiscaisAtivos, garantiaAviso, garantiaMaisLonga, type GarantiaResumo } from '../../services/contractResponsaveisService';
 
 interface Contract360HeaderProps {
   contract: ContractDashboardRecord;
@@ -21,6 +31,13 @@ interface Contract360HeaderProps {
   canSync?: boolean;
   /** Indicadores e linha da vida (ContractHealthStrip), dentro do mesmo cartão. */
   children?: React.ReactNode;
+}
+
+/** Texto de apoio da garantia: uma linha por garantia, da de vencimento mais longo para a mais curta. */
+function garantiaDetalhe(garantia: GarantiaResumo, hoje: string): string {
+  return garantia.todas
+    .map((g) => [g.tipo, g.valor !== undefined ? formatCurrency(g.valor) : null, `${g.vencimento < hoje ? 'venceu' : 'vence'} em ${formatDateBR(g.vencimento)}`].filter(Boolean).join(' · '))
+    .join('. ');
 }
 
 function formatDateBR(dateStr?: string): string {
@@ -61,6 +78,12 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   const { role } = useAuth();
   const canRefreshItems = role === 'gestor' || role === 'admin';
   const { data: manager, isLoading: loadingManager } = useContractManager(contractKey);
+  // Id PNCP e data de divulgação: o Contratos.gov.br não os devolve; vêm do PNCP e só aparecem se o PNCP responder.
+  const { data: pncp } = useContractPncp(contract);
+  const numeroControlePncp = contract.numeroControlePncp || pncp?.numeroControlePncp;
+  // Ata de origem: o PNCP diz de qual ata o contrato decorre; os dados dessa ata dão o número e a UASG.
+  const { data: ataPncp } = useAtaPncp({ numeroControlePncpAta: pncp?.numeroControlePncpAta });
+  const ataOrigem = ataDeOrigem(ataPncp);
 
   // RBAC: gestor, coordenador e admin possuem permissão
   const isAuthorized =
@@ -90,8 +113,8 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
 
   const pncpUrl =
     contract.linkPncp ||
-    (contract.numeroControlePncp
-      ? `https://pncp.gov.br/app/contratos/${contract.numeroControlePncp}`
+    (numeroControlePncp
+      ? `https://pncp.gov.br/app/contratos/${numeroControlePncp}`
       : undefined);
 
   // Resumo da parte dos itens da ata (só quando o perfil refaz os itens e há itens ligados)
@@ -147,8 +170,18 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
     : null;
 
   const dias = getContractDaysRemaining(contract.dataVigenciaFim);
-  const faixa = classifyPrazo(dias, contract.statusVigencia === 'Expirado');
+  const expirado = contract.statusVigencia === 'Expirado';
+  const faixa = classifyPrazo(dias, expirado);
   const numDisplay = formatContractNumber(contract);
+  const categoria = typeof contract.raw?.categoria === 'string' ? contract.raw.categoria : undefined;
+
+  // Fiscais e garantia vêm do Contratos.gov.br (uma consulta cada, ao abrir o contrato). Enquanto não
+  // chegam, ou se falharem, não aparece nada: "Não informado" só vale quando a API respondeu e veio vazio.
+  const { data: responsaveis, isSuccess: responsaveisOk } = useContractResponsaveis(contract);
+  const { data: garantiasRows } = useContractGarantias(contract);
+  const fiscais = fiscaisAtivos(responsaveis);
+  const garantia = garantiaMaisLonga(garantiasRows);
+  const hoje = formatDateISO(new Date());
 
   return (
     <Instrument360Hero
@@ -187,21 +220,67 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
           </NoticeBar>
         ) : null
       }
-      icon={<FileText size={26} color="#0c326f" aria-hidden="true" />}
-      title={`Contrato ${numDisplay}`}
-      status={{ faixa, label: instrumentStatusLabel(faixa, dias) }}
+      eyebrow={[contract.uasg ? `UASG ${contract.uasg}` : '', contract.nomeUnidadeGestora].filter(Boolean).join(' · ')}
+      title={`Contrato nº ${numDisplay}`}
+      status={{ faixa: expirado ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, false), neutral: !expirado }}
       manager={<ManagerInfo label="Gestor titular" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="contract-manager-info" />}
+      subtitle={
+        contract.fornecedorNome ? (
+          <>
+            <strong style={{ color: '#0f172a' }}>{contract.fornecedorNome}</strong>
+            {contract.fornecedorCnpjCpf && <span> · CNPJ {formatCnpj(contract.fornecedorCnpjCpf)}</span>}
+          </>
+        ) : undefined
+      }
       objeto={contract.objeto}
-      metaTestId="contract-header-metadata"
-      meta={[
+      origin={
+        ataOrigem ? (
+          <>
+            Ata de origem:{' '}
+            {ataOrigem.uasg && isUasgCglic(ataOrigem.uasg) ? (
+              <button
+                type="button"
+                onClick={() => navigate(buildAtaPath(ataOrigem.numeroAta, ataOrigem.uasg as string))}
+                style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: '#075985', textDecoration: 'underline', cursor: 'pointer' }}
+              >
+                nº {ataOrigem.numeroAta}
+              </button>
+            ) : (
+              <span>nº {ataOrigem.numeroAta}</span>
+            )}
+          </>
+        ) : undefined
+      }
+      dates={[
+        ...(contract.dataAssinatura ? [{ label: 'Assinatura', value: formatDateBR(contract.dataAssinatura) }] : []),
+        ...(pncp?.dataPublicacaoPncp ? [{ label: 'Divulgação no PNCP', value: formatDateBR(pncp.dataPublicacaoPncp) }] : []),
+        ...(contract.dataVigenciaFim
+          ? [{
+              label: 'Vigência',
+              value: contract.dataVigenciaInicio ? `${formatDateBR(contract.dataVigenciaInicio)} a ${formatDateBR(contract.dataVigenciaFim)}` : `até ${formatDateBR(contract.dataVigenciaFim)}`,
+              emphasis: true
+            }]
+          : []),
+        ...(garantia
+          ? [{
+              label: 'Garantia',
+              value: `até ${formatDateBR(garantia.principal.vencimento)}`,
+              title: garantiaDetalhe(garantia, hoje),
+              risk: garantiaAviso(garantia, contract.dataVigenciaFim, hoje)
+            }]
+          : [])
+      ]}
+      identifiersTestId="contract-header-metadata"
+      identifiers={[
         { label: 'Processo', value: contract.processo },
-        { label: 'Órgão', value: contract.nomeOrgao },
-        ...(contract.nomeUnidadeGestora && contract.nomeUnidadeGestora.trim().toUpperCase() !== (contract.nomeOrgao || '').trim().toUpperCase()
-          ? [{ label: 'Unidade gestora', value: `${contract.nomeUnidadeGestora} (${contract.uasg})` }]
-          : [{ label: 'UASG', value: contract.uasg }]),
-        { label: 'Modalidade', value: contract.modalidadeCompra },
-        { label: 'Nº PNCP', value: contract.numeroControlePncp },
-        { label: 'Assinatura', value: contract.dataAssinatura ? formatDateBR(contract.dataAssinatura) : undefined }
+        { label: 'Categoria', value: categoria },
+        ...(responsaveisOk
+          ? fiscais.length > 0
+            ? fiscais.map((grupo) => ({ label: grupo.label, value: grupo.nomes.join(', ') }))
+            : [{ label: 'Fiscal técnico', value: undefined }]
+          : []),
+        // Sem Id conhecido o campo some: não há o que mostrar, e "Não informado" aqui seria só ruído.
+        ...(numeroControlePncp ? [{ label: 'Id PNCP', value: numeroControlePncp }] : [])
       ]}
     >
       {children}

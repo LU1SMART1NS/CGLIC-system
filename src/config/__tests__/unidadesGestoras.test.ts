@@ -12,7 +12,9 @@ describe('unidadesGestoras', () => {
 
   it('devolve o CNPJ cadastrado e vazio para UASG desconhecida', () => {
     expect(cnpjDaUasg('200331')).toBe(CNPJ_SENASP);
-    expect(cnpjDaUasg('154080')).toBe('34792077000163');
+    expect(cnpjDaUasg(200330)).toBe(CNPJ_SENASP);
+    // Só as UASGs do CGLIC têm CNPJ cadastrado; UASG de outro órgão (como a 154080) fica vazia
+    expect(cnpjDaUasg('154080')).toBe('');
     expect(cnpjDaUasg('999999')).toBe('');
     expect(cnpjDaUasg(undefined)).toBe('');
   });
