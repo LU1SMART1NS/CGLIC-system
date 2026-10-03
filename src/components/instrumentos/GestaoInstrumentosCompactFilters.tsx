@@ -36,7 +36,7 @@ export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompac
       gap: '0.75rem'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem', flex: 1 }}>
-        <div style={{ position: 'relative', minWidth: '240px', flex: 1, maxWidth: '380px' }}>
+        <div style={{ position: 'relative', minWidth: 0, flex: '1 1 240px', maxWidth: '380px' }}>
           <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
@@ -62,7 +62,8 @@ export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompac
           onChange={(e) => onChangeFilter('severidade', e.target.value as GestaoInstrumentosCompactFiltersState['severidade'])}
           data-testid="instrumentos-filter-severity"
           style={{
-            minWidth: '160px',
+            minWidth: 0,
+            flex: '1 1 160px',
             padding: '0.4rem 0.65rem',
             borderRadius: '6px',
             border: '1px solid #cbd5e1',

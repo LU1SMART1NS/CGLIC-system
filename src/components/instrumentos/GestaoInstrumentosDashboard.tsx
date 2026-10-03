@@ -296,7 +296,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           flexWrap: 'wrap',
           gap: '0.75rem'
         }}>
-          <div style={{ flex: '1 1 360px', minWidth: '320px' }}>
+          <div style={{ flex: '1 1 360px', minWidth: 0 }}>
             <GestaoInstrumentosCompactFilters
               filters={{ severidade, busca }}
               onChangeFilter={handleChangeFilter}

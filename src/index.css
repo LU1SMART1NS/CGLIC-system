@@ -1545,3 +1545,53 @@ h1, h2, h3, h4 {
    `body { overflow-x: hidden }`, que escondia estouros e quebrava `position: sticky`.
    `clip` não cria contêiner de rolagem; blocos largos devem ter o próprio overflow-x: auto. */
 .app-content { overflow-x: clip; }
+
+
+/* ==========================================================================
+   Carteiras no celular (Fase 3 / L2): tabela vira lista de cartões, só com CSS.
+   Marcação: <table class="carteira-stack">, <td data-label="..."> e, nas células
+   de expansão e ação, data-role="expand" / "action". Linha expandida: .carteira-expanded.
+   ========================================================================== */
+@media (max-width: 767px) {
+  .carteira-stack, .carteira-stack tbody { display: block; width: 100%; }
+  .carteira-stack thead { display: none; }
+  .carteira-stack tr {
+    display: flex; flex-direction: column; gap: 0.45rem; position: relative;
+    margin: 0.6rem; padding: 0.75rem; background: #ffffff;
+    border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  .carteira-stack td {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem;
+    padding: 0 !important; border: 0 !important; text-align: left !important;
+    white-space: normal !important; max-width: none !important; min-width: 0 !important;
+  }
+  .carteira-stack td[data-label]::before {
+    content: attr(data-label); flex: none; font-size: 0.75rem; font-weight: 700;
+    color: #64748b; text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .carteira-stack td > * { min-width: 0; text-align: right; overflow-wrap: break-word; }
+  .carteira-stack td[data-label] { flex-wrap: wrap; }
+  .carteira-stack td:not([data-label]):not([data-role]) { display: block; }
+  .carteira-stack td:not([data-label]):not([data-role]) > * { text-align: left; }
+  /* Seta de expandir vai para o rodapé do cartão, depois do botão de ação (nada sobre o conteúdo). */
+  .carteira-stack td[data-role='expand'] { order: 100; justify-content: center; }
+  .carteira-stack td[data-role='expand'] button { min-width: 100%; justify-content: center; }
+  .carteira-stack td[data-role='action'] { order: 99; }
+  .carteira-stack td[data-role='action'] { display: block; padding-top: 0.5rem !important; border-top: 1px solid #f1f5f9 !important; }
+  .carteira-stack td[data-role='action'] button { width: 100%; min-height: 44px; justify-content: center; }
+  .carteira-stack tr.carteira-expanded {
+    margin-top: -0.35rem; background: #f8fafc; gap: 0;
+  }
+  .carteira-stack tr.carteira-expanded td { display: block; padding: 0 !important; }
+  .carteira-stack tr.carteira-expanded td > * { text-align: left; }
+  .arp-item-row { grid-template-columns: 1fr !important; gap: 0.35rem !important; }
+  .arp-item-row > * { white-space: normal !important; }
+  .carteira-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 0.6rem !important; }
+}
+
+@media (max-width: 767px) {
+  .carteira-pend-row { flex-direction: column; align-items: stretch !important; gap: 0.5rem !important; }
+  .carteira-pend-main { flex-wrap: wrap; }
+  .carteira-pend-main > span { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+  .carteira-pend-row > button { width: 100%; justify-content: center; min-height: 44px; }
+}

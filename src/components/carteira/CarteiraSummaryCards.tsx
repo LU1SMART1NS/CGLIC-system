@@ -58,7 +58,7 @@ export const CarteiraSummaryCards: React.FC<CarteiraSummaryCardsProps> = ({
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: '0.9rem' }}>
+    <div className="carteira-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: '0.9rem' }}>
       {cards.map((card) => {
         const Icon = card.icon;
         const isActive = active === card.id;

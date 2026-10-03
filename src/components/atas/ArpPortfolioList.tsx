@@ -159,7 +159,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   return (
     <div data-testid="arp-portfolio-table" role="feed" aria-label="Lista de Atas de Registro de Preços" style={carteiraTableShell}>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
@@ -208,7 +208,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               return (
                 <React.Fragment key={card.key}>
                   <tr data-testid={`arp-row-${numeroAta}`}>
-                    <td style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
+                    <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
                       <button
                         type="button"
                         onClick={() => {
@@ -223,7 +223,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                       </button>
                     </td>
-                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                    <td data-label="Ata" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 800 }}>ATA {numeroAta}</div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>UASG {arp.codigoUnidadeGerenciadora}</div>
                     </td>
@@ -238,13 +238,13 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         </div>
                       )}
                     </td>
-                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                    <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <CarteiraPrazoPill faixa={faixa} diasRestantes={dias} />
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
                         até {formatDateBR(arp.dataVigenciaFinal)}
                       </div>
                     </td>
-                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                    <td data-label="Itens" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 700 }}>{totalItens} {totalItens === 1 ? 'item' : 'itens'}</div>
                       {stats && (stats.criticos > 0 || stats.atencao > 0) ? (
                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: stats.criticos > 0 ? '#b91c1c' : '#b45309' }}>
@@ -255,10 +255,10 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         </div>
                       ) : null}
                     </td>
-                    <td style={carteiraTd}>
+                    <td data-label="Maior consumo" style={carteiraTd}>
                       <SaldoBar pct={stats?.maxPct ?? null} />
                     </td>
-                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                    <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <ManagerCell
                         target={{ tipo: 'ATA', ataKey: numeroAta }}
                         gestorNome={gestor}
@@ -268,7 +268,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         contractsByKey={assignContext.contractsByKey}
                       />
                     </td>
-                    <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button
                         type="button"
                         onClick={() => navigate(`/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, arp.codigoUnidadeGerenciadora))}`)}
@@ -281,7 +281,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                   </tr>
 
                   {isExpanded && (
-                    <tr data-testid={`arp-expanded-${numeroAta}`}>
+                    <tr className="carteira-expanded" data-testid={`arp-expanded-${numeroAta}`}>
                       <td colSpan={8} style={CARTEIRA_EXPANDED_CELL_STYLE}>
                         {isItemsLoading ? (
                           <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Carregando itens…</div>
@@ -293,6 +293,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                             {visibleItems.map((item, idx) => (
                               <div
                                 key={`${item.numeroItem}-${item.codigoItem}-${idx}`}
+                                className="arp-item-row"
                                 style={{ display: 'grid', gridTemplateColumns: '56px minmax(0, 1fr) 120px 110px auto', gap: '0.75rem', alignItems: 'center', fontSize: '0.82rem', padding: '0.45rem 0', borderTop: '1px solid #e2e8f0' }}
                               >
                                 <span style={{ fontWeight: 700 }}>{item.numeroItem}</span>

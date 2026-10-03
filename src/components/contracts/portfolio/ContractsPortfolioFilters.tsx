@@ -48,7 +48,7 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem', flex: 1 }}>
-        <div style={{ position: 'relative', minWidth: '260px', flex: 1, maxWidth: '400px' }}>
+        <div style={{ position: 'relative', minWidth: 0, flex: '1 1 260px', maxWidth: '400px' }}>
           <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"

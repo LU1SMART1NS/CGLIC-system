@@ -157,7 +157,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   return (
     <div data-testid="contracts-portfolio-table" style={carteiraTableShell}>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
@@ -186,7 +186,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
               return (
                 <React.Fragment key={contractKey}>
                   <tr data-testid={`contracts-row-${contractKey}`}>
-                    <td style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
+                    <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
                       <button
                         type="button"
                         onClick={() => setExpandedKey(isExpanded ? null : contractKey)}
@@ -198,7 +198,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                         {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                       </button>
                     </td>
-                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                    <td data-label="Contrato" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 800 }}>{numDisplay}</div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
                         {tipoLabel === 'Contrato' ? `UASG ${contract.uasg}` : `${tipoLabel} · UASG ${contract.uasg}`}
@@ -217,16 +217,16 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                         </div>
                       )}
                     </td>
-                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                    <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <CarteiraPrazoPill faixa={faixa} diasRestantes={diasRestantes} />
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
                         até {formatDateBR(contract.dataVigenciaFim)}
                       </div>
                     </td>
-                    <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800 }}>
+                    <td data-label="Valor vigente" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800 }}>
                       {formatCurrency(valorVigente)}
                     </td>
-                    <td style={carteiraTd}>
+                    <td data-label="Pendências" style={carteiraTd}>
                       {worst ? (
                         <span
                           data-testid={`contracts-pendencias-${contractKey}`}
@@ -238,7 +238,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                         <span style={{ color: '#94a3b8' }}>—</span>
                       )}
                     </td>
-                    <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                    <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <ManagerCell
                         target={{ tipo: 'CONTRATO', contractKey }}
                         gestorNome={gestorNome}
@@ -248,7 +248,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                         contractsByKey={assignContext.contractsByKey}
                       />
                     </td>
-                    <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button
                         type="button"
                         onClick={() => navigate(`/contratos/${encodeURIComponent(contractKey)}`)}
@@ -261,7 +261,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                   </tr>
 
                   {isExpanded && (
-                    <tr data-testid={`contracts-expanded-${contractKey}`}>
+                    <tr className="carteira-expanded" data-testid={`contracts-expanded-${contractKey}`}>
                       <td colSpan={8} style={CARTEIRA_EXPANDED_CELL_STYLE}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: '1rem', fontSize: '0.82rem' }}>
                           <div>
@@ -311,9 +311,10 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                               return (
                                 <div
                                   key={p.id}
+                                  className="carteira-pend-row"
                                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.45rem 0', borderTop: '1px solid #e2e8f0' }}
                                 >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                  <div className="carteira-pend-main" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
                                     <SeverityBadge severity={p.severity} />
                                     <span style={{ fontWeight: 700, color: motivo.color }}>{motivo.label}</span>
                                     <span style={{ color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

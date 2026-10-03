@@ -129,7 +129,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
       }}
     >
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={th}>Prioridade</th>
@@ -159,10 +159,10 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                   <td style={td}>
                     <SeverityBadge severity={item.severity} />
                   </td>
-                  <td style={{ ...td, fontWeight: 700, color: '#475569' }} data-testid={`instrumentos-uasg-${item.id}`}>
+                  <td data-label="UASG" style={{ ...td, fontWeight: 700, color: '#475569' }} data-testid={`instrumentos-uasg-${item.id}`}>
                     {item.uasg}
                   </td>
-                  <td style={td}>
+                  <td data-label="Instrumento" style={td}>
                     <div style={{ fontWeight: 800 }}>{instrumento.label}</div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                       {instrumento.tipo}
@@ -182,8 +182,8 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                       <span style={{ color: '#94a3b8' }}>—</span>
                     )}
                   </td>
-                  <td style={td}>{situacao}</td>
-                  <td style={td}>
+                  <td data-label="Situação" style={td}>{situacao}</td>
+                  <td data-label="Motivo" style={td}>
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -199,11 +199,11 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                       {motivo.label}{motivo.referenciaLegal ? ` (${motivo.referenciaLegal})` : ''}
                     </span>
                   </td>
-                  <td style={td}>{prazo}</td>
-                  <td style={td}>
+                  <td data-label="Prazo" style={td}>{prazo}</td>
+                  <td data-label="Responsável" style={td}>
                     {responsavel || <span style={{ color: '#94a3b8' }}>—</span>}
                   </td>
-                  <td style={td}>
+                  <td data-role="action" style={td}>
                     <button
                       type="button"
                       onClick={() => navigate(acao.targetUrl)}
