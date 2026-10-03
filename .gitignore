@@ -28,3 +28,8 @@ scratch/
 supabase/.temp/
 .claude/
 .vercel
+
+# Sessão e relatórios do Playwright (e2e)
+e2e/.auth
+test-results
+playwright-report
