@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ContractDashboardRecord } from '../../types';
 import type { ContratosGovHistoricoRecord } from '../../types/contractHistorico';
-import { buildContractEventsFromHistorico, parseValorBR } from '../contractHistoricoService';
+import { buildContractEventsFromHistorico, parseValorBR, contarTermosDeValor } from '../contractHistoricoService';
 
 const contract = {
   id: '110099-00009-2024',
@@ -138,5 +138,34 @@ describe('buildContractEventsFromHistorico (classificação)', () => {
     expect(buildContractEventsFromHistorico(contract, [])).toEqual([]);
     expect(buildContractEventsFromHistorico(contract, undefined as unknown as ContratosGovHistoricoRecord[])).toEqual([]);
     expect(buildContractEventsFromHistorico(contract, [base])).toEqual([]);
+  });
+});
+
+describe('contarTermosDeValor', () => {
+  const evento = (qualificacoes: string[], fonteOrigem = 'Contratos.gov.br') =>
+    ({ fonteOrigem, rawOfficialData: { qualificacao_termo: qualificacoes.map((descricao) => ({ descricao })) } }) as any;
+
+  it('conta pelos qualificadores do termo; termo com os dois entra nas duas contagens', () => {
+    const total = contarTermosDeValor([
+      evento(['VIGÊNCIA']),
+      evento(['ACRÉSCIMO / SUPRESSÃO']),
+      evento(['VIGÊNCIA', 'REAJUSTE', 'ACRÉSCIMO / SUPRESSÃO']),
+      evento(['INFORMATIVO', 'REAJUSTE'])
+    ]);
+    expect(total).toEqual({ acrescimoSupressao: 2, reajuste: 2, apostilamentoValor: 0 });
+  });
+
+  it('ignora eventos de outra fonte, sem qualificação ou sem lista', () => {
+    expect(contarTermosDeValor([evento(['REAJUSTE'], 'Outra'), { fonteOrigem: 'Contratos.gov.br', rawOfficialData: {} } as any])).toEqual({
+      acrescimoSupressao: 0,
+      reajuste: 0,
+      apostilamentoValor: 0
+    });
+    expect(contarTermosDeValor(undefined)).toEqual({ acrescimoSupressao: 0, reajuste: 0, apostilamentoValor: 0 });
+  });
+
+  it('conta apostilamento só quando traz novo valor global', () => {
+    const apostilamento = (novo: string) => ({ fonteOrigem: 'Contratos.gov.br', rawOfficialData: { tipo: 'Termo de Apostilamento', novo_valor_global: novo } }) as any;
+    expect(contarTermosDeValor([apostilamento('1.270.002,00'), apostilamento('0,00')]).apostilamentoValor).toBe(1);
   });
 });

@@ -1224,3 +1224,20 @@ h1, h2, h3, h4 {
   .health-tile-grid[data-columns] { grid-template-columns: 1fr; }
   .health-tile--wide { grid-column: auto; }
 }
+
+/* Topo das telas 360: identidade à esquerda e coluna lateral fixa (gestor, origem e datas) à direita.
+   A coluna desce para baixo do texto quando o cartão é estreito (container query no cartão). */
+.i360-hero-wrap { container-type: inline-size; }
+.i360-identity { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
+.i360-identity-main { display: grid; gap: 4px; flex: 1 1 340px; min-width: 0; }
+.i360-side { flex: 0 0 300px; width: 300px; box-sizing: border-box; display: grid; gap: 10px; align-content: start; align-self: stretch; padding-left: 20px; border-left: 1px solid #e2e8f0; }
+.i360-datalist { margin: 0; display: grid; gap: 4px; font-size: 0.86rem; color: #334155; }
+.i360-dr { display: grid; grid-template-columns: auto 1fr; gap: 0 14px; align-items: baseline; }
+.i360-dr dt { font-weight: 600; color: #64748b; white-space: nowrap; }
+.i360-dr dd { margin: 0; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.i360-dr--emphasis dd { font-weight: 700; color: #075985; }
+.i360-dr-risk { margin-left: 0.5rem; font-weight: 700; color: #b91c1c; }
+@container (max-width: 700px) {
+  .i360-side { flex: 1 1 100%; width: auto; padding-left: 0; padding-top: 12px; border-left: 0; border-top: 1px solid #e2e8f0; }
+  .i360-dr dd { text-align: left; }
+}

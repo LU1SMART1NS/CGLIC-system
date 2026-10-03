@@ -200,3 +200,30 @@ export function buildContractEventsFromHistorico(
 
   return events;
 }
+
+export interface TermosDeValor {
+  /** Termos qualificados como "Acréscimo / Supressão". */
+  acrescimoSupressao: number;
+  /** Termos qualificados como "Reajuste". */
+  reajuste: number;
+  /** Termos de apostilamento com `novo_valor_global` maior que zero (alteram o valor do contrato). */
+  apostilamentoValor: number;
+}
+
+/**
+ * Conta, pelo `qualificacao_termo` do histórico (e pelo `novo_valor_global` dos apostilamentos), os termos que mexeram em valor. A API não informa o valor de cada
+ * aditivo, então só a quantidade é exposta. Um termo com as duas qualificações entra nas duas contagens.
+ */
+export function contarTermosDeValor(events: ContractEvent[] | undefined): TermosDeValor {
+  const total: TermosDeValor = { acrescimoSupressao: 0, reajuste: 0, apostilamentoValor: 0 };
+  for (const event of events ?? []) {
+    const row = event.rawOfficialData as ContratosGovHistoricoRecord | undefined;
+    if (event.fonteOrigem !== 'Contratos.gov.br' || !row) continue;
+    if (normalize(row.tipo).includes('apostilamento') && (parseValorBR(row.novo_valor_global) ?? 0) > 0) total.apostilamentoValor++;
+    if (!Array.isArray(row.qualificacao_termo)) continue;
+    const qualificacoes = row.qualificacao_termo.map((q) => normalize(q.descricao));
+    if (qualificacoes.some((q) => q.includes('acrescimo') || q.includes('supressao'))) total.acrescimoSupressao++;
+    if (qualificacoes.some((q) => q.includes('reajuste'))) total.reajuste++;
+  }
+  return total;
+}

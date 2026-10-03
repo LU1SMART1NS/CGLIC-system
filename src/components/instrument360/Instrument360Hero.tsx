@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import { PRAZO_COLORS, type PrazoFaixa } from '../carteira/carteiraPrazo';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 
@@ -9,7 +9,7 @@ export interface Instrument360MetaItem {
   value?: React.ReactNode;
 }
 
-/** Item da linha de datas, sempre logo abaixo do objeto. */
+/** Linha da coluna lateral (origem e datas): rótulo à esquerda, valor à direita. */
 export interface Instrument360DateItem {
   label: string;
   value: React.ReactNode;
@@ -19,6 +19,12 @@ export interface Instrument360DateItem {
   risk?: React.ReactNode;
   /** Texto de apoio ao passar o mouse ou focar. */
   title?: string;
+}
+
+/** Instrumento de onde este deriva (ex.: "Ata de origem"), primeira linha da coluna lateral. */
+export interface Instrument360Origin {
+  label: string;
+  value: React.ReactNode;
 }
 
 interface Instrument360HeroProps {
@@ -35,13 +41,16 @@ interface Instrument360HeroProps {
   eyebrow?: React.ReactNode;
   /** Situação ao lado do título. `neutral` mostra o selo cinza (a gravidade fica no indicador). */
   status?: { faixa: PrazoFaixa; label: string; neutral?: boolean };
-  /** Gestor titular, à direita do título. */
+  /** Aviso em selo vermelho ao lado da situação (ex.: "Ata vence em 8 dias"). */
+  statusAlert?: React.ReactNode;
+  /** Gestor, no alto da coluna lateral à direita. */
   manager?: React.ReactNode;
   /** Linha logo abaixo do título (ex.: fornecedor). */
   subtitle?: React.ReactNode;
   objeto?: string;
-  /** Linha logo acima das datas (ex.: ata de origem). */
-  origin?: React.ReactNode;
+  /** Primeira linha da coluna lateral, acima das datas (ex.: ata de origem). */
+  origin?: Instrument360Origin;
+  /** Linhas da coluna lateral, abaixo do gestor e da origem. */
   dates?: Instrument360DateItem[];
   /** Rodapé: só identificadores, depois dos indicadores. */
   identifiers: Instrument360MetaItem[];
@@ -69,6 +78,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
   title,
   eyebrow,
   status,
+  statusAlert,
   manager,
   subtitle,
   objeto,
@@ -95,6 +105,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
         marginBottom: '1.5rem'
       }}
+      className="i360-hero-wrap"
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
         <button
@@ -122,8 +133,8 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
 
       {notice && <div>{notice}</div>}
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px 24px' }}>
-        <div style={{ display: 'grid', gap: '4px', flex: '1 1 420px', minWidth: 0 }}>
+      <div className="i360-identity">
+        <div className="i360-identity-main">
           {eyebrow && (
             <div style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: COLORS.muted }}>
               {eyebrow}
@@ -153,6 +164,26 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
                 {status.label}
               </span>
             )}
+            {statusAlert && (
+              <span
+                data-testid="instrument-360-status-alert"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '3px 10px',
+                  borderRadius: '999px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#b91c1c',
+                  background: 'transparent',
+                  border: '1px solid #b91c1c'
+                }}
+              >
+                <AlertTriangle size={11} aria-hidden="true" />
+                {statusAlert}
+              </span>
+            )}
           </div>
 
           {subtitle && <div style={{ fontSize: '0.9rem', color: COLORS.inkSoft }}>{subtitle}</div>}
@@ -172,22 +203,32 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
             </p>
           )}
 
-          {origin && <div style={{ marginTop: '6px', fontSize: '0.9rem', color: COLORS.inkSoft }}>{origin}</div>}
-
-          {dates && dates.length > 0 && (
-            <p style={{ margin: origin ? 0 : texto ? '6px 0 0 0' : 0, display: 'flex', flexWrap: 'wrap', gap: '4px 18px', fontSize: '0.86rem', color: COLORS.inkSoft }}>
-              {dates.map((d) => (
-                <span key={d.label} title={d.title} tabIndex={d.title ? 0 : undefined}>
-                  <b style={{ fontWeight: 600, color: COLORS.muted }}>{d.label}</b>{' '}
-                  <span style={d.emphasis ? { fontWeight: 700, color: COLORS.link } : undefined}>{d.value}</span>
-                  {d.risk && <span style={{ marginLeft: '0.75rem', fontWeight: 700, color: '#b91c1c' }}>{d.risk}</span>}
-                </span>
-              ))}
-            </p>
-          )}
         </div>
 
-        {manager && <div>{manager}</div>}
+        {(manager || origin || (dates && dates.length > 0)) && (
+          <div className="i360-side" data-testid="instrument-360-side">
+            {manager && <div>{manager}</div>}
+            {(origin || (dates && dates.length > 0)) && (
+              <dl className="i360-datalist">
+                {origin && (
+                  <div className="i360-dr" data-testid="instrument-360-origin">
+                    <dt>{origin.label}</dt>
+                    <dd>{origin.value}</dd>
+                  </div>
+                )}
+                {(dates ?? []).map((d) => (
+                  <div key={d.label} className={d.emphasis ? 'i360-dr i360-dr--emphasis' : 'i360-dr'} title={d.title} tabIndex={d.title ? 0 : undefined}>
+                    <dt>{d.label}</dt>
+                    <dd>
+                      {d.value}
+                      {d.risk && <span className="i360-dr-risk">{d.risk}</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        )}
       </div>
 
       {children}

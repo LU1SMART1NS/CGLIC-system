@@ -397,7 +397,8 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
         data: { numeroAtaRegistroPreco: '00059', anoAta: 2025, codigoUnidade: '200331' }
       } as any);
       const html = render();
-      expect(html).toContain('Ata de origem:');
+      expect(html).toContain('Ata de origem');
+      expect(html).toContain('data-testid="instrument-360-origin"');
       expect(html).toContain('nº 00059/2025');
       expect(html).toMatch(/<button[^>]*>nº 00059\/2025<\/button>/);
       // A consulta da ata usa o Id PNCP que o contrato trouxe

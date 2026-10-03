@@ -812,7 +812,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           limiteAdesao: totalLimiteAdesao,
           valorFinanceiroDisponivel,
           valorFinanceiroConsumido,
-          empenhosPendentes: empenhoVinculos.filter((v) => v.quantidade == null).length
+          empenhosPendentes: empenhoVinculos.filter((v) => v.quantidade == null).length,
+          quantidadeAlocada: totalAllocatedSum,
+          quantidadeTotalAta: item.quantidadeHomologadaItem || totalRegistrado,
+          orgaosParticipantes: unidades.length
         }}
         referencia={comprasGovReferencia}
         onGoTo={(tab) => setActiveTab(tab, true)}

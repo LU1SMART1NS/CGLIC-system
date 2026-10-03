@@ -60,9 +60,11 @@ export const HealthTile: React.FC<{
   wide?: boolean;
   /** Conteúdo abaixo das dicas (a régua de prazos). */
   children?: React.ReactNode;
+  /** Texto do tooltip do cartão; sem ele, o tooltip é a junção das dicas. */
+  tooltip?: string;
   onClick?: () => void;
   testId?: string;
-}> = ({ label, value, hint, tone, badge, positive = false, compact = false, wide = false, children, onClick, testId }) => {
+}> = ({ label, value, hint, tone, badge, positive = false, compact = false, wide = false, children, tooltip, onClick, testId }) => {
   const token = tone && tone !== 'INFO' ? severityTokens[tone] : null;
   const badgeText = token ? (badge ?? BADGE_LABEL[tone as SeverityLevel]) : null;
   const hints = (Array.isArray(hint) ? hint : hint ? [hint] : []).filter(Boolean);
@@ -138,7 +140,7 @@ export const HealthTile: React.FC<{
           ))}
       </div>
       <div
-        title={inlineHints ? undefined : hints.join(' · ') || undefined}
+        title={inlineHints ? undefined : tooltip || hints.join(' · ') || undefined}
         style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, minHeight: 0, overflow: 'hidden' }}
       >
         {(inlineHints ? [] : hints).map((line, index) =>

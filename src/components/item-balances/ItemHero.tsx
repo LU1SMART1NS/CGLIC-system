@@ -30,6 +30,12 @@ export interface ItemHeroMetrics {
   valorFinanceiroConsumido: number;
   /** Vínculos de empenho ainda sem quantidade confirmada. */
   empenhosPendentes?: number;
+  /** Soma das alocações internas do quantitativo SENASP. */
+  quantidadeAlocada?: number;
+  /** Total registrado do item na ata, somando todos os órgãos. */
+  quantidadeTotalAta?: number;
+  /** Órgãos com quantidade registrada no item (gerenciador e participantes). */
+  orgaosParticipantes?: number;
 }
 
 export interface ItemHeroProps {
@@ -95,6 +101,13 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   const saldoBadge = status.faixa === 'EXPIRADO' ? 'Esgotado' : undefined;
   const empenhosPendentes = metrics.empenhosPendentes ?? 0;
 
+  // Alocação interna: o quantitativo SENASP (`itemTotalQty`) menos o que já foi distribuído às unidades internas.
+  const alocada = metrics.quantidadeAlocada ?? 0;
+  const aAlocar = metrics.itemTotalQty - alocada;
+  const alocadaAcima = aAlocar < 0;
+  // Total registrado do item na ata, somando todos os órgãos (só quando conhecido).
+  const totalAta = metrics.quantidadeTotalAta && metrics.quantidadeTotalAta > 0 ? metrics.quantidadeTotalAta : null;
+
   // O item não tem vigência própria: vale a da ata, com o fim corrigido pelo PNCP quando existir.
   const fimAta = arp.dataVigenciaFinalPncp || arp.dataVigenciaFinal;
   const fimAtaData = fimAta ? parseDateBRT(fimAta) : null;
@@ -154,39 +167,41 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
         </>
       }
       objeto={item.descricaoItem}
-      origin={
-        <>
-          Ata:{' '}
-          {onOpenAta ? (
-            <button
-              type="button"
-              onClick={onOpenAta}
-              style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: '#075985', textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              nº {arp.numeroAtaRegistroPreco}
-            </button>
-          ) : (
-            <span>nº {arp.numeroAtaRegistroPreco}</span>
-          )}
-        </>
-      }
-      dates={fimAtaData ? [{ label: 'Vigência da ata', value: `até ${formatDateBR(fimAta)}`, emphasis: true, risk: avisoAta }] : []}
+      origin={{
+        label: 'Ata de origem',
+        value: onOpenAta ? (
+          <button
+            type="button"
+            onClick={onOpenAta}
+            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: '#075985', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            nº {arp.numeroAtaRegistroPreco}
+          </button>
+        ) : (
+          <span>nº {arp.numeroAtaRegistroPreco}</span>
+        )
+      }}
+      statusAlert={avisoAta ? `Ata ${avisoAta}` : undefined}
+      dates={[
+        ...(totalAta ? [{ label: 'Registrado na ata', value: `${formatNumber(totalAta)} un` }] : []),
+        ...(metrics.orgaosParticipantes ? [{ label: 'Órgãos participantes', value: String(metrics.orgaosParticipantes) }] : []),
+        ...(fimAtaData ? [{ label: 'Vigência da ata', value: `até ${formatDateBR(fimAta)}`, emphasis: true }] : [])
+      ]}
       identifiersTestId="item-header-metadata"
       identifiers={[
         { label: 'Tipo', value: item.tipoItem },
         { label: 'Código do item', value: item.codigoItem ? String(item.codigoItem) : undefined },
+        { label: 'Valor unitário', value: Number(item.valorUnitario) > 0 ? formatCurrency(item.valorUnitario) : undefined },
         { label: 'PDM', value: item.codigoPdm ? String(item.codigoPdm) : undefined }
       ]}
     >
       <div data-testid="item-health-strip">
-        <HealthTileGrid columns={4}>
+        <HealthTileGrid columns={5}>
           <HealthTile
             label="Saldo SENASP"
             value={`${formatNumber(metrics.officialSaldo)} un`}
-            hint={[
-              `${formatCurrencyCompact(metrics.valorFinanceiroDisponivel)} · ${formatCurrency(item.valorUnitario)} por un`,
-              `contratado ${formatNumber(metrics.totalEmpenhado)} (${formatNumber(metrics.empenhoConsumidoPercent)}%)`
-            ]}
+            hint={`de ${formatNumber(metrics.itemTotalQty)} · ${formatNumber(metrics.empenhoConsumidoPercent)}% contratado`}
+            tooltip={`Saldo de ${formatNumber(metrics.officialSaldo)} un do quantitativo SENASP de ${formatNumber(metrics.itemTotalQty)} un · ${formatCurrencyCompact(metrics.valorFinanceiroDisponivel)} disponíveis · contratado ${formatNumber(metrics.totalEmpenhado)} un (${formatNumber(metrics.empenhoConsumidoPercent)}%)`}
             tone={saldoTone}
             badge={saldoBadge}
             onClick={() => onGoTo('contratos')}
@@ -206,9 +221,18 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             testId="item-health-adesoes"
           />
           <HealthTile
+            label="Alocação interna"
+            value={`${formatNumber(alocada)} un`}
+            hint={alocadaAcima ? `acima do SENASP em ${formatNumber(-aAlocar)} un` : `a alocar ${formatNumber(aAlocar)} un`}
+            tone={alocadaAcima ? 'ATENCAO' : undefined}
+            onClick={() => onGoTo('alocacao')}
+            testId="item-health-alocacao"
+          />
+          <HealthTile
             label="Empenhos pendentes"
             value={String(empenhosPendentes)}
-            hint="de confirmação de quantidade"
+            hint="a confirmar"
+            tooltip="Empenhos vinculados ao item que ainda aguardam confirmação de quantidade"
             tone={empenhosPendentes > 0 ? 'ATENCAO' : undefined}
             onClick={() => onGoTo('contratos')}
             testId="item-health-empenhos"
@@ -226,7 +250,8 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             <HealthTile
               label="Pendências"
               value="Nenhuma"
-              hint="consumo confere com o Compras.gov"
+              hint="consumo confere"
+              tooltip="O consumo informado pelo Compras.gov confere com o contratado"
               positive
               testId="item-health-pendencias"
             />

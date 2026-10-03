@@ -148,15 +148,17 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     const daqui = (n: number) => formatDateISO(addDays(new Date(), n));
     const critica = renderToStaticMarkup(<ItemHero {...baseProps} arp={{ ...mockArp, dataVigenciaFinal: daqui(8) }} />);
     expect(critica).toContain('Vigência da ata');
-    expect(critica).toContain('vence em 8 dias');
+    expect(critica).toContain('Ata vence em 8 dias');
+    expect(critica).toContain('instrument-360-status-alert');
     expect(critica).not.toContain('Assinatura');
 
     const folgada = renderToStaticMarkup(<ItemHero {...baseProps} arp={{ ...mockArp, dataVigenciaFinal: daqui(200) }} />);
     expect(folgada).toContain('Vigência da ata');
     expect(folgada).not.toContain('vence em');
+    expect(folgada).not.toContain('instrument-360-status-alert');
 
     const encerrada = renderToStaticMarkup(<ItemHero {...baseProps} arp={{ ...mockArp, dataVigenciaFinal: daqui(-3) }} />);
-    expect(encerrada).toContain('encerrada há 3 dias');
+    expect(encerrada).toContain('Ata encerrada há 3 dias');
   });
 
   it('13. usa o fim da vigência corrigido pelo PNCP quando existir', () => {
@@ -221,5 +223,57 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     expect(html).not.toContain('item-manager-info');
     expect(html).not.toContain('Não atribuído');
     expect(html).toContain('Item 1'); // o resto do topo continua
+  });
+});
+
+describe('ItemHero — alocação interna, participação da SENASP e valor unitário', () => {
+  beforeEach(() => {
+    vi.mocked(ataManagersModule.useAtaManager).mockReturnValue({ data: { gestorNome: 'Maria Gestora' }, isLoading: false, isError: false } as any);
+  });
+  const render = (metrics: Record<string, number>) =>
+    renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, ...metrics }} />);
+
+  it('mostra o alocado, o total SENASP e o que falta alocar', () => {
+    const html = render({ quantidadeAlocada: 60 });
+    expect(html).toContain('data-testid="item-health-alocacao"');
+    expect(html).toContain('Alocação interna');
+    expect(html).toContain('a alocar 40 un');
+  });
+
+  it('alocação acima do quantitativo SENASP ganha o selo de atenção', () => {
+    const html = render({ quantidadeAlocada: 120 });
+    expect(html).toContain('acima do SENASP em 20 un');
+    expect(html).toContain('Atenção');
+  });
+
+  it('a coluna lateral diz o total registrado e os órgãos participantes, uma única vez cada', () => {
+    const html = render({ quantidadeTotalAta: 400, orgaosParticipantes: 37 });
+    expect(html).toContain('Registrado na ata');
+    expect(html).toContain('400 un');
+    expect(html).toContain('Órgãos participantes');
+    expect(html).toContain('>37<');
+    expect(html).toContain('Vigência da ata');
+    expect(html).not.toContain('SENASP 100 (25%)');
+    const ordem = ['Ata de origem', 'Registrado na ata', 'Órgãos participantes', 'Vigência da ata'].map((t) => html.indexOf(t));
+    expect(ordem.every((i) => i >= 0)).toBe(true);
+    expect([...ordem].sort((a, b) => a - b)).toEqual(ordem);
+    const sem = render({});
+    expect(sem).not.toContain('Registrado na ata');
+    expect(sem).not.toContain('Órgãos participantes');
+  });
+
+  it('cada card tem uma linha de dica; o detalhe do saldo fica no tooltip', () => {
+    const html = render({});
+    expect(html).toContain('de 100 · 30% contratado');
+    expect(html).toContain('title="Saldo de 70 un do quantitativo SENASP de 100 un');
+    expect(html).toContain('a confirmar');
+    expect(html).toContain('consumo confere');
+  });
+
+  it('o valor unitário aparece uma vez, no rodapé, e não no card de saldo', () => {
+    const html = render({});
+    expect(html).toContain('Valor unitário');
+    expect(html).not.toContain('por un');
+    expect(html).toContain('disponíveis');
   });
 });

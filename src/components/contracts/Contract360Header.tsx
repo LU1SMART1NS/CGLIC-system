@@ -223,7 +223,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       eyebrow={[contract.uasg ? `UASG ${contract.uasg}` : '', contract.nomeUnidadeGestora].filter(Boolean).join(' · ')}
       title={`Contrato nº ${numDisplay}`}
       status={{ faixa: expirado ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, false), neutral: !expirado }}
-      manager={<ManagerInfo label="Gestor titular" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="contract-manager-info" />}
+      manager={<ManagerInfo label="Gestor do contrato" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="contract-manager-info" />}
       subtitle={
         contract.fornecedorNome ? (
           <>
@@ -234,22 +234,23 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       }
       objeto={contract.objeto}
       origin={
-        ataOrigem ? (
-          <>
-            Ata de origem:{' '}
-            {ataOrigem.uasg && isUasgCglic(ataOrigem.uasg) ? (
-              <button
-                type="button"
-                onClick={() => navigate(buildAtaPath(ataOrigem.numeroAta, ataOrigem.uasg as string))}
-                style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: '#075985', textDecoration: 'underline', cursor: 'pointer' }}
-              >
-                nº {ataOrigem.numeroAta}
-              </button>
-            ) : (
-              <span>nº {ataOrigem.numeroAta}</span>
-            )}
-          </>
-        ) : undefined
+        ataOrigem
+          ? {
+              label: 'Ata de origem',
+              value:
+                ataOrigem.uasg && isUasgCglic(ataOrigem.uasg) ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(buildAtaPath(ataOrigem.numeroAta, ataOrigem.uasg as string))}
+                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: '#075985', textDecoration: 'underline', cursor: 'pointer' }}
+                  >
+                    nº {ataOrigem.numeroAta}
+                  </button>
+                ) : (
+                  <span>nº {ataOrigem.numeroAta}</span>
+                )
+            }
+          : undefined
       }
       dates={[
         ...(contract.dataAssinatura ? [{ label: 'Assinatura', value: formatDateBR(contract.dataAssinatura) }] : []),
