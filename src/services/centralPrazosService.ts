@@ -10,6 +10,7 @@
  */
 
 import { formatContractNumber } from '../utils/contractNumber';
+import { toSentenceCaseIfAllCaps } from '../utils/textCase';
 import type {
   CentralPrazosItem,
   CentralPrazosKPIs,
@@ -161,7 +162,7 @@ export function buildCentralPrazosItems(
               contractKey,
               identificadorFormatado: numDisplay,
               uasg: contract.uasg,
-              objetoResumido: contract.objeto,
+              objetoResumido: toSentenceCaseIfAllCaps(contract.objeto),
               fornecedorNome: contract.fornecedorNome,
               fornecedorCnpj: contract.fornecedorCnpjCpf,
               processoNumero: contract.processo,
@@ -245,7 +246,7 @@ export function buildCentralPrazosItems(
               contractKey,
               identificadorFormatado: numDisplay,
               uasg: contract.uasg,
-              objetoResumido: contract.objeto,
+              objetoResumido: toSentenceCaseIfAllCaps(contract.objeto),
               fornecedorNome: contract.fornecedorNome,
               fornecedorCnpj: contract.fornecedorCnpjCpf,
               processoNumero: contract.processo,
@@ -295,7 +296,7 @@ export function buildCentralPrazosItems(
               contractKey,
               identificadorFormatado: numDisplay,
               uasg: contract.uasg,
-              objetoResumido: contract.objeto,
+              objetoResumido: toSentenceCaseIfAllCaps(contract.objeto),
               fornecedorNome: contract.fornecedorNome,
               fornecedorCnpj: contract.fornecedorCnpjCpf,
               processoNumero: contract.processo,
@@ -363,7 +364,7 @@ export function buildCentralPrazosItems(
             arpKey,
             identificadorFormatado: `ARP ${arp.numeroAtaRegistroPreco}`,
             uasg: arp.codigoUnidadeGerenciadora,
-            objetoResumido: arp.objeto,
+            objetoResumido: toSentenceCaseIfAllCaps(arp.objeto),
             fornecedorNome: undefined,
             processoNumero: arp.numeroCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : undefined,
 
@@ -413,7 +414,7 @@ export function buildCentralPrazosItems(
           arpKey,
           identificadorFormatado: `ARP ${arp.numeroAtaRegistroPreco}`,
           uasg: arp.codigoUnidadeGerenciadora,
-          objetoResumido: arp.objeto,
+          objetoResumido: toSentenceCaseIfAllCaps(arp.objeto),
           fornecedorNome: undefined,
           processoNumero: arp.numeroCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : undefined,
 
@@ -479,7 +480,7 @@ export function buildCentralPrazosItems(
             arpKey: itemKey,
             identificadorFormatado: `Ata ${numAta} — Item ${numItem}`,
             uasg,
-            objetoResumido: desc,
+            objetoResumido: toSentenceCaseIfAllCaps(desc),
             fornecedorNome: fornecedor,
 
             marcoEvento: 'Saldo Físico de Ata',

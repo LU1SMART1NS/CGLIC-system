@@ -48,7 +48,7 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
         <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={carteiraTh}>Item / Fornecedor</th>
+              <th style={carteiraTh}>Nº do item</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor unitário</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }} title="Quantitativo registrado para as UASGs 200330 e 200331">Qtd. SENASP</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Consumido</th>
@@ -68,16 +68,15 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
 
               return (
                 <tr key={item.numeroItem} data-testid={`ata-item-row-${item.numeroItem}`}>
-                  <td style={{ ...carteiraTd, maxWidth: '320px', minWidth: '200px' }}>
-                    <div style={{ fontWeight: 800 }}>
-                      Item {item.numeroItem}
-                      <span style={{ fontWeight: 600, color: '#334155' }}> · {item.nomeRazaoSocialFornecedor || 'Fornecedor não informado'}</span>
-                    </div>
-                    <div
-                      title={item.descricaoItem}
-                      style={{ fontSize: '0.75rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    >
-                      {item.descricaoItem}
+                  <td style={{ ...carteiraTd, maxWidth: '520px', minWidth: '260px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
+                      <span style={{ fontWeight: 800, flexShrink: 0 }}>{item.numeroItem}</span>
+                      <span
+                        title={item.descricaoItem}
+                        style={{ fontWeight: 600, color: '#334155', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                      >
+                        {item.descricaoItem}
+                      </span>
                     </div>
                   </td>
                   <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.valorUnitario)}</td>

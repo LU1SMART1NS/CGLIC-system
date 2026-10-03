@@ -162,7 +162,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
             <tr>
               <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
               <th style={carteiraTh}>Nº do contrato</th>
-              <th style={carteiraTh}>Fornecedor / Objeto</th>
+              <th style={carteiraTh}>Fornecedor</th>
               <th style={carteiraTh}>Vigência</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor Vigente</th>
               <th style={carteiraTh}>Pendências</th>
@@ -206,15 +206,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                     </td>
                     <td style={{ ...carteiraTd, maxWidth: '220px', minWidth: '170px' }}>
                       {contract.fornecedorNome && (
-                        <div title={contract.fornecedorNome} style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contract.fornecedorNome}</div>
-                      )}
-                      {contract.objeto && (
-                        <div
-                          title={contract.objeto}
-                          style={{ fontSize: '0.75rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                        >
-                          {contract.objeto}
-                        </div>
+                        <div title={contract.fornecedorNome} style={{ fontWeight: 600, color: '#334155', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{contract.fornecedorNome}</div>
                       )}
                     </td>
                     <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>

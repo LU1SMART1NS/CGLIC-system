@@ -163,8 +163,8 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
           <thead>
             <tr>
               <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
-              <th style={carteiraTh}>Ata</th>
-              <th style={carteiraTh}>Fornecedor / Objeto</th>
+              <th style={carteiraTh}>Nº da ata</th>
+              <th style={carteiraTh}>Fornecedor</th>
               <th style={carteiraTh}>Vigência</th>
               <th style={carteiraTh}>Itens</th>
               <th style={carteiraTh}>Maior consumo</th>
@@ -224,19 +224,11 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                       </button>
                     </td>
                     <td data-label="Ata" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <div style={{ fontWeight: 800 }}>ATA {numeroAta}</div>
+                      <div style={{ fontWeight: 800 }}>{numeroAta}</div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>UASG {arp.codigoUnidadeGerenciadora}</div>
                     </td>
                     <td style={{ ...carteiraTd, maxWidth: '220px', minWidth: '170px' }}>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{card.fornecedorNome}</div>
-                      {arp.objeto && (
-                        <div
-                          title={arp.objeto}
-                          style={{ fontSize: '0.75rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                        >
-                          {arp.objeto}
-                        </div>
-                      )}
+                      <div title={card.fornecedorNome} style={{ fontWeight: 600, color: '#334155', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.fornecedorNome}</div>
                     </td>
                     <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <CarteiraPrazoPill faixa={faixa} diasRestantes={dias} />

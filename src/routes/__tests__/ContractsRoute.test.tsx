@@ -201,7 +201,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     );
 
     // Cabeçalhos de coluna
-    expect(html).toContain('Fornecedor / Objeto');
+    expect(html).toContain('Fornecedor');
     expect(html).toContain('Vigência');
     expect(html).toContain('Valor Vigente');
     expect(html).toContain('Pendências');
