@@ -22,7 +22,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
 }) => {
   return (
     <header
-      className={className}
+      className={`ds-page-header ${className ?? ''}`.trim()}
       style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -33,10 +33,10 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         ...style
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xs }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+      <div className="ds-page-header__title-block" style={{ display: 'flex', flexDirection: 'column', gap: spacing.xs }}>
+        <div className="ds-page-header__title-row" style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
           {icon && <span style={{ color: '#0f172a', display: 'flex', fontSize: '1.5rem' }}>{icon}</span>}
-          <h1 style={{
+          <h1 className="ds-page-header__title" style={{
             margin: 0,
             fontSize: '1.5rem',
             fontWeight: 900,
@@ -62,7 +62,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       </div>
       
       {actions && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+        <div className="ds-page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
           {actions}
         </div>
       )}

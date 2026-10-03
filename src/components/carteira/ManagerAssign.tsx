@@ -9,6 +9,7 @@ import { resolveManagerPropagation, type ManagerTarget } from '../../services/ma
 import type { ArpItemContractLinkPair } from '../../services/arpContractLinkService';
 import type { ContractDashboardRecord } from '../../types';
 import { carteiraButton } from './carteiraStyles';
+import { AnchoredPanel } from '../../design-system/components/AnchoredPanel';
 
 /** Perfis que podem atribuir gestor (mesma regra das RPCs save_*_manager_atomic). */
 export function canAssignManager(role: string | null | undefined): boolean {
@@ -29,8 +30,6 @@ interface ManagerAssignPanelProps extends ManagerAssignContext {
   onDone?: () => void;
 }
 
-const PANEL_WIDTH = 340;
-
 function describePropagation(targets: ManagerTarget[], links: ArpItemContractLinkPair[]): string | null {
   const { ataKeys, contractKeys } = resolveManagerPropagation(targets, links);
   const alvoAtas = new Set(targets.filter((t) => t.tipo === 'ATA').map((t) => (t as { ataKey: string }).ataKey));
@@ -50,8 +49,8 @@ function describePropagation(targets: ManagerTarget[], links: ArpItemContractLin
 }
 
 /**
- * Painel de atribuição de gestor, ancorado ao botão que o abriu (posição fixa,
- * para não ser cortado pela rolagem da tabela).
+ * Painel de atribuição de gestor, ancorado ao botão que o abriu: popover no desktop e
+ * bottom sheet no celular (ver AnchoredPanel).
  */
 export const ManagerAssignPanel: React.FC<ManagerAssignPanelProps> = ({
   targets,
@@ -73,27 +72,6 @@ export const ManagerAssignPanel: React.FC<ManagerAssignPanelProps> = ({
   const [gestorUserId, setGestorUserId] = React.useState<string | null>(
     activeUsers.find((u) => u.nome === currentGestorNome)?.id ?? null
   );
-  const panelRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    const onPointer = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    document.addEventListener('mousedown', onPointer);
-    window.addEventListener('scroll', onClose, true);
-    window.addEventListener('resize', onClose);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onPointer);
-      window.removeEventListener('scroll', onClose, true);
-      window.removeEventListener('resize', onClose);
-    };
-  }, [onClose]);
-
   const propagacao = describePropagation(targets, links);
   const perdeAcesso = role === 'gestor' && Boolean(gestorNome.trim()) && gestorUserId !== user?.id;
   const quantidade = targets.length;
@@ -114,36 +92,14 @@ export const ManagerAssignPanel: React.FC<ManagerAssignPanelProps> = ({
     );
   };
 
-  const left = Math.max(8, Math.min(anchorRect.right - PANEL_WIDTH, window.innerWidth - PANEL_WIDTH - 8));
-  const openUp = anchorRect.bottom + 320 > window.innerHeight;
-  const position: React.CSSProperties = openUp
-    ? { left, bottom: window.innerHeight - anchorRect.top + 6 }
-    : { left, top: anchorRect.bottom + 6 };
-
   const falhas = assign.data?.falhas || [];
 
   return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-label="Atribuir gestor"
-      data-testid="manager-assign-panel"
-      style={{
-        position: 'fixed',
-        zIndex: 50,
-        width: `${PANEL_WIDTH}px`,
-        background: '#ffffff',
-        border: '1px solid #cbd5e1',
-        borderRadius: '10px',
-        boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)',
-        padding: '0.9rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.6rem',
-        textAlign: 'left',
-        whiteSpace: 'normal',
-        ...position
-      }}
+    <AnchoredPanel
+      anchorRect={anchorRect}
+      onClose={onClose}
+      ariaLabel="Atribuir gestor"
+      testId="manager-assign-panel"
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
@@ -195,7 +151,7 @@ export const ManagerAssignPanel: React.FC<ManagerAssignPanelProps> = ({
               setCustomMode(false);
               setGestorNome(currentGestorNome || '');
             }}
-            style={{ alignSelf: 'flex-start', fontSize: '0.72rem', color: '#0284c7', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+            style={{ alignSelf: 'flex-start', fontSize: '0.75rem', color: '#0284c7', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
           >
             Selecionar da lista de servidores
           </button>
@@ -246,7 +202,7 @@ export const ManagerAssignPanel: React.FC<ManagerAssignPanelProps> = ({
           {assign.isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Salvar
         </button>
       </div>
-    </div>
+    </AnchoredPanel>
   );
 };
 
@@ -289,7 +245,7 @@ export const ManagerCell: React.FC<ManagerCellProps> = ({ target, gestorNome, ca
           type="button"
           onClick={open}
           data-testid={testId}
-          style={{ ...carteiraButton, padding: '0.25rem 0.55rem', fontSize: '0.72rem', color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
+          style={{ ...carteiraButton, padding: '0.25rem 0.55rem', fontSize: '0.75rem', color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
         >
           <UserPlus size={12} /> Atribuir
         </button>

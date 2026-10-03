@@ -28,6 +28,7 @@ export const CarteiraPagination: React.FC<CarteiraPaginationProps> = ({
     <button
       key={`${typeof label === 'string' ? label : p}-${p}`}
       type="button"
+      className={typeof label === 'string' && /^\d+$/.test(label) ? 'carteira-pagination__num' : undefined}
       disabled={disabled}
       onClick={() => onChange(p)}
       data-testid={`${testIdPrefix}-page-${p}`}
@@ -48,7 +49,7 @@ export const CarteiraPagination: React.FC<CarteiraPaginationProps> = ({
   );
 
   return (
-    <div style={{
+    <div className="carteira-pagination" style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -60,9 +61,12 @@ export const CarteiraPagination: React.FC<CarteiraPaginationProps> = ({
       <span>
         Mostrando {(current - 1) * pageSize + 1}–{Math.min(current * pageSize, total)} de {total}
       </span>
-      <div style={{ display: 'flex', gap: '0.35rem' }}>
+      <div className="carteira-pagination__pages" style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
         {pageButton(Math.max(1, current - 1), 'Anterior', false, current === 1)}
         {pages.map((p) => pageButton(p, String(p), p === current))}
+        <span className="carteira-pagination__compact" aria-hidden="true">
+          {current}/{totalPages}
+        </span>
         {pageButton(Math.min(totalPages, current + 1), 'Próxima', false, current === totalPages)}
       </div>
     </div>

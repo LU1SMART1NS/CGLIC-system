@@ -132,7 +132,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
           </div>
           <div style={{ width: '120px', height: '28px', background: '#e2e8f0', borderRadius: '6px' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} style={{ height: '90px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
           ))}
@@ -274,47 +274,47 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
           data-testid="payments-stages-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))',
             gap: '0.5rem'
           }}
         >
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>1. Em conferência</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>1. Em conferência</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#334155', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['RECEBIDO'] || 0}
             </div>
           </div>
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Com pendência</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Com pendência</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#d97706', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['COM_PENDENCIA'] || 0}
             </div>
           </div>
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>2. Conferido</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>2. Conferido</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#7e22ce', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['CONFERIDO'] || 0}
             </div>
           </div>
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>3. Na CGOFI</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>3. Na CGOFI</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ea580c', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['ENVIADO_CGOFI'] || 0}
             </div>
           </div>
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>4. Pago</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>4. Pago</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#166534', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['PAGO'] || 0}
             </div>
           </div>
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Exceções</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Exceções</span>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#b91c1c', marginTop: '0.2rem' }}>
               {(distribuicaoPorEstado['DEVOLVIDO'] || 0) + (distribuicaoPorEstado['CANCELADO'] || 0)}
             </div>
@@ -414,7 +414,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Proc: {cycle.input.numeroProcessoPagamentoSei}</div>
                         )}
                         {cycle.input?.responsavelNome && (
-                          <div style={{ fontSize: '0.72rem', color: '#0284c7', marginTop: '0.15rem' }}>Resp: {cycle.input.responsavelNome}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#0284c7', marginTop: '0.15rem' }}>Resp: {cycle.input.responsavelNome}</div>
                         )}
                       </td>
 
@@ -439,7 +439,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                           </span>
                         )}
                         {cgofiAtrasado && (
-                          <div style={{ fontSize: '0.72rem', color: '#ea580c', fontWeight: 700, marginTop: '0.2rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#ea580c', fontWeight: 700, marginTop: '0.2rem' }}>
                             Cobrar a CGOFI: {diasCgofi} dias úteis sem resposta
                           </div>
                         )}
@@ -453,7 +453,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                               <span>{cycle.input.numeroOrdemBancaria}</span>
                             </div>
                             {cycle.input.dataOrdemBancaria && (
-                              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Emitida em: {formatDateBR(cycle.input.dataOrdemBancaria)}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Emitida em: {formatDateBR(cycle.input.dataOrdemBancaria)}</div>
                             )}
                           </div>
                         ) : (

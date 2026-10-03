@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { PageContainer } from '../design-system/components/PageContainer';
 import { fetchAllAllocationsGlobal, fetchEmpenhoLinks, fetchManualEmpenhos, type GlobalAllocationRecord } from '../services/allocationService';
 import { fetchArps, fetchArpItems, fetchEmpenhosSaldoItem } from '../services/api';
 import { fetchArpsFromDb } from '../services/dbCacheService';
@@ -325,14 +326,7 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
   }, []);
 
   return (
-    <div style={{
-      maxWidth: '1600px',
-      margin: '0 auto',
-      padding: '1.5rem 2rem 3rem',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.25rem'
-    }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <AllocationsPortfolioHeader
         onOpenManageUnits={canManageUnits ? () => navigate('/admin/departamentos') : undefined}
         onOpenExportExcel={() => setIsExportExcelModalOpen(true)}
@@ -384,6 +378,6 @@ export const InternalAllocationsDashboard: React.FC<InternalAllocationsDashboard
         atas={arps}
         itemsByAta={itemsByAta}
       />
-    </div>
+    </PageContainer>
   );
 };

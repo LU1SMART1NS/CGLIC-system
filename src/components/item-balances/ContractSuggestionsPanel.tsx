@@ -64,7 +64,7 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
         return (
           <>
             <div style={{ fontWeight: 600 }}>{f.nome}</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>CNPJ: {f.cnpj ? formatCnpj(f.cnpj) : '-'}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>CNPJ: {f.cnpj ? formatCnpj(f.cnpj) : '-'}</div>
           </>
         );
       }

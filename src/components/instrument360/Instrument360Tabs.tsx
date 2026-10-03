@@ -1,4 +1,5 @@
 import React from 'react';
+import { useScrollActiveTab } from '../../design-system/hooks/useScrollActiveTab';
 
 export interface Instrument360TabDef<T extends string> {
   id: T;
@@ -19,15 +20,26 @@ export const Instrument360Tabs = React.forwardRef(function Instrument360Tabs<T e
   { tabs, active, onSelect, idPrefix, ariaLabel }: Instrument360TabsProps<T>,
   ref: React.Ref<HTMLDivElement>
 ) {
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+  useScrollActiveTab(listRef, active);
+  const setRefs = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      listRef.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    },
+    [ref]
+  );
   return (
     <div
-      ref={ref}
+      ref={setRefs}
+      className="ds-tabs-scroll"
       role="tablist"
       aria-label={ariaLabel}
       style={{
         display: 'flex',
         gap: '0.25rem',
-        flexWrap: 'wrap',
+        ['--scroll-bg' as string]: '#f8fafc',
         borderBottom: '1px solid #e2e8f0',
         marginBottom: '1.25rem',
         scrollMarginTop: '1rem'

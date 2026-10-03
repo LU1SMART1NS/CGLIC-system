@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import { KeyRound, Shield, UserCheck, Coins, Eye, X, ChevronRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -207,7 +208,7 @@ export const RolesPermissions: React.FC = () => {
   const selectedProfile = PROFILE_DEFINITIONS.find((p) => p.id === selectedProfileId) ?? null;
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Perfis"
         subtitle="Perfis de acesso ao CGLIC e o que cada um pode consultar e gerir"
@@ -216,7 +217,7 @@ export const RolesPermissions: React.FC = () => {
 
       <div
         data-testid="profiles-cards-grid"
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: spacing.lg }}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: spacing.lg }}
       >
         {PROFILE_DEFINITIONS.map((profile) => {
           const Icon = profile.icon;
@@ -257,6 +258,6 @@ export const RolesPermissions: React.FC = () => {
       </div>
 
       <ProfileDrawer profile={selectedProfile} onClose={() => setSelectedProfileId(null)} />
-    </div>
+    </PageContainer>
   );
 };

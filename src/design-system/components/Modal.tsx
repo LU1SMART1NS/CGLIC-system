@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { colors, shapes, spacing, typography } from '../tokens';
+import { colors, shapes, typography } from '../tokens';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -19,6 +19,11 @@ export interface ModalProps {
 
 const WIDTHS = { sm: '420px', md: '560px', lg: '760px', xl: '1040px' } as const;
 
+/**
+ * Camada única de modais. Layout e responsividade em index.css (.ds-modal*): em ≤480px o painel
+ * vira bottom sheet de altura quase total, com rodapé fixo e botões empilhados de 44px.
+ * Coloque as ações na prop `footer` (fixa), não no fim do corpo.
+ */
 /** Camada única de modais: mesmo z-index, Esc para fechar, foco inicial e rolagem do fundo travada. */
 export const MODAL_Z_INDEX = 1000;
 
@@ -67,19 +72,11 @@ export const Modal: React.FC<ModalProps> = ({
   return createPortal(
     <div
       data-testid={`${testId}-overlay`}
+      className="ds-modal-overlay"
       onMouseDown={(e) => {
         if (dismissible && e.target === e.currentTarget) onClose();
       }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: MODAL_Z_INDEX,
-        background: colors.background.overlay,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: spacing.lg
-      }}
+      style={{ zIndex: MODAL_Z_INDEX, background: colors.background.overlay }}
     >
       <div
         ref={panelRef}
@@ -88,29 +85,15 @@ export const Modal: React.FC<ModalProps> = ({
         aria-labelledby={titleId}
         tabIndex={-1}
         data-testid={testId}
+        className="ds-modal"
         style={{
-          width: '100%',
           maxWidth: WIDTHS[size],
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
           background: colors.background.surface,
-          borderRadius: shapes.radius.lg,
-          boxShadow: '0 20px 50px rgba(15, 23, 42, 0.25)',
-          outline: 'none'
+          borderRadius: shapes.radius.lg
         }}
       >
-        <header
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: spacing.md,
-            padding: `${spacing.md} ${spacing.lg}`,
-            borderBottom: `1px solid ${colors.border.default}`
-          }}
-        >
-          <div>
+        <header className="ds-modal__header">
+          <div style={{ minWidth: 0 }}>
             <h2 id={titleId} style={{ margin: 0, fontSize: typography.fontSize.h3, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
               {title}
             </h2>
@@ -123,23 +106,16 @@ export const Modal: React.FC<ModalProps> = ({
               type="button"
               aria-label="Fechar"
               onClick={onClose}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text.muted, padding: '4px', display: 'inline-flex' }}
+              className="ds-modal__close"
+              style={{ color: colors.text.muted }}
             >
               <X size={18} />
             </button>
           )}
         </header>
-        <div style={{ padding: spacing.lg, overflowY: 'auto', flex: 1 }}>{children}</div>
+        <div className="ds-modal__body">{children}</div>
         {footer && (
-          <footer
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: spacing.sm,
-              padding: `${spacing.md} ${spacing.lg}`,
-              borderTop: `1px solid ${colors.border.default}`
-            }}
-          >
+          <footer className="ds-modal__footer">
             {footer}
           </footer>
         )}

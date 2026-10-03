@@ -230,7 +230,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
                 alignItems: 'center',
                 gap: '3px',
                 padding: '0.25rem 0.5rem',
-                fontSize: '0.72rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: '#0c326f',
                 backgroundColor: '#f8fafc',
@@ -274,12 +274,12 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             borderRadius: '6px',
             border: '1px solid #e2e8f0',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
             gap: '0.75rem'
           }}
         >
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
               Nome da tarefa
             </label>
             <input
@@ -297,7 +297,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           </div>
 
           <div>
-            <label htmlFor={`responsavel-${task.id}`} style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label htmlFor={`responsavel-${task.id}`} style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
               Responsável
             </label>
             <ResponsavelField
@@ -310,7 +310,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           </div>
 
           <div>
-            <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
               Prazo limite
             </label>
             <input
@@ -327,12 +327,12 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             />
           </div>
 
-          <div style={{ gridColumn: '1 / -1', fontSize: '0.72rem', color: gestorNome ? '#64748b' : '#b45309', marginTop: '-0.4rem' }}>
+          <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: gestorNome ? '#64748b' : '#b45309', marginTop: '-0.4rem' }}>
             {gestorNome ? labels.herancaMsg : labels.semGestorMsg}
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
               Observação / Justificativa
             </label>
             <input

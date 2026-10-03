@@ -1,4 +1,5 @@
 import React from 'react';
+import { PageContainer } from '../design-system/components/PageContainer';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard } from 'lucide-react';
 import { ManagementPaymentsOverview } from '../components/dashboard/ManagementPaymentsOverview';
@@ -26,7 +27,7 @@ export const PaymentsRoute: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem' }}>
+    <PageContainer>
       {/* Header da Página Canônico */}
       <PageHeader
         title="Pagamentos"
@@ -51,6 +52,6 @@ export const PaymentsRoute: React.FC = () => {
         onNavigateContract={handleNavigateContract}
         onRefresh={() => refresh()}
       />
-    </div>
+    </PageContainer>
   );
 };

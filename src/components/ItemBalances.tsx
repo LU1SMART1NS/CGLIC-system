@@ -1029,7 +1029,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                                           {resolvedOrgaoName}
                                           {contractUasg ? (
-                                            <span style={{ marginLeft: '0.4rem', fontSize: '0.74rem', color: '#1d4ed8', fontWeight: 600, background: '#eff6ff', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+                                            <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: '#1d4ed8', fontWeight: 600, background: '#eff6ff', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
                                               UASG: {contractUasg}
                                             </span>
                                           ) : null}
@@ -1042,7 +1042,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                       </td>
                                       <td style={{ fontSize: '0.82rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.nomeRazaoSocialFornecedor}</div>
-                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                                           CNPJ: {c.niFornecedor?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") || '-'}
                                         </div>
                                       </td>
@@ -1062,7 +1062,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                             <td style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700 }}>
                                               {formatNumber(exec.empenhado)}
                                               {exec.pendentes > 0 && (
-                                                <div style={{ fontFamily: 'inherit', fontWeight: 500, fontSize: '0.7rem', color: 'var(--warning)' }}>
+                                                <div style={{ fontFamily: 'inherit', fontWeight: 500, fontSize: '0.75rem', color: 'var(--warning)' }}>
                                                   {exec.pendentes} {exec.pendentes === 1 ? 'pendente' : 'pendentes'}
                                                 </div>
                                               )}

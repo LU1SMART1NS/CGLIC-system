@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, AlertCircle, Clock } from 'lucide-react';
-import { colors, shapes, typography, spacing } from '../tokens';
+import { colors, shapes, typography, spacing, breakpoints } from '../tokens';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 export type StepState = 'COMPLETED' | 'CURRENT' | 'PENDING' | 'BLOCKED';
 
@@ -14,18 +15,20 @@ export interface WorkflowStep {
 
 export interface WorkflowStepperProps {
   steps: WorkflowStep[];
-  orientation?: 'horizontal' | 'vertical';
+  /** `auto` (padrão): horizontal a partir de 768px e vertical abaixo disso. */
+  orientation?: 'horizontal' | 'vertical' | 'auto';
   testId?: string;
   className?: string;
 }
 
 export const WorkflowStepper: React.FC<WorkflowStepperProps> = ({
   steps,
-  orientation = 'horizontal',
+  orientation = 'auto',
   testId = 'workflow-stepper',
   className = ''
 }) => {
-  const isHorizontal = orientation === 'horizontal';
+  const isNarrow = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
+  const isHorizontal = orientation === 'auto' ? !isNarrow : orientation === 'horizontal';
 
   return (
     <div

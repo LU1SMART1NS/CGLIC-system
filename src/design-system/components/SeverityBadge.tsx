@@ -30,7 +30,7 @@ export const SeverityBadge: React.FC<SeverityBadgeProps> = ({
   return (
     <span
       data-testid={testId || `severity-badge-${severity.toLowerCase()}`}
-      className={`severity-badge ${className}`.trim()}
+      className={`severity-badge ds-badge ${className}`.trim()}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -49,7 +49,7 @@ export const SeverityBadge: React.FC<SeverityBadgeProps> = ({
       }}
     >
       {showIcon && <span style={{ color: token.iconColor }}>{icon}</span>}
-      <span>{customLabel || token.label}</span>
+      <span className="ds-badge__label" title={customLabel || token.label}>{customLabel || token.label}</span>
     </span>
   );
 };

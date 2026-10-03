@@ -92,7 +92,7 @@ export const HealthTile: React.FC<{
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
         <span
           title={label}
-          style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.72rem', fontWeight: 700, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+          style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.75rem', fontWeight: 700, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}
         >
           {label}
         </span>
@@ -105,7 +105,7 @@ export const HealthTile: React.FC<{
               gap: '4px',
               padding: '1px 7px',
               borderRadius: '999px',
-              fontSize: '0.68rem',
+              fontSize: '0.75rem',
               fontWeight: 700,
               background: token.badgeBg,
               color: token.badgeText,
@@ -229,8 +229,23 @@ function relativeDays(dias: number): string {
   return `há ${Math.abs(dias)} dia${dias === -1 ? '' : 's'}`;
 }
 
-/** Marco mais perto do fim que isso (em % da vigência) é desenhado junto do marcador de fim. */
-const MERGE_WITH_END_PCT = 3;
+/** Marco a menos que isso (em px) do marcador de fim é desenhado junto dele. Medido na barra real, não em %. */
+const MERGE_WITH_END_PX = 14;
+
+/** Largura em px de um elemento, acompanhando redimensionamentos (0 até a primeira medição). */
+function useElementWidth<T extends HTMLElement>(ref: React.RefObject<T | null>): number {
+  const [width, setWidth] = React.useState(0);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setWidth(el.getBoundingClientRect().width);
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => setWidth(entries[0].contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
 
 /**
  * Régua de prazos, dentro do cartão de vigência: barra do tempo consumido, "Hoje" e fim.
@@ -244,6 +259,9 @@ export const LifelineRule: React.FC<{
   /** Tom do cartão; colore o preenchimento da barra. */
   tone?: SeverityLevel;
 }> = ({ lifeline, testId, tone }) => {
+  const barRef = React.useRef<HTMLDivElement>(null);
+  const barWidth = useElementWidth(barRef);
+
   if (!lifeline) {
     return (
       <div data-testid={testId} style={{ fontSize: '0.78rem', color: COLORS.muted, marginTop: '0.75rem' }}>
@@ -257,7 +275,9 @@ export const LifelineRule: React.FC<{
   const ahead = milestones.filter((m) => m.state !== 'PASSADO');
   const next: LifelineMilestone | undefined = ahead[0];
   const ticks = [...passed, ...ahead.slice(1)];
-  const mergedWithEnd = Boolean(next && 100 - next.pct <= MERGE_WITH_END_PCT);
+  // Sem medição ainda (SSR/primeiro render), cai no equivalente antigo de 3%.
+  const distanceToEndPx = next ? ((100 - next.pct) / 100) * (barWidth || 460) : Infinity;
+  const mergedWithEnd = Boolean(next && distanceToEndPx <= MERGE_WITH_END_PX);
   const termos = clusterLifelineEvents(lifeline.events ?? []);
   const totalTermos = lifeline.events?.length ?? 0;
 
@@ -277,6 +297,7 @@ export const LifelineRule: React.FC<{
   return (
     <div data-testid={testId} style={{ position: 'relative', margin: '22px 12px 0 8px' }}>
       <div
+        ref={barRef}
         role="img"
         aria-label={`${Math.round(lifeline.todayPct)}% da vigência consumida.${nextText ? ` Próximo marco: ${nextText}.` : ''}${totalTermos ? ` ${totalTermos} termos registrados.` : ''}`}
         style={{ position: 'relative', height: '6px', borderRadius: '3px', background: '#dfe5ee' }}
@@ -335,7 +356,7 @@ export const LifelineRule: React.FC<{
             }}
           >
             {cluster.count > 1 && (
-              <span style={{ position: 'absolute', left: '9px', top: '-12px', transform: 'rotate(-45deg)', fontSize: '0.6rem', fontWeight: 800, color: COLORS.brand }}>
+              <span style={{ position: 'absolute', left: '9px', top: '-12px', transform: 'rotate(-45deg)', fontSize: '0.75rem', fontWeight: 800, color: COLORS.brand }}>
                 {cluster.count}
               </span>
             )}
@@ -365,7 +386,7 @@ export const LifelineRule: React.FC<{
               style={{
                 position: 'absolute',
                 bottom: '22px',
-                fontSize: '0.7rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 whiteSpace: 'nowrap',
                 color: COLORS.ink,
@@ -379,7 +400,7 @@ export const LifelineRule: React.FC<{
       </div>
 
       {(leftNote || nextText) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '4px', fontSize: '0.74rem', lineHeight: 1.2, color: COLORS.muted }}>
+        <div className="lifeline-notes" style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '4px', fontSize: '0.75rem', lineHeight: 1.2, color: COLORS.muted }}>
           {leftNote && <span style={{ flex: 'none', whiteSpace: 'nowrap' }}>{leftNote}</span>}
           {nextText && (
             <span
@@ -390,6 +411,24 @@ export const LifelineRule: React.FC<{
             </span>
           )}
         </div>
+      )}
+
+      {/* Celular: sem hover, os marcos viram uma lista com nome, data e prazo. */}
+      {milestones.length > 0 && (
+        <ul className="lifeline-list" aria-label="Marcos da vigência">
+          {milestones.map((m) => (
+            <li key={m.id} data-next={m === next ? 'true' : undefined}>
+              <span>{shortMilestoneLabel(m.label)} · {formatDateBR(m.date)}</span>
+              <span>{relativeDays(m.diasRestantes)}</span>
+            </li>
+          ))}
+          {totalTermos > 0 && (
+            <li>
+              <span>{totalTermos} {totalTermos === 1 ? 'termo registrado' : 'termos registrados'}</span>
+              <span />
+            </li>
+          )}
+        </ul>
       )}
     </div>
   );

@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { breakpoints } from '../../design-system/tokens';
+import { useMediaQuery } from '../../design-system/hooks/useMediaQuery';
 import { Header } from '../Header';
 import { Sidebar } from './Sidebar';
 
@@ -17,10 +19,13 @@ const SIDEBAR_COLLAPSED_KEY = 'saldoarp:sidebar-collapsed';
 
 function readStoredCollapsed(): boolean {
   try {
-    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (stored !== null) return stored === '1';
   } catch {
-    return false;
+    // storage indisponível: cai no padrão por largura
   }
+  // Sem preferência salva: tablet (768–1023px) começa recolhida.
+  return typeof window !== 'undefined' && window.innerWidth < breakpoints.lg;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -28,6 +33,45 @@ export const AppShell: React.FC<AppShellProps> = ({
   onOpenDepartmentsModal
 }) => {
   const [collapsed, setCollapsed] = useState<boolean>(readStoredCollapsed);
+  // < 768px: sidebar vira drawer off-canvas aberto pelo botão de menu do Header.
+  const isMobile = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const location = useLocation();
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    menuButtonRef.current?.focus();
+  }, []);
+
+  // Fecha ao navegar e ao sair do modo mobile.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname, location.search, isMobile]);
+
+  // Esc fecha o drawer e a rolagem do fundo fica travada enquanto aberto.
+  useEffect(() => {
+    if (!isMobile || !drawerOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDrawer();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobile, drawerOpen, closeDrawer]);
+
+  const expandSidebar = () => {
+    setCollapsed(false);
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '0');
+    } catch {
+      // preferência apenas de UI
+    }
+  };
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -47,10 +91,21 @@ export const AppShell: React.FC<AppShellProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div style={{ display: 'flex', minHeight: '100dvh', background: '#f8fafc' }}>
+      {isMobile && drawerOpen && (
+        <div
+          className="app-drawer-overlay"
+          onClick={closeDrawer}
+          aria-hidden="true"
+        />
+      )}
       <Sidebar
-        collapsed={collapsed}
+        mode={isMobile ? 'drawer' : 'desktop'}
+        drawerOpen={drawerOpen}
+        onCloseDrawer={closeDrawer}
+        collapsed={isMobile ? false : collapsed}
         onToggleCollapsed={toggleCollapsed}
+        onRequestExpand={expandSidebar}
         onOpenExportModal={onOpenExportModal}
         onOpenDepartmentsModal={onOpenDepartmentsModal}
       />
@@ -66,10 +121,14 @@ export const AppShell: React.FC<AppShellProps> = ({
         }}>
           <Header
             onOpenExportModal={onOpenExportModal}
+            showMenuButton={isMobile}
+            menuOpen={drawerOpen}
+            menuButtonRef={menuButtonRef}
+            onOpenMenu={() => setDrawerOpen(true)}
           />
         </div>
 
-        <main style={{ flex: 1 }}>
+        <main className="app-main" style={{ flex: 1 }}>
           <Outlet context={contextValue} />
         </main>
       </div>

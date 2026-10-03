@@ -113,7 +113,7 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
           </div>
           <div style={{ width: '140px', height: '24px', background: '#e2e8f0', borderRadius: '6px' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} style={{ height: '90px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
           ))}

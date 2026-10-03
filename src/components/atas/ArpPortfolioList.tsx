@@ -225,7 +225,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     </td>
                     <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 800 }}>ATA {numeroAta}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>UASG {arp.codigoUnidadeGerenciadora}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>UASG {arp.codigoUnidadeGerenciadora}</div>
                     </td>
                     <td style={{ ...carteiraTd, maxWidth: '220px', minWidth: '170px' }}>
                       <div style={{ fontWeight: 600, color: '#334155' }}>{card.fornecedorNome}</div>
@@ -240,14 +240,14 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     </td>
                     <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <CarteiraPrazoPill faixa={faixa} diasRestantes={dias} />
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
                         até {formatDateBR(arp.dataVigenciaFinal)}
                       </div>
                     </td>
                     <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 700 }}>{totalItens} {totalItens === 1 ? 'item' : 'itens'}</div>
                       {stats && (stats.criticos > 0 || stats.atencao > 0) ? (
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: stats.criticos > 0 ? '#b91c1c' : '#b45309' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: stats.criticos > 0 ? '#b91c1c' : '#b45309' }}>
                           {[
                             stats.criticos > 0 ? `${stats.criticos} ${stats.criticos === 1 ? 'crítico' : 'críticos'}` : null,
                             stats.atencao > 0 ? `${stats.atencao} em atenção` : null

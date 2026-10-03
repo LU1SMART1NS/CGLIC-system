@@ -49,6 +49,7 @@ export const HeaderRefreshAction: React.FC<HeaderRefreshActionProps> = ({
 
   return (
     <div
+      className="ds-refresh"
       style={{
         display: 'flex',
         alignItems: 'center',

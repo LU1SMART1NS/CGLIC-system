@@ -1,4 +1,5 @@
 import React from 'react';
+import { useScrollActiveTab } from '../../design-system/hooks/useScrollActiveTab';
 
 export type GestaoInstrumentosCategoryTab =
   | 'TODAS'
@@ -33,13 +34,16 @@ export const GestaoInstrumentosCategoryTabs: React.FC<GestaoInstrumentosCategory
   active,
   onSelect
 }) => {
+  const listRef = React.useRef<HTMLDivElement>(null);
+  useScrollActiveTab(listRef, active);
   return (
     <div
+      ref={listRef}
       role="tablist"
       aria-label="Filtrar por categoria de atenção"
+      className="ds-tabs-scroll ds-tabs-scroll--pills"
       style={{
         display: 'flex',
-        flexWrap: 'wrap',
         gap: '0.5rem'
       }}
     >

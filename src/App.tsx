@@ -73,7 +73,7 @@ const AuthRedirectHandler: React.FC = () => {
 };
 
 const AppFooter: React.FC = () => (
-  <footer style={{
+  <footer className="app-footer" style={{
     background: '#0c326f',
     color: '#ffffff',
     padding: '2.5rem 3rem',
@@ -94,7 +94,7 @@ const AppFooter: React.FC = () => (
           © {new Date().getFullYear()} Governo Federal. Todos os direitos reservados. Padrão Visual Institucional BR-DS / MJSP.
         </p>
       </div>
-      <div style={{ textAlign: 'right', opacity: 0.9 }}>
+      <div className="app-footer-source" style={{ textAlign: 'right', opacity: 0.9 }}>
         <p style={{ fontWeight: 700, color: '#ffffff' }}>Dados Oficiais das APIs Compras.gov.br e PNCP</p>
         <p style={{ fontSize: '0.78rem', marginTop: '0.2rem', opacity: 0.8, color: '#cbd5e1' }}>
           Sincronizado com os dados abertos do Governo Federal e licitações públicas.

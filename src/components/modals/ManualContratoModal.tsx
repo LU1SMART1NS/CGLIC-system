@@ -300,7 +300,7 @@ export const ManualContratoModal: React.FC<ManualContratoModalProps> = ({
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <span style={{ fontWeight: 700, color: 'var(--success)' }}>{emp.quantidade} un</span>
-                        <span className={`badge ${emp.origem === 'MANUAL' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: '0.68rem' }}>
+                        <span className={`badge ${emp.origem === 'MANUAL' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: '0.75rem' }}>
                           {emp.origem}
                         </span>
                       </div>

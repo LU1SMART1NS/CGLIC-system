@@ -76,7 +76,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))',
         gap: '0.9rem'
       }}
     >
@@ -91,7 +91,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Atas de Registro de Preço (ARP)
           </span>
           <div style={{ background: '#eff6ff', color: '#0c326f', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
@@ -123,7 +123,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Contratos Vigentes
           </span>
           <div style={{ background: '#ecfdf5', color: '#059669', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
@@ -158,7 +158,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Valor Total Global
           </span>
           <div style={{ background: '#fef9c3', color: '#a16207', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
@@ -189,7 +189,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Alertas Críticos
           </span>
           <div style={{ background: '#fef2f2', color: '#dc2626', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>

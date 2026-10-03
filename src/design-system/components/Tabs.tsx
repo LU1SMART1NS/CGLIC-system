@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { useScrollActiveTab } from '../hooks/useScrollActiveTab';
 import { colors, shapes, typography, spacing } from '../tokens';
 
 export interface TabItem {
@@ -27,6 +28,8 @@ export const Tabs: React.FC<TabsProps> = ({
   className = ''
 }) => {
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const listRef = useRef<HTMLDivElement>(null);
+  useScrollActiveTab(listRef, activeTabId);
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
     const enabledTabs = tabs.filter(t => !t.disabled);
@@ -58,16 +61,16 @@ export const Tabs: React.FC<TabsProps> = ({
 
   return (
     <div
+      ref={listRef}
       role="tablist"
       aria-label={ariaLabel}
       data-testid={testId}
-      className={`tabs-nav-container ${className}`.trim()}
+      className={`tabs-nav-container ds-tabs-scroll ${className}`.trim()}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: spacing.xs,
         borderBottom: `2px solid ${colors.border.default}`,
-        overflowX: 'auto',
         paddingBottom: '2px'
       }}
     >

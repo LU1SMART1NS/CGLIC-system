@@ -1,4 +1,5 @@
 import React from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import { BellRing, RotateCcw, Scale } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -81,7 +82,7 @@ export const AlertRulesPage: React.FC = () => {
   const sectionStrip: React.CSSProperties = { padding: '0.6rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' };
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Regras de Alertas"
         subtitle="Limites que classificam os alertas em todas as telas."
@@ -214,6 +215,6 @@ export const AlertRulesPage: React.FC = () => {
           </table>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };

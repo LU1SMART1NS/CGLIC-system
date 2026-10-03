@@ -1,6 +1,9 @@
 /* CSS System for CGLIC - Gov.br Standard Layout (Light Theme) */
 
 :root {
+  /* Gutter horizontal único das páginas (espelha pageGutter em tokens.ts) */
+  --page-gutter: 2rem;
+
   /* Paleta de Cores e Tokens Gov.br Modernos */
   --primary: #0c326f;
   --primary-hover: #08214d;
@@ -108,7 +111,7 @@ a:hover {
 main {
   flex: 1;
   width: 100%;
-  padding: 2rem 3rem;
+  padding: 2rem var(--page-gutter);
   max-width: 1800px;
   margin: 0 auto;
   animation: fadeIn 0.3s ease-out;
@@ -118,29 +121,6 @@ main {
 footer {
   width: 100%;
   margin-top: auto;
-}
-
-/* Glass Card re-styled as gov.br Solid Card */
-.glass-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  transition: var(--transition);
-}
-
-.glass-card:hover {
-  border-color: var(--border-color-hover);
-  box-shadow: var(--shadow-md);
-}
-
-/* --- GRID DE KPIs & STATS --- */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 2rem;
 }
 
 .kpi-card {
@@ -158,8 +138,10 @@ footer {
 
 .kpi-card:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
   border-color: #cbd5e1;
+}
+@media (hover: hover) {
+  .kpi-card:hover { transform: translateY(-2px); }
 }
 
 .kpi-header {
@@ -252,14 +234,6 @@ footer {
   display: grid;
   gap: 1.25rem;
   width: 100%;
-}
-
-.grid-3-cols {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-
-.grid-2-cols {
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
 }
 
 .filter-actions {
@@ -624,13 +598,6 @@ h1, h2, h3, h4 {
   line-height: 1.6;
 }
 
-.item-metadata {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1.2rem;
-  font-size: 0.9rem;
-}
-
 .meta-field {
   display: flex;
   flex-direction: column;
@@ -652,14 +619,6 @@ h1, h2, h3, h4 {
 .meta-value-price {
   font-family: monospace;
   font-weight: 700;
-}
-
-/* Balances dashboard styles */
-.balances-header-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
 }
 
 .balance-card-summary {
@@ -705,11 +664,7 @@ h1, h2, h3, h4 {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   main {
-    padding: 1.5rem 1.5rem;
-  }
-  
-  .search-grid {
-    grid-template-columns: 1fr;
+    padding: 1.5rem var(--page-gutter);
   }
   
   .custom-table th, .custom-table td {
@@ -744,7 +699,9 @@ h1, h2, h3, h4 {
 .ata-card:hover {
   border-color: #cbd5e1;
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+}
+@media (hover: hover) {
+  .ata-card:hover { transform: translateY(-2px); }
 }
 
 /* Header */
@@ -873,7 +830,7 @@ h1, h2, h3, h4 {
 }
 
 .ata-col-header {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.06em;
@@ -986,8 +943,8 @@ h1, h2, h3, h4 {
   flex-shrink: 0;
 }
 
-.ata-item-row:hover .ata-item-chevron {
-  transform: translateX(3px);
+@media (hover: hover) {
+  .ata-item-row:hover .ata-item-chevron { transform: translateX(3px); }
 }
 
 /* Expand / Collapse Button */
@@ -1167,46 +1124,174 @@ h1, h2, h3, h4 {
   color: var(--primary) !important;
 }
 
-/* --- Modais do Sistema (Padrão Canônico Gov.br) --- */
-.modal-backdrop {
+
+
+
+
+/* ==========================================================================
+   SHELL RESPONSIVO (Fase 2 / P0) — breakpoints: 480 / 768 / 1024
+   ========================================================================== */
+@media (max-width: 1024px) {
+  :root { --page-gutter: 1.5rem; }
+}
+@media (max-width: 480px) {
+  :root { --page-gutter: 1rem; }
+}
+
+.app-drawer-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(15, 23, 42, 0.7);
-  display: flex;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 55;
+}
+
+.app-header-org-short,
+.app-header-menu-btn {
+  display: none;
+}
+
+.app-header-menu-btn {
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  padding: 1rem;
-  backdrop-filter: blur(4px);
-  animation: fadeIn 0.15s ease-out;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  margin-left: -0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #0c326f;
+  cursor: pointer;
 }
 
-.modal-content {
-  background: #ffffff;
-  border-radius: 12px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  border: 1px solid #e2e8f0;
-  animation: modalScaleUp 0.15s ease-out;
+.app-header-topbar,
+.app-header-main {
+  padding-left: var(--page-gutter);
+  padding-right: var(--page-gutter);
 }
 
-@keyframes modalScaleUp {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
+@media (max-width: 767px) {
+  .gov-topbar-links,
+  .app-header-subtitle {
+    display: none !important;
   }
-  to {
-    opacity: 1;
-    transform: scale(1);
+  .app-header-menu-btn {
+    display: inline-flex;
+  }
+  .app-header-main {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+  .app-header-brand {
+    gap: 0.5rem !important;
+  }
+  .app-header-email {
+    display: none;
+  }
+  .app-header-signout {
+    min-height: 44px;
+    min-width: 44px;
+    justify-content: center;
+  }
+  .app-footer {
+    padding: 1.5rem var(--page-gutter) !important;
   }
 }
 
+@media (max-width: 480px) {
+  .app-header-org-full {
+    display: none;
+  }
+  .app-header-org-short {
+    display: inline;
+  }
+  .app-header-signout-label {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .app-footer-source { text-align: left !important; }
+}
 
+/* Detalhe 360 (Ata/Contrato/Item): padding interno reduz em telas estreitas */
+.i360-hero { padding: 1.5rem; }
+.i360-tabpanel { padding: 1.25rem; }
+@media (max-width: 480px) {
+  .i360-hero { padding: 1rem; }
+  .i360-tabpanel { padding: 0.75rem; }
+}
+
+
+/* ==========================================================================
+   UTILITÁRIOS DE LAYOUT RESPONSIVO (Fase 2 / P1)
+   Preferir estas classes a grids/flex inline com larguras mínimas fixas.
+   ========================================================================== */
+.stack { display: flex; flex-direction: column; gap: var(--stack-gap, 1rem); }
+.cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cluster-gap, 0.5rem); }
+.grid-auto {
+  display: grid;
+  gap: var(--grid-gap, 1rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 220px)), 1fr));
+}
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  /* sombras laterais indicam que há mais conteúdo ao rolar */
+  background:
+    linear-gradient(to right, #fff 30%, rgba(255,255,255,0)) left center / 24px 100% no-repeat local,
+    linear-gradient(to left, #fff 30%, rgba(255,255,255,0)) right center / 24px 100% no-repeat local,
+    linear-gradient(to right, rgba(15,23,42,0.12), rgba(15,23,42,0)) left center / 10px 100% no-repeat scroll,
+    linear-gradient(to left, rgba(15,23,42,0.12), rgba(15,23,42,0)) right center / 10px 100% no-repeat scroll;
+}
+.min-w-0 { min-width: 0; }
+@media (max-width: 767px) { .hide-below-md { display: none !important; } }
+@media (min-width: 768px) { .show-below-md { display: none !important; } }
+
+/* ==========================================================================
+   COMPONENTES COMPARTILHADOS — quebra de linha em telas estreitas (Fase 2 / P1)
+   ========================================================================== */
+/* PageHeader */
+.ds-page-header__title-block { min-width: 0; flex: 1 1 260px; }
+.ds-page-header__title-row { flex-wrap: wrap; }
+.ds-page-header__title { overflow-wrap: anywhere; }
+.ds-page-header__actions { flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .ds-page-header__title { font-size: 1.25rem !important; }
+  .ds-page-header__actions { width: 100%; }
+  .ds-page-header__actions > * { flex: 1 1 auto; }
+}
+
+/* HeaderRefreshAction */
+.ds-refresh { flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .ds-refresh { width: 100%; justify-content: space-between; }
+}
+
+/* FilterBar */
+.ds-filter-search { min-width: 0 !important; }
+@media (max-width: 480px) {
+  .ds-filter-search { flex: 1 1 100% !important; }
+  .ds-filter-select { flex: 1 1 100% !important; flex-direction: column; align-items: stretch !important; }
+  .ds-filter-select select,
+  .ds-filter-search input { min-height: 44px; font-size: 16px !important; }
+  .ds-filter-chip { min-height: 36px; }
+}
+
+/* Paginação da carteira */
+.carteira-pagination { flex-wrap: wrap; gap: 0.5rem; }
+.carteira-pagination__pages { flex-wrap: wrap; }
+.carteira-pagination__compact { display: none; }
+@media (max-width: 480px) {
+  .carteira-pagination { justify-content: center !important; }
+  .carteira-pagination__pages .carteira-pagination__num { display: none; }
+  .carteira-pagination__compact { display: inline; }
+  .carteira-pagination button { min-height: 44px; min-width: 44px; }
+}
+
+/* Badges: nunca estouram a largura do contêiner */
+.ds-badge { max-width: 100%; }
+.ds-badge__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 /* Indicadores do topo das telas 360 (HealthTile / HealthTileGrid).
    O número de colunas segue a largura do cartão, não a da janela: o menu lateral e as margens tiram ~350px. */
@@ -1223,6 +1308,9 @@ h1, h2, h3, h4 {
 @container (max-width: 420px) {
   .health-tile-grid[data-columns] { grid-template-columns: 1fr; }
   .health-tile--wide { grid-column: auto; }
+  /* O cartão da régua cresce para caber a lista de marcos (celular); os demais mantêm 128px. */
+  .health-tile-grid[data-columns] .health-tile--wide { height: auto; min-height: 128px; }
+  .health-tile--wide > div { overflow: visible !important; }
 }
 
 /* Topo das telas 360: identidade à esquerda e coluna lateral fixa (gestor, origem e datas) à direita.
@@ -1240,4 +1328,216 @@ h1, h2, h3, h4 {
 @container (max-width: 700px) {
   .i360-side { flex: 1 1 100%; width: auto; padding-left: 0; padding-top: 12px; border-left: 0; border-top: 1px solid #e2e8f0; }
   .i360-dr dd { text-align: left; }
+}
+
+/* ==========================================================================
+   DataTable (Fase 2 / P2) — tabela rolável e modo cartões no mobile
+   ========================================================================== */
+.ds-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; }
+.ds-table thead tr { background: #f8fafc; color: #475569; border-bottom: 1px solid #e2e8f0; }
+.ds-table th { padding: 0.75rem 1rem; font-size: 0.78rem; font-weight: 700; }
+.ds-table td { padding: 0.75rem 1rem; vertical-align: middle; color: #0f172a; border-bottom: 1px solid #f1f5f9; }
+.ds-table__empty { padding: 3rem 1rem !important; text-align: center !important; font-style: italic; }
+.ds-table--sticky-first th:first-child,
+.ds-table--sticky-first td:first-child {
+  position: sticky; left: 0; z-index: 1; background: #ffffff;
+  box-shadow: 1px 0 0 #e2e8f0;
+}
+.ds-table--sticky-first thead th:first-child { background: #f8fafc; }
+@media (max-width: 767px) {
+  .ds-table th, .ds-table td { padding: 0.5rem 0.75rem; }
+  .ds-table__hide-md { display: none; }
+}
+@media (max-width: 479px) {
+  .ds-table__hide-sm { display: none; }
+}
+
+.ds-table-cards__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.ds-table-cards__item {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.6rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04); min-width: 0;
+}
+.ds-table-cards__title { font-weight: 800; color: #0c326f; font-size: 0.95rem; overflow-wrap: anywhere; }
+.ds-table-cards__fields { margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.ds-table-cards__field { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; min-width: 0; }
+.ds-table-cards__field dt { flex: 0 0 auto; max-width: 45%; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.02em; }
+.ds-table-cards__field dd { margin: 0; text-align: right; font-size: 0.85rem; color: #0f172a; min-width: 0; overflow-wrap: anywhere; }
+.ds-table-cards__actions {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end;
+  padding-top: 0.6rem; border-top: 1px solid #f1f5f9;
+}
+.ds-table-cards__actions > * { min-height: 44px; min-width: 44px; }
+.ds-table-cards__empty { text-align: center; padding: 2rem 1rem; font-style: italic; }
+
+.data-table-container--flush { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+.ds-icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; }
+@media (max-width: 767px) { .ds-icon-btn { min-width: 44px; min-height: 44px; } }
+
+
+/* ==========================================================================
+   Modal, Toast e AnchoredPanel responsivos (Fase 2 / P3)
+   ========================================================================== */
+.ds-modal-overlay {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.ds-modal {
+  width: 100%; display: flex; flex-direction: column; outline: none;
+  max-height: min(90vh, 90dvh);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+.ds-modal__header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;
+  padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0;
+}
+.ds-modal__header h2 { overflow-wrap: anywhere; }
+.ds-modal__close {
+  background: none; border: none; cursor: pointer; padding: 4px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; min-height: 32px; border-radius: 8px;
+}
+.ds-modal__body { padding: 1rem; overflow-y: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
+.ds-modal__footer {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem;
+  padding: 0.75rem 1rem; border-top: 1px solid #e2e8f0;
+}
+@media (max-width: 480px) {
+  .ds-modal-overlay { padding: 0; align-items: flex-end; }
+  .ds-modal {
+    max-width: none !important; max-height: calc(100dvh - 12px);
+    border-radius: 16px 16px 0 0 !important;
+  }
+  .ds-modal__header { padding: 0.75rem; }
+  .ds-modal__close { min-width: 44px; min-height: 44px; }
+  .ds-modal__body { padding: 0.75rem; }
+  .ds-modal__footer {
+    flex-direction: column-reverse; align-items: stretch;
+    padding: 0.75rem calc(0.75rem) calc(0.75rem + env(safe-area-inset-bottom));
+  }
+  .ds-modal__footer > * { width: 100%; min-height: 44px; justify-content: center; }
+}
+
+.ds-toast-region {
+  position: fixed; right: 1rem; bottom: 1rem; display: flex; flex-direction: column;
+  gap: 0.5rem; max-width: 380px;
+}
+.ds-toast__close {
+  background: none; border: none; cursor: pointer; padding: 0; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; min-height: 32px; margin: -0.4rem -0.5rem -0.4rem 0;
+}
+@media (max-width: 480px) {
+  .ds-toast-region {
+    left: 1rem; right: 1rem; max-width: none;
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+  .ds-toast__close { min-width: 44px; min-height: 44px; }
+}
+
+/* AnchoredPanel: popover no desktop, bottom sheet no celular */
+.ds-anchored-sheet-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); }
+.ds-anchored-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; width: 100%;
+  max-height: calc(100dvh - 48px); overflow-y: auto; overscroll-behavior: contain;
+  border-radius: 16px 16px 0 0 !important;
+  padding-bottom: calc(0.9rem + env(safe-area-inset-bottom)) !important;
+}
+.ds-anchored-sheet button { min-height: 44px; min-width: 44px; }
+.ds-anchored-sheet select, .ds-anchored-sheet input { min-height: 44px; font-size: 16px !important; }
+
+/* ==========================================================================
+   P4 — Toque, formulários e tipografia (Fase 2)
+   ========================================================================== */
+/* AppButton: hover só com mouse, foco só por teclado */
+.ds-btn { position: relative; }
+.ds-btn:focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
+@media (hover: hover) {
+  .ds-btn--secondary:hover:not(:disabled) { background-color: #e2e8f0 !important; }
+  .ds-btn--outline:hover:not(:disabled) { background-color: #f8fafc !important; }
+  .ds-btn--ghost:hover:not(:disabled) { background-color: #f1f5f9 !important; }
+  .ds-btn--ghostDanger:hover:not(:disabled) { background-color: #fef2f2 !important; }
+  .ds-btn--danger:hover:not(:disabled) { background-color: #dc2626 !important; }
+  .ds-btn--primary:hover:not(:disabled) { background-color: #08214d !important; }
+}
+/* Em telas de toque a área clicável chega a 44x44 sem mudar o visual compacto */
+@media (pointer: coarse) {
+  .ds-btn::after {
+    content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: max(100%, 44px); height: max(100%, 44px);
+  }
+}
+
+/* Alvos de toque em telas estreitas */
+@media (max-width: 767px) {
+  button { min-height: 44px; }
+  button:has(> svg:only-child) { min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .ds-badge, .ds-filter-chip { min-height: 0; }
+  .ds-filter-chip { min-height: 36px; }
+}
+
+/* Campos de formulário: 16px evita o zoom automático do iOS ao focar */
+@media (max-width: 768px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea { font-size: 16px !important; }
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select { min-height: 44px; }
+}
+
+/* Campos do design system (AppInput / AppSelect / AppTextarea) */
+.ds-field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.ds-field__label { font-size: 0.78rem; font-weight: 700; color: #334155; }
+.ds-field__control {
+  width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; font-size: 0.85rem;
+  border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #0f172a;
+}
+.ds-field__control:focus-visible { outline: 2px solid #0284c7; outline-offset: 1px; border-color: #0284c7; }
+.ds-field__control[aria-invalid='true'] { border-color: #dc2626; }
+.ds-field__hint { font-size: 0.75rem; color: #64748b; }
+.ds-field__error { font-size: 0.75rem; color: #b91c1c; font-weight: 600; }
+
+/* Tooltip acessível (hover, foco e toque) */
+.ds-tooltip { position: relative; display: inline-flex; }
+.ds-tooltip__bubble {
+  position: absolute; z-index: 1200; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: min(260px, calc(100vw - 32px));
+  background: #0f172a; color: #ffffff; font-size: 0.75rem; font-weight: 500; line-height: 1.35;
+  padding: 0.4rem 0.6rem; border-radius: 6px; box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+  white-space: normal; text-align: left; pointer-events: none;
+}
+
+
+/* ==========================================================================
+   Abas roláveis (Fase 2 / P5 — F2-16)
+   ========================================================================== */
+.ds-tabs-scroll {
+  --scroll-bg: #ffffff;
+  position: relative; flex-wrap: nowrap !important; overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity; scrollbar-width: none;
+  background:
+    linear-gradient(to right, var(--scroll-bg) 30%, transparent) left center / 24px 100% no-repeat local,
+    linear-gradient(to left, var(--scroll-bg) 30%, transparent) right center / 24px 100% no-repeat local,
+    linear-gradient(to right, rgba(15,23,42,0.14), transparent) left center / 10px 100% no-repeat scroll,
+    linear-gradient(to left, rgba(15,23,42,0.14), transparent) right center / 10px 100% no-repeat scroll;
+}
+.ds-tabs-scroll::-webkit-scrollbar { display: none; }
+.ds-tabs-scroll > [role='tab'] { flex: none; white-space: nowrap; scroll-snap-align: center; }
+.ds-tabs-scroll--pills { padding-bottom: 2px; }
+@media (min-width: 768px) {
+  .ds-tabs-scroll--pills { flex-wrap: wrap !important; overflow-x: visible; background: none; }
+}
+
+/* ==========================================================================
+   Régua de prazos: lista de marcos no celular (F2-18)
+   ========================================================================== */
+.lifeline-list { display: none; list-style: none; margin: 0.6rem 0 0; padding: 0; flex-direction: column; gap: 0.35rem; }
+.lifeline-list li { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; color: #334155; line-height: 1.3; }
+.lifeline-list li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.lifeline-list li span:last-child { flex: none; text-align: right; color: #64748b; white-space: nowrap; }
+.lifeline-list li[data-next='true'] { font-weight: 700; color: #b45309; }
+.lifeline-list li[data-next='true'] span:last-child { color: #b45309; }
+@media (max-width: 480px) {
+  .lifeline-list { display: flex; }
+  .lifeline-notes { display: none !important; }
 }

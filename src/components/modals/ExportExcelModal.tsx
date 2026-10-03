@@ -250,7 +250,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.6rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: '0.6rem' }}>
               
               {/* Preset Balanços */}
               <button
@@ -269,7 +269,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
                   <Sliders size={16} /> Saldos Contábeis
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
                   Itens, fornecedores, empenhos e saldo disponível
                 </div>
               </button>
@@ -291,7 +291,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
                   <FileText size={16} /> Resumo Executivo
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
                   Visão consolidada por Ata, vigências e valores
                 </div>
               </button>
@@ -313,7 +313,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
                   <Building2 size={16} /> Alocações Setoriais
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
                   Cotas por diretoria, empenhos e processos SEI
                 </div>
               </button>
@@ -335,7 +335,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
                   <ShoppingBag size={16} /> Catálogo de Compras
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
                   Itens, valores, caronas e links PNCP
                 </div>
               </button>
@@ -357,7 +357,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
                   <Sparkles size={16} /> Personalizado
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
                   Seleção livre de colunas personalizadas
                 </div>
               </button>
@@ -419,21 +419,21 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSelectAll}
-                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
                 >
                   Marcar Todas
                 </button>
                 <button
                   type="button"
                   onClick={handleClearAll}
-                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
                 >
                   Desmarcar Todas
                 </button>
                 <button
                   type="button"
                   onClick={handleResetDefaults}
-                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                 >
                   <RotateCcw size={12} /> Padrão
                 </button>
@@ -488,7 +488,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
             {/* Grid de Checkboxes de Colunas */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))',
               gap: '0.5rem',
               maxHeight: '230px',
               overflowY: 'auto',
@@ -524,7 +524,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                         {col.label}
                       </div>
                       {col.description && (
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.2, marginTop: '0.1rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.2, marginTop: '0.1rem' }}>
                           {col.description}
                         </div>
                       )}

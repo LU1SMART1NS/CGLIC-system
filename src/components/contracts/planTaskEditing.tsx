@@ -16,7 +16,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: '0.72rem',
+  fontSize: '0.75rem',
   fontWeight: 600,
   color: '#475569',
   display: 'block',
@@ -24,7 +24,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export const PERSONALIZADA_BADGE_STYLE: React.CSSProperties = {
-  fontSize: '0.68rem',
+  fontSize: '0.75rem',
   fontWeight: 700,
   padding: '0.1rem 0.4rem',
   borderRadius: '4px',
@@ -66,7 +66,7 @@ export const ConfirmDeleteButton: React.FC<{
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', color: '#b91c1c' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#b91c1c' }}>
       {confirmMessage}
       <AppButton
         type="button"
@@ -137,7 +137,7 @@ export const AddTaskForm: React.FC<{
         borderRadius: '6px',
         border: '1px solid #e2e8f0',
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
         gap: '0.75rem'
       }}
     >
@@ -168,7 +168,7 @@ export const AddTaskForm: React.FC<{
         />
       </div>
       <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
           {gestorNome ? `Responsável: ${gestorNome} (gestor). Você pode alterar depois.` : 'Você pode definir o responsável depois.'}
         </span>
         <span style={{ display: 'inline-flex', gap: '0.5rem' }}>
@@ -370,7 +370,7 @@ export const ModuleGroupHeader: React.FC<{
   const summary = (
     <div>
       <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c326f' }}>{nome}</div>
-      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
         {etapas} etapa{etapas !== 1 ? 's' : ''} • {concluidas} de {aplicaveis} tarefas concluídas ({percentual}%)
         {appliedLabel && <> • aplicado em {appliedLabel}</>}
         {atrasadas > 0 && (

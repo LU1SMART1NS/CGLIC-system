@@ -49,16 +49,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode; durationMs?: n
       {typeof document !== 'undefined' && createPortal(
         <div
           aria-live="polite"
-          style={{
-            position: 'fixed',
-            right: spacing.lg,
-            bottom: spacing.lg,
-            zIndex: MODAL_Z_INDEX + 100,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: spacing.sm,
-            maxWidth: '380px'
-          }}
+          className="ds-toast-region"
+          style={{ zIndex: MODAL_Z_INDEX + 100 }}
         >
           {items.map((t) => {
             const token = colors.semantic[t.tone];
@@ -82,12 +74,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode; durationMs?: n
                 }}
               >
                 <Icon size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-                <span style={{ flex: 1 }}>{t.message}</span>
+                <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{t.message}</span>
                 <button
                   type="button"
                   aria-label="Fechar aviso"
                   onClick={() => dismiss(t.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, display: 'inline-flex' }}
+                  className="ds-toast__close"
+                  style={{ color: 'inherit' }}
                 >
                   <X size={14} />
                 </button>

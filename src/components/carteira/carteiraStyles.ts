@@ -3,7 +3,7 @@ import type React from 'react';
 export const carteiraTh: React.CSSProperties = {
   textAlign: 'left',
   padding: '0.65rem 0.6rem',
-  fontSize: '0.7rem',
+  fontSize: '0.75rem',
   fontWeight: 800,
   textTransform: 'uppercase',
   letterSpacing: '0.03em',
@@ -43,7 +43,9 @@ export const carteiraTableShell: React.CSSProperties = {
 };
 
 export const carteiraSelect: React.CSSProperties = {
-  width: '190px',
+  width: '100%',
+  maxWidth: '190px',
+  flex: '1 1 160px',
   padding: '0.4rem 0.65rem',
   borderRadius: '6px',
   border: '1px solid #cbd5e1',

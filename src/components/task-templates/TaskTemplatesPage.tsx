@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import {
   Plus,
   Trash2,
@@ -162,7 +163,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                     border: '1px solid #f1f5f9'
                   }}
                 >
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', width: '20px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', width: '20px' }}>
                     {idx + 1}.
                   </span>
                   <CheckSquare size={13} color="#0c326f" />
@@ -507,7 +508,7 @@ const TaskTemplatesContent: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
       {/* Cabeçalho */}
       <PageHeader
@@ -536,7 +537,7 @@ const TaskTemplatesContent: React.FC = () => {
 
         <form onSubmit={handleCreateTemplate}>
           {/* Grid de Campos em 2 Colunas */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.85rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
                 Nome do Template *
@@ -644,7 +645,7 @@ const TaskTemplatesContent: React.FC = () => {
         )}
       </div>
 
-    </div>
+    </PageContainer>
   );
 };
 

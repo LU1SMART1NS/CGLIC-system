@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
+import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import {
   getInstrumentoInfo,
   getMotivoInfo,
@@ -25,7 +26,7 @@ interface GestaoInstrumentosTableProps {
 const th: React.CSSProperties = {
   textAlign: 'left',
   padding: '0.65rem 0.85rem',
-  fontSize: '0.7rem',
+  fontSize: '0.75rem',
   fontWeight: 800,
   textTransform: 'uppercase',
   letterSpacing: '0.03em',
@@ -163,7 +164,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                   </td>
                   <td style={td}>
                     <div style={{ fontWeight: 800 }}>{instrumento.label}</div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                       {instrumento.tipo}
                     </div>
                   </td>
@@ -172,7 +173,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                       <>
                         <div title={item.objetoItem} style={{ fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.objetoItem}</div>
                         {item.fornecedorNome && (
-                          <div title={item.fornecedorNome} style={{ fontSize: '0.72rem', color: '#64748b' }}>{item.fornecedorNome}</div>
+                          <div title={item.fornecedorNome} style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.fornecedorNome}</div>
                         )}
                       </>
                     ) : fornecedor ? (
@@ -187,7 +188,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.3rem',
-                      fontSize: '0.72rem',
+                      fontSize: '0.75rem',
                       fontWeight: 800,
                       color: motivo.color,
                       background: motivo.bg,
@@ -233,43 +234,13 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.65rem 0.85rem',
-          borderTop: '1px solid #e2e8f0',
-          fontSize: '0.78rem',
-          color: '#64748b'
-        }}>
-          <span>
-            Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, items.length)} de {items.length}
-          </span>
-          <div style={{ display: 'flex', gap: '0.35rem' }}>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPage(p)}
-                data-testid={`instrumentos-page-${p}`}
-                style={{
-                  minWidth: '28px',
-                  padding: '0.3rem 0.5rem',
-                  borderRadius: '6px',
-                  border: p === currentPage ? '1px solid #0c326f' : '1px solid #e2e8f0',
-                  background: p === currentPage ? '#0c326f' : '#ffffff',
-                  color: p === currentPage ? '#ffffff' : '#475569',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <CarteiraPagination
+        page={currentPage}
+        pageSize={pageSize}
+        total={items.length}
+        onChange={setPage}
+        testIdPrefix="instrumentos"
+      />
     </div>
   );
 };

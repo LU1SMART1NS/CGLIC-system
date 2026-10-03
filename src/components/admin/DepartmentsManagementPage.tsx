@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppButton } from '../../design-system/components/AppButton';
@@ -8,7 +9,8 @@ import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
 import { useAuth } from '../../context/AuthContext';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraTableShell } from '../carteira/carteiraStyles';
+import { DataTable } from '../../design-system/components/DataTable';
 import { Plus, Trash2, Edit2, Check, X, Building2, ArrowLeft, Sparkles } from 'lucide-react';
 import { useDepartments } from '../../hooks/useDepartments';
 import { useSaveDepartment } from '../../hooks/useSaveDepartment';
@@ -174,7 +176,7 @@ export const DepartmentsManagementPage: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Unidades Internas"
         subtitle="Diretorias, coordenações-gerais e coordenações oficiais da SENASP usadas no controle de cotas."
@@ -283,40 +285,44 @@ export const DepartmentsManagementPage: React.FC = () => {
             description="Use o formulário acima para cadastrar as unidades oficiais. As alocações internas só aceitam unidades deste catálogo."
           />
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ ...carteiraTh, width: '180px' }}>Sigla</th>
-                <th style={carteiraTh}>Nome completo / Diretoria</th>
-                {canManage && <th style={{ ...carteiraTh, width: '120px', textAlign: 'right' }}>Ações</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {departments.map((d: any) => (
-                <tr key={d.id} style={{ opacity: d.ativo ? 1 : 0.7 }}>
-                  <td style={{ ...carteiraTd, fontWeight: 700, color: d.ativo ? '#0c326f' : '#64748b' }}>
+          <DataTable<InternalDepartment>
+            testId="departments-table"
+            className="data-table-container--flush"
+            data={departments}
+            keyExtractor={(d) => String(d.id)}
+            rowStyle={(d) => (d.ativo ? undefined : { opacity: 0.7 })}
+            columns={[
+              {
+                key: 'sigla',
+                header: 'Sigla',
+                width: '180px',
+                priority: 'primary',
+                render: (d) => (
+                  <span style={{ fontWeight: 700, color: d.ativo ? '#0c326f' : '#64748b' }}>
                     {d.sigla} {!d.ativo && <StatusBadge label="Inativa" variant="danger" size="sm" dot={false} />}
-                  </td>
-                  <td style={carteiraTd}>{d.nomeCompleto}</td>
-                  {canManage && (
-                    <td style={{ ...carteiraTd, textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button type="button" onClick={() => handleEdit(d)} disabled={isSubmitting} title="Editar unidade" aria-label={`Editar ${d.sigla}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0ea5e9' }}>
-                          <Edit2 size={16} />
-                        </button>
-                        <button type="button" onClick={() => handleDelete(d.id, d.sigla)} disabled={isSubmitting} title="Excluir ou inativar unidade" aria-label={`Excluir ${d.sigla}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}>
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </span>
+                )
+              },
+              { key: 'nomeCompleto', header: 'Nome completo / Diretoria', mobileLabel: 'Nome', render: (d) => d.nomeCompleto }
+            ]}
+            rowActions={
+              canManage
+                ? (d) => (
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <button type="button" className="ds-icon-btn" onClick={() => handleEdit(d)} disabled={isSubmitting} title="Editar unidade" aria-label={`Editar ${d.sigla}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0ea5e9' }}>
+                        <Edit2 size={16} />
+                      </button>
+                      <button type="button" className="ds-icon-btn" onClick={() => handleDelete(d.id, d.sigla)} disabled={isSubmitting} title="Excluir ou inativar unidade" aria-label={`Excluir ${d.sigla}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )
+                : undefined
+            }
+          />
         )}
       </div>
       {dialog}
-    </div>
+    </PageContainer>
   );
 };

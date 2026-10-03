@@ -35,7 +35,7 @@ const Field: React.FC<{ id: string; label: string; children: React.ReactNode; hi
   <div className="form-group">
     <label className="form-label" htmlFor={id}>{label}</label>
     {children}
-    {hint && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{hint}</div>}
+    {hint && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{hint}</div>}
   </div>
 );
 
@@ -395,7 +395,7 @@ export const MarcoModal: React.FC<{
             />
             <span>
               Regularidade fiscal e trabalhista do credor verificada (SICAF / CNDs) *
-              <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b' }}>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>
                 Se encontrou pendência (por exemplo, CND vencida), escolha "Com pendência" acima.
               </span>
             </span>

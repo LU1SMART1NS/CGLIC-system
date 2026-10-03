@@ -41,11 +41,11 @@ export const EmpenhoDetailModal: React.FC<EmpenhoDetailModalProps> = ({
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="badge badge-info" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
+          <span className="badge badge-info" style={{ textTransform: 'uppercase', fontSize: '0.75rem' }}>
             {selectedEmpenhoDetail.tipo}
           </span>
           {beneficiariaUasg && (
-            <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>
+            <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
               UASG Beneficiária: {beneficiariaUasg}
             </span>
           )}
@@ -58,19 +58,19 @@ export const EmpenhoDetailModal: React.FC<EmpenhoDetailModalProps> = ({
           </h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', textAlign: 'center' }}>
             <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>QUANTIDADE REGISTRADA</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>QUANTIDADE REGISTRADA</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
                 {formatNumber(selectedEmpenhoDetail.quantidadeRegistrada)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>QUANTIDADE EMPENHADA</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>QUANTIDADE EMPENHADA</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--warning)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
                 {formatNumber(selectedEmpenhoDetail.quantidadeEmpenhada)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>SALDO P/ EMPENHAR</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>SALDO P/ EMPENHAR</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: selectedEmpenhoDetail.saldoEmpenho < 0 ? 'var(--danger)' : 'var(--success)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
                 {formatNumber(selectedEmpenhoDetail.saldoEmpenho)}
               </div>
@@ -108,7 +108,7 @@ export const EmpenhoDetailModal: React.FC<EmpenhoDetailModalProps> = ({
                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                           Contrato {c.numeroContrato}
                         </span>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           CNPJ Contratado: {c.niFornecedor?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") || '-'}
                         </div>
                       </div>
@@ -120,7 +120,7 @@ export const EmpenhoDetailModal: React.FC<EmpenhoDetailModalProps> = ({
                           {formatCurrency(c.valorInicial || 0)}
                         </span>
                         {contractUrl && (
-                          <a href={contractUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.72rem', color: 'var(--primary)', textDecoration: 'underline' }}>
+                          <a href={contractUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', color: 'var(--primary)', textDecoration: 'underline' }}>
                             PNCP <ExternalLink size={10} />
                           </a>
                         )}
@@ -139,16 +139,16 @@ export const EmpenhoDetailModal: React.FC<EmpenhoDetailModalProps> = ({
                       </div>
                       
                       {isLoadingEmps ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--text-secondary)', padding: '0.25rem 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '0.25rem 0' }}>
                           <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
                           <span>Carregando empenhos...</span>
                         </div>
                       ) : emps.length === 0 ? (
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '0.25rem 0' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0.25rem 0' }}>
                           Nenhum empenho publicado para este contrato no PNCP.
                         </div>
                       ) : (
-                        <table style={{ width: '100%', fontSize: '0.72rem', borderCollapse: 'collapse' }}>
+                        <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
                           <thead>
                             <tr style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                               <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 600 }}>N.º Empenho</th>

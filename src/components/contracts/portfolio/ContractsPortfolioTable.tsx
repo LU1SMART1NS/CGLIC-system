@@ -200,7 +200,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                     </td>
                     <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 800 }}>{numDisplay}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
                         {tipoLabel === 'Contrato' ? `UASG ${contract.uasg}` : `${tipoLabel} · UASG ${contract.uasg}`}
                       </div>
                     </td>
@@ -219,7 +219,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                     </td>
                     <td style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <CarteiraPrazoPill faixa={faixa} diasRestantes={diasRestantes} />
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
                         até {formatDateBR(contract.dataVigenciaFim)}
                       </div>
                     </td>
@@ -230,7 +230,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                       {worst ? (
                         <span
                           data-testid={`contracts-pendencias-${contractKey}`}
-                          style={{ fontSize: '0.74rem', fontWeight: 800, color: worst.color, background: worst.bg, padding: '0.2rem 0.55rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
+                          style={{ fontSize: '0.75rem', fontWeight: 800, color: worst.color, background: worst.bg, padding: '0.2rem 0.55rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
                         >
                           {pendencias.length} {pendencias.length === 1 ? 'pendência' : 'pendências'}
                         </span>
@@ -263,7 +263,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                   {isExpanded && (
                     <tr data-testid={`contracts-expanded-${contractKey}`}>
                       <td colSpan={8} style={CARTEIRA_EXPANDED_CELL_STYLE}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem', fontSize: '0.82rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: '1rem', fontSize: '0.82rem' }}>
                           <div>
                             <CarteiraDetailLabel>Processo</CarteiraDetailLabel>
                             <div>{contract.processo || '—'}</div>

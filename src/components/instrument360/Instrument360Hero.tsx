@@ -136,7 +136,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
       <div className="i360-identity">
         <div className="i360-identity-main">
           {eyebrow && (
-            <div style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: COLORS.muted }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: COLORS.muted }}>
               {eyebrow}
             </div>
           )}
