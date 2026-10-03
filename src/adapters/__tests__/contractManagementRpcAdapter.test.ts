@@ -8,6 +8,7 @@ import {
   saveContractTaskTemplateTaskRpc,
   deleteContractTaskTemplateTaskRpc,
   applyContractTaskTemplateRpc,
+  renameContractTaskModuleRpc,
   updateContractTaskRpc
 } from '../contractManagementRpcAdapter';
 import * as supabaseClientModule from '../../services/supabaseClient';
@@ -229,10 +230,31 @@ describe('contractManagementRpcAdapter', () => {
         p_uasg: '200331',
         p_numero: '15',
         p_ano: 2026,
-        p_template_id: 'tpl-1'
+        p_template_id: 'tpl-1',
+        p_modulo_nome: null
       });
       expect(result.macrotasks_count).toBe(8);
       expect(result.tasks_count).toBe(31);
+    });
+
+    it('envia o nome do módulo quando informado e renomeia um módulo', async () => {
+      mockRpc.mockResolvedValueOnce({ data: { success: true }, error: null });
+      await applyContractTaskTemplateRpc({ uasg: '200331', numero: '15', ano: 2026, templateId: 'tpl-1', moduloNome: ' 2º Termo aditivo ' });
+      expect(mockRpc).toHaveBeenCalledWith('apply_contract_task_template_atomic', {
+        p_uasg: '200331',
+        p_numero: '15',
+        p_ano: 2026,
+        p_template_id: 'tpl-1',
+        p_modulo_nome: '2º Termo aditivo'
+      });
+
+      mockRpc.mockResolvedValueOnce({ data: { success: true }, error: null });
+      await renameContractTaskModuleRpc({ planId: 'plan-1', moduloId: 'mod-1', nome: ' 1º Termo aditivo ' });
+      expect(mockRpc).toHaveBeenLastCalledWith('rename_contract_task_module_atomic', {
+        p_plan_id: 'plan-1',
+        p_modulo_id: 'mod-1',
+        p_nome: '1º Termo aditivo'
+      });
     });
 
     it('deve rejeitar aplicação sem template selecionado (aplicação inválida)', async () => {

@@ -221,7 +221,7 @@ export const typography = {
     body: '0.875rem',    // 14px
     bodySm: '0.8125rem', // 13px
     label: '0.75rem',    // 12px
-    caption: '0.6875rem' // 11px
+    caption: '0.75rem'   // 12px (mínimo legível em mobile)
   },
   fontWeight: {
     normal: 400,
@@ -263,3 +263,36 @@ export const shapes = {
     slow: 'all 0.3s ease-in-out'
   }
 } as const;
+
+/**
+ * Responsividade (mobile-first). Os valores espelham os @media de src/index.css,
+ * que não aceita var() — mantenha os dois lados em sincronia.
+ * Regra: estilo (padding, fonte, quebra) vai em CSS; useBreakpoint/useMediaQuery
+ * só para decisões estruturais (drawer x sidebar, cartões x tabela).
+ */
+export const breakpoints = {
+  sm: 480,
+  md: 768,
+  lg: 1024,
+  xl: 1280
+} as const;
+
+export type Breakpoint = 'xs' | keyof typeof breakpoints;
+
+export const touchTarget = { min: '44px' } as const;
+
+/** Inputs com fonte menor que 16px provocam zoom automático no iOS Safari. */
+export const inputFontSizeMobile = '16px';
+
+export const pageGutter = {
+  mobile: '1rem',
+  tablet: '1.5rem',
+  desktop: '2rem'
+} as const;
+
+/**
+ * Grid auto-ajustável que nunca ultrapassa a largura do contêiner.
+ * Use no lugar de `repeat(auto-fit, minmax(Npx, 1fr))`, que estoura abaixo de N px.
+ */
+export const responsiveGrid = (minPx: number, mode: 'fit' | 'fill' = 'fit'): string =>
+  `repeat(auto-${mode}, minmax(min(100%, ${minPx}px), 1fr))`;

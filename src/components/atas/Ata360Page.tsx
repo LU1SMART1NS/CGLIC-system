@@ -200,9 +200,9 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         actionItems={queue.items}
         linkedContractsCount={linkedContracts.length}
         isLoadingSaldos={loadingSaldos}
-        onOpenActions={() => goToTab('acoes', true)}
-        onOpenItens={() => goToTab('itens', true)}
-        onOpenContratos={() => goToTab('contratos', true)}
+        onOpenActions={() => goToTab('acoes')}
+        onOpenItens={() => goToTab('itens')}
+        onOpenContratos={() => goToTab('contratos')}
       />
 
       <Instrument360Tabs
@@ -227,7 +227,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
               ataKey={arp.numeroAtaRegistroPreco}
               plan={taskPlan}
               isLoading={loadingSaldos || loadingTaskPlan}
-              onGoTo={(tab) => goToTab(tab, true)}
+              onGoTo={(tab) => goToTab(tab)}
             />
           </InstrumentSection>
         )}

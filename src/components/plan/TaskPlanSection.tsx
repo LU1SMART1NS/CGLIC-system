@@ -22,6 +22,8 @@ import type {
   ContractTaskStatusValue
 } from '../../types';
 import { groupMacrotasksByModule } from '../../utils/taskPlanModules';
+import { sugerirNomeModulo } from '../../utils/planModuleNaming';
+import { numeroEtapa, numeroTarefa, stripNumeracaoManual } from '../../utils/planNumbering';
 import { ResponsavelField, type ResponsavelValue } from '../contracts/ResponsavelField';
 import {
   AddTaskForm,
@@ -31,13 +33,14 @@ import {
   ConfirmDeleteButton,
   MutationError,
   PERSONALIZADA_BADGE_STYLE,
-  describeResponsavel
+  describeResponsavel,
+  planFormStyles
 } from '../contracts/planTaskEditing';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { classifyTaskAttention } from '../contracts/taskAttentionDisplay';
 import { severityFromAttentionPriorityLevel } from '../../services/severityService';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
-import { AppButton, DataTable, EmptyState, NoticeBar, SummaryBar, useConfirmDialog } from '../../design-system';
+import { AppButton, DataTable, EmptyState, Modal, NoticeBar, SummaryBar, useConfirmDialog } from '../../design-system';
 
 /**
  * Plano de gestão: mesma tela para Contrato e Ata. O componente só desenha; quem usa informa por
@@ -90,11 +93,12 @@ export interface TaskPlanController {
   useDeleteTask: (key: string) => PlanMutation<string>;
   templates: Array<{ id: string; nome: string }>;
   loadingTemplates: boolean;
-  applyTemplate: PlanAction<[templateId: string, onSuccess: () => void]>;
+  applyTemplate: PlanAction<[templateId: string, onSuccess: () => void, moduloNome?: string]>;
   startPlan: PlanAction<[]>;
   saveMacrotask: PlanAction<[vars: { id?: string; planId?: string; nome: string }]>;
   deleteMacrotask: PlanAction<[id: string]>;
   deleteModule: PlanAction<[vars: { planId: string; moduloId: string }]>;
+  renameModule: PlanAction<[vars: { planId: string; moduloId: string; nome: string }]>;
   createTask: PlanAction<[vars: { macrotaskId: string; nome: string; prazo: string | null; observacao: string | null }]>;
 }
 
@@ -110,12 +114,13 @@ const externalLinkOf = (task: PlanTask): string | undefined => (task as Contract
 /** Linha de uma tarefa do plano, igual em Contrato e Ata. */
 export type TaskPlanRowController = Pick<TaskPlanController, 'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask'>;
 
-export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowController }> = ({ task, controller }) => {
+export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowController; numero?: string }> = ({ task, controller, numero }) => {
   const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask } = controller;
   const updateMutation = useUpdateTask(entityKey);
   const deleteMutation = useDeleteTask(entityKey);
   const [expanded, setExpanded] = useState(false);
-  const [nome, setNome] = useState(task.nome);
+  const nomeTarefa = stripNumeracaoManual(task.nome);
+  const [nome, setNome] = useState(nomeTarefa);
   const [responsavel, setResponsavel] = useState<ResponsavelValue>({
     nome: task.responsavelNome || '',
     userId: task.responsavelUserId
@@ -147,7 +152,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
     updateMutation.mutate({
       taskId: task.id,
       status: task.status,
-      nome: nome.trim() || task.nome,
+      nome: stripNumeracaoManual(nome).trim() || nomeTarefa,
       // Vazio limpa o responsável próprio e a tarefa volta a herdar o gestor.
       responsavelNome: responsavel.nome.trim(),
       responsavelUserId: responsavel.nome.trim() ? responsavel.userId : undefined,
@@ -161,12 +166,15 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
     <div style={{ borderBottom: '1px solid #f1f5f9', padding: '0.65rem 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         {/* Seletor Rápido de Status */}
-        <div style={{ display: 'flex', gap: '2px' }}>
+        <div className="plan-status-group" style={{ display: 'flex', gap: '2px' }}>
           {STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               title={opt.label}
+              aria-label={opt.label}
+              aria-pressed={task.status === opt.value}
+              className="plan-status-btn"
               onClick={() => handleStatusChange(opt.value)}
               disabled={updateMutation.isPending}
               style={{
@@ -189,7 +197,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
         </div>
 
         {/* Informações da Tarefa */}
-        <div style={{ flex: 1, minWidth: '240px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
+        <div style={{ flex: '1 1 240px', minWidth: 0, cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span
               style={{
@@ -199,7 +207,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
                 textDecoration: task.status === 'CONCLUIDA' ? 'line-through' : 'none'
               }}
             >
-              {task.nome}
+              {numero ? `${numero}. ${nomeTarefa}` : nomeTarefa}
             </span>
 
 
@@ -230,7 +238,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
                 alignItems: 'center',
                 gap: '3px',
                 padding: '0.25rem 0.5rem',
-                fontSize: '0.72rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: '#0c326f',
                 backgroundColor: '#f8fafc',
@@ -274,12 +282,12 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             borderRadius: '6px',
             border: '1px solid #e2e8f0',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
             gap: '0.75rem'
           }}
         >
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
               Nome da tarefa
             </label>
             <input
@@ -297,7 +305,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           </div>
 
           <div>
-            <label htmlFor={`responsavel-${task.id}`} style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label htmlFor={`responsavel-${task.id}`} style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
               Responsável
             </label>
             <ResponsavelField
@@ -310,7 +318,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           </div>
 
           <div>
-            <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
               Prazo limite
             </label>
             <input
@@ -327,12 +335,12 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             />
           </div>
 
-          <div style={{ gridColumn: '1 / -1', fontSize: '0.72rem', color: gestorNome ? '#64748b' : '#b45309', marginTop: '-0.4rem' }}>
+          <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: gestorNome ? '#64748b' : '#b45309', marginTop: '-0.4rem' }}>
             {gestorNome ? labels.herancaMsg : labels.semGestorMsg}
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
               Observação / Justificativa
             </label>
             <input
@@ -386,6 +394,7 @@ export const TaskPlanSection: React.FC<{
   const confirm = useConfirmDialog();
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [showApplyModel, setShowApplyModel] = useState(false);
+  const [nomeNovoModulo, setNomeNovoModulo] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const toggleGroup = (key: string) =>
     setCollapsedGroups((prev) => {
@@ -395,25 +404,35 @@ export const TaskPlanSection: React.FC<{
       return next;
     });
 
-  const handleApplyTemplate = async () => {
+  const finishApply = () => {
+    setSelectedTemplateId('');
+    setShowApplyModel(false);
+    setNomeNovoModulo(null);
+  };
+
+  /** Módulos já aplicados a partir do modelo escolhido (para sugerir o nome do próximo). */
+  const modulosDoModelo = (templateId: string) =>
+    plan
+      ? groupMacrotasksByModule(plan.macrotarefas as Parameters<typeof groupMacrotasksByModule>[0], plan)
+          .filter((g) => g.modulo?.templateId === templateId)
+          .map((g) => g.modulo!.nome)
+      : [];
+
+  const handleApplyTemplate = () => {
     if (!selectedTemplateId) return;
-    const alreadyApplied = plan
-      ? groupMacrotasksByModule(plan.macrotarefas as Parameters<typeof groupMacrotasksByModule>[0], plan).some(
-          (g) => g.modulo?.templateId === selectedTemplateId
-        )
-      : false;
-    if (alreadyApplied) {
-      const ok = await confirm({
-        title: 'Aplicar modelo novamente',
-        message: 'Este modelo já foi aplicado a este plano. Acrescentar novamente vai duplicar as etapas e tarefas em um novo módulo. Deseja continuar?',
-        confirmLabel: 'Aplicar mesmo assim'
-      });
-      if (!ok) return;
+    const existentes = modulosDoModelo(selectedTemplateId);
+    if (existentes.length > 0) {
+      // Mesmo modelo outra vez: o usuário confirma (ou troca) o nome do novo módulo.
+      const nomeModelo = c.templates.find((t) => t.id === selectedTemplateId)?.nome ?? '';
+      setNomeNovoModulo(sugerirNomeModulo(nomeModelo, existentes));
+      return;
     }
-    c.applyTemplate.run(selectedTemplateId, () => {
-      setSelectedTemplateId('');
-      setShowApplyModel(false);
-    });
+    c.applyTemplate.run(selectedTemplateId, finishApply);
+  };
+
+  const confirmarNovoModulo = () => {
+    if (!selectedTemplateId || !nomeNovoModulo?.trim()) return;
+    c.applyTemplate.run(selectedTemplateId, finishApply, nomeNovoModulo.trim());
   };
 
   if (isLoading) {
@@ -437,7 +456,7 @@ export const TaskPlanSection: React.FC<{
                 value={selectedTemplateId}
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
                 disabled={c.loadingTemplates || c.applyTemplate.isPending}
-                style={{ minWidth: '260px', width: 'auto' }}
+                style={{ minWidth: 0, width: '100%', maxWidth: '360px' }}
               >
                 <option value="">Selecione um Modelo de Gestão...</option>
                 {c.templates.map((tpl) => (
@@ -502,6 +521,48 @@ export const TaskPlanSection: React.FC<{
 
   return (
     <div>
+      <Modal
+        isOpen={nomeNovoModulo !== null}
+        onClose={() => setNomeNovoModulo(null)}
+        title="Aplicar modelo novamente"
+        subtitle="Este modelo já foi aplicado a este plano. Acrescentar vai criar um novo módulo com as mesmas etapas e tarefas."
+        size="sm"
+        dismissible={!c.applyTemplate.isPending}
+        testId="apply-again-modal"
+        footer={
+          <>
+            <AppButton type="button" variant="outline" onClick={() => setNomeNovoModulo(null)} disabled={c.applyTemplate.isPending}>
+              Cancelar
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="primary"
+              onClick={confirmarNovoModulo}
+              disabled={!nomeNovoModulo?.trim() || c.applyTemplate.isPending}
+              isLoading={c.applyTemplate.isPending}
+            >
+              Aplicar
+            </AppButton>
+          </>
+        }
+      >
+        <label style={planFormStyles.labelStyle} htmlFor="nome-novo-modulo">Nome do novo módulo</label>
+        <input
+          id="nome-novo-modulo"
+          className="form-input"
+          value={nomeNovoModulo ?? ''}
+          onChange={(e) => setNomeNovoModulo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              confirmarNovoModulo();
+            }
+          }}
+          maxLength={200}
+          style={{ width: '100%' }}
+        />
+      </Modal>
+
       {/* Resumo do plano: progresso à esquerda, ações à direita */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div style={{ flex: '1 1 320px', minWidth: 0 }}>
@@ -552,7 +613,7 @@ export const TaskPlanSection: React.FC<{
               value={selectedTemplateId}
               onChange={(e) => setSelectedTemplateId(e.target.value)}
               disabled={c.loadingTemplates || c.applyTemplate.isPending}
-              style={{ minWidth: '240px', width: 'auto' }}
+              style={{ minWidth: 0, width: '100%', maxWidth: '360px' }}
             >
               <option value="">Selecione um Modelo de Gestão...</option>
               {c.templates.map((tpl) => (
@@ -581,6 +642,7 @@ export const TaskPlanSection: React.FC<{
           c.saveMacrotask.error ||
           c.deleteMacrotask.error ||
           c.deleteModule.error ||
+          c.renameModule.error ||
           c.createTask.error
         }
       />
@@ -600,7 +662,12 @@ export const TaskPlanSection: React.FC<{
               atrasadas={countOverdue(group)}
               collapsed={collapsed}
               onToggleCollapsed={() => toggleGroup(group.key)}
-              isPending={c.deleteModule.isPending}
+              isPending={c.deleteModule.isPending || c.renameModule.isPending}
+              onRename={
+                group.modulo
+                  ? (nome) => c.renameModule.run({ planId: plan.id, moduloId: group.modulo!.id, nome })
+                  : undefined
+              }
               onDelete={
                 group.modulo
                   ? async () => {
@@ -615,7 +682,7 @@ export const TaskPlanSection: React.FC<{
                   : undefined
               }
             />
-        {!collapsed && group.macrotarefas.map((macro) => (
+        {!collapsed && group.macrotarefas.map((macro, macroIndex) => (
           <div
             key={macro.id}
             style={{
@@ -627,15 +694,16 @@ export const TaskPlanSection: React.FC<{
           >
             <MacrotaskHeader
               nome={macro.nome}
+              numero={numeroEtapa(macroIndex)}
               taskCount={macro.tarefas.length}
               isPending={c.saveMacrotask.isPending || c.deleteMacrotask.isPending}
-              onRename={(nome) => c.saveMacrotask.run({ id: macro.id, nome })}
+              onRename={(nome) => c.saveMacrotask.run({ id: macro.id, nome: stripNumeracaoManual(nome) })}
               onDelete={() => c.deleteMacrotask.run(macro.id)}
             />
 
             <div>
-              {macro.tarefas.map((tarefa) => (
-                <TaskPlanRow key={tarefa.id} task={tarefa} controller={c} />
+              {macro.tarefas.map((tarefa, tarefaIndex) => (
+                <TaskPlanRow key={tarefa.id} task={tarefa} controller={c} numero={numeroTarefa(macroIndex, tarefaIndex)} />
               ))}
               <AddTaskForm
                 gestorNome={c.gestorNome}
@@ -643,7 +711,7 @@ export const TaskPlanSection: React.FC<{
                 onSubmit={(values) =>
                   c.createTask.run({
                     macrotaskId: macro.id,
-                    nome: values.nome,
+                    nome: stripNumeracaoManual(values.nome),
                     prazo: values.prazo || null,
                     observacao: values.observacao || null
                   })
@@ -658,7 +726,7 @@ export const TaskPlanSection: React.FC<{
 
         <AddMacrotaskForm
           isPending={c.saveMacrotask.isPending}
-          onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome })}
+          onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome: stripNumeracaoManual(nome) })}
         />
       </div>
     </div>

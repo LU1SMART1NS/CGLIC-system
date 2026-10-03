@@ -131,7 +131,7 @@ export const LoginRoute: React.FC = () => {
         background: 'rgba(0, 0, 0, 0.25)',
         color: '#ffffff',
         padding: '0.4rem 2rem',
-        fontSize: '0.72rem',
+        fontSize: '0.75rem',
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
@@ -434,7 +434,7 @@ export const LoginRoute: React.FC = () => {
         zIndex: 1,
         textAlign: 'center',
         padding: '0.75rem 1rem 1.25rem',
-        fontSize: '0.72rem',
+        fontSize: '0.75rem',
         color: 'rgba(255, 255, 255, 0.65)'
       }}>
         CGLIC · Ministério da Justiça e Segurança Pública · SENASP

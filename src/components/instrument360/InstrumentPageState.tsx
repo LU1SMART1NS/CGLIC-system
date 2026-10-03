@@ -83,7 +83,7 @@ export const InstrumentPageState: React.FC<InstrumentPageStateProps> = ({
           </p>
         )}
         {(onRetry || onBack) && (
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
             {onRetry && <AppButton onClick={onRetry}>Tentar novamente</AppButton>}
             {onBack && (
               <AppButton variant={onRetry ? 'outline' : 'primary'} icon={<ArrowLeft size={16} />} onClick={onBack}>

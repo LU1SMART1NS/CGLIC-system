@@ -1,12 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Lock } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Lock, X } from 'lucide-react';
 import { navigationConfig, filterNavigationByRole, type NavItem } from '../../config/navigation';
 import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
+  mode?: 'desktop' | 'drawer';
+  drawerOpen?: boolean;
+  onCloseDrawer?: () => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  /** Chamado ao clicar num grupo com filhos enquanto a barra está recolhida. */
+  onRequestExpand?: () => void;
   onOpenExportModal?: () => void;
   onOpenDepartmentsModal?: () => void;
 }
@@ -34,7 +39,8 @@ const SidebarLink: React.FC<{
   depth: number;
   collapsed: boolean;
   onAction?: (actionId: string) => void;
-}> = ({ item, depth, collapsed, onAction }) => {
+  onRequestExpand?: () => void;
+}> = ({ item, depth, collapsed, onAction, onRequestExpand }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const active = isItemActive(item, location.pathname);
@@ -51,6 +57,12 @@ const SidebarLink: React.FC<{
       return;
     }
     if (hasChildren) {
+      // Recolhida, os filhos ficam ocultos: expande a barra para torná-los acessíveis.
+      if (collapsed && onRequestExpand) {
+        setExpanded(true);
+        onRequestExpand();
+        return;
+      }
       setExpanded((prev) => !prev);
       return;
     }
@@ -87,6 +99,7 @@ const SidebarLink: React.FC<{
           display: 'flex',
           alignItems: 'center',
           gap: '0.65rem',
+          minHeight: '44px',
           padding: depth === 0 ? '0.62rem 0.85rem' : '0.48rem 0.85rem 0.48rem 2.1rem',
           background: isSelectedLeaf
             ? 'rgba(12, 50, 111, 0.08)'
@@ -134,7 +147,7 @@ const SidebarLink: React.FC<{
             </span>
             {item.badge && badgeStyle && (
               <span style={{
-                fontSize: '0.68rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 padding: '0.15rem 0.45rem',
                 borderRadius: '999px',
@@ -162,6 +175,7 @@ const SidebarLink: React.FC<{
               depth={depth + 1}
               collapsed={collapsed}
               onAction={onAction}
+              onRequestExpand={onRequestExpand}
             />
           ))}
         </div>
@@ -171,8 +185,12 @@ const SidebarLink: React.FC<{
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  mode = 'desktop',
+  drawerOpen = false,
+  onCloseDrawer,
   collapsed,
   onToggleCollapsed,
+  onRequestExpand,
   onOpenExportModal,
   onOpenDepartmentsModal
 }) => {
@@ -181,7 +199,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // até a role real resolver) — mesmo princípio fail-closed do backend.
   const visibleNavigation = useMemo(() => filterNavigationByRole(navigationConfig, role), [role]);
 
+  const isDrawer = mode === 'drawer';
+  const asideRef = useRef<HTMLElement>(null);
+
+  // Drawer: foco entra ao abrir e fica preso (Tab/Shift+Tab) enquanto aberto.
+  useEffect(() => {
+    if (!isDrawer || !drawerOpen) return;
+    const el = asideRef.current;
+    if (!el) return;
+    const focusables = () =>
+      Array.from(el.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]'));
+    focusables()[0]?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    el.addEventListener('keydown', onKeyDown);
+    return () => el.removeEventListener('keydown', onKeyDown);
+  }, [isDrawer, drawerOpen]);
+
   const handleAction = (actionId: string) => {
+    if (isDrawer) onCloseDrawer?.();
     if (actionId === 'open-export-modal' && onOpenExportModal) {
       onOpenExportModal();
     } else if (actionId === 'open-departments-modal' && onOpenDepartmentsModal) {
@@ -191,20 +239,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      style={{
-        width: collapsed ? '64px' : '280px',
-        flexShrink: 0,
-        background: '#ffffff',
-        borderRight: '1px solid #e2e8f0',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'sticky',
-        top: 0,
-        height: '100vh',
-        overflowY: 'auto',
-        zIndex: 40
-      }}
+      ref={asideRef}
+      className={isDrawer ? 'app-drawer' : undefined}
+      aria-label={isDrawer ? 'Menu de navegação' : undefined}
+      aria-hidden={isDrawer && !drawerOpen ? true : undefined}
+      // inert evita foco em links do drawer fechado (React 19 aceita o atributo booleano)
+      inert={isDrawer && !drawerOpen ? true : undefined}
+      style={
+        isDrawer
+          ? {
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: 'min(300px, 85vw)',
+              height: '100dvh',
+              background: '#ffffff',
+              borderRight: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              overflowY: 'auto',
+              zIndex: 60,
+              transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
+              transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: drawerOpen ? '0 10px 40px rgba(15, 23, 42, 0.25)' : 'none'
+            }
+          : {
+              width: collapsed ? '64px' : '280px',
+              flexShrink: 0,
+              background: '#ffffff',
+              borderRight: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              position: 'sticky',
+              top: 0,
+              height: '100dvh',
+              overflowY: 'auto',
+              zIndex: 40
+            }
+      }
     >
       <div style={{
         padding: collapsed ? '1.1rem 0.5rem' : '1.1rem 1rem',
@@ -230,15 +304,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           type="button"
-          onClick={onToggleCollapsed}
-          title={collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'}
-          aria-label={collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'}
+          onClick={isDrawer ? onCloseDrawer : onToggleCollapsed}
+          title={isDrawer ? 'Fechar menu' : collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'}
+          aria-label={isDrawer ? 'Fechar menu' : collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '28px',
-            height: '28px',
+            width: isDrawer ? '44px' : '28px',
+            height: isDrawer ? '44px' : '28px',
             background: '#f8fafc',
             border: '1px solid #e2e8f0',
             borderRadius: '6px',
@@ -247,7 +321,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             transition: 'background 0.15s ease'
           }}
         >
-          {collapsed ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
+          {isDrawer ? <X size={18} /> : collapsed ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
         </button>
       </div>
 
@@ -279,6 +353,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 depth={0}
                 collapsed={collapsed}
                 onAction={handleAction}
+                onRequestExpand={onRequestExpand}
               />
             </React.Fragment>
           );

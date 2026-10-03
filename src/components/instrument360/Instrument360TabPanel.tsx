@@ -25,11 +25,11 @@ export const Instrument360TabPanel: React.FC<Instrument360TabPanelProps> = ({
     id={`${idPrefix}-tabpanel-${activeTab}`}
     aria-labelledby={`${idPrefix}-tab-${activeTab}`}
     data-testid="instrument-tab-panel"
+    className="i360-tabpanel"
     style={{
       background: '#f8fafc',
       border: '1px solid #e2e8f0',
       borderRadius: '8px',
-      padding: '1.25rem',
       minHeight,
       display: 'flex',
       flexDirection: 'column',

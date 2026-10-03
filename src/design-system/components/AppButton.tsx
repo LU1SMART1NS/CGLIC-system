@@ -19,46 +19,45 @@ export interface AppButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> 
 export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
   ({ variant = 'primary', size = 'md', icon, isLoading, iconOnly = false, disabled, children, className, style, ...rest }, ref) => {
     
-    const [isHovered, setIsHovered] = React.useState(false);
-    const [isFocused, setIsFocused] = React.useState(false);
-
+    // Hover e foco ficam em CSS (.ds-btn em index.css): hover só em dispositivos com mouse
+    // e foco só por teclado (:focus-visible), sem estado React por botão.
     const getVariantStyles = (): React.CSSProperties => {
       switch (variant) {
         case 'secondary':
           return {
-            backgroundColor: isHovered && !disabled ? '#e2e8f0' : '#f1f5f9',
+            backgroundColor: '#f1f5f9',
             color: '#0f172a',
             border: '1px solid #cbd5e1'
           };
         case 'outline':
           return {
-            backgroundColor: isHovered && !disabled ? '#f8fafc' : '#ffffff',
+            backgroundColor: '#ffffff',
             color: '#0c326f',
             border: '1px solid #cbd5e1'
           };
         case 'ghost':
           return {
-            backgroundColor: isHovered && !disabled ? '#f1f5f9' : 'transparent',
+            backgroundColor: 'transparent',
             color: '#475569',
             border: '1px solid transparent'
           };
         case 'ghostDanger':
           // Ação destrutiva discreta: só texto em vermelho; ganha fundo avermelhado ao passar o mouse.
           return {
-            backgroundColor: isHovered && !disabled ? '#fef2f2' : 'transparent',
+            backgroundColor: 'transparent',
             color: '#b91c1c',
             border: '1px solid transparent'
           };
         case 'danger':
           return {
-            backgroundColor: isHovered && !disabled ? '#dc2626' : '#ef4444',
+            backgroundColor: '#ef4444',
             color: '#ffffff',
             border: '1px solid transparent'
           };
         case 'primary':
         default:
           return {
-            backgroundColor: isHovered && !disabled ? '#08214d' : '#0c326f',
+            backgroundColor: '#0c326f',
             color: '#ffffff',
             border: '1px solid transparent'
           };
@@ -101,8 +100,6 @@ export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
       cursor: disabled || isLoading ? 'not-allowed' : 'pointer',
       opacity: disabled || isLoading ? 0.6 : 1,
       transition: shapes.transition.fast,
-      outline: isFocused ? '2px solid #0284c7' : 'none',
-      outlineOffset: '2px',
       boxSizing: 'border-box'
     };
 
@@ -118,11 +115,7 @@ export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
         ref={ref}
         disabled={disabled || isLoading}
         style={combinedStyles}
-        className={className}
-        onMouseEnter={(e) => { setIsHovered(true); rest.onMouseEnter?.(e); }}
-        onMouseLeave={(e) => { setIsHovered(false); rest.onMouseLeave?.(e); }}
-        onFocus={(e) => { setIsFocused(true); rest.onFocus?.(e); }}
-        onBlur={(e) => { setIsFocused(false); rest.onBlur?.(e); }}
+        className={`ds-btn ds-btn--${variant}${className ? ` ${className}` : ''}`}
         aria-disabled={disabled || isLoading}
         aria-busy={isLoading}
         {...rest}

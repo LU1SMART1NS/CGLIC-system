@@ -1,4 +1,5 @@
 import React from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import { CalendarOff, ChevronLeft, ChevronRight, CopyPlus, Download, Edit2, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -151,7 +152,7 @@ export const HolidaysPage: React.FC = () => {
   const iconButton = (color: string): React.CSSProperties => ({ background: 'none', border: 'none', cursor: isBusy ? 'not-allowed' : 'pointer', color, padding: '0.2rem', display: 'inline-flex' });
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Feriados"
         subtitle="Datas sem expediente descontadas dos prazos em dias úteis."
@@ -209,7 +210,7 @@ export const HolidaysPage: React.FC = () => {
           />
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={{ ...carteiraTh, width: '120px' }}>Data</th>
@@ -223,13 +224,13 @@ export const HolidaysPage: React.FC = () => {
               <tbody>
                 {yearRecords.map((r) => (
                   <tr key={r.data} data-testid={`holiday-row-${r.data}`} style={{ opacity: r.ativo ? 1 : 0.7 }}>
-                    <td style={{ ...carteiraTd, fontWeight: 700, color: '#0c326f' }}>{formatDateBR(r.data)}</td>
-                    <td style={{ ...carteiraTd, color: '#64748b' }}>{weekdayOf(r.data)}</td>
-                    <td style={carteiraTd}>{r.nome}</td>
-                    <td style={carteiraTd}>
+                    <td data-label="Data" style={{ ...carteiraTd, fontWeight: 700, color: '#0c326f' }}>{formatDateBR(r.data)}</td>
+                    <td data-label="Dia" style={{ ...carteiraTd, color: '#64748b' }}>{weekdayOf(r.data)}</td>
+                    <td data-label="Nome" style={carteiraTd}>{r.nome}</td>
+                    <td data-label="Tipo" style={carteiraTd}>
                       <StatusBadge size="sm" label={HOLIDAY_TIPO_LABEL[r.tipo]} variant={r.tipo === 'NACIONAL' ? 'info' : r.tipo === 'DISTRITAL' ? 'purple' : 'neutral'} />
                     </td>
-                    <td style={carteiraTd}>
+                    <td data-label="Nos prazos" style={carteiraTd}>
                       {!r.ativo ? (
                         <StatusBadge size="sm" label="Desativado: dia útil" variant="neutral" />
                       ) : r.meioExpediente ? (
@@ -238,7 +239,7 @@ export const HolidaysPage: React.FC = () => {
                         <StatusBadge size="sm" label="Sem expediente" variant="success" />
                       )}
                     </td>
-                    <td style={{ ...carteiraTd, textAlign: 'right' }}>
+                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                         <button
                           type="button"
@@ -327,6 +328,6 @@ export const HolidaysPage: React.FC = () => {
           </div>
         )}
       </Modal>
-    </div>
+    </PageContainer>
   );
 };

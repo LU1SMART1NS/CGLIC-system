@@ -52,7 +52,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   return (
     <span
       data-testid={testId || 'status-badge'}
-      className={`status-badge ${className}`.trim()}
+      className={`status-badge ds-badge ${className}`.trim()}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -82,7 +82,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         />
       )}
       {icon && <span aria-hidden="true">{icon}</span>}
-      <span>{label}</span>
+      <span className="ds-badge__label" title={label}>{label}</span>
     </span>
   );
 };

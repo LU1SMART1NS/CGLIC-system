@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { PageContainer } from '../design-system/components/PageContainer';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
 import { useAllContractManagers } from '../hooks/useAllContractManagers';
@@ -213,13 +214,13 @@ export const ContractsRoute: React.FC = () => {
 
   if (error && !hasAnyData) {
     return (
-      <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '2rem' }}>
+      <PageContainer style={{ padding: '2rem 0' }}>
         <ErrorState
           title="Erro ao carregar carteira de contratos"
           message={error.message || 'Não foi possível buscar a lista de contratos administrativos.'}
           onRetry={() => refresh()}
         />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -228,14 +229,7 @@ export const ContractsRoute: React.FC = () => {
   const isBusy = isLoading || (role === 'gestor' && isLoadingManagers);
 
   return (
-    <div style={{
-      maxWidth: '1600px',
-      margin: '0 auto',
-      padding: '1.5rem 2rem 3rem',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.25rem'
-    }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <ContractsPortfolioHeader
         onRefresh={() => refresh()}
         isRefreshing={isFetching}
@@ -281,6 +275,6 @@ export const ContractsRoute: React.FC = () => {
           />
         </>
       )}
-    </div>
+    </PageContainer>
   );
 };

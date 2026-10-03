@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import { useSearchParams } from 'react-router-dom';
 import { useManagementDashboard } from '../../hooks/useManagementDashboard';
 import { useAllContractManagers } from '../../hooks/useAllContractManagers';
@@ -255,25 +256,18 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   if (isError) {
     return (
-      <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '2rem' }}>
+      <PageContainer style={{ padding: '2rem 0' }}>
         <ErrorState
           title="Erro ao carregar a Visão Geral"
           message={error?.message || 'Não foi possível consolidar a carteira de ARPs e contratos.'}
           onRetry={() => refetch()}
         />
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div style={{
-      maxWidth: '1600px',
-      margin: '0 auto',
-      padding: '1.5rem 2rem 3rem',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.25rem'
-    }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <GestaoInstrumentosHeader
         onRefresh={refetch}
         isRefreshing={isLoading || isFetching || itemSaldos.isRefreshing}
@@ -302,7 +296,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           flexWrap: 'wrap',
           gap: '0.75rem'
         }}>
-          <div style={{ flex: '1 1 360px', minWidth: '320px' }}>
+          <div style={{ flex: '1 1 360px', minWidth: 0 }}>
             <GestaoInstrumentosCompactFilters
               filters={{ severidade, busca }}
               onChangeFilter={handleChangeFilter}
@@ -338,6 +332,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           onResetFilters={handleResetFilters}
         />
       )}
-    </div>
+    </PageContainer>
   );
 };

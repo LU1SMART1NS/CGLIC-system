@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import {
   UserPlus,
   Users,
@@ -210,16 +211,7 @@ export const UsersManagement: React.FC = () => {
   }, [users, searchTerm, filterRole]);
 
   return (
-    <div
-      style={{
-        maxWidth: '1600px',
-        margin: '0 auto',
-        padding: '1.5rem 2rem 3rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.25rem'
-      }}
-    >
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* 1. Header Padronizado */}
       <PageHeader
         title="Usuários e Servidores"
@@ -283,7 +275,7 @@ export const UsersManagement: React.FC = () => {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={carteiraTh}>Servidor / Usuário</th>
@@ -313,7 +305,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Perfil Operacional */}
-                      <td style={carteiraTd}>
+                      <td data-label="Perfil" style={carteiraTd}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <span
                             title={user.perfil === GESTOR_SALDO_ROLE_ID ? `Permissões: ${GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}` : undefined}
@@ -335,7 +327,7 @@ export const UsersManagement: React.FC = () => {
                             {getPerfilDisplayLabel(user.perfil, roles)}
                           </span>
                           {user.perfil === GESTOR_SALDO_ROLE_ID && (
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                               Todas as Atas
                             </span>
                           )}
@@ -343,7 +335,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Status Derivado da Autenticação */}
-                      <td style={{ ...carteiraTd, textAlign: 'center' }}>
+                      <td data-label="Situação" style={{ ...carteiraTd, textAlign: 'center' }}>
                         {isPending ? (
                           <StatusBadge variant="warning" label="Convite pendente" />
                         ) : isInactive ? (
@@ -354,7 +346,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Ações */}
-                      <td style={{ ...carteiraTd, textAlign: 'right' }}>
+                      <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                           {isPending && (
                             <button
@@ -551,7 +543,7 @@ export const UsersManagement: React.FC = () => {
                   <p style={{ margin: 0, fontSize: '0.78rem', color: '#0f766e' }}>
                     Gerencia as alocações internas de todas as Atas.
                   </p>
-                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
                     Permissões: {GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}. Nenhum acesso a contratos, financeiro, departamentos ou administração do sistema.
                   </p>
                 </div>
@@ -560,6 +552,6 @@ export const UsersManagement: React.FC = () => {
             </form>
       </Modal>
       {dialog}
-    </div>
+    </PageContainer>
   );
 };

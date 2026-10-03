@@ -196,8 +196,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
             data-testid={`payment-cycle-${cycle.cycleKey}`}
             style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}
           >
-            <div style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-              <div style={{ flex: 1, minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div className="payment-cycle-head" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                   <StatusBadge label={statusStyle.label} variant={statusStyle.variant} dot={false} size="sm" />
                   <strong style={{ fontSize: '0.98rem', color: '#0f172a' }}>{describeDocuments(cycle)}</strong>
@@ -232,45 +232,49 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <div className="payment-cycle-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {canEdit && acao && (
                   <AppButton
                     variant="outline"
                     size="sm"
-                    iconOnly
+                    
                     icon={<ArrowRight size={15} />}
                     onClick={() => setMarcoCycleKey(cycle.cycleKey)}
-                    title={acao}
-                  />
+                    title={acao}>
+                    <span className="payment-action-label">{acao}</span>
+                  </AppButton>
                 )}
                 {canEdit && !isPaymentCycleEncerrado(cycle.status) && (
                   <AppButton
                     variant="ghostDanger"
                     size="sm"
-                    iconOnly
+                    
                     icon={<Ban size={15} />}
                     onClick={() => setCancelCycleKey(cycle.cycleKey)}
-                    title="Cancelar ciclo"
-                  />
+                    title="Cancelar ciclo">
+                    <span className="payment-action-label">Cancelar ciclo</span>
+                  </AppButton>
                 )}
                 {isAdmin && (
                   <AppButton
                     variant="ghostDanger"
                     size="sm"
-                    iconOnly
+                    
                     icon={<Trash2 size={15} />}
                     onClick={() => void handleDelete(cycle)}
-                    title="Excluir ciclo definitivamente"
-                  />
+                    title="Excluir ciclo definitivamente">
+                    <span className="payment-action-label">Excluir</span>
+                  </AppButton>
                 )}
                 <AppButton
                   variant="outline"
                   size="sm"
-                  iconOnly
+                  
                   icon={isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                   onClick={() => toggleExpand(cycle.cycleKey)}
-                  title={isExpanded ? 'Ocultar documentos e histórico' : 'Ver documentos e histórico'}
-                />
+                  title={isExpanded ? 'Ocultar documentos e histórico' : 'Ver documentos e histórico'}>
+                    <span className="payment-action-label">{isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}</span>
+                  </AppButton>
               </div>
             </div>
 

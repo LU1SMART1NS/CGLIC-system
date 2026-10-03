@@ -58,7 +58,7 @@ export const CarteiraSummaryCards: React.FC<CarteiraSummaryCardsProps> = ({
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.9rem' }}>
+    <div className="carteira-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: '0.9rem' }}>
       {cards.map((card) => {
         const Icon = card.icon;
         const isActive = active === card.id;
@@ -83,7 +83,7 @@ export const CarteiraSummaryCards: React.FC<CarteiraSummaryCardsProps> = ({
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isActive ? card.color : '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: isActive ? card.color : '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                 {card.label}
               </span>
               <div style={{ background: isActive ? '#ffffff' : card.bg, color: card.color, padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
@@ -93,8 +93,8 @@ export const CarteiraSummaryCards: React.FC<CarteiraSummaryCardsProps> = ({
             <div style={{ fontSize: '1.6rem', fontWeight: 900, color: card.color, letterSpacing: '-0.02em', lineHeight: 1 }}>
               {card.count}
             </div>
-            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>{card.hint}</div>
-            {card.hint2 && <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '-0.3rem' }}>{card.hint2}</div>}
+            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{card.hint}</div>
+            {card.hint2 && <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '-0.3rem' }}>{card.hint2}</div>}
           </button>
         );
       })}

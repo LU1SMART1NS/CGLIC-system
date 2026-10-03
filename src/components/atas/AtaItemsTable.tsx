@@ -45,10 +45,10 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
   return (
     <div data-testid="ata-items-table" style={carteiraTableShell}>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={carteiraTh}>Item / Fornecedor</th>
+              <th style={carteiraTh}>Nº do item</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor unitário</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }} title="Quantitativo registrado para as UASGs 200330 e 200331">Qtd. SENASP</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Consumido</th>
@@ -68,23 +68,22 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
 
               return (
                 <tr key={item.numeroItem} data-testid={`ata-item-row-${item.numeroItem}`}>
-                  <td style={{ ...carteiraTd, maxWidth: '320px', minWidth: '200px' }}>
-                    <div style={{ fontWeight: 800 }}>
-                      Item {item.numeroItem}
-                      <span style={{ fontWeight: 600, color: '#334155' }}> · {item.nomeRazaoSocialFornecedor || 'Fornecedor não informado'}</span>
-                    </div>
-                    <div
-                      title={item.descricaoItem}
-                      style={{ fontSize: '0.75rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    >
-                      {item.descricaoItem}
+                  <td style={{ ...carteiraTd, maxWidth: '520px', minWidth: '260px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
+                      <span style={{ fontWeight: 800, flexShrink: 0 }}>{item.numeroItem}</span>
+                      <span
+                        title={item.descricaoItem}
+                        style={{ fontWeight: 600, color: '#334155', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                      >
+                        {item.descricaoItem}
+                      </span>
                     </div>
                   </td>
-                  <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.valorUnitario)}</td>
-                  <td style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdHomologada)}</td>
-                  <td style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdConsumida)}</td>
-                  <td style={{ ...carteiraTd, textAlign: 'right', fontWeight: 800 }}>{formatQtd(saldoDisponivel)}</td>
-                  <td style={carteiraTd}>
+                  <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.valorUnitario)}</td>
+                  <td data-label="Qtd. SENASP" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdHomologada)}</td>
+                  <td data-label="Consumido" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdConsumida)}</td>
+                  <td data-label="Saldo" style={{ ...carteiraTd, textAlign: 'right', fontWeight: 800 }}>{formatQtd(saldoDisponivel)}</td>
+                  <td data-label="Saldo usado" style={carteiraTd}>
                     <div style={{ minWidth: '84px' }}>
                       <span style={{ fontWeight: 800 }}>{percentualConsumido.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</span>
                       <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', marginTop: '0.2rem', overflow: 'hidden' }}>
@@ -93,16 +92,17 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
                     </div>
                   </td>
                   {onSelectItem && (
-                    <td style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <AppButton
                         variant="outline"
                         size="sm"
-                        iconOnly
                         icon={<Eye size={15} />}
                         onClick={() => onSelectItem(item)}
                         data-testid={`ata-item-open-${item.numeroItem}`}
                         title="Ver saldo do item"
-                      />
+                      >
+                        <span className="payment-action-label">Ver saldo do item</span>
+                      </AppButton>
                     </td>
                   )}
                 </tr>

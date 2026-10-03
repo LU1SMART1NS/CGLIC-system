@@ -14,7 +14,9 @@ export default defineConfig({
       '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
       // Worktrees isolados criados por sessões de agente (ex.: .claude/worktrees/<nome>)
       // duplicavam a suíte inteira por estarem aninhados dentro do repositório.
-      '**/.claude/**'
+      '**/.claude/**',
+      // Testes e2e (Playwright) rodam com `npm run e2e`, não com o vitest
+      'e2e/**'
     ]
   },
   server: {

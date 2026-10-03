@@ -146,7 +146,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
         <>
           <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.empenhado)}</span>
           {r.pendentes > 0 && (
-            <div style={{ fontSize: '0.7rem', color: 'var(--warning)' }} title="Empenhos vinculados à unidade sem quantidade confirmada; não entram no empenhado">
+            <div style={{ fontSize: '0.75rem', color: 'var(--warning)' }} title="Empenhos vinculados à unidade sem quantidade confirmada; não entram no empenhado">
               {r.pendentes} {r.pendentes === 1 ? 'pendente' : 'pendentes'}
             </div>
           )}

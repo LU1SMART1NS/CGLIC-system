@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { stripNumeracaoManual } from '../../utils/planNumbering';
 import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
 
@@ -16,7 +17,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: '0.72rem',
+  fontSize: '0.75rem',
   fontWeight: 600,
   color: '#475569',
   display: 'block',
@@ -24,7 +25,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export const PERSONALIZADA_BADGE_STYLE: React.CSSProperties = {
-  fontSize: '0.68rem',
+  fontSize: '0.75rem',
   fontWeight: 700,
   padding: '0.1rem 0.4rem',
   borderRadius: '4px',
@@ -66,7 +67,7 @@ export const ConfirmDeleteButton: React.FC<{
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', color: '#b91c1c' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#b91c1c' }}>
       {confirmMessage}
       <AppButton
         type="button"
@@ -137,7 +138,7 @@ export const AddTaskForm: React.FC<{
         borderRadius: '6px',
         border: '1px solid #e2e8f0',
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
         gap: '0.75rem'
       }}
     >
@@ -168,7 +169,7 @@ export const AddTaskForm: React.FC<{
         />
       </div>
       <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
           {gestorNome ? `Responsável: ${gestorNome} (gestor). Você pode alterar depois.` : 'Você pode definir o responsável depois.'}
         </span>
         <span style={{ display: 'inline-flex', gap: '0.5rem' }}>
@@ -185,11 +186,14 @@ export const AddTaskForm: React.FC<{
 /** Título de etapa com renomear/excluir inline. */
 export const MacrotaskHeader: React.FC<{
   nome: string;
+  /** Número da etapa no módulo (ex.: "2"), calculado pela posição. */
+  numero?: string;
   onRename: (nome: string) => void;
   onDelete: () => void;
   isPending?: boolean;
   taskCount: number;
-}> = ({ nome, onRename, onDelete, isPending, taskCount }) => {
+}> = ({ nome: nomeBruto, numero, onRename, onDelete, isPending, taskCount }) => {
+  const nome = stripNumeracaoManual(nomeBruto);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(nome);
 
@@ -246,7 +250,7 @@ export const MacrotaskHeader: React.FC<{
           />
         </form>
       ) : (
-        <h4 style={headingStyle}>{nome}</h4>
+        <h4 style={headingStyle}>{numero ? `${numero}. ${nome}` : nome}</h4>
       )}
 
       {!editing && (
@@ -359,18 +363,22 @@ export const ModuleGroupHeader: React.FC<{
   etapas: number;
   /** Ausente para etapas personalizadas (não há módulo a excluir). */
   onDelete?: () => void;
+  /** Ausente para etapas personalizadas (não há módulo a renomear). */
+  onRename?: (nome: string) => void;
   isPending?: boolean;
   atrasadas?: number;
   /** Quando informado, o cabeçalho vira um botão de recolher/expandir o módulo. */
   onToggleCollapsed?: () => void;
   collapsed?: boolean;
-}> = ({ nome, appliedAt, concluidas, aplicaveis, etapas, onDelete, isPending, atrasadas = 0, onToggleCollapsed, collapsed = false }) => {
+}> = ({ nome, appliedAt, concluidas, aplicaveis, etapas, onDelete, onRename, isPending, atrasadas = 0, onToggleCollapsed, collapsed = false }) => {
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(nome);
   const appliedLabel = appliedAt ? new Date(appliedAt).toLocaleDateString('pt-BR') : null;
   const percentual = aplicaveis > 0 ? Math.round((concluidas / aplicaveis) * 100) : 0;
   const summary = (
     <div>
       <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c326f' }}>{nome}</div>
-      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
         {etapas} etapa{etapas !== 1 ? 's' : ''} • {concluidas} de {aplicaveis} tarefas concluídas ({percentual}%)
         {appliedLabel && <> • aplicado em {appliedLabel}</>}
         {atrasadas > 0 && (
@@ -394,7 +402,39 @@ export const ModuleGroupHeader: React.FC<{
         borderRadius: '6px'
       }}
     >
-      {onToggleCollapsed ? (
+      {renaming ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!draft.trim()) return;
+            if (draft.trim() !== nome) onRename?.(draft.trim());
+            setRenaming(false);
+          }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flex: 1 }}
+        >
+          <input
+            autoFocus
+            aria-label="Nome do módulo"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            style={{ ...inputStyle, maxWidth: '360px' }}
+          />
+          <AppButton type="submit" variant="ghost" size="sm" iconOnly icon={<Check size={15} />} title="Salvar nome" aria-label="Salvar nome do módulo" />
+          <AppButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={15} />}
+            title="Cancelar"
+            aria-label="Cancelar edição do nome do módulo"
+            onClick={() => {
+              setDraft(nome);
+              setRenaming(false);
+            }}
+          />
+        </form>
+      ) : onToggleCollapsed ? (
         <button
           type="button"
           onClick={onToggleCollapsed}
@@ -418,6 +458,22 @@ export const ModuleGroupHeader: React.FC<{
         </button>
       ) : (
         summary
+      )}
+      {onRename && !renaming && (
+        <AppButton
+          type="button"
+          variant="ghost"
+          size="sm"
+          iconOnly
+          icon={<Pencil size={14} />}
+          onClick={() => {
+            setDraft(nome);
+            setRenaming(true);
+          }}
+          disabled={isPending}
+          title="Renomear módulo"
+          aria-label={`Renomear módulo ${nome}`}
+        />
       )}
       {onDelete && (
         <AppButton

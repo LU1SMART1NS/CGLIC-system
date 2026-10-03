@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { PageContainer } from '../design-system/components/PageContainer';
 import { fetchArpItems } from '../services/api';
 import { fetchAtasWithEmpenhosSet, fetchAtasWithAllocationsSet, fetchArpsWithItemsFromDb } from '../services/dbCacheService';
 import { runFullSync, checkAndTriggerAutoSync, getLastSyncMetadata } from '../services/syncService';
@@ -350,25 +351,18 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
 
   if (error && arps.length === 0) {
     return (
-      <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '2rem' }}>
+      <PageContainer style={{ padding: '2rem 0' }}>
         <ErrorState
           title="Erro ao carregar Atas de Registro de Preços"
           message={error}
           onRetry={() => loadFromDatabase()}
         />
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div style={{
-      maxWidth: '1600px',
-      margin: '0 auto',
-      padding: '1.5rem 2rem 3rem',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.25rem'
-    }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <ArpPortfolioHeader
         syncInfo={syncInfo}
         isSyncing={isSyncing}
@@ -418,6 +412,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         }}
         onResetFilters={handleResetFilters}
       />
-    </div>
+    </PageContainer>
   );
 };

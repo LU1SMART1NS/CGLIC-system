@@ -4,6 +4,8 @@ import {
   saveContractTaskMacrotaskRpc,
   deleteContractTaskMacrotaskRpc,
   deleteContractTaskModuleRpc,
+  renameContractTaskModuleRpc,
+  type RenameTaskPlanModuleInput,
   createContractTaskRpc,
   deleteContractTaskRpc,
   type DeleteTaskPlanModuleInput,
@@ -46,6 +48,9 @@ export const useDeleteContractTaskMacrotask = (contractKey: string) =>
 
 export const useDeleteContractTaskModule = (contractKey: string) =>
   usePlanMutation<RpcGenericDeleteResult, DeleteTaskPlanModuleInput>(contractKey, deleteContractTaskModuleRpc);
+
+export const useRenameContractTaskModule = (contractKey: string) =>
+  usePlanMutation<RpcGenericDeleteResult, RenameTaskPlanModuleInput>(contractKey, renameContractTaskModuleRpc);
 
 export const useCreateContractTask = (contractKey: string) =>
   usePlanMutation<RpcCreateTaskResult, CreateContractTaskInput>(contractKey, createContractTaskRpc);

@@ -62,6 +62,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         {/* Campo de Busca */}
         {onSearchChange && (
           <div
+            className="ds-filter-search"
             style={{
               position: 'relative',
               flex: '1 1 220px',
@@ -102,7 +103,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
         {/* Dropdowns */}
         {selects.map((sel) => (
-          <div key={sel.id} style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, flex: '0 1 auto' }}>
+          <div key={sel.id} className="ds-filter-select" style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, flex: '0 1 auto' }}>
             <label
               htmlFor={`select-${sel.id}`}
               style={{ fontSize: typography.fontSize.label, fontWeight: typography.fontWeight.semibold, color: colors.text.secondary, whiteSpace: 'nowrap' }}
@@ -172,6 +173,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 type="button"
                 onClick={chip.onClick}
                 data-testid={`filter-chip-${chip.id}`}
+                className="ds-filter-chip"
                 aria-pressed={chip.active}
                 style={{
                   padding: `${spacing.xxs} ${spacing.sm}`,

@@ -99,7 +99,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
       render: (v) => (
         <>
           <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0c326f' }}>{v.empenho.numero}</span>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             UASG {v.empenho.uasg}{v.empenho.dataEmissao ? ` • ${v.empenho.dataEmissao.split('-').reverse().join('/')}` : ''}
           </div>
         </>
@@ -139,7 +139,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
       header: 'Unidade interna',
       render: (v) => {
         if (allocationOptions.length === 0) {
-          return <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Sem unidades cadastradas</span>;
+          return <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Sem unidades cadastradas</span>;
         }
         const current = linkedAllocationId(v.empenho.numero);
         return (

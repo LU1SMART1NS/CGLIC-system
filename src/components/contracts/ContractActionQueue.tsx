@@ -80,17 +80,21 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
           <AppButton
             variant="outline"
             size="sm"
-            iconOnly
+            
             icon={<Check size={15} />}
             onClick={() => updateMutation.mutate({ taskId: item.taskId!, status: 'CONCLUIDA' })}
             disabled={updateMutation.isPending}
             title="Concluir"
-          />
+          >
+              <span className="payment-action-label">Concluir</span>
+            </AppButton>
         );
       }
       case 'PAGAMENTO':
         return (
-          <AppButton variant="outline" size="sm" iconOnly icon={<ArrowRight size={15} />} onClick={() => onGoTo('pagamentos')} title="Abrir ciclo" />
+          <AppButton variant="outline" size="sm"  icon={<ArrowRight size={15} />} onClick={() => onGoTo('pagamentos')} title="Abrir ciclo" >
+              <span className="payment-action-label">Abrir ciclo</span>
+            </AppButton>
         );
       case 'EMPENHO':
         if (!item.href) return null;
@@ -98,15 +102,19 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
           <AppButton
             variant="outline"
             size="sm"
-            iconOnly
+            
             icon={<ArrowRight size={15} />}
             onClick={() => navigate(item.href!)}
             title="Confirmar a quantidade no item da ata"
-          />
+          >
+              <span className="payment-action-label">Confirmar quantidade</span>
+            </AppButton>
         );
       case 'REAJUSTE':
         return (
-          <AppButton variant="outline" size="sm" iconOnly icon={<ArrowRight size={15} />} onClick={() => onGoTo('historico')} title="Ver histórico" />
+          <AppButton variant="outline" size="sm"  icon={<ArrowRight size={15} />} onClick={() => onGoTo('historico')} title="Ver histórico" >
+              <span className="payment-action-label">Ver histórico</span>
+            </AppButton>
         );
       case 'LEMBRETE':
         return (
@@ -114,20 +122,24 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
             <AppButton
               variant="outline"
               size="sm"
-              iconOnly
+              
               icon={<Check size={15} />}
               onClick={() => dismiss.mutate({ itemId: item.id })}
               disabled={dismiss.isPending}
               title="Resolvido: já resolvido ou não se aplica, o lembrete some deste ciclo de vigência"
-            />
+            >
+              <span className="payment-action-label">Resolvido</span>
+            </AppButton>
             <AppButton
               variant="outline"
               size="sm"
-              iconOnly
+              
               icon={<ArrowRight size={15} />}
               onClick={() => onGoTo('plano')}
               title={plan ? 'Ver plano' : 'Aplicar modelo'}
-            />
+            >
+              <span className="payment-action-label">{plan ? 'Ver plano' : 'Aplicar modelo'}</span>
+            </AppButton>
           </div>
         );
     }
@@ -193,14 +205,14 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
                     flexWrap: 'wrap'
                   }}
                 >
-                  <div style={{ minWidth: '120px' }}>
+                  <div style={{ flex: '0 1 120px', minWidth: 0 }}>
                     <SeverityBadge severity={item.severity} customLabel={item.badgeLabel} />
                   </div>
-                  <div style={{ flex: 1, minWidth: '220px' }}>
+                  <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                     <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.4 }}>{item.title}</div>
                     <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>{subtitle(item)}</div>
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#475569', minWidth: '80px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', flex: '0 1 80px', minWidth: 0 }}>
                     {item.dataAlvo ? formatDateBR(item.dataAlvo) : '—'}
                   </div>
                   <div>{renderAction(item)}</div>
@@ -219,7 +231,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
           <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {queue.dispensados.map((item) => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <span style={{ flex: 1, minWidth: '220px' }}>{item.title}</span>
+                <span style={{ flex: '1 1 220px', minWidth: 0 }}>{item.title}</span>
                 <button
                   type="button"
                   onClick={() => restore.mutate({ itemId: item.id })}

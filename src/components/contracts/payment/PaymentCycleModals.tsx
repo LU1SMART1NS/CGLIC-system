@@ -35,7 +35,7 @@ const Field: React.FC<{ id: string; label: string; children: React.ReactNode; hi
   <div className="form-group">
     <label className="form-label" htmlFor={id}>{label}</label>
     {children}
-    {hint && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{hint}</div>}
+    {hint && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{hint}</div>}
   </div>
 );
 
@@ -76,15 +76,19 @@ const JustificativaField: React.FC<{ id: string; value: string; onChange: (v: st
   </Field>
 );
 
-const FooterButtons: React.FC<{ onCancel: () => void; saving: boolean; submitLabel: string }> = ({ onCancel, saving, submitLabel }) => (
-  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+/**
+ * Ações dos modais. Vão na prop `footer` do Modal (fixa, sempre visível, empilhada em 44px no celular);
+ * o botão de envio usa `form` para submeter o formulário do corpo.
+ */
+const FooterButtons: React.FC<{ formId: string; onCancel: () => void; saving: boolean; submitLabel: string }> = ({ formId, onCancel, saving, submitLabel }) => (
+  <>
     <AppButton type="button" variant="outline" onClick={onCancel} disabled={saving}>
       Cancelar
     </AppButton>
-    <AppButton type="submit" variant="primary" disabled={saving} isLoading={saving}>
+    <AppButton type="submit" form={formId} variant="primary" disabled={saving} isLoading={saving}>
       {saving ? 'Salvando...' : submitLabel}
     </AppButton>
-  </div>
+  </>
 );
 
 // -----------------------------------------------------------------------------
@@ -178,8 +182,8 @@ export const CreateCycleModal: React.FC<{
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Registrar documentos recebidos" size="lg" dismissible={!saving} testId="payment-cycle-modal">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <Modal isOpen={isOpen} onClose={onClose} title="Registrar documentos recebidos" size="lg" dismissible={!saving} testId="payment-cycle-modal" footer={<FooterButtons formId="payment-cycle-form" onCancel={onClose} saving={saving} submitLabel="Registrar ciclo" />}>
+      <form id="payment-cycle-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div className="form-grid">
           <DateField id="payment-recebimento" label="Data de recebimento *" value={dataRecebimento} onChange={setDataRecebimento} hint="Início da contagem do prazo de conferência." />
           <DateField id="payment-vencimento" label="Vencimento da fatura *" value={vencimento} onChange={setVencimento} />
@@ -188,33 +192,35 @@ export const CreateCycleModal: React.FC<{
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>Documentos recebidos *</div>
           {docs.map((d, idx) => (
-            <div key={idx} data-testid={`payment-doc-row-${idx}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px,1.3fr) minmax(90px,0.8fr) minmax(110px,1fr) minmax(100px,0.9fr) auto', gap: '0.5rem', alignItems: 'end' }}>
-              <Field id={`payment-doc-tipo-${idx}`} label={idx === 0 ? 'Tipo' : ' '}>
+            <div key={idx} data-testid={`payment-doc-row-${idx}`} className={`payment-doc-row${idx > 0 ? ' payment-doc-row--followup' : ''}`}>
+              <Field id={`payment-doc-tipo-${idx}`} label="Tipo">
                 <select id={`payment-doc-tipo-${idx}`} className="form-input" value={d.tipo} onChange={(e) => updateDoc(idx, { tipo: e.target.value })} required>
                   {TIPOS_DOCUMENTO_RECEBIDO.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
               </Field>
-              <Field id={`payment-doc-numero-${idx}`} label={idx === 0 ? 'Nº' : ' '}>
+              <Field id={`payment-doc-numero-${idx}`} label="Nº">
                 <input id={`payment-doc-numero-${idx}`} className="form-input" type="text" placeholder="1234" value={d.numero} onChange={(e) => updateDoc(idx, { numero: e.target.value })} />
               </Field>
-              <Field id={`payment-doc-sei-${idx}`} label={idx === 0 ? 'Id. SEI *' : ' '}>
+              <Field id={`payment-doc-sei-${idx}`} label="Id. SEI *">
                 <input id={`payment-doc-sei-${idx}`} className="form-input" type="text" placeholder="12345678" value={d.sei} onChange={(e) => updateDoc(idx, { sei: e.target.value })} required />
               </Field>
-              <Field id={`payment-doc-valor-${idx}`} label={idx === 0 ? 'Valor (R$)' : ' '}>
+              <Field id={`payment-doc-valor-${idx}`} label="Valor (R$)">
                 <input id={`payment-doc-valor-${idx}`} className="form-input" type="text" inputMode="numeric" placeholder="0,00" value={d.valor} onChange={(e) => updateDoc(idx, { valor: formatCurrencyInputBR(e.target.value) })} />
               </Field>
               <AppButton
                 type="button"
                 variant="ghostDanger"
                 size="sm"
-                iconOnly
                 icon={<Trash2 size={15} />}
                 disabled={idx === 0}
                 onClick={() => setDocs((prev) => prev.filter((_, i) => i !== idx))}
                 title="Remover documento"
-              />
+                className="payment-doc-remove"
+              >
+                <span className="payment-doc-remove__label">Remover</span>
+              </AppButton>
             </div>
           ))}
           <div>
@@ -256,7 +262,6 @@ export const CreateCycleModal: React.FC<{
         )}
 
         {error && <NoticeBar tone="danger" testId="payment-cycle-error">{error}</NoticeBar>}
-        <FooterButtons onCancel={onClose} saving={saving} submitLabel="Registrar ciclo" />
       </form>
     </Modal>
   );
@@ -373,8 +378,8 @@ export const MarcoModal: React.FC<{
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={titulo} size="md" dismissible={!saving} testId="payment-marco-modal">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <Modal isOpen onClose={onClose} title={titulo} size="md" dismissible={!saving} testId="payment-marco-modal" footer={<FooterButtons formId="payment-marco-form" onCancel={onClose} saving={saving} submitLabel="Registrar" />}>
+      <form id="payment-marco-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {fase === 'CONFERENCIA' && (
           <Field id="marco-resultado" label="Resultado da conferência">
             <select id="marco-resultado" className="form-input" value={resultado} onChange={(e) => { setResultado(e.target.value as Resultado); setPrazoTocado(false); }}>
@@ -395,7 +400,7 @@ export const MarcoModal: React.FC<{
             />
             <span>
               Regularidade fiscal e trabalhista do credor verificada (SICAF / CNDs) *
-              <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b' }}>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>
                 Se encontrou pendência (por exemplo, CND vencida), escolha "Com pendência" acima.
               </span>
             </span>
@@ -466,7 +471,6 @@ export const MarcoModal: React.FC<{
         )}
 
         {error && <NoticeBar tone="danger" testId="payment-marco-error">{error}</NoticeBar>}
-        <FooterButtons onCancel={onClose} saving={saving} submitLabel="Registrar" />
       </form>
     </Modal>
   );
@@ -507,8 +511,8 @@ export const CancelCycleModal: React.FC<{
   };
 
   return (
-    <Modal isOpen onClose={onClose} title="Cancelar ciclo" size="md" dismissible={!saving} testId="payment-cancel-modal">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <Modal isOpen onClose={onClose} title="Cancelar ciclo" size="md" dismissible={!saving} testId="payment-cancel-modal" footer={<FooterButtons formId="payment-cancel-form" onCancel={onClose} saving={saving} submitLabel="Cancelar ciclo" />}>
+      <form id="payment-cancel-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <NoticeBar tone="warning" testId="payment-cancel-note">
           O ciclo continua no histórico, marcado como cancelado, e deixa de contar nos ciclos ativos e nos alertas.
         </NoticeBar>
@@ -524,7 +528,6 @@ export const CancelCycleModal: React.FC<{
           />
         </Field>
         {error && <NoticeBar tone="danger" testId="payment-cancel-error">{error}</NoticeBar>}
-        <FooterButtons onCancel={onClose} saving={saving} submitLabel="Cancelar ciclo" />
       </form>
     </Modal>
   );

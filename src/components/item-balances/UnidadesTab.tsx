@@ -29,7 +29,7 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
         <>
           <div style={{ fontWeight: 700 }}>{r.nome}</div>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.15rem' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>UASG {r.codigo}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>UASG {r.codigo}</span>
             <StatusBadge label={r.gerenciadora ? 'Gerenciadora' : 'Participante'} variant={r.gerenciadora ? 'info' : 'neutral'} size="sm" dot={false} />
           </div>
         </>
@@ -48,7 +48,7 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
       render: (r) => (
         <>
           <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.consumido)}</span>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{FONTE_LABEL[r.fonte]}</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{FONTE_LABEL[r.fonte]}</div>
         </>
       )
     },

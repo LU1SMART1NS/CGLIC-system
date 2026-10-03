@@ -17,6 +17,7 @@ vi.mock('../../../hooks/useContractTaskPlanEditing', () => ({
   useSaveContractTaskMacrotask: idle,
   useDeleteContractTaskMacrotask: idle,
   useDeleteContractTaskModule: idle,
+  useRenameContractTaskModule: idle,
   useCreateContractTask: idle,
   useDeleteContractTask: idle
 }));

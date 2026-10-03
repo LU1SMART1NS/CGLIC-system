@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import {
   Plus,
   Trash2,
@@ -84,7 +85,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
               type="text"
               value={editingMacroNome}
               onChange={e => setEditingMacroNome(e.target.value)}
-              style={{ flex: 1, fontSize: '0.85rem', padding: '0.3rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
+              style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.85rem', padding: '0.3rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
               autoFocus
             />
             <button
@@ -99,7 +100,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
         ) : (
           <>
             <Layers size={15} color="#0c326f" />
-            <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>{macro.nome}</span>
+            <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>{macro.nome}</span>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
               {macro.tarefas.length} tarefa{macro.tarefas.length !== 1 ? 's' : ''}
             </span>
@@ -162,7 +163,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                     border: '1px solid #f1f5f9'
                   }}
                 >
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', width: '20px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', width: '20px' }}>
                     {idx + 1}.
                   </span>
                   <CheckSquare size={13} color="#0c326f" />
@@ -177,7 +178,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                           if (e.key === 'Escape') setEditingTaskId(null);
                         }}
                         autoFocus
-                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.25rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
+                        style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', padding: '0.25rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
                       />
                       <button
                         type="button"
@@ -191,7 +192,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                     </>
                   ) : (
                     <>
-                      <span style={{ flex: 1, fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -240,7 +241,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                 setNewTaskNome(e.target.value);
               }}
               onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); }}
-              style={{ flex: 1, fontSize: '0.8rem', padding: '0.4rem 0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
+              style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.8rem', padding: '0.4rem 0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
             />
             <AppButton
               type="button"
@@ -456,7 +457,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
                 setNewMacroNome(e.target.value);
               }}
               onKeyDown={e => { if (e.key === 'Enter') handleAddMacrotask(); }}
-              style={{ flex: 1, fontSize: '0.84rem', padding: '0.45rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
+              style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.84rem', padding: '0.45rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
             />
             <AppButton
               type="button"
@@ -507,7 +508,7 @@ const TaskTemplatesContent: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
       {/* Cabeçalho */}
       <PageHeader
@@ -536,7 +537,7 @@ const TaskTemplatesContent: React.FC = () => {
 
         <form onSubmit={handleCreateTemplate}>
           {/* Grid de Campos em 2 Colunas */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.85rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
                 Nome do Template *
@@ -644,7 +645,7 @@ const TaskTemplatesContent: React.FC = () => {
         )}
       </div>
 
-    </div>
+    </PageContainer>
   );
 };
 

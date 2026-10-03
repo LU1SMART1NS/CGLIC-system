@@ -5,6 +5,7 @@ import { classifyArpItemSaldo } from './balanceService';
 import { differenceInBusinessDays, parseDateBRT } from './temporalEngineService';
 import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import { classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
+import { toSentenceCaseIfAllCaps } from '../utils/textCase';
 
 export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE';
 
@@ -87,7 +88,7 @@ export function buildAtaActionQueue(params: {
       id: `ATA-SALDO-${arp.numeroAtaRegistroPreco}-${numeroItem}`,
       kind: 'SALDO',
       severity,
-      title: `Item ${numeroItem}${s.descricao_item ? ` · ${s.descricao_item}` : ''}`,
+      title: `Item ${numeroItem}${s.descricao_item ? ` · ${toSentenceCaseIfAllCaps(s.descricao_item)}` : ''}`,
       description: isCritico ? 'Saldo físico crítico: avaliar nova licitação ou remanejamento' : 'Saldo físico próximo do limite',
       badgeLabel: `${percentualConsumido.toFixed(1)}% consumido`,
       numeroItem

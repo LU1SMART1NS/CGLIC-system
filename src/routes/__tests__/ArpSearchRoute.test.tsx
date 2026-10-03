@@ -168,7 +168,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
       />
     );
 
-    expect(html).toContain('ATA 00001/2025');
+    expect(html).toContain('00001/2025');
     expect(html).toContain('Proteção Tática Brasil Ltda');
     expect(html).toContain('1 item');
     expect(html).toContain('Ver Detalhes');

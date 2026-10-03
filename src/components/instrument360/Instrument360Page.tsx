@@ -1,11 +1,13 @@
 import React from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 
 /**
  * Casca das telas de detalhe (Ata, Contrato e Item): largura máxima e margens iguais em todas.
  * Também é usada pelos estados de página inteira (carregando, erro, acesso negado).
+ * O gutter horizontal vem do <main> (--page-gutter); aqui só o respiro vertical.
  */
 export const Instrument360Page: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div data-testid="instrument-page" style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
+  <PageContainer data-testid="instrument-page" maxWidth={1400} style={{ padding: '1.5rem 0' }}>
     {children}
-  </div>
+  </PageContainer>
 );

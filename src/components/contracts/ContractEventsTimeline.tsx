@@ -413,7 +413,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
               Nenhum evento encontrado para o filtro selecionado.
             </div>
           ) : (
-            <div style={{ position: 'relative', paddingLeft: '1.75rem' }}>
+            <div className="timeline-track" style={{ position: 'relative', paddingLeft: '1.75rem' }}>
               {/* Linha Vertical Conectora */}
               <div
                 style={{
@@ -463,6 +463,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
 
                       {/* Card do Evento */}
                       <div
+                        className="timeline-card"
                         style={{
                           backgroundColor: '#ffffff',
                           borderRadius: '8px',
@@ -503,7 +504,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.75rem',
                                 fontWeight: 800,
                                 padding: '0.15rem 0.5rem',
                                 borderRadius: '4px',
@@ -522,7 +523,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.75rem',
                                 fontWeight: 700,
                                 padding: '0.15rem 0.5rem',
                                 borderRadius: '4px',
@@ -546,7 +547,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                fontSize: '0.74rem',
+                                fontSize: '0.75rem',
                                 fontWeight: 700,
                                 color: '#0c326f',
                                 backgroundColor: '#eff6ff',

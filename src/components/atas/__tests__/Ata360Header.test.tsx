@@ -78,3 +78,36 @@ describe('Ata360Header: aceita adesão', () => {
     expect(render()).toContain('Id PNCP');
   });
 });
+
+describe('Ata360Header: itens em risco', () => {
+  beforeEach(() => vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: undefined } as any));
+
+  const renderComSaldos = (saldos: any[]) =>
+    renderToStaticMarkup(
+      <Ata360Header arp={arp} itens={[]} saldos={saldos} linkedContractsCount={0} onOpenActions={vi.fn()} onOpenItens={vi.fn()} onOpenContratos={vi.fn()} />
+    );
+  const riscoValor = (html: string) => html.match(/ata-health-itens-risco[\s\S]*?(\d+ de \d+)/)?.[1];
+
+  it('conta só item acima de 80% consumido (50% a 80% fica de fora)', () => {
+    const html = renderComSaldos([
+      { numero_item: 1, quantidade_base_senasp: 100, quantidade_consumida: 60 },
+      { numero_item: 2, quantidade_base_senasp: 100, quantidade_consumida: 80 },
+      { numero_item: 3, quantidade_base_senasp: 100, quantidade_consumida: 81 },
+      { numero_item: 4, quantidade_base_senasp: 100, quantidade_consumida: 100 }
+    ]);
+    expect(riscoValor(html)).toBe('2 de 4');
+    expect(html).toContain('item 4 a 100% consumido');
+  });
+
+  it('calcula sobre a quantidade base da SENASP, não sobre a homologada da ata', () => {
+    const html = renderComSaldos([{ numero_item: 1, quantidade_homologada: 1000, quantidade_base_senasp: 100, quantidade_consumida: 90 }]);
+    expect(riscoValor(html)).toBe('1 de 1');
+    expect(html).toContain('item 1 a 90% consumido');
+  });
+
+  it('sem item acima de 80%, a dica diz o corte', () => {
+    const html = renderComSaldos([{ numero_item: 1, quantidade_base_senasp: 100, quantidade_consumida: 60 }]);
+    expect(riscoValor(html)).toBe('0 de 1');
+    expect(html).toContain('nenhum acima de 80% consumido');
+  });
+});

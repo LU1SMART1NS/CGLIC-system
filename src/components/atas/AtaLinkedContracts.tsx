@@ -75,7 +75,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
             flexWrap: 'wrap'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', flex: 1, minWidth: '260px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', flex: '1 1 260px', minWidth: 0 }}>
             <div style={{ padding: '0.3rem', background: '#eff6ff', borderRadius: '6px', color: '#0c326f', marginTop: '0.1rem' }}>
               <FileText size={15} />
             </div>
@@ -84,7 +84,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
               <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
                 {link.fornecedorNome} {link.valorGlobal ? `• ${formatCurrency(link.valorGlobal)}` : ''}
               </p>
-              <p style={{ fontSize: '0.74rem', color: '#475569', margin: '0.15rem 0 0 0' }}>
+              <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.15rem 0 0 0' }}>
                 Item {itemNumberFromKey(link.itemKey)}
                 {link.observacoes ? ` • ${link.observacoes}` : ''}
               </p>

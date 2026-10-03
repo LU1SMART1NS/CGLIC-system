@@ -12,7 +12,7 @@ export const CarteiraPrazoPill: React.FC<CarteiraPrazoPillProps> = ({ faixa, dia
     <span
       style={{
         display: 'inline-block',
-        fontSize: '0.72rem',
+        fontSize: '0.75rem',
         fontWeight: 800,
         color,
         background: bg,

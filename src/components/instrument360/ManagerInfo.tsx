@@ -31,7 +31,7 @@ export const ManagerInfo: React.FC<{ label: string; gestorNome?: string; isLoadi
         {assigned ? <UserCheck size={16} /> : <UserCircle2 size={16} />}
       </div>
       <div>
-        <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b' }}>{label}</div>
+        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>{label}</div>
         <div style={{ fontSize: '0.85rem', fontWeight: assigned ? 700 : 400, color: assigned ? '#0f172a' : '#94a3b8', fontStyle: assigned ? 'normal' : 'italic' }}>
           {isLoading ? 'Carregando...' : gestorNome || 'Não atribuído'}
         </div>

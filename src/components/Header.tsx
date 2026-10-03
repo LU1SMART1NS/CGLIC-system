@@ -1,21 +1,27 @@
 import React from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   onOpenExportModal?: () => void;
+  /** Mobile (<768px): exibe o botão que abre a Sidebar como drawer. */
+  showMenuButton?: boolean;
+  menuOpen?: boolean;
+  menuButtonRef?: React.Ref<HTMLButtonElement>;
+  onOpenMenu?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = () => {
+export const Header: React.FC<HeaderProps> = ({ showMenuButton, menuOpen, menuButtonRef, onOpenMenu }) => {
   const { user, signOut } = useAuth();
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Gov.br Federal Identity Topbar */}
-      <div style={{
+      <div className="app-header-topbar" style={{
         background: '#0c326f',
         color: '#ffffff',
-        padding: '0.25rem 2rem',
-        fontSize: '0.72rem',
+        paddingTop: '0.25rem',
+        paddingBottom: '0.25rem',
+        fontSize: '0.75rem',
         fontWeight: 600,
         display: 'flex',
         justifyContent: 'space-between',
@@ -28,7 +34,8 @@ export const Header: React.FC<HeaderProps> = () => {
             gov<span style={{ color: '#00cc55' }}>.</span>br
           </span>
           <span style={{ opacity: 0.5, margin: '0 0.25rem' }}>|</span>
-          <span style={{ fontWeight: 600, opacity: 0.95 }}>Ministério da Justiça e Segurança Pública</span>
+          <span className="app-header-org-full" style={{ fontWeight: 600, opacity: 0.95 }}>Ministério da Justiça e Segurança Pública</span>
+          <span className="app-header-org-short" style={{ fontWeight: 600, opacity: 0.95 }}>MJSP</span>
         </div>
         <div style={{ display: 'flex', gap: '1.25rem', opacity: 0.9, fontWeight: 400 }} className="gov-topbar-links">
           <a href="https://www.gov.br/mj/pt-br" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'none' }}>Portal MJSP</a>
@@ -38,19 +45,32 @@ export const Header: React.FC<HeaderProps> = () => {
       </div>
 
       {/* Main MJSP / SENASP Styled Header */}
-      <header style={{
+      <header className="app-header-main" style={{
         background: '#ffffff',
         borderBottom: '1px solid #e2e8f0',
-        padding: '0.45rem 2rem',
+        paddingTop: '0.45rem',
+        paddingBottom: '0.45rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         fontFamily: 'var(--font-family)',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap',
         gap: '1rem'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', minWidth: 0 }} className="app-header-brand">
+          {showMenuButton && (
+            <button
+              type="button"
+              ref={menuButtonRef}
+              onClick={onOpenMenu}
+              aria-label="Abrir menu de navegação"
+              aria-expanded={!!menuOpen}
+              className="app-header-menu-btn"
+            >
+              <Menu size={22} />
+            </button>
+          )}
           <div style={{
             width: '32px',
             height: '32px',
@@ -72,8 +92,8 @@ export const Header: React.FC<HeaderProps> = () => {
             <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
               CGLIC
             </h1>
-            <span style={{ color: '#cbd5e1' }}>|</span>
-            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
+            <span className="app-header-subtitle" style={{ color: '#cbd5e1' }}>|</span>
+            <span className="app-header-subtitle" style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
               Gestão Inteligente de Atas e Contratos
             </span>
           </div>
@@ -89,12 +109,14 @@ export const Header: React.FC<HeaderProps> = () => {
               paddingLeft: '0.5rem',
               borderLeft: '1px solid #e2e8f0'
             }}>
-              <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
+              <span className="app-header-email" title={user.email ?? undefined} style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
                 {user.email}
               </span>
               <button
                 type="button"
+                className="app-header-signout"
                 onClick={signOut}
+                aria-label="Sair"
                 title="Encerrar sessão no CGLIC"
                 style={{
                   display: 'inline-flex',
@@ -105,12 +127,12 @@ export const Header: React.FC<HeaderProps> = () => {
                   border: '1px solid #cbd5e1',
                   borderRadius: '4px',
                   color: '#475569',
-                  fontSize: '0.72rem',
+                  fontSize: '0.75rem',
                   fontWeight: 600,
                   cursor: 'pointer'
                 }}
               >
-                <LogOut size={12} /> Sair
+                <LogOut size={12} /> <span className="app-header-signout-label">Sair</span>
               </button>
             </div>
           )}

@@ -59,8 +59,12 @@ describe('LifelineRule', () => {
       })
     );
     expect(html).toContain('2 marcos já passaram');
-    expect(html).not.toMatch(/Planejar nova licitação ·/);
+    // A linha de resumo (visível no desktop) não destaca um "próximo marco"; a lista de marcos
+    // do celular, separada, apenas enumera os que já passaram.
+    const notes = /class="lifeline-notes"[^>]*>(.*?)<\/div>/.exec(html)?.[1] ?? '';
+    expect(notes).not.toMatch(/Planejar nova licitação ·/);
     expect(html).toContain('Planejamento de Prorrogação da Ata (180d)');
+    expect(html).not.toMatch(/data-next="true"/);
   });
 
   it('marco colado no fim vira o próprio marcador de fim, sem anel separado', () => {
@@ -103,5 +107,22 @@ describe('LifelineRule', () => {
   it('não desenha "Hoje" fora da vigência', () => {
     expect(render(vida({ todayPct: 100 }))).not.toContain('Hoje');
     expect(render(vida({ todayPct: 0 }))).not.toContain('Hoje');
+  });
+});
+
+describe('LifelineRule — lista de marcos do celular', () => {
+  it('lista todos os marcos com prazo relativo e destaca o próximo', () => {
+    const html = render(
+      vida({
+        milestones: [
+          marco({ id: 'a', label: 'Reajuste (24 meses)', date: '2026-11-14', pct: 40, diasRestantes: 43, state: 'PROXIMO' }),
+          marco({ id: 'b', label: 'Alerta de Exaustão de Vigência da ARP (90d)', pct: 80, diasRestantes: 120, state: 'FUTURO' })
+        ]
+      })
+    );
+    expect(html).toContain('class="lifeline-list"');
+    expect(html).toContain('em 43 dias');
+    expect(html).toContain('em 120 dias');
+    expect(html).toMatch(/data-next="true"/);
   });
 });

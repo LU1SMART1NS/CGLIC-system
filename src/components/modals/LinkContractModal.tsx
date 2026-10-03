@@ -365,7 +365,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   <span style={{ fontSize: '0.78rem' }}>Verifique se o contrato já foi sincronizado no módulo Contratos.</span>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto' }} className="link-contract-list">
                   {filteredContracts.map(({ contract: c, reasons }) => (
                     <div
                       key={contractKeyOf(c)}
@@ -393,17 +393,17 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.2rem' }}>
                           <strong style={{ fontSize: '0.92rem', color: '#0c326f' }}>
                             {displayContractNumber(c) || `Contrato ${c.numero}/${c.ano}`}
                           </strong>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
                             {formatStatusVigencia(c.statusVigencia)}
                           </span>
                           {isAtaMode && (() => {
                             const cov = ataLinkCoverage(contractKeyOf(c), itemOptions!);
                             return cov.vinculados > 0 ? (
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
                                 Vinculado a {cov.vinculados} de {cov.total} itens
                               </span>
                             ) : null;
@@ -411,7 +411,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                           {reasons.map((r) => (
                             <span
                               key={r}
-                              style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
                             >
                               <Sparkles size={10} /> {SUGGESTION_LABEL[r]}
                             </span>
@@ -426,14 +426,14 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                           )}
                         </div>
                         {c.objeto && (
-                          <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '0.15rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '0.15rem' }}>
                             {c.objeto}
                           </div>
                         )}
                       </div>
 
                       <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Valor Global</span>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Valor Global</span>
                         <strong style={{ fontSize: '0.88rem', color: '#0c326f' }}>
                           {formatCurrency(c.valorGlobal || c.valorInicial)}
                         </strong>
@@ -450,7 +450,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
               <div style={{ background: '#f8fafc', border: '1.5px solid #bfdbfe', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem', position: 'relative' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Contrato Oficial Selecionado
                     </span>
                     <h4 style={{ margin: '0.15rem 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: '#0c326f' }}>
@@ -460,13 +460,13 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setSelectedContract(null)}
-                    style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.74rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+                    style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
                   >
                     Trocar contrato
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem', fontSize: '0.78rem', color: '#475569' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.5rem', fontSize: '0.78rem', color: '#475569' }}>
                   <div>
                     <strong>Fornecedor:</strong> {selectedContract.fornecedorNome || 'N/A'}
                   </div>
@@ -507,7 +507,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: '#0c326f' }} />
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto' }} className="link-contract-list">
                       {itemOptions!.map((i) => {
                         const linked = isItemLinked(i);
                         const checked = isItemChecked(i);
@@ -529,15 +529,15 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                             <div style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}>
                               <div style={{ fontWeight: 700, color: '#0c326f' }}>
                                 Item {i.numeroItem}
-                                {isSameSupplier(i) && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', color: '#b45309' }}>mesmo fornecedor</span>}
-                                {linked && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', color: '#64748b' }}>já vinculado</span>}
+                                {isSameSupplier(i) && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: '#b45309' }}>mesmo fornecedor</span>}
+                                {linked && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: '#64748b' }}>já vinculado</span>}
                               </div>
                               <div style={{ color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {i.descricao || 'Sem descrição'}
                                 {i.fornecedorNome ? ` (${i.fornecedorNome})` : ''}
                               </div>
                               {!linked && checked && apiListsItems && !listed && (
-                                <div style={{ color: '#b45309', fontSize: '0.72rem' }}>A API oficial não lista este item neste contrato.</div>
+                                <div style={{ color: '#b45309', fontSize: '0.75rem' }}>A API oficial não lista este item neste contrato.</div>
                               )}
                             </div>
                             <div style={{ textAlign: 'right', whiteSpace: 'nowrap', fontSize: '0.78rem', color: '#64748b' }}>
@@ -575,7 +575,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
               </div>
 
               {/* Botões de Ação */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <div className="link-contract-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
                 <button
                   type="button"
                   onClick={handleClose}

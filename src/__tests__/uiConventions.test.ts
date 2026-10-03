@@ -30,4 +30,19 @@ describe('convenções de interface', () => {
     ).map((f) => f.file);
     expect(offenders).toEqual([]);
   });
+
+  it('grids auto-fit/auto-fill usam minmax(min(100%, Npx), 1fr) para não estourar em telas estreitas', () => {
+    const offenders = FILES.filter(({ text }) =>
+      /repeat\(auto-(fit|fill),\s*minmax\(\d+px/.test(stripComments(text))
+    ).map((f) => f.file);
+    expect(offenders).toEqual([]);
+  });
+
+  it('texto da interface não usa fonte menor que 12px (0.75rem)', () => {
+    const offenders = FILES.filter(({ text }) => {
+      const t = stripComments(text);
+      return /fontSize:\s*['"]0\.(?:[0-6]\d*|7[0-4]\d*)rem['"]/.test(t) || /fontSize:\s*['"]?(?:[0-9]|1[01])(?:px)?['"]?\s*[,}]/.test(t);
+    }).map((f) => f.file);
+    expect(offenders).toEqual([]);
+  });
 });

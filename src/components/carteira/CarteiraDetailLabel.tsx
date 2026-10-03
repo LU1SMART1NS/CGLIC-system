@@ -2,7 +2,7 @@ import React from 'react';
 
 /** Título de seção das linhas expandidas das carteiras (ex.: "Processo", "Pendências abertas", "Itens da ata"). */
 export const CarteiraDetailLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', color: '#64748b', marginBottom: '0.2rem' }}>
+  <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', color: '#64748b', marginBottom: '0.2rem' }}>
     {children}
   </div>
 );

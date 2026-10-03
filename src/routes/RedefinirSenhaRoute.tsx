@@ -66,7 +66,7 @@ export const RedefinirSenhaRoute: React.FC = () => {
         background: 'rgba(0, 0, 0, 0.25)',
         color: '#ffffff',
         padding: '0.4rem 2rem',
-        fontSize: '0.72rem',
+        fontSize: '0.75rem',
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
@@ -242,7 +242,7 @@ export const RedefinirSenhaRoute: React.FC = () => {
             background: '#f8fafc',
             borderTop: '1px solid #e2e8f0',
             textAlign: 'center',
-            fontSize: '0.72rem',
+            fontSize: '0.75rem',
             color: '#64748b'
           }}>
             Suas credenciais são criptografadas e protegidas pelo Supabase Auth.

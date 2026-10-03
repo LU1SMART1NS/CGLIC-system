@@ -1,4 +1,5 @@
 import React from 'react';
+import { PageContainer } from '../../design-system/components/PageContainer';
 import { BellRing, RotateCcw, Scale } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -81,7 +82,7 @@ export const AlertRulesPage: React.FC = () => {
   const sectionStrip: React.CSSProperties = { padding: '0.6rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' };
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Regras de Alertas"
         subtitle="Limites que classificam os alertas em todas as telas."
@@ -118,7 +119,7 @@ export const AlertRulesPage: React.FC = () => {
               <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{group.description}</div>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     <th style={carteiraTh}>Regra</th>
@@ -141,7 +142,7 @@ export const AlertRulesPage: React.FC = () => {
                             <div role="alert" style={{ fontSize: '0.76rem', color: '#b91c1c', marginTop: '2px', fontWeight: 600 }}>{error}</div>
                           )}
                         </td>
-                        <td style={carteiraTd}>
+                        <td data-label="Valor" style={carteiraTd}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <input
                               id={`rule-${def.key}`}
@@ -162,8 +163,8 @@ export const AlertRulesPage: React.FC = () => {
                             <span style={{ fontSize: '0.8rem', color: '#475569' }}>{def.unit}</span>
                           </div>
                         </td>
-                        <td style={{ ...carteiraTd, color: '#64748b' }}>{ALERT_RULE_DEFAULTS[def.key]} {def.unit}</td>
-                        <td style={{ ...carteiraTd, textAlign: 'right' }}>
+                        <td data-label="Padrão" style={{ ...carteiraTd, color: '#64748b' }}>{ALERT_RULE_DEFAULTS[def.key]} {def.unit}</td>
+                        <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
                           <button
                             type="button"
                             onClick={() => resetToDefaults([def.key])}
@@ -194,7 +195,7 @@ export const AlertRulesPage: React.FC = () => {
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={carteiraTh}>Regra</th>
@@ -206,14 +207,14 @@ export const AlertRulesPage: React.FC = () => {
               {LEGAL_RULES.map((rule) => (
                 <tr key={rule.label}>
                   <td style={{ ...carteiraTd, fontWeight: 700 }}>{rule.label}</td>
-                  <td style={carteiraTd}>{rule.value}</td>
-                  <td style={{ ...carteiraTd, color: '#64748b' }}>{rule.source}</td>
+                  <td data-label="Limite" style={carteiraTd}>{rule.value}</td>
+                  <td data-label="Fonte" style={{ ...carteiraTd, color: '#64748b' }}>{rule.source}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };

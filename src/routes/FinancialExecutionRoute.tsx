@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PageContainer } from '../design-system/components/PageContainer';
 import { useNavigate } from 'react-router-dom';
 import { Banknote, RefreshCw, Loader2, CheckCircle2, XCircle, X } from 'lucide-react';
 import { ManagementFinancialExecution } from '../components/dashboard/ManagementFinancialExecution';
@@ -54,7 +55,7 @@ export const FinancialExecutionRoute: React.FC = () => {
   const batchTone = !batchSummary ? colors.semantic.info : batchSummary.erro ? colors.semantic.warning : colors.semantic.success;
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '1.5rem 2rem 3rem' }}>
+    <PageContainer>
       {/* Header da Página Canônico */}
       <PageHeader
         title="Empenhos e Execução"
@@ -161,6 +162,6 @@ export const FinancialExecutionRoute: React.FC = () => {
         onNavigateContract={handleNavigateContract}
         onRefresh={() => refresh()}
       />
-    </div>
+    </PageContainer>
   );
 };

@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:mutation": "vitest run src/services/__tests__/mutationCheck.test.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "playwright test",
+    "e2e:login": "node e2e/login.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
@@ -21,6 +23,7 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

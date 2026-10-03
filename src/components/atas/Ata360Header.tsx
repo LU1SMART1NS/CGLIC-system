@@ -106,7 +106,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
         ? s.percentual_consumido
         : homologada > 0 ? (consumida / homologada) * 100 : 0;
       const classificacao = classifyArpItemSaldo(raw);
-      if (classificacao.isCritico || classificacao.isProximoLimite || raw >= SALDO_RULES.esgotadoAPartirDePct) emRisco++;
+      if (classificacao.isCritico) emRisco++;
       if (!pior || classificacao.percentualConsumido > pior.pct) {
         pior = { pct: classificacao.percentualConsumido, numeroItem: String(s.numero_item ?? '') };
       }
@@ -116,9 +116,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
 
   const piorClass = saldoContratavel.pior ? classifyArpItemSaldo(saldoContratavel.pior.pct) : null;
   const riscoTone: SeverityLevel | undefined =
-    piorClass && (piorClass.isCritico || piorClass.isProximoLimite || piorClass.percentualConsumido >= SALDO_RULES.esgotadoAPartirDePct)
-      ? piorClass.severity
-      : undefined;
+    piorClass?.isCritico ? piorClass.severity : undefined;
   const temSaldo = saldos.length > 0 && saldoContratavel.total > 0;
 
   const vig = vigenciaTile(faixa, dias);
@@ -142,12 +140,12 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       actions={
         <>
           {ataUrl && (
-            <a href={ataUrl} target="_blank" rel="noopener noreferrer" style={pncpLinkStyle}>
+            <a href={ataUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
               <ExternalLink size={13} /> Ata no PNCP
             </a>
           )}
           {compraUrl && (
-            <a href={compraUrl} target="_blank" rel="noopener noreferrer" style={pncpLinkStyle}>
+            <a href={compraUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
               <ExternalLink size={13} /> Edital no PNCP
             </a>
           )}
@@ -205,7 +203,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
                 ? 'Sem saldo registrado'
                 : saldoContratavel.emRisco > 0 && saldoContratavel.pior
                   ? `item ${saldoContratavel.pior.numeroItem} a ${Math.round(saldoContratavel.pior.pct)}% consumido`
-                  : `nenhum acima de ${SALDO_RULES.atencaoAcimaDePct}% consumido`
+                  : `nenhum acima de ${SALDO_RULES.criticoAcimaDePct}% consumido`
             }
             tone={saldoContratavel.emRisco > 0 ? riscoTone : undefined}
             onClick={onOpenItens}

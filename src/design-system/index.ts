@@ -27,7 +27,16 @@ export * from './components/TaskCard';
 export * from './components/WorkflowStepper';
 export * from './components/AppButton';
 export * from './components/PageHeader';
+export * from './components/PageContainer';
+export * from './components/AnchoredPanel';
+export * from './components/IconButton';
+export * from './components/FormFields';
+export * from './components/Tooltip';
 export * from './components/HeaderRefreshAction';
 export * from './components/Modal';
 export * from './components/ConfirmDialog';
 export * from './components/Toast';
+
+// Hooks
+export * from './hooks/useMediaQuery';
+export * from './hooks/useScrollActiveTab';
