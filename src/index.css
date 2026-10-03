@@ -1599,3 +1599,11 @@ h1, h2, h3, h4 {
   /* Célula de ação sem botão (ex.: empenho sem contrato) não ocupa linha no cartão. */
   .carteira-stack td[data-role='action']:not(:has(button, a)) { display: none; }
 }
+
+/* Células de ação com vários botões (admin): ficam em linha, quebrando se faltar espaço */
+@media (max-width: 767px) {
+  .carteira-stack td[data-role='action'] > div { display: flex !important; flex-wrap: wrap; gap: 0.5rem; width: 100%; justify-content: stretch !important; }
+  .carteira-stack td[data-role='action'] > div > button { flex: 1 1 auto; width: auto; }
+  .carteira-stack td[data-role='action'] button:has(> svg:only-child) { width: auto; min-width: 44px; }
+  .carteira-stack td[data-role='action']:has(> button:only-child > svg:only-child) { display: flex; justify-content: flex-end; }
+}

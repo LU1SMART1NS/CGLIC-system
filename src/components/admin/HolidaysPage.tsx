@@ -210,7 +210,7 @@ export const HolidaysPage: React.FC = () => {
           />
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={{ ...carteiraTh, width: '120px' }}>Data</th>
@@ -224,13 +224,13 @@ export const HolidaysPage: React.FC = () => {
               <tbody>
                 {yearRecords.map((r) => (
                   <tr key={r.data} data-testid={`holiday-row-${r.data}`} style={{ opacity: r.ativo ? 1 : 0.7 }}>
-                    <td style={{ ...carteiraTd, fontWeight: 700, color: '#0c326f' }}>{formatDateBR(r.data)}</td>
-                    <td style={{ ...carteiraTd, color: '#64748b' }}>{weekdayOf(r.data)}</td>
-                    <td style={carteiraTd}>{r.nome}</td>
-                    <td style={carteiraTd}>
+                    <td data-label="Data" style={{ ...carteiraTd, fontWeight: 700, color: '#0c326f' }}>{formatDateBR(r.data)}</td>
+                    <td data-label="Dia" style={{ ...carteiraTd, color: '#64748b' }}>{weekdayOf(r.data)}</td>
+                    <td data-label="Nome" style={carteiraTd}>{r.nome}</td>
+                    <td data-label="Tipo" style={carteiraTd}>
                       <StatusBadge size="sm" label={HOLIDAY_TIPO_LABEL[r.tipo]} variant={r.tipo === 'NACIONAL' ? 'info' : r.tipo === 'DISTRITAL' ? 'purple' : 'neutral'} />
                     </td>
-                    <td style={carteiraTd}>
+                    <td data-label="Nos prazos" style={carteiraTd}>
                       {!r.ativo ? (
                         <StatusBadge size="sm" label="Desativado: dia útil" variant="neutral" />
                       ) : r.meioExpediente ? (
@@ -239,7 +239,7 @@ export const HolidaysPage: React.FC = () => {
                         <StatusBadge size="sm" label="Sem expediente" variant="success" />
                       )}
                     </td>
-                    <td style={{ ...carteiraTd, textAlign: 'right' }}>
+                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                         <button
                           type="button"

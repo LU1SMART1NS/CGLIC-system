@@ -275,7 +275,7 @@ export const UsersManagement: React.FC = () => {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={carteiraTh}>Servidor / Usuário</th>
@@ -305,7 +305,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Perfil Operacional */}
-                      <td style={carteiraTd}>
+                      <td data-label="Perfil" style={carteiraTd}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <span
                             title={user.perfil === GESTOR_SALDO_ROLE_ID ? `Permissões: ${GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}` : undefined}
@@ -335,7 +335,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Status Derivado da Autenticação */}
-                      <td style={{ ...carteiraTd, textAlign: 'center' }}>
+                      <td data-label="Situação" style={{ ...carteiraTd, textAlign: 'center' }}>
                         {isPending ? (
                           <StatusBadge variant="warning" label="Convite pendente" />
                         ) : isInactive ? (
@@ -346,7 +346,7 @@ export const UsersManagement: React.FC = () => {
                       </td>
 
                       {/* Ações */}
-                      <td style={{ ...carteiraTd, textAlign: 'right' }}>
+                      <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                           {isPending && (
                             <button
