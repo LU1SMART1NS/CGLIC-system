@@ -141,8 +141,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
           contract={contract}
           contractKey={resolvedContractKey}
           counts={queue.counts}
-          onOpenActions={() => goToTab('acoes', true)}
-          onOpenFinanceiro={() => goToTab('financeiro', true)}
+          onOpenActions={() => goToTab('acoes')}
+          onOpenFinanceiro={() => goToTab('financeiro')}
         />
       </Contract360Header>
 
@@ -168,7 +168,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
               contractKey={resolvedContractKey}
               plan={plan}
               isLoading={loadingPlan || loadingQueue}
-              onGoTo={(tab) => goToTab(tab, true)}
+              onGoTo={(tab) => goToTab(tab)}
             />
           </InstrumentSection>
         )}

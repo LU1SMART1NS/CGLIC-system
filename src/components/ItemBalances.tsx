@@ -818,7 +818,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           orgaosParticipantes: unidades.length
         }}
         referencia={comprasGovReferencia}
-        onGoTo={(tab) => setActiveTab(tab, true)}
+        onGoTo={(tab) => setActiveTab(tab)}
         onOpenAta={role === 'gestor_saldos' ? undefined : onBack}
       />
 
@@ -1218,7 +1218,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
               if (alloc) handleEditAllocation(alloc);
             }}
             onDelete={handleDeleteAllocation}
-            onGoToContracts={() => setActiveTab('contratos', true)}
+            onGoToContracts={() => setActiveTab('contratos')}
           />
         ) : (
           <AdesoesTab
