@@ -250,7 +250,7 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
           />
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table data-testid="table-empenhos" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="carteira-stack" data-testid="table-empenhos" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={carteiraTh}>Nota de Empenho</th>
@@ -267,23 +267,23 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
               <tbody>
                 {pageEmpenhos.map((emp: ManagementDashboardEmpenhoDetail) => (
                   <tr key={emp.empenhoKey} data-testid={`row-empenho-${emp.numeroEmpenho}`}>
-                    <td style={{ ...carteiraTd, fontWeight: 700 }}>
+                    <td data-label="Empenho" style={{ ...carteiraTd, fontWeight: 700 }}>
                       {emp.numeroEmpenho}
                       {emp.ano && <span style={{ color: '#64748b', fontWeight: 500, marginLeft: '0.25rem' }}>/{emp.ano}</span>}
                     </td>
-                    <td style={carteiraTd}>{emp.fornecedorNome || '—'}</td>
-                    <td style={carteiraTd}>
+                    <td data-label="Credor" style={carteiraTd}>{emp.fornecedorNome || '—'}</td>
+                    <td data-label="Contrato" style={carteiraTd}>
                       {emp.contratoNumero ? (
                         <span style={{ fontWeight: 600 }}>Contrato {emp.contratoNumero}</span>
                       ) : (
                         <span style={{ color: '#94a3b8' }}>Sem contrato</span>
                       )}
                     </td>
-                    <td style={{ ...carteiraTd, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(emp.valorEmpenhado)}</td>
-                    <td style={{ ...carteiraTd, textAlign: 'right', color: '#0284c7' }}>{formatCurrency(emp.valorLiquidado)}</td>
-                    <td style={{ ...carteiraTd, textAlign: 'right', color: '#059669', fontWeight: 700 }}>{formatCurrency(emp.valorPago)}</td>
-                    <td style={{ ...carteiraTd, textAlign: 'right', color: '#64748b' }}>{formatCurrency(emp.saldoNaoExecutado)}</td>
-                    <td style={{ ...carteiraTd, textAlign: 'center' }}>
+                    <td data-label="Empenhado" style={{ ...carteiraTd, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(emp.valorEmpenhado)}</td>
+                    <td data-label="Liquidado" style={{ ...carteiraTd, textAlign: 'right', color: '#0284c7' }}>{formatCurrency(emp.valorLiquidado)}</td>
+                    <td data-label="Pago" style={{ ...carteiraTd, textAlign: 'right', color: '#059669', fontWeight: 700 }}>{formatCurrency(emp.valorPago)}</td>
+                    <td data-label="Saldo a executar" style={{ ...carteiraTd, textAlign: 'right', color: '#64748b' }}>{formatCurrency(emp.saldoNaoExecutado)}</td>
+                    <td data-label="% Exec." style={{ ...carteiraTd, textAlign: 'center' }}>
                       <StatusBadge
                         label={`${emp.percentualExecutado}%`}
                         variant={emp.percentualExecutado >= 80 ? 'success' : emp.percentualExecutado >= 40 ? 'info' : 'neutral'}
@@ -291,7 +291,7 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
                         dot={false}
                       />
                     </td>
-                    <td style={{ ...carteiraTd, textAlign: 'right' }}>
+                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
                       {emp.contratoNumero && onNavigateContract ? (
                         <button
                           type="button"

@@ -380,7 +380,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
           />
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table data-testid="payments-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="carteira-stack" data-testid="payments-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={carteiraTh}>Contrato / Competência</th>
@@ -408,7 +408,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                         <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Competência: {cycle.competencia || 'N/D'}</div>
                       </td>
 
-                      <td style={{ ...carteiraTd, verticalAlign: 'top' }}>
+                      <td data-label="Atesto / SEI" style={{ ...carteiraTd, verticalAlign: 'top' }}>
                         <div style={{ fontWeight: 600 }}>{cycle.input?.documentoAtestoSei || 'Atesto sem doc'}</div>
                         {cycle.input?.numeroProcessoPagamentoSei && (
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Proc: {cycle.input.numeroProcessoPagamentoSei}</div>
@@ -418,15 +418,15 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                         )}
                       </td>
 
-                      <td style={{ ...carteiraTd, verticalAlign: 'top', textAlign: 'right', fontWeight: 700 }}>
+                      <td data-label="Valor do atesto" style={{ ...carteiraTd, verticalAlign: 'top', textAlign: 'right', fontWeight: 700 }}>
                         {formatCurrency(cycle.input?.valorAtesto)}
                       </td>
 
-                      <td style={{ ...carteiraTd, verticalAlign: 'top' }}>
+                      <td data-label="Situação" style={{ ...carteiraTd, verticalAlign: 'top' }}>
                         <StatusBadge label={statusInfo.label} variant={statusInfo.variant} size="sm" dot={false} />
                       </td>
 
-                      <td style={{ ...carteiraTd, verticalAlign: 'top' }}>
+                      <td data-label="Prazos e SLA" style={{ ...carteiraTd, verticalAlign: 'top' }}>
                         {encerrado ? (
                           <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>—</span>
                         ) : isVencida ? (
@@ -445,7 +445,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                         )}
                       </td>
 
-                      <td style={{ ...carteiraTd, verticalAlign: 'top' }}>
+                      <td data-label="Ordem bancária" style={{ ...carteiraTd, verticalAlign: 'top' }}>
                         {cycle.input?.numeroOrdemBancaria ? (
                           <div>
                             <div style={{ fontWeight: 700, color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -461,7 +461,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                         )}
                       </td>
 
-                      <td style={{ ...carteiraTd, verticalAlign: 'top', textAlign: 'right' }}>
+                      <td data-role="action" style={{ ...carteiraTd, verticalAlign: 'top', textAlign: 'right' }}>
                         {onNavigateContract && (
                           <button
                             type="button"

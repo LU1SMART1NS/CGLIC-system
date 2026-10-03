@@ -1595,3 +1595,7 @@ h1, h2, h3, h4 {
   .carteira-pend-main > span { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
   .carteira-pend-row > button { width: 100%; justify-content: center; min-height: 44px; }
 }
+@media (max-width: 767px) {
+  /* Célula de ação sem botão (ex.: empenho sem contrato) não ocupa linha no cartão. */
+  .carteira-stack td[data-role='action']:not(:has(button, a)) { display: none; }
+}
