@@ -114,12 +114,17 @@ export function DataTable<T>({
                       )}
                       {secondary.length > 0 && (
                         <dl className="ds-table-cards__fields">
-                          {secondary.map((c) => (
-                            <div key={c.key} className="ds-table-cards__field">
-                              <dt>{c.mobileLabel ?? c.header}</dt>
-                              <dd>{cell(c, item, idx)}</dd>
-                            </div>
-                          ))}
+                          {secondary.map((c) => {
+                            const content = cell(c, item, idx);
+                            // Campo sem valor (ex.: coluna de ação vazia na linha) não ocupa espaço no cartão.
+                            if (content === null || content === undefined || content === false || content === '') return null;
+                            return (
+                              <div key={c.key} className="ds-table-cards__field">
+                                <dt>{c.mobileLabel ?? c.header}</dt>
+                                <dd>{content}</dd>
+                              </div>
+                            );
+                          })}
                         </dl>
                       )}
                     </>

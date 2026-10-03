@@ -67,7 +67,7 @@ export const PaymentCycleDocuments: React.FC<{
         testId={`payment-documents-table-${cycle.cycleKey}`}
       />
       {editavel && (
-        <form onSubmit={handleAdd} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px,1.3fr) minmax(90px,0.8fr) minmax(110px,1fr) minmax(100px,0.9fr) auto', gap: '0.5rem', alignItems: 'end' }}>
+        <form onSubmit={handleAdd} className="payment-doc-row">
           <select aria-label="Tipo do documento" className="form-input" value={tipo} onChange={(e) => setTipo(e.target.value)}>
             {TIPOS_DOCUMENTO_RECEBIDO.map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -76,7 +76,9 @@ export const PaymentCycleDocuments: React.FC<{
           <input aria-label="Número do documento" className="form-input" type="text" placeholder="Nº" value={numero} onChange={(e) => setNumero(e.target.value)} />
           <input aria-label="Id. SEI" className="form-input" type="text" placeholder="Id. SEI *" value={sei} onChange={(e) => setSei(e.target.value)} required />
           <input aria-label="Valor do documento" className="form-input" type="text" inputMode="numeric" placeholder="Valor (R$)" value={valor} onChange={(e) => setValor(formatCurrencyInputBR(e.target.value))} />
-          <AppButton type="submit" variant="outline" size="sm" iconOnly icon={<Plus size={15} />} disabled={saving} isLoading={saving} title="Incluir documento" />
+          <AppButton type="submit" variant="outline" size="sm" icon={<Plus size={15} />} disabled={saving} isLoading={saving} title="Incluir documento" className="payment-doc-remove">
+            <span className="payment-doc-remove__label">Incluir</span>
+          </AppButton>
         </form>
       )}
       {error && <NoticeBar tone="danger" testId="payment-document-error">{error}</NoticeBar>}

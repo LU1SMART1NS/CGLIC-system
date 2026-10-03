@@ -106,7 +106,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const linksOf = (e: EmpenhoRow) => (e.empenho_id ? linksByEmpenho.get(e.empenho_id) ?? [] : []);
 
   const columns: Column<EmpenhoRow>[] = [
-    { key: 'numero', header: 'Empenho', render: (e) => <strong style={{ color: '#0c326f' }}>{e.numero_oficial || 'N/A'}</strong> },
+    { key: 'numero', header: 'Empenho', priority: 'primary', render: (e) => <strong style={{ color: '#0c326f' }}>{e.numero_oficial || 'N/A'}</strong> },
     { key: 'credor', header: 'Credor', render: (e) => e.credor_nome || '—' },
     { key: 'data', header: 'Emissão', render: (e) => formatDate(e.data_emissao) },
     { key: 'empenhado', header: 'Empenhado', align: 'right', render: (e) => formatCurrency(e.valor_empenhado) },
@@ -136,26 +136,6 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
         if (links.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
         const estado = quantidadeEstado(links);
         return <StatusBadge label={estado.label} variant={estado.variant} size="sm" dot={false} />;
-      }
-    },
-    {
-      key: 'acao',
-      header: 'Ação',
-      align: 'right',
-      render: (e) => {
-        const pendente = linksOf(e).find((l) => l.quantidade == null);
-        const path = pendente ? itemPath(pendente.itemKey) : null;
-        if (!path) return null;
-        return (
-          <AppButton
-            variant="outline"
-            size="sm"
-            iconOnly
-            icon={<ArrowRight size={15} />}
-            onClick={() => navigate(path)}
-            title="Confirmar a quantidade no item da ata"
-          />
-        );
       }
     }
   ];
@@ -194,6 +174,23 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           data={empenhosList}
           keyExtractor={(e, i) => e.canonical_key || e.numero_oficial || String(i)}
           testId="contract-financial-table"
+          rowActionsHeader="Ação"
+          rowActions={(e) => {
+            const pendente = linksOf(e).find((l) => l.quantidade == null);
+            const path = pendente ? itemPath(pendente.itemKey) : null;
+            if (!path) return null;
+            return (
+              <AppButton
+                variant="outline"
+                size="sm"
+                icon={<ArrowRight size={15} />}
+                onClick={() => navigate(path)}
+                title="Confirmar a quantidade no item da ata"
+              >
+                <span className="payment-action-label">Confirmar quantidade</span>
+              </AppButton>
+            );
+          }}
         />
       </div>
     </div>

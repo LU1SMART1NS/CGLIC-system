@@ -1607,3 +1607,36 @@ h1, h2, h3, h4 {
   .carteira-stack td[data-role='action'] button:has(> svg:only-child) { width: auto; min-width: 44px; }
   .carteira-stack td[data-role='action']:has(> button:only-child > svg:only-child) { display: flex; justify-content: flex-end; }
 }
+
+
+/* ==========================================================================
+   Pagamentos do contrato (Fase 3 / L4)
+   ========================================================================== */
+/* Linha "documento recebido": 5 colunas no desktop, mini-cartão em 2 colunas no celular */
+.payment-doc-row {
+  display: grid; align-items: end; gap: 0.5rem;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(90px, 0.8fr) minmax(110px, 1fr) minmax(100px, 0.9fr) auto;
+}
+/* A partir da 2a linha o rótulo é redundante no desktop (a coluna já foi nomeada) */
+@media (min-width: 768px) {
+  .payment-doc-row--followup .form-label { visibility: hidden; }
+}
+@media (max-width: 767px) {
+  .payment-doc-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 0.6rem;
+  }
+  .payment-doc-row > :first-child { grid-column: 1 / -1; }
+  .payment-doc-row > .payment-doc-remove, .payment-doc-row > .ds-btn:last-child { grid-column: 1 / -1; width: 100%; justify-content: center; }
+  div.payment-doc-row { padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+  form.payment-doc-row .form-input, form.payment-doc-row select { min-width: 0; }
+}
+/* Ciclo: ações com espaço suficiente para o toque */
+@media (max-width: 767px) {
+  .payment-cycle-actions { width: 100%; flex-wrap: wrap; }
+  .payment-cycle-actions > .ds-btn { flex: 1 1 auto; min-width: 44px; min-height: 44px; }
+}
+
+/* Texto das ações do ciclo só no celular, onde ícone sem rótulo não comunica nada */
+@media (min-width: 768px) { .payment-action-label { display: none; } }
+@media (max-width: 767px) { .payment-cycle-actions > .ds-btn { justify-content: center; } }
+.ds-table-cards__actions:empty { display: none; }
