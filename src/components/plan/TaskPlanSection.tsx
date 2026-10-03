@@ -22,6 +22,7 @@ import type {
   ContractTaskStatusValue
 } from '../../types';
 import { groupMacrotasksByModule } from '../../utils/taskPlanModules';
+import { numeroEtapa, numeroTarefa, stripNumeracaoManual } from '../../utils/planNumbering';
 import { ResponsavelField, type ResponsavelValue } from '../contracts/ResponsavelField';
 import {
   AddTaskForm,
@@ -110,12 +111,13 @@ const externalLinkOf = (task: PlanTask): string | undefined => (task as Contract
 /** Linha de uma tarefa do plano, igual em Contrato e Ata. */
 export type TaskPlanRowController = Pick<TaskPlanController, 'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask'>;
 
-export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowController }> = ({ task, controller }) => {
+export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowController; numero?: string }> = ({ task, controller, numero }) => {
   const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask } = controller;
   const updateMutation = useUpdateTask(entityKey);
   const deleteMutation = useDeleteTask(entityKey);
   const [expanded, setExpanded] = useState(false);
-  const [nome, setNome] = useState(task.nome);
+  const nomeTarefa = stripNumeracaoManual(task.nome);
+  const [nome, setNome] = useState(nomeTarefa);
   const [responsavel, setResponsavel] = useState<ResponsavelValue>({
     nome: task.responsavelNome || '',
     userId: task.responsavelUserId
@@ -147,7 +149,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
     updateMutation.mutate({
       taskId: task.id,
       status: task.status,
-      nome: nome.trim() || task.nome,
+      nome: stripNumeracaoManual(nome).trim() || nomeTarefa,
       // Vazio limpa o responsável próprio e a tarefa volta a herdar o gestor.
       responsavelNome: responsavel.nome.trim(),
       responsavelUserId: responsavel.nome.trim() ? responsavel.userId : undefined,
@@ -202,7 +204,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
                 textDecoration: task.status === 'CONCLUIDA' ? 'line-through' : 'none'
               }}
             >
-              {task.nome}
+              {numero ? `${numero}. ${nomeTarefa}` : nomeTarefa}
             </span>
 
 
@@ -618,7 +620,7 @@ export const TaskPlanSection: React.FC<{
                   : undefined
               }
             />
-        {!collapsed && group.macrotarefas.map((macro) => (
+        {!collapsed && group.macrotarefas.map((macro, macroIndex) => (
           <div
             key={macro.id}
             style={{
@@ -630,15 +632,16 @@ export const TaskPlanSection: React.FC<{
           >
             <MacrotaskHeader
               nome={macro.nome}
+              numero={numeroEtapa(macroIndex)}
               taskCount={macro.tarefas.length}
               isPending={c.saveMacrotask.isPending || c.deleteMacrotask.isPending}
-              onRename={(nome) => c.saveMacrotask.run({ id: macro.id, nome })}
+              onRename={(nome) => c.saveMacrotask.run({ id: macro.id, nome: stripNumeracaoManual(nome) })}
               onDelete={() => c.deleteMacrotask.run(macro.id)}
             />
 
             <div>
-              {macro.tarefas.map((tarefa) => (
-                <TaskPlanRow key={tarefa.id} task={tarefa} controller={c} />
+              {macro.tarefas.map((tarefa, tarefaIndex) => (
+                <TaskPlanRow key={tarefa.id} task={tarefa} controller={c} numero={numeroTarefa(macroIndex, tarefaIndex)} />
               ))}
               <AddTaskForm
                 gestorNome={c.gestorNome}
@@ -646,7 +649,7 @@ export const TaskPlanSection: React.FC<{
                 onSubmit={(values) =>
                   c.createTask.run({
                     macrotaskId: macro.id,
-                    nome: values.nome,
+                    nome: stripNumeracaoManual(values.nome),
                     prazo: values.prazo || null,
                     observacao: values.observacao || null
                   })
@@ -661,7 +664,7 @@ export const TaskPlanSection: React.FC<{
 
         <AddMacrotaskForm
           isPending={c.saveMacrotask.isPending}
-          onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome })}
+          onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome: stripNumeracaoManual(nome) })}
         />
       </div>
     </div>

@@ -4,6 +4,8 @@ import {
   saveAtaTaskMacrotaskRpc,
   deleteAtaTaskMacrotaskRpc,
   deleteAtaTaskModuleRpc,
+  renameAtaTaskModuleRpc,
+  type RenameAtaTaskModuleInput,
   createAtaTaskRpc,
   deleteAtaTaskRpc,
   type DeleteAtaTaskModuleInput,
@@ -45,6 +47,9 @@ export const useDeleteAtaTaskMacrotask = (ataKey: string) =>
 
 export const useDeleteAtaTaskModule = (ataKey: string) =>
   usePlanMutation<RpcGenericDeleteResult, DeleteAtaTaskModuleInput>(ataKey, deleteAtaTaskModuleRpc);
+
+export const useRenameAtaTaskModule = (ataKey: string) =>
+  usePlanMutation<RpcGenericDeleteResult, RenameAtaTaskModuleInput>(ataKey, renameAtaTaskModuleRpc);
 
 export const useCreateAtaTask = (ataKey: string) =>
   usePlanMutation<RpcCreateTaskResult, CreateAtaTaskInput>(ataKey, createAtaTaskRpc);

@@ -240,6 +240,8 @@ export interface ApplyContractTaskTemplateInput {
   numero: string;
   ano: number;
   templateId: string;
+  /** Nome do módulo; vazio = nome do modelo. */
+  moduloNome?: string;
 }
 
 export async function applyContractTaskTemplateRpc(
@@ -257,7 +259,8 @@ export async function applyContractTaskTemplateRpc(
       p_uasg: (input.uasg || '').trim(),
       p_numero: (input.numero || '').trim(),
       p_ano: input.ano,
-      p_template_id: cleanTemplateId
+      p_template_id: cleanTemplateId,
+      p_modulo_nome: (input.moduloNome || '').trim() || null
     });
 
     if (error) throw mapPostgresErrorToAppError(error);
@@ -383,6 +386,20 @@ export async function deleteContractTaskModuleRpc(input: DeleteTaskPlanModuleInp
   return callPlanRpc<RpcGenericDeleteResult>('delete_contract_task_module_atomic', {
     p_plan_id: requireField(input.planId, 'O plano é obrigatório.'),
     p_modulo_id: requireField(input.moduloId, 'O módulo é obrigatório.')
+  });
+}
+
+export interface RenameTaskPlanModuleInput {
+  planId: string;
+  moduloId: string;
+  nome: string;
+}
+
+export async function renameContractTaskModuleRpc(input: RenameTaskPlanModuleInput): Promise<RpcGenericDeleteResult> {
+  return callPlanRpc<RpcGenericDeleteResult>('rename_contract_task_module_atomic', {
+    p_plan_id: requireField(input.planId, 'O plano é obrigatório.'),
+    p_modulo_id: requireField(input.moduloId, 'O módulo é obrigatório.'),
+    p_nome: requireField(input.nome, 'O nome do módulo é obrigatório.')
   });
 }
 

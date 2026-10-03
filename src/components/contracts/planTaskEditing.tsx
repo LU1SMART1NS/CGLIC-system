@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { stripNumeracaoManual } from '../../utils/planNumbering';
 import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
 
@@ -185,11 +186,14 @@ export const AddTaskForm: React.FC<{
 /** Título de etapa com renomear/excluir inline. */
 export const MacrotaskHeader: React.FC<{
   nome: string;
+  /** Número da etapa no módulo (ex.: "2"), calculado pela posição. */
+  numero?: string;
   onRename: (nome: string) => void;
   onDelete: () => void;
   isPending?: boolean;
   taskCount: number;
-}> = ({ nome, onRename, onDelete, isPending, taskCount }) => {
+}> = ({ nome: nomeBruto, numero, onRename, onDelete, isPending, taskCount }) => {
+  const nome = stripNumeracaoManual(nomeBruto);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(nome);
 
@@ -246,7 +250,7 @@ export const MacrotaskHeader: React.FC<{
           />
         </form>
       ) : (
-        <h4 style={headingStyle}>{nome}</h4>
+        <h4 style={headingStyle}>{numero ? `${numero}. ${nome}` : nome}</h4>
       )}
 
       {!editing && (

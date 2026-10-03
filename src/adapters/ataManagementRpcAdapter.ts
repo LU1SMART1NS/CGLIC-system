@@ -197,6 +197,8 @@ export async function deleteAtaTaskTemplateTaskRpc(id: string): Promise<RpcGener
 export interface ApplyAtaTaskTemplateInput {
   ataKey: string;
   templateId: string;
+  /** Nome do módulo; vazio = nome do modelo. */
+  moduloNome?: string;
 }
 
 export async function applyAtaTaskTemplateRpc(
@@ -216,7 +218,8 @@ export async function applyAtaTaskTemplateRpc(
   try {
     const { data, error } = await client.rpc('apply_ata_task_template_atomic', {
       p_ata_key: cleanAtaKey,
-      p_template_id: cleanTemplateId
+      p_template_id: cleanTemplateId,
+      p_modulo_nome: (input.moduloNome || '').trim() || null
     });
 
     if (error) throw mapPostgresErrorToAppError(error);
@@ -328,6 +331,20 @@ export async function deleteAtaTaskModuleRpc(input: DeleteAtaTaskModuleInput): P
   return callPlanRpc<RpcGenericDeleteResult>('delete_ata_task_module_atomic', {
     p_plan_id: requireField(input.planId, 'O plano é obrigatório.'),
     p_modulo_id: requireField(input.moduloId, 'O módulo é obrigatório.')
+  });
+}
+
+export interface RenameAtaTaskModuleInput {
+  planId: string;
+  moduloId: string;
+  nome: string;
+}
+
+export async function renameAtaTaskModuleRpc(input: RenameAtaTaskModuleInput): Promise<RpcGenericDeleteResult> {
+  return callPlanRpc<RpcGenericDeleteResult>('rename_ata_task_module_atomic', {
+    p_plan_id: requireField(input.planId, 'O plano é obrigatório.'),
+    p_modulo_id: requireField(input.moduloId, 'O módulo é obrigatório.'),
+    p_nome: requireField(input.nome, 'O nome do módulo é obrigatório.')
   });
 }
 

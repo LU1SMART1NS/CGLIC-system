@@ -9,6 +9,7 @@ import {
   useSaveAtaTaskMacrotask,
   useDeleteAtaTaskMacrotask,
   useDeleteAtaTaskModule,
+  useRenameAtaTaskModule,
   useCreateAtaTask,
   useDeleteAtaTask
 } from '../../hooks/useAtaTaskPlanEditing';
@@ -36,6 +37,7 @@ function useAtaPlanController(ataKey: string): TaskPlanController {
   const saveMacro = useSaveAtaTaskMacrotask(ataKey);
   const deleteMacro = useDeleteAtaTaskMacrotask(ataKey);
   const deleteModule = useDeleteAtaTaskModule(ataKey);
+  const renameModule = useRenameAtaTaskModule(ataKey);
   const createTask = useCreateAtaTask(ataKey);
   const { data: manager } = useAtaManager(ataKey);
 
@@ -48,7 +50,7 @@ function useAtaPlanController(ataKey: string): TaskPlanController {
     templates,
     loadingTemplates,
     applyTemplate: {
-      run: (templateId, onSuccess) => applyMutation.mutate({ ataKey, templateId }, { onSuccess }),
+      run: (templateId, onSuccess, moduloNome) => applyMutation.mutate({ ataKey, templateId, moduloNome }, { onSuccess }),
       isPending: applyMutation.isPending,
       error: applyMutation.error
     },
@@ -56,6 +58,7 @@ function useAtaPlanController(ataKey: string): TaskPlanController {
     saveMacrotask: { run: (vars) => saveMacro.mutate(vars), isPending: saveMacro.isPending, error: saveMacro.error },
     deleteMacrotask: { run: (id) => deleteMacro.mutate(id), isPending: deleteMacro.isPending, error: deleteMacro.error },
     deleteModule: { run: (vars) => deleteModule.mutate(vars), isPending: deleteModule.isPending, error: deleteModule.error },
+    renameModule: { run: (vars) => renameModule.mutate(vars), isPending: renameModule.isPending, error: renameModule.error },
     createTask: { run: (vars) => createTask.mutate(vars), isPending: createTask.isPending, error: createTask.error }
   };
 }

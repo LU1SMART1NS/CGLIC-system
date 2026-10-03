@@ -9,6 +9,7 @@ import {
   useSaveContractTaskMacrotask,
   useDeleteContractTaskMacrotask,
   useDeleteContractTaskModule,
+  useRenameContractTaskModule,
   useCreateContractTask,
   useDeleteContractTask
 } from '../../hooks/useContractTaskPlanEditing';
@@ -41,6 +42,7 @@ function useContractPlanController(contract: ContractDashboardRecord): TaskPlanC
   const saveMacro = useSaveContractTaskMacrotask(contractKey);
   const deleteMacro = useDeleteContractTaskMacrotask(contractKey);
   const deleteModule = useDeleteContractTaskModule(contractKey);
+  const renameModule = useRenameContractTaskModule(contractKey);
   const createTask = useCreateContractTask(contractKey);
   const { data: manager } = useContractManager(contractKey);
 
@@ -53,8 +55,8 @@ function useContractPlanController(contract: ContractDashboardRecord): TaskPlanC
     templates,
     loadingTemplates,
     applyTemplate: {
-      run: (templateId, onSuccess) =>
-        applyMutation.mutate({ uasg: contract.uasg, numero: contract.numero, ano: anoNum, templateId }, { onSuccess }),
+      run: (templateId, onSuccess, moduloNome) =>
+        applyMutation.mutate({ uasg: contract.uasg, numero: contract.numero, ano: anoNum, templateId, moduloNome }, { onSuccess }),
       isPending: applyMutation.isPending,
       error: applyMutation.error
     },
@@ -66,6 +68,7 @@ function useContractPlanController(contract: ContractDashboardRecord): TaskPlanC
     saveMacrotask: { run: (vars) => saveMacro.mutate(vars), isPending: saveMacro.isPending, error: saveMacro.error },
     deleteMacrotask: { run: (id) => deleteMacro.mutate(id), isPending: deleteMacro.isPending, error: deleteMacro.error },
     deleteModule: { run: (vars) => deleteModule.mutate(vars), isPending: deleteModule.isPending, error: deleteModule.error },
+    renameModule: { run: (vars) => renameModule.mutate(vars), isPending: renameModule.isPending, error: renameModule.error },
     createTask: { run: (vars) => createTask.mutate(vars), isPending: createTask.isPending, error: createTask.error }
   };
 }
