@@ -1566,7 +1566,7 @@ h1, h2, h3, h4 {
     white-space: normal !important; max-width: none !important; min-width: 0 !important;
   }
   .carteira-stack td[data-label]::before {
-    content: attr(data-label); flex: none; font-size: 0.75rem; font-weight: 700;
+    content: attr(data-label); flex: none; font-size: 0.75rem; font-weight: 700; font-family: var(--font-family);
     color: #64748b; text-transform: uppercase; letter-spacing: 0.02em;
   }
   .carteira-stack td > * { min-width: 0; text-align: right; overflow-wrap: break-word; }
@@ -1662,4 +1662,31 @@ h1, h2, h3, h4 {
 /* No desktop o botão com rótulo oculto mantém o formato quadrado compacto de antes */
 @media (min-width: 768px) {
   .ds-btn:has(.payment-action-label) { min-width: 32px; min-height: 32px; padding: 0 0.4rem !important; }
+}
+
+/* Item da Ata (Fase 3 / L5) */
+@media (max-width: 767px) {
+  .item-expanded-panel { margin-left: 0 !important; margin-right: 0 !important; padding: 0.75rem !important; }
+  .custom-table.carteira-stack td { font-size: 0.85rem; }
+}
+/* Cartão do DataTable com campo editável (select/input): rótulo em cima, controle em largura total */
+.ds-table-cards__field:has(select, input) { flex-direction: column; align-items: stretch; gap: 0.25rem; }
+.ds-table-cards__field:has(select, input) dt { max-width: none; }
+.ds-table-cards__field dd select, .ds-table-cards__field dd input { width: 100% !important; max-width: none !important; }
+
+/* Modal Vincular Contrato (L5): sem rolagem aninhada; ações presas no rodapé do corpo, empilhadas */
+@media (max-width: 767px) {
+  .link-contract-list { max-height: none !important; overflow: visible !important; }
+  .link-contract-actions {
+    position: sticky; bottom: -0.75rem; z-index: 2; background: #ffffff; flex-direction: column-reverse;
+    margin: 0 -0.75rem -0.75rem; padding: 0.75rem !important;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)) !important;
+  }
+  .link-contract-actions > button { width: 100%; min-height: 44px; justify-content: center; }
+}
+
+/* Caixas de seleção: o rótulo inteiro é o alvo de toque (44px) e a caixa fica maior */
+@media (max-width: 767px) {
+  label:has(> input[type='checkbox']), label:has(> input[type='radio']) { min-height: 44px; align-items: center; }
+  input[type='checkbox'], input[type='radio'] { width: 20px; height: 20px; flex-shrink: 0; }
 }

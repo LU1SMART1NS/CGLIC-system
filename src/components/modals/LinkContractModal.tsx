@@ -365,7 +365,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   <span style={{ fontSize: '0.78rem' }}>Verifique se o contrato já foi sincronizado no módulo Contratos.</span>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto' }} className="link-contract-list">
                   {filteredContracts.map(({ contract: c, reasons }) => (
                     <div
                       key={contractKeyOf(c)}
@@ -393,7 +393,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.2rem' }}>
                           <strong style={{ fontSize: '0.92rem', color: '#0c326f' }}>
                             {displayContractNumber(c) || `Contrato ${c.numero}/${c.ano}`}
                           </strong>
@@ -507,7 +507,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: '#0c326f' }} />
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto' }} className="link-contract-list">
                       {itemOptions!.map((i) => {
                         const linked = isItemLinked(i);
                         const checked = isItemChecked(i);
@@ -575,7 +575,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
               </div>
 
               {/* Botões de Ação */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <div className="link-contract-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
                 <button
                   type="button"
                   onClick={handleClose}

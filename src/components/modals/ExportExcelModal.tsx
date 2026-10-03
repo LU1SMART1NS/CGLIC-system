@@ -366,7 +366,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
           </div>
 
           {/* SEÇÃO 2: ESCOPO E GRANULARIDADE */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem' }}>
             
             {/* Granularidade */}
             <div style={{ background: '#f8fafc', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -415,7 +415,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                   2. Seleção de Colunas ({selectedColumnIds.length} selecionadas)
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <button
                   type="button"
                   onClick={handleSelectAll}

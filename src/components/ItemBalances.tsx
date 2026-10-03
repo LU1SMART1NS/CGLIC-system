@@ -975,7 +975,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                         </div>
                       ) : (
                         <div className="table-container" style={{ marginTop: 0, overflowX: 'auto', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                          <table className="custom-table" style={{ margin: 0 }}>
+                          <table className="custom-table carteira-stack" style={{ margin: 0 }}>
                             <thead>
                               <tr>
                                 <th style={{ width: '40px' }}></th>
@@ -1013,19 +1013,20 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                 return (
                                   <React.Fragment key={`${c.numeroContrato}-${idx}`}>
                                     <tr style={{ background: isExpanded ? '#f8fafc' : 'transparent' }}>
-                                      <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                      <td data-role="expand" style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                                         <button
                                           onClick={() => toggleContractExpansion(c)}
                                           style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', padding: '6px' }}
                                           title={isExpanded ? "Recolher empenhos" : "Expandir empenhos"}
+                                          aria-expanded={isExpanded}
                                         >
                                           {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                         </button>
                                       </td>
-                                      <td style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', color: '#0c326f' }}>
+                                      <td data-label="Contrato" style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', color: '#0c326f' }}>
                                         {displayNumeroContrato}
                                       </td>
-                                      <td style={{ fontSize: '0.85rem' }}>
+                                      <td data-label="Unidade" style={{ fontSize: '0.85rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                                           {resolvedOrgaoName}
                                           {contractUasg ? (
@@ -1040,13 +1041,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                           </div>
                                         )}
                                       </td>
-                                      <td style={{ fontSize: '0.82rem' }}>
+                                      <td data-label="Fornecedor" style={{ fontSize: '0.82rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.nomeRazaoSocialFornecedor}</div>
                                         <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                                           CNPJ: {c.niFornecedor?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") || '-'}
                                         </div>
                                       </td>
-                                      <td style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700, color: c.quantidadeContratada != null ? 'var(--success)' : 'var(--text-muted)' }}>
+                                      <td data-label="Qtd. contratada" style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700, color: c.quantidadeContratada != null ? 'var(--success)' : 'var(--text-muted)' }}>
                                         {c.quantidadeContratada != null ? (
                                           <span>{formatNumber(c.quantidadeContratada)}</span>
                                         ) : (
@@ -1059,7 +1060,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                         const exec = summarizeContractExecution(c.contractKey || '', c.quantidadeContratada ?? null, empenhoVinculos);
                                         return (
                                           <>
-                                            <td style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700 }}>
+                                            <td data-label="Empenhado" style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700 }}>
                                               {formatNumber(exec.empenhado)}
                                               {exec.pendentes > 0 && (
                                                 <div style={{ fontFamily: 'inherit', fontWeight: 500, fontSize: '0.75rem', color: 'var(--warning)' }}>
@@ -1067,13 +1068,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                                 </div>
                                               )}
                                             </td>
-                                            <td style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700, color: exec.aEmpenhar != null && exec.aEmpenhar < 0 ? 'var(--danger)' : undefined }}>
+                                            <td data-label="A empenhar" style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700, color: exec.aEmpenhar != null && exec.aEmpenhar < 0 ? 'var(--danger)' : undefined }}>
                                               {exec.aEmpenhar != null ? formatNumber(exec.aEmpenhar) : <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>N/D</span>}
                                             </td>
                                           </>
                                         );
                                       })()}
-                                      <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                                      <td data-label="Vigência até" style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
                                           {c.dataVigenciaFim ? (
                                             <span style={{ color: c.statusVigencia === 'Expirado' ? 'var(--danger)' : 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatDate(c.dataVigenciaFim)}</span>
@@ -1094,58 +1095,66 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
                                           )}
                                         </div>
                                       </td>
-                                      <td style={{ textAlign: 'center' }}>
+                                      <td data-role="action" style={{ textAlign: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
                                           {c.contractKey && (
                                             <AppButton
                                               variant="outline"
                                               size="sm"
-                                              iconOnly
+                                              
                                               icon={<Eye size={15} />}
                                               onClick={() => navigate(`/contratos/${encodeURIComponent(c.contractKey)}`)}
                                               title="Ver detalhes do contrato"
-                                            />
+                                            >
+                                              <span className="payment-action-label">Detalhes</span>
+                                            </AppButton>
                                           )}
                                           {contractUrl ? (
                                             <AppButton
                                               variant="ghost"
                                               size="sm"
-                                              iconOnly
+                                              
                                               icon={<ExternalLink size={15} />}
                                               onClick={() => window.open(contractUrl, '_blank', 'noopener,noreferrer')}
                                               title="Abrir o contrato no portal oficial"
-                                            />
+                                            >
+                                              <span className="payment-action-label">Portal oficial</span>
+                                            </AppButton>
                                           ) : null}
                                           {canEditData && c._isOfficialLink && c._linkId && (
                                             <AppButton
                                               variant="ghostDanger"
                                               size="sm"
-                                              iconOnly
+                                              
                                               icon={<Trash2 size={15} />}
                                               onClick={() => handleUnlinkOfficialContract(c._linkId, c.contractKey)}
                                               disabled={unlinkContractMutation.isPending}
                                               title="Desvincular contrato deste item"
-                                            />
+                                            >
+                                              <span className="payment-action-label">Desvincular</span>
+                                            </AppButton>
                                           )}
                                           {canEditData && c._isManual && c._manualId && (
                                             <AppButton
                                               variant="ghostDanger"
                                               size="sm"
-                                              iconOnly
+                                              
                                               icon={<Trash2 size={15} />}
                                               onClick={() => handleDeleteManualContrato(c._manualId)}
                                               disabled={deleteManualContractMutation.isPending}
                                               title="Excluir contrato manual"
-                                            />
+                                            >
+                                              <span className="payment-action-label">Excluir</span>
+                                            </AppButton>
                                           )}
                                         </div>
                                       </td>
                                     </tr>
                                     
                                     {isExpanded && (
-                                      <tr>
+                                      <tr className="carteira-expanded">
                                         <td colSpan={9} style={{ padding: '0 0 1rem 0', background: '#f8fafc' }}>
-                                          <div style={{ padding: '1rem', marginLeft: '2.5rem', marginRight: '1rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                                          <div className="item-expanded-panel" style={{ padding: '1rem', marginLeft: '2.5rem', marginRight: '1rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
                                             <ContractEmpenhosPanel
                                               contractKey={c.contractKey || ''}
                                               contratado={c.quantidadeContratada ?? null}
