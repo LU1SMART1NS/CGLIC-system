@@ -1,26 +1,29 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, Package } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { buildAtaLifeline } from '../../services/contractLifelineService';
 import { classifyArpItemSaldo } from '../../services/balanceService';
-import type { AtaItemSaldoInput } from '../../services/ataActionQueueService';
+import type { AtaActionItem, AtaItemSaldoInput } from '../../services/ataActionQueueService';
+import { SALDO_RULES } from '../../config/alertRules';
 import { useAtaManager } from '../../hooks/useAtaManagers';
+import { useAtaPncp } from '../../hooks/useAtaPncp';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
-import { classifyPrazo } from '../carteira/carteiraPrazo';
+import { classifyPrazo, type PrazoFaixa } from '../carteira/carteiraPrazo';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
-import { Instrument360Hero, instrumentStatusLabel } from '../instrument360/Instrument360Hero';
-import { HealthTile, HealthTileGrid, LifelineBar, PendenciasTile } from '../instrument360/HealthStripParts';
+import { Instrument360Hero, instrumentSituationLabel } from '../instrument360/Instrument360Hero';
+import { HealthTile, HealthTileGrid, LifelineRule } from '../instrument360/HealthStripParts';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 
 interface Ata360HeaderProps {
   arp: ArpRecord;
   itens: ArpItemRecord[];
   saldos: AtaItemSaldoInput[];
-  counts: Record<SeverityLevel, number>;
+  /** Fila de ações da ata, já em ordem de prioridade. */
+  actionItems?: AtaActionItem[];
   linkedContractsCount: number;
   isLoadingSaldos?: boolean;
   onOpenActions: () => void;
@@ -42,9 +45,22 @@ export const pncpLinkStyle: React.CSSProperties = {
   textDecoration: 'none'
 };
 
+/** Tom e selo do indicador de vigência: as faixas da Carteira (crítico ≤30 dias, atenção até 90) nos tokens de gravidade do sistema. */
+export function vigenciaTile(faixa: PrazoFaixa, dias: number | null): { tone?: SeverityLevel; badge?: string; value: string } {
+  if (dias === null) return { value: '—' };
+  if (dias < 0) return { tone: 'CRITICA', badge: 'Encerrada', value: 'Encerrada' };
+  const value = dias === 0 ? 'Vence hoje' : `${dias} ${dias === 1 ? 'dia' : 'dias'}`;
+  if (faixa === 'CRITICO') return { tone: 'CRITICA', badge: 'Crítico', value };
+  if (faixa === 'ATENCAO') return { tone: 'ATENCAO', badge: 'Atenção', value };
+  return { value };
+}
+
+const truncate = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+
 /**
- * Topo da Ata 360: identificação, situação, dados cadastrais, indicadores e
- * linha da vida num só cartão (mesmo Instrument360Hero do Contrato 360).
+ * Topo da Ata 360: UASG, título e situação, objeto, datas, quatro indicadores (vigência com a régua,
+ * saldo contratável, itens em risco e ações) e os identificadores, num só cartão
+ * (mesmo Instrument360Hero do Contrato 360 e do Item).
  *
  * Sem botão de sincronizar: vigência e itens das atas já são atualizados
  * automaticamente a cada 3 horas e pelo botão "Atualizar" da Carteira de Atas.
@@ -53,17 +69,18 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   arp,
   itens,
   saldos,
-  counts,
+  actionItems = [],
   linkedContractsCount,
   isLoadingSaldos = false,
   onOpenActions,
   onOpenItens,
-  onOpenContratos,
   onBack
 }) => {
   const navigate = useNavigate();
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
   const { data: manager, isLoading: loadingManager } = useAtaManager(arp.numeroAtaRegistroPreco);
+  // A divulgação no PNCP só aparece quando o PNCP responde; sem resposta, a linha de datas fica sem ela.
+  const { data: pncp } = useAtaPncp(arp);
   const cancelada = Boolean(arp.isCanceladaPncp);
   const dias = lifeline ? lifeline.diasParaFim : null;
   const faixa = classifyPrazo(dias, cancelada);
@@ -71,14 +88,13 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   const ataUrl = formatPncpAtaUrl(arp.linkAtaPNCP, arp.numeroControlePncpAta, arp.numeroAtaRegistroPreco);
   const compraUrl = formatPncpCompraUrl(arp.linkCompraPNCP, arp.numeroControlePncpCompra, arp.numeroControlePncpAta);
 
-  const fornecedores = new Set(itens.map((i) => i.nomeRazaoSocialFornecedor).filter(Boolean)).size;
-
   // Saldo ainda contratável, em valor (itens têm unidades diferentes, então não se somam quantidades).
-  // O tom segue o item mais consumido: um item a 91% já é alerta, independente do conjunto da Ata.
+  // O item mais consumido define o alerta: um item a 91% já pede atenção, independente do conjunto da Ata.
   const saldoContratavel = React.useMemo(() => {
     const precoPorItem = new Map(itens.map((i) => [Number(i.numeroItem), Number(i.valorUnitario) || 0]));
     let total = 0;
     let livre = 0;
+    let emRisco = 0;
     let pior: { pct: number; numeroItem: string } | null = null;
     for (const s of saldos) {
       const preco = precoPorItem.get(Number(s.numero_item)) ?? 0;
@@ -89,19 +105,34 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       const raw = typeof s.percentual_consumido === 'number'
         ? s.percentual_consumido
         : homologada > 0 ? (consumida / homologada) * 100 : 0;
-      const pct = classifyArpItemSaldo(raw).percentualConsumido;
-      if (!pior || pct > pior.pct) pior = { pct, numeroItem: String(s.numero_item ?? '') };
+      const classificacao = classifyArpItemSaldo(raw);
+      if (classificacao.isCritico || classificacao.isProximoLimite || raw >= SALDO_RULES.esgotadoAPartirDePct) emRisco++;
+      if (!pior || classificacao.percentualConsumido > pior.pct) {
+        pior = { pct: classificacao.percentualConsumido, numeroItem: String(s.numero_item ?? '') };
+      }
     }
-    return { total, livre, pior };
+    return { total, livre, pior, emRisco };
   }, [itens, saldos]);
-  const piorClass = saldoContratavel.pior ? classifyArpItemSaldo(saldoContratavel.pior.pct) : null;
-  const saldoTone: SeverityLevel | undefined =
-    piorClass && (piorClass.isCritico || piorClass.isProximoLimite) ? piorClass.severity : undefined;
-  const temSaldo = saldos.length > 0 && saldoContratavel.total > 0;
-  const livrePct = temSaldo ? Math.round((saldoContratavel.livre / saldoContratavel.total) * 100) : 0;
 
-  // Órgão só aparece quando for diferente da unidade gerenciadora (evita "SENASP" repetido).
-  const orgaoDiferente = arp.nomeOrgao && arp.nomeOrgao.trim().toUpperCase() !== (arp.nomeUnidadeGerenciadora || '').trim().toUpperCase();
+  const piorClass = saldoContratavel.pior ? classifyArpItemSaldo(saldoContratavel.pior.pct) : null;
+  const riscoTone: SeverityLevel | undefined =
+    piorClass && (piorClass.isCritico || piorClass.isProximoLimite || piorClass.percentualConsumido >= SALDO_RULES.esgotadoAPartirDePct)
+      ? piorClass.severity
+      : undefined;
+  const temSaldo = saldos.length > 0 && saldoContratavel.total > 0;
+
+  const vig = vigenciaTile(faixa, dias);
+  const vigenciaHint = cancelada
+    ? 'cancelada no PNCP'
+    : dias !== null && dias < 0
+      ? `encerrada há ${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'dia' : 'dias'}`
+      : `prorrogada no PNCP: ${arp.prorrogadaPncp ? 'sim' : 'não'}`;
+
+  const encerrada = cancelada || faixa === 'EXPIRADO';
+  const primeiraAcao = actionItems[0];
+  const acaoTone: SeverityLevel | undefined =
+    primeiraAcao && primeiraAcao.severity !== 'INFO' ? primeiraAcao.severity : undefined;
+  const contratadoHint = temSaldo ? `contratado ${formatCurrencyCompact(Math.max(saldoContratavel.total - saldoContratavel.livre, 0))}` : null;
 
   return (
     <Instrument360Hero
@@ -122,59 +153,77 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
           )}
         </>
       }
-      icon={<Package size={26} color="#0c326f" aria-hidden="true" />}
-      title={`Ata ${arp.numeroAtaRegistroPreco}`}
-      status={{ faixa, label: instrumentStatusLabel(faixa, dias, cancelada) }}
+      eyebrow={[`UASG ${arp.codigoUnidadeGerenciadora}`, arp.nomeUnidadeGerenciadora].filter(Boolean).join(' · ')}
+      title={`Ata nº ${arp.numeroAtaRegistroPreco}`}
+      status={{ faixa: encerrada ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, cancelada), neutral: !encerrada }}
       manager={<ManagerInfo label="Gestor da ata" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="ata-manager-info" />}
       objeto={arp.objeto}
-      metaTestId="ata-header-metadata"
-      meta={[
-        ...(orgaoDiferente ? [{ label: 'Órgão', value: arp.nomeOrgao }] : []),
-        {
-          label: 'Unidade gerenciadora',
-          value: arp.nomeUnidadeGerenciadora
-            ? `${arp.nomeUnidadeGerenciadora} (${arp.codigoUnidadeGerenciadora})`
-            : arp.codigoUnidadeGerenciadora
-        },
+      dates={[
+        ...(arp.dataAssinatura ? [{ label: 'Assinatura', value: formatDateBR(arp.dataAssinatura) }] : []),
+        ...(pncp?.dataPublicacaoPncp ? [{ label: 'Divulgação no PNCP', value: formatDateBR(pncp.dataPublicacaoPncp.slice(0, 10)) }] : []),
+        ...(lifeline ? [{ label: 'Vigência', value: `${formatDateBR(lifeline.start)} a ${formatDateBR(lifeline.end)}`, emphasis: true }] : [])
+      ]}
+      identifiersTestId="ata-header-metadata"
+      identifiers={[
         { label: 'Modalidade', value: arp.nomeModalidadeCompra },
         { label: 'Compra', value: arp.numeroCompra && arp.anoCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : undefined },
-        { label: 'Nº PNCP', value: arp.numeroControlePncpAta },
-        { label: 'Assinatura', value: arp.dataAssinatura ? formatDateBR(arp.dataAssinatura) : undefined }
+        // Só aparece quando o PNCP informa: ausente não quer dizer que não aceita.
+        ...(typeof pncp?.possibilidadeAdesao === 'boolean' ? [{ label: 'Aceita adesão', value: pncp.possibilidadeAdesao ? 'Sim' : 'Não' }] : []),
+        ...(arp.numeroControlePncpAta ? [{ label: 'Id PNCP', value: arp.numeroControlePncpAta }] : [])
       ]}
     >
       <div data-testid="ata-health-strip">
-        <HealthTileGrid>
+        <HealthTileGrid columns={5}>
           <HealthTile
-            label="Valor registrado"
-            value={formatCurrencyCompact(Number(arp.valorTotal) || 0)}
-            hint={`${itens.length} ${itens.length === 1 ? 'item' : 'itens'} · ${fornecedores} ${fornecedores === 1 ? 'fornecedor' : 'fornecedores'}`}
-            testId="ata-health-valor"
-          />
+            wide
+            label="Vigência"
+            value={vig.value}
+            hint={vigenciaHint}
+            tone={vig.tone}
+            badge={vig.badge}
+            onClick={onOpenActions}
+            testId="ata-health-vigencia"
+          >
+            <LifelineRule lifeline={lifeline} testId="ata-lifeline" tone={vig.tone} />
+          </HealthTile>
           <HealthTile
             label="Saldo contratável"
             value={isLoadingSaldos && !temSaldo ? '…' : temSaldo ? formatCurrencyCompact(saldoContratavel.livre) : '—'}
             hint={
               temSaldo
-                ? saldoTone && saldoContratavel.pior
-                  ? `item ${saldoContratavel.pior.numeroItem} a ${Math.round(saldoContratavel.pior.pct)}% contratado`
-                  : `${livrePct}% do valor registrado`
+                ? [contratadoHint as string, ...(linkedContractsCount > 0 ? [`${linkedContractsCount} ${linkedContractsCount === 1 ? 'contrato vinculado' : 'contratos vinculados'}`] : [])]
                 : isLoadingSaldos ? 'Carregando saldos' : 'Sem saldo registrado'
             }
-            tone={saldoTone}
             onClick={onOpenItens}
             testId="ata-health-saldo"
           />
           <HealthTile
-            label="Contratos vinculados"
-            value={String(linkedContractsCount)}
-            hint={linkedContractsCount === 0 ? 'nenhum ainda' : 'usam itens desta ata'}
-            onClick={onOpenContratos}
-            testId="ata-health-contratos"
+            label="Itens em risco"
+            value={temSaldo || saldos.length > 0 ? `${saldoContratavel.emRisco} de ${saldos.length}` : '—'}
+            hint={
+              saldos.length === 0
+                ? 'Sem saldo registrado'
+                : saldoContratavel.emRisco > 0 && saldoContratavel.pior
+                  ? `item ${saldoContratavel.pior.numeroItem} a ${Math.round(saldoContratavel.pior.pct)}% consumido`
+                  : `nenhum acima de ${SALDO_RULES.atencaoAcimaDePct}% consumido`
+            }
+            tone={saldoContratavel.emRisco > 0 ? riscoTone : undefined}
+            onClick={onOpenItens}
+            testId="ata-health-itens-risco"
           />
-          <PendenciasTile counts={counts} onClick={onOpenActions} testId="ata-health-pendencias" />
+          {primeiraAcao ? (
+            <HealthTile
+              label="Ações"
+              value={String(actionItems.length)}
+              hint={[truncate(primeiraAcao.title, 44), ...(primeiraAcao.dataAlvo ? [`prazo ${formatDateBR(primeiraAcao.dataAlvo)}`] : [])]}
+              tone={acaoTone}
+              onClick={onOpenActions}
+              testId="ata-health-acoes"
+            />
+          ) : (
+            <HealthTile label="Ações" value="Nenhuma" hint="tudo em dia" positive onClick={onOpenActions} testId="ata-health-acoes" />
+          )}
         </HealthTileGrid>
-
-        <LifelineBar lifeline={lifeline} testId="ata-lifeline" cancelada={cancelada} />
       </div>
     </Instrument360Hero>
   );

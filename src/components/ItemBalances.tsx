@@ -811,10 +811,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
           saldoAdesoes: totalSaldoAdesoes,
           limiteAdesao: totalLimiteAdesao,
           valorFinanceiroDisponivel,
-          valorFinanceiroConsumido
+          valorFinanceiroConsumido,
+          empenhosPendentes: empenhoVinculos.filter((v) => v.quantidade == null).length
         }}
         referencia={comprasGovReferencia}
         onGoTo={(tab) => setActiveTab(tab, true)}
+        onOpenAta={role === 'gestor_saldos' ? undefined : onBack}
       />
 
       <Instrument360Tabs

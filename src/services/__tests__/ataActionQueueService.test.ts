@@ -115,20 +115,38 @@ describe('buildAtaLifeline — linha da vida da ata', () => {
 });
 
 import { shortMilestoneLabel } from '../../components/instrument360/HealthStripParts';
-import { instrumentStatusLabel } from '../../components/instrument360/Instrument360Hero';
+import { instrumentSituationLabel } from '../../components/instrument360/Instrument360Hero';
+import { vigenciaTile } from '../../components/atas/Ata360Header';
 
 describe('rótulos do cabeçalho 360', () => {
-  it('encurta nomes de marcos para caber sob a linha da vida', () => {
-    expect(shortMilestoneLabel('Planejamento de Prorrogação da Ata (180d)')).toBe('Prorrogação');
-    expect(shortMilestoneLabel('Alerta de Exaustão de Vigência da ARP (90d)')).toBe('Nova licitação');
-    expect(shortMilestoneLabel('Reajuste (24 meses)')).toBe('Reajuste 24m');
-    expect(shortMilestoneLabel('Remessa aos Órgãos de Controle (60d)')).toBe('Órgãos de controle');
+  it('nomeia os marcos de 180 e 90 dias como planejamento, não como o ato em si', () => {
+    expect(shortMilestoneLabel('Planejamento de Prorrogação da Ata (180d)')).toBe('Planejamento de prorrogação');
+    expect(shortMilestoneLabel('Início da Análise de Prorrogação (180d)')).toBe('Início da análise de prorrogação');
+    expect(shortMilestoneLabel('Alerta de Exaustão de Vigência da ARP (90d)')).toBe('Planejar nova licitação');
+    expect(shortMilestoneLabel('Remessa aos Órgãos de Controle (60d)')).toBe('Remessa aos órgãos de controle');
+    expect(shortMilestoneLabel('Consulta de Interesse ao Fornecedor (120d)')).toBe('Consulta ao fornecedor');
   });
 
-  it('usa as faixas da Carteira na situação', () => {
-    expect(instrumentStatusLabel('CRITICO', 10)).toBe('Crítico · vence em 10 dias');
-    expect(instrumentStatusLabel('ATENCAO', 45)).toBe('Atenção · vence em 45 dias');
-    expect(instrumentStatusLabel('EXPIRADO', -3)).toBe('Encerrada há 3 dias');
-    expect(instrumentStatusLabel('REGULAR', 200, true)).toBe('Cancelada no PNCP');
+  it('mantém o número de meses no marco de reajuste', () => {
+    expect(shortMilestoneLabel('Reajuste (24 meses)')).toBe('Reajuste (24 meses)');
+  });
+
+  it('a situação ao lado do título não leva os dias (ficam no indicador de vigência)', () => {
+    expect(instrumentSituationLabel('CRITICO')).toBe('Vigente');
+    expect(instrumentSituationLabel('ATENCAO')).toBe('Vigente');
+    expect(instrumentSituationLabel('REGULAR')).toBe('Vigente');
+    expect(instrumentSituationLabel('EXPIRADO')).toBe('Encerrada');
+    expect(instrumentSituationLabel('SEM_DATA')).toBe('Vigência não informada');
+    expect(instrumentSituationLabel('REGULAR', true)).toBe('Cancelada no PNCP');
+  });
+
+  it('o indicador de vigência usa as faixas da Carteira: crítico até 30 dias, atenção até 90', () => {
+    expect(vigenciaTile('CRITICO', 8)).toEqual({ tone: 'CRITICA', badge: 'Crítico', value: '8 dias' });
+    expect(vigenciaTile('ATENCAO', 45)).toEqual({ tone: 'ATENCAO', badge: 'Atenção', value: '45 dias' });
+    expect(vigenciaTile('REGULAR', 278)).toEqual({ value: '278 dias' });
+    expect(vigenciaTile('CRITICO', 1).value).toBe('1 dia');
+    expect(vigenciaTile('CRITICO', 0).value).toBe('Vence hoje');
+    expect(vigenciaTile('EXPIRADO', -3)).toEqual({ tone: 'CRITICA', badge: 'Encerrada', value: 'Encerrada' });
+    expect(vigenciaTile('SEM_DATA', null)).toEqual({ value: '—' });
   });
 });

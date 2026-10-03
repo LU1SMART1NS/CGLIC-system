@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ContractDashboardRecord, ContractEvent } from '../types';
 import { buildContractEventsFromOfficialData } from '../services/contractEventService';
+import { buildContractEventsFromHistorico } from '../services/contractHistoricoService';
+import { fetchContratosGovHistorico } from '../services/api';
 import { getContractManagementKey } from '../services/contractManagementService';
 
 /**
@@ -30,7 +32,18 @@ export function getContractEventsQueryOptions(
         ? contract.raw.aditivos
         : [];
 
-      return buildContractEventsFromOfficialData(contract, aditivosRaw);
+      const baseEvents = buildContractEventsFromOfficialData(contract, aditivosRaw);
+
+      // A lista de contratos não traz os termos: busca o histórico oficial do contrato.
+      // Só para contratos do Contratos.gov.br e quando o `raw` não trouxe aditivos.
+      const contratoId = contract.contratoId;
+      const fromContratosGov = String(contract.fonteDados || '').includes('Contratos.gov');
+      if (aditivosRaw.length > 0 || !fromContratosGov || contratoId === undefined || contratoId === '') {
+        return baseEvents;
+      }
+
+      const historico = await fetchContratosGovHistorico(contratoId);
+      return [...baseEvents, ...buildContractEventsFromHistorico(contract, historico)];
     },
     enabled: isEnabled,
     staleTime: 5 * 60 * 1000 // 5 minutos

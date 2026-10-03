@@ -197,7 +197,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         arp={arp}
         itens={itens}
         saldos={saldos}
-        counts={queue.counts}
+        actionItems={queue.items}
         linkedContractsCount={linkedContracts.length}
         isLoadingSaldos={loadingSaldos}
         onOpenActions={() => goToTab('acoes', true)}

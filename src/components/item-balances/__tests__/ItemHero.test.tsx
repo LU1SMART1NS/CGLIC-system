@@ -1,7 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ItemHero, itemSaldoStatus } from '../ItemHero';
+import * as ataManagersModule from '../../../hooks/useAtaManagers';
 import type { ArpRecord, ArpItemRecord } from '../../../types';
+import { addDays, formatDateISO } from '../../../services/temporalEngineService';
+
+vi.mock('../../../hooks/useAtaManagers', () => ({ useAtaManager: vi.fn() }));
 
 const mockArp: ArpRecord = {
   numeroAtaRegistroPreco: '90001/2026',
@@ -72,6 +76,10 @@ const baseProps = {
 };
 
 describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => {
+  beforeEach(() => {
+    vi.mocked(ataManagersModule.useAtaManager).mockReturnValue({ data: { gestorNome: 'Maria Gestora' }, isLoading: false, isError: false } as any);
+  });
+
   it('1. todos veem uma única ação, "Atualizar", habilitada, e não "Sincronizar empenhos"', () => {
     const html = renderToStaticMarkup(<ItemHero {...baseProps} />);
 
@@ -115,10 +123,103 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     expect(html).toContain('Diferença +7 un');
   });
 
+  it('11. o topo segue o padrão das telas 360: UASG, fornecedor com CNPJ e identificadores só do item', () => {
+    const html = renderToStaticMarkup(
+      <ItemHero {...baseProps} item={{ ...mockItem, niFornecedor: '12345678000190', codigoPdm: 4321, nomePdm: 'Servidor' } as any} />
+    );
+
+    expect(html).toContain('UASG 200331 · MINISTERIO DA JUSTICA E SEGURANCA PUBLICA');
+    expect(html).toContain('CNPJ 12.345.678/0001-90');
+    // Identificadores do item; o que é da ata (modalidade, compra, Id PNCP) fica na Ata 360
+    expect(html).toContain('Tipo');
+    expect(html).toContain('Código do item');
+    // PDM: só o código, sem o nome
+    expect(html).toContain('4321');
+    expect(html).not.toContain('Servidor</dd>');
+    expect(html).not.toContain('4321 · Servidor');
+    expect(html).not.toContain('Modalidade');
+    expect(html).not.toContain('Id PNCP');
+    // O que já está nos indicadores não se repete no rodapé
+    expect(html).not.toContain('Preço unitário');
+    expect(html).not.toContain('Valor total do item');
+  });
+
+  it('12. mostra só o fim da vigência da ata (o item não tem prazo próprio), com aviso quando crítico', () => {
+    const daqui = (n: number) => formatDateISO(addDays(new Date(), n));
+    const critica = renderToStaticMarkup(<ItemHero {...baseProps} arp={{ ...mockArp, dataVigenciaFinal: daqui(8) }} />);
+    expect(critica).toContain('Vigência da ata');
+    expect(critica).toContain('vence em 8 dias');
+    expect(critica).not.toContain('Assinatura');
+
+    const folgada = renderToStaticMarkup(<ItemHero {...baseProps} arp={{ ...mockArp, dataVigenciaFinal: daqui(200) }} />);
+    expect(folgada).toContain('Vigência da ata');
+    expect(folgada).not.toContain('vence em');
+
+    const encerrada = renderToStaticMarkup(<ItemHero {...baseProps} arp={{ ...mockArp, dataVigenciaFinal: daqui(-3) }} />);
+    expect(encerrada).toContain('encerrada há 3 dias');
+  });
+
+  it('13. usa o fim da vigência corrigido pelo PNCP quando existir', () => {
+    const html = renderToStaticMarkup(
+      <ItemHero {...baseProps} arp={{ ...mockArp, dataVigenciaFinal: '2027-01-15', dataVigenciaFinalPncp: '2028-03-20' }} />
+    );
+    expect(html).toContain('20/03/2028');
+    expect(html).not.toContain('15/01/2027');
+  });
+
+  it('14. o número da ata é link quando há como abrir a ata, e texto quando não há', () => {
+    expect(renderToStaticMarkup(<ItemHero {...baseProps} onOpenAta={vi.fn()} />)).toContain('<button');
+    const semLink = renderToStaticMarkup(<ItemHero {...baseProps} />);
+    expect(semLink).toContain('nº 90001/2026');
+    expect(semLink).not.toContain('>nº 90001/2026</button>');
+  });
+
+  it('15. empenhos pendentes de confirmação ganham o selo de atenção; zero fica neutro', () => {
+    const com = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, empenhosPendentes: 3 }} />);
+    expect(com).toContain('Empenhos pendentes');
+    expect(com).toContain('Atenção');
+    const sem = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, empenhosPendentes: 0 }} />);
+    expect(sem).not.toContain('Atenção');
+  });
+
   it('10. situação do saldo segue as faixas das barras de progresso', () => {
     expect(itemSaldoStatus(0, 0).label).toBe('Saldo esgotado');
     expect(itemSaldoStatus(10, 10).label).toBe('Saldo crítico');
     expect(itemSaldoStatus(40, 40).label).toBe('Saldo em atenção');
     expect(itemSaldoStatus(80, 80).label).toBe('Saldo disponível');
+  });
+  it('16. mostra o gestor da ata, que é o do item, no mesmo formato das outras telas 360', () => {
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} />);
+
+    expect(html).toContain('data-testid="item-manager-info"');
+    expect(html).toContain('Gestor da ata');
+    expect(html).toContain('Maria Gestora');
+    // A consulta é pela ata do item
+    expect(vi.mocked(ataManagersModule.useAtaManager)).toHaveBeenCalledWith('90001/2026');
+  });
+
+  it('17. ata sem gestor atribuído aparece como "Não atribuído"', () => {
+    vi.mocked(ataManagersModule.useAtaManager).mockReturnValue({ data: null, isLoading: false, isError: false } as any);
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} />);
+
+    expect(html).toContain('Gestor da ata');
+    expect(html).toContain('Não atribuído');
+  });
+
+  it('18. enquanto o gestor carrega, mostra "Carregando..." e não "Não atribuído"', () => {
+    vi.mocked(ataManagersModule.useAtaManager).mockReturnValue({ data: undefined, isLoading: true, isError: false } as any);
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} />);
+
+    expect(html).toContain('Carregando...');
+    expect(html).not.toContain('Não atribuído');
+  });
+
+  it('19. se a consulta do gestor falhar, o bloco some em vez de dizer que não há gestor', () => {
+    vi.mocked(ataManagersModule.useAtaManager).mockReturnValue({ data: undefined, isLoading: false, isError: true } as any);
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} />);
+
+    expect(html).not.toContain('item-manager-info');
+    expect(html).not.toContain('Não atribuído');
+    expect(html).toContain('Item 1'); // o resto do topo continua
   });
 });

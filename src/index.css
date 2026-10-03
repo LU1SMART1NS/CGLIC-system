@@ -1207,3 +1207,20 @@ h1, h2, h3, h4 {
 }
 
 
+
+/* Indicadores do topo das telas 360 (HealthTile / HealthTileGrid).
+   O número de colunas segue a largura do cartão, não a da janela: o menu lateral e as margens tiram ~350px. */
+.health-tiles-wrap { container-type: inline-size; }
+.health-tile-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.health-tile-grid[data-columns='4'] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.health-tile-grid[data-columns='5'] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.health-tile--wide { grid-column: span 2; }
+/* Nos cabeçalhos 360 todos os cartões têm exatamente 128px (a altura do cartão do Item), com ou sem a régua e qualquer que seja o texto. */
+.health-tile-grid[data-columns] .health-tile { height: 128px; }
+@container (max-width: 890px) {
+  .health-tile-grid[data-columns] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 420px) {
+  .health-tile-grid[data-columns] { grid-template-columns: 1fr; }
+  .health-tile--wide { grid-column: auto; }
+}

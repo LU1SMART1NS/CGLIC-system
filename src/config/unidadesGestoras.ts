@@ -24,8 +24,7 @@ export const CNPJ_SENASP = '00394494000136';
 /** CNPJ do órgão por UASG, para consultas ao PNCP. */
 export const CNPJ_POR_UASG: Readonly<Record<string, string>> = {
   '200330': CNPJ_SENASP,
-  '200331': CNPJ_SENASP,
-  '154080': '34792077000163' // UFSC
+  '200331': CNPJ_SENASP
 };
 
 const onlyDigits = (v?: string | number | null) => String(v ?? '').replace(/\D/g, '');
