@@ -110,7 +110,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         onOpenDepartmentsModal={onOpenDepartmentsModal}
       />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="app-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <div style={{
           position: 'sticky',
           top: 0,

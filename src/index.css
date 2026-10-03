@@ -67,7 +67,6 @@ body {
   min-height: 100vh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 /* Custom Scrollbar */
@@ -1541,3 +1540,8 @@ h1, h2, h3, h4 {
   .lifeline-list { display: flex; }
   .lifeline-notes { display: none !important; }
 }
+
+/* F2-05: rede de segurança contra rolagem horizontal da página. Substitui o antigo
+   `body { overflow-x: hidden }`, que escondia estouros e quebrava `position: sticky`.
+   `clip` não cria contêiner de rolagem; blocos largos devem ter o próprio overflow-x: auto. */
+.app-content { overflow-x: clip; }
