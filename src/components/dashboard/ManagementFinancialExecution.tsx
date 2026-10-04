@@ -267,11 +267,11 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
               <tbody>
                 {pageEmpenhos.map((emp: ManagementDashboardEmpenhoDetail) => (
                   <tr key={emp.empenhoKey} data-testid={`row-empenho-${emp.numeroEmpenho}`}>
-                    <td data-label="Empenho" style={{ ...carteiraTd, fontWeight: 700 }}>
+                    <td data-role="id" style={{ ...carteiraTd, fontWeight: 700 }}>
                       {emp.numeroEmpenho}
                       {emp.ano && <span style={{ color: '#64748b', fontWeight: 500, marginLeft: '0.25rem' }}>/{emp.ano}</span>}
                     </td>
-                    <td data-label="Credor" style={carteiraTd}>{emp.fornecedorNome || '—'}</td>
+                    <td data-role="id" style={carteiraTd}>{emp.fornecedorNome || '—'}</td>
                     <td data-label="Contrato" style={carteiraTd}>
                       {emp.contratoNumero ? (
                         <span style={{ fontWeight: 600 }}>Contrato {emp.contratoNumero}</span>

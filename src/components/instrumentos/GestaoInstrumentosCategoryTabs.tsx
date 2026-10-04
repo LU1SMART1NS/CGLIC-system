@@ -41,10 +41,12 @@ export const GestaoInstrumentosCategoryTabs: React.FC<GestaoInstrumentosCategory
       ref={listRef}
       role="tablist"
       aria-label="Filtrar por categoria de atenção"
-      className="ds-tabs-scroll ds-tabs-scroll--pills"
+      className="ds-tabs-scroll"
       style={{
         display: 'flex',
-        gap: '0.5rem'
+        gap: '0.25rem',
+        borderBottom: '1px solid #e2e8f0',
+        ['--scroll-bg' as string]: '#f8fafc'
       }}
     >
       {TABS.map((tab) => {
@@ -58,15 +60,15 @@ export const GestaoInstrumentosCategoryTabs: React.FC<GestaoInstrumentosCategory
             onClick={() => onSelect(tab.id)}
             data-testid={`instrumentos-tab-${tab.id.toLowerCase()}`}
             style={{
-              padding: '0.4rem 0.9rem',
-              borderRadius: '999px',
-              border: isActive ? '1px solid #0c326f' : '1px solid #e2e8f0',
-              background: isActive ? '#0c326f' : '#ffffff',
-              color: isActive ? '#ffffff' : '#475569',
-              fontSize: '0.8rem',
-              fontWeight: 700,
+              padding: '0.5rem 0.9rem',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: `2px solid ${isActive ? '#0c326f' : 'transparent'}`,
+              marginBottom: '-1px',
+              color: isActive ? '#0c326f' : '#475569',
+              fontSize: '0.82rem',
+              fontWeight: isActive ? 800 : 600,
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
               whiteSpace: 'nowrap'
             }}
           >

@@ -34,16 +34,16 @@ const render = (url: string) =>
 describe('ModelosGestaoPage (abas Atas e Contratos)', () => {
   it('abre em Atas por padrão e mantém o painel de Contratos oculto', () => {
     const html = render('/configuracoes/modelos');
-    expect(html).toMatch(/id="modelos-tab-atas"[^>]*aria-selected="true"/);
-    expect(html).toMatch(/id="modelos-tab-contratos"[^>]*aria-selected="false"/);
-    expect(html).toMatch(/id="modelos-panel-contratos"[^>]*hidden/);
-    expect(html).not.toMatch(/id="modelos-panel-atas"[^>]*hidden/);
+    expect(html).toMatch(/id="tab-atas"[^>]*aria-selected="true"/);
+    expect(html).toMatch(/id="tab-contratos"[^>]*aria-selected="false"/);
+    expect(html).toMatch(/id="tabpanel-contratos"[^>]*hidden/);
+    expect(html).not.toMatch(/id="tabpanel-atas"[^>]*hidden/);
   });
 
   it('?tipo=contratos abre a aba de Contratos', () => {
     const html = render('/configuracoes/modelos?tipo=contratos');
-    expect(html).toMatch(/id="modelos-tab-contratos"[^>]*aria-selected="true"/);
-    expect(html).toMatch(/id="modelos-panel-atas"[^>]*hidden/);
+    expect(html).toMatch(/id="tab-contratos"[^>]*aria-selected="true"/);
+    expect(html).toMatch(/id="tabpanel-atas"[^>]*hidden/);
   });
 
   it('mostra um único título de página, sem o cabeçalho de cada tipo', () => {

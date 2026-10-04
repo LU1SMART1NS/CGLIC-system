@@ -18,7 +18,7 @@ export interface RequireRoleProps {
  * Financeiro nem Administração (fora do seu domínio), por isso ganha um destino próprio.
  */
 function getSafeFallbackRoute(role: AppRole | null): string {
-  if (role === 'gestor_saldos') return '/atas/saldos-unidade';
+  if (role === 'gestor_saldos') return '/itens';
   return '/instrumentos';
 }
 

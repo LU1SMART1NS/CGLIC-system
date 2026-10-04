@@ -24,13 +24,14 @@ import { useRoles } from '../../hooks/useRoles';
 import { AppButton } from '../../design-system/components/AppButton';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
-import { EmptyState } from '../../design-system/components/EmptyState';
-import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { FilterBar } from '../../design-system/components/FilterBar';
 import { Modal } from '../../design-system/components/Modal';
 import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { DataTable } from '../../design-system/components/DataTable';
+import { IconButton } from '../../design-system/components/IconButton';
+import { AppInput, AppSelect } from '../../design-system/components/FormFields';
+import { AdminListShell } from './shared/AdminListShell';
 import type { SystemUser, UserRole } from '../../types/user';
 import {
   getPerfilDisplayLabel,
@@ -259,210 +260,139 @@ export const UsersManagement: React.FC = () => {
       </div>
 
       {/* 3. Tabela de Usuários */}
-      <div data-testid="users-table-container" style={carteiraTableShell}>
-        {isLoading ? (
-          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <SkeletonLoader variant="card" height="48px" />
-            <SkeletonLoader variant="card" height="48px" />
-            <SkeletonLoader variant="card" height="48px" />
-          </div>
-        ) : filteredUsers.length === 0 ? (
-          <div style={{ padding: '3rem 1.5rem' }}>
-            <EmptyState
-              title="Nenhum usuário encontrado"
-              description="Nenhum servidor ou usuário corresponde aos filtros aplicados."
-            />
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={carteiraTh}>Servidor / Usuário</th>
-                  <th style={carteiraTh}>Perfil operacional</th>
-                  <th style={{ ...carteiraTh, textAlign: 'center' }}>Situação</th>
-                  <th style={{ ...carteiraTh, textAlign: 'right' }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((user) => {
-                  const roleObj = roles.find((r) => r.id === user.perfil);
-                  const isPending = user.status === 'pendente';
-                  const isInactive = user.status === 'inativo' || user.ativo === false;
-
-                  return (
-                    <tr key={user.id}>
-                      {/* Servidor / Usuário */}
-                      <td style={carteiraTd}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span style={{ fontWeight: 700, color: '#0f172a' }}>{user.nome}</span>
-                          </div>
-                          <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <Mail size={12} /> {user.email}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Perfil Operacional */}
-                      <td data-label="Perfil" style={carteiraTd}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <span
-                            title={user.perfil === GESTOR_SALDO_ROLE_ID ? `Permissões: ${GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}` : undefined}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.3rem',
-                              padding: '0.2rem 0.55rem',
-                              borderRadius: '6px',
-                              fontSize: '0.76rem',
-                              fontWeight: 700,
-                              width: 'fit-content',
-                              color: roleObj?.badgeColor || '#0c326f',
-                              background: `${roleObj?.badgeColor || '#0c326f'}15`,
-                              border: `1px solid ${roleObj?.badgeColor || '#0c326f'}30`
-                            }}
-                          >
-                            <Shield size={12} />
-                            {getPerfilDisplayLabel(user.perfil, roles)}
-                          </span>
-                          {user.perfil === GESTOR_SALDO_ROLE_ID && (
-                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              Todas as Atas
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Status Derivado da Autenticação */}
-                      <td data-label="Situação" style={{ ...carteiraTd, textAlign: 'center' }}>
-                        {isPending ? (
-                          <StatusBadge variant="warning" label="Convite pendente" />
-                        ) : isInactive ? (
-                          <StatusBadge variant="neutral" label="Inativo" />
-                        ) : (
-                          <StatusBadge variant="success" label="Ativo" />
-                        )}
-                      </td>
-
-                      {/* Ações */}
-                      <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                          {isPending && (
-                            <button
-                              type="button"
-                              onClick={() => handleReinvite(user)}
-                              disabled={reinviteUserMutation.isPending}
-                              title="Reenviar convite por e-mail"
-                              style={{
-                                padding: '0.35rem 0.6rem',
-                                background: '#eff6ff',
-                                border: '1px solid #bfdbfe',
-                                borderRadius: '4px',
-                                color: '#1d4ed8',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                fontSize: '0.76rem',
-                                fontWeight: 600
-                              }}
-                            >
-                              <Send size={12} /> Reenviar convite
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(user)}
-                            title="Editar servidor"
-                            style={{
-                              padding: '0.35rem 0.6rem',
-                              background: '#f8fafc',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '4px',
-                              color: '#0c326f',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              fontSize: '0.76rem',
-                              fontWeight: 600
-                            }}
-                          >
-                            <Edit2 size={13} /> Editar
-                          </button>
-                          {isInactive ? (
-                            <button
-                              type="button"
-                              onClick={() => handleReactivate(user)}
-                              disabled={reactivateUserMutation.isPending}
-                              title="Reativar acesso do servidor"
-                              style={{
-                                padding: '0.35rem 0.6rem',
-                                background: '#f0fdf4',
-                                border: '1px solid #bbf7d0',
-                                borderRadius: '4px',
-                                color: '#166534',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                fontSize: '0.76rem',
-                                fontWeight: 600
-                              }}
-                            >
-                              <UserCheck size={13} /> Reativar
-                            </button>
-                          ) : !isPending ? (
-                            <button
-                              type="button"
-                              onClick={() => handleDeactivate(user)}
-                              disabled={deactivateUserMutation.isPending}
-                              title="Desativar acesso do servidor"
-                              style={{
-                                padding: '0.35rem 0.5rem',
-                                background: '#fff1f2',
-                                border: '1px solid #fecdd3',
-                                borderRadius: '4px',
-                                color: '#e11d48',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center'
-                              }}
-                            >
-                              <UserX size={13} />
-                            </button>
-                          ) : null}
-                          {isPending && (
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(user)}
-                              disabled={deleteUserMutation.isPending}
-                              title="Cancelar e excluir convite pendente"
-                              style={{
-                                padding: '0.35rem 0.5rem',
-                                background: '#fff1f2',
-                                border: '1px solid #fecdd3',
-                                borderRadius: '4px',
-                                color: '#e11d48',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center'
-                              }}
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <AdminListShell
+        testId="users-table-container"
+        title="Servidores e usuários"
+        countLabel={filteredUsers.length === users.length ? String(users.length) : `${filteredUsers.length} de ${users.length}`}
+        isLoading={isLoading}
+        isEmpty={filteredUsers.length === 0}
+        emptyTitle="Nenhum usuário encontrado"
+        emptyDescription="Nenhum servidor ou usuário corresponde aos filtros aplicados."
+      >
+        <DataTable<SystemUser>
+          testId="users-table"
+          className="data-table-container--flush"
+          data={filteredUsers}
+          keyExtractor={(u) => String(u.id)}
+          columns={[
+            {
+              key: 'nome',
+              header: 'Servidor / Usuário',
+              priority: 'primary',
+              render: (user) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                  <span style={{ fontWeight: 700, color: '#0f172a' }}>{user.nome}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Mail size={12} /> {user.email}
+                  </span>
+                </div>
+              )
+            },
+            {
+              key: 'perfil',
+              header: 'Perfil operacional',
+              mobileLabel: 'Perfil',
+              render: (user) => {
+                const roleObj = roles.find((r) => r.id === user.perfil);
+                const color = roleObj?.badgeColor || '#0c326f';
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <span
+                      title={user.perfil === GESTOR_SALDO_ROLE_ID ? `Permissões: ${GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}` : undefined}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        width: 'fit-content',
+                        color,
+                        background: `${color}15`,
+                        border: `1px solid ${color}30`
+                      }}
+                    >
+                      <Shield size={12} />
+                      {getPerfilDisplayLabel(user.perfil, roles)}
+                    </span>
+                    {user.perfil === GESTOR_SALDO_ROLE_ID && (
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Todas as Atas</span>
+                    )}
+                  </div>
+                );
+              }
+            },
+            {
+              key: 'situacao',
+              header: 'Situação',
+              align: 'center',
+              render: (user) => {
+                const isInactive = user.status === 'inativo' || user.ativo === false;
+                return user.status === 'pendente' ? (
+                  <StatusBadge variant="warning" label="Convite pendente" />
+                ) : isInactive ? (
+                  <StatusBadge variant="neutral" label="Inativo" />
+                ) : (
+                  <StatusBadge variant="success" label="Ativo" />
+                );
+              }
+            }
+          ]}
+          rowActions={(user) => {
+            const isPending = user.status === 'pendente';
+            const isInactive = user.status === 'inativo' || user.ativo === false;
+            return (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {isPending && (
+                  <AppButton
+                    variant="outline"
+                    size="sm"
+                    icon={<Send size={13} />}
+                    onClick={() => handleReinvite(user)}
+                    disabled={reinviteUserMutation.isPending}
+                    title="Reenviar convite por e-mail"
+                  >
+                    Reenviar convite
+                  </AppButton>
+                )}
+                <AppButton variant="outline" size="sm" icon={<Edit2 size={13} />} onClick={() => handleOpenEditModal(user)} title="Editar servidor">
+                  Editar
+                </AppButton>
+                {isInactive ? (
+                  <AppButton
+                    variant="outline"
+                    size="sm"
+                    icon={<UserCheck size={13} />}
+                    onClick={() => handleReactivate(user)}
+                    disabled={reactivateUserMutation.isPending}
+                    title="Reativar acesso do servidor"
+                  >
+                    Reativar
+                  </AppButton>
+                ) : !isPending ? (
+                  <IconButton
+                    label={`Desativar acesso de ${user.nome}`}
+                    icon={<UserX size={15} />}
+                    onClick={() => handleDeactivate(user)}
+                    disabled={deactivateUserMutation.isPending}
+                    style={{ color: '#e11d48' }}
+                  />
+                ) : null}
+                {isPending && (
+                  <IconButton
+                    label={`Cancelar e excluir convite de ${user.nome}`}
+                    icon={<Trash2 size={15} />}
+                    onClick={() => handleDelete(user)}
+                    disabled={deleteUserMutation.isPending}
+                    style={{ color: '#e11d48' }}
+                  />
+                )}
+              </div>
+            );
+          }}
+        />
+      </AdminListShell>
 
       <Modal
         isOpen={isModalOpen}
@@ -490,50 +420,29 @@ export const UsersManagement: React.FC = () => {
                 </div>
               )}
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                  Nome
-                </label>
-                <input
-                  type="text"
-                  value={formNome}
-                  onChange={(e) => setFormNome(e.target.value)}
-                  placeholder="Nome completo do servidor"
-                  required
-                  style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                  E-mail institucional
-                </label>
-                <input
-                  type="email"
-                  value={formEmail}
-                  onChange={(e) => setFormEmail(e.target.value)}
-                  placeholder="servidor@mj.gov.br"
-                  required
-                  style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                  Perfil operacional
-                </label>
-                <select
-                  value={formPerfil}
-                  onChange={(e) => setFormPerfil(e.target.value as UserRole)}
-                  style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600 }}
-                >
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <AppInput
+                label="Nome"
+                type="text"
+                value={formNome}
+                onChange={(e) => setFormNome(e.target.value)}
+                placeholder="Nome completo do servidor"
+                required
+              />
+              <AppInput
+                label="E-mail institucional"
+                type="email"
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+                placeholder="servidor@mj.gov.br"
+                required
+              />
+              <AppSelect label="Perfil operacional" value={formPerfil} onChange={(e) => setFormPerfil(e.target.value as UserRole)}>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.nome}
+                  </option>
+                ))}
+              </AppSelect>
 
               {isGestorSaldoSelecionado && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.85rem', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '8px' }}>

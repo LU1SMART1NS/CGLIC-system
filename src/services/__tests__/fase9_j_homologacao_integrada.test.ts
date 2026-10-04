@@ -11,7 +11,7 @@ describe('FASE 9-J — Homologação Integrada do Frontend com Dados Reais', () 
     const routeFlow = [
       { path: '/instrumentos', expectedBreadcrumb: 'Visão Geral' },
       { path: '/atas', expectedBreadcrumb: 'Carteira de Atas' },
-      { path: '/atas/saldos-unidade', expectedBreadcrumb: 'Alocações por Unidade' },
+      { path: '/itens', expectedBreadcrumb: 'Carteira de Itens' },
       { path: '/contratos', expectedBreadcrumb: 'Carteira de Contratos' },
       { path: '/contratos/200331-00132-2024', expectedBreadcrumb: 'Contrato 200331-00132-2024' },
       { path: '/empenhos', expectedBreadcrumb: 'Empenhos e Execução' },

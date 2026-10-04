@@ -43,7 +43,7 @@ describe('TaskTemplatesPage genérica (Atas e Contratos)', () => {
   it('usa os textos do kit e mostra o estado vazio', () => {
     const html = render(makeKit([], 'Ata'));
     expect(html).toContain('Modelos de Ata');
-    expect(html).toContain('Criar modelo de Ata');
+    expect(html).toContain('Novo modelo');
     expect(html).toContain('Cadastre o primeiro modelo de Ata');
   });
 

@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
-import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppButton } from '../../design-system/components/AppButton';
-import { EmptyState } from '../../design-system/components/EmptyState';
-import { ErrorState } from '../../design-system/components/ErrorState';
+import { FilterBar } from '../../design-system/components/FilterBar';
+import { Modal } from '../../design-system/components/Modal';
+import { AppInput, AppSelect } from '../../design-system/components/FormFields';
+import { AdminListShell } from './shared/AdminListShell';
+import { AdminRowActions } from './shared/AdminRowActions';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
 import { useAuth } from '../../context/AuthContext';
-import { carteiraTableShell } from '../carteira/carteiraStyles';
 import { DataTable } from '../../design-system/components/DataTable';
-import { Plus, Trash2, Edit2, Check, X, Building2, ArrowLeft, Sparkles } from 'lucide-react';
+import { Plus, Building2, Sparkles } from 'lucide-react';
 import { useDepartments } from '../../hooks/useDepartments';
 import { useSaveDepartment } from '../../hooks/useSaveDepartment';
 import { useDeleteDepartment } from '../../hooks/useDeleteDepartment';
@@ -28,9 +29,11 @@ export const DepartmentsManagementPage: React.FC = () => {
   const [sigla, setSigla] = useState('');
   const [nomeCompleto, setNomeCompleto] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'todas' | 'ativas' | 'inativas'>('todas');
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
-  const navigate = useNavigate();
   // Mesma regra do backend (departments.manage): admin e gestor de saldos editam; os demais consultam.
   const { role } = useAuth();
   const canManage = role === 'admin' || role === 'gestor_saldos';
@@ -100,18 +103,31 @@ export const DepartmentsManagementPage: React.FC = () => {
       });
 
       toast.success(editingId ? `Unidade "${cleanSigla}" atualizada com sucesso.` : `Unidade "${cleanSigla}" cadastrada com sucesso.`);
-      setSigla('');
-      setNomeCompleto('');
-      setEditingId(null);
+      closeModal();
     } catch (err: any) {
       toast.error(err.message || 'Erro ao salvar unidade.');
     }
   };
 
-  const handleEdit = (d: any) => {
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setSigla('');
+    setNomeCompleto('');
+  };
+
+  const handleNew = () => {
+    setEditingId(null);
+    setSigla('');
+    setNomeCompleto('');
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (d: InternalDepartment) => {
     setEditingId(d.id);
     setSigla(d.sigla);
     setNomeCompleto(d.nomeCompleto);
+    setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string, siglaDel: string) => {
@@ -164,16 +180,15 @@ export const DepartmentsManagementPage: React.FC = () => {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    fontSize: '0.82rem',
-    padding: '0.45rem 0.75rem',
-    border: '1px solid #cbd5e1',
-    borderRadius: '6px',
-    background: '#f8fafc',
-    color: '#0f172a',
-    outline: 'none'
-  };
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return departments.filter((d) => {
+      if (statusFilter === 'ativas' && !d.ativo) return false;
+      if (statusFilter === 'inativas' && d.ativo) return false;
+      return !term || d.sigla.toLowerCase().includes(term) || d.nomeCompleto.toLowerCase().includes(term);
+    });
+  }, [departments, search, statusFilter]);
+  const hasActiveFilters = Boolean(search) || statusFilter !== 'todas';
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -182,9 +197,11 @@ export const DepartmentsManagementPage: React.FC = () => {
         subtitle="Diretorias, coordenações-gerais e coordenações oficiais da SENASP usadas no controle de cotas."
         icon={<Building2 size={26} color="#0c326f" aria-hidden="true" />}
         actions={
-          <AppButton variant="outline" icon={<ArrowLeft size={14} />} onClick={() => navigate('/atas/saldos-unidade')}>
-            Voltar para Alocações
-          </AppButton>
+          canManage ? (
+            <AppButton icon={<Plus size={15} />} onClick={handleNew} data-testid="departments-new">
+              Nova unidade
+            </AppButton>
+          ) : undefined
         }
       />
 
@@ -207,19 +224,18 @@ export const DepartmentsManagementPage: React.FC = () => {
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '6px', border: '1px solid #fde68a' }}
               >
                 <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#dc2626' }}>"{name}"</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>mesclar para:</span>
-                  <select
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <AppSelect
+                    label="Mesclar para"
                     value={mergeTargets[name] || ''}
                     onChange={(e) => setMergeTargets({ ...mergeTargets, [name]: e.target.value })}
                     disabled={isSubmitting}
-                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 600 }}
                   >
                     {departments.map((d) => (
                       <option key={d.id} value={d.sigla}>{d.sigla} - {d.nomeCompleto}</option>
                     ))}
-                  </select>
-                  <AppButton type="button" size="sm" onClick={() => handleMerge(name)} disabled={isSubmitting} isLoading={mergeMutation.isPending}>
+                  </AppSelect>
+                  <AppButton type="button" onClick={() => handleMerge(name)} disabled={isSubmitting} isLoading={mergeMutation.isPending}>
                     Mesclar
                   </AppButton>
                 </div>
@@ -229,99 +245,112 @@ export const DepartmentsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* Cadastro / edição (somente quem pode gerir) */}
-      {canManage && (
-        <form
-          onSubmit={handleSave}
-          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
-        >
-          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0c326f' }}>
-            {editingId ? 'Editar unidade oficial' : 'Cadastrar nova unidade oficial'}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem', alignItems: 'flex-start' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Sigla / Código *</label>
-              <input type="text" placeholder="Ex: DFNSP" value={sigla} onChange={(e) => setSigla(e.target.value.toUpperCase())} disabled={isSubmitting} required style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Nome completo / Diretoria *</label>
-              <input type="text" placeholder="Ex: Diretoria da Força Nacional de Segurança Pública" value={nomeCompleto} onChange={(e) => setNomeCompleto(e.target.value)} disabled={isSubmitting} required style={inputStyle} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
-            {editingId && (
-              <AppButton
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => { setEditingId(null); setSigla(''); setNomeCompleto(''); }}
-                disabled={isSubmitting}
-                icon={<X size={14} />}
-              >
-                Cancelar
-              </AppButton>
-            )}
-            <AppButton type="submit" size="sm" disabled={isSubmitting} isLoading={saveMutation.isPending} icon={editingId ? <Check size={14} /> : <Plus size={14} />}>
+      <FilterBar
+        testId="departments-filter-bar"
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por sigla ou nome..."
+        chips={[
+          { id: 'todas', label: 'Todas', active: statusFilter === 'todas', onClick: () => setStatusFilter('todas') },
+          { id: 'ativas', label: 'Ativas', active: statusFilter === 'ativas', onClick: () => setStatusFilter('ativas') },
+          { id: 'inativas', label: 'Inativas', active: statusFilter === 'inativas', onClick: () => setStatusFilter('inativas') }
+        ]}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={() => {
+          setSearch('');
+          setStatusFilter('todas');
+        }}
+      />
+
+      <AdminListShell
+        testId="departments-table-container"
+        title="Unidades e departamentos oficiais"
+        countLabel={filtered.length === departments.length ? String(departments.length) : `${filtered.length} de ${departments.length}`}
+        isLoading={isDepartmentsLoading}
+        isError={isDepartmentsError}
+        errorTitle="Não foi possível carregar as unidades internas"
+        errorMessage={(departmentsError as Error | null)?.message || 'Falha ao consultar o catálogo de unidades internas.'}
+        onRetry={() => refetch()}
+        isEmpty={filtered.length === 0}
+        emptyTitle={departments.length === 0 ? 'Nenhuma unidade cadastrada.' : 'Nenhuma unidade encontrada.'}
+        emptyDescription={
+          departments.length === 0
+            ? 'As alocações internas só aceitam unidades deste catálogo.'
+            : 'Ajuste a busca ou os filtros.'
+        }
+      >
+        <DataTable<InternalDepartment>
+          testId="departments-table"
+          className="data-table-container--flush"
+          data={filtered}
+          keyExtractor={(d) => String(d.id)}
+          rowStyle={(d) => (d.ativo ? undefined : { opacity: 0.7 })}
+          columns={[
+            {
+              key: 'sigla',
+              header: 'Sigla',
+              width: '180px',
+              priority: 'primary',
+              render: (d) => (
+                <span style={{ fontWeight: 700, color: d.ativo ? '#0c326f' : '#64748b' }}>
+                  {d.sigla} {!d.ativo && <StatusBadge label="Inativa" variant="danger" size="sm" dot={false} />}
+                </span>
+              )
+            },
+            { key: 'nomeCompleto', header: 'Nome completo / Diretoria', mobileLabel: 'Nome', render: (d) => d.nomeCompleto }
+          ]}
+          rowActions={
+            canManage
+              ? (d) => (
+                  <AdminRowActions
+                    name={d.sigla}
+                    onEdit={() => handleEdit(d)}
+                    onDelete={() => handleDelete(d.id, d.sigla)}
+                    disabled={isSubmitting}
+                  />
+                )
+              : undefined
+          }
+        />
+      </AdminListShell>
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        dismissible={!isSubmitting}
+        size="sm"
+        testId="departments-modal"
+        title={editingId ? 'Editar unidade oficial' : 'Nova unidade oficial'}
+        footer={
+          <>
+            <AppButton type="button" variant="outline" onClick={closeModal} disabled={isSubmitting}>
+              Cancelar
+            </AppButton>
+            <AppButton type="submit" form="departments-form" disabled={isSubmitting} isLoading={saveMutation.isPending}>
               {editingId ? 'Salvar alterações' : 'Adicionar unidade'}
             </AppButton>
-          </div>
+          </>
+        }
+      >
+        <form id="departments-form" onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+          <AppInput
+            label="Sigla / Código *"
+            placeholder="Ex: DFNSP"
+            value={sigla}
+            onChange={(e) => setSigla(e.target.value.toUpperCase())}
+            disabled={isSubmitting}
+            required
+          />
+          <AppInput
+            label="Nome completo / Diretoria *"
+            placeholder="Ex: Diretoria da Força Nacional de Segurança Pública"
+            value={nomeCompleto}
+            onChange={(e) => setNomeCompleto(e.target.value)}
+            disabled={isSubmitting}
+            required
+          />
         </form>
-      )}
-
-      {/* Unidades cadastradas */}
-      <div data-testid="departments-table-container" style={carteiraTableShell}>
-        <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-          Unidades e departamentos oficiais ({departments.length})
-        </div>
-        {isDepartmentsError ? (
-          <ErrorState
-            title="Não foi possível carregar as unidades internas"
-            message={(departmentsError as Error | null)?.message || 'Falha ao consultar o catálogo de unidades internas.'}
-            onRetry={() => refetch()}
-          />
-        ) : departments.length === 0 && !isDepartmentsLoading ? (
-          <EmptyState
-            title="Nenhuma unidade cadastrada."
-            description="Use o formulário acima para cadastrar as unidades oficiais. As alocações internas só aceitam unidades deste catálogo."
-          />
-        ) : (
-          <DataTable<InternalDepartment>
-            testId="departments-table"
-            className="data-table-container--flush"
-            data={departments}
-            keyExtractor={(d) => String(d.id)}
-            rowStyle={(d) => (d.ativo ? undefined : { opacity: 0.7 })}
-            columns={[
-              {
-                key: 'sigla',
-                header: 'Sigla',
-                width: '180px',
-                priority: 'primary',
-                render: (d) => (
-                  <span style={{ fontWeight: 700, color: d.ativo ? '#0c326f' : '#64748b' }}>
-                    {d.sigla} {!d.ativo && <StatusBadge label="Inativa" variant="danger" size="sm" dot={false} />}
-                  </span>
-                )
-              },
-              { key: 'nomeCompleto', header: 'Nome completo / Diretoria', mobileLabel: 'Nome', render: (d) => d.nomeCompleto }
-            ]}
-            rowActions={
-              canManage
-                ? (d) => (
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      <button type="button" className="ds-icon-btn" onClick={() => handleEdit(d)} disabled={isSubmitting} title="Editar unidade" aria-label={`Editar ${d.sigla}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0ea5e9' }}>
-                        <Edit2 size={16} />
-                      </button>
-                      <button type="button" className="ds-icon-btn" onClick={() => handleDelete(d.id, d.sigla)} disabled={isSubmitting} title="Excluir ou inativar unidade" aria-label={`Excluir ${d.sigla}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )
-                : undefined
-            }
-          />
-        )}
-      </div>
+      </Modal>
       {dialog}
     </PageContainer>
   );

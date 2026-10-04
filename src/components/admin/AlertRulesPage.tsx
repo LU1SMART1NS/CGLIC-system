@@ -13,7 +13,9 @@ import {
   validateAlertRuleValues
 } from '../../config/alertRules';
 import { saveAlertSettings } from '../../services/alertSettingsService';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { DataTable } from '../../design-system/components/DataTable';
+import { IconButton } from '../../design-system/components/IconButton';
+import { AdminListShell } from './shared/AdminListShell';
 
 /** Limites que vêm de lei ou decreto: aparecem só como referência, nunca editáveis. */
 const LEGAL_RULES: Array<{ label: string; value: string; source: string }> = [
@@ -26,9 +28,6 @@ const LEGAL_RULES: Array<{ label: string; value: string; source: string }> = [
 const inputStyle: React.CSSProperties = {
   width: '96px',
   padding: '0.4rem 0.55rem',
-  border: '1px solid #cbd5e1',
-  borderRadius: '6px',
-  fontSize: '0.88rem',
   fontWeight: 700,
   color: '#0f172a',
   textAlign: 'right'
@@ -79,8 +78,6 @@ export const AlertRulesPage: React.FC = () => {
     }
   };
 
-  const sectionStrip: React.CSSProperties = { padding: '0.6rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' };
-
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
@@ -113,108 +110,103 @@ export const AlertRulesPage: React.FC = () => {
       {ALERT_RULE_GROUPS.map((group) => {
         const defs = ALERT_RULE_DEFINITIONS.filter((d) => d.group === group.id);
         return (
-          <div key={group.id} data-testid={`alert-rules-group-${group.id}`} style={carteiraTableShell}>
-            <div style={sectionStrip}>
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>{group.label}</div>
-              <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{group.description}</div>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={carteiraTh}>Regra</th>
-                    <th style={{ ...carteiraTh, width: '220px' }}>Valor</th>
-                    <th style={{ ...carteiraTh, width: '110px' }}>Padrão</th>
-                    <th style={{ ...carteiraTh, width: '70px', textAlign: 'right' }}>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {defs.map((def) => {
+          <AdminListShell key={group.id} testId={`alert-rules-group-${group.id}`} title={group.label} description={group.description}>
+            <DataTable<(typeof defs)[number]>
+              testId={`alert-rules-table-${group.id}`}
+              className="data-table-container--flush"
+              data={defs}
+              keyExtractor={(d) => d.key}
+              columns={[
+                {
+                  key: 'regra',
+                  header: 'Regra',
+                  priority: 'primary',
+                  render: (def) => {
+                    const error = errors[def.key];
+                    return (
+                      <>
+                        <label htmlFor={`rule-${def.key}`} style={{ fontWeight: 700, color: '#0f172a' }}>{def.label}</label>
+                        {def.hint && <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{def.hint}</div>}
+                        {error && (
+                          <div role="alert" style={{ fontSize: '0.76rem', color: '#b91c1c', marginTop: '2px', fontWeight: 600 }}>{error}</div>
+                        )}
+                      </>
+                    );
+                  }
+                },
+                {
+                  key: 'valor',
+                  header: 'Valor',
+                  width: '220px',
+                  render: (def) => {
                     const error = errors[def.key];
                     const isChanged = parsed[def.key] !== saved[def.key];
-                    const isDefault = parsed[def.key] === ALERT_RULE_DEFAULTS[def.key];
                     return (
-                      <tr key={def.key}>
-                        <td style={carteiraTd}>
-                          <label htmlFor={`rule-${def.key}`} style={{ fontWeight: 700, color: '#0f172a' }}>{def.label}</label>
-                          {def.hint && <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{def.hint}</div>}
-                          {error && (
-                            <div role="alert" style={{ fontSize: '0.76rem', color: '#b91c1c', marginTop: '2px', fontWeight: 600 }}>{error}</div>
-                          )}
-                        </td>
-                        <td data-label="Valor" style={carteiraTd}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input
-                              id={`rule-${def.key}`}
-                              type="number"
-                              inputMode="numeric"
-                              value={draft[def.key]}
-                              min={def.min}
-                              max={def.max}
-                              onChange={(e) => setValue(def.key, e.target.value)}
-                              aria-invalid={Boolean(error)}
-                              data-testid={`rule-${def.key}`}
-                              style={{
-                                ...inputStyle,
-                                borderColor: error ? '#dc2626' : isChanged ? '#0c326f' : '#cbd5e1',
-                                background: isChanged ? '#eff6ff' : '#ffffff'
-                              }}
-                            />
-                            <span style={{ fontSize: '0.8rem', color: '#475569' }}>{def.unit}</span>
-                          </div>
-                        </td>
-                        <td data-label="Padrão" style={{ ...carteiraTd, color: '#64748b' }}>{ALERT_RULE_DEFAULTS[def.key]} {def.unit}</td>
-                        <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
-                          <button
-                            type="button"
-                            onClick={() => resetToDefaults([def.key])}
-                            disabled={isDefault || isSaving}
-                            title="Voltar ao padrão"
-                            aria-label={`Voltar ao padrão: ${def.label}`}
-                            style={{ background: 'none', border: 'none', padding: '0.2rem', display: 'inline-flex', cursor: isDefault || isSaving ? 'not-allowed' : 'pointer', color: isDefault ? '#cbd5e1' : '#0ea5e9' }}
-                          >
-                            <RotateCcw size={16} />
-                          </button>
-                        </td>
-                      </tr>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          id={`rule-${def.key}`}
+                          type="number"
+                          inputMode="numeric"
+                          value={draft[def.key]}
+                          min={def.min}
+                          max={def.max}
+                          onChange={(e) => setValue(def.key, e.target.value)}
+                          aria-invalid={Boolean(error)}
+                          data-testid={`rule-${def.key}`}
+                          className="ds-field__control"
+                          style={{
+                            ...inputStyle,
+                            borderColor: error ? '#dc2626' : isChanged ? '#0c326f' : undefined,
+                            background: isChanged ? '#eff6ff' : undefined
+                          }}
+                        />
+                        <span style={{ fontSize: '0.8rem', color: '#475569' }}>{def.unit}</span>
+                      </div>
                     );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                  }
+                },
+                {
+                  key: 'padrao',
+                  header: 'Padrão',
+                  width: '110px',
+                  render: (def) => <span style={{ color: '#64748b' }}>{ALERT_RULE_DEFAULTS[def.key]} {def.unit}</span>
+                }
+              ]}
+              rowActions={(def) => {
+                const isDefault = parsed[def.key] === ALERT_RULE_DEFAULTS[def.key];
+                return (
+                  <IconButton
+                    label={`Voltar ao padrão: ${def.label}`}
+                    title="Voltar ao padrão"
+                    icon={<RotateCcw size={16} />}
+                    onClick={() => resetToDefaults([def.key])}
+                    disabled={isDefault || isSaving}
+                  />
+                );
+              }}
+            />
+          </AdminListShell>
         );
       })}
 
-      <div data-testid="alert-rules-legal" style={carteiraTableShell}>
-        <div style={{ ...sectionStrip, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Scale size={16} color="#334155" aria-hidden="true" />
-          <div>
-            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>Regras legais (somente leitura)</div>
-            <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Vêm de lei ou decreto e não podem ser alteradas aqui.</div>
-          </div>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={carteiraTh}>Regra</th>
-                <th style={carteiraTh}>Limite</th>
-                <th style={carteiraTh}>Fonte</th>
-              </tr>
-            </thead>
-            <tbody>
-              {LEGAL_RULES.map((rule) => (
-                <tr key={rule.label}>
-                  <td style={{ ...carteiraTd, fontWeight: 700 }}>{rule.label}</td>
-                  <td data-label="Limite" style={carteiraTd}>{rule.value}</td>
-                  <td data-label="Fonte" style={{ ...carteiraTd, color: '#64748b' }}>{rule.source}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <AdminListShell
+        testId="alert-rules-legal"
+        title="Regras legais (somente leitura)"
+        description="Vêm de lei ou decreto e não podem ser alteradas aqui."
+        icon={<Scale size={16} color="#334155" aria-hidden="true" />}
+      >
+        <DataTable<(typeof LEGAL_RULES)[number]>
+          testId="alert-rules-legal-table"
+          className="data-table-container--flush"
+          data={LEGAL_RULES}
+          keyExtractor={(r) => r.label}
+          columns={[
+            { key: 'label', header: 'Regra', priority: 'primary', render: (r) => <span style={{ fontWeight: 700 }}>{r.label}</span> },
+            { key: 'value', header: 'Limite', render: (r) => r.value },
+            { key: 'source', header: 'Fonte', render: (r) => <span style={{ color: '#64748b' }}>{r.source}</span> }
+          ]}
+        />
+      </AdminListShell>
     </PageContainer>
   );
 };
