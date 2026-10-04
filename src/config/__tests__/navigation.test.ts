@@ -29,13 +29,12 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(area.children![0].matchPrefixes).toContain('/prazos');
     });
 
-    it('Carteira tem as abas Atas, Contratos, Por unidade interna (página de Alocações) e Por órgão partícipe', () => {
+    it('Carteira tem as abas Atas, Contratos e Itens (unidade interna e órgão partícipe são filtros)', () => {
       const area = navigationConfig.find((i) => i.id === 'carteira')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Atas', '/atas'],
         ['Contratos', '/contratos'],
-        ['Por unidade interna', '/atas/saldos-unidade'],
-        ['Por órgão partícipe', '/atas/orgaos-participantes']
+        ['Itens', '/itens']
       ]);
     });
 
@@ -52,11 +51,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const area = navigationConfig.find((i) => i.id === 'configuracoes')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Modelos de Gestão', '/configuracoes/modelos'],
-        ['Usuários e Servidores', '/admin/usuarios'],
-        ['Perfis e Permissões', '/admin/perfis'],
         ['Regras de Alertas', '/admin/regras-alertas'],
-        ['Feriados', '/admin/feriados']
+        ['Feriados', '/admin/feriados'],
+        ['Unidades Internas', '/admin/departamentos'],
+        ['Usuários e Servidores', '/admin/usuarios'],
+        ['Perfis e Permissões', '/admin/perfis']
       ]);
+      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Acesso', 'Acesso']);
     });
 
     it('não deve conter itens legados isolados no menu (SEI, Exportar Excel, Prorrogações soltas)', () => {
@@ -72,10 +73,10 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const admin = filterNavigationByRole(navigationConfig, 'admin');
       expect(findAreaForTabs(admin, '/atas')?.id).toBe('carteira');
       expect(findAreaForTabs(admin, '/contratos')?.id).toBe('carteira');
-      expect(findAreaForTabs(admin, '/atas/saldos-unidade')?.id).toBe('carteira');
-      expect(findAreaForTabs(admin, '/atas/orgaos-participantes')?.id).toBe('carteira');
+      expect(findAreaForTabs(admin, '/itens')?.id).toBe('carteira');
       expect(findAreaForTabs(admin, '/atas/distribuicao')?.id).toBe('visao-geral');
       expect(findAreaForTabs(admin, '/admin/feriados')?.id).toBe('configuracoes');
+      expect(findAreaForTabs(admin, '/admin/departamentos')?.id).toBe('configuracoes');
     });
 
     it('telas de detalhe (Ata 360, Item, Contrato 360) e subpáginas não recebem as abas da área', () => {
@@ -83,7 +84,6 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(findAreaForTabs(admin, '/atas/detalhe/00011%2F2026-200331')).toBeNull();
       expect(findAreaForTabs(admin, '/atas/detalhe/00011%2F2026-200331/itens/00003')).toBeNull();
       expect(findAreaForTabs(admin, '/contratos/200331-00015-2026')).toBeNull();
-      expect(findAreaForTabs(admin, '/admin/departamentos')).toBeNull();
     });
 
     it('o gestor vê a Visão Geral com uma aba só (sem Distribuição)', () => {
@@ -141,15 +141,14 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       ]);
     });
 
-    it('deve gerar breadcrumb para /atas, subrotas e alocações', () => {
+    it('deve gerar breadcrumb para /atas, subrotas e itens', () => {
       expect(getBreadcrumbs('/atas')).toEqual([
         { label: 'Visão Geral', route: '/instrumentos' },
         { label: 'Carteira de Atas', route: '/atas' }
       ]);
-      expect(getBreadcrumbs('/atas/saldos-unidade')).toEqual([
+      expect(getBreadcrumbs('/itens')).toEqual([
         { label: 'Visão Geral', route: '/instrumentos' },
-        { label: 'Carteira de Atas', route: '/atas' },
-        { label: 'Alocações por Unidade', route: '/atas/saldos-unidade' }
+        { label: 'Carteira de Itens', route: '/itens' }
       ]);
       expect(getBreadcrumbs('/atas/distribuicao')).toEqual([
         { label: 'Visão Geral', route: '/instrumentos' },
@@ -206,16 +205,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(child('execucao-financeira', 'execucao-empenhos').matchPrefixes).toContain('/empenhos');
     });
 
-    it('em /atas/orgaos-participantes só Por órgão partícipe fica selecionada, sem Atas', () => {
-      const pathname = '/atas/orgaos-participantes';
-      expect(isExactChildActive(child('carteira', 'atas-orgaos-participantes'), pathname)).toBe(true);
+    it('em /itens só Itens fica selecionada, sem Atas nem Contratos', () => {
+      const pathname = '/itens';
+      expect(isExactChildActive(child('carteira', 'itens-carteira'), pathname)).toBe(true);
       expect(isExactChildActive(child('carteira', 'atas-consulta'), pathname)).toBe(false);
-    });
-
-    it('não seleciona Atas e Por unidade interna ao mesmo tempo em /atas/saldos-unidade', () => {
-      const pathname = '/atas/saldos-unidade';
-      expect(isExactChildActive(child('carteira', 'atas-alocacoes'), pathname)).toBe(true);
-      expect(isExactChildActive(child('carteira', 'atas-consulta'), pathname)).toBe(false);
+      expect(isExactChildActive(child('carteira', 'contratos-acompanhamento'), pathname)).toBe(false);
       expect(isItemActive(area('carteira'), pathname)).toBe(true);
     });
 
@@ -232,59 +226,64 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(isItemActive(area('carteira'), pathname)).toBe(false);
     });
 
-    it('a Ata 360 e o cadastro de unidades internas mantêm a Carteira ativa', () => {
+    it('a Ata 360 mantém a Carteira ativa', () => {
       expect(isItemActive(area('carteira'), '/atas/detalhe/00011%2F2026-200331')).toBe(true);
-      expect(isItemActive(area('carteira'), '/admin/departamentos')).toBe(true);
+    });
+
+    it('o cadastro de unidades internas fica em Configurações, não na Carteira', () => {
+      expect(isItemActive(area('configuracoes'), '/admin/departamentos')).toBe(true);
+      expect(isItemActive(area('carteira'), '/admin/departamentos')).toBe(false);
     });
   });
 
   describe('filterNavigationByRole — Autorização de Navegação por Perfil (Fase Frontend RBAC)', () => {
-    it('Coordenador (admin) vê o menu completo, incluindo Usuários, Perfis e Alocações', () => {
+    it('Coordenador (admin) vê o menu completo, incluindo Usuários, Perfis e Itens', () => {
       const visible = filterNavigationByRole(navigationConfig, 'admin');
       const labels = flatLabels(visible);
 
       expect(labels).toContain('Visão Geral');
-      expect(labels).toContain('Por unidade interna');
+      expect(labels).toContain('Itens');
       expect(labels).toContain('Modelos de Gestão');
       expect(labels).toContain('Distribuição');
       expect(labels).toContain('Usuários e Servidores');
       expect(labels).toContain('Perfis e Permissões');
     });
 
-    it('Gestor de Contratos (gestor) NÃO vê Alocações, Usuários ou Perfis, mas continua vendo Contratos', () => {
+    it('Gestor de Contratos (gestor) vê Atas, Contratos e Itens, mas NÃO vê Usuários ou Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor');
       const labels = flatLabels(visible);
 
       expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Atas');
       expect(labels).toContain('Contratos');
+      expect(labels).toContain('Itens');
       expect(labels).toContain('Modelos de Gestão');
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos e Execução');
 
-      expect(labels).not.toContain('Por unidade interna');
       // A distribuição por gestor é visão de coordenação: o gestor já vê só a própria carteira.
       expect(labels).not.toContain('Distribuição');
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
 
-      // Configurações aparece para o gestor só com os modelos de gestão que ele edita
+      // Configurações aparece para o gestor com os modelos de gestão e a consulta das unidades internas
       const config = visible.find((i) => i.id === 'configuracoes');
-      expect(config?.children?.map((c) => c.label)).toEqual(['Modelos de Gestão']);
+      expect(config?.children?.map((c) => c.label)).toEqual(['Modelos de Gestão', 'Unidades Internas']);
     });
 
-    it('Gestor de Saldo (gestor_saldos) vê Visão Geral (restrita a saldos), Atas e Por unidade interna — nada de Contratos, Financeiro, Usuários ou Perfis', () => {
+    it('Gestor de Saldo (gestor_saldos) vê Visão Geral (restrita a saldos), Atas e Itens — nada de Contratos, Financeiro, Usuários ou Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor_saldos');
       const labels = flatLabels(visible);
 
-      expect(labels).toContain('Por unidade interna');
+      expect(labels).toContain('Itens');
       expect(labels).not.toContain('Distribuição');
 
       expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Atas');
       expect(labels).not.toContain('Contratos');
       expect(labels).not.toContain('Modelos de Gestão');
-      expect(labels).not.toContain('Configurações');
+      // Configurações aparece só com o cadastro de unidades internas, que ele mantém
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);
       expect(labels).not.toContain('Pagamentos');
       expect(labels).not.toContain('Empenhos e Execução');
       expect(labels).not.toContain('Usuários e Servidores');
@@ -304,12 +303,12 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Contratos');
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos e Execução');
-      expect(labels).toContain('Por unidade interna');
+      expect(labels).toContain('Itens');
       expect(labels).toContain('Distribuição');
 
       expect(labels).not.toContain('Modelos de Gestão');
-      // Sem Distribuição dentro, o grupo Configurações não aparece para o leitor
-      expect(labels).not.toContain('Configurações');
+      // Configurações aparece para o leitor só com a consulta das unidades internas
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
     });

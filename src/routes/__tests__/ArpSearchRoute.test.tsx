@@ -117,7 +117,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
     expect(html).not.toContain('totalUGRegisteredValue');
   });
 
-  it('2. deve renderizar os 4 cards de resumo de vigência com contadores corretos', () => {
+  it('2. deve renderizar a situação em segmentos com contagem', () => {
     const html = renderToStaticMarkup(
       <ArpPortfolioSummary
         totalAtas={10}
@@ -130,19 +130,23 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
       />
     );
 
-    expect(html).toContain('de 10 atas');
+    expect(html).toContain('arp-situacao-VIGENTES');
+    expect(html).toContain('Todas');
+    expect(html).toContain('>10<');
     expect(html).toContain('Vigentes');
     expect(html).toContain('>8<');
-    expect(html).toContain('Crítico (≤30 dias)');
-    expect(html).toContain('Atenção (31–90 dias)');
+    expect(html).toContain('Crítico');
+    expect(html).toContain('Vencem em até 30 dias');
+    expect(html).toContain('Atenção');
     expect(html).toContain('Histórico');
-    expect(html).toContain('Expiradas / canceladas');
+    expect(html).toContain('aria-pressed="true"');
   });
 
   it('3. deve renderizar a barra de filtros em linha com busca textual e opções', () => {
     const html = renderToStaticMarkup(
       <ArpPortfolioFilters
-        filters={{ statusVigencia: 'TODOS', filtroAlocacao: 'TODAS', filtroEmpenho: 'TODAS', gestor: 'TODOS', busca: '' }}
+        filters={{ statusVigencia: 'TODOS', filtroAlocacao: 'TODOS', filtroEmpenho: 'TODOS', unidade: 'TODAS', gestor: 'TODOS', busca: '' }}
+        unidades={[{ chave: 'cglic', nome: 'CGLIC' }]}
         onChangeFilter={vi.fn()}
         onResetFilters={vi.fn()}
         totalFiltered={5}
@@ -150,9 +154,13 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
       />
     );
 
-    expect(html).toContain('Todas as Vigências');
-    expect(html).toContain('Alocação (Todas)');
-    expect(html).toContain('Empenho (Todos)');
+    expect(html).not.toContain('Todas as Vigências');
+    expect(html).toContain('arp-filter-alocacao');
+    expect(html).toContain('arp-filter-empenho');
+    expect(html).toContain('arp-filter-unidade');
+    expect(html).toContain('Alocação');
+    expect(html).toContain('Empenho');
+    expect(html).toContain('Unidade');
     expect(html).toContain('Buscar por Ata, fornecedor, CNPJ, item...');
     expect(html).toContain('5 Atas');
   });
@@ -171,7 +179,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
     expect(html).toContain('00001/2025');
     expect(html).toContain('Proteção Tática Brasil Ltda');
     expect(html).toContain('1 item');
-    expect(html).toContain('Ver Detalhes');
+    expect(html).toContain('Ver detalhes da ata 00001/2025');
     // Itens ficam recolhidos por padrão: só aparecem ao expandir a linha.
     expect(html).not.toContain('Colete Balístico Nível III-A');
   });

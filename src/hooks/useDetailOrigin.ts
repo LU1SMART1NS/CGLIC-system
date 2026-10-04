@@ -30,9 +30,8 @@ export function originLabel(path: string): string | null {
     case '/instrumentos': return 'Visão Geral';
     case '/atas': return 'Atas';
     case '/contratos': return 'Contratos';
-    case '/atas/saldos-unidade': return 'Por unidade interna';
+    case '/itens': return 'Itens';
     case '/atas/distribuicao': return 'Distribuição';
-    case '/atas/orgaos-participantes': return 'Por órgão partícipe';
     case '/pagamentos': return 'Pagamentos';
     case '/empenhos': return 'Empenhos e Execução';
     default: break;

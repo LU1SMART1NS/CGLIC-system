@@ -156,19 +156,19 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
 
               return (
                 <tr key={item.id} data-testid={`instrumentos-row-${item.id}`}>
-                  <td style={td}>
+                  <td data-role="id" style={td}>
                     <SeverityBadge severity={item.severity} />
                   </td>
                   <td data-label="UASG" style={{ ...td, fontWeight: 700, color: '#475569' }} data-testid={`instrumentos-uasg-${item.id}`}>
                     {item.uasg}
                   </td>
-                  <td data-label="Instrumento" style={td}>
+                  <td data-role="id" style={td}>
                     <div style={{ fontWeight: 800 }}>{instrumento.label}</div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                       {instrumento.tipo}
                     </div>
                   </td>
-                  <td style={{ ...td, maxWidth: '220px' }}>
+                  <td data-role="id" style={{ ...td, maxWidth: '220px' }}>
                     {item.objetoItem ? (
                       <>
                         <div title={item.objetoItem} style={{ fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.objetoItem}</div>

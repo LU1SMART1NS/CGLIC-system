@@ -3,7 +3,6 @@ import {
   Package,
   FileText,
   Settings,
-  Coins,
   Sliders,
   Users,
   KeyRound,
@@ -14,6 +13,7 @@ import {
   CalendarOff,
   UsersRound,
   Briefcase,
+  ListChecks,
   Building2
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -44,6 +44,8 @@ export interface NavItem {
    * filtro — ver `filterNavigationByRole`.
    */
   allowedRoles?: AppRole[];
+  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Configurações → Gestão · Acesso). */
+  group?: string;
   /** 'bottom' = área fica no pé do menu chave (ex.: Configurações). */
   placement?: 'bottom';
 }
@@ -53,11 +55,11 @@ export interface NavItem {
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
  * - Visão Geral: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
- * - Carteira: Atas (/atas) · Contratos (/contratos) · Por unidade interna (/atas/saldos-unidade) ·
- *   Por órgão partícipe (/atas/orgaos-participantes, em desenvolvimento)
+ * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
+ *   são filtros dessas abas, não páginas.
  * - Financeiro: Pagamentos (/pagamentos) · Empenhos e Execução (/empenhos)
- * - Configurações (no pé do menu): Modelos de Gestão · Usuários e Servidores ·
- *   Perfis e Permissões · Regras de Alertas · Feriados
+ * - Configurações (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
+ *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
 export const navigationConfig: NavItem[] = [
   {
@@ -100,7 +102,7 @@ export const navigationConfig: NavItem[] = [
         route: '/atas',
         status: 'active',
         matchPrefixes: ['/atas', '/atas/detalhe'],
-        excludePrefixes: ['/atas/saldos-unidade', '/atas/distribuicao', '/atas/orgaos-participantes'],
+        excludePrefixes: ['/atas/distribuicao'],
         allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
@@ -113,22 +115,12 @@ export const navigationConfig: NavItem[] = [
         allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
-        id: 'atas-alocacoes',
-        label: 'Por unidade interna',
-        icon: Coins,
-        route: '/atas/saldos-unidade',
+        id: 'itens-carteira',
+        label: 'Itens',
+        icon: ListChecks,
+        route: '/itens',
         status: 'active',
-        matchPrefixes: ['/atas/saldos-unidade', '/admin/departamentos'],
-        allowedRoles: ['admin', 'gestor_saldos', 'leitor']
-      },
-      {
-        // Página reservada (em desenvolvimento): consumo por órgão somado na carteira.
-        id: 'atas-orgaos-participantes',
-        label: 'Por órgão partícipe',
-        icon: Building2,
-        route: '/atas/orgaos-participantes',
-        status: 'active',
-        matchPrefixes: ['/atas/orgaos-participantes'],
+        matchPrefixes: ['/itens'],
         allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       }
     ]
@@ -172,26 +164,9 @@ export const navigationConfig: NavItem[] = [
         icon: Sliders,
         route: '/configuracoes/modelos',
         status: 'active',
+        group: 'Gestão',
         matchPrefixes: ['/configuracoes/modelos'],
         allowedRoles: ['admin', 'gestor']
-      },
-      {
-        id: 'admin-usuarios',
-        label: 'Usuários e Servidores',
-        icon: Users,
-        route: '/admin/usuarios',
-        status: 'active',
-        matchPrefixes: ['/admin/usuarios'],
-        allowedRoles: ['admin']
-      },
-      {
-        id: 'admin-perfis',
-        label: 'Perfis e Permissões',
-        icon: KeyRound,
-        route: '/admin/perfis',
-        status: 'active',
-        matchPrefixes: ['/admin/perfis'],
-        allowedRoles: ['admin']
       },
       {
         id: 'admin-regras-alertas',
@@ -199,6 +174,7 @@ export const navigationConfig: NavItem[] = [
         icon: BellRing,
         route: '/admin/regras-alertas',
         status: 'active',
+        group: 'Gestão',
         matchPrefixes: ['/admin/regras-alertas'],
         allowedRoles: ['admin']
       },
@@ -208,7 +184,39 @@ export const navigationConfig: NavItem[] = [
         icon: CalendarOff,
         route: '/admin/feriados',
         status: 'active',
+        group: 'Gestão',
         matchPrefixes: ['/admin/feriados'],
+        allowedRoles: ['admin']
+      },
+      {
+        // Cadastro das unidades internas usadas na alocação de itens. Edição: admin e gestor_saldos.
+        id: 'admin-unidades-internas',
+        label: 'Unidades Internas',
+        icon: Building2,
+        route: '/admin/departamentos',
+        status: 'active',
+        group: 'Gestão',
+        matchPrefixes: ['/admin/departamentos'],
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+      },
+      {
+        id: 'admin-usuarios',
+        label: 'Usuários e Servidores',
+        icon: Users,
+        route: '/admin/usuarios',
+        status: 'active',
+        group: 'Acesso',
+        matchPrefixes: ['/admin/usuarios'],
+        allowedRoles: ['admin']
+      },
+      {
+        id: 'admin-perfis',
+        label: 'Perfis e Permissões',
+        icon: KeyRound,
+        route: '/admin/perfis',
+        status: 'active',
+        group: 'Acesso',
+        matchPrefixes: ['/admin/perfis'],
         allowedRoles: ['admin']
       }
     ]
@@ -265,9 +273,8 @@ export interface BreadcrumbEntry {
 const staticRouteLabels: Record<string, string> = {
   '/instrumentos': 'Visão Geral',
   '/atas': 'Carteira de Atas',
-  '/atas/saldos-unidade': 'Alocações por Unidade',
+  '/itens': 'Carteira de Itens',
   '/atas/distribuicao': 'Central de Distribuição',
-  '/atas/orgaos-participantes': 'Por órgão partícipe',
   '/contratos': 'Carteira de Contratos',
   '/configuracoes/modelos': 'Modelos de Gestão',
   '/pagamentos': 'Pagamentos',

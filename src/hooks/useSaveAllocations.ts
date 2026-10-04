@@ -37,6 +37,8 @@ export function useSaveAllocations() {
       queryClient.invalidateQueries({
         queryKey: ['item-allocations', canonicalKey]
       });
+      // A carteira (aba Itens e filtros de alocação) soma as alocações de todos os itens.
+      queryClient.invalidateQueries({ queryKey: ['carteira-alocacoes'] });
     }
   });
 }

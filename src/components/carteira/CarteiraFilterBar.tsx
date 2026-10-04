@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
-import { carteiraSelect } from './carteiraStyles';
+import { CarteiraFilterButton, type CarteiraFilterOption } from './CarteiraFilterButton';
 import { SEM_GESTOR, TODOS_GESTORES } from './carteiraGestor';
 
 interface CarteiraFilterBarProps {
@@ -28,9 +28,9 @@ export const CarteiraFilterBar: React.FC<CarteiraFilterBarProps> = ({
   testIdPrefix,
   children
 }) => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem', flex: 1 }}>
-      <div style={{ position: 'relative', minWidth: 0, flex: '1 1 260px', maxWidth: '400px' }}>
+  <div className="carteira-filter-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+    <div className="carteira-filter-row" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem', flex: 1 }}>
+      <div className="carteira-filter-search" style={{ position: 'relative', minWidth: 0, flex: '1 1 260px', maxWidth: '400px' }}>
         <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)' }} />
         <input
           type="text"
@@ -77,7 +77,7 @@ export const CarteiraFilterBar: React.FC<CarteiraFilterBarProps> = ({
       )}
     </div>
 
-    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{counter}</div>
+    <div className="carteira-filter-counter" style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{counter}</div>
   </div>
 );
 
@@ -88,17 +88,23 @@ interface CarteiraGestorSelectProps {
   testId: string;
 }
 
-/** Seletor de gestor das carteiras, com a opção "Sem gestor". Um gestor vindo da URL que não está na lista continua selecionável. */
+/** Opções do filtro de gestor: "Sem gestor" e os nomes; um gestor vindo da URL que não está na lista continua selecionável. */
+export function gestorFilterOptions(value: string, gestores: string[]): CarteiraFilterOption[] {
+  const nomes = value !== TODOS_GESTORES && value !== SEM_GESTOR && !gestores.includes(value) ? [value, ...gestores] : gestores;
+  return [{ value: SEM_GESTOR, label: 'Sem gestor' }, ...nomes.map((nome) => ({ value: nome, label: nome }))];
+}
+
+/** Filtro de gestor das carteiras, em botão. */
 export const CarteiraGestorSelect: React.FC<CarteiraGestorSelectProps> = ({ value, gestores, onChange, testId }) => {
-  const options = value !== TODOS_GESTORES && value !== SEM_GESTOR && !gestores.includes(value) ? [value, ...gestores] : gestores;
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId} style={carteiraSelect} aria-label="Filtrar por gestor">
-      <option value={TODOS_GESTORES}>Todos os Gestores</option>
-      <option value={SEM_GESTOR}>Sem gestor</option>
-      {options.map((nome) => (
-        <option key={nome} value={nome}>{nome}</option>
-      ))}
-    </select>
+    <CarteiraFilterButton
+      label="Gestor"
+      value={value}
+      emptyValue={TODOS_GESTORES}
+      options={gestorFilterOptions(value, gestores)}
+      onChange={onChange}
+      testId={testId}
+    />
   );
 };
 

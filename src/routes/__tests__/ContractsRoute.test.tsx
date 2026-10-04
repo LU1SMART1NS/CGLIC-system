@@ -20,6 +20,11 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
+// Unidades internas dos contratos vêm de consultas à parte (alocações e vínculos): aqui ficam fora do teste.
+vi.mock('../../hooks/useCarteiraItens', () => ({
+  useCarteiraItens: () => ({ unidades: [], unidadesDoContrato: new Map(), rows: [], resumoPorAta: new Map(), isLoading: false })
+}));
+
 const mockContracts: ContractDashboardRecord[] = [
   {
     id: '200331-00001-2025',
@@ -149,7 +154,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).toContain('Atualizar');
   });
 
-  it('3. deve renderizar os 4 cards de resumo com os contadores corretos', () => {
+  it('3. deve renderizar a situação em segmentos com contagem e o valor vigente uma vez', () => {
     const html = renderToStaticMarkup(
       <ContractsPortfolioSummary
         totalContratos={7}
@@ -157,24 +162,27 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
         criticos={1}
         atencao={1}
         historico={5}
+        valorVigenteTotal={2150000}
         activeStatus="VIGENTES"
         onSelectStatus={vi.fn()}
       />
     );
 
     expect(html).toContain('Vigentes');
-    expect(html).toContain('Crítico (≤30 dias)');
-    expect(html).toContain('Atenção (31–90 dias)');
+    expect(html).toContain('Crítico');
+    expect(html).toContain('Atenção');
     expect(html).toContain('Histórico');
     expect(html).toContain('>5<');
-    expect(html).toContain('de 7 contratos');
+    expect(html).toContain('>7<');
+    expect((html.match(/em valor vigente/g) || []).length).toBe(1);
   });
 
   it('4. deve renderizar a barra de filtros com situação, pendência, gestor e busca', () => {
     const html = renderToStaticMarkup(
       <ContractsPortfolioFilters
-        filters={{ status: 'TODOS', pendencia: 'TODOS', gestor: 'TODOS', busca: '' }}
+        filters={{ status: 'TODOS', pendencia: 'TODOS', unidade: 'TODAS', gestor: 'TODOS', busca: '' }}
         gestores={['Maria Souza']}
+        unidades={[{ chave: 'cglic', nome: 'CGLIC' }]}
         onChangeFilter={vi.fn()}
         onResetFilters={vi.fn()}
         totalFiltered={3}
@@ -182,10 +190,10 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
       />
     );
 
-    expect(html).toContain('Todas as Situações');
-    expect(html).toContain('Todas as Pendências');
-    expect(html).toContain('Todos os Gestores');
-    expect(html).toContain('Maria Souza');
+    expect(html).not.toContain('Todas as Situações');
+    expect(html).toContain('contracts-filter-pendencia');
+    expect(html).toContain('contracts-filter-unidade');
+    expect(html).toContain('contracts-filter-gestor');
     expect(html).toContain('Buscar por contrato, fornecedor, CNPJ...');
     expect(html).toContain('3 contratos');
     expect(html).not.toContain('Todos os Instrumentos');
@@ -201,7 +209,8 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     );
 
     // Cabeçalhos de coluna
-    expect(html).toContain('Fornecedor');
+    expect(html).toContain('Contrato');
+    expect(html).not.toContain('>Fornecedor<');
     expect(html).toContain('Vigência');
     expect(html).toContain('Valor Vigente');
     expect(html).toContain('Pendências');
@@ -217,7 +226,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).toContain('Gamma Locações Comerciais Eireli');
 
     // Botões de Drill-down
-    expect(html).toContain('Ver Detalhes');
+    expect(html).toContain('Ver detalhes do contrato');
   });
 
   it('6. deve exibir estado vazio quando não há contratos na base', () => {

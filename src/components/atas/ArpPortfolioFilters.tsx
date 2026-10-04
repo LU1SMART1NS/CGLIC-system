@@ -1,15 +1,25 @@
 import React from 'react';
-import { carteiraSelect } from '../carteira/carteiraStyles';
 import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { hasActiveCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES } from '../carteira/carteiraGestor';
 import type { ArpVigenciaFilterOption } from './ArpPortfolioSummary';
-import { VIGENCIA_RULES } from '../../config/alertRules';
+import {
+  CarteiraAlocacaoSelect,
+  CarteiraEmpenhoSelect,
+  CarteiraUnidadeSelect,
+  NIVEL_FILTER_VALUES,
+  TODAS_UNIDADES
+} from '../carteira/CarteiraExecucaoSelects';
+import type { FiltroNivel, NivelAtendimento } from '../../utils/itemAtendimento';
 
 export interface ArpPortfolioFilterState {
   statusVigencia: ArpVigenciaFilterOption;
-  filtroAlocacao: 'TODAS' | 'SIM' | 'NAO';
-  filtroEmpenho: 'TODAS' | 'SIM' | 'NAO';
+  /** Alocação interna da ata, somada dos itens, contra o quantitativo SENASP. */
+  filtroAlocacao: FiltroNivel;
+  /** Empenho da ata, somado dos itens, contra a quantidade contratada. */
+  filtroEmpenho: FiltroNivel;
+  /** Unidade interna (nome normalizado; 'TODAS' = sem filtro). */
+  unidade: string;
   /** Nome do gestor ('TODOS' = sem filtro; '__SEM_GESTOR__' = atas sem gestor atribuído). */
   gestor: string;
   busca: string;
@@ -17,16 +27,18 @@ export interface ArpPortfolioFilterState {
 
 export const ARP_FILTER_SCHEMA: CarteiraFilterSchema<ArpPortfolioFilterState> = {
   statusVigencia: { param: 'situacao', default: 'VIGENTES', values: ['TODOS', 'VIGENTES', 'CRITICO', 'ATENCAO', 'HISTORICO'] },
-  filtroAlocacao: { param: 'alocacao', default: 'TODAS', values: ['TODAS', 'SIM', 'NAO'] },
-  filtroEmpenho: { param: 'empenho', default: 'TODAS', values: ['TODAS', 'SIM', 'NAO'] },
+  filtroAlocacao: { param: 'alocacao', default: 'TODOS', values: NIVEL_FILTER_VALUES },
+  filtroEmpenho: { param: 'empenho', default: 'TODOS', values: NIVEL_FILTER_VALUES },
+  unidade: { param: 'unidade', default: TODAS_UNIDADES },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   busca: { param: 'busca', default: '' }
 };
 
 export const DEFAULT_ARP_FILTERS: ArpPortfolioFilterState = {
   statusVigencia: 'VIGENTES',
-  filtroAlocacao: 'TODAS',
-  filtroEmpenho: 'TODAS',
+  filtroAlocacao: 'TODOS',
+  filtroEmpenho: 'TODOS',
+  unidade: TODAS_UNIDADES,
   gestor: TODOS_GESTORES,
   busca: ''
 };
@@ -34,6 +46,11 @@ export const DEFAULT_ARP_FILTERS: ArpPortfolioFilterState = {
 interface ArpPortfolioFiltersProps {
   filters: ArpPortfolioFilterState;
   gestores?: string[];
+  /** Unidades internas com alocação (opções do seletor). */
+  unidades?: Array<{ chave: string; nome: string }>;
+  /** Quantas atas cada nível de alocação / empenho traria (aparece no menu do filtro). */
+  alocacaoCounts?: Partial<Record<NivelAtendimento, number>>;
+  empenhoCounts?: Partial<Record<NivelAtendimento, number>>;
   /** Esconde o seletor de gestor (perfil "gestor", que já vê só as próprias atas). */
   showGestorFilter?: boolean;
   onChangeFilter: <K extends keyof ArpPortfolioFilterState>(key: K, value: ArpPortfolioFilterState[K]) => void;
@@ -45,6 +62,9 @@ interface ArpPortfolioFiltersProps {
 export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
   filters,
   gestores = [],
+  unidades = [],
+  alocacaoCounts,
+  empenhoCounts,
   showGestorFilter = true,
   onChangeFilter,
   onResetFilters,
@@ -63,40 +83,26 @@ export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
       counter={carteiraCounter(totalFiltered, totalAtas, hasActiveFilters, 'Ata', 'Atas')}
       testIdPrefix="arp"
     >
-      <select
-        value={filters.statusVigencia}
-        onChange={(e) => onChangeFilter('statusVigencia', e.target.value as ArpVigenciaFilterOption)}
-        data-testid="arp-filter-vigencia"
-        style={carteiraSelect}
-      >
-        <option value="TODOS">Todas as Vigências</option>
-        <option value="VIGENTES">Vigentes</option>
-        <option value="CRITICO">Crítico (≤{VIGENCIA_RULES.faixaCriticoAteDias} dias)</option>
-        <option value="ATENCAO">Atenção ({VIGENCIA_RULES.faixaCriticoAteDias + 1}–{VIGENCIA_RULES.faixaAtencaoAteDias} dias)</option>
-        <option value="HISTORICO">Histórico</option>
-      </select>
-
-      <select
+      <CarteiraAlocacaoSelect
         value={filters.filtroAlocacao}
-        onChange={(e) => onChangeFilter('filtroAlocacao', e.target.value as 'TODAS' | 'SIM' | 'NAO')}
-        data-testid="arp-filter-alocacao"
-        style={carteiraSelect}
-      >
-        <option value="TODAS">Alocação (Todas)</option>
-        <option value="SIM">Com Alocação</option>
-        <option value="NAO">Sem Alocação</option>
-      </select>
+        onChange={(value) => onChangeFilter('filtroAlocacao', value)}
+        counts={alocacaoCounts}
+        testId="arp-filter-alocacao"
+      />
 
-      <select
+      <CarteiraEmpenhoSelect
         value={filters.filtroEmpenho}
-        onChange={(e) => onChangeFilter('filtroEmpenho', e.target.value as 'TODAS' | 'SIM' | 'NAO')}
-        data-testid="arp-filter-empenho"
-        style={carteiraSelect}
-      >
-        <option value="TODAS">Empenho (Todos)</option>
-        <option value="SIM">Com Empenho</option>
-        <option value="NAO">Sem Empenho</option>
-      </select>
+        onChange={(value) => onChangeFilter('filtroEmpenho', value)}
+        counts={empenhoCounts}
+        testId="arp-filter-empenho"
+      />
+
+      <CarteiraUnidadeSelect
+        value={filters.unidade}
+        unidades={unidades}
+        onChange={(value) => onChangeFilter('unidade', value)}
+        testId="arp-filter-unidade"
+      />
 
       {showGestorFilter && (
         <CarteiraGestorSelect

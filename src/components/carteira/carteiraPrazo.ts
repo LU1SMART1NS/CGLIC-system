@@ -36,6 +36,17 @@ export function matchesStatusFilter(faixa: PrazoFaixa, filter: CarteiraStatusFil
   }
 }
 
+/** Segmento de situação que corresponde a uma faixa de prazo (para filtrar ao clicar no selo de prazo). */
+export function situacaoDaFaixa(faixa: PrazoFaixa): CarteiraStatusFilter | null {
+  switch (faixa) {
+    case 'CRITICO': return 'CRITICO';
+    case 'ATENCAO': return 'ATENCAO';
+    case 'EXPIRADO': return 'HISTORICO';
+    case 'REGULAR': return 'VIGENTES';
+    default: return null;
+  }
+}
+
 export function formatDiasRestantes(dias: number | null): string {
   if (dias === null) return 'Sem data';
   if (dias < 0) return `Vencido há ${Math.abs(dias)}d`;

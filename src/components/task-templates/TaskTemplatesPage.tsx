@@ -16,6 +16,9 @@ import {
 import { AppCard } from '../../design-system/components/AppCard';
 import { AppButton } from '../../design-system/components/AppButton';
 import { PageHeader } from '../../design-system/components/PageHeader';
+import { Modal } from '../../design-system/components/Modal';
+import { IconButton } from '../../design-system/components/IconButton';
+import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
@@ -270,12 +273,88 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
   );
 };
 
+/** Criar ou editar um modelo (nome e descrição): mesmo diálogo nos dois casos. */
+const TemplateFormModal: React.FC<{
+  template?: TaskTemplate;
+  onClose: () => void;
+}> = ({ template, onClose }) => {
+  const { hooks, copy } = useTaskTemplatesKit();
+  const saveTemplate = hooks.useSaveTemplate();
+  const [nome, setNome] = useState(template?.nome ?? '');
+  const [descricao, setDescricao] = useState(template?.descricao ?? '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    saveTemplate.mutate(
+      {
+        id: template?.id,
+        nome: nome.trim(),
+        descricao: descricao.trim() || undefined,
+        ativo: template ? template.ativo : true
+      },
+      { onSuccess: onClose }
+    );
+  };
+
+  const clearError = () => {
+    if (saveTemplate.isError) saveTemplate.reset();
+  };
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      dismissible={!saveTemplate.isPending}
+      size="md"
+      testId="template-modal"
+      title={template ? 'Editar modelo' : copy.createLabel}
+      footer={
+        <>
+          <AppButton type="button" variant="outline" onClick={onClose} disabled={saveTemplate.isPending}>
+            Cancelar
+          </AppButton>
+          <AppButton type="submit" form="template-form" disabled={!nome.trim() || saveTemplate.isPending} isLoading={saveTemplate.isPending}>
+            {template ? 'Salvar alterações' : 'Criar modelo'}
+          </AppButton>
+        </>
+      }
+    >
+      <form id="template-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+        <AppInput
+          label="Nome do modelo *"
+          required
+          placeholder={copy.namePlaceholder}
+          value={nome}
+          onChange={(e) => {
+            clearError();
+            setNome(e.target.value);
+          }}
+        />
+        <AppTextarea
+          label="Descrição operacional (opcional)"
+          rows={3}
+          placeholder={copy.descriptionPlaceholder}
+          value={descricao}
+          onChange={(e) => {
+            clearError();
+            setDescricao(e.target.value);
+          }}
+        />
+        {saveTemplate.isError && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', fontSize: '0.82rem' }}>
+            <AlertCircle size={16} /> {saveTemplate.error?.message || 'Falha ao salvar modelo.'}
+          </div>
+        )}
+      </form>
+    </Modal>
+  );
+};
+
 const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
   const [expanded, setExpanded] = useState(true);
   const [newMacroNome, setNewMacroNome] = useState('');
   const [editing, setEditing] = useState(false);
-  const [editNome, setEditNome] = useState('');
-  const [editDescricao, setEditDescricao] = useState('');
   const { hooks, copy } = useTaskTemplatesKit();
   const saveTemplate = hooks.useSaveTemplate();
   const deleteTemplate = hooks.useDeleteTemplate();
@@ -295,20 +374,6 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
     saveTemplate.mutate({ id: template.id, nome: template.nome, descricao: template.descricao, ativo: !template.ativo });
   };
 
-  const startEdit = () => {
-    setEditNome(template.nome);
-    setEditDescricao(template.descricao ?? '');
-    setEditing(true);
-  };
-
-  const handleSaveEdit = () => {
-    if (!editNome.trim()) return;
-    saveTemplate.mutate(
-      { id: template.id, nome: editNome.trim(), descricao: editDescricao.trim() || undefined, ativo: template.ativo },
-      { onSuccess: () => setEditing(false) }
-    );
-  };
-
   const totalTarefas = template.macrotarefas.reduce((acc, m) => acc + m.tarefas.length, 0);
 
   return (
@@ -325,41 +390,15 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {editing ? (
-                <input
-                  type="text"
-                  value={editNome}
-                  onChange={e => setEditNome(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleSaveEdit();
-                    if (e.key === 'Escape') setEditing(false);
-                  }}
-                  autoFocus
-                  style={{ fontSize: '0.95rem', fontWeight: 700, padding: '0.3rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none', minWidth: '260px' }}
-                />
-              ) : (
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  {template.nome}
-                </h3>
-              )}
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                {template.nome}
+              </h3>
               <StatusBadge
                 variant={template.ativo ? 'success' : 'neutral'}
                 label={template.ativo ? 'ATIVO' : 'INATIVO'}
               />
             </div>
-            {editing ? (
-              <input
-                type="text"
-                placeholder="Descrição (opcional)"
-                value={editDescricao}
-                onChange={e => setEditDescricao(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleSaveEdit();
-                  if (e.key === 'Escape') setEditing(false);
-                }}
-                style={{ width: '100%', marginTop: '0.35rem', fontSize: '0.82rem', padding: '0.3rem 0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
-              />
-            ) : template.descricao && (
+            {template.descricao && (
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
                 {template.descricao}
               </p>
@@ -371,35 +410,16 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {editing ? (
-            <>
-              <AppButton
-                type="button"
-                variant="primary"
-                size="sm"
-                icon={<Check size={14} />}
-                onClick={handleSaveEdit}
-                disabled={!editNome.trim() || saveTemplate.isPending}
-                isLoading={saveTemplate.isPending}
-              >
-                Salvar
-              </AppButton>
-              <AppButton type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
-                Cancelar
-              </AppButton>
-            </>
-          ) : (
-            <AppButton
-              type="button"
-              variant="outline"
-              size="sm"
-              icon={<Edit2 size={14} />}
-              onClick={startEdit}
-              title="Editar nome e descrição"
-            >
-              Editar
-            </AppButton>
-          )}
+          <AppButton
+            type="button"
+            variant="outline"
+            size="sm"
+            icon={<Edit2 size={14} />}
+            onClick={() => setEditing(true)}
+            title="Editar nome e descrição"
+          >
+            Editar
+          </AppButton>
           <AppButton
             type="button"
             variant="secondary"
@@ -408,10 +428,9 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
           >
             {template.ativo ? 'Desativar' : 'Ativar'}
           </AppButton>
-          <AppButton
-            type="button"
-            variant="outline"
-            size="sm"
+          <IconButton
+            label={`Excluir modelo ${template.nome}`}
+            icon={<Trash2 size={16} />}
             onClick={async () => {
               const ok = await confirm({
                 title: 'Excluir modelo',
@@ -424,11 +443,8 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
                 onError: err => toast.error(`Erro ao excluir modelo: ${err.message || 'Erro desconhecido'}`)
               });
             }}
-            style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-            title="Excluir template"
-          >
-            <Trash2 size={14} />
-          </AppButton>
+            style={{ color: '#dc2626' }}
+          />
         </div>
       </div>
 
@@ -481,6 +497,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
         </div>
       )}
     </AppCard>
+    {editing && <TemplateFormModal template={template} onClose={() => setEditing(false)} />}
     {dialog}
     </>
   );
@@ -490,23 +507,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
 const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { hooks, copy } = useTaskTemplatesKit();
   const { data: templates = [], isLoading, error } = hooks.useTemplates();
-  const saveTemplate = hooks.useSaveTemplate();
-  const [novoNome, setNovoNome] = useState('');
-  const [novaDescricao, setNovaDescricao] = useState('');
-
-  const handleCreateTemplate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!novoNome.trim()) return;
-    saveTemplate.mutate(
-      { nome: novoNome.trim(), descricao: novaDescricao.trim() || undefined, ativo: true },
-      {
-        onSuccess: () => {
-          setNovoNome('');
-          setNovaDescricao('');
-        }
-      }
-    );
-  };
+  const [creating, setCreating] = useState(false);
 
   const Container = embedded ? 'div' : PageContainer;
 
@@ -522,115 +523,24 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
         />
       )}
 
-      {/* Formulário de Criação de Novo Template */}
-      <div
-        style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          padding: '1.25rem',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
-        }}
-      >
-        {/* Cabeçalho do Card de Ação */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-          <Sliders size={16} color="#0c326f" aria-hidden="true" />
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.01em' }}>
-            {copy.createLabel}
-          </h3>
+      {error && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', fontSize: '0.82rem' }}>
+          <AlertCircle size={16} /> Falha ao carregar templates oficiais.
         </div>
-
-        <form onSubmit={handleCreateTemplate}>
-          {/* Grid de Campos em 2 Colunas */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.85rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                Nome do Template *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder={copy.namePlaceholder}
-                value={novoNome}
-                onChange={e => {
-                  if (saveTemplate.isError) saveTemplate.reset();
-                  setNovoNome(e.target.value);
-                }}
-                style={{
-                  width: '100%',
-                  fontSize: '0.82rem',
-                  padding: '0.45rem 0.75rem',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  background: '#f8fafc',
-                  color: '#0f172a',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                Descrição Operacional (opcional)
-              </label>
-              <input
-                type="text"
-                placeholder={copy.descriptionPlaceholder}
-                value={novaDescricao}
-                onChange={e => {
-                  if (saveTemplate.isError) saveTemplate.reset();
-                  setNovaDescricao(e.target.value);
-                }}
-                style={{
-                  width: '100%',
-                  fontSize: '0.82rem',
-                  padding: '0.45rem 0.75rem',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  background: '#f8fafc',
-                  color: '#0f172a',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Rodapé de Ações Alinhado à Direita */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem', marginTop: '0.85rem' }}>
-            <AppButton
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={!novoNome.trim() || saveTemplate.isPending}
-              isLoading={saveTemplate.isPending}
-              icon={<Plus size={14} />}
-            >
-              Criar Modelo
-            </AppButton>
-          </div>
-
-          {saveTemplate.isError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', marginTop: '0.85rem', fontSize: '0.82rem' }}>
-              <AlertCircle size={16} /> {saveTemplate.error?.message || 'Falha ao criar modelo.'}
-            </div>
-          )}
-        </form>
-
-        {error && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', marginTop: '1rem', fontSize: '0.82rem' }}>
-            <AlertCircle size={16} /> Falha ao carregar templates oficiais.
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Lista de Templates Cadastrados */}
       <div>
-        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-            Modelos Disponíveis ({templates.length})
-          </h2>
-          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-            {copy.activeHint}
-          </span>
+        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+              Modelos Disponíveis ({templates.length})
+            </h2>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{copy.activeHint}</span>
+          </div>
+          <AppButton icon={<Plus size={15} />} onClick={() => setCreating(true)} data-testid="template-new">
+            Novo modelo
+          </AppButton>
         </div>
 
         {isLoading ? (
@@ -650,6 +560,7 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
         )}
       </div>
 
+      {creating && <TemplateFormModal onClose={() => setCreating(false)} />}
     </Container>
   );
 };

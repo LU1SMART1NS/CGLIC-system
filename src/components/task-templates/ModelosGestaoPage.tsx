@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Sliders } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
+import { Tabs } from '../../design-system/components/Tabs';
 import { AtaTaskTemplatesPage } from '../atas/AtaTaskTemplatesPage';
 import { ContractTaskTemplatesPage } from '../contracts/ContractTaskTemplatesPage';
 
@@ -33,54 +34,26 @@ export const ModelosGestaoPage: React.FC = () => {
         icon={<Sliders size={26} color="#0c326f" aria-hidden="true" />}
       />
 
-      <div
-        role="tablist"
-        aria-label="Tipo de modelo de gestão"
-        style={{ display: 'flex', gap: '0.5rem' }}
-      >
-        {TABS.map((tab) => {
-          const isActive = active === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              id={`modelos-tab-${tab.id}`}
-              aria-selected={isActive}
-              aria-controls={`modelos-panel-${tab.id}`}
-              onClick={() => setSearchParams({ tipo: tab.id }, { replace: true })}
-              data-testid={`modelos-tab-${tab.id}`}
-              style={{
-                padding: '0.4rem 1.1rem',
-                borderRadius: '999px',
-                border: isActive ? '1px solid #0c326f' : '1px solid #e2e8f0',
-                background: isActive ? '#0c326f' : '#ffffff',
-                color: isActive ? '#ffffff' : '#475569',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        tabs={TABS}
+        activeTabId={active}
+        onTabChange={(id) => setSearchParams({ tipo: id }, { replace: true })}
+        ariaLabel="Tipo de modelo de gestão"
+        testId="modelos-tabs"
+      />
 
       <div
         role="tabpanel"
-        id="modelos-panel-atas"
-        aria-labelledby="modelos-tab-atas"
+        id="tabpanel-atas"
+        aria-labelledby="tab-atas"
         hidden={active !== 'atas'}
       >
         <AtaTaskTemplatesPage embedded />
       </div>
       <div
         role="tabpanel"
-        id="modelos-panel-contratos"
-        aria-labelledby="modelos-tab-contratos"
+        id="tabpanel-contratos"
+        aria-labelledby="tab-contratos"
         hidden={active !== 'contratos'}
       >
         <ContractTaskTemplatesPage embedded />

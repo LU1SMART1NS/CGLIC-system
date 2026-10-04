@@ -1,9 +1,8 @@
 import React from 'react';
-import { CarteiraSummaryCards } from '../../carteira/CarteiraSummaryCards';
+import { CarteiraSituacaoTabs, type CarteiraSituacao } from '../../carteira/CarteiraSituacaoTabs';
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
-import type { CarteiraStatusFilter } from '../../carteira/carteiraPrazo';
 
-export type ContractStatusFilterOption = CarteiraStatusFilter | 'TODOS';
+export type ContractStatusFilterOption = CarteiraSituacao;
 
 interface ContractsPortfolioSummaryProps {
   vigentes: number;
@@ -11,13 +10,13 @@ interface ContractsPortfolioSummaryProps {
   atencao: number;
   historico: number;
   totalContratos: number;
+  /** Valor vigente da carteira: aparece uma vez, ao lado dos segmentos. */
   valorVigenteTotal?: number;
-  valorCritico?: number;
-  valorAtencao?: number;
   activeStatus: ContractStatusFilterOption;
   onSelectStatus: (status: ContractStatusFilterOption) => void;
 }
 
+/** Situação dos contratos em segmentos com contagem; o segmento ativo é o filtro de situação. */
 export const ContractsPortfolioSummary: React.FC<ContractsPortfolioSummaryProps> = ({
   vigentes,
   criticos,
@@ -25,22 +24,17 @@ export const ContractsPortfolioSummary: React.FC<ContractsPortfolioSummaryProps>
   historico,
   totalContratos,
   valorVigenteTotal,
-  valorCritico,
-  valorAtencao,
   activeStatus,
   onSelectStatus
 }) => (
-  <CarteiraSummaryCards
+  <CarteiraSituacaoTabs
     testIdPrefix="contracts"
     vigentes={vigentes}
     criticos={criticos}
     atencao={atencao}
     historico={historico}
-    vigentesHint={`de ${totalContratos} ${totalContratos === 1 ? 'contrato' : 'contratos'}`}
-    vigentesValorHint={typeof valorVigenteTotal === 'number' ? `${formatCurrencyCompact(valorVigenteTotal)} em valor vigente` : undefined}
-    criticoValorHint={typeof valorCritico === 'number' ? `${formatCurrencyCompact(valorCritico)} em valor vigente` : undefined}
-    atencaoValorHint={typeof valorAtencao === 'number' ? `${formatCurrencyCompact(valorAtencao)} em valor vigente` : undefined}
-    historicoHint="Expirados / encerrados"
+    total={totalContratos}
+    meta={typeof valorVigenteTotal === 'number' ? `${formatCurrencyCompact(valorVigenteTotal)} em valor vigente` : undefined}
     active={activeStatus}
     onSelect={onSelectStatus}
   />
