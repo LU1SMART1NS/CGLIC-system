@@ -14,7 +14,7 @@ const ata = encodeURIComponent(ATA_KEY);
 const ROUTES: Array<{ name: string; url: string }> = [
   { name: 'Visão Geral', url: '/instrumentos' },
   { name: 'Carteira de Atas', url: '/atas' },
-  { name: 'Saldos por unidade', url: '/atas/saldos-unidade' },
+  { name: 'Itens da carteira', url: '/itens' },
   { name: 'Carteira de Contratos', url: '/contratos' },
   { name: 'Pagamentos', url: '/pagamentos' },
   { name: 'Empenhos', url: '/empenhos' },
