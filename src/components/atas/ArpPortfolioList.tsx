@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { AtaCardSkeleton } from '../cards/AtaCardSkeleton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { buildAtaKey } from '../../hooks/useAta';
@@ -8,6 +8,9 @@ import { getArpVigenciaStatus } from '../../services/temporalEngineService';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/CarteiraDetailLabel';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
+import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
+import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
+import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
 import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { ManagerCell, type ManagerAssignContext } from '../carteira/ManagerAssign';
@@ -36,11 +39,6 @@ interface ArpPortfolioListProps {
 }
 
 const MAX_ITENS_EXPANDIDOS = 5;
-
-function formatCurrency(val?: number): string {
-  if (typeof val !== 'number' || isNaN(val)) return '—';
-  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 function formatDateBR(dateStr?: string): string {
   if (!dateStr) return '—';
@@ -76,23 +74,18 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   assignContext = { links: [] }
 }) => {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
   /** Escolha explícita do usuário por linha; sem escolha vale o padrão (abrir só se a busca casar com algum item). */
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
-
-  // Só volta à página 1 quando o conjunto listado muda (filtro/busca).
-  const cardsSignature = useMemo(() => cards.map((c) => c.key).join('|'), [cards]);
+  const { currentPage, setPage, pageItems: pageCards, signature } = useCarteiraPagination(
+    cards,
+    useCallback((c: AtaGroupedCard) => c.key, []),
+    pageSize
+  );
   useEffect(() => {
-    setPage(1);
     setOverrides({});
-  }, [cardsSignature]);
+  }, [signature]);
 
   const query = busca.trim().toLowerCase();
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(cards.length / pageSize)));
-  const pageCards = useMemo(
-    () => cards.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [cards, currentPage, pageSize]
-  );
 
   if (isLoading && totalAtas === 0) {
     return (
@@ -115,44 +108,11 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
 
   if (cards.length === 0) {
     return (
-      <div style={{
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: '8px',
-        padding: '3rem 1.5rem',
-        textAlign: 'center',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '0.75rem'
-      }}>
-        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
-          Nenhuma Ata corresponde aos filtros aplicados.
-        </h3>
-        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', maxWidth: '400px' }}>
-          Altere os critérios selecionados ou limpe os filtros para visualizar a carteira completa de Atas.
-        </p>
-        <button
-          type="button"
-          onClick={onResetFilters}
-          style={{
-            marginTop: '0.5rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            padding: '0.45rem 0.85rem',
-            background: '#0c326f',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            color: '#ffffff',
-            cursor: 'pointer'
-          }}
-        >
-          <RotateCcw size={13} /> Limpar Filtros
-        </button>
-      </div>
+      <CarteiraNoResults
+        title="Nenhuma Ata corresponde aos filtros aplicados."
+        description="Altere os critérios selecionados ou limpe os filtros para visualizar a carteira completa de Atas."
+        onResetFilters={onResetFilters}
+      />
     );
   }
 
@@ -290,7 +250,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                               >
                                 <span style={{ fontWeight: 700 }}>{item.numeroItem}</span>
                                 <span title={item.descricaoItem} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.descricaoItem}</span>
-                                <span>{formatCurrency(item.valorUnitario)}</span>
+                                <span>{formatCurrencyOrDash(item.valorUnitario)}</span>
                                 <SaldoBar pct={pctOf(item)} />
                                 <button
                                   type="button"

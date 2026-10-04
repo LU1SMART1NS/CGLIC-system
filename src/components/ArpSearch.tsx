@@ -12,7 +12,10 @@ import { useAllAtaItemSaldos } from '../hooks/useAta';
 import { useAllAtaManagers, useArpItemContractLinks } from '../hooks/useAtaManagers';
 import { useAuth } from '../context/AuthContext';
 import { canAssignManager } from './carteira/ManagerAssign';
-import { ArpPortfolioFilters, DEFAULT_ARP_FILTERS, type ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
+import { ArpPortfolioFilters, ARP_FILTER_SCHEMA } from './atas/ArpPortfolioFilters';
+import { useCarteiraFilters } from './carteira/carteiraFilters';
+import { canFilterByGestor, listGestores, matchesGestorFilter } from './carteira/carteiraGestor';
+import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
 import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { getArpVigenciaStatus } from '../services/temporalEngineService';
@@ -49,7 +52,9 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     numeroAtaRegistroPreco: ''
   });
 
-  const [filterState, setFilterState] = useState<ArpPortfolioFilterState>(DEFAULT_ARP_FILTERS);
+  // Filtros na URL (?situacao=&alocacao=&empenho=&gestor=&busca=): sobrevivem à ida ao detalhe e permitem link já filtrado.
+  const { filters: filterState, setFilter: handleFilterChange, resetFilters: handleResetFilters } =
+    useCarteiraFilters(ARP_FILTER_SCHEMA);
 
   const [arps, setArps] = useState<ArpRecord[]>([]);
 
@@ -207,26 +212,10 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     });
   }, [itemsByAta, itemsLoadingByAta, loadItemsForArp]);
 
-  const handleFilterChange = useCallback(
-    <K extends keyof ArpPortfolioFilterState>(key: K, value: ArpPortfolioFilterState[K]) => {
-      setFilterState(prev => ({
-        ...prev,
-        [key]: value
-      }));
-    },
-    []
+  const handleSelectStatus = useCallback(
+    (status: ArpVigenciaFilterOption) => handleFilterChange('statusVigencia', status),
+    [handleFilterChange]
   );
-
-  const handleSelectStatus = useCallback((status: ArpVigenciaFilterOption) => {
-    setFilterState(prev => ({
-      ...prev,
-      statusVigencia: status
-    }));
-  }, []);
-
-  const handleResetFilters = useCallback(() => {
-    setFilterState(DEFAULT_ARP_FILTERS);
-  }, []);
 
   // Summary Metrics
   const summaryMetrics = useMemo(() => {
@@ -260,6 +249,23 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     return { total: scopedArps.length, vigentes, criticos, atencao, historico, valorVigenteTotal, valorCritico, valorAtencao };
   }, [scopedArps]);
 
+  // Gestor por ata (mesma fonte do detalhe da Ata e da Visão Geral).
+  const { data: ataManagers } = useAllAtaManagers();
+  const gestorByAta = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [ataKey, manager] of Object.entries(ataManagers || {})) {
+      if (manager?.gestorNome) map[ataKey] = manager.gestorNome;
+    }
+    return map;
+  }, [ataManagers]);
+  const gestoresDisponiveis = useMemo(
+    () => listGestores(scopedArps.map((arp) => gestorByAta[arp.numeroAtaRegistroPreco])),
+    [scopedArps, gestorByAta]
+  );
+  // O perfil "gestor" já vê só as próprias atas: sem seletor, e um ?gestor= na URL é ignorado.
+  const { role } = useAuth();
+  const showGestorFilter = canFilterByGestor(role);
+
   // Filtragem determinística de Atas
   const filteredArps = useMemo(() => {
     return scopedArps.filter(arp => {
@@ -277,7 +283,10 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       if (filterState.filtroEmpenho === 'SIM' && !hasEmp) return false;
       if (filterState.filtroEmpenho === 'NAO' && hasEmp) return false;
 
-      // 4. Busca Textual
+      // 4. Filtro de Gestor
+      if (showGestorFilter && !matchesGestorFilter(gestorByAta[arp.numeroAtaRegistroPreco], filterState.gestor)) return false;
+
+      // 5. Busca Textual
       if (filterState.busca.trim().length > 0) {
         const query = filterState.busca.trim().toLowerCase();
         const queryDigits = query.replace(/\D/g, '');
@@ -300,7 +309,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
 
       return true;
     }).sort((a, b) => comparePrazo(getArpPrazo(a).dias, getArpPrazo(b).dias));
-  }, [scopedArps, filterState, allocationsDbSet, empenhosDbSet, itemsByAta]);
+  }, [scopedArps, filterState, allocationsDbSet, empenhosDbSet, itemsByAta, showGestorFilter, gestorByAta]);
 
   // Carregar itens para as atas filtradas
   useEffect(() => {
@@ -309,7 +318,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     }
   }, [filteredArps, loadItemsForArps]);
 
-  // Consumo de saldo por item e gestor por ata (mesmas fontes do detalhe da Ata e da Visão Geral).
+  // Consumo de saldo por item (mesma fonte do detalhe da Ata e da Visão Geral).
   const { data: saldos200330 } = useAllAtaItemSaldos(UASGS_CGLIC[0]);
   const { data: saldos200331 } = useAllAtaItemSaldos(UASGS_CGLIC[1]);
   // Atas vencidas, canceladas ou sem data não geram alerta de saldo (mesma regra da Visão Geral).
@@ -327,18 +336,9 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     );
     return buildAtaSaldoStats(saldos);
   }, [arps, saldos200330, saldos200331]);
-  const { data: ataManagers } = useAllAtaManagers();
-  const gestorByAta = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const [ataKey, manager] of Object.entries(ataManagers || {})) {
-      if (manager?.gestorNome) map[ataKey] = manager.gestorNome;
-    }
-    return map;
-  }, [ataManagers]);
 
   // Atribuição de gestor na própria carteira (admin e gestor), com propagação
   // Ata ↔ contratos vinculados — ver managerAssignmentService.
-  const { role } = useAuth();
   const canAssign = canAssignManager(role);
   const { data: links = [] } = useArpItemContractLinks(canAssign);
   const assignContext = useMemo(() => ({ links }), [links]);
@@ -361,6 +361,10 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     );
   }
 
+  // Os cards só aparecem com a carteira carregada e o escopo do gestor resolvido: antes disso
+  // mostrariam totais zerados ou, para o perfil "gestor", as atas de todos.
+  const isBusy = (loading && arps.length === 0) || scopeLoading;
+
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <ArpPortfolioHeader
@@ -370,6 +374,14 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         onTriggerSync={role === 'gestor_saldos' ? undefined : handleTriggerSync}
       />
 
+      {isBusy ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando atas...">
+          <SkeletonLoader variant="card" height="96px" count={1} />
+          <SkeletonLoader variant="rectangular" height="46px" count={1} />
+          <SkeletonLoader variant="rectangular" height="300px" count={1} />
+        </div>
+      ) : (
+      <>
       <ArpPortfolioSummary
         totalAtas={summaryMetrics.total}
         vigentes={summaryMetrics.vigentes}
@@ -385,6 +397,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
 
       <ArpPortfolioFilters
         filters={filterState}
+        gestores={gestoresDisponiveis}
+        showGestorFilter={showGestorFilter}
         onChangeFilter={handleFilterChange}
         onResetFilters={handleResetFilters}
         totalFiltered={filteredArps.length}
@@ -396,7 +410,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         assignContext={assignContext}
         cards={groupedCards}
         totalAtas={scopedArps.length}
-        isLoading={loading || scopeLoading}
+        isLoading={loading}
         itemsLoadingByAta={itemsLoadingByAta}
         saldoStatsByAta={saldoStatsByAta}
         gestorByAta={gestorByAta}
@@ -412,6 +426,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         }}
         onResetFilters={handleResetFilters}
       />
+      </>
+      )}
     </PageContainer>
   );
 };

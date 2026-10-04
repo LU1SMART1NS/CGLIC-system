@@ -142,7 +142,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
   it('3. deve renderizar a barra de filtros em linha com busca textual e opções', () => {
     const html = renderToStaticMarkup(
       <ArpPortfolioFilters
-        filters={{ statusVigencia: 'TODOS', filtroAlocacao: 'TODAS', filtroEmpenho: 'TODAS', busca: '' }}
+        filters={{ statusVigencia: 'TODOS', filtroAlocacao: 'TODAS', filtroEmpenho: 'TODAS', gestor: 'TODOS', busca: '' }}
         onChangeFilter={vi.fn()}
         onResetFilters={vi.fn()}
         totalFiltered={5}
