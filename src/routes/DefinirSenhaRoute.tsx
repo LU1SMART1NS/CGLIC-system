@@ -4,7 +4,7 @@ import { NewPasswordScreen } from '../components/auth/NewPasswordScreen';
 export const DefinirSenhaRoute: React.FC = () => (
   <NewPasswordScreen
     title="Primeiro acesso"
-    subtitle="Crie sua senha pessoal para ativar sua conta no CGLIC."
+    subtitle="Crie sua senha pessoal para ativar sua conta no ComprasSUSP."
     submitLabel="Ativar minha conta"
     successTitle="Conta ativada"
     successText="Tudo pronto. Você será levado à tela principal do sistema."

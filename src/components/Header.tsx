@@ -58,10 +58,8 @@ export const Header: React.FC<HeaderProps> = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', minWidth: 0 }} className="app-header-brand">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <h1 aria-label="ComprasSUSP · CGLIC" style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
+            <h1 aria-label="ComprasSUSP" style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
               <span style={{ fontWeight: 500 }}>Compras</span>SUSP
-              <span className="app-header-subtitle" style={{ color: '#94a3b8', fontWeight: 500, margin: '0 0.4rem' }}>·</span>
-              <span className="app-header-subtitle">CGLIC</span>
             </h1>
             <span className="app-header-subtitle" style={{ color: '#cbd5e1' }}>|</span>
             <span className="app-header-subtitle" style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
@@ -88,7 +86,7 @@ export const Header: React.FC<HeaderProps> = () => {
                 className="app-header-signout"
                 onClick={signOut}
                 aria-label="Sair"
-                title="Encerrar sessão no CGLIC"
+                title="Encerrar sessão no ComprasSUSP"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
