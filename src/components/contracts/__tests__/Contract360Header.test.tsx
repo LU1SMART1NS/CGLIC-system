@@ -9,7 +9,8 @@ import * as ataPncpHookModule from '../../../hooks/useAtaPncp';
 import type { ContractDashboardRecord } from '../../../types';
 
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn()
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/', search: '', state: null })
 }));
 
 vi.mock('../../../hooks/useSyncContractEmpenhos', () => ({
@@ -336,8 +337,30 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
       vi.mocked(syncHookModule.useSyncContractEmpenhos).mockReturnValue(defaultMockMutation as any);
     });
 
-    it('G. sem resposta do PNCP, a linha de datas não leva a divulgação', () => {
+    it('G. sem resposta do PNCP, a linha da divulgação continua e diz "não informada"', () => {
+      const html = render();
+      expect(html).toContain('Divulgação no PNCP');
+      expect(html).toContain('não informada');
+    });
+
+    it('G2. enquanto o PNCP ainda responde, a linha da divulgação não aparece', () => {
+      vi.mocked(pncpHookModule.useContractPncp).mockReturnValue({ data: undefined, isLoading: true } as any);
       expect(render()).not.toContain('Divulgação no PNCP');
+    });
+
+    it('G3. sem assinatura no registro, a linha diz "não informada"; enquanto completa com o Contratos.gov.br, espera', () => {
+      const semAssinatura = { ...mockContract, dataAssinatura: undefined };
+      const pronto = renderToStaticMarkup(<Contract360Header contract={semAssinatura} userRole="gestor" />);
+      expect(pronto).toContain('O Contratos.gov.br não informou a data de assinatura deste contrato.');
+      const carregando = renderToStaticMarkup(<Contract360Header contract={semAssinatura} userRole="gestor" loadingOfficial />);
+      expect(carregando).not.toContain('Assinatura');
+    });
+
+    it('G4. a categoria vem de `categoria` (Contratos.gov.br) ou de `nomeCategoria` (Compras.gov.br)', () => {
+      expect(render({ ...mockContract, raw: { categoria: 'Compras' } })).toContain('Compras');
+      const compras = render({ ...mockContract, raw: { nomeCategoria: 'Serviços' } });
+      expect(compras).toContain('Categoria');
+      expect(compras).toContain('Serviços');
     });
 
     it('H. com a resposta do PNCP, mostra a divulgação entre a assinatura e a vigência', () => {

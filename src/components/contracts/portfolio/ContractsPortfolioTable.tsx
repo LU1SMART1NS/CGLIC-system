@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { EmptyState } from '../../../design-system/components/EmptyState';
 import { SeverityBadge } from '../../../design-system/components/SeverityBadge';
@@ -82,7 +82,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   canAssign = false,
   assignContext = { links: [] }
 }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const { currentPage, setPage, pageItems: pageRows, signature } = useCarteiraPagination(
     rows,

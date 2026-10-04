@@ -1,5 +1,6 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { useBackTarget } from '../../hooks/useDetailOrigin';
 import {
   AlertTriangle,
   DollarSign,
@@ -40,7 +41,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   uasg: uasgProp
 }) => {
   const { contractKey: paramContractKey } = useParams<{ contractKey: string }>();
-  const navigate = useNavigate();
+  const back = useBackTarget({ path: '/contratos', label: 'Voltar para Contratos' });
   const contractKey = contractKeyOverride || paramContractKey;
 
   // A chave canônica é "UASG-NUMERO-ANO": quando a UASG não é informada por prop,
@@ -48,7 +49,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   const uasgFromKey = /^(\d{6})-/.exec((contractKey || '').trim())?.[1];
   const uasg = uasgProp || uasgFromKey || UASG_LINK_LEGADO;
 
-  const { contract, isLoading, isError, error, refetch } = useContract(contractKey, uasg);
+  const { contract, enriching, isLoading, isError, error, refetch } = useContract(contractKey, uasg);
 
   const resolvedContractKey = contract
     ? contract.id || getContractManagementKey(contract.uasg, contract.numero, contract.ano)
@@ -92,8 +93,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
         title="Falha ao carregar contrato"
         message={error instanceof Error ? error.message : 'Não foi possível recuperar as informações do contrato.'}
         onRetry={() => refetch()}
-        backLabel="Voltar para Contratos"
-        onBack={() => navigate('/contratos')}
+        backLabel={back.label}
+        onBack={back.back}
       />
     );
   }
@@ -104,8 +105,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
         kind="notFound"
         title="Contrato não encontrado"
         message={<>A chave de contrato informada (<code>{contractKey || 'N/A'}</code>) não corresponde a nenhum registro ativo na UASG {uasg}.</>}
-        backLabel="Voltar para lista de contratos"
-        onBack={() => navigate('/contratos')}
+        backLabel={back.label}
+        onBack={back.back}
       />
     );
   }
@@ -120,8 +121,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
         kind="forbidden"
         title="Acesso não autorizado"
         message="Este contrato não está atribuído a você. Seu perfil de gestor só permite visualizar a Visão 360° dos contratos onde você é o gestor titular."
-        backLabel="Voltar para lista de contratos"
-        onBack={() => navigate('/contratos')}
+        backLabel={back.label}
+        onBack={back.back}
       />
     );
   }
@@ -136,7 +137,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
 
   return (
     <Instrument360Page>
-      <Contract360Header contract={contract}>
+      <Contract360Header contract={contract} loadingOfficial={enriching}>
         <ContractHealthStrip
           contract={contract}
           contractKey={resolvedContractKey}

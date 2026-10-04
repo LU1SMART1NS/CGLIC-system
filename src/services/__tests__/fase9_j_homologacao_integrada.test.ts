@@ -32,8 +32,8 @@ describe('FASE 9-J — Homologação Integrada do Frontend com Dados Reais', () 
       }
     });
 
-    it('deve garantir que todos os 5 pilares de navegação possuam itens ativos e rotas vinculadas', () => {
-      expect(navigationConfig.length).toBe(5);
+    it('deve garantir que todas as 4 áreas de navegação possuam itens ativos e rotas vinculadas', () => {
+      expect(navigationConfig.length).toBe(4);
       for (const nav of navigationConfig) {
         if (nav.children) {
           for (const child of nav.children) {

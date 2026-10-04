@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import { useContractsDashboard } from './useContractsDashboard';
+import { useContratoGov } from './useContractContratosGov';
+import { mesclarContratosGov } from '../services/contratosGovContratoService';
 import { getContractManagementKey } from '../services/contractManagementService';
 import type { ContractDashboardRecord } from '../types';
 
@@ -8,6 +11,10 @@ import type { ContractDashboardRecord } from '../types';
  * Arquitetura ("Digite uma vez, use em todo lugar"):
  * Reutiliza a mesma query cacheada do Dashboard de Contratos ['contracts-dashboard', uasg]
  * sem disparar requisições duplicadas ou criar novas rotas de API.
+ *
+ * Quando o registro veio só do Compras.gov.br (sem o id do Contratos.gov.br), completa com o contrato
+ * aberto no Contratos.gov.br: assinatura, valor inicial, categoria e o id que libera fiscais, garantia e termos.
+ * `enriching` fica verdadeiro enquanto essa consulta roda.
  */
 export function useContract(contractKey?: string, uasg?: string) {
   const cleanUasg = (uasg || '').trim();
@@ -22,7 +29,7 @@ export function useContract(contractKey?: string, uasg?: string) {
 
   const normalizedTargetKey = (contractKey || '').trim().toUpperCase();
 
-  const contract: ContractDashboardRecord | null = contracts.find((c) => {
+  const base: ContractDashboardRecord | null = contracts.find((c) => {
     if (!normalizedTargetKey) return false;
     const key = c.id || getContractManagementKey(c.uasg, c.numero, c.ano);
     return (
@@ -32,8 +39,12 @@ export function useContract(contractKey?: string, uasg?: string) {
     );
   }) || null;
 
+  const { data: gov, isLoading: enriching } = useContratoGov(base);
+  const contract = useMemo(() => (base && gov ? mesclarContratosGov(base, gov) : base), [base, gov]);
+
   return {
     contract,
+    enriching,
     isLoading,
     isError,
     error,

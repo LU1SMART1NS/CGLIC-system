@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Ata360Header } from '../Ata360Header';
 import * as pncpHookModule from '../../../hooks/useAtaPncp';
+import * as assinaturaHookModule from '../../../hooks/useAtaAssinatura';
 import type { ArpRecord } from '../../../types';
 
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn(), useLocation: () => ({ pathname: '/', search: '', state: null }) }));
 vi.mock('../../../hooks/useAtaManagers', () => ({ useAtaManager: () => ({ data: { gestorNome: 'Gestora Teste' }, isLoading: false }) }));
 vi.mock('../../../hooks/useAtaPncp', () => ({ useAtaPncp: vi.fn() }));
+vi.mock('../../../hooks/useAtaAssinatura', () => ({ useAtaAssinatura: vi.fn() }));
 
 const arp = {
   numeroAtaRegistroPreco: '00059/2025',
@@ -23,13 +25,44 @@ const render = () =>
   renderToStaticMarkup(<Ata360Header arp={arp} itens={[]} saldos={[]} linkedContractsCount={0} onOpenActions={vi.fn()} onOpenItens={vi.fn()} onOpenContratos={vi.fn()} />);
 
 describe('Ata360Header: divulgação no PNCP', () => {
-  beforeEach(() => vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: undefined } as any));
+  beforeEach(() => {
+    vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: undefined } as any);
+    vi.mocked(assinaturaHookModule.useAtaAssinatura).mockReturnValue({ data: undefined } as any);
+  });
 
-  it('sem resposta do PNCP, a linha de datas só leva assinatura e vigência', () => {
+  it('sem resposta do PNCP, a linha da divulgação continua e diz "não informada"', () => {
     const html = render();
     expect(html).toContain('Assinatura');
     expect(html).toContain('Vigência');
-    expect(html).not.toContain('Divulgação no PNCP');
+    expect(html).toContain('Divulgação no PNCP');
+    expect(html).toContain('não informada');
+  });
+
+  it('enquanto o PNCP ainda responde, a linha da divulgação não aparece', () => {
+    vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: undefined, isLoading: true } as any);
+    expect(render()).not.toContain('Divulgação no PNCP');
+  });
+
+  it('sem resposta do PNCP, a vigência não afirma que a ata não foi prorrogada', () => {
+    const html = render();
+    expect(html).toContain('prorrogação no PNCP: não verificada');
+    expect(html).not.toContain('prorrogada no PNCP: não');
+  });
+
+  it('ata do banco, sem assinatura: usa a assinatura do Compras.gov.br e não o início da vigência', () => {
+    vi.mocked(assinaturaHookModule.useAtaAssinatura).mockReturnValue({ data: { dataAssinatura: '2025-09-30' } } as any);
+    const html = renderToStaticMarkup(
+      <Ata360Header arp={{ ...arp, dataAssinatura: '' }} itens={[]} saldos={[]} linkedContractsCount={0} onOpenActions={vi.fn()} onOpenItens={vi.fn()} onOpenContratos={vi.fn()} />
+    );
+    expect(html).toContain('30/09/2025');
+    expect(html).toContain('10/10/2025 a 10/10/2099');
+  });
+
+  it('sem assinatura em nenhuma fonte, a linha da assinatura diz "não informada"', () => {
+    const html = renderToStaticMarkup(
+      <Ata360Header arp={{ ...arp, dataAssinatura: '' }} itens={[]} saldos={[]} linkedContractsCount={0} onOpenActions={vi.fn()} onOpenItens={vi.fn()} onOpenContratos={vi.fn()} />
+    );
+    expect(html).toContain('O Compras.gov.br não informou a data de assinatura desta ata.');
   });
 
   it('com a resposta, mostra a divulgação entre a assinatura e a vigência', () => {
@@ -41,12 +74,17 @@ describe('Ata360Header: divulgação no PNCP', () => {
     expect([...ordem].sort((a, b) => a - b)).toEqual(ordem);
   });
 
-  it('resposta sem data de divulgação não mostra a linha', () => {
+  it('resposta sem data de divulgação mostra a linha como "não informada"', () => {
     vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: { cancelado: false } } as any);
-    expect(render()).not.toContain('Divulgação no PNCP');
+    const html = render();
+    expect(html).toContain('Divulgação no PNCP');
+    expect(html).toContain('não informada');
   });
 describe('Ata360Header: aceita adesão', () => {
-  beforeEach(() => vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: undefined } as any));
+  beforeEach(() => {
+    vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: undefined } as any);
+    vi.mocked(assinaturaHookModule.useAtaAssinatura).mockReturnValue({ data: undefined } as any);
+  });
 
   it('sem resposta do PNCP, o rodapé não diz se aceita adesão', () => {
     expect(render()).not.toContain('Aceita adesão');
@@ -80,7 +118,10 @@ describe('Ata360Header: aceita adesão', () => {
 });
 
 describe('Ata360Header: itens em risco', () => {
-  beforeEach(() => vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: undefined } as any));
+  beforeEach(() => {
+    vi.mocked(pncpHookModule.useAtaPncp).mockReturnValue({ data: undefined } as any);
+    vi.mocked(assinaturaHookModule.useAtaAssinatura).mockReturnValue({ data: undefined } as any);
+  });
 
   const renderComSaldos = (saldos: any[]) =>
     renderToStaticMarkup(

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { ArrowLeftRight, ArrowRight, UserPlus } from 'lucide-react';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
 import { carteiraButton } from '../../carteira/carteiraStyles';
@@ -40,7 +40,7 @@ interface DistribuicaoItensProps {
  * só eles (o gestor da ata se propaga aos contratos vinculados, como nas carteiras).
  */
 export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, canAssign, onTransfer }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
   const [visible, setVisible] = React.useState(PAGE_SIZE);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const isSemGestor = linha.gestorNome === null;

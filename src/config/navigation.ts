@@ -3,18 +3,18 @@ import {
   Package,
   FileText,
   Settings,
-  Clock,
   Coins,
   Sliders,
   Users,
   KeyRound,
-  Search,
   FileSpreadsheet,
   Receipt,
   Landmark,
   BellRing,
   CalendarOff,
-  UsersRound
+  UsersRound,
+  Briefcase,
+  Building2
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -44,58 +44,77 @@ export interface NavItem {
    * filtro — ver `filterNavigationByRole`.
    */
   allowedRoles?: AppRole[];
+  /** 'bottom' = área fica no pé do menu chave (ex.: Configurações). */
+  placement?: 'bottom';
 }
 
 /**
- * Configuração definitiva de navegação do CGLIC:
- * - Visão Geral (/instrumentos) — painel unificado de gestão e
- *   monitoramento (consolida a antiga Visão Geral e a antiga Central de Atenção)
- * - Atas de Registro de Preços (recolhível)
- *     - Carteira de Atas (/atas)
- *     - Alocações por Unidade (/atas/saldos-unidade)
- *     - Distribuição da Equipe (/atas/distribuicao)
- *     - Modelos de Gestão de Atas (/atas/modelos)
- * - Contratos (recolhível)
- *     - Carteira de Contratos (/contratos)
- *     - Modelos de Gestão de Contratos (/contratos/modelos)
- * - Execução Financeira (recolhível)
- *     - Pagamentos (/pagamentos)
- *     - Empenhos & Execução (/empenhos)
- * - Administração (recolhível)
- *     - Usuários e Servidores (/admin/usuarios)
- *     - Perfis e Permissões (/admin/perfis)
- *     - Regras de Alertas (/admin/regras-alertas)
- *     - Feriados (/admin/feriados)
+ * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
+ * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
+ * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
+ * - Visão Geral: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
+ * - Carteira: Atas (/atas) · Contratos (/contratos) · Por unidade interna (/atas/saldos-unidade) ·
+ *   Por órgão partícipe (/atas/orgaos-participantes, em desenvolvimento)
+ * - Financeiro: Pagamentos (/pagamentos) · Empenhos e Execução (/empenhos)
+ * - Configurações (no pé do menu): Modelos de Gestão · Usuários e Servidores ·
+ *   Perfis e Permissões · Regras de Alertas · Feriados
  */
 export const navigationConfig: NavItem[] = [
   {
-    id: 'gestao-instrumentos',
+    id: 'visao-geral',
     label: 'Visão Geral',
     icon: LayoutDashboard,
-    route: '/instrumentos',
     status: 'active',
-    matchPrefixes: ['/instrumentos', '/prazos'],
-    allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+    children: [
+      {
+        id: 'gestao-instrumentos',
+        label: 'Painel',
+        icon: LayoutDashboard,
+        route: '/instrumentos',
+        status: 'active',
+        matchPrefixes: ['/instrumentos', '/prazos'],
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+      },
+      {
+        // Atas e contratos por gestor: visão de coordenação (contratos vinculados herdam o gestor da ata).
+        id: 'central-distribuicao',
+        label: 'Distribuição',
+        icon: UsersRound,
+        route: '/atas/distribuicao',
+        status: 'active',
+        matchPrefixes: ['/atas/distribuicao'],
+        allowedRoles: ['admin', 'leitor']
+      }
+    ]
   },
   {
-    id: 'atas',
-    label: 'Atas de Registro de Preços',
-    icon: Package,
+    id: 'carteira',
+    label: 'Carteira',
+    icon: Briefcase,
     status: 'active',
     children: [
       {
         id: 'atas-consulta',
-        label: 'Carteira de Atas',
-        icon: Search,
+        label: 'Atas',
+        icon: Package,
         route: '/atas',
         status: 'active',
         matchPrefixes: ['/atas', '/atas/detalhe'],
-        excludePrefixes: ['/atas/saldos-unidade', '/atas/modelos', '/atas/distribuicao'],
+        excludePrefixes: ['/atas/saldos-unidade', '/atas/distribuicao', '/atas/orgaos-participantes'],
         allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
+        id: 'contratos-acompanhamento',
+        label: 'Contratos',
+        icon: FileText,
+        route: '/contratos',
+        status: 'active',
+        matchPrefixes: ['/contratos'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
+      },
+      {
         id: 'atas-alocacoes',
-        label: 'Alocações por Unidade',
+        label: 'Por unidade interna',
         icon: Coins,
         route: '/atas/saldos-unidade',
         status: 'active',
@@ -103,56 +122,20 @@ export const navigationConfig: NavItem[] = [
         allowedRoles: ['admin', 'gestor_saldos', 'leitor']
       },
       {
-        // Atas e contratos por gestor: contratos vinculados herdam o gestor da ata, por isso fica em Atas.
-        id: 'atas-distribuicao',
-        label: 'Distribuição da Equipe',
-        icon: UsersRound,
-        route: '/atas/distribuicao',
+        // Página reservada (em desenvolvimento): consumo por órgão somado na carteira.
+        id: 'atas-orgaos-participantes',
+        label: 'Por órgão partícipe',
+        icon: Building2,
+        route: '/atas/orgaos-participantes',
         status: 'active',
-        matchPrefixes: ['/atas/distribuicao'],
-        allowedRoles: ['admin', 'leitor']
-      },
-      {
-        id: 'atas-modelos',
-        label: 'Modelos de Gestão de Atas',
-        icon: Sliders,
-        route: '/atas/modelos',
-        status: 'active',
-        matchPrefixes: ['/atas/modelos'],
-        allowedRoles: ['admin', 'gestor']
-      }
-    ]
-  },
-  {
-    id: 'contratos',
-    label: 'Contratos',
-    icon: FileText,
-    status: 'active',
-    children: [
-      {
-        id: 'contratos-acompanhamento',
-        label: 'Carteira de Contratos',
-        icon: Clock,
-        route: '/contratos',
-        status: 'active',
-        matchPrefixes: ['/contratos'],
-        excludePrefixes: ['/contratos/modelos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
-      },
-      {
-        id: 'contratos-modelos',
-        label: 'Modelos de Gestão de Contratos',
-        icon: Sliders,
-        route: '/contratos/modelos',
-        status: 'active',
-        matchPrefixes: ['/contratos/modelos'],
-        allowedRoles: ['admin', 'gestor']
+        matchPrefixes: ['/atas/orgaos-participantes'],
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       }
     ]
   },
   {
     id: 'execucao-financeira',
-    label: 'Execução Financeira',
+    label: 'Financeiro',
     icon: Landmark,
     status: 'active',
     children: [
@@ -177,11 +160,21 @@ export const navigationConfig: NavItem[] = [
     ]
   },
   {
-    id: 'administracao',
-    label: 'Administração',
+    id: 'configuracoes',
+    label: 'Configurações',
     icon: Settings,
     status: 'active',
+    placement: 'bottom',
     children: [
+      {
+        id: 'config-modelos',
+        label: 'Modelos de Gestão',
+        icon: Sliders,
+        route: '/configuracoes/modelos',
+        status: 'active',
+        matchPrefixes: ['/configuracoes/modelos'],
+        allowedRoles: ['admin', 'gestor']
+      },
       {
         id: 'admin-usuarios',
         label: 'Usuários e Servidores',
@@ -221,6 +214,15 @@ export const navigationConfig: NavItem[] = [
     ]
   }
 ];
+
+/**
+ * Área cujas abas aparecem no topo da página: só nas páginas de lista (rota igual
+ * à de uma aba). Telas de detalhe (Ata 360, Contrato 360, Item) têm as próprias abas
+ * e não recebem as da área. Recebe a árvore já filtrada pelo perfil.
+ */
+export function findAreaForTabs(items: NavItem[], pathname: string): NavItem | null {
+  return items.find((area) => area.children?.some((child) => child.route === pathname)) ?? null;
+}
 
 /**
  * Filtra a árvore de navegação pela role real do usuário (fonte: AuthContext,
@@ -264,10 +266,10 @@ const staticRouteLabels: Record<string, string> = {
   '/instrumentos': 'Visão Geral',
   '/atas': 'Carteira de Atas',
   '/atas/saldos-unidade': 'Alocações por Unidade',
-  '/atas/distribuicao': 'Distribuição da Equipe',
-  '/atas/modelos': 'Modelos de Gestão de Atas',
+  '/atas/distribuicao': 'Central de Distribuição',
+  '/atas/orgaos-participantes': 'Por órgão partícipe',
   '/contratos': 'Carteira de Contratos',
-  '/contratos/modelos': 'Modelos de Gestão de Contratos',
+  '/configuracoes/modelos': 'Modelos de Gestão',
   '/pagamentos': 'Pagamentos',
   '/empenhos': 'Empenhos e Execução',
   '/admin/departamentos': 'Unidades Internas',
@@ -278,6 +280,14 @@ const staticRouteLabels: Record<string, string> = {
 export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   if (pathname === '/' || pathname === '/instrumentos') {
     return [{ label: 'Visão Geral' }];
+  }
+
+  // Item de topo do menu: não herda o "Carteira de Atas" do prefixo /atas da rota.
+  if (pathname === '/atas/distribuicao') {
+    return [
+      { label: 'Visão Geral', route: '/instrumentos' },
+      { label: 'Central de Distribuição', route: '/atas/distribuicao' }
+    ];
   }
 
   const segments = pathname.split('/').filter(Boolean);

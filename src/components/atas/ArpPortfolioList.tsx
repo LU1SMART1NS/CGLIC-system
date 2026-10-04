@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { AtaCardSkeleton } from '../cards/AtaCardSkeleton';
 import { EmptyState } from '../../design-system/components/EmptyState';
@@ -73,7 +73,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   canAssign = false,
   assignContext = { links: [] }
 }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
   /** Escolha explícita do usuário por linha; sem escolha vale o padrão (abrir só se a busca casar com algum item). */
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const { currentPage, setPage, pageItems: pageCards, signature } = useCarteiraPagination(

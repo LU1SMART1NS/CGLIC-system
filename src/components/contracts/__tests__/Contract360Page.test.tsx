@@ -11,6 +11,7 @@ import type { ContractDashboardRecord } from '../../../types';
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ contractKey: '200331-00002-2024' }),
   useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/', search: '', state: null }),
   useOutletContext: () => null,
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));

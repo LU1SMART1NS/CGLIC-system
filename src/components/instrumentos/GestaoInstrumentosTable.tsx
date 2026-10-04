@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
@@ -51,7 +51,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
   onResetFilters,
   pageSize = 10
 }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
   const [page, setPage] = useState(1);
 
   useEffect(() => {

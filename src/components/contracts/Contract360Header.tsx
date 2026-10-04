@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackTarget, useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import { useSyncContractEmpenhos } from '../../hooks/useSyncContractEmpenhos';
@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import type { OrchestrationStatus } from '../../types/empenhoSync';
 import { useContractManager } from '../../hooks/useContractManager';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
+import { MissingValue } from '../instrument360/MissingValue';
 import { getContractDaysRemaining } from '../../services/dashboardService';
 import { formatContractNumber } from '../../utils/contractNumber';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
@@ -29,6 +30,8 @@ interface Contract360HeaderProps {
   onBack?: () => void;
   userRole?: string;
   canSync?: boolean;
+  /** Enquanto o contrato é completado com o Contratos.gov.br: não mostra "não informada" antes da hora. */
+  loadingOfficial?: boolean;
   /** Indicadores e linha da vida (ContractHealthStrip), dentro do mesmo cartão. */
   children?: React.ReactNode;
 }
@@ -55,17 +58,13 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   onBack,
   userRole,
   canSync,
+  loadingOfficial = false,
   children
 }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
 
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      navigate('/contratos');
-    }
-  };
+  const back = useBackTarget({ path: '/contratos', label: 'Voltar para Contratos' });
+  const handleBack = onBack ?? back.back;
 
   const contractKey =
     contract.id ||
@@ -79,7 +78,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   const canRefreshItems = role === 'gestor' || role === 'admin';
   const { data: manager, isLoading: loadingManager } = useContractManager(contractKey);
   // Id PNCP e data de divulgação: o Contratos.gov.br não os devolve; vêm do PNCP e só aparecem se o PNCP responder.
-  const { data: pncp } = useContractPncp(contract);
+  const { data: pncp, isLoading: loadingPncp } = useContractPncp(contract);
   const numeroControlePncp = contract.numeroControlePncp || pncp?.numeroControlePncp;
   // Ata de origem: o PNCP diz de qual ata o contrato decorre; os dados dessa ata dão o número e a UASG.
   const { data: ataPncp } = useAtaPncp({ numeroControlePncpAta: pncp?.numeroControlePncpAta });
@@ -173,7 +172,9 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   const expirado = contract.statusVigencia === 'Expirado';
   const faixa = classifyPrazo(dias, expirado);
   const numDisplay = formatContractNumber(contract);
-  const categoria = typeof contract.raw?.categoria === 'string' ? contract.raw.categoria : undefined;
+  // `categoria` vem do Contratos.gov.br; o Compras.gov.br a chama de `nomeCategoria`.
+  const categoriaRaw = contract.raw?.categoria ?? contract.raw?.nomeCategoria;
+  const categoria = typeof categoriaRaw === 'string' ? categoriaRaw : undefined;
 
   // Fiscais e garantia vêm do Contratos.gov.br (uma consulta cada, ao abrir o contrato). Enquanto não
   // chegam, ou se falharem, não aparece nada: "Não informado" só vale quando a API respondeu e veio vazio.
@@ -185,7 +186,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
 
   return (
     <Instrument360Hero
-      backLabel="Voltar para Contratos"
+      backLabel={back.label}
       onBack={handleBack}
       actions={
         <>
@@ -254,8 +255,13 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
           : undefined
       }
       dates={[
-        ...(contract.dataAssinatura ? [{ label: 'Assinatura', value: formatDateBR(contract.dataAssinatura) }] : []),
-        ...(pncp?.dataPublicacaoPncp ? [{ label: 'Divulgação no PNCP', value: formatDateBR(pncp.dataPublicacaoPncp) }] : []),
+        // Sem o dado, a linha continua e diz que não foi informado; só espera enquanto a fonte ainda responde.
+        ...(contract.dataAssinatura
+          ? [{ label: 'Assinatura', value: formatDateBR(contract.dataAssinatura) }]
+          : loadingOfficial ? [] : [{ label: 'Assinatura', value: <MissingValue />, title: 'O Contratos.gov.br não informou a data de assinatura deste contrato.' }]),
+        ...(pncp?.dataPublicacaoPncp
+          ? [{ label: 'Divulgação no PNCP', value: formatDateBR(pncp.dataPublicacaoPncp) }]
+          : loadingPncp ? [] : [{ label: 'Divulgação no PNCP', value: <MissingValue />, title: 'O PNCP não respondeu ou não localizou este contrato.' }]),
         ...(contract.dataVigenciaFim
           ? [{
               label: 'Vigência',

@@ -33,4 +33,6 @@ const kit: TaskTemplatesKit = {
   }
 };
 
-export const AtaTaskTemplatesPage: React.FC = () => <TaskTemplatesPage kit={kit} />;
+export const AtaTaskTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded }) => (
+  <TaskTemplatesPage kit={kit} embedded={embedded} />
+);

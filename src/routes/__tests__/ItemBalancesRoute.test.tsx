@@ -7,7 +7,8 @@ import * as authModule from '../../context/AuthContext';
 let mockParams: Record<string, string> = {};
 vi.mock('react-router-dom', () => ({
   useParams: () => mockParams,
-  useNavigate: () => vi.fn()
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/', search: '', state: null })
 }));
 vi.mock('../../context/SelectionContext', () => ({ useSelection: () => ({ setSelectedArp: vi.fn() }) }));
 vi.mock('../../components/ItemBalances', () => ({

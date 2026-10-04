@@ -70,7 +70,8 @@ export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): 
         anoCompra: d.ano_compra || '',
         codigoModalidadeCompra: '05',
         nomeModalidadeCompra: d.modalidade || 'Pregão',
-        dataAssinatura: d.data_vigencia_inicial || '',
+        // O banco não guarda a assinatura: vazio, e não o início da vigência (a Ata 360 a busca no Compras.gov.br).
+        dataAssinatura: '',
         dataVigenciaInicial: d.data_vigencia_inicial || '',
         dataVigenciaFinal: d.data_vigencia_final || '',
         valorTotal: Number(d.valor_total) || 0,
@@ -135,7 +136,8 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
             numeroCompra: d.numero_compra || '',
             anoCompra: d.ano_compra || '',
             codigoModalidadeCompra: '05',
-            dataAssinatura: d.data_vigencia_inicial || '',
+            // O banco não guarda a assinatura: vazio, e não o início da vigência (a Ata 360 a busca no Compras.gov.br).
+        dataAssinatura: '',
             dataVigenciaInicial: d.data_vigencia_inicial || '',
             dataVigenciaFinal: d.data_vigencia_final || '',
             numeroItem: it.numero_item,
@@ -191,7 +193,8 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
           anoCompra: d.ano_compra || '',
           codigoModalidadeCompra: '05',
           nomeModalidadeCompra: d.modalidade || 'Pregão',
-          dataAssinatura: d.data_vigencia_inicial || '',
+          // O banco não guarda a assinatura: vazio, e não o início da vigência (a Ata 360 a busca no Compras.gov.br).
+        dataAssinatura: '',
           dataVigenciaInicial: d.data_vigencia_inicial || '',
           dataVigenciaFinal: d.data_vigencia_final || '',
           valorTotal: Number(d.valor_total) || 0,

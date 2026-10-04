@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { Eye, FileText, Loader2, Trash2 } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
@@ -33,7 +33,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
   onUnlink,
   unlinkingId
 }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
 
   if (isLoading) {
     return (

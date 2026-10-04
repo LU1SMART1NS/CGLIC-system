@@ -1,5 +1,6 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { useBackTarget, useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { AlertTriangle, Layers, Link2, ListTodo, Plus } from 'lucide-react';
 import { buildAtaItemPath, uasgFromAtaKey, useAta, useAtaItemSaldos, useAtaLinkedContracts } from '../../hooks/useAta';
 import { useBackfillItemSenasp } from '../../hooks/useSyncItemSenasp';
@@ -37,7 +38,8 @@ interface Ata360PageProps {
 
 export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: uasgProp }) => {
   const { ataKey: paramAtaKey } = useParams<{ ataKey: string }>();
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
+  const back = useBackTarget({ path: '/atas', label: 'Voltar para Atas' });
   const ataKey = ataKeyOverride || (paramAtaKey ? decodeURIComponent(paramAtaKey) : undefined);
   // A chave canônica é "NUMERO-UASG" (ex.: 00059/2025-200331): sem prop, usa a UASG da chave.
   const uasg = uasgProp || uasgFromAtaKey(ataKey) || UASG_LINK_LEGADO;
@@ -113,8 +115,8 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         title="Falha ao carregar a Ata"
         message={error instanceof Error ? error.message : 'Não foi possível recuperar as informações da Ata.'}
         onRetry={() => refetch()}
-        backLabel="Voltar para Atas"
-        onBack={() => navigate('/atas')}
+        backLabel={back.label}
+        onBack={back.back}
       />
     );
   }
@@ -125,8 +127,8 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         kind="notFound"
         title="Ata não encontrada"
         message={<>A chave informada (<code>{ataKey || 'N/A'}</code>) não corresponde a nenhuma Ata sincronizada na UASG {uasg}.</>}
-        backLabel="Voltar para lista de Atas"
-        onBack={() => navigate('/atas')}
+        backLabel={back.label}
+        onBack={back.back}
       />
     );
   }
@@ -141,8 +143,8 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         kind="forbidden"
         title="Acesso não autorizado"
         message="Esta Ata não está atribuída a você. Seu perfil de gestor só permite visualizar a Visão 360° das Atas onde você é o gestor titular."
-        backLabel="Voltar para lista de Atas"
-        onBack={() => navigate('/atas')}
+        backLabel={back.label}
+        onBack={back.back}
       />
     );
   }

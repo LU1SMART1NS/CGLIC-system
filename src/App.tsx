@@ -10,11 +10,11 @@ import { ArpSearchRoute } from './routes/ArpSearchRoute';
 import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
 import { AllocationsRoute } from './routes/AllocationsRoute';
 import { DistribuicaoEquipeRoute } from './routes/DistribuicaoEquipeRoute';
+import { OrgaosParticipantesRoute } from './routes/OrgaosParticipantesRoute';
 import { ContractsRoute } from './routes/ContractsRoute';
 import { Contract360Route } from './routes/Contract360Route';
 import { Ata360Route } from './routes/Ata360Route';
-import { AtaTaskTemplatesRoute } from './routes/AtaTaskTemplatesRoute';
-import { ContractTaskTemplatesRoute } from './routes/ContractTaskTemplatesRoute';
+import { ModelosGestaoRoute } from './routes/ModelosGestaoRoute';
 import { UsersRoute } from './routes/UsersRoute';
 import { RolesRoute } from './routes/RolesRoute';
 import { DepartmentsRoute } from './routes/DepartmentsRoute';
@@ -204,6 +204,14 @@ const AppContent: React.FC = () => {
             }
           />
           <Route
+            path="/atas/orgaos-participantes"
+            element={
+              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <OrgaosParticipantesRoute />
+              </RequireRole>
+            }
+          />
+          <Route
             path="/atas/distribuicao"
             element={
               <RequireRole allowedRoles={['admin', 'leitor']}>
@@ -212,13 +220,15 @@ const AppContent: React.FC = () => {
             }
           />
           <Route
-            path="/atas/modelos"
+            path="/configuracoes/modelos"
             element={
               <RequireRole allowedRoles={['admin', 'gestor']}>
-                <AtaTaskTemplatesRoute />
+                <ModelosGestaoRoute />
               </RequireRole>
             }
           />
+          <Route path="/atas/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=atas" />} />
+          <Route path="/contratos/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=contratos" />} />
           <Route
             path="/atas/detalhe/:ataKey"
             element={
@@ -240,14 +250,6 @@ const AppContent: React.FC = () => {
             element={
               <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                 <ContractsRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/contratos/modelos"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor']}>
-                <ContractTaskTemplatesRoute />
               </RequireRole>
             }
           />

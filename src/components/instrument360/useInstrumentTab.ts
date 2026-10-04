@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { scrollToDock } from './instrument360Dock';
 
 /** Resolve a aba ativa a partir do `?aba=`; valor desconhecido cai na aba padrão e `aliases` cobre nomes antigos. */
@@ -27,11 +27,13 @@ export function tabSearchParams<T extends string>(tab: T, defaultTab: T): Record
 export function useInstrumentTab<T extends string>(options: { tabs: readonly T[]; defaultTab: T; aliases?: Record<string, T> }) {
   const { tabs, defaultTab, aliases } = options;
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const tabsRef = React.useRef<HTMLDivElement>(null);
   const activeTab = resolveInstrumentTab(searchParams.get('aba'), tabs, defaultTab, aliases);
 
   const goToTab = (tab: T) => {
-    setSearchParams(tabSearchParams(tab, defaultTab), { replace: true });
+    // Mantém o state da navegação: é nele que viaja a origem do Voltar.
+    setSearchParams(tabSearchParams(tab, defaultTab), { replace: true, state: location.state });
     scrollToDock(tabsRef.current);
   };
 

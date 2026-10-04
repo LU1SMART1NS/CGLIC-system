@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ArrowRight, Layers, Receipt } from 'lucide-react';
 import { useAutoSyncContractEmpenhos } from '../../hooks/useAutoSyncContractEmpenhos';
 import { useContractEmpenhoItemLinks } from '../../hooks/useContractEmpenhoItemLinks';
@@ -49,7 +49,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   contract,
   contractKey
 }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
   const { data: itemLinks = [] } = useContractEmpenhoItemLinks(contractKey);
   const linksByEmpenho = new Map<string, ContractEmpenhoItemLink[]>();
   for (const l of itemLinks) linksByEmpenho.set(l.empenhoId, [...(linksByEmpenho.get(l.empenhoId) ?? []), l]);

@@ -1,17 +1,12 @@
 import React from 'react';
-import { LogOut, Menu } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   onOpenExportModal?: () => void;
-  /** Mobile (<768px): exibe o botão que abre a Sidebar como drawer. */
-  showMenuButton?: boolean;
-  menuOpen?: boolean;
-  menuButtonRef?: React.Ref<HTMLButtonElement>;
-  onOpenMenu?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ showMenuButton, menuOpen, menuButtonRef, onOpenMenu }) => {
+export const Header: React.FC<HeaderProps> = () => {
   const { user, signOut } = useAuth();
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -59,18 +54,6 @@ export const Header: React.FC<HeaderProps> = ({ showMenuButton, menuOpen, menuBu
         gap: '1rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', minWidth: 0 }} className="app-header-brand">
-          {showMenuButton && (
-            <button
-              type="button"
-              ref={menuButtonRef}
-              onClick={onOpenMenu}
-              aria-label="Abrir menu de navegação"
-              aria-expanded={!!menuOpen}
-              className="app-header-menu-btn"
-            >
-              <Menu size={22} />
-            </button>
-          )}
           <div style={{
             width: '32px',
             height: '32px',

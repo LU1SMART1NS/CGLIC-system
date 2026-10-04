@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackTarget } from '../../hooks/useDetailOrigin';
 import { ExternalLink } from 'lucide-react';
 import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
@@ -10,7 +10,9 @@ import type { AtaActionItem, AtaItemSaldoInput } from '../../services/ataActionQ
 import { SALDO_RULES } from '../../config/alertRules';
 import { useAtaManager } from '../../hooks/useAtaManagers';
 import { useAtaPncp } from '../../hooks/useAtaPncp';
+import { useAtaAssinatura } from '../../hooks/useAtaAssinatura';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
+import { MissingValue } from '../instrument360/MissingValue';
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
 import { classifyPrazo, type PrazoFaixa } from '../carteira/carteiraPrazo';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
@@ -76,11 +78,14 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   onOpenItens,
   onBack
 }) => {
-  const navigate = useNavigate();
+  const back = useBackTarget({ path: '/atas', label: 'Voltar para Atas' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
   const { data: manager, isLoading: loadingManager } = useAtaManager(arp.numeroAtaRegistroPreco);
   // A divulgação no PNCP só aparece quando o PNCP responde; sem resposta, a linha de datas fica sem ela.
-  const { data: pncp } = useAtaPncp(arp);
+  const { data: pncp, isLoading: loadingPncp } = useAtaPncp(arp);
+  // O banco local não guarda a assinatura (só o início da vigência): vem do Compras.gov.br.
+  const { data: oficial, isLoading: loadingOficial } = useAtaAssinatura(arp);
+  const dataAssinatura = arp.dataAssinatura || oficial?.dataAssinatura;
   const cancelada = Boolean(arp.isCanceladaPncp);
   const dias = lifeline ? lifeline.diasParaFim : null;
   const faixa = classifyPrazo(dias, cancelada);
@@ -124,7 +129,9 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
     ? 'cancelada no PNCP'
     : dias !== null && dias < 0
       ? `encerrada há ${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'dia' : 'dias'}`
-      : `prorrogada no PNCP: ${arp.prorrogadaPncp ? 'sim' : 'não'}`;
+      : !pncp && !loadingPncp
+        ? 'prorrogação no PNCP: não verificada'
+        : `prorrogada no PNCP: ${arp.prorrogadaPncp ? 'sim' : 'não'}`;
 
   const encerrada = cancelada || faixa === 'EXPIRADO';
   const primeiraAcao = actionItems[0];
@@ -134,8 +141,8 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
 
   return (
     <Instrument360Hero
-      backLabel="Voltar para Atas"
-      onBack={onBack || (() => navigate('/atas'))}
+      backLabel={back.label}
+      onBack={onBack || back.back}
       backTestId="ata-360-back-btn"
       actions={
         <>
@@ -162,8 +169,13 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       manager={<ManagerInfo label="Gestor da ata" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="ata-manager-info" />}
       objeto={arp.objeto}
       dates={[
-        ...(arp.dataAssinatura ? [{ label: 'Assinatura', value: formatDateBR(arp.dataAssinatura) }] : []),
-        ...(pncp?.dataPublicacaoPncp ? [{ label: 'Divulgação no PNCP', value: formatDateBR(pncp.dataPublicacaoPncp.slice(0, 10)) }] : []),
+        // Sem o dado, a linha continua e diz que não foi informado; só espera enquanto a fonte ainda responde.
+        ...(dataAssinatura
+          ? [{ label: 'Assinatura', value: formatDateBR(dataAssinatura) }]
+          : loadingOficial ? [] : [{ label: 'Assinatura', value: <MissingValue />, title: 'O Compras.gov.br não informou a data de assinatura desta ata.' }]),
+        ...(pncp?.dataPublicacaoPncp
+          ? [{ label: 'Divulgação no PNCP', value: formatDateBR(pncp.dataPublicacaoPncp.slice(0, 10)) }]
+          : loadingPncp ? [] : [{ label: 'Divulgação no PNCP', value: <MissingValue />, title: 'O PNCP não respondeu ou não localizou esta ata.' }]),
         ...(lifeline ? [{ label: 'Vigência', value: `${formatDateBR(lifeline.start)} a ${formatDateBR(lifeline.end)}`, emphasis: true }] : [])
       ]}
       identifiersTestId="ata-header-metadata"

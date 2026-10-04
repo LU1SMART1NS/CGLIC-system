@@ -15,7 +15,7 @@ const UASGS = UASGS_CGLIC;
 /**
  * Carteira de Contratos das UASGs da CGLIC, no escopo do usuário: contratos enriquecidos com prazo,
  * gestor e pendências (Funil Único de Atenção). Mesmas consultas e parâmetros da Visão Geral, logo
- * mesmo cache do React Query. Fonte única para a Carteira de Contratos e a Distribuição da Equipe.
+ * mesmo cache do React Query. Fonte única para a Carteira de Contratos e a Central de Distribuição.
  */
 export function useContractsPortfolio() {
   const dash200330 = useContractsDashboard(UASGS[0]);
