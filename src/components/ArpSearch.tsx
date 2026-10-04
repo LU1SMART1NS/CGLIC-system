@@ -110,14 +110,15 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       // 1. Filtro de Vigência
       if (!matchesStatusFilter(getArpPrazo(arp).faixa, filterState.statusVigencia)) return false;
 
-      // 2. Filtro de Alocação
-      const cleanAta = (arp.numeroAtaRegistroPreco || '').replace(/^0+/, '');
-      const hasAlloc = allocationsDbSet.has(arp.numeroAtaRegistroPreco) || allocationsDbSet.has(cleanAta);
+      // 2. Filtro de Alocação — os conjuntos usam a chave `numeroAta-uasg` (com e sem zeros à esquerda).
+      const uasg = arp.codigoUnidadeGerenciadora;
+      const ataKeys = [`${arp.numeroAtaRegistroPreco}-${uasg}`, `${(arp.numeroAtaRegistroPreco || '').replace(/^0+/, '')}-${uasg}`];
+      const hasAlloc = ataKeys.some((key) => allocationsDbSet.has(key));
       if (filterState.filtroAlocacao === 'SIM' && !hasAlloc) return false;
       if (filterState.filtroAlocacao === 'NAO' && hasAlloc) return false;
 
       // 3. Filtro de Empenho
-      const hasEmp = empenhosDbSet.has(arp.numeroAtaRegistroPreco) || empenhosDbSet.has(cleanAta);
+      const hasEmp = ataKeys.some((key) => empenhosDbSet.has(key));
       if (filterState.filtroEmpenho === 'SIM' && !hasEmp) return false;
       if (filterState.filtroEmpenho === 'NAO' && hasEmp) return false;
 
