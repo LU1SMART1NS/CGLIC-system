@@ -613,6 +613,21 @@ h1, h2, h3, h4 {
   text-decoration: none;
 }
 .area-tab:hover { color: #0f172a; }
+/* Segunda linha de abas (páginas do grupo ativo, ex.: Configurações → Gestão). */
+.area-subtabs { display: flex; gap: 0.25rem; border-bottom: 1px solid #e2e8f0; --scroll-bg: #f8fafc; }
+.area-subtab {
+  flex: none;
+  padding: 0.5rem 0.9rem;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.area-subtab:hover { color: #0f172a; text-decoration: none; }
+.area-subtab[data-active='true'] { color: #0c326f; border-bottom-color: #0c326f; font-weight: 800; }
 .app-rail-link:hover,
 .area-tab:hover { text-decoration: none; }
 .area-tab[data-active='true'] { color: #0c326f; border-bottom-color: #0c326f; font-weight: 800; }
@@ -769,7 +784,12 @@ h1, h2, h3, h4 {
 .i360-dock-row { display: flex; align-items: stretch; gap: 0 16px; }
 .i360-dock[data-stuck='true'] { background: #ffffff; box-shadow: 0 4px 10px -6px rgba(15, 23, 42, 0.18); }
 .i360-dock-tabs { flex: 1 1 0; min-width: 0; }
-.i360-dock-mini { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 58%; padding-bottom: 1px; border-bottom: 1px solid #e2e8f0; }
+/* Só a área das abas é tingida: destaca a navegação sem pesar no contexto (número, situação, fornecedor). */
+.i360-dock .i360-dock-tabs { background-color: #eef3fb; border-bottom: 2px solid #bfcde6; padding: 0 0.5rem; border-radius: 8px 8px 0 0; }
+.i360-dock[data-stuck='true'] .i360-dock-tabs { border-radius: 0; }
+.i360-dock-tab { background: transparent; }
+.i360-dock-tab:hover:not([aria-selected='true']) { color: #0c326f; }
+.i360-dock-mini { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 58%; padding-bottom: 2px; border-bottom: 2px solid #e2e8f0; }
 .i360-dock-up { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0c326f; cursor: pointer; }
 .i360-dock-id { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; margin-left: -4px; background: none; border: 0; border-radius: 6px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .i360-dock-up:hover, .i360-dock-id:hover { background: #f1f5f9; }
@@ -960,9 +980,10 @@ h1, h2, h3, h4 {
 .ds-field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .ds-field__label { font-size: 0.78rem; font-weight: 700; color: #334155; }
 .ds-field__control {
-  width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; font-size: 0.85rem;
+  width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; font-family: inherit; font-size: 0.85rem;
   border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #0f172a;
 }
+textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .ds-field__control:focus-visible { outline: 2px solid #0284c7; outline-offset: 1px; border-color: #0284c7; }
 .ds-field__control[aria-invalid='true'] { border-color: #dc2626; }
 .ds-field__hint { font-size: 0.75rem; color: #64748b; }
@@ -1292,4 +1313,58 @@ h1, h2, h3, h4 {
 @media (prefers-reduced-motion: reduce) {
   .auth-panel { animation: none; }
   .auth-spinner { animation-duration: 1.5s; }
+}
+
+/* Valor de célula da carteira que filtra a lista ao clicar (CarteiraCellFilter). */
+.carteira-cell-filter:hover > *,
+.carteira-cell-filter:focus-visible > * {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  filter: brightness(0.94);
+}
+.carteira-cell-filter:focus-visible {
+  outline: 2px solid #0c326f;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Linhas das carteiras: a linha toda abre o detalhe (CarteiraRowLink). */
+.carteira-row-link { cursor: pointer; }
+@media (hover: hover) { .carteira-row-link:hover > td { background: #f8fafc; } }
+.carteira-id-link:hover, .carteira-id-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.carteira-id-link:focus-visible { outline: 2px solid #0c326f; outline-offset: 2px; border-radius: 3px; }
+
+/* Carteiras no celular: cabeçalho do cartão, filtros compactos e menu de filtro como folha inferior. */
+@media (max-width: 767px) {
+  /* A tabela já vira cartões: sem moldura em volta (evita cartão dentro de cartão). */
+  .carteira-shell, div:has(> div > table.carteira-stack), div:has(> table.carteira-stack) {
+    border: 0 !important; background: transparent !important; border-radius: 0 !important; overflow: visible !important;
+  }
+  .carteira-stack tr { margin: 0.5rem 0; }
+
+  /* Primeira célula = cabeçalho do cartão: número + fornecedor, à esquerda, sem rótulo. */
+  .carteira-stack td[data-role='id'] { display: block; order: -1; }
+  .carteira-stack td[data-role='id'] > * { text-align: left; }
+  .carteira-id-link, .carteira-cell-filter { min-height: 0; }
+  /* Seta de expandir: faixa baixa no pé do cartão, separada do conteúdo. */
+  .carteira-stack td[data-role='expand'] { border-top: 1px solid #f1f5f9 !important; padding-top: 0.15rem !important; }
+  .carteira-stack td[data-role='expand'] button { min-height: 34px; }
+  .carteira-stack td[data-label] { align-items: center; }
+  /* Célula com conteúdo largo (ex.: Execução): rótulo em cima, conteúdo à esquerda em largura total, sempre igual. */
+  .carteira-stack td[data-stack] { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+  .carteira-stack td[data-stack] > * { text-align: left; width: 100%; }
+
+  /* Filtros: busca em linha própria, botões compactos lado a lado, contador pequeno por último. */
+  .carteira-filter-search { flex: 1 1 100% !important; max-width: none !important; }
+  .carteira-filter-row { gap: 0.45rem !important; }
+  .carteira-filter-btn { min-height: 38px; }
+  .carteira-filter-counter { width: 100%; font-size: 0.75rem; }
+  /* O menu abre como folha acima da barra inferior: nunca sai da tela nem é cortado. */
+  .carteira-filter-menu {
+    position: fixed !important; left: 0.75rem !important; right: 0.75rem !important; top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 5.25rem); max-height: 55vh !important; z-index: 80 !important;
+    min-width: 0 !important;
+  }
+  .carteira-filter-menu button { min-height: 44px; }
 }

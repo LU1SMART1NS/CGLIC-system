@@ -8,9 +8,8 @@ import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { GestaoInstrumentosRoute } from './routes/GestaoInstrumentosRoute';
 import { ArpSearchRoute } from './routes/ArpSearchRoute';
 import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
-import { AllocationsRoute } from './routes/AllocationsRoute';
+import { ItensRoute } from './routes/ItensRoute';
 import { DistribuicaoEquipeRoute } from './routes/DistribuicaoEquipeRoute';
-import { OrgaosParticipantesRoute } from './routes/OrgaosParticipantesRoute';
 import { ContractsRoute } from './routes/ContractsRoute';
 import { Contract360Route } from './routes/Contract360Route';
 import { Ata360Route } from './routes/Ata360Route';
@@ -196,21 +195,16 @@ const AppContent: React.FC = () => {
             }
           />
           <Route
-            path="/atas/saldos-unidade"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor_saldos', 'leitor']}>
-                <AllocationsRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/atas/orgaos-participantes"
+            path="/itens"
             element={
               <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
-                <OrgaosParticipantesRoute />
+                <ItensRoute />
               </RequireRole>
             }
           />
+          {/* Páginas antigas da Carteira, absorvidas pela aba Itens (unidade interna é filtro). */}
+          <Route path="/atas/saldos-unidade" element={<LegacyRouteRedirect to="/itens" />} />
+          <Route path="/atas/orgaos-participantes" element={<LegacyRouteRedirect to="/itens" />} />
           <Route
             path="/atas/distribuicao"
             element={
@@ -281,7 +275,7 @@ const AppContent: React.FC = () => {
           <Route
             path="/admin/departamentos"
             element={
-              <RequireRole allowedRoles={['admin', 'gestor_saldos', 'leitor']}>
+              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
                 <DepartmentsRoute />
               </RequireRole>
             }

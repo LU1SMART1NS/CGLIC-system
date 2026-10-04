@@ -74,8 +74,7 @@ export const Instrument360Tabs = React.forwardRef(function Instrument360Tabs<T e
             style={{
               display: 'flex',
               gap: '0.25rem',
-              ['--scroll-bg' as string]: showMini ? '#ffffff' : '#f8fafc',
-              borderBottom: '1px solid #e2e8f0'
+              ['--scroll-bg' as string]: '#eef3fb'
             }}
           >
             {tabs.map((tab) => {
@@ -89,12 +88,12 @@ export const Instrument360Tabs = React.forwardRef(function Instrument360Tabs<T e
                   aria-selected={selected}
                   aria-controls={`${idPrefix}-tabpanel-${tab.id}`}
                   onClick={() => onSelect(tab.id)}
+                  className="i360-dock-tab"
                   style={{
                     padding: '0.6rem 1rem',
-                    background: 'transparent',
                     border: 'none',
                     borderBottom: `3px solid ${selected ? '#0c326f' : 'transparent'}`,
-                    marginBottom: '-1px',
+                    marginBottom: '-2px',
                     color: selected ? '#0c326f' : '#475569',
                     fontWeight: selected ? 800 : 600,
                     fontSize: '0.88rem',

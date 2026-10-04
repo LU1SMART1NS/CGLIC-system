@@ -70,8 +70,9 @@ export const Tabs: React.FC<TabsProps> = ({
         display: 'flex',
         alignItems: 'center',
         gap: spacing.xs,
-        borderBottom: `2px solid ${colors.border.default}`,
-        paddingBottom: '2px'
+        borderBottom: '2px solid #e2e8f0',
+        paddingBottom: '2px',
+        ['--scroll-bg' as string]: '#f8fafc'
       }}
     >
       {tabs.map((tab, idx) => {
@@ -95,14 +96,14 @@ export const Tabs: React.FC<TabsProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: spacing.xs,
-              padding: `${spacing.sm} ${spacing.md}`,
+              padding: '0.6rem 1rem',
               background: 'transparent',
               border: 'none',
-              borderBottom: isActive ? `3px solid ${colors.brand.primary}` : '3px solid transparent',
+              borderBottom: isActive ? '3px solid #0c326f' : '3px solid transparent',
               marginBottom: '-2px',
-              color: isActive ? colors.brand.primary : (isDisabled ? colors.text.subtle : colors.text.secondary),
-              fontSize: typography.fontSize.bodySm,
-              fontWeight: isActive ? typography.fontWeight.bold : typography.fontWeight.medium,
+              color: isActive ? '#0c326f' : (isDisabled ? colors.text.subtle : '#475569'),
+              fontSize: '0.88rem',
+              fontWeight: isActive ? 800 : 600,
               cursor: isDisabled ? 'not-allowed' : 'pointer',
               whiteSpace: 'nowrap',
               outline: 'none',

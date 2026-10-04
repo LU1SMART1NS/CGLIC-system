@@ -11,7 +11,7 @@ describe('isDetailPath: só telas de detalhe recebem a origem', () => {
   });
 
   it('listas e demais páginas não recebem', () => {
-    for (const path of ['/atas', '/contratos', '/contratos?busca=2024', '/atas/saldos-unidade', '/atas/distribuicao', '/pagamentos', '/empenhos', '/admin/usuarios']) {
+    for (const path of ['/atas', '/contratos', '/contratos?busca=2024', '/itens', '/atas/distribuicao', '/pagamentos', '/empenhos', '/admin/usuarios']) {
       expect(isDetailPath(path)).toBe(false);
     }
   });
@@ -24,8 +24,8 @@ describe('originLabel: nome do destino do Voltar', () => {
     expect(originLabel('/pagamentos')).toBe('Pagamentos');
     expect(originLabel('/empenhos')).toBe('Empenhos e Execução');
     expect(originLabel('/atas/distribuicao')).toBe('Distribuição');
-    expect(originLabel('/atas/saldos-unidade')).toBe('Por unidade interna');
-    expect(originLabel('/atas/orgaos-participantes')).toBe('Por órgão partícipe');
+    expect(originLabel('/itens')).toBe('Itens');
+    expect(originLabel('/itens?unidade=cglic')).toBe('Itens');
     expect(originLabel('/instrumentos')).toBe('Visão Geral');
   });
 
