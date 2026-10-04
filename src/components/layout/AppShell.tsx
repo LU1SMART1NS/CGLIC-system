@@ -85,6 +85,20 @@ export const AppShell: React.FC<AppShellProps> = ({
     });
   };
 
+  // Publica a altura do cabeçalho fixo (--app-header-h) para o que gruda logo abaixo dele, como a barra de abas das telas 360.
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = stickyHeaderRef.current;
+    const content = el?.parentElement;
+    if (!el || !content) return;
+    const publish = () => content.style.setProperty('--app-header-h', `${el.offsetHeight}px`);
+    publish();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const contextValue: AppShellContextValue = {
     onOpenExportModal,
     onOpenDepartmentsModal
@@ -111,7 +125,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       />
 
       <div className="app-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{
+        <div ref={stickyHeaderRef} style={{
           position: 'sticky',
           top: 0,
           zIndex: 30,

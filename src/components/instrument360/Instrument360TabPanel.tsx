@@ -4,7 +4,10 @@ interface Instrument360TabPanelProps {
   /** Mesmo prefixo passado ao `Instrument360Tabs` (ex.: "ata", "contract", "item"). */
   idPrefix: string;
   activeTab: string;
-  /** Altura mínima, para a página não encolher e puxar a tela ao trocar de aba. */
+  /**
+   * Altura mínima. Além de a página não encolher ao trocar de aba, garante que mesmo uma aba curta
+   * deixa rolar até a barra de abas grudar no alto.
+   */
   minHeight?: string;
   children: React.ReactNode;
 }
@@ -17,7 +20,7 @@ interface Instrument360TabPanelProps {
 export const Instrument360TabPanel: React.FC<Instrument360TabPanelProps> = ({
   idPrefix,
   activeTab,
-  minHeight = '28rem',
+  minHeight = 'max(28rem, calc(100dvh - var(--app-header-h, 0px) - 4rem))',
   children
 }) => (
   <div

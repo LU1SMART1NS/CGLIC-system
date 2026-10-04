@@ -223,6 +223,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       eyebrow={[contract.uasg ? `UASG ${contract.uasg}` : '', contract.nomeUnidadeGestora].filter(Boolean).join(' · ')}
       title={`Contrato nº ${numDisplay}`}
       status={{ faixa: expirado ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, false), neutral: !expirado }}
+      dockSubtitle={contract.fornecedorNome || undefined}
       manager={<ManagerInfo label="Gestor do contrato" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="contract-manager-info" />}
       subtitle={
         contract.fornecedorNome ? (

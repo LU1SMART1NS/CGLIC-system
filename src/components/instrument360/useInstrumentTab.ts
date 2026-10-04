@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { scrollToDock } from './instrument360Dock';
 
 /** Resolve a aba ativa a partir do `?aba=`; valor desconhecido cai na aba padrão e `aliases` cobre nomes antigos. */
 export function resolveInstrumentTab<T extends string>(
@@ -19,8 +20,9 @@ export function tabSearchParams<T extends string>(tab: T, defaultTab: T): Record
 
 /**
  * Aba da tela de detalhe no endereço (`?aba=`), com o mesmo comportamento em Ata, Contrato e Item:
- * trocar de aba não empilha histórico e nem os atalhos de fora das abas (cartões do topo, avisos)
- * rolam a página.
+ * trocar de aba não empilha histórico. Todo clique do usuário (abas, cartões do topo, avisos) rola a
+ * página até a barra de abas grudar no alto, com o conteúdo da aba logo abaixo; abrir a tela ou um
+ * endereço com `?aba=` não rola, para o cartão do topo aparecer inteiro.
  */
 export function useInstrumentTab<T extends string>(options: { tabs: readonly T[]; defaultTab: T; aliases?: Record<string, T> }) {
   const { tabs, defaultTab, aliases } = options;
@@ -30,6 +32,7 @@ export function useInstrumentTab<T extends string>(options: { tabs: readonly T[]
 
   const goToTab = (tab: T) => {
     setSearchParams(tabSearchParams(tab, defaultTab), { replace: true });
+    scrollToDock(tabsRef.current);
   };
 
   return { activeTab, goToTab, tabsRef };

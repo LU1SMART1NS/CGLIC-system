@@ -182,6 +182,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
         )
       }}
       statusAlert={avisoAta ? `Ata ${avisoAta}` : undefined}
+      dockSubtitle={item.nomeRazaoSocialFornecedor || undefined}
       dates={[
         ...(totalAta ? [{ label: 'Registrado na ata', value: `${formatNumber(totalAta)} un` }] : []),
         ...(metrics.orgaosParticipantes ? [{ label: 'Órgãos participantes', value: String(metrics.orgaosParticipantes) }] : []),

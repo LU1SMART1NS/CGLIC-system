@@ -701,6 +701,28 @@ h1, h2, h3, h4 {
 
 /* Topo das telas 360: identidade à esquerda e coluna lateral fixa (gestor, origem e datas) à direita.
    A coluna desce para baixo do texto quando o cartão é estreito (container query no cartão). */
+/* Barra de abas das telas 360: gruda abaixo do cabeçalho do sistema (altura em --app-header-h, publicada pelo AppShell). */
+.i360-dock { position: sticky; top: var(--app-header-h, 0px); z-index: 20; margin-bottom: 1.25rem; background: #f8fafc; container-type: inline-size; }
+.i360-dock-row { display: flex; align-items: stretch; gap: 0 16px; }
+.i360-dock[data-stuck='true'] { background: #ffffff; box-shadow: 0 4px 10px -6px rgba(15, 23, 42, 0.18); }
+.i360-dock-tabs { flex: 1 1 0; min-width: 0; }
+.i360-dock-mini { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 58%; padding-bottom: 1px; border-bottom: 1px solid #e2e8f0; }
+.i360-dock-up { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0c326f; cursor: pointer; }
+.i360-dock-id { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; margin-left: -4px; background: none; border: 0; border-radius: 6px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.i360-dock-up:hover, .i360-dock-id:hover { background: #f1f5f9; }
+.i360-dock-title { font-weight: 800; font-size: 1rem; color: #0f172a; white-space: nowrap; }
+.i360-dock-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; color: #64748b; }
+@container (max-width: 900px) {
+  .i360-dock-row { flex-wrap: wrap; }
+  .i360-dock-id { flex-wrap: wrap; row-gap: 2px; }
+  .i360-dock-sub { display: none; }
+  .i360-dock-mini { max-width: 100%; flex: 1 1 100%; padding-block: 4px 0; border-bottom: 0; }
+  .i360-dock-tabs { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .i360-dock-mini { animation: i360-dock-in 0.18s ease-out; }
+  @keyframes i360-dock-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+}
 .i360-hero-wrap { container-type: inline-size; }
 .i360-identity { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
 .i360-identity-main { display: grid; gap: 4px; flex: 1 1 340px; min-width: 0; }

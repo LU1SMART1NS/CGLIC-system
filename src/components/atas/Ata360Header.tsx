@@ -154,6 +154,11 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       eyebrow={[`UASG ${arp.codigoUnidadeGerenciadora}`, arp.nomeUnidadeGerenciadora].filter(Boolean).join(' · ')}
       title={`Ata nº ${arp.numeroAtaRegistroPreco}`}
       status={{ faixa: encerrada ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, cancelada), neutral: !encerrada }}
+      dockAlert={
+        faixa === 'CRITICO' && dias !== null && dias >= 0
+          ? dias === 0 ? 'Vence hoje' : `Vence em ${dias} ${dias === 1 ? 'dia' : 'dias'}`
+          : undefined
+      }
       manager={<ManagerInfo label="Gestor da ata" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="ata-manager-info" />}
       objeto={arp.objeto}
       dates={[

@@ -1,7 +1,9 @@
 import React from 'react';
-import { AlertTriangle, ArrowLeft } from 'lucide-react';
-import { PRAZO_COLORS, type PrazoFaixa } from '../carteira/carteiraPrazo';
+import { ArrowLeft } from 'lucide-react';
+import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
+import { useInstrument360Dock } from './instrument360Dock';
 
 /** Identificador do rodapé (processo, categoria, Id PNCP...). Nunca data nem valor. */
 export interface Instrument360MetaItem {
@@ -43,6 +45,10 @@ interface Instrument360HeroProps {
   status?: { faixa: PrazoFaixa; label: string; neutral?: boolean };
   /** Aviso em selo vermelho ao lado da situação (ex.: "Ata vence em 8 dias"). */
   statusAlert?: React.ReactNode;
+  /** Aviso da barra fixa quando o `statusAlert` não é texto ou a tela não o mostra no cartão (ex.: "Vence em 8 dias"). */
+  dockAlert?: string;
+  /** Fornecedor em texto simples, para a barra fixa. */
+  dockSubtitle?: string;
   /** Gestor, no alto da coluna lateral à direita. */
   manager?: React.ReactNode;
   /** Linha logo abaixo do título (ex.: fornecedor). */
@@ -79,6 +85,8 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
   eyebrow,
   status,
   statusAlert,
+  dockAlert,
+  dockSubtitle,
   manager,
   subtitle,
   objeto,
@@ -91,7 +99,25 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
   const [objetoAberto, setObjetoAberto] = React.useState(false);
   const texto = toSentenceCaseIfAllCaps(objeto);
   const objetoLongo = Boolean(texto && texto.length > OBJETO_LIMITE);
-  const statusColors = status ? (status.neutral ? { color: COLORS.inkSoft, bg: COLORS.surface } : PRAZO_COLORS[status.faixa]) : null;
+  const dock = useInstrument360Dock();
+  const setDockSummary = dock?.setSummary;
+  const setHeroEl = dock?.setHeroEl;
+  const alertText = dockAlert ?? (typeof statusAlert === 'string' ? statusAlert : undefined);
+  const statusFaixa = status?.faixa;
+  const statusLabel = status?.label;
+  const statusNeutral = status?.neutral;
+
+  // Entrega à barra fixa o que ela mostra quando este cartão sai da vista.
+  React.useEffect(() => {
+    if (!setDockSummary) return;
+    setDockSummary({
+      title,
+      status: statusFaixa && statusLabel ? { faixa: statusFaixa, label: statusLabel, neutral: statusNeutral } : undefined,
+      alert: alertText,
+      subtitle: dockSubtitle
+    });
+    return () => setDockSummary(null);
+  }, [setDockSummary, title, statusFaixa, statusLabel, statusNeutral, alertText, dockSubtitle]);
 
   return (
     <header
@@ -106,6 +132,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
         marginBottom: '1.5rem'
       }}
       className="i360-hero-wrap"
+      ref={setHeroEl}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
         <button
@@ -144,46 +171,8 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {icon}
             <h1 style={{ margin: 0, fontSize: '1.85rem', lineHeight: 1.1, fontWeight: 800, color: COLORS.ink }}>{title}</h1>
-            {status && statusColors && (
-              <span
-                data-testid="instrument-360-status"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '3px 10px',
-                  borderRadius: '999px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: statusColors.color,
-                  background: statusColors.bg,
-                  border: status.neutral ? `1px solid ${COLORS.line}` : '1px solid transparent'
-                }}
-              >
-                <span aria-hidden="true" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor' }} />
-                {status.label}
-              </span>
-            )}
-            {statusAlert && (
-              <span
-                data-testid="instrument-360-status-alert"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '3px 10px',
-                  borderRadius: '999px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: '#b91c1c',
-                  background: 'transparent',
-                  border: '1px solid #b91c1c'
-                }}
-              >
-                <AlertTriangle size={11} aria-hidden="true" />
-                {statusAlert}
-              </span>
-            )}
+            {status && <InstrumentStatusBadge status={status} testId="instrument-360-status" />}
+            {statusAlert && <InstrumentAlertBadge testId="instrument-360-status-alert">{statusAlert}</InstrumentAlertBadge>}
           </div>
 
           {subtitle && <div style={{ fontSize: '0.9rem', color: COLORS.inkSoft }}>{subtitle}</div>}
