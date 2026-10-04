@@ -7,6 +7,9 @@ import { matchesStatusFilter, comparePrazo } from './carteira/carteiraPrazo';
 import { useArpItemContractLinks } from '../hooks/useAtaManagers';
 import { getArpPrazo, useAtasPortfolio } from '../hooks/useAtasPortfolio';
 import { useAuth } from '../context/AuthContext';
+import { useCarteiraItens } from '../hooks/useCarteiraItens';
+import { passaFiltroNivel, type NivelAtendimento } from '../utils/itemAtendimento';
+import { TODAS_UNIDADES } from './carteira/CarteiraExecucaoSelects';
 import { canAssignManager } from './carteira/ManagerAssign';
 import { ArpPortfolioFilters, ARP_FILTER_SCHEMA } from './atas/ArpPortfolioFilters';
 import { useCarteiraFilters } from './carteira/carteiraFilters';
@@ -37,8 +40,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     itemsLoadingByAta,
     loadItemsForArp,
     loadItemsForArps,
-    empenhosDbSet,
-    allocationsDbSet,
     gestorByAta,
     saldoStatsByAta,
     syncInfo,
@@ -48,6 +49,9 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     triggerSync,
     reload
   } = useAtasPortfolio();
+
+  // Alocação, empenho e unidades de cada ata, somados dos itens (filtros e colunas da carteira).
+  const { resumoPorAta, unidades } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
 
   useEffect(() => {
     if (onArpsLoaded && scopedArps.length > 0) {
@@ -64,37 +68,36 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     [handleFilterChange]
   );
 
-  // Summary Metrics
+  // Contagens dos segmentos de situação (sobre toda a carteira visível, independentes dos filtros).
   const summaryMetrics = useMemo(() => {
     let vigentes = 0;
     let criticos = 0;
     let atencao = 0;
     let historico = 0;
-    let valorVigenteTotal = 0;
-    let valorCritico = 0;
-    let valorAtencao = 0;
-
     for (const arp of scopedArps) {
       const { faixa } = getArpPrazo(arp);
-      if (faixa === 'EXPIRADO') {
-        historico++;
-        continue;
-      }
-      if (faixa === 'SEM_DATA') continue;
-      vigentes++;
-      const valor = Number(arp.valorTotal) || 0;
-      valorVigenteTotal += valor;
-      if (faixa === 'CRITICO') {
-        criticos++;
-        valorCritico += valor;
-      } else if (faixa === 'ATENCAO') {
-        atencao++;
-        valorAtencao += valor;
+      if (faixa === 'EXPIRADO') historico++;
+      else if (faixa !== 'SEM_DATA') {
+        vigentes++;
+        if (faixa === 'CRITICO') criticos++;
+        else if (faixa === 'ATENCAO') atencao++;
       }
     }
-
-    return { total: scopedArps.length, vigentes, criticos, atencao, historico, valorVigenteTotal, valorCritico, valorAtencao };
+    return { total: scopedArps.length, vigentes, criticos, atencao, historico };
   }, [scopedArps]);
+
+  // Quantas atas da situação escolhida cairiam em cada nível de alocação / empenho (contagem no menu do filtro).
+  const nivelCounts = useMemo(() => {
+    const alocacao: Partial<Record<NivelAtendimento, number>> = {};
+    const empenho: Partial<Record<NivelAtendimento, number>> = {};
+    for (const arp of scopedArps) {
+      if (!matchesStatusFilter(getArpPrazo(arp).faixa, filterState.statusVigencia)) continue;
+      const execucao = resumoPorAta.get(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`);
+      if (execucao?.nivelAlocacao) alocacao[execucao.nivelAlocacao] = (alocacao[execucao.nivelAlocacao] ?? 0) + 1;
+      if (execucao?.nivelEmpenho) empenho[execucao.nivelEmpenho] = (empenho[execucao.nivelEmpenho] ?? 0) + 1;
+    }
+    return { alocacao, empenho };
+  }, [scopedArps, resumoPorAta, filterState.statusVigencia]);
 
   const gestoresDisponiveis = useMemo(
     () => listGestores(scopedArps.map((arp) => gestorByAta[arp.numeroAtaRegistroPreco])),
@@ -110,17 +113,13 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       // 1. Filtro de Vigência
       if (!matchesStatusFilter(getArpPrazo(arp).faixa, filterState.statusVigencia)) return false;
 
-      // 2. Filtro de Alocação — os conjuntos usam a chave `numeroAta-uasg` (com e sem zeros à esquerda).
-      const uasg = arp.codigoUnidadeGerenciadora;
-      const ataKeys = [`${arp.numeroAtaRegistroPreco}-${uasg}`, `${(arp.numeroAtaRegistroPreco || '').replace(/^0+/, '')}-${uasg}`];
-      const hasAlloc = ataKeys.some((key) => allocationsDbSet.has(key));
-      if (filterState.filtroAlocacao === 'SIM' && !hasAlloc) return false;
-      if (filterState.filtroAlocacao === 'NAO' && hasAlloc) return false;
+      // 2. Alocação interna, empenho e unidade: resumidos dos itens da ata (ver useCarteiraItens).
+      const execucao = resumoPorAta.get(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`);
+      if (!passaFiltroNivel(execucao?.nivelAlocacao ?? null, filterState.filtroAlocacao)) return false;
 
-      // 3. Filtro de Empenho
-      const hasEmp = ataKeys.some((key) => empenhosDbSet.has(key));
-      if (filterState.filtroEmpenho === 'SIM' && !hasEmp) return false;
-      if (filterState.filtroEmpenho === 'NAO' && hasEmp) return false;
+      // 3. Empenho
+      if (!passaFiltroNivel(execucao?.nivelEmpenho ?? null, filterState.filtroEmpenho)) return false;
+      if (filterState.unidade !== TODAS_UNIDADES && !execucao?.unidades.has(filterState.unidade)) return false;
 
       // 4. Filtro de Gestor
       if (showGestorFilter && !matchesGestorFilter(gestorByAta[arp.numeroAtaRegistroPreco], filterState.gestor)) return false;
@@ -148,7 +147,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
 
       return true;
     }).sort((a, b) => comparePrazo(getArpPrazo(a).dias, getArpPrazo(b).dias));
-  }, [scopedArps, filterState, allocationsDbSet, empenhosDbSet, itemsByAta, showGestorFilter, gestorByAta]);
+  }, [scopedArps, filterState, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta]);
 
   // Carregar itens para as atas filtradas
   useEffect(() => {
@@ -208,9 +207,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         criticos={summaryMetrics.criticos}
         atencao={summaryMetrics.atencao}
         historico={summaryMetrics.historico}
-        valorVigenteTotal={summaryMetrics.valorVigenteTotal}
-        valorCritico={summaryMetrics.valorCritico}
-        valorAtencao={summaryMetrics.valorAtencao}
         activeStatus={filterState.statusVigencia}
         onSelectStatus={handleSelectStatus}
       />
@@ -218,6 +214,9 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       <ArpPortfolioFilters
         filters={filterState}
         gestores={gestoresDisponiveis}
+        unidades={unidades}
+        alocacaoCounts={nivelCounts.alocacao}
+        empenhoCounts={nivelCounts.empenho}
         showGestorFilter={showGestorFilter}
         onChangeFilter={handleFilterChange}
         onResetFilters={handleResetFilters}
@@ -228,11 +227,15 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       <ArpPortfolioList
         canAssign={canAssign}
         assignContext={assignContext}
+        onFilter={handleFilterChange}
         cards={groupedCards}
         totalAtas={scopedArps.length}
         isLoading={isLoading}
         itemsLoadingByAta={itemsLoadingByAta}
         saldoStatsByAta={saldoStatsByAta}
+        execucaoPorAta={resumoPorAta}
+        unidades={unidades}
+        filters={filterState}
         gestorByAta={gestorByAta}
         busca={filterState.busca}
         onExpandAta={loadItemsForArp}

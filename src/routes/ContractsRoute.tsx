@@ -4,6 +4,8 @@ import { useArpItemContractLinks } from '../hooks/useAtaManagers';
 import { useContractsPortfolio } from '../hooks/useContractsPortfolio';
 import { canAssignManager } from '../components/carteira/ManagerAssign';
 import { useAuth } from '../context/AuthContext';
+import { useCarteiraItens } from '../hooks/useCarteiraItens';
+import { TODAS_UNIDADES } from '../components/carteira/CarteiraExecucaoSelects';
 import { ContractsPartialNotice } from '../components/carteira/ContractsPartialNotice';
 import { ContractsPortfolioHeader } from '../components/contracts/portfolio/ContractsPortfolioHeader';
 import { ContractsPortfolioSummary } from '../components/contracts/portfolio/ContractsPortfolioSummary';
@@ -34,6 +36,8 @@ export const ContractsRoute: React.FC = () => {
     refresh
   } = useContractsPortfolio();
   const { role } = useAuth();
+  // Unidades internas de cada contrato: as que receberam alocação de algum item vinculado a ele.
+  const { unidades, unidadesDoContrato } = useCarteiraItens({ apenasUnidadesDeContratos: true });
 
   // Filtros na URL (?situacao=&pendencia=&gestor=&busca=): sobrevivem à ida ao detalhe e permitem link já filtrado.
   const { filters: filterState, setFilter: handleFilterChange, resetFilters: handleResetFilters } =
@@ -52,33 +56,23 @@ export const ContractsRoute: React.FC = () => {
   const { data: links = [] } = useArpItemContractLinks(canAssign);
   const assignContext = useMemo(() => ({ links, contractsByKey }), [links, contractsByKey]);
 
-  // KPIs dos cards, sobre toda a carteira visível ao usuário (independentes dos filtros).
+  // Contagens dos segmentos de situação e valor vigente, sobre toda a carteira visível (independentes dos filtros).
   const summaryMetrics = useMemo(() => {
     let vigentes = 0;
     let criticos = 0;
     let atencao = 0;
     let historico = 0;
     let valorVigenteTotal = 0;
-    let valorCritico = 0;
-    let valorAtencao = 0;
     for (const { contract, faixa } of allRows) {
-      if (faixa === 'EXPIRADO') {
-        historico++;
-        continue;
-      }
-      if (faixa === 'SEM_DATA') continue;
-      vigentes++;
-      const valor = contract.valorGlobal || contract.valorInicial || 0;
-      valorVigenteTotal += valor;
-      if (faixa === 'CRITICO') {
-        criticos++;
-        valorCritico += valor;
-      } else if (faixa === 'ATENCAO') {
-        atencao++;
-        valorAtencao += valor;
+      if (faixa === 'EXPIRADO') historico++;
+      else if (faixa !== 'SEM_DATA') {
+        vigentes++;
+        valorVigenteTotal += contract.valorGlobal || contract.valorInicial || 0;
+        if (faixa === 'CRITICO') criticos++;
+        else if (faixa === 'ATENCAO') atencao++;
       }
     }
-    return { vigentes, criticos, atencao, historico, valorVigenteTotal, valorCritico, valorAtencao };
+    return { vigentes, criticos, atencao, historico, valorVigenteTotal };
   }, [allRows]);
 
   const gestoresDisponiveis = useMemo(() => listGestores(allRows.map((r) => r.gestorNome)), [allRows]);
@@ -88,9 +82,10 @@ export const ContractsRoute: React.FC = () => {
     const queryDigits = query.replace(/\D/g, '');
 
     return allRows
-      .filter(({ contract, faixa, gestorNome, pendencias }) => {
+      .filter(({ contract, contractKey, faixa, gestorNome, pendencias }) => {
         if (!matchesStatusFilter(faixa, filterState.status)) return false;
         if (filterState.pendencia === 'COM_PENDENCIA' && pendencias.length === 0) return false;
+        if (filterState.unidade !== TODAS_UNIDADES && !unidadesDoContrato.get(contractKey)?.has(filterState.unidade)) return false;
         if (showGestorFilter && !matchesGestorFilter(gestorNome, filterState.gestor)) return false;
 
         if (query) {
@@ -107,7 +102,7 @@ export const ContractsRoute: React.FC = () => {
         return true;
       })
       .sort((a, b) => comparePrazo(a.diasRestantes, b.diasRestantes));
-  }, [allRows, filterState, showGestorFilter]);
+  }, [allRows, filterState, showGestorFilter, unidadesDoContrato]);
 
 
   if (error && !hasAnyData) {
@@ -151,8 +146,6 @@ export const ContractsRoute: React.FC = () => {
             historico={summaryMetrics.historico}
             totalContratos={allRows.length}
             valorVigenteTotal={summaryMetrics.valorVigenteTotal}
-            valorCritico={summaryMetrics.valorCritico}
-            valorAtencao={summaryMetrics.valorAtencao}
             activeStatus={filterState.status}
             onSelectStatus={handleSelectStatus}
           />
@@ -160,6 +153,8 @@ export const ContractsRoute: React.FC = () => {
           <ContractsPortfolioFilters
             filters={filterState}
             gestores={gestoresDisponiveis}
+            unidades={unidades}
+            comPendencia={allRows.filter((r) => r.pendencias.length > 0 && matchesStatusFilter(r.faixa, filterState.status)).length}
             showGestorFilter={showGestorFilter}
             onChangeFilter={handleFilterChange}
             onResetFilters={handleResetFilters}
@@ -173,6 +168,7 @@ export const ContractsRoute: React.FC = () => {
             onResetFilters={handleResetFilters}
             canAssign={canAssign}
             assignContext={assignContext}
+            onFilter={handleFilterChange}
           />
         </>
       )}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { AtaCardSkeleton } from '../cards/AtaCardSkeleton';
@@ -12,8 +12,17 @@ import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
 import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
-import { classifyPrazo } from '../carteira/carteiraPrazo';
+import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
+import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
+import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
+import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { ManagerCell, type ManagerAssignContext } from '../carteira/ManagerAssign';
+import { CarteiraNivelPill } from '../carteira/CarteiraNivelPill';
+import { TODAS_UNIDADES } from '../carteira/CarteiraExecucaoSelects';
+import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
+import type { CarteiraAtaExecucao } from '../../utils/carteiraItens';
+import type { ArpPortfolioFilterState } from './ArpPortfolioFilters';
 import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
 
@@ -24,6 +33,12 @@ interface ArpPortfolioListProps {
   itemsLoadingByAta?: Record<string, boolean>;
   /** Resumo de consumo de saldo por número de ata. */
   saldoStatsByAta?: Record<string, AtaSaldoStats>;
+  /** Alocação, empenho e unidades de cada ata (chave "{numeroAta}-{uasg}"), somados dos itens. */
+  execucaoPorAta?: Map<string, CarteiraAtaExecucao>;
+  /** Unidades internas (para exibir o nome da unidade filtrada). */
+  unidades?: Array<{ chave: string; nome: string }>;
+  /** Filtros ativos: alocação, empenho e unidade ganham uma coluna quando filtrados. */
+  filters?: Pick<ArpPortfolioFilterState, 'filtroAlocacao' | 'filtroEmpenho' | 'unidade'>;
   /** Nome do gestor por número de ata. */
   gestorByAta?: Record<string, string>;
   /** Texto da busca — quando algum item da ata casa com ela, a linha abre já mostrando esse item. */
@@ -36,6 +51,8 @@ interface ArpPortfolioListProps {
   /** Atribuição de gestor na própria carteira (admin e gestor). */
   canAssign?: boolean;
   assignContext?: ManagerAssignContext;
+  /** Clique num valor da célula aplica o filtro correspondente (prazo → situação, fornecedor → busca). */
+  onFilter?: <K extends keyof ArpPortfolioFilterState>(key: K, value: ArpPortfolioFilterState[K]) => void;
 }
 
 const MAX_ITENS_EXPANDIDOS = 5;
@@ -64,6 +81,9 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   isLoading = false,
   itemsLoadingByAta = {},
   saldoStatsByAta = {},
+  execucaoPorAta,
+  unidades = [],
+  filters,
   gestorByAta = {},
   busca = '',
   onSelectItem,
@@ -71,13 +91,26 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   onResetFilters,
   pageSize = 15,
   canAssign = false,
-  assignContext = { links: [] }
+  assignContext = { links: [] },
+  onFilter
 }) => {
   const navigate = useNavigateWithOrigin();
   /** Escolha explícita do usuário por linha; sem escolha vale o padrão (abrir só se a busca casar com algum item). */
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  const sortColumns = useMemo<Record<string, CarteiraSortColumn<AtaGroupedCard>>>(
+    () => ({
+      numero: { value: (c) => c.arp.numeroAtaRegistroPreco.split('/').reverse().join('/') },
+      vigencia: { value: (c) => getArpVigenciaStatus(c.arp.dataVigenciaFinal)?.diasRestantes ?? null },
+      itens: { value: (c) => c.itens.length || c.arp.quantidadeItens || 0, firstDir: 'desc' },
+      consumo: { value: (c) => saldoStatsByAta[c.arp.numeroAtaRegistroPreco]?.maxPct ?? null, firstDir: 'desc' },
+      gestor: { value: (c) => gestorByAta[c.arp.numeroAtaRegistroPreco] }
+    }),
+    [saldoStatsByAta, gestorByAta]
+  );
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(cards, sortColumns);
+  const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
   const { currentPage, setPage, pageItems: pageCards, signature } = useCarteiraPagination(
-    cards,
+    sorted,
     useCallback((c: AtaGroupedCard) => c.key, []),
     pageSize
   );
@@ -86,6 +119,11 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   }, [signature]);
 
   const query = busca.trim().toLowerCase();
+  // Alocação, empenho e unidade só viram coluna quando filtrados (a tabela sem filtro fica como sempre foi).
+  const colAlocacao = filters != null && filters.filtroAlocacao !== 'TODOS';
+  const colEmpenho = filters != null && filters.filtroEmpenho !== 'TODOS';
+  const colUnidade = filters != null && filters.unidade !== TODAS_UNIDADES;
+  const totalColunas = 6 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade);
 
   if (isLoading && totalAtas === 0) {
     return (
@@ -117,19 +155,20 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   }
 
   return (
-    <div data-testid="arp-portfolio-table" role="feed" aria-label="Lista de Atas de Registro de Preços" style={carteiraTableShell}>
+    <div data-testid="arp-portfolio-table" role="feed" aria-label="Lista de Atas de Registro de Preços" className="carteira-shell" style={carteiraTableShell}>
       <div style={{ overflowX: 'auto' }}>
         <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
-              <th style={carteiraTh}>Nº da ata</th>
-              <th style={carteiraTh}>Fornecedor</th>
-              <th style={carteiraTh}>Vigência</th>
-              <th style={carteiraTh}>Itens</th>
-              <th style={carteiraTh}>Maior consumo</th>
-              <th style={carteiraTh}>Gestor</th>
-              <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>
+              <CarteiraSortHeader label="Ata" sortKey="numero" {...sortProps} />
+              <CarteiraSortHeader label="Vigência" sortKey="vigencia" {...sortProps} />
+              <CarteiraSortHeader label="Itens" sortKey="itens" {...sortProps} />
+              <CarteiraSortHeader label="Maior consumo" sortKey="consumo" {...sortProps} />
+              {colAlocacao && <th style={carteiraTh}>Alocação interna</th>}
+              {colEmpenho && <th style={carteiraTh}>Empenho</th>}
+              {colUnidade && <th style={carteiraTh}>Unidade</th>}
+              <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sortProps} />
             </tr>
           </thead>
           <tbody>
@@ -144,6 +183,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               const gestor = gestorByAta[numeroAta];
               const totalItens = card.itens.length || arp.quantidadeItens || 0;
               const isItemsLoading = Boolean(itemsLoadingByAta[ataKey]);
+              const abrirAta = () => navigate(`/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, arp.codigoUnidadeGerenciadora))}`);
 
               const matchedItems = query
                 ? card.itens.filter((item) =>
@@ -167,7 +207,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
 
               return (
                 <React.Fragment key={card.key}>
-                  <tr data-testid={`arp-row-${numeroAta}`}>
+                  <tr data-testid={`arp-row-${numeroAta}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirAta)}>
                     <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
                       <button
                         type="button"
@@ -183,15 +223,28 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                       </button>
                     </td>
-                    <td data-label="Ata" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <div style={{ fontWeight: 800 }}>{numeroAta}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>UASG {arp.codigoUnidadeGerenciadora}</div>
-                    </td>
-                    <td style={{ ...carteiraTd, maxWidth: '220px', minWidth: '170px' }}>
-                      <div title={card.fornecedorNome} style={{ fontWeight: 600, color: '#334155', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.fornecedorNome}</div>
+                    <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
+                      <CarteiraIdLink onClick={abrirAta} label={`Ver detalhes da ata ${numeroAta}`} title={`Ver detalhes · UASG ${arp.codigoUnidadeGerenciadora}`} testId={`ata-360-link-${numeroAta}`}>
+                        {numeroAta}
+                      </CarteiraIdLink>
+                      {card.fornecedorNome && (
+                        <CarteiraCellFilter
+                          descricao={`fornecedor ${card.fornecedorNome}`}
+                          onFilter={onFilter ? () => onFilter('busca', card.fornecedorNome) : undefined}
+                        >
+                          <div title={card.fornecedorNome} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.fornecedorNome}</div>
+                        </CarteiraCellFilter>
+                      )}
+                      </div>
                     </td>
                     <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <CarteiraPrazoPill faixa={faixa} diasRestantes={dias} />
+                      <CarteiraCellFilter
+                        descricao="esta situação de prazo"
+                        onFilter={onFilter && situacaoDaFaixa(faixa) ? () => onFilter('statusVigencia', situacaoDaFaixa(faixa)!) : undefined}
+                      >
+                        <CarteiraPrazoPill faixa={faixa} diasRestantes={dias} />
+                      </CarteiraCellFilter>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
                         até {formatDateBR(arp.dataVigenciaFinal)}
                       </div>
@@ -210,6 +263,31 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     <td data-label="Maior consumo" style={carteiraTd}>
                       <SaldoBar pct={stats?.maxPct ?? null} />
                     </td>
+                    {colAlocacao && (
+                      <td data-label="Alocação interna" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                        <CarteiraCellFilter
+                          descricao="este nível de alocação"
+                          onFilter={onFilter && execucaoPorAta?.get(ataKey)?.nivelAlocacao ? () => onFilter('filtroAlocacao', execucaoPorAta.get(ataKey)!.nivelAlocacao!) : undefined}
+                        >
+                          <CarteiraNivelPill nivel={execucaoPorAta?.get(ataKey)?.nivelAlocacao ?? null} labels={NIVEL_ALOCACAO_LABEL} />
+                        </CarteiraCellFilter>
+                      </td>
+                    )}
+                    {colEmpenho && (
+                      <td data-label="Empenho" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                        <CarteiraCellFilter
+                          descricao="este nível de empenho"
+                          onFilter={onFilter && execucaoPorAta?.get(ataKey)?.nivelEmpenho ? () => onFilter('filtroEmpenho', execucaoPorAta.get(ataKey)!.nivelEmpenho!) : undefined}
+                        >
+                          <CarteiraNivelPill nivel={execucaoPorAta?.get(ataKey)?.nivelEmpenho ?? null} labels={NIVEL_EMPENHO_LABEL} />
+                        </CarteiraCellFilter>
+                      </td>
+                    )}
+                    {colUnidade && (
+                      <td data-label="Unidade" style={{ ...carteiraTd, whiteSpace: 'nowrap', fontWeight: 700 }}>
+                        {unidades.find((u) => u.chave === filters?.unidade)?.nome ?? filters?.unidade}
+                      </td>
+                    )}
                     <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <ManagerCell
                         target={{ tipo: 'ATA', ataKey: numeroAta }}
@@ -220,21 +298,11 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         contractsByKey={assignContext.contractsByKey}
                       />
                     </td>
-                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, arp.codigoUnidadeGerenciadora))}`)}
-                        data-testid={`ata-360-link-${numeroAta}`}
-                        style={carteiraButton}
-                      >
-                        Ver Detalhes <ArrowRight size={13} />
-                      </button>
-                    </td>
                   </tr>
 
                   {isExpanded && (
                     <tr className="carteira-expanded" data-testid={`arp-expanded-${numeroAta}`}>
-                      <td colSpan={8} style={CARTEIRA_EXPANDED_CELL_STYLE}>
+                      <td colSpan={totalColunas} style={CARTEIRA_EXPANDED_CELL_STYLE}>
                         {isItemsLoading ? (
                           <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Carregando itens…</div>
                         ) : orderedItems.length === 0 ? (
@@ -264,7 +332,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                             ))}
                             {hiddenCount > 0 && (
                               <div style={{ fontSize: '0.76rem', color: '#0c326f', fontWeight: 700, paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
-                                + {hiddenCount} {hiddenCount === 1 ? 'item' : 'itens'} · veja todos em Ver Detalhes
+                                + {hiddenCount} {hiddenCount === 1 ? 'item' : 'itens'} · veja todos nos detalhes da ata
                               </div>
                             )}
                           </>

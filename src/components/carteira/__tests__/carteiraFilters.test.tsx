@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readCarteiraFilters, writeCarteiraFilters, hasActiveCarteiraFilters } from '../carteiraFilters';
 import { canFilterByGestor, listGestores, matchesGestorFilter, SEM_GESTOR } from '../carteiraGestor';
+import { gestorFilterOptions } from '../CarteiraFilterBar';
 import { ARP_FILTER_SCHEMA, ArpPortfolioFilters, DEFAULT_ARP_FILTERS } from '../../atas/ArpPortfolioFilters';
 import { CONTRACTS_FILTER_SCHEMA, ContractsPortfolioFilters, DEFAULT_CONTRACTS_FILTERS } from '../../contracts/portfolio/ContractsPortfolioFilters';
 
@@ -68,8 +69,8 @@ describe('filtro de gestor', () => {
       />
     );
     expect(html).toContain('arp-filter-gestor');
-    expect(html).toContain('Sem gestor');
-    expect(html).toContain('Maria Souza');
+    expect(html).toContain('Gestor');
+    expect(gestorFilterOptions('TODOS', ['Maria Souza']).map((o) => o.label)).toEqual(['Sem gestor', 'Maria Souza']);
   });
 
   it('esconde o seletor quando showGestorFilter é falso', () => {
@@ -98,7 +99,8 @@ describe('filtro de gestor', () => {
         totalContracts={2}
       />
     );
-    expect(html).toContain('<option value="Carlos" selected="">Carlos</option>');
+    expect(html).toContain('Carlos');
+    expect(gestorFilterOptions('Carlos', ['Maria Souza']).map((o) => o.value)).toContain('Carlos');
     expect(html).toContain('Exibindo 0 de 2 contratos');
   });
 });

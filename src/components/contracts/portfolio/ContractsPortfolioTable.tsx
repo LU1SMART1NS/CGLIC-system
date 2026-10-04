@@ -12,7 +12,12 @@ import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { formatCurrency } from '../../carteira/carteiraFormat';
 import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
-import type { PrazoFaixa } from '../../carteira/carteiraPrazo';
+import { situacaoDaFaixa, type PrazoFaixa } from '../../carteira/carteiraPrazo';
+import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
+import { CarteiraCellFilter } from '../../carteira/CarteiraCellFilter';
+import { CarteiraIdLink, abrirAoClicarNaLinha } from '../../carteira/CarteiraRowLink';
+import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
+import type { ContractsPortfolioFilterState } from './ContractsPortfolioFilters';
 import { ManagerCell, type ManagerAssignContext } from '../../carteira/ManagerAssign';
 import { getAcaoInfo, getMotivoInfo } from '../../instrumentos/gestaoInstrumentosRowHelpers';
 import type { DashboardAttentionItem } from '../../../types/managementDashboard';
@@ -36,7 +41,17 @@ interface ContractsPortfolioTableProps {
   /** Atribuição de gestor na própria carteira (admin e gestor). */
   canAssign?: boolean;
   assignContext?: ManagerAssignContext;
+  /** Clique num valor da célula aplica o filtro correspondente (prazo → situação, pendências, fornecedor → busca). */
+  onFilter?: <K extends keyof ContractsPortfolioFilterState>(key: K, value: ContractsPortfolioFilterState[K]) => void;
 }
+
+const SORT_COLUMNS: Record<string, CarteiraSortColumn<ContractPortfolioRow>> = {
+  numero: { value: (r) => `${r.contract.ano ?? ''}-${String(r.contract.numero ?? '').padStart(6, '0')}` },
+  vigencia: { value: (r) => r.diasRestantes },
+  valor: { value: (r) => r.contract.valorGlobal || r.contract.valorInicial || 0, firstDir: 'desc' },
+  pendencias: { value: (r) => r.pendencias.length, firstDir: 'desc' },
+  gestor: { value: (r) => r.gestorNome }
+};
 
 function formatTipoInstrumento(tipo?: string): string {
   switch (tipo) {
@@ -80,12 +95,15 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   onResetFilters,
   pageSize = 15,
   canAssign = false,
-  assignContext = { links: [] }
+  assignContext = { links: [] },
+  onFilter
 }) => {
   const navigate = useNavigateWithOrigin();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, SORT_COLUMNS);
+  const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
   const { currentPage, setPage, pageItems: pageRows, signature } = useCarteiraPagination(
-    rows,
+    sorted,
     useCallback((r: ContractPortfolioRow) => r.contractKey, []),
     pageSize
   );
@@ -113,19 +131,17 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   }
 
   return (
-    <div data-testid="contracts-portfolio-table" style={carteiraTableShell}>
+    <div data-testid="contracts-portfolio-table" className="carteira-shell" style={carteiraTableShell}>
       <div style={{ overflowX: 'auto' }}>
         <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
-              <th style={carteiraTh}>Nº do contrato</th>
-              <th style={carteiraTh}>Fornecedor</th>
-              <th style={carteiraTh}>Vigência</th>
-              <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor Vigente</th>
-              <th style={carteiraTh}>Pendências</th>
-              <th style={carteiraTh}>Gestor</th>
-              <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>
+              <CarteiraSortHeader label="Contrato" sortKey="numero" {...sortProps} />
+              <CarteiraSortHeader label="Vigência" sortKey="vigencia" {...sortProps} />
+              <CarteiraSortHeader label="Valor Vigente" sortKey="valor" align="right" {...sortProps} />
+              <CarteiraSortHeader label="Pendências" sortKey="pendencias" {...sortProps} />
+              <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sortProps} />
             </tr>
           </thead>
           <tbody>
@@ -135,6 +151,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
               const numDisplay = formatContractNumber(contract);
               const valorVigente = contract.valorGlobal || contract.valorInicial;
               const tipoLabel = formatTipoInstrumento(contract.tipoInstrumento);
+              const abrirContrato = () => navigate(`/contratos/${encodeURIComponent(contractKey)}`);
               const acrescimoPct =
                 contract.valorInicial && contract.valorGlobal && contract.valorInicial > 0
                   ? ((contract.valorGlobal - contract.valorInicial) / contract.valorInicial) * 100
@@ -143,7 +160,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
 
               return (
                 <React.Fragment key={contractKey}>
-                  <tr data-testid={`contracts-row-${contractKey}`}>
+                  <tr data-testid={`contracts-row-${contractKey}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirContrato)}>
                     <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
                       <button
                         type="button"
@@ -156,19 +173,36 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                         {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                       </button>
                     </td>
-                    <td data-label="Contrato" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <div style={{ fontWeight: 800 }}>{numDisplay}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
-                        {tipoLabel === 'Contrato' ? `UASG ${contract.uasg}` : `${tipoLabel} · UASG ${contract.uasg}`}
+                    <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'wrap' }}>
+                      <CarteiraIdLink
+                        onClick={abrirContrato}
+                        label={`Ver detalhes do contrato ${numDisplay}`}
+                        testId={`open-contract-360-btn-${contractKey}`}
+                        title={`Ver detalhes · ${tipoLabel === 'Contrato' ? '' : `${tipoLabel} · `}UASG ${contract.uasg}`}
+                      >
+                        {numDisplay}
+                      </CarteiraIdLink>
+                      {tipoLabel !== 'Contrato' && <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>{tipoLabel}</span>}
+                      </div>
+                      {contract.fornecedorNome && (
+                        <CarteiraCellFilter
+                          descricao={`fornecedor ${contract.fornecedorNome}`}
+                          onFilter={onFilter && (() => onFilter('busca', contract.fornecedorNome || ''))}
+                        >
+                          <div title={contract.fornecedorNome} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{contract.fornecedorNome}</div>
+                        </CarteiraCellFilter>
+                      )}
                       </div>
                     </td>
-                    <td style={{ ...carteiraTd, maxWidth: '220px', minWidth: '170px' }}>
-                      {contract.fornecedorNome && (
-                        <div title={contract.fornecedorNome} style={{ fontWeight: 600, color: '#334155', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{contract.fornecedorNome}</div>
-                      )}
-                    </td>
                     <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <CarteiraPrazoPill faixa={faixa} diasRestantes={diasRestantes} />
+                      <CarteiraCellFilter
+                        descricao="esta situação de prazo"
+                        onFilter={onFilter && situacaoDaFaixa(faixa) ? () => onFilter('status', situacaoDaFaixa(faixa)!) : undefined}
+                      >
+                        <CarteiraPrazoPill faixa={faixa} diasRestantes={diasRestantes} />
+                      </CarteiraCellFilter>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
                         até {formatDateBR(contract.dataVigenciaFim)}
                       </div>
@@ -178,12 +212,14 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                     </td>
                     <td data-label="Pendências" style={carteiraTd}>
                       {worst ? (
+                        <CarteiraCellFilter descricao="contratos com pendência" onFilter={onFilter && (() => onFilter('pendencia', 'COM_PENDENCIA'))}>
                         <span
                           data-testid={`contracts-pendencias-${contractKey}`}
                           style={{ fontSize: '0.75rem', fontWeight: 800, color: worst.color, background: worst.bg, padding: '0.2rem 0.55rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
                         >
                           {pendencias.length} {pendencias.length === 1 ? 'pendência' : 'pendências'}
                         </span>
+                        </CarteiraCellFilter>
                       ) : (
                         <span style={{ color: '#94a3b8' }}>—</span>
                       )}
@@ -198,21 +234,11 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                         contractsByKey={assignContext.contractsByKey}
                       />
                     </td>
-                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/contratos/${encodeURIComponent(contractKey)}`)}
-                        data-testid={`open-contract-360-btn-${contractKey}`}
-                        style={carteiraButton}
-                      >
-                        Ver Detalhes <ArrowRight size={13} />
-                      </button>
-                    </td>
                   </tr>
 
                   {isExpanded && (
                     <tr className="carteira-expanded" data-testid={`contracts-expanded-${contractKey}`}>
-                      <td colSpan={8} style={CARTEIRA_EXPANDED_CELL_STYLE}>
+                      <td colSpan={6} style={CARTEIRA_EXPANDED_CELL_STYLE}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: '1rem', fontSize: '0.82rem' }}>
                           <div>
                             <CarteiraDetailLabel>Processo</CarteiraDetailLabel>
