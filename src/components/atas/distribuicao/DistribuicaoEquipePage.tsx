@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, FileText, Package, UserX, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, FileText, Package, UserPlus, UserX, Users, ArrowLeftRight } from 'lucide-react';
 import { PageContainer } from '../../../design-system/components/PageContainer';
 import { PageHeader } from '../../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../../design-system/components/HeaderRefreshAction';
@@ -10,6 +10,9 @@ import { EmptyState } from '../../../design-system/components/EmptyState';
 import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import { SEM_GESTOR } from '../../carteira/carteiraGestor';
+import { ManagerAssignPanel, canAssignManager } from '../../carteira/ManagerAssign';
+import type { ManagerTarget } from '../../../services/managerAssignmentService';
+import { useAuth } from '../../../context/AuthContext';
 import { useAtasPortfolio, getArpPrazo } from '../../../hooks/useAtasPortfolio';
 import { useContractsPortfolio } from '../../../hooks/useContractsPortfolio';
 import { useArpItemContractLinks } from '../../../hooks/useAtaManagers';
@@ -110,6 +113,20 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const atas = useAtasPortfolio();
   const contratos = useContractsPortfolio();
   const { data: links = [], isLoading: linksLoading } = useArpItemContractLinks();
+  // Só quem pode atribuir (admin) vê as ações de transferir; o leitor acompanha.
+  const { role } = useAuth();
+  const canAssign = canAssignManager(role);
+  const [transferencia, setTransferencia] = React.useState<{ linha: DistribuicaoLinha; anchor: DOMRect } | null>(null);
+  const transferTargets = useMemo<ManagerTarget[]>(
+    () =>
+      transferencia
+        ? [
+            ...transferencia.linha.ataKeys.map((ataKey) => ({ tipo: 'ATA' as const, ataKey })),
+            ...transferencia.linha.contractKeys.map((contractKey) => ({ tipo: 'CONTRATO' as const, contractKey }))
+          ]
+        : [],
+    [transferencia]
+  );
 
   const distribuicao = useMemo(
     () =>
@@ -238,9 +255,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
                     <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor registrado</th>
                     <th style={carteiraTh}>Contratos</th>
                     <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor vigente</th>
-                    <th style={carteiraTh}>Pendências</th>
+                    <th style={carteiraTh} title="Gravidade crítica ou urgente: tarefa vencida, fatura vencida, saldo crítico…">Urgentes</th>
+                    <th style={carteiraTh} title="Gravidade de atenção ou informativa: prazos próximos, reajustes, lembretes">A acompanhar</th>
                     <th style={carteiraTh}>Parte da carteira</th>
-                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Ver na carteira</th>
+                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -270,9 +288,14 @@ export const DistribuicaoEquipePage: React.FC = () => {
                         <td data-label="Valor vigente" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>
                           <span>{l.contratos.vigentes > 0 ? formatCurrencyCompact(l.contratos.valor) : '—'}</span>
                         </td>
-                        <td data-label="Pendências" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <span style={{ fontWeight: 800, color: l.pendencias > 0 ? '#b91c1c' : '#94a3b8' }}>
-                            {l.pendencias > 0 ? l.pendencias : '—'}
+                        <td data-label="Urgentes" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 800, color: l.pendencias.urgentes > 0 ? '#b91c1c' : '#94a3b8' }}>
+                            {l.pendencias.urgentes > 0 ? l.pendencias.urgentes : '—'}
+                          </span>
+                        </td>
+                        <td data-label="A acompanhar" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 700, color: l.pendencias.acompanhar > 0 ? '#b45309' : '#94a3b8' }}>
+                            {l.pendencias.acompanhar > 0 ? l.pendencias.acompanhar : '—'}
                           </span>
                         </td>
                         <td data-label="Parte da carteira" style={carteiraTd}>
@@ -298,6 +321,17 @@ export const DistribuicaoEquipePage: React.FC = () => {
                             >
                               Contratos <ArrowRight size={13} />
                             </button>
+                            {canAssign && (l.ataKeys.length > 0 || l.contractKeys.length > 0) && (
+                              <button
+                                type="button"
+                                onClick={(e) => setTransferencia({ linha: l, anchor: e.currentTarget.getBoundingClientRect() })}
+                                data-testid={`distribuicao-transferir-${testKey}`}
+                                title={isSemGestor ? 'Atribuir todas as atas e contratos vigentes sem gestor' : 'Passar toda a carteira vigente deste gestor para outra pessoa'}
+                                style={{ ...carteiraButton, color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
+                              >
+                                {isSemGestor ? <UserPlus size={13} /> : <ArrowLeftRight size={13} />} {isSemGestor ? 'Atribuir' : 'Transferir'}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -307,6 +341,16 @@ export const DistribuicaoEquipePage: React.FC = () => {
               </table>
             </div>
           </div>
+
+          {transferencia && (
+            <ManagerAssignPanel
+              targets={transferTargets}
+              anchorRect={transferencia.anchor}
+              links={links}
+              contractsByKey={contratos.contractsByKey}
+              onClose={() => setTransferencia(null)}
+            />
+          )}
 
           {divergencias.length > 0 && (
             <section id="distribuicao-divergencias" data-testid="distribuicao-divergencias" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', scrollMarginTop: '1rem' }}>

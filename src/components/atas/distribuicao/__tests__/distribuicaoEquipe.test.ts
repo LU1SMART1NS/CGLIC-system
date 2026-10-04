@@ -46,21 +46,34 @@ describe('buildDistribuicaoEquipe', () => {
     expect(linhas.map((l) => l.gestorNome)).toEqual([null, 'Ana', 'Bruno', 'Carla']);
   });
 
-  it('atribui pendências ao gestor do contrato ou da ata', () => {
+  it('atribui pendências ao gestor do contrato ou da ata, separando urgentes de acompanhamento', () => {
     const { linhas } = buildDistribuicaoEquipe({
       atas: [ata('00001/2025', 'Ana'), ata('00002/2025')],
       contratos: [contrato('200331-00001-2025', 'Bruno'), contrato('200331-00009-2020', 'Bruno', 'EXPIRADO')],
       links: [],
       attentionItems: [
-        alerta({ contractKey: '200331-00001-2025' }),
-        alerta({ arpKey: '00001/2025-200331' }),
-        alerta({ numeroAta: '00002/2025' }),
-        alerta({ contractKey: '200331-00009-2020' }) // contrato expirado: fora da carteira vigente
+        alerta({ contractKey: '200331-00001-2025', severity: 'CRITICA' }),
+        alerta({ contractKey: '200331-00001-2025', severity: 'INFO' }),
+        alerta({ arpKey: '00001/2025-200331', severity: 'URGENTE' }),
+        alerta({ numeroAta: '00002/2025', severity: 'ATENCAO' }),
+        alerta({ contractKey: '200331-00009-2020', severity: 'CRITICA' }) // contrato expirado: fora da carteira vigente
       ]
     });
-    expect(linhas.find((l) => l.gestorNome === 'Ana')!.pendencias).toBe(1);
-    expect(linhas.find((l) => l.gestorNome === 'Bruno')!.pendencias).toBe(1);
-    expect(linhas.find((l) => l.gestorNome === null)!.pendencias).toBe(1);
+    expect(linhas.find((l) => l.gestorNome === 'Ana')!.pendencias).toEqual({ urgentes: 1, acompanhar: 0 });
+    expect(linhas.find((l) => l.gestorNome === 'Bruno')!.pendencias).toEqual({ urgentes: 1, acompanhar: 1 });
+    expect(linhas.find((l) => l.gestorNome === null)!.pendencias).toEqual({ urgentes: 0, acompanhar: 1 });
+  });
+
+  it('lista as chaves das atas e contratos vigentes de cada gestor (alvos da transferência)', () => {
+    const { linhas } = buildDistribuicaoEquipe({
+      atas: [ata('00001/2025', 'Ana'), ata('00002/2025', 'Ana', 'EXPIRADO'), ata('00003/2025', 'Ana')],
+      contratos: [contrato('200331-00001-2025', 'Ana'), contrato('200331-00002-2025', 'Ana', 'EXPIRADO')],
+      links: [],
+      attentionItems: []
+    });
+    const ana = linhas.find((l) => l.gestorNome === 'Ana')!;
+    expect(ana.ataKeys).toEqual(['00001/2025', '00003/2025']);
+    expect(ana.contractKeys).toEqual(['200331-00001-2025']);
   });
 
   it('aponta contrato vinculado com gestor diferente do da ata, uma vez por par', () => {

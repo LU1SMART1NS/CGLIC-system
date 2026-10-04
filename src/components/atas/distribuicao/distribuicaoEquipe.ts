@@ -31,7 +31,16 @@ export interface DistribuicaoLinha {
   atas: CargaInstrumentos;
   contratos: CargaInstrumentos;
   /** Alertas em aberto (Funil Único de Atenção) nas atas e contratos vigentes do gestor. */
-  pendencias: number;
+  pendencias: Pendencias;
+  /** Chaves das atas e contratos vigentes do gestor — alvos para transferir a carteira. */
+  ataKeys: string[];
+  contractKeys: string[];
+}
+
+/** Mesma gravidade da Visão Geral: urgentes = crítica ou urgente (tarefa vencida, fatura vencida, saldo crítico…); o resto é acompanhamento. */
+export interface Pendencias {
+  urgentes: number;
+  acompanhar: number;
 }
 
 /** Contrato vigente vinculado a uma ata cujo gestor não é o mesmo (a regra é herdar o gestor da ata). */
@@ -84,7 +93,7 @@ export function buildDistribuicaoEquipe(input: {
     const key = gestorNome || null;
     let l = linhas.get(key);
     if (!l) {
-      l = { gestorNome: key, atas: cargaVazia(), contratos: cargaVazia(), pendencias: 0 };
+      l = { gestorNome: key, atas: cargaVazia(), contratos: cargaVazia(), pendencias: { urgentes: 0, acompanhar: 0 }, ataKeys: [], contractKeys: [] };
       linhas.set(key, l);
     }
     return l;
@@ -97,25 +106,34 @@ export function buildDistribuicaoEquipe(input: {
   for (const ata of input.atas) {
     if (!isVigente(ata.faixa)) continue;
     ataPorNumero.set(ata.numeroAta, ata);
-    somar(linha(ata.gestorNome).atas, ata.faixa, ata.valor);
+    const l = linha(ata.gestorNome);
+    somar(l.atas, ata.faixa, ata.valor);
+    l.ataKeys.push(ata.numeroAta);
     somar(totais.atas, ata.faixa, ata.valor);
   }
   for (const contrato of input.contratos) {
     if (!isVigente(contrato.faixa)) continue;
     contratoPorChave.set(contrato.contractKey, contrato);
-    somar(linha(contrato.gestorNome).contratos, contrato.faixa, contrato.valor);
+    const l = linha(contrato.gestorNome);
+    somar(l.contratos, contrato.faixa, contrato.valor);
+    l.contractKeys.push(contrato.contractKey);
     somar(totais.contratos, contrato.faixa, contrato.valor);
   }
 
+  const contar = (gestorNome: string | undefined, item: DashboardAttentionItem) => {
+    const { pendencias } = linha(gestorNome);
+    if (item.severity === 'CRITICA' || item.severity === 'URGENTE') pendencias.urgentes++;
+    else pendencias.acompanhar++;
+  };
   for (const item of input.attentionItems) {
     const contrato = item.contractKey ? contratoPorChave.get(item.contractKey) : undefined;
     if (contrato) {
-      linha(contrato.gestorNome).pendencias++;
+      contar(contrato.gestorNome, item);
       continue;
     }
     const numeroAta = item.contractKey ? undefined : numeroAtaDoAlerta(item);
     const ata = numeroAta ? ataPorNumero.get(numeroAta) : undefined;
-    if (ata) linha(ata.gestorNome).pendencias++;
+    if (ata) contar(ata.gestorNome, item);
   }
 
   const divergencias: DistribuicaoDivergencia[] = [];
