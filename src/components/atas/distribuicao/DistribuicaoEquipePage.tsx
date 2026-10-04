@@ -13,7 +13,8 @@ import { CARTEIRA_EXPANDED_CELL_STYLE } from '../../carteira/CarteiraDetailLabel
 import { DistribuicaoItens } from './DistribuicaoItens';
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import { SEM_GESTOR } from '../../carteira/carteiraGestor';
-import { ManagerAssignPanel, canAssignManager } from '../../carteira/ManagerAssign';
+import { canAssignManager } from '../../carteira/ManagerAssign';
+import { AtribuirGestorModal } from './AtribuirGestorModal';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { useAuth } from '../../../context/AuthContext';
 import { useAtasPortfolio, getArpPrazo } from '../../../hooks/useAtasPortfolio';
@@ -160,7 +161,7 @@ const KpiTile: React.FC<KpiTileProps> = ({ label, value, hint, icon: Icon, tone,
 };
 
 /**
- * Distribuição da Equipe: carteira vigente (atas e contratos) por gestor, para o coordenador
+ * Central de Distribuição: carteira vigente (atas e contratos) por gestor, para o coordenador
  * acompanhar a carga de cada um, o que está sem gestor e contratos com gestor diferente da ata.
  */
 export const DistribuicaoEquipePage: React.FC = () => {
@@ -171,8 +172,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // Só quem pode atribuir (admin) vê as ações de transferir; o leitor acompanha.
   const { role } = useAuth();
   const canAssign = canAssignManager(role);
-  // Painel de atribuição aberto: alvos (carteira inteira de um gestor ou itens marcados) e o que fazer ao salvar.
-  const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; anchor: DOMRect; done?: () => void } | null>(null);
+  // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
+  const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void } | null>(null);
   const [expanded, setExpanded] = React.useState<string | null>(null);
   const [ordem, setOrdem] = React.useState<'NOME' | 'CARGA'>('NOME');
   const carteiraTargets = (l: DistribuicaoLinha): ManagerTarget[] => [
@@ -219,7 +220,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
     return (
       <PageContainer style={{ padding: '2rem 0' }}>
         <ErrorState
-          title="Erro ao carregar a distribuição da equipe"
+          title="Erro ao carregar a central de distribuição"
           message={contratos.error.message || 'Não foi possível carregar atas e contratos.'}
           onRetry={refresh}
         />
@@ -240,7 +241,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title="Distribuição da Equipe"
+        title="Central de Distribuição"
         subtitle="Atas e contratos vigentes por gestor. Contratos vinculados a uma ata seguem o gestor da ata."
         icon={<Users size={26} color="#0c326f" aria-hidden="true" />}
         actions={
@@ -413,7 +414,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
                             {canAssign && (l.ataKeys.length > 0 || l.contractKeys.length > 0) && (
                               <button
                                 type="button"
-                                onClick={(e) => setTransferencia({ targets: carteiraTargets(l), anchor: e.currentTarget.getBoundingClientRect() })}
+                                onClick={() => setTransferencia({ targets: carteiraTargets(l), origem: l.gestorNome })}
                                 data-testid={`distribuicao-transferir-${testKey}`}
                                 title={isSemGestor ? 'Atribuir todas as atas e contratos vigentes sem gestor' : 'Passar toda a carteira vigente deste gestor para outra pessoa'}
                                 style={{ ...carteiraButton, color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
@@ -430,7 +431,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
                             <DistribuicaoItens
                               linha={l}
                               canAssign={canAssign}
-                              onTransfer={(targets, anchor, done) => setTransferencia({ targets, anchor, done })}
+                              onTransfer={(targets, done) => setTransferencia({ targets, origem: l.gestorNome, done })}
                             />
                           </td>
                         </tr>
@@ -444,9 +445,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
           </div>
 
           {transferencia && (
-            <ManagerAssignPanel
+            <AtribuirGestorModal
               targets={transferencia.targets}
-              anchorRect={transferencia.anchor}
+              origem={transferencia.origem}
+              linhas={distribuicao.linhas}
               links={links}
               contractsByKey={contratos.contractsByKey}
               onDone={transferencia.done}

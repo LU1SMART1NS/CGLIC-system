@@ -31,8 +31,8 @@ interface DistribuicaoItensProps {
   linha: DistribuicaoLinha;
   /** Só o admin transfere; para os demais a lista é de consulta. */
   canAssign: boolean;
-  /** Abre o painel de atribuição para os itens marcados; `done` limpa a marcação depois de salvar. */
-  onTransfer: (targets: ManagerTarget[], anchor: DOMRect, done: () => void) => void;
+  /** Abre o "Para quem atribuo?" para os itens marcados; `done` limpa a marcação depois de salvar. */
+  onTransfer: (targets: ManagerTarget[], done: () => void) => void;
 }
 
 /**
@@ -66,9 +66,9 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
       return next;
     });
 
-  const transferSelected = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const transferSelected = () => {
     const targets = linha.itens.filter((i) => selected.has(itemId(i))).map(toTarget);
-    onTransfer(targets, e.currentTarget.getBoundingClientRect(), () => setSelected(new Set()));
+    onTransfer(targets, () => setSelected(new Set()));
   };
 
   if (linha.itens.length === 0) {
