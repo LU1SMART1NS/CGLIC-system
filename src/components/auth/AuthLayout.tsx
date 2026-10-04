@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { AlertCircle, BarChart3, CalendarClock, Check, Database, Eye, EyeOff } from 'lucide-react';
+import govbrLogo from '../../assets/govbr-logo.svg';
+import fnspLogo from '../../assets/fnsp-logo.png';
 
 /**
  * Layout compartilhado das telas de acesso (login, primeiro acesso e
@@ -11,20 +13,14 @@ import { AlertCircle, BarChart3, CalendarClock, Check, Database, Eye, EyeOff } f
 export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="auth">
     <div className="auth-govbar">
-      <span className="auth-govbar__logo">gov<span>.</span>br</span>
+      <img className="auth-govbar__logo" src={govbrLogo} alt="gov.br" />
       <span className="auth-govbar__sep" aria-hidden="true" />
-      <span>Ministério da Justiça e Segurança Pública</span>
+      <span className="auth-govbar__org">Ministério da Justiça e Segurança Pública</span>
     </div>
 
     <div className="auth-body">
       <aside className="auth-brand" aria-hidden="true">
-        <div className="auth-brand__id">
-          <img src="/logo.png" alt="" />
-          <div>
-            <div className="auth-brand__name">CGLIC</div>
-            <div className="auth-brand__org">SENASP · ComprasSUSP</div>
-          </div>
-        </div>
+        <div className="auth-brand__name"><span>Compras</span>SUSP</div>
 
         <div className="auth-brand__main">
           <h2 className="auth-brand__title">Gestão inteligente de atas e contratos</h2>
@@ -47,24 +43,25 @@ export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           </ul>
         </div>
 
-        <div className="auth-brand__foot">Secretaria Nacional de Segurança Pública — SENASP</div>
+        <div className="auth-brand__foot">
+          <img src={fnspLogo} alt="" />
+          <span className="auth-brand__foot-sep" />
+          <span>Fundo Nacional de Segurança Pública</span>
+        </div>
       </aside>
 
       <main className="auth-main">
         <div className="auth-panel-wrap">
           <div className="auth-panel">
             <div className="auth-mobile-id">
-              <img src="/logo.png" alt="" />
-              <div>
-                <div className="auth-mobile-id__name">CGLIC</div>
-                <div className="auth-mobile-id__org">Gestão Inteligente de Atas e Contratos</div>
-              </div>
+              <div className="auth-mobile-id__name"><span>Compras</span>SUSP</div>
+              <div className="auth-mobile-id__org">Gestão Inteligente de Atas e Contratos</div>
             </div>
             {children}
           </div>
         </div>
         <footer className="auth-foot">
-          © {new Date().getFullYear()} Ministério da Justiça e Segurança Pública · SENASP
+          Dados: Compras.gov.br e PNCP · © {new Date().getFullYear()}
         </footer>
       </main>
     </div>

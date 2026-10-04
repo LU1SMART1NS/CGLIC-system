@@ -1196,10 +1196,10 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 
 .auth { min-height: 100vh; display: flex; flex-direction: column; background: #ffffff; color: #0f172a; font-family: var(--font-family); }
 
-.auth-govbar { display: flex; align-items: center; gap: 0.65rem; padding: 0.45rem 1.5rem; background: #071d41; color: #ffffff; font-size: 0.75rem; }
-.auth-govbar__logo { font-weight: 800; font-size: 0.85rem; letter-spacing: -0.01em; }
-.auth-govbar__logo span { color: #00cc55; }
-.auth-govbar__sep { width: 1px; height: 14px; background: rgba(255, 255, 255, 0.3); }
+.auth-govbar { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 1.5rem; background: #0c326f; border-bottom: 2px solid #00cc55; color: #ffffff; font-size: 0.75rem; }
+.auth-govbar__logo { height: 15px; width: auto; display: block; filter: brightness(0) invert(1); }
+.auth-govbar__org { font-weight: 600; opacity: 0.95; }
+.auth-govbar__sep { width: 1px; height: 12px; margin: 0 0.25rem; background: rgba(255, 255, 255, 0.5); }
 
 .auth-body { flex: 1; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
 
@@ -1217,17 +1217,17 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
     radial-gradient(ellipse 70% 50% at 100% 100%, rgba(0, 204, 85, 0.14), transparent 70%),
     linear-gradient(160deg, rgba(7, 29, 65, 0.95) 0%, rgba(12, 50, 111, 0.9) 55%, rgba(7, 29, 65, 0.97) 100%);
 }
-.auth-brand__id { display: flex; align-items: center; gap: 0.85rem; }
-.auth-brand__id img { width: 42px; height: auto; filter: invert(1); }
-.auth-brand__name { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.05em; line-height: 1; }
-.auth-brand__org { font-size: 0.75rem; color: rgba(255, 255, 255, 0.7); margin-top: 0.3rem; }
+.auth-brand__name { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.auth-brand__name span { font-weight: 500; }
 .auth-brand__main { max-width: 30rem; }
 .auth-brand__title { font-size: clamp(1.8rem, 2.7vw, 2.5rem); font-weight: 800; line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 1rem; color: #ffffff; }
 .auth-brand__lead { font-size: 1rem; line-height: 1.6; color: rgba(255, 255, 255, 0.8); margin: 0 0 2.25rem; }
 .auth-brand__list { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
 .auth-brand__list li { display: flex; align-items: center; gap: 0.85rem; font-size: 0.92rem; line-height: 1.4; color: rgba(255, 255, 255, 0.92); }
 .auth-brand__icon { flex: none; width: 2.1rem; height: 2.1rem; border-radius: 8px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); }
-.auth-brand__foot { font-size: 0.75rem; color: rgba(255, 255, 255, 0.55); }
+.auth-brand__foot { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
+.auth-brand__foot img { height: 12px; width: auto; display: block; filter: brightness(0) invert(1); }
+.auth-brand__foot-sep { width: 1px; height: 12px; margin: 0 0.25rem; background: rgba(255, 255, 255, 0.5); }
 
 /* Área do formulário */
 .auth-main { display: flex; flex-direction: column; background: #ffffff; }
@@ -1311,10 +1311,10 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
   .auth-body { grid-template-columns: 1fr; }
   .auth-brand { display: none; }
   .auth-panel-wrap { align-items: flex-start; padding: 2.5rem 1rem; }
-  .auth-mobile-id { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2.25rem; }
-  .auth-mobile-id img { width: 38px; height: auto; }
-  .auth-mobile-id__name { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.05em; color: var(--primary); line-height: 1; }
-  .auth-mobile-id__org { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+  .auth-mobile-id { display: block; margin-bottom: 2.25rem; }
+  .auth-mobile-id__name { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; color: #0f172a; line-height: 1; }
+  .auth-mobile-id__name span { font-weight: 500; }
+  .auth-mobile-id__org { font-size: 0.75rem; color: #64748b; margin-top: 0.35rem; }
 }
 @media (max-width: 480px) {
   .auth-govbar { padding: 0.45rem 1rem; }

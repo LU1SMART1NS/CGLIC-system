@@ -35,7 +35,7 @@ describe('AuthRoutes — Testes Unitários de Acesso e Credenciamento com Supaba
 
     const html = renderToStaticMarkup(<LoginRoute />);
 
-    expect(html).toContain('CGLIC');
+    expect(html).toContain('Gestão Inteligente de Atas e Contratos');
     expect(html).toContain('E-mail institucional');
     expect(html).toContain('"current-password"');
     expect(html).toContain('Entrar');

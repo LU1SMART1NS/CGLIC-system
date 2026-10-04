@@ -33,7 +33,7 @@ export const LoginRoute: React.FC = () => {
   const [forgotError, setForgotError] = useState<string | null>(null);
 
   if (loading) {
-    return <AuthLoading label="Carregando CGLIC…" />;
+    return <AuthLoading label="Carregando ComprasSUSP…" />;
   }
 
   if (user && !devPreview) {
