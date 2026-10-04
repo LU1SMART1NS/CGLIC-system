@@ -8,7 +8,7 @@ import { HeaderRefreshAction } from '../../../design-system/components/HeaderRef
 import { SkeletonLoader } from '../../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../../design-system/components/ErrorState';
 import { EmptyState } from '../../../design-system/components/EmptyState';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraButton, carteiraSelect, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { CARTEIRA_EXPANDED_CELL_STYLE } from '../../carteira/CarteiraDetailLabel';
 import { DistribuicaoItens } from './DistribuicaoItens';
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
@@ -22,9 +22,11 @@ import { useArpItemContractLinks } from '../../../hooks/useAtaManagers';
 import { formatContractNumber } from '../../../utils/contractNumber';
 import {
   buildDistribuicaoEquipe,
-  type CargaInstrumentos,
+  ordenarDistribuicao,
+  FAIXA_MEDIA_EQUIPE,
   type DistribuicaoLinha
 } from './distribuicaoEquipe';
+import { mesesDeVigencia, PESO_COMPLEXIDADE, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 
 /** Carteira filtrada por gestor (o filtro padrão de situação já é "Vigentes", o mesmo critério desta tela). */
 function carteiraPath(base: '/atas' | '/contratos', gestorNome: string | null): string {
@@ -33,31 +35,81 @@ function carteiraPath(base: '/atas' | '/contratos', gestorNome: string | null): 
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
-const CargaCell: React.FC<{ carga: CargaInstrumentos; feminino?: boolean }> = ({ carga, feminino }) => {
-  const detalhes = [
-    carga.criticos > 0 ? `${carga.criticos} ${feminino ? (carga.criticos === 1 ? 'crítica' : 'críticas') : (carga.criticos === 1 ? 'crítico' : 'críticos')}` : null,
-    carga.atencao > 0 ? `${carga.atencao} em atenção` : null
-  ].filter(Boolean);
+/** Itens e fornecedores distintos (CNPJ) da ata, para a complexidade. */
+function contarItensEFornecedores(itens?: Array<{ niFornecedor?: string }>): { itens: number; fornecedores: number } {
+  const lista = itens || [];
+  const cnpjs = new Set(lista.map((i) => (i.niFornecedor || '').replace(/\D/g, '')).filter(Boolean));
+  return { itens: lista.length, fornecedores: cnpjs.size };
+}
+
+/** Categoria do contrato: `categoria` no Contratos.gov.br, `nomeCategoria` no Compras.gov.br. */
+function categoriaDoContrato(raw: unknown): string | undefined {
+  const r = raw as { categoria?: unknown; nomeCategoria?: unknown } | undefined;
+  const c = r?.categoria ?? r?.nomeCategoria;
+  return typeof c === 'string' ? c : undefined;
+}
+
+/** Cores das faixas de complexidade (barra empilhada e etiquetas). */
+export const COR_COMPLEXIDADE: Record<NivelComplexidade, string> = { ALTA: '#0c326f', MEDIA: '#5b8bd6', BAIXA: '#c7d7f0' };
+const NIVEIS: NivelComplexidade[] = ['ALTA', 'MEDIA', 'BAIXA'];
+
+const CarteiraCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
+  <div title={`Valor registrado das atas: ${formatCurrencyCompact(l.atas.valor)} · Valor vigente dos contratos: ${formatCurrencyCompact(l.contratos.valor)}`}>
+    <div style={{ fontWeight: 800 }}>
+      {plural(l.atas.vigentes, 'ata', 'atas')} · {plural(l.contratos.vigentes, 'contrato', 'contratos')}
+    </div>
+  </div>
+);
+
+/** Composição da carteira por complexidade: barra empilhada e "3 A · 6 M · 4 B". */
+const ComplexidadeCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => {
+  const total = l.complexidade.ALTA + l.complexidade.MEDIA + l.complexidade.BAIXA;
   return (
-    <div>
-      <div style={{ fontWeight: 800 }}>{carga.vigentes}</div>
-      {detalhes.length > 0 && (
-        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: carga.criticos > 0 ? '#b91c1c' : '#b45309' }}>
-          {detalhes.join(' · ')}
-        </div>
-      )}
+    <div style={{ minWidth: '130px' }}>
+      <div
+        style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', background: '#f1f5f9' }}
+        aria-hidden="true"
+      >
+        {total > 0 && NIVEIS.map((n) => (
+          <div key={n} style={{ width: `${(l.complexidade[n] / total) * 100}%`, background: COR_COMPLEXIDADE[n] }} />
+        ))}
+      </div>
+      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>
+        {NIVEIS.map((n) => `${l.complexidade[n]} ${ROTULO_COMPLEXIDADE[n].charAt(0)}`).join(' · ')}
+      </div>
     </div>
   );
 };
 
-const CargaBar: React.FC<{ pct: number }> = ({ pct }) => (
-  <div style={{ minWidth: '90px' }}>
-    <span style={{ fontWeight: 800 }}>{pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%</span>
-    <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', marginTop: '0.2rem', overflow: 'hidden' }}>
-      <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: '#0c326f' }} />
-    </div>
+const RELACAO_ROTULO = { ACIMA: 'Acima da média', NA_MEDIA: 'Na média', ABAIXO: 'Abaixo da média' } as const;
+
+/** Carga equivalente e posição neutra em relação à equipe (sem ranking, sem cor de alerta). */
+const CargaEquivalenteCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
+  <div title={`Soma dos pesos: Baixa = ${PESO_COMPLEXIDADE.BAIXA}, Média = ${PESO_COMPLEXIDADE.MEDIA}, Alta = ${PESO_COMPLEXIDADE.ALTA}`}>
+    <div style={{ fontWeight: 800 }}>{l.equivalente}</div>
+    {l.relacaoEquipe && (
+      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>{RELACAO_ROTULO[l.relacaoEquipe]}</div>
+    )}
   </div>
 );
+
+/** Pressão do momento: o que aperta agora (não muda a carga estrutural). */
+const PressaoCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => {
+  const vencendo = l.atas.criticos + l.atas.atencao + l.contratos.criticos + l.contratos.atencao;
+  const partes: Array<{ texto: string; cor: string }> = [];
+  if (l.pendencias.urgentes > 0) partes.push({ texto: plural(l.pendencias.urgentes, 'urgente', 'urgentes'), cor: '#b91c1c' });
+  if (l.pendencias.atrasadas > 0) partes.push({ texto: plural(l.pendencias.atrasadas, 'tarefa atrasada', 'tarefas atrasadas'), cor: '#b91c1c' });
+  if (l.pendencias.acompanhar > 0) partes.push({ texto: `${l.pendencias.acompanhar} a acompanhar`, cor: '#b45309' });
+  if (vencendo > 0) partes.push({ texto: `${vencendo} ${vencendo === 1 ? 'vence' : 'vencem'} em até 90 dias`, cor: '#b45309' });
+  if (partes.length === 0) return <span style={{ color: '#94a3b8' }}>—</span>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.75rem', fontWeight: 700 }}>
+      {partes.map((p) => (
+        <span key={p.texto} style={{ color: p.cor, whiteSpace: 'nowrap' }}>{p.texto}</span>
+      ))}
+    </div>
+  );
+};
 
 interface KpiTileProps {
   label: string;
@@ -122,6 +174,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // Painel de atribuição aberto: alvos (carteira inteira de um gestor ou itens marcados) e o que fazer ao salvar.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; anchor: DOMRect; done?: () => void } | null>(null);
   const [expanded, setExpanded] = React.useState<string | null>(null);
+  const [ordem, setOrdem] = React.useState<'NOME' | 'CARGA'>('NOME');
   const carteiraTargets = (l: DistribuicaoLinha): ManagerTarget[] => [
     ...l.ataKeys.map((ataKey) => ({ tipo: 'ATA' as const, ataKey })),
     ...l.contractKeys.map((contractKey) => ({ tipo: 'CONTRATO' as const, contractKey }))
@@ -137,7 +190,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
           dias: getArpPrazo(arp).dias,
           faixa: getArpPrazo(arp).faixa,
           valor: Number(arp.valorTotal) || 0,
-          gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco]
+          gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
+          ...contarItensEFornecedores(atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`])
         })),
         contratos: contratos.rows.map((row) => ({
           contractKey: row.contractKey,
@@ -146,12 +200,14 @@ export const DistribuicaoEquipePage: React.FC = () => {
           dias: row.diasRestantes,
           faixa: row.faixa,
           valor: row.contract.valorGlobal || row.contract.valorInicial || 0,
-          gestorNome: row.gestorNome
+          gestorNome: row.gestorNome,
+          categoria: categoriaDoContrato(row.contract.raw),
+          mesesVigencia: mesesDeVigencia(row.contract.dataVigenciaInicio, row.contract.dataVigenciaFim)
         })),
         links,
         attentionItems: contratos.attentionItems
       }),
-    [atas.scopedArps, atas.gestorByAta, contratos.rows, contratos.attentionItems, links]
+    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links]
   );
 
   const refresh = () => {
@@ -173,11 +229,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
 
   // Só mostra números com atas, contratos e vínculos carregados: totais parciais enganariam a leitura da carga.
   const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading;
-  const { linhas, divergencias, totais } = distribuicao;
+  const { divergencias, totais } = distribuicao;
+  const linhas = ordenarDistribuicao(distribuicao.linhas, ordem);
   const semGestor = linhas.find((l) => l.gestorNome === null);
   const totalInstrumentos = totais.atas.vigentes + totais.contratos.vigentes;
-  const cargaPct = (l: DistribuicaoLinha) =>
-    totalInstrumentos > 0 ? ((l.atas.vigentes + l.contratos.vigentes) / totalInstrumentos) * 100 : 0;
 
   const scrollToDivergencias = () =>
     document.getElementById('distribuicao-divergencias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -253,6 +308,33 @@ export const DistribuicaoEquipePage: React.FC = () => {
             />
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.75rem', color: '#475569', fontWeight: 700 }}>
+              <span>Complexidade:</span>
+              {NIVEIS.map((n) => (
+                <span key={n} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: COR_COMPLEXIDADE[n] }} aria-hidden="true" />
+                  {ROTULO_COMPLEXIDADE[n]} (peso {PESO_COMPLEXIDADE[n]})
+                </span>
+              ))}
+              {totais.mediaEquivalente !== null && (
+                <span>· Média da equipe: {totais.mediaEquivalente.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</span>
+              )}
+            </div>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
+              Ordenar por
+              <select
+                value={ordem}
+                onChange={(e) => setOrdem(e.target.value as 'NOME' | 'CARGA')}
+                data-testid="distribuicao-ordem"
+                style={{ ...carteiraSelect, maxWidth: '140px' }}
+              >
+                <option value="NOME">Nome</option>
+                <option value="CARGA">Carga</option>
+              </select>
+            </label>
+          </div>
+
           <div data-testid="distribuicao-table" style={carteiraTableShell}>
             <div style={{ overflowX: 'auto', containerType: 'inline-size' }}>
               <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -260,13 +342,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
                   <tr>
                     <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
                     <th style={carteiraTh}>Gestor</th>
-                    <th style={carteiraTh}>Atas</th>
-                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor registrado</th>
-                    <th style={carteiraTh}>Contratos</th>
-                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor vigente</th>
-                    <th style={carteiraTh} title="Gravidade crítica ou urgente: tarefa vencida, fatura vencida, saldo crítico…">Urgentes</th>
-                    <th style={carteiraTh} title="Gravidade de atenção ou informativa: prazos próximos, reajustes, lembretes">A acompanhar</th>
-                    <th style={carteiraTh}>Parte da carteira</th>
+                    <th style={carteiraTh}>Carteira</th>
+                    <th style={carteiraTh} title="Alta: serviço/TIC com 12+ meses, obra ou engenharia; ata com 6+ itens ou 2+ fornecedores. Baixa: compra de até 12 meses; ata com 1 item. Média: o resto.">Complexidade</th>
+                    <th style={carteiraTh} title={`Soma dos pesos (Baixa = ${PESO_COMPLEXIDADE.BAIXA}, Média = ${PESO_COMPLEXIDADE.MEDIA}, Alta = ${PESO_COMPLEXIDADE.ALTA}), comparada à média da equipe (±${FAIXA_MEDIA_EQUIPE * 100}%)`}>Carga</th>
+                    <th style={carteiraTh}>Pressão agora</th>
                     <th style={{ ...carteiraTh, textAlign: 'right' }}>Ações</th>
                   </tr>
                 </thead>
@@ -299,30 +378,17 @@ export const DistribuicaoEquipePage: React.FC = () => {
                             <span style={{ fontWeight: 800 }}>{l.gestorNome}</span>
                           )}
                         </td>
-                        <td data-label="Atas" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <CargaCell carga={l.atas} feminino />
+                        <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                          <CarteiraCell l={l} />
                         </td>
-                        <td data-label="Valor registrado" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>
-                          <span>{l.atas.vigentes > 0 ? formatCurrencyCompact(l.atas.valor) : '—'}</span>
+                        <td data-label="Complexidade" style={carteiraTd}>
+                          <ComplexidadeCell l={l} />
                         </td>
-                        <td data-label="Contratos" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <CargaCell carga={l.contratos} />
+                        <td data-label="Carga" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                          <CargaEquivalenteCell l={l} />
                         </td>
-                        <td data-label="Valor vigente" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>
-                          <span>{l.contratos.vigentes > 0 ? formatCurrencyCompact(l.contratos.valor) : '—'}</span>
-                        </td>
-                        <td data-label="Urgentes" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <span style={{ fontWeight: 800, color: l.pendencias.urgentes > 0 ? '#b91c1c' : '#94a3b8' }}>
-                            {l.pendencias.urgentes > 0 ? l.pendencias.urgentes : '—'}
-                          </span>
-                        </td>
-                        <td data-label="A acompanhar" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <span style={{ fontWeight: 700, color: l.pendencias.acompanhar > 0 ? '#b45309' : '#94a3b8' }}>
-                            {l.pendencias.acompanhar > 0 ? l.pendencias.acompanhar : '—'}
-                          </span>
-                        </td>
-                        <td data-label="Parte da carteira" style={carteiraTd}>
-                          <CargaBar pct={cargaPct(l)} />
+                        <td data-label="Pressão agora" style={carteiraTd}>
+                          <PressaoCell l={l} />
                         </td>
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
@@ -360,7 +426,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
                       </tr>
                       {isExpanded && (
                         <tr className="carteira-expanded" data-testid={`distribuicao-expanded-${testKey}`}>
-                          <td colSpan={10} style={CARTEIRA_EXPANDED_CELL_STYLE}>
+                          <td colSpan={7} style={CARTEIRA_EXPANDED_CELL_STYLE}>
                             <DistribuicaoItens
                               linha={l}
                               canAssign={canAssign}

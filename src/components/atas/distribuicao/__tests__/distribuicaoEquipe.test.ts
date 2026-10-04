@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDistribuicaoEquipe, type DistribuicaoAta, type DistribuicaoContrato } from '../distribuicaoEquipe';
+import { buildDistribuicaoEquipe, ordenarDistribuicao, type DistribuicaoAta, type DistribuicaoContrato } from '../distribuicaoEquipe';
 import type { DashboardAttentionItem } from '../../../../types/managementDashboard';
 
 const ata = (numeroAta: string, gestorNome?: string, faixa: DistribuicaoAta['faixa'] = 'REGULAR', valor = 100): DistribuicaoAta => ({
@@ -16,7 +16,7 @@ const contrato = (contractKey: string, gestorNome?: string, faixa: DistribuicaoC
   valor
 });
 const alerta = (fields: Partial<DashboardAttentionItem>): DashboardAttentionItem =>
-  ({ id: Math.random().toString(), category: 'TAREFA_ATRASADA', severity: 'ATENCAO', title: 'x', ...fields }) as DashboardAttentionItem;
+  ({ id: Math.random().toString(), category: 'LEMBRETE', severity: 'ATENCAO', title: 'x', ...fields }) as DashboardAttentionItem;
 
 describe('buildDistribuicaoEquipe', () => {
   it('soma só instrumentos vigentes por gestor, com prazo e valor', () => {
@@ -36,14 +36,46 @@ describe('buildDistribuicaoEquipe', () => {
     expect(totais).toMatchObject({ gestores: 2, atas: { vigentes: 2 }, contratos: { vigentes: 2 } });
   });
 
-  it('põe "Sem gestor" primeiro e ordena os gestores pela carga', () => {
+  it('põe "Sem gestor" primeiro e os gestores em ordem alfabética; por carga quando pedido', () => {
     const { linhas } = buildDistribuicaoEquipe({
-      atas: [ata('00001/2025', 'Bruno'), ata('00002/2025'), ata('00003/2025', 'Ana'), ata('00004/2025', 'Ana')],
-      contratos: [contrato('200331-00001-2025', 'Carla')],
+      atas: [ata('00001/2025', 'Bruno'), ata('00002/2025'), { ...ata('00003/2025', 'Ana'), itens: 1 }, { ...ata('00004/2025', 'Carla'), itens: 10 }],
+      contratos: [],
       links: [],
       attentionItems: []
     });
     expect(linhas.map((l) => l.gestorNome)).toEqual([null, 'Ana', 'Bruno', 'Carla']);
+    // Ana: 1 item = Baixa (1); Bruno: sem itens = Média (2); Carla: 10 itens = Alta (3)
+    expect(ordenarDistribuicao(linhas, 'CARGA').map((l) => l.gestorNome)).toEqual([null, 'Carla', 'Bruno', 'Ana']);
+  });
+
+  it('soma a carga equivalente por complexidade e compara com a média da equipe (±25%)', () => {
+    const { linhas, totais } = buildDistribuicaoEquipe({
+      atas: [{ ...ata('00001/2025', 'Ana'), itens: 10 }, { ...ata('00002/2025', 'Ana'), itens: 10 }, { ...ata('00003/2025', 'Bruno'), itens: 1 }],
+      contratos: [
+        { ...contrato('200331-00001-2025', 'Ana'), categoria: 'Serviços', mesesVigencia: 24 },
+        { ...contrato('200331-00002-2025', 'Bruno'), categoria: 'Compras', mesesVigencia: 6 },
+        { ...contrato('200331-00003-2025', 'Carla'), categoria: 'Compras', mesesVigencia: 13 },
+        { ...contrato('200331-00004-2025', 'Carla'), categoria: 'Compras', mesesVigencia: 18 },
+        { ...contrato('200331-00005-2025'), categoria: 'Serviços', mesesVigencia: 24 }
+      ],
+      links: [],
+      attentionItems: []
+    });
+    const por = (n: string | null) => linhas.find((l) => l.gestorNome === n)!;
+    expect(por('Ana')).toMatchObject({ complexidade: { ALTA: 3, MEDIA: 0, BAIXA: 0 }, equivalente: 9 });
+    expect(por('Bruno')).toMatchObject({ complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 2 }, equivalente: 2 });
+    expect(por('Carla')).toMatchObject({ complexidade: { ALTA: 0, MEDIA: 2, BAIXA: 0 }, equivalente: 4 });
+    expect(totais.mediaEquivalente).toBe(5); // (9 + 2 + 4) / 3; "Sem gestor" fora da média
+    expect(por('Ana').relacaoEquipe).toBe('ACIMA');
+    expect(por('Bruno').relacaoEquipe).toBe('ABAIXO');
+    expect(por('Carla').relacaoEquipe).toBe('NA_MEDIA'); // 4 está dentro de 5 ± 25%
+    expect(por(null).relacaoEquipe).toBeNull();
+  });
+
+  it('com um gestor só não há comparação com a média', () => {
+    const { linhas, totais } = buildDistribuicaoEquipe({ atas: [ata('00001/2025', 'Ana')], contratos: [], links: [], attentionItems: [] });
+    expect(totais.mediaEquivalente).toBeNull();
+    expect(linhas[0].relacaoEquipe).toBeNull();
   });
 
   it('atribui pendências ao gestor do contrato ou da ata, separando urgentes de acompanhamento', () => {
@@ -52,16 +84,16 @@ describe('buildDistribuicaoEquipe', () => {
       contratos: [contrato('200331-00001-2025', 'Bruno'), contrato('200331-00009-2020', 'Bruno', 'EXPIRADO')],
       links: [],
       attentionItems: [
-        alerta({ contractKey: '200331-00001-2025', severity: 'CRITICA' }),
+        alerta({ contractKey: '200331-00001-2025', severity: 'CRITICA', category: 'TAREFA_ATRASADA' }),
         alerta({ contractKey: '200331-00001-2025', severity: 'INFO' }),
         alerta({ arpKey: '00001/2025-200331', severity: 'URGENTE' }),
         alerta({ numeroAta: '00002/2025', severity: 'ATENCAO' }),
         alerta({ contractKey: '200331-00009-2020', severity: 'CRITICA' }) // contrato expirado: fora da carteira vigente
       ]
     });
-    expect(linhas.find((l) => l.gestorNome === 'Ana')!.pendencias).toEqual({ urgentes: 1, acompanhar: 0 });
-    expect(linhas.find((l) => l.gestorNome === 'Bruno')!.pendencias).toEqual({ urgentes: 1, acompanhar: 1 });
-    expect(linhas.find((l) => l.gestorNome === null)!.pendencias).toEqual({ urgentes: 0, acompanhar: 1 });
+    expect(linhas.find((l) => l.gestorNome === 'Ana')!.pendencias).toEqual({ urgentes: 1, acompanhar: 0, atrasadas: 0 });
+    expect(linhas.find((l) => l.gestorNome === 'Bruno')!.pendencias).toEqual({ urgentes: 1, acompanhar: 1, atrasadas: 1 });
+    expect(linhas.find((l) => l.gestorNome === null)!.pendencias).toEqual({ urgentes: 0, acompanhar: 1, atrasadas: 0 });
   });
 
   it('lista as chaves das atas e contratos vigentes de cada gestor (alvos da transferência)', () => {

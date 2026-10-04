@@ -1,6 +1,13 @@
 import type { PrazoFaixa } from '../../carteira/carteiraPrazo';
 import type { ArpItemContractLinkPair } from '../../../services/arpContractLinkService';
 import type { DashboardAttentionItem } from '../../../types/managementDashboard';
+import {
+  classificarAta,
+  classificarContrato,
+  PESO_COMPLEXIDADE,
+  type Complexidade,
+  type NivelComplexidade
+} from './complexidade';
 
 /** Ata já com prazo e gestor (chave do gestor = número da ata, como em ata_managers). */
 export interface DistribuicaoAta {
@@ -11,6 +18,9 @@ export interface DistribuicaoAta {
   faixa: PrazoFaixa;
   valor: number;
   gestorNome?: string;
+  /** Itens e fornecedores distintos da ata (para a complexidade). */
+  itens?: number;
+  fornecedores?: number;
 }
 
 export interface DistribuicaoContrato {
@@ -21,6 +31,9 @@ export interface DistribuicaoContrato {
   faixa: PrazoFaixa;
   valor: number;
   gestorNome?: string;
+  /** Categoria do Contratos.gov.br (Compras, Serviços…) e duração da vigência, para a complexidade. */
+  categoria?: string;
+  mesesVigencia?: number | null;
 }
 
 /** Ata ou contrato vigente listado dentro da linha do gestor. */
@@ -36,6 +49,7 @@ export interface DistribuicaoItem {
   valor: number;
   urgentes: number;
   acompanhar: number;
+  complexidade: Complexidade;
 }
 
 export interface CargaInstrumentos {
@@ -57,12 +71,20 @@ export interface DistribuicaoLinha {
   contractKeys: string[];
   /** Atas e contratos vigentes do gestor, os mais urgentes primeiro (alertas urgentes, depois menor prazo). */
   itens: DistribuicaoItem[];
+  /** Quantos instrumentos vigentes em cada faixa de complexidade. */
+  complexidade: Record<NivelComplexidade, number>;
+  /** Carga estrutural: soma dos pesos (Baixa = 1, Média = 2, Alta = 3). */
+  equivalente: number;
+  /** Carga em relação à média da equipe (±25%); `null` para "Sem gestor" ou com menos de 2 gestores. */
+  relacaoEquipe: 'ACIMA' | 'NA_MEDIA' | 'ABAIXO' | null;
 }
 
 /** Mesma gravidade da Visão Geral: urgentes = crítica ou urgente (tarefa vencida, fatura vencida, saldo crítico…); o resto é acompanhamento. */
 export interface Pendencias {
   urgentes: number;
   acompanhar: number;
+  /** Tarefas do plano de gestão vencidas (já contadas em urgentes). */
+  atrasadas: number;
 }
 
 /** Contrato vigente vinculado a uma ata cujo gestor não é o mesmo (a regra é herdar o gestor da ata). */
@@ -77,8 +99,17 @@ export interface DistribuicaoDivergencia {
 export interface DistribuicaoEquipe {
   linhas: DistribuicaoLinha[];
   divergencias: DistribuicaoDivergencia[];
-  totais: { atas: CargaInstrumentos; contratos: CargaInstrumentos; gestores: number };
+  totais: {
+    atas: CargaInstrumentos;
+    contratos: CargaInstrumentos;
+    gestores: number;
+    /** Média da carga equivalente entre os gestores com carteira; `null` com menos de 2 gestores. */
+    mediaEquivalente: number | null;
+  };
 }
+
+/** Faixa de ±25% em torno da média da equipe. */
+export const FAIXA_MEDIA_EQUIPE = 0.25;
 
 /** Vigente = mesmo critério dos cards e do filtro padrão das carteiras (sem expirados e sem data). */
 export function isVigente(faixa: PrazoFaixa): boolean {
@@ -102,7 +133,7 @@ function numeroAtaDoAlerta(item: DashboardAttentionItem): string | undefined {
 /**
  * Distribuição da carteira vigente por gestor: atas e contratos (quantidade, prazo e valor),
  * pendências em aberto e contratos vinculados com gestor diferente do da ata.
- * Linhas ordenadas por carga (atas + contratos vigentes); "Sem gestor" vem primeiro.
+ * Cada instrumento recebe uma faixa de complexidade (ver complexidade.ts) e cada gestor uma carga equivalente.
  */
 export function buildDistribuicaoEquipe(input: {
   atas: DistribuicaoAta[];
@@ -115,13 +146,28 @@ export function buildDistribuicaoEquipe(input: {
     const key = gestorNome || null;
     let l = linhas.get(key);
     if (!l) {
-      l = { gestorNome: key, atas: cargaVazia(), contratos: cargaVazia(), pendencias: { urgentes: 0, acompanhar: 0 }, ataKeys: [], contractKeys: [], itens: [] };
+      l = {
+        gestorNome: key,
+        atas: cargaVazia(),
+        contratos: cargaVazia(),
+        pendencias: { urgentes: 0, acompanhar: 0, atrasadas: 0 },
+        ataKeys: [],
+        contractKeys: [],
+        itens: [],
+        complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 },
+        equivalente: 0,
+        relacaoEquipe: null
+      };
       linhas.set(key, l);
     }
     return l;
   };
 
-  const totais = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0 };
+  const totais: DistribuicaoEquipe['totais'] = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0, mediaEquivalente: null };
+  const contarComplexidade = (l: DistribuicaoLinha, c: Complexidade) => {
+    l.complexidade[c.nivel]++;
+    l.equivalente += PESO_COMPLEXIDADE[c.nivel];
+  };
   const ataPorNumero = new Map<string, DistribuicaoAta>();
   const contratoPorChave = new Map<string, DistribuicaoContrato>();
   const itemAta = new Map<string, DistribuicaoItem>();
@@ -143,9 +189,11 @@ export function buildDistribuicaoEquipe(input: {
       dias: ata.dias ?? null,
       valor: ata.valor,
       urgentes: 0,
-      acompanhar: 0
+      acompanhar: 0,
+      complexidade: classificarAta(ata.itens ?? 0, ata.fornecedores ?? 0)
     };
     l.itens.push(item);
+    contarComplexidade(l, item.complexidade);
     itemAta.set(ata.numeroAta, item);
     somar(totais.atas, ata.faixa, ata.valor);
   }
@@ -164,9 +212,11 @@ export function buildDistribuicaoEquipe(input: {
       dias: contrato.dias ?? null,
       valor: contrato.valor,
       urgentes: 0,
-      acompanhar: 0
+      acompanhar: 0,
+      complexidade: classificarContrato(contrato.categoria, contrato.mesesVigencia ?? null)
     };
     l.itens.push(item);
+    contarComplexidade(l, item.complexidade);
     itemContrato.set(contrato.contractKey, item);
     somar(totais.contratos, contrato.faixa, contrato.valor);
   }
@@ -176,6 +226,7 @@ export function buildDistribuicaoEquipe(input: {
     const urgente = alerta.severity === 'CRITICA' || alerta.severity === 'URGENTE';
     if (urgente) pendencias.urgentes++;
     else pendencias.acompanhar++;
+    if (alerta.category === 'TAREFA_ATRASADA') pendencias.atrasadas++;
     if (alvo) {
       if (urgente) alvo.urgentes++;
       else alvo.acompanhar++;
@@ -213,12 +264,8 @@ export function buildDistribuicaoEquipe(input: {
   }
   divergencias.sort((a, b) => a.numeroAta.localeCompare(b.numeroAta) || a.numeroContrato.localeCompare(b.numeroContrato));
 
-  const carga = (l: DistribuicaoLinha) => l.atas.vigentes + l.contratos.vigentes;
-  const ordenadas = Array.from(linhas.values()).sort((a, b) => {
-    if (a.gestorNome === null) return -1;
-    if (b.gestorNome === null) return 1;
-    return carga(b) - carga(a) || a.gestorNome.localeCompare(b.gestorNome, 'pt-BR');
-  });
+  // Ordem alfabética (sem cara de ranking); "Sem gestor" primeiro. A tela pode reordenar por carga.
+  const ordenadas = ordenarDistribuicao(Array.from(linhas.values()), 'NOME');
   const diasOrd = (d: number | null) => (d === null ? Number.POSITIVE_INFINITY : d);
   for (const l of ordenadas) {
     l.itens.sort(
@@ -229,7 +276,27 @@ export function buildDistribuicaoEquipe(input: {
         a.numero.localeCompare(b.numero)
     );
   }
-  totais.gestores = ordenadas.filter((l) => l.gestorNome !== null).length;
+  const gestores = ordenadas.filter((l) => l.gestorNome !== null);
+  totais.gestores = gestores.length;
+  // Comparar com a média só faz sentido com pelo menos 2 gestores (com 1, ele é a própria média).
+  if (gestores.length >= 2) {
+    const media = gestores.reduce((soma, l) => soma + l.equivalente, 0) / gestores.length;
+    totais.mediaEquivalente = media;
+    for (const l of gestores) {
+      l.relacaoEquipe =
+        l.equivalente > media * (1 + FAIXA_MEDIA_EQUIPE) ? 'ACIMA' : l.equivalente < media * (1 - FAIXA_MEDIA_EQUIPE) ? 'ABAIXO' : 'NA_MEDIA';
+    }
+  }
 
   return { linhas: ordenadas, divergencias, totais };
+}
+
+/** "Sem gestor" sempre primeiro; depois por nome ou pela carga equivalente (maior primeiro). */
+export function ordenarDistribuicao(linhas: DistribuicaoLinha[], por: 'NOME' | 'CARGA'): DistribuicaoLinha[] {
+  return [...linhas].sort((a, b) => {
+    if (a.gestorNome === null) return -1;
+    if (b.gestorNome === null) return 1;
+    const porNome = a.gestorNome.localeCompare(b.gestorNome, 'pt-BR');
+    return por === 'CARGA' ? b.equivalente - a.equivalente || porNome : porNome;
+  });
 }

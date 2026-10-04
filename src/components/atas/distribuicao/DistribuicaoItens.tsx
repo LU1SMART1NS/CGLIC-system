@@ -7,6 +7,13 @@ import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import { buildAtaPath } from '../../../hooks/useAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import type { DistribuicaoItem, DistribuicaoLinha } from './distribuicaoEquipe';
+import { ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
+
+const ETIQUETA_COMPLEXIDADE: Record<NivelComplexidade, { color: string; bg: string }> = {
+  ALTA: { color: '#ffffff', bg: '#0c326f' },
+  MEDIA: { color: '#0c326f', bg: '#dbe6f7' },
+  BAIXA: { color: '#475569', bg: '#f1f5f9' }
+};
 
 const PAGE_SIZE = 10;
 const MORE_SIZE = 20;
@@ -117,11 +124,28 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                 </label>
               )}
               <div style={{ flex: '1 1 130px', minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.45rem' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.03em' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.45rem', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.03em' }}>
                     {item.tipo === 'ATA' ? 'Ata' : 'Contrato'}
                   </span>
                   <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{item.numero}</span>
+                  <span
+                    title={`Complexidade ${ROTULO_COMPLEXIDADE[item.complexidade.nivel]}: ${item.complexidade.motivo}`}
+                    data-testid={`distribuicao-complexidade-${itemId(item)}`}
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      padding: '0.05rem 0.4rem',
+                      borderRadius: '4px',
+                      whiteSpace: 'nowrap',
+                      ...ETIQUETA_COMPLEXIDADE[item.complexidade.nivel]
+                    }}
+                  >
+                    {ROTULO_COMPLEXIDADE[item.complexidade.nivel]}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {item.complexidade.motivo}
+                  </span>
                 </div>
                 <div
                   title={item.objeto}
