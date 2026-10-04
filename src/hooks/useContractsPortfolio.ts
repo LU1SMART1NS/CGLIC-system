@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useContractsDashboard } from './useContractsDashboard';
+import { useContractsDashboard, useContractsListPartial } from './useContractsDashboard';
 import { useAssignedManagementScope } from './useAssignedManagementScope';
 import { useAllContractManagers } from './useAllContractManagers';
 import { useManagementDashboard } from './useManagementDashboard';
@@ -27,6 +27,8 @@ export function useContractsPortfolio() {
   );
   const isLoading = dash200330.isLoading || dash200331.isLoading;
   const isFetching = dash200330.isFetching || dash200331.isFetching;
+  /** Uma das fontes não respondeu: os números podem estar abaixo do real até a próxima tentativa (automática). */
+  const isPartial = useContractsListPartial([...UASGS]);
   const error = (dash200330.error || dash200331.error) as Error | null;
   const dataUpdatedAt = Math.max(dash200330.dataUpdatedAt || 0, dash200331.dataUpdatedAt || 0) || undefined;
   const refresh = useCallback(() => {
@@ -118,6 +120,7 @@ export function useContractsPortfolio() {
     isLoading,
     isLoadingScope,
     isFetching,
+    isPartial,
     error,
     dataUpdatedAt,
     refresh

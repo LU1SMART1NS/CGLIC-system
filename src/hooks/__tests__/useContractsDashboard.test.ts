@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getContractsDashboardQueryOptions } from '../useContractsDashboard';
+import { getContractsDashboardQueryOptions, CONTRACTS_PARTIAL_RETRY_MS } from '../useContractsDashboard';
 import * as contractService from '../../services/contractService';
 
 vi.mock('../../services/contractService', () => ({
-  fetchContractsForDashboard: vi.fn()
+  fetchContractsForDashboard: vi.fn(),
+  clearContractsCache: vi.fn(),
+  isContractsListPartial: vi.fn(() => false),
+  subscribeContractsPartial: vi.fn(() => () => {})
 }));
 
 describe('useContractsDashboard Hook / Query Options - Testes Unitários do Dashboard de Contratos', () => {
@@ -46,6 +49,20 @@ describe('useContractsDashboard Hook / Query Options - Testes Unitários do Dash
 
     expect(contractService.fetchContractsForDashboard).toHaveBeenCalledWith('200331', false);
     expect(result).toEqual(mockContracts);
+  });
+
+  it('lista completa: não refaz a consulta sozinho; incompleta: tenta de novo a cada 30s e ao voltar para a aba', () => {
+    const options = getContractsDashboardQueryOptions('200331');
+
+    vi.mocked(contractService.isContractsListPartial).mockReturnValue(false);
+    expect(options.refetchInterval()).toBe(false);
+    expect(options.refetchOnWindowFocus()).toBe(true);
+
+    vi.mocked(contractService.isContractsListPartial).mockReturnValue(true);
+    expect(options.refetchInterval()).toBe(CONTRACTS_PARTIAL_RETRY_MS);
+    expect(CONTRACTS_PARTIAL_RETRY_MS).toBe(30000);
+    expect(options.refetchOnWindowFocus()).toBe('always');
+    expect(contractService.isContractsListPartial).toHaveBeenCalledWith('200331');
   });
 
   it('deve diferenciar queryKeys por UASG', () => {

@@ -1,6 +1,15 @@
+import { useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchContractsForDashboard, clearContractsCache } from '../services/contractService';
+import {
+  fetchContractsForDashboard,
+  clearContractsCache,
+  isContractsListPartial,
+  subscribeContractsPartial
+} from '../services/contractService';
 import type { ContractDashboardRecord } from '../types';
+
+/** Intervalo para tentar de novo enquanto a lista de contratos estiver incompleta (alguma fonte não respondeu). */
+export const CONTRACTS_PARTIAL_RETRY_MS = 30 * 1000;
 
 /**
  * Constrói as opções canônicas de query para o Dashboard de Contratos.
@@ -16,8 +25,21 @@ export function getContractsDashboardQueryOptions(uasg?: string) {
       return fetchContractsForDashboard(cleanUasg, false);
     },
     enabled: Boolean(cleanUasg),
-    staleTime: 5 * 60 * 1000 // 5 minutos
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    // Lista incompleta não vai para o cache do serviço: tenta de novo até vir completa.
+    refetchInterval: (): number | false => (isContractsListPartial(cleanUasg) ? CONTRACTS_PARTIAL_RETRY_MS : false),
+    // Ao voltar para a aba com a lista incompleta, consulta de novo (mesmo dentro dos 5 minutos de staleTime).
+    refetchOnWindowFocus: (): boolean | 'always' => (isContractsListPartial(cleanUasg) ? 'always' : true)
   };
+}
+
+/** Alguma das UASGs está com a lista de contratos incompleta (uma das fontes não respondeu). */
+export function useContractsListPartial(uasgs: string[]): boolean {
+  return useSyncExternalStore(
+    subscribeContractsPartial,
+    () => uasgs.some((uasg) => isContractsListPartial(uasg)),
+    () => false
+  );
 }
 
 /**

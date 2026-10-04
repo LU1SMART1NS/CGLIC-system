@@ -4,6 +4,7 @@ import { useArpItemContractLinks } from '../hooks/useAtaManagers';
 import { useContractsPortfolio } from '../hooks/useContractsPortfolio';
 import { canAssignManager } from '../components/carteira/ManagerAssign';
 import { useAuth } from '../context/AuthContext';
+import { ContractsPartialNotice } from '../components/carteira/ContractsPartialNotice';
 import { ContractsPortfolioHeader } from '../components/contracts/portfolio/ContractsPortfolioHeader';
 import { ContractsPortfolioSummary } from '../components/contracts/portfolio/ContractsPortfolioSummary';
 import {
@@ -27,6 +28,7 @@ export const ContractsRoute: React.FC = () => {
     isLoading,
     isLoadingScope: isLoadingManagers,
     isFetching,
+    isPartial,
     error,
     dataUpdatedAt,
     refresh
@@ -140,6 +142,8 @@ export const ContractsRoute: React.FC = () => {
         </div>
       ) : (
         <>
+          {isPartial && <ContractsPartialNotice onRetry={() => refresh()} isRetrying={isFetching} />}
+
           <ContractsPortfolioSummary
             vigentes={summaryMetrics.vigentes}
             criticos={summaryMetrics.criticos}
