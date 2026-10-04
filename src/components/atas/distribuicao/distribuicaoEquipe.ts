@@ -5,6 +5,9 @@ import type { DashboardAttentionItem } from '../../../types/managementDashboard'
 /** Ata já com prazo e gestor (chave do gestor = número da ata, como em ata_managers). */
 export interface DistribuicaoAta {
   numeroAta: string;
+  uasg?: string;
+  objeto?: string;
+  dias?: number | null;
   faixa: PrazoFaixa;
   valor: number;
   gestorNome?: string;
@@ -13,9 +16,26 @@ export interface DistribuicaoAta {
 export interface DistribuicaoContrato {
   contractKey: string;
   numero: string;
+  objeto?: string;
+  dias?: number | null;
   faixa: PrazoFaixa;
   valor: number;
   gestorNome?: string;
+}
+
+/** Ata ou contrato vigente listado dentro da linha do gestor. */
+export interface DistribuicaoItem {
+  tipo: 'ATA' | 'CONTRATO';
+  /** Número da ata (chave do gestor) ou chave do contrato. */
+  chave: string;
+  uasg?: string;
+  numero: string;
+  objeto: string;
+  faixa: PrazoFaixa;
+  dias: number | null;
+  valor: number;
+  urgentes: number;
+  acompanhar: number;
 }
 
 export interface CargaInstrumentos {
@@ -35,6 +55,8 @@ export interface DistribuicaoLinha {
   /** Chaves das atas e contratos vigentes do gestor — alvos para transferir a carteira. */
   ataKeys: string[];
   contractKeys: string[];
+  /** Atas e contratos vigentes do gestor, os mais urgentes primeiro (alertas urgentes, depois menor prazo). */
+  itens: DistribuicaoItem[];
 }
 
 /** Mesma gravidade da Visão Geral: urgentes = crítica ou urgente (tarefa vencida, fatura vencida, saldo crítico…); o resto é acompanhamento. */
@@ -93,7 +115,7 @@ export function buildDistribuicaoEquipe(input: {
     const key = gestorNome || null;
     let l = linhas.get(key);
     if (!l) {
-      l = { gestorNome: key, atas: cargaVazia(), contratos: cargaVazia(), pendencias: { urgentes: 0, acompanhar: 0 }, ataKeys: [], contractKeys: [] };
+      l = { gestorNome: key, atas: cargaVazia(), contratos: cargaVazia(), pendencias: { urgentes: 0, acompanhar: 0 }, ataKeys: [], contractKeys: [], itens: [] };
       linhas.set(key, l);
     }
     return l;
@@ -102,6 +124,8 @@ export function buildDistribuicaoEquipe(input: {
   const totais = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0 };
   const ataPorNumero = new Map<string, DistribuicaoAta>();
   const contratoPorChave = new Map<string, DistribuicaoContrato>();
+  const itemAta = new Map<string, DistribuicaoItem>();
+  const itemContrato = new Map<string, DistribuicaoItem>();
 
   for (const ata of input.atas) {
     if (!isVigente(ata.faixa)) continue;
@@ -109,6 +133,20 @@ export function buildDistribuicaoEquipe(input: {
     const l = linha(ata.gestorNome);
     somar(l.atas, ata.faixa, ata.valor);
     l.ataKeys.push(ata.numeroAta);
+    const item: DistribuicaoItem = {
+      tipo: 'ATA',
+      chave: ata.numeroAta,
+      uasg: ata.uasg,
+      numero: ata.numeroAta,
+      objeto: ata.objeto || '',
+      faixa: ata.faixa,
+      dias: ata.dias ?? null,
+      valor: ata.valor,
+      urgentes: 0,
+      acompanhar: 0
+    };
+    l.itens.push(item);
+    itemAta.set(ata.numeroAta, item);
     somar(totais.atas, ata.faixa, ata.valor);
   }
   for (const contrato of input.contratos) {
@@ -117,23 +155,41 @@ export function buildDistribuicaoEquipe(input: {
     const l = linha(contrato.gestorNome);
     somar(l.contratos, contrato.faixa, contrato.valor);
     l.contractKeys.push(contrato.contractKey);
+    const item: DistribuicaoItem = {
+      tipo: 'CONTRATO',
+      chave: contrato.contractKey,
+      numero: contrato.numero,
+      objeto: contrato.objeto || '',
+      faixa: contrato.faixa,
+      dias: contrato.dias ?? null,
+      valor: contrato.valor,
+      urgentes: 0,
+      acompanhar: 0
+    };
+    l.itens.push(item);
+    itemContrato.set(contrato.contractKey, item);
     somar(totais.contratos, contrato.faixa, contrato.valor);
   }
 
-  const contar = (gestorNome: string | undefined, item: DashboardAttentionItem) => {
+  const contar = (gestorNome: string | undefined, alvo: DistribuicaoItem | undefined, alerta: DashboardAttentionItem) => {
     const { pendencias } = linha(gestorNome);
-    if (item.severity === 'CRITICA' || item.severity === 'URGENTE') pendencias.urgentes++;
+    const urgente = alerta.severity === 'CRITICA' || alerta.severity === 'URGENTE';
+    if (urgente) pendencias.urgentes++;
     else pendencias.acompanhar++;
+    if (alvo) {
+      if (urgente) alvo.urgentes++;
+      else alvo.acompanhar++;
+    }
   };
   for (const item of input.attentionItems) {
     const contrato = item.contractKey ? contratoPorChave.get(item.contractKey) : undefined;
     if (contrato) {
-      contar(contrato.gestorNome, item);
+      contar(contrato.gestorNome, itemContrato.get(contrato.contractKey), item);
       continue;
     }
     const numeroAta = item.contractKey ? undefined : numeroAtaDoAlerta(item);
     const ata = numeroAta ? ataPorNumero.get(numeroAta) : undefined;
-    if (ata) contar(ata.gestorNome, item);
+    if (ata) contar(ata.gestorNome, itemAta.get(ata.numeroAta), item);
   }
 
   const divergencias: DistribuicaoDivergencia[] = [];
@@ -163,6 +219,16 @@ export function buildDistribuicaoEquipe(input: {
     if (b.gestorNome === null) return 1;
     return carga(b) - carga(a) || a.gestorNome.localeCompare(b.gestorNome, 'pt-BR');
   });
+  const diasOrd = (d: number | null) => (d === null ? Number.POSITIVE_INFINITY : d);
+  for (const l of ordenadas) {
+    l.itens.sort(
+      (a, b) =>
+        b.urgentes - a.urgentes ||
+        diasOrd(a.dias) - diasOrd(b.dias) ||
+        a.tipo.localeCompare(b.tipo) ||
+        a.numero.localeCompare(b.numero)
+    );
+  }
   totais.gestores = ordenadas.filter((l) => l.gestorNome !== null).length;
 
   return { linhas: ordenadas, divergencias, totais };

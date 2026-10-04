@@ -76,6 +76,36 @@ describe('buildDistribuicaoEquipe', () => {
     expect(ana.contractKeys).toEqual(['200331-00001-2025']);
   });
 
+  it('lista os itens vigentes do gestor, os mais urgentes primeiro, com as pendências de cada um', () => {
+    const { linhas } = buildDistribuicaoEquipe({
+      atas: [
+        { ...ata('00001/2025', 'Ana', 'REGULAR'), dias: 200, objeto: 'Papel' },
+        { ...ata('00002/2025', 'Ana', 'CRITICO'), dias: 10, uasg: '200331' },
+        ata('00003/2024', 'Ana', 'EXPIRADO')
+      ],
+      contratos: [
+        { ...contrato('200331-00001-2025', 'Ana', 'ATENCAO'), dias: 40, objeto: 'Limpeza' },
+        { ...contrato('200331-00002-2025', 'Ana', 'REGULAR'), dias: 300 }
+      ],
+      links: [],
+      attentionItems: [
+        alerta({ contractKey: '200331-00002-2025', severity: 'URGENTE' }),
+        alerta({ contractKey: '200331-00002-2025', severity: 'CRITICA' }),
+        alerta({ numeroAta: '00001/2025', severity: 'INFO' })
+      ]
+    });
+    const itens = linhas.find((l) => l.gestorNome === 'Ana')!.itens;
+    expect(itens.map((i) => `${i.tipo}:${i.chave}`)).toEqual([
+      'CONTRATO:200331-00002-2025', // 2 urgentes
+      'ATA:00002/2025', // sem urgentes, menor prazo (10)
+      'CONTRATO:200331-00001-2025', // 40
+      'ATA:00001/2025' // 200
+    ]);
+    expect(itens[0]).toMatchObject({ urgentes: 2, acompanhar: 0 });
+    expect(itens[1].uasg).toBe('200331');
+    expect(itens[3]).toMatchObject({ objeto: 'Papel', urgentes: 0, acompanhar: 1 });
+  });
+
   it('aponta contrato vinculado com gestor diferente do da ata, uma vez por par', () => {
     const { divergencias } = buildDistribuicaoEquipe({
       atas: [ata('00001/2025', 'Ana'), ata('00002/2025', 'Bruno')],

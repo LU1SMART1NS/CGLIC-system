@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, FileText, Package, UserPlus, UserX, Users, ArrowLeftRight } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, FileText, Package, UserPlus, UserX, Users, ArrowLeftRight } from 'lucide-react';
+import { ContractsPartialNotice } from '../../carteira/ContractsPartialNotice';
 import { PageContainer } from '../../../design-system/components/PageContainer';
 import { PageHeader } from '../../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../../design-system/components/HeaderRefreshAction';
@@ -8,6 +9,8 @@ import { SkeletonLoader } from '../../../design-system/components/SkeletonLoader
 import { ErrorState } from '../../../design-system/components/ErrorState';
 import { EmptyState } from '../../../design-system/components/EmptyState';
 import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { CARTEIRA_EXPANDED_CELL_STYLE } from '../../carteira/CarteiraDetailLabel';
+import { DistribuicaoItens } from './DistribuicaoItens';
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import { SEM_GESTOR } from '../../carteira/carteiraGestor';
 import { ManagerAssignPanel, canAssignManager } from '../../carteira/ManagerAssign';
@@ -116,23 +119,22 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // Só quem pode atribuir (admin) vê as ações de transferir; o leitor acompanha.
   const { role } = useAuth();
   const canAssign = canAssignManager(role);
-  const [transferencia, setTransferencia] = React.useState<{ linha: DistribuicaoLinha; anchor: DOMRect } | null>(null);
-  const transferTargets = useMemo<ManagerTarget[]>(
-    () =>
-      transferencia
-        ? [
-            ...transferencia.linha.ataKeys.map((ataKey) => ({ tipo: 'ATA' as const, ataKey })),
-            ...transferencia.linha.contractKeys.map((contractKey) => ({ tipo: 'CONTRATO' as const, contractKey }))
-          ]
-        : [],
-    [transferencia]
-  );
+  // Painel de atribuição aberto: alvos (carteira inteira de um gestor ou itens marcados) e o que fazer ao salvar.
+  const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; anchor: DOMRect; done?: () => void } | null>(null);
+  const [expanded, setExpanded] = React.useState<string | null>(null);
+  const carteiraTargets = (l: DistribuicaoLinha): ManagerTarget[] => [
+    ...l.ataKeys.map((ataKey) => ({ tipo: 'ATA' as const, ataKey })),
+    ...l.contractKeys.map((contractKey) => ({ tipo: 'CONTRATO' as const, contractKey }))
+  ];
 
   const distribuicao = useMemo(
     () =>
       buildDistribuicaoEquipe({
         atas: atas.scopedArps.map((arp) => ({
           numeroAta: arp.numeroAtaRegistroPreco,
+          uasg: arp.codigoUnidadeGerenciadora,
+          objeto: arp.objeto,
+          dias: getArpPrazo(arp).dias,
           faixa: getArpPrazo(arp).faixa,
           valor: Number(arp.valorTotal) || 0,
           gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco]
@@ -140,6 +142,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
         contratos: contratos.rows.map((row) => ({
           contractKey: row.contractKey,
           numero: formatContractNumber(row.contract),
+          objeto: row.contract.objeto,
+          dias: row.diasRestantes,
           faixa: row.faixa,
           valor: row.contract.valorGlobal || row.contract.valorInicial || 0,
           gestorNome: row.gestorNome
@@ -195,6 +199,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
         }
       />
 
+      {!isBusy && contratos.isPartial && (
+        <ContractsPartialNotice onRetry={() => contratos.refresh()} isRetrying={contratos.isFetching} />
+      )}
+
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando distribuição...">
           <SkeletonLoader variant="card" height="96px" count={1} />
@@ -246,10 +254,11 @@ export const DistribuicaoEquipePage: React.FC = () => {
           </div>
 
           <div data-testid="distribuicao-table" style={carteiraTableShell}>
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto', containerType: 'inline-size' }}>
               <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
+                    <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
                     <th style={carteiraTh}>Gestor</th>
                     <th style={carteiraTh}>Atas</th>
                     <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor registrado</th>
@@ -265,8 +274,22 @@ export const DistribuicaoEquipePage: React.FC = () => {
                   {linhas.map((l) => {
                     const isSemGestor = l.gestorNome === null;
                     const testKey = isSemGestor ? 'sem-gestor' : l.gestorNome;
+                    const isExpanded = expanded === testKey;
                     return (
-                      <tr key={testKey ?? 'sem-gestor'} data-testid={`distribuicao-row-${testKey}`} style={isSemGestor ? { background: '#fffbeb' } : undefined}>
+                      <React.Fragment key={testKey ?? 'sem-gestor'}>
+                      <tr data-testid={`distribuicao-row-${testKey}`} style={isSemGestor ? { background: '#fffbeb' } : undefined}>
+                        <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => setExpanded(isExpanded ? null : testKey)}
+                            aria-expanded={isExpanded}
+                            aria-label={isExpanded ? 'Recolher atas e contratos' : 'Ver atas e contratos'}
+                            data-testid={`distribuicao-expand-${testKey}`}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.2rem' }}
+                          >
+                            {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                          </button>
+                        </td>
                         <td style={{ ...carteiraTd, minWidth: '160px' }}>
                           {isSemGestor ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 800, color: '#b45309' }}>
@@ -324,7 +347,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
                             {canAssign && (l.ataKeys.length > 0 || l.contractKeys.length > 0) && (
                               <button
                                 type="button"
-                                onClick={(e) => setTransferencia({ linha: l, anchor: e.currentTarget.getBoundingClientRect() })}
+                                onClick={(e) => setTransferencia({ targets: carteiraTargets(l), anchor: e.currentTarget.getBoundingClientRect() })}
                                 data-testid={`distribuicao-transferir-${testKey}`}
                                 title={isSemGestor ? 'Atribuir todas as atas e contratos vigentes sem gestor' : 'Passar toda a carteira vigente deste gestor para outra pessoa'}
                                 style={{ ...carteiraButton, color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
@@ -335,6 +358,18 @@ export const DistribuicaoEquipePage: React.FC = () => {
                           </div>
                         </td>
                       </tr>
+                      {isExpanded && (
+                        <tr className="carteira-expanded" data-testid={`distribuicao-expanded-${testKey}`}>
+                          <td colSpan={10} style={CARTEIRA_EXPANDED_CELL_STYLE}>
+                            <DistribuicaoItens
+                              linha={l}
+                              canAssign={canAssign}
+                              onTransfer={(targets, anchor, done) => setTransferencia({ targets, anchor, done })}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -344,10 +379,11 @@ export const DistribuicaoEquipePage: React.FC = () => {
 
           {transferencia && (
             <ManagerAssignPanel
-              targets={transferTargets}
+              targets={transferencia.targets}
               anchorRect={transferencia.anchor}
               links={links}
               contractsByKey={contratos.contractsByKey}
+              onDone={transferencia.done}
               onClose={() => setTransferencia(null)}
             />
           )}
