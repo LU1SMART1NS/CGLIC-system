@@ -13,7 +13,8 @@ import {
   Receipt,
   Landmark,
   BellRing,
-  CalendarOff
+  CalendarOff,
+  UsersRound
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -52,6 +53,7 @@ export interface NavItem {
  * - Atas de Registro de Preços (recolhível)
  *     - Carteira de Atas (/atas)
  *     - Alocações por Unidade (/atas/saldos-unidade)
+ *     - Distribuição da Equipe (/atas/distribuicao)
  *     - Modelos de Gestão de Atas (/atas/modelos)
  * - Contratos (recolhível)
  *     - Carteira de Contratos (/contratos)
@@ -88,7 +90,7 @@ export const navigationConfig: NavItem[] = [
         route: '/atas',
         status: 'active',
         matchPrefixes: ['/atas', '/atas/detalhe'],
-        excludePrefixes: ['/atas/saldos-unidade', '/atas/modelos'],
+        excludePrefixes: ['/atas/saldos-unidade', '/atas/modelos', '/atas/distribuicao'],
         allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
@@ -99,6 +101,16 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/atas/saldos-unidade', '/admin/departamentos'],
         allowedRoles: ['admin', 'gestor_saldos', 'leitor']
+      },
+      {
+        // Atas e contratos por gestor: contratos vinculados herdam o gestor da ata, por isso fica em Atas.
+        id: 'atas-distribuicao',
+        label: 'Distribuição da Equipe',
+        icon: UsersRound,
+        route: '/atas/distribuicao',
+        status: 'active',
+        matchPrefixes: ['/atas/distribuicao'],
+        allowedRoles: ['admin', 'leitor']
       },
       {
         id: 'atas-modelos',
@@ -252,6 +264,7 @@ const staticRouteLabels: Record<string, string> = {
   '/instrumentos': 'Visão Geral',
   '/atas': 'Carteira de Atas',
   '/atas/saldos-unidade': 'Alocações por Unidade',
+  '/atas/distribuicao': 'Distribuição da Equipe',
   '/atas/modelos': 'Modelos de Gestão de Atas',
   '/contratos': 'Carteira de Contratos',
   '/contratos/modelos': 'Modelos de Gestão de Contratos',

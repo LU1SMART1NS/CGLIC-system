@@ -30,7 +30,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(gestaoInstrumentos?.matchPrefixes).toContain('/prazos');
     });
 
-    it('deve configurar Atas de Registro de Preços com Carteira de Atas, Alocações por Unidade, e Modelos de Gestão de Atas (Unidades Internas fica na tela de Alocações)', () => {
+    it('deve configurar Atas de Registro de Preços com Carteira de Atas, Alocações por Unidade, Distribuição da Equipe e Modelos de Gestão de Atas (Unidades Internas fica na tela de Alocações)', () => {
       const atas = navigationConfig.find((i) => i.id === 'atas');
       expect(atas).toBeDefined();
       expect(atas?.label).toBe('Atas de Registro de Preços');
@@ -39,11 +39,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(children.map((c) => c.label)).toEqual([
         'Carteira de Atas',
         'Alocações por Unidade',
+        'Distribuição da Equipe',
         'Modelos de Gestão de Atas'
       ]);
       expect(children.map((c) => c.route)).toEqual([
         '/atas',
         '/atas/saldos-unidade',
+        '/atas/distribuicao',
         '/atas/modelos'
       ]);
     });
@@ -273,6 +275,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Alocações por Unidade');
       expect(labels).toContain('Modelos de Gestão de Contratos');
       expect(labels).toContain('Modelos de Gestão de Atas');
+      expect(labels).toContain('Distribuição da Equipe');
       expect(labels).toContain('Usuários e Servidores');
       expect(labels).toContain('Perfis e Permissões');
     });
@@ -290,6 +293,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Empenhos e Execução');
 
       expect(labels).not.toContain('Alocações por Unidade');
+      // A distribuição por gestor é visão de coordenação: o gestor já vê só a própria carteira.
+      expect(labels).not.toContain('Distribuição da Equipe');
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
 
@@ -302,6 +307,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const labels = flatLabels(visible);
 
       expect(labels).toContain('Alocações por Unidade');
+      expect(labels).not.toContain('Distribuição da Equipe');
 
       expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Carteira de Atas');
@@ -329,6 +335,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos e Execução');
       expect(labels).toContain('Alocações por Unidade');
+      expect(labels).toContain('Distribuição da Equipe');
 
       expect(labels).not.toContain('Modelos de Gestão');
       expect(labels).not.toContain('Usuários e Servidores');

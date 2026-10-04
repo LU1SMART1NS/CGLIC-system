@@ -9,6 +9,7 @@ import { GestaoInstrumentosRoute } from './routes/GestaoInstrumentosRoute';
 import { ArpSearchRoute } from './routes/ArpSearchRoute';
 import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
 import { AllocationsRoute } from './routes/AllocationsRoute';
+import { DistribuicaoEquipeRoute } from './routes/DistribuicaoEquipeRoute';
 import { ContractsRoute } from './routes/ContractsRoute';
 import { Contract360Route } from './routes/Contract360Route';
 import { Ata360Route } from './routes/Ata360Route';
@@ -199,6 +200,14 @@ const AppContent: React.FC = () => {
             element={
               <RequireRole allowedRoles={['admin', 'gestor_saldos', 'leitor']}>
                 <AllocationsRoute />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/atas/distribuicao"
+            element={
+              <RequireRole allowedRoles={['admin', 'leitor']}>
+                <DistribuicaoEquipeRoute />
               </RequireRole>
             }
           />
