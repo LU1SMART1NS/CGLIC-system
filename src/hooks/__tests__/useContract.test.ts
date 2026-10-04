@@ -1,10 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useContract } from '../useContract';
 import * as useContractsDashboardModule from '../useContractsDashboard';
+import * as contratoGovModule from '../useContractContratosGov';
 import type { ContractDashboardRecord } from '../../types';
 
 vi.mock('../useContractsDashboard', () => ({
   useContractsDashboard: vi.fn()
+}));
+vi.mock('../useContractContratosGov', () => ({
+  useContratoGov: vi.fn()
+}));
+// Os testes chamam o hook direto, fora de um componente: useMemo vira a própria conta.
+vi.mock('react', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react')>()),
+  useMemo: (fn: () => unknown) => fn()
 }));
 
 const mockContracts: ContractDashboardRecord[] = [
@@ -44,6 +53,38 @@ const mockContracts: ContractDashboardRecord[] = [
 describe('useContract Hook — Localização Canônica de Contrato na Visão 360°', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(contratoGovModule.useContratoGov).mockReturnValue({ data: undefined, isLoading: false } as any);
+  });
+
+  it('completa o registro do Compras.gov.br com o contrato do Contratos.gov.br, sem mudar o id da tela', () => {
+    vi.mocked(useContractsDashboardModule.useContractsDashboard).mockReturnValue({
+      data: mockContracts, isLoading: false, isError: false, error: null, refetch: vi.fn(), refresh: vi.fn()
+    } as any);
+    vi.mocked(contratoGovModule.useContratoGov).mockReturnValue({
+      data: { ...mockContracts[1], id: 'OUTRO-ID', contratoId: 670960, dataAssinatura: '2025-10-06', valorInicial: 3800, fonteDados: 'Contratos.gov.br', raw: { categoria: 'Compras' } },
+      isLoading: false
+    } as any);
+
+    const result = useContract('200331-00020-2025', '200331');
+
+    expect(result.contract?.id).toBe('200331-00020-2025');
+    expect(result.contract?.contratoId).toBe(670960);
+    expect(result.contract?.dataAssinatura).toBe('2025-10-06');
+    expect(result.contract?.fonteDados).toBe('Contratos.gov.br');
+    expect(result.contract?.raw?.categoria).toBe('Compras');
+    expect(result.enriching).toBe(false);
+  });
+
+  it('enquanto completa, repassa o registro de base e avisa que está completando', () => {
+    vi.mocked(useContractsDashboardModule.useContractsDashboard).mockReturnValue({
+      data: mockContracts, isLoading: false, isError: false, error: null, refetch: vi.fn(), refresh: vi.fn()
+    } as any);
+    vi.mocked(contratoGovModule.useContratoGov).mockReturnValue({ data: undefined, isLoading: true } as any);
+
+    const result = useContract('200331-00020-2025', '200331');
+
+    expect(result.contract?.fonteDados).toBe('Compras.gov.br');
+    expect(result.enriching).toBe(true);
   });
 
   it('deve localizar contrato existente por ID canônico', () => {

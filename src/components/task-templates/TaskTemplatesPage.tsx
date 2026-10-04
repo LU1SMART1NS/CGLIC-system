@@ -486,7 +486,8 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
   );
 };
 
-const TaskTemplatesContent: React.FC = () => {
+/** `embedded`: dentro de outra página (abas), sem o cabeçalho e o container próprios. */
+const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { hooks, copy } = useTaskTemplatesKit();
   const { data: templates = [], isLoading, error } = hooks.useTemplates();
   const saveTemplate = hooks.useSaveTemplate();
@@ -507,15 +508,19 @@ const TaskTemplatesContent: React.FC = () => {
     );
   };
 
+  const Container = embedded ? 'div' : PageContainer;
+
   return (
-    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <Container style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
       {/* Cabeçalho */}
-      <PageHeader
-        title={copy.title}
-        subtitle={copy.subtitle}
-        icon={<Sliders size={26} color="#0c326f" aria-hidden="true" />}
-      />
+      {!embedded && (
+        <PageHeader
+          title={copy.title}
+          subtitle={copy.subtitle}
+          icon={<Sliders size={26} color="#0c326f" aria-hidden="true" />}
+        />
+      )}
 
       {/* Formulário de Criação de Novo Template */}
       <div
@@ -645,12 +650,12 @@ const TaskTemplatesContent: React.FC = () => {
         )}
       </div>
 
-    </PageContainer>
+    </Container>
   );
 };
 
-export const TaskTemplatesPage: React.FC<{ kit: TaskTemplatesKit }> = ({ kit }) => (
+export const TaskTemplatesPage: React.FC<{ kit: TaskTemplatesKit; embedded?: boolean }> = ({ kit, embedded }) => (
   <TaskTemplatesKitContext.Provider value={kit}>
-    <TaskTemplatesContent />
+    <TaskTemplatesContent embedded={embedded} />
   </TaskTemplatesKitContext.Provider>
 );

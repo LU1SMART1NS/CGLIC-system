@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useBackTarget } from '../hooks/useDetailOrigin';
 import { ItemBalances } from '../components/ItemBalances';
 import { InstrumentPageState } from '../components/instrument360/InstrumentPageState';
 import { useSelection } from '../context/SelectionContext';
@@ -35,12 +36,16 @@ export const ItemBalancesRoute: React.FC = () => {
   const isScopedRole = role === 'gestor';
 
   // O gestor de saldos não acessa a carteira de Atas: chega ao item por /atas/saldos-unidade e volta para lá.
-  const voltarParaAta = () => {
-    if (role === 'gestor_saldos') return navigate('/atas/saldos-unidade');
-    return arp
-      ? navigate(buildAtaPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, 'itens'))
-      : navigate('/atas');
-  };
+  const ataPath = arp ? buildAtaPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, 'itens') : '/atas';
+  const back = useBackTarget(
+    role === 'gestor_saldos'
+      ? { path: '/atas/saldos-unidade', label: 'Voltar para Alocações' }
+      : arp
+        ? { path: ataPath, label: 'Voltar para a ata' }
+        : { path: '/atas', label: 'Voltar para Atas' }
+  );
+  // "Abrir ata" sobe um nível: a ata herda a origem de quem veio antes do item.
+  const abrirAta = () => navigate(ataPath, { state: back.upState });
 
   if (isLoading || (isScopedRole && loadingScope)) {
     return <InstrumentPageState kind="loading" title="Carregando item da ata..." />;
@@ -68,11 +73,11 @@ export const ItemBalancesRoute: React.FC = () => {
             ? `A Ata ${arp.numeroAtaRegistroPreco} não tem o item ${numeroItem} sincronizado.`
             : `Não há Ata sincronizada com a chave ${ataKey || 'informada'}.`
         }
-        backLabel={role === 'gestor_saldos' ? 'Voltar para Alocações' : arp ? 'Voltar para a ata' : 'Voltar para Atas'}
-        onBack={voltarParaAta}
+        backLabel={back.label}
+        onBack={back.back}
       />
     );
   }
 
-  return <ItemBalances arp={arp} item={item} onBack={voltarParaAta} />;
+  return <ItemBalances arp={arp} item={item} onBack={back.back} backLabel={back.label} onOpenAta={role === 'gestor_saldos' ? undefined : abrirAta} />;
 };

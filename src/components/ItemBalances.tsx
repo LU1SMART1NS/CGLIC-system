@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Building2, Plus, Trash2, ExternalLink, ChevronRight, ChevronDown, Eye } from 'lucide-react';
 import { getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
@@ -71,13 +71,17 @@ interface ItemBalancesProps {
   arp: ArpRecord;
   item: ArpItemRecord;
   onBack: () => void;
+  /** Texto do botão Voltar (já com a origem: "Voltar para Pagamentos"). */
+  backLabel?: string;
+  /** Abre a ata do item; sem ele, o link da ata no cartão não aparece. */
+  onOpenAta?: () => void;
 }
 
 const ITEM_TABS: ItemTab[] = ['unidades', 'alocacao', 'contratos', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 
-export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack }) => {
+export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, backLabel, onOpenAta }) => {
 
   const {
     data: unidades = [],
@@ -105,7 +109,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
 
   // Aba no endereço (?aba=), com o mesmo comportamento das telas de Ata e Contrato.
   // 'empenhos' era uma aba própria; os empenhos agora ficam dentro de cada contrato.
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
   const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
     tabs: ITEM_TABS,
     defaultTab: 'unidades',
@@ -799,7 +803,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         arp={arp}
         item={item}
         onBack={onBack}
-        backLabel={role === 'gestor_saldos' ? 'Voltar para Alocações' : undefined}
+        backLabel={backLabel}
         isRefreshing={loading || contractsLoading || syncingContracts}
         onRefresh={handleRefresh}
         metrics={{
@@ -819,7 +823,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack })
         }}
         referencia={comprasGovReferencia}
         onGoTo={(tab) => setActiveTab(tab)}
-        onOpenAta={role === 'gestor_saldos' ? undefined : onBack}
+        onOpenAta={onOpenAta}
       />
 
       <Instrument360Tabs

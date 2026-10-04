@@ -11,6 +11,7 @@ let mockSearch = '';
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ ataKey: '00011%2F2026-200331' }),
   useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/', search: '', state: null }),
   useSearchParams: () => [new URLSearchParams(mockSearch), vi.fn()]
 }));
 

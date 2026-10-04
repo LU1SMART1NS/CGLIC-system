@@ -27,6 +27,20 @@ export function uasgFromAtaKey(ataKey?: string): string | undefined {
 }
 
 /**
+ * Atas (+ itens) de uma UASG no banco local. Query única por UASG, compartilhada entre a
+ * Ata 360 (useAta) e a Carteira de Atas (useAtasPortfolio).
+ */
+export function getAtaSourceQueryOptions(uasg: string) {
+  const cleanUasg = (uasg || '').trim();
+  return {
+    queryKey: ['ata-detail-source', cleanUasg] as const,
+    queryFn: () => fetchArpsWithItemsFromDb(cleanUasg),
+    enabled: Boolean(cleanUasg),
+    staleTime: 5 * 60 * 1000
+  };
+}
+
+/**
  * Hook canônico para recuperar uma única Ata (+ seus itens) por ataKey
  * (`${numeroAta}-${uasg}`), no mesmo espírito de useContract.ts: reaproveita
  * uma única query cacheada por UASG em vez de disparar uma consulta por Ata.
@@ -35,10 +49,8 @@ export function useAta(ataKey?: string, uasg?: string) {
   const cleanUasg = (uasg || '').trim();
 
   const query = useQuery({
-    queryKey: ['ata-detail-source', cleanUasg] as const,
-    queryFn: () => fetchArpsWithItemsFromDb(cleanUasg),
-    enabled: Boolean(ataKey && cleanUasg),
-    staleTime: 5 * 60 * 1000
+    ...getAtaSourceQueryOptions(cleanUasg),
+    enabled: Boolean(ataKey && cleanUasg)
   });
 
   const normalizedTarget = (ataKey || '').trim().toUpperCase();

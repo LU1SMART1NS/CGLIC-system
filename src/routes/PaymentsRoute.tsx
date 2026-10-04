@@ -1,6 +1,6 @@
 import React from 'react';
 import { PageContainer } from '../design-system/components/PageContainer';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { CreditCard } from 'lucide-react';
 import { ManagementPaymentsOverview } from '../components/dashboard/ManagementPaymentsOverview';
 import { useManagementDashboard } from '../hooks/useManagementDashboard';
@@ -9,7 +9,7 @@ import { PageHeader } from '../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../design-system/components/HeaderRefreshAction';
 
 export const PaymentsRoute: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
 
   // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
   // migration 20260925000023), agora derivado também das Atas atribuídas

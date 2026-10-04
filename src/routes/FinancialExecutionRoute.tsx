@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageContainer } from '../design-system/components/PageContainer';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Banknote, RefreshCw, Loader2, CheckCircle2, XCircle, X } from 'lucide-react';
 import { ManagementFinancialExecution } from '../components/dashboard/ManagementFinancialExecution';
 import { useManagementDashboard } from '../hooks/useManagementDashboard';
@@ -18,7 +18,7 @@ import { colors, shapes } from '../design-system/tokens';
 const SYNC_AUTHORIZED_ROLES = ['gestor', 'coordenador', 'admin'];
 
 export const FinancialExecutionRoute: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithOrigin();
   const { role } = useAuth();
   const isAuthorizedToSync = role !== null && SYNC_AUTHORIZED_ROLES.includes(role);
 

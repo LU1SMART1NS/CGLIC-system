@@ -1,154 +1,56 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { PageContainer } from '../design-system/components/PageContainer';
-import { useContractsDashboard } from '../hooks/useContractsDashboard';
-import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
-import { useAllContractManagers } from '../hooks/useAllContractManagers';
-import { useManagementDashboard } from '../hooks/useManagementDashboard';
 import { useArpItemContractLinks } from '../hooks/useAtaManagers';
+import { useContractsPortfolio } from '../hooks/useContractsPortfolio';
 import { canAssignManager } from '../components/carteira/ManagerAssign';
 import { useAuth } from '../context/AuthContext';
+import { ContractsPartialNotice } from '../components/carteira/ContractsPartialNotice';
 import { ContractsPortfolioHeader } from '../components/contracts/portfolio/ContractsPortfolioHeader';
 import { ContractsPortfolioSummary } from '../components/contracts/portfolio/ContractsPortfolioSummary';
 import {
   ContractsPortfolioFilters,
-  DEFAULT_CONTRACTS_FILTERS,
-  SEM_GESTOR,
+  CONTRACTS_FILTER_SCHEMA,
   type ContractsPortfolioFilterState
 } from '../components/contracts/portfolio/ContractsPortfolioFilters';
-import {
-  ContractsPortfolioTable,
-  type ContractPortfolioRow
-} from '../components/contracts/portfolio/ContractsPortfolioTable';
-import { classifyPrazo, comparePrazo, matchesStatusFilter } from '../components/carteira/carteiraPrazo';
+import { useCarteiraFilters } from '../components/carteira/carteiraFilters';
+import { canFilterByGestor, listGestores, matchesGestorFilter } from '../components/carteira/carteiraGestor';
+import { ContractsPortfolioTable } from '../components/contracts/portfolio/ContractsPortfolioTable';
+import { comparePrazo, matchesStatusFilter } from '../components/carteira/carteiraPrazo';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
-import { getContractDaysRemaining } from '../services/dashboardService';
-import type { DashboardAttentionItem } from '../types/managementDashboard';
-import { UASGS_CGLIC } from '../config/unidadesGestoras';
-
-/** UASGs consolidadas nesta tela — mesmo escopo já usado na Visão Geral (/instrumentos), para que os dois painéis reportem os mesmos números de carteira de contratos. */
-const UASGS = UASGS_CGLIC;
 
 export const ContractsRoute: React.FC = () => {
-  const dash200330 = useContractsDashboard(UASGS[0]);
-  const dash200331 = useContractsDashboard(UASGS[1]);
-
-  const allContracts = useMemo(
-    () => [...(dash200330.data || []), ...(dash200331.data || [])],
-    [dash200330.data, dash200331.data]
-  );
-  const isLoading = dash200330.isLoading || dash200331.isLoading;
-  const isFetching = dash200330.isFetching || dash200331.isFetching;
-  const hasAnyData = allContracts.length > 0;
-  const error = (dash200330.error || dash200331.error) as Error | null;
-  const dataUpdatedAt = Math.max(dash200330.dataUpdatedAt || 0, dash200331.dataUpdatedAt || 0) || undefined;
-  const refresh = useCallback(() => {
-    dash200330.refresh();
-    dash200331.refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // Dados da carteira (contratos no escopo do usuário, com prazo, gestor e pendências).
+  const {
+    rows: allRows,
+    contractsByKey,
+    hasAnyData,
+    isLoading,
+    isLoadingScope: isLoadingManagers,
+    isFetching,
+    isPartial,
+    error,
+    dataUpdatedAt,
+    refresh
+  } = useContractsPortfolio();
   const { role } = useAuth();
-  const scope200330 = useAssignedManagementScope(UASGS[0]);
-  const scope200331 = useAssignedManagementScope(UASGS[1]);
-  const isLoadingManagers = scope200330.isLoading || scope200331.isLoading;
-  const assignedContractKeys = useMemo(() => {
-    if (!scope200330.contractKeys && !scope200331.contractKeys) return undefined;
-    return [...(scope200330.contractKeys || []), ...(scope200331.contractKeys || [])];
-  }, [scope200330.contractKeys, scope200331.contractKeys]);
 
-  const contracts = useMemo(() => {
-    if (!assignedContractKeys) return allContracts;
-    const scopedKeys = new Set(assignedContractKeys);
-    return allContracts.filter((contract) => scopedKeys.has(contract.id));
-  }, [allContracts, assignedContractKeys]);
+  // Filtros na URL (?situacao=&pendencia=&gestor=&busca=): sobrevivem à ida ao detalhe e permitem link já filtrado.
+  const { filters: filterState, setFilter: handleFilterChange, resetFilters: handleResetFilters } =
+    useCarteiraFilters(CONTRACTS_FILTER_SCHEMA);
 
-  // Gestor (nome) e pendências (Funil Único de Atenção) por contrato — mesmas
-  // consultas da Visão Geral (mesmos parâmetros, logo mesmo cache do React Query).
-  const managers200330 = useAllContractManagers(UASGS[0]);
-  const managers200331 = useAllContractManagers(UASGS[1]);
-  const mgmt200330 = useManagementDashboard({
-    uasg: UASGS[0],
-    assignedContractKeys: scope200330.contractKeys,
-    assignedAtaKeys: scope200330.ataKeys
-  });
-  const mgmt200331 = useManagementDashboard({
-    uasg: UASGS[1],
-    assignedContractKeys: scope200331.contractKeys,
-    assignedAtaKeys: scope200331.ataKeys
-  });
-
-  const gestorByContractKey = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const managers of [managers200330.data, managers200331.data]) {
-      for (const [key, manager] of Object.entries(managers || {})) {
-        if (manager?.gestorNome) map.set(key, manager.gestorNome);
-      }
-    }
-    return map;
-  }, [managers200330.data, managers200331.data]);
-
-  const pendenciasByContractKey = useMemo(() => {
-    const map = new Map<string, DashboardAttentionItem[]>();
-    for (const mgmt of [mgmt200330, mgmt200331]) {
-      for (const item of mgmt.readModel?.attention?.items || []) {
-        if (!item.contractKey) continue;
-        const list = map.get(item.contractKey) || [];
-        list.push(item);
-        map.set(item.contractKey, list);
-      }
-    }
-    return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mgmt200330.readModel, mgmt200331.readModel]);
-
-  const [filterState, setFilterState] = useState<ContractsPortfolioFilterState>(DEFAULT_CONTRACTS_FILTERS);
-
-  const handleFilterChange = useCallback(
-    <K extends keyof ContractsPortfolioFilterState>(
-      key: K,
-      value: ContractsPortfolioFilterState[K]
-    ) => {
-      setFilterState((prev) => ({
-        ...prev,
-        [key]: value
-      }));
-    },
-    []
+  const handleSelectStatus = useCallback(
+    (status: ContractsPortfolioFilterState['status']) => handleFilterChange('status', status),
+    [handleFilterChange]
   );
-
-  const handleSelectStatus = useCallback((status: ContractsPortfolioFilterState['status']) => {
-    setFilterState((prev) => ({ ...prev, status }));
-  }, []);
-
-  const handleResetFilters = useCallback(() => {
-    setFilterState(DEFAULT_CONTRACTS_FILTERS);
-  }, []);
+  // O perfil "gestor" já vê só os próprios contratos: sem seletor, e um ?gestor= na URL é ignorado.
+  const showGestorFilter = canFilterByGestor(role);
 
   // Atribuição de gestor na própria carteira (admin e gestor), com propagação
   // Ata ↔ contratos vinculados — ver managerAssignmentService.
   const canAssign = canAssignManager(role);
   const { data: links = [] } = useArpItemContractLinks(canAssign);
-  const contractsByKey = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
   const assignContext = useMemo(() => ({ links, contractsByKey }), [links, contractsByKey]);
-
-
-  // Contratos enriquecidos com prazo, gestor e pendências (base única para cards, filtros e tabela).
-  const allRows = useMemo<ContractPortfolioRow[]>(() => {
-    return contracts.map((contract) => {
-      const contractKey = contract.id || `${contract.uasg || '200331'}-${contract.numero}-${contract.ano}`;
-      const diasRestantes = getContractDaysRemaining(contract.dataVigenciaFim);
-      const faixa = classifyPrazo(diasRestantes, contract.statusVigencia === 'Expirado');
-      return {
-        contract,
-        contractKey,
-        diasRestantes,
-        faixa,
-        gestorNome: gestorByContractKey.get(contractKey),
-        pendencias: pendenciasByContractKey.get(contractKey) || []
-      };
-    });
-  }, [contracts, gestorByContractKey, pendenciasByContractKey]);
 
   // KPIs dos cards, sobre toda a carteira visível ao usuário (independentes dos filtros).
   const summaryMetrics = useMemo(() => {
@@ -179,10 +81,7 @@ export const ContractsRoute: React.FC = () => {
     return { vigentes, criticos, atencao, historico, valorVigenteTotal, valorCritico, valorAtencao };
   }, [allRows]);
 
-  const gestoresDisponiveis = useMemo(
-    () => Array.from(new Set(allRows.map((r) => r.gestorNome).filter((n): n is string => Boolean(n)))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    [allRows]
-  );
+  const gestoresDisponiveis = useMemo(() => listGestores(allRows.map((r) => r.gestorNome)), [allRows]);
 
   const filteredRows = useMemo(() => {
     const query = filterState.busca.trim().toLowerCase();
@@ -192,8 +91,7 @@ export const ContractsRoute: React.FC = () => {
       .filter(({ contract, faixa, gestorNome, pendencias }) => {
         if (!matchesStatusFilter(faixa, filterState.status)) return false;
         if (filterState.pendencia === 'COM_PENDENCIA' && pendencias.length === 0) return false;
-        if (filterState.gestor === SEM_GESTOR && gestorNome) return false;
-        if (filterState.gestor !== 'TODOS' && filterState.gestor !== SEM_GESTOR && gestorNome !== filterState.gestor) return false;
+        if (showGestorFilter && !matchesGestorFilter(gestorNome, filterState.gestor)) return false;
 
         if (query) {
           const fornCnpj = String(contract.fornecedorCnpjCpf || '').replace(/\D/g, '');
@@ -209,7 +107,7 @@ export const ContractsRoute: React.FC = () => {
         return true;
       })
       .sort((a, b) => comparePrazo(a.diasRestantes, b.diasRestantes));
-  }, [allRows, filterState]);
+  }, [allRows, filterState, showGestorFilter]);
 
 
   if (error && !hasAnyData) {
@@ -244,6 +142,8 @@ export const ContractsRoute: React.FC = () => {
         </div>
       ) : (
         <>
+          {isPartial && <ContractsPartialNotice onRetry={() => refresh()} isRetrying={isFetching} />}
+
           <ContractsPortfolioSummary
             vigentes={summaryMetrics.vigentes}
             criticos={summaryMetrics.criticos}
@@ -260,6 +160,7 @@ export const ContractsRoute: React.FC = () => {
           <ContractsPortfolioFilters
             filters={filterState}
             gestores={gestoresDisponiveis}
+            showGestorFilter={showGestorFilter}
             onChangeFilter={handleFilterChange}
             onResetFilters={handleResetFilters}
             totalFiltered={filteredRows.length}

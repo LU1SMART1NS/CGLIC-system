@@ -49,7 +49,7 @@ describe('Instrument360TabPanel', () => {
     expect(estilo('ata')).toContain('background:#f8fafc');
     expect(estilo('ata')).toContain('border-radius:8px');
     expect(estilo('ata')).not.toContain('box-shadow');
-    expect(estilo('ata')).toContain('min-height:28rem');
+    expect(estilo('ata')).toContain('min-height:max(28rem');
   });
 });
 

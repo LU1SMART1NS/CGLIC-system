@@ -11,13 +11,59 @@ const CONTRATOS_CACHE = new Map<string, { timestamp: number; data: ContractDashb
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos de cache
 
 /**
+ * Limite de espera da lista da UG no Contratos.gov.br. É a única fonte com todos os contratos
+ * (inclusive vigentes iniciados há mais de 3 anos) e leva ~20s para a UASG 200331: com um limite
+ * menor a lista saía incompleta sem aviso.
+ */
+export const CONTRATOS_GOV_TIMEOUT_MS = 45000;
+const COMPRAS_GOV_TIMEOUT_MS = 8000;
+
+/** Carregamentos em andamento por UASG: telas que pedem a mesma lista ao mesmo tempo dividem uma só consulta. */
+const CONTRATOS_INFLIGHT = new Map<string, Promise<ContractDashboardRecord[]>>();
+
+/**
+ * Última lista COMPLETA conhecida por UASG. Se uma consulta seguinte sair incompleta (fonte fora do ar),
+ * ela é somada a esta lista em vez de substituí-la: a carteira não encolhe por uma falha momentânea.
+ */
+const CONTRATOS_ULTIMA_COMPLETA = new Map<string, ContractDashboardRecord[]>();
+
+/**
+ * UASGs cuja última consulta saiu incompleta (alguma fonte falhou). Resultado incompleto não vai
+ * para o cache, e as telas podem avisar e tentar de novo (ver useContractsDashboard).
+ */
+const CONTRATOS_PARCIAIS = new Map<string, boolean>();
+const parciaisListeners = new Set<() => void>();
+
+function setContractsPartial(uasg: string, partial: boolean): void {
+  if ((CONTRATOS_PARCIAIS.get(uasg) ?? false) === partial) return;
+  CONTRATOS_PARCIAIS.set(uasg, partial);
+  parciaisListeners.forEach((listener) => listener());
+}
+
+/** A última consulta de contratos da UASG ficou incompleta (alguma fonte não respondeu). */
+export function isContractsListPartial(uasg: string): boolean {
+  return CONTRATOS_PARCIAIS.get(uasg.trim()) ?? false;
+}
+
+/** Assina mudanças no estado "lista incompleta" (para useSyncExternalStore). */
+export function subscribeContractsPartial(listener: () => void): () => void {
+  parciaisListeners.add(listener);
+  return () => {
+    parciaisListeners.delete(listener);
+  };
+}
+
+/**
  * Limpa o cache em memória de contratos para forçar recarregamento imediato
  */
 export function clearContractsCache(uasg?: string): void {
   if (uasg) {
     CONTRATOS_CACHE.delete(`contracts_${uasg.trim()}`);
+    CONTRATOS_INFLIGHT.delete(`contracts_${uasg.trim()}`);
   } else {
     CONTRATOS_CACHE.clear();
+    CONTRATOS_INFLIGHT.clear();
+    CONTRATOS_ULTIMA_COMPLETA.clear();
   }
 }
 
@@ -66,93 +112,90 @@ function parseMoney(val: any): number {
 }
 
 /**
- * Busca contratos para o Dashboard unificando Compras.gov.br e Contratos.gov.br
+ * Monta o registro do painel a partir de um contrato do Contratos.gov.br, venha ele da lista da UG
+ * ou da consulta por número. Devolve null quando o número não permite derivar a identidade.
  */
-export async function fetchContractsForDashboard(
-  uasg: string = '200331',
-  forceRefresh: boolean = false
-): Promise<ContractDashboardRecord[]> {
-  const cleanUasg = (uasg || '200331').trim();
-  const cacheKey = `contracts_${cleanUasg}`;
+export function mapContratosGovRecord(c: any, uasgPadrao: string): ContractDashboardRecord | null {
+  const orgao = codigoOrgaoDaUasg(uasgPadrao);
+  const numRaw = c.numero ? String(c.numero).trim() : '';
+  const ugCodigo = c.unidade_gestora || c.contratante?.orgao?.unidade_gestora?.codigo || c.contratante?.orgao_origem?.unidade_gestora_origem?.codigo || uasgPadrao;
 
-  if (forceRefresh) {
-    CONTRATOS_CACHE.delete(cacheKey);
-  } else if (CONTRATOS_CACHE.has(cacheKey)) {
-    const cached = CONTRATOS_CACHE.get(cacheKey)!;
-    if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return cached.data;
-    }
+  const keyResolution = resolveContractKey(ugCodigo, numRaw, c.data_assinatura || c.vigencia_inicio);
+  if (keyResolution.tipo === 'INVALIDO') {
+    console.warn(`[contractService] Contrato descartado: número "${numRaw}" não permitiu derivar identidade (sem "/" reconhecível e sem data de fallback).`);
+    return null;
   }
+  const canKey = keyResolution.key;
+  const anoRaw = keyResolution.ano;
 
-  const contractsMap = new Map<string, ContractDashboardRecord>();
-  const orgao = codigoOrgaoDaUasg(cleanUasg);
+  const dataFim = c.vigencia_fim || c.dataVigenciaFinal;
+  const status = calculateStatusVigencia(dataFim);
 
-  // 1. Tentar buscar da API Contratos.gov.br (diretamente pela UG)
+  const ugNome = c.unidade_gestora_nome || c.contratante?.orgao?.unidade_gestora?.nome || c.contratante?.orgao_origem?.unidade_gestora_origem?.nome || c.contratante?.unidade_origem?.nome;
+  const orgaoNome = c.contratante?.orgao?.nome || c.contratante?.orgao_origem?.nome;
+
+  const record: ContractDashboardRecord = {
+    id: canKey,
+    numero: numRaw,
+    ano: anoRaw,
+    numeroFormatado: formatNumeroAnoContrato(numRaw, anoRaw) || `${numRaw}/${anoRaw}`,
+    uasg: String(ugCodigo),
+    nomeUnidadeGestora: ugNome,
+    codigoOrgao: c.orgao || orgao,
+    nomeOrgao: orgaoNome,
+    objeto: c.objeto || '',
+    processo: c.processo || c.licitacao_numero,
+    fornecedorNome: c.fornecedor?.nome || c.nomeRazaoSocialFornecedor,
+    fornecedorCnpjCpf: c.fornecedor?.cnpj_cpf_idgener || c.niFornecedor,
+    valorGlobal: parseMoney(c.valor_global || c.valor_inicial),
+    valorInicial: parseMoney(c.valor_inicial),
+    dataAssinatura: c.data_assinatura,
+    dataVigenciaInicio: c.vigencia_inicio || c.dataVigenciaInicial,
+    dataVigenciaFim: dataFim,
+    statusVigencia: status,
+    numeroControlePncp: c.numeroControlePncp || c.numeroControlePncpContrato,
+    contratoId: c.id || c.contrato_id,
+    fonteDados: 'Contratos.gov.br',
+    sourceSystem: 'Contratos.gov.br',
+    sourceRecordId: c.id || c.contrato_id || canKey,
+    sourceUpdatedAt: c.data_assinatura || c.vigencia_inicio,
+    lastSyncedAt: new Date().toISOString(),
+    origem: 'API',
+    raw: c
+  };
+  return record;
+}
+
+/**
+ * Lista da UG no Contratos.gov.br (fonte completa). `ok = false` quando não respondeu a tempo,
+ * respondeu erro ou não devolveu JSON: a lista fica incompleta.
+ */
+async function fetchContratosGovList(uasg: string): Promise<{ list: any[]; ok: boolean }> {
   try {
-    const res = await fetchWithTimeout(`/api-contratos-gov/api/contrato/ug/${cleanUasg}`, 12000);
+    const res = await fetchWithTimeout(`/api-contratos-gov/api/contrato/ug/${uasg}`, CONTRATOS_GOV_TIMEOUT_MS);
     const contentType = res.headers.get('content-type') || '';
     if (res.ok && contentType.includes('application/json')) {
       const list = await res.json();
-      if (Array.isArray(list)) {
-        for (const c of list) {
-          const numRaw = c.numero ? String(c.numero).trim() : '';
-          const ugCodigo = c.unidade_gestora || c.contratante?.orgao?.unidade_gestora?.codigo || c.contratante?.orgao_origem?.unidade_gestora_origem?.codigo || cleanUasg;
-
-          const keyResolution = resolveContractKey(ugCodigo, numRaw, c.data_assinatura || c.vigencia_inicio);
-          if (keyResolution.tipo === 'INVALIDO') {
-            console.warn(`[contractService] Contrato descartado: número "${numRaw}" não permitiu derivar identidade (sem "/" reconhecível e sem data de fallback).`);
-            continue;
-          }
-          const canKey = keyResolution.key;
-          const anoRaw = keyResolution.ano;
-
-          const dataFim = c.vigencia_fim || c.dataVigenciaFinal;
-          const status = calculateStatusVigencia(dataFim);
-
-          const ugNome = c.unidade_gestora_nome || c.contratante?.orgao?.unidade_gestora?.nome || c.contratante?.orgao_origem?.unidade_gestora_origem?.nome || c.contratante?.unidade_origem?.nome;
-          const orgaoNome = c.contratante?.orgao?.nome || c.contratante?.orgao_origem?.nome;
-
-          const record: ContractDashboardRecord = {
-            id: canKey,
-            numero: numRaw,
-            ano: anoRaw,
-            numeroFormatado: formatNumeroAnoContrato(numRaw, anoRaw) || `${numRaw}/${anoRaw}`,
-            uasg: String(ugCodigo),
-            nomeUnidadeGestora: ugNome,
-            codigoOrgao: c.orgao || orgao,
-            nomeOrgao: orgaoNome,
-            objeto: c.objeto || '',
-            processo: c.processo || c.licitacao_numero,
-            fornecedorNome: c.fornecedor?.nome || c.nomeRazaoSocialFornecedor,
-            fornecedorCnpjCpf: c.fornecedor?.cnpj_cpf_idgener || c.niFornecedor,
-            valorGlobal: parseMoney(c.valor_global || c.valor_inicial),
-            valorInicial: parseMoney(c.valor_inicial),
-            dataAssinatura: c.data_assinatura,
-            dataVigenciaInicio: c.vigencia_inicio || c.dataVigenciaInicial,
-            dataVigenciaFim: dataFim,
-            statusVigencia: status,
-            numeroControlePncp: c.numeroControlePncp || c.numeroControlePncpContrato,
-            contratoId: c.id || c.contrato_id,
-            fonteDados: 'Contratos.gov.br',
-            sourceSystem: 'Contratos.gov.br',
-            sourceRecordId: c.id || c.contrato_id || canKey,
-            sourceUpdatedAt: c.data_assinatura || c.vigencia_inicio,
-            lastSyncedAt: new Date().toISOString(),
-            origem: 'API',
-            raw: c
-          };
-
-          contractsMap.set(canKey, record);
-        }
-      }
-    } else if (res.ok) {
-      console.warn(`[contractService] API /api-contratos-gov retornou tipo não-JSON (${contentType}).`);
+      if (Array.isArray(list)) return { list, ok: true };
+      console.warn(`[contractService] Contratos.gov.br retornou formato inesperado para a UG ${uasg}.`);
+      return { list: [], ok: false };
     }
+    console.warn(`[contractService] Contratos.gov.br indisponível para a UG ${uasg} (status ${res.status}, tipo ${contentType || 'desconhecido'}).`);
+    return { list: [], ok: false };
   } catch (err) {
-    console.warn(`[contractService] Falha ao consultar Contratos.gov.br para UG ${cleanUasg}:`, err);
+    console.warn(`[contractService] Falha ao consultar Contratos.gov.br para UG ${uasg}:`, err);
+    return { list: [], ok: false };
   }
+}
 
-  // 2. Buscar também no Compras.gov.br Dados Abertos (módulo-contratos)
+/**
+ * Contratos do Compras.gov.br Dados Abertos (módulo-contratos) iniciados nos últimos 3 anos.
+ * `ok = false` quando alguma página falhou: o que veio até ali é devolvido, mas a lista fica incompleta.
+ */
+async function fetchComprasGovList(uasg: string): Promise<{ list: any[]; ok: boolean }> {
+  const list: any[] = [];
+  let ok = true;
+  const orgao = codigoOrgaoDaUasg(uasg);
   try {
     const anoAtual = new Date().getFullYear();
     const dateChunks = splitDateRange(`${anoAtual - 2}-01-01`, `${anoAtual}-12-31`);
@@ -163,83 +206,21 @@ export async function fetchContractsForDashboard(
       let hasNext = true;
 
       while (hasNext && pagina <= maxPages) {
-        const url = `${BASE_URL}/1_consultarContratos?pagina=${pagina}&tamanhoPagina=500${orgao ? `&codigoOrgao=${orgao}` : ''}&codigoUnidadeGestora=${cleanUasg}&dataVigenciaInicialMin=${chunk.start}&dataVigenciaInicialMax=${chunk.end}`;
-        const res = await fetchWithTimeout(url, 8000).catch(() => null);
-        if (!res || !res.ok) break;
+        const url = `${BASE_URL}/1_consultarContratos?pagina=${pagina}&tamanhoPagina=500${orgao ? `&codigoOrgao=${orgao}` : ''}&codigoUnidadeGestora=${uasg}&dataVigenciaInicialMin=${chunk.start}&dataVigenciaInicialMax=${chunk.end}`;
+        const res = await fetchWithTimeout(url, COMPRAS_GOV_TIMEOUT_MS).catch(() => null);
+        if (!res || !res.ok) {
+          ok = false;
+          break;
+        }
 
         const data = await res.json().catch(() => null);
-        if (!data) break;
-        const list = data.resultado || [];
-        if (!Array.isArray(list) || list.length === 0) break;
-
-        for (const c of list) {
-          const numRaw = c.numeroContrato ? String(c.numeroContrato).trim() : '';
-
-          const keyResolution = resolveContractKey(c.codigoUnidadeGestora || cleanUasg, numRaw, c.dataVigenciaInicial);
-          if (keyResolution.tipo === 'INVALIDO') {
-            continue;
-          }
-          const canKey = keyResolution.key;
-          const anoRaw = keyResolution.ano;
-
-          const dataFim = c.dataVigenciaFinal || c.vigencia_fim;
-          const status = calculateStatusVigencia(dataFim);
-
-          const existing = contractsMap.get(canKey);
-          if (existing) {
-            if (!existing.numeroControlePncp && c.numeroControlePncpContrato) {
-              existing.numeroControlePncp = c.numeroControlePncpContrato;
-            }
-            if (!existing.idCompra && c.idCompra) {
-              existing.idCompra = c.idCompra;
-            }
-            if (!existing.modalidadeCompra && c.modalidadeCompra) {
-              existing.modalidadeCompra = c.modalidadeCompra;
-            }
-            if (!existing.nomeUnidadeGestora && c.nomeUnidadeGestora) {
-              existing.nomeUnidadeGestora = c.nomeUnidadeGestora;
-            }
-            if (!existing.nomeOrgao && c.nomeOrgao) {
-              existing.nomeOrgao = c.nomeOrgao;
-            }
-            if (!existing.processo && c.processo) {
-              existing.processo = c.processo;
-            }
-            if (!existing.valorGlobal && c.valorGlobal) {
-              existing.valorGlobal = typeof c.valorGlobal === 'number' ? c.valorGlobal : parseFloat(c.valorGlobal || '0');
-            }
-          } else {
-            const record: ContractDashboardRecord = {
-              id: canKey,
-              numero: numRaw,
-              ano: anoRaw,
-              numeroFormatado: formatNumeroAnoContrato(numRaw, anoRaw) || `${numRaw}/${anoRaw}`,
-              uasg: String(c.codigoUnidadeGestora || cleanUasg),
-              nomeUnidadeGestora: c.nomeUnidadeGestora,
-              codigoOrgao: c.codigoOrgao || orgao,
-              nomeOrgao: c.nomeOrgao,
-              objeto: c.objeto || '',
-              processo: c.processo,
-              fornecedorNome: c.nomeRazaoSocialFornecedor,
-              fornecedorCnpjCpf: c.niFornecedor,
-              valorGlobal: typeof c.valorGlobal === 'number' ? c.valorGlobal : parseFloat(c.valorGlobal || '0'),
-              dataVigenciaInicio: c.dataVigenciaInicial,
-              dataVigenciaFim: dataFim,
-              statusVigencia: status,
-              numeroControlePncp: c.numeroControlePncpContrato,
-              idCompra: c.idCompra,
-              modalidadeCompra: c.modalidadeCompra,
-              fonteDados: 'Compras.gov.br',
-              sourceSystem: 'Compras.gov.br',
-              sourceRecordId: c.numeroControlePncpContrato || canKey,
-              sourceUpdatedAt: c.dataHoraAtualizacao || c.dataHoraInclusao || c.dataVigenciaInicial,
-              lastSyncedAt: new Date().toISOString(),
-              origem: 'API',
-              raw: c
-            };
-            contractsMap.set(canKey, record);
-          }
+        if (!data) {
+          ok = false;
+          break;
         }
+        const page = data.resultado || [];
+        if (!Array.isArray(page) || page.length === 0) break;
+        list.push(...page);
 
         if (data.paginasRestantes && data.paginasRestantes > 0) {
           pagina++;
@@ -249,7 +230,105 @@ export async function fetchContractsForDashboard(
       }
     }
   } catch (err) {
-    console.warn(`[contractService] Falha ao consultar Compras.gov.br módulo-contratos para UG ${cleanUasg}:`, err);
+    console.warn(`[contractService] Falha ao consultar Compras.gov.br módulo-contratos para UG ${uasg}:`, err);
+    ok = false;
+  }
+  return { list, ok };
+}
+
+/** Compras.gov.br: completa o registro vindo do Contratos.gov.br ou cria o contrato que só existe nele. */
+function mergeComprasGovRecord(contractsMap: Map<string, ContractDashboardRecord>, c: any, uasg: string): void {
+  const orgao = codigoOrgaoDaUasg(uasg);
+  const numRaw = c.numeroContrato ? String(c.numeroContrato).trim() : '';
+
+  const keyResolution = resolveContractKey(c.codigoUnidadeGestora || uasg, numRaw, c.dataVigenciaInicial);
+  if (keyResolution.tipo === 'INVALIDO') {
+    return;
+  }
+  const canKey = keyResolution.key;
+  const anoRaw = keyResolution.ano;
+
+  const dataFim = c.dataVigenciaFinal || c.vigencia_fim;
+  const status = calculateStatusVigencia(dataFim);
+
+  const existing = contractsMap.get(canKey);
+  if (existing) {
+    if (!existing.numeroControlePncp && c.numeroControlePncpContrato) {
+      existing.numeroControlePncp = c.numeroControlePncpContrato;
+    }
+    if (!existing.idCompra && c.idCompra) {
+      existing.idCompra = c.idCompra;
+    }
+    if (!existing.modalidadeCompra && c.modalidadeCompra) {
+      existing.modalidadeCompra = c.modalidadeCompra;
+    }
+    if (!existing.nomeUnidadeGestora && c.nomeUnidadeGestora) {
+      existing.nomeUnidadeGestora = c.nomeUnidadeGestora;
+    }
+    if (!existing.nomeOrgao && c.nomeOrgao) {
+      existing.nomeOrgao = c.nomeOrgao;
+    }
+    if (!existing.processo && c.processo) {
+      existing.processo = c.processo;
+    }
+    if (!existing.valorGlobal && c.valorGlobal) {
+      existing.valorGlobal = typeof c.valorGlobal === 'number' ? c.valorGlobal : parseFloat(c.valorGlobal || '0');
+    }
+  } else {
+    const record: ContractDashboardRecord = {
+      id: canKey,
+      numero: numRaw,
+      ano: anoRaw,
+      numeroFormatado: formatNumeroAnoContrato(numRaw, anoRaw) || `${numRaw}/${anoRaw}`,
+      uasg: String(c.codigoUnidadeGestora || uasg),
+      nomeUnidadeGestora: c.nomeUnidadeGestora,
+      codigoOrgao: c.codigoOrgao || orgao,
+      nomeOrgao: c.nomeOrgao,
+      objeto: c.objeto || '',
+      processo: c.processo,
+      fornecedorNome: c.nomeRazaoSocialFornecedor,
+      fornecedorCnpjCpf: c.niFornecedor,
+      valorGlobal: typeof c.valorGlobal === 'number' ? c.valorGlobal : parseFloat(c.valorGlobal || '0'),
+      dataVigenciaInicio: c.dataVigenciaInicial,
+      dataVigenciaFim: dataFim,
+      statusVigencia: status,
+      numeroControlePncp: c.numeroControlePncpContrato,
+      idCompra: c.idCompra,
+      modalidadeCompra: c.modalidadeCompra,
+      fonteDados: 'Compras.gov.br',
+      sourceSystem: 'Compras.gov.br',
+      sourceRecordId: c.numeroControlePncpContrato || canKey,
+      sourceUpdatedAt: c.dataHoraAtualizacao || c.dataHoraInclusao || c.dataVigenciaInicial,
+      lastSyncedAt: new Date().toISOString(),
+      origem: 'API',
+      raw: c
+    };
+    contractsMap.set(canKey, record);
+  }
+}
+
+async function loadContractsForDashboard(cleanUasg: string, cacheKey: string): Promise<ContractDashboardRecord[]> {
+  // As duas fontes são consultadas ao mesmo tempo: a espera é a da fonte mais lenta, não a soma.
+  const [contratosGov, comprasGov] = await Promise.all([
+    fetchContratosGovList(cleanUasg),
+    fetchComprasGovList(cleanUasg)
+  ]);
+
+  const partial = !contratosGov.ok || !comprasGov.ok;
+
+  // Lista incompleta: parte do que já se sabia (última lista completa), para não encolher a carteira.
+  const contractsMap = new Map<string, ContractDashboardRecord>();
+  if (partial) {
+    for (const record of CONTRATOS_ULTIMA_COMPLETA.get(cleanUasg) ?? []) contractsMap.set(record.id, record);
+  }
+
+  // O Contratos.gov.br entra primeiro; o Compras.gov.br completa os campos que faltarem e traz o que só existe nele.
+  for (const c of contratosGov.list) {
+    const record = mapContratosGovRecord(c, cleanUasg);
+    if (record) contractsMap.set(record.id, record);
+  }
+  for (const c of comprasGov.list) {
+    mergeComprasGovRecord(contractsMap, c, cleanUasg);
   }
 
   // Contratos manuais (tabela contratos_manuais) deixaram de ser carregados: o cadastro manual
@@ -265,12 +344,42 @@ export async function fetchContractsForDashboard(
     return numB - numA;
   });
 
-  // Apenas grava no cache se houver resultados encontrados
-  if (result.length > 0) {
+  // Só grava no cache a lista completa: uma lista incompleta ficaria 5 minutos valendo como se fosse a carteira inteira.
+  setContractsPartial(cleanUasg, partial);
+  if (!partial && result.length > 0) {
     CONTRATOS_CACHE.set(cacheKey, { timestamp: Date.now(), data: result });
+    CONTRATOS_ULTIMA_COMPLETA.set(cleanUasg, result);
   }
 
   return result;
+}
+
+/**
+ * Busca contratos para o Dashboard unificando Compras.gov.br e Contratos.gov.br
+ */
+export async function fetchContractsForDashboard(
+  uasg: string = '200331',
+  forceRefresh: boolean = false
+): Promise<ContractDashboardRecord[]> {
+  const cleanUasg = (uasg || '200331').trim();
+  const cacheKey = `contracts_${cleanUasg}`;
+
+  if (forceRefresh) {
+    CONTRATOS_CACHE.delete(cacheKey);
+  } else {
+    const cached = CONTRATOS_CACHE.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return cached.data;
+    }
+    const inflight = CONTRATOS_INFLIGHT.get(cacheKey);
+    if (inflight) return inflight;
+  }
+
+  const promise = loadContractsForDashboard(cleanUasg, cacheKey).finally(() => {
+    if (CONTRATOS_INFLIGHT.get(cacheKey) === promise) CONTRATOS_INFLIGHT.delete(cacheKey);
+  });
+  CONTRATOS_INFLIGHT.set(cacheKey, promise);
+  return promise;
 }
 
 /**

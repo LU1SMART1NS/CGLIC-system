@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
+import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { EmptyState } from '../../../design-system/components/EmptyState';
 import { SeverityBadge } from '../../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../../services/temporalEngineService';
@@ -8,6 +8,9 @@ import { formatContractNumber } from '../../../utils/contractNumber';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
 import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../../carteira/CarteiraDetailLabel';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
+import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
+import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
+import { formatCurrency } from '../../carteira/carteiraFormat';
 import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import type { PrazoFaixa } from '../../carteira/carteiraPrazo';
 import { ManagerCell, type ManagerAssignContext } from '../../carteira/ManagerAssign';
@@ -33,11 +36,6 @@ interface ContractsPortfolioTableProps {
   /** Atribuição de gestor na própria carteira (admin e gestor). */
   canAssign?: boolean;
   assignContext?: ManagerAssignContext;
-}
-
-function formatCurrency(val?: number): string {
-  if (typeof val !== 'number' || isNaN(val)) return 'R$ 0,00';
-  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function formatTipoInstrumento(tipo?: string): string {
@@ -84,23 +82,16 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   canAssign = false,
   assignContext = { links: [] }
 }) => {
-  const navigate = useNavigate();
-  const [page, setPage] = useState(1);
+  const navigate = useNavigateWithOrigin();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-
-  // Só volta à página 1 quando o conjunto listado muda (filtro/busca), não quando
-  // um gestor é atribuído e a linha é recalculada.
-  const rowsSignature = useMemo(() => rows.map((r) => r.contractKey).join('|'), [rows]);
-  useEffect(() => {
-    setPage(1);
-    setExpandedKey(null);
-  }, [rowsSignature]);
-
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / pageSize)));
-  const pageRows = useMemo(
-    () => rows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [rows, currentPage, pageSize]
+  const { currentPage, setPage, pageItems: pageRows, signature } = useCarteiraPagination(
+    rows,
+    useCallback((r: ContractPortfolioRow) => r.contractKey, []),
+    pageSize
   );
+  useEffect(() => {
+    setExpandedKey(null);
+  }, [signature]);
 
   if (totalContracts === 0) {
     return (
@@ -113,44 +104,11 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
 
   if (rows.length === 0) {
     return (
-      <div style={{
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: '8px',
-        padding: '3rem 1.5rem',
-        textAlign: 'center',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '0.75rem'
-      }}>
-        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
-          Nenhum contrato corresponde aos filtros aplicados.
-        </h3>
-        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', maxWidth: '400px' }}>
-          Altere os critérios selecionados ou limpe os filtros para visualizar a carteira completa.
-        </p>
-        <button
-          type="button"
-          onClick={onResetFilters}
-          style={{
-            marginTop: '0.5rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            padding: '0.45rem 0.85rem',
-            background: '#0c326f',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            color: '#ffffff',
-            cursor: 'pointer'
-          }}
-        >
-          <RotateCcw size={13} /> Limpar Filtros
-        </button>
-      </div>
+      <CarteiraNoResults
+        title="Nenhum contrato corresponde aos filtros aplicados."
+        description="Altere os critérios selecionados ou limpe os filtros para visualizar a carteira completa."
+        onResetFilters={onResetFilters}
+      />
     );
   }
 
