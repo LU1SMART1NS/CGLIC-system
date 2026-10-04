@@ -548,6 +548,17 @@ h1, h2, h3, h4 {
   background: #ffffff;
   border-right: 1px solid #e2e8f0;
 }
+/* Rodapé na coluna do conteúdo: alinhado à barra gov.br e ao cabeçalho, ao lado do menu. */
+.app-footer { margin-left: 88px; width: calc(100% - 88px); }
+@media (max-width: 480px) {
+  .app-footer-full { display: none; }
+}
+@media (max-width: 767px) {
+  .app-footer {
+    margin-left: 0;
+    width: 100%;
+  }
+}
 .app-rail-spacer { flex: 1; }
 .app-rail-item { position: relative; }
 .app-rail-link {
@@ -663,7 +674,7 @@ h1, h2, h3, h4 {
     justify-content: center;
   }
   .app-footer {
-    padding: 1.5rem var(--page-gutter) !important;
+    padding: 0.75rem var(--page-gutter) calc(0.75rem + 64px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 

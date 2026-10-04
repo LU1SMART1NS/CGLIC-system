@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import govbrLogo from '../assets/govbr-logo.svg';
 
 interface HeaderProps {
   onOpenExportModal?: () => void;
@@ -21,13 +22,15 @@ export const Header: React.FC<HeaderProps> = () => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        borderBottom: '2px solid #00cc55',
         fontFamily: 'var(--font-family)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontWeight: 800, fontSize: '0.85rem', letterSpacing: '-0.03em' }}>
-            gov<span style={{ color: '#00cc55' }}>.</span>br
-          </span>
+          <img
+            src={govbrLogo}
+            alt="gov.br"
+            style={{ height: '15px', width: 'auto', display: 'block', filter: 'brightness(0) invert(1)' }}
+          />
           <span style={{ opacity: 0.5, margin: '0 0.25rem' }}>|</span>
           <span className="app-header-org-full" style={{ fontWeight: 600, opacity: 0.95 }}>Ministério da Justiça e Segurança Pública</span>
           <span className="app-header-org-short" style={{ fontWeight: 600, opacity: 0.95 }}>MJSP</span>
@@ -54,26 +57,11 @@ export const Header: React.FC<HeaderProps> = () => {
         gap: '1rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', minWidth: 0 }} className="app-header-brand">
-          <div style={{
-            width: '32px',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <img 
-              src="/logo.png" 
-              alt="Logo Compras SUSP / SENASP" 
-              style={{ 
-                maxHeight: '100%', 
-                maxWidth: '100%', 
-                objectFit: 'contain' 
-              }} 
-            />
-          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
-              CGLIC
+            <h1 aria-label="ComprasSUSP · CGLIC" style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
+              <span style={{ fontWeight: 500 }}>Compras</span>SUSP
+              <span className="app-header-subtitle" style={{ color: '#94a3b8', fontWeight: 500, margin: '0 0.4rem' }}>·</span>
+              <span className="app-header-subtitle">CGLIC</span>
             </h1>
             <span className="app-header-subtitle" style={{ color: '#cbd5e1' }}>|</span>
             <span className="app-header-subtitle" style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
