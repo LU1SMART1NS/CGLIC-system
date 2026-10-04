@@ -35,11 +35,11 @@ export const ItemBalancesRoute: React.FC = () => {
   const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(uasg);
   const isScopedRole = role === 'gestor';
 
-  // O gestor de saldos não acessa a carteira de Atas: chega ao item por /atas/saldos-unidade e volta para lá.
+  // O gestor de saldos chega ao item pela carteira de Itens e volta para lá.
   const ataPath = arp ? buildAtaPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, 'itens') : '/atas';
   const back = useBackTarget(
     role === 'gestor_saldos'
-      ? { path: '/atas/saldos-unidade', label: 'Voltar para Alocações' }
+      ? { path: '/itens', label: 'Voltar para Itens' }
       : arp
         ? { path: ataPath, label: 'Voltar para a ata' }
         : { path: '/atas', label: 'Voltar para Atas' }
