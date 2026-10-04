@@ -5,6 +5,7 @@ import { SelectionProvider, useSelection } from './context/SelectionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, ConfirmProvider } from './design-system';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
+import fnspLogo from './assets/fnsp-logo.png';
 import { GestaoInstrumentosRoute } from './routes/GestaoInstrumentosRoute';
 import { ArpSearchRoute } from './routes/ArpSearchRoute';
 import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
@@ -76,30 +77,26 @@ const AppFooter: React.FC = () => (
   <footer className="app-footer" style={{
     background: '#0c326f',
     color: '#ffffff',
-    padding: '2.5rem 3rem',
-    fontSize: '0.82rem',
+    padding: '0.4rem var(--page-gutter)',
+    fontSize: '0.75rem',
     fontFamily: 'var(--font-family)',
     marginTop: 0,
-    borderTop: '4px solid #00cc55'
+    borderTop: '2px solid #00cc55'
   }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', maxWidth: '1800px', margin: '0 auto' }}>
-      <div>
-        <p style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '0.25rem', color: '#ffffff' }}>
-          Ministério da Justiça e Segurança Pública
-        </p>
-        <p style={{ opacity: 0.9, color: '#e2e8f0' }}>
-          Secretaria Nacional de Segurança Pública — SENASP | Controle de Saldos de Atas de Registro de Preços
-        </p>
-        <p style={{ opacity: 0.7, fontSize: '0.75rem', marginTop: '0.5rem', color: '#cbd5e1' }}>
-          © {new Date().getFullYear()} Governo Federal. Todos os direitos reservados. Padrão Visual Institucional BR-DS / MJSP.
-        </p>
+    {/* Espelha a barra gov.br do topo: marca | órgão à esquerda, metadado à direita. */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem 1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <img
+          src={fnspLogo}
+          alt="FNSP"
+          style={{ height: '12px', width: 'auto', display: 'block', filter: 'brightness(0) invert(1)' }}
+        />
+        <span className="app-footer-full" aria-hidden="true" style={{ opacity: 0.5, margin: '0 0.25rem' }}>|</span>
+        <span className="app-footer-full" style={{ fontWeight: 600, opacity: 0.95 }}>Fundo Nacional de Segurança Pública</span>
       </div>
-      <div className="app-footer-source" style={{ textAlign: 'right', opacity: 0.9 }}>
-        <p style={{ fontWeight: 700, color: '#ffffff' }}>Dados Oficiais das APIs Compras.gov.br e PNCP</p>
-        <p style={{ fontSize: '0.78rem', marginTop: '0.2rem', opacity: 0.8, color: '#cbd5e1' }}>
-          Sincronizado com os dados abertos do Governo Federal e licitações públicas.
-        </p>
-      </div>
+      <p className="app-footer-source" style={{ margin: 0, color: '#cbd5e1', opacity: 0.85, textAlign: 'right' }}>
+        Dados: Compras.gov.br e PNCP · © {new Date().getFullYear()}
+      </p>
     </div>
   </footer>
 );
