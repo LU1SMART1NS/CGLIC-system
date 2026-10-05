@@ -156,3 +156,23 @@ describe('buildDistribuicaoEquipe', () => {
     ]);
   });
 });
+
+describe('ajuste manual de complexidade', () => {
+  it('a carga do gestor usa a faixa ajustada (ata e contrato)', () => {
+    const { linhas } = buildDistribuicaoEquipe({
+      atas: [{ ...ata('00001/2025', 'Ana'), itens: 1 }],
+      contratos: [{ ...contrato('200331-00001-2025', 'Ana'), categoria: 'Compras', mesesVigencia: 6 }],
+      links: [],
+      attentionItems: [],
+      ajustes: {
+        'CONTRATO:200331-00001-2025': { tipo: 'CONTRATO', chave: '200331-00001-2025', nivel: 'ALTA', motivo: 'Mão de obra com dedicação exclusiva' },
+        'ATA:00099/2025': { tipo: 'ATA', chave: '00099/2025', nivel: 'ALTA', motivo: 'Outra ata' }
+      }
+    });
+    const ana = linhas.find((l) => l.gestorNome === 'Ana')!;
+    expect(ana.complexidade).toEqual({ ALTA: 1, MEDIA: 0, BAIXA: 1 });
+    expect(ana.equivalente).toBe(4);
+    const c = ana.itens.find((i) => i.tipo === 'CONTRATO')!;
+    expect(c.complexidade.ajuste?.automatica.nivel).toBe('BAIXA');
+  });
+});

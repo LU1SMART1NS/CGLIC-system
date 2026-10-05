@@ -20,6 +20,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useAtasPortfolio, getArpPrazo } from '../../../hooks/useAtasPortfolio';
 import { useContractsPortfolio } from '../../../hooks/useContractsPortfolio';
 import { useArpItemContractLinks } from '../../../hooks/useAtaManagers';
+import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
 import { formatContractNumber } from '../../../utils/contractNumber';
 import {
   buildDistribuicaoEquipe,
@@ -172,6 +173,9 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // Só quem pode atribuir (admin) vê as ações de transferir; o leitor acompanha.
   const { role } = useAuth();
   const canAssign = canAssignManager(role);
+  // Ajuste manual de complexidade: só o coordenador (a RPC também exige admin).
+  const canAjustar = role === 'admin';
+  const { data: ajustes } = useComplexidadeAjustes();
   // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void } | null>(null);
   const [expanded, setExpanded] = React.useState<string | null>(null);
@@ -206,9 +210,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
           mesesVigencia: mesesDeVigencia(row.contract.dataVigenciaInicio, row.contract.dataVigenciaFim)
         })),
         links,
-        attentionItems: contratos.attentionItems
+        attentionItems: contratos.attentionItems,
+        ajustes
       }),
-    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links]
+    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes]
   );
 
   const refresh = () => {
@@ -431,6 +436,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
                             <DistribuicaoItens
                               linha={l}
                               canAssign={canAssign}
+                              canAjustar={canAjustar}
                               onTransfer={(targets, done) => setTransferencia({ targets, origem: l.gestorNome, done })}
                             />
                           </td>

@@ -9,7 +9,22 @@ export interface Complexidade {
   nivel: NivelComplexidade;
   /** Por que caiu nesta faixa, em linguagem do usuário (ex.: "Serviços · 24 meses"). */
   motivo: string;
+  /** Presente quando o coordenador ajustou a faixa à mão (migration 66). */
+  ajuste?: {
+    /** Faixa e motivo que as regras dariam sem o ajuste. */
+    automatica: { nivel: NivelComplexidade; motivo: string };
+    ajustadoPorNome?: string;
+    atualizadoEm?: string;
+  };
 }
+
+/** Motivos rápidos do ajuste manual (o coordenador pode escrever outro). */
+export const MOTIVOS_AJUSTE = [
+  'Mão de obra com dedicação exclusiva',
+  'Muitas unidades participantes ou adesões',
+  'Fiscalização técnica especializada',
+  'Histórico de problemas na execução'
+] as const;
 
 /** Peso de cada faixa na carga equivalente (Baixa = 1, Média = 2, Alta = 3). */
 export const PESO_COMPLEXIDADE: Record<NivelComplexidade, number> = { BAIXA: 1, MEDIA: 2, ALTA: 3 };
@@ -61,4 +76,21 @@ export function classificarContrato(categoria: string | undefined, meses: number
   return meses !== null && meses >= 12
     ? { nivel: 'ALTA', motivo: `${cat} · ${txtMeses}` }
     : { nivel: 'MEDIA', motivo: `${cat} · ${txtMeses}` };
+}
+
+/** Ajuste manual por cima da faixa automática: vale a faixa do coordenador, guardando a automática. */
+export function aplicarAjuste(
+  automatica: Complexidade,
+  ajuste?: { nivel: NivelComplexidade; motivo: string; ajustadoPorNome?: string; atualizadoEm?: string }
+): Complexidade {
+  if (!ajuste) return automatica;
+  return {
+    nivel: ajuste.nivel,
+    motivo: ajuste.motivo,
+    ajuste: {
+      automatica: { nivel: automatica.nivel, motivo: automatica.motivo },
+      ajustadoPorNome: ajuste.ajustadoPorNome,
+      atualizadoEm: ajuste.atualizadoEm
+    }
+  };
 }
