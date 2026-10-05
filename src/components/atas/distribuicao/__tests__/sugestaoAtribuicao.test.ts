@@ -76,9 +76,26 @@ describe('avaliarCandidatos', () => {
     const loteDaAna = montarLote([{ tipo: 'ATA', ataKey: '00001/2025' }], [], indexarItens(distribuicao.linhas));
     const r = avaliarCandidatos(loteDaAna, [{ nome: 'Ana', userId: 'u1', ehGestor: true }, { nome: 'Carla', userId: 'u3', ehGestor: true }], distribuicao.linhas);
     expect(r.opcoes.find((o) => o.nome === 'Ana')!.jaEhGestor).toBe(true);
-    // Ana já é a gestora e Bruno entra pela carteira atual: os elegíveis são Bruno e Carla
-    expect(r.sugestao).toBe('Carla');
-    const so = avaliarCandidatos(loteDaAna, [{ nome: 'Ana', userId: 'u1', ehGestor: true }], [distribuicao.linhas.find((l) => l.gestorNome === 'Ana')!]);
-    expect(so.sugestao).toBeNull();
+    // Ana já é a gestora do lote: sobra só Carla entre os gestores, então não há escolha a apoiar
+    expect(r.sugestao).toBeNull();
+    const dois = avaliarCandidatos(loteDaAna, [{ nome: 'Ana', userId: 'u1', ehGestor: true }, { nome: 'Carla', userId: 'u3', ehGestor: true }, { nome: 'Dora', userId: 'u4', ehGestor: true }], distribuicao.linhas);
+    expect(dois.sugestao).toBe('Carla'); // Carla e Dora: mesma carga e urgências, desempate por nome
+  });
+
+  it('ter carteira não faz de ninguém "gestor": coordenador com contrato fica em "outros" e nunca é sugerido', () => {
+    const lote = montarLote([{ tipo: 'ATA', ataKey: '00010/2025' }], links, indexarItens(distribuicao.linhas));
+    // Bruno tem carteira (1 contrato) mas aqui é só coordenador (ehGestor false); Carla é gestora sem carga
+    const r = avaliarCandidatos(lote, [{ nome: 'Bruno', userId: 'u2', ehGestor: false }, { nome: 'Carla', userId: 'u3', ehGestor: true }, { nome: 'Dora', userId: 'u4', ehGestor: true }], distribuicao.linhas);
+    const bruno = r.opcoes.find((o) => o.nome === 'Bruno')!;
+    expect(bruno.ehGestor).toBe(false);
+    expect(bruno.cargaAtual).toBe(1); // a carga dele continua visível para comparar
+    expect(r.opcoes.map((o) => o.nome)).toEqual(['Carla', 'Dora', 'Bruno']);
+    expect(r.sugestao).not.toBe('Bruno');
+  });
+
+  it('só lista usuários cadastrados: quem tem carteira mas não está na lista não vira candidato', () => {
+    const lote = montarLote([{ tipo: 'ATA', ataKey: '00010/2025' }], links, indexarItens(distribuicao.linhas));
+    const r = avaliarCandidatos(lote, [{ nome: 'Carla', userId: 'u3', ehGestor: true }], distribuicao.linhas);
+    expect(r.opcoes.map((o) => o.nome)).toEqual(['Carla']); // Ana e Bruno têm carteira, mas não são usuários da lista
   });
 });

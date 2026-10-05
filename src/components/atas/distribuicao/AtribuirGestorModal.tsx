@@ -39,7 +39,6 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
   const { data: roles = [] } = useRoles();
   const assign = useAssignManager();
   const [escolhido, setEscolhido] = React.useState<{ nome: string; userId: string | null } | null>(null);
-  const [outroNome, setOutroNome] = React.useState<string | null>(null);
 
   const lote = React.useMemo(() => montarLote(targets, links, indexarItens(linhas)), [targets, links, linhas]);
   const candidatos = React.useMemo<CandidatoAtribuicao[]>(
@@ -51,8 +50,9 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
   );
   const { opcoes, sugestao } = React.useMemo(() => avaliarCandidatos(lote, candidatos, linhas), [lote, candidatos, linhas]);
 
-  const nomeFinal = outroNome !== null ? outroNome.trim() : escolhido?.nome ?? '';
-  const gestorUserId = outroNome !== null ? null : escolhido?.userId ?? null;
+  // Só servidores cadastrados: o gestor precisa da conta para ver a própria carteira (escopo pelo usuário).
+  const nomeFinal = escolhido?.nome ?? '';
+  const gestorUserId = escolhido?.userId ?? null;
   const falhas = assign.data?.falhas || [];
 
   const salvar = () => {
@@ -132,7 +132,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
         <div role="radiogroup" aria-label="Gestor que vai receber" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           {opcoes.map((o, i) => {
             const primeiroDoGrupo = i === 0 || opcoes[i - 1].ehGestor !== o.ehGestor;
-            const selecionado = outroNome === null && escolhido?.nome === o.nome;
+            const selecionado = escolhido?.nome === o.nome;
             const pressao = [
               o.urgentes > 0 ? plural(o.urgentes, 'urgente', 'urgentes') : null,
               o.atrasadas > 0 ? plural(o.atrasadas, 'tarefa atrasada', 'tarefas atrasadas') : null
@@ -165,10 +165,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
                     name="atribuir-gestor"
                     checked={selecionado}
                     disabled={o.jaEhGestor}
-                    onChange={() => {
-                      setOutroNome(null);
-                      setEscolhido({ nome: o.nome, userId: o.userId });
-                    }}
+                    onChange={() => setEscolhido({ nome: o.nome, userId: o.userId })}
                   />
                   <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                     <div style={{ fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
@@ -196,25 +193,6 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
             );
           })}
         </div>
-
-        {outroNome === null ? (
-          <button
-            type="button"
-            onClick={() => setOutroNome('')}
-            style={{ alignSelf: 'flex-start', fontSize: '0.78rem', color: '#0284c7', background: 'none', border: 'none', padding: '0.5rem 0', minHeight: '44px', cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            Digitar outro nome...
-          </button>
-        ) : (
-          <input
-            autoFocus
-            type="text"
-            value={outroNome}
-            onChange={(e) => setOutroNome(e.target.value)}
-            placeholder="Nome completo do gestor"
-            style={{ fontSize: '16px', padding: '0.5rem 0.6rem', border: '1px solid #0c326f', borderRadius: '6px' }}
-          />
-        )}
 
         {assign.isError && (
           <div role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', fontWeight: 600 }}>

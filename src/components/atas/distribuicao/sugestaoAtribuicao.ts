@@ -54,7 +54,7 @@ export function montarLote(targets: ManagerTarget[], links: ArpItemContractLinkP
 export interface CandidatoAtribuicao {
   nome: string;
   userId: string | null;
-  /** Perfil "gestor" (ou já gere instrumentos): entra na sugestão. */
+  /** Perfil "gestor": aparece em "Gestores" e entra na sugestão. Coordenador e outros perfis, nunca. */
   ehGestor: boolean;
   perfilLabel?: string;
 }
@@ -70,9 +70,9 @@ export interface OpcaoAtribuicao extends CandidatoAtribuicao {
 }
 
 /**
- * Carga atual → carga depois de cada candidato, e uma sugestão discreta: entre os gestores (perfil gestor ou
- * que já têm carteira), o de menor carga depois da atribuição; empate pelo menor número de urgentes.
- * Só sugere com 2+ gestores possíveis — com um só, não há escolha a apoiar.
+ * Carga atual → carga depois de cada candidato (só usuários cadastrados), e uma sugestão discreta: entre os de
+ * perfil gestor, o de menor carga depois da atribuição; empate pelo menor número de urgentes. Ter carteira não
+ * torna ninguém "gestor" para a sugestão (ex.: coordenador com um contrato). Só sugere com 2+ gestores possíveis.
  */
 export function avaliarCandidatos(
   lote: LoteAtribuicao,
@@ -81,13 +81,7 @@ export function avaliarCandidatos(
 ): { opcoes: OpcaoAtribuicao[]; sugestao: string | null } {
   const linhaPorNome = new Map(linhas.filter((l) => l.gestorNome !== null).map((l) => [l.gestorNome as string, l]));
 
-  // Quem já gere instrumentos mas não está na lista de usuários (nome digitado) também é candidato.
-  const todos = [...candidatos];
-  for (const nome of linhaPorNome.keys()) {
-    if (!todos.some((c) => c.nome === nome)) todos.push({ nome, userId: null, ehGestor: true });
-  }
-
-  const opcoes = todos.map((c): OpcaoAtribuicao => {
+  const opcoes = candidatos.map((c): OpcaoAtribuicao => {
     const linha = linhaPorNome.get(c.nome);
     const cargaAtual = linha?.equivalente ?? 0;
     const acrescimo = lote.itens
@@ -95,7 +89,6 @@ export function avaliarCandidatos(
       .reduce((soma, i) => soma + PESO_COMPLEXIDADE[i.item.complexidade.nivel], 0);
     return {
       ...c,
-      ehGestor: c.ehGestor || Boolean(linha),
       cargaAtual,
       cargaDepois: cargaAtual + acrescimo,
       urgentes: linha?.pendencias.urgentes ?? 0,
