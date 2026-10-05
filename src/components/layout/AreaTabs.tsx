@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { navigationConfig, filterNavigationByRole, findAreaForTabs } from '../../config/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { AREA_TABS_ACTIONS_ID } from '../../design-system/components/PageHeader';
 
 /** Filtros da Carteira que valem em mais de uma aba: seguem o usuário ao trocar de aba (mesmos nomes de parâmetro). */
 const CARTEIRA_SHARED_PARAMS = ['situacao', 'unidade', 'gestor', 'busca', 'alocacao', 'empenho'];
@@ -58,7 +59,10 @@ export const AreaTabs: React.FC = () => {
   if (!grouped) {
     return (
       <nav aria-label={`Páginas de ${area.label}`} className="area-tabs">
-        <div className="area-tabs-list ds-tabs-scroll">{tabs.map((tab) => renderLink(tab, 'area-tab'))}</div>
+        <div className="area-tabs-row">
+          <div className="area-tabs-list ds-tabs-scroll">{tabs.map((tab) => renderLink(tab, 'area-tab'))}</div>
+          <div id={AREA_TABS_ACTIONS_ID} className="area-tabs-actions" />
+        </div>
       </nav>
     );
   }
@@ -67,6 +71,7 @@ export const AreaTabs: React.FC = () => {
 
   return (
     <nav aria-label={`Páginas de ${area.label}`} className="area-tabs">
+      <div className="area-tabs-row">
       <div className="area-tabs-list ds-tabs-scroll" role="group" aria-label="Grupos">
         {groups.map((group) => {
           const first = tabs.find((t) => t.group === group)!;
@@ -83,6 +88,8 @@ export const AreaTabs: React.FC = () => {
             </Link>
           );
         })}
+      </div>
+      <div id={AREA_TABS_ACTIONS_ID} className="area-tabs-actions" />
       </div>
       {subTabs.length > 1 && (
         <div className="area-subtabs ds-tabs-scroll" role="group" aria-label={`Páginas de ${activeGroup}`}>

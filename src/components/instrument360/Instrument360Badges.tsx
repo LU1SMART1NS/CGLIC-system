@@ -23,7 +23,7 @@ export const InstrumentStatusBadge: React.FC<{ status: InstrumentStatus; testId?
         gap: '6px',
         padding: compact ? '2px 8px' : '3px 10px',
         borderRadius: '999px',
-        fontSize: compact ? '0.72rem' : '0.78rem',
+        fontSize: compact ? '0.75rem' : '0.78rem',
         fontWeight: 700,
         color: colors.color,
         background: colors.bg,
@@ -47,11 +47,12 @@ export const InstrumentAlertBadge: React.FC<{ children: React.ReactNode; testId?
       gap: '6px',
       padding: compact ? '2px 8px' : '3px 10px',
       borderRadius: '999px',
-      fontSize: compact ? '0.72rem' : '0.78rem',
+      fontSize: compact ? '0.75rem' : '0.78rem',
       fontWeight: 700,
       color: '#b91c1c',
-      background: 'transparent',
-      border: '1px solid #b91c1c',
+      // O selo compacto vive na barra azul-marinho: precisa de fundo claro para o vermelho ter contraste.
+      background: compact ? '#fef2f2' : 'transparent',
+      border: compact ? '1px solid #fecaca' : '1px solid #b91c1c',
       whiteSpace: 'nowrap'
     }}
   >

@@ -1,6 +1,6 @@
 import React from 'react';
-import { LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { UserMenu } from './UserMenu';
 import govbrLogo from '../assets/govbr-logo.svg';
 
 interface HeaderProps {
@@ -8,7 +8,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Gov.br Federal Identity Topbar */}
@@ -33,80 +33,26 @@ export const Header: React.FC<HeaderProps> = () => {
           />
           <span style={{ opacity: 0.5, margin: '0 0.25rem' }}>|</span>
           <span className="app-header-org-full" style={{ fontWeight: 600, opacity: 0.95 }}>Ministério da Justiça e Segurança Pública</span>
-          <span className="app-header-org-short" style={{ fontWeight: 600, opacity: 0.95 }}>MJSP</span>
+          {/* Celular: sem menu lateral, a marca do produto assume o lugar do nome do órgão. */}
+          <span className="app-header-wordmark" aria-label="ComprasSUSP" style={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
+            <span style={{ fontWeight: 500 }}>Compras</span>SUSP
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: '1.25rem', opacity: 0.9, fontWeight: 400 }} className="gov-topbar-links">
-          <a href="https://www.gov.br/mj/pt-br" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'none' }}>Portal MJSP</a>
-          <a href="https://www.gov.br/pt-br/orgaos-do-governo" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'none' }}>Órgãos do Governo</a>
-          <a href="https://www.gov.br/acessoainformacao/pt-br" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'none' }}>Acesso à Informação</a>
-        </div>
-      </div>
-
-      {/* Main MJSP / SENASP Styled Header */}
-      <header className="app-header-main" style={{
-        background: '#ffffff',
-        borderBottom: '1px solid #e2e8f0',
-        paddingTop: '0.45rem',
-        paddingBottom: '0.45rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        fontFamily: 'var(--font-family)',
-        flexWrap: 'nowrap',
-        gap: '1rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', minWidth: 0 }} className="app-header-brand">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <h1 aria-label="ComprasSUSP" style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', borderBottom: 'none', paddingBottom: 0 }}>
-              <span style={{ fontWeight: 500 }}>Compras</span>SUSP
-            </h1>
-            <span className="app-header-subtitle" style={{ color: '#cbd5e1' }}>|</span>
-            <span className="app-header-subtitle" style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
-              Gestão Inteligente de Atas e Contratos
-            </span>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {/* Grupo institucional (gov.br): discreto, some primeiro quando a tela estreita. */}
+          <div className="gov-topbar-links">
+            <a href="https://www.gov.br/mj/pt-br" target="_blank" rel="noopener noreferrer">Portal MJSP</a>
+            <a href="https://www.gov.br/pt-br/orgaos-do-governo" target="_blank" rel="noopener noreferrer">Órgãos do Governo</a>
+            <a href="https://www.gov.br/acessoainformacao/pt-br" target="_blank" rel="noopener noreferrer">Acesso à Informação</a>
           </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* Usuário Autenticado & Logout */}
           {user && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              paddingLeft: '0.5rem',
-              borderLeft: '1px solid #e2e8f0'
-            }}>
-              <span className="app-header-email" title={user.email ?? undefined} style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
-                {user.email}
-              </span>
-              <button
-                type="button"
-                className="app-header-signout"
-                onClick={signOut}
-                aria-label="Sair"
-                title="Encerrar sessão no ComprasSUSP"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.25rem 0.5rem',
-                  background: '#f8fafc',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
-                  color: '#475569',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                <LogOut size={12} /> <span className="app-header-signout-label">Sair</span>
-              </button>
-            </div>
+            <>
+              <span className="gov-topbar-divider" aria-hidden="true" />
+              <UserMenu />
+            </>
           )}
         </div>
-      </header>
+      </div>
     </div>
   );
 };

@@ -2,7 +2,16 @@
 
 :root {
   /* Gutter horizontal único das páginas (espelha pageGutter em tokens.ts) */
-  --page-gutter: 2rem;
+  --page-gutter: 1.5rem;
+  /* Largura do menu lateral (trilha); o rodapé recua o mesmo valor para alinhar com a barra gov.br. */
+  --rail-w: 96px;
+
+  /* Altura da barra de navegação inferior do celular, com a área segura: o rodapé e o conteúdo reservam exatamente este espaço.
+     O AppShell troca este valor pela altura medida da barra; este é só o ponto de partida. */
+  --bottom-nav-h: calc(68px + env(safe-area-inset-bottom, 0px));
+
+  /* Altura das duas barras azuis (cabeçalho gov.br e rodapé), sem a linha verde: iguais nos dois extremos da página. */
+  --gov-bar-h: 28px;
 
   /* Paleta de Cores e Tokens Gov.br Modernos */
   --primary: #0c326f;
@@ -107,6 +116,8 @@ a:hover {
   background-color: var(--bg-primary);
 }
 
+/* Área útil máxima: o miolo do app encosta mais no topo; o respiro entre blocos é de ~12–14px. */
+.app-main { padding: 0.5rem var(--page-gutter) 1.5rem; }
 main {
   flex: 1;
   width: 100%;
@@ -529,9 +540,52 @@ h1, h2, h3, h4 {
   :root { --page-gutter: 1rem; }
 }
 
-.app-header-org-short {
-  display: none;
+.app-header-wordmark { display: none; }
+.gov-topbar-links { display: flex; gap: 1rem; font-weight: 400; opacity: 0.7; }
+.gov-topbar-links a { color: #ffffff; text-decoration: none; }
+.gov-topbar-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.gov-topbar-divider { width: 1px; height: 12px; margin: 0 1.25rem; background: rgba(255, 255, 255, 0.35); }
+/* Menu do usuário (nome + alterar senha + sair) */
+.user-menu { position: relative; }
+.user-menu__trigger {
+  display: inline-flex; align-items: center; gap: 0.35rem; background: none; border: 0; cursor: pointer;
+  color: #fff; font: inherit; font-weight: 600; padding: 0.8rem 0.25rem; margin: -0.8rem 0;
 }
+.user-menu__trigger:hover .user-menu__name { text-decoration: underline; text-underline-offset: 3px; }
+.user-menu__trigger:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 2px; }
+.user-menu__name { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-menu__panel {
+  position: absolute; right: 0; top: calc(100% + 0.6rem); min-width: 230px; z-index: 200;
+  background: #fff; color: #1b1b1b; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.25);
+  padding: 0.35rem; font-size: 0.85rem; font-weight: 500;
+}
+.user-menu__who { display: flex; flex-direction: column; padding: 0.55rem 0.7rem; border-bottom: 1px solid #e5e7eb; margin-bottom: 0.25rem; }
+.user-menu__who span { color: #6b7280; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; }
+.user-menu__panel button {
+  display: flex; align-items: center; gap: 0.55rem; width: 100%; text-align: left; background: none; border: 0;
+  padding: 0.55rem 0.7rem; border-radius: 6px; cursor: pointer; font: inherit; color: inherit;
+}
+.user-menu__panel button:hover, .user-menu__panel button:focus-visible { background: #f1f5f9; }
+.user-modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.user-modal { background: #fff; color: #1b1b1b; border-radius: 10px; width: 100%; max-width: 400px; box-shadow: 0 16px 48px rgba(0,0,0,.3); font-size: 0.9rem; }
+.user-modal__head { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb; }
+.user-modal__head h2 { margin: 0; font-size: 1.05rem; }
+.user-modal__close { background: none; border: 0; cursor: pointer; color: inherit; display: flex; }
+.user-modal__body { display: flex; flex-direction: column; gap: 0.5rem; padding: 1.25rem; }
+.user-modal__body label { font-weight: 600; font-size: 0.8rem; margin-top: 0.25rem; }
+.user-modal__error { background: #fef2f2; color: #b91c1c; border-radius: 6px; padding: 0.6rem 0.75rem; font-size: 0.8rem; }
+.user-modal__btn { margin-top: 0.75rem; background: #0c326f; color: #fff; border: 0; border-radius: 6px; padding: 0.65rem; font: inherit; font-weight: 700; cursor: pointer; }
+.user-modal__btn:disabled { opacity: .6; cursor: default; }
+/* Estreitando a tela: primeiro somem os links institucionais (e o divisor), depois o e-mail; o Sair fica. */
+@media (max-width: 1100px) {
+  .gov-topbar-links, .gov-topbar-divider { display: none; }
+}
+.gov-topbar-signout {
+  background: none; border: 0; padding: 0.8rem 0.25rem; margin: -0.8rem 0; cursor: pointer;
+  color: #ffffff; font: inherit; font-weight: 700; text-decoration: none;
+}
+.gov-topbar-signout:hover { text-decoration: underline; text-underline-offset: 3px; }
+.gov-topbar-signout:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; border-radius: 2px; }
 
 /* Menu chave: trilha de ícones (desktop) e barra inferior (celular). */
 .app-rail {
@@ -539,17 +593,17 @@ h1, h2, h3, h4 {
   top: 0;
   z-index: 40;
   flex-shrink: 0;
-  width: 88px;
+  width: var(--rail-w);
   height: 100dvh;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  padding: 0.75rem 0.5rem;
+  padding: 0 0.4rem 0.75rem;
   background: #ffffff;
   border-right: 1px solid #e2e8f0;
 }
 /* Rodapé na coluna do conteúdo: alinhado à barra gov.br e ao cabeçalho, ao lado do menu. */
-.app-footer { margin-left: 88px; width: calc(100% - 88px); }
+.app-footer { margin-left: var(--rail-w); width: calc(100% - var(--rail-w)); }
 @media (max-width: 480px) {
   .app-footer-full { display: none; }
 }
@@ -559,6 +613,15 @@ h1, h2, h3, h4 {
     width: 100%;
   }
 }
+/* Marca do produto no topo do menu: alinhada à altura da faixa gov.br ao lado. */
+.app-rail-brand {
+  display: flex; align-items: center; justify-content: center;
+  height: 32px; margin: 0 -0.4rem 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a; font-size: 0.8rem; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; text-decoration: none;
+}
+.app-rail-brand span { font-weight: 500; }
+.app-rail-brand:hover { text-decoration: none; background: rgba(12, 50, 111, 0.04); }
 .app-rail-spacer { flex: 1; }
 .app-rail-item { position: relative; }
 .app-rail-link {
@@ -604,7 +667,13 @@ h1, h2, h3, h4 {
 .app-bottom-nav .app-rail-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Abas da área no topo das páginas de lista. */
-.area-tabs { max-width: 1600px; margin: -0.5rem auto 0; }
+.area-tabs { max-width: 1600px; margin: 0 auto; }
+.area-tabs-row { display: flex; align-items: stretch; gap: 1rem; }
+.area-tabs-row .area-tabs-list { flex: 1; min-width: 0; }
+/* Ações da página (ex.: Atualizar) sobem para a linha das abas e continuam a linha de base. */
+.area-tabs-actions { flex: none; display: flex; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 2px; }
+.area-tabs-actions:empty { display: none; }
+@media (max-width: 767px) { .area-tabs-actions { display: none; } }
 .area-tabs-list {
   display: flex;
   gap: 0.25rem;
@@ -614,11 +683,11 @@ h1, h2, h3, h4 {
 .area-tabs .area-tabs-list { --scroll-bg: #f8fafc; }
 .area-tab {
   flex: none;
-  padding: 0.6rem 1rem;
+  padding: 0.5rem 0.875rem;
   margin-bottom: -2px;
   border-bottom: 3px solid transparent;
   color: #475569;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 600;
   white-space: nowrap;
   text-decoration: none;
@@ -643,52 +712,29 @@ h1, h2, h3, h4 {
 .area-tab:hover { text-decoration: none; }
 .area-tab[data-active='true'] { color: #0c326f; border-bottom-color: #0c326f; font-weight: 800; }
 
-.app-header-topbar,
-.app-header-main {
+.app-header-topbar {
   padding-left: var(--page-gutter);
   padding-right: var(--page-gutter);
+  box-sizing: border-box;
+  min-height: calc(var(--gov-bar-h) + 2px); /* + a linha verde de 2 px */
 }
+/* Rodapé: a faixa azul visível tem a mesma altura da barra do topo; a marca fica centralizada nela. */
+.app-footer { box-sizing: border-box; padding-top: 0 !important; padding-bottom: 0 !important; }
+.app-footer-row { min-height: var(--gov-bar-h); }
 
 @media (max-width: 767px) {
-  .gov-topbar-links,
-  .app-header-subtitle {
-    display: none !important;
-  }
   /* Espaço para a barra inferior do menu chave não cobrir o fim da página. */
   .app-content {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--bottom-nav-h);
   }
-  .app-header-main {
-    flex-wrap: nowrap;
-    gap: 0.5rem;
-  }
-  .app-header-brand {
-    gap: 0.5rem !important;
-  }
-  .app-header-email {
-    display: none;
-  }
-  .app-header-signout {
-    min-height: 44px;
-    min-width: 44px;
-    justify-content: center;
-  }
-  .app-footer {
-    padding: 0.75rem var(--page-gutter) calc(0.75rem + 64px + env(safe-area-inset-bottom, 0px)) !important;
-  }
+  .app-header-org-full { display: none; }
+  .app-header-wordmark { display: inline; }
+  .user-menu__name { max-width: 14ch; }
+  /* Celular: a barra de navegação inferior cobre o fim do rodapé; a faixa azul visível fica com a altura da barra do topo. */
+  .app-footer { padding-bottom: var(--bottom-nav-h) !important; }
+  :root { --gov-bar-h: 32px; }
 }
 
-@media (max-width: 480px) {
-  .app-header-org-full {
-    display: none;
-  }
-  .app-header-org-short {
-    display: inline;
-  }
-  .app-header-signout-label {
-    display: none;
-  }
-}
 @media (max-width: 767px) {
   .app-footer-source { text-align: left !important; }
 }
@@ -727,7 +773,19 @@ h1, h2, h3, h4 {
    COMPONENTES COMPARTILHADOS — quebra de linha em telas estreitas (Fase 2 / P1)
    ========================================================================== */
 /* PageHeader */
+.ds-page-header { margin-bottom: 0.75rem !important; }
 .ds-page-header__title-block { min-width: 0; flex: 1 1 260px; }
+.ds-page-header__title { font-size: 1.25rem !important; }
+.ds-page-header__title-row > span { font-size: 1.25rem !important; }
+.ds-page-header__title-row svg { width: 20px; height: 20px; }
+.ds-page { gap: 0.875rem !important; }
+.kpi-card { min-height: 0 !important; padding: 0.75rem 0.9rem !important; }
+/* Desktop: título e descrição na mesma linha; descrição longa vira reticências (o texto completo fica no tooltip). */
+@media (min-width: 768px) {
+  .ds-page-header__title-block { flex-direction: row !important; align-items: baseline !important; gap: 0.75rem !important; flex-wrap: nowrap; }
+  .ds-page-header__title-row { flex-wrap: nowrap; flex: none; }
+  .ds-page-header__subtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem !important; }
+}
 .ds-page-header__title-row { flex-wrap: wrap; }
 .ds-page-header__title { overflow-wrap: anywhere; }
 .ds-page-header__actions { flex-wrap: wrap; }
@@ -793,24 +851,35 @@ h1, h2, h3, h4 {
 /* Barra de abas das telas 360: gruda abaixo do cabeçalho do sistema (altura em --app-header-h, publicada pelo AppShell). */
 .i360-dock { position: sticky; top: var(--app-header-h, 0px); z-index: 20; margin-bottom: 1.25rem; background: #f8fafc; container-type: inline-size; }
 .i360-dock-row { display: flex; align-items: stretch; gap: 0 16px; }
-.i360-dock[data-stuck='true'] { background: #ffffff; box-shadow: 0 4px 10px -6px rgba(15, 23, 42, 0.18); }
+/* Grudada, a barra inteira fica no azul-marinho do cabeçalho do sistema (a faixa de abas segue clara). */
+.i360-dock[data-stuck='true'] { background: transparent; padding-top: 6px; }
+/* O azul sangra até as bordas da área de conteúdo (o conteúdo da barra segue alinhado à página): sem cantos soltos nas pontas.
+   O 1px de cima cobre a emenda com o cabeçalho; a sombra de baixo separa a barra do conteúdo que rola. */
+.i360-dock[data-stuck='true']::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -100vmax; right: -100vmax; z-index: -1; pointer-events: none;
+  background: #0c326f; box-shadow: 0 -1px 0 #0c326f, 0 4px 10px -6px rgba(15, 23, 42, 0.35);
+}
 .i360-dock-tabs { flex: 1 1 0; min-width: 0; }
 /* Só a área das abas é tingida: destaca a navegação sem pesar no contexto (número, situação, fornecedor). */
 .i360-dock .i360-dock-tabs { background-color: #eef3fb; border-bottom: 2px solid #bfcde6; padding: 0 0.5rem; border-radius: 8px 8px 0 0; }
-.i360-dock[data-stuck='true'] .i360-dock-tabs { border-radius: 0; }
+/* Grudada, as abas viram pastas: encostam na base da barra azul e têm os cantos de cima arredondados. */
+.i360-dock[data-stuck='true'] .i360-dock-tabs { border-radius: 8px 8px 0 0; }
 .i360-dock-tab { background: transparent; }
 .i360-dock-tab:hover:not([aria-selected='true']) { color: #0c326f; }
-.i360-dock-mini { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 58%; padding-bottom: 2px; border-bottom: 2px solid #e2e8f0; }
-.i360-dock-up { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0c326f; cursor: pointer; }
-.i360-dock-id { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; margin-left: -4px; background: none; border: 0; border-radius: 6px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.i360-dock-up:hover, .i360-dock-id:hover { background: #f1f5f9; }
-.i360-dock-title { font-weight: 800; font-size: 1rem; color: #0f172a; white-space: nowrap; }
-.i360-dock-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; color: #64748b; }
+.i360-dock-mini { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 58%; padding: 0; }
+.i360-dock-id { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; margin-left: -8px; background: none; border: 0; border-radius: 6px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.i360-dock-id { min-height: 0; } /* sobrepõe o alvo de toque de 44 px do celular: a identidade já é larga e clicável */
+.i360-dock-id:hover { background: rgba(255, 255, 255, 0.2); }
+.i360-dock-id:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+.i360-dock-title { font-weight: 800; font-size: 1rem; color: #ffffff; white-space: nowrap; }
+.i360-dock-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; color: rgba(255, 255, 255, 0.78); }
 @container (max-width: 900px) {
   .i360-dock-row { flex-wrap: wrap; }
   .i360-dock-id { flex-wrap: wrap; row-gap: 2px; }
   .i360-dock-sub { display: none; }
-  .i360-dock-mini { max-width: 100%; flex: 1 1 100%; padding-block: 4px 0; border-bottom: 0; }
+  .i360-dock-mini { max-width: 100%; flex: 1 1 100%; padding-block: 0 6px; }
+  .i360-dock-id { padding-block: 2px; }
+  .i360-dock-title { font-size: 0.95rem; }
   .i360-dock-tabs { flex: 1 1 100%; }
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -838,8 +907,8 @@ h1, h2, h3, h4 {
    ========================================================================== */
 .ds-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; }
 .ds-table thead tr { background: #f8fafc; color: #475569; border-bottom: 1px solid #e2e8f0; }
-.ds-table th { padding: 0.75rem 1rem; font-size: 0.78rem; font-weight: 700; }
-.ds-table td { padding: 0.75rem 1rem; vertical-align: middle; color: #0f172a; border-bottom: 1px solid #f1f5f9; }
+.ds-table th { padding: 0.55rem 0.875rem; font-size: 0.78rem; font-weight: 700; }
+.ds-table td { padding: 0.55rem 0.875rem; vertical-align: middle; color: #0f172a; border-bottom: 1px solid #f1f5f9; }
 .ds-table__empty { padding: 3rem 1rem !important; text-align: center !important; font-style: italic; }
 .ds-table--sticky-first th:first-child,
 .ds-table--sticky-first td:first-child {
@@ -973,6 +1042,7 @@ h1, h2, h3, h4 {
 /* Alvos de toque em telas estreitas */
 @media (max-width: 767px) {
   button { min-height: 44px; }
+  .i360-dock-tab { min-height: 40px; } /* barra fixa mais baixa: 40 px ainda é um alvo confortável */
   button:has(> svg:only-child) { min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
   .ds-badge, .ds-filter-chip { min-height: 0; }
   .ds-filter-chip { min-height: 36px; }

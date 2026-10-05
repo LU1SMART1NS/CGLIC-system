@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ContractTasksSection } from '../ContractTasksSection';
 import type { ContractDashboardRecord, ContractTask, ContractTaskPlan } from '../../../types';
-import { addDays, formatDateISO } from '../../../services/temporalEngineService';
+import { addBusinessDays as addDays, formatDateISO } from '../../../services/temporalEngineService';
 
 const { idle } = vi.hoisted(() => ({ idle: () => ({ mutate: () => {}, isPending: false, error: null }) }));
 

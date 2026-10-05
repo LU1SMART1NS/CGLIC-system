@@ -84,7 +84,7 @@ const AppFooter: React.FC = () => (
     borderTop: '2px solid #00cc55'
   }}>
     {/* Espelha a barra gov.br do topo: marca | órgão à esquerda, metadado à direita. */}
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem 1.5rem' }}>
+    <div className="app-footer-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem 1.5rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <img
           src={fnspLogo}

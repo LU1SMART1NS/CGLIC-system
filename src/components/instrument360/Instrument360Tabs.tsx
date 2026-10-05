@@ -1,5 +1,4 @@
 import React from 'react';
-import { ArrowUp } from 'lucide-react';
 import { useScrollActiveTab } from '../../design-system/hooks/useScrollActiveTab';
 import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
 import { scrollToSummary, useHeroOutOfView, useInstrument360Dock } from './instrument360Dock';
@@ -49,9 +48,6 @@ export const Instrument360Tabs = React.forwardRef(function Instrument360Tabs<T e
         <div className="i360-dock-row">
           {showMini && summary && (
             <div className="i360-dock-mini" data-testid="instrument-dock-mini">
-              <button type="button" className="i360-dock-up" onClick={scrollToSummary} aria-label="Voltar ao resumo" title="Voltar ao resumo">
-                <ArrowUp size={14} aria-hidden="true" />
-              </button>
               <button
                 type="button"
                 className="i360-dock-id"
@@ -90,7 +86,7 @@ export const Instrument360Tabs = React.forwardRef(function Instrument360Tabs<T e
                   onClick={() => onSelect(tab.id)}
                   className="i360-dock-tab"
                   style={{
-                    padding: '0.6rem 1rem',
+                    padding: '0.5rem 1rem',
                     border: 'none',
                     borderBottom: `3px solid ${selected ? '#0c326f' : 'transparent'}`,
                     marginBottom: '-2px',
