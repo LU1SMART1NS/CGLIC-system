@@ -19,6 +19,8 @@ import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLink
 import { useItemContractLinks } from '../hooks/useItemContractLinks';
 import { useUnlinkContractFromItem } from '../hooks/useUnlinkContractFromItem';
 import { useDismissedContractSuggestions } from '../hooks/useDismissedContractSuggestions';
+import { useArpItemContractLinks } from '../hooks/useAtaManagers';
+import { useContratosSemAta } from '../hooks/useContratosSemAta';
 import { useSyncContractItemQuantity } from '../hooks/useSyncContractItemQuantity';
 import { useSyncItemContractEmpenhos } from '../hooks/useSyncItemContractEmpenhos';
 import { useItemEmpenhoVinculos } from '../hooks/useItemEmpenhoVinculos';
@@ -442,6 +444,17 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   // Sugestões de contrato (PNCP + catálogo), sem os já vinculados nem os descartados
   const { data: dismissedSuggestions = [] } = useDismissedContractSuggestions(canonicalItemKey);
+  // Não sugerir: contrato já vinculado a outra ata (um contrato pertence a uma só ata) ou marcado pelo
+  // coordenador como "não pertence a ata".
+  const { data: todosVinculos = [] } = useArpItemContractLinks();
+  const { data: contratosSemAta = {} } = useContratosSemAta();
+  const naoSugerir = useMemo(
+    () => [
+      ...todosVinculos.filter((l) => l.ataKey !== arp?.numeroAtaRegistroPreco).map((l) => l.contractKey),
+      ...Object.keys(contratosSemAta)
+    ],
+    [todosVinculos, contratosSemAta, arp?.numeroAtaRegistroPreco]
+  );
   const dismissSuggestionMutation = useDismissContractSuggestion();
   const restoreSuggestionMutation = useRestoreContractSuggestion();
   const { suggestions: contractSuggestions, dismissed: dismissedContractSuggestions } = useMemo(
@@ -450,9 +463,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       officialContracts: officialDashboardContracts,
       criteria: buildItemSuggestionCriteria(arp, item),
       linkedContractKeys: contractLinks.map((l) => l.contractKey),
-      dismissedContractKeys: dismissedSuggestions.map((d) => d.contractKey)
+      dismissedContractKeys: dismissedSuggestions.map((d) => d.contractKey),
+      excludedContractKeys: naoSugerir
     }),
-    [contracts, officialDashboardContracts, arp, item, contractLinks, dismissedSuggestions]
+    [contracts, officialDashboardContracts, arp, item, contractLinks, dismissedSuggestions, naoSugerir]
   );
 
   const handleSuggestionMutationError = (action: string, err: any) => {

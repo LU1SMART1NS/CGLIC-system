@@ -9,6 +9,7 @@ import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import type { DistribuicaoItem, DistribuicaoLinha } from './distribuicaoEquipe';
 import { ROTULO_COMPLEXIDADE, type Complexidade, type NivelComplexidade } from './complexidade';
 import { AjusteComplexidadePanel } from './AjusteComplexidadePanel';
+import type { ContratoAVincular } from './contratosSemAta';
 import { formatDateBR } from '../../../utils/format';
 
 const ETIQUETA_COMPLEXIDADE: Record<NivelComplexidade, { color: string; bg: string }> = {
@@ -37,6 +38,8 @@ interface DistribuicaoItensProps {
   onTransfer: (targets: ManagerTarget[], done: () => void) => void;
   /** Só o coordenador (admin) ajusta a complexidade à mão. */
   canAjustar?: boolean;
+  /** Contratos prováveis das atas deste gestor ainda não vinculados (o servidor vincula na Ata 360). */
+  aVincular?: ContratoAVincular[];
 }
 
 /** Tooltip da etiqueta: faixa e motivo; quando ajustada, quem ajustou, quando e qual era a automática. */
@@ -52,7 +55,7 @@ function tituloComplexidade(c: Complexidade): string {
  * Atas e contratos vigentes de um gestor, os mais urgentes primeiro. Marcar itens e transferir
  * só eles (o gestor da ata se propaga aos contratos vinculados, como nas carteiras).
  */
-export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, canAssign, onTransfer, canAjustar = false }) => {
+export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, canAssign, onTransfer, canAjustar = false, aVincular = [] }) => {
   const navigate = useNavigateWithOrigin();
   const [visible, setVisible] = React.useState(PAGE_SIZE);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
@@ -117,6 +120,23 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
           </button>
         )}
       </div>
+
+      {aVincular.length > 0 && (
+        <div
+          data-testid="distribuicao-a-vincular"
+          style={{ fontSize: '0.78rem', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
+        >
+          <strong>{aVincular.length} {aVincular.length === 1 ? 'contrato a vincular' : 'contratos a vincular'}</strong> nas atas deste gestor
+          (mesma compra e fornecedor). O vínculo é feito na Ata 360 e o contrato passa a ser dele:{' '}
+          {aVincular.slice(0, 8).map((c, i) => (
+            <React.Fragment key={`${c.contractKey}-${c.numeroAta}`}>
+              {i > 0 && ', '}
+              {c.numero} <span style={{ color: '#64748b' }}>(ata {c.numeroAta})</span>
+            </React.Fragment>
+          ))}
+          {aVincular.length > 8 && ` e mais ${aVincular.length - 8}`}.
+        </div>
+      )}
 
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' }}>
         {shown.map((item) => {

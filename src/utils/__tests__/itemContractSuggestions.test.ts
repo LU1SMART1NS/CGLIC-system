@@ -153,4 +153,18 @@ describe('quantidadesPorContrato', () => {
     expect(map.has('160001-7-2026')).toBe(false);
     expect(map.get('160001-8-2026')).toBe(12);
   });
+
+  it('não sugere contrato vinculado a outra ata nem marcado "não pertence a ata"', () => {
+    const outraAta = official({ id: 'OUTRA', numeroControlePncp: 'X-1' });
+    const marcado = official({ id: 'MARCADO', numeroControlePncp: 'X-2' });
+    const livre = official({ id: 'LIVRE', numeroControlePncp: 'X-3' });
+    const { suggestions, dismissed } = buildItemContractSuggestions({
+      pncpContracts: [pncp({ numeroControlePncp: 'X-1' }), pncp({ numeroControlePncp: 'X-2' }), pncp({ numeroControlePncp: 'X-3' })],
+      officialContracts: [outraAta, marcado, livre],
+      dismissedContractKeys: ['MARCADO'],
+      excludedContractKeys: ['OUTRA', 'MARCADO']
+    });
+    expect(suggestions.map((s) => s.contractKey)).toEqual(['LIVRE']);
+    expect(dismissed).toHaveLength(0);
+  });
 });

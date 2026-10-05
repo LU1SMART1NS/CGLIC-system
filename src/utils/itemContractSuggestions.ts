@@ -36,6 +36,11 @@ export interface ItemContractSuggestionInput {
   linkedContractKeys?: string[];
   /** contract_key das sugestões já descartadas no item. */
   dismissedContractKeys?: string[];
+  /**
+   * contract_key que nunca são sugeridos: já vinculados a outra ata (um contrato pertence a uma só ata) ou
+   * marcados pelo coordenador como "não pertence a ata".
+   */
+  excludedContractKeys?: string[];
 }
 
 export interface ItemContractSuggestionResult {
@@ -146,6 +151,7 @@ export function buildItemContractSuggestions(input: ItemContractSuggestionInput)
   const official = input.officialContracts || [];
   const linked = new Set((input.linkedContractKeys || []).map(norm));
   const dismissedKeys = new Set((input.dismissedContractKeys || []).map(norm));
+  const excluded = new Set((input.excludedContractKeys || []).map(norm));
 
   const byKey = new Map<string, ItemContractSuggestion>();
 
@@ -186,7 +192,7 @@ export function buildItemContractSuggestions(input: ItemContractSuggestionInput)
   const suggestions: ItemContractSuggestion[] = [];
   const dismissed: ItemContractSuggestion[] = [];
   for (const [id, suggestion] of byKey) {
-    if (linked.has(id)) continue;
+    if (linked.has(id) || excluded.has(id)) continue;
     (dismissedKeys.has(id) ? dismissed : suggestions).push(suggestion);
   }
 

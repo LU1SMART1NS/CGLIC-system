@@ -26,13 +26,15 @@ interface AtribuirGestorModalProps {
   onClose: () => void;
   /** Depois de salvar sem falhas (ex.: limpar a seleção). */
   onDone?: () => void;
+  /** Contratos prováveis da ata ainda não vinculados: virão para o gestor quando o servidor vincular. */
+  provaveis?: number;
 }
 
 /**
  * "Para quem atribuo?": mostra o que muda de mãos (com os contratos que seguem a ata), a carga atual → depois de
  * cada candidato e a pressão de agora, com uma sugestão discreta. A escolha é sempre do coordenador.
  */
-export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ targets, origem, linhas, links, contractsByKey, onClose, onDone }) => {
+export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ targets, origem, linhas, links, contractsByKey, onClose, onDone, provaveis = 0 }) => {
   const { data: users = [] } = useUsers();
   const { data: roles = [] } = useRoles();
   const assign = useAssignManager();
@@ -120,6 +122,11 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
           <div style={{ color: '#475569' }}>
             Complexidade: {NIVEIS.map((n) => `${lote.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')} — soma {lote.equivalente} de carga
           </div>
+          {provaveis > 0 && (
+            <div data-testid="atribuir-gestor-provaveis" style={{ color: '#b45309', fontWeight: 600 }}>
+              Mais {plural(provaveis, 'contrato provável', 'contratos prováveis')} desta ata {provaveis === 1 ? 'virá' : 'virão'} para o gestor quando o servidor vincular.
+            </div>
+          )}
         </section>
 
         <div role="radiogroup" aria-label="Gestor que vai receber" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>

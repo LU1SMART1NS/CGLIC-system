@@ -16,9 +16,8 @@ import { SEM_GESTOR } from '../../carteira/carteiraGestor';
 import { canAssignManager } from '../../carteira/ManagerAssign';
 import { AtribuirGestorModal } from './AtribuirGestorModal';
 import { ContratosSemAtaSection } from './ContratosSemAtaSection';
-import { buildFilaSemAta, type AtaSugerida, type ItemFila } from './contratosSemAta';
-import { LinkContractModal, type LinkableAtaItemOption } from '../../modals/LinkContractModal';
-import { normalizeItemKey } from '../../../utils/itemKeyUtils';
+import { buildPendenciasDistribuicao, type ContratoAVincular } from './contratosSemAta';
+import { AtasSemGestorSection } from './AtasSemGestorSection';
 import { useContratosSemAta } from '../../../hooks/useContratosSemAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { useAuth } from '../../../context/AuthContext';
@@ -29,6 +28,7 @@ import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
 import { formatContractNumber } from '../../../utils/contractNumber';
 import {
   buildDistribuicaoEquipe,
+  isVigente,
   ordenarDistribuicao,
   FAIXA_MEDIA_EQUIPE,
   type DistribuicaoLinha
@@ -101,13 +101,14 @@ const CargaEquivalenteCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
 );
 
 /** Pressão do momento: o que aperta agora (não muda a carga estrutural). */
-const PressaoCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => {
+const PressaoCell: React.FC<{ l: DistribuicaoLinha; aVincular?: number }> = ({ l, aVincular = 0 }) => {
   const vencendo = l.atas.criticos + l.atas.atencao + l.contratos.criticos + l.contratos.atencao;
   const partes: Array<{ texto: string; cor: string }> = [];
   if (l.pendencias.urgentes > 0) partes.push({ texto: plural(l.pendencias.urgentes, 'urgente', 'urgentes'), cor: '#b91c1c' });
   if (l.pendencias.atrasadas > 0) partes.push({ texto: plural(l.pendencias.atrasadas, 'tarefa atrasada', 'tarefas atrasadas'), cor: '#b91c1c' });
   if (l.pendencias.acompanhar > 0) partes.push({ texto: `${l.pendencias.acompanhar} a acompanhar`, cor: '#b45309' });
   if (vencendo > 0) partes.push({ texto: `${vencendo} ${vencendo === 1 ? 'vence' : 'vencem'} em até 90 dias`, cor: '#b45309' });
+  if (aVincular > 0) partes.push({ texto: `${aVincular} ${aVincular === 1 ? 'contrato' : 'contratos'} a vincular`, cor: '#1e3a8a' });
   if (partes.length === 0) return <span style={{ color: '#94a3b8' }}>—</span>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.75rem', fontWeight: 700 }}>
@@ -182,10 +183,9 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const canAjustar = role === 'admin';
   const { data: ajustes } = useComplexidadeAjustes();
   const { data: confirmacoesSemAta = {}, isLoading: semAtaLoading } = useContratosSemAta();
-  // Modal "Vincular Contrato" (o mesmo da Ata 360) aberto a partir da fila "Contratos sem ata".
-  const [vinculo, setVinculo] = React.useState<{ item: ItemFila; ata: AtaSugerida } | null>(null);
+
   // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
-  const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void } | null>(null);
+  const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void; provaveis?: number } | null>(null);
   const [expanded, setExpanded] = React.useState<string | null>(null);
   const [ordem, setOrdem] = React.useState<'NOME' | 'CARGA'>('NOME');
   const carteiraTargets = (l: DistribuicaoLinha): ManagerTarget[] => [
@@ -224,11 +224,11 @@ export const DistribuicaoEquipePage: React.FC = () => {
     [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes]
   );
 
-  // Fila "Contratos sem ata": contratos vigentes sem vínculo com item de ata e sem confirmação de "sem ata".
-  // Atas expiradas entram nas sugestões (o contrato costuma durar mais que a ata de onde veio).
-  const fila = useMemo(() => {
-    const vinculados = new Set(links.map((l) => l.contractKey));
-    return buildFilaSemAta({
+  // Pendências de distribuição: atas sem gestor, contratos sem gestor e sem ata e contratos a vincular por
+  // gestor. Atas encerradas entram nas sugestões (o contrato costuma durar mais que a ata de onde veio).
+  const pendencias = useMemo(() => {
+    const ataDoContrato = new Map(links.map((l) => [l.contractKey, l.ataKey]));
+    return buildPendenciasDistribuicao({
       contratos: contratos.rows.map((row) => ({
         contractKey: row.contractKey,
         numero: formatContractNumber(row.contract),
@@ -243,6 +243,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
       })),
       atas: atas.arps.map((arp) => {
         const itens = atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`] || [];
+        const prazo = getArpPrazo(arp);
         return {
           numeroAta: arp.numeroAtaRegistroPreco,
           uasg: arp.codigoUnidadeGerenciadora,
@@ -251,39 +252,19 @@ export const DistribuicaoEquipePage: React.FC = () => {
           anoCompra: arp.anoCompra,
           cnpjs: Array.from(new Set(itens.map((i) => (i.niFornecedor || '').replace(/\D/g, '')).filter(Boolean))),
           gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
-          temItens: itens.length > 0
+          objeto: arp.objeto,
+          fornecedorNome: itens[0]?.nomeRazaoSocialFornecedor,
+          faixa: prazo.faixa,
+          dias: prazo.dias,
+          itens: itens.length
         };
       }),
-      vinculados,
-      confirmadosSemAta: new Set(Object.keys(confirmacoesSemAta))
+      ataDoContrato,
+      naoPertencemAAta: new Set(Object.keys(confirmacoesSemAta))
     });
   }, [contratos.rows, atas.arps, atas.itemsByAta, atas.gestorByAta, links, confirmacoesSemAta]);
-
-  // Itens e critérios da ata escolhida, no mesmo formato que a Ata 360 entrega ao modal "Vincular Contrato".
-  const vinculoModal = useMemo(() => {
-    if (!vinculo) return null;
-    const arp = atas.arps.find((a) => a.numeroAtaRegistroPreco === vinculo.ata.numeroAta && a.codigoUnidadeGerenciadora === vinculo.ata.uasg);
-    if (!arp) return null;
-    const itens = atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`] || [];
-    const itemOptions: LinkableAtaItemOption[] = itens.map((item) => ({
-      itemKey: normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem),
-      numeroItem: item.numeroItem,
-      descricao: item.descricaoItem,
-      fornecedorNome: item.nomeRazaoSocialFornecedor,
-      fornecedorCnpj: item.niFornecedor,
-      valorUnitario: item.valorUnitario,
-      quantidadeHomologada: item.quantidadeHomologadaVencedor ?? item.quantidadeHomologadaItem,
-      linkedContractKeys: []
-    }));
-    return {
-      arp,
-      itemOptions,
-      criteria: {
-        compra: { idCompra: arp.idCompra, uasg: arp.codigoUnidadeGerenciadora, numeroCompra: arp.numeroCompra, anoCompra: arp.anoCompra },
-        fornecedorCnpjs: itens.map((i) => i.niFornecedor).filter(Boolean) as string[]
-      }
-    };
-  }, [vinculo, atas.arps, atas.itemsByAta]);
+  const aVincularDe = (gestorNome: string | null): ContratoAVincular[] =>
+    gestorNome ? pendencias.aVincularPorGestor.get(gestorNome) || [] : [];
 
   const refresh = () => {
     contratos.refresh();
@@ -306,13 +287,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading || semAtaLoading;
   const { divergencias, totais } = distribuicao;
   const linhas = ordenarDistribuicao(distribuicao.linhas, ordem);
-  const semGestor = linhas.find((l) => l.gestorNome === null);
   const totalInstrumentos = totais.atas.vigentes + totais.contratos.vigentes;
 
-  const scrollToDivergencias = () =>
-    document.getElementById('distribuicao-divergencias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const scrollToSemAta = () =>
-    document.getElementById('distribuicao-sem-ata')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const scrollTo = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const totalContratosSemAta = pendencias.precisamDecisao.length + pendencias.aguardamVinculo.length;
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -359,29 +337,36 @@ export const DistribuicaoEquipePage: React.FC = () => {
             <KpiTile
               testId="distribuicao-kpi-atas-sem-gestor"
               label="Atas sem gestor"
-              value={semGestor?.atas.vigentes ?? 0}
-              hint={`de ${plural(totais.atas.vigentes, 'ata vigente', 'atas vigentes')}`}
+              value={pendencias.atasSemGestor.length}
+              hint={(() => {
+                const vigentes = pendencias.atasSemGestor.filter((a) => isVigente(a.faixa)).length;
+                const encerradas = pendencias.atasSemGestor.length - vigentes;
+                return encerradas > 0 ? `${vigentes} vigentes e ${encerradas} encerradas com contratos` : `${plural(vigentes, 'vigente', 'vigentes')}`;
+              })()}
               icon={Package}
-              tone={semGestor?.atas.vigentes ? 'warning' : 'neutral'}
-              onClick={semGestor?.atas.vigentes ? () => navigate(carteiraPath('/atas', null)) : undefined}
-            />
-            <KpiTile
-              testId="distribuicao-kpi-contratos-sem-gestor"
-              label="Contratos sem gestor"
-              value={semGestor?.contratos.vigentes ?? 0}
-              hint={`de ${plural(totais.contratos.vigentes, 'contrato vigente', 'contratos vigentes')}`}
-              icon={FileText}
-              tone={semGestor?.contratos.vigentes ? 'warning' : 'neutral'}
-              onClick={semGestor?.contratos.vigentes ? () => navigate(carteiraPath('/contratos', null)) : undefined}
+              tone={pendencias.atasSemGestor.length ? 'warning' : 'neutral'}
+              onClick={pendencias.atasSemGestor.length ? scrollTo('distribuicao-atas-sem-gestor') : undefined}
             />
             <KpiTile
               testId="distribuicao-kpi-sem-ata"
-              label="Contratos sem ata"
-              value={fila.pendentes.length}
-              hint={fila.pendentes.length > 0 ? `${fila.contagem.UNICA} com uma ata provável` : 'Todos vinculados ou confirmados'}
+              label="Contratos sem gestor e sem ata"
+              value={totalContratosSemAta}
+              hint={
+                totalContratosSemAta
+                  ? `${pendencias.precisamDecisao.length} precisam de decisão, ${pendencias.aguardamVinculo.length} aguardam vínculo`
+                  : 'Nenhum pendente'
+              }
+              icon={FileText}
+              tone={pendencias.precisamDecisao.length ? 'warning' : 'neutral'}
+              onClick={totalContratosSemAta ? scrollTo('distribuicao-sem-ata') : undefined}
+            />
+            <KpiTile
+              testId="distribuicao-kpi-a-vincular"
+              label="Contratos a vincular"
+              value={pendencias.totalAVincular}
+              hint={pendencias.totalAVincular ? 'Prováveis nas atas que já têm gestor' : 'Nenhum provável pendente'}
               icon={Link2}
-              tone={fila.pendentes.length > 0 ? 'warning' : 'neutral'}
-              onClick={fila.pendentes.length > 0 ? scrollToSemAta : undefined}
+              tone={pendencias.totalAVincular ? 'warning' : 'neutral'}
             />
             <KpiTile
               testId="distribuicao-kpi-divergencias"
@@ -390,7 +375,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
               hint={divergencias.length > 0 ? 'Contratos vinculados fora da regra' : 'Contratos vinculados seguem a ata'}
               icon={AlertTriangle}
               tone={divergencias.length > 0 ? 'danger' : 'neutral'}
-              onClick={divergencias.length > 0 ? scrollToDivergencias : undefined}
+              onClick={divergencias.length > 0 ? scrollTo('distribuicao-divergencias') : undefined}
             />
           </div>
 
@@ -474,7 +459,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
                           <CargaEquivalenteCell l={l} />
                         </td>
                         <td data-label="Pressão agora" style={carteiraTd}>
-                          <PressaoCell l={l} />
+                          <PressaoCell l={l} aVincular={aVincularDe(l.gestorNome).length} />
                         </td>
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
@@ -517,6 +502,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
                               linha={l}
                               canAssign={canAssign}
                               canAjustar={canAjustar}
+                              aVincular={aVincularDe(l.gestorNome)}
                               onTransfer={(targets, done) => setTransferencia({ targets, origem: l.gestorNome, done })}
                             />
                           </td>
@@ -530,25 +516,18 @@ export const DistribuicaoEquipePage: React.FC = () => {
             </div>
           </div>
 
-          <ContratosSemAtaSection
-            fila={fila}
-            confirmacoes={confirmacoesSemAta}
-            podeAgir={canAssign}
-            onVincular={(item, ata) => setVinculo({ item, ata })}
-            onAtribuir={(item) => setTransferencia({ targets: [{ tipo: 'CONTRATO', contractKey: item.contractKey }], origem: item.gestorNome ?? null })}
+          <AtasSemGestorSection
+            atas={pendencias.atasSemGestor}
+            podeAtribuir={canAssign}
+            onAtribuir={(ata) => setTransferencia({ targets: [{ tipo: 'ATA', ataKey: ata.numeroAta }], origem: null, provaveis: ata.provaveis.length })}
           />
 
-          {vinculoModal && vinculo && (
-            <LinkContractModal
-              isOpen
-              onClose={() => setVinculo(null)}
-              numeroAta={vinculoModal.arp.numeroAtaRegistroPreco}
-              uasg={vinculoModal.arp.codigoUnidadeGerenciadora}
-              itemOptions={vinculoModal.itemOptions}
-              suggestionCriteria={vinculoModal.criteria}
-              initialContract={vinculo.item.contract}
-            />
-          )}
+          <ContratosSemAtaSection
+            pendencias={pendencias}
+            confirmacoes={confirmacoesSemAta}
+            podeAgir={canAssign}
+            onAtribuir={(item) => setTransferencia({ targets: [{ tipo: 'CONTRATO', contractKey: item.contractKey }], origem: item.gestorNome ?? null })}
+          />
 
           {transferencia && (
             <AtribuirGestorModal
@@ -558,6 +537,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
               links={links}
               contractsByKey={contratos.contractsByKey}
               onDone={transferencia.done}
+              provaveis={transferencia.provaveis}
               onClose={() => setTransferencia(null)}
             />
           )}

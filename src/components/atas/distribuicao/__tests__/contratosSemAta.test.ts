@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildFilaSemAta, sugerirAtas, type FilaAta, type FilaContrato } from '../contratosSemAta';
+import { buildPendenciasDistribuicao, sugerirAtas, type FilaAta, type FilaContrato } from '../contratosSemAta';
 import type { ContractDashboardRecord } from '../../../../types';
 
 // idCompra do contrato = UASG + modalidade + número da compra + ano (formato do Compras.gov.br)
@@ -19,9 +19,12 @@ const ata = (numeroAta: string, extra: Partial<FilaAta> = {}): FilaAta => ({
   numeroCompra: '90025',
   anoCompra: '2025',
   cnpjs: ['11111111000111'],
-  temItens: true,
+  faixa: 'REGULAR',
+  dias: 200,
+  itens: 1,
   ...extra
 });
+const SEM_PISTA = { idCompra: '', fornecedorCnpj: '22.222.222/0001-22' };
 
 describe('sugerirAtas', () => {
   it('UNICA quando uma ata tem a mesma compra e o mesmo fornecedor', () => {
@@ -31,32 +34,50 @@ describe('sugerirAtas', () => {
     expect(r.sugestoes[1]).toMatchObject({ numeroAta: '00002/2025', motivo: 'FORNECEDOR' });
   });
 
-  it('VARIAS quando mais de uma ata casa nos dois critérios', () => {
+  it('VARIAS, PARCIAL e NENHUMA', () => {
     expect(sugerirAtas(contrato('c1'), [ata('00001/2025'), ata('00002/2025')]).situacao).toBe('VARIAS');
-  });
-
-  it('PARCIAL com só a mesma compra ou só o mesmo fornecedor; NENHUMA sem pista', () => {
     expect(sugerirAtas(contrato('c1'), [ata('00001/2025', { cnpjs: ['99999999000199'] })]).situacao).toBe('PARCIAL');
-    expect(sugerirAtas(contrato('c1', { idCompra: '', fornecedorCnpj: '22.222.222/0001-22' }), [ata('00001/2025')]).situacao).toBe('NENHUMA');
+    expect(sugerirAtas(contrato('c1', SEM_PISTA), [ata('00001/2025')]).situacao).toBe('NENHUMA');
   });
 });
 
-describe('buildFilaSemAta', () => {
-  it('deixa de fora vinculados e encerrados; confirmados "sem ata" vão para a lista própria', () => {
-    const fila = buildFilaSemAta({
+describe('buildPendenciasDistribuicao', () => {
+  const base = () =>
+    buildPendenciasDistribuicao({
       contratos: [
         contrato('vinculado'),
         contrato('expirado', { faixa: 'EXPIRADO' }),
-        contrato('confirmado', { idCompra: '' , fornecedorCnpj: '' }),
-        contrato('sem-pista', { idCompra: '', fornecedorCnpj: '', dias: 5 }),
-        contrato('unica', { dias: 300 })
+        contrato('provavel-ana', { idCompra: '20033105900332025', fornecedorCnpj: '33.333.333/0001-33' }),
+        contrato('provavel-sem-gestor'),
+        contrato('com-gestor-sem-pista', { ...SEM_PISTA, gestorNome: 'Bruno' }),
+        contrato('sem-pista', { ...SEM_PISTA, dias: 5 }),
+        contrato('marcado', SEM_PISTA)
       ],
-      atas: [ata('00001/2025')],
-      vinculados: new Set(['vinculado']),
-      confirmadosSemAta: new Set(['confirmado'])
+      atas: [
+        ata('00001/2025'), // sem gestor, compra 90025, fornecedor 111
+        ata('00003/2025', { numeroCompra: '90033', cnpjs: ['33333333000133'], gestorNome: 'Ana' }),
+        ata('00009/2020', { faixa: 'EXPIRADO', numeroCompra: '90099', cnpjs: ['99999999000199'] }) // encerrada, nada a distribuir
+      ],
+      ataDoContrato: new Map([['vinculado', '00001/2025']]),
+      naoPertencemAAta: new Set(['marcado'])
     });
-    expect(fila.pendentes.map((i) => i.contractKey)).toEqual(['unica', 'sem-pista']); // mais fáceis primeiro
-    expect(fila.confirmados.map((i) => i.contractKey)).toEqual(['confirmado']);
-    expect(fila.contagem).toEqual({ UNICA: 1, VARIAS: 0, PARCIAL: 0, NENHUMA: 1 });
+
+  it('lista atas sem gestor com vinculados e prováveis; ignora encerrada sem contrato', () => {
+    const { atasSemGestor } = base();
+    expect(atasSemGestor.map((a) => a.numeroAta)).toEqual(['00001/2025']);
+    expect(atasSemGestor[0]).toMatchObject({ vinculados: ['vinculado'], provaveis: ['provavel-sem-gestor'] });
+  });
+
+  it('separa contratos sem gestor: com ata provável aguardam vínculo; os demais precisam de decisão', () => {
+    const p = base();
+    expect(p.aguardamVinculo.map((i) => i.contractKey)).toEqual(['provavel-ana', 'provavel-sem-gestor']); // mesmo prazo: pelo número
+    expect(p.precisamDecisao.map((i) => i.contractKey)).toEqual(['sem-pista']); // com gestor não entra
+    expect(p.naoPertencem.map((i) => i.contractKey)).toEqual(['marcado']);
+  });
+
+  it('conta contratos a vincular por gestor da ata provável', () => {
+    const p = base();
+    expect(p.aVincularPorGestor.get('Ana')).toEqual([{ contractKey: 'provavel-ana', numero: 'provavel-ana', numeroAta: '00003/2025' }]);
+    expect(p.totalAVincular).toBe(1);
   });
 });

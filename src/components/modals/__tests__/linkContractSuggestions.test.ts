@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  aplicarRestricoesDeVinculo,
   contractMatchesCompra,
   getContractSuggestionReasons,
   rankContractsBySuggestion,
@@ -64,5 +65,25 @@ describe('ataLinkCoverage', () => {
   it('só é completo quando todos os itens já têm o contrato', () => {
     expect(ataLinkCoverage('200331-00160-2026', [{ linkedContractKeys: ['200331-00160-2026'] }])).toMatchObject({ completo: true });
     expect(ataLinkCoverage('200331-00160-2026', [])).toMatchObject({ completo: false });
+  });
+});
+
+describe('aplicarRestricoesDeVinculo', () => {
+  const c = (id: string) => ({ id, uasg: '200331', numero: id, ano: 2025 }) as any;
+  const keyOf = (x: any) => x.id;
+
+  it('sugeridos primeiro; marcados "não pertence a ata" perdem a sugestão; vinculados a outra ata vão para o fim, bloqueados', () => {
+    const r = aplicarRestricoesDeVinculo(
+      [
+        { contract: c('OUTRA'), reasons: ['compra', 'fornecedor'] },
+        { contract: c('MARCADO'), reasons: ['fornecedor'] },
+        { contract: c('SUG'), reasons: ['compra'] },
+        { contract: c('COMUM'), reasons: [] }
+      ],
+      { contractKeyOf: keyOf, ataDeOutroVinculo: new Map([['OUTRA', '00059/2025']]), naoPertencemAAta: new Set(['MARCADO']) }
+    );
+    expect(r.map((x) => x.contract.id)).toEqual(['SUG', 'MARCADO', 'COMUM', 'OUTRA']);
+    expect(r[1]).toMatchObject({ reasons: [], naoPertenceAAta: true });
+    expect(r[3]).toMatchObject({ reasons: [], vinculadoAOutraAta: '00059/2025' });
   });
 });

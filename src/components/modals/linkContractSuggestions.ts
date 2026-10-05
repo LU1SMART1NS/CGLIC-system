@@ -101,3 +101,48 @@ export function ataLinkCoverage(
   const vinculados = itemOptions.filter((i) => i.linkedContractKeys?.some((k) => k.toUpperCase() === key)).length;
   return { vinculados, total, completo: total > 0 && vinculados === total };
 }
+
+/** Linha da lista do modal de vínculo, já com as restrições de vínculo da CGLIC. */
+export interface ContratoParaVincular {
+  contract: ContractDashboardRecord;
+  reasons: ContractSuggestionReason[];
+  /** Número da ata a que o contrato já está vinculado (outra ata): não pode ser escolhido. */
+  vinculadoAOutraAta?: string;
+  /** O coordenador marcou que o contrato não pertence a ata: não é sugerido (vincular desfaz a marcação). */
+  naoPertenceAAta?: boolean;
+}
+
+/**
+ * Aplica as regras de vínculo à lista já ordenada por sugestão:
+ * - um contrato pertence a uma só ata: o já vinculado a outra ata perde a sugestão, vai para o fim e fica bloqueado;
+ * - o marcado "não pertence a ata" perde a sugestão (continua pesquisável).
+ * A ordem relativa dentro de cada grupo é preservada.
+ */
+export function aplicarRestricoesDeVinculo(
+  ranked: Array<{ contract: ContractDashboardRecord; reasons: ContractSuggestionReason[] }>,
+  opts: {
+    contractKeyOf: (c: ContractDashboardRecord) => string;
+    /** contract_key (maiúsculas) → número da ata a que já está vinculado, só para atas diferentes desta. */
+    ataDeOutroVinculo: Map<string, string>;
+    /** contract_key (maiúsculas) dos contratos marcados "não pertence a ata". */
+    naoPertencemAAta: Set<string>;
+  }
+): ContratoParaVincular[] {
+  const sugeridos: ContratoParaVincular[] = [];
+  const demais: ContratoParaVincular[] = [];
+  const bloqueados: ContratoParaVincular[] = [];
+  for (const row of ranked) {
+    const key = opts.contractKeyOf(row.contract).toUpperCase();
+    const outraAta = opts.ataDeOutroVinculo.get(key);
+    if (outraAta) {
+      bloqueados.push({ contract: row.contract, reasons: [], vinculadoAOutraAta: outraAta });
+      continue;
+    }
+    if (opts.naoPertencemAAta.has(key)) {
+      demais.push({ contract: row.contract, reasons: [], naoPertenceAAta: true });
+      continue;
+    }
+    (row.reasons.length > 0 ? sugeridos : demais).push({ contract: row.contract, reasons: row.reasons });
+  }
+  return [...sugeridos, ...demais, ...bloqueados];
+}
