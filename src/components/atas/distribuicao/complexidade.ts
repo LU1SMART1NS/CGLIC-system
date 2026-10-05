@@ -31,17 +31,16 @@ export const PESO_COMPLEXIDADE: Record<NivelComplexidade, number> = { BAIXA: 1, 
 
 export const ROTULO_COMPLEXIDADE: Record<NivelComplexidade, string> = { ALTA: 'Alta', MEDIA: 'Média', BAIXA: 'Baixa' };
 
-/** Ata: Alta com 6+ itens ou 2+ fornecedores; Baixa com 1 item; Média de 2 a 5 itens (ou sem itens no banco). */
+/**
+ * Ata: Alta com 6+ itens; Baixa com 1 item; Média de 2 a 5 itens (ou sem itens no banco).
+ * Só itens: toda ata tem um único fornecedor (confirmado na API oficial), então o fornecedor não diferencia atas.
+ */
 export const ATA_ALTA_MIN_ITENS = 6;
-export const ATA_ALTA_MIN_FORNECEDORES = 2;
 
-export function classificarAta(itens: number, fornecedores: number): Complexidade {
+export function classificarAta(itens: number): Complexidade {
   const txtItens = `${itens} ${itens === 1 ? 'item' : 'itens'}`;
-  const txtForn = `${fornecedores} ${fornecedores === 1 ? 'fornecedor' : 'fornecedores'}`;
   if (itens === 0) return { nivel: 'MEDIA', motivo: 'Sem itens no banco' };
-  if (itens >= ATA_ALTA_MIN_ITENS || fornecedores >= ATA_ALTA_MIN_FORNECEDORES) {
-    return { nivel: 'ALTA', motivo: fornecedores >= ATA_ALTA_MIN_FORNECEDORES ? `${txtItens} · ${txtForn}` : txtItens };
-  }
+  if (itens >= ATA_ALTA_MIN_ITENS) return { nivel: 'ALTA', motivo: txtItens };
   if (itens === 1) return { nivel: 'BAIXA', motivo: txtItens };
   return { nivel: 'MEDIA', motivo: txtItens };
 }

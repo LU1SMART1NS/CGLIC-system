@@ -110,12 +110,14 @@ export interface ContratoParaVincular {
   vinculadoAOutraAta?: string;
   /** O coordenador marcou que o contrato não pertence a ata: não é sugerido (vincular desfaz a marcação). */
   naoPertenceAAta?: boolean;
+  /** O coordenador descartou esta ata para o contrato (Central de Distribuição): não é sugerido para ela. */
+  descartadoParaEstaAta?: boolean;
 }
 
 /**
  * Aplica as regras de vínculo à lista já ordenada por sugestão:
  * - um contrato pertence a uma só ata: o já vinculado a outra ata perde a sugestão, vai para o fim e fica bloqueado;
- * - o marcado "não pertence a ata" perde a sugestão (continua pesquisável).
+ * - o marcado "não pertence a ata" ou descartado para esta ata perde a sugestão (continua pesquisável).
  * A ordem relativa dentro de cada grupo é preservada.
  */
 export function aplicarRestricoesDeVinculo(
@@ -126,6 +128,8 @@ export function aplicarRestricoesDeVinculo(
     ataDeOutroVinculo: Map<string, string>;
     /** contract_key (maiúsculas) dos contratos marcados "não pertence a ata". */
     naoPertencemAAta: Set<string>;
+    /** contract_key (maiúsculas) dos contratos que o coordenador descartou para ESTA ata. */
+    descartadosParaEstaAta?: Set<string>;
   }
 ): ContratoParaVincular[] {
   const sugeridos: ContratoParaVincular[] = [];
@@ -140,6 +144,10 @@ export function aplicarRestricoesDeVinculo(
     }
     if (opts.naoPertencemAAta.has(key)) {
       demais.push({ contract: row.contract, reasons: [], naoPertenceAAta: true });
+      continue;
+    }
+    if (opts.descartadosParaEstaAta?.has(key)) {
+      demais.push({ contract: row.contract, reasons: [], descartadoParaEstaAta: true });
       continue;
     }
     (row.reasons.length > 0 ? sugeridos : demais).push({ contract: row.contract, reasons: row.reasons });

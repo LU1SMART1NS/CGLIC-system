@@ -2,15 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { aplicarAjuste, classificarAta, classificarContrato, mesesDeVigencia } from '../complexidade';
 
 describe('complexidade de ata', () => {
-  it('Baixa com 1 item, Média de 2 a 5, Alta com 6+ itens ou 2+ fornecedores', () => {
-    expect(classificarAta(1, 1)).toEqual({ nivel: 'BAIXA', motivo: '1 item' });
-    expect(classificarAta(5, 1)).toEqual({ nivel: 'MEDIA', motivo: '5 itens' });
-    expect(classificarAta(6, 1)).toEqual({ nivel: 'ALTA', motivo: '6 itens' });
-    expect(classificarAta(2, 2)).toEqual({ nivel: 'ALTA', motivo: '2 itens · 2 fornecedores' });
+  it('Baixa com 1 item, Média de 2 a 5, Alta com 6+ itens', () => {
+    expect(classificarAta(1)).toEqual({ nivel: 'BAIXA', motivo: '1 item' });
+    expect(classificarAta(5)).toEqual({ nivel: 'MEDIA', motivo: '5 itens' });
+    expect(classificarAta(6)).toEqual({ nivel: 'ALTA', motivo: '6 itens' });
   });
 
   it('sem itens no banco fica em Média, com o motivo à vista', () => {
-    expect(classificarAta(0, 0)).toEqual({ nivel: 'MEDIA', motivo: 'Sem itens no banco' });
+    expect(classificarAta(0)).toEqual({ nivel: 'MEDIA', motivo: 'Sem itens no banco' });
   });
 });
 

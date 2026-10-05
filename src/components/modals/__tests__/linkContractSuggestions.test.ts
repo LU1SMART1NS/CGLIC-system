@@ -86,4 +86,16 @@ describe('aplicarRestricoesDeVinculo', () => {
     expect(r[1]).toMatchObject({ reasons: [], naoPertenceAAta: true });
     expect(r[3]).toMatchObject({ reasons: [], vinculadoAOutraAta: '00059/2025' });
   });
+
+  it('contrato descartado para esta ata perde a sugestão e é sinalizado', () => {
+    const r = aplicarRestricoesDeVinculo(
+      [
+        { contract: c('DESCARTADO'), reasons: ['compra', 'fornecedor'] },
+        { contract: c('SUG'), reasons: ['compra'] }
+      ],
+      { contractKeyOf: keyOf, ataDeOutroVinculo: new Map(), naoPertencemAAta: new Set(), descartadosParaEstaAta: new Set(['DESCARTADO']) }
+    );
+    expect(r.map((x) => x.contract.id)).toEqual(['SUG', 'DESCARTADO']);
+    expect(r[1]).toMatchObject({ reasons: [], descartadoParaEstaAta: true });
+  });
 });

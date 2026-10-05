@@ -16,6 +16,7 @@ import { useSyncContractItemQuantity } from '../../hooks/useSyncContractItemQuan
 import type { ContractDashboardRecord } from '../../types';
 import { formatCnpj } from '../../utils/format';
 import { displayContractNumber } from '../../utils/contractNumber';
+import { useDescartesAtaContrato } from '../../hooks/useDescartesAtaContrato';
 import { Modal, AlertCard, useToast } from '../../design-system';
 import {
   rankContractsBySuggestion,
@@ -126,6 +127,11 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     }
     return map;
   }, [todosVinculos, numeroAta]);
+  const { data: descartesAta = {} } = useDescartesAtaContrato();
+  const descartadosParaEstaAta = useMemo(() => {
+    const ataKey = `${numeroAta}-${(uasg || '').trim()}`;
+    return new Set(Object.values(descartesAta).filter((d) => d.ataKey === ataKey).map((d) => d.contractKey.toUpperCase()));
+  }, [descartesAta, numeroAta, uasg]);
   const naoPertencemAAta = useMemo(() => new Set(Object.keys(semAta).map((k) => k.toUpperCase())), [semAta]);
 
   useEffect(() => {
@@ -166,9 +172,10 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     return aplicarRestricoesDeVinculo(rankContractsBySuggestion(filtered, suggestionCriteria), {
       contractKeyOf: (c) => c.id || `${c.uasg}-${c.numero}-${c.ano}`,
       ataDeOutroVinculo,
-      naoPertencemAAta
+      naoPertencemAAta,
+      descartadosParaEstaAta
     });
-  }, [officialContracts, searchTerm, existingLinkedContractKeys, selectedContract, isAtaMode, suggestionCriteria, ataDeOutroVinculo, naoPertencemAAta]);
+  }, [officialContracts, searchTerm, existingLinkedContractKeys, selectedContract, isAtaMode, suggestionCriteria, ataDeOutroVinculo, naoPertencemAAta, descartadosParaEstaAta]);
 
   const isPending = linkMutation.isPending || linkItemsMutation.isPending;
 
@@ -395,7 +402,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto' }} className="link-contract-list">
-                  {filteredContracts.map(({ contract: c, reasons, vinculadoAOutraAta, naoPertenceAAta }) => (
+                  {filteredContracts.map(({ contract: c, reasons, vinculadoAOutraAta, naoPertenceAAta, descartadoParaEstaAta }) => (
                     <div
                       key={contractKeyOf(c)}
                       data-testid="link-contract-option"
@@ -447,6 +454,14 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                           {vinculadoAOutraAta && (
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
                               Vinculado à ata {vinculadoAOutraAta}
+                            </span>
+                          )}
+                          {descartadoParaEstaAta && (
+                            <span
+                              title="O coordenador descartou esta ata para o contrato na Central de Distribuição. Se vincular, o descarte é desfeito."
+                              style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}
+                            >
+                              Descartado para esta ata
                             </span>
                           )}
                           {naoPertenceAAta && (
@@ -547,10 +562,17 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   {gestorDaAta ? (
                     <>
                       Ao vincular, este contrato passa a ser gerido por <strong>{gestorDaAta}</strong>, gestor da ata.
-                      {gestorAtualDoContrato && gestorAtualDoContrato !== gestorDaAta && <> Hoje ele está com <strong>{gestorAtualDoContrato}</strong>.</>}
+                      {gestorAtualDoContrato && gestorAtualDoContrato !== gestorDaAta && (
+                        <> Hoje ele está com <strong>{gestorAtualDoContrato}</strong>; o coordenador será avisado da mudança.</>
+                      )}
+                    </>
+                  ) : gestorAtualDoContrato ? (
+                    <>
+                      A ata ainda não tem gestor: ao vincular, ela passa a ser de <strong>{gestorAtualDoContrato}</strong>, gestor deste contrato,
+                      e os outros contratos da ata acompanham. O coordenador será avisado.
                     </>
                   ) : (
-                    <>A ata ainda não tem gestor: o contrato recebe o gestor quando o coordenador atribuir a ata.</>
+                    <>A ata e o contrato ainda não têm gestor: eles recebem o gestor quando o coordenador atribuir a ata.</>
                   )}
                 </p>
               )}

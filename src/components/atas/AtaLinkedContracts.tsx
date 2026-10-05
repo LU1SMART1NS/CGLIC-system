@@ -86,8 +86,10 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
               </p>
               <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.15rem 0 0 0' }}>
                 Item {itemNumberFromKey(link.itemKey)}
-                {link.observacoes ? ` • ${link.observacoes}` : ''}
               </p>
+              {link.observacoes && (
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.1rem 0 0 0' }}>Obs. {link.observacoes}</p>
+              )}
             </div>
           </div>
 

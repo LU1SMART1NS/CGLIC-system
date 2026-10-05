@@ -68,16 +68,55 @@ describe('buildPendenciasDistribuicao', () => {
     expect(atasSemGestor[0]).toMatchObject({ vinculados: ['vinculado'], provaveis: ['provavel-sem-gestor'] });
   });
 
-  it('separa contratos sem gestor: com ata provável aguardam vínculo; os demais precisam de decisão', () => {
+  it('A vincular: todo contrato com ata provável forte (tenha ou não gestor); só os sem pista forte e sem gestor precisam de decisão', () => {
     const p = base();
-    expect(p.aguardamVinculo.map((i) => i.contractKey)).toEqual(['provavel-ana', 'provavel-sem-gestor']); // mesmo prazo: pelo número
-    expect(p.precisamDecisao.map((i) => i.contractKey)).toEqual(['sem-pista']); // com gestor não entra
+    expect(p.aVincular.map((i) => i.contractKey)).toEqual(['provavel-ana', 'provavel-sem-gestor']); // mesmo prazo: pelo número
+    expect(p.precisamDecisao.map((i) => i.contractKey)).toEqual(['sem-pista']); // o que já tem gestor e não tem ata provável está resolvido
     expect(p.naoPertencem.map((i) => i.contractKey)).toEqual(['marcado']);
+  });
+
+  it('contrato que já tem gestor continua em "A vincular" quando tem ata provável; uma ata provável vem antes de várias', () => {
+    const p = buildPendenciasDistribuicao({
+      contratos: [
+        contrato('varias', { dias: 1 }),
+        contrato('com-gestor', { idCompra: '20033105900332025', fornecedorCnpj: '33.333.333/0001-33', gestorNome: 'Bruno', dias: 50 })
+      ],
+      atas: [
+        ata('00001/2025'),
+        ata('00002/2025'), // as duas casam com "varias" (compra e fornecedor iguais)
+        ata('00003/2025', { numeroCompra: '90033', cnpjs: ['33333333000133'], gestorNome: 'Ana' })
+      ],
+      ataDoContrato: new Map(),
+      naoPertencemAAta: new Set()
+    });
+    expect(p.aVincular.map((i) => [i.contractKey, i.situacao])).toEqual([
+      ['com-gestor', 'UNICA'],
+      ['varias', 'VARIAS']
+    ]);
   });
 
   it('conta contratos a vincular por gestor da ata provável', () => {
     const p = base();
-    expect(p.aVincularPorGestor.get('Ana')).toEqual([{ contractKey: 'provavel-ana', numero: 'provavel-ana', numeroAta: '00003/2025' }]);
+    expect(p.aVincularPorGestor.get('Ana')).toEqual([{ contractKey: 'provavel-ana', numero: 'provavel-ana', numeroAta: '00003/2025', uasg: '200331' }]);
     expect(p.totalAVincular).toBe(1);
+  });
+  it('ata descartada para o contrato deixa de ser sugerida: sobrando outra, segue em A vincular; sem outra, vai para decisão; aparece em descartados', () => {
+    const p = buildPendenciasDistribuicao({
+      contratos: [contrato('duas'), contrato('uma')],
+      atas: [ata('00001/2025'), ata('00002/2025')], // as duas casam com os dois contratos
+      ataDoContrato: new Map(),
+      naoPertencemAAta: new Set(),
+      descartes: new Set(['duas|00001/2025-200331', 'uma|00001/2025-200331', 'uma|00002/2025-200331'])
+    });
+    const duas = p.aVincular.find((i) => i.contractKey === 'duas');
+    expect(duas?.situacao).toBe('UNICA');
+    expect(duas?.sugestoes.map((s) => s.numeroAta)).toEqual(['00002/2025']);
+    expect(p.aVincular.map((i) => i.contractKey)).toEqual(['duas']);
+    expect(p.precisamDecisao.map((i) => i.contractKey)).toEqual(['uma']);
+    expect(p.descartados.map((d) => [d.contractKey, d.ataKey])).toEqual([
+      ['duas', '00001/2025-200331'],
+      ['uma', '00001/2025-200331'],
+      ['uma', '00002/2025-200331']
+    ]);
   });
 });

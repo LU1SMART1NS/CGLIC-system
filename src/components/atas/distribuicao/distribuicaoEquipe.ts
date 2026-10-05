@@ -20,9 +20,8 @@ export interface DistribuicaoAta {
   faixa: PrazoFaixa;
   valor: number;
   gestorNome?: string;
-  /** Itens e fornecedores distintos da ata (para a complexidade). */
+  /** Itens da ata (para a complexidade). */
   itens?: number;
-  fornecedores?: number;
 }
 
 export interface DistribuicaoContrato {
@@ -194,7 +193,7 @@ export function buildDistribuicaoEquipe(input: {
       valor: ata.valor,
       urgentes: 0,
       acompanhar: 0,
-      complexidade: aplicarAjuste(classificarAta(ata.itens ?? 0, ata.fornecedores ?? 0), input.ajustes?.[`ATA:${ata.numeroAta}`])
+      complexidade: aplicarAjuste(classificarAta(ata.itens ?? 0), input.ajustes?.[`ATA:${ata.numeroAta}`])
     };
     l.itens.push(item);
     contarComplexidade(l, item.complexidade);

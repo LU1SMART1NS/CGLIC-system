@@ -3,7 +3,7 @@ import { buildDistribuicaoEquipe, type DistribuicaoAta, type DistribuicaoContrat
 import { avaliarCandidatos, indexarItens, montarLote, type CandidatoAtribuicao } from '../sugestaoAtribuicao';
 import type { DashboardAttentionItem } from '../../../../types/managementDashboard';
 
-const ata = (numeroAta: string, gestorNome: string | undefined, itens: number): DistribuicaoAta => ({ numeroAta, gestorNome, faixa: 'REGULAR', valor: 1, itens, fornecedores: 1 });
+const ata = (numeroAta: string, gestorNome: string | undefined, itens: number): DistribuicaoAta => ({ numeroAta, gestorNome, faixa: 'REGULAR', valor: 1, itens });
 const contrato = (contractKey: string, gestorNome: string | undefined, categoria: string, mesesVigencia: number): DistribuicaoContrato => ({
   contractKey,
   numero: contractKey,

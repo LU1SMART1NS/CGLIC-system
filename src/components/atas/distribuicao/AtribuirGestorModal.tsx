@@ -124,7 +124,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
           </div>
           {provaveis > 0 && (
             <div data-testid="atribuir-gestor-provaveis" style={{ color: '#b45309', fontWeight: 600 }}>
-              Mais {plural(provaveis, 'contrato provável', 'contratos prováveis')} desta ata {provaveis === 1 ? 'virá' : 'virão'} para o gestor quando o servidor vincular.
+              Mais {plural(provaveis, 'contrato provável', 'contratos prováveis')} {lote.atas > 1 ? 'destas atas' : 'desta ata'} {provaveis === 1 ? 'virá' : 'virão'} para o gestor quando o servidor vincular.
             </div>
           )}
         </section>
