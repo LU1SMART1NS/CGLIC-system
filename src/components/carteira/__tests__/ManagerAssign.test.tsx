@@ -1,43 +1,27 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-vi.mock('../../../hooks/useAssignManager', () => ({ useAssignManager: () => ({ mutate: vi.fn(), isPending: false }) }));
-vi.mock('../../../hooks/useUsers', () => ({ useUsers: () => ({ data: [] }) }));
-vi.mock('../../../hooks/useRoles', () => ({ useRoles: () => ({ data: [] }) }));
-vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' }, role: 'admin' }) }));
+vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 
 import { ManagerCell, canAssignManager } from '../ManagerAssign';
 
 describe('ManagerCell — coluna Gestor das carteiras', () => {
-  it('só admin e gestor podem atribuir', () => {
+  it('só o coordenador (admin) atribui gestor', () => {
     expect(canAssignManager('admin')).toBe(true);
-    expect(canAssignManager('gestor')).toBe(true);
+    expect(canAssignManager('gestor')).toBe(false);
     expect(canAssignManager('leitor')).toBe(false);
     expect(canAssignManager('gestor_saldos')).toBe(false);
   });
 
-  it('sem permissão, mostra apenas o nome (ou traço)', () => {
-    const comNome = renderToStaticMarkup(
-      <ManagerCell target={{ tipo: 'ATA', ataKey: '1' }} gestorNome="Maria" canAssign={false} testId="t" links={[]} />
-    );
-    expect(comNome).toContain('Maria');
-    expect(comNome).not.toContain('<button');
-
-    const semNome = renderToStaticMarkup(
-      <ManagerCell target={{ tipo: 'ATA', ataKey: '1' }} canAssign={false} testId="t" links={[]} />
-    );
-    expect(semNome).toContain('—');
+  it('mostra só o nome, sem ação de atribuir, mesmo para o coordenador', () => {
+    const html = renderToStaticMarkup(<ManagerCell gestorNome="Maria" canAssign testId="t" />);
+    expect(html).toContain('Maria');
+    expect(html).not.toContain('<button');
   });
 
-  it('com permissão, oferece "Atribuir" quando não há gestor e o lápis para alterar quando há', () => {
-    const semNome = renderToStaticMarkup(
-      <ManagerCell target={{ tipo: 'ATA', ataKey: '1' }} canAssign testId="t" links={[]} />
-    );
-    expect(semNome).toContain('Atribuir');
-
-    const comNome = renderToStaticMarkup(
-      <ManagerCell target={{ tipo: 'CONTRATO', contractKey: 'k' }} gestorNome="Maria" canAssign testId="t" links={[]} />
-    );
-    expect(comNome).toContain('Alterar gestor (Maria)');
+  it('sem gestor: traço para quem não atribui; atalho para a Central para o coordenador', () => {
+    expect(renderToStaticMarkup(<ManagerCell canAssign={false} testId="t" />)).toContain('—');
+    const coordenador = renderToStaticMarkup(<ManagerCell canAssign testId="t" />);
+    expect(coordenador).toContain('atribuir na Central');
   });
 });

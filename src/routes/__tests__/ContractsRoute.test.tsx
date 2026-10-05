@@ -290,7 +290,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).not.toContain('Empresa Alfa Serviços');
   });
 
-  it('9b. admin pode atribuir gestor na própria carteira (botão "Atribuir")', () => {
+  it('9b. a atribuição é só na Central: na carteira o admin vê o atalho para lá, não o seletor', () => {
     vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockReturnValue({
       data: mockContracts,
       isLoading: false,
@@ -304,7 +304,8 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     const html = renderToStaticMarkup(<ContractsRoute />);
 
     expect(html).not.toContain('type="checkbox"');
-    expect(html).toContain('Atribuir');
+    expect(html).toContain('atribuir na Central');
+    expect(html).not.toContain('Alterar gestor');
   });
 
   it('10. perfil "gestor" deve ver apenas os contratos onde é o gestor titular (escopo ASSIGNED)', () => {

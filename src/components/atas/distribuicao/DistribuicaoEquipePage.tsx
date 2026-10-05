@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, FileText, Package, UserPlus, UserX, Users, ArrowLeftRight } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, FileText, Link2, Package, UserPlus, UserX, Users, ArrowLeftRight } from 'lucide-react';
 import { ContractsPartialNotice } from '../../carteira/ContractsPartialNotice';
 import { PageContainer } from '../../../design-system/components/PageContainer';
 import { PageHeader } from '../../../design-system/components/PageHeader';
@@ -15,6 +15,11 @@ import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import { SEM_GESTOR } from '../../carteira/carteiraGestor';
 import { canAssignManager } from '../../carteira/ManagerAssign';
 import { AtribuirGestorModal } from './AtribuirGestorModal';
+import { ContratosSemAtaSection } from './ContratosSemAtaSection';
+import { buildFilaSemAta, type AtaSugerida, type ItemFila } from './contratosSemAta';
+import { LinkContractModal, type LinkableAtaItemOption } from '../../modals/LinkContractModal';
+import { normalizeItemKey } from '../../../utils/itemKeyUtils';
+import { useContratosSemAta } from '../../../hooks/useContratosSemAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { useAuth } from '../../../context/AuthContext';
 import { useAtasPortfolio, getArpPrazo } from '../../../hooks/useAtasPortfolio';
@@ -176,6 +181,9 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // Ajuste manual de complexidade: só o coordenador (a RPC também exige admin).
   const canAjustar = role === 'admin';
   const { data: ajustes } = useComplexidadeAjustes();
+  const { data: confirmacoesSemAta = {}, isLoading: semAtaLoading } = useContratosSemAta();
+  // Modal "Vincular Contrato" (o mesmo da Ata 360) aberto a partir da fila "Contratos sem ata".
+  const [vinculo, setVinculo] = React.useState<{ item: ItemFila; ata: AtaSugerida } | null>(null);
   // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void } | null>(null);
   const [expanded, setExpanded] = React.useState<string | null>(null);
@@ -216,6 +224,67 @@ export const DistribuicaoEquipePage: React.FC = () => {
     [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes]
   );
 
+  // Fila "Contratos sem ata": contratos vigentes sem vínculo com item de ata e sem confirmação de "sem ata".
+  // Atas expiradas entram nas sugestões (o contrato costuma durar mais que a ata de onde veio).
+  const fila = useMemo(() => {
+    const vinculados = new Set(links.map((l) => l.contractKey));
+    return buildFilaSemAta({
+      contratos: contratos.rows.map((row) => ({
+        contractKey: row.contractKey,
+        numero: formatContractNumber(row.contract),
+        fornecedorNome: row.contract.fornecedorNome,
+        fornecedorCnpj: row.contract.fornecedorCnpjCpf,
+        idCompra: row.contract.idCompra,
+        objeto: row.contract.objeto,
+        faixa: row.faixa,
+        dias: row.diasRestantes,
+        gestorNome: row.gestorNome,
+        contract: row.contract
+      })),
+      atas: atas.arps.map((arp) => {
+        const itens = atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`] || [];
+        return {
+          numeroAta: arp.numeroAtaRegistroPreco,
+          uasg: arp.codigoUnidadeGerenciadora,
+          idCompra: arp.idCompra,
+          numeroCompra: arp.numeroCompra,
+          anoCompra: arp.anoCompra,
+          cnpjs: Array.from(new Set(itens.map((i) => (i.niFornecedor || '').replace(/\D/g, '')).filter(Boolean))),
+          gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
+          temItens: itens.length > 0
+        };
+      }),
+      vinculados,
+      confirmadosSemAta: new Set(Object.keys(confirmacoesSemAta))
+    });
+  }, [contratos.rows, atas.arps, atas.itemsByAta, atas.gestorByAta, links, confirmacoesSemAta]);
+
+  // Itens e critérios da ata escolhida, no mesmo formato que a Ata 360 entrega ao modal "Vincular Contrato".
+  const vinculoModal = useMemo(() => {
+    if (!vinculo) return null;
+    const arp = atas.arps.find((a) => a.numeroAtaRegistroPreco === vinculo.ata.numeroAta && a.codigoUnidadeGerenciadora === vinculo.ata.uasg);
+    if (!arp) return null;
+    const itens = atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`] || [];
+    const itemOptions: LinkableAtaItemOption[] = itens.map((item) => ({
+      itemKey: normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem),
+      numeroItem: item.numeroItem,
+      descricao: item.descricaoItem,
+      fornecedorNome: item.nomeRazaoSocialFornecedor,
+      fornecedorCnpj: item.niFornecedor,
+      valorUnitario: item.valorUnitario,
+      quantidadeHomologada: item.quantidadeHomologadaVencedor ?? item.quantidadeHomologadaItem,
+      linkedContractKeys: []
+    }));
+    return {
+      arp,
+      itemOptions,
+      criteria: {
+        compra: { idCompra: arp.idCompra, uasg: arp.codigoUnidadeGerenciadora, numeroCompra: arp.numeroCompra, anoCompra: arp.anoCompra },
+        fornecedorCnpjs: itens.map((i) => i.niFornecedor).filter(Boolean) as string[]
+      }
+    };
+  }, [vinculo, atas.arps, atas.itemsByAta]);
+
   const refresh = () => {
     contratos.refresh();
     atas.reload();
@@ -234,7 +303,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   }
 
   // Só mostra números com atas, contratos e vínculos carregados: totais parciais enganariam a leitura da carga.
-  const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading;
+  const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading || semAtaLoading;
   const { divergencias, totais } = distribuicao;
   const linhas = ordenarDistribuicao(distribuicao.linhas, ordem);
   const semGestor = linhas.find((l) => l.gestorNome === null);
@@ -242,6 +311,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
 
   const scrollToDivergencias = () =>
     document.getElementById('distribuicao-divergencias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const scrollToSemAta = () =>
+    document.getElementById('distribuicao-sem-ata')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -302,6 +373,15 @@ export const DistribuicaoEquipePage: React.FC = () => {
               icon={FileText}
               tone={semGestor?.contratos.vigentes ? 'warning' : 'neutral'}
               onClick={semGestor?.contratos.vigentes ? () => navigate(carteiraPath('/contratos', null)) : undefined}
+            />
+            <KpiTile
+              testId="distribuicao-kpi-sem-ata"
+              label="Contratos sem ata"
+              value={fila.pendentes.length}
+              hint={fila.pendentes.length > 0 ? `${fila.contagem.UNICA} com uma ata provável` : 'Todos vinculados ou confirmados'}
+              icon={Link2}
+              tone={fila.pendentes.length > 0 ? 'warning' : 'neutral'}
+              onClick={fila.pendentes.length > 0 ? scrollToSemAta : undefined}
             />
             <KpiTile
               testId="distribuicao-kpi-divergencias"
@@ -450,6 +530,26 @@ export const DistribuicaoEquipePage: React.FC = () => {
             </div>
           </div>
 
+          <ContratosSemAtaSection
+            fila={fila}
+            confirmacoes={confirmacoesSemAta}
+            podeAgir={canAssign}
+            onVincular={(item, ata) => setVinculo({ item, ata })}
+            onAtribuir={(item) => setTransferencia({ targets: [{ tipo: 'CONTRATO', contractKey: item.contractKey }], origem: item.gestorNome ?? null })}
+          />
+
+          {vinculoModal && vinculo && (
+            <LinkContractModal
+              isOpen
+              onClose={() => setVinculo(null)}
+              numeroAta={vinculoModal.arp.numeroAtaRegistroPreco}
+              uasg={vinculoModal.arp.codigoUnidadeGerenciadora}
+              itemOptions={vinculoModal.itemOptions}
+              suggestionCriteria={vinculoModal.criteria}
+              initialContract={vinculo.item.contract}
+            />
+          )}
+
           {transferencia && (
             <AtribuirGestorModal
               targets={transferencia.targets}
@@ -467,7 +567,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
               <div>
                 <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Contratos com gestor diferente da ata</h2>
                 <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                  Pela regra, o contrato vinculado a uma ata tem o mesmo gestor da ata. Atribua de novo o gestor na ata para alinhar os vínculos.
+                  Pela regra, o contrato vinculado a uma ata tem o mesmo gestor da ata. "Alinhar gestor" atribui o gestor à ata e o leva a todos os contratos vinculados a ela.
                 </p>
               </div>
               <div style={carteiraTableShell}>
@@ -490,13 +590,16 @@ export const DistribuicaoEquipePage: React.FC = () => {
                           <td data-label="Contrato" style={{ ...carteiraTd, fontWeight: 800, whiteSpace: 'nowrap' }}><span>{d.numeroContrato}</span></td>
                           <td data-label="Gestor do contrato" style={carteiraTd}><span>{d.gestorContrato || <em style={{ color: '#b45309' }}>Sem gestor</em>}</span></td>
                           <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/atas?${new URLSearchParams({ busca: d.numeroAta, situacao: 'TODOS' })}`)}
-                              style={carteiraButton}
-                            >
-                              Ver ata <ArrowRight size={13} />
-                            </button>
+                            {canAssign ? (
+                              <button
+                                type="button"
+                                onClick={() => setTransferencia({ targets: [{ tipo: 'ATA', ataKey: d.numeroAta }], origem: d.gestorAta ?? null })}
+                                data-testid={`distribuicao-alinhar-${d.contractKey}`}
+                                style={{ ...carteiraButton, color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
+                              >
+                                <UserPlus size={13} /> Alinhar gestor
+                              </button>
+                            ) : null}
                           </td>
                         </tr>
                       ))}

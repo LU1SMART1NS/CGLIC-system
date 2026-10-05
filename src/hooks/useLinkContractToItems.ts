@@ -15,6 +15,8 @@ export function useLinkContractToItems() {
       queryClient.invalidateQueries({ queryKey: ['item-contract-links'] });
       // Aba "Contratos vinculados" da Ata 360 (useAtaLinkedContracts)
       queryClient.invalidateQueries({ queryKey: ['ata-linked-contracts'] });
+      // Lista geral de vínculos: Central de Distribuição, propagação do gestor e escopo do perfil gestor
+      queryClient.invalidateQueries({ queryKey: ['all-arp-item-contract-links'] });
     }
   });
 }

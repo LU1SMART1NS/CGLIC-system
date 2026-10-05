@@ -4,7 +4,6 @@ import { groupArpsAndItems } from '../utils/ataGrouping';
 import { ArpPortfolioHeader } from './atas/ArpPortfolioHeader';
 import { ArpPortfolioSummary, type ArpVigenciaFilterOption } from './atas/ArpPortfolioSummary';
 import { matchesStatusFilter, comparePrazo } from './carteira/carteiraPrazo';
-import { useArpItemContractLinks } from '../hooks/useAtaManagers';
 import { getArpPrazo, useAtasPortfolio } from '../hooks/useAtasPortfolio';
 import { useAuth } from '../context/AuthContext';
 import { useCarteiraItens } from '../hooks/useCarteiraItens';
@@ -156,12 +155,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     }
   }, [filteredArps, loadItemsForArps]);
 
-  // Atribuição de gestor na própria carteira (admin e gestor), com propagação
-  // Ata ↔ contratos vinculados — ver managerAssignmentService.
+  // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
-  const { data: links = [] } = useArpItemContractLinks(canAssign);
-  const assignContext = useMemo(() => ({ links }), [links]);
-
 
   // Agrupamento de cards
   const groupedCards = useMemo(() => {
@@ -226,7 +221,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
 
       <ArpPortfolioList
         canAssign={canAssign}
-        assignContext={assignContext}
         onFilter={handleFilterChange}
         cards={groupedCards}
         totalAtas={scopedArps.length}

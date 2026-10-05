@@ -18,7 +18,7 @@ import { CarteiraCellFilter } from '../../carteira/CarteiraCellFilter';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../../carteira/CarteiraRowLink';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
 import type { ContractsPortfolioFilterState } from './ContractsPortfolioFilters';
-import { ManagerCell, type ManagerAssignContext } from '../../carteira/ManagerAssign';
+import { ManagerCell } from '../../carteira/ManagerAssign';
 import { getAcaoInfo, getMotivoInfo } from '../../instrumentos/gestaoInstrumentosRowHelpers';
 import type { DashboardAttentionItem } from '../../../types/managementDashboard';
 import type { ContractDashboardRecord } from '../../../types';
@@ -38,9 +38,8 @@ interface ContractsPortfolioTableProps {
   totalContracts: number;
   onResetFilters: () => void;
   pageSize?: number;
-  /** Atribuição de gestor na própria carteira (admin e gestor). */
+  /** Coordenador: "Sem gestor" vira atalho para a Central de Distribuição (a atribuição é feita só lá). */
   canAssign?: boolean;
-  assignContext?: ManagerAssignContext;
   /** Clique num valor da célula aplica o filtro correspondente (prazo → situação, pendências, fornecedor → busca). */
   onFilter?: <K extends keyof ContractsPortfolioFilterState>(key: K, value: ContractsPortfolioFilterState[K]) => void;
 }
@@ -95,7 +94,6 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   onResetFilters,
   pageSize = 15,
   canAssign = false,
-  assignContext = { links: [] },
   onFilter
 }) => {
   const navigate = useNavigateWithOrigin();
@@ -225,14 +223,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                       )}
                     </td>
                     <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <ManagerCell
-                        target={{ tipo: 'CONTRATO', contractKey }}
-                        gestorNome={gestorNome}
-                        canAssign={canAssign}
-                        testId={`contracts-manager-${contractKey}`}
-                        links={assignContext.links}
-                        contractsByKey={assignContext.contractsByKey}
-                      />
+                      <ManagerCell gestorNome={gestorNome} canAssign={canAssign} testId={`contracts-manager-${contractKey}`} />
                     </td>
                   </tr>
 

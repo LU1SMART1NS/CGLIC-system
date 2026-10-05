@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
 import { PageContainer } from '../design-system/components/PageContainer';
-import { useArpItemContractLinks } from '../hooks/useAtaManagers';
 import { useContractsPortfolio } from '../hooks/useContractsPortfolio';
 import { canAssignManager } from '../components/carteira/ManagerAssign';
 import { useAuth } from '../context/AuthContext';
@@ -25,7 +24,6 @@ export const ContractsRoute: React.FC = () => {
   // Dados da carteira (contratos no escopo do usuário, com prazo, gestor e pendências).
   const {
     rows: allRows,
-    contractsByKey,
     hasAnyData,
     isLoading,
     isLoadingScope: isLoadingManagers,
@@ -50,11 +48,8 @@ export const ContractsRoute: React.FC = () => {
   // O perfil "gestor" já vê só os próprios contratos: sem seletor, e um ?gestor= na URL é ignorado.
   const showGestorFilter = canFilterByGestor(role);
 
-  // Atribuição de gestor na própria carteira (admin e gestor), com propagação
-  // Ata ↔ contratos vinculados — ver managerAssignmentService.
+  // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
-  const { data: links = [] } = useArpItemContractLinks(canAssign);
-  const assignContext = useMemo(() => ({ links, contractsByKey }), [links, contractsByKey]);
 
   // Contagens dos segmentos de situação e valor vigente, sobre toda a carteira visível (independentes dos filtros).
   const summaryMetrics = useMemo(() => {
@@ -167,7 +162,6 @@ export const ContractsRoute: React.FC = () => {
             totalContracts={allRows.length}
             onResetFilters={handleResetFilters}
             canAssign={canAssign}
-            assignContext={assignContext}
             onFilter={handleFilterChange}
           />
         </>
