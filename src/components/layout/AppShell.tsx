@@ -37,6 +37,24 @@ export const AppShell: React.FC<AppShellProps> = ({
     return () => observer.disconnect();
   }, []);
 
+  // Publica a altura real da barra inferior do celular (--bottom-nav-h, já com a área segura) para o rodapé e o
+  // conteúdo reservarem exatamente esse espaço: uma altura escrita à mão ficava curta e a barra comia a folga do rodapé.
+  useEffect(() => {
+    if (!isMobile) return;
+    const root = document.documentElement;
+    const nav = document.querySelector<HTMLElement>('.app-bottom-nav');
+    if (!nav) return;
+    const publish = () => root.style.setProperty('--bottom-nav-h', `${nav.offsetHeight}px`);
+    publish();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(publish);
+    observer.observe(nav);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--bottom-nav-h');
+    };
+  }, [isMobile]);
+
   const contextValue: AppShellContextValue = {
     onOpenExportModal,
     onOpenDepartmentsModal
@@ -53,7 +71,8 @@ export const AppShell: React.FC<AppShellProps> = ({
           zIndex: 30,
           background: '#ffffff',
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-          borderBottom: '1px solid #e2e8f0'
+          // Sem filete cinza: a linha verde do gov.br já separa o cabeçalho, e um 1px claro aparecia entre ela e a barra azul fixa.
+          borderBottom: 'none'
         }}>
           <Header onOpenExportModal={onOpenExportModal} />
         </div>

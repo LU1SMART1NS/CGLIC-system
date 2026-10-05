@@ -5,7 +5,7 @@ import {
   getExecutionModeDisplay,
   type AttentionItem
 } from '../taskAttentionDisplay';
-import { addDays, formatDateISO } from '../../../services/temporalEngineService';
+import { addBusinessDays as addDays, formatDateISO } from '../../../services/temporalEngineService';
 
 describe('Fase 5.2 — Central de Atenção e Tarefas do Contrato 360°', () => {
   describe('1. Classificação Temporal de Tarefas (classifyTaskAttention)', () => {

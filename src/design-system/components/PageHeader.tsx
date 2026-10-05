@@ -1,5 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { typography, spacing } from '../tokens';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+
+/** Espaço à direita das abas da área (AreaTabs): no desktop, as ações da página sobem para lá. */
+export const AREA_TABS_ACTIONS_ID = 'area-tabs-actions';
 
 export interface PageHeaderProps {
   title: string;
@@ -20,6 +25,21 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   className,
   style
 }) => {
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+
+  // Procura o espaço das abas depois de montar (nos testes e no SSR não existe, e as ações ficam no lugar).
+  useEffect(() => {
+    const next = isDesktop ? document.getElementById(AREA_TABS_ACTIONS_ID) : null;
+    setSlot((current) => (current === next ? current : next));
+  });
+
+  const actionsNode = actions ? (
+    <div className="ds-page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+      {actions}
+    </div>
+  ) : null;
+
   return (
     <header
       className={`ds-page-header ${className ?? ''}`.trim()}
@@ -50,7 +70,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           {badge && <div>{badge}</div>}
         </div>
         {subtitle && (
-          <p style={{
+          <p className="ds-page-header__subtitle" title={subtitle} style={{
             margin: 0,
             color: '#64748b',
             fontSize: '0.84rem',
@@ -60,12 +80,9 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           </p>
         )}
       </div>
-      
-      {actions && (
-        <div className="ds-page-header__actions" style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-          {actions}
-        </div>
-      )}
+
+      {actionsNode && !slot && actionsNode}
+      {actionsNode && slot && createPortal(actionsNode, slot)}
     </header>
   );
 };

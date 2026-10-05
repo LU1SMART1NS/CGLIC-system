@@ -89,6 +89,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
 
   return (
     <nav aria-label="Navegação Principal" className={mode === 'rail' ? 'app-rail' : 'app-bottom-nav'}>
+      {mode === 'rail' && (
+        <Link to="/" className="app-rail-brand" aria-label="ComprasSUSP, página inicial">
+          <span>Compras</span>SUSP
+        </Link>
+      )}
       {top.map((area) => <AreaItem key={area.id} area={area} pathname={pathname} />)}
       {mode === 'rail' && <div className="app-rail-spacer" />}
       {bottom.map((area) => <AreaItem key={area.id} area={area} pathname={pathname} />)}
