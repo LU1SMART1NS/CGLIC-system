@@ -11,10 +11,14 @@
 export const ALLOWED_INVITE_ORIGINS: readonly string[] = Object.freeze([
   // Domínio canônico de produção.
   'https://cglic.vercel.app',
-  // Domínio de produção anterior — manter temporariamente para convites/testes já existentes.
+  // Domínio anterior: protegido por SSO da Vercel (leva ao login da Vercel). Ainda é aceito
+  // como origem do admin, mas o link do convite é sempre redirecionado ao domínio canônico.
   'https://cglic-lu1smart1ns-projects.vercel.app',
   'http://localhost:5173'
 ]);
+
+const CANONICAL_ORIGIN = 'https://cglic.vercel.app';
+const LEGACY_PROTECTED_ORIGIN = 'https://cglic-lu1smart1ns-projects.vercel.app';
 
 export type InviteRedirectResult =
   | { ok: true; redirectTo: string }
@@ -30,5 +34,6 @@ export function resolveInviteRedirect(origin: unknown): InviteRedirectResult {
     };
   }
 
-  return { ok: true, redirectTo: `${requestedOrigin}/definir-senha` };
+  const finalOrigin = requestedOrigin === LEGACY_PROTECTED_ORIGIN ? CANONICAL_ORIGIN : requestedOrigin;
+  return { ok: true, redirectTo: `${finalOrigin}/definir-senha` };
 }
