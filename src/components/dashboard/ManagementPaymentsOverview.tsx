@@ -414,7 +414,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Proc: {cycle.input.numeroProcessoPagamentoSei}</div>
                         )}
                         {cycle.input?.responsavelNome && (
-                          <div style={{ fontSize: '0.75rem', color: '#0284c7', marginTop: '0.15rem' }}>Resp: {cycle.input.responsavelNome}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-info-text)', marginTop: '0.15rem' }}>Resp: {cycle.input.responsavelNome}</div>
                         )}
                       </td>
 

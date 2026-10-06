@@ -173,7 +173,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           <button
             type="button"
             onClick={onOpenAta}
-            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: '#075985', textDecoration: 'underline', cursor: 'pointer' }}
+            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer' }}
           >
             nº {arp.numeroAtaRegistroPreco}
           </button>

@@ -120,7 +120,7 @@ export function getEventTypeDisplay(tipo: ContractEventType): {
     case 'CELEBRACAO':
       return { label: 'Celebração Inicial', icon: FileSignature, color: 'var(--primary)', dotColor: 'var(--primary)' };
     case 'PRORROGACAO':
-      return { label: 'Prorrogação de Vigência', icon: Clock, color: '#0284c7', dotColor: '#0284c7' };
+      return { label: 'Prorrogação de Vigência', icon: Clock, color: 'var(--color-info-text)', dotColor: 'var(--color-info-solid)' };
     case 'REAJUSTE':
       return { label: 'Reajuste Contratual', icon: TrendingUp, color: 'var(--color-success)', dotColor: 'var(--color-success)' };
     case 'REPACTUACAO':
@@ -173,7 +173,7 @@ export function getImpactoDisplay(impacto: ContractEventImpact): {
 } {
   switch (impacto) {
     case 'ALTERA_VIGENCIA':
-      return { label: 'Altera Vigência', bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd' };
+      return { label: 'Altera Vigência', bg: 'var(--color-info-bg)', color: 'var(--color-info-text)', border: 'var(--color-info-border)' };
     case 'ALTERA_VALOR':
       return { label: 'Altera Valor', bg: 'var(--color-success-bg)', color: 'var(--color-success-text)', border: 'var(--color-success-border)' };
     case 'ALTERA_QUANTITATIVO':
@@ -633,7 +633,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
 
                           {/* Impacto em Vigência (se houver) */}
                           {event.vigenciaPosterior && (
-                            <span style={{ color: '#0369a1', backgroundColor: '#f0f9ff', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #bae6fd' }}>
+                            <span style={{ color: 'var(--color-info-text)', backgroundColor: 'var(--color-info-bg)', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid var(--color-info-border)' }}>
                               <strong>Nova Vigência:</strong> {formatDateBR(event.vigenciaPosterior)}
                             </span>
                           )}

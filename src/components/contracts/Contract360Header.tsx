@@ -244,7 +244,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => navigate(buildAtaPath(ataOrigem.numeroAta, ataOrigem.uasg as string))}
-                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: '#075985', textDecoration: 'underline', cursor: 'pointer' }}
+                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer' }}
                   >
                     nº {ataOrigem.numeroAta}
                   </button>

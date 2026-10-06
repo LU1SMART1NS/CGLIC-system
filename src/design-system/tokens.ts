@@ -35,10 +35,10 @@ export const colors = {
 
   // Cores de Marca / Ação Principal
   brand: {
-    primary: '#0284c7', // Sky-600
-    primaryHover: '#0369a1',
-    primaryLight: '#e0f2fe',
-    primaryDark: '#075985',
+    primary: 'var(--primary)',
+    primaryHover: 'var(--primary-hover)',
+    primaryLight: 'var(--primary-light)',
+    primaryDark: 'var(--primary-hover)',
     secondary: '#6366f1', // Indigo-500
     secondaryLight: '#ede9fe',
     secondaryDark: '#4338ca'

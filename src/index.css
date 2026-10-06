@@ -21,40 +21,41 @@
 
   /* Cores semânticas: fonte única. Todo componente deve usar estes tokens, nunca o hex.
      Hoje têm os valores históricos do app; a adoção da paleta gov.br muda só estas linhas. */
-  --color-danger-bg: #fef2f2;
-  --color-danger-bg-strong: #fee2e2;
-  --color-danger-border: #fecaca;
-  --color-danger-solid: #ef4444;
-  --color-danger: #dc2626;
-  --color-danger-text: #b91c1c;
-  --color-danger-text-strong: #991b1b;
+  --color-danger-bg: #fdf2f0;
+  --color-danger-bg-strong: #fbe0dc;
+  --color-danger-border: #f6b2a8;
+  --color-danger-solid: #e52207;
+  --color-danger: #e52207;
+  --color-danger-text: #ca1e06;
+  --color-danger-text-strong: #931604;
 
-  --color-success-bg: #f0fdf4;
-  --color-success-border: #bbf7d0;
-  --color-success-solid: #16a34a;
-  --color-success: #059669;
-  --color-success-text: #15803d;
-  --color-success-text-strong: #166534;
+  --color-success-bg: #f0f8f2;
+  --color-success-bg-strong: #dbeee0;
+  --color-success-border: #a6d5b1;
+  --color-success-solid: #008821;
+  --color-success: #008821;
+  --color-success-text: #007a1e;
+  --color-success-text-strong: #005715;
 
-  --color-warning-bg: #fffbeb;
-  --color-warning-bg-strong: #fef3c7;
-  --color-warning-border: #fde68a;
-  --color-warning-solid: #f59e0b;
-  --color-warning: #d97706;
-  --color-warning-text: #b45309;
-  --color-warning-text-strong: #92400e;
+  --color-warning-bg: #fffbe5;
+  --color-warning-bg-strong: #fff3bf;
+  --color-warning-border: #ffe270;
+  --color-warning-solid: #ffcd07;
+  --color-warning: #a16207;
+  --color-warning-text: #854d0e;
+  --color-warning-text-strong: #713f12;
 
-  --color-info-bg: #eff6ff;
-  --color-info-border: #bfdbfe;
-  --color-info-solid: #3b82f6;
-  --color-info-text: #1d4ed8;
-  --color-info-text-strong: #1e3a8a;
+  --color-info-bg: #f1f5fc;
+  --color-info-border: #adc6ed;
+  --color-info-solid: #155bcb;
+  --color-info-text: #155bcb;
+  --color-info-text-strong: #10479e;
 
-  --color-focus: #0284c7;
+  --color-focus: #c2850c;
   
-  --success: #10b981;
-  --success-bg: #d1fae5;
-  --success-text: #065f46;
+  --success: var(--color-success);
+  --success-bg: var(--color-success-bg-strong);
+  --success-text: var(--color-success-text-strong);
   
   --danger: var(--color-danger-solid);
   --danger-bg: var(--color-danger-bg-strong);
@@ -351,7 +352,7 @@ h1, h2, h3, h4 {
 }
 
 .fill-warning {
-  background: var(--warning);
+  background: var(--color-warning-solid);
 }
 
 .fill-danger {
@@ -927,7 +928,7 @@ h1, h2, h3, h4 {
 .i360-dr { display: grid; grid-template-columns: auto 1fr; gap: 0 14px; align-items: baseline; }
 .i360-dr dt { font-weight: 600; color: #64748b; white-space: nowrap; }
 .i360-dr dd { margin: 0; text-align: right; min-width: 0; overflow-wrap: anywhere; }
-.i360-dr--emphasis dd { font-weight: 700; color: #075985; }
+.i360-dr--emphasis dd { font-weight: 700; color: var(--primary); }
 .i360-dr-missing { font-weight: 400; font-style: italic; color: #94a3b8; }
 .i360-dr-risk { margin-left: 0.5rem; font-weight: 700; color: var(--color-danger-text); }
 @container (max-width: 700px) {
@@ -1055,7 +1056,7 @@ h1, h2, h3, h4 {
    ========================================================================== */
 /* AppButton: hover só com mouse, foco só por teclado */
 .ds-btn { position: relative; }
-.ds-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-btn:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 @media (hover: hover) {
   .ds-btn--secondary:hover:not(:disabled) { background-color: #e2e8f0 !important; }
   .ds-btn--outline:hover:not(:disabled) { background-color: #f8fafc !important; }
@@ -1098,7 +1099,7 @@ h1, h2, h3, h4 {
   border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #0f172a;
 }
 textarea.ds-field__control { resize: vertical; line-height: 1.4; }
-.ds-field__control:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; border-color: var(--color-focus); }
+.ds-field__control:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 1px; border-color: var(--color-focus); }
 .ds-field__control[aria-invalid='true'] { border-color: var(--color-danger); }
 .ds-field__hint { font-size: 0.75rem; color: #64748b; }
 .ds-field__error { font-size: 0.75rem; color: var(--color-danger-text); font-weight: 600; }

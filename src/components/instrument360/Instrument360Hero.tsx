@@ -67,7 +67,7 @@ interface Instrument360HeroProps {
 
 const OBJETO_LIMITE = 220;
 
-const COLORS = { ink: '#0f172a', inkSoft: '#334155', muted: '#64748b', line: '#e2e8f0', surface: '#f8fafc', link: '#075985', brand: 'var(--primary)' };
+const COLORS = { ink: '#0f172a', inkSoft: '#334155', muted: '#64748b', line: '#e2e8f0', surface: '#f8fafc', link: 'var(--primary)', brand: 'var(--primary)' };
 
 /**
  * Cartão único do topo das telas 360 (Ata, Contrato e Item), na mesma ordem nas três:
