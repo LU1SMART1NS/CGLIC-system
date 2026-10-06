@@ -113,6 +113,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
           numeroCompra: arp.numeroCompra,
           anoCompra: arp.anoCompra,
           cnpjs: Array.from(new Set(itens.map((i) => (i.niFornecedor || '').replace(/\D/g, '')).filter(Boolean))),
+          fornecedorNomes: Array.from(new Set(itens.map((i) => i.nomeRazaoSocialFornecedor).filter(Boolean))),
           gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
           objeto: arp.objeto,
           fornecedorNome: itens[0]?.nomeRazaoSocialFornecedor,
@@ -159,7 +160,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   );
 
   const refresh = () => {
-    contratos.refresh();
+    void contratos.refresh();
     atas.reload();
   };
 
@@ -216,7 +217,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
         icon={<Users size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
-            onRefresh={refresh}
+            onRefresh={contratos.podeForcarAtualizacao ? refresh : undefined}
             isRefreshing={contratos.isFetching}
             lastUpdated={contratos.dataUpdatedAt}
             dataTestId="distribuicao-refresh-btn"
@@ -238,7 +239,14 @@ export const DistribuicaoEquipePage: React.FC = () => {
         />
       ) : (
         <>
-          {contratos.isPartial && <ContractsPartialNotice onRetry={() => contratos.refresh()} isRetrying={contratos.isFetching} />}
+          {contratos.isPartial && (
+            <ContractsPartialNotice
+              fontesComFalha={contratos.fontesComFalha}
+              ultimoSucessoEm={typeof contratos.dataUpdatedAt === 'string' ? contratos.dataUpdatedAt : null}
+              onRetry={contratos.podeForcarAtualizacao ? () => void contratos.refresh() : undefined}
+              isRetrying={contratos.isFetching}
+            />
+          )}
 
           <AvisosVinculoBanner podeVer={canAssign} />
 
@@ -276,6 +284,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
               confirmacoes={confirmacoesSemAta}
               podeAgir={canAssign}
               ataDe={ataDe}
+              atas={atasFila}
               itensDaAta={itensDaAta}
               onAtribuir={(lista, done) =>
                 setTransferencia({

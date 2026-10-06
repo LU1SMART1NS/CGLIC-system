@@ -15,6 +15,21 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
+// Situação da sincronização dos contratos (consulta ao banco): fora do teste, carteira em dia.
+vi.mock('../../hooks/useSincronizacaoContratos', () => ({
+  useSincronizacaoContratos: () => ({
+    ultimoSucessoEm: null,
+    nuncaSincronizado: false,
+    incompleta: false,
+    fontesComFalha: [],
+    emAndamentoNoBanco: false,
+    sincronizando: false,
+    podeForcar: false,
+    atualizar: vi.fn(),
+    isAtualizando: false
+  })
+}));
+
 vi.mock('../../hooks/useRefreshItemSaldos', () => ({
   useRefreshItemSaldos: () => ({ refresh: vi.fn(), isRefreshing: false })
 }));
@@ -396,7 +411,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     );
 
     expect(html).toContain('Nenhum instrumento encontrado');
-    expect(html).toContain('Limpar Filtros');
+    expect(html).toContain('Limpar filtros');
   });
 
   it('7. deve renderizar estado de erro explícito quando useManagementDashboard falhar', () => {

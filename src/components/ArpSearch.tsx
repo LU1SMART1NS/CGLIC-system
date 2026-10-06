@@ -16,6 +16,7 @@ import { canFilterByGestor, listGestores, matchesGestorFilter } from './carteira
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
 import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
+import { SincronizacaoFalhaNotice } from './carteira/SincronizacaoFalhaNotice';
 import type { ArpRecord, ArpItemRecord } from '../types';
 
 interface ArpSearchProps {
@@ -45,6 +46,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     isSyncing,
     syncProgress,
     syncError,
+    situacaoSincronizacao,
     triggerSync,
     reload
   } = useAtasPortfolio();
@@ -185,7 +187,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         syncInfo={syncInfo}
         isSyncing={isSyncing}
         syncProgress={syncProgress}
-        onTriggerSync={role === 'gestor_saldos' ? undefined : triggerSync}
+        // A sincronização das atas consulta as APIs do governo: só o coordenador dispara.
+        onTriggerSync={role === 'admin' ? triggerSync : undefined}
       />
 
       {isBusy ? (
@@ -196,6 +199,18 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         </div>
       ) : (
       <>
+      {situacaoSincronizacao.incompleta && !isSyncing && (
+        <SincronizacaoFalhaNotice
+          assunto="das atas"
+          mensagem={situacaoSincronizacao.mensagemFalha}
+          fontesComFalha={situacaoSincronizacao.fontesComFalha}
+          falhaEm={situacaoSincronizacao.falhaEm}
+          ultimoSucessoEm={situacaoSincronizacao.ultimoSucessoEm}
+          onRetry={role === 'admin' ? () => void triggerSync() : undefined}
+          isRetrying={isSyncing}
+        />
+      )}
+
       <ArpPortfolioSummary
         totalAtas={summaryMetrics.total}
         vigentes={summaryMetrics.vigentes}

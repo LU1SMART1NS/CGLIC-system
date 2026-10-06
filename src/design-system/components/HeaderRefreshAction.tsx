@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { AppButton } from './AppButton';
+import { ActionButton } from './ActionButton';
 
 export interface HeaderRefreshActionProps {
-  onRefresh: () => void | Promise<unknown>;
+  /** Sem `onRefresh`, mostra só o indicador "Atualizado em" (perfis que não atualizam os dados). */
+  onRefresh?: () => void | Promise<unknown>;
   isRefreshing?: boolean;
   lastUpdated?: Date | string | number | null;
   syncProgress?: { step?: string; percent?: number } | null;
@@ -37,8 +37,12 @@ export const HeaderRefreshAction: React.FC<HeaderRefreshActionProps> = ({
     return internalTime;
   }, [lastUpdated, internalTime]);
 
-  const formattedTime = React.useMemo(() => {
-    return effectiveDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  // A data vem da última sincronização gravada no banco e pode ser de outro dia: aí mostra o dia também.
+  const updatedLabel = React.useMemo(() => {
+    const hora = effectiveDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (effectiveDate.toDateString() === new Date().toDateString()) return `Atualizado às ${hora}`;
+    const dia = effectiveDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    return `Atualizado em ${dia} às ${hora}`;
   }, [effectiveDate]);
 
   const displayTooltip = tooltipTitle || (
@@ -64,6 +68,8 @@ export const HeaderRefreshAction: React.FC<HeaderRefreshActionProps> = ({
           userSelect: 'none'
         }}
         aria-live="polite"
+        title={onRefresh ? undefined : displayTooltip}
+        data-testid={onRefresh ? undefined : dataTestId && `${dataTestId}-indicador`}
       >
         <span
           style={{
@@ -86,21 +92,23 @@ export const HeaderRefreshAction: React.FC<HeaderRefreshActionProps> = ({
         >
           {isRefreshing
             ? (syncProgress?.percent ? `Sincronizando ${syncProgress.percent}%` : 'Atualizando...')
-            : `Atualizado às ${formattedTime}`}
+            : updatedLabel}
         </span>
       </div>
 
-      <AppButton
-        variant="outline"
-        onClick={onRefresh}
-        disabled={isRefreshing}
-        isLoading={isRefreshing}
-        icon={<RefreshCw size={14} className={isRefreshing ? 'spin-animation' : ''} />}
-        title={displayTooltip}
-        data-testid={dataTestId}
-      >
-        {isRefreshing ? 'Atualizando...' : 'Atualizar'}
-      </AppButton>
+      {onRefresh && (
+        <ActionButton
+          action="sincronizar"
+          label="Atualizar"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          isLoading={isRefreshing}
+          title={displayTooltip}
+          data-testid={dataTestId}
+        >
+          {isRefreshing ? 'Atualizando...' : 'Atualizar'}
+        </ActionButton>
+      )}
     </div>
   );
 };

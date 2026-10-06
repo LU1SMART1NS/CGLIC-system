@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from 'react';
-import { useContractsDashboard, useContractsListPartial } from './useContractsDashboard';
+import { useMemo } from 'react';
+import { useContractsDashboard } from './useContractsDashboard';
+import { useSincronizacaoContratos } from './useSincronizacaoContratos';
 import { useAssignedManagementScope } from './useAssignedManagementScope';
 import { useAllContractManagers } from './useAllContractManagers';
 import { useManagementDashboard } from './useManagementDashboard';
@@ -27,16 +28,16 @@ export function useContractsPortfolio() {
     [dash200330.data, dash200331.data]
   );
   const isLoading = dash200330.isLoading || dash200331.isLoading;
-  const isFetching = dash200330.isFetching || dash200331.isFetching;
-  /** Uma das fontes não respondeu: os números podem estar abaixo do real até a próxima tentativa (automática). */
-  const isPartial = useContractsListPartial([...UASGS]);
+  const sincronizacao = useSincronizacaoContratos();
+  const isFetching = dash200330.isFetching || dash200331.isFetching || sincronizacao.sincronizando;
+  /** A última sincronização de alguma UASG saiu incompleta: os números podem estar abaixo do real. */
+  const isPartial = sincronizacao.incompleta;
   const error = (dash200330.error || dash200331.error) as Error | null;
-  const dataUpdatedAt = Math.max(dash200330.dataUpdatedAt || 0, dash200331.dataUpdatedAt || 0) || undefined;
-  const refresh = useCallback(() => {
-    dash200330.refresh();
-    dash200331.refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  /** Data da última sincronização com as fontes oficiais; antes da primeira, a hora da consulta. */
+  const dataUpdatedAt =
+    sincronizacao.ultimoSucessoEm ?? (Math.max(dash200330.dataUpdatedAt || 0, dash200331.dataUpdatedAt || 0) || undefined);
+  /** Coordenador: atualiza com as fontes oficiais. Demais perfis: relê o banco. */
+  const refresh = sincronizacao.atualizar;
 
   const scope200330 = useAssignedManagementScope(UASGS[0]);
   const scope200331 = useAssignedManagementScope(UASGS[1]);
@@ -54,16 +55,15 @@ export function useContractsPortfolio() {
 
   const managers200330 = useAllContractManagers(UASGS[0]);
   const managers200331 = useAllContractManagers(UASGS[1]);
-  const mgmt200330 = useManagementDashboard({
-    uasg: UASGS[0],
-    assignedContractKeys: scope200330.contractKeys,
-    assignedAtaKeys: scope200330.ataKeys
-  });
-  const mgmt200331 = useManagementDashboard({
-    uasg: UASGS[1],
-    assignedContractKeys: scope200331.contractKeys,
-    assignedAtaKeys: scope200331.ataKeys
-  });
+  // Só consulta depois do escopo do gestor: a chave inclui o escopo, e consultar antes carregava tudo duas vezes.
+  const mgmt200330 = useManagementDashboard(
+    { uasg: UASGS[0], assignedContractKeys: scope200330.contractKeys, assignedAtaKeys: scope200330.ataKeys },
+    { enabled: !scope200330.isLoading }
+  );
+  const mgmt200331 = useManagementDashboard(
+    { uasg: UASGS[1], assignedContractKeys: scope200331.contractKeys, assignedAtaKeys: scope200331.ataKeys },
+    { enabled: !scope200331.isLoading }
+  );
 
   const gestorByContractKey = useMemo(() => {
     const map = new Map<string, string>();
@@ -136,6 +136,10 @@ export function useContractsPortfolio() {
     isLoadingScope,
     isFetching,
     isPartial,
+    /** Fontes que falharam na última sincronização incompleta. */
+    fontesComFalha: sincronizacao.fontesComFalha,
+    /** Coordenador pode forçar a atualização com as fontes oficiais. */
+    podeForcarAtualizacao: sincronizacao.podeForcar,
     error,
     dataUpdatedAt,
     refresh

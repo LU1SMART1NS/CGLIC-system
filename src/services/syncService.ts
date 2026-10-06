@@ -1,206 +1,130 @@
-import { fetchArps, fetchArpItems, enrichArpsBatchWithPncpVigencia } from './api';
-import { cacheArpsInDb, cacheArpItemsInDb } from './dbCacheService';
-import { isSupabaseConfigured } from './supabaseClient';
-import type { FilterParams, SyncMetadata, ArpRecord, ArpItemRecord } from '../types';
+/**
+ * Sincronização das Atas de Registro de Preços (e seus itens) com o Compras.gov.br e o PNCP.
+ *
+ * Mesmo modelo dos contratos (contratosOficiaisService): as telas leem as atas do banco
+ * (atas_registro_preco / itens_ata), e a sincronização roda em segundo plano, uma vez para todos,
+ * sob a trava de sincronizacao_fontes (recurso 'atas'). Só o coordenador força pelo botão.
+ *
+ * Substitui a regra antiga de "sincronizar a cada 3 horas", que guardava o horário no navegador de
+ * cada usuário e só disparava com o banco de atas vazio (na prática, nunca rodava).
+ */
 
-const SYNC_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 Horas
-const SYNC_STORAGE_KEY = 'saldoarp-sync-metadata';
+import { fetchArpsDasFontes, fetchArpItems, limparCachesAtas } from './api';
+import { cacheArpsInDb, cacheArpItemsInDb } from './dbCacheService';
+import {
+  executarComReserva,
+  uasgsSincronizandoAgoraDe,
+  VALIDADE_PADRAO,
+  type ResultadoConcluido,
+  type ResultadoSincronizacao
+} from './sincronizacaoFontesService';
+import type { FilterParams } from '../types';
+
+export const RECURSO_ATAS = 'atas' as const;
+
+/** Janela de vigência consultada no Compras.gov.br. */
+export const JANELA_VIGENCIA_ATAS = {
+  dataVigenciaInicialMin: '2024-01-01',
+  dataVigenciaInicialMax: '2028-08-21'
+};
+
+/**
+ * Atas cujos itens são consultados ao mesmo tempo. Com 5, o Compras.gov.br recusava dezenas de
+ * consultas por excesso de requisições (429); as consultas repetidas agora são reaproveitadas.
+ */
+const ITENS_EM_PARALELO = 2;
+
+export const FONTE_ITENS_ATAS = 'Itens das atas';
 
 export interface SyncProgressCallback {
   (progress: { step: string; percent: number; current?: number; total?: number }): void;
 }
 
-let isSyncingInProgress = false;
-
 /**
- * Obtém os metadados da última sincronização
+ * Consulta as atas e os itens nas fontes oficiais e grava no banco. Não apaga nada: ata ou item que
+ * some de uma resposta continua no banco. Lança erro se a lista de atas não vier ou não for gravada.
  */
-export function getLastSyncMetadata(): SyncMetadata {
-  try {
-    const raw = localStorage.getItem(SYNC_STORAGE_KEY);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch {}
-
-  return {
-    isCachedInDb: isSupabaseConfigured,
-    status: 'IDLE'
-  };
-}
-
-/**
- * Salva metadados da sincronização
- */
-export function saveSyncMetadata(metadata: Partial<SyncMetadata>): void {
-  try {
-    const current = getLastSyncMetadata();
-    const updated: SyncMetadata = {
-      ...current,
-      ...metadata,
-      ultimoSyncEm: metadata.ultimoSyncEm || new Date().toISOString()
-    };
-    localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(updated));
-  } catch {}
-}
-
-/**
- * Executa a sincronização completa das Atas e Itens da UASG
- * Consulta Compras.gov + PNCP e persiste no banco Supabase
- */
-export async function runFullSync(
-  params: FilterParams = {
-    dataVigenciaInicialMin: '2024-01-01',
-    dataVigenciaInicialMax: '2028-08-21',
-    codigoUnidadeGerenciadora: '200331',
-    numeroAtaRegistroPreco: ''
-  },
+export async function coletarEGravarAtas(
+  params: FilterParams,
   onProgress?: SyncProgressCallback
-): Promise<{
-  success: boolean;
-  totalAtas: number;
-  totalItens: number;
-  arps?: ArpRecord[];
-  itemsByAta?: Record<string, ArpItemRecord[]>;
-  error?: string;
-}> {
-  if (isSyncingInProgress) {
-    return { success: false, totalAtas: 0, totalItens: 0, error: 'Sincronização já em andamento' };
+): Promise<ResultadoConcluido> {
+  onProgress?.({ step: 'Consultando atas de registro de preços...', percent: 10 });
+
+  // Lista das atas, já com as vigências do PNCP. Falha da fonte vira erro (não cai para o banco).
+  const atas = await fetchArpsDasFontes(params);
+  if (atas.length === 0) {
+    return { status: 'SUCESSO', total: 0, fontesComFalha: [] };
   }
 
-  isSyncingInProgress = true;
-  saveSyncMetadata({ status: 'SYNCING', mensagem: 'Iniciando sincronização com APIs do governo...' });
+  onProgress?.({ step: 'Gravando atas...', percent: 35, current: 0, total: atas.length });
+  const gravou = await cacheArpsInDb(atas);
+  if (!gravou) throw new Error('Não foi possível gravar as atas no banco.');
 
-  try {
-    onProgress?.({ step: 'Consultando Atas de Registro de Preço...', percent: 15 });
+  let falhasConsulta = 0;
+  let falhasGravacao = 0;
+  for (let i = 0; i < atas.length; i += ITENS_EM_PARALELO) {
+    const lote = atas.slice(i, i + ITENS_EM_PARALELO);
+    const resultados = await Promise.all(
+      lote.map(async (arp): Promise<'ok' | 'consulta' | 'gravacao'> => {
+        let itens;
+        try {
+          itens = await fetchArpItems(arp.dataVigenciaInicial, arp.codigoUnidadeGerenciadora, arp.numeroAtaRegistroPreco, arp, { estrito: true });
+        } catch (err) {
+          console.warn(`[sincronizacao] itens da ata ${arp.numeroAtaRegistroPreco} não consultados:`, err);
+          return 'consulta';
+        }
+        // Ata sem itens nas fontes não é falha (ex.: compra com vários fornecedores sem indicação de qual é o da ata).
+        if (!itens.resultado || itens.resultado.length === 0) return 'ok';
+        const gravou = await cacheArpItemsInDb(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, itens.resultado);
+        return gravou ? 'ok' : 'gravacao';
+      })
+    );
+    falhasConsulta += resultados.filter((r) => r === 'consulta').length;
+    falhasGravacao += resultados.filter((r) => r === 'gravacao').length;
 
-    // 1. Busca lista de Atas
-    const arpsResponse = await fetchArps({
-      ...params,
-      numeroAtaRegistroPreco: '' // sincroniza todas da UASG
+    const feitas = Math.min(i + lote.length, atas.length);
+    onProgress?.({
+      step: `Sincronizando itens (${feitas}/${atas.length})...`,
+      percent: Math.min(95, Math.round(35 + (feitas / atas.length) * 60)),
+      current: feitas,
+      total: atas.length
     });
-
-    const arpsList = arpsResponse.resultado || [];
-    if (arpsList.length === 0) {
-      saveSyncMetadata({
-        status: 'SUCCESS',
-        totalAtas: 0,
-        totalItens: 0,
-        mensagem: 'Nenhuma ata encontrada para sincronizar.'
-      });
-      isSyncingInProgress = false;
-      return { success: true, totalAtas: 0, totalItens: 0, arps: [], itemsByAta: {} };
-    }
-
-    onProgress?.({ step: 'Sincronizando vigências PNCP...', percent: 35, current: arpsList.length, total: arpsList.length });
-
-    // 2. Enriquece vigências PNCP
-    const enrichedArps = await enrichArpsBatchWithPncpVigencia(arpsList);
-
-    // 3. Salva atas no Supabase
-    await cacheArpsInDb(enrichedArps);
-
-    onProgress?.({ step: 'Carregando itens das atas...', percent: 50, current: 0, total: enrichedArps.length });
-
-    // 4. Busca e armazena itens das atas (com concorrência controlada)
-    let totalItensCount = 0;
-    const itemsByAta: Record<string, ArpItemRecord[]> = {};
-    const batchSize = 5;
-    for (let i = 0; i < enrichedArps.length; i += batchSize) {
-      const chunk = enrichedArps.slice(i, i + batchSize);
-      await Promise.allSettled(
-        chunk.map(async (arp) => {
-          try {
-            const itemsRes = await fetchArpItems(
-              arp.dataVigenciaInicial,
-              arp.codigoUnidadeGerenciadora,
-              arp.numeroAtaRegistroPreco,
-              arp
-            );
-            if (itemsRes.resultado && itemsRes.resultado.length > 0) {
-              const ataKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
-              itemsByAta[ataKey] = itemsRes.resultado;
-              totalItensCount += itemsRes.resultado.length;
-              await cacheArpItemsInDb(
-                arp.numeroAtaRegistroPreco,
-                arp.codigoUnidadeGerenciadora,
-                itemsRes.resultado
-              );
-            }
-          } catch (e) {
-            console.warn(`Falha ao sincronizar itens da ata ${arp.numeroAtaRegistroPreco}:`, e);
-          }
-        })
-      );
-
-      const progressPercent = Math.min(95, Math.round(50 + ((i + chunk.length) / enrichedArps.length) * 45));
-      onProgress?.({
-        step: `Sincronizando itens (${i + chunk.length}/${enrichedArps.length})...`,
-        percent: progressPercent,
-        current: i + chunk.length,
-        total: enrichedArps.length
-      });
-    }
-
-    saveSyncMetadata({
-      status: 'SUCCESS',
-      totalAtas: enrichedArps.length,
-      totalItens: totalItensCount,
-      isCachedInDb: true,
-      ultimoSyncEm: new Date().toISOString(),
-      mensagem: `Sincronização concluída com sucesso: ${enrichedArps.length} atas e ${totalItensCount} itens.`
-    });
-
-    onProgress?.({ step: 'Sincronização concluída!', percent: 100, current: enrichedArps.length, total: enrichedArps.length });
-
-    isSyncingInProgress = false;
-    return {
-      success: true,
-      totalAtas: enrichedArps.length,
-      totalItens: totalItensCount,
-      arps: enrichedArps,
-      itemsByAta
-    };
-  } catch (error: any) {
-    console.error('Erro na sincronização completa:', error);
-    saveSyncMetadata({
-      status: 'ERROR',
-      mensagem: error.message || 'Erro durante a sincronização com as APIs governamentais.'
-    });
-    isSyncingInProgress = false;
-    return { success: false, totalAtas: 0, totalItens: 0, error: error.message };
   }
+
+  onProgress?.({ step: 'Sincronização concluída!', percent: 100, current: atas.length, total: atas.length });
+  const plural = (n: number) => `${n} ${n === 1 ? 'ata' : 'atas'}`;
+  const problemas = [
+    falhasConsulta > 0 ? `o Compras.gov.br não entregou os itens de ${plural(falhasConsulta)}` : '',
+    falhasGravacao > 0 ? `não foi possível gravar os itens de ${plural(falhasGravacao)} no banco` : ''
+  ].filter(Boolean);
+  return problemas.length > 0
+    ? {
+        status: 'PARCIAL',
+        total: atas.length,
+        fontesComFalha: [FONTE_ITENS_ATAS],
+        mensagem: `${problemas.join(' e ')}.`
+      }
+    : { status: 'SUCESSO', total: atas.length, fontesComFalha: [] };
 }
 
 /**
- * Verifica se a sincronização periódica (a cada 3 horas) deve ser disparada
+ * Sincroniza as atas da UASG com as fontes oficiais, sob a trava do banco.
+ * Devolve NAO_RESERVADO quando outra pessoa já está sincronizando ou os dados ainda estão na validade
+ * (sem forçar). `forcar` é só para o coordenador; a função do banco recusa para os outros perfis.
  */
-export async function checkAndTriggerAutoSync(
-  uasg: string = '200331',
-  onSyncDone?: () => void
-): Promise<boolean> {
-  const meta = getLastSyncMetadata();
-  const lastSyncTime = meta.ultimoSyncEm ? new Date(meta.ultimoSyncEm).getTime() : 0;
-  const now = Date.now();
+export async function sincronizarAtas(
+  uasg: string,
+  opts: { forcar?: boolean; onProgress?: SyncProgressCallback } = {}
+): Promise<ResultadoSincronizacao> {
+  const cleanUasg = (uasg || '').trim();
+  return executarComReserva(RECURSO_ATAS, cleanUasg, { forcar: opts.forcar, validade: VALIDADE_PADRAO }, async () => {
+    // Sem isso, uma segunda sincronização na mesma sessão reaproveitaria as respostas da primeira.
+    limparCachesAtas();
+    return coletarEGravarAtas({ ...JANELA_VIGENCIA_ATAS, codigoUnidadeGerenciadora: cleanUasg, numeroAtaRegistroPreco: '' }, opts.onProgress);
+  });
+}
 
-  const isExpired = now - lastSyncTime > SYNC_INTERVAL_MS;
-
-  if (isExpired && !isSyncingInProgress) {
-    console.info(`[AutoSync] Última sincronização há mais de 3 horas (${new Date(lastSyncTime).toLocaleString()}). Iniciando sync em background...`);
-    runFullSync({
-      dataVigenciaInicialMin: '2024-01-01',
-      dataVigenciaInicialMax: '2028-08-21',
-      codigoUnidadeGerenciadora: uasg,
-      numeroAtaRegistroPreco: ''
-    }).then((res) => {
-      if (res.success && onSyncDone) {
-        onSyncDone();
-      }
-    }).catch(err => {
-      console.warn('[AutoSync] Falha no auto-sync:', err);
-    });
-    return true;
-  }
-
-  return false;
+/** UASGs sincronizando atas neste navegador agora. */
+export function uasgsSincronizandoAtasAgora(): readonly string[] {
+  return uasgsSincronizandoAgoraDe(RECURSO_ATAS);
 }

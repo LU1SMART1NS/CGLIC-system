@@ -20,6 +20,21 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
+// Situação da sincronização dos contratos (consulta ao banco): fora do teste, carteira em dia.
+vi.mock('../../hooks/useSincronizacaoContratos', () => ({
+  useSincronizacaoContratos: () => ({
+    ultimoSucessoEm: null,
+    nuncaSincronizado: false,
+    incompleta: false,
+    fontesComFalha: [],
+    emAndamentoNoBanco: false,
+    sincronizando: false,
+    podeForcar: false,
+    atualizar: vi.fn(),
+    isAtualizando: false
+  })
+}));
+
 // Unidades internas dos contratos vêm de consultas à parte (alocações e vínculos): aqui ficam fora do teste.
 vi.mock('../../hooks/useCarteiraItens', () => ({
   useCarteiraItens: () => ({ unidades: [], unidadesDoContrato: new Map(), rows: [], resumoPorAta: new Map(), isLoading: false })
@@ -270,7 +285,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     );
 
     expect(html).toContain('Nenhum contrato corresponde aos filtros aplicados.');
-    expect(html).toContain('Limpar Filtros');
+    expect(html).toContain('Limpar filtros');
   });
 
   it('8. deve renderizar estado de erro explícito com mensagem quando a query falhar', () => {

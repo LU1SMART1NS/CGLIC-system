@@ -5,6 +5,7 @@ import { useManagementDashboard } from '../../hooks/useManagementDashboard';
 import { useAllContractManagers } from '../../hooks/useAllContractManagers';
 import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
 import { useRefreshItemSaldos } from '../../hooks/useRefreshItemSaldos';
+import { useSincronizacaoContratos } from '../../hooks/useSincronizacaoContratos';
 import { useAuth } from '../../context/AuthContext';
 import { GestaoInstrumentosHeader } from './GestaoInstrumentosHeader';
 import { GestaoInstrumentosSummaryCards, type GestaoInstrumentosCardId } from './GestaoInstrumentosSummaryCards';
@@ -70,16 +71,15 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const scope200330 = useAssignedManagementScope(UASGS[0]);
   const scope200331 = useAssignedManagementScope(UASGS[1]);
 
-  const dash200330 = useManagementDashboard({
-    uasg: UASGS[0],
-    assignedContractKeys: scope200330.contractKeys,
-    assignedAtaKeys: scope200330.ataKeys
-  });
-  const dash200331 = useManagementDashboard({
-    uasg: UASGS[1],
-    assignedContractKeys: scope200331.contractKeys,
-    assignedAtaKeys: scope200331.ataKeys
-  });
+  // Só consulta depois do escopo do gestor: a chave inclui o escopo, e consultar antes carregava tudo duas vezes.
+  const dash200330 = useManagementDashboard(
+    { uasg: UASGS[0], assignedContractKeys: scope200330.contractKeys, assignedAtaKeys: scope200330.ataKeys },
+    { enabled: !scope200330.isLoading }
+  );
+  const dash200331 = useManagementDashboard(
+    { uasg: UASGS[1], assignedContractKeys: scope200331.contractKeys, assignedAtaKeys: scope200331.ataKeys },
+    { enabled: !scope200331.isLoading }
+  );
   const dashboards = [dash200330, dash200331];
 
   // Aguarda também os gestores carregarem antes de liberar a tela: evita
@@ -93,12 +93,14 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const dataUpdatedAt = Math.max(...dashboards.map((d) => d.dataUpdatedAt || 0)) || undefined;
   // Mantém em dia a quantidade contratada dos itens (base do saldo SENASP) que este painel lê do banco.
   const itemSaldos = useRefreshItemSaldos();
+  // Coordenador: atualiza os contratos com as fontes oficiais. Demais perfis: relê o banco.
+  // Nos dois casos o painel é recarregado (a atualização invalida o read model).
+  const sincronizacao = useSincronizacaoContratos();
   const refetch = useCallback(() => {
     void itemSaldos.refresh();
-    dash200330.refetch();
-    dash200331.refetch();
+    void sincronizacao.atualizar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sincronizacao.atualizar]);
 
   // Gestor de Saldo (domínio de alocações, sem contratos): enxerga só os alertas de saldo das Atas.
   const { role } = useAuth();
@@ -269,9 +271,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <GestaoInstrumentosHeader
-        onRefresh={refetch}
-        isRefreshing={isLoading || isFetching || itemSaldos.isRefreshing}
-        lastUpdated={dataUpdatedAt}
+        // Só o coordenador atualiza com as fontes oficiais; os demais perfis já leem o banco atualizado.
+        onRefresh={sincronizacao.podeForcar ? refetch : undefined}
+        isRefreshing={isLoading || isFetching || itemSaldos.isRefreshing || sincronizacao.sincronizando}
+        lastUpdated={sincronizacao.ultimoSucessoEm ?? dataUpdatedAt}
       />
 
       <GestaoInstrumentosSummaryCards
