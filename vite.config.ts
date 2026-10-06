@@ -38,6 +38,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api-contratos-gov/, '')
+      },
+      '/api-sta': {
+        target: 'https://sta.api.gov.br',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api-sta/, '')
       }
     }
   }

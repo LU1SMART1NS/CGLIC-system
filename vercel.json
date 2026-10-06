@@ -13,6 +13,10 @@
       "destination": "https://contratos.comprasnet.gov.br/:path*"
     },
     {
+      "source": "/api-sta/:path*",
+      "destination": "https://sta.api.gov.br/:path*"
+    },
+    {
       "source": "/((?!assets/|favicon|logo|icons).*)",
       "destination": "/index.html"
     }

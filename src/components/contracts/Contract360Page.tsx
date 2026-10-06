@@ -4,6 +4,7 @@ import { useBackTarget } from '../../hooks/useDetailOrigin';
 import {
   AlertTriangle,
   DollarSign,
+  FileText,
   History,
   ListTodo,
   Package,
@@ -25,6 +26,7 @@ import { ContractHealthStrip } from './ContractHealthStrip';
 import { useContractActionQueue } from '../../hooks/useContractActionQueue';
 import { ContractPaymentFollowUpSection } from './ContractPaymentFollowUpSection';
 import { ContractFinancialExecutionSection } from './ContractFinancialExecutionSection';
+import { ContractFaturasSection } from './ContractFaturasSection';
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
 import { ContractItemsSection } from './ContractItemsSection';
@@ -217,6 +219,17 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
             icon={DollarSign}
           >
             <ContractPaymentFollowUpSection contract={contract} contractKey={resolvedContractKey} />
+          </InstrumentSection>
+        )}
+
+        {activeTab === 'pagamentos' && (
+          <InstrumentSection
+            id="contract-faturas-section"
+            title="Faturas e ordens bancárias"
+            subtitle="Faturas no Contratos.gov.br, liquidação no SIAFI e pagamento no Tesouro (dados oficiais, atualizados pelo servidor)"
+            icon={FileText}
+          >
+            <ContractFaturasSection contractKey={resolvedContractKey} />
           </InstrumentSection>
         )}
 

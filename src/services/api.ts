@@ -1185,6 +1185,48 @@ export async function fetchContratosGovEmpenhos(
 }
 
 /**
+ * Faturas (instrumentos de cobrança) do contrato no Contratos.gov.br.
+ * Endpoint aberto: GET /api/contrato/{contrato_id}/faturas. Lança erro se a fonte falhar; lista vazia só
+ * quando ela responde que o contrato não tem fatura.
+ */
+export async function fetchContratosGovFaturas(contratoId: string | number): Promise<any[]> {
+  const res = await fetchComTempoLimite(
+    `/api-contratos-gov/api/contrato/${contratoId}/faturas`,
+    TEMPO_LIMITE_EMPENHOS_MS,
+    'Contratos.gov.br'
+  );
+  if (!res.ok) {
+    throw new Error(`Contratos.gov.br respondeu ${res.status} ao listar as faturas do contrato (id ${contratoId}).`);
+  }
+  const data = await res.json().catch(() => null);
+  if (!Array.isArray(data)) {
+    throw new Error(`Contratos.gov.br devolveu um formato inesperado para as faturas do contrato (id ${contratoId}).`);
+  }
+  return data;
+}
+
+/**
+ * Ordens bancárias de uma nota de pagamento (NP) no Tesouro Nacional (STA).
+ * Endpoint aberto: GET https://sta.api.gov.br/api/ordembancaria/documento/{UG}{gestão}{NP}; a gestão das
+ * UASGs da CGLIC é 00001 (com 30911 a consulta volta vazia). Lista vazia: a NP ainda não foi paga.
+ */
+export async function fetchOrdensBancariasDaNp(ug: string, np: string, gestao = '00001'): Promise<any[]> {
+  const res = await fetchComTempoLimite(
+    `/api-sta/api/ordembancaria/documento/${ug}${gestao}${np}`,
+    TEMPO_LIMITE_EMPENHOS_MS,
+    'Tesouro (STA)'
+  );
+  if (!res.ok) {
+    throw new Error(`Tesouro (STA) respondeu ${res.status} ao consultar as ordens bancárias da ${np}.`);
+  }
+  const data = await res.json().catch(() => null);
+  if (!Array.isArray(data)) {
+    throw new Error(`Tesouro (STA) devolveu um formato inesperado para as ordens bancárias da ${np}.`);
+  }
+  return data;
+}
+
+/**
  * Consulta o histórico do contrato (celebração, termos aditivos e apostilamentos) no Contratos.gov.br
  * Endpoint: GET /api/contrato/{contrato_id}/historico
  */

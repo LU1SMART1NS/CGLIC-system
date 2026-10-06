@@ -137,7 +137,10 @@ Decisões tomadas na implementação: consultar as faturas dos 687 contratos ven
 11. Lote por UASG (incluir 200330) e critério de inclusão "vigente OU com fatura nos últimos 12 meses" em vez de só `statusVigencia`.
 12. Mover o lote para a Edge Function. Pré-requisito: as RPCs de empenho usam `has_role`, que falha com service role (`auth.uid()` nulo). A migration 72 já avisa que isso precisa de adaptação.
 
-### Fase 5: novo elo Fatura → NP → OB (dados que o sistema ainda não lê)
+### Fase 5: novo elo Fatura → NP → OB (implementada na branch feat/empenhos-sync-fase-5)
+
+Medido na implementação (06/10/2026): 8.733 faturas em 512 contratos, 1.860 NPs distintas; 94% de uma amostra aleatória de 120 NPs tem OB na gestão 00001 (a 30911 nunca responde). Duas regras saíram dos dados e mudaram o desenho: 27% das NPs (498) juntam faturas de mais de um contrato, então o "pago" de cada contrato é a soma das faturas dele com OB válida, nunca o valor da OB; e a OB cancelada vem com `cancelamentoob = '1'` e é reemitida com outro número. A fatura liga ao empenho pelo id do Contratos.gov.br (`dados_empenho[].id_empenho = empenhos.identificador_fonte`, único no banco), e entre os contratos já sincronizados nenhuma fatura cita NE sem vínculo. O servidor tem os recursos `faturas` e `ordens_bancarias`, por UASG; o Contrato 360 mostra as faturas na aba Pagamentos.
+
 
 `GET /api/contrato/{id}/faturas` é aberto e rápido. Cada fatura traz `dados_empenho[] {id_empenho, numero_empenho, valor_empenho}`, `data_liquidacao`, `valor`, `situacao` ("Siafi Apropriado") e `sfadrao_id` (a NP). `GET https://sta.api.gov.br/api/ordembancaria/documento/{UG}{gestão}{NP}` é aberto e devolve a OB com valor, data, banco, agência, conta e o empenho.
 
