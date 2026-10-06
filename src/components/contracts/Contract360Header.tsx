@@ -3,7 +3,7 @@ import { useBackTarget, useNavigateWithOrigin } from '../../hooks/useDetailOrigi
 import { ExternalLink } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import { useSyncContractEmpenhos } from '../../hooks/useSyncContractEmpenhos';
-import { mensagemDoResultado, pendenciasPncp } from '../../services/contratoEmpenhosSincronizacaoService';
+import { mensagemDoResultado, pendenciasPncp, avisoVinculosRemovidos } from '../../services/contratoEmpenhosSincronizacaoService';
 import { useAuth } from '../../context/AuthContext';
 import type { OrchestrationStatus } from '../../types/empenhoSync';
 import { useContractManager } from '../../hooks/useContractManager';
@@ -124,14 +124,15 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
 
   // Conferência com o PNCP: empenho que ele lista e o Contratos.gov.br não (nada do PNCP é gravado).
   const avisosPncp = syncMutation.data ? pendenciasPncp(syncMutation.data) : [];
-  const pncpResumo = avisosPncp.length > 0 ? ` Conferência com o PNCP: ${avisosPncp.join(' ')}` : '';
+  const removidos = syncMutation.data ? avisoVinculosRemovidos(syncMutation.data) : undefined;
+  const pncpResumo = [removidos, ...avisosPncp].filter(Boolean).map((a) => ` ${a}`).join('');
 
   // Feedback operacional da sincronização de empenhos
   const getFeedbackConfig = (status?: OrchestrationStatus): { tone: NoticeBarTone; message: string } => {
     switch (status) {
       case 'SUCESSO':
         return {
-          tone: (itensRefresh && itensRefresh.falhas.length > 0) || avisosPncp.length > 0 ? 'warning' : 'success',
+          tone: (itensRefresh && itensRefresh.falhas.length > 0) || avisosPncp.length > 0 || removidos ? 'warning' : 'success',
           message: `Sincronização concluída. ${
             syncMutation.data?.empenhos_persistidos ?? syncMutation.data?.empenhos_encontrados ?? 0
           } empenho(s) processado(s) e atualizado(s) com sucesso.${pncpResumo}${itensResumo}`

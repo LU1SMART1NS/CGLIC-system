@@ -53,6 +53,8 @@ export interface BatchSyncSummary {
   empenhosPersistidos: number;
   /** Contratos com empenho no PNCP que não está no Contratos.gov.br (conferência; nada é gravado). */
   divergentesPncp: BatchSyncDivergenciaPncp[];
+  /** Vínculos removidos porque o Contratos.gov.br não lista mais a NE no contrato. */
+  vinculosRemovidos: number;
   /** Contratos que passaram por uma segunda tentativa. */
   novasTentativas: number;
   cancelado: boolean;
@@ -103,6 +105,7 @@ export function resumirLote(
     comErro: 0,
     empenhosPersistidos: 0,
     divergentesPncp: [],
+    vinculosRemovidos: 0,
     novasTentativas,
     cancelado,
     falhas: []
@@ -111,6 +114,7 @@ export function resumirLote(
   for (const { contract, contractKey, result } of resultados) {
     const situacao = situacaoDoResultado(result);
     summary.empenhosPersistidos += result.empenhos_persistidos || 0;
+    summary.vinculosRemovidos += result.vinculos_contrato_removidos || 0;
     const avisosPncp = pendenciasPncp(result).filter((m) => !m.startsWith('Conferência com o PNCP não feita'));
     if (avisosPncp.length > 0) {
       summary.divergentesPncp.push({

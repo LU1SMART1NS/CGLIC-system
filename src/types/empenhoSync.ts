@@ -113,6 +113,8 @@ export interface EmpenhoSyncSummary {
   total_conflitos: number;
   erros: Array<{ canonical_key?: string; erro: string }>;
   reconciliados: EmpenhoReconciliado[];
+  /** UUID gravado de cada empenho, por chave canônica (só os que foram gravados). */
+  ids_por_chave?: Record<string, string>;
 }
 
 // -----------------------------------------------------------------------------
@@ -192,6 +194,12 @@ export interface OrchestrationResult {
   empenhos_atualizados: number;
   vinculos_item_criados: number;
   vinculos_contrato_criados: number;
+  /** Vínculos com valor alterado (fluxo do contrato, substituição do conjunto). */
+  vinculos_contrato_atualizados?: number;
+  /** Vínculos removidos porque a fonte não lista mais a NE no contrato. */
+  vinculos_contrato_removidos?: number;
+  /** Números das NEs desvinculadas. */
+  vinculos_removidos_numeros?: string[];
   divergencias: ConflitoCampo[];
   pendencias: VinculoPendente[];
   erros: Array<{ origem?: string; erro: string }>;

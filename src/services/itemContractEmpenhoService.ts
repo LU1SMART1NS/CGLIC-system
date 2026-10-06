@@ -92,7 +92,8 @@ async function linkEmpenhoToContract(contractKey: string, empenhoId: string, val
   const { error } = await supabase.rpc('link_empenho_to_contract_atomic', {
     p_contract_key: contractKey,
     p_empenho_id: empenhoId,
-    p_valor_vinculado: valor && valor > 0 ? valor : null
+    // 0 é valor (NE anulada): só a ausência vira NULL, que mantém o valor anterior.
+    p_valor_vinculado: valor ?? null
   });
   // Sem o vínculo, a aba Financeiro do contrato não mostra o empenho: interrompe antes de mexer no item.
   if (error) {

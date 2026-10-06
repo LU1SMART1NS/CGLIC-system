@@ -204,6 +204,16 @@ export function resolveContractKey(
 }
 
 /**
+ * Número do contrato para exibição a partir da chave canônica: "200331-00005-2017" → "00005/2017";
+ * "200331-NE00171-2021" → "2021NE00171". Devolve a própria chave se ela não estiver no formato.
+ */
+export function numeroDaChave(contractKey: string): string {
+  const m = String(contractKey ?? '').match(/^\d{6}-(NE)?(\d{5})-(\d{4})$/);
+  if (!m) return contractKey;
+  return m[1] ? `${m[3]}NE${m[2]}` : `${m[2]}/${m[3]}`;
+}
+
+/**
  * Chave de gestão de um contrato já mapeado: o `id` do registro (que os mapeamentos montam com
  * resolveContractKey) e, se faltar, a mesma derivação canônica. Vazia quando não dá para derivar.
  * Use esta função em vez de montar `${uasg}-${numero}-${ano}` no ponto de uso.

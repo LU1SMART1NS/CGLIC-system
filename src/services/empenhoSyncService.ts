@@ -103,8 +103,17 @@ export async function saveEmpenhoSoberanoM17(empenho: EmpenhoSoberanoInput): Pro
 /**
  * Persiste um único empenho reconciliado utilizando exclusivamente as RPCs M17
  */
+export interface PersistOptions {
+  /**
+   * Vincula cada empenho aos contratos dele, um por vez (padrão). O fluxo do contrato desliga e grava o
+   * conjunto inteiro de uma vez com syncContractEmpenhosM17, que também remove os ausentes.
+   */
+  vincularContratos?: boolean;
+}
+
 export async function persistReconciledEmpenhoM17(
-  reconciled: EmpenhoReconciliado
+  reconciled: EmpenhoReconciliado,
+  opts: PersistOptions = {}
 ): Promise<{
   success: boolean;
   empenho_id: string;
@@ -150,10 +159,11 @@ export async function persistReconciledEmpenhoM17(
   }
 
   // 3. Vínculo Financeiro de Lastro com Contratos (M17: link_empenho_to_contract_atomic)
-  for (const contractLink of reconciled.contract_links) {
+  for (const contractLink of opts.vincularContratos === false ? [] : reconciled.contract_links) {
     const { error: linkContractError } = await supabase.rpc('link_empenho_to_contract_atomic', {
       p_contract_key: contractLink.contract_key,
       p_empenho_id: empenhoId,
+      // 0 é valor (NE anulada): só undefined vira NULL, que mantém o valor anterior.
       p_valor_vinculado: contractLink.valor_vinculado ?? null
     });
 
@@ -181,8 +191,10 @@ export async function persistReconciledEmpenhoM17(
  * Executa o sync em lote de uma lista de empenhos reconciliados
  */
 export async function syncReconciledBatch(
-  reconciledList: EmpenhoReconciliado[]
+  reconciledList: EmpenhoReconciliado[],
+  opts: PersistOptions = {}
 ): Promise<EmpenhoSyncSummary> {
+  const idsPorChave: Record<string, string> = {};
   let totalSalvos = 0;
   let totalItensVinculados = 0;
   let totalContratosVinculados = 0;
@@ -192,8 +204,9 @@ export async function syncReconciledBatch(
   for (const rec of reconciledList) {
     totalConflitos += rec.conflitos.length;
     try {
-      const result = await persistReconciledEmpenhoM17(rec);
+      const result = await persistReconciledEmpenhoM17(rec, opts);
       if (result.success) {
+        idsPorChave[rec.canonical_key] = result.empenho_id;
         totalSalvos++;
         totalItensVinculados += result.items_linked;
         totalContratosVinculados += result.contracts_linked;
@@ -216,7 +229,75 @@ export async function syncReconciledBatch(
     total_contratos_vinculados: totalContratosVinculados,
     total_conflitos: totalConflitos,
     erros,
-    reconciliados: reconciledList
+    reconciliados: reconciledList,
+    ids_por_chave: idsPorChave
+  };
+}
+
+export interface SyncContractEmpenhosRpcResult {
+  inseridos: number;
+  atualizados: number;
+  removidos: number;
+  removidos_numeros: string[];
+  /** Vínculos que não foram removidos porque a fonte devolveu lista vazia. */
+  remocao_bloqueada: number;
+}
+
+/** A RPC não existe no banco (migration ainda não aplicada): PostgREST responde PGRST202. */
+export function rpcInexistente(err: any): boolean {
+  const details = err?.details ?? err;
+  return details?.code === 'PGRST202' || /Could not find the function/i.test(String(details?.message ?? err?.message ?? ''));
+}
+
+/**
+ * Vincula os empenhos ao contrato um por vez (link_empenho_to_contract_atomic), sem remover nada.
+ * Usado enquanto a migration 81 não está aplicada. Devolve as falhas.
+ */
+export async function vincularEmpenhosAoContratoUmAUm(
+  contractKey: string,
+  empenhos: Array<{ empenho_id: string; valor_vinculado: number; numero?: string }>
+): Promise<{ vinculados: number; falhas: string[] }> {
+  if (!isSupabaseConfigured || !supabase) return { vinculados: 0, falhas: [] };
+  let vinculados = 0;
+  const falhas: string[] = [];
+  for (const e of empenhos) {
+    const { error } = await supabase.rpc('link_empenho_to_contract_atomic', {
+      p_contract_key: contractKey,
+      p_empenho_id: e.empenho_id,
+      p_valor_vinculado: e.valor_vinculado
+    });
+    if (error) {
+      falhas.push(`Empenho ${e.numero ?? e.empenho_id} gravado, mas não vinculado ao contrato ${contractKey}: ${mapPostgresErrorToAppError(error).message}`);
+    } else {
+      vinculados++;
+    }
+  }
+  return { vinculados, falhas };
+}
+
+/**
+ * Grava de uma vez o conjunto de empenhos do contrato (migration 81: sync_contract_empenhos_atomic):
+ * insere, atualiza o valor (inclusive para 0) e, com `removerAusentes`, remove os que não vieram.
+ * Devolve null sem Supabase configurado; lança o erro da RPC já traduzido.
+ */
+export async function syncContractEmpenhosM17(
+  contractKey: string,
+  empenhos: Array<{ empenho_id: string; valor_vinculado: number }>,
+  removerAusentes: boolean
+): Promise<SyncContractEmpenhosRpcResult | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase.rpc('sync_contract_empenhos_atomic', {
+    p_contract_key: contractKey,
+    p_empenhos: empenhos,
+    p_remover_ausentes: removerAusentes
+  });
+  if (error) throw Object.assign(mapPostgresErrorToAppError(error), { details: error });
+  return {
+    inseridos: Number(data?.inseridos ?? 0),
+    atualizados: Number(data?.atualizados ?? 0),
+    removidos: Number(data?.removidos ?? 0),
+    removidos_numeros: Array.isArray(data?.removidos_numeros) ? data.removidos_numeros.map(String) : [],
+    remocao_bloqueada: Number(data?.remocao_bloqueada ?? 0)
   };
 }
 

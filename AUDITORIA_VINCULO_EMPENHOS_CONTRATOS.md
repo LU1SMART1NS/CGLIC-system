@@ -120,7 +120,10 @@ Decisão tomada na implementação: o PNCP passa a ser só conferência. Ele é 
 6. Nunca usar `contract.id` como `contratoId`. Sem id: resolver via `/ugorigem/{ug}/numeroano/{n}` como o fluxo de item, e gravar o id obtido em `contratos_oficiais`.
 7. Substituir as 4 fórmulas inline por `resolveContractKey`; unificar o fallback de UASG emitente (usar a UASG do contrato nos dois fluxos, ou rejeitar registro sem `unidade_gestora`).
 
-### Fase 3: ciclo de vida do vínculo
+### Fase 3: ciclo de vida do vínculo (implementada na branch feat/empenhos-sync-fase-3)
+
+Decisões tomadas na implementação: lista vazia da fonte com vínculos existentes não remove nada (o Contratos.gov.br devolve lista vazia para id errado) e vira ERRO para a equipe conferir; a remoção de ausentes só acontece se todos os empenhos lidos foram gravados; sem a migration 81 aplicada, o app vincula um por vez como antes. A NE compartilhada é marcada na tela, sem rateio (não há rateio oficial; as faturas da Fase 5 podem dar a divisão por contrato). `v_contrato_empenhos_lastro` não foi alterada porque nenhuma tela a lê. Simulação real antes da primeira execução: 0 remoções, 92 valores nulos passam a 0, 2 valores alterados.
+
 
 8. Nova RPC `sync_contract_empenhos_atomic(p_contract_key, p_empenhos jsonb[])` que substitui o conjunto do contrato (mesmo padrão de `sync_item_contract_empenhos_atomic`, M52): insere novos, atualiza `valor_vinculado` (inclusive para 0), remove os que a fonte não lista mais e grava evento `CANCELAMENTO_TOTAL` para cada remoção. Corrigir o delta de `ANULACAO_PARCIAL` em `link_empenho_to_contract_atomic` enquanto ela existir.
 9. Marcar na tela a NE presente em mais de um contrato ("compartilhada com 00005/2017") e não somar 100% em cada um; `v_contrato_empenhos_lastro` passa a somar `valor_vinculado` rateado ou a expor a contagem de contratos por NE.
