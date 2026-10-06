@@ -335,7 +335,10 @@ export async function sincronizarOrdensBancariasDaCarteira(uasg: string, opts: O
         try {
           const brutas = await fetchOrdensBancariasDaNp(uasg, np);
           const lista = brutas.map(normalizarOrdemBancaria).filter((o): o is OrdemBancariaParaGravar => o !== null);
-          gravadas += (await gravarOrdensBancarias(uasg, np, lista)) ?? 0;
+          // Não somar na mesma linha do await: `x += await f()` lê x antes de esperar e, com várias NPs em
+          // paralelo, sobrescreve as somas dos outros (06/10/2026: 309 contadas contra 386 gravadas).
+          const gravadasDaNp = (await gravarOrdensBancarias(uasg, np, lista)) ?? 0;
+          gravadas += gravadasDaNp;
           if (lista.some((o) => !o.cancelada)) comOb++;
         } catch (err) {
           erros.push(`${np}: ${mensagemDeErro(err)}`);
