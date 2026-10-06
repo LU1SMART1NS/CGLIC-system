@@ -1,9 +1,9 @@
 import React from 'react';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
-import { ArrowLeftRight, ArrowRight, UserPlus } from 'lucide-react';
+import { ArrowLeftRight, UserPlus } from 'lucide-react';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { AppButton } from '../../../design-system/components/AppButton';
-import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import { buildAtaPath } from '../../../hooks/useAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import type { DistribuicaoItem, DistribuicaoLinha } from './distribuicaoEquipe';
@@ -52,7 +52,7 @@ function tituloComplexidade(c: Complexidade): string {
 }
 
 /**
- * Atas e contratos vigentes de um gestor, os mais urgentes primeiro. Marcar itens e transferir
+ * Atas e contratos vigentes de um gestor, atas primeiro, depois contratos, cada grupo pelo prazo. Marcar itens e transferir
  * só eles (o gestor da ata se propaga aos contratos vinculados, como nas carteiras).
  */
 export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, canAssign, onTransfer, canAjustar = false, aVincular = [] }) => {
@@ -106,7 +106,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
             Selecionar os {shown.length} exibidos
           </label>
         ) : (
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>Mais urgentes primeiro</span>
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>Atas primeiro, depois contratos</span>
         )}
         {canAssign && selected.size > 0 && (
           <AppButton
@@ -172,7 +172,8 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                       borderRadius: '4px',
                       whiteSpace: 'nowrap',
                       border: 'none',
-                      ...ETIQUETA_COMPLEXIDADE[item.complexidade.nivel]
+                      color: ETIQUETA_COMPLEXIDADE[item.complexidade.nivel].color,
+                      background: ETIQUETA_COMPLEXIDADE[item.complexidade.nivel].bg
                     };
                     const rotulo = `${ROTULO_COMPLEXIDADE[item.complexidade.nivel]}${item.complexidade.ajuste ? ' · ajustada' : ''}`;
                     return canAjustar ? (
@@ -196,12 +197,6 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                     {item.complexidade.motivo}
                   </span>
                 </div>
-                <div
-                  title={item.objeto}
-                  style={{ fontSize: '0.78rem', color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-                >
-                  {item.objeto || '—'}
-                </div>
               </div>
               <CarteiraPrazoPill faixa={item.faixa} diasRestantes={item.dias} />
               <span style={{ fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
@@ -217,10 +212,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                   </>
                 )}
               </span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, minWidth: '64px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrencyCompact(item.valor)}</span>
-              <AppButton type="button" variant="outline" size="sm" onClick={() => navigate(itemPath(item))}>
-                Abrir <ArrowRight size={13} />
-              </AppButton>
+              <ActionButton action="abrir" type="button" size="sm" onClick={() => navigate(itemPath(item))} />
             </li>
           );
         })}

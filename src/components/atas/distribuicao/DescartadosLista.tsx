@@ -1,6 +1,5 @@
 import React from 'react';
-import { RotateCcw } from 'lucide-react';
-import { AppButton } from '../../../design-system';
+import { ActionButton } from '../../../design-system';
 import { useToast } from '../../../design-system/components/Toast';
 import { useRestaurarAta } from '../../../hooks/useDescartesAtaContrato';
 import { carteiraTableShell } from '../../carteira/carteiraStyles';
@@ -24,17 +23,17 @@ export const DescartadosLista: React.FC<{ descartados: DescarteAta[]; podeRestau
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <AppButton
+      <ActionButton
+        action={aberto ? 'ocultar' : 'verDetalhes'}
         type="button"
-        variant="outline"
         size="sm"
         onClick={() => setAberto((v) => !v)}
-        aria-expanded={aberto}
+        expanded={aberto}
         data-testid={`${testIdPrefix}-ver-descartados`}
         style={{ alignSelf: 'flex-start' }}
       >
         {aberto ? 'Ocultar descartados' : 'Ver descartados'} ({descartados.length})
-      </AppButton>
+      </ActionButton>
       {aberto && (
         <div style={carteiraTableShell} data-testid={`${testIdPrefix}-descartados`}>
           {descartados.map((d) => (
@@ -48,9 +47,7 @@ export const DescartadosLista: React.FC<{ descartados: DescarteAta[]; podeRestau
               </span>
               {podeRestaurar && (
                 <span style={{ marginLeft: 'auto' }}>
-                  <AppButton variant="outline" size="sm" icon={<RotateCcw size={13} />} onClick={() => restaurarAta(d)} disabled={restaurar.isPending} title="Voltar a sugerir esta ata" data-testid={`${testIdPrefix}-restaurar-${d.contractKey}-${d.numeroAta}`}>
-                    Restaurar
-                  </AppButton>
+                  <ActionButton action="restaurar" size="sm" onClick={() => restaurarAta(d)} disabled={restaurar.isPending} title="Voltar a sugerir esta ata" data-testid={`${testIdPrefix}-restaurar-${d.contractKey}-${d.numeroAta}`} />
                 </span>
               )}
             </div>

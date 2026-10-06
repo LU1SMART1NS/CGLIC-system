@@ -1,9 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import {
-  Search,
-  Loader2,
-  Sparkles
-} from 'lucide-react';
+import { Search, Loader2, Sparkles } from 'lucide-react';
 import { useContractsDashboard } from '../../hooks/useContractsDashboard';
 import { useAllAtaManagers, useArpItemContractLinks } from '../../hooks/useAtaManagers';
 import { useAllContractManagers } from '../../hooks/useAllContractManagers';
@@ -17,7 +13,7 @@ import type { ContractDashboardRecord } from '../../types';
 import { formatCnpj } from '../../utils/format';
 import { displayContractNumber } from '../../utils/contractNumber';
 import { useDescartesAtaContrato } from '../../hooks/useDescartesAtaContrato';
-import { Modal, AlertCard, useToast, AppButton } from '../../design-system';
+import { Modal, AlertCard, useToast, ActionButton, AppButton } from '../../design-system';
 import {
   rankContractsBySuggestion,
   aplicarRestricoesDeVinculo,
@@ -667,17 +663,14 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 
               {/* Botões de Ação */}
               <div className="link-contract-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-                <AppButton type="button" variant="outline" onClick={handleClose} disabled={isPending}>
-                  Cancelar
-                </AppButton>
-                <AppButton
+                <ActionButton action="cancelar" type="button" onClick={handleClose} disabled={isPending} />
+                <ActionButton action="vincular"
                   type="submit"
-                  variant="primary"
                   disabled={isPending || Boolean(ataBloqueandoSelecionado) || (isAtaMode && checkedItems.length === 0)}
                   isLoading={isPending}
                 >
                   {isAtaMode && checkedItems.length > 1 ? `Vincular a ${checkedItems.length} itens` : 'Vincular Contrato'}
-                </AppButton>
+                </ActionButton>
               </div>
             </form>
           )}

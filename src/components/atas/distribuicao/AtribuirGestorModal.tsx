@@ -1,7 +1,7 @@
 import React from 'react';
-import { Check, Lightbulb, Loader2 } from 'lucide-react';
+import { Lightbulb } from 'lucide-react';
 import { Modal } from '../../../design-system/components/Modal';
-import { AppButton } from '../../../design-system/components/AppButton';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { useUsers } from '../../../hooks/useUsers';
 import { useRoles } from '../../../hooks/useRoles';
 import { useAssignManager } from '../../../hooks/useAssignManager';
@@ -83,19 +83,17 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
       testId="atribuir-gestor-modal"
       footer={
         <>
-          <AppButton type="button" variant="outline" onClick={onClose} disabled={assign.isPending}>
-            Cancelar
-          </AppButton>
-          <AppButton
+          <ActionButton action="cancelar" type="button" onClick={onClose} disabled={assign.isPending} />
+          <ActionButton
+            action="salvar"
             type="button"
-            variant="primary"
             onClick={salvar}
             disabled={assign.isPending || !nomeFinal}
             data-testid="atribuir-gestor-salvar"
-            icon={assign.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            isLoading={assign.isPending}
           >
             {nomeFinal ? `Atribuir a ${nomeFinal}` : 'Escolha um gestor'}
-          </AppButton>
+          </ActionButton>
         </>
       }
     >

@@ -1,11 +1,9 @@
 import React from 'react';
-import { ArrowLeftRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { CarteiraFilterBar } from '../../carteira/CarteiraFilterBar';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CARTEIRA_EXPANDED_CELL_STYLE } from '../../carteira/CarteiraDetailLabel';
-import { AppButton } from '../../../design-system/components/AppButton';
-import { IconButton } from '../../../design-system/components/IconButton';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
@@ -151,14 +149,15 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                     <React.Fragment key={nome}>
                       <tr data-testid={`distribuicao-row-${nome}`}>
                         <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
-                          <IconButton
+                          <ActionButton
+                            action={isExpanded ? 'recolher' : 'expandir'}
+                            iconOnly
                             type="button"
                             size="xs"
                             onClick={() => setExpanded(isExpanded ? null : nome)}
                             expanded={isExpanded}
                             label={isExpanded ? 'Recolher atas e contratos' : 'Ver atas e contratos'}
                             data-testid={`distribuicao-expand-${nome}`}
-                            icon={isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                           />
                         </td>
                         <td style={{ ...carteiraTd, minWidth: '160px' }}>
@@ -183,9 +182,8 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                             {canAssign && (l.ataKeys.length > 0 || l.contractKeys.length > 0) && (
-                              <AppButton
+                              <ActionButton action="transferir"
                                 type="button"
-                                variant="success"
                                 size="sm"
                                 onClick={() =>
                                   onTransfer(
@@ -198,10 +196,7 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                                 }
                                 data-testid={`distribuicao-transferir-${nome}`}
                                 title="Passar toda a carteira vigente deste gestor para outra pessoa"
-                                icon={<ArrowLeftRight size={14} />}
-                              >
-                                Transferir
-                              </AppButton>
+                               />
                             )}
                           </div>
                         </td>

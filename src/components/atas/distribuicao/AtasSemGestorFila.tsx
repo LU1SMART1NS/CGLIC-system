@@ -1,5 +1,4 @@
 import React from 'react';
-import { UserPlus } from 'lucide-react';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
@@ -7,8 +6,8 @@ import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../../carteira/CarteiraRowLink';
-import { AppButton } from '../../../design-system/components/AppButton';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { ActionButton } from '../../../design-system/components/ActionButton';
+import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
@@ -207,7 +206,7 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                             {ata.numeroAta}
                           </CarteiraIdLink>
                           {ata.fornecedorNome && (
-                            <div title={ata.fornecedorNome} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            <div title={ata.fornecedorNome} style={carteiraSubtitle}>
                               {ata.fornecedorNome}
                             </div>
                           )}
@@ -242,16 +241,12 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                       </td>
                       {podeAtribuir && (
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <AppButton
+                          <ActionButton action="atribuir"
                             type="button"
-                            variant="success"
                             size="sm"
                             onClick={() => onAtribuir([ata])}
                             data-testid={`ata-sem-gestor-atribuir-${ata.numeroAta}`}
-                            icon={<UserPlus size={14} />}
-                          >
-                            Atribuir
-                          </AppButton>
+                           />
                         </td>
                       )}
                     </tr>

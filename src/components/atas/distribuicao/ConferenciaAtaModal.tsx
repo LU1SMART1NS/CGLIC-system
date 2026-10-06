@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ExternalLink, Link2, Loader2, MinusCircle, X } from 'lucide-react';
-import { AppButton, Modal } from '../../../design-system';
+import { CheckCircle2, ExternalLink, Loader2, MinusCircle } from 'lucide-react';
+import { ActionButton, AppButton, Modal } from '../../../design-system';
 import { useToast } from '../../../design-system/components/Toast';
 import { useDescartarAta } from '../../../hooks/useDescartesAtaContrato';
 import { buildAtaPath } from '../../../hooks/useAta';
@@ -10,7 +10,7 @@ import { fetchContractItemQuantities } from '../../../services/contractItemsServ
 import type { PlanoVinculo } from '../../../services/vinculoEmMassaService';
 import { formatDateBR } from '../../../utils/format';
 import { normalizeItemKey } from '../../../utils/itemKeyUtils';
-import type { FilaAta, ItemFila } from './contratosSemAta';
+import { sugerirAtas, type FilaAta, type ItemFila } from './contratosSemAta';
 import { efeitoGestorDoVinculo, preverVinculo, type ItemDaAta } from './vinculoEmMassa';
 
 interface ConferenciaAtaModalProps {
@@ -58,15 +58,18 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
   const toast = useToast();
   const lote = useVinculoEmMassa();
   const descartar = useDescartarAta();
-  const sugerida = contrato.sugestoes.find((s) => s.numeroAta === ata.numeroAta && s.uasg === ata.uasg);
-  const motivo = sugerida?.motivo;
+  // Pista calculada pelas mesmas regras das sugestões: a ata escolhida à mão (fora das sugestões) também mostra o que bate.
+  const motivo = sugerirAtas(contrato, [ata]).sugestoes[0]?.motivo;
+  const fornecedorBate = motivo === 'FORNECEDOR' || motivo === 'COMPRA_E_FORNECEDOR';
+  const compraBate = motivo === 'COMPRA' || motivo === 'COMPRA_E_FORNECEDOR';
 
   const consulta = useQuery({
     queryKey: ['contract-item-quantities', `${contrato.contract.uasg}-${contrato.contract.numero}-${contrato.contract.ano}`] as const,
     queryFn: () => fetchContractItemQuantities(contrato.contract),
     staleTime: 10 * 60 * 1000,
     retry: 1,
-    enabled: itensDaAta.length > 0
+    // Os itens da API só se comparam com os da ata quando a compra é a mesma (ver preverVinculo).
+    enabled: itensDaAta.length > 0 && compraBate
   });
   const previsao = preverVinculo({
     numeroAta: ata.numeroAta,
@@ -75,12 +78,14 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
     itensDaAta,
     apiQuantidades: consulta.data,
     apiCarregando: consulta.isLoading,
-    apiErro: consulta.isError
+    apiErro: consulta.isError,
+    compraDiferente: !compraBate
   });
   const efeito = efeitoGestorDoVinculo(contrato.gestorNome, ata.gestorNome);
 
   // Itens marcados: começa pelos que a API confirma (uma vez, quando a consulta responde); o coordenador ajusta.
-  const api = consulta.data;
+  // Em outra compra a API não vale: nada vem marcado e nenhuma quantidade da API é gravada.
+  const api = compraBate ? consulta.data : undefined;
   const confirmado = (numeroItem: string) => Boolean(api?.has(parseInt(numeroItem, 10)));
   const [marcados, setMarcados] = React.useState<Set<string>>(new Set());
   const iniciou = React.useRef(false);
@@ -137,9 +142,6 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
 
   const verAtaCompleta = () => window.open(buildAtaPath(ata.numeroAta, ata.uasg), '_blank', 'noopener');
 
-  const fornecedorBate = motivo === 'FORNECEDOR' || motivo === 'COMPRA_E_FORNECEDOR';
-  const compraBate = motivo === 'COMPRA' || motivo === 'COMPRA_E_FORNECEDOR';
-
   return (
     <Modal
       isOpen
@@ -155,20 +157,20 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
           </AppButton>
           {podeAgir && (
             <>
-              <AppButton variant="outline" size="sm" icon={<X size={13} />} onClick={naoEhEstaAta} disabled={ocupado} title="Esta ata não é a deste contrato: deixa de ser sugerida" data-testid="conferencia-descartar">
+              <ActionButton action="descartar" size="sm" onClick={naoEhEstaAta} disabled={ocupado} title="Este contrato não pertence a esta ata: ela deixa de ser sugerida" data-testid="conferencia-descartar">
                 Esta não é a ata
-              </AppButton>
-              <AppButton
-                variant="primary"
+              </ActionButton>
+              <ActionButton
+                action="vincular"
                 size="sm"
-                icon={lote.estado.rodando ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}
+                isLoading={lote.estado.rodando}
                 onClick={vincular}
                 disabled={ocupado || itensMarcados.length === 0 || consulta.isLoading}
                 title={itensMarcados.length === 0 ? 'Marque os itens que o contrato cobre' : 'Vincular o contrato aos itens marcados'}
                 data-testid="conferencia-vincular"
               >
                 {itensMarcados.length > 0 && !algumConfirmado ? 'Vincular mesmo assim' : 'Vincular'}
-              </AppButton>
+              </ActionButton>
             </>
           )}
         </>

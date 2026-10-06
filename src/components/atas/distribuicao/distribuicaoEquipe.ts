@@ -276,9 +276,9 @@ export function buildDistribuicaoEquipe(input: {
   for (const l of ordenadas) {
     l.itens.sort(
       (a, b) =>
-        b.urgentes - a.urgentes ||
-        diasOrd(a.dias) - diasOrd(b.dias) ||
         a.tipo.localeCompare(b.tipo) ||
+        diasOrd(a.dias) - diasOrd(b.dias) ||
+        b.urgentes - a.urgentes ||
         a.numero.localeCompare(b.numero)
     );
   }

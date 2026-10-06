@@ -12,6 +12,13 @@ const contract = (over: Partial<ContractDashboardRecord>): ContractDashboardReco
   ({ id: 'X', numero: '1', ano: '2025', numeroFormatado: '1/2025', uasg: '200331', fonteDados: 'Compras.gov.br', ...over }) as any;
 
 describe('linkContractSuggestions', () => {
+  it('sugere por fornecedor o contrato de estrangeiro pelo nome, já que não há CNPJ', () => {
+    const c = contract({ fornecedorCnpjCpf: 'EXAXONEN1', fornecedorNome: 'AXON  INTERPRISE' });
+    const criteria = { fornecedorCnpjs: ['ESTRANG0000348'], fornecedorNomes: ['Axon Enterprise, Inc.'] };
+    expect(getContractSuggestionReasons(c, criteria)).toEqual(['fornecedor']);
+    expect(getContractSuggestionReasons(contract({ fornecedorCnpjCpf: 'EXCESKAZB', fornecedorNome: 'CESKÁ ZBROJOVKA A.S.' }), criteria)).toEqual([]);
+  });
+
   const compra = { uasg: '200331', numeroCompra: '90045', anoCompra: '2024' };
 
   it('casa o idCompra oficial de 17 dígitos (UASG + modalidade + número + ano)', () => {

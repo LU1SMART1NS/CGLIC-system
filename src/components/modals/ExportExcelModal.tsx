@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Check, 
-  FileText, 
-  Building2, 
-  RotateCcw, 
-  Download, 
-  Sliders, 
-  Sparkles,
-  ShoppingBag
-} from 'lucide-react';
+import { Check, FileText, Building2, RotateCcw, Download, Sliders, Sparkles, ShoppingBag } from 'lucide-react';
 import type { ArpRecord, ArpItemRecord } from '../../types';
-import { Modal, AppButton, useToast } from '../../design-system';
+import { Modal, ActionButton, AppButton, useToast } from '../../design-system';
 import type { 
   ReportExportConfig, 
   ReportPreset, 
@@ -204,9 +195,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
       testId="export-excel-modal"
       footer={
         <>
-          <AppButton type="button" variant="outline" onClick={onClose} disabled={isExporting}>
-            Cancelar
-          </AppButton>
+          <ActionButton action="cancelar" type="button" onClick={onClose} disabled={isExporting} />
           <AppButton
             type="button"
             onClick={handleGenerateReport}
@@ -418,7 +407,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <AppButton
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   size="xs"
                   onClick={handleSelectAll}
                 >
@@ -426,7 +415,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 </AppButton>
                 <AppButton
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   size="xs"
                   onClick={handleClearAll}
                 >
@@ -434,7 +423,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 </AppButton>
                 <AppButton
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   size="xs"
                   onClick={handleResetDefaults}
                   icon={<RotateCcw size={14} />}

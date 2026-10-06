@@ -1,5 +1,6 @@
 import type { ContractDashboardRecord, PncpContract } from '../types';
 import { getCanonicalContractKey } from '../services/api';
+import { ataTemFornecedorConhecido, contratoDoFornecedorDaAta } from './fornecedorMatch';
 import {
   contractMatchesCompra,
   type ContractSuggestionCriteria
@@ -138,9 +139,9 @@ export function quantidadesPorContrato(
 function catalogMatchesItem(contract: ContractDashboardRecord, criteria?: ContractSuggestionCriteria): boolean {
   if (!criteria?.compra || !contractMatchesCompra(contract, criteria.compra)) return false;
 
-  const cnpjs = (criteria.fornecedorCnpjs || []).map(digits).filter(Boolean);
-  if (cnpjs.length === 0) return true;
-  return cnpjs.includes(digits(contract.fornecedorCnpjCpf));
+  const fornecedores = { cnpjs: criteria.fornecedorCnpjs, nomes: criteria.fornecedorNomes };
+  if (!ataTemFornecedorConhecido(fornecedores)) return true;
+  return contratoDoFornecedorDaAta({ cnpj: contract.fornecedorCnpjCpf, nome: contract.fornecedorNome }, fornecedores);
 }
 
 /**
@@ -202,7 +203,7 @@ export function buildItemContractSuggestions(input: ItemContractSuggestionInput)
 /** Critérios de sugestão de um item: compra da Ata e fornecedor do próprio item. */
 export function buildItemSuggestionCriteria(
   arp: { idCompra?: string; codigoUnidadeGerenciadora?: string; numeroCompra?: string; anoCompra?: string },
-  item: { niFornecedor?: string }
+  item: { niFornecedor?: string; nomeRazaoSocialFornecedor?: string }
 ): ContractSuggestionCriteria {
   return {
     compra: {
@@ -211,7 +212,8 @@ export function buildItemSuggestionCriteria(
       numeroCompra: arp.numeroCompra,
       anoCompra: arp.anoCompra
     },
-    fornecedorCnpjs: item.niFornecedor ? [item.niFornecedor] : []
+    fornecedorCnpjs: item.niFornecedor ? [item.niFornecedor] : [],
+    fornecedorNomes: item.nomeRazaoSocialFornecedor ? [item.nomeRazaoSocialFornecedor] : []
   };
 }
 

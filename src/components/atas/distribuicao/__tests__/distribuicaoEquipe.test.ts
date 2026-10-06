@@ -108,7 +108,7 @@ describe('buildDistribuicaoEquipe', () => {
     expect(ana.contractKeys).toEqual(['200331-00001-2025']);
   });
 
-  it('lista os itens vigentes do gestor, os mais urgentes primeiro, com as pendências de cada um', () => {
+  it('lista os itens vigentes do gestor, atas antes de contratos, cada grupo pelo prazo, com as pendências de cada um', () => {
     const { linhas } = buildDistribuicaoEquipe({
       atas: [
         { ...ata('00001/2025', 'Ana', 'REGULAR'), dias: 200, objeto: 'Papel' },
@@ -128,14 +128,14 @@ describe('buildDistribuicaoEquipe', () => {
     });
     const itens = linhas.find((l) => l.gestorNome === 'Ana')!.itens;
     expect(itens.map((i) => `${i.tipo}:${i.chave}`)).toEqual([
-      'CONTRATO:200331-00002-2025', // 2 urgentes
-      'ATA:00002/2025', // sem urgentes, menor prazo (10)
+      'ATA:00002/2025', // 10 dias
+      'ATA:00001/2025', // 200
       'CONTRATO:200331-00001-2025', // 40
-      'ATA:00001/2025' // 200
+      'CONTRATO:200331-00002-2025' // 300
     ]);
-    expect(itens[0]).toMatchObject({ urgentes: 2, acompanhar: 0 });
-    expect(itens[1].uasg).toBe('200331');
-    expect(itens[3]).toMatchObject({ objeto: 'Papel', urgentes: 0, acompanhar: 1 });
+    expect(itens[0].uasg).toBe('200331');
+    expect(itens[1]).toMatchObject({ objeto: 'Papel', urgentes: 0, acompanhar: 1 });
+    expect(itens[3]).toMatchObject({ urgentes: 2, acompanhar: 0 });
   });
 
   it('aponta contrato vinculado com gestor diferente do da ata, uma vez por par', () => {

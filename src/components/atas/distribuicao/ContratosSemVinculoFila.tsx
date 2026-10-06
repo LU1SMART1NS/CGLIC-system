@@ -1,17 +1,17 @@
 import React from 'react';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Link2, Loader2, RotateCcw, Search, UserPlus, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink } from '../../carteira/CarteiraRowLink';
-import { carteiraSelect, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraSelect, carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
-import { AppButton, IconButton } from '../../../design-system';
+import { ActionButton, AppButton } from '../../../design-system';
 import { useConfirmDialog } from '../../../design-system/components/ConfirmDialog';
 import { useToast } from '../../../design-system/components/Toast';
 import { useConfirmarContratoSemAta, useDesfazerContratoSemAta } from '../../../hooks/useContratosSemAta';
@@ -26,6 +26,7 @@ import { formatDateBR } from '../../../utils/format';
 import { ConferenciaAtaModal } from './ConferenciaAtaModal';
 import type { AtaSugerida, FilaAta, ItemFila, MotivoSugestao, PendenciasDistribuicao } from './contratosSemAta';
 import { DescartadosLista } from './DescartadosLista';
+import { EscolherAtaModal } from './EscolherAtaModal';
 import { SELECIONADA_BG, SelecaoCell, SelecaoHeaderCell, useSelecaoFila } from './DistribuicaoSelecao';
 import { contemBusca, PAGE_SIZE, TODAS } from './filaComum';
 import { efeitoGestorDoVinculo, preverVinculo, semZeros, textoItemQtd, type ItemDaAta, type PrevisaoVinculo } from './vinculoEmMassa';
@@ -120,6 +121,8 @@ interface ContratosSemVinculoFilaProps {
   itensDaAta: (numeroAta: string, uasg: string) => ItemDaAta[];
   /** Dados completos da ata, para o painel de conferência. */
   ataDe: (numeroAta: string, uasg: string) => FilaAta | undefined;
+  /** Todas as atas do catálogo (inclusive encerradas), para o "Escolher ata". */
+  atas: FilaAta[];
 }
 
 /**
@@ -128,7 +131,7 @@ interface ContratosSemVinculoFilaProps {
  * parcial e os sem pista (o coordenador confere a ata ou marca "não pertence a nenhuma ata" e escolhe o gestor). O nome
  * da ata abre o painel de conferência; descartar tira a ata das sugestões do contrato.
  */
-export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = ({ pendencias, confirmacoes, podeAgir, onAtribuir, itensDaAta, ataDe: ataCompleta }) => {
+export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = ({ pendencias, confirmacoes, podeAgir, onAtribuir, itensDaAta, ataDe: ataCompleta, atas }) => {
   const navigate = useNavigateWithOrigin();
   const queryClient = useQueryClient();
   const confirmDialog = useConfirmDialog();
@@ -141,6 +144,13 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
   const desfazer = useDesfazerContratoSemAta();
   const [ataEscolhida, setAtaEscolhida] = React.useState<Record<string, string>>({});
   const [conferindo, setConferindo] = React.useState<{ item: ItemFila; ata: FilaAta } | null>(null);
+  // "Escolher ata": contrato cuja ata não foi sugerida; a ata escolhida segue para a mesma conferência.
+  const [escolhendo, setEscolhendo] = React.useState<ItemFila | null>(null);
+  const descartadasDe = React.useCallback(
+    (contractKey: string) => new Set(pendencias.descartados.filter((d) => d.contractKey === contractKey).map((d) => d.ataKey)),
+    [pendencias.descartados]
+  );
+  const descartadasDoEscolhido = React.useMemo(() => (escolhendo ? descartadasDe(escolhendo.contractKey) : new Set<string>()), [escolhendo, descartadasDe]);
 
   const todas = React.useMemo<Linha[]>(() => {
     const comFortes = (i: ItemFila, grupo: Grupo): Linha => ({ ...i, grupo, fortes: i.sugestoes.filter((s) => s.motivo === 'COMPRA_E_FORNECEDOR') });
@@ -346,7 +356,8 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
     <section data-testid="distribuicao-sem-vinculo" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
         Contratos vigentes ainda sem vínculo com ata. Clique no nome da ata para conferir e vincular; os que a API confirma podem ser vinculados
-        vários de uma vez. Se o contrato não veio de ata, marque "Não pertence a nenhuma ata" e escolha o gestor.
+        vários de uma vez. Se a ata certa não foi sugerida, use "Escolher ata". Se o contrato não veio de ata, marque "Não pertence a
+        nenhuma ata" e escolha o gestor.
       </p>
 
       {(estado.rodando || estado.resultados.length > 0) && (
@@ -374,7 +385,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                   {falhas.length > 0 && `, ${plural(falhas.length, 'falha', 'falhas')}`}
                   {estado.resultados.length < estado.total && ` — parou em ${estado.resultados.length} de ${estado.total}`}
                 </strong>
-                <IconButton label="Fechar resumo" icon={<X size={15} />} onClick={lote.limpar} style={{ marginLeft: 'auto' }} />
+                <ActionButton action="fechar" iconOnly label="Fechar resumo" onClick={lote.limpar} style={{ marginLeft: 'auto' }} />
               </div>
               {falhas.map((r) => (
                 <div key={r.contractKey} style={{ color: 'var(--color-danger-text-strong)' }}>
@@ -427,25 +438,22 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
         >
           <strong>{plural(selecionadas.length, 'contrato selecionado', 'contratos selecionados')}</strong>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <AppButton variant="outline" size="sm" icon={<X size={13} />} onClick={selecao.limpar} disabled={ocupado}>
-              Limpar
-            </AppButton>
+            <ActionButton action="limpar" size="sm" onClick={selecao.limpar} disabled={ocupado} />
             {selecionadasDecisao.length > 0 && (
-              <AppButton
-                variant="outline"
+              <ActionButton
+                action="naoPertence"
                 size="sm"
-                icon={<XCircle size={13} />}
                 onClick={() => naoPertence(selecionadasDecisao, selecao.limpar)}
                 disabled={ocupado || confirmar.isPending}
                 data-testid="sem-vinculo-nao-pertencem-selecionados"
               >
                 {selecionadasDecisao.length === 1 ? 'Não pertence a nenhuma ata' : `${selecionadasDecisao.length} não pertencem a nenhuma ata`}
-              </AppButton>
+              </ActionButton>
             )}
             {selecionadasProntas.length > 0 && (
-              <AppButton variant="primary" size="sm" icon={<Link2 size={13} />} onClick={() => vincular(selecionadasProntas)} disabled={ocupado} data-testid="sem-vinculo-vincular-selecionados">
+              <ActionButton action="vincular" size="sm" onClick={() => vincular(selecionadasProntas)} disabled={ocupado} data-testid="sem-vinculo-vincular-selecionados">
                 Vincular {selecionadasProntas.length}
-              </AppButton>
+              </ActionButton>
             )}
           </span>
         </div>
@@ -498,12 +506,12 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                           Contrato {l.numero}
                         </CarteiraIdLink>
                         {l.fornecedorNome && (
-                          <div title={l.fornecedorNome} style={{ fontSize: '0.75rem', color: '#64748b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          <div title={l.fornecedorNome} style={carteiraSubtitle}>
                             {l.fornecedorNome}
                           </div>
                         )}
                       </td>
-                      <td data-label="Ata provável" style={{ ...carteiraTd, fontSize: '0.8rem', minWidth: '190px' }}>
+                      <td data-label="Ata provável" style={{ ...carteiraTd, minWidth: '190px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
                           {l.grupo === 'ATA_PROVAVEL' && ata && (
                             <>
@@ -548,50 +556,52 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                       {podeAgir && (
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                            {l.grupo === 'ATA_PROVAVEL' && (
-                              <>
-                                {previsao?.status === 'PRONTO' ? (
-                                  <AppButton variant="primary" size="sm" icon={<Link2 size={13} />} onClick={() => vincular([l])} disabled={ocupado} title="Vincular este contrato à ata" data-testid={`sem-vinculo-vincular-${l.contractKey}`}>
-                                    Vincular
-                                  </AppButton>
-                                ) : (
-                                  <AppButton variant="primary" size="sm" icon={<Search size={13} />} onClick={() => conferir(l)} disabled={ocupado} title="Conferir a ata e escolher os itens" data-testid={`sem-vinculo-conferir-${l.contractKey}`}>
-                                    Conferir
-                                  </AppButton>
-                                )}
-                                <AppButton variant="outline" size="sm" icon={<X size={13} />} onClick={() => descartarAta(l)} disabled={ocupado || descartar.isPending} title={`Esta ata (${ata?.numeroAta}) não é a deste contrato`} data-testid={`sem-vinculo-descartar-${l.contractKey}`}>
-                                  Descartar
-                                </AppButton>
-                              </>
+                            {/* Ordem fixa: Vincular · Escolher ata · Conferir · Descartar (ou Não pertence). Conferir e o último só com ícone. */}
+                            {l.grupo === 'ATA_PROVAVEL' && previsao?.status === 'PRONTO' && (
+                              <ActionButton action="vincular" size="sm" onClick={() => vincular([l])} disabled={ocupado} title="Vincular este contrato à ata" data-testid={`sem-vinculo-vincular-${l.contractKey}`} />
                             )}
-                            {l.grupo === 'PARCIAL' && (
-                              <AppButton variant="outline" size="sm" icon={<Search size={13} />} onClick={() => conferir(l)} disabled={ocupado} title="Conferir a ata da pista" data-testid={`sem-vinculo-conferir-${l.contractKey}`}>
-                                Conferir
-                              </AppButton>
+                            {(l.grupo === 'ATA_PROVAVEL' || decidivel(l)) && (
+                              <ActionButton
+                                action="escolherAta"
+                                size="sm"
+                                onClick={() => setEscolhendo(l)}
+                                disabled={ocupado}
+                                title={l.grupo === 'ATA_PROVAVEL' ? 'A sugestão não é a ata certa: escolher outra' : 'Procurar a ata entre todas as do catálogo e conferir os itens'}
+                                data-testid={`sem-vinculo-escolher-${l.contractKey}`}
+                              />
+                            )}
+                            {l.grupo === 'ATA_PROVAVEL' || l.grupo === 'PARCIAL' ? (
+                              <ActionButton
+                                action="conferir"
+                                iconOnly
+                                onClick={() => conferir(l)}
+                                disabled={ocupado}
+                                title={l.grupo === 'PARCIAL' ? 'Conferir a ata da pista' : 'Conferir a ata e escolher os itens'}
+                                data-testid={`sem-vinculo-conferir-${l.contractKey}`}
+                              />
+                            ) : (
+                              // Sem pista não há ata para conferir: reserva o lugar para os ícones seguintes ficarem alinhados.
+                              l.grupo === 'SEM_PISTA' && <span aria-hidden="true" style={{ display: 'inline-block', width: '32px', flexShrink: 0 }} />
+                            )}
+                            {l.grupo === 'ATA_PROVAVEL' && (
+                              <ActionButton action="descartar" iconOnly onClick={() => descartarAta(l)} disabled={ocupado || descartar.isPending} title={`Este contrato não pertence a esta ata (${ata?.numeroAta})`} data-testid={`sem-vinculo-descartar-${l.contractKey}`} />
                             )}
                             {decidivel(l) && (
-                              <AppButton
-                                variant={l.grupo === 'SEM_PISTA' ? 'primary' : 'outline'}
-                                size="sm"
-                                icon={<XCircle size={13} />}
+                              <ActionButton
+                                action="naoPertence"
+                                iconOnly
                                 onClick={() => naoPertence([l])}
                                 disabled={ocupado || confirmar.isPending}
-                                title="Este contrato não veio de ata: marcar e escolher o gestor"
+                                title="Não pertence a nenhuma ata: este contrato não veio de ata; marcar e escolher o gestor"
                                 data-testid={`sem-vinculo-nao-pertence-${l.contractKey}`}
-                              >
-                                Não pertence a nenhuma ata
-                              </AppButton>
+                              />
                             )}
                             {l.grupo === 'NAO_PERTENCE' && (
                               <>
                                 {!l.gestorNome && (
-                                  <AppButton variant="primary" size="sm" icon={<UserPlus size={13} />} onClick={() => onAtribuir([l])} title="Escolher o gestor do contrato">
-                                    Atribuir gestor
-                                  </AppButton>
+                                  <ActionButton action="atribuir" size="sm" label="Atribuir gestor" onClick={() => onAtribuir([l])} title="Escolher o gestor do contrato" />
                                 )}
-                                <AppButton variant="outline" size="sm" icon={<RotateCcw size={13} />} onClick={() => desfazerMarcacao(l)} disabled={desfazer.isPending} title="Voltar a tratar o contrato como possível de ata">
-                                  Desfazer
-                                </AppButton>
+                                <ActionButton action="desfazer" size="sm" onClick={() => desfazerMarcacao(l)} disabled={desfazer.isPending} title="Voltar a tratar o contrato como possível de ata" />
                               </>
                             )}
                           </div>
@@ -608,6 +618,19 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
       )}
 
       <DescartadosLista descartados={pendencias.descartados} podeRestaurar={podeAgir} testIdPrefix="sem-vinculo" />
+
+      {escolhendo && (
+        <EscolherAtaModal
+          contrato={escolhendo}
+          atas={atas}
+          descartadas={descartadasDoEscolhido}
+          onClose={() => setEscolhendo(null)}
+          onEscolher={(ata) => {
+            setConferindo({ item: escolhendo, ata });
+            setEscolhendo(null);
+          }}
+        />
+      )}
 
       {conferindo && (
         <ConferenciaAtaModal

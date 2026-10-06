@@ -1,10 +1,9 @@
 import React from 'react';
-import { UserPlus } from 'lucide-react';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
-import { AppButton } from '../../../design-system/components/AppButton';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
@@ -88,16 +87,12 @@ export const DivergenciasFila: React.FC<DivergenciasFilaProps> = ({ divergencias
                     <td data-label="Gestor do contrato" style={carteiraTd}><span>{d.gestorContrato || semGestor}</span></td>
                     {podeAlinhar && (
                       <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <AppButton
+                        <ActionButton action="alinharGestor"
                           type="button"
-                          variant="success"
                           size="sm"
                           onClick={() => onAlinhar(d)}
                           data-testid={`distribuicao-alinhar-${d.contractKey}`}
-                          icon={<UserPlus size={14} />}
-                        >
-                          Alinhar gestor
-                        </AppButton>
+                         />
                       </td>
                     )}
                   </tr>

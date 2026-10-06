@@ -35,11 +35,17 @@ export interface EntradaPrevisao {
   apiQuantidades?: Map<number, number | null> | null;
   apiCarregando?: boolean;
   apiErro?: boolean;
+  /**
+   * A ata é de outra compra. A API devolve os números dos itens na compra do contrato, que só coincidem com os
+   * números dos itens da ata quando a compra é a mesma; em outra compra o "item 1" de um não é o "item 1" do outro.
+   */
+  compraDiferente?: boolean;
 }
 
 export function preverVinculo(e: EntradaPrevisao): PrevisaoVinculo {
   if (e.atasProvaveis > 1) return { status: 'REVISAR', motivo: 'Mais de uma ata provável: escolha a ata' };
   if (e.itensDaAta.length === 0) return { status: 'REVISAR', motivo: 'A ata não tem itens no banco' };
+  if (e.compraDiferente) return { status: 'REVISAR', motivo: 'A ata é de outra compra: a API não tem como confirmar os itens' };
   if (e.apiCarregando || (!e.apiQuantidades && !e.apiErro)) return { status: 'CONFERINDO' };
   if (e.apiErro) return { status: 'REVISAR', motivo: 'A API oficial não respondeu' };
   const api = e.apiQuantidades as Map<number, number | null>;

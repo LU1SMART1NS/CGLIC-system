@@ -34,6 +34,20 @@ describe('sugerirAtas', () => {
     expect(r.sugestoes[1]).toMatchObject({ numeroAta: '00002/2025', motivo: 'FORNECEDOR' });
   });
 
+  it('fornecedor estrangeiro (sem CNPJ) casa com a ata pelo nome e a compra', () => {
+    const estrangeiro = contrato('c1', { fornecedorCnpj: 'EXAXONEN1', fornecedorNome: 'AXON  INTERPRISE' });
+    const daAta = ata('00001/2025', { cnpjs: ['ESTRANG0000348'], fornecedorNomes: ['Axon Enterprise, Inc.'] });
+    const r = sugerirAtas(estrangeiro, [daAta]);
+    expect(r.situacao).toBe('UNICA');
+    expect(r.sugestoes[0]).toMatchObject({ numeroAta: '00001/2025', motivo: 'COMPRA_E_FORNECEDOR' });
+  });
+
+  it('estrangeiro de outra empresa na mesma compra segue como só compra', () => {
+    const estrangeiro = contrato('c1', { fornecedorCnpj: 'EXCESKAZB', fornecedorNome: 'CESKÁ ZBROJOVKA A.S.' });
+    const daAta = ata('00001/2025', { cnpjs: ['ESTRANG0000348'], fornecedorNomes: ['Axon Enterprise, Inc.'] });
+    expect(sugerirAtas(estrangeiro, [daAta])).toMatchObject({ situacao: 'PARCIAL', sugestoes: [{ motivo: 'COMPRA' }] });
+  });
+
   it('VARIAS, PARCIAL e NENHUMA', () => {
     expect(sugerirAtas(contrato('c1'), [ata('00001/2025'), ata('00002/2025')]).situacao).toBe('VARIAS');
     expect(sugerirAtas(contrato('c1'), [ata('00001/2025', { cnpjs: ['99999999000199'] })]).situacao).toBe('PARCIAL');

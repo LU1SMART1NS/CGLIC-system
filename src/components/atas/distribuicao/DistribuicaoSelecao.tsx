@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckSquare, UserPlus, X } from 'lucide-react';
+import { CheckSquare, UserPlus } from 'lucide-react';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { AppButton } from '../../../design-system/components/AppButton';
 import { carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 
@@ -153,9 +154,7 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
       </AppButton>
     )}
     <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem' }}>
-      <AppButton type="button" variant="outline" size="sm" onClick={onLimpar} data-testid={`${testIdPrefix}-limpar-selecao`} icon={<X size={14} />}>
-        Limpar
-      </AppButton>
+      <ActionButton action="limpar" type="button" size="sm" onClick={onLimpar} data-testid={`${testIdPrefix}-limpar-selecao`} />
       <AppButton
         type="button"
         variant="primary"

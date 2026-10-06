@@ -3,6 +3,7 @@ import type { PrazoFaixa } from '../../carteira/carteiraPrazo';
 import type { ContractDashboardRecord } from '../../../types';
 import { isVigente } from './distribuicaoEquipe';
 import { classificarAta, type Complexidade } from './complexidade';
+import { contratoDoFornecedorDaAta } from '../../../utils/fornecedorMatch';
 
 /**
  * Pendências de distribuição da Central, pelo caminho da CGLIC: o coordenador atribui ATAS (o servidor recebe
@@ -33,6 +34,8 @@ export interface FilaAta {
   anoCompra?: string;
   /** CNPJs (só dígitos) dos fornecedores dos itens da ata. */
   cnpjs: string[];
+  /** Razões sociais dos fornecedores dos itens da ata: comparam o fornecedor estrangeiro, que não tem CNPJ. */
+  fornecedorNomes?: string[];
   gestorNome?: string;
   objeto?: string;
   fornecedorNome?: string;
@@ -116,18 +119,19 @@ export interface PendenciasDistribuicao {
 
 const MAX_SUGESTOES = 5;
 const ORDEM_MOTIVO: Record<MotivoSugestao, number> = { COMPRA_E_FORNECEDOR: 0, COMPRA: 1, FORNECEDOR: 2 };
-const digits = (v?: string | null) => (v || '').replace(/\D/g, '');
 const diasOrd = (d: number | null) => (d === null ? Number.POSITIVE_INFINITY : d);
 
-export function sugerirAtas(contrato: Pick<FilaContrato, 'idCompra' | 'fornecedorCnpj'>, atas: FilaAta[]): { situacao: SituacaoFila; sugestoes: AtaSugerida[] } {
-  const cnpj = digits(contrato.fornecedorCnpj);
+export function sugerirAtas(contrato: Pick<FilaContrato, 'idCompra' | 'fornecedorCnpj' | 'fornecedorNome'>, atas: FilaAta[]): { situacao: SituacaoFila; sugestoes: AtaSugerida[] } {
   const sugestoes: AtaSugerida[] = [];
   for (const ata of atas) {
     const mesmaCompra = contractMatchesCompra(
       { idCompra: contrato.idCompra },
       { idCompra: ata.idCompra, uasg: ata.uasg, numeroCompra: ata.numeroCompra, anoCompra: ata.anoCompra }
     );
-    const mesmoFornecedor = Boolean(cnpj) && ata.cnpjs.includes(cnpj);
+    const mesmoFornecedor = contratoDoFornecedorDaAta(
+      { cnpj: contrato.fornecedorCnpj, nome: contrato.fornecedorNome },
+      { cnpjs: ata.cnpjs, nomes: ata.fornecedorNomes }
+    );
     if (!mesmaCompra && !mesmoFornecedor) continue;
     sugestoes.push({
       numeroAta: ata.numeroAta,

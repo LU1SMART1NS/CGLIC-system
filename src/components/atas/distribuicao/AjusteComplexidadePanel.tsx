@@ -1,8 +1,6 @@
 import React from 'react';
-import { Check, Loader2, RotateCcw, X } from 'lucide-react';
 import { AnchoredPanel } from '../../../design-system/components/AnchoredPanel';
-import { AppButton } from '../../../design-system/components/AppButton';
-import { IconButton } from '../../../design-system/components/IconButton';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { useRemoverComplexidadeAjuste, useSalvarComplexidadeAjuste } from '../../../hooks/useComplexidadeAjustes';
 import { MOTIVOS_AJUSTE, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import type { DistribuicaoItem } from './distribuicaoEquipe';
@@ -50,7 +48,7 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
         <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
           Complexidade {item.tipo === 'ATA' ? 'da ata' : 'do contrato'} {item.numero}
         </strong>
-        <IconButton label="Fechar" onClick={onClose} type="button" size="xs" icon={<X size={14} />} />
+        <ActionButton action="fechar" iconOnly onClick={onClose} type="button" size="xs" />
       </div>
 
       <div style={{ fontSize: '0.78rem', color: '#475569' }}>
@@ -125,27 +123,23 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap' }}>
         {ajustada ? (
-          <AppButton type="button" variant="outline" size="sm" onClick={handleVoltar} disabled={ocupado} data-testid="ajuste-voltar-automatica" icon={<RotateCcw size={14} />}>
+          <ActionButton action="desfazer" type="button" size="sm" onClick={handleVoltar} disabled={ocupado} data-testid="ajuste-voltar-automatica">
             Voltar à automática
-          </AppButton>
+          </ActionButton>
         ) : (
           <span />
         )}
         <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <AppButton type="button" variant="outline" size="sm" onClick={onClose} disabled={ocupado}>
-            Cancelar
-          </AppButton>
-          <AppButton
+          <ActionButton action="cancelar" type="button" size="sm" onClick={onClose} disabled={ocupado} />
+          <ActionButton
+            action="salvar"
             type="button"
-            variant="primary"
             size="sm"
             onClick={handleSalvar}
             disabled={!podeSalvar}
             data-testid="ajuste-salvar"
-            icon={salvar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-          >
-            Salvar
-          </AppButton>
+            isLoading={salvar.isPending}
+          />
         </div>
       </div>
     </AnchoredPanel>
