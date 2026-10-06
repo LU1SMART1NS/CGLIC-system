@@ -22,6 +22,7 @@ import {
   type ContractSuggestionReason
 } from './linkContractSuggestions';
 import { formatStatusVigencia } from '../../utils/statusVigencia';
+import { chaveDoContrato } from '../../utils/contractKeyUtils';
 
 /** Item da Ata selecionável quando o modal é aberto a partir da Ata 360 (vários itens). */
 export interface LinkableAtaItemOption {
@@ -146,7 +147,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     const filtered = officialContracts.filter(c => {
       // Modo Item: ignora o contrato já vinculado ao item. Modo Ata: um contrato pode cobrir vários itens,
       // então só some quando já está vinculado a todos os itens da ata.
-      const canKey = (c.id || `${c.uasg}-${c.numero}-${c.ano}`).toUpperCase();
+      const canKey = chaveDoContrato(c).toUpperCase();
       if (!isAtaMode && existingSet.has(canKey) && (!selectedContract || selectedContract.id?.toUpperCase() !== canKey)) {
         return false;
       }
@@ -166,7 +167,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     });
 
     return aplicarRestricoesDeVinculo(rankContractsBySuggestion(filtered, suggestionCriteria), {
-      contractKeyOf: (c) => c.id || `${c.uasg}-${c.numero}-${c.ano}`,
+      contractKeyOf: chaveDoContrato,
       ataDeOutroVinculo,
       naoPertencemAAta,
       descartadosParaEstaAta
@@ -179,7 +180,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 
   if (!isOpen) return null;
 
-  const contractKeyOf = (c: ContractDashboardRecord) => c.id || `${c.uasg}-${c.numero}-${c.ano}`;
+  const contractKeyOf = (c: ContractDashboardRecord) => chaveDoContrato(c);
 
   const handleClose = () => {
     setSearchTerm('');

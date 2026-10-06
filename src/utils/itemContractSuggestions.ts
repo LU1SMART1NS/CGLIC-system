@@ -5,6 +5,7 @@ import {
   contractMatchesCompra,
   type ContractSuggestionCriteria
 } from '../components/modals/linkContractSuggestions';
+import { chaveDoContrato } from './contractKeyUtils';
 
 /** De onde a sugestão veio. Uma mesma sugestão pode ter as duas origens. */
 export type ItemContractSuggestionSource = 'pncp' | 'catalogo';
@@ -52,7 +53,7 @@ export interface ItemContractSuggestionResult {
 }
 
 /** Chave de vínculo de um contrato do catálogo (mesma regra do LinkContractModal). */
-export const contractKeyOf = (c: ContractDashboardRecord) => c.id || `${c.uasg}-${c.numero}-${c.ano}`;
+export const contractKeyOf = (c: ContractDashboardRecord) => chaveDoContrato(c);
 
 const digits = (v?: string | number | null) => String(v ?? '').replace(/\D/g, '');
 const norm = (k: string) => k.trim().toUpperCase();

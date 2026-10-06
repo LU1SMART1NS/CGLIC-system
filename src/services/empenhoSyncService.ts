@@ -11,7 +11,6 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { fetchAndNormalizeComprasGovEmpenhos } from '../adapters/comprasGovEmpenhoAdapter';
 import { fetchAndNormalizeContratosGovEmpenhos } from '../adapters/contratosGovEmpenhoAdapter';
-import { fetchAndNormalizePncpEmpenhos } from '../adapters/pncpEmpenhoAdapter';
 import { reconcileNormalizedEmpenhos } from './empenhoReconciliationService';
 import type {
   NormalizedEmpenho,
@@ -240,7 +239,7 @@ export async function syncEmpenhosForItem(
   });
   allNormalized.push(...comprasGovEmpenhos);
 
-  // 2. Leitura e normalização de Contratos.gov.br e PNCP para cada contrato vinculado
+  // 2. Leitura e normalização de Contratos.gov.br para cada contrato vinculado
   for (const c of contracts) {
     if (c.contratoId) {
       const targetNum = numeroItem ? parseInt(numeroItem, 10) : undefined;
@@ -255,16 +254,8 @@ export async function syncEmpenhosForItem(
       allNormalized.push(...contratosGovEmpenhos);
     }
 
-    if (c.cnpj && c.ano && c.sequencialContrato) {
-      const pncpEmpenhos = await fetchAndNormalizePncpEmpenhos({
-        cnpj: c.cnpj,
-        ano: c.ano,
-        sequencialContrato: c.sequencialContrato,
-        contractKey: c.contractKey,
-        uasg
-      });
-      allNormalized.push(...pncpEmpenhos);
-    }
+    // O PNCP não entra: ele não informa a UASG emitente, e gravar o que vem dele criaria a NE com
+    // chave errada. A conferência com o PNCP fica no fluxo do contrato (empenhoOrchestrationService).
   }
 
   // 3. Reconciliação determinística campo a campo

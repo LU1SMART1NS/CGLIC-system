@@ -1,15 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  sincronizarEmpenhosDoContrato,
+  sincronizarEmpenhosDoRegistro,
+  pendenciasPncp,
   situacaoDoResultado,
   mensagemDoResultado,
   falhaTransitoria,
   type SituacaoSincronizacaoEmpenhos
 } from '../services/contratoEmpenhosSincronizacaoService';
-import { resolveContractKey } from '../utils/contractKeyUtils';
 import { SINCRONIZACAO_EMPENHOS_QUERY_KEY } from './useSincronizacaoEmpenhosContrato';
-import type { ContractTarget, OrchestrationResult } from '../types/empenhoSync';
+import type { OrchestrationResult } from '../types/empenhoSync';
 import type { ContractDashboardRecord } from '../types';
 
 /** Mesmo teto de concorrência usado em orchestrateAtaEmpenhoSync, para não saturar as APIs oficiais (HTTP 429). */
@@ -33,6 +33,13 @@ export interface BatchSyncFalha {
   erro: string;
 }
 
+export interface BatchSyncDivergenciaPncp {
+  contractKey: string;
+  numero: string;
+  uasg: string;
+  avisos: string[];
+}
+
 export interface BatchSyncSummary {
   totalContratos: number;
   /** A fonte respondeu e os empenhos foram gravados. */
@@ -44,32 +51,13 @@ export interface BatchSyncSummary {
   /** A fonte não respondeu, ou o contrato não tem o id do Contratos.gov.br. */
   comErro: number;
   empenhosPersistidos: number;
+  /** Contratos com empenho no PNCP que não está no Contratos.gov.br (conferência; nada é gravado). */
+  divergentesPncp: BatchSyncDivergenciaPncp[];
   /** Contratos que passaram por uma segunda tentativa. */
   novasTentativas: number;
   cancelado: boolean;
   /** Contratos que terminaram em PARCIAL ou ERRO, para mostrar e tentar de novo. */
   falhas: BatchSyncFalha[];
-}
-
-export function buildContractTarget(contract: ContractDashboardRecord): ContractTarget {
-  const contractKey = contract.id || resolveContractKey(contract.uasg, contract.numero, contract.ano).key;
-
-  const pncpParams =
-    contract.codigoOrgao && contract.ano && contract.numero
-      ? {
-          cnpj: contract.codigoOrgao,
-          ano: contract.ano,
-          sequencialContrato: contract.numero
-        }
-      : undefined;
-
-  return {
-    tipo: 'CONTRATO',
-    contractKey,
-    // Só o id do Contratos.gov.br: a chave do contrato no lugar dele faz a consulta falhar.
-    contratoId: contract.contratoId,
-    pncpParams
-  };
 }
 
 /** Contratos das carteiras das duas UASGs, sem repetir a mesma chave, que o lote sincroniza. */
@@ -95,8 +83,8 @@ interface ResultadoContrato {
 }
 
 async function sincronizarContrato(contract: ContractDashboardRecord): Promise<ResultadoContrato> {
-  const target = buildContractTarget(contract);
-  const result = await sincronizarEmpenhosDoContrato(target);
+  // Completa o id do Contratos.gov.br se faltar (e grava), confere com o PNCP pelo id do PNCP.
+  const { target, result } = await sincronizarEmpenhosDoRegistro(contract);
   return { contract, contractKey: target.contractKey, result };
 }
 
@@ -114,6 +102,7 @@ export function resumirLote(
     parciais: 0,
     comErro: 0,
     empenhosPersistidos: 0,
+    divergentesPncp: [],
     novasTentativas,
     cancelado,
     falhas: []
@@ -122,6 +111,15 @@ export function resumirLote(
   for (const { contract, contractKey, result } of resultados) {
     const situacao = situacaoDoResultado(result);
     summary.empenhosPersistidos += result.empenhos_persistidos || 0;
+    const avisosPncp = pendenciasPncp(result).filter((m) => !m.startsWith('Conferência com o PNCP não feita'));
+    if (avisosPncp.length > 0) {
+      summary.divergentesPncp.push({
+        contractKey,
+        numero: contract.numeroFormatado || contract.numero || contractKey,
+        uasg: contract.uasg,
+        avisos: avisosPncp
+      });
+    }
     if (situacao === 'OK') summary.atualizados++;
     else if (situacao === 'SEM_EMPENHOS') summary.semEmpenhos++;
     else {

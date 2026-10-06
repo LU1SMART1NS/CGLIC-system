@@ -16,6 +16,7 @@ import type {
 } from '../types/contractValueEvolution';
 import type { ContractDashboardRecord } from '../types';
 import { formatDateBR } from './temporalEngineService';
+import { chaveDoContrato } from '../utils/contractKeyUtils';
 
 /**
  * 1. Arredonda valor monetário garantindo precisão estrita de centavos (2 casas decimais)
@@ -218,7 +219,7 @@ export function buildContractValueEvolutionModel(
   },
   events: readonly ContractEvent[] = []
 ): ContractValueEvolutionReadModel {
-  const contractKey = contract.contractKey || contract.id || `${contract.uasg || ''}-${contract.numero || ''}-${contract.ano || ''}`;
+  const contractKey = contract.contractKey || chaveDoContrato(contract);
   const uasg = contract.uasg;
   const numeroContrato = contract.numero;
   const anoContrato = typeof contract.ano === 'number' ? contract.ano : (parseInt(String(contract.ano || '0'), 10) || undefined);

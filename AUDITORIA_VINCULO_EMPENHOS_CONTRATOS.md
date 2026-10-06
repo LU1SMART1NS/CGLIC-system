@@ -41,6 +41,7 @@ Checagens contra a API:
 - 14 contratos via `/faturas`: nenhuma fatura cita NE ausente do contrato no banco. Os 8 contratos vigentes sem empenho amostrados têm 0 faturas.
 - `/api/contrato/22571/empenhos` (00021/2017) não respondeu em 300 s. O mesmo endpoint para 745812 responde em 0,3 s. O travamento é por contrato, não geral.
 - PNCP `/orgaos/00394494000136/contratos/{ano}/{seq}/empenhos`: 404 "Nenhum empenho do contrato encontrado" nos 3 contratos testados do MJSP.
+- **Correção (Fase 2):** com o id do PNCP de cada contrato, o PNCP lista empenho em 16 dos 344 contratos vigentes que têm esse id. São as mesmas NEs do Contratos.gov.br (0 divergências), mas o PNCP não informa a UASG emitente: em 21 delas a emitente é a 200330 e o contrato é da 200331. Gravá-las a partir do PNCP criaria a NE com a chave errada.
 - `/api/v1/contrato/empenho/consultar/{id}` (minuta): 401, exige token.
 
 Casos que parecem erro mas são fiéis à fonte:
@@ -110,7 +111,10 @@ Ordem: impacto no vínculo primeiro.
 3. Registrar resultado por contrato: coluna `empenhos_sincronizados_em` + `empenhos_sync_status` (OK, SEM_NE, ERRO, mensagem) em `contratos_oficiais`, gravada pela RPC já existente `atualizar_contrato_oficial`. A tela mostra "atualizado em …" ou "falhou em …" em vez de "Nenhum empenho".
 4. Lote: `Promise.allSettled`, uma nova tentativa para timeouts, lista final dos contratos que falharam com botão "tentar só estes".
 
-### Fase 2: parâmetros corretos
+### Fase 2: parâmetros corretos (implementada na branch feat/empenhos-sync-fase-2)
+
+Decisão tomada na implementação: o PNCP passa a ser só conferência. Ele é consultado pelo id do PNCP do contrato, depois do Contratos.gov.br, e o que ele listar a mais vira aviso; nada do PNCP é gravado, em nenhum fluxo.
+
 
 5. `pncpParams` derivados de `parseNumeroControlePncpContrato(contract.numeroControlePncp)` e `cnpjDaUasg(contract.uasg)`; sem id PNCP, fonte "não aplicável". Como o PNCP não devolve empenhos do MJSP, considerar desligar a fonte até mostrar valor.
 6. Nunca usar `contract.id` como `contratoId`. Sem id: resolver via `/ugorigem/{ug}/numeroano/{n}` como o fluxo de item, e gravar o id obtido em `contratos_oficiais`.

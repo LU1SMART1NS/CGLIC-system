@@ -55,6 +55,7 @@ import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
 import { fetchPaymentCyclesForContracts } from '../adapters/paymentCycleRpcAdapter';
 import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
+import { chaveDoContrato } from '../utils/contractKeyUtils';
 
 /**
  * Auxiliar para cálculo de dias restantes de vigência
@@ -149,7 +150,7 @@ export function calculateDeadlinesSummary(
   const itensVencendo: ManagementDashboardDeadlinesSummary['itensVencendo'] = [];
 
   for (const contract of contracts) {
-    const contractKey = contract.id || `${contract.uasg || ''}-${contract.numero || ''}-${contract.ano || ''}`;
+    const contractKey = chaveDoContrato(contract);
     const dias = getContractDaysRemaining(contract.dataVigenciaFim, currentDate);
 
     if (dias === null) continue;

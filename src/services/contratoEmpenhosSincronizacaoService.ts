@@ -7,8 +7,13 @@
  * módulo só a executa, traduz o resultado e o registra.
  */
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import { orchestrateContractEmpenhoSync } from './empenhoOrchestrationService';
+import { orchestrateContractEmpenhoSync, contratoIdValido } from './empenhoOrchestrationService';
+import { parseNumeroControlePncpContrato } from './pncpContratoService';
+import { fetchContratoContratosGov, mesclarContratosGov } from './contratosGovContratoService';
+import { persistirContratoCompletado } from './contratosOficiaisService';
+import { chaveDoContrato } from '../utils/contractKeyUtils';
 import type { ContractTarget, OrchestrationResult } from '../types/empenhoSync';
+import type { ContractDashboardRecord } from '../types';
 
 export type SituacaoSincronizacaoEmpenhos = 'OK' | 'SEM_EMPENHOS' | 'PARCIAL' | 'ERRO';
 
@@ -48,6 +53,21 @@ export function mensagemDoResultado(result: Pick<OrchestrationResult, 'erros' | 
   return result.resumo_sync?.erros?.find((e) => e.erro)?.erro;
 }
 
+/** Pendências da conferência com o PNCP (empenho no PNCP e não no Contratos.gov.br, ou conferência não feita). */
+export function pendenciasPncp(result: Pick<OrchestrationResult, 'pendencias'>): string[] {
+  return (result.pendencias ?? []).filter((p) => p.contexto?.fonte === 'PNCP').map((p) => p.motivo);
+}
+
+/**
+ * Mensagem gravada com a situação: o erro, se houver; senão, o aviso da conferência com o PNCP.
+ */
+export function mensagemParaRegistro(result: Pick<OrchestrationResult, 'erros' | 'resumo_sync' | 'pendencias'>): string | undefined {
+  const erro = mensagemDoResultado(result);
+  if (erro) return erro;
+  const pncp = pendenciasPncp(result);
+  return pncp.length > 0 ? pncp.join(' ') : undefined;
+}
+
 /**
  * Erro que vale tentar de novo: a fonte não respondeu, respondeu com limite de requisições ou erro
  * do servidor, ou a rede falhou. Contrato sem id do Contratos.gov.br não muda numa nova tentativa.
@@ -70,7 +90,7 @@ export async function registrarSincronizacaoEmpenhos(contractKey: string, result
   const { error } = await supabase.rpc('registrar_sincronizacao_empenhos_contrato', {
     p_contract_key: contractKey,
     p_situacao: situacaoDoResultado(result),
-    p_mensagem: mensagemDoResultado(result) ?? null,
+    p_mensagem: mensagemParaRegistro(result) ?? null,
     p_empenhos_lidos: result.empenhos_encontrados ?? 0,
     p_empenhos_gravados: result.empenhos_persistidos ?? 0,
     p_vinculos_gravados: result.vinculos_contrato_criados ?? 0
@@ -123,6 +143,66 @@ export async function sincronizarEmpenhosDoContrato(target: ContractTarget): Pro
   }
   await registrarSincronizacaoEmpenhos(target.contractKey, result);
   return result;
+}
+
+/** Parâmetros do PNCP a partir do id do contrato no PNCP ("cnpj-2-sequencial/ano"); sem ele, nenhum. */
+export function pncpParamsDoContrato(numeroControlePncp?: string | null): ContractTarget['pncpParams'] {
+  const p = parseNumeroControlePncpContrato(numeroControlePncp);
+  return p ? { cnpj: p.cnpj, ano: p.ano, sequencialContrato: p.sequencial } : undefined;
+}
+
+/**
+ * Alvo da sincronização a partir do registro do contrato: chave canônica, id do Contratos.gov.br (só
+ * ele, nunca a chave no lugar), UASG do contrato (para o empenho sem UASG emitente) e PNCP pelo id do PNCP.
+ */
+export function alvoDoContrato(contract: ContractDashboardRecord, numeroControlePncp?: string | null): ContractTarget {
+  return {
+    tipo: 'CONTRATO',
+    contractKey: chaveDoContrato(contract),
+    contratoId: contratoIdValido(contract.contratoId) ? contract.contratoId : undefined,
+    uasg: contract.uasg,
+    pncpParams: pncpParamsDoContrato(numeroControlePncp ?? contract.numeroControlePncp)
+  };
+}
+
+/**
+ * Garante o id do Contratos.gov.br: se o registro não tem, busca o contrato avulso
+ * (`/contrato/ugorigem/{uasg}/numeroano/{NNNNNAAAA}`) e grava o registro completado no banco, para a
+ * próxima sincronização já ter o id. Lança se o Contratos.gov.br falhar; devolve o registro como
+ * veio se o contrato não for encontrado (ou houver mais de um com o mesmo número).
+ */
+export async function completarIdContratosGov(contract: ContractDashboardRecord): Promise<ContractDashboardRecord> {
+  if (contratoIdValido(contract.contratoId)) return contract;
+  const gov = await fetchContratoContratosGov(contract);
+  if (!gov || !contratoIdValido(gov.contratoId)) return contract;
+  const completo = mesclarContratosGov(contract, gov);
+  await persistirContratoCompletado(completo);
+  return completo;
+}
+
+/**
+ * Sincroniza os empenhos de um contrato a partir do registro dele: completa o id do Contratos.gov.br
+ * se faltar, monta o alvo e registra o resultado. Não lança.
+ */
+export async function sincronizarEmpenhosDoRegistro(
+  contract: ContractDashboardRecord,
+  opts: { numeroControlePncp?: string | null } = {}
+): Promise<{ target: ContractTarget; result: OrchestrationResult }> {
+  let completo = contract;
+  try {
+    completo = await completarIdContratosGov(contract);
+  } catch (err: any) {
+    const target = alvoDoContrato(contract, opts.numeroControlePncp);
+    const result = resultadoDeErro(
+      target,
+      `O id do contrato no Contratos.gov.br não pôde ser obtido: ${err?.message || 'a fonte não respondeu.'}`
+    );
+    result.erros[0].origem = 'CONTRATOSNET';
+    await registrarSincronizacaoEmpenhos(target.contractKey, result);
+    return { target, result };
+  }
+  const target = alvoDoContrato(completo, opts.numeroControlePncp);
+  return { target, result: await sincronizarEmpenhosDoContrato(target) };
 }
 
 function mapRow(row: any): SincronizacaoEmpenhosContrato {

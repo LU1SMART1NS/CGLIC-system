@@ -61,10 +61,20 @@ const SituacaoSincronizacaoEmpenhos: React.FC<{ sync?: SincronizacaoEmpenhosCont
       </NoticeBar>
     );
   }
-  return (
+  const consultados = (
     <span data-testid="contract-financial-sync-ok" style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
       Empenhos consultados no Contratos.gov.br em {formatDataHora(sync.ultimoSucessoEm || sync.tentativaEm)}.
     </span>
+  );
+  // Sem erro, a mensagem é o aviso da conferência com o PNCP (nada do PNCP é gravado).
+  if (!sync.mensagem) return consultados;
+  return (
+    <>
+      {consultados}
+      <NoticeBar tone="info" testId="contract-financial-sync-pncp">
+        Conferência com o PNCP: {sync.mensagem}
+      </NoticeBar>
+    </>
   );
 };
 
@@ -118,7 +128,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
     const vazio = sync?.situacao === 'SEM_EMPENHOS'
       ? {
           title: 'O Contratos.gov.br não tem empenho para este contrato',
-          description: `Consulta feita em ${formatDataHora(sync.tentativaEm)}. Use Atualizar empenhos, no topo, para consultar de novo.`
+          description: `Consulta feita em ${formatDataHora(sync.tentativaEm)}.${sync.mensagem ? ` Conferência com o PNCP: ${sync.mensagem}` : ''} Use Atualizar empenhos, no topo, para consultar de novo.`
         }
       : ultimaTentativaFalhou(sync) && !sync?.ultimoSucessoEm
         ? {

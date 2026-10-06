@@ -3,7 +3,7 @@ import { useBackTarget, useNavigateWithOrigin } from '../../hooks/useDetailOrigi
 import { ExternalLink } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import { useSyncContractEmpenhos } from '../../hooks/useSyncContractEmpenhos';
-import { mensagemDoResultado } from '../../services/contratoEmpenhosSincronizacaoService';
+import { mensagemDoResultado, pendenciasPncp } from '../../services/contratoEmpenhosSincronizacaoService';
 import { useAuth } from '../../context/AuthContext';
 import type { OrchestrationStatus } from '../../types/empenhoSync';
 import { useContractManager } from '../../hooks/useContractManager';
@@ -25,6 +25,7 @@ import { buildAtaPath } from '../../hooks/useAta';
 import { ataDeOrigem } from '../../services/pncpContratoService';
 import { isUasgCglic } from '../../config/unidadesGestoras';
 import { fiscaisAtivos, garantiaAviso, garantiaMaisLonga, type GarantiaResumo } from '../../services/contractResponsaveisService';
+import { chaveDoContrato } from '../../utils/contractKeyUtils';
 
 interface Contract360HeaderProps {
   contract: ContractDashboardRecord;
@@ -67,11 +68,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   const back = useBackTarget({ path: '/contratos', label: 'Voltar para Contratos' });
   const handleBack = onBack ?? back.back;
 
-  const contractKey =
-    contract.id ||
-    (contract.uasg && contract.numero && contract.ano
-      ? `${contract.uasg}-${contract.numero}-${contract.ano}`
-      : contract.numeroControlePncp || 'unknown-contract');
+  const contractKey = chaveDoContrato(contract) || contract.numeroControlePncp || 'unknown-contract';
 
   const syncMutation = useSyncContractEmpenhos(contractKey);
   // Itens da ata são gravados por RPCs de gestor/admin: só esses perfis refazem a parte dos itens.
@@ -95,19 +92,11 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
 
   const handleSync = () => {
     if (!isAuthorized || syncMutation.isPending) return;
-    const pncpParams =
-      contract.codigoOrgao && contract.ano && contract.numero
-        ? {
-            cnpj: contract.codigoOrgao,
-            ano: contract.ano,
-            sequencialContrato: contract.numero
-          }
-        : undefined;
-
+    // O alvo sai do próprio contrato: id do Contratos.gov.br (buscado e gravado se faltar), UASG e,
+    // para a conferência com o PNCP, o id do PNCP que a tela já conhece.
     syncMutation.mutate({
-      // Só o id do Contratos.gov.br: a chave do contrato no lugar dele faz a consulta falhar.
-      contratoId: contract.contratoId,
-      pncpParams,
+      contrato: contract,
+      numeroControlePncp,
       refreshItems: canRefreshItems ? contract : undefined
     });
   };
@@ -133,18 +122,25 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
     return ` ${partes.join(' · ')}.`;
   })();
 
+  // Conferência com o PNCP: empenho que ele lista e o Contratos.gov.br não (nada do PNCP é gravado).
+  const avisosPncp = syncMutation.data ? pendenciasPncp(syncMutation.data) : [];
+  const pncpResumo = avisosPncp.length > 0 ? ` Conferência com o PNCP: ${avisosPncp.join(' ')}` : '';
+
   // Feedback operacional da sincronização de empenhos
   const getFeedbackConfig = (status?: OrchestrationStatus): { tone: NoticeBarTone; message: string } => {
     switch (status) {
       case 'SUCESSO':
         return {
-          tone: itensRefresh && itensRefresh.falhas.length > 0 ? 'warning' : 'success',
+          tone: (itensRefresh && itensRefresh.falhas.length > 0) || avisosPncp.length > 0 ? 'warning' : 'success',
           message: `Sincronização concluída. ${
             syncMutation.data?.empenhos_persistidos ?? syncMutation.data?.empenhos_encontrados ?? 0
-          } empenho(s) processado(s) e atualizado(s) com sucesso.${itensResumo}`
+          } empenho(s) processado(s) e atualizado(s) com sucesso.${pncpResumo}${itensResumo}`
         };
       case 'SEM_DADOS':
-        return { tone: 'info', message: `O Contratos.gov.br respondeu que este contrato não tem empenho.${itensResumo}` };
+        return {
+          tone: avisosPncp.length > 0 ? 'warning' : 'info',
+          message: `O Contratos.gov.br respondeu que este contrato não tem empenho.${pncpResumo}${itensResumo}`
+        };
       case 'SUCESSO_PARCIAL': {
         const motivo = syncMutation.data ? mensagemDoResultado(syncMutation.data) : undefined;
         return {
