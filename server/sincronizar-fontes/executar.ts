@@ -8,6 +8,11 @@ import { sincronizarContratos } from '../../src/services/contratosOficiaisServic
 import { fetchArpsDasFontes } from '../../src/services/api';
 import { JANELA_VIGENCIA_ATAS, sincronizarAtas } from '../../src/services/syncService';
 import { sincronizarSaldosItens } from '../../src/services/saldosItensSyncService';
+import {
+  contarItensContratosPendentes,
+  ORCAMENTO_ITENS_CONTRATOS_MS,
+  sincronizarItensContratos
+} from '../../src/services/itensContratosSyncService';
 import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFontesService';
 
 /**
@@ -16,12 +21,12 @@ import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFon
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
   recurso: RecursoDoServidor;
-  /** Obrigatória para contratos e atas; saldos_itens vale para todas as carteiras. */
+  /** Obrigatória para contratos, atas e itens_contratos; saldos_itens vale para todas as carteiras. */
   uasg?: string;
   /** Ignora a validade (só o coordenador). */
   forcar?: boolean;
@@ -37,6 +42,8 @@ export interface DependenciasDeExecucao {
   sincronizarContratos: typeof sincronizarContratos;
   sincronizarAtas: typeof sincronizarAtas;
   sincronizarSaldosItens: typeof sincronizarSaldosItens;
+  sincronizarItensContratos: typeof sincronizarItensContratos;
+  contarItensContratosPendentes: typeof contarItensContratosPendentes;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
   fetchArpsDasFontes: typeof fetchArpsDasFontes;
   agora: () => number;
@@ -46,6 +53,8 @@ const PADRAO: DependenciasDeExecucao = {
   sincronizarContratos,
   sincronizarAtas,
   sincronizarSaldosItens,
+  sincronizarItensContratos,
+  contarItensContratosPendentes,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
   agora: () => Date.now()
@@ -94,6 +103,8 @@ export async function executarPedido(
         numeroAtaRegistroPreco: ''
       });
       consulta = { atas: atas.length };
+    } else if (pedido.recurso === 'itens_contratos') {
+      consulta = { ...(await deps.contarItensContratosPendentes(uasg as string)) };
     } else {
       consulta = { observacao: 'saldos_itens não tem consulta de teste; usa os contratos e as atas já gravados.' };
     }
@@ -103,6 +114,8 @@ export async function executarPedido(
   let resultado: ResultadoSincronizacao;
   if (pedido.recurso === 'contratos') resultado = await deps.sincronizarContratos(uasg as string, { forcar: pedido.forcar });
   else if (pedido.recurso === 'atas') resultado = await deps.sincronizarAtas(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
-  else resultado = await deps.sincronizarSaldosItens({ forcar: pedido.forcar });
+  else if (pedido.recurso === 'itens_contratos') {
+    resultado = await deps.sincronizarItensContratos(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_ITENS_CONTRATOS_MS });
+  } else resultado = await deps.sincronizarSaldosItens({ forcar: pedido.forcar });
   return { ...base, dry: false, duracaoMs: deps.agora() - inicio, resultado };
 }

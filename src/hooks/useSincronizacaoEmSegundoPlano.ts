@@ -5,6 +5,7 @@ import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import { sincronizarContratos } from '../services/contratosOficiaisService';
 import { sincronizarAtas } from '../services/syncService';
 import { sincronizarSaldosItens } from '../services/saldosItensSyncService';
+import { sincronizarItensContratos } from '../services/itensContratosSyncService';
 import type { ResultadoSincronizacao } from '../services/sincronizacaoFontesService';
 import { podeSincronizar } from './useSituacaoSincronizacao';
 import { invalidarDadosDeContratos } from './useSincronizacaoContratos';
@@ -27,7 +28,7 @@ function houveMudanca(resultado: ResultadoSincronizacao): boolean {
 }
 
 /**
- * Montado uma vez no layout. Para gestor e coordenador, confere se contratos, atas e saldos dos itens
+ * Montado uma vez no layout. Para gestor e coordenador, confere se contratos, atas, saldos dos itens e itens dos contratos
  * passaram da validade e, se passaram, sincroniza em segundo plano, sem bloquear a tela. A trava do banco garante
  * que, com várias pessoas abrindo o sistema, só uma sincroniza cada recurso. Isso substitui os disparos
  * que as telas faziam sozinhas ao abrir (contrato, item, ata e Visão Geral). Perfis de consulta nunca
@@ -59,6 +60,12 @@ async function conferir(queryClient: QueryClient): Promise<void> {
     const saldos = await sincronizarSaldosItens();
     if (saldos.status === 'ERRO') console.warn('[sincronizacao] saldos dos itens:', saldos.erro);
     if (houveMudanca(saldos)) await invalidarDadosDeSaldosItens(queryClient);
+    // Itens dos contratos: a leitura mais longa, por isso depois do resto; incremental, com orçamento de tempo.
+    for (const uasg of UASGS_CGLIC) {
+      const resultado = await sincronizarItensContratos(uasg);
+      if (resultado.status === 'ERRO') console.warn(`[sincronizacao] itens dos contratos da UASG ${uasg}:`, resultado.erro);
+      if (houveMudanca(resultado)) await queryClient.invalidateQueries({ queryKey: ['itens-contrato'] });
+    }
   } catch (err) {
     console.warn('[sincronizacao] conferência interrompida:', err);
   } finally {

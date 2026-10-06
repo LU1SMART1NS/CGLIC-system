@@ -115,7 +115,11 @@ export const PAGAMENTO_RULES = {
 // -----------------------------------------------------------------------------
 export const SINCRONIZACAO_RULES = {
   /** A quantidade contratada lida da API é relida quando passa de N horas. */
-  quantidadeContratadaVencidaEmHoras: 6
+  quantidadeContratadaVencidaEmHoras: 6,
+  /** Itens de contrato vigente são relidos da API quando a última leitura passa de N horas. */
+  itensContratoVigenteRelidosEmHoras: 24,
+  /** Contrato encerrado quase não muda: os itens são relidos a cada N dias. */
+  itensContratoEncerradoRelidosEmDias: 30
 };
 
 // -----------------------------------------------------------------------------

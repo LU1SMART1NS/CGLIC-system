@@ -381,3 +381,11 @@ Pede confirmação e, em ordem: define o secret da função, implanta a função
 - Como os dados estavam em dia (contratos 14:30, atas 12:48, saldos 13:21), as próximas execuções reais do agendamento só agem quando vencer a validade de 6 h: atas a partir do :15 depois das 18:48, saldos depois das 19:21, contratos depois das 20:30. Até lá, a hora cheia só confere e responde "nada a fazer".
 - O script ganhou `--sim` sem perguntas (também no `db push --yes`), para rodar sem terminal interativo.
 - **Primeira sincronização real feita pelo servidor (14:40):** com a validade de contratos 200330 marcada como vencida, o disparo do agendamento reservou a trava, leu as fontes, gravou 42 contratos pela chave de service role e concluiu com SUCESSO em cerca de 5 s. Caminho de gravação do servidor comprovado em produção.
+
+### Itens dos contratos (06/10/2026, migration 78)
+- Recurso novo `itens_contratos`, por UASG, no servidor (jobs `sincronizar-itens-contratos-200330` e `-200331`, às :25) e no navegador de gestor e coordenador, depois dos saldos. Agora são 8 jobs.
+- Grava `itens_contrato` (cópia dos itens como o Contratos.gov.br ou, na falta, o Compras.gov.br informa) e `itens_contrato_leituras` (quando cada contrato foi lido e quantos itens vieram), pela função `gravar_itens_contratos`, sob a trava.
+- Incremental: lê o contrato nunca lido, o vigente lido há mais de 24 h e o encerrado lido há mais de 30 dias. Orçamento de 100 s por execução; o resto fica para a próxima (PARCIAL). Leitura vazia não apaga itens já gravados.
+- A leitura dos itens (`lerItensDoContrato`) é a mesma que alimenta a quantidade dos vínculos com a ata: uma fonte só.
+- O Contrato 360 ganhou a aba Itens, que lê só do banco e mostra o item da ata vinculado a cada item, avisando o vínculo que aponta para um item que o contrato não tem.
+- Primeira execução (15:31): 200330 completa (42 contratos); 200331 leu 302 de 1.057 em 100 s. O restante entra nas próximas execuções horárias.
