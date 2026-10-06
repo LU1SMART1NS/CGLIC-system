@@ -1,6 +1,6 @@
 import React from 'react';
 import { Check, Info } from 'lucide-react';
-import { carteiraButton } from '../../carteira/carteiraStyles';
+import { AppButton } from '../../../design-system/components/AppButton';
 import { useAvisosDistribuicao, useMarcarAvisosLidos } from '../../../hooks/useAvisosDistribuicao';
 import { useToast } from '../../../design-system/components/Toast';
 import type { DistribuicaoAviso } from '../../../services/distribuicaoAvisosService';
@@ -47,17 +47,20 @@ export const AvisosVinculoBanner: React.FC<{ podeVer: boolean }> = ({ podeVer })
         <strong>
           {avisos.length === 1 ? '1 vínculo mudou o gestor' : `${avisos.length} vínculos mudaram o gestor`} desde a última leitura
         </strong>
-        <button
+        <AppButton
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() =>
             marcar.mutate(undefined, { onError: (err: any) => toast.error(`Não foi possível marcar como lido: ${err?.message || 'erro desconhecido'}`) })
           }
           disabled={marcar.isPending}
           data-testid="distribuicao-avisos-lidos"
-          style={{ ...carteiraButton, marginLeft: 'auto' }}
+          icon={<Check size={14} />}
+          style={{ marginLeft: 'auto' }}
         >
-          <Check size={13} /> Marcar como lido
-        </button>
+          Marcar como lido
+        </AppButton>
       </div>
       <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
         {mostrados.map((a) => (
@@ -67,13 +70,9 @@ export const AvisosVinculoBanner: React.FC<{ podeVer: boolean }> = ({ podeVer })
         ))}
       </ul>
       {avisos.length > MOSTRAR && (
-        <button
-          type="button"
-          onClick={() => setTodos((v) => !v)}
-          style={{ marginTop: '0.4rem', background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
-        >
+        <AppButton type="button" variant="link" size="sm" onClick={() => setTodos((v) => !v)} style={{ marginTop: '0.4rem' }}>
           {todos ? 'Mostrar menos' : `Mostrar todos (${avisos.length})`}
-        </button>
+        </AppButton>
       )}
     </section>
   );

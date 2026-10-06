@@ -157,13 +157,9 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
 
       {dismissed.length > 0 && (
         <div style={{ marginTop: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={() => setShowDismissed((v) => !v)}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)' }}
-          >
+          <AppButton type="button" variant="link" size="sm" onClick={() => setShowDismissed((v) => !v)}>
             {showDismissed ? 'Ocultar descartados' : `Ver descartados (${dismissed.length})`}
-          </button>
+          </AppButton>
           {showDismissed && <div style={{ marginTop: '0.5rem' }}>{renderTable(dismissed, true)}</div>}
         </div>
       )}

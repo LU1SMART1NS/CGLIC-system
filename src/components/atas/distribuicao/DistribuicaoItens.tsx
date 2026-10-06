@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { ArrowLeftRight, ArrowRight, UserPlus } from 'lucide-react';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
-import { carteiraButton } from '../../carteira/carteiraStyles';
+import { AppButton } from '../../../design-system/components/AppButton';
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import { buildAtaPath } from '../../../hooks/useAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
@@ -109,15 +109,16 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>Mais urgentes primeiro</span>
         )}
         {canAssign && selected.size > 0 && (
-          <button
+          <AppButton
             type="button"
+            variant="primary"
+            size="sm"
             onClick={transferSelected}
             data-testid="distribuicao-transferir-selecionados"
-            style={{ ...carteiraButton, color: '#ffffff', background: 'var(--primary)', borderColor: 'var(--primary)' }}
+            icon={isSemGestor ? <UserPlus size={14} /> : <ArrowLeftRight size={14} />}
           >
-            {isSemGestor ? <UserPlus size={13} /> : <ArrowLeftRight size={13} />}{' '}
             {isSemGestor ? 'Atribuir' : 'Transferir'} {selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}
-          </button>
+          </AppButton>
         )}
       </div>
 
@@ -217,9 +218,9 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                 )}
               </span>
               <span style={{ fontSize: '0.78rem', fontWeight: 700, minWidth: '64px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrencyCompact(item.valor)}</span>
-              <button type="button" onClick={() => navigate(itemPath(item))} style={carteiraButton}>
+              <AppButton type="button" variant="outline" size="sm" onClick={() => navigate(itemPath(item))}>
                 Abrir <ArrowRight size={13} />
-              </button>
+              </AppButton>
             </li>
           );
         })}
@@ -228,9 +229,9 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.78rem', color: '#64748b' }}>
         <span>Mostrando {shown.length} de {linha.itens.length}</span>
         {shown.length < linha.itens.length && (
-          <button type="button" onClick={() => setVisible((v) => v + MORE_SIZE)} data-testid="distribuicao-mostrar-mais" style={carteiraButton}>
+          <AppButton type="button" variant="outline" size="sm" onClick={() => setVisible((v) => v + MORE_SIZE)} data-testid="distribuicao-mostrar-mais">
             Mostrar mais {Math.min(MORE_SIZE, linha.itens.length - shown.length)}
-          </button>
+          </AppButton>
         )}
       </div>
       {ajustando && <AjusteComplexidadePanel item={ajustando.item} anchorRect={ajustando.anchor} onClose={() => setAjustando(null)} />}

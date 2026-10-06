@@ -20,7 +20,7 @@ describe('AppButton — hover e foco em CSS', () => {
   it('não usa estado de hover inline e expõe a classe por variante', () => {
     const html = renderToStaticMarkup(<AppButton variant="danger">Excluir</AppButton>);
     expect(html).toContain('ds-btn ds-btn--danger');
-    expect(html).toContain('background-color:var(--color-danger-solid)');
+    expect(html).not.toContain('background');
     expect(html).not.toContain('outline');
   });
 });

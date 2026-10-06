@@ -225,7 +225,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
           title="Nenhuma unidade interna cadastrada"
           description="As alocações usam as unidades do catálogo oficial de Unidades Internas, que ainda está vazio. Cadastre as unidades para poder alocar."
           icon={<Building2 size={32} color="#94a3b8" />}
-          action={<Link to="/admin/departamentos" className="btn btn-secondary">Abrir Unidades Internas</Link>}
+          action={<Link to="/admin/departamentos" className="ds-btn ds-btn--outline ds-btn--md">Abrir Unidades Internas</Link>}
         />
       )}
 

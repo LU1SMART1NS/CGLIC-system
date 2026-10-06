@@ -17,7 +17,7 @@ import type { ContractDashboardRecord } from '../../types';
 import { formatCnpj } from '../../utils/format';
 import { displayContractNumber } from '../../utils/contractNumber';
 import { useDescartesAtaContrato } from '../../hooks/useDescartesAtaContrato';
-import { Modal, AlertCard, useToast } from '../../design-system';
+import { Modal, AlertCard, useToast, AppButton } from '../../design-system';
 import {
   rankContractsBySuggestion,
   aplicarRestricoesDeVinculo,
@@ -521,13 +521,9 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       {displayContractNumber(selectedContract) || `Contrato ${selectedContract.numero}/${selectedContract.ano}`}
                     </h4>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedContract(null)}
-                    style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
-                  >
+                  <AppButton type="button" variant="outline" size="xs" onClick={() => setSelectedContract(null)}>
                     Trocar contrato
-                  </button>
+                  </AppButton>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.5rem', fontSize: '0.78rem', color: '#475569' }}>
@@ -671,42 +667,17 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 
               {/* Botões de Ação */}
               <div className="link-contract-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  disabled={isPending}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.85rem',
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    color: '#475569'
-                  }}
-                >
+                <AppButton type="button" variant="outline" onClick={handleClose} disabled={isPending}>
                   Cancelar
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   type="submit"
+                  variant="primary"
                   disabled={isPending || Boolean(ataBloqueandoSelecionado) || (isAtaMode && checkedItems.length === 0)}
-                  style={{
-                    padding: '0.5rem 1.25rem',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    background: 'var(--primary)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: isPending ? 'wait' : 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem'
-                  }}
+                  isLoading={isPending}
                 >
-                  {isPending ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : null}
                   {isAtaMode && checkedItems.length > 1 ? `Vincular a ${checkedItems.length} itens` : 'Vincular Contrato'}
-                </button>
+                </AppButton>
               </div>
             </form>
           )}

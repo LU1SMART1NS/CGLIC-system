@@ -170,13 +170,9 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
       origin={{
         label: 'Ata de origem',
         value: onOpenAta ? (
-          <button
-            type="button"
-            onClick={onOpenAta}
-            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer' }}
-          >
+          <AppButton type="button" variant="link" size="sm" onClick={onOpenAta}>
             nº {arp.numeroAtaRegistroPreco}
-          </button>
+          </AppButton>
         ) : (
           <span>nº {arp.numeroAtaRegistroPreco}</span>
         )

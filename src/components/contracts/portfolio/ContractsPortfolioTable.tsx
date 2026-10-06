@@ -2,6 +2,8 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { EmptyState } from '../../../design-system/components/EmptyState';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { IconButton } from '../../../design-system/components/IconButton';
 import { SeverityBadge } from '../../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../../services/temporalEngineService';
 import { formatContractNumber } from '../../../utils/contractNumber';
@@ -11,7 +13,7 @@ import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { formatCurrency } from '../../carteira/carteiraFormat';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { situacaoDaFaixa, type PrazoFaixa } from '../../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../../carteira/CarteiraCellFilter';
@@ -162,16 +164,14 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                 <React.Fragment key={contractKey}>
                   <tr data-testid={`contracts-row-${contractKey}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirContrato)}>
                     <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
-                      <button
+                      <IconButton
                         type="button"
                         onClick={() => setExpandedKey(isExpanded ? null : contractKey)}
-                        aria-expanded={isExpanded}
-                        aria-label={isExpanded ? 'Recolher detalhes do contrato' : 'Expandir detalhes do contrato'}
+                        expanded={isExpanded}
+                        label={isExpanded ? 'Recolher detalhes do contrato' : 'Expandir detalhes do contrato'}
                         data-testid={`contracts-expand-${contractKey}`}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.2rem' }}
-                      >
-                        {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                      </button>
+                        icon={isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      />
                     </td>
                     <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
@@ -307,13 +307,14 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                                       {p.badgeLabel || p.description || p.title}
                                     </span>
                                   </div>
-                                  <button
+                                  <AppButton
                                     type="button"
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => navigate(acao.targetUrl)}
-                                    style={carteiraButton}
                                   >
                                     {acao.label} <ArrowRight size={13} />
-                                  </button>
+                                  </AppButton>
                                 </div>
                               );
                             })

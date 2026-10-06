@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, Calendar, Cpu } from 'lucide-react';
+import { AppButton } from './AppButton';
 import { StatusBadge, type StatusBadgeVariant } from './StatusBadge';
 import { colors, shapes, typography, spacing } from '../tokens';
 
@@ -155,26 +156,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         </div>
 
         {onAction && (
-          <button
+          <AppButton
             type="button"
+            variant="outline"
+            size="sm"
             onClick={onAction}
             data-testid={`task-action-btn-${id}`}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: spacing.xxs,
-              padding: `${spacing.xxs} ${spacing.sm}`,
-              background: colors.background.subtle,
-              color: colors.brand.primary,
-              border: `1px solid ${colors.border.strong}`,
-              borderRadius: shapes.radius.md,
-              fontSize: typography.fontSize.label,
-              fontWeight: typography.fontWeight.bold,
-              cursor: 'pointer'
-            }}
           >
             <span>{actionLabel}</span>
-          </button>
+          </AppButton>
         )}
       </div>
     </div>

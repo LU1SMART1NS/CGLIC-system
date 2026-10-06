@@ -7,7 +7,8 @@ import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../../carteira/CarteiraRowLink';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
@@ -241,14 +242,16 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                       </td>
                       {podeAtribuir && (
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button
+                          <AppButton
                             type="button"
+                            variant="success"
+                            size="sm"
                             onClick={() => onAtribuir([ata])}
                             data-testid={`ata-sem-gestor-atribuir-${ata.numeroAta}`}
-                            style={{ ...carteiraButton, color: 'var(--color-success-text)', borderColor: 'var(--color-success-border)', background: 'var(--color-success-bg)' }}
+                            icon={<UserPlus size={14} />}
                           >
-                            <UserPlus size={13} /> Atribuir
-                          </button>
+                            Atribuir
+                          </AppButton>
                         </td>
                       )}
                     </tr>

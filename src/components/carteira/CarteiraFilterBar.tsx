@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
+import { AppButton } from '../../design-system/components/AppButton';
 import { CarteiraFilterButton, type CarteiraFilterOption } from './CarteiraFilterButton';
 import { SEM_GESTOR, TODOS_GESTORES } from './carteiraGestor';
 
@@ -54,26 +55,16 @@ export const CarteiraFilterBar: React.FC<CarteiraFilterBarProps> = ({
       {children}
 
       {hasActiveFilters && (
-        <button
+        <AppButton
           type="button"
+          variant="ghostDanger"
+          size="sm"
           onClick={onResetFilters}
           data-testid={`${testIdPrefix}-reset-filters-btn`}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            padding: '0.35rem 0.65rem',
-            background: 'var(--color-danger-bg-strong)',
-            border: '1px solid var(--color-danger-border)',
-            borderRadius: '6px',
-            fontSize: '0.76rem',
-            fontWeight: 700,
-            color: 'var(--color-danger-text-strong)',
-            cursor: 'pointer'
-          }}
+          icon={<X size={14} />}
         >
-          <X size={12} /> Limpar
-        </button>
+          Limpar
+        </AppButton>
       )}
     </div>
 

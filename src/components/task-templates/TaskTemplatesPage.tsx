@@ -74,13 +74,13 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
     <>
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '0.75rem', background: '#ffffff', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem', background: '#f8fafc', borderBottom: open ? '1px solid #e2e8f0' : 'none' }}>
-        <button
+        <IconButton
           type="button"
           onClick={() => setOpen(!open)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '2px' }}
-        >
-          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
+          label={open ? 'Recolher macrotarefa' : 'Expandir macrotarefa'}
+          expanded={open}
+          icon={open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        />
 
         {editingMacroNome !== null ? (
           <>
@@ -91,14 +91,13 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
               style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.85rem', padding: '0.3rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
               autoFocus
             />
-            <button
+            <IconButton
               type="button"
+              variant="success"
               onClick={handleRenameMacro}
-              style={{ background: 'none', border: 'none', color: 'var(--color-success)', cursor: 'pointer' }}
-              title="Salvar"
-            >
-              <Check size={16} />
-            </button>
+              label="Salvar"
+              icon=<Check size={16} />
+            />
           </>
         ) : (
           <>
@@ -107,16 +106,15 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
               {macro.tarefas.length} tarefa{macro.tarefas.length !== 1 ? 's' : ''}
             </span>
-            <button
+            <IconButton
               type="button"
               onClick={() => setEditingMacroNome(macro.nome)}
-              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}
-              title="Renomear macrotarefa"
-            >
-              <Edit2 size={14} />
-            </button>
-            <button
+              label="Renomear macrotarefa"
+              icon=<Edit2 size={14} />
+            />
+            <IconButton
               type="button"
+              variant="ghostDanger"
               onClick={async () => {
                 const ok = await confirm({
                   title: 'Excluir macrotarefa',
@@ -129,11 +127,9 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                   onError: err => toast.error(`Erro ao excluir macrotarefa: ${err.message || 'Erro desconhecido'}`)
                 });
               }}
-              style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '2px' }}
-              title="Excluir macrotarefa"
-            >
-              <Trash2 size={14} />
-            </button>
+              label="Excluir macrotarefa"
+              icon=<Trash2 size={14} />
+            />
           </>
         )}
       </div>
@@ -183,35 +179,33 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                         autoFocus
                         style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', padding: '0.25rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
                       />
-                      <button
+                      <IconButton
                         type="button"
+                        variant="success"
                         onClick={() => handleRenameTask(task)}
                         disabled={saveTask.isPending}
-                        style={{ background: 'none', border: 'none', color: 'var(--color-success)', cursor: 'pointer', padding: '2px' }}
-                        title="Salvar"
-                      >
-                        <Check size={14} />
-                      </button>
+                        label="Salvar"
+                        icon=<Check size={14} />
+                      />
                     </>
                   ) : (
                     <>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
-                      <button
+                      <IconButton
                         type="button"
                         onClick={() => {
                           saveTask.reset();
                           setEditingTaskNome(task.nome);
                           setEditingTaskId(task.id);
                         }}
-                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}
-                        title="Renomear tarefa"
-                      >
-                        <Edit2 size={13} />
-                      </button>
+                        label="Renomear tarefa"
+                        icon=<Edit2 size={13} />
+                      />
                     </>
                   )}
-                  <button
+                  <IconButton
                     type="button"
+                    variant="ghostDanger"
                     onClick={async () => {
                       const ok = await confirm({
                         title: 'Excluir tarefa',
@@ -224,11 +218,9 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                         onError: err => toast.error(`Erro ao excluir tarefa: ${err.message || 'Erro desconhecido'}`)
                       });
                     }}
-                    style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '2px' }}
-                    title="Excluir tarefa"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                    label="Excluir tarefa"
+                    icon=<Trash2 size={13} />
+                  />
                 </div>
               ))}
             </div>
@@ -381,13 +373,13 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
     <AppCard style={{ borderLeft: template.ativo ? '4px solid var(--primary)' : '4px solid #94a3b8' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '240px' }}>
-          <button
+          <IconButton
             type="button"
             onClick={() => setExpanded(!expanded)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '2px' }}
-          >
-            {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </button>
+            label={expanded ? 'Recolher modelo' : 'Expandir modelo'}
+            expanded={expanded}
+            icon={expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>

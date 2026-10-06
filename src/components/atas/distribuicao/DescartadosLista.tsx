@@ -3,7 +3,7 @@ import { RotateCcw } from 'lucide-react';
 import { AppButton } from '../../../design-system';
 import { useToast } from '../../../design-system/components/Toast';
 import { useRestaurarAta } from '../../../hooks/useDescartesAtaContrato';
-import { carteiraButton, carteiraTableShell } from '../../carteira/carteiraStyles';
+import { carteiraTableShell } from '../../carteira/carteiraStyles';
 import type { DescarteAta } from './contratosSemAta';
 
 /** "Ver descartados (N)": atas que o coordenador descartou para o contrato, com Restaurar. */
@@ -24,15 +24,17 @@ export const DescartadosLista: React.FC<{ descartados: DescarteAta[]; podeRestau
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <button
+      <AppButton
         type="button"
+        variant="outline"
+        size="sm"
         onClick={() => setAberto((v) => !v)}
         aria-expanded={aberto}
         data-testid={`${testIdPrefix}-ver-descartados`}
-        style={{ ...carteiraButton, color: '#475569', alignSelf: 'flex-start' }}
+        style={{ alignSelf: 'flex-start' }}
       >
         {aberto ? 'Ocultar descartados' : 'Ver descartados'} ({descartados.length})
-      </button>
+      </AppButton>
       {aberto && (
         <div style={carteiraTableShell} data-testid={`${testIdPrefix}-descartados`}>
           {descartados.map((d) => (

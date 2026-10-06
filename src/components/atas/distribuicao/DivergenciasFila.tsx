@@ -4,7 +4,8 @@ import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilte
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
@@ -87,14 +88,16 @@ export const DivergenciasFila: React.FC<DivergenciasFilaProps> = ({ divergencias
                     <td data-label="Gestor do contrato" style={carteiraTd}><span>{d.gestorContrato || semGestor}</span></td>
                     {podeAlinhar && (
                       <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button
+                        <AppButton
                           type="button"
+                          variant="success"
+                          size="sm"
                           onClick={() => onAlinhar(d)}
                           data-testid={`distribuicao-alinhar-${d.contractKey}`}
-                          style={{ ...carteiraButton, color: 'var(--color-success-text)', borderColor: 'var(--color-success-border)', background: 'var(--color-success-bg)' }}
+                          icon={<UserPlus size={14} />}
                         >
-                          <UserPlus size={13} /> Alinhar gestor
-                        </button>
+                          Alinhar gestor
+                        </AppButton>
                       </td>
                     )}
                   </tr>

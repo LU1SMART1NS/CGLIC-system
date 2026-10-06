@@ -20,21 +20,6 @@ export const carteiraTd: React.CSSProperties = {
   verticalAlign: 'middle'
 };
 
-export const carteiraButton: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.3rem',
-  padding: '0.4rem 0.75rem',
-  background: '#ffffff',
-  border: '1px solid #cbd5e1',
-  borderRadius: '6px',
-  fontSize: '0.76rem',
-  fontWeight: 700,
-  color: 'var(--primary)',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap'
-};
-
 export const carteiraTableShell: React.CSSProperties = {
   background: '#ffffff',
   border: '1px solid #e2e8f0',

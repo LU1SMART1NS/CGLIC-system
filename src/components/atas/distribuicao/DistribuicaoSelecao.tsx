@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckSquare, UserPlus, X } from 'lucide-react';
-import { carteiraButton, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 
 /**
  * Seleção em lote das filas (padrão Gmail / "alterar em lote" do Jira): a seleção sobrevive à troca de página e
@@ -147,27 +148,24 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
     </strong>
     {detalhe && <span>· {detalhe}</span>}
     {quantidade < totalFiltrado && (
-      <button
-        type="button"
-        onClick={onSelecionarTodas}
-        data-testid={`${testIdPrefix}-selecionar-todas`}
-        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
-      >
+      <AppButton type="button" variant="link" size="sm" onClick={onSelecionarTodas} data-testid={`${testIdPrefix}-selecionar-todas`}>
         Selecionar todas as {totalFiltrado}
-      </button>
+      </AppButton>
     )}
     <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem' }}>
-      <button type="button" onClick={onLimpar} data-testid={`${testIdPrefix}-limpar-selecao`} style={{ ...carteiraButton, color: '#475569' }}>
-        <X size={13} /> Limpar
-      </button>
-      <button
+      <AppButton type="button" variant="outline" size="sm" onClick={onLimpar} data-testid={`${testIdPrefix}-limpar-selecao`} icon={<X size={14} />}>
+        Limpar
+      </AppButton>
+      <AppButton
         type="button"
+        variant="primary"
+        size="sm"
         onClick={onAtribuir}
         data-testid={`${testIdPrefix}-atribuir-selecionadas`}
-        style={{ ...carteiraButton, color: '#ffffff', background: 'var(--primary)', borderColor: 'var(--primary)' }}
+        icon={<UserPlus size={14} />}
       >
-        <UserPlus size={13} /> Atribuir a...
-      </button>
+        Atribuir a...
+      </AppButton>
     </span>
   </div>
 );

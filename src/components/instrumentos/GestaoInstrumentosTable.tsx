@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
+import { AppButton } from '../../design-system/components/AppButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import {
@@ -94,26 +95,16 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
         <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', maxWidth: '400px' }}>
           Nenhum instrumento corresponde aos filtros selecionados. Altere os critérios ou limpe os filtros.
         </p>
-        <button
+        <AppButton
           type="button"
+          variant="ghostDanger"
+          size="sm"
           onClick={onResetFilters}
-          style={{
-            marginTop: '0.5rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            padding: '0.45rem 0.85rem',
-            background: 'var(--primary)',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            color: '#ffffff',
-            cursor: 'pointer'
-          }}
+          icon={<RotateCcw size={14} />}
+          style={{ marginTop: '0.5rem' }}
         >
-          <RotateCcw size={13} /> Limpar Filtros
-        </button>
+          Limpar Filtros
+        </AppButton>
       </div>
     );
   }
@@ -204,28 +195,16 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                     {responsavel || <span style={{ color: '#94a3b8' }}>—</span>}
                   </td>
                   <td data-role="action" style={td}>
-                    <button
+                    <AppButton
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => navigate(acao.targetUrl)}
                       data-testid={`instrumentos-action-${item.id}`}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.3rem',
-                        padding: '0.4rem 0.75rem',
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        fontSize: '0.76rem',
-                        fontWeight: 700,
-                        color: 'var(--primary)',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                      }}
                     >
                       {acao.label}
                       <ChevronRight size={13} />
-                    </button>
+                    </AppButton>
                   </td>
                 </tr>
               );

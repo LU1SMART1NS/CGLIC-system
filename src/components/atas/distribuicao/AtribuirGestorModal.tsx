@@ -1,7 +1,7 @@
 import React from 'react';
 import { Check, Lightbulb, Loader2 } from 'lucide-react';
 import { Modal } from '../../../design-system/components/Modal';
-import { carteiraButton } from '../../carteira/carteiraStyles';
+import { AppButton } from '../../../design-system/components/AppButton';
 import { useUsers } from '../../../hooks/useUsers';
 import { useRoles } from '../../../hooks/useRoles';
 import { useAssignManager } from '../../../hooks/useAssignManager';
@@ -83,26 +83,19 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
       testId="atribuir-gestor-modal"
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={assign.isPending} style={{ ...carteiraButton, color: '#475569' }}>
+          <AppButton type="button" variant="outline" onClick={onClose} disabled={assign.isPending}>
             Cancelar
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             type="button"
+            variant="primary"
             onClick={salvar}
             disabled={assign.isPending || !nomeFinal}
             data-testid="atribuir-gestor-salvar"
-            style={{
-              ...carteiraButton,
-              background: 'var(--primary)',
-              borderColor: 'var(--primary)',
-              color: '#ffffff',
-              opacity: assign.isPending || !nomeFinal ? 0.6 : 1,
-              cursor: assign.isPending || !nomeFinal ? 'not-allowed' : 'pointer'
-            }}
+            icon={assign.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           >
-            {assign.isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}{' '}
             {nomeFinal ? `Atribuir a ${nomeFinal}` : 'Escolha um gestor'}
-          </button>
+          </AppButton>
         </>
       }
     >

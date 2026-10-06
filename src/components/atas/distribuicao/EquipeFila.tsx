@@ -4,7 +4,9 @@ import { CarteiraFilterBar } from '../../carteira/CarteiraFilterBar';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CARTEIRA_EXPANDED_CELL_STYLE } from '../../carteira/CarteiraDetailLabel';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { IconButton } from '../../../design-system/components/IconButton';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
@@ -149,16 +151,15 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                     <React.Fragment key={nome}>
                       <tr data-testid={`distribuicao-row-${nome}`}>
                         <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
-                          <button
+                          <IconButton
                             type="button"
+                            size="xs"
                             onClick={() => setExpanded(isExpanded ? null : nome)}
-                            aria-expanded={isExpanded}
-                            aria-label={isExpanded ? 'Recolher atas e contratos' : 'Ver atas e contratos'}
+                            expanded={isExpanded}
+                            label={isExpanded ? 'Recolher atas e contratos' : 'Ver atas e contratos'}
                             data-testid={`distribuicao-expand-${nome}`}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.2rem' }}
-                          >
-                            {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                          </button>
+                            icon={isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                          />
                         </td>
                         <td style={{ ...carteiraTd, minWidth: '160px' }}>
                           <span style={{ fontWeight: 800 }}>{nome}</span>
@@ -182,8 +183,10 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                             {canAssign && (l.ataKeys.length > 0 || l.contractKeys.length > 0) && (
-                              <button
+                              <AppButton
                                 type="button"
+                                variant="success"
+                                size="sm"
                                 onClick={() =>
                                   onTransfer(
                                     [
@@ -195,10 +198,10 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                                 }
                                 data-testid={`distribuicao-transferir-${nome}`}
                                 title="Passar toda a carteira vigente deste gestor para outra pessoa"
-                                style={{ ...carteiraButton, color: 'var(--color-success-text)', borderColor: 'var(--color-success-border)', background: 'var(--color-success-bg)' }}
+                                icon={<ArrowLeftRight size={14} />}
                               >
-                                <ArrowLeftRight size={13} /> Transferir
-                              </button>
+                                Transferir
+                              </AppButton>
                             )}
                           </div>
                         </td>

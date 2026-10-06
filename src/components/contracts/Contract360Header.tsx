@@ -241,13 +241,14 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
               label: 'Ata de origem',
               value:
                 ataOrigem.uasg && isUasgCglic(ataOrigem.uasg) ? (
-                  <button
+                  <AppButton
                     type="button"
+                    variant="link"
+                    size="sm"
                     onClick={() => navigate(buildAtaPath(ataOrigem.numeroAta, ataOrigem.uasg as string))}
-                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer' }}
                   >
                     nº {ataOrigem.numeroAta}
-                  </button>
+                  </AppButton>
                 ) : (
                   <span>nº {ataOrigem.numeroAta}</span>
                 )

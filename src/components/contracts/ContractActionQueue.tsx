@@ -37,21 +37,6 @@ const KIND_LABELS: Record<ContractActionItem['kind'], string> = {
   EMPENHO: 'Execução do contrato'
 };
 
-const secondaryButton: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  padding: '0.4rem 0.75rem',
-  backgroundColor: '#ffffff',
-  color: 'var(--primary)',
-  border: '1px solid #cbd5e1',
-  borderRadius: '6px',
-  fontSize: '0.78rem',
-  fontWeight: 700,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap'
-};
-
 export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue, contractKey, plan, isLoading = false, onGoTo }) => {
   const updateMutation = useUpdateContractTask(contractKey);
   const { dismiss, restore } = useReminderDismissals('CONTRATO', contractKey);
@@ -233,14 +218,15 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
             {queue.dispensados.map((item) => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <span style={{ flex: '1 1 220px', minWidth: 0 }}>{item.title}</span>
-                <button
+                <AppButton
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => restore.mutate({ itemId: item.id })}
                   disabled={restore.isPending}
-                  style={secondaryButton}
                 >
                   Reexibir
-                </button>
+                </AppButton>
               </div>
             ))}
           </div>
@@ -248,24 +234,17 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
       )}
 
       {queue.tarefasSemPrazo > 0 && (
-        <button
+        <AppButton
           type="button"
+          variant="link"
+          size="xs"
           onClick={() => onGoTo('plano')}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            color: '#475569',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            textDecoration: 'underline'
-          }}
+          style={{ alignSelf: 'flex-start' }}
         >
           {queue.tarefasSemPrazo === 1
             ? '1 tarefa do plano está sem prazo definido — definir no plano'
             : `${queue.tarefasSemPrazo} tarefas do plano estão sem prazo definido — definir no plano`}
-        </button>
+        </AppButton>
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../design-system/components/HeaderRefreshAction';
 import { AppButton } from '../design-system/components/AppButton';
+import { IconButton } from '../design-system/components/IconButton';
 import { colors, shapes } from '../design-system/tokens';
 
 // Mesmo critério de autorização de sincronização usado no botão individual
@@ -141,14 +142,12 @@ export const FinancialExecutionRoute: React.FC = () => {
               </AppButton>
             )}
             {!isSyncingAll && (
-              <button
+              <IconButton
                 type="button"
+                label="Fechar notificação"
+                icon={<X size={14} />}
                 onClick={() => setShowBatchPanel(false)}
-                aria-label="Fechar notificação"
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6, display: 'flex' }}
-              >
-                <X size={14} />
-              </button>
+              />
             )}
           </div>
         </div>

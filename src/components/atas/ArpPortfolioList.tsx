@@ -11,7 +11,9 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { AppButton } from '../../design-system/components/AppButton';
+import { IconButton } from '../../design-system/components/IconButton';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
@@ -207,19 +209,18 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                 <React.Fragment key={card.key}>
                   <tr data-testid={`arp-row-${numeroAta}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirAta)}>
                     <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
-                      <button
+                      <IconButton
                         type="button"
+                        size="xs"
                         onClick={() => {
                           if (!isExpanded) onExpandAta?.(arp);
                           setOverrides((prev) => ({ ...prev, [card.key]: !isExpanded }));
                         }}
-                        aria-expanded={isExpanded}
-                        aria-label={isExpanded ? 'Recolher itens da ata' : 'Expandir itens da ata'}
+                        expanded={isExpanded}
+                        label={isExpanded ? 'Recolher itens da ata' : 'Expandir itens da ata'}
                         data-testid={`arp-expand-${numeroAta}`}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.2rem' }}
-                      >
-                        {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                      </button>
+                        icon={isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      />
                     </td>
                     <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
@@ -311,14 +312,15 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                                 <span title={item.descricaoItem} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.descricaoItem}</span>
                                 <span>{formatCurrencyOrDash(item.valorUnitario)}</span>
                                 <SaldoBar pct={pctOf(item)} />
-                                <button
+                                <AppButton
                                   type="button"
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() => onSelectItem(arp, item)}
                                   data-testid={`arp-item-${numeroAta}-${item.numeroItem}`}
-                                  style={carteiraButton}
                                 >
                                   Ver saldo <ArrowRight size={13} />
-                                </button>
+                                </AppButton>
                               </div>
                             ))}
                             {hiddenCount > 0 && (

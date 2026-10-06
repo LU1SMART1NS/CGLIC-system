@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { AppButton } from '../../design-system/components/AppButton';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
@@ -135,26 +136,16 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
       ref={setHeroEl}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <button
+        <AppButton
           type="button"
+          variant="outline"
+          size="sm"
           onClick={onBack}
           data-testid={backTestId}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            padding: '0.45rem 0.85rem',
-            background: COLORS.surface,
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            color: COLORS.brand,
-            cursor: 'pointer'
-          }}
+          icon={<ArrowLeft size={14} />}
         >
-          <ArrowLeft size={16} /> {backLabel}
-        </button>
+          {backLabel}
+        </AppButton>
         {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
       </div>
 
@@ -181,13 +172,15 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
             <p style={{ margin: subtitle ? '2px 0 0 0' : 0, fontSize: '0.92rem', color: COLORS.inkSoft, lineHeight: 1.45, maxWidth: '1200px' }}>
               {objetoLongo && !objetoAberto ? `${texto.slice(0, OBJETO_LIMITE).trimEnd()}…` : texto}
               {objetoLongo && (
-                <button
+                <AppButton
                   type="button"
+                  variant="link"
+                  size="xs"
                   onClick={() => setObjetoAberto((v) => !v)}
-                  style={{ marginLeft: '0.4rem', background: 'none', border: 'none', padding: 0, color: COLORS.brand, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+                  style={{ marginLeft: '0.4rem' }}
                 >
                   {objetoAberto ? 'ver menos' : 'ver mais'}
-                </button>
+                </AppButton>
               )}
             </p>
           )}

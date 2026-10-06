@@ -4,7 +4,7 @@ import { useManagementDashboard } from '../../hooks/useManagementDashboard';
 import { AppButton, EmptyState, ErrorState, FilterBar, StatusBadge } from '../../design-system';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { formatCurrency } from '../../utils/format';
 import type {
   ManagementDashboardReadModel,
@@ -293,14 +293,15 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
                     </td>
                     <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
                       {emp.contratoNumero && onNavigateContract ? (
-                        <button
+                        <AppButton
                           type="button"
+                          variant="link"
+                          size="sm"
                           data-testid={`btn-navigate-contract-${emp.numeroEmpenho}`}
                           onClick={() => onNavigateContract(emp.contratoNumero!)}
-                          style={carteiraButton}
                         >
                           Ver contrato <ExternalLink size={12} aria-hidden="true" />
-                        </button>
+                        </AppButton>
                       ) : (
                         <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>—</span>
                       )}

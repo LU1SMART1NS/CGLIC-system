@@ -1,7 +1,8 @@
 import React from 'react';
 import { Check, Loader2, RotateCcw, X } from 'lucide-react';
 import { AnchoredPanel } from '../../../design-system/components/AnchoredPanel';
-import { carteiraButton } from '../../carteira/carteiraStyles';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { IconButton } from '../../../design-system/components/IconButton';
 import { useRemoverComplexidadeAjuste, useSalvarComplexidadeAjuste } from '../../../hooks/useComplexidadeAjustes';
 import { MOTIVOS_AJUSTE, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import type { DistribuicaoItem } from './distribuicaoEquipe';
@@ -49,9 +50,7 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
         <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
           Complexidade {item.tipo === 'ATA' ? 'da ata' : 'do contrato'} {item.numero}
         </strong>
-        <button type="button" onClick={onClose} aria-label="Fechar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.25rem' }}>
-          <X size={15} />
-        </button>
+        <IconButton label="Fechar" onClick={onClose} type="button" size="xs" icon={<X size={14} />} />
       </div>
 
       <div style={{ fontSize: '0.78rem', color: '#475569' }}>
@@ -126,32 +125,27 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap' }}>
         {ajustada ? (
-          <button type="button" onClick={handleVoltar} disabled={ocupado} data-testid="ajuste-voltar-automatica" style={{ ...carteiraButton, color: '#475569' }}>
-            <RotateCcw size={13} /> Voltar à automática
-          </button>
+          <AppButton type="button" variant="outline" size="sm" onClick={handleVoltar} disabled={ocupado} data-testid="ajuste-voltar-automatica" icon={<RotateCcw size={14} />}>
+            Voltar à automática
+          </AppButton>
         ) : (
           <span />
         )}
         <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <button type="button" onClick={onClose} disabled={ocupado} style={{ ...carteiraButton, color: '#475569' }}>
+          <AppButton type="button" variant="outline" size="sm" onClick={onClose} disabled={ocupado}>
             Cancelar
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             type="button"
+            variant="primary"
+            size="sm"
             onClick={handleSalvar}
             disabled={!podeSalvar}
             data-testid="ajuste-salvar"
-            style={{
-              ...carteiraButton,
-              background: 'var(--primary)',
-              borderColor: 'var(--primary)',
-              color: '#ffffff',
-              opacity: podeSalvar ? 1 : 0.6,
-              cursor: podeSalvar ? 'pointer' : 'not-allowed'
-            }}
+            icon={salvar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           >
-            {salvar.isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Salvar
-          </button>
+            Salvar
+          </AppButton>
         </div>
       </div>
     </AnchoredPanel>

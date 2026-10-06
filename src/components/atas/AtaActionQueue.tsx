@@ -33,21 +33,6 @@ const KIND_LABELS: Record<AtaActionItem['kind'], string> = {
   LEMBRETE: 'Planejamento da vigência'
 };
 
-const secondaryButton: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  padding: '0.4rem 0.75rem',
-  backgroundColor: '#ffffff',
-  color: 'var(--primary)',
-  border: '1px solid #cbd5e1',
-  borderRadius: '6px',
-  fontSize: '0.78rem',
-  fontWeight: 700,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap'
-};
-
 /** Fila única da Ata 360 — mesmo layout da ContractActionQueue do Contrato 360. */
 export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, plan, isLoading = false, onGoTo }) => {
   const updateMutation = useUpdateAtaTask(ataKey);
@@ -194,14 +179,9 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
             {queue.dispensados.map((item) => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <span style={{ flex: '1 1 220px', minWidth: 0 }}>{item.title}</span>
-                <button
-                  type="button"
-                  onClick={() => restore.mutate({ itemId: item.id })}
-                  disabled={restore.isPending}
-                  style={secondaryButton}
-                >
+                <AppButton type="button" variant="link" size="sm" onClick={() => restore.mutate({ itemId: item.id })} disabled={restore.isPending}>
                   Reexibir
-                </button>
+                </AppButton>
               </div>
             ))}
           </div>
@@ -209,24 +189,11 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
       )}
 
       {queue.tarefasSemPrazo > 0 && (
-        <button
-          type="button"
-          onClick={() => onGoTo('plano')}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            color: '#475569',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            textDecoration: 'underline'
-          }}
-        >
+        <AppButton type="button" variant="link" size="sm" onClick={() => onGoTo('plano')} style={{ alignSelf: 'flex-start' }}>
           {queue.tarefasSemPrazo === 1
             ? '1 tarefa do plano está sem prazo definido — definir no plano'
             : `${queue.tarefasSemPrazo} tarefas do plano estão sem prazo definido — definir no plano`}
-        </button>
+        </AppButton>
       )}
     </div>
   );

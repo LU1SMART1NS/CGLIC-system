@@ -212,15 +212,13 @@ const ProfileDrawer: React.FC<{ profile: ProfileDefinition | null; onClose: () =
           <span style={{ fontSize: typography.fontSize.label, fontWeight: 700, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Detalhe do perfil
           </span>
-          <button
+          <IconButton
             type="button"
             onClick={onClose}
-            aria-label="Fechar"
+            label="Fechar"
             data-testid="profile-drawer-close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text.secondary, padding: spacing.xs }}
-          >
-            <X size={18} />
-          </button>
+            icon={<X size={18} />}
+          />
         </div>
         <div style={{ padding: spacing.lg, overflowY: 'auto', flex: 1 }}>
           <ProfileDetailContent profile={profile} />

@@ -5,9 +5,10 @@ import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { resetUserPassword } from '../services/userService';
 import {
-  AuthAlert, AuthLayout, AuthLoading, AuthSpinner, PasswordInput,
+  AuthAlert, AuthLayout, AuthLoading, PasswordInput,
   isErroDeInfraestrutura, traduzirErroAuth
 } from '../components/auth/AuthLayout';
+import { AppButton } from '../design-system';
 
 export const LoginRoute: React.FC = () => {
   const { user, loading } = useAuth();
@@ -128,9 +129,9 @@ export const LoginRoute: React.FC = () => {
   if (showForgot) {
     return (
       <AuthLayout>
-        <button type="button" className="auth-link auth-back" onClick={closeForgot}>
-          <ArrowLeft size={15} /> Voltar para o login
-        </button>
+        <AppButton type="button" variant="link" className="auth-back" icon={<ArrowLeft size={15} />} onClick={closeForgot}>
+          Voltar para o login
+        </AppButton>
 
         {forgotSentTo ? (
           <div className="auth-state">
@@ -140,9 +141,9 @@ export const LoginRoute: React.FC = () => {
               Se houver uma conta para <strong>{forgotSentTo}</strong>, você receberá em alguns minutos um link para
               criar uma nova senha. Confira também a caixa de spam.
             </p>
-            <button type="button" className="auth-btn auth-btn--secondary" onClick={closeForgot}>
+            <AppButton type="button" variant="outline" size="lg" fullWidth onClick={closeForgot}>
               Voltar para o login
-            </button>
+            </AppButton>
           </div>
         ) : (
           <>
@@ -168,9 +169,9 @@ export const LoginRoute: React.FC = () => {
                   required
                 />
               </div>
-              <button type="submit" className="auth-btn" disabled={forgotLoading}>
-                {forgotLoading ? <><AuthSpinner /> Enviando…</> : 'Enviar link de recuperação'}
-              </button>
+              <AppButton type="submit" size="lg" fullWidth isLoading={forgotLoading}>
+                {forgotLoading ? 'Enviando…' : 'Enviar link de recuperação'}
+              </AppButton>
             </form>
           </>
         )}
@@ -211,9 +212,9 @@ export const LoginRoute: React.FC = () => {
         <div className="auth-field">
           <div className="auth-label-row">
             <label htmlFor="login-password" className="auth-label">Senha</label>
-            <button type="button" className="auth-link" onClick={openForgot}>
+            <AppButton type="button" variant="link" size="sm" onClick={openForgot}>
               Esqueci minha senha
-            </button>
+            </AppButton>
           </div>
           <PasswordInput
             id="login-password"
@@ -227,9 +228,9 @@ export const LoginRoute: React.FC = () => {
           />
         </div>
 
-        <button type="submit" className="auth-btn" disabled={isSubmitting}>
-          {isSubmitting ? <><AuthSpinner /> Entrando…</> : <>Entrar <ArrowRight size={16} /></>}
-        </button>
+        <AppButton type="submit" size="lg" fullWidth isLoading={isSubmitting}>
+          {isSubmitting ? 'Entrando…' : <>Entrar <ArrowRight size={16} /></>}
+        </AppButton>
       </form>
 
       <p className="auth-help">

@@ -416,27 +416,31 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 </span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <button
+                <AppButton
                   type="button"
+                  variant="secondary"
+                  size="xs"
                   onClick={handleSelectAll}
-                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
                 >
                   Marcar Todas
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   type="button"
+                  variant="secondary"
+                  size="xs"
                   onClick={handleClearAll}
-                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
                 >
                   Desmarcar Todas
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   type="button"
+                  variant="secondary"
+                  size="xs"
                   onClick={handleResetDefaults}
-                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                  icon={<RotateCcw size={14} />}
                 >
-                  <RotateCcw size={12} /> Padrão
-                </button>
+                  Padrão
+                </AppButton>
               </div>
             </div>
 

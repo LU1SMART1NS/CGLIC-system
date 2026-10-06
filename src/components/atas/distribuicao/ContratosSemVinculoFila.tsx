@@ -7,11 +7,11 @@ import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink } from '../../carteira/CarteiraRowLink';
-import { carteiraButton, carteiraSelect, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraSelect, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
-import { AppButton } from '../../../design-system';
+import { AppButton, IconButton } from '../../../design-system';
 import { useConfirmDialog } from '../../../design-system/components/ConfirmDialog';
 import { useToast } from '../../../design-system/components/Toast';
 import { useConfirmarContratoSemAta, useDesfazerContratoSemAta } from '../../../hooks/useContratosSemAta';
@@ -80,17 +80,6 @@ const COLUNAS: Record<string, CarteiraSortColumn<Linha>> = {
 
 const chave = (l: Linha) => l.contractKey;
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
-
-const linkAta: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  font: 'inherit',
-  fontWeight: 700,
-  color: 'var(--primary)',
-  textDecoration: 'underline',
-  cursor: 'pointer'
-};
 
 /** Resultado da conferência pela API, numa linha curta embaixo da ata. */
 const StatusApi: React.FC<{ previsao: PrevisaoVinculo; testId: string }> = ({ previsao, testId }) => {
@@ -348,9 +337,9 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
   const ocupado = estado.rodando;
 
   const nomeAta = (l: Linha, s: AtaSugerida, prefixo = 'Ata') => (
-    <button type="button" onClick={() => conferir(l, s)} title="Conferir esta ata" data-testid={`sem-vinculo-ata-${l.contractKey}-${s.numeroAta}`} style={linkAta}>
+    <AppButton type="button" variant="link" onClick={() => conferir(l, s)} title="Conferir esta ata" data-testid={`sem-vinculo-ata-${l.contractKey}-${s.numeroAta}`} style={{ fontWeight: 700 }}>
       {prefixo} {s.numeroAta}
-    </button>
+    </AppButton>
   );
 
   return (
@@ -372,9 +361,9 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
               <strong>Vinculando {Math.min(estado.feitos + 1, estado.total)} de {estado.total}</strong>
               {estado.atual && <span style={{ color: '#475569' }}>contrato {estado.atual}</span>}
               <progress value={estado.feitos} max={estado.total} style={{ flex: '1 1 160px', height: '8px' }} />
-              <button type="button" onClick={lote.parar} data-testid="sem-vinculo-parar" style={{ ...carteiraButton, color: '#475569' }}>
+              <AppButton type="button" variant="outline" size="sm" onClick={lote.parar} data-testid="sem-vinculo-parar">
                 Parar depois deste
-              </button>
+              </AppButton>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -385,9 +374,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                   {falhas.length > 0 && `, ${plural(falhas.length, 'falha', 'falhas')}`}
                   {estado.resultados.length < estado.total && ` — parou em ${estado.resultados.length} de ${estado.total}`}
                 </strong>
-                <button type="button" onClick={lote.limpar} aria-label="Fechar resumo" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: '#475569' }}>
-                  <X size={15} />
-                </button>
+                <IconButton label="Fechar resumo" icon={<X size={15} />} onClick={lote.limpar} style={{ marginLeft: 'auto' }} />
               </div>
               {falhas.map((r) => (
                 <div key={r.contractKey} style={{ color: 'var(--color-danger-text-strong)' }}>

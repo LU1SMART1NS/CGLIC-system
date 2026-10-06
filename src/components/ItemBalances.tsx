@@ -46,6 +46,7 @@ import {
   type ItemContractSuggestion
 } from '../utils/itemContractSuggestions';
 import { AppButton, EmptyState, SectionHeader } from '../design-system';
+import { IconButton } from '../design-system/components/IconButton';
 
 import { LinkContractModal } from './modals/LinkContractModal';
 import { ContractSuggestionsPanel } from './item-balances/ContractSuggestionsPanel';
@@ -1032,14 +1033,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                   <React.Fragment key={`${c.numeroContrato}-${idx}`}>
                                     <tr style={{ background: isExpanded ? '#f8fafc' : 'transparent' }}>
                                       <td data-role="expand" style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                                        <button
+                                        <IconButton
                                           onClick={() => toggleContractExpansion(c)}
-                                          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', padding: '6px' }}
-                                          title={isExpanded ? "Recolher empenhos" : "Expandir empenhos"}
-                                          aria-expanded={isExpanded}
-                                        >
-                                          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                        </button>
+                                          label={isExpanded ? "Recolher empenhos" : "Expandir empenhos"}
+                                          expanded={isExpanded}
+                                          icon={isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                        />
                                       </td>
                                       <td data-label="Contrato" style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', color: 'var(--primary)' }}>
                                         {displayNumeroContrato}

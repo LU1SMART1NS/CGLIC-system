@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, KeyRound, LogOut, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabaseClient';
+import { AppButton } from '../design-system';
 import { MIN_PASSWORD_LENGTH, PasswordInput, traduzirErroAuth } from './auth/AuthLayout';
 
 /** Nome exibido: cadastro (nome / full_name) ou, na falta, a parte local do e-mail. */
@@ -64,7 +65,7 @@ const ChangePasswordModal: React.FC<{ email: string; onClose: () => void }> = ({
         {ok ? (
           <div className="user-modal__body" role="status">
             <p>Senha alterada com sucesso.</p>
-            <button type="button" className="user-modal__btn" onClick={onClose}>Fechar</button>
+            <AppButton type="button" fullWidth style={{ marginTop: '0.75rem' }} onClick={onClose}>Fechar</AppButton>
           </div>
         ) : (
           <form className="user-modal__body" onSubmit={submit} noValidate>
@@ -76,7 +77,7 @@ const ChangePasswordModal: React.FC<{ email: string; onClose: () => void }> = ({
             <PasswordInput id="pw-nova" value={nova} onChange={setNova} autoComplete="new-password" placeholder={`Mínimo de ${MIN_PASSWORD_LENGTH} caracteres`} />
             <label htmlFor="pw-confirma">Confirme a nova senha</label>
             <PasswordInput id="pw-confirma" value={confirma} onChange={setConfirma} autoComplete="new-password" />
-            <button type="submit" className="user-modal__btn" disabled={busy}>{busy ? 'Salvando…' : 'Salvar nova senha'}</button>
+            <AppButton type="submit" fullWidth style={{ marginTop: '0.75rem' }} isLoading={busy}>{busy ? 'Salvando…' : 'Salvar nova senha'}</AppButton>
           </form>
         )}
       </div>

@@ -10,7 +10,7 @@ import { formatCurrency, formatDateBR } from '../../utils/format';
 import { AppButton, EmptyState, ErrorState, FilterBar, StatusBadge } from '../../design-system';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { PAGAMENTO_RULES } from '../../config/alertRules';
 
 export interface ManagementPaymentsOverviewProps {
@@ -463,14 +463,15 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
 
                       <td data-role="action" style={{ ...carteiraTd, verticalAlign: 'top', textAlign: 'right' }}>
                         {onNavigateContract && (
-                          <button
+                          <AppButton
                             type="button"
+                            variant="link"
+                            size="sm"
                             data-testid={`btn-navigate-payment-${cycle.cycleKey}`}
                             onClick={() => onNavigateContract(cycle.contractKey)}
-                            style={carteiraButton}
                           >
                             Ver contrato <ExternalLink size={12} aria-hidden="true" />
-                          </button>
+                          </AppButton>
                         )}
                       </td>
                     </tr>
