@@ -44,7 +44,7 @@ import { buildCentralPrazosItems, calculateCentralPrazosKPIs } from './centralPr
 import { parseDateBRT, differenceInDays, differenceInBusinessDays, getArpVigenciaStatus } from './temporalEngineService';
 import { classifyPrazo } from '../components/carteira/carteiraPrazo';
 import { buildContractEventsFromOfficialData } from './contractEventService';
-import { fetchContractsForDashboard } from './contractService';
+import { fetchContratosParaTela } from './contratosOficiaisService';
 import { fetchArpsFromDb } from './dbCacheService';
 import { fetchAllContractManagers, fetchAllContractTaskPlans, fetchAllDismissedReminders, type AllDismissedReminders } from './contractManagementService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
@@ -1338,7 +1338,7 @@ export async function fetchManagementDashboardData(
     empenhosResumo,
     arpItemsSaldo
   ] = await Promise.all([
-    fetchContractsForDashboard(cleanUasg, false).catch((err) => {
+    fetchContratosParaTela(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar contratos para o dashboard:', err);
       return [] as ContractDashboardRecord[];
     }),

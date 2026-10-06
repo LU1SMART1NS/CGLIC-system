@@ -1,9 +1,15 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { persistirContratoCompletado } from '../services/contratosOficiaisService';
+import { podeSincronizarContratos } from './useSincronizacaoContratos';
 import { useContractsDashboard } from './useContractsDashboard';
 import { useContratoGov } from './useContractContratosGov';
 import { mesclarContratosGov } from '../services/contratosGovContratoService';
 import { getContractManagementKey } from '../services/contractManagementService';
 import type { ContractDashboardRecord } from '../types';
+
+/** Contratos completados já gravados nesta sessão (uma gravação por contrato). */
+const completadosGravados = new Set<string>();
 
 /**
  * Hook canônico para recuperar um único contrato por sua chave identificadora (contractKey).
@@ -41,6 +47,15 @@ export function useContract(contractKey?: string, uasg?: string) {
 
   const { data: gov, isLoading: enriching } = useContratoGov(base);
   const contract = useMemo(() => (base && gov ? mesclarContratosGov(base, gov) : base), [base, gov]);
+
+  // Grava o contrato completado no banco (gestor/coordenador), para o próximo usuário não repetir a consulta.
+  const { role } = useAuth();
+  const podeGravar = podeSincronizarContratos(role);
+  useEffect(() => {
+    if (!podeGravar || !base || !gov || !contract || completadosGravados.has(base.id)) return;
+    completadosGravados.add(base.id);
+    void persistirContratoCompletado(contract);
+  }, [podeGravar, base, gov, contract]);
 
   return {
     contract,

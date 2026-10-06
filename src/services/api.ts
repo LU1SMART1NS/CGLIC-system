@@ -107,9 +107,138 @@ export function matchAtaNumber(target?: string, query?: string): boolean {
 const arpsMemoryCache = new Map<string, ArpRecord[]>();
 const contratosGovUgListCache = new Map<string, any[]>();
 
+/** Erro de rede do navegador (servidor local fora do ar, conexão caiu): não é resposta da fonte. */
+function isErroDeRede(err: unknown): boolean {
+  return err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String((err as Error)?.message ?? err));
+}
+
+/**
+ * GET com novas tentativas quando a conexão cai ou a fonte responde 429 (limite de requisições) ou 5xx.
+ * Espera 2 s, depois 4 s, 8 s... (ou o que a fonte pedir em Retry-After, até 15 s).
+ * Usado pela sincronização, que não pode tratar recusa da fonte como "não há dados".
+ */
+async function fetchComNovaTentativa(url: string, fonte: string, tentativas = 2): Promise<Response> {
+  const esperar = (tentativa: number, response?: Response) => {
+    const pedido = Number(response?.headers.get('retry-after'));
+    const ms = Number.isFinite(pedido) && pedido > 0 ? Math.min(pedido, 15) * 1000 : 2000 * 2 ** (tentativa - 1);
+    return new Promise((r) => setTimeout(r, ms));
+  };
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      const response = await fetch(url);
+      if ((response.status === 429 || response.status >= 500) && tentativa < tentativas) {
+        await esperar(tentativa, response);
+        continue;
+      }
+      return response;
+    } catch (err) {
+      if (tentativa < tentativas && isErroDeRede(err)) {
+        await esperar(tentativa);
+        continue;
+      }
+      if (isErroDeRede(err)) {
+        throw new Error(`Sem conexão com o ${fonte}: a consulta não chegou à fonte oficial (falha de rede ou servidor local fora do ar).`);
+      }
+      throw err;
+    }
+  }
+}
+
+/** A fonte recusou ou falhou (429, 5xx): diferente de "não há dados". */
+export class FonteIndisponivelError extends Error {
+  constructor(fonte: string, status: number) {
+    super(status === 429
+      ? `${fonte} recusou por excesso de requisições (429).`
+      : `${fonte} respondeu ${status}.`);
+    this.name = 'FonteIndisponivelError';
+  }
+}
+
+/**
+ * Atas da UASG direto das fontes oficiais (Compras.gov.br + atas suplementares do PNCP), já com as
+ * vigências do PNCP. Sem cache e sem cair para o banco: se a fonte falhar, lança erro.
+ * Usada pela sincronização (sincronizarAtas), que precisa saber se a consulta deu certo.
+ */
+export async function fetchArpsDasFontes(params: FilterParams): Promise<ArpRecord[]> {
+  const chunks = splitDateRange(params.dataVigenciaInicialMin, params.dataVigenciaInicialMax);
+  const allArpsMap = new Map<string, ArpRecord>();
+
+  // Executa os chunks de datas em PARALELO para máxima velocidade
+  const chunkPromises = chunks.map(async (chunk) => {
+    let currentPage = 1;
+    let hasMorePages = true;
+    const chunkArps: ArpRecord[] = [];
+
+    while (hasMorePages) {
+      const queryParams = {
+        pagina: currentPage,
+        tamanhoPagina: 500,
+        codigoUnidadeGerenciadora: params.codigoUnidadeGerenciadora,
+        dataVigenciaInicialMin: chunk.start,
+        dataVigenciaInicialMax: chunk.end
+      };
+
+      const url = `${BASE_URL}/1_consultarARP${buildQueryString(queryParams)}`;
+      const response = await fetchComNovaTentativa(url, 'Compras.gov.br');
+      if (!response.ok) {
+        throw new Error(`Compras.gov.br respondeu ${response.status} na consulta de atas.`);
+      }
+      const data = await response.json() as ArpResponse;
+
+      if (data.resultado && data.resultado.length > 0) {
+        chunkArps.push(...data.resultado);
+      }
+
+      if (data.paginasRestantes && data.paginasRestantes > 0) {
+        currentPage++;
+      } else {
+        hasMorePages = false;
+      }
+    }
+    return chunkArps;
+  });
+
+  const chunksResults = await Promise.all(chunkPromises);
+  for (const chunkArps of chunksResults) {
+    for (const arp of chunkArps) {
+      const key = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
+      allArpsMap.set(key, arp);
+    }
+  }
+
+  // Carregar Atas publicadas via Contratos.gov.br diretamente do PNCP
+  const supplementalArps = await fetchSupplementalPncpArps(params.codigoUnidadeGerenciadora);
+  for (const sArp of supplementalArps) {
+    const key = `${sArp.numeroAtaRegistroPreco}-${sArp.codigoUnidadeGerenciadora}`;
+    if (!allArpsMap.has(key)) {
+      allArpsMap.set(key, sArp);
+    }
+  }
+
+  // Enriquece com vigências oficiais do PNCP (prorrogações e cancelamentos)
+  const allArps = await enrichArpsBatchWithPncpVigencia(Array.from(allArpsMap.values()));
+  allArps.sort((a, b) => b.dataVigenciaFinal.localeCompare(a.dataVigenciaFinal));
+  return allArps;
+}
+
+/**
+ * Esvazia os caches em memória das consultas de atas (lista, vigências PNCP, atas suplementares e itens).
+ * A sincronização chama antes de começar: sem isso, uma segunda sincronização na mesma sessão
+ * reaproveitaria as respostas da primeira e não traria prorrogações nem itens novos.
+ */
+export function limparCachesAtas(): void {
+  arpsMemoryCache.clear();
+  pncpVigenciaCache.clear();
+  supplementalPncpArpsCache = null;
+  pncpCompraItemsCache.clear();
+  memoryItemsCache.clear();
+  itensComprasQueryCache.clear();
+}
+
 /**
  * 1. Consultar ARP
  * Endereço: /modulo-arp/1_consultarARP
+ * Com cache em memória por consulta; se a fonte falhar, devolve o que está no banco.
  */
 export async function fetchArps(params: FilterParams): Promise<ArpResponse> {
   const cacheKey = `${params.codigoUnidadeGerenciadora || 'ALL'}_${params.dataVigenciaInicialMin}_${params.dataVigenciaInicialMax}`;
@@ -120,65 +249,7 @@ export async function fetchArps(params: FilterParams): Promise<ArpResponse> {
     if (arpsMemoryCache.has(cacheKey)) {
       allArps = arpsMemoryCache.get(cacheKey)!;
     } else {
-      const chunks = splitDateRange(params.dataVigenciaInicialMin, params.dataVigenciaInicialMax);
-      const allArpsMap = new Map<string, ArpRecord>();
-
-      // Executa os chunks de datas em PARALELO para máxima velocidade
-      const chunkPromises = chunks.map(async (chunk) => {
-        let currentPage = 1;
-        let hasMorePages = true;
-        const chunkArps: ArpRecord[] = [];
-
-        while (hasMorePages) {
-          const queryParams = {
-            pagina: currentPage,
-            tamanhoPagina: 500,
-            codigoUnidadeGerenciadora: params.codigoUnidadeGerenciadora,
-            dataVigenciaInicialMin: chunk.start,
-            dataVigenciaInicialMax: chunk.end
-          };
-
-          const url = `${BASE_URL}/1_consultarARP${buildQueryString(queryParams)}`;
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const data = await response.json() as ArpResponse;
-
-          if (data.resultado && data.resultado.length > 0) {
-            chunkArps.push(...data.resultado);
-          }
-
-          if (data.paginasRestantes && data.paginasRestantes > 0) {
-            currentPage++;
-          } else {
-            hasMorePages = false;
-          }
-        }
-        return chunkArps;
-      });
-
-      const chunksResults = await Promise.all(chunkPromises);
-      for (const chunkArps of chunksResults) {
-        for (const arp of chunkArps) {
-          const key = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
-          allArpsMap.set(key, arp);
-        }
-      }
-
-      // Carregar Atas publicadas via Contratos.gov.br diretamente do PNCP
-      const supplementalArps = await fetchSupplementalPncpArps(params.codigoUnidadeGerenciadora);
-      for (const sArp of supplementalArps) {
-        const key = `${sArp.numeroAtaRegistroPreco}-${sArp.codigoUnidadeGerenciadora}`;
-        if (!allArpsMap.has(key)) {
-          allArpsMap.set(key, sArp);
-        }
-      }
-
-      allArps = Array.from(allArpsMap.values());
-      // Enriquece com vigências oficiais do PNCP (prorrogações e cancelamentos)
-      allArps = await enrichArpsBatchWithPncpVigencia(allArps);
-      allArps.sort((a, b) => b.dataVigenciaFinal.localeCompare(a.dataVigenciaFinal));
+      allArps = await fetchArpsDasFontes(params);
       arpsMemoryCache.set(cacheKey, allArps);
       cacheArpsInDb(allArps);
     }
@@ -551,11 +622,53 @@ const memoryItemsCache = new Map<string, ArpItemRecord[]>();
  * 2. Consultar ARP Item
  * Endereço: /modulo-arp/2_consultarARPItem com fallback dinâmico completo ao PNCP
  */
+/**
+ * A fonte às vezes publica o mesmo item da ata duas vezes (mesmo número, mesmos dados, outra data de
+ * inclusão). Fica só a publicação mais recente: sem isso, a ata mostrava itens em dobro e o banco
+ * recusava gravar (dois itens com o mesmo número na mesma ata).
+ */
+export function deduplicarItensPorNumero(itens: ArpItemRecord[]): ArpItemRecord[] {
+  const porNumero = new Map<string, ArpItemRecord>();
+  for (const item of itens) {
+    const chave = String(item.numeroItem || '');
+    const atual = porNumero.get(chave);
+    if (!chave || !atual || String(item.dataHoraInclusao || '') > String(atual.dataHoraInclusao || '')) {
+      porNumero.set(chave || `sem-numero-${porNumero.size}`, item);
+    }
+  }
+  return Array.from(porNumero.values());
+}
+
+/**
+ * Consultas de itens do Compras.gov.br já feitas (por endereço). A mesma consulta (o ano inteiro, ou um
+ * dia com várias atas) se repetia para cada ata e estourava o limite de requisições da fonte.
+ * Guarda a promessa: consultas simultâneas iguais dividem uma só. Falha não fica guardada.
+ */
+const itensComprasQueryCache = new Map<string, Promise<ArpItemsResponse>>();
+
+function consultarItensCompras(url: string): Promise<ArpItemsResponse> {
+  const emCache = itensComprasQueryCache.get(url);
+  if (emCache) return emCache;
+  const promessa = (async () => {
+    const response = await fetchComNovaTentativa(url, 'Compras.gov.br', 4);
+    if (!response.ok) throw new FonteIndisponivelError('Compras.gov.br', response.status);
+    return await response.json() as ArpItemsResponse;
+  })();
+  itensComprasQueryCache.set(url, promessa);
+  promessa.catch(() => itensComprasQueryCache.delete(url));
+  return promessa;
+}
+
+/**
+ * Itens da ata. `estrito` (sincronização): se a fonte recusar ou falhar, lança erro em vez de devolver
+ * a ata sem itens, para a sincronização contar a falha e tentar de novo depois.
+ */
 export async function fetchArpItems(
   dataVigenciaInicial: string,
   codigoUnidadeGerenciadora: string,
   numeroAtaRegistroPreco: string,
-  arpContext?: Partial<ArpRecord> | string
+  arpContext?: Partial<ArpRecord> | string,
+  opts: { estrito?: boolean } = {}
 ): Promise<ArpItemsResponse> {
   const cacheKey = `${numeroAtaRegistroPreco}-${codigoUnidadeGerenciadora}`;
   if (memoryItemsCache.has(cacheKey)) {
@@ -574,7 +687,7 @@ export async function fetchArpItems(
   const parts = numeroAtaRegistroPreco.split('/');
   const ataYear = parts.length === 2 ? parts[1] : (cleanDate ? cleanDate.split('-')[0] : '2026');
 
-  const executeQuery = async (minDate: string, maxDate: string) => {
+  const executeQuery = async (minDate: string, maxDate: string): Promise<ArpItemsResponse | null> => {
     const queryParams = {
       pagina: 1,
       tamanhoPagina: 500,
@@ -583,9 +696,13 @@ export async function fetchArpItems(
       dataVigenciaInicialMax: maxDate
     };
     const url = `${BASE_URL}/2_consultarARPItem${buildQueryString(queryParams)}`;
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    return await response.json() as ArpItemsResponse;
+    try {
+      return await consultarItensCompras(url);
+    } catch (err) {
+      // Na sincronização, recusa da fonte é falha (a ata fica para a próxima); nas telas, segue como antes.
+      if (opts.estrito) throw err;
+      return null;
+    }
   };
 
   try {
@@ -690,6 +807,7 @@ export async function fetchArpItems(
         }
       }
 
+      foundItems = deduplicarItensPorNumero(foundItems);
       foundItems.sort((a, b) => (parseInt(a.numeroItem, 10) || 0) - (parseInt(b.numeroItem, 10) || 0));
 
       foundItems.forEach((item, idx) => {
@@ -710,6 +828,7 @@ export async function fetchArpItems(
 
     return { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 };
   } catch (error) {
+    if (opts.estrito) throw error;
     console.warn("Falha na requisição de itens da API.", error);
     return { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 };
   }

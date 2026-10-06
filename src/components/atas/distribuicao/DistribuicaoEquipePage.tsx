@@ -159,7 +159,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   );
 
   const refresh = () => {
-    contratos.refresh();
+    void contratos.refresh();
     atas.reload();
   };
 
@@ -216,7 +216,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
         icon={<Users size={26} color="#0c326f" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
-            onRefresh={refresh}
+            onRefresh={contratos.podeForcarAtualizacao ? refresh : undefined}
             isRefreshing={contratos.isFetching}
             lastUpdated={contratos.dataUpdatedAt}
             dataTestId="distribuicao-refresh-btn"
@@ -238,7 +238,14 @@ export const DistribuicaoEquipePage: React.FC = () => {
         />
       ) : (
         <>
-          {contratos.isPartial && <ContractsPartialNotice onRetry={() => contratos.refresh()} isRetrying={contratos.isFetching} />}
+          {contratos.isPartial && (
+            <ContractsPartialNotice
+              fontesComFalha={contratos.fontesComFalha}
+              ultimoSucessoEm={typeof contratos.dataUpdatedAt === 'string' ? contratos.dataUpdatedAt : null}
+              onRetry={contratos.podeForcarAtualizacao ? () => void contratos.refresh() : undefined}
+              isRetrying={contratos.isFetching}
+            />
+          )}
 
           <AvisosVinculoBanner podeVer={canAssign} />
 

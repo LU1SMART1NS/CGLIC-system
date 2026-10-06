@@ -15,11 +15,11 @@ describe('useManagementDashboard Hook / Query Options (CGLIC 3.0 — Fase 8-B)',
     vi.clearAllMocks();
   });
 
-  it('deve gerar queryKey canônica e staleTime padrão de 2 minutos', () => {
+  it('deve gerar queryKey canônica e staleTime padrão de 10 minutos (fontes no banco)', () => {
     const options = getManagementDashboardQueryOptions('200331');
     expect(options.queryKey).toEqual(['management-dashboard', '200331', 'ALL', 'ALL', 'ALL', 'GLOBAL', 'GLOBAL']);
-    expect(options.staleTime).toBe(120000);
-    expect(options.gcTime).toBe(600000);
+    expect(options.staleTime).toBe(600000);
+    expect(options.gcTime).toBe(1800000);
     expect(options.refetchOnWindowFocus).toBe(false);
   });
 

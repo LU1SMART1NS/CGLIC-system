@@ -3,13 +3,14 @@ import type { DbAta } from './supabaseClient';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../utils/pncpUtils';
-import { SUPPLEMENTAL_PNCP_ATAS } from './api';
+import { SUPPLEMENTAL_PNCP_ATAS, deduplicarItensPorNumero } from './api';
 
 /**
- * Persiste registros de ARPs buscados das APIs governamentais no Supabase
+ * Persiste registros de ARPs buscados das APIs governamentais no Supabase.
+ * Devolve false se a gravação falhou (a sincronização usa isso; os demais chamadores ignoram).
  */
-export async function cacheArpsInDb(arps: ArpRecord[]): Promise<void> {
-  if (!isSupabaseConfigured || !supabase || !arps || arps.length === 0) return;
+export async function cacheArpsInDb(arps: ArpRecord[]): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !arps || arps.length === 0) return false;
 
   try {
     const rows = arps.map((arp) => ({
@@ -29,11 +30,14 @@ export async function cacheArpsInDb(arps: ArpRecord[]): Promise<void> {
       ultimo_sync_em: new Date().toISOString()
     }));
 
-    await supabase
+    const { error } = await supabase
       .from('atas_registro_preco')
       .upsert(rows, { onConflict: 'numero_ata,codigo_uasg' });
+    if (error) throw error;
+    return true;
   } catch (error) {
     console.warn('Erro ao armazenar ARPs em cache no Supabase', error);
+    return false;
   }
 }
 
@@ -234,8 +238,22 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
 /**
  * Persiste Itens da Ata no Supabase
  */
-export async function cacheArpItemsInDb(ataNumero: string, uasg: string, items: ArpItemRecord[]): Promise<void> {
-  if (!isSupabaseConfigured || !supabase || !items || items.length === 0) return;
+/** Tamanho da coluna itens_ata.fornecedor_cnpj_cpf (migration 73; antes era 20). */
+export const TAMANHO_IDENTIFICADOR_FORNECEDOR = 255;
+
+/**
+ * Identificador do fornecedor como a fonte entrega: CNPJ, CPF ou, para fornecedor estrangeiro, um texto
+ * ("ESTRANGEIRO_CESKÁ_ZBROJOVKA_AS"). Vazio vira nulo. Só corta se passar do tamanho da coluna (nunca
+ * aconteceu), para uma gravação não falhar por causa de um campo de referência.
+ */
+export function cnpjCpfParaGravar(valor?: string | null): string | null {
+  const texto = (valor || '').trim();
+  if (!texto) return null;
+  return texto.slice(0, TAMANHO_IDENTIFICADOR_FORNECEDOR);
+}
+
+export async function cacheArpItemsInDb(ataNumero: string, uasg: string, items: ArpItemRecord[]): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !items || items.length === 0) return false;
 
   try {
     // 1. Obter id da Ata
@@ -246,14 +264,15 @@ export async function cacheArpItemsInDb(ataNumero: string, uasg: string, items: 
       .eq('codigo_uasg', uasg)
       .maybeSingle();
 
-    if (!ataData) return;
+    if (!ataData) return false;
 
-    const rows = items.map((item) => ({
+    const rows = deduplicarItensPorNumero(items).map((item) => ({
       ata_id: ataData.id,
       numero_item: item.numeroItem,
       codigo_pdm: item.codigoPdm,
-      descricao_item: item.descricaoItem,
-      fornecedor_cnpj_cpf: item.niFornecedor,
+      // A coluna não aceita vazio: sem descrição na fonte, vale o nome do material (PDM).
+      descricao_item: item.descricaoItem || item.nomePdm || 'Descrição não informada pela fonte oficial',
+      fornecedor_cnpj_cpf: cnpjCpfParaGravar(item.niFornecedor),
       fornecedor_razao_social: item.nomeRazaoSocialFornecedor,
       quantidade_homologada: item.quantidadeHomologadaItem,
       valor_unitario: item.valorUnitario,
@@ -262,11 +281,14 @@ export async function cacheArpItemsInDb(ataNumero: string, uasg: string, items: 
       ultimo_sync_em: new Date().toISOString()
     }));
 
-    await supabase
+    const { error } = await supabase
       .from('itens_ata')
       .upsert(rows, { onConflict: 'ata_id,numero_item' });
+    if (error) throw error;
+    return true;
   } catch (error) {
     console.warn('Erro ao salvar itens da Ata no Supabase', error);
+    return false;
   }
 }
 

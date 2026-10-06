@@ -7,7 +7,7 @@
  * Uma leitura de API por contrato (a resposta traz todos os itens), e só o que está sem leitura ou velho.
  */
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import { fetchContractsForDashboard } from './contractService';
+import { fetchContratosParaTela } from './contratosOficiaisService';
 import { fetchContractItemDetails } from './contractItemsService';
 import { syncContractItemQuantityRpc } from '../adapters/arpContractLinkRpcAdapter';
 import { parseItemKey } from '../utils/itemKeyParts';
@@ -48,10 +48,10 @@ export async function refreshAllLinkedItemQuantities(options: { force?: boolean;
   const stale = pickStaleLinksByContract((data ?? []) as LinkRow[], options.now, options.force);
   if (stale.size === 0) return summary;
 
-  const contractsByKey = new Map<string, Awaited<ReturnType<typeof fetchContractsForDashboard>>[number]>();
+  const contractsByKey = new Map<string, Awaited<ReturnType<typeof fetchContratosParaTela>>[number]>();
   for (const uasg of UASGS_CGLIC) {
     try {
-      for (const c of await fetchContractsForDashboard(uasg, false)) contractsByKey.set(c.id.toUpperCase(), c);
+      for (const c of await fetchContratosParaTela(uasg)) contractsByKey.set(c.id.toUpperCase(), c);
     } catch (err) {
       console.warn(`[itemSaldoRefresh] contratos da UASG ${uasg} indisponíveis:`, err);
     }

@@ -4,7 +4,8 @@ import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 
 interface GestaoInstrumentosHeaderProps {
-  onRefresh: () => void;
+  /** Só para o coordenador: sem ele, o cabeçalho mostra apenas a data da última atualização. */
+  onRefresh?: () => void;
   isRefreshing?: boolean;
   lastUpdated?: Date | string | number | null;
 }
