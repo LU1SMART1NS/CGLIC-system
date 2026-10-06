@@ -1,54 +1,36 @@
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { refreshAllLinkedItemQuantities } from '../services/itemSaldoRefreshService';
-import { syncAllPendingItemSenasp } from '../services/itemSenaspBatchService';
-
-// Quem grava a cópia da quantidade contratada (RPC exige gestor/admin).
-const WRITER_ROLES = ['gestor', 'admin'];
-
-let attemptedThisSession = false;
+import { sincronizarSaldosItens } from '../services/saldosItensSyncService';
+import { invalidarDadosDeSaldosItens } from './useSincronizacaoEmSegundoPlano';
 
 /**
- * Mantém o saldo dos itens (quantidade contratada lida da API) em dia para os painéis. Roda uma vez por
- * sessão ao abrir a tela, só relê o que está sem leitura ou com mais de 6 horas, e recarrega os painéis
- * se algo mudou. `refresh()` roda de novo sob demanda (botão Atualizar).
+ * Botão "Atualizar" da Visão Geral para o coordenador: força a releitura dos saldos dos itens (quantidade
+ * contratada nos contratos vinculados e quantitativo SENASP) nas fontes oficiais.
+ *
+ * Não roda sozinho ao abrir a tela: a atualização periódica é feita em segundo plano, uma vez para todos,
+ * por useSincronizacaoEmSegundoPlano (trava no banco, validade de 6 horas).
  */
 export function useRefreshItemSaldos() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const canWrite = WRITER_ROLES.includes(role ?? '');
+  // Forçar é só do coordenador (a função do banco recusa os demais perfis).
+  const canForce = role === 'admin';
 
   const refresh = React.useCallback(async () => {
-    if (!canWrite) return;
+    if (!canForce) return;
     setIsRefreshing(true);
     try {
-      const summary = await refreshAllLinkedItemQuantities();
-      // Base SENASP dos itens ainda não sincronizados (sem isso o percentual usa o total da ata).
-      const senasp = await syncAllPendingItemSenasp().catch((err) => {
-        console.warn('[itemSaldoRefresh] falha ao sincronizar quantitativo SENASP:', err);
-        return null;
-      });
-      if (summary.itensAtualizados > 0 || (senasp?.gravados ?? 0) > 0) {
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['management-dashboard'] }),
-          queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] })
-        ]);
-      }
-      if (summary.falhas.length > 0) console.warn('[itemSaldoRefresh] contratos não atualizados:', summary.falhas);
+      const resultado = await sincronizarSaldosItens({ forcar: true });
+      if (resultado.status === 'ERRO') console.warn('[itemSaldos] falha ao atualizar saldos dos itens:', resultado.erro);
+      await invalidarDadosDeSaldosItens(queryClient);
     } catch (err) {
-      console.warn('[itemSaldoRefresh] falha ao atualizar saldos dos itens:', err);
+      console.warn('[itemSaldos] falha ao atualizar saldos dos itens:', err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [canWrite, queryClient]);
-
-  React.useEffect(() => {
-    if (!canWrite || attemptedThisSession) return;
-    attemptedThisSession = true;
-    void refresh();
-  }, [canWrite, refresh]);
+  }, [canForce, queryClient]);
 
   return { refresh, isRefreshing };
 }

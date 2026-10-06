@@ -66,7 +66,6 @@ import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract } from '../types';
-import { SINCRONIZACAO_RULES } from '../config/alertRules';
 import { STATUS_A_VENCER, formatStatusVigencia } from '../utils/statusVigencia';
 
 interface ItemBalancesProps {
@@ -126,12 +125,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
   const canLinkEmpenhos = canManageAllocations || role === 'gestor';
   const canEditData = role === 'admin' || role === 'gestor';
-  // Mantém gravado o quantitativo SENASP do item (base do saldo na Ata, nos dashboards e na central de prazos).
+  // Quantitativo SENASP do item (base do saldo na Ata, nos dashboards e na central de prazos): é gravado em
+  // segundo plano para todos os itens; aqui só o botão Atualizar relê o deste item.
   const { mutate: syncSenasp } = useSyncItemSenasp();
-  React.useEffect(() => {
-    if (!canEditData) return;
-    syncSenasp({ numeroAta: arp.numeroAtaRegistroPreco, uasg: arp.codigoUnidadeGerenciadora, numeroItem: item.numeroItem });
-  }, [canEditData, syncSenasp, arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem]);
 
   const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
 
@@ -358,42 +354,33 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const syncEmpenhosMutation = useSyncItemContractEmpenhos();
 
   // Relê da API, para cada contrato vinculado, a quantidade contratada (que entra no saldo) e os empenhos do
-  // contrato, estimados pelo preço unitário do próprio contrato. Ao abrir o item roda uma vez por contrato
-  // (a quantidade só se nunca lida ou com mais de 6 horas); o botão Atualizar força tudo de novo.
+  // contrato, estimados pelo preço unitário do próprio contrato. Só roda pelo botão Atualizar: abrir o item
+  // não consulta mais as APIs (antes rodava para cada contrato em cada abertura, em cada navegador). A
+  // quantidade contratada também é relida em segundo plano para todos os itens (saldosItensSyncService).
   const syncContractQuantityMutation = useSyncContractItemQuantity();
-  const contractSyncAttempted = React.useRef<Set<string>>(new Set());
   const [syncingContracts, setSyncingContracts] = useState(false);
 
-  const syncLinkedContracts = async (force: boolean): Promise<{ total: number; falhas: number }> => {
-    const sixHours = SINCRONIZACAO_RULES.quantidadeContratadaVencidaEmHoras * 60 * 60 * 1000;
-    const targets = enrichedOfficialLinks.filter(
-      (l) => l.contract && (force || !contractSyncAttempted.current.has(l.linkId))
-    );
-    // Marca todos de uma vez: uma nova passagem do efeito não repete contratos que já estão na fila.
-    targets.forEach((l) => contractSyncAttempted.current.add(l.linkId));
+  const syncLinkedContracts = async (): Promise<{ total: number; falhas: number }> => {
+    const targets = enrichedOfficialLinks.filter((l) => l.contract);
 
     let falhas = 0;
     for (const l of targets) {
       const contract = l.contract!;
-      const lastRead = l.quantidadeLidaEm ? Date.parse(l.quantidadeLidaEm) : NaN;
-      const quantityStale = force || Number.isNaN(lastRead) || Date.now() - lastRead >= sixHours;
       let unitPrice = l.valorUnitarioContrato ?? (Number(item.valorUnitario) || undefined);
       let falhou = false;
 
-      if (quantityStale) {
-        try {
-          const q = await syncContractQuantityMutation.mutateAsync({
-            numeroAta: arp.numeroAtaRegistroPreco,
-            uasg: arp.codigoUnidadeGerenciadora,
-            numeroItem: item.numeroItem,
-            contractKey: l.contractKey,
-            contract
-          });
-          if (q.valorUnitario) unitPrice = q.valorUnitario;
-        } catch (err) {
-          falhou = true;
-          console.warn('Quantidade contratada não sincronizada:', l.contractKey, err);
-        }
+      try {
+        const q = await syncContractQuantityMutation.mutateAsync({
+          numeroAta: arp.numeroAtaRegistroPreco,
+          uasg: arp.codigoUnidadeGerenciadora,
+          numeroItem: item.numeroItem,
+          contractKey: l.contractKey,
+          contract
+        });
+        if (q.valorUnitario) unitPrice = q.valorUnitario;
+      } catch (err) {
+        falhou = true;
+        console.warn('Quantidade contratada não sincronizada:', l.contractKey, err);
       }
       try {
         await syncEmpenhosMutation.mutateAsync({
@@ -418,19 +405,16 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     return { total: targets.length, falhas };
   };
 
-  useEffect(() => {
-    if (!canEditData) return;
-    void syncLinkedContracts(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enrichedOfficialLinks, canEditData, arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem]);
-
   const handleRefresh = async () => {
     refetchContracts();
     loadManualData();
-    if (!canEditData || enrichedOfficialLinks.length === 0) return;
+    if (!canEditData) return;
+    // Quantitativo SENASP deste item (as demais leituras são em segundo plano).
+    syncSenasp({ numeroAta: arp.numeroAtaRegistroPreco, uasg: arp.codigoUnidadeGerenciadora, numeroItem: item.numeroItem });
+    if (enrichedOfficialLinks.length === 0) return;
     setSyncingContracts(true);
     try {
-      const { total, falhas } = await syncLinkedContracts(true);
+      const { total, falhas } = await syncLinkedContracts();
       if (total === 0) return;
       if (falhas > 0) {
         toast.error(`${falhas} de ${total} ${total === 1 ? 'contrato não pôde ser atualizado' : 'contratos não puderam ser atualizados'} a partir da API. Tente novamente em instantes.`);

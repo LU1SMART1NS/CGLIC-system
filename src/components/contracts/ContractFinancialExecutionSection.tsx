@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ArrowRight, Layers, Receipt } from 'lucide-react';
-import { useAutoSyncContractEmpenhos } from '../../hooks/useAutoSyncContractEmpenhos';
 import { useContractEmpenhoItemLinks } from '../../hooks/useContractEmpenhoItemLinks';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { formatItemKeyLabel, parseItemKey } from '../../utils/itemKeyParts';
@@ -59,13 +58,9 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   // Empenhos de Contratos.gov/Compras.gov + v_empenhos_resumo, deduplicados por canonical_key
   const { empenhosList, summary: financialSummary, isLoading, isError, refetch } = useContractFinancialSummary(contract, contractKey);
 
-  const { isSyncing } = useAutoSyncContractEmpenhos(contract, contractKey, {
-    isLoading,
-    isError,
-    empenhosCount: empenhosList.length
-  });
-
-  if ((isLoading || isSyncing) && empenhosList.length === 0) {
+  // Abrir o contrato só lê o que está gravado. Os empenhos são buscados nas bases oficiais pelo botão
+  // "Atualizar empenhos" (no topo do contrato) ou pela atualização em lote da Execução Financeira.
+  if (isLoading && empenhosList.length === 0) {
     return <DataTable columns={[]} data={[]} keyExtractor={() => ''} isLoading testId="contract-financial-loading" />;
   }
 
