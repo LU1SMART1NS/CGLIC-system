@@ -10,6 +10,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     sincronizarContratos: vi.fn(async () => sucesso(3)),
     sincronizarAtas: vi.fn(async () => sucesso(5)),
     sincronizarSaldosItens: vi.fn(async () => sucesso(7)),
+    sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
+    consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
     buscarContratosNasFontes: vi.fn(async () => ({ contracts: [{}, {}] as any, fontesComFalha: ['Compras.gov.br'] })),
     fetchArpsDasFontes: vi.fn(async () => [{}, {}, {}] as any),
     agora: () => (t += 1000),
@@ -39,6 +41,27 @@ describe('validarPedido', () => {
     const r = validarPedido(corpo);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erro).toMatch(erro);
+  });
+});
+
+describe('recurso empenhos', () => {
+  it('exige UASG da CGLIC', () => {
+    expect(validarPedido({ recurso: 'empenhos', uasg: '200330' })).toMatchObject({ ok: true, pedido: { recurso: 'empenhos', uasg: '200330' } });
+    expect(validarPedido({ recurso: 'empenhos' })).toMatchObject({ ok: false });
+  });
+
+  it('sincroniza a carteira da UASG com o orçamento de tempo do servidor', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'empenhos', uasg: '200330', forcar: true }, d);
+    expect(d.sincronizarEmpenhosDaCarteira).toHaveBeenCalledWith('200330', { forcar: true, orcamentoMs: 100_000 });
+    expect(r).toMatchObject({ dry: false, recurso: 'empenhos', resultado: { status: 'SUCESSO', total: 9 } });
+  });
+
+  it('dry: só consulta, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'empenhos', uasg: '200331', dry: true }, d);
+    expect(d.sincronizarEmpenhosDaCarteira).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { elegiveis: 6, empenhosDaAmostra: 1 } });
   });
 });
 

@@ -129,7 +129,10 @@ Decisões tomadas na implementação: lista vazia da fonte com vínculos existen
 9. Marcar na tela a NE presente em mais de um contrato ("compartilhada com 00005/2017") e não somar 100% em cada um; `v_contrato_empenhos_lastro` passa a somar `valor_vinculado` rateado ou a expor a contagem de contratos por NE.
 10. Opcional: `CHECK (contract_key ~ '^[0-9]{6}-(NE)?[0-9]{5}-[0-9]{4}$')` em `contrato_empenhos` e checagem de existência em `contratos_oficiais` na RPC.
 
-### Fase 4: cobertura
+### Fase 4: cobertura (implementada na branch feat/empenhos-sync-fase-4)
+
+Decisões tomadas na implementação: consultar as faturas dos 687 contratos vencidos a cada execução custa cerca de 43 s, então o critério usa só dados do banco: vigente, vencido há até 24 meses ou com empenho vinculado ainda não pago por inteiro. Em 06/10/2026 isso cobre 106 dos 108 vencidos com fatura liquidada nos últimos 12 meses e dá 693 contratos elegíveis (690 na 200331, 3 na 200330). O servidor roda o recurso `empenhos` por UASG, de hora em hora, com orçamento de 100 s, começando pelos contratos consultados há mais tempo; o que não couber fica para a execução seguinte. O botão da Execução Financeira continua, com o mesmo critério.
+
 
 11. Lote por UASG (incluir 200330) e critério de inclusão "vigente OU com fatura nos últimos 12 meses" em vez de só `statusVigencia`.
 12. Mover o lote para a Edge Function. Pré-requisito: as RPCs de empenho usam `has_role`, que falha com service role (`auth.uid()` nulo). A migration 72 já avisa que isso precisa de adaptação.

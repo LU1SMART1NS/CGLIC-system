@@ -9,6 +9,7 @@ import {
   type SituacaoSincronizacaoEmpenhos
 } from '../services/contratoEmpenhosSincronizacaoService';
 import { SINCRONIZACAO_EMPENHOS_QUERY_KEY } from './useSincronizacaoEmpenhosContrato';
+import { selecionarContratos } from '../services/empenhosCarteiraService';
 import type { OrchestrationResult } from '../types/empenhoSync';
 import type { ContractDashboardRecord } from '../types';
 
@@ -62,20 +63,15 @@ export interface BatchSyncSummary {
   falhas: BatchSyncFalha[];
 }
 
-/** Contratos das carteiras das duas UASGs, sem repetir a mesma chave, que o lote sincroniza. */
-export function contratosParaSincronizar(...carteiras: Array<ContractDashboardRecord[] | undefined>): ContractDashboardRecord[] {
-  const vistos = new Set<string>();
-  const lista: ContractDashboardRecord[] = [];
-  for (const carteira of carteiras) {
-    for (const contrato of carteira || []) {
-      if (contrato.statusVigencia === 'Expirado') continue;
-      const chave = contrato.id || `${contrato.uasg}-${contrato.numero}`;
-      if (vistos.has(chave)) continue;
-      vistos.add(chave);
-      lista.push(contrato);
-    }
-  }
-  return lista;
+/**
+ * Contratos das carteiras das duas UASGs que o lote sincroniza, sem repetir a mesma chave: o mesmo
+ * critério do servidor (vigente, vencido há até 24 meses ou com empenho ainda não pago por inteiro).
+ */
+export function contratosParaSincronizar(
+  carteiras: Array<ContractDashboardRecord[] | undefined>,
+  ctx: { hoje: string; comEmpenhoAPagar: Set<string> }
+): ContractDashboardRecord[] {
+  return selecionarContratos(carteiras, ctx);
 }
 
 interface ResultadoContrato {
