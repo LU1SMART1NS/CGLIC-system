@@ -238,6 +238,38 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
 /**
  * Persiste Itens da Ata no Supabase
  */
+/** O que o banco já tem de uma ata: usado pela sincronização para só reler os itens que precisam. */
+export interface EstadoAtaNoBanco {
+  /** Quantos itens a ata tem gravados. */
+  itens: number;
+  /** Leitura mais antiga entre os itens da ata (ISO), ou null se não há itens. */
+  itensLidosEmMaisAntigo: string | null;
+}
+
+/**
+ * Estado das atas da UASG no banco, por número da ata. Se o banco não responder, devolve um mapa vazio:
+ * a sincronização então relê os itens de todas as atas, como antes.
+ */
+export async function fetchEstadoAtasNoBanco(uasg: string): Promise<Map<string, EstadoAtaNoBanco>> {
+  const estado = new Map<string, EstadoAtaNoBanco>();
+  if (!isSupabaseConfigured || !supabase) return estado;
+  try {
+    const { data, error } = await supabase
+      .from('atas_registro_preco')
+      .select('numero_ata, itens_ata(ultimo_sync_em)')
+      .eq('codigo_uasg', uasg);
+    if (error) throw error;
+    for (const linha of (data ?? []) as Array<{ numero_ata: string; itens_ata: Array<{ ultimo_sync_em: string | null }> | null }>) {
+      const lidos = (linha.itens_ata ?? []).map((i) => i.ultimo_sync_em).filter((t): t is string => Boolean(t)).sort();
+      estado.set(linha.numero_ata, { itens: linha.itens_ata?.length ?? 0, itensLidosEmMaisAntigo: lidos[0] ?? null });
+    }
+  } catch (err) {
+    console.warn('Não foi possível ler o estado das atas no banco; os itens de todas serão relidos.', err);
+    return new Map();
+  }
+  return estado;
+}
+
 /** Tamanho da coluna itens_ata.fornecedor_cnpj_cpf (migration 73; antes era 20). */
 export const TAMANHO_IDENTIFICADOR_FORNECEDOR = 255;
 

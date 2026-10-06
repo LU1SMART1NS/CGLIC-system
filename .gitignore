@@ -33,3 +33,6 @@ supabase/.temp/
 e2e/.auth
 test-results
 playwright-report
+
+# Edge Function sincronizar-fontes: pacote gerado por npm run build:sincronizar-fontes
+supabase/functions/sincronizar-fontes/index.ts

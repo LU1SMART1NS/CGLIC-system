@@ -327,3 +327,48 @@ O gargalo era uma só chamada: para sugerir contratos ao item, `fetchComprasGovC
 
 - Resultado idêntico ao antigo para a mesma compra (4 contratos nos dois caminhos); 32,7 s caiu para 3,8 s com o cache frio (inclui a primeira leitura do banco) e o pior caso da tela passou a ser uma chamada de 1,5 s.
 - **Conclusão sobre persistir os painéis de detalhe:** com a medição, não é necessário agora. Ata 360 e Contrato 360 fazem poucas chamadas pequenas; o Item ainda faz cerca de 26, mas nenhuma passa de 1,5 s. Só vale revisitar se o uso real mostrar lentidão nessas telas.
+
+---
+
+## 10. Sincronização agendada no servidor (item 2)
+
+**06/10/2026 — construída e testada; falta ativar em produção (um comando).**
+
+### Como funciona
+```
+pg_cron (de hora em hora) ──► public.disparar_sincronizacao() ──► pg_net (POST) ──► Edge Function sincronizar-fontes
+                                   lê do Vault o endereço                              │ confere o segredo do agendamento
+                                   e o segredo                                         ▼
+                                                                          reserva a trava (sincronizacao_fontes)
+                                                                          consulta Compras.gov.br / Contratos.gov.br / PNCP
+                                                                          grava no banco e registra o resultado
+```
+- **Jobs** (migration 77): contratos 200330 e 200331 às :05, atas 200330 e 200331 às :15, saldos dos itens às :35, nessa ordem porque os saldos usam o que as outras duas acabaram de atualizar. Cada chamada é uma execução separada, para caber no tempo máximo de uma Edge Function. A cada hora a função confere a validade (6 h) e a trava; na maior parte das horas a resposta é "nada a fazer".
+- **Mesma lógica do app.** A função não reimplementa nada: `scripts/build-sincronizar-fontes.mjs` empacota (rolldown) os mesmos serviços de `src/services` num arquivo só, trocando o cliente do navegador por um cliente de service role (`server/sincronizar-fontes/supabaseServidor.ts`) e traduzindo os endereços `/api-*` para os servidores reais (`proxyDeFontes.ts`, os mesmos destinos do `vite.config.ts` e do `vercel.json`).
+- **Acesso do servidor** (migration 76): `reservar_sincronizacao`, `gravar_contratos_oficiais`, `concluir_sincronizacao` e as duas funções de saldo (`sync_contract_item_quantity_atomic`, `sync_item_senasp_quantity_atomic`) passam a aceitar a chave de service role (`eh_service_role()`). A trava do servidor tem `em_andamento_por` nulo e só o servidor grava e conclui nela; a de um usuário, só ele. As regras de gestor, coordenador e consulta não mudam.
+- **Quem pode chamar a função** (`verify_jwt = false`, a autenticação é feita dentro dela): o agendamento, com o segredo em `x-cron-secret` (só sincroniza o que venceu, nunca força), ou o coordenador, com o token da sessão (também força). Qualquer outra chamada recebe 401 ou 403. O segredo fica no Vault (`sincronizacao_segredo`) e como secret da função (`CRON_SECRET`); o endereço, no Vault (`sincronizacao_url`). Nada disso vai para o git.
+- **Atas incrementais.** O servidor sempre relê a lista de atas (uma consulta), mas só relê os **itens** das atas que precisam: sem itens gravados, itens lidos há mais de 7 dias, ou ata alterada na fonte nos últimos 2 dias. O coordenador força a releitura de todas. Antes, cada execução relia os itens das 191 atas (cerca de 100 s). Há também um orçamento de 100 s para consultar itens: se acabar, grava o que tem como PARCIAL e o resto fica para a próxima hora, em vez de a função ser interrompida no meio.
+- **Teste de acesso** (`"dry": true`): consulta as fontes e conta, sem gravar. É o que o script de ativação usa para provar que o servidor do Supabase alcança as fontes do governo.
+
+### Verificado antes de ativar
+- Pacote real executado em Node contra as fontes do governo, em modo dry: 1.057 contratos (200331), 42 (200330) e 191 atas, em 28 s, 1 s e 17 s; 0,55 s de processador no total.
+- Migration 76 em Postgres 17 local: ciclo completo do servidor, a trava não é invadida por usuários nem pelo servidor, regras de gestor, coordenador e consulta preservadas, troca de autorização das funções de saldo e aborto se a linha mudar.
+- Migrations 76 e 77 no banco real, dentro de uma transação desfeita: extensões criadas, 6 jobs agendados, disparo sem secrets devolve nulo, o `pg_net` enfileira o POST com o endereço, o corpo e o tempo certos. Nada ficou gravado.
+- 1.896 testes, tipos (app e servidor) e build ok.
+
+### Ativar (uma vez)
+```bash
+npm run ativar:sincronizacao-no-servidor
+```
+Pede confirmação e, em ordem: define o secret da função, implanta a função, aplica as migrations 76 e 77, grava endereço e segredo no Vault e faz o teste de acesso às fontes (modo dry). Se o teste não retornar 200, a função e o agendamento ficam instalados, mas o script avisa para conferir os logs antes de confiar nele.
+
+### Operar
+- Situação: `select * from sincronizacao_fontes;` (último sucesso, última tentativa, falhas) e `select * from cron.job_run_details order by start_time desc limit 10;`
+- Logs da função: `supabase functions logs sincronizar-fontes`
+- Disparar agora: `select public.disparar_sincronizacao('contratos', '200331');`
+- Pausar tudo: `update cron.job set active = false where jobname like 'sincronizar-%';`
+
+### Falta (próximo PR, depois de ver o agendamento rodando em produção)
+- Tirar a sincronização do navegador de gestor e coordenador (`useSincronizacaoEmSegundoPlano`); enquanto isso, as duas convivem sem problema, pela trava.
+- O botão "Atualizar" do coordenador passar a chamar a função (`forcar: true`) em vez de rodar no navegador.
+- Fechar a escrita aberta a qualquer usuário logado em `atas_registro_preco` e `itens_ata` (a sincronização no servidor deixa de precisar dela).

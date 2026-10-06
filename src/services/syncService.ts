@@ -10,7 +10,7 @@
  */
 
 import { fetchArpsDasFontes, fetchArpItems, limparCachesAtas } from './api';
-import { cacheArpsInDb, cacheArpItemsInDb } from './dbCacheService';
+import { cacheArpsInDb, cacheArpItemsInDb, fetchEstadoAtasNoBanco, type EstadoAtaNoBanco } from './dbCacheService';
 import {
   executarComReserva,
   uasgsSincronizandoAgoraDe,
@@ -18,7 +18,7 @@ import {
   type ResultadoConcluido,
   type ResultadoSincronizacao
 } from './sincronizacaoFontesService';
-import type { FilterParams } from '../types';
+import type { ArpRecord, FilterParams } from '../types';
 
 export const RECURSO_ATAS = 'atas' as const;
 
@@ -40,15 +40,53 @@ export interface SyncProgressCallback {
   (progress: { step: string; percent: number; current?: number; total?: number }): void;
 }
 
+/** Itens lidos há mais que isto são relidos mesmo sem mudança na fonte (renovação periódica). */
+export const ITENS_VALIDADE_DIAS = 7;
+/** Ata alterada na fonte nos últimos dias: relê os itens (a hora da fonte pode vir sem fuso, daí a folga). */
+export const ATA_ALTERADA_RECENTE_DIAS = 2;
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+export interface OpcoesDaColeta {
+  onProgress?: SyncProgressCallback;
+  /** Relê os itens de todas as atas, sem olhar o que o banco já tem (botão do coordenador). */
+  forcar?: boolean;
+  /**
+   * Tempo máximo, em ms, para consultar itens. Ao esgotar, para e grava o que tem como PARCIAL, e as atas
+   * que ficaram serão lidas na próxima execução. Usado no servidor, onde a Edge Function tem tempo limitado.
+   */
+  orcamentoMs?: number;
+  agora?: () => number;
+}
+
+/**
+ * A ata precisa ter os itens relidos nas fontes? Sim quando: o coordenador forçou; a ata ainda não tem itens
+ * gravados; os itens foram lidos há mais de ITENS_VALIDADE_DIAS; ou a ata foi alterada na fonte nos últimos
+ * ATA_ALTERADA_RECENTE_DIAS dias. Caso contrário os itens do banco continuam valendo: a quantidade homologada
+ * de uma ata não muda, e o consumo vem dos contratos, que têm sincronização própria.
+ */
+export function ataPrecisaDeItens(arp: ArpRecord, estado: EstadoAtaNoBanco | undefined, agora: number, forcar: boolean): boolean {
+  if (forcar || !estado || estado.itens === 0) return true;
+  const lidoEm = estado.itensLidosEmMaisAntigo ? Date.parse(estado.itensLidosEmMaisAntigo) : NaN;
+  if (Number.isNaN(lidoEm) || agora - lidoEm > ITENS_VALIDADE_DIAS * DIA_MS) return true;
+  const alteradaNaFonte = arp.dataHoraAtualizacao ? Date.parse(arp.dataHoraAtualizacao) : NaN;
+  return !Number.isNaN(alteradaNaFonte) && agora - alteradaNaFonte < ATA_ALTERADA_RECENTE_DIAS * DIA_MS;
+}
+
 /**
  * Consulta as atas e os itens nas fontes oficiais e grava no banco. Não apaga nada: ata ou item que
  * some de uma resposta continua no banco. Lança erro se a lista de atas não vier ou não for gravada.
+ * A lista de atas é sempre relida (é uma consulta só); os itens, só das atas que precisam (ataPrecisaDeItens).
  */
 export async function coletarEGravarAtas(
   params: FilterParams,
-  onProgress?: SyncProgressCallback
+  opcoes: OpcoesDaColeta = {}
 ): Promise<ResultadoConcluido> {
+  const { onProgress, forcar = false, orcamentoMs, agora = () => Date.now() } = opcoes;
+  const inicio = agora();
   onProgress?.({ step: 'Consultando atas de registro de preços...', percent: 10 });
+
+  // O que o banco já tem, lido ANTES de gravar a lista nova.
+  const estadoNoBanco = await fetchEstadoAtasNoBanco(params.codigoUnidadeGerenciadora || '');
 
   // Lista das atas, já com as vigências do PNCP. Falha da fonte vira erro (não cai para o banco).
   const atas = await fetchArpsDasFontes(params);
@@ -60,10 +98,21 @@ export async function coletarEGravarAtas(
   const gravou = await cacheArpsInDb(atas);
   if (!gravou) throw new Error('Não foi possível gravar as atas no banco.');
 
+  // Só as atas que precisam de itens; as sem itens primeiro, para o orçamento de tempo não deixá-las de fora.
+  const momento = agora();
+  const pendentes = atas
+    .filter((arp) => ataPrecisaDeItens(arp, estadoNoBanco.get(arp.numeroAtaRegistroPreco), momento, forcar))
+    .sort((a, b) => (estadoNoBanco.get(a.numeroAtaRegistroPreco)?.itens ? 1 : 0) - (estadoNoBanco.get(b.numeroAtaRegistroPreco)?.itens ? 1 : 0));
+
   let falhasConsulta = 0;
   let falhasGravacao = 0;
-  for (let i = 0; i < atas.length; i += ITENS_EM_PARALELO) {
-    const lote = atas.slice(i, i + ITENS_EM_PARALELO);
+  let adiadas = 0;
+  for (let i = 0; i < pendentes.length; i += ITENS_EM_PARALELO) {
+    if (orcamentoMs !== undefined && agora() - inicio > orcamentoMs) {
+      adiadas = pendentes.length - i;
+      break;
+    }
+    const lote = pendentes.slice(i, i + ITENS_EM_PARALELO);
     const resultados = await Promise.all(
       lote.map(async (arp): Promise<'ok' | 'consulta' | 'gravacao'> => {
         let itens;
@@ -75,19 +124,19 @@ export async function coletarEGravarAtas(
         }
         // Ata sem itens nas fontes não é falha (ex.: compra com vários fornecedores sem indicação de qual é o da ata).
         if (!itens.resultado || itens.resultado.length === 0) return 'ok';
-        const gravou = await cacheArpItemsInDb(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, itens.resultado);
-        return gravou ? 'ok' : 'gravacao';
+        const gravouItens = await cacheArpItemsInDb(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, itens.resultado);
+        return gravouItens ? 'ok' : 'gravacao';
       })
     );
     falhasConsulta += resultados.filter((r) => r === 'consulta').length;
     falhasGravacao += resultados.filter((r) => r === 'gravacao').length;
 
-    const feitas = Math.min(i + lote.length, atas.length);
+    const feitas = Math.min(i + lote.length, pendentes.length);
     onProgress?.({
-      step: `Sincronizando itens (${feitas}/${atas.length})...`,
-      percent: Math.min(95, Math.round(35 + (feitas / atas.length) * 60)),
+      step: `Sincronizando itens (${feitas}/${pendentes.length})...`,
+      percent: Math.min(95, Math.round(35 + (feitas / Math.max(pendentes.length, 1)) * 60)),
       current: feitas,
-      total: atas.length
+      total: pendentes.length
     });
   }
 
@@ -95,7 +144,8 @@ export async function coletarEGravarAtas(
   const plural = (n: number) => `${n} ${n === 1 ? 'ata' : 'atas'}`;
   const problemas = [
     falhasConsulta > 0 ? `o Compras.gov.br não entregou os itens de ${plural(falhasConsulta)}` : '',
-    falhasGravacao > 0 ? `não foi possível gravar os itens de ${plural(falhasGravacao)} no banco` : ''
+    falhasGravacao > 0 ? `não foi possível gravar os itens de ${plural(falhasGravacao)} no banco` : '',
+    adiadas > 0 ? `o tempo da execução acabou e os itens de ${plural(adiadas)} ficam para a próxima` : ''
   ].filter(Boolean);
   return problemas.length > 0
     ? {
@@ -114,13 +164,16 @@ export async function coletarEGravarAtas(
  */
 export async function sincronizarAtas(
   uasg: string,
-  opts: { forcar?: boolean; onProgress?: SyncProgressCallback } = {}
+  opts: { forcar?: boolean; onProgress?: SyncProgressCallback; orcamentoMs?: number } = {}
 ): Promise<ResultadoSincronizacao> {
   const cleanUasg = (uasg || '').trim();
   return executarComReserva(RECURSO_ATAS, cleanUasg, { forcar: opts.forcar, validade: VALIDADE_PADRAO }, async () => {
     // Sem isso, uma segunda sincronização na mesma sessão reaproveitaria as respostas da primeira.
     limparCachesAtas();
-    return coletarEGravarAtas({ ...JANELA_VIGENCIA_ATAS, codigoUnidadeGerenciadora: cleanUasg, numeroAtaRegistroPreco: '' }, opts.onProgress);
+    return coletarEGravarAtas(
+      { ...JANELA_VIGENCIA_ATAS, codigoUnidadeGerenciadora: cleanUasg, numeroAtaRegistroPreco: '' },
+      { onProgress: opts.onProgress, forcar: opts.forcar, orcamentoMs: opts.orcamentoMs }
+    );
   });
 }
 
