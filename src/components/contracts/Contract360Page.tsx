@@ -46,7 +46,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   uasg: uasgProp
 }) => {
   const { contractKey: paramContractKey } = useParams<{ contractKey: string }>();
-  const back = useBackTarget({ path: '/contratos', label: 'Voltar para Contratos' });
+  const back = useBackTarget({ path: '/contratos', label: 'Voltar para Carteira' });
   const contractKey = contractKeyOverride || paramContractKey;
 
   // A chave canônica é "UASG-NUMERO-ANO": quando a UASG não é informada por prop,

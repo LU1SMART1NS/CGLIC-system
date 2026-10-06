@@ -39,10 +39,10 @@ export const ItemBalancesRoute: React.FC = () => {
   const ataPath = arp ? buildAtaPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, 'itens') : '/atas';
   const back = useBackTarget(
     role === 'gestor_saldos'
-      ? { path: '/itens', label: 'Voltar para Itens' }
+      ? { path: '/itens', label: 'Voltar para Carteira' }
       : arp
         ? { path: ataPath, label: 'Voltar para a ata' }
-        : { path: '/atas', label: 'Voltar para Atas' }
+        : { path: '/atas', label: 'Voltar para Carteira' }
   );
   // "Abrir ata" sobe um nível: a ata herda a origem de quem veio antes do item.
   const abrirAta = () => navigate(ataPath, { state: back.upState });

@@ -78,7 +78,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   onOpenItens,
   onBack
 }) => {
-  const back = useBackTarget({ path: '/atas', label: 'Voltar para Atas' });
+  const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
   const { data: manager, isLoading: loadingManager } = useAtaManager(arp.numeroAtaRegistroPreco);
   // A divulgação no PNCP só aparece quando o PNCP responde; sem resposta, a linha de datas fica sem ela.

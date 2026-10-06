@@ -28,9 +28,9 @@ export function originLabel(path: string): string | null {
   const pathname = path.split(/[?#]/)[0];
   switch (pathname) {
     case '/instrumentos': return 'Visão Geral';
-    case '/atas': return 'Atas';
-    case '/contratos': return 'Contratos';
-    case '/itens': return 'Itens';
+    case '/atas': return 'Carteira';
+    case '/contratos': return 'Carteira';
+    case '/itens': return 'Carteira';
     case '/atas/distribuicao': return 'Distribuição';
     case '/pagamentos': return 'Pagamentos';
     case '/empenhos': return 'Empenhos e Execução';
