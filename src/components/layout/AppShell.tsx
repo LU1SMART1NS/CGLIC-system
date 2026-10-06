@@ -6,7 +6,6 @@ import { Header } from '../Header';
 import { Sidebar } from './Sidebar';
 import { AreaTabs } from './AreaTabs';
 import { SkeletonLoader } from '../../design-system';
-import { useSincronizacaoEmSegundoPlano } from '../../hooks/useSincronizacaoEmSegundoPlano';
 import { useVoltarAoTopoAoTrocarDePagina } from '../../hooks/useVoltarAoTopoAoTrocarDePagina';
 
 export interface AppShellContextValue {
@@ -23,8 +22,6 @@ export const AppShell: React.FC<AppShellProps> = ({
   onOpenExportModal,
   onOpenDepartmentsModal
 }) => {
-  // Gestor e coordenador: atualizam contratos e atas no banco em segundo plano quando passam da validade.
-  useSincronizacaoEmSegundoPlano();
   useVoltarAoTopoAoTrocarDePagina();
 
   // < 768px: o menu chave vira barra inferior.

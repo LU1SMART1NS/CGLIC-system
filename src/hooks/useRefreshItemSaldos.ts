@@ -1,36 +1,44 @@
 import React from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { sincronizarSaldosItens } from '../services/saldosItensSyncService';
-import { invalidarDadosDeSaldosItens } from './useSincronizacaoEmSegundoPlano';
+import { RECURSO_SALDOS_ITENS } from '../services/saldosItensSyncService';
+import { UASG_TODAS } from '../services/sincronizacaoFontesService';
+import { useAtualizacaoNoServidor } from './useAtualizacaoNoServidor';
+
+/** Relê do banco tudo o que depende dos saldos dos itens (quantidade contratada e quantitativo SENASP). */
+export async function invalidarDadosDeSaldosItens(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] }),
+    queryClient.invalidateQueries({ queryKey: ['ata-detail-source'] }),
+    queryClient.invalidateQueries({ queryKey: ['management-dashboard'] })
+  ]);
+}
 
 /**
- * Botão "Atualizar" da Visão Geral para o coordenador: força a releitura dos saldos dos itens (quantidade
- * contratada nos contratos vinculados e quantitativo SENASP) nas fontes oficiais.
+ * Botão "Atualizar" da Visão Geral para o coordenador: pede ao servidor a releitura forçada dos saldos dos
+ * itens (quantidade contratada nos contratos vinculados e quantitativo SENASP) e espera terminar.
  *
- * Não roda sozinho ao abrir a tela: a atualização periódica é feita em segundo plano, uma vez para todos,
- * por useSincronizacaoEmSegundoPlano (trava no banco, validade de 6 horas).
+ * Não roda sozinho ao abrir a tela: a atualização periódica é feita pelo servidor, de hora em hora
+ * (agendamento do banco, trava e validade de 6 horas).
  */
 export function useRefreshItemSaldos() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
+  const atualizarNoServidor = useAtualizacaoNoServidor();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  // Forçar é só do coordenador (a função do banco recusa os demais perfis).
+  // Forçar é só do coordenador (a função de sincronização recusa os demais perfis).
   const canForce = role === 'admin';
 
   const refresh = React.useCallback(async () => {
     if (!canForce) return;
     setIsRefreshing(true);
     try {
-      const resultado = await sincronizarSaldosItens({ forcar: true });
-      if (resultado.status === 'ERRO') console.warn('[itemSaldos] falha ao atualizar saldos dos itens:', resultado.erro);
+      await atualizarNoServidor(RECURSO_SALDOS_ITENS, [UASG_TODAS]);
       await invalidarDadosDeSaldosItens(queryClient);
-    } catch (err) {
-      console.warn('[itemSaldos] falha ao atualizar saldos dos itens:', err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [canForce, queryClient]);
+  }, [canForce, queryClient, atualizarNoServidor]);
 
   return { refresh, isRefreshing };
 }

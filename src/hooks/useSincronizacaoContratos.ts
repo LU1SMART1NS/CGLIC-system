@@ -2,11 +2,8 @@ import { useCallback, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { UASGS_CGLIC } from '../config/unidadesGestoras';
-import {
-  RECURSO_CONTRATOS,
-  sincronizarContratos,
-  type ResultadoSincronizacao
-} from '../services/contratosOficiaisService';
+import { RECURSO_CONTRATOS } from '../services/contratosOficiaisService';
+import { useAtualizacaoNoServidor } from './useAtualizacaoNoServidor';
 import {
   chaveStatusSincronizacao,
   podeForcarAtualizacao,
@@ -41,7 +38,7 @@ function relerContratos(queryClient: QueryClient) {
 
 /**
  * Situação da sincronização dos contratos e o botão "Atualizar" das carteiras.
- * - Coordenador: `atualizar` força a sincronização com as fontes oficiais das duas UASGs.
+ * - Coordenador: `atualizar` pede ao servidor a sincronização forçada das duas UASGs e espera terminar.
  * - Demais perfis não têm o botão; `atualizar` só relê o banco (usado no "tentar de novo" de erros).
  * Quando uma sincronização (deste ou de outro navegador) termina, as telas são recarregadas do banco.
  */
@@ -49,6 +46,7 @@ export function useSincronizacaoContratos() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const situacao = useSituacaoSincronizacao(RECURSO_CONTRATOS, relerContratos);
+  const atualizarNoServidor = useAtualizacaoNoServidor();
 
   const [isAtualizando, setIsAtualizando] = useState(false);
   const podeForcar = podeForcarAtualizacao(role);
@@ -56,17 +54,12 @@ export function useSincronizacaoContratos() {
   const atualizar = useCallback(async () => {
     setIsAtualizando(true);
     try {
-      if (podeForcar) {
-        const resultados = await Promise.all(UASGS_CGLIC.map((uasg) => sincronizarContratos(uasg, { forcar: true })));
-        resultados
-          .filter((r): r is Extract<ResultadoSincronizacao, { status: 'ERRO' }> => r.status === 'ERRO')
-          .forEach((r) => console.warn('[sincronizacaoContratos] falha ao atualizar:', r.erro));
-      }
+      if (podeForcar) await atualizarNoServidor(RECURSO_CONTRATOS, UASGS_CGLIC);
       await invalidarDadosDeContratos(queryClient);
     } finally {
       setIsAtualizando(false);
     }
-  }, [podeForcar, queryClient]);
+  }, [podeForcar, queryClient, atualizarNoServidor]);
 
   return {
     ...situacao,

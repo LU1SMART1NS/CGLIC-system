@@ -63,6 +63,12 @@ const codigo = readFileSync(saida, 'utf8');
 const problemas = [];
 if (codigo.includes('import.meta.env')) problemas.push('contém import.meta.env (o cliente do navegador entrou no pacote)');
 if (!codigo.includes('Deno.serve')) problemas.push('não contém Deno.serve');
+// A gravação de atas e itens só vale no servidor (ehServidor = true). Se a trava do navegador (false) entrar
+// no pacote, a sincronização rodaria sem gravar nada. O empacotador troca a constante pelo valor, então o
+// teste é: cacheArpsInDb não pode ter sobrado com um "!false" ou com a constante falsa.
+if (/ehServidor\s*=\s*false/.test(codigo) || /ehServidor/.test(codigo.match(/async function cacheArpsInDb[\s\S]{0,200}/)?.[0] ?? '')) {
+  problemas.push('a trava de gravação do navegador (ehServidor = false) entrou no pacote');
+}
 if (!local && !codigo.includes(`npm:@supabase/supabase-js@${versaoSupabase}`)) problemas.push('o supabase-js não ficou como npm:');
 // A chave pública do navegador (valor padrão de supabaseClient.ts) não pode ir para o servidor.
 const chavePublicaDoNavegador = /DEFAULT_SUPABASE_ANON_KEY\s*=\s*'([^']+)'/.exec(readFileSync(resolve(raiz, 'src/services/supabaseClient.ts'), 'utf8'))?.[1];

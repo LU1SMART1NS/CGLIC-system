@@ -67,7 +67,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(arp.numeroAtaRegistroPreco));
   // Mesma regra das RPCs link/unlink_contract_to_item_atomic (has_role gestor/admin)
   const canEditLinks = role === 'admin' || role === 'gestor';
-  // O quantitativo SENASP dos itens é gravado em segundo plano (useSincronizacaoEmSegundoPlano); a tela só lê.
+  // O quantitativo SENASP dos itens é gravado em segundo plano (pelo servidor, de hora em hora); a tela só lê.
 
   const [isLinkModalOpen, setIsLinkModalOpen] = React.useState(false);
   const unlinkMutation = useUnlinkContractFromItem();
