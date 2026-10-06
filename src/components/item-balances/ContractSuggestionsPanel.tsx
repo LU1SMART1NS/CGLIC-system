@@ -49,7 +49,7 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
     {
       key: 'numero',
       header: 'Número do contrato',
-      render: (s) => <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: '#0c326f' }}>{displayNumero(s)}</span>
+      render: (s) => <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: 'var(--primary)' }}>{displayNumero(s)}</span>
     },
     {
       key: 'unidade',

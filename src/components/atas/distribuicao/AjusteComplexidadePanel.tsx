@@ -69,8 +69,8 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
               justifyContent: 'center',
               gap: '0.3rem',
               minHeight: '40px',
-              border: `1px solid ${nivel === n ? '#0c326f' : '#cbd5e1'}`,
-              background: nivel === n ? '#eff6ff' : '#ffffff',
+              border: `1px solid ${nivel === n ? 'var(--primary)' : '#cbd5e1'}`,
+              background: nivel === n ? 'var(--color-info-bg)' : '#ffffff',
               borderRadius: '6px',
               fontSize: '0.8rem',
               fontWeight: 700,
@@ -95,7 +95,7 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
             value={motivoOpcao}
             onChange={(e) => setMotivoOpcao(e.target.value)}
             data-testid="ajuste-motivo"
-            style={{ fontSize: '0.82rem', padding: '0.45rem 0.5rem', border: '1px solid #0c326f', borderRadius: '6px', background: '#ffffff' }}
+            style={{ fontSize: '0.82rem', padding: '0.45rem 0.5rem', border: '1px solid var(--primary)', borderRadius: '6px', background: '#ffffff' }}
           >
             <option value="">Selecione o motivo...</option>
             {MOTIVOS_AJUSTE.map((m) => (
@@ -112,14 +112,14 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
               onChange={(e) => setMotivoTexto(e.target.value)}
               placeholder="Descreva o motivo"
               data-testid="ajuste-motivo-texto"
-              style={{ fontSize: '16px', padding: '0.45rem 0.5rem', border: '1px solid #0c326f', borderRadius: '6px' }}
+              style={{ fontSize: '16px', padding: '0.45rem 0.5rem', border: '1px solid var(--primary)', borderRadius: '6px' }}
             />
           )}
         </div>
       )}
 
       {erro && (
-        <div role="alert" style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 600 }}>
+        <div role="alert" style={{ fontSize: '0.75rem', color: 'var(--color-danger-text)', fontWeight: 600 }}>
           Erro ao salvar: {erro.message}
         </div>
       )}
@@ -143,8 +143,8 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
             data-testid="ajuste-salvar"
             style={{
               ...carteiraButton,
-              background: '#0c326f',
-              borderColor: '#0c326f',
+              background: 'var(--primary)',
+              borderColor: 'var(--primary)',
               color: '#ffffff',
               opacity: podeSalvar ? 1 : 0.6,
               cursor: podeSalvar ? 'pointer' : 'not-allowed'

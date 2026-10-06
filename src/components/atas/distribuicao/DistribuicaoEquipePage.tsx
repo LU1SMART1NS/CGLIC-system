@@ -31,8 +31,8 @@ import { formatContractNumber } from '../../../utils/contractNumber';
 import { buildDistribuicaoEquipe } from './distribuicaoEquipe';
 import { mesesDeVigencia } from './complexidade';
 
-const AMBAR = '#d97706';
-const VERMELHO = '#dc2626';
+const AMBAR = 'var(--color-warning)';
+const VERMELHO = 'var(--color-danger)';
 
 
 /** Categoria do contrato: `categoria` no Contratos.gov.br, `nomeCategoria` no Compras.gov.br. */
@@ -213,7 +213,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
       <PageHeader
         title="Central de Distribuição"
         subtitle="Quem cuida de cada ata e contrato vigente. Contratos vinculados a uma ata seguem o gestor da ata."
-        icon={<Users size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<Users size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
             onRefresh={refresh}

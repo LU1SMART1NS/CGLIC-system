@@ -240,7 +240,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
                 padding: '0.25rem 0.5rem',
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                color: '#0c326f',
+                color: 'var(--primary)',
                 backgroundColor: '#f8fafc',
                 border: '1px solid #cbd5e1',
                 borderRadius: '4px',
@@ -335,7 +335,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             />
           </div>
 
-          <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: gestorNome ? '#64748b' : '#b45309', marginTop: '-0.4rem' }}>
+          <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: gestorNome ? '#64748b' : 'var(--color-warning-text)', marginTop: '-0.4rem' }}>
             {gestorNome ? labels.herancaMsg : labels.semGestorMsg}
           </div>
 

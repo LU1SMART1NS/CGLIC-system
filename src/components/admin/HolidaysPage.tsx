@@ -143,7 +143,7 @@ export const HolidaysPage: React.FC = () => {
       <PageHeader
         title="Feriados"
         subtitle="Datas sem expediente descontadas dos prazos em dias úteis."
-        icon={<CalendarOff size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<CalendarOff size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
             <AppButton variant="outline" icon={<Download size={15} />} onClick={handleImport} disabled={isBusy} data-testid="holidays-import">
@@ -180,7 +180,7 @@ export const HolidaysPage: React.FC = () => {
         stripActions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <AppButton variant="outline" size="sm" iconOnly icon={<ChevronLeft size={15} />} onClick={() => setYear((y) => y - 1)} aria-label="Ano anterior" />
-            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0c326f', minWidth: '4ch', textAlign: 'center' }} data-testid="holidays-year">{year}</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary)', minWidth: '4ch', textAlign: 'center' }} data-testid="holidays-year">{year}</span>
             <AppButton variant="outline" size="sm" iconOnly icon={<ChevronRight size={15} />} onClick={() => setYear((y) => y + 1)} aria-label="Próximo ano" />
           </div>
         }
@@ -201,7 +201,7 @@ export const HolidaysPage: React.FC = () => {
               header: 'Data',
               width: '120px',
               priority: 'primary',
-              render: (r) => <span style={{ fontWeight: 700, color: '#0c326f' }}>{formatDateBR(r.data)}</span>
+              render: (r) => <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{formatDateBR(r.data)}</span>
             },
             { key: 'dia', header: 'Dia', width: '110px', render: (r) => <span style={{ color: '#64748b' }}>{weekdayOf(r.data)}</span> },
             { key: 'nome', header: 'Nome', render: (r) => r.nome },
@@ -248,7 +248,7 @@ export const HolidaysPage: React.FC = () => {
                 icon={<Trash2 size={16} />}
                 onClick={() => handleDelete(r)}
                 disabled={isBusy}
-                style={{ color: '#ef4444' }}
+                style={{ color: 'var(--color-danger-solid)' }}
               />
             </div>
           )}

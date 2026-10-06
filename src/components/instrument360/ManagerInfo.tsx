@@ -21,7 +21,7 @@ export const ManagerInfo: React.FC<{ label: string; gestorNome?: string; isLoadi
           borderRadius: '8px',
           background: assigned ? 'rgba(12, 50, 111, 0.08)' : '#f8fafc',
           border: `1px solid ${assigned ? 'rgba(12, 50, 111, 0.2)' : '#e2e8f0'}`,
-          color: assigned ? '#0c326f' : '#94a3b8',
+          color: assigned ? 'var(--primary)' : '#94a3b8',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

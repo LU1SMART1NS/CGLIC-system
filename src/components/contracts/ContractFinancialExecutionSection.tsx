@@ -106,7 +106,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const linksOf = (e: EmpenhoRow) => (e.empenho_id ? linksByEmpenho.get(e.empenho_id) ?? [] : []);
 
   const columns: Column<EmpenhoRow>[] = [
-    { key: 'numero', header: 'Empenho', priority: 'primary', render: (e) => <strong style={{ color: '#0c326f' }}>{e.numero_oficial || 'N/A'}</strong> },
+    { key: 'numero', header: 'Empenho', priority: 'primary', render: (e) => <strong style={{ color: 'var(--primary)' }}>{e.numero_oficial || 'N/A'}</strong> },
     { key: 'credor', header: 'Credor', render: (e) => e.credor_nome || '—' },
     { key: 'data', header: 'Emissão', render: (e) => formatDate(e.data_emissao) },
     { key: 'empenhado', header: 'Empenhado', align: 'right', render: (e) => formatCurrency(e.valor_empenhado) },

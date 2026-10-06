@@ -2,8 +2,8 @@ import React from 'react';
 import type { NivelAtendimento } from '../../utils/itemAtendimento';
 
 const COLORS: Record<NivelAtendimento, { color: string; bg: string }> = {
-  TOTAL: { color: '#15803d', bg: '#f0fdf4' },
-  PARCIAL: { color: '#b45309', bg: '#fffbeb' },
+  TOTAL: { color: 'var(--color-success-text)', bg: 'var(--color-success-bg)' },
+  PARCIAL: { color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   SEM: { color: '#475569', bg: '#f1f5f9' }
 };
 

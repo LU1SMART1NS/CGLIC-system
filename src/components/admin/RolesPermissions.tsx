@@ -319,7 +319,7 @@ export const RolesPermissions: React.FC = () => {
       <PageHeader
         title="Perfis"
         subtitle="Perfis de acesso ao CGLIC e o que cada um pode consultar e gerir"
-        icon={<KeyRound size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<KeyRound size={26} color="var(--primary)" aria-hidden="true" />}
       />
 
       <div
@@ -335,7 +335,7 @@ export const RolesPermissions: React.FC = () => {
               style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                <Icon size={20} color="#0c326f" aria-hidden="true" />
+                <Icon size={20} color="var(--primary)" aria-hidden="true" />
                 <ProfileCardTitle profile={profile} canEdit={canEdit} />
               </div>
 

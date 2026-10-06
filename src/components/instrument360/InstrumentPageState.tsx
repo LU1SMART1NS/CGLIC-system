@@ -17,8 +17,8 @@ interface InstrumentPageStateProps {
 }
 
 const ICON_STYLE: Record<Exclude<InstrumentPageStateKind, 'loading'>, { bg: string; fg: string }> = {
-  error: { bg: '#fee2e2', fg: '#dc2626' },
-  forbidden: { bg: '#fee2e2', fg: '#dc2626' },
+  error: { bg: 'var(--color-danger-bg-strong)', fg: 'var(--color-danger)' },
+  forbidden: { bg: 'var(--color-danger-bg-strong)', fg: 'var(--color-danger)' },
   notFound: { bg: colors.background.subtle, fg: colors.text.muted }
 };
 
@@ -43,13 +43,13 @@ export const InstrumentPageState: React.FC<InstrumentPageStateProps> = ({
         style={{
           background: colors.background.surface,
           borderRadius: shapes.radius.lg,
-          border: `1px solid ${isDanger ? '#fecaca' : colors.border.default}`,
+          border: `1px solid ${isDanger ? 'var(--color-danger-border)' : colors.border.default}`,
           padding: kind === 'loading' ? '2.5rem' : '3rem 2rem',
           textAlign: 'center'
         }}
       >
         {kind === 'loading' ? (
-          <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: '#0c326f', margin: '0 auto 1rem auto' }} />
+          <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary)', margin: '0 auto 1rem auto' }} />
         ) : (
           <div
             style={{
@@ -71,7 +71,7 @@ export const InstrumentPageState: React.FC<InstrumentPageStateProps> = ({
           style={{
             fontSize: typography.fontSize.h3,
             fontWeight: typography.fontWeight.bold,
-            color: isDanger ? '#991b1b' : colors.text.primary,
+            color: isDanger ? 'var(--color-danger-text-strong)' : colors.text.primary,
             margin: '0 0 0.5rem 0'
           }}
         >

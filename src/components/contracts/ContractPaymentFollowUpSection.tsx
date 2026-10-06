@@ -218,13 +218,13 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     <span style={{ color: '#c2410c', fontWeight: 600 }}>Gestor do contrato não cadastrado</span>
                   )}
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#0f172a' }}>
-                    <DollarSign size={13} color="#059669" /> Valor Atestado:{' '}
+                    <DollarSign size={13} color="var(--color-success)" /> Valor Atestado:{' '}
                     <strong>{cycle.input.valorAtesto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     <Calendar size={13} /> Vencimento da fatura: <strong>{isoToBR(cycle.input.dataVencimentoFatura)}</strong>
                     {cycle.prazos?.diasUteisAteVencimento !== undefined && cycle.status !== 'PAGO' && cycle.status !== 'CANCELADO' && (
-                      <span style={{ color: cycle.prazos.diasUteisAteVencimento < 0 ? '#dc2626' : '#475569' }}>
+                      <span style={{ color: cycle.prazos.diasUteisAteVencimento < 0 ? 'var(--color-danger)' : '#475569' }}>
                         ({cycle.prazos.diasUteisAteVencimento < 0 ? `${Math.abs(cycle.prazos.diasUteisAteVencimento)}d vencida` : `${cycle.prazos.diasUteisAteVencimento}d úteis`})
                       </span>
                     )}

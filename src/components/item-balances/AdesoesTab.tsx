@@ -45,7 +45,7 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
         const { codigo, nome } = splitUnidade(ade.unidadeNaoParticipante);
         return (
           <>
-            <div style={{ fontWeight: 700, color: '#0c326f' }}>{nome || 'Órgão não informado'}</div>
+            <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{nome || 'Órgão não informado'}</div>
             {codigo && <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>UASG: {codigo}</div>}
           </>
         );

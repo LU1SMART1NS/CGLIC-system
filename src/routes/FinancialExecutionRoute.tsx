@@ -60,7 +60,7 @@ export const FinancialExecutionRoute: React.FC = () => {
       <PageHeader
         title="Empenhos e Execução"
         subtitle="Execução financeira oficial dos empenhos, liquidações e pagamentos."
-        icon={<Banknote size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<Banknote size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <AppButton

@@ -39,7 +39,7 @@ const secondaryButton: React.CSSProperties = {
   gap: '4px',
   padding: '0.4rem 0.75rem',
   backgroundColor: '#ffffff',
-  color: '#0c326f',
+  color: 'var(--primary)',
   border: '1px solid #cbd5e1',
   borderRadius: '6px',
   fontSize: '0.78rem',
@@ -127,15 +127,15 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
       {queue.items.length === 0 ? (
         <div
           style={{
-            background: '#f0fdf4',
+            background: 'var(--color-success-bg)',
             borderRadius: '10px',
-            border: '1px solid #bbf7d0',
+            border: '1px solid var(--color-success-border)',
             padding: '1.25rem',
             textAlign: 'center',
-            color: '#166534'
+            color: 'var(--color-success-text-strong)'
           }}
         >
-          <CheckCircle2 size={22} style={{ color: '#15803d', margin: '0 auto 0.5rem auto', display: 'block' }} />
+          <CheckCircle2 size={22} style={{ color: 'var(--color-success-text)', margin: '0 auto 0.5rem auto', display: 'block' }} />
           <h4 style={{ fontSize: '1rem', fontWeight: 800, margin: '0 0 0.25rem 0', color: '#14532d' }}>
             Tudo em dia com esta ata
           </h4>

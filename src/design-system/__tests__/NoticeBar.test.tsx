@@ -11,8 +11,8 @@ describe('NoticeBar', () => {
   });
 
   it('o aviso padrão é amarelo e o informativo é azul', () => {
-    expect(renderToStaticMarkup(<NoticeBar>x</NoticeBar>)).toContain('background:#fffbeb');
-    expect(renderToStaticMarkup(<NoticeBar tone="info">x</NoticeBar>)).toContain('background:#eff6ff');
+    expect(renderToStaticMarkup(<NoticeBar>x</NoticeBar>)).toContain('background:var(--color-warning-bg)');
+    expect(renderToStaticMarkup(<NoticeBar tone="info">x</NoticeBar>)).toContain('background:var(--color-info-bg)');
   });
 
   it('aceita testId próprio', () => {

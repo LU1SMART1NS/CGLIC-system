@@ -31,7 +31,7 @@ export const ModelosGestaoPage: React.FC = () => {
       <PageHeader
         title="Modelos de Gestão"
         subtitle="Padronização de planos de acompanhamento, checklists e marcos de gestão de Atas e de Contratos."
-        icon={<Sliders size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<Sliders size={26} color="var(--primary)" aria-hidden="true" />}
       />
 
       <Tabs

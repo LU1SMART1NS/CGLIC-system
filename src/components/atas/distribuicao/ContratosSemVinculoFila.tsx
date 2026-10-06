@@ -87,7 +87,7 @@ const linkAta: React.CSSProperties = {
   padding: 0,
   font: 'inherit',
   fontWeight: 700,
-  color: '#0c326f',
+  color: 'var(--primary)',
   textDecoration: 'underline',
   cursor: 'pointer'
 };
@@ -108,13 +108,13 @@ const StatusApi: React.FC<{ previsao: PrevisaoVinculo; testId: string }> = ({ pr
         ? `Item ${semZeros(itens[0].numeroItem)} · Qtd ${itens[0].quantidade != null ? itens[0].quantidade.toLocaleString('pt-BR') : '—'}`
         : `${itens.length} itens confirmados`;
     return (
-      <span data-testid={testId} title={itens.map(textoItemQtd).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: '#15803d' }}>
+      <span data-testid={testId} title={itens.map(textoItemQtd).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--color-success-text)' }}>
         <CheckCircle2 size={11} aria-hidden="true" /> {texto}
       </span>
     );
   }
   return (
-    <span data-testid={testId} style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>
+    <span data-testid={testId} style={{ fontSize: '0.75rem', color: 'var(--color-warning-text)', fontWeight: 600 }}>
       {previsao.motivo}
     </span>
   );
@@ -280,9 +280,9 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
             ))}
           </div>
           <span>A quantidade contratada passa a contar no saldo e {prontos.length === 1 ? 'o contrato passa' : 'os contratos passam'} ao gestor da ata.</span>
-          {muda > 0 && <strong style={{ color: '#b45309' }}>{plural(muda, 'contrato muda', 'contratos mudam')} de gestor para seguir a ata.</strong>}
+          {muda > 0 && <strong style={{ color: 'var(--color-warning-text)' }}>{plural(muda, 'contrato muda', 'contratos mudam')} de gestor para seguir a ata.</strong>}
           {ataAssume > 0 && (
-            <strong style={{ color: '#b45309' }}>{plural(ataAssume, 'ata sem gestor passa', 'atas sem gestor passam')} a ser do gestor do contrato vinculado.</strong>
+            <strong style={{ color: 'var(--color-warning-text)' }}>{plural(ataAssume, 'ata sem gestor passa', 'atas sem gestor passam')} a ser do gestor do contrato vinculado.</strong>
           )}
         </div>
       ),
@@ -364,7 +364,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
         <div
           role="status"
           data-testid="sem-vinculo-progresso"
-          style={{ border: `1px solid ${falhas.length ? '#fecaca' : '#bfdbfe'}`, background: falhas.length ? '#fef2f2' : '#eff6ff', borderRadius: '8px', padding: '0.65rem 0.85rem', fontSize: '0.82rem', color: '#0f172a' }}
+          style={{ border: `1px solid ${falhas.length ? 'var(--color-danger-border)' : 'var(--color-info-border)'}`, background: falhas.length ? 'var(--color-danger-bg)' : 'var(--color-info-bg)', borderRadius: '8px', padding: '0.65rem 0.85rem', fontSize: '0.82rem', color: '#0f172a' }}
         >
           {estado.rodando ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -379,7 +379,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {falhas.length ? <AlertTriangle size={16} color="#b91c1c" aria-hidden="true" /> : <CheckCircle2 size={16} color="#15803d" aria-hidden="true" />}
+                {falhas.length ? <AlertTriangle size={16} color="var(--color-danger-text)" aria-hidden="true" /> : <CheckCircle2 size={16} color="var(--color-success-text)" aria-hidden="true" />}
                 <strong>
                   {plural(estado.resultados.filter((r) => r.ok).length, 'contrato vinculado', 'contratos vinculados')} ({estado.resultados.reduce((n, r) => n + r.itens, 0)} itens)
                   {falhas.length > 0 && `, ${plural(falhas.length, 'falha', 'falhas')}`}
@@ -390,12 +390,12 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                 </button>
               </div>
               {falhas.map((r) => (
-                <div key={r.contractKey} style={{ color: '#991b1b' }}>
+                <div key={r.contractKey} style={{ color: 'var(--color-danger-text-strong)' }}>
                   Contrato {r.numero}: {r.erro}
                 </div>
               ))}
               {comAviso.length > 0 && (
-                <div style={{ color: '#92400e' }}>
+                <div style={{ color: 'var(--color-warning-text-strong)' }}>
                   Vinculados, mas a API não respondeu para: {comAviso.map((r) => `${r.numero} (${r.avisos.join(', ')})`).join('; ')}. A quantidade é lida de novo ao abrir o item.
                 </div>
               )}
@@ -436,7 +436,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
           role="region"
           aria-label="Ações em lote"
           data-testid="sem-vinculo-selecao"
-          style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', padding: '0.55rem 0.85rem', background: SELECIONADA_BG, border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '0.8rem', color: '#1e3a8a' }}
+          style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', padding: '0.55rem 0.85rem', background: SELECIONADA_BG, border: '1px solid var(--color-info-border)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--color-info-text-strong)' }}
         >
           <strong>{plural(selecionadas.length, 'contrato selecionado', 'contratos selecionados')}</strong>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap' }}>
@@ -555,8 +555,8 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                           )}
                         </div>
                       </td>
-                      <td data-label="Gestor" style={{ ...carteiraTd, fontSize: '0.78rem', color: efeito?.atencao ? '#b45309' : '#0f172a', fontWeight: efeito?.atencao ? 700 : 500 }}>
-                        {efeito ? efeito.texto : l.gestorNome || <span style={{ color: '#b45309' }}>sem gestor</span>}
+                      <td data-label="Gestor" style={{ ...carteiraTd, fontSize: '0.78rem', color: efeito?.atencao ? 'var(--color-warning-text)' : '#0f172a', fontWeight: efeito?.atencao ? 700 : 500 }}>
+                        {efeito ? efeito.texto : l.gestorNome || <span style={{ color: 'var(--color-warning-text)' }}>sem gestor</span>}
                       </td>
                       {podeAgir && (
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>

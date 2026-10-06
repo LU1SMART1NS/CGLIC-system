@@ -250,7 +250,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     <td data-label="Itens" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 700 }}>{totalItens} {totalItens === 1 ? 'item' : 'itens'}</div>
                       {stats && (stats.criticos > 0 || stats.atencao > 0) ? (
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: stats.criticos > 0 ? '#b91c1c' : '#b45309' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: stats.criticos > 0 ? 'var(--color-danger-text)' : 'var(--color-warning-text)' }}>
                           {[
                             stats.criticos > 0 ? `${stats.criticos} ${stats.criticos === 1 ? 'crítico' : 'críticos'}` : null,
                             stats.atencao > 0 ? `${stats.atencao} em atenção` : null
@@ -322,7 +322,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                               </div>
                             ))}
                             {hiddenCount > 0 && (
-                              <div style={{ fontSize: '0.76rem', color: '#0c326f', fontWeight: 700, paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+                              <div style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700, paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
                                 + {hiddenCount} {hiddenCount === 1 ? 'item' : 'itens'} · veja todos nos detalhes da ata
                               </div>
                             )}

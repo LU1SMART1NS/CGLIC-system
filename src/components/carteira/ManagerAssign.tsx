@@ -35,7 +35,7 @@ export const ManagerCell: React.FC<ManagerCellProps> = ({ gestorNome, canAssign,
       onClick={() => navigate(CENTRAL_DISTRIBUICAO_PATH)}
       data-testid={testId}
       title="A atribuição de gestor é feita na Central de Distribuição"
-      style={{ ...carteiraButton, padding: '0.25rem 0.55rem', fontSize: '0.75rem', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb' }}
+      style={{ ...carteiraButton, padding: '0.25rem 0.55rem', fontSize: '0.75rem', color: 'var(--color-warning-text)', borderColor: 'var(--color-warning-border)', background: 'var(--color-warning-bg)' }}
     >
       Sem gestor · atribuir na Central <ArrowRight size={12} />
     </button>

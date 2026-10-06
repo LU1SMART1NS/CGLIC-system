@@ -87,27 +87,27 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         data-testid="instrumentos-card-arp"
         style={{
           ...cardBaseStyle,
-          border: activeCard === 'ARP' ? '2px solid #0c326f' : cardBaseStyle.border
+          border: activeCard === 'ARP' ? '2px solid var(--primary)' : cardBaseStyle.border
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Atas de Registro de Preço (ARP)
           </span>
-          <div style={{ background: '#eff6ff', color: '#0c326f', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+          <div style={{ background: 'var(--color-info-bg)', color: 'var(--primary)', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
             <Package size={16} />
           </div>
         </div>
-        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0c326f', letterSpacing: '-0.02em' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em' }}>
           {counts.totalAtas} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>geridas</span>
         </div>
         <div style={rowStyle}>
           <span>Saldo crítico ({'>'}{SALDO_RULES.criticoAcimaDePct}%)</span>
-          <strong style={{ color: counts.itensCriticosArp > 0 ? '#dc2626' : '#0f172a' }}>{counts.itensCriticosArp}</strong>
+          <strong style={{ color: counts.itensCriticosArp > 0 ? 'var(--color-danger)' : '#0f172a' }}>{counts.itensCriticosArp}</strong>
         </div>
         <div style={rowStyle}>
           <span>Saldo em atenção ({SALDO_RULES.atencaoAcimaDePct}–{SALDO_RULES.criticoAcimaDePct}%)</span>
-          <strong style={{ color: counts.itensProximosLimiteArp > 0 ? '#d97706' : '#0f172a' }}>{counts.itensProximosLimiteArp}</strong>
+          <strong style={{ color: counts.itensProximosLimiteArp > 0 ? 'var(--color-warning)' : '#0f172a' }}>{counts.itensProximosLimiteArp}</strong>
         </div>
       </button>
 
@@ -119,23 +119,23 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         data-testid="instrumentos-card-contratos"
         style={{
           ...cardBaseStyle,
-          border: activeCard === 'CONTRATOS' ? '2px solid #0c326f' : cardBaseStyle.border
+          border: activeCard === 'CONTRATOS' ? '2px solid var(--primary)' : cardBaseStyle.border
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Contratos Vigentes
           </span>
-          <div style={{ background: '#ecfdf5', color: '#059669', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+          <div style={{ background: '#ecfdf5', color: 'var(--color-success)', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
             <FileText size={16} />
           </div>
         </div>
-        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#059669', letterSpacing: '-0.02em' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--color-success)', letterSpacing: '-0.02em' }}>
           {counts.contratosAtivos} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>ativos</span>
         </div>
         <div style={rowStyle}>
           <span>Em atenção ({VIGENCIA_RULES.faixaCriticoAteDias + 1}–{VIGENCIA_RULES.faixaAtencaoAteDias} dias)</span>
-          <strong style={{ color: counts.contratosEmAtencao60a90d > 0 ? '#d97706' : '#0f172a' }}>{counts.contratosEmAtencao60a90d}</strong>
+          <strong style={{ color: counts.contratosEmAtencao60a90d > 0 ? 'var(--color-warning)' : '#0f172a' }}>{counts.contratosEmAtencao60a90d}</strong>
         </div>
         <div style={rowStyle}>
           <span>Em prorrogação</span>
@@ -143,7 +143,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         </div>
         <div style={rowStyle}>
           <span>A vencer (≤{VIGENCIA_RULES.faixaCriticoAteDias} dias)</span>
-          <strong style={{ color: counts.contratosAVencer30d > 0 ? '#dc2626' : '#0f172a' }}>{counts.contratosAVencer30d}</strong>
+          <strong style={{ color: counts.contratosAVencer30d > 0 ? 'var(--color-danger)' : '#0f172a' }}>{counts.contratosAVencer30d}</strong>
         </div>
       </button>
 
@@ -154,7 +154,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         data-testid="instrumentos-card-valor"
         style={{
           ...cardBaseStyle,
-          border: activeCard === 'VALOR' ? '2px solid #0c326f' : cardBaseStyle.border
+          border: activeCard === 'VALOR' ? '2px solid var(--primary)' : cardBaseStyle.border
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -185,18 +185,18 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         data-testid="instrumentos-card-alertas"
         style={{
           ...cardBaseStyle,
-          border: activeCard === 'ALERTAS' ? '2px solid #dc2626' : cardBaseStyle.border
+          border: activeCard === 'ALERTAS' ? '2px solid var(--color-danger)' : cardBaseStyle.border
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Alertas Críticos
           </span>
-          <div style={{ background: '#fef2f2', color: '#dc2626', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
             <AlertTriangle size={16} />
           </div>
         </div>
-        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#dc2626', letterSpacing: '-0.02em' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--color-danger)', letterSpacing: '-0.02em' }}>
           {counts.criticalCount} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>itens críticos</span>
         </div>
         <div style={rowStyle}>
@@ -205,7 +205,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         </div>
         <div style={rowStyle}>
           <span>Urgentes</span>
-          <strong style={{ color: counts.urgenteCount > 0 ? '#d97706' : '#0f172a' }}>{counts.urgenteCount}</strong>
+          <strong style={{ color: counts.urgenteCount > 0 ? 'var(--color-warning)' : '#0f172a' }}>{counts.urgenteCount}</strong>
         </div>
         <div style={rowStyle}>
           <span>Em atenção</span>

@@ -30,7 +30,7 @@ export const carteiraButton: React.CSSProperties = {
   borderRadius: '6px',
   fontSize: '0.76rem',
   fontWeight: 700,
-  color: '#0c326f',
+  color: 'var(--primary)',
   cursor: 'pointer',
   whiteSpace: 'nowrap'
 };

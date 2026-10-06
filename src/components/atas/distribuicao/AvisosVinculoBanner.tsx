@@ -40,7 +40,7 @@ export const AvisosVinculoBanner: React.FC<{ podeVer: boolean }> = ({ podeVer })
     <section
       role="status"
       data-testid="distribuicao-avisos-vinculo"
-      style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.75rem 0.9rem', color: '#1e3a8a', fontSize: '0.82rem' }}
+      style={{ background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: '8px', padding: '0.75rem 0.9rem', color: 'var(--color-info-text-strong)', fontSize: '0.82rem' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
         <Info size={15} aria-hidden="true" />
@@ -70,7 +70,7 @@ export const AvisosVinculoBanner: React.FC<{ podeVer: boolean }> = ({ podeVer })
         <button
           type="button"
           onClick={() => setTodos((v) => !v)}
-          style={{ marginTop: '0.4rem', background: 'none', border: 'none', padding: 0, color: '#0c326f', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+          style={{ marginTop: '0.4rem', background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
         >
           {todos ? 'Mostrar menos' : `Mostrar todos (${avisos.length})`}
         </button>

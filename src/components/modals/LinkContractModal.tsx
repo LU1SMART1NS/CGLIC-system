@@ -382,7 +382,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 
               {suggestionCriteria && !loadingContracts && (
                 <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.76rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Sparkles size={13} color="#b45309" />
+                  <Sparkles size={13} color="var(--color-warning-text)" />
                   {suggestedCount > 0
                     ? `${suggestedCount} ${suggestedCount === 1 ? 'contrato sugerido' : 'contratos sugeridos'} (mesma compra ou mesmo fornecedor da ata) no topo da lista. Confirme antes de vincular.`
                     : 'Nenhum contrato da mesma compra ou dos mesmos fornecedores desta ata foi encontrado.'}
@@ -392,7 +392,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
               {/* Lista com scroll dos contratos oficiais */}
               {loadingContracts ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
-                  <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.5rem auto', color: '#0c326f' }} />
+                  <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.5rem auto', color: 'var(--primary)' }} />
                   Carregando contratos oficiais da UASG...
                 </div>
               ) : filteredContracts.length === 0 ? (
@@ -414,7 +414,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       style={{
                         padding: '0.75rem 1rem',
                         background: vinculadoAOutraAta ? '#f8fafc' : '#ffffff',
-                        border: reasons.length > 0 ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                        border: reasons.length > 0 ? '1px solid var(--color-warning-border)' : '1px solid #e2e8f0',
                         borderRadius: '8px',
                         cursor: vinculadoAOutraAta ? 'not-allowed' : 'pointer',
                         opacity: vinculadoAOutraAta ? 0.6 : 1,
@@ -426,21 +426,21 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       }}
                       onMouseEnter={(e) => {
                         if (vinculadoAOutraAta) return;
-                        e.currentTarget.style.borderColor = '#0c326f';
+                        e.currentTarget.style.borderColor = 'var(--primary)';
                         e.currentTarget.style.backgroundColor = '#f8fafc';
                       }}
                       onMouseLeave={(e) => {
                         if (vinculadoAOutraAta) return;
-                        e.currentTarget.style.borderColor = reasons.length > 0 ? '#fde68a' : '#e2e8f0';
+                        e.currentTarget.style.borderColor = reasons.length > 0 ? 'var(--color-warning-border)' : '#e2e8f0';
                         e.currentTarget.style.backgroundColor = '#ffffff';
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                          <strong style={{ fontSize: '0.92rem', color: '#0c326f' }}>
+                          <strong style={{ fontSize: '0.92rem', color: 'var(--primary)' }}>
                             {displayContractNumber(c) || `Contrato ${c.numero}/${c.ano}`}
                           </strong>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: 'var(--color-success-bg)', color: 'var(--color-success-text)', border: '1px solid var(--color-success-border)' }}>
                             {formatStatusVigencia(c.statusVigencia)}
                           </span>
                           {isAtaMode && (() => {
@@ -475,7 +475,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                           {reasons.map((r) => (
                             <span
                               key={r}
-                              style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-warning-text)', border: '1px solid var(--color-warning-border)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
                             >
                               <Sparkles size={10} /> {SUGGESTION_LABEL[r]}
                             </span>
@@ -498,7 +498,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 
                       <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Valor Global</span>
-                        <strong style={{ fontSize: '0.88rem', color: '#0c326f' }}>
+                        <strong style={{ fontSize: '0.88rem', color: 'var(--primary)' }}>
                           {formatCurrency(c.valorGlobal || c.valorInicial)}
                         </strong>
                       </div>
@@ -511,13 +511,13 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
             /* PASSO 2: Contrato Selecionado + Preenchimento da Quantidade */
             <form onSubmit={handleSubmit}>
               {/* Card Resumido do Contrato Selecionado */}
-              <div style={{ background: '#f8fafc', border: '1.5px solid #bfdbfe', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem', position: 'relative' }}>
+              <div style={{ background: '#f8fafc', border: '1.5px solid var(--color-info-border)', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem', position: 'relative' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-info-text)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Contrato Oficial Selecionado
                     </span>
-                    <h4 style={{ margin: '0.15rem 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: '#0c326f' }}>
+                    <h4 style={{ margin: '0.15rem 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>
                       {displayContractNumber(selectedContract) || `Contrato ${selectedContract.numero}/${selectedContract.ano}`}
                     </h4>
                   </div>
@@ -557,7 +557,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
               ) : (
                 <p
                   data-testid="link-contract-heranca"
-                  style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
+                  style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: 'var(--color-info-text-strong)', background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
                 >
                   {gestorDaAta ? (
                     <>
@@ -588,7 +588,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
               {isAtaMode && (
                 <div style={{ marginBottom: '1.25rem' }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
-                    Itens cobertos por este contrato <span style={{ color: '#dc2626' }}>*</span>
+                    Itens cobertos por este contrato <span style={{ color: 'var(--color-danger)' }}>*</span>
                   </div>
                   <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.76rem', color: '#64748b' }}>
                     {itemQuantities.isLoading
@@ -599,7 +599,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   </p>
                   {itemQuantities.isLoading ? (
                     <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>
-                      <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: '#0c326f' }} />
+                      <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary)' }} />
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto' }} className="link-contract-list">
@@ -622,9 +622,9 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                               onChange={(e) => setCheckedOverrides((prev) => ({ ...prev, [i.itemKey]: e.target.checked }))}
                             />
                             <div style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}>
-                              <div style={{ fontWeight: 700, color: '#0c326f' }}>
+                              <div style={{ fontWeight: 700, color: 'var(--primary)' }}>
                                 Item {i.numeroItem}
-                                {isSameSupplier(i) && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: '#b45309' }}>mesmo fornecedor</span>}
+                                {isSameSupplier(i) && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: 'var(--color-warning-text)' }}>mesmo fornecedor</span>}
                                 {linked && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: '#64748b' }}>já vinculado</span>}
                               </div>
                               <div style={{ color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -632,12 +632,12 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                                 {i.fornecedorNome ? ` (${i.fornecedorNome})` : ''}
                               </div>
                               {!linked && checked && apiListsItems && !listed && (
-                                <div style={{ color: '#b45309', fontSize: '0.75rem' }}>A API oficial não lista este item neste contrato.</div>
+                                <div style={{ color: 'var(--color-warning-text)', fontSize: '0.75rem' }}>A API oficial não lista este item neste contrato.</div>
                               )}
                             </div>
                             <div style={{ textAlign: 'right', whiteSpace: 'nowrap', fontSize: '0.78rem', color: '#64748b' }}>
                               Qtd contratada
-                              <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, color: listed && apiQty != null ? '#0c326f' : '#94a3b8' }}>
+                              <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, color: listed && apiQty != null ? 'var(--primary)' : '#94a3b8' }}>
                                 {listed && apiQty != null ? apiQty.toLocaleString('pt-BR') : 'N/D'}
                               </div>
                             </div>
@@ -694,7 +694,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                     padding: '0.5rem 1.25rem',
                     fontSize: '0.85rem',
                     fontWeight: 700,
-                    background: '#0c326f',
+                    background: 'var(--primary)',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '6px',

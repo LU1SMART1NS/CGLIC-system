@@ -30,7 +30,7 @@ export const colors = {
     default: '#e2e8f0',
     strong: '#cbd5e1',
     interactive: '#94a3b8',
-    focus: '#0284c7'
+    focus: 'var(--color-focus)'
   },
 
   // Cores de Marca / Ação Principal
@@ -47,28 +47,28 @@ export const colors = {
   // Semântica de Feedback e Severidade (Contraste AA testado)
   semantic: {
     success: {
-      bg: '#f0fdf4',
-      border: '#bbf7d0',
-      text: '#15803d',
-      solid: '#16a34a'
+      bg: 'var(--color-success-bg)',
+      border: 'var(--color-success-border)',
+      text: 'var(--color-success-text)',
+      solid: 'var(--color-success-solid)'
     },
     warning: {
-      bg: '#fffbeb',
-      border: '#fde68a',
-      text: '#b45309',
-      solid: '#f59e0b'
+      bg: 'var(--color-warning-bg)',
+      border: 'var(--color-warning-border)',
+      text: 'var(--color-warning-text)',
+      solid: 'var(--color-warning-solid)'
     },
     danger: {
-      bg: '#fef2f2',
-      border: '#fecaca',
-      text: '#b91c1c',
-      solid: '#ef4444'
+      bg: 'var(--color-danger-bg)',
+      border: 'var(--color-danger-border)',
+      text: 'var(--color-danger-text)',
+      solid: 'var(--color-danger-solid)'
     },
     info: {
-      bg: '#eff6ff',
-      border: '#bfdbfe',
-      text: '#1d4ed8',
-      solid: '#3b82f6'
+      bg: 'var(--color-info-bg)',
+      border: 'var(--color-info-border)',
+      text: 'var(--color-info-text)',
+      solid: 'var(--color-info-solid)'
     },
     neutral: {
       bg: '#f8fafc',
@@ -98,26 +98,26 @@ export const severityTokens: Record<SeverityLevel, {
 }> = {
   CRITICA: {
     label: 'CRÍTICA',
-    badgeBg: '#fef2f2',
-    badgeBorder: '#fecaca',
-    badgeText: '#b91c1c',
-    borderLeft: '#ef4444',
-    iconColor: '#dc2626'
+    badgeBg: 'var(--color-danger-bg)',
+    badgeBorder: 'var(--color-danger-border)',
+    badgeText: 'var(--color-danger-text)',
+    borderLeft: 'var(--color-danger-solid)',
+    iconColor: 'var(--color-danger)'
   },
   URGENTE: {
     label: 'URGENTE',
-    badgeBg: '#fffbeb',
-    badgeBorder: '#fde68a',
-    badgeText: '#b45309',
-    borderLeft: '#f59e0b',
-    iconColor: '#d97706'
+    badgeBg: 'var(--color-warning-bg)',
+    badgeBorder: 'var(--color-warning-border)',
+    badgeText: 'var(--color-warning-text)',
+    borderLeft: 'var(--color-warning-solid)',
+    iconColor: 'var(--color-warning)'
   },
   ATENCAO: {
     label: 'ATENÇÃO',
-    badgeBg: '#eff6ff',
-    badgeBorder: '#bfdbfe',
-    badgeText: '#1d4ed8',
-    borderLeft: '#3b82f6',
+    badgeBg: 'var(--color-info-bg)',
+    badgeBorder: 'var(--color-info-border)',
+    badgeText: 'var(--color-info-text)',
+    borderLeft: 'var(--color-info-solid)',
     iconColor: '#2563eb'
   },
   INFO: {
@@ -155,16 +155,16 @@ export const operationalCategoryTokens: Record<OperationalCategory, {
   },
   ALERTA: {
     label: 'Alerta Operacional',
-    bg: '#fffbeb',
-    border: '#fde68a',
-    text: '#b45309',
+    bg: 'var(--color-warning-bg)',
+    border: 'var(--color-warning-border)',
+    text: 'var(--color-warning-text)',
     description: 'Situação de risco ou temporalidade projetada que demanda atenção'
   },
   TAREFA: {
     label: 'Tarefa Humana',
-    bg: '#eff6ff',
-    border: '#bfdbfe',
-    text: '#1d4ed8',
+    bg: 'var(--color-info-bg)',
+    border: 'var(--color-info-border)',
+    text: 'var(--color-info-text)',
     description: 'Obrigação persistida com responsável e prazo determinado'
   },
   WORKFLOW: {
@@ -183,9 +183,9 @@ export const operationalCategoryTokens: Record<OperationalCategory, {
   },
   CONFIRMACAO: {
     label: 'Confirmação',
-    bg: '#f0fdf4',
-    border: '#bbf7d0',
-    text: '#15803d',
+    bg: 'var(--color-success-bg)',
+    border: 'var(--color-success-border)',
+    text: 'var(--color-success-text)',
     description: 'Registro de validação ou efetivação operacional confirmada'
   }
 };

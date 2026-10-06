@@ -43,7 +43,7 @@ const secondaryButton: React.CSSProperties = {
   gap: '4px',
   padding: '0.4rem 0.75rem',
   backgroundColor: '#ffffff',
-  color: '#0c326f',
+  color: 'var(--primary)',
   border: '1px solid #cbd5e1',
   borderRadius: '6px',
   fontSize: '0.78rem',
@@ -163,15 +163,15 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
       {queue.items.length === 0 ? (
         <div
           style={{
-            background: '#f0fdf4',
+            background: 'var(--color-success-bg)',
             borderRadius: '10px',
-            border: '1px solid #bbf7d0',
+            border: '1px solid var(--color-success-border)',
             padding: '1.25rem',
             textAlign: 'center',
-            color: '#166534'
+            color: 'var(--color-success-text-strong)'
           }}
         >
-          <CheckCircle2 size={22} style={{ color: '#15803d', margin: '0 auto 0.5rem auto', display: 'block' }} />
+          <CheckCircle2 size={22} style={{ color: 'var(--color-success-text)', margin: '0 auto 0.5rem auto', display: 'block' }} />
           <h4 style={{ fontSize: '1rem', fontWeight: 800, margin: '0 0 0.25rem 0', color: '#14532d' }}>
             Tudo em dia com este contrato
           </h4>
@@ -201,8 +201,8 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
                     gap: '1rem',
                     padding: '0.8rem 1rem',
                     borderTop: idx === 0 ? 'none' : '1px solid #e2e8f0',
-                    borderLeft: `4px solid ${isHighlighted ? '#0c326f' : severityTokens[item.severity].borderLeft}`,
-                    backgroundColor: isHighlighted ? '#eff6ff' : '#ffffff',
+                    borderLeft: `4px solid ${isHighlighted ? 'var(--primary)' : severityTokens[item.severity].borderLeft}`,
+                    backgroundColor: isHighlighted ? 'var(--color-info-bg)' : '#ffffff',
                     flexWrap: 'wrap'
                   }}
                 >

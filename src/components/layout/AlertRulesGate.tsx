@@ -24,7 +24,7 @@ export const AlertRulesGate: React.FC<{ children: React.ReactNode }> = ({ childr
 
   if (!ready) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#0c326f', fontSize: '0.9rem', fontWeight: 600 }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: 'var(--primary)', fontSize: '0.9rem', fontWeight: 600 }}>
         Carregando regras de alertas...
       </div>
     );

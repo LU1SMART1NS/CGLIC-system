@@ -45,7 +45,7 @@ export function useSelecaoFila(chavesDaFila: string[]) {
   return { selecionadas, alternar, alternarVarias, selecionarTodas, limpar };
 }
 
-const checkboxStyle: React.CSSProperties = { width: '15px', height: '15px', cursor: 'pointer', accentColor: '#0c326f' };
+const checkboxStyle: React.CSSProperties = { width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--primary)' };
 
 /** Cabeçalho com "marcar a página". */
 export const SelecaoHeaderCell: React.FC<{ chavesDaPagina: string[]; selecionadas: Set<string>; onToggle: () => void; testId: string }> = ({
@@ -95,7 +95,7 @@ export const SelecaoCell: React.FC<{ checked: boolean; onToggle: () => void; lab
 );
 
 /** Fundo da linha marcada. */
-export const SELECIONADA_BG = '#eff6ff';
+export const SELECIONADA_BG = 'var(--color-info-bg)';
 
 interface SelecaoBarProps {
   quantidade: number;
@@ -135,10 +135,10 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
       gap: '0.6rem',
       padding: '0.55rem 0.85rem',
       background: SELECIONADA_BG,
-      border: '1px solid #bfdbfe',
+      border: '1px solid var(--color-info-border)',
       borderRadius: '8px',
       fontSize: '0.8rem',
-      color: '#1e3a8a'
+      color: 'var(--color-info-text-strong)'
     }}
   >
     <CheckSquare size={15} aria-hidden="true" />
@@ -151,7 +151,7 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
         type="button"
         onClick={onSelecionarTodas}
         data-testid={`${testIdPrefix}-selecionar-todas`}
-        style={{ background: 'none', border: 'none', padding: 0, color: '#0c326f', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
       >
         Selecionar todas as {totalFiltrado}
       </button>
@@ -164,7 +164,7 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
         type="button"
         onClick={onAtribuir}
         data-testid={`${testIdPrefix}-atribuir-selecionadas`}
-        style={{ ...carteiraButton, color: '#ffffff', background: '#0c326f', borderColor: '#0c326f' }}
+        style={{ ...carteiraButton, color: '#ffffff', background: 'var(--primary)', borderColor: 'var(--primary)' }}
       >
         <UserPlus size={13} /> Atribuir a...
       </button>

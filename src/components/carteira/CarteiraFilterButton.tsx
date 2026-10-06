@@ -61,7 +61,7 @@ export const CarteiraFilterButton: React.FC<CarteiraFilterButtonProps> = ({ labe
           borderRadius: '6px',
           borderWidth: '1px',
           borderStyle: ativo ? 'solid' : 'dashed',
-          borderColor: ativo ? '#0c326f' : '#cbd5e1',
+          borderColor: ativo ? 'var(--primary)' : '#cbd5e1',
           background: ativo ? '#e0e7f5' : '#ffffff',
           overflow: 'hidden'
         }}
@@ -81,7 +81,7 @@ export const CarteiraFilterButton: React.FC<CarteiraFilterButtonProps> = ({ labe
             padding: '0.38rem 0.65rem',
             border: 'none',
             background: 'transparent',
-            color: ativo ? '#0c326f' : '#334155',
+            color: ativo ? 'var(--primary)' : '#334155',
             fontSize: '0.8rem',
             fontWeight: 700,
             cursor: 'pointer',
@@ -113,7 +113,7 @@ export const CarteiraFilterButton: React.FC<CarteiraFilterButtonProps> = ({ labe
               border: 'none',
               borderLeft: '1px solid rgba(12, 50, 111, 0.25)',
               background: 'transparent',
-              color: '#0c326f',
+              color: 'var(--primary)',
               cursor: 'pointer'
             }}
           >

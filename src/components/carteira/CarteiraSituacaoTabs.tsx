@@ -36,12 +36,12 @@ export const CarteiraSituacaoTabs: React.FC<CarteiraSituacaoTabsProps> = ({
 }) => {
   const segmentos: Array<CarteiraSegment<CarteiraSituacao>> = [
     { id: 'VIGENTES', label: 'Vigentes', count: vigentes },
-    { id: 'CRITICO', label: 'Crítico', count: criticos, dot: '#dc2626', title: `Vencem em até ${VIGENCIA_RULES.faixaCriticoAteDias} dias` },
+    { id: 'CRITICO', label: 'Crítico', count: criticos, dot: 'var(--color-danger)', title: `Vencem em até ${VIGENCIA_RULES.faixaCriticoAteDias} dias` },
     {
       id: 'ATENCAO',
       label: 'Atenção',
       count: atencao,
-      dot: '#d97706',
+      dot: 'var(--color-warning)',
       title: `Vencem entre ${VIGENCIA_RULES.faixaCriticoAteDias + 1} e ${VIGENCIA_RULES.faixaAtencaoAteDias} dias`
     },
     { id: 'HISTORICO', label: 'Histórico', count: historico, title: 'Expirados ou cancelados' },

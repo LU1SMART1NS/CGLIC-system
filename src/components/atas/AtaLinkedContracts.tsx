@@ -76,7 +76,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', flex: '1 1 260px', minWidth: 0 }}>
-            <div style={{ padding: '0.3rem', background: '#eff6ff', borderRadius: '6px', color: '#0c326f', marginTop: '0.1rem' }}>
+            <div style={{ padding: '0.3rem', background: 'var(--color-info-bg)', borderRadius: '6px', color: 'var(--primary)', marginTop: '0.1rem' }}>
               <FileText size={15} />
             </div>
             <div>

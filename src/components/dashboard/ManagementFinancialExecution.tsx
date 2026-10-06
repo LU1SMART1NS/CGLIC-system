@@ -281,7 +281,7 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
                     </td>
                     <td data-label="Empenhado" style={{ ...carteiraTd, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(emp.valorEmpenhado)}</td>
                     <td data-label="Liquidado" style={{ ...carteiraTd, textAlign: 'right', color: '#0284c7' }}>{formatCurrency(emp.valorLiquidado)}</td>
-                    <td data-label="Pago" style={{ ...carteiraTd, textAlign: 'right', color: '#059669', fontWeight: 700 }}>{formatCurrency(emp.valorPago)}</td>
+                    <td data-label="Pago" style={{ ...carteiraTd, textAlign: 'right', color: 'var(--color-success)', fontWeight: 700 }}>{formatCurrency(emp.valorPago)}</td>
                     <td data-label="Saldo a executar" style={{ ...carteiraTd, textAlign: 'right', color: '#64748b' }}>{formatCurrency(emp.saldoNaoExecutado)}</td>
                     <td data-label="% Exec." style={{ ...carteiraTd, textAlign: 'center' }}>
                       <StatusBadge

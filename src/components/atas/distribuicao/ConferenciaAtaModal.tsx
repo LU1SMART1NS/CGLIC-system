@@ -29,7 +29,7 @@ type Sinal = 'SIM' | 'NAO' | 'NEUTRO';
 const SinalLinha: React.FC<{ sinal: Sinal; children: React.ReactNode }> = ({ sinal, children }) => (
   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.45rem', fontSize: '0.84rem', color: sinal === 'NAO' ? '#64748b' : '#0f172a' }}>
     {sinal === 'SIM' ? (
-      <CheckCircle2 size={15} color="#15803d" aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
+      <CheckCircle2 size={15} color="var(--color-success-text)" aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
     ) : (
       <MinusCircle size={15} color="#94a3b8" aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
     )}
@@ -222,12 +222,12 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
               return (
                 <label
                   key={i.numeroItem}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.55rem 0.75rem', border: `1px solid ${marcado ? '#bfdbfe' : '#e2e8f0'}`, background: marcado ? '#eff6ff' : '#ffffff', borderRadius: '8px', cursor: podeAgir ? 'pointer' : 'default' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.55rem 0.75rem', border: `1px solid ${marcado ? 'var(--color-info-border)' : '#e2e8f0'}`, background: marcado ? 'var(--color-info-bg)' : '#ffffff', borderRadius: '8px', cursor: podeAgir ? 'pointer' : 'default' }}
                 >
                   <input type="checkbox" checked={marcado} onChange={() => alternar(i.numeroItem)} disabled={!podeAgir || ocupado} data-testid={`conferencia-item-${i.numeroItem}`} />
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0c326f' }}>Item {i.numeroItem}</span>
-                    {!ok && marcado && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#b45309' }}>não confirmado pela API</span>}
+                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--primary)' }}>Item {i.numeroItem}</span>
+                    {!ok && marcado && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-warning-text)' }}>não confirmado pela API</span>}
                     {i.descricao && (
                       <span title={i.descricao} style={{ display: 'block', fontSize: '0.78rem', color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {i.descricao}

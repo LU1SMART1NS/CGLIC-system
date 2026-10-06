@@ -63,12 +63,12 @@ export const CarteiraFilterBar: React.FC<CarteiraFilterBarProps> = ({
             alignItems: 'center',
             gap: '0.25rem',
             padding: '0.35rem 0.65rem',
-            background: '#fee2e2',
-            border: '1px solid #fecaca',
+            background: 'var(--color-danger-bg-strong)',
+            border: '1px solid var(--color-danger-border)',
             borderRadius: '6px',
             fontSize: '0.76rem',
             fontWeight: 700,
-            color: '#991b1b',
+            color: 'var(--color-danger-text-strong)',
             cursor: 'pointer'
           }}
         >

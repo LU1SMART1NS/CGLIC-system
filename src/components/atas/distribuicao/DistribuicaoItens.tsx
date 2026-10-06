@@ -13,8 +13,8 @@ import type { ContratoAVincular } from './contratosSemAta';
 import { formatDateBR } from '../../../utils/format';
 
 const ETIQUETA_COMPLEXIDADE: Record<NivelComplexidade, { color: string; bg: string }> = {
-  ALTA: { color: '#ffffff', bg: '#0c326f' },
-  MEDIA: { color: '#0c326f', bg: '#dbe6f7' },
+  ALTA: { color: '#ffffff', bg: 'var(--primary)' },
+  MEDIA: { color: 'var(--primary)', bg: '#dbe6f7' },
   BAIXA: { color: '#475569', bg: '#f1f5f9' }
 };
 
@@ -113,7 +113,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
             type="button"
             onClick={transferSelected}
             data-testid="distribuicao-transferir-selecionados"
-            style={{ ...carteiraButton, color: '#ffffff', background: '#0c326f', borderColor: '#0c326f' }}
+            style={{ ...carteiraButton, color: '#ffffff', background: 'var(--primary)', borderColor: 'var(--primary)' }}
           >
             {isSemGestor ? <UserPlus size={13} /> : <ArrowLeftRight size={13} />}{' '}
             {isSemGestor ? 'Atribuir' : 'Transferir'} {selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}
@@ -124,7 +124,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
       {aVincular.length > 0 && (
         <div
           data-testid="distribuicao-a-vincular"
-          style={{ fontSize: '0.78rem', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
+          style={{ fontSize: '0.78rem', color: 'var(--color-info-text-strong)', background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
         >
           <strong>{aVincular.length} {aVincular.length === 1 ? 'contrato a vincular' : 'contratos a vincular'}</strong> nas atas deste gestor
           (mesma compra e fornecedor). O vínculo é feito na Ata 360 e o contrato passa a ser dele:{' '}
@@ -145,7 +145,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
             <li
               key={itemId(item)}
               data-testid={`distribuicao-item-${itemId(item)}`}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.5rem 0', borderTop: '1px solid #e2e8f0', background: checked ? '#eff6ff' : undefined }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.5rem 0', borderTop: '1px solid #e2e8f0', background: checked ? 'var(--color-info-bg)' : undefined }}
             >
               {canAssign && (
                 <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', cursor: 'pointer' }}>
@@ -209,10 +209,10 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                 ) : (
                   <>
                     {item.urgentes > 0 && (
-                      <span style={{ color: '#b91c1c' }}>{item.urgentes} {item.urgentes === 1 ? 'urgente' : 'urgentes'}</span>
+                      <span style={{ color: 'var(--color-danger-text)' }}>{item.urgentes} {item.urgentes === 1 ? 'urgente' : 'urgentes'}</span>
                     )}
                     {item.urgentes > 0 && item.acompanhar > 0 && <span style={{ color: '#94a3b8' }}> · </span>}
-                    {item.acompanhar > 0 && <span style={{ color: '#b45309' }}>{item.acompanhar} a acompanhar</span>}
+                    {item.acompanhar > 0 && <span style={{ color: 'var(--color-warning-text)' }}>{item.acompanhar} a acompanhar</span>}
                   </>
                 )}
               </span>

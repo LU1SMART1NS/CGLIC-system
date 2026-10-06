@@ -1041,14 +1041,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                           {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                         </button>
                                       </td>
-                                      <td data-label="Contrato" style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', color: '#0c326f' }}>
+                                      <td data-label="Contrato" style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', color: 'var(--primary)' }}>
                                         {displayNumeroContrato}
                                       </td>
                                       <td data-label="Unidade" style={{ fontSize: '0.85rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                                           {resolvedOrgaoName}
                                           {contractUasg ? (
-                                            <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: '#1d4ed8', fontWeight: 600, background: '#eff6ff', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+                                            <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: 'var(--color-info-text)', fontWeight: 600, background: 'var(--color-info-bg)', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid var(--color-info-border)' }}>
                                               UASG: {contractUasg}
                                             </span>
                                           ) : null}

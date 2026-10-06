@@ -40,11 +40,11 @@ export function getExecutionModeDisplay(mode?: TaskExecutionMode): {
 } {
   switch (mode) {
     case 'CONFIRMACAO':
-      return { label: 'Confirmação Oficial', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
+      return { label: 'Confirmação Oficial', bg: 'var(--color-info-bg)', color: 'var(--color-info-text)', border: 'var(--color-info-border)' };
     case 'EXTERNA':
       return { label: 'Ação Externa', bg: '#fdf4ff', color: '#86198f', border: '#f5d0fe' };
     case 'AUTOMATICA':
-      return { label: 'Processamento Automático', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
+      return { label: 'Processamento Automático', bg: 'var(--color-success-bg)', color: 'var(--color-success-text)', border: 'var(--color-success-border)' };
     case 'INTERNA':
     default:
       return { label: 'Providência Interna', bg: '#f8fafc', color: '#334155', border: '#cbd5e1' };

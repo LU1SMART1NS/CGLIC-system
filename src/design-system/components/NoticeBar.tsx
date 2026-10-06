@@ -16,10 +16,10 @@ export interface NoticeBarProps {
 }
 
 const TONES: Record<NoticeBarTone, { background: string; border: string; color: string }> = {
-  warning: { background: '#fffbeb', border: '#fde68a', color: '#92400e' },
-  info: { background: '#eff6ff', border: '#bfdbfe', color: '#1e3a8a' },
-  success: { background: '#f0fdf4', border: '#bbf7d0', color: '#166534' },
-  danger: { background: '#fef2f2', border: '#fecaca', color: '#991b1b' }
+  warning: { background: 'var(--color-warning-bg)', border: 'var(--color-warning-border)', color: 'var(--color-warning-text-strong)' },
+  info: { background: 'var(--color-info-bg)', border: 'var(--color-info-border)', color: 'var(--color-info-text-strong)' },
+  success: { background: 'var(--color-success-bg)', border: 'var(--color-success-border)', color: 'var(--color-success-text-strong)' },
+  danger: { background: 'var(--color-danger-bg)', border: 'var(--color-danger-border)', color: 'var(--color-danger-text-strong)' }
 };
 
 /**

@@ -31,7 +31,7 @@ export const CarteiraNoResults: React.FC<CarteiraNoResultsProps> = ({ title, des
         alignItems: 'center',
         gap: '0.35rem',
         padding: '0.45rem 0.85rem',
-        background: '#0c326f',
+        background: 'var(--primary)',
         border: 'none',
         borderRadius: '6px',
         fontSize: '0.78rem',

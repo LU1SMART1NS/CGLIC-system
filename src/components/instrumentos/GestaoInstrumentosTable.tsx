@@ -103,7 +103,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
             alignItems: 'center',
             gap: '0.35rem',
             padding: '0.45rem 0.85rem',
-            background: '#0c326f',
+            background: 'var(--primary)',
             border: 'none',
             borderRadius: '6px',
             fontSize: '0.78rem',
@@ -218,7 +218,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                         borderRadius: '6px',
                         fontSize: '0.76rem',
                         fontWeight: 700,
-                        color: '#0c326f',
+                        color: 'var(--primary)',
                         cursor: 'pointer',
                         whiteSpace: 'nowrap'
                       }}

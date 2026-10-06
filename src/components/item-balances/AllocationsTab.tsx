@@ -68,7 +68,7 @@ export const AllocationUnavailableNotice: React.FC<{ catalogEmpty: boolean }> = 
         ? 'O catálogo de Unidades Internas está vazio. Cadastre as unidades para poder alocar quantitativo.'
         : 'Todas as unidades do catálogo já têm alocação neste item. Para alocar a outra unidade, cadastre-a em Unidades Internas; para mudar a quantidade de uma já alocada, use o lápis na tabela.'}
     </p>
-    <Link to="/admin/departamentos" style={{ fontWeight: 700, color: '#0c326f', textDecoration: 'none' }}>
+    <Link to="/admin/departamentos" style={{ fontWeight: 700, color: 'var(--primary)', textDecoration: 'none' }}>
       Abrir Unidades Internas
     </Link>
   </div>
@@ -294,7 +294,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
                 value={unitName}
                 onChange={(e) => onUnitChange(e.target.value)}
                 required
-                style={{ fontWeight: 700, color: '#0c326f', fontSize: '0.85rem', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
+                style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.85rem', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
               >
                 {departments.map((d) => {
                   const isAllocated = allocatedNames.has(norm(d.sigla));
@@ -320,7 +320,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
               />
             </label>
-            <Link to="/admin/departamentos" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0c326f', textDecoration: 'none' }}>
+            <Link to="/admin/departamentos" style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', textDecoration: 'none' }}>
               Gerenciar Unidades Internas
             </Link>
           </form>

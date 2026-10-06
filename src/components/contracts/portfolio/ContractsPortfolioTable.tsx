@@ -84,10 +84,10 @@ function worstSeverity(pendencias: DashboardAttentionItem[]): DashboardAttention
   return 'INFO';
 }
 const PENDENCIA_COLORS: Record<string, { color: string; bg: string }> = {
-  CRITICA: { color: '#b91c1c', bg: '#fef2f2' },
+  CRITICA: { color: 'var(--color-danger-text)', bg: 'var(--color-danger-bg)' },
   URGENTE: { color: '#c2410c', bg: '#fff7ed' },
-  ATENCAO: { color: '#b45309', bg: '#fffbeb' },
-  INFO: { color: '#1d4ed8', bg: '#eff6ff' }
+  ATENCAO: { color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  INFO: { color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' }
 };
 
 export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = ({
@@ -265,7 +265,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                               <div style={{ color: '#64748b' }}>
                                 Inicial: {formatCurrency(contract.valorInicial)}
                                 {acrescimoPct > 0.05 && (
-                                  <span style={{ color: '#b45309', fontWeight: 700 }}>
+                                  <span style={{ color: 'var(--color-warning-text)', fontWeight: 700 }}>
                                     {' '}(+{acrescimoPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% em aditivos)
                                   </span>
                                 )}

@@ -235,7 +235,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
               alignItems: 'center',
               gap: '0.5rem'
             }}>
-              <Check size={18} color="#059669" /> {successMsg}
+              <Check size={18} color="var(--color-success)" /> {successMsg}
             </div>
           )}
 
@@ -259,14 +259,14 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 style={{
                   padding: '0.75rem 0.6rem',
                   borderRadius: '8px',
-                  border: preset === 'BALANCES' ? '2px solid #0c326f' : '1px solid #e2e8f0',
-                  background: preset === 'BALANCES' ? '#eff6ff' : '#ffffff',
+                  border: preset === 'BALANCES' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                  background: preset === 'BALANCES' ? 'var(--color-info-bg)' : '#ffffff',
                   textAlign: 'left',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: 'var(--primary)' }}>
                   <Sliders size={16} /> Saldos Contábeis
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
@@ -281,14 +281,14 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 style={{
                   padding: '0.75rem 0.6rem',
                   borderRadius: '8px',
-                  border: preset === 'EXECUTIVE' ? '2px solid #0c326f' : '1px solid #e2e8f0',
-                  background: preset === 'EXECUTIVE' ? '#eff6ff' : '#ffffff',
+                  border: preset === 'EXECUTIVE' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                  background: preset === 'EXECUTIVE' ? 'var(--color-info-bg)' : '#ffffff',
                   textAlign: 'left',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: 'var(--primary)' }}>
                   <FileText size={16} /> Resumo Executivo
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
@@ -303,14 +303,14 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 style={{
                   padding: '0.75rem 0.6rem',
                   borderRadius: '8px',
-                  border: preset === 'ALLOCATIONS' ? '2px solid #0c326f' : '1px solid #e2e8f0',
-                  background: preset === 'ALLOCATIONS' ? '#eff6ff' : '#ffffff',
+                  border: preset === 'ALLOCATIONS' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                  background: preset === 'ALLOCATIONS' ? 'var(--color-info-bg)' : '#ffffff',
                   textAlign: 'left',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: 'var(--primary)' }}>
                   <Building2 size={16} /> Alocações Setoriais
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
@@ -325,14 +325,14 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 style={{
                   padding: '0.75rem 0.6rem',
                   borderRadius: '8px',
-                  border: preset === 'PURCHASES' ? '2px solid #0c326f' : '1px solid #e2e8f0',
-                  background: preset === 'PURCHASES' ? '#eff6ff' : '#ffffff',
+                  border: preset === 'PURCHASES' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                  background: preset === 'PURCHASES' ? 'var(--color-info-bg)' : '#ffffff',
                   textAlign: 'left',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: 'var(--primary)' }}>
                   <ShoppingBag size={16} /> Catálogo de Compras
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
@@ -347,14 +347,14 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 style={{
                   padding: '0.75rem 0.6rem',
                   borderRadius: '8px',
-                  border: preset === 'CUSTOM' ? '2px solid #0c326f' : '1px solid #e2e8f0',
-                  background: preset === 'CUSTOM' ? '#eff6ff' : '#ffffff',
+                  border: preset === 'CUSTOM' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                  background: preset === 'CUSTOM' ? 'var(--color-info-bg)' : '#ffffff',
                   textAlign: 'left',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: '#0c326f' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.82rem', color: 'var(--primary)' }}>
                   <Sparkles size={16} /> Personalizado
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
@@ -449,7 +449,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                   padding: '0.35rem 0.7rem',
                   borderRadius: '20px',
                   border: 'none',
-                  background: activeGroupFilter === 'all' ? '#0c326f' : '#f1f5f9',
+                  background: activeGroupFilter === 'all' ? 'var(--primary)' : '#f1f5f9',
                   color: activeGroupFilter === 'all' ? '#ffffff' : '#475569',
                   fontSize: '0.75rem',
                   fontWeight: 700,
@@ -471,7 +471,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                       padding: '0.35rem 0.7rem',
                       borderRadius: '20px',
                       border: 'none',
-                      background: activeGroupFilter === g.id ? '#0c326f' : '#f1f5f9',
+                      background: activeGroupFilter === g.id ? 'var(--primary)' : '#f1f5f9',
                       color: activeGroupFilter === g.id ? '#ffffff' : '#475569',
                       fontSize: '0.75rem',
                       fontWeight: 700,
@@ -506,7 +506,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                       gap: '0.5rem',
                       padding: '0.45rem 0.6rem',
                       borderRadius: '6px',
-                      border: isSelected ? '1px solid #bfdbfe' : '1px solid #f1f5f9',
+                      border: isSelected ? '1px solid var(--color-info-border)' : '1px solid #f1f5f9',
                       background: isSelected ? '#f8fafc' : '#ffffff',
                       cursor: 'pointer',
                       userSelect: 'none',
@@ -520,7 +520,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                       style={{ marginTop: '0.2rem', cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isSelected ? '#0c326f' : '#334155' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isSelected ? 'var(--primary)' : '#334155' }}>
                         {col.label}
                       </div>
                       {col.description && (

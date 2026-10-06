@@ -75,7 +75,7 @@ const AuthRedirectHandler: React.FC = () => {
 
 const AppFooter: React.FC = () => (
   <footer className="app-footer" style={{
-    background: '#0c326f',
+    background: 'var(--primary)',
     color: '#ffffff',
     padding: '0.4rem var(--page-gutter)',
     fontSize: '0.75rem',
@@ -124,7 +124,7 @@ const ProtectedLayout: React.FC<{
         alignItems: 'center',
         justifyContent: 'center',
         background: '#f8fafc',
-        color: '#0c326f',
+        color: 'var(--primary)',
         fontSize: '0.9rem',
         fontWeight: 600
       }}>

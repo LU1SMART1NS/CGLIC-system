@@ -233,7 +233,7 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                             {ata.vinculados.length ? `${plural(ata.vinculados.length, 'vinculado', 'vinculados')} (vão junto)` : 'Nenhum vinculado'}
                           </span>
                           {ata.provaveis.length > 0 && (
-                            <span title={`Prováveis: ${listar(ata.provaveis)}`} style={{ color: '#b45309', fontWeight: 700 }}>
+                            <span title={`Prováveis: ${listar(ata.provaveis)}`} style={{ color: 'var(--color-warning-text)', fontWeight: 700 }}>
                               {plural(ata.provaveis.length, 'provável', 'prováveis')} a vincular
                             </span>
                           )}
@@ -245,7 +245,7 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                             type="button"
                             onClick={() => onAtribuir([ata])}
                             data-testid={`ata-sem-gestor-atribuir-${ata.numeroAta}`}
-                            style={{ ...carteiraButton, color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
+                            style={{ ...carteiraButton, color: 'var(--color-success-text)', borderColor: 'var(--color-success-border)', background: 'var(--color-success-bg)' }}
                           >
                             <UserPlus size={13} /> Atribuir
                           </button>

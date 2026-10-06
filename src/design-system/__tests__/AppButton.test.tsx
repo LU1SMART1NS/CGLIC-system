@@ -18,9 +18,9 @@ describe('AppButton Component', () => {
   it('renders ghostDanger variant: só texto em vermelho, sem fundo cheio', () => {
     const html = renderToStaticMarkup(<AppButton variant="ghostDanger">Desvincular</AppButton>);
     expect(html).toContain('Desvincular');
-    expect(html).toContain('color:#b91c1c');
+    expect(html).toContain('color:var(--color-danger-text)');
     expect(html).toContain('background-color:transparent');
-    expect(html).not.toContain('background-color:#ef4444');
+    expect(html).not.toContain('background-color:var(--color-danger-solid)');
   });
 
   it('iconOnly: botão quadrado sem texto, com nome acessível vindo do title ou do aria-label', () => {

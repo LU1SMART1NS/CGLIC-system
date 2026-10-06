@@ -287,7 +287,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Com pendência</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#d97706', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-warning)', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['COM_PENDENCIA'] || 0}
             </div>
           </div>
@@ -308,14 +308,14 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>4. Pago</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#166534', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-success-text-strong)', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['PAGO'] || 0}
             </div>
           </div>
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Exceções</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#b91c1c', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-danger-text)', marginTop: '0.2rem' }}>
               {(distribuicaoPorEstado['DEVOLVIDO'] || 0) + (distribuicaoPorEstado['CANCELADO'] || 0)}
             </div>
           </div>
@@ -434,7 +434,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                             FATURA VENCIDA ({Math.abs(diasVenc)}d úteis)
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.75rem', fontWeight: diasVenc <= 3 ? 700 : 400, color: diasVenc <= 3 ? '#d97706' : '#475569' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: diasVenc <= 3 ? 700 : 400, color: diasVenc <= 3 ? 'var(--color-warning)' : '#475569' }}>
                             Vence em {diasVenc} {diasVenc === 1 ? 'dia útil' : 'dias úteis'}
                           </span>
                         )}
@@ -448,7 +448,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                       <td data-label="Ordem bancária" style={{ ...carteiraTd, verticalAlign: 'top' }}>
                         {cycle.input?.numeroOrdemBancaria ? (
                           <div>
-                            <div style={{ fontWeight: 700, color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--color-success-text)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                               <CheckCircle2 size={13} aria-hidden="true" />
                               <span>{cycle.input.numeroOrdemBancaria}</span>
                             </div>

@@ -19,10 +19,10 @@ const COLORS = {
   muted: '#64748b',
   line: '#e2e8f0',
   surface: '#f8fafc',
-  ok: '#166534',
+  ok: 'var(--color-success-text-strong)',
   tick: '#94a3b8',
-  brand: '#0c326f',
-  warn: '#d97706'
+  brand: 'var(--primary)',
+  warn: 'var(--color-warning)'
 };
 
 /** Texto do selo por tom. INFO não tem selo. */
@@ -405,7 +405,7 @@ export const LifelineRule: React.FC<{
           {nextText && (
             <span
               title={nextText}
-              style={{ minWidth: 0, marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', fontWeight: 700, color: next?.state === 'PROXIMO' ? '#b45309' : COLORS.inkSoft }}
+              style={{ minWidth: 0, marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', fontWeight: 700, color: next?.state === 'PROXIMO' ? 'var(--color-warning-text)' : COLORS.inkSoft }}
             >
               {nextText}
             </span>

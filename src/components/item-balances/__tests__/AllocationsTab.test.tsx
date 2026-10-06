@@ -127,7 +127,7 @@ describe('AllocationsTab', () => {
   it('avisa no topo, com o mesmo desenho da faixa de pendências, dos empenhos confirmados ainda sem unidade', () => {
     const out = html({ semUnidade: { empenhado: 34, count: 3 } });
     expect(out).toContain('empenhos-sem-unidade');
-    expect(out).toContain('background:#fffbeb');
+    expect(out).toContain('background:var(--color-warning-bg)');
     expect(out).toContain('empenhos confirmados');
     expect(out).toContain('(34 un)');
     expect(out).toContain('Vincular em Contratos e empenhos');

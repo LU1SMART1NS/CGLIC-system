@@ -98,7 +98,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
       header: 'Empenho',
       render: (v) => (
         <>
-          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0c326f' }}>{v.empenho.numero}</span>
+          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--primary)' }}>{v.empenho.numero}</span>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             UASG {v.empenho.uasg}{v.empenho.dataEmissao ? ` • ${v.empenho.dataEmissao.split('-').reverse().join('/')}` : ''}
           </div>
@@ -156,7 +156,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
               width: '100%',
               maxWidth: '200px',
               borderColor: current ? 'var(--primary)' : '#cbd5e1',
-              background: current ? '#eff6ff' : '#ffffff'
+              background: current ? 'var(--color-info-bg)' : '#ffffff'
             }}
           >
             <option value="">Não vinculado</option>

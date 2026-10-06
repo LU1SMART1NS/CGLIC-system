@@ -32,7 +32,7 @@ export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
         case 'outline':
           return {
             backgroundColor: '#ffffff',
-            color: '#0c326f',
+            color: 'var(--primary)',
             border: '1px solid #cbd5e1'
           };
         case 'ghost':
@@ -45,19 +45,19 @@ export const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
           // Ação destrutiva discreta: só texto em vermelho; ganha fundo avermelhado ao passar o mouse.
           return {
             backgroundColor: 'transparent',
-            color: '#b91c1c',
+            color: 'var(--color-danger-text)',
             border: '1px solid transparent'
           };
         case 'danger':
           return {
-            backgroundColor: '#ef4444',
+            backgroundColor: 'var(--color-danger-solid)',
             color: '#ffffff',
             border: '1px solid transparent'
           };
         case 'primary':
         default:
           return {
-            backgroundColor: '#0c326f',
+            backgroundColor: 'var(--primary)',
             color: '#ffffff',
             border: '1px solid transparent'
           };

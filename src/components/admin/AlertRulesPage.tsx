@@ -83,7 +83,7 @@ export const AlertRulesPage: React.FC = () => {
       <PageHeader
         title="Regras de Alertas"
         subtitle="Limites que classificam os alertas em todas as telas."
-        icon={<BellRing size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<BellRing size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
             <AppButton
@@ -128,7 +128,7 @@ export const AlertRulesPage: React.FC = () => {
                         <label htmlFor={`rule-${def.key}`} style={{ fontWeight: 700, color: '#0f172a' }}>{def.label}</label>
                         {def.hint && <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{def.hint}</div>}
                         {error && (
-                          <div role="alert" style={{ fontSize: '0.76rem', color: '#b91c1c', marginTop: '2px', fontWeight: 600 }}>{error}</div>
+                          <div role="alert" style={{ fontSize: '0.76rem', color: 'var(--color-danger-text)', marginTop: '2px', fontWeight: 600 }}>{error}</div>
                         )}
                       </>
                     );
@@ -156,8 +156,8 @@ export const AlertRulesPage: React.FC = () => {
                           className="ds-field__control"
                           style={{
                             ...inputStyle,
-                            borderColor: error ? '#dc2626' : isChanged ? '#0c326f' : undefined,
-                            background: isChanged ? '#eff6ff' : undefined
+                            borderColor: error ? 'var(--color-danger)' : isChanged ? 'var(--primary)' : undefined,
+                            background: isChanged ? 'var(--color-info-bg)' : undefined
                           }}
                         />
                         <span style={{ fontSize: '0.8rem', color: '#475569' }}>{def.unit}</span>

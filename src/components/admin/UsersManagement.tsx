@@ -217,7 +217,7 @@ export const UsersManagement: React.FC = () => {
       <PageHeader
         title="Usuários e Servidores"
         subtitle="Cadastro de servidores, atribuição de competências operacionais e credenciamento de gestores da pasta"
-        icon={<Users size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<Users size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <AppButton
             variant="primary"
@@ -415,7 +415,7 @@ export const UsersManagement: React.FC = () => {
       >
             <form id="user-form" onSubmit={handleSaveOrInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {formError && (
-                <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#991b1b', fontSize: '0.8rem', fontWeight: 600 }}>
+                <div style={{ padding: '0.65rem 0.85rem', background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger-border)', borderRadius: '6px', color: 'var(--color-danger-text-strong)', fontSize: '0.8rem', fontWeight: 600 }}>
                   {formError}
                 </div>
               )}

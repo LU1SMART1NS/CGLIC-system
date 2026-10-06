@@ -67,7 +67,7 @@ export const ConfirmDeleteButton: React.FC<{
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#b91c1c' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--color-danger-text)' }}>
       {confirmMessage}
       <AppButton
         type="button"
@@ -200,7 +200,7 @@ export const MacrotaskHeader: React.FC<{
   const headingStyle: React.CSSProperties = {
     fontSize: '0.92rem',
     fontWeight: 800,
-    color: '#0c326f',
+    color: 'var(--primary)',
     margin: 0
   };
 
@@ -346,7 +346,7 @@ export const MutationError: React.FC<{ error: unknown }> = ({ error }) => {
     ? rawMessage
     : 'Não foi possível concluir a operação.';
   return (
-    <div role="alert" style={{ fontSize: '0.78rem', color: '#b91c1c', margin: '0.5rem 0' }}>
+    <div role="alert" style={{ fontSize: '0.78rem', color: 'var(--color-danger-text)', margin: '0.5rem 0' }}>
       {message}
     </div>
   );
@@ -377,12 +377,12 @@ export const ModuleGroupHeader: React.FC<{
   const percentual = aplicaveis > 0 ? Math.round((concluidas / aplicaveis) * 100) : 0;
   const summary = (
     <div>
-      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c326f' }}>{nome}</div>
+      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: 'var(--primary)' }}>{nome}</div>
       <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
         {etapas} etapa{etapas !== 1 ? 's' : ''} • {concluidas} de {aplicaveis} tarefas concluídas ({percentual}%)
         {appliedLabel && <> • aplicado em {appliedLabel}</>}
         {atrasadas > 0 && (
-          <span style={{ color: '#dc2626', fontWeight: 700 }}> • {atrasadas} atrasada{atrasadas !== 1 ? 's' : ''}</span>
+          <span style={{ color: 'var(--color-danger)', fontWeight: 700 }}> • {atrasadas} atrasada{atrasadas !== 1 ? 's' : ''}</span>
         )}
       </div>
     </div>
@@ -398,7 +398,7 @@ export const ModuleGroupHeader: React.FC<{
         flexWrap: 'wrap',
         padding: '0.55rem 0.85rem',
         background: '#eef2f8',
-        borderLeft: '3px solid #0c326f',
+        borderLeft: '3px solid var(--primary)',
         borderRadius: '6px'
       }}
     >
@@ -453,7 +453,7 @@ export const ModuleGroupHeader: React.FC<{
             font: 'inherit'
           }}
         >
-          {collapsed ? <ChevronRight size={16} color="#0c326f" /> : <ChevronDown size={16} color="#0c326f" />}
+          {collapsed ? <ChevronRight size={16} color="var(--primary)" /> : <ChevronDown size={16} color="var(--primary)" />}
           {summary}
         </button>
       ) : (

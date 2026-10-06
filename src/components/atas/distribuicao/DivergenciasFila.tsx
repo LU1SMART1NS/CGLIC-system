@@ -21,7 +21,7 @@ const COLUNAS: Record<string, CarteiraSortColumn<DistribuicaoDivergencia>> = {
 };
 
 const chave = (d: DistribuicaoDivergencia) => `${d.numeroAta}|${d.contractKey}`;
-const semGestor = <em style={{ color: '#b45309' }}>Sem gestor</em>;
+const semGestor = <em style={{ color: 'var(--color-warning-text)' }}>Sem gestor</em>;
 
 interface DivergenciasFilaProps {
   divergencias: DistribuicaoDivergencia[];
@@ -91,7 +91,7 @@ export const DivergenciasFila: React.FC<DivergenciasFilaProps> = ({ divergencias
                           type="button"
                           onClick={() => onAlinhar(d)}
                           data-testid={`distribuicao-alinhar-${d.contractKey}`}
-                          style={{ ...carteiraButton, color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
+                          style={{ ...carteiraButton, color: 'var(--color-success-text)', borderColor: 'var(--color-success-border)', background: 'var(--color-success-bg)' }}
                         >
                           <UserPlus size={13} /> Alinhar gestor
                         </button>

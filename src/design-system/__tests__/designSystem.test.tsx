@@ -31,9 +31,9 @@ describe('SaldoARP 3.0 — Design System Foundation (Fase 9-C1)', () => {
       expect(colors.background.surface).toBe('#ffffff');
       expect(colors.text.primary).toBe('#0f172a');
       expect(colors.brand.primary).toBe('#0284c7');
-      expect(colors.semantic.success.solid).toBe('#16a34a');
-      expect(colors.semantic.danger.solid).toBe('#ef4444');
-      expect(colors.semantic.warning.solid).toBe('#f59e0b');
+      expect(colors.semantic.success.solid).toBe('var(--color-success-solid)');
+      expect(colors.semantic.danger.solid).toBe('var(--color-danger-solid)');
+      expect(colors.semantic.warning.solid).toBe('var(--color-warning-solid)');
     });
 
     it('deve conter definições semânticas para as 4 severidades do Funil de Atenção', () => {

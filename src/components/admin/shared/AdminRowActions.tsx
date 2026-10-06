@@ -21,7 +21,7 @@ export const AdminRowActions: React.FC<AdminRowActionsProps> = ({ name, onEdit, 
         icon={<Trash2 size={16} />}
         onClick={onDelete}
         disabled={disabled}
-        style={{ color: '#ef4444' }}
+        style={{ color: 'var(--color-danger-solid)' }}
       />
     )}
   </div>

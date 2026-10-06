@@ -195,7 +195,7 @@ export const DepartmentsManagementPage: React.FC = () => {
       <PageHeader
         title="Unidades Internas"
         subtitle="Diretorias, coordenações-gerais e coordenações oficiais da SENASP usadas no controle de cotas."
-        icon={<Building2 size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<Building2 size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           canManage ? (
             <AppButton icon={<Plus size={15} />} onClick={handleNew} data-testid="departments-new">
@@ -209,9 +209,9 @@ export const DepartmentsManagementPage: React.FC = () => {
       {canManage && legacyNames.length > 0 && (
         <div
           data-testid="departments-legacy-panel"
-          style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+          style={{ background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', borderRadius: '8px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#92400e', fontWeight: 700, fontSize: '0.9rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-warning-text-strong)', fontWeight: 700, fontSize: '0.9rem' }}>
             <Sparkles size={18} /> Registros antigos ou com nome digitado incorretamente
           </div>
           <p style={{ fontSize: '0.82rem', color: '#78350f', margin: 0 }}>
@@ -221,9 +221,9 @@ export const DepartmentsManagementPage: React.FC = () => {
             {legacyNames.map((name) => (
               <div
                 key={name}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '6px', border: '1px solid #fde68a' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '6px', border: '1px solid var(--color-warning-border)' }}
               >
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#dc2626' }}>"{name}"</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-danger)' }}>"{name}"</span>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <AppSelect
                     label="Mesclar para"
@@ -292,7 +292,7 @@ export const DepartmentsManagementPage: React.FC = () => {
               width: '180px',
               priority: 'primary',
               render: (d) => (
-                <span style={{ fontWeight: 700, color: d.ativo ? '#0c326f' : '#64748b' }}>
+                <span style={{ fontWeight: 700, color: d.ativo ? 'var(--primary)' : '#64748b' }}>
                   {d.sigla} {!d.ativo && <StatusBadge label="Inativa" variant="danger" size="sm" dot={false} />}
                 </span>
               )

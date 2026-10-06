@@ -77,7 +77,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0c326f', padding: '2px' }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '2px' }}
         >
           {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
@@ -94,7 +94,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
             <button
               type="button"
               onClick={handleRenameMacro}
-              style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', color: 'var(--color-success)', cursor: 'pointer' }}
               title="Salvar"
             >
               <Check size={16} />
@@ -102,7 +102,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
           </>
         ) : (
           <>
-            <Layers size={15} color="#0c326f" />
+            <Layers size={15} color="var(--primary)" />
             <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>{macro.nome}</span>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
               {macro.tarefas.length} tarefa{macro.tarefas.length !== 1 ? 's' : ''}
@@ -129,7 +129,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                   onError: err => toast.error(`Erro ao excluir macrotarefa: ${err.message || 'Erro desconhecido'}`)
                 });
               }}
-              style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '2px' }}
+              style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '2px' }}
               title="Excluir macrotarefa"
             >
               <Trash2 size={14} />
@@ -139,7 +139,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
       </div>
 
       {saveMacrotask.isError && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.85rem', background: '#fef2f2', color: '#dc2626', fontSize: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.85rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', fontSize: '0.75rem' }}>
           <AlertCircle size={13} />
           <span>{saveMacrotask.error?.message || 'Erro ao atualizar macrotarefa.'}</span>
         </div>
@@ -169,7 +169,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', width: '20px' }}>
                     {idx + 1}.
                   </span>
-                  <CheckSquare size={13} color="#0c326f" />
+                  <CheckSquare size={13} color="var(--primary)" />
                   {editingTaskId === task.id ? (
                     <>
                       <input
@@ -187,7 +187,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                         type="button"
                         onClick={() => handleRenameTask(task)}
                         disabled={saveTask.isPending}
-                        style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', padding: '2px' }}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-success)', cursor: 'pointer', padding: '2px' }}
                         title="Salvar"
                       >
                         <Check size={14} />
@@ -224,7 +224,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                         onError: err => toast.error(`Erro ao excluir tarefa: ${err.message || 'Erro desconhecido'}`)
                       });
                     }}
-                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '2px' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '2px' }}
                     title="Excluir tarefa"
                   >
                     <Trash2 size={13} />
@@ -260,7 +260,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
           </div>
 
           {saveTask.isError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: '#dc2626', fontSize: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: 'var(--color-danger)', fontSize: '0.75rem' }}>
               <AlertCircle size={13} />
               <span>{saveTask.error?.message || 'Erro ao adicionar tarefa.'}</span>
             </div>
@@ -342,7 +342,7 @@ const TemplateFormModal: React.FC<{
           }}
         />
         {saveTemplate.isError && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', fontSize: '0.82rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', borderRadius: '6px', fontSize: '0.82rem' }}>
             <AlertCircle size={16} /> {saveTemplate.error?.message || 'Falha ao salvar modelo.'}
           </div>
         )}
@@ -378,13 +378,13 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
 
   return (
     <>
-    <AppCard style={{ borderLeft: template.ativo ? '4px solid #0c326f' : '4px solid #94a3b8' }}>
+    <AppCard style={{ borderLeft: template.ativo ? '4px solid var(--primary)' : '4px solid #94a3b8' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '240px' }}>
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0c326f', padding: '2px' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '2px' }}
           >
             {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
@@ -443,7 +443,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
                 onError: err => toast.error(`Erro ao excluir modelo: ${err.message || 'Erro desconhecido'}`)
               });
             }}
-            style={{ color: '#dc2626' }}
+            style={{ color: 'var(--color-danger)' }}
           />
         </div>
       </div>
@@ -489,7 +489,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
           </div>
 
           {saveMacrotask.isError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: '#dc2626', fontSize: '0.78rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: 'var(--color-danger)', fontSize: '0.78rem' }}>
               <AlertCircle size={14} />
               <span>{saveMacrotask.error?.message || 'Erro ao adicionar macrotarefa.'}</span>
             </div>
@@ -519,12 +519,12 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
         <PageHeader
           title={copy.title}
           subtitle={copy.subtitle}
-          icon={<Sliders size={26} color="#0c326f" aria-hidden="true" />}
+          icon={<Sliders size={26} color="var(--primary)" aria-hidden="true" />}
         />
       )}
 
       {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', fontSize: '0.82rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', borderRadius: '6px', fontSize: '0.82rem' }}>
           <AlertCircle size={16} /> Falha ao carregar templates oficiais.
         </div>
       )}
@@ -547,7 +547,7 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
           <SkeletonLoader count={3} height="120px" />
         ) : templates.length === 0 ? (
           <EmptyState
-            icon={<ClipboardList size={36} color="#0c326f" />}
+            icon={<ClipboardList size={36} color="var(--primary)" />}
             title="Nenhum modelo cadastrado"
             description={copy.emptyDescription}
           />

@@ -35,7 +35,7 @@ export const CarteiraSortButton: React.FC<CarteiraSortButtonProps> = ({ label, s
         font: 'inherit',
         letterSpacing: 'inherit',
         textTransform: 'inherit',
-        color: ativo ? '#0c326f' : 'inherit',
+        color: ativo ? 'var(--primary)' : 'inherit',
         cursor: 'pointer'
       }}
     >
