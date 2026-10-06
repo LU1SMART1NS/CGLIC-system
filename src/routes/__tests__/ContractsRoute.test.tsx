@@ -194,7 +194,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).toContain('contracts-filter-pendencia');
     expect(html).toContain('contracts-filter-unidade');
     expect(html).toContain('contracts-filter-gestor');
-    expect(html).toContain('Buscar por contrato, fornecedor, CNPJ...');
+    expect(html).toContain('Buscar por contrato, ata, fornecedor, CNPJ...');
     expect(html).toContain('3 contratos');
     expect(html).not.toContain('Todos os Instrumentos');
   });
@@ -227,6 +227,24 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
 
     // Botões de Drill-down
     expect(html).toContain('Ver detalhes do contrato');
+  });
+
+  it('5b. mostra a ata de origem ao lado do número: uma ata pelo número, várias pela contagem, nenhuma sem nada', () => {
+    const [um, varios, nenhum] = toRows(mockContracts);
+    const html = renderToStaticMarkup(
+      <ContractsPortfolioTable
+        rows={[{ ...um, atas: ['00059/2025'] }, { ...varios, atas: ['00010/2024', '00059/2025'] }, { ...nenhum, atas: [] }]}
+        totalContracts={3}
+        onResetFilters={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('Ata 00059/2025');
+    expect(html).toContain('2 atas');
+    expect(html).toContain('title="Atas: 00010/2024, 00059/2025"');
+    // Contrato sem ata não ganha rótulo, e o fornecedor continua na segunda linha.
+    expect(html).not.toContain(`contracts-ata-${nenhum.contractKey}`);
+    expect(html).toContain('Gamma Locações Comerciais Eireli');
   });
 
   it('6. deve exibir estado vazio quando não há contratos na base', () => {
@@ -290,7 +308,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).not.toContain('Empresa Alfa Serviços');
   });
 
-  it('9b. admin pode atribuir gestor na própria carteira (botão "Atribuir")', () => {
+  it('9b. a atribuição é só na Central: na carteira o admin vê o atalho para lá, não o seletor', () => {
     vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockReturnValue({
       data: mockContracts,
       isLoading: false,
@@ -304,7 +322,8 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     const html = renderToStaticMarkup(<ContractsRoute />);
 
     expect(html).not.toContain('type="checkbox"');
-    expect(html).toContain('Atribuir');
+    expect(html).toContain('atribuir na Central');
+    expect(html).not.toContain('Alterar gestor');
   });
 
   it('10. perfil "gestor" deve ver apenas os contratos onde é o gestor titular (escopo ASSIGNED)', () => {

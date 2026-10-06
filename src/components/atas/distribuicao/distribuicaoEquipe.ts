@@ -1,7 +1,9 @@
 import type { PrazoFaixa } from '../../carteira/carteiraPrazo';
 import type { ArpItemContractLinkPair } from '../../../services/arpContractLinkService';
 import type { DashboardAttentionItem } from '../../../types/managementDashboard';
+import type { ComplexidadeAjuste } from '../../../services/complexidadeAjusteService';
 import {
+  aplicarAjuste,
   classificarAta,
   classificarContrato,
   PESO_COMPLEXIDADE,
@@ -18,9 +20,8 @@ export interface DistribuicaoAta {
   faixa: PrazoFaixa;
   valor: number;
   gestorNome?: string;
-  /** Itens e fornecedores distintos da ata (para a complexidade). */
+  /** Itens da ata (para a complexidade). */
   itens?: number;
-  fornecedores?: number;
 }
 
 export interface DistribuicaoContrato {
@@ -140,6 +141,8 @@ export function buildDistribuicaoEquipe(input: {
   contratos: DistribuicaoContrato[];
   links: ArpItemContractLinkPair[];
   attentionItems: DashboardAttentionItem[];
+  /** Ajustes manuais de complexidade, por "TIPO:chave" (migration 66). */
+  ajustes?: Record<string, ComplexidadeAjuste>;
 }): DistribuicaoEquipe {
   const linhas = new Map<string | null, DistribuicaoLinha>();
   const linha = (gestorNome?: string) => {
@@ -190,7 +193,7 @@ export function buildDistribuicaoEquipe(input: {
       valor: ata.valor,
       urgentes: 0,
       acompanhar: 0,
-      complexidade: classificarAta(ata.itens ?? 0, ata.fornecedores ?? 0)
+      complexidade: aplicarAjuste(classificarAta(ata.itens ?? 0), input.ajustes?.[`ATA:${ata.numeroAta}`])
     };
     l.itens.push(item);
     contarComplexidade(l, item.complexidade);
@@ -213,7 +216,10 @@ export function buildDistribuicaoEquipe(input: {
       valor: contrato.valor,
       urgentes: 0,
       acompanhar: 0,
-      complexidade: classificarContrato(contrato.categoria, contrato.mesesVigencia ?? null)
+      complexidade: aplicarAjuste(
+        classificarContrato(contrato.categoria, contrato.mesesVigencia ?? null),
+        input.ajustes?.[`CONTRATO:${contrato.contractKey}`]
+      )
     };
     l.itens.push(item);
     contarComplexidade(l, item.complexidade);

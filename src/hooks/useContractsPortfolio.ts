@@ -3,6 +3,7 @@ import { useContractsDashboard, useContractsListPartial } from './useContractsDa
 import { useAssignedManagementScope } from './useAssignedManagementScope';
 import { useAllContractManagers } from './useAllContractManagers';
 import { useManagementDashboard } from './useManagementDashboard';
+import { useArpItemContractLinks } from './useAtaManagers';
 import { classifyPrazo } from '../components/carteira/carteiraPrazo';
 import { getContractDaysRemaining } from '../services/dashboardService';
 import { UASGS_CGLIC } from '../config/unidadesGestoras';
@@ -94,6 +95,19 @@ export function useContractsPortfolio() {
 
   const contractsByKey = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
 
+  // Atas de origem de cada contrato: o vínculo é por item, então um contrato pode vir de 0, 1 ou várias atas.
+  // Mesma consulta (e cache) do escopo do perfil gestor.
+  const { data: ataLinks } = useArpItemContractLinks();
+  const atasByContractKey = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const { ataKey, contractKey } of ataLinks || []) {
+      const atas = map.get(contractKey) || new Set<string>();
+      atas.add(ataKey);
+      map.set(contractKey, atas);
+    }
+    return new Map([...map].map(([key, atas]) => [key, [...atas].sort()]));
+  }, [ataLinks]);
+
   // Contratos enriquecidos com prazo, gestor e pendências (base única para cards, filtros e tabela).
   const rows = useMemo<ContractPortfolioRow[]>(() => {
     return contracts.map((contract) => {
@@ -106,10 +120,11 @@ export function useContractsPortfolio() {
         diasRestantes,
         faixa,
         gestorNome: gestorByContractKey.get(contractKey),
-        pendencias: pendenciasByContractKey.get(contractKey) || []
+        pendencias: pendenciasByContractKey.get(contractKey) || [],
+        atas: atasByContractKey.get(contractKey) || []
       };
     });
-  }, [contracts, gestorByContractKey, pendenciasByContractKey]);
+  }, [contracts, gestorByContractKey, pendenciasByContractKey, atasByContractKey]);
 
   return {
     /** Contratos no escopo do usuário, enriquecidos. */

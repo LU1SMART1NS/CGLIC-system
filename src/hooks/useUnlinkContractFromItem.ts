@@ -40,6 +40,8 @@ export function useUnlinkContractFromItem() {
       queryClient.invalidateQueries({
         queryKey: ['ata-linked-contracts']
       });
+      // Lista geral de vínculos: Central de Distribuição, propagação do gestor e escopo do perfil gestor
+      queryClient.invalidateQueries({ queryKey: ['all-arp-item-contract-links'] });
       queryClient.invalidateQueries({ queryKey: ['item-empenho-vinculos'] });
       queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links'] });
       queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });

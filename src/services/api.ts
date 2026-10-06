@@ -427,6 +427,22 @@ export function parsePncpControlNumber(ctrl?: string): { cnpj: string; seqCompra
   };
 }
 
+/**
+ * Itens que podem ser atribuídos a uma ata sem saber o fornecedor dela: só quando todos são de um único fornecedor
+ * (matriz e filiais, que compartilham a raiz do CNPJ, contam como o mesmo). Com mais de um, devolve vazio.
+ */
+export function itensSeUmFornecedor<T extends { niFornecedor?: string; nomeRazaoSocialFornecedor?: string }>(items: T[]): T[] {
+  const chaves = new Set(
+    items.map((i) => {
+      const ni = (i.niFornecedor || '').trim().toUpperCase();
+      const digitos = ni.replace(/\D/g, '');
+      if (digitos.length === 14) return digitos.slice(0, 8);
+      return ni || (i.nomeRazaoSocialFornecedor || '').trim().toUpperCase();
+    })
+  );
+  return chaves.size <= 1 ? items : [];
+}
+
 export async function fetchPncpCompraItems(
   anoCompra: string,
   seqCompra: number | string,
@@ -640,6 +656,15 @@ export async function fetchArpItems(
       // 3.5. Busca itens na API do PNCP se possuir ano e sequência da compra
       if (anoCompra && seqCompra) {
         foundItems = await fetchPncpCompraItems(anoCompra, seqCompra, numeroAtaRegistroPreco, codigoUnidadeGerenciadora, cnpjFornecedor);
+        // Uma compra pode gerar várias atas, cada uma de um fornecedor. Sem o fornecedor da ata, não dá para saber quais
+        // itens são dela: melhor não gravar nada do que gravar itens de outra ata (e ficar para sempre no banco).
+        if (!cnpjFornecedor) {
+          const itensDaCompra = foundItems;
+          foundItems = itensSeUmFornecedor(foundItems);
+          if (foundItems.length === 0 && itensDaCompra.length > 0) {
+            console.warn(`Ata ${numeroAtaRegistroPreco}: a compra ${seqCompra}/${anoCompra} tem mais de um fornecedor e a ata não informa qual é o dela; itens não carregados pelo PNCP.`);
+          }
+        }
       }
     }
 

@@ -1,16 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { classificarAta, classificarContrato, mesesDeVigencia } from '../complexidade';
+import { aplicarAjuste, classificarAta, classificarContrato, mesesDeVigencia } from '../complexidade';
 
 describe('complexidade de ata', () => {
-  it('Baixa com 1 item, Média de 2 a 5, Alta com 6+ itens ou 2+ fornecedores', () => {
-    expect(classificarAta(1, 1)).toEqual({ nivel: 'BAIXA', motivo: '1 item' });
-    expect(classificarAta(5, 1)).toEqual({ nivel: 'MEDIA', motivo: '5 itens' });
-    expect(classificarAta(6, 1)).toEqual({ nivel: 'ALTA', motivo: '6 itens' });
-    expect(classificarAta(2, 2)).toEqual({ nivel: 'ALTA', motivo: '2 itens · 2 fornecedores' });
+  it('Baixa com 1 item, Média de 2 a 5, Alta com 6+ itens', () => {
+    expect(classificarAta(1)).toEqual({ nivel: 'BAIXA', motivo: '1 item' });
+    expect(classificarAta(5)).toEqual({ nivel: 'MEDIA', motivo: '5 itens' });
+    expect(classificarAta(6)).toEqual({ nivel: 'ALTA', motivo: '6 itens' });
   });
 
   it('sem itens no banco fica em Média, com o motivo à vista', () => {
-    expect(classificarAta(0, 0)).toEqual({ nivel: 'MEDIA', motivo: 'Sem itens no banco' });
+    expect(classificarAta(0)).toEqual({ nivel: 'MEDIA', motivo: 'Sem itens no banco' });
   });
 });
 
@@ -43,5 +42,21 @@ describe('mesesDeVigencia', () => {
     expect(mesesDeVigencia('2025-01-01', '2026-01-01')).toBe(12);
     expect(mesesDeVigencia('2025-01-01', null)).toBeNull();
     expect(mesesDeVigencia('2026-01-01', '2025-01-01')).toBeNull();
+  });
+});
+
+describe('aplicarAjuste', () => {
+  it('sem ajuste, vale a automática', () => {
+    const auto = classificarContrato('Compras', 6);
+    expect(aplicarAjuste(auto)).toBe(auto);
+  });
+
+  it('com ajuste, vale a faixa do coordenador e a automática fica guardada', () => {
+    const auto = classificarContrato('Compras', 6);
+    expect(aplicarAjuste(auto, { nivel: 'ALTA', motivo: 'Mão de obra com dedicação exclusiva', ajustadoPorNome: 'Furtado', atualizadoEm: '2026-10-05' })).toEqual({
+      nivel: 'ALTA',
+      motivo: 'Mão de obra com dedicação exclusiva',
+      ajuste: { automatica: { nivel: 'BAIXA', motivo: 'Compra · 6 meses' }, ajustadoPorNome: 'Furtado', atualizadoEm: '2026-10-05' }
+    });
   });
 });

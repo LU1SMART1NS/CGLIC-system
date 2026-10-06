@@ -34,3 +34,9 @@ export const displayContractNumber = (c: { numero?: string | number | null; ano?
   if (numero) return formatNumeroContrato(numero, c.ano ?? undefined);
   return formatNumeroContrato(String(c.numeroFormatado ?? '').trim(), c.ano ?? undefined);
 };
+
+/** "200330-00067-2021" -> "00067/2021"; devolve a entrada se não for uma chave "UASG-número-ano". */
+export const formatContractKey = (key: string): string => {
+  const m = String(key ?? '').trim().match(/^\d{6}-(\d+)-(\d{4})$/);
+  return m ? `${m[1]}/${m[2]}` : String(key ?? '').trim();
+};

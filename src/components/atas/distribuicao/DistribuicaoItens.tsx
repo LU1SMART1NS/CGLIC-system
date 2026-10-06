@@ -7,7 +7,10 @@ import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import { buildAtaPath } from '../../../hooks/useAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import type { DistribuicaoItem, DistribuicaoLinha } from './distribuicaoEquipe';
-import { ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
+import { ROTULO_COMPLEXIDADE, type Complexidade, type NivelComplexidade } from './complexidade';
+import { AjusteComplexidadePanel } from './AjusteComplexidadePanel';
+import type { ContratoAVincular } from './contratosSemAta';
+import { formatDateBR } from '../../../utils/format';
 
 const ETIQUETA_COMPLEXIDADE: Record<NivelComplexidade, { color: string; bg: string }> = {
   ALTA: { color: '#ffffff', bg: '#0c326f' },
@@ -33,16 +36,30 @@ interface DistribuicaoItensProps {
   canAssign: boolean;
   /** Abre o "Para quem atribuo?" para os itens marcados; `done` limpa a marcação depois de salvar. */
   onTransfer: (targets: ManagerTarget[], done: () => void) => void;
+  /** Só o coordenador (admin) ajusta a complexidade à mão. */
+  canAjustar?: boolean;
+  /** Contratos prováveis das atas deste gestor ainda não vinculados (o servidor vincula na Ata 360). */
+  aVincular?: ContratoAVincular[];
+}
+
+/** Tooltip da etiqueta: faixa e motivo; quando ajustada, quem ajustou, quando e qual era a automática. */
+function tituloComplexidade(c: Complexidade): string {
+  const base = `Complexidade ${ROTULO_COMPLEXIDADE[c.nivel]}: ${c.motivo}`;
+  if (!c.ajuste) return base;
+  const quem = c.ajuste.ajustadoPorNome ? ` por ${c.ajuste.ajustadoPorNome}` : '';
+  const quando = c.ajuste.atualizadoEm ? ` em ${formatDateBR(c.ajuste.atualizadoEm)}` : '';
+  return `${base}\nAjustada${quem}${quando}. Automática: ${ROTULO_COMPLEXIDADE[c.ajuste.automatica.nivel]} (${c.ajuste.automatica.motivo}).`;
 }
 
 /**
  * Atas e contratos vigentes de um gestor, os mais urgentes primeiro. Marcar itens e transferir
  * só eles (o gestor da ata se propaga aos contratos vinculados, como nas carteiras).
  */
-export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, canAssign, onTransfer }) => {
+export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, canAssign, onTransfer, canAjustar = false, aVincular = [] }) => {
   const navigate = useNavigateWithOrigin();
   const [visible, setVisible] = React.useState(PAGE_SIZE);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [ajustando, setAjustando] = React.useState<{ item: DistribuicaoItem; anchor: DOMRect } | null>(null);
   const isSemGestor = linha.gestorNome === null;
 
   const shown = linha.itens.slice(0, visible);
@@ -104,6 +121,23 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
         )}
       </div>
 
+      {aVincular.length > 0 && (
+        <div
+          data-testid="distribuicao-a-vincular"
+          style={{ fontSize: '0.78rem', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
+        >
+          <strong>{aVincular.length} {aVincular.length === 1 ? 'contrato a vincular' : 'contratos a vincular'}</strong> nas atas deste gestor
+          (mesma compra e fornecedor). O vínculo é feito na Ata 360 e o contrato passa a ser dele:{' '}
+          {aVincular.slice(0, 8).map((c, i) => (
+            <React.Fragment key={`${c.contractKey}-${c.numeroAta}`}>
+              {i > 0 && ', '}
+              {c.numero} <span style={{ color: '#64748b' }}>(ata {c.numeroAta})</span>
+            </React.Fragment>
+          ))}
+          {aVincular.length > 8 && ` e mais ${aVincular.length - 8}`}.
+        </div>
+      )}
+
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' }}>
         {shown.map((item) => {
           const checked = selected.has(itemId(item));
@@ -129,20 +163,34 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                     {item.tipo === 'ATA' ? 'Ata' : 'Contrato'}
                   </span>
                   <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{item.numero}</span>
-                  <span
-                    title={`Complexidade ${ROTULO_COMPLEXIDADE[item.complexidade.nivel]}: ${item.complexidade.motivo}`}
-                    data-testid={`distribuicao-complexidade-${itemId(item)}`}
-                    style={{
+                  {(() => {
+                    const etiquetaStyle: React.CSSProperties = {
                       fontSize: '0.75rem',
                       fontWeight: 800,
                       padding: '0.05rem 0.4rem',
                       borderRadius: '4px',
                       whiteSpace: 'nowrap',
+                      border: 'none',
                       ...ETIQUETA_COMPLEXIDADE[item.complexidade.nivel]
-                    }}
-                  >
-                    {ROTULO_COMPLEXIDADE[item.complexidade.nivel]}
-                  </span>
+                    };
+                    const rotulo = `${ROTULO_COMPLEXIDADE[item.complexidade.nivel]}${item.complexidade.ajuste ? ' · ajustada' : ''}`;
+                    return canAjustar ? (
+                      <button
+                        type="button"
+                        title={`${tituloComplexidade(item.complexidade)}\nClique para ajustar.`}
+                        aria-label={`Ajustar complexidade (${rotulo})`}
+                        data-testid={`distribuicao-complexidade-${itemId(item)}`}
+                        onClick={(e) => setAjustando({ item, anchor: e.currentTarget.getBoundingClientRect() })}
+                        style={{ ...etiquetaStyle, cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: '2px' }}
+                      >
+                        {rotulo}
+                      </button>
+                    ) : (
+                      <span title={tituloComplexidade(item.complexidade)} data-testid={`distribuicao-complexidade-${itemId(item)}`} style={etiquetaStyle}>
+                        {rotulo}
+                      </span>
+                    );
+                  })()}
                   <span style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {item.complexidade.motivo}
                   </span>
@@ -185,6 +233,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
           </button>
         )}
       </div>
+      {ajustando && <AjusteComplexidadePanel item={ajustando.item} anchorRect={ajustando.anchor} onClose={() => setAjustando(null)} />}
     </div>
   );
 };

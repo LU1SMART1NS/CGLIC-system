@@ -5,6 +5,9 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useContractsDashboard } from '../../hooks/useContractsDashboard';
+import { useAllAtaManagers, useArpItemContractLinks } from '../../hooks/useAtaManagers';
+import { useAllContractManagers } from '../../hooks/useAllContractManagers';
+import { useContratosSemAta } from '../../hooks/useContratosSemAta';
 import { useLinkContractToItem } from '../../hooks/useLinkContractToItem';
 import { useLinkContractToItems } from '../../hooks/useLinkContractToItems';
 import { useContractItemQuantities } from '../../hooks/useContractItemQuantities';
@@ -13,9 +16,11 @@ import { useSyncContractItemQuantity } from '../../hooks/useSyncContractItemQuan
 import type { ContractDashboardRecord } from '../../types';
 import { formatCnpj } from '../../utils/format';
 import { displayContractNumber } from '../../utils/contractNumber';
+import { useDescartesAtaContrato } from '../../hooks/useDescartesAtaContrato';
 import { Modal, AlertCard, useToast } from '../../design-system';
 import {
   rankContractsBySuggestion,
+  aplicarRestricoesDeVinculo,
   ataLinkCoverage,
   type ContractSuggestionCriteria,
   type ContractSuggestionReason
@@ -108,6 +113,27 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   const [checkedOverrides, setCheckedOverrides] = useState<Record<string, boolean>>({});
   const itemQuantities = useContractItemQuantities(isAtaMode ? selectedContract : null);
 
+  // Regras de vínculo da CGLIC: um contrato pertence a uma só ata (o banco recusa vincular a outra) e o
+  // contrato marcado pelo coordenador como "não pertence a ata" sai das sugestões. Ao vincular, o contrato
+  // herda o gestor da ata (gatilho no banco, migration 69) — o passo 2 avisa.
+  const { data: todosVinculos = [] } = useArpItemContractLinks(isOpen);
+  const { data: semAta = {} } = useContratosSemAta();
+  const { data: ataManagers } = useAllAtaManagers();
+  const { data: contractManagers } = useAllContractManagers(cleanUasg);
+  const ataDeOutroVinculo = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const l of todosVinculos) {
+      if (l.ataKey !== numeroAta) map.set(l.contractKey.toUpperCase(), l.ataKey);
+    }
+    return map;
+  }, [todosVinculos, numeroAta]);
+  const { data: descartesAta = {} } = useDescartesAtaContrato();
+  const descartadosParaEstaAta = useMemo(() => {
+    const ataKey = `${numeroAta}-${(uasg || '').trim()}`;
+    return new Set(Object.values(descartesAta).filter((d) => d.ataKey === ataKey).map((d) => d.contractKey.toUpperCase()));
+  }, [descartesAta, numeroAta, uasg]);
+  const naoPertencemAAta = useMemo(() => new Set(Object.keys(semAta).map((k) => k.toUpperCase())), [semAta]);
+
   useEffect(() => {
     if (!isOpen || !initialContract) return;
     setSelectedContract(initialContract);
@@ -143,8 +169,13 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
       return numMatch || numFmtMatch || fornecedorMatch || cnpjMatch || anoMatch;
     });
 
-    return rankContractsBySuggestion(filtered, suggestionCriteria);
-  }, [officialContracts, searchTerm, existingLinkedContractKeys, selectedContract, isAtaMode, suggestionCriteria]);
+    return aplicarRestricoesDeVinculo(rankContractsBySuggestion(filtered, suggestionCriteria), {
+      contractKeyOf: (c) => c.id || `${c.uasg}-${c.numero}-${c.ano}`,
+      ataDeOutroVinculo,
+      naoPertencemAAta,
+      descartadosParaEstaAta
+    });
+  }, [officialContracts, searchTerm, existingLinkedContractKeys, selectedContract, isAtaMode, suggestionCriteria, ataDeOutroVinculo, naoPertencemAAta, descartadosParaEstaAta]);
 
   const isPending = linkMutation.isPending || linkItemsMutation.isPending;
 
@@ -162,6 +193,11 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     setCheckedOverrides({});
     onClose();
   };
+
+  // Contrato escolhido já vinculado a outra ata (ex.: veio pronto de uma sugestão): o banco recusaria o vínculo.
+  const ataBloqueandoSelecionado = selectedContract ? ataDeOutroVinculo.get(contractKeyOf(selectedContract).toUpperCase()) : undefined;
+  const gestorDaAta = ataManagers?.[numeroAta]?.gestorNome;
+  const gestorAtualDoContrato = selectedContract ? contractManagers?.[contractKeyOf(selectedContract)]?.gestorNome : undefined;
 
   const handleSelectContract = (contract: ContractDashboardRecord) => {
     setSelectedContract(contract);
@@ -366,17 +402,22 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto' }} className="link-contract-list">
-                  {filteredContracts.map(({ contract: c, reasons }) => (
+                  {filteredContracts.map(({ contract: c, reasons, vinculadoAOutraAta, naoPertenceAAta, descartadoParaEstaAta }) => (
                     <div
                       key={contractKeyOf(c)}
                       data-testid="link-contract-option"
-                      onClick={() => handleSelectContract(c)}
+                      aria-disabled={vinculadoAOutraAta ? true : undefined}
+                      title={vinculadoAOutraAta ? `Este contrato já está vinculado à ata ${vinculadoAOutraAta}. Um contrato pertence a uma só ata.` : undefined}
+                      onClick={() => {
+                        if (!vinculadoAOutraAta) handleSelectContract(c);
+                      }}
                       style={{
                         padding: '0.75rem 1rem',
-                        background: '#ffffff',
+                        background: vinculadoAOutraAta ? '#f8fafc' : '#ffffff',
                         border: reasons.length > 0 ? '1px solid #fde68a' : '1px solid #e2e8f0',
                         borderRadius: '8px',
-                        cursor: 'pointer',
+                        cursor: vinculadoAOutraAta ? 'not-allowed' : 'pointer',
+                        opacity: vinculadoAOutraAta ? 0.6 : 1,
                         transition: 'all 0.15s ease',
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -384,10 +425,12 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                         gap: '0.75rem'
                       }}
                       onMouseEnter={(e) => {
+                        if (vinculadoAOutraAta) return;
                         e.currentTarget.style.borderColor = '#0c326f';
                         e.currentTarget.style.backgroundColor = '#f8fafc';
                       }}
                       onMouseLeave={(e) => {
+                        if (vinculadoAOutraAta) return;
                         e.currentTarget.style.borderColor = reasons.length > 0 ? '#fde68a' : '#e2e8f0';
                         e.currentTarget.style.backgroundColor = '#ffffff';
                       }}
@@ -408,6 +451,27 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                               </span>
                             ) : null;
                           })()}
+                          {vinculadoAOutraAta && (
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
+                              Vinculado à ata {vinculadoAOutraAta}
+                            </span>
+                          )}
+                          {descartadoParaEstaAta && (
+                            <span
+                              title="O coordenador descartou esta ata para o contrato na Central de Distribuição. Se vincular, o descarte é desfeito."
+                              style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}
+                            >
+                              Descartado para esta ata
+                            </span>
+                          )}
+                          {naoPertenceAAta && (
+                            <span
+                              title="O coordenador marcou que este contrato não pertence a ata. Se vincular, a marcação é desfeita."
+                              style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}
+                            >
+                              Não pertence a ata
+                            </span>
+                          )}
                           {reasons.map((r) => (
                             <span
                               key={r}
@@ -481,6 +545,37 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Regra de vínculo: contrato de outra ata é recusado; vincular leva o gestor da ata para o contrato */}
+              {ataBloqueandoSelecionado ? (
+                <div style={{ marginBottom: '1rem' }} data-testid="link-contract-outra-ata">
+                  <AlertCard
+                    severity="CRITICA"
+                    title={`Este contrato já está vinculado à ata ${ataBloqueandoSelecionado}. Um contrato pertence a uma só ata; desvincule lá antes, se for o caso.`}
+                  />
+                </div>
+              ) : (
+                <p
+                  data-testid="link-contract-heranca"
+                  style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
+                >
+                  {gestorDaAta ? (
+                    <>
+                      Ao vincular, este contrato passa a ser gerido por <strong>{gestorDaAta}</strong>, gestor da ata.
+                      {gestorAtualDoContrato && gestorAtualDoContrato !== gestorDaAta && (
+                        <> Hoje ele está com <strong>{gestorAtualDoContrato}</strong>; o coordenador será avisado da mudança.</>
+                      )}
+                    </>
+                  ) : gestorAtualDoContrato ? (
+                    <>
+                      A ata ainda não tem gestor: ao vincular, ela passa a ser de <strong>{gestorAtualDoContrato}</strong>, gestor deste contrato,
+                      e os outros contratos da ata acompanham. O coordenador será avisado.
+                    </>
+                  ) : (
+                    <>A ata e o contrato ainda não têm gestor: eles recebem o gestor quando o coordenador atribuir a ata.</>
+                  )}
+                </p>
+              )}
 
               {/* Item fixo (modo Item) */}
               {!isAtaMode && (
@@ -594,7 +689,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isPending || (isAtaMode && checkedItems.length === 0)}
+                  disabled={isPending || Boolean(ataBloqueandoSelecionado) || (isAtaMode && checkedItems.length === 0)}
                   style={{
                     padding: '0.5rem 1.25rem',
                     fontSize: '0.85rem',

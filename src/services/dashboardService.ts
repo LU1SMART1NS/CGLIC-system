@@ -13,7 +13,7 @@
  * 3. Funções puras para cálculos em memória e orquestração assíncrona paralela (Promise.all).
  */
 
-import { formatContractNumber } from '../utils/contractNumber';
+import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
 import type {
   ContractDashboardRecord,
   ArpRecord,
@@ -433,7 +433,7 @@ export function calculateAttentionSummary(params: {
         title: isAtrasoCgofi
           ? `Aguardando CGOFI há ${cycle.prazos?.diasSemRespostaCgofi} dias úteis (${docSei})`
           : `Fatura ${isVencido ? 'Vencida' : 'com Vencimento Crítico'} (${docSei})`,
-        description: `Contrato ${cycle.contractKey} — Competência ${cycle.competencia || 'N/D'} (${valorFmt})`,
+        description: `Contrato ${formatContractKey(cycle.contractKey)} — Competência ${cycle.competencia || 'N/D'} (${valorFmt})`,
         contractKey: cycle.contractKey,
         cycleKey: cycle.cycleKey,
         diasRelevantes: cycle.prazos?.diasUteisAteVencimento,
@@ -462,7 +462,7 @@ export function calculateAttentionSummary(params: {
       category: 'PAGAMENTO_CRITICO',
       severity: atrasada ? 'URGENTE' : 'ATENCAO',
       title: `${acao} (${docSei}): ${atrasada ? `atrasada há ${abs} ${unidade}` : dias === 0 ? 'prazo é hoje' : `prazo em ${abs} ${unidade}`}`,
-      description: `Contrato ${cycle.contractKey} — prazo da etapa ${etapa.dataAlvo.split('-').reverse().join('/')}`,
+      description: `Contrato ${formatContractKey(cycle.contractKey)} — prazo da etapa ${etapa.dataAlvo.split('-').reverse().join('/')}`,
       contractKey: cycle.contractKey,
       cycleKey: cycle.cycleKey,
       diasRelevantes: dias,

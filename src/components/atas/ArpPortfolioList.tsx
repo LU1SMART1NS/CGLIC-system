@@ -17,7 +17,7 @@ import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
-import { ManagerCell, type ManagerAssignContext } from '../carteira/ManagerAssign';
+import { ManagerCell } from '../carteira/ManagerAssign';
 import { CarteiraNivelPill } from '../carteira/CarteiraNivelPill';
 import { TODAS_UNIDADES } from '../carteira/CarteiraExecucaoSelects';
 import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
@@ -48,9 +48,8 @@ interface ArpPortfolioListProps {
   onExpandAta?: (arp: ArpRecord) => void;
   onResetFilters: () => void;
   pageSize?: number;
-  /** Atribuição de gestor na própria carteira (admin e gestor). */
+  /** Coordenador: "Sem gestor" vira atalho para a Central de Distribuição (a atribuição é feita só lá). */
   canAssign?: boolean;
-  assignContext?: ManagerAssignContext;
   /** Clique num valor da célula aplica o filtro correspondente (prazo → situação, fornecedor → busca). */
   onFilter?: <K extends keyof ArpPortfolioFilterState>(key: K, value: ArpPortfolioFilterState[K]) => void;
 }
@@ -91,7 +90,6 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   onResetFilters,
   pageSize = 15,
   canAssign = false,
-  assignContext = { links: [] },
   onFilter
 }) => {
   const navigate = useNavigateWithOrigin();
@@ -289,14 +287,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                       </td>
                     )}
                     <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <ManagerCell
-                        target={{ tipo: 'ATA', ataKey: numeroAta }}
-                        gestorNome={gestor}
-                        canAssign={canAssign}
-                        testId={`arp-manager-${numeroAta}`}
-                        links={assignContext.links}
-                        contractsByKey={assignContext.contractsByKey}
-                      />
+                      <ManagerCell gestorNome={gestor} canAssign={canAssign} testId={`arp-manager-${numeroAta}`} />
                     </td>
                   </tr>
 

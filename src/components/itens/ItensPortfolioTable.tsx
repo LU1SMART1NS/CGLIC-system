@@ -13,6 +13,7 @@ import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import { situacaoDaFaixa } from '../carteira/carteiraPrazo';
+import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import type { ItensPortfolioFilterState } from './ItensPortfolioFilters';
@@ -154,7 +155,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                         title={`Ver saldo · valor unitário ${formatCurrencyOrDash(item.valorUnitario)}`}
                         testId={`itens-saldo-${row.key}`}
                       >
-                        Item {item.numeroItem}
+                        {item.numeroItem}
                       </CarteiraIdLink>
                       <span style={subtle}>·</span>
                       <CarteiraCellFilter descricao={`ata ${arp.numeroAtaRegistroPreco}`} onFilter={onFilter && (() => onFilter('busca', arp.numeroAtaRegistroPreco))}>
@@ -164,18 +165,8 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                       </CarteiraCellFilter>
                     </div>
                     <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp(2) }}>
-                      {item.descricaoItem}
+                      {toSentenceCaseIfAllCaps(item.descricaoItem)}
                     </div>
-                    {item.nomeRazaoSocialFornecedor && (
-                      <CarteiraCellFilter
-                        descricao={`fornecedor ${item.nomeRazaoSocialFornecedor}`}
-                        onFilter={onFilter ? () => onFilter('busca', item.nomeRazaoSocialFornecedor) : undefined}
-                      >
-                        <div title={item.nomeRazaoSocialFornecedor} style={{ ...subtle, marginTop: '0.15rem', ...clamp(1) }}>
-                          {item.nomeRazaoSocialFornecedor}
-                        </div>
-                      </CarteiraCellFilter>
-                    )}
                   </td>
                   <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                     <CarteiraCellFilter
