@@ -1,23 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 import { callerHasPermission } from "../_shared/authorization.ts";
-
-export type DbRole = 'admin' | 'gestor' | 'leitor' | 'gestor_saldos';
-
-const PERFIL_TO_DB_ROLE: Readonly<Record<string, DbRole>> = Object.freeze({
-  coordenador: 'admin',
-  gestor: 'gestor',
-  consulta: 'leitor',
-  // Fase 3A: perfil funcional novo (public.roles.id = 'gestor_saldos').
-  gestor_saldos: 'gestor_saldos',
-});
-
-export function mapPerfilToDbRole(perfil: unknown): DbRole | null {
-  if (typeof perfil !== 'string') return null;
-  const key = perfil.trim();
-  if (!key) return null;
-  return PERFIL_TO_DB_ROLE[key] ?? null;
-}
+import { mapPerfilToDbRole } from "../_shared/roleMapping.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
