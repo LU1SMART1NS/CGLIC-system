@@ -7,6 +7,7 @@ import {
   AuthAlert, AuthLayout, AuthLoading, AuthSpinner, MIN_PASSWORD_LENGTH,
   PasswordChecklist, PasswordInput, traduzirErroAuth
 } from './AuthLayout';
+import { ActionButton, AppButton } from '../../design-system';
 
 interface NewPasswordScreenProps {
   title: string;
@@ -51,12 +52,10 @@ export const NewPasswordScreen: React.FC<NewPasswordScreenProps> = ({
           <div className="auth-state__icon auth-state__icon--warn"><LinkIcon size={22} /></div>
           <h1 className="auth-title">Link inválido ou expirado</h1>
           <p className="auth-subtitle">{invalidText}</p>
-          <button type="button" className="auth-btn" onClick={() => navigate('/login?recuperar')}>
+          <AppButton type="button" size="lg" fullWidth onClick={() => navigate('/login?recuperar')}>
             Solicitar novo link
-          </button>
-          <button type="button" className="auth-link" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/login')}>
-            Voltar para o login
-          </button>
+          </AppButton>
+          <ActionButton action="voltar" label="Voltar para o login" type="button" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/login')} />
         </div>
       </AuthLayout>
     );
@@ -112,9 +111,9 @@ export const NewPasswordScreen: React.FC<NewPasswordScreenProps> = ({
           {autoRedirect ? (
             <span className="auth-hint" style={{ justifyContent: 'center' }}><AuthSpinner /> Abrindo o sistema…</span>
           ) : (
-            <button type="button" className="auth-btn" onClick={() => navigate('/')}>
+            <AppButton type="button" size="lg" fullWidth onClick={() => navigate('/')}>
               Acessar o sistema <ArrowRight size={16} />
-            </button>
+            </AppButton>
           )}
         </div>
       </AuthLayout>
@@ -162,9 +161,9 @@ export const NewPasswordScreen: React.FC<NewPasswordScreenProps> = ({
 
         <PasswordChecklist password={password} confirm={confirmPassword} />
 
-        <button type="submit" className="auth-btn" disabled={isSubmitting}>
-          {isSubmitting ? <><AuthSpinner /> Salvando…</> : submitLabel}
-        </button>
+        <AppButton type="submit" size="lg" fullWidth isLoading={isSubmitting}>
+          {isSubmitting ? 'Salvando…' : submitLabel}
+        </AppButton>
       </form>
     </AuthLayout>
   );

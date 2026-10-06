@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { FileSpreadsheet, ListChecks } from 'lucide-react';
+import { ListChecks } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
-import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
@@ -139,12 +139,10 @@ export const ItensPortfolio: React.FC = () => {
       <PageHeader
         title="Carteira de Itens"
         subtitle="Itens de todas as atas, com alocação por unidade interna e empenho."
-        icon={<ListChecks size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<ListChecks size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
-            <AppButton variant="outline" icon={<FileSpreadsheet size={14} />} onClick={() => setIsExportOpen(true)} data-testid="itens-export-btn">
-              Exportar Relatório
-            </AppButton>
+            <ActionButton action="exportar" label="Exportar Relatório" onClick={() => setIsExportOpen(true)} data-testid="itens-export-btn" />
           </>
         }
       />
@@ -171,7 +169,7 @@ export const ItensPortfolio: React.FC = () => {
           {resumoUnidade && (
             <div
               data-testid="itens-faixa-unidade"
-              style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem 2rem', alignItems: 'center', background: '#e0e7f5', border: '1px solid #0c326f', borderRadius: '10px', padding: '0.75rem 1rem' }}
+              style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem 2rem', alignItems: 'center', background: '#e0e7f5', border: '1px solid var(--primary)', borderRadius: '10px', padding: '0.75rem 1rem' }}
             >
               <div>
                 <div style={{ fontWeight: 800, color: '#0f172a' }}>{unidadeNome ?? filters.unidade}</div>

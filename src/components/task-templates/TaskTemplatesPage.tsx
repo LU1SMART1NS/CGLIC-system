@@ -2,11 +2,6 @@ import React, { useState } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import {
   Plus,
-  Trash2,
-  Edit2,
-  Check,
-  ChevronDown,
-  ChevronUp,
   ClipboardList,
   AlertCircle,
   Layers,
@@ -17,7 +12,7 @@ import { AppCard } from '../../design-system/components/AppCard';
 import { AppButton } from '../../design-system/components/AppButton';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { Modal } from '../../design-system/components/Modal';
-import { IconButton } from '../../design-system/components/IconButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
@@ -74,13 +69,14 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
     <>
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '0.75rem', background: '#ffffff', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem', background: '#f8fafc', borderBottom: open ? '1px solid #e2e8f0' : 'none' }}>
-        <button
+        <ActionButton
+          action={open ? 'recolher' : 'expandir'}
+          iconOnly
           type="button"
           onClick={() => setOpen(!open)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0c326f', padding: '2px' }}
-        >
-          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
+          label={open ? 'Recolher macrotarefa' : 'Expandir macrotarefa'}
+          expanded={open}
+        />
 
         {editingMacroNome !== null ? (
           <>
@@ -91,31 +87,30 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
               style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.85rem', padding: '0.3rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
               autoFocus
             />
-            <button
+            <ActionButton
+              action="salvar"
+              iconOnly
               type="button"
               onClick={handleRenameMacro}
-              style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer' }}
-              title="Salvar"
-            >
-              <Check size={16} />
-            </button>
+            />
           </>
         ) : (
           <>
-            <Layers size={15} color="#0c326f" />
+            <Layers size={15} color="var(--primary)" />
             <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>{macro.nome}</span>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
               {macro.tarefas.length} tarefa{macro.tarefas.length !== 1 ? 's' : ''}
             </span>
-            <button
+            <ActionButton
+              action="renomear"
+              iconOnly
               type="button"
               onClick={() => setEditingMacroNome(macro.nome)}
-              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}
-              title="Renomear macrotarefa"
-            >
-              <Edit2 size={14} />
-            </button>
-            <button
+              label="Renomear macrotarefa"
+            />
+            <ActionButton
+              action="excluir"
+              iconOnly
               type="button"
               onClick={async () => {
                 const ok = await confirm({
@@ -129,17 +124,14 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                   onError: err => toast.error(`Erro ao excluir macrotarefa: ${err.message || 'Erro desconhecido'}`)
                 });
               }}
-              style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '2px' }}
-              title="Excluir macrotarefa"
-            >
-              <Trash2 size={14} />
-            </button>
+              label="Excluir macrotarefa"
+            />
           </>
         )}
       </div>
 
       {saveMacrotask.isError && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.85rem', background: '#fef2f2', color: '#dc2626', fontSize: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.85rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', fontSize: '0.75rem' }}>
           <AlertCircle size={13} />
           <span>{saveMacrotask.error?.message || 'Erro ao atualizar macrotarefa.'}</span>
         </div>
@@ -169,7 +161,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', width: '20px' }}>
                     {idx + 1}.
                   </span>
-                  <CheckSquare size={13} color="#0c326f" />
+                  <CheckSquare size={13} color="var(--primary)" />
                   {editingTaskId === task.id ? (
                     <>
                       <input
@@ -183,34 +175,33 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                         autoFocus
                         style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', padding: '0.25rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
                       />
-                      <button
+                      <ActionButton
+                        action="salvar"
+                        iconOnly
                         type="button"
                         onClick={() => handleRenameTask(task)}
                         disabled={saveTask.isPending}
-                        style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', padding: '2px' }}
-                        title="Salvar"
-                      >
-                        <Check size={14} />
-                      </button>
+                      />
                     </>
                   ) : (
                     <>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
-                      <button
+                      <ActionButton
+                        action="renomear"
+                        iconOnly
                         type="button"
                         onClick={() => {
                           saveTask.reset();
                           setEditingTaskNome(task.nome);
                           setEditingTaskId(task.id);
                         }}
-                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}
-                        title="Renomear tarefa"
-                      >
-                        <Edit2 size={13} />
-                      </button>
+                        label="Renomear tarefa"
+                      />
                     </>
                   )}
-                  <button
+                  <ActionButton
+                    action="excluir"
+                    iconOnly
                     type="button"
                     onClick={async () => {
                       const ok = await confirm({
@@ -224,11 +215,8 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                         onError: err => toast.error(`Erro ao excluir tarefa: ${err.message || 'Erro desconhecido'}`)
                       });
                     }}
-                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '2px' }}
-                    title="Excluir tarefa"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                    label="Excluir tarefa"
+                  />
                 </div>
               ))}
             </div>
@@ -246,21 +234,18 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
               onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); }}
               style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.8rem', padding: '0.4rem 0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
             />
-            <AppButton
+            <ActionButton
+              action="adicionar"
               type="button"
-              variant="secondary"
               size="sm"
-              icon={<Plus size={13} />}
               onClick={handleAddTask}
               disabled={!newTaskNome.trim() || saveTask.isPending}
               isLoading={saveTask.isPending}
-            >
-              Adicionar
-            </AppButton>
+            />
           </div>
 
           {saveTask.isError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: '#dc2626', fontSize: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: 'var(--color-danger)', fontSize: '0.75rem' }}>
               <AlertCircle size={13} />
               <span>{saveTask.error?.message || 'Erro ao adicionar tarefa.'}</span>
             </div>
@@ -311,9 +296,7 @@ const TemplateFormModal: React.FC<{
       title={template ? 'Editar modelo' : copy.createLabel}
       footer={
         <>
-          <AppButton type="button" variant="outline" onClick={onClose} disabled={saveTemplate.isPending}>
-            Cancelar
-          </AppButton>
+          <ActionButton action="cancelar" type="button" onClick={onClose} disabled={saveTemplate.isPending} />
           <AppButton type="submit" form="template-form" disabled={!nome.trim() || saveTemplate.isPending} isLoading={saveTemplate.isPending}>
             {template ? 'Salvar alterações' : 'Criar modelo'}
           </AppButton>
@@ -342,7 +325,7 @@ const TemplateFormModal: React.FC<{
           }}
         />
         {saveTemplate.isError && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', fontSize: '0.82rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', borderRadius: '6px', fontSize: '0.82rem' }}>
             <AlertCircle size={16} /> {saveTemplate.error?.message || 'Falha ao salvar modelo.'}
           </div>
         )}
@@ -378,16 +361,17 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
 
   return (
     <>
-    <AppCard style={{ borderLeft: template.ativo ? '4px solid #0c326f' : '4px solid #94a3b8' }}>
+    <AppCard style={{ borderLeft: template.ativo ? '4px solid var(--primary)' : '4px solid #94a3b8' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '240px' }}>
-          <button
+          <ActionButton
+            action={expanded ? 'recolher' : 'expandir'}
+            iconOnly
             type="button"
             onClick={() => setExpanded(!expanded)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0c326f', padding: '2px' }}
-          >
-            {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </button>
+            label={expanded ? 'Recolher modelo' : 'Expandir modelo'}
+            expanded={expanded}
+          />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -410,27 +394,25 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <ActionButton
+            action="editar"
+            type="button"
+            size="sm"
+            onClick={() => setEditing(true)}
+            title="Editar nome e descrição"
+          />
           <AppButton
             type="button"
             variant="outline"
-            size="sm"
-            icon={<Edit2 size={14} />}
-            onClick={() => setEditing(true)}
-            title="Editar nome e descrição"
-          >
-            Editar
-          </AppButton>
-          <AppButton
-            type="button"
-            variant="secondary"
             size="sm"
             onClick={handleToggleAtivo}
           >
             {template.ativo ? 'Desativar' : 'Ativar'}
           </AppButton>
-          <IconButton
+          <ActionButton
+            action="excluir"
+            iconOnly
             label={`Excluir modelo ${template.nome}`}
-            icon={<Trash2 size={16} />}
             onClick={async () => {
               const ok = await confirm({
                 title: 'Excluir modelo',
@@ -443,7 +425,6 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
                 onError: err => toast.error(`Erro ao excluir modelo: ${err.message || 'Erro desconhecido'}`)
               });
             }}
-            style={{ color: '#dc2626' }}
           />
         </div>
       </div>
@@ -489,7 +470,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
           </div>
 
           {saveMacrotask.isError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: '#dc2626', fontSize: '0.78rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: 'var(--color-danger)', fontSize: '0.78rem' }}>
               <AlertCircle size={14} />
               <span>{saveMacrotask.error?.message || 'Erro ao adicionar macrotarefa.'}</span>
             </div>
@@ -519,12 +500,12 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
         <PageHeader
           title={copy.title}
           subtitle={copy.subtitle}
-          icon={<Sliders size={26} color="#0c326f" aria-hidden="true" />}
+          icon={<Sliders size={26} color="var(--primary)" aria-hidden="true" />}
         />
       )}
 
       {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', fontSize: '0.82rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', borderRadius: '6px', fontSize: '0.82rem' }}>
           <AlertCircle size={16} /> Falha ao carregar templates oficiais.
         </div>
       )}
@@ -538,16 +519,14 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
             </h2>
             <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{copy.activeHint}</span>
           </div>
-          <AppButton icon={<Plus size={15} />} onClick={() => setCreating(true)} data-testid="template-new">
-            Novo modelo
-          </AppButton>
+          <ActionButton action="novo" label="Novo modelo" onClick={() => setCreating(true)} data-testid="template-new" />
         </div>
 
         {isLoading ? (
           <SkeletonLoader count={3} height="120px" />
         ) : templates.length === 0 ? (
           <EmptyState
-            icon={<ClipboardList size={36} color="#0c326f" />}
+            icon={<ClipboardList size={36} color="var(--primary)" />}
             title="Nenhum modelo cadastrado"
             description={copy.emptyDescription}
           />

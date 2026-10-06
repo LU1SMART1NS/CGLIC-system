@@ -62,9 +62,9 @@ export function getOficialidadeInfo(event: ContractEvent): {
     return {
       level: 'PROPOSTA_ADMINISTRATIVA',
       label: 'Proposta administrativa',
-      bg: '#fffbeb',
-      color: '#b45309',
-      border: '#fde68a',
+      bg: 'var(--color-warning-bg)',
+      color: 'var(--color-warning-text)',
+      border: 'var(--color-warning-border)',
       icon: FileQuestion
     };
   }
@@ -79,9 +79,9 @@ export function getOficialidadeInfo(event: ContractEvent): {
     return {
       level: 'FATO_OFICIAL',
       label: 'Fato oficial',
-      bg: '#eff6ff',
-      color: '#1d4ed8',
-      border: '#bfdbfe',
+      bg: 'var(--color-info-bg)',
+      color: 'var(--color-info-text)',
+      border: 'var(--color-info-border)',
       icon: CheckCircle2
     };
   }
@@ -118,23 +118,23 @@ export function getEventTypeDisplay(tipo: ContractEventType): {
 } {
   switch (tipo) {
     case 'CELEBRACAO':
-      return { label: 'Celebração Inicial', icon: FileSignature, color: '#0c326f', dotColor: '#0c326f' };
+      return { label: 'Celebração Inicial', icon: FileSignature, color: 'var(--primary)', dotColor: 'var(--primary)' };
     case 'PRORROGACAO':
-      return { label: 'Prorrogação de Vigência', icon: Clock, color: '#0284c7', dotColor: '#0284c7' };
+      return { label: 'Prorrogação de Vigência', icon: Clock, color: 'var(--color-info-text)', dotColor: 'var(--color-info-solid)' };
     case 'REAJUSTE':
-      return { label: 'Reajuste Contratual', icon: TrendingUp, color: '#059669', dotColor: '#059669' };
+      return { label: 'Reajuste Contratual', icon: TrendingUp, color: 'var(--color-success)', dotColor: 'var(--color-success)' };
     case 'REPACTUACAO':
       return { label: 'Repactuação Salarial', icon: Layers, color: '#7c3aed', dotColor: '#7c3aed' };
     case 'ACRESCIMO':
       return { label: 'Acréscimo de Valor/Qtd', icon: TrendingUp, color: '#0d9488', dotColor: '#0d9488' };
     case 'SUPRESSAO':
-      return { label: 'Supressão de Valor/Qtd', icon: TrendingDown, color: '#d97706', dotColor: '#d97706' };
+      return { label: 'Supressão de Valor/Qtd', icon: TrendingDown, color: 'var(--color-warning)', dotColor: 'var(--color-warning)' };
     case 'APOSTILAMENTO':
       return { label: 'Apostilamento', icon: FileSpreadsheet, color: '#475569', dotColor: '#475569' };
     case 'ENCERRAMENTO':
-      return { label: 'Encerramento Contratual', icon: FileCheck2, color: '#16a34a', dotColor: '#16a34a' };
+      return { label: 'Encerramento Contratual', icon: FileCheck2, color: 'var(--color-success-solid)', dotColor: 'var(--color-success-solid)' };
     case 'RESCISAO':
-      return { label: 'Rescisão Contratual', icon: FileX2, color: '#dc2626', dotColor: '#dc2626' };
+      return { label: 'Rescisão Contratual', icon: FileX2, color: 'var(--color-danger)', dotColor: 'var(--color-danger)' };
     default:
       return { label: 'Evento Contratual', icon: FileText, color: '#64748b', dotColor: '#64748b' };
   }
@@ -173,15 +173,15 @@ export function getImpactoDisplay(impacto: ContractEventImpact): {
 } {
   switch (impacto) {
     case 'ALTERA_VIGENCIA':
-      return { label: 'Altera Vigência', bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd' };
+      return { label: 'Altera Vigência', bg: 'var(--color-info-bg)', color: 'var(--color-info-text)', border: 'var(--color-info-border)' };
     case 'ALTERA_VALOR':
-      return { label: 'Altera Valor', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
+      return { label: 'Altera Valor', bg: 'var(--color-success-bg)', color: 'var(--color-success-text)', border: 'var(--color-success-border)' };
     case 'ALTERA_QUANTITATIVO':
       return { label: 'Altera Quantitativo', bg: '#fdf4ff', color: '#86198f', border: '#f5d0fe' };
     case 'ATUALIZA_DADOS':
       return { label: 'Atualiza Dados', bg: '#f8fafc', color: '#334155', border: '#cbd5e1' };
     case 'EXTINGUE_CONTRATO':
-      return { label: 'Extingue Contrato', bg: '#fef2f2', color: '#991b1b', border: '#fecaca' };
+      return { label: 'Extingue Contrato', bg: 'var(--color-danger-bg)', color: 'var(--color-danger-text-strong)', border: 'var(--color-danger-border)' };
     case 'SEM_IMPACTO_FINANCEIRO_TEMPORAL':
     default:
       return { label: 'Sem Impacto Financeiro/Temporal', bg: '#f1f5f9', color: '#475569', border: '#e2e8f0' };
@@ -549,9 +549,9 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                                 gap: '4px',
                                 fontSize: '0.75rem',
                                 fontWeight: 700,
-                                color: '#0c326f',
-                                backgroundColor: '#eff6ff',
-                                border: '1px solid #bfdbfe',
+                                color: 'var(--primary)',
+                                backgroundColor: 'var(--color-info-bg)',
+                                border: '1px solid var(--color-info-border)',
                                 padding: '0.2rem 0.55rem',
                                 borderRadius: '4px',
                                 textDecoration: 'none'
@@ -612,11 +612,11 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                           {evoItem && evoItem.impactoMonetario && (
                             <span
                               style={{
-                                color: evoItem.deltaValor > 0 ? '#15803d' : '#b91c1c',
-                                backgroundColor: evoItem.deltaValor > 0 ? '#f0fdf4' : '#fef2f2',
+                                color: evoItem.deltaValor > 0 ? 'var(--color-success-text)' : 'var(--color-danger-text)',
+                                backgroundColor: evoItem.deltaValor > 0 ? 'var(--color-success-bg)' : 'var(--color-danger-bg)',
                                 padding: '0.15rem 0.45rem',
                                 borderRadius: '4px',
-                                border: `1px solid ${evoItem.deltaValor > 0 ? '#bbf7d0' : '#fecaca'}`,
+                                border: `1px solid ${evoItem.deltaValor > 0 ? 'var(--color-success-border)' : 'var(--color-danger-border)'}`,
                                 fontWeight: 800
                               }}
                             >
@@ -626,14 +626,14 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
 
                           {/* Impacto em Valor Formal (se houver) */}
                           {typeof event.valorPosterior === 'number' && event.valorPosterior > 0 && (
-                            <span style={{ color: '#166534', backgroundColor: '#f0fdf4', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                            <span style={{ color: 'var(--color-success-text-strong)', backgroundColor: 'var(--color-success-bg)', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid var(--color-success-border)' }}>
                               <strong>Valor Formal:</strong> {formatCurrencyBRL(event.valorPosterior)}
                             </span>
                           )}
 
                           {/* Impacto em Vigência (se houver) */}
                           {event.vigenciaPosterior && (
-                            <span style={{ color: '#0369a1', backgroundColor: '#f0f9ff', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #bae6fd' }}>
+                            <span style={{ color: 'var(--color-info-text)', backgroundColor: 'var(--color-info-bg)', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid var(--color-info-border)' }}>
                               <strong>Nova Vigência:</strong> {formatDateBR(event.vigenciaPosterior)}
                             </span>
                           )}

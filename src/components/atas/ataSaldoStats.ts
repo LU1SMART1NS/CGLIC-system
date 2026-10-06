@@ -47,7 +47,7 @@ export function buildAtaSaldoStats(saldos: Array<any> = []): Record<string, AtaS
 export function saldoBarColor(pct: number | null): string {
   if (pct === null) return '#cbd5e1';
   const { isCritico, isProximoLimite } = classifyArpItemSaldo(pct);
-  if (isCritico) return '#dc2626';
-  if (isProximoLimite) return '#d97706';
-  return '#16a34a';
+  if (isCritico) return 'var(--color-danger)';
+  if (isProximoLimite) return 'var(--color-warning)';
+  return 'var(--color-success-solid)';
 }

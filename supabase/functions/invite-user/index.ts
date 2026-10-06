@@ -115,6 +115,14 @@ serve(async (req) => {
 
     const redirectTo = redirectResolution.redirectTo;
 
+    const jsonError = (message: string, status: number) =>
+      new Response(
+        JSON.stringify({ error: message }),
+        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+
+    let invitedUserId: string;
+
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       cleanEmail,
       {
@@ -127,13 +135,36 @@ serve(async (req) => {
     );
 
     if (inviteError) {
-      return new Response(
-        JSON.stringify({ error: inviteError.message }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      // Reenvio: o usuário já existe no Auth. Se ainda não ativou a conta (convite
+      // pendente), reenviamos o link por e-mail de definição de senha; se já ativou, bloqueia.
+      if (!/already.*registered/i.test(inviteError.message)) {
+        return jsonError(inviteError.message, 400);
+      }
 
-    const invitedUserId = inviteData.user.id;
+      let existing: { id: string; email_confirmed_at?: string | null; last_sign_in_at?: string | null } | undefined;
+      for (let page = 1; page <= 20 && !existing; page++) {
+        const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (listError) return jsonError(listError.message, 400);
+        existing = list.users.find((u) => u.email?.toLowerCase() === cleanEmail);
+        if (list.users.length < 1000) break;
+      }
+
+      if (!existing) return jsonError(inviteError.message, 400);
+      if (existing.last_sign_in_at) {
+        return jsonError("Este usuário já ativou a conta. Use \"Redefinir senha\" se ele esqueceu a senha.", 409);
+      }
+
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+      if (!anonKey) return jsonError("Configuração do servidor incompleta (SUPABASE_ANON_KEY ausente)", 500);
+
+      const supabaseAnon = createClient(supabaseUrl, anonKey);
+      const { error: resendError } = await supabaseAnon.auth.resetPasswordForEmail(cleanEmail, { redirectTo });
+      if (resendError) return jsonError(resendError.message, 400);
+
+      invitedUserId = existing.id;
+    } else {
+      invitedUserId = inviteData.user.id;
+    }
 
     // Vincula ao RBAC oficial existente. Fail-closed (Fase 0.1): se o
     // perfil não tem mapeamento explícito, NENHUMA role é concedida — o

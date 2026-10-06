@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { AtaCardSkeleton } from '../cards/AtaCardSkeleton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { buildAtaKey } from '../../hooks/useAta';
@@ -11,7 +11,9 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
+import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
@@ -207,19 +209,19 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                 <React.Fragment key={card.key}>
                   <tr data-testid={`arp-row-${numeroAta}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirAta)}>
                     <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
-                      <button
+                      <ActionButton
+                        action={isExpanded ? 'recolher' : 'expandir'}
+                        iconOnly
                         type="button"
+                        size="xs"
                         onClick={() => {
                           if (!isExpanded) onExpandAta?.(arp);
                           setOverrides((prev) => ({ ...prev, [card.key]: !isExpanded }));
                         }}
-                        aria-expanded={isExpanded}
-                        aria-label={isExpanded ? 'Recolher itens da ata' : 'Expandir itens da ata'}
+                        expanded={isExpanded}
+                        label={isExpanded ? 'Recolher itens da ata' : 'Expandir itens da ata'}
                         data-testid={`arp-expand-${numeroAta}`}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.2rem' }}
-                      >
-                        {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                      </button>
+                      />
                     </td>
                     <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
@@ -231,7 +233,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                           descricao={`fornecedor ${card.fornecedorNome}`}
                           onFilter={onFilter ? () => onFilter('busca', card.fornecedorNome) : undefined}
                         >
-                          <div title={card.fornecedorNome} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.fornecedorNome}</div>
+                          <div title={card.fornecedorNome} style={carteiraSubtitle}>{card.fornecedorNome}</div>
                         </CarteiraCellFilter>
                       )}
                       </div>
@@ -250,7 +252,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     <td data-label="Itens" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 700 }}>{totalItens} {totalItens === 1 ? 'item' : 'itens'}</div>
                       {stats && (stats.criticos > 0 || stats.atencao > 0) ? (
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: stats.criticos > 0 ? '#b91c1c' : '#b45309' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: stats.criticos > 0 ? 'var(--color-danger-text)' : 'var(--color-warning-text)' }}>
                           {[
                             stats.criticos > 0 ? `${stats.criticos} ${stats.criticos === 1 ? 'crítico' : 'críticos'}` : null,
                             stats.atencao > 0 ? `${stats.atencao} em atenção` : null
@@ -311,18 +313,19 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                                 <span title={item.descricaoItem} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.descricaoItem}</span>
                                 <span>{formatCurrencyOrDash(item.valorUnitario)}</span>
                                 <SaldoBar pct={pctOf(item)} />
-                                <button
+                                <AppButton
                                   type="button"
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() => onSelectItem(arp, item)}
                                   data-testid={`arp-item-${numeroAta}-${item.numeroItem}`}
-                                  style={carteiraButton}
                                 >
                                   Ver saldo <ArrowRight size={13} />
-                                </button>
+                                </AppButton>
                               </div>
                             ))}
                             {hiddenCount > 0 && (
-                              <div style={{ fontSize: '0.76rem', color: '#0c326f', fontWeight: 700, paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+                              <div style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700, paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
                                 + {hiddenCount} {hiddenCount === 1 ? 'item' : 'itens'} · veja todos nos detalhes da ata
                               </div>
                             )}

@@ -20,21 +20,6 @@ export const carteiraTd: React.CSSProperties = {
   verticalAlign: 'middle'
 };
 
-export const carteiraButton: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.3rem',
-  padding: '0.4rem 0.75rem',
-  background: '#ffffff',
-  border: '1px solid #cbd5e1',
-  borderRadius: '6px',
-  fontSize: '0.76rem',
-  fontWeight: 700,
-  color: '#0c326f',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap'
-};
-
 export const carteiraTableShell: React.CSSProperties = {
   background: '#ffffff',
   border: '1px solid #e2e8f0',
@@ -54,4 +39,15 @@ export const carteiraSelect: React.CSSProperties = {
   color: '#0f172a',
   fontWeight: 600,
   cursor: 'pointer'
+};
+
+/** Segunda linha da célula de identificação (fornecedor/objeto), limitada a 2 linhas: igual em todas as carteiras. */
+export const carteiraSubtitle: React.CSSProperties = {
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  color: '#475569',
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden'
 };

@@ -225,6 +225,6 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
     );
 
     expect(html).toContain('Nenhuma Ata corresponde aos filtros aplicados.');
-    expect(html).toContain('Limpar Filtros');
+    expect(html).toContain('Limpar filtros');
   });
 });

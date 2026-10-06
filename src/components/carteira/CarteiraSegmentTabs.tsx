@@ -48,7 +48,7 @@ export function CarteiraSegmentTabs<T extends string>({ segments, active, onSele
               marginBottom: '-1px',
               background: 'none',
               border: 'none',
-              borderBottom: `2px solid ${on ? '#0c326f' : 'transparent'}`,
+              borderBottom: `2px solid ${on ? 'var(--primary)' : 'transparent'}`,
               color: on ? '#0f172a' : '#64748b',
               fontSize: '0.84rem',
               fontWeight: 700,

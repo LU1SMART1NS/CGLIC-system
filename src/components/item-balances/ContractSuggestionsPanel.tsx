@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Sparkles, RotateCcw, X, Link2 } from 'lucide-react';
-import { AppButton, StatusBadge, SectionHeader, DataTable, type Column } from '../../design-system';
+import { Sparkles } from 'lucide-react';
+import { ActionButton, AppButton, StatusBadge, SectionHeader, DataTable, type Column } from '../../design-system';
 import { formatCnpj } from '../../utils/format';
 import { formatNumber } from './itemBalanceUtils';
 import { formatNumeroContrato, displayContractNumber } from '../../utils/contractNumber';
@@ -49,16 +49,19 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
     {
       key: 'numero',
       header: 'Número do contrato',
-      render: (s) => <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: '#0c326f' }}>{displayNumero(s)}</span>
+      sortValue: (s) => displayNumero(s),
+      render: (s) => <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: 'var(--primary)' }}>{displayNumero(s)}</span>
     },
     {
       key: 'unidade',
       header: 'Unidade',
+      sortValue: (s) => (s.linkable ? (s.contract?.uasg || s.pncp?.uasg || s.contractKey.split('-')[0]) : null),
       render: (s) => (s.linkable ? (s.contract?.uasg || s.pncp?.uasg || s.contractKey.split('-')[0] || '-') : '-')
     },
     {
       key: 'fornecedor',
       header: 'Fornecedor',
+      sortValue: (s) => fornecedorOf(s).nome,
       render: (s) => {
         const f = fornecedorOf(s);
         return (
@@ -72,6 +75,8 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
     {
       key: 'quantidade',
       header: 'Qtd. contratada',
+      sortValue: (s) => s.quantidadeContratada,
+      sortFirstDir: 'desc',
       render: (s) =>
         s.quantidadeContratada != null ? (
           <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatNumber(s.quantidadeContratada)}</span>
@@ -99,19 +104,13 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
         canEdit ? (
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}>
             {isDismissed ? (
-              <AppButton variant="outline" size="sm" icon={<RotateCcw size={13} />} onClick={() => onRestore(s)} disabled={busy} title="Voltar a sugerir este contrato">
-                Restaurar
-              </AppButton>
+              <ActionButton action="restaurar" size="sm" onClick={() => onRestore(s)} disabled={busy} title="Voltar a sugerir este contrato" />
             ) : (
               <>
                 {s.linkable && (
-                  <AppButton variant="primary" size="sm" icon={<Link2 size={13} />} onClick={() => onLink(s)} disabled={busy} title="Vincular este contrato ao item">
-                    Vincular
-                  </AppButton>
+                  <ActionButton action="vincular" size="sm" onClick={() => onLink(s)} disabled={busy} title="Vincular este contrato ao item" />
                 )}
-                <AppButton variant="outline" size="sm" icon={<X size={13} />} onClick={() => onDismiss(s)} disabled={busy} title="Este contrato não pertence a este item">
-                  Descartar
-                </AppButton>
+                <ActionButton action="descartar" size="sm" onClick={() => onDismiss(s)} disabled={busy} title="Este contrato não pertence a este item" />
               </>
             )}
           </div>
@@ -157,13 +156,9 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
 
       {dismissed.length > 0 && (
         <div style={{ marginTop: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={() => setShowDismissed((v) => !v)}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)' }}
-          >
+          <AppButton type="button" variant="link" size="sm" onClick={() => setShowDismissed((v) => !v)}>
             {showDismissed ? 'Ocultar descartados' : `Ver descartados (${dismissed.length})`}
-          </button>
+          </AppButton>
           {showDismissed && <div style={{ marginTop: '0.5rem' }}>{renderTable(dismissed, true)}</div>}
         </div>
       )}

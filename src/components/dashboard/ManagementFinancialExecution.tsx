@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { CreditCard, ExternalLink } from 'lucide-react';
 import { useManagementDashboard } from '../../hooks/useManagementDashboard';
-import { AppButton, EmptyState, ErrorState, FilterBar, StatusBadge } from '../../design-system';
+import { ActionButton, AppButton, EmptyState, ErrorState, FilterBar, StatusBadge } from '../../design-system';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { formatCurrency } from '../../utils/format';
 import type {
   ManagementDashboardReadModel,
@@ -34,6 +36,17 @@ const PAGE_SIZE = 15;
  * 3. Prevenção absoluta de dupla contagem através da ancoragem na chave soberana de empenho;
  * 4. Tratamento resiliente de loading (skeleton), erro explícito e empty state.
  */
+const EMPENHO_SORT_COLUMNS: Record<string, CarteiraSortColumn<ManagementDashboardEmpenhoDetail>> = {
+  empenho: { value: (e) => `${e.ano ?? ''}/${String(e.numeroEmpenho).padStart(8, '0')}` },
+  fornecedor: { value: (e) => e.fornecedorNome },
+  contrato: { value: (e) => e.contratoNumero },
+  empenhado: { value: (e) => e.valorEmpenhado, firstDir: 'desc' },
+  liquidado: { value: (e) => e.valorLiquidado, firstDir: 'desc' },
+  pago: { value: (e) => e.valorPago, firstDir: 'desc' },
+  saldo: { value: (e) => e.saldoNaoExecutado, firstDir: 'desc' },
+  execucao: { value: (e) => e.percentualExecutado, firstDir: 'desc' }
+};
+
 export const ManagementFinancialExecution: React.FC<ManagementFinancialExecutionProps> = ({
   readModel: propReadModel,
   isLoading: propIsLoading,
@@ -82,11 +95,14 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
     return list;
   }, [financial, filter, searchQuery]);
 
-  React.useEffect(() => setPage(1), [filter, searchQuery]);
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(filteredEmpenhos.length / PAGE_SIZE)));
+  const { sorted: sortedEmpenhos, sortKey, sortDir, toggle } = useCarteiraSort(filteredEmpenhos, EMPENHO_SORT_COLUMNS);
+  const sort = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
+
+  React.useEffect(() => setPage(1), [filter, searchQuery, sortKey, sortDir]);
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(sortedEmpenhos.length / PAGE_SIZE)));
   const pageEmpenhos = useMemo(
-    () => filteredEmpenhos.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [filteredEmpenhos, currentPage]
+    () => sortedEmpenhos.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [sortedEmpenhos, currentPage]
   );
 
   // 1. Estado de Loading
@@ -236,16 +252,12 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
             title="Nenhuma nota de empenho corresponde aos filtros aplicados."
             description="Altere a situação ou limpe o termo de busca para visualizar os empenhos da unidade."
             action={
-              <AppButton
-                variant="outline"
+              <ActionButton action="limparFiltros"
                 size="sm"
                 onClick={() => {
                   setFilter('TODOS');
                   setSearchQuery('');
-                }}
-              >
-                Limpar filtros
-              </AppButton>
+                }} />
             }
           />
         ) : (
@@ -253,14 +265,14 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
             <table className="carteira-stack" data-testid="table-empenhos" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={carteiraTh}>Nota de Empenho</th>
-                  <th style={carteiraTh}>Credor / Fornecedor</th>
-                  <th style={carteiraTh}>Contrato</th>
-                  <th style={{ ...carteiraTh, textAlign: 'right' }}>Empenhado</th>
-                  <th style={{ ...carteiraTh, textAlign: 'right' }}>Liquidado</th>
-                  <th style={{ ...carteiraTh, textAlign: 'right' }}>Pago</th>
-                  <th style={{ ...carteiraTh, textAlign: 'right' }}>Saldo a Executar</th>
-                  <th style={{ ...carteiraTh, textAlign: 'center' }}>% Exec.</th>
+                  <CarteiraSortHeader label="Nota de Empenho" sortKey="empenho" {...sort} />
+                  <CarteiraSortHeader label="Credor / Fornecedor" sortKey="fornecedor" {...sort} />
+                  <CarteiraSortHeader label="Contrato" sortKey="contrato" {...sort} />
+                  <CarteiraSortHeader label="Empenhado" sortKey="empenhado" align="right" {...sort} />
+                  <CarteiraSortHeader label="Liquidado" sortKey="liquidado" align="right" {...sort} />
+                  <CarteiraSortHeader label="Pago" sortKey="pago" align="right" {...sort} />
+                  <CarteiraSortHeader label="Saldo a Executar" sortKey="saldo" align="right" {...sort} />
+                  <CarteiraSortHeader label="% Exec." sortKey="execucao" {...sort} />
                   <th style={{ ...carteiraTh, textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
@@ -280,8 +292,8 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
                       )}
                     </td>
                     <td data-label="Empenhado" style={{ ...carteiraTd, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(emp.valorEmpenhado)}</td>
-                    <td data-label="Liquidado" style={{ ...carteiraTd, textAlign: 'right', color: '#0284c7' }}>{formatCurrency(emp.valorLiquidado)}</td>
-                    <td data-label="Pago" style={{ ...carteiraTd, textAlign: 'right', color: '#059669', fontWeight: 700 }}>{formatCurrency(emp.valorPago)}</td>
+                    <td data-label="Liquidado" style={{ ...carteiraTd, textAlign: 'right', color: 'var(--color-info-text)' }}>{formatCurrency(emp.valorLiquidado)}</td>
+                    <td data-label="Pago" style={{ ...carteiraTd, textAlign: 'right', color: 'var(--color-success)', fontWeight: 700 }}>{formatCurrency(emp.valorPago)}</td>
                     <td data-label="Saldo a executar" style={{ ...carteiraTd, textAlign: 'right', color: '#64748b' }}>{formatCurrency(emp.saldoNaoExecutado)}</td>
                     <td data-label="% Exec." style={{ ...carteiraTd, textAlign: 'center' }}>
                       <StatusBadge
@@ -293,14 +305,15 @@ export const ManagementFinancialExecution: React.FC<ManagementFinancialExecution
                     </td>
                     <td data-role="action" style={{ ...carteiraTd, textAlign: 'right' }}>
                       {emp.contratoNumero && onNavigateContract ? (
-                        <button
+                        <AppButton
                           type="button"
+                          variant="link"
+                          size="sm"
                           data-testid={`btn-navigate-contract-${emp.numeroEmpenho}`}
                           onClick={() => onNavigateContract(emp.contratoNumero!)}
-                          style={carteiraButton}
                         >
                           Ver contrato <ExternalLink size={12} aria-hidden="true" />
-                        </button>
+                        </AppButton>
                       ) : (
                         <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>—</span>
                       )}

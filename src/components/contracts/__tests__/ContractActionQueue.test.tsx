@@ -148,7 +148,7 @@ describe('ContractActionQueue', () => {
     const first = render(baseContract, plan);
     const id = /data-action-id="([^"]+)"/.exec(first)![1];
     const html = render(baseContract, plan, `/?item=${encodeURIComponent(id)}`);
-    expect(html).toContain('background-color:#eff6ff');
+    expect(html).toContain('background-color:var(--color-info-bg)');
   });
 
   it('mostra o empenho com quantidade pendente e o botão que leva ao item da ata', () => {

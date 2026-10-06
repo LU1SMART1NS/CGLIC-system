@@ -1,5 +1,6 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
@@ -67,7 +68,7 @@ interface Instrument360HeroProps {
 
 const OBJETO_LIMITE = 220;
 
-const COLORS = { ink: '#0f172a', inkSoft: '#334155', muted: '#64748b', line: '#e2e8f0', surface: '#f8fafc', link: '#075985', brand: '#0c326f' };
+const COLORS = { ink: '#0f172a', inkSoft: '#334155', muted: '#64748b', line: '#e2e8f0', surface: '#f8fafc', link: 'var(--primary)', brand: 'var(--primary)' };
 
 /**
  * Cartão único do topo das telas 360 (Ata, Contrato e Item), na mesma ordem nas três:
@@ -135,26 +136,12 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
       ref={setHeroEl}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <button
+        <ActionButton action="voltar"
           type="button"
+          size="sm"
           onClick={onBack}
           data-testid={backTestId}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            padding: '0.45rem 0.85rem',
-            background: COLORS.surface,
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            color: COLORS.brand,
-            cursor: 'pointer'
-          }}
-        >
-          <ArrowLeft size={16} /> {backLabel}
-        </button>
+        >{backLabel}</ActionButton>
         {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
       </div>
 
@@ -181,13 +168,15 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
             <p style={{ margin: subtitle ? '2px 0 0 0' : 0, fontSize: '0.92rem', color: COLORS.inkSoft, lineHeight: 1.45, maxWidth: '1200px' }}>
               {objetoLongo && !objetoAberto ? `${texto.slice(0, OBJETO_LIMITE).trimEnd()}…` : texto}
               {objetoLongo && (
-                <button
+                <AppButton
                   type="button"
+                  variant="link"
+                  size="xs"
                   onClick={() => setObjetoAberto((v) => !v)}
-                  style={{ marginLeft: '0.4rem', background: 'none', border: 'none', padding: 0, color: COLORS.brand, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+                  style={{ marginLeft: '0.4rem' }}
                 >
                   {objetoAberto ? 'ver menos' : 'ver mais'}
-                </button>
+                </AppButton>
               )}
             </p>
           )}

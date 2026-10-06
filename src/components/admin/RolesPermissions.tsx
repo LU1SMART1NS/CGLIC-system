@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
-import { KeyRound, Shield, UserCheck, Coins, Eye, X, ChevronRight, Pencil } from 'lucide-react';
+import { KeyRound, Shield, UserCheck, Coins, Eye } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppCard } from '../../design-system/components/AppCard';
-import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { SectionHeader } from '../../design-system/components/SectionHeader';
 import { colors, spacing, typography } from '../../design-system/tokens';
@@ -12,7 +12,6 @@ import type { AppRole } from '../../types/rbac';
 import type { RoleDefinition } from '../../types/user';
 import { useRoles, useRenameRole } from '../../hooks/useRoles';
 import { useAuth } from '../../context/AuthContext';
-import { IconButton } from '../../design-system/components/IconButton';
 import { AppInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 
@@ -212,15 +211,13 @@ const ProfileDrawer: React.FC<{ profile: ProfileDefinition | null; onClose: () =
           <span style={{ fontSize: typography.fontSize.label, fontWeight: 700, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Detalhe do perfil
           </span>
-          <button
+          <ActionButton
+            action="fechar"
+            iconOnly
             type="button"
             onClick={onClose}
-            aria-label="Fechar"
             data-testid="profile-drawer-close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text.secondary, padding: spacing.xs }}
-          >
-            <X size={18} />
-          </button>
+          />
         </div>
         <div style={{ padding: spacing.lg, overflowY: 'auto', flex: 1 }}>
           <ProfileDetailContent profile={profile} />
@@ -282,8 +279,8 @@ const ProfileCardTitle: React.FC<{ profile: ProfileDefinition; canEdit: boolean 
           onChange={(e) => setDraft(e.target.value)}
         />
         <div style={{ display: 'flex', gap: spacing.sm }}>
-          <AppButton type="submit" size="sm" disabled={rename.isPending}>Salvar</AppButton>
-          <AppButton type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>Cancelar</AppButton>
+          <ActionButton action="salvar" type="submit" size="sm" disabled={rename.isPending} />
+          <ActionButton action="cancelar" type="button" size="sm" onClick={() => setEditing(false)} />
         </div>
       </form>
     );
@@ -295,9 +292,10 @@ const ProfileCardTitle: React.FC<{ profile: ProfileDefinition; canEdit: boolean 
         {profile.label}
       </h3>
       {canEdit && (
-        <IconButton
+        <ActionButton
+          action="renomear"
+          iconOnly
           label={`Editar nome do perfil ${profile.label}`}
-          icon={<Pencil size={14} />}
           onClick={startEditing}
           data-testid={`editar-nome-${profile.id}`}
         />
@@ -319,7 +317,7 @@ export const RolesPermissions: React.FC = () => {
       <PageHeader
         title="Perfis"
         subtitle="Perfis de acesso ao CGLIC e o que cada um pode consultar e gerir"
-        icon={<KeyRound size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<KeyRound size={26} color="var(--primary)" aria-hidden="true" />}
       />
 
       <div
@@ -335,7 +333,7 @@ export const RolesPermissions: React.FC = () => {
               style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                <Icon size={20} color="#0c326f" aria-hidden="true" />
+                <Icon size={20} color="var(--primary)" aria-hidden="true" />
                 <ProfileCardTitle profile={profile} canEdit={canEdit} />
               </div>
 
@@ -347,16 +345,14 @@ export const RolesPermissions: React.FC = () => {
                 <StatusBadge label="Perfil do sistema" variant="neutral" size="sm" />
               </div>
 
-              <AppButton
-                variant="outline"
+              <ActionButton
+                action="verDetalhes"
+                label="Ver detalhes"
                 size="sm"
                 onClick={() => setSelectedProfileId(profile.id)}
                 data-testid={`ver-detalhes-${profile.id}`}
-                icon={<ChevronRight size={14} />}
                 style={{ alignSelf: 'flex-start' }}
-              >
-                Ver detalhes
-              </AppButton>
+              />
             </AppCard>
           );
         })}

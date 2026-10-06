@@ -1,10 +1,10 @@
 import React from 'react';
-import { ArrowLeftRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { CarteiraFilterBar } from '../../carteira/CarteiraFilterBar';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CARTEIRA_EXPANDED_CELL_STYLE } from '../../carteira/CarteiraDetailLabel';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { ActionButton } from '../../../design-system/components/ActionButton';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
@@ -18,7 +18,7 @@ import { contemBusca } from './filaComum';
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 /** Cores das faixas de complexidade (barra empilhada e legenda). */
-export const COR_COMPLEXIDADE: Record<NivelComplexidade, string> = { ALTA: '#0c326f', MEDIA: '#5b8bd6', BAIXA: '#c7d7f0' };
+export const COR_COMPLEXIDADE: Record<NivelComplexidade, string> = { ALTA: 'var(--primary)', MEDIA: '#5b8bd6', BAIXA: '#c7d7f0' };
 const NIVEIS: NivelComplexidade[] = ['ALTA', 'MEDIA', 'BAIXA'];
 
 const CarteiraCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
@@ -58,11 +58,11 @@ const CargaEquivalenteCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
 const PressaoCell: React.FC<{ l: DistribuicaoLinha; aVincular?: number }> = ({ l, aVincular = 0 }) => {
   const vencendo = l.atas.criticos + l.atas.atencao + l.contratos.criticos + l.contratos.atencao;
   const partes: Array<{ texto: string; cor: string }> = [];
-  if (l.pendencias.urgentes > 0) partes.push({ texto: plural(l.pendencias.urgentes, 'urgente', 'urgentes'), cor: '#b91c1c' });
-  if (l.pendencias.atrasadas > 0) partes.push({ texto: plural(l.pendencias.atrasadas, 'tarefa atrasada', 'tarefas atrasadas'), cor: '#b91c1c' });
-  if (l.pendencias.acompanhar > 0) partes.push({ texto: `${l.pendencias.acompanhar} a acompanhar`, cor: '#b45309' });
-  if (vencendo > 0) partes.push({ texto: `${vencendo} ${vencendo === 1 ? 'vence' : 'vencem'} em até 90 dias`, cor: '#b45309' });
-  if (aVincular > 0) partes.push({ texto: `${aVincular} ${aVincular === 1 ? 'contrato' : 'contratos'} a vincular`, cor: '#1e3a8a' });
+  if (l.pendencias.urgentes > 0) partes.push({ texto: plural(l.pendencias.urgentes, 'urgente', 'urgentes'), cor: 'var(--color-danger-text)' });
+  if (l.pendencias.atrasadas > 0) partes.push({ texto: plural(l.pendencias.atrasadas, 'tarefa atrasada', 'tarefas atrasadas'), cor: 'var(--color-danger-text)' });
+  if (l.pendencias.acompanhar > 0) partes.push({ texto: `${l.pendencias.acompanhar} a acompanhar`, cor: 'var(--color-warning-text)' });
+  if (vencendo > 0) partes.push({ texto: `${vencendo} ${vencendo === 1 ? 'vence' : 'vencem'} em até 90 dias`, cor: 'var(--color-warning-text)' });
+  if (aVincular > 0) partes.push({ texto: `${aVincular} ${aVincular === 1 ? 'contrato' : 'contratos'} a vincular`, cor: 'var(--color-info-text-strong)' });
   if (partes.length === 0) return <span style={{ color: '#94a3b8' }}>—</span>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.75rem', fontWeight: 700 }}>
@@ -149,16 +149,16 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                     <React.Fragment key={nome}>
                       <tr data-testid={`distribuicao-row-${nome}`}>
                         <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
-                          <button
+                          <ActionButton
+                            action={isExpanded ? 'recolher' : 'expandir'}
+                            iconOnly
                             type="button"
+                            size="xs"
                             onClick={() => setExpanded(isExpanded ? null : nome)}
-                            aria-expanded={isExpanded}
-                            aria-label={isExpanded ? 'Recolher atas e contratos' : 'Ver atas e contratos'}
+                            expanded={isExpanded}
+                            label={isExpanded ? 'Recolher atas e contratos' : 'Ver atas e contratos'}
                             data-testid={`distribuicao-expand-${nome}`}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.2rem' }}
-                          >
-                            {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                          </button>
+                          />
                         </td>
                         <td style={{ ...carteiraTd, minWidth: '160px' }}>
                           <span style={{ fontWeight: 800 }}>{nome}</span>
@@ -182,8 +182,9 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                             {canAssign && (l.ataKeys.length > 0 || l.contractKeys.length > 0) && (
-                              <button
+                              <ActionButton action="transferir"
                                 type="button"
+                                size="sm"
                                 onClick={() =>
                                   onTransfer(
                                     [
@@ -195,10 +196,7 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                                 }
                                 data-testid={`distribuicao-transferir-${nome}`}
                                 title="Passar toda a carteira vigente deste gestor para outra pessoa"
-                                style={{ ...carteiraButton, color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
-                              >
-                                <ArrowLeftRight size={13} /> Transferir
-                              </button>
+                               />
                             )}
                           </div>
                         </td>

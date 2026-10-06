@@ -285,7 +285,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     );
 
     expect(html).toContain('Nenhum contrato corresponde aos filtros aplicados.');
-    expect(html).toContain('Limpar Filtros');
+    expect(html).toContain('Limpar filtros');
   });
 
   it('8. deve renderizar estado de erro explícito com mensagem quando a query falhar', () => {

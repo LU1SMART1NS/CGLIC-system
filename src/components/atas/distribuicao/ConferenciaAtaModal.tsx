@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ExternalLink, Link2, Loader2, MinusCircle, X } from 'lucide-react';
-import { AppButton, Modal } from '../../../design-system';
+import { CheckCircle2, ExternalLink, Loader2, MinusCircle } from 'lucide-react';
+import { ActionButton, AppButton, Modal } from '../../../design-system';
 import { useToast } from '../../../design-system/components/Toast';
 import { useDescartarAta } from '../../../hooks/useDescartesAtaContrato';
 import { buildAtaPath } from '../../../hooks/useAta';
@@ -10,7 +10,7 @@ import { fetchContractItemQuantities } from '../../../services/contractItemsServ
 import type { PlanoVinculo } from '../../../services/vinculoEmMassaService';
 import { formatDateBR } from '../../../utils/format';
 import { normalizeItemKey } from '../../../utils/itemKeyUtils';
-import type { FilaAta, ItemFila } from './contratosSemAta';
+import { sugerirAtas, type FilaAta, type ItemFila } from './contratosSemAta';
 import { efeitoGestorDoVinculo, preverVinculo, type ItemDaAta } from './vinculoEmMassa';
 
 interface ConferenciaAtaModalProps {
@@ -29,7 +29,7 @@ type Sinal = 'SIM' | 'NAO' | 'NEUTRO';
 const SinalLinha: React.FC<{ sinal: Sinal; children: React.ReactNode }> = ({ sinal, children }) => (
   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.45rem', fontSize: '0.84rem', color: sinal === 'NAO' ? '#64748b' : '#0f172a' }}>
     {sinal === 'SIM' ? (
-      <CheckCircle2 size={15} color="#15803d" aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
+      <CheckCircle2 size={15} color="var(--color-success-text)" aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
     ) : (
       <MinusCircle size={15} color="#94a3b8" aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
     )}
@@ -58,15 +58,18 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
   const toast = useToast();
   const lote = useVinculoEmMassa();
   const descartar = useDescartarAta();
-  const sugerida = contrato.sugestoes.find((s) => s.numeroAta === ata.numeroAta && s.uasg === ata.uasg);
-  const motivo = sugerida?.motivo;
+  // Pista calculada pelas mesmas regras das sugestões: a ata escolhida à mão (fora das sugestões) também mostra o que bate.
+  const motivo = sugerirAtas(contrato, [ata]).sugestoes[0]?.motivo;
+  const fornecedorBate = motivo === 'FORNECEDOR' || motivo === 'COMPRA_E_FORNECEDOR';
+  const compraBate = motivo === 'COMPRA' || motivo === 'COMPRA_E_FORNECEDOR';
 
   const consulta = useQuery({
     queryKey: ['contract-item-quantities', `${contrato.contract.uasg}-${contrato.contract.numero}-${contrato.contract.ano}`] as const,
     queryFn: () => fetchContractItemQuantities(contrato.contract),
     staleTime: 10 * 60 * 1000,
     retry: 1,
-    enabled: itensDaAta.length > 0
+    // Os itens da API só se comparam com os da ata quando a compra é a mesma (ver preverVinculo).
+    enabled: itensDaAta.length > 0 && compraBate
   });
   const previsao = preverVinculo({
     numeroAta: ata.numeroAta,
@@ -75,12 +78,14 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
     itensDaAta,
     apiQuantidades: consulta.data,
     apiCarregando: consulta.isLoading,
-    apiErro: consulta.isError
+    apiErro: consulta.isError,
+    compraDiferente: !compraBate
   });
   const efeito = efeitoGestorDoVinculo(contrato.gestorNome, ata.gestorNome);
 
   // Itens marcados: começa pelos que a API confirma (uma vez, quando a consulta responde); o coordenador ajusta.
-  const api = consulta.data;
+  // Em outra compra a API não vale: nada vem marcado e nenhuma quantidade da API é gravada.
+  const api = compraBate ? consulta.data : undefined;
   const confirmado = (numeroItem: string) => Boolean(api?.has(parseInt(numeroItem, 10)));
   const [marcados, setMarcados] = React.useState<Set<string>>(new Set());
   const iniciou = React.useRef(false);
@@ -137,9 +142,6 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
 
   const verAtaCompleta = () => window.open(buildAtaPath(ata.numeroAta, ata.uasg), '_blank', 'noopener');
 
-  const fornecedorBate = motivo === 'FORNECEDOR' || motivo === 'COMPRA_E_FORNECEDOR';
-  const compraBate = motivo === 'COMPRA' || motivo === 'COMPRA_E_FORNECEDOR';
-
   return (
     <Modal
       isOpen
@@ -155,20 +157,20 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
           </AppButton>
           {podeAgir && (
             <>
-              <AppButton variant="outline" size="sm" icon={<X size={13} />} onClick={naoEhEstaAta} disabled={ocupado} title="Esta ata não é a deste contrato: deixa de ser sugerida" data-testid="conferencia-descartar">
+              <ActionButton action="descartar" size="sm" onClick={naoEhEstaAta} disabled={ocupado} title="Este contrato não pertence a esta ata: ela deixa de ser sugerida" data-testid="conferencia-descartar">
                 Esta não é a ata
-              </AppButton>
-              <AppButton
-                variant="primary"
+              </ActionButton>
+              <ActionButton
+                action="vincular"
                 size="sm"
-                icon={lote.estado.rodando ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}
+                isLoading={lote.estado.rodando}
                 onClick={vincular}
                 disabled={ocupado || itensMarcados.length === 0 || consulta.isLoading}
                 title={itensMarcados.length === 0 ? 'Marque os itens que o contrato cobre' : 'Vincular o contrato aos itens marcados'}
                 data-testid="conferencia-vincular"
               >
                 {itensMarcados.length > 0 && !algumConfirmado ? 'Vincular mesmo assim' : 'Vincular'}
-              </AppButton>
+              </ActionButton>
             </>
           )}
         </>
@@ -222,12 +224,12 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
               return (
                 <label
                   key={i.numeroItem}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.55rem 0.75rem', border: `1px solid ${marcado ? '#bfdbfe' : '#e2e8f0'}`, background: marcado ? '#eff6ff' : '#ffffff', borderRadius: '8px', cursor: podeAgir ? 'pointer' : 'default' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.55rem 0.75rem', border: `1px solid ${marcado ? 'var(--color-info-border)' : '#e2e8f0'}`, background: marcado ? 'var(--color-info-bg)' : '#ffffff', borderRadius: '8px', cursor: podeAgir ? 'pointer' : 'default' }}
                 >
                   <input type="checkbox" checked={marcado} onChange={() => alternar(i.numeroItem)} disabled={!podeAgir || ocupado} data-testid={`conferencia-item-${i.numeroItem}`} />
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0c326f' }}>Item {i.numeroItem}</span>
-                    {!ok && marcado && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#b45309' }}>não confirmado pela API</span>}
+                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--primary)' }}>Item {i.numeroItem}</span>
+                    {!ok && marcado && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-warning-text)' }}>não confirmado pela API</span>}
                     {i.descricao && (
                       <span title={i.descricao} style={{ display: 'block', fontSize: '0.78rem', color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {i.descricao}

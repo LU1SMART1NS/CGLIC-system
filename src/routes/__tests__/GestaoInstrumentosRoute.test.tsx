@@ -411,7 +411,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     );
 
     expect(html).toContain('Nenhum instrumento encontrado');
-    expect(html).toContain('Limpar Filtros');
+    expect(html).toContain('Limpar filtros');
   });
 
   it('7. deve renderizar estado de erro explícito quando useManagementDashboard falhar', () => {

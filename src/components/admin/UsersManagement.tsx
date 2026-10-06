@@ -1,15 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import {
-  UserPlus,
   Users,
-  Edit2,
-  UserX,
-  UserCheck,
   Mail,
   Shield,
-  Send,
-  Trash2
+  Send
 } from 'lucide-react';
 import {
   useUsers,
@@ -22,6 +17,7 @@ import {
 } from '../../hooks/useUsers';
 import { useRoles } from '../../hooks/useRoles';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { FilterBar } from '../../design-system/components/FilterBar';
@@ -29,7 +25,6 @@ import { Modal } from '../../design-system/components/Modal';
 import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
 import { DataTable } from '../../design-system/components/DataTable';
-import { IconButton } from '../../design-system/components/IconButton';
 import { AppInput, AppSelect } from '../../design-system/components/FormFields';
 import { AdminListShell } from './shared/AdminListShell';
 import type { SystemUser, UserRole } from '../../types/user';
@@ -217,16 +212,14 @@ export const UsersManagement: React.FC = () => {
       <PageHeader
         title="Usuários e Servidores"
         subtitle="Cadastro de servidores, atribuição de competências operacionais e credenciamento de gestores da pasta"
-        icon={<Users size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<Users size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
-          <AppButton
-            variant="primary"
+          <ActionButton
+            action="novo"
+            label="Novo Servidor"
             onClick={handleOpenCreateModal}
             data-testid="create-user-btn"
-            icon={<UserPlus size={15} />}
-          >
-            Novo Servidor
-          </AppButton>
+          />
         }
       />
 
@@ -278,6 +271,7 @@ export const UsersManagement: React.FC = () => {
             {
               key: 'nome',
               header: 'Servidor / Usuário',
+              sortValue: (user) => user.nome,
               priority: 'primary',
               render: (user) => (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
@@ -291,6 +285,7 @@ export const UsersManagement: React.FC = () => {
             {
               key: 'perfil',
               header: 'Perfil operacional',
+              sortValue: (user) => getPerfilDisplayLabel(user.perfil, roles),
               mobileLabel: 'Perfil',
               render: (user) => {
                 const roleObj = roles.find((r) => r.id === user.perfil);
@@ -327,6 +322,7 @@ export const UsersManagement: React.FC = () => {
               key: 'situacao',
               header: 'Situação',
               align: 'center',
+              sortValue: (user) => (user.status === 'pendente' ? 'Convite pendente' : user.status === 'inativo' || user.ativo === false ? 'Inativo' : 'Ativo'),
               render: (user) => {
                 const isInactive = user.status === 'inativo' || user.ativo === false;
                 return user.status === 'pendente' ? (
@@ -356,36 +352,31 @@ export const UsersManagement: React.FC = () => {
                     Reenviar convite
                   </AppButton>
                 )}
-                <AppButton variant="outline" size="sm" icon={<Edit2 size={13} />} onClick={() => handleOpenEditModal(user)} title="Editar servidor">
-                  Editar
-                </AppButton>
+                <ActionButton action="editar" size="sm" onClick={() => handleOpenEditModal(user)} title="Editar servidor" />
                 {isInactive ? (
-                  <AppButton
-                    variant="outline"
+                  <ActionButton
+                    action="reativar"
                     size="sm"
-                    icon={<UserCheck size={13} />}
                     onClick={() => handleReactivate(user)}
                     disabled={reactivateUserMutation.isPending}
                     title="Reativar acesso do servidor"
-                  >
-                    Reativar
-                  </AppButton>
+                  />
                 ) : !isPending ? (
-                  <IconButton
+                  <ActionButton
+                    action="desativar"
+                    iconOnly
                     label={`Desativar acesso de ${user.nome}`}
-                    icon={<UserX size={15} />}
                     onClick={() => handleDeactivate(user)}
                     disabled={deactivateUserMutation.isPending}
-                    style={{ color: '#e11d48' }}
                   />
                 ) : null}
                 {isPending && (
-                  <IconButton
+                  <ActionButton
+                    action="excluir"
+                    iconOnly
                     label={`Cancelar e excluir convite de ${user.nome}`}
-                    icon={<Trash2 size={15} />}
                     onClick={() => handleDelete(user)}
                     disabled={deleteUserMutation.isPending}
-                    style={{ color: '#e11d48' }}
                   />
                 )}
               </div>
@@ -402,9 +393,7 @@ export const UsersManagement: React.FC = () => {
         testId="user-modal"
         footer={
           <>
-            <AppButton type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancelar
-            </AppButton>
+            <ActionButton action="cancelar" type="button" onClick={() => setIsModalOpen(false)} />
             <AppButton type="submit" form="user-form" isLoading={inviteUserMutation.isPending || saveUserMutation.isPending}>
               {editingUser
                 ? (saveUserMutation.isPending ? 'Salvando...' : 'Salvar alterações')
@@ -415,7 +404,7 @@ export const UsersManagement: React.FC = () => {
       >
             <form id="user-form" onSubmit={handleSaveOrInvite} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {formError && (
-                <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#991b1b', fontSize: '0.8rem', fontWeight: 600 }}>
+                <div style={{ padding: '0.65rem 0.85rem', background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger-border)', borderRadius: '6px', color: 'var(--color-danger-text-strong)', fontSize: '0.8rem', fontWeight: 600 }}>
                   {formError}
                 </div>
               )}

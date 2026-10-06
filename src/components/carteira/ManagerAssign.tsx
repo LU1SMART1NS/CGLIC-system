@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { carteiraButton } from './carteiraStyles';
+import { AppButton } from '../../design-system/components/AppButton';
 
 /** Endereço da Central de Distribuição, único lugar onde se atribui gestor. */
 export const CENTRAL_DISTRIBUICAO_PATH = '/atas/distribuicao';
@@ -30,14 +30,15 @@ export const ManagerCell: React.FC<ManagerCellProps> = ({ gestorNome, canAssign,
   if (gestorNome) return <span data-testid={testId}>{gestorNome}</span>;
   if (!canAssign) return <span data-testid={testId} style={{ color: '#94a3b8' }}>—</span>;
   return (
-    <button
+    <AppButton
       type="button"
+      variant="outline"
+      size="xs"
       onClick={() => navigate(CENTRAL_DISTRIBUICAO_PATH)}
       data-testid={testId}
       title="A atribuição de gestor é feita na Central de Distribuição"
-      style={{ ...carteiraButton, padding: '0.25rem 0.55rem', fontSize: '0.75rem', color: '#b45309', borderColor: '#fde68a', background: '#fffbeb' }}
     >
       Sem gestor · atribuir na Central <ArrowRight size={12} />
-    </button>
+    </AppButton>
   );
 };

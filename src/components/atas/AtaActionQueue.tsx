@@ -1,9 +1,10 @@
 import React from 'react';
-import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, ChevronRight } from 'lucide-react';
 import type { AtaTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { useUpdateAtaTask } from '../../hooks/useUpdateAtaTask';
@@ -33,21 +34,6 @@ const KIND_LABELS: Record<AtaActionItem['kind'], string> = {
   LEMBRETE: 'Planejamento da vigência'
 };
 
-const secondaryButton: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  padding: '0.4rem 0.75rem',
-  backgroundColor: '#ffffff',
-  color: '#0c326f',
-  border: '1px solid #cbd5e1',
-  borderRadius: '6px',
-  fontSize: '0.78rem',
-  fontWeight: 700,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap'
-};
-
 /** Fila única da Ata 360 — mesmo layout da ContractActionQueue do Contrato 360. */
 export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, plan, isLoading = false, onGoTo }) => {
   const updateMutation = useUpdateAtaTask(ataKey);
@@ -64,25 +50,19 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
   const renderAction = (item: AtaActionItem) => {
     switch (item.kind) {
       case 'SALDO':
-        return (
-          <AppButton variant="outline" size="sm"  icon={<ArrowRight size={15} />} onClick={() => onGoTo('itens')} title="Ver itens" >
-              <span className="payment-action-label">Ver itens</span>
-            </AppButton>
-        );
+        return <span className="action-row__go" aria-hidden="true"><ChevronRight size={18} /></span>;
       case 'TAREFA':
         if (!item.taskId) return null;
         return (
-          <AppButton
-            variant="outline"
+          <ActionButton
+            action="concluir"
             size="sm"
-            
-            icon={<Check size={15} />}
             onClick={() => updateMutation.mutate({ taskId: item.taskId!, status: 'CONCLUIDA' })}
             disabled={updateMutation.isPending}
             title="Concluir"
           >
               <span className="payment-action-label">Concluir</span>
-            </AppButton>
+            </ActionButton>
         );
       case 'LEMBRETE':
         return (
@@ -127,15 +107,15 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
       {queue.items.length === 0 ? (
         <div
           style={{
-            background: '#f0fdf4',
+            background: 'var(--color-success-bg)',
             borderRadius: '10px',
-            border: '1px solid #bbf7d0',
+            border: '1px solid var(--color-success-border)',
             padding: '1.25rem',
             textAlign: 'center',
-            color: '#166534'
+            color: 'var(--color-success-text-strong)'
           }}
         >
-          <CheckCircle2 size={22} style={{ color: '#15803d', margin: '0 auto 0.5rem auto', display: 'block' }} />
+          <CheckCircle2 size={22} style={{ color: 'var(--color-success-text)', margin: '0 auto 0.5rem auto', display: 'block' }} />
           <h4 style={{ fontSize: '1rem', fontWeight: 800, margin: '0 0 0.25rem 0', color: '#14532d' }}>
             Tudo em dia com esta ata
           </h4>
@@ -153,10 +133,23 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
           </div>
 
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
-            {queue.items.map((item, idx) => (
+            {queue.items.map((item, idx) => {
+              const go = item.kind === 'SALDO' ? () => onGoTo('itens') : null;
+              return (
               <div
                 key={item.id}
                 data-action-id={item.id}
+                className={go ? 'action-row--go' : undefined}
+                {...(go ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  title: 'Ver itens',
+                  'aria-label': `Ver itens: ${item.title}`,
+                  onClick: go,
+                  onKeyDown: (e: React.KeyboardEvent) => {
+                    if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(); }
+                  }
+                } : {})}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -180,7 +173,8 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
                 </div>
                 <div>{renderAction(item)}</div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
@@ -194,14 +188,9 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
             {queue.dispensados.map((item) => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <span style={{ flex: '1 1 220px', minWidth: 0 }}>{item.title}</span>
-                <button
-                  type="button"
-                  onClick={() => restore.mutate({ itemId: item.id })}
-                  disabled={restore.isPending}
-                  style={secondaryButton}
-                >
+                <AppButton type="button" variant="link" size="sm" onClick={() => restore.mutate({ itemId: item.id })} disabled={restore.isPending}>
                   Reexibir
-                </button>
+                </AppButton>
               </div>
             ))}
           </div>
@@ -209,24 +198,11 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
       )}
 
       {queue.tarefasSemPrazo > 0 && (
-        <button
-          type="button"
-          onClick={() => onGoTo('plano')}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            color: '#475569',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            textDecoration: 'underline'
-          }}
-        >
+        <AppButton type="button" variant="link" size="sm" onClick={() => onGoTo('plano')} style={{ alignSelf: 'flex-start' }}>
           {queue.tarefasSemPrazo === 1
             ? '1 tarefa do plano está sem prazo definido — definir no plano'
             : `${queue.tarefasSemPrazo} tarefas do plano estão sem prazo definido — definir no plano`}
-        </button>
+        </AppButton>
       )}
     </div>
   );

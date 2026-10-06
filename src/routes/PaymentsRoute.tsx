@@ -32,7 +32,7 @@ export const PaymentsRoute: React.FC = () => {
       <PageHeader
         title="Pagamentos"
         subtitle="Acompanhamento operacional do ciclo de faturamento, liquidação de atestos e tramitação setorial (CGOFI)."
-        icon={<CreditCard size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<CreditCard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
             onRefresh={() => refresh()}

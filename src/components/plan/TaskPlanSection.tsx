@@ -1,19 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Check,
-  Circle,
-  CircleDot,
-  Minus,
-  ChevronDown,
-  ChevronUp,
-  Sliders,
-  ExternalLink,
-  Save,
-  Plus,
-  X,
-  ChevronsUpDown,
-  ChevronsDownUp
-} from 'lucide-react';
+import { Check, Circle, CircleDot, Minus, Sliders, ExternalLink, Plus } from 'lucide-react';
 import type {
   AtaTask,
   AtaTaskPlan,
@@ -40,7 +26,7 @@ import { formatDateBR } from '../../services/temporalEngineService';
 import { classifyTaskAttention } from '../contracts/taskAttentionDisplay';
 import { severityFromAttentionPriorityLevel } from '../../services/severityService';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
-import { AppButton, DataTable, EmptyState, Modal, NoticeBar, SummaryBar, useConfirmDialog } from '../../design-system';
+import { ActionButton, AppButton, DataTable, EmptyState, Modal, NoticeBar, SummaryBar, useConfirmDialog } from '../../design-system';
 
 /**
  * Plano de gestão: mesma tela para Contrato e Ata. O componente só desenha; quem usa informa por
@@ -240,7 +226,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
                 padding: '0.25rem 0.5rem',
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                color: '#0c326f',
+                color: 'var(--primary)',
                 backgroundColor: '#f8fafc',
                 border: '1px solid #cbd5e1',
                 borderRadius: '4px',
@@ -252,14 +238,10 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             </a>
           )}
 
-          <AppButton
+          <ActionButton action={expanded ? 'recolher' : 'expandir'} iconOnly label={expanded ? 'Recolher detalhes' : 'Editar prazo e responsável'}
             type="button"
-            variant="ghost"
             size="sm"
-            iconOnly
-            icon={expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             onClick={() => setExpanded(!expanded)}
-            title={expanded ? 'Recolher detalhes' : 'Editar prazo e responsável'}
           />
 
           <ConfirmDeleteButton
@@ -335,7 +317,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             />
           </div>
 
-          <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: gestorNome ? '#64748b' : '#b45309', marginTop: '-0.4rem' }}>
+          <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: gestorNome ? '#64748b' : 'var(--color-warning-text)', marginTop: '-0.4rem' }}>
             {gestorNome ? labels.herancaMsg : labels.semGestorMsg}
           </div>
 
@@ -359,24 +341,18 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           </div>
 
           <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-            <AppButton
+            <ActionButton action="cancelar"
               type="button"
-              variant="outline"
               size="sm"
-              onClick={() => setExpanded(false)}
-            >
-              Cancelar
-            </AppButton>
-            <AppButton
+              onClick={() => setExpanded(false)} />
+            <ActionButton action="salvar"
               type="submit"
-              variant="primary"
               size="sm"
-              icon={<Save size={13} />}
               disabled={updateMutation.isPending}
               isLoading={updateMutation.isPending}
             >
               Salvar Alterações
-            </AppButton>
+            </ActionButton>
           </div>
         </form>
       )}
@@ -482,7 +458,7 @@ export const TaskPlanSection: React.FC<{
               ou{' '}
               <AppButton
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={c.startPlan.run}
                 disabled={c.startPlan.isPending}
@@ -531,9 +507,7 @@ export const TaskPlanSection: React.FC<{
         testId="apply-again-modal"
         footer={
           <>
-            <AppButton type="button" variant="outline" onClick={() => setNomeNovoModulo(null)} disabled={c.applyTemplate.isPending}>
-              Cancelar
-            </AppButton>
+            <ActionButton action="cancelar" type="button" onClick={() => setNomeNovoModulo(null)} disabled={c.applyTemplate.isPending} />
             <AppButton
               type="button"
               variant="primary"
@@ -579,25 +553,19 @@ export const TaskPlanSection: React.FC<{
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
           {moduleGroups.length > 1 && (
-            <AppButton
+            <ActionButton action={allCollapsed ? 'expandir' : 'recolher'} iconOnly label={allCollapsed ? 'Expandir todos' : 'Recolher todos'}
               type="button"
-              variant="ghost"
               size="sm"
-              iconOnly
-              icon={allCollapsed ? <ChevronsUpDown size={15} /> : <ChevronsDownUp size={15} />}
               onClick={() => setCollapsedGroups(allCollapsed ? new Set() : new Set(moduleGroups.map((g) => g.key)))}
-              title={allCollapsed ? 'Expandir todos' : 'Recolher todos'}
             />
           )}
-          <AppButton
-            type="button"
-            variant={showApplyModel ? 'outline' : 'primary'}
-            size="sm"
-            icon={showApplyModel ? <X size={14} /> : <Plus size={14} />}
-            onClick={() => setShowApplyModel((v) => !v)}
-          >
-            {showApplyModel ? 'Fechar' : 'Aplicar modelo'}
-          </AppButton>
+          {showApplyModel ? (
+            <ActionButton action="fechar" type="button" size="sm" onClick={() => setShowApplyModel(false)} />
+          ) : (
+            <AppButton type="button" variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setShowApplyModel(true)}>
+              Aplicar modelo
+            </AppButton>
+          )}
         </div>
       </div>
 

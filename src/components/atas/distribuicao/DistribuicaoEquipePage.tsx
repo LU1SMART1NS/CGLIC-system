@@ -31,8 +31,8 @@ import { formatContractNumber } from '../../../utils/contractNumber';
 import { buildDistribuicaoEquipe } from './distribuicaoEquipe';
 import { mesesDeVigencia } from './complexidade';
 
-const AMBAR = '#d97706';
-const VERMELHO = '#dc2626';
+const AMBAR = 'var(--color-warning)';
+const VERMELHO = 'var(--color-danger)';
 
 
 /** Categoria do contrato: `categoria` no Contratos.gov.br, `nomeCategoria` no Compras.gov.br. */
@@ -113,6 +113,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
           numeroCompra: arp.numeroCompra,
           anoCompra: arp.anoCompra,
           cnpjs: Array.from(new Set(itens.map((i) => (i.niFornecedor || '').replace(/\D/g, '')).filter(Boolean))),
+          fornecedorNomes: Array.from(new Set(itens.map((i) => i.nomeRazaoSocialFornecedor).filter(Boolean))),
           gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
           objeto: arp.objeto,
           fornecedorNome: itens[0]?.nomeRazaoSocialFornecedor,
@@ -213,7 +214,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
       <PageHeader
         title="Central de Distribuição"
         subtitle="Quem cuida de cada ata e contrato vigente. Contratos vinculados a uma ata seguem o gestor da ata."
-        icon={<Users size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<Users size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
             onRefresh={contratos.podeForcarAtualizacao ? refresh : undefined}
@@ -283,6 +284,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
               confirmacoes={confirmacoesSemAta}
               podeAgir={canAssign}
               ataDe={ataDe}
+              atas={atasFila}
               itensDaAta={itensDaAta}
               onAtribuir={(lista, done) =>
                 setTransferencia({

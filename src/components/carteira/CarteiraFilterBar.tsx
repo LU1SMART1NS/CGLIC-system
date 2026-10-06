@@ -1,5 +1,6 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraFilterButton, type CarteiraFilterOption } from './CarteiraFilterButton';
 import { SEM_GESTOR, TODOS_GESTORES } from './carteiraGestor';
 
@@ -54,26 +55,13 @@ export const CarteiraFilterBar: React.FC<CarteiraFilterBarProps> = ({
       {children}
 
       {hasActiveFilters && (
-        <button
+        <ActionButton
+          action="limpar"
           type="button"
+          size="sm"
           onClick={onResetFilters}
           data-testid={`${testIdPrefix}-reset-filters-btn`}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            padding: '0.35rem 0.65rem',
-            background: '#fee2e2',
-            border: '1px solid #fecaca',
-            borderRadius: '6px',
-            fontSize: '0.76rem',
-            fontWeight: 700,
-            color: '#991b1b',
-            cursor: 'pointer'
-          }}
-        >
-          <X size={12} /> Limpar
-        </button>
+        />
       )}
     </div>
 

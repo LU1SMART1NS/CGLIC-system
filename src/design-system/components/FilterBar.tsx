@@ -1,5 +1,6 @@
 import React from 'react';
-import { Search, X, Filter } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
+import { ActionButton } from './ActionButton';
 import { colors, shapes, typography, spacing } from '../tokens';
 
 export interface FilterOption {
@@ -135,27 +136,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
         {/* Limpar Filtros */}
         {hasActiveFilters && onClearFilters && (
-          <button
+          <ActionButton
+            action="limparFiltros"
             type="button"
+            size="sm"
             onClick={onClearFilters}
             data-testid="filter-bar-clear-btn"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: spacing.xxs,
-              padding: `${spacing.xs} ${spacing.sm}`,
-              borderRadius: shapes.radius.md,
-              border: `1px solid ${colors.semantic.danger.border}`,
-              background: colors.semantic.danger.bg,
-              color: colors.semantic.danger.text,
-              fontSize: typography.fontSize.label,
-              fontWeight: typography.fontWeight.bold,
-              cursor: 'pointer'
-            }}
-          >
-            <X size={12} aria-hidden="true" />
-            <span>Limpar Filtros</span>
-          </button>
+          />
         )}
       </div>
 

@@ -1,6 +1,8 @@
 import React from 'react';
-import { CheckSquare, UserPlus, X } from 'lucide-react';
-import { carteiraButton, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { CheckSquare, UserPlus } from 'lucide-react';
+import { ActionButton } from '../../../design-system/components/ActionButton';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 
 /**
  * Seleção em lote das filas (padrão Gmail / "alterar em lote" do Jira): a seleção sobrevive à troca de página e
@@ -45,7 +47,7 @@ export function useSelecaoFila(chavesDaFila: string[]) {
   return { selecionadas, alternar, alternarVarias, selecionarTodas, limpar };
 }
 
-const checkboxStyle: React.CSSProperties = { width: '15px', height: '15px', cursor: 'pointer', accentColor: '#0c326f' };
+const checkboxStyle: React.CSSProperties = { width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--primary)' };
 
 /** Cabeçalho com "marcar a página". */
 export const SelecaoHeaderCell: React.FC<{ chavesDaPagina: string[]; selecionadas: Set<string>; onToggle: () => void; testId: string }> = ({
@@ -95,7 +97,7 @@ export const SelecaoCell: React.FC<{ checked: boolean; onToggle: () => void; lab
 );
 
 /** Fundo da linha marcada. */
-export const SELECIONADA_BG = '#eff6ff';
+export const SELECIONADA_BG = 'var(--color-info-bg)';
 
 interface SelecaoBarProps {
   quantidade: number;
@@ -135,10 +137,10 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
       gap: '0.6rem',
       padding: '0.55rem 0.85rem',
       background: SELECIONADA_BG,
-      border: '1px solid #bfdbfe',
+      border: '1px solid var(--color-info-border)',
       borderRadius: '8px',
       fontSize: '0.8rem',
-      color: '#1e3a8a'
+      color: 'var(--color-info-text-strong)'
     }}
   >
     <CheckSquare size={15} aria-hidden="true" />
@@ -147,27 +149,22 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
     </strong>
     {detalhe && <span>· {detalhe}</span>}
     {quantidade < totalFiltrado && (
-      <button
-        type="button"
-        onClick={onSelecionarTodas}
-        data-testid={`${testIdPrefix}-selecionar-todas`}
-        style={{ background: 'none', border: 'none', padding: 0, color: '#0c326f', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
-      >
+      <AppButton type="button" variant="link" size="sm" onClick={onSelecionarTodas} data-testid={`${testIdPrefix}-selecionar-todas`}>
         Selecionar todas as {totalFiltrado}
-      </button>
+      </AppButton>
     )}
     <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem' }}>
-      <button type="button" onClick={onLimpar} data-testid={`${testIdPrefix}-limpar-selecao`} style={{ ...carteiraButton, color: '#475569' }}>
-        <X size={13} /> Limpar
-      </button>
-      <button
+      <ActionButton action="limpar" type="button" size="sm" onClick={onLimpar} data-testid={`${testIdPrefix}-limpar-selecao`} />
+      <AppButton
         type="button"
+        variant="primary"
+        size="sm"
         onClick={onAtribuir}
         data-testid={`${testIdPrefix}-atribuir-selecionadas`}
-        style={{ ...carteiraButton, color: '#ffffff', background: '#0c326f', borderColor: '#0c326f' }}
+        icon={<UserPlus size={14} />}
       >
-        <UserPlus size={13} /> Atribuir a...
-      </button>
+        Atribuir a...
+      </AppButton>
     </span>
   </div>
 );

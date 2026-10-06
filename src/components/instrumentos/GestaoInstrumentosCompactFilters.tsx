@@ -1,5 +1,6 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import type { DashboardAttentionSeverity } from '../../types/managementDashboard';
 
 export interface GestaoInstrumentosCompactFiltersState {
@@ -82,26 +83,11 @@ export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompac
         </select>
 
         {hasActiveFilters && (
-          <button
+          <ActionButton action="limpar"
             type="button"
+            size="sm"
             onClick={onResetFilters}
-            data-testid="instrumentos-reset-filters-btn"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-              padding: '0.35rem 0.65rem',
-              background: '#fee2e2',
-              border: '1px solid #fecaca',
-              borderRadius: '6px',
-              fontSize: '0.76rem',
-              fontWeight: 700,
-              color: '#991b1b',
-              cursor: 'pointer'
-            }}
-          >
-            <X size={12} /> Limpar
-          </button>
+            data-testid="instrumentos-reset-filters-btn" />
         )}
       </div>
 

@@ -1,6 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2 } from 'lucide-react';
-import { IconButton } from '../../../design-system/components/IconButton';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 
 export interface AdminRowActionsProps {
   /** Nome do registro, usado no texto acessível ("Editar DFNSP"). */
@@ -14,15 +13,9 @@ export interface AdminRowActionsProps {
 /** Ações de linha padrão das listas administrativas: editar e excluir. */
 export const AdminRowActions: React.FC<AdminRowActionsProps> = ({ name, onEdit, onDelete, disabled, deleteLabel = 'Excluir' }) => (
   <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-    {onEdit && <IconButton label={`Editar ${name}`} icon={<Edit2 size={16} />} onClick={onEdit} disabled={disabled} />}
+    {onEdit && <ActionButton action="editar" iconOnly label={`Editar ${name}`} onClick={onEdit} disabled={disabled} />}
     {onDelete && (
-      <IconButton
-        label={`${deleteLabel} ${name}`}
-        icon={<Trash2 size={16} />}
-        onClick={onDelete}
-        disabled={disabled}
-        style={{ color: '#ef4444' }}
-      />
+      <ActionButton action="excluir" iconOnly label={`${deleteLabel} ${name}`} onClick={onDelete} disabled={disabled} />
     )}
   </div>
 );

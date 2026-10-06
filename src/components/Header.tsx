@@ -13,7 +13,7 @@ export const Header: React.FC<HeaderProps> = () => {
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Gov.br Federal Identity Topbar */}
       <div className="app-header-topbar" style={{
-        background: '#0c326f',
+        background: 'var(--primary)',
         color: '#ffffff',
         paddingTop: '0.25rem',
         paddingBottom: '0.25rem',

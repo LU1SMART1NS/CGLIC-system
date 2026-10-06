@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, RotateCcw } from 'lucide-react';
+import { AppButton } from './AppButton';
 import { colors, shapes, typography, spacing } from '../tokens';
 
 export interface ErrorStateProps {
@@ -49,27 +50,16 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
 
       {onRetry && (
         <div style={{ marginTop: spacing.xs }}>
-          <button
+          <AppButton
             type="button"
+            variant="outline"
+            size="sm"
+            icon={<RotateCcw size={14} aria-hidden="true" />}
             onClick={onRetry}
             data-testid={`${testId}-retry-btn`}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: spacing.xs,
-              padding: `${spacing.xs} ${spacing.md}`,
-              borderRadius: shapes.radius.md,
-              border: `1px solid ${colors.semantic.danger.solid}`,
-              background: colors.background.surface,
-              color: colors.semantic.danger.text,
-              fontSize: typography.fontSize.bodySm,
-              fontWeight: typography.fontWeight.bold,
-              cursor: 'pointer'
-            }}
           >
-            <RotateCcw size={14} aria-hidden="true" />
             <span>{retryLabel}</span>
-          </button>
+          </AppButton>
         </div>
       )}
     </div>

@@ -1,6 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
-import { AppButton } from './AppButton';
+import { ActionButton } from './ActionButton';
 
 export type NoticeBarTone = 'warning' | 'info' | 'success' | 'danger';
 
@@ -16,10 +15,10 @@ export interface NoticeBarProps {
 }
 
 const TONES: Record<NoticeBarTone, { background: string; border: string; color: string }> = {
-  warning: { background: '#fffbeb', border: '#fde68a', color: '#92400e' },
-  info: { background: '#eff6ff', border: '#bfdbfe', color: '#1e3a8a' },
-  success: { background: '#f0fdf4', border: '#bbf7d0', color: '#166534' },
-  danger: { background: '#fef2f2', border: '#fecaca', color: '#991b1b' }
+  warning: { background: 'var(--color-warning-bg)', border: 'var(--color-warning-border)', color: 'var(--color-warning-text-strong)' },
+  info: { background: 'var(--color-info-bg)', border: 'var(--color-info-border)', color: 'var(--color-info-text-strong)' },
+  success: { background: 'var(--color-success-bg)', border: 'var(--color-success-border)', color: 'var(--color-success-text-strong)' },
+  danger: { background: 'var(--color-danger-bg)', border: 'var(--color-danger-border)', color: 'var(--color-danger-text-strong)' }
 };
 
 /**
@@ -49,7 +48,7 @@ export const NoticeBar: React.FC<NoticeBarProps> = ({ tone = 'warning', children
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
         {action}
         {onDismiss && (
-          <AppButton variant="ghost" size="sm" iconOnly icon={<X size={14} />} onClick={onDismiss} title="Fechar aviso" />
+          <ActionButton action="fechar" iconOnly label="Fechar aviso" onClick={onDismiss} />
         )}
       </span>
     </div>

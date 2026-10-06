@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, Calendar, Layers, Tag } from 'lucide-react';
+import { AppButton } from './AppButton';
 import { SeverityBadge } from './SeverityBadge';
 import { severityTokens, type SeverityLevel, type OperationalCategory, operationalCategoryTokens, colors, shapes, typography, spacing } from '../tokens';
 
@@ -185,29 +186,17 @@ export const AlertCard: React.FC<AlertCardProps> = ({
         {/* Action Button */}
         {hasAction && (
           <div style={{ alignSelf: 'center' }}>
-            <button
+            <AppButton
               type="button"
+              variant="outline"
+              size="sm"
               onClick={handleActionClick}
               aria-label={`${resolvedActionLabel} para ${title}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: spacing.xs,
-                padding: `${spacing.xs} ${spacing.md}`,
-                background: colors.background.subtle,
-                color: colors.brand.primary,
-                border: `1px solid ${colors.border.strong}`,
-                borderRadius: shapes.radius.md,
-                fontSize: typography.fontSize.bodySm,
-                fontWeight: typography.fontWeight.bold,
-                cursor: 'pointer',
-                transition: shapes.transition.fast,
-                whiteSpace: 'nowrap'
-              }}
+              style={{ whiteSpace: 'nowrap' }}
             >
               <span>{resolvedActionLabel}</span>
               <ArrowRight size={14} aria-hidden="true" />
-            </button>
+            </AppButton>
           </div>
         )}
       </div>

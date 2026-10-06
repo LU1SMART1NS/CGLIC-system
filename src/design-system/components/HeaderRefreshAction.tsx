@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { AppButton } from './AppButton';
+import { ActionButton } from './ActionButton';
 
 export interface HeaderRefreshActionProps {
   /** Sem `onRefresh`, mostra só o indicador "Atualizado em" (perfis que não atualizam os dados). */
@@ -98,17 +97,17 @@ export const HeaderRefreshAction: React.FC<HeaderRefreshActionProps> = ({
       </div>
 
       {onRefresh && (
-        <AppButton
-          variant="outline"
+        <ActionButton
+          action="sincronizar"
+          label="Atualizar"
           onClick={onRefresh}
           disabled={isRefreshing}
           isLoading={isRefreshing}
-          icon={<RefreshCw size={14} className={isRefreshing ? 'spin-animation' : ''} />}
           title={displayTooltip}
           data-testid={dataTestId}
         >
           {isRefreshing ? 'Atualizando...' : 'Atualizar'}
-        </AppButton>
+        </ActionButton>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Check, Lightbulb, Loader2 } from 'lucide-react';
+import { Lightbulb } from 'lucide-react';
 import { Modal } from '../../../design-system/components/Modal';
-import { carteiraButton } from '../../carteira/carteiraStyles';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { useUsers } from '../../../hooks/useUsers';
 import { useRoles } from '../../../hooks/useRoles';
 import { useAssignManager } from '../../../hooks/useAssignManager';
@@ -83,26 +83,17 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
       testId="atribuir-gestor-modal"
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={assign.isPending} style={{ ...carteiraButton, color: '#475569' }}>
-            Cancelar
-          </button>
-          <button
+          <ActionButton action="cancelar" type="button" onClick={onClose} disabled={assign.isPending} />
+          <ActionButton
+            action="salvar"
             type="button"
             onClick={salvar}
             disabled={assign.isPending || !nomeFinal}
             data-testid="atribuir-gestor-salvar"
-            style={{
-              ...carteiraButton,
-              background: '#0c326f',
-              borderColor: '#0c326f',
-              color: '#ffffff',
-              opacity: assign.isPending || !nomeFinal ? 0.6 : 1,
-              cursor: assign.isPending || !nomeFinal ? 'not-allowed' : 'pointer'
-            }}
+            isLoading={assign.isPending}
           >
-            {assign.isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}{' '}
             {nomeFinal ? `Atribuir a ${nomeFinal}` : 'Escolha um gestor'}
-          </button>
+          </ActionButton>
         </>
       }
     >
@@ -114,7 +105,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
           <div style={{ fontWeight: 800, color: '#0f172a' }}>
             {plural(lote.atas, 'ata', 'atas')} · {plural(lote.contratos, 'contrato', 'contratos')} vigentes
             {lote.vinculados > 0 && (
-              <span style={{ fontWeight: 600, color: '#1e3a8a' }}>
+              <span style={{ fontWeight: 600, color: 'var(--color-info-text-strong)' }}>
                 {' '}({lote.vinculados} {lote.vinculados === 1 ? 'vem junto' : 'vêm junto'} pelos vínculos com a ata)
               </span>
             )}
@@ -123,7 +114,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
             Complexidade: {NIVEIS.map((n) => `${lote.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')} — soma {lote.equivalente} de carga
           </div>
           {provaveis > 0 && (
-            <div data-testid="atribuir-gestor-provaveis" style={{ color: '#b45309', fontWeight: 600 }}>
+            <div data-testid="atribuir-gestor-provaveis" style={{ color: 'var(--color-warning-text)', fontWeight: 600 }}>
               Mais {plural(provaveis, 'contrato provável', 'contratos prováveis')} {lote.atas > 1 ? 'destas atas' : 'desta ata'} {provaveis === 1 ? 'virá' : 'virão'} para o gestor quando o servidor vincular.
             </div>
           )}
@@ -153,8 +144,8 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
                     flexWrap: 'wrap',
                     padding: '0.55rem 0.75rem',
                     minHeight: '44px',
-                    border: `1px solid ${selecionado ? '#0c326f' : '#e2e8f0'}`,
-                    background: selecionado ? '#eff6ff' : '#ffffff',
+                    border: `1px solid ${selecionado ? 'var(--primary)' : '#e2e8f0'}`,
+                    background: selecionado ? 'var(--color-info-bg)' : '#ffffff',
                     borderRadius: '8px',
                     cursor: o.jaEhGestor ? 'default' : 'pointer',
                     opacity: o.jaEhGestor ? 0.55 : 1
@@ -174,7 +165,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
                         <span
                           data-testid="atribuir-sugestao"
                           title="Menor carga depois da atribuição entre os gestores (empate: menos urgentes). É só uma sugestão."
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', fontWeight: 700, color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px', padding: '0 0.35rem' }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-success-text)', background: 'var(--color-success-bg)', border: '1px solid var(--color-success-border)', borderRadius: '4px', padding: '0 0.35rem' }}
                         >
                           <Lightbulb size={12} aria-hidden="true" /> Sugestão
                         </span>
@@ -183,9 +174,9 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
                     {o.perfilLabel && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{o.perfilLabel}</div>}
                   </div>
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap' }} title="Carga equivalente: Baixa = 1, Média = 2, Alta = 3">
-                    {o.jaEhGestor ? 'Já é o gestor' : <>Carga {o.cargaAtual} → <span style={{ color: '#0c326f', fontWeight: 900 }}>{o.cargaDepois}</span></>}
+                    {o.jaEhGestor ? 'Já é o gestor' : <>Carga {o.cargaAtual} → <span style={{ color: 'var(--primary)', fontWeight: 900 }}>{o.cargaDepois}</span></>}
                   </div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, minWidth: '120px', color: pressao.length ? '#b91c1c' : '#94a3b8' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, minWidth: '120px', color: pressao.length ? 'var(--color-danger-text)' : '#94a3b8' }}>
                     {pressao.length ? pressao.join(' · ') : 'Sem urgências'}
                   </div>
                 </label>
@@ -195,12 +186,12 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
         </div>
 
         {assign.isError && (
-          <div role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', fontWeight: 600 }}>
+          <div role="alert" style={{ fontSize: '0.8rem', color: 'var(--color-danger-text)', fontWeight: 600 }}>
             Erro ao salvar: {assign.error.message}
           </div>
         )}
         {falhas.length > 0 && (
-          <div role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', fontWeight: 600 }}>
+          <div role="alert" style={{ fontSize: '0.8rem', color: 'var(--color-danger-text)', fontWeight: 600 }}>
             {falhas.length === 1 ? 'Não foi possível salvar 1 item' : `Não foi possível salvar ${falhas.length} itens`}: {falhas.map((f) => f.chave).join(', ')}. {falhas[0].erro}
           </div>
         )}

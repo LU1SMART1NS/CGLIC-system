@@ -248,8 +248,8 @@ export function getContractScopeDisplay(scope?: ContractScope, isReadOnly = fals
       return {
         label: 'Apenas Contratos Atribuídos',
         description: 'Atuação operacional estritamente delimitada aos contratos vinculados ao operador.',
-        badgeBg: '#e0f2fe',
-        badgeColor: '#0284c7'
+        badgeBg: '#dee8f8',
+        badgeColor: '#155bcb'
       };
     case 'UNIT':
       return {
@@ -262,8 +262,8 @@ export function getContractScopeDisplay(scope?: ContractScope, isReadOnly = fals
       return {
         label: 'Apenas Contratos Atribuídos',
         description: 'Atuação operacional delimitada aos contratos atribuídos.',
-        badgeBg: '#e0f2fe',
-        badgeColor: '#0284c7'
+        badgeBg: '#dee8f8',
+        badgeColor: '#155bcb'
       };
   }
 }
@@ -370,7 +370,7 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
   {
     id: 'gestor',
     nome: 'Gestor / Fiscal de Contrato',
-    badgeColor: '#0284c7',
+    badgeColor: '#155bcb',
     descricao: 'Gestão operacional dos contratos atribuídos, preenchimento de checklists e acompanhamento de vigências.',
     isCustom: false,
     permissoes: {

@@ -1,11 +1,12 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, ChevronRight } from 'lucide-react';
 import type { ContractTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { useUpdateContractTask } from '../../hooks/useUpdateContractTask';
@@ -37,21 +38,6 @@ const KIND_LABELS: Record<ContractActionItem['kind'], string> = {
   EMPENHO: 'Execução do contrato'
 };
 
-const secondaryButton: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  padding: '0.4rem 0.75rem',
-  backgroundColor: '#ffffff',
-  color: '#0c326f',
-  border: '1px solid #cbd5e1',
-  borderRadius: '6px',
-  fontSize: '0.78rem',
-  fontWeight: 700,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap'
-};
-
 export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue, contractKey, plan, isLoading = false, onGoTo }) => {
   const updateMutation = useUpdateContractTask(contractKey);
   const { dismiss, restore } = useReminderDismissals('CONTRATO', contractKey);
@@ -73,50 +59,35 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
     );
   }
 
+  /** Itens que só levam a outra tela: a linha inteira é o clique (sem botão de seta). */
+  const rowGo = (item: ContractActionItem): { label: string; go: () => void } | null => {
+    switch (item.kind) {
+      case 'PAGAMENTO': return { label: 'Abrir ciclo', go: () => onGoTo('pagamentos') };
+      case 'REAJUSTE': return { label: 'Ver histórico', go: () => onGoTo('historico') };
+      case 'EMPENHO': return item.href ? { label: 'Confirmar a quantidade no item da ata', go: () => navigate(item.href!) } : null;
+      default: return null;
+    }
+  };
+
   const renderAction = (item: ContractActionItem) => {
     switch (item.kind) {
       case 'TAREFA': {
         if (!item.taskId) return null;
         return (
-          <AppButton
-            variant="outline"
+          <ActionButton action="concluir"
             size="sm"
-            
-            icon={<Check size={15} />}
             onClick={() => updateMutation.mutate({ taskId: item.taskId!, status: 'CONCLUIDA' })}
             disabled={updateMutation.isPending}
             title="Concluir"
           >
               <span className="payment-action-label">Concluir</span>
-            </AppButton>
+            </ActionButton>
         );
       }
       case 'PAGAMENTO':
-        return (
-          <AppButton variant="outline" size="sm"  icon={<ArrowRight size={15} />} onClick={() => onGoTo('pagamentos')} title="Abrir ciclo" >
-              <span className="payment-action-label">Abrir ciclo</span>
-            </AppButton>
-        );
       case 'EMPENHO':
-        if (!item.href) return null;
-        return (
-          <AppButton
-            variant="outline"
-            size="sm"
-            
-            icon={<ArrowRight size={15} />}
-            onClick={() => navigate(item.href!)}
-            title="Confirmar a quantidade no item da ata"
-          >
-              <span className="payment-action-label">Confirmar quantidade</span>
-            </AppButton>
-        );
       case 'REAJUSTE':
-        return (
-          <AppButton variant="outline" size="sm"  icon={<ArrowRight size={15} />} onClick={() => onGoTo('historico')} title="Ver histórico" >
-              <span className="payment-action-label">Ver histórico</span>
-            </AppButton>
-        );
+        return rowGo(item) ? <span className="action-row__go" aria-hidden="true"><ChevronRight size={18} /></span> : null;
       case 'LEMBRETE':
         return (
           <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -163,15 +134,15 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
       {queue.items.length === 0 ? (
         <div
           style={{
-            background: '#f0fdf4',
+            background: 'var(--color-success-bg)',
             borderRadius: '10px',
-            border: '1px solid #bbf7d0',
+            border: '1px solid var(--color-success-border)',
             padding: '1.25rem',
             textAlign: 'center',
-            color: '#166534'
+            color: 'var(--color-success-text-strong)'
           }}
         >
-          <CheckCircle2 size={22} style={{ color: '#15803d', margin: '0 auto 0.5rem auto', display: 'block' }} />
+          <CheckCircle2 size={22} style={{ color: 'var(--color-success-text)', margin: '0 auto 0.5rem auto', display: 'block' }} />
           <h4 style={{ fontSize: '1rem', fontWeight: 800, margin: '0 0 0.25rem 0', color: '#14532d' }}>
             Tudo em dia com este contrato
           </h4>
@@ -191,18 +162,30 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
             {queue.items.map((item, idx) => {
               const isHighlighted = item.id === highlightedId;
+              const target = rowGo(item);
               return (
                 <div
                   key={item.id}
                   data-action-id={item.id}
+                  className={target ? 'action-row--go' : undefined}
+                  {...(target ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    title: target.label,
+                    'aria-label': `${target.label}: ${item.title}`,
+                    onClick: target.go,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); target.go(); }
+                    }
+                  } : {})}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '1rem',
                     padding: '0.8rem 1rem',
                     borderTop: idx === 0 ? 'none' : '1px solid #e2e8f0',
-                    borderLeft: `4px solid ${isHighlighted ? '#0c326f' : severityTokens[item.severity].borderLeft}`,
-                    backgroundColor: isHighlighted ? '#eff6ff' : '#ffffff',
+                    borderLeft: `4px solid ${isHighlighted ? 'var(--primary)' : severityTokens[item.severity].borderLeft}`,
+                    backgroundColor: isHighlighted ? 'var(--color-info-bg)' : '#ffffff',
                     flexWrap: 'wrap'
                   }}
                 >
@@ -233,14 +216,15 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
             {queue.dispensados.map((item) => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <span style={{ flex: '1 1 220px', minWidth: 0 }}>{item.title}</span>
-                <button
+                <AppButton
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => restore.mutate({ itemId: item.id })}
                   disabled={restore.isPending}
-                  style={secondaryButton}
                 >
                   Reexibir
-                </button>
+                </AppButton>
               </div>
             ))}
           </div>
@@ -248,24 +232,17 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
       )}
 
       {queue.tarefasSemPrazo > 0 && (
-        <button
+        <AppButton
           type="button"
+          variant="link"
+          size="xs"
           onClick={() => onGoTo('plano')}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            color: '#475569',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            textDecoration: 'underline'
-          }}
+          style={{ alignSelf: 'flex-start' }}
         >
           {queue.tarefasSemPrazo === 1
             ? '1 tarefa do plano está sem prazo definido — definir no plano'
             : `${queue.tarefasSemPrazo} tarefas do plano estão sem prazo definido — definir no plano`}
-        </button>
+        </AppButton>
       )}
     </div>
   );

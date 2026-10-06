@@ -88,9 +88,9 @@ export const Instrument360Tabs = React.forwardRef(function Instrument360Tabs<T e
                   style={{
                     padding: '0.5rem 1rem',
                     border: 'none',
-                    borderBottom: `3px solid ${selected ? '#0c326f' : 'transparent'}`,
+                    borderBottom: `3px solid ${selected ? 'var(--primary)' : 'transparent'}`,
                     marginBottom: '-2px',
-                    color: selected ? '#0c326f' : '#475569',
+                    color: selected ? 'var(--primary)' : '#475569',
                     fontWeight: selected ? 800 : 600,
                     fontSize: '0.88rem',
                     cursor: 'pointer'

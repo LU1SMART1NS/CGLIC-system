@@ -40,8 +40,8 @@ export const pncpLinkStyle: React.CSSProperties = {
   gap: '0.35rem',
   fontSize: '0.75rem',
   fontWeight: 700,
-  color: '#0284c7',
-  backgroundColor: 'rgba(2, 132, 199, 0.08)',
+  color: 'var(--color-info-text)',
+  backgroundColor: 'rgba(21, 91, 203, 0.08)',
   padding: '0.25rem 0.65rem',
   borderRadius: '6px',
   textDecoration: 'none'

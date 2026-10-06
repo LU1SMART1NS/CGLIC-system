@@ -1,6 +1,5 @@
 import React from 'react';
-import { Check } from 'lucide-react';
-import { AlertCard, AppButton, NoticeBar, StatusBadge, SummaryBar } from '../../design-system';
+import { AlertCard, ActionButton, NoticeBar, StatusBadge, SummaryBar } from '../../design-system';
 import { formatNumber } from './itemBalanceUtils';
 import type { ItemExecutionSummary, ReferenciaComprasGovStatus } from '../../utils/itemExecutionSummary';
 
@@ -69,9 +68,9 @@ export const ItemExecutionSummaryStrip: React.FC<ItemExecutionSummaryStripProps>
           testId="empenhos-pendentes-banner"
           action={
             canEdit && aceitaveis > 0 && onAcceptAll ? (
-              <AppButton variant="outline" size="sm" icon={<Check size={13} />} onClick={onAcceptAll} disabled={busy}>
+              <ActionButton action="aplicarSugestao" size="sm" onClick={onAcceptAll} disabled={busy}>
                 Aceitar todas as sugestões do item
-              </AppButton>
+              </ActionButton>
             ) : undefined
           }
         >

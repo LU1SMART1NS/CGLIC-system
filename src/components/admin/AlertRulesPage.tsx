@@ -1,9 +1,9 @@
 import React from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
-import { BellRing, RotateCcw, Scale } from 'lucide-react';
+import { BellRing, Scale } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../design-system/components/PageHeader';
-import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { useConfirmDialog, useToast } from '../../design-system';
 import {
   ALERT_RULE_DEFAULTS,
@@ -14,7 +14,6 @@ import {
 } from '../../config/alertRules';
 import { saveAlertSettings } from '../../services/alertSettingsService';
 import { DataTable } from '../../design-system/components/DataTable';
-import { IconButton } from '../../design-system/components/IconButton';
 import { AdminListShell } from './shared/AdminListShell';
 
 /** Limites que vêm de lei ou decreto: aparecem só como referência, nunca editáveis. */
@@ -83,26 +82,25 @@ export const AlertRulesPage: React.FC = () => {
       <PageHeader
         title="Regras de Alertas"
         subtitle="Limites que classificam os alertas em todas as telas."
-        icon={<BellRing size={26} color="#0c326f" aria-hidden="true" />}
+        icon={<BellRing size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
-            <AppButton
-              variant="outline"
-              icon={<RotateCcw size={15} />}
+            <ActionButton
+              action="restaurar"
+              label="Restaurar padrão"
               onClick={() => resetToDefaults(ALERT_RULE_DEFINITIONS.map((d) => d.key))}
               disabled={differsFromDefault === 0 || isSaving}
               data-testid="alert-rules-reset-all"
-            >
-              Restaurar padrão
-            </AppButton>
-            <AppButton
+            />
+            <ActionButton
+              action="salvar"
               onClick={handleSave}
               disabled={hasErrors || changedKeys.length === 0 || isSaving}
               isLoading={isSaving}
               data-testid="alert-rules-save"
             >
               Salvar{changedKeys.length > 0 ? ` (${changedKeys.length})` : ''}
-            </AppButton>
+            </ActionButton>
           </>
         }
       />
@@ -128,7 +126,7 @@ export const AlertRulesPage: React.FC = () => {
                         <label htmlFor={`rule-${def.key}`} style={{ fontWeight: 700, color: '#0f172a' }}>{def.label}</label>
                         {def.hint && <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{def.hint}</div>}
                         {error && (
-                          <div role="alert" style={{ fontSize: '0.76rem', color: '#b91c1c', marginTop: '2px', fontWeight: 600 }}>{error}</div>
+                          <div role="alert" style={{ fontSize: '0.76rem', color: 'var(--color-danger-text)', marginTop: '2px', fontWeight: 600 }}>{error}</div>
                         )}
                       </>
                     );
@@ -156,8 +154,8 @@ export const AlertRulesPage: React.FC = () => {
                           className="ds-field__control"
                           style={{
                             ...inputStyle,
-                            borderColor: error ? '#dc2626' : isChanged ? '#0c326f' : undefined,
-                            background: isChanged ? '#eff6ff' : undefined
+                            borderColor: error ? 'var(--color-danger)' : isChanged ? 'var(--primary)' : undefined,
+                            background: isChanged ? 'var(--color-info-bg)' : undefined
                           }}
                         />
                         <span style={{ fontSize: '0.8rem', color: '#475569' }}>{def.unit}</span>
@@ -175,10 +173,11 @@ export const AlertRulesPage: React.FC = () => {
               rowActions={(def) => {
                 const isDefault = parsed[def.key] === ALERT_RULE_DEFAULTS[def.key];
                 return (
-                  <IconButton
+                  <ActionButton
+                    action="restaurar"
+                    iconOnly
                     label={`Voltar ao padrão: ${def.label}`}
                     title="Voltar ao padrão"
-                    icon={<RotateCcw size={16} />}
                     onClick={() => resetToDefaults([def.key])}
                     disabled={isDefault || isSaving}
                   />

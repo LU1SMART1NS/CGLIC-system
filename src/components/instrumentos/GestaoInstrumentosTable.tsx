@@ -1,9 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ChevronRight, RotateCcw } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
+import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
+import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
+import { carteiraSubtitle, carteiraTh as th, carteiraTd as td } from '../carteira/carteiraStyles';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import {
   getInstrumentoInfo,
   getMotivoInfo,
@@ -23,25 +28,27 @@ interface GestaoInstrumentosTableProps {
   pageSize?: number;
 }
 
-const th: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '0.65rem 0.85rem',
-  fontSize: '0.75rem',
-  fontWeight: 800,
-  textTransform: 'uppercase',
-  letterSpacing: '0.03em',
-  color: '#64748b',
-  borderBottom: '1px solid #e2e8f0',
-  whiteSpace: 'nowrap'
+const SEVERIDADE_ORDEM: Record<string, number> = { CRITICA: 0, URGENTE: 1, ATENCAO: 2, INFO: 3 };
+
+const SORT_COLUMNS: Record<string, CarteiraSortColumn<RowData>> = {
+  prioridade: { value: (r) => SEVERIDADE_ORDEM[r.item.severity] ?? 9 },
+  uasg: { value: (r) => r.item.uasg },
+  instrumento: { value: (r) => `${r.instrumento.tipo} ${r.instrumento.label}` },
+  objeto: { value: (r) => r.item.objetoItem || r.fornecedor || r.item.fornecedorNome },
+  situacao: { value: (r) => r.situacao },
+  motivo: { value: (r) => r.motivo.label },
+  prazo: { value: (r) => r.item.diasRelevantes ?? null },
+  responsavel: { value: (r) => r.responsavel }
 };
 
-const td: React.CSSProperties = {
-  padding: '0.7rem 0.85rem',
-  fontSize: '0.82rem',
-  color: '#0f172a',
-  borderBottom: '1px solid #f1f5f9',
-  verticalAlign: 'middle'
-};
+interface RowData {
+  item: AttentionItemWithUasg;
+  instrumento: ReturnType<typeof getInstrumentoInfo>;
+  motivo: ReturnType<typeof getMotivoInfo>;
+  situacao: string;
+  fornecedor?: string;
+  responsavel?: string;
+}
 
 export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = ({
   items,
@@ -58,13 +65,29 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
     setPage(1);
   }, [items]);
 
+  const rows = useMemo<RowData[]>(
+    () =>
+      items.map((item) => {
+        const fornecedor = fornecedorByKey.get(getLookupKey(item));
+        return {
+          item,
+          instrumento: getInstrumentoInfo(item),
+          motivo: getMotivoInfo(item.category),
+          situacao: getSituacaoAtual(item),
+          fornecedor,
+          responsavel: item.contractKey ? responsavelByContractKey.get(item.contractKey) : undefined
+        };
+      }),
+    [items, fornecedorByKey, responsavelByContractKey]
+  );
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, SORT_COLUMNS);
+  const sort = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
+
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const currentPage = Math.min(page, totalPages);
 
-  const pageItems = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }, [items, currentPage, pageSize]);
+
+  const pageRows = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   if (totalItems === 0) {
     return (
@@ -94,26 +117,11 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
         <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', maxWidth: '400px' }}>
           Nenhum instrumento corresponde aos filtros selecionados. Altere os critérios ou limpe os filtros.
         </p>
-        <button
+        <ActionButton action="limparFiltros"
           type="button"
+          size="sm"
           onClick={onResetFilters}
-          style={{
-            marginTop: '0.5rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            padding: '0.45rem 0.85rem',
-            background: '#0c326f',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            color: '#ffffff',
-            cursor: 'pointer'
-          }}
-        >
-          <RotateCcw size={13} /> Limpar Filtros
-        </button>
+          style={{ marginTop: '0.5rem' }} />
       </div>
     );
   }
@@ -132,27 +140,21 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
         <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={th}>Prioridade</th>
-              <th style={th}>UASG</th>
-              <th style={th}>Instrumento</th>
-              <th style={th}>Objeto / Fornecedor</th>
-              <th style={th}>Situação Atual</th>
-              <th style={th}>Motivo da Atenção</th>
-              <th style={th}>Prazo</th>
-              <th style={th}>Responsável</th>
+              <CarteiraSortHeader label="Prioridade" sortKey="prioridade" {...sort} />
+              <CarteiraSortHeader label="UASG" sortKey="uasg" {...sort} />
+              <CarteiraSortHeader label="Instrumento" sortKey="instrumento" {...sort} />
+              <CarteiraSortHeader label="Objeto / Fornecedor" sortKey="objeto" {...sort} />
+              <CarteiraSortHeader label="Situação Atual" sortKey="situacao" {...sort} />
+              <CarteiraSortHeader label="Motivo da Atenção" sortKey="motivo" {...sort} />
+              <CarteiraSortHeader label="Prazo" sortKey="prazo" {...sort} />
+              <CarteiraSortHeader label="Responsável" sortKey="responsavel" {...sort} />
               <th style={th}>Ação</th>
             </tr>
           </thead>
           <tbody>
-            {pageItems.map((item) => {
-              const instrumento = getInstrumentoInfo(item);
-              const motivo = getMotivoInfo(item.category);
-              const situacao = getSituacaoAtual(item);
+            {pageRows.map(({ item, instrumento, motivo, situacao, fornecedor, responsavel }) => {
               const prazo = getPrazoLabel(item);
               const acao = getAcaoInfo(item);
-              const lookupKey = getLookupKey(item);
-              const fornecedor = fornecedorByKey.get(lookupKey);
-              const responsavel = item.contractKey ? responsavelByContractKey.get(item.contractKey) : undefined;
 
               return (
                 <tr key={item.id} data-testid={`instrumentos-row-${item.id}`}>
@@ -173,7 +175,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                       <>
                         <div title={item.objetoItem} style={{ fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.objetoItem}</div>
                         {item.fornecedorNome && (
-                          <div title={item.fornecedorNome} style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.fornecedorNome}</div>
+                          <div title={item.fornecedorNome} style={carteiraSubtitle}>{item.fornecedorNome}</div>
                         )}
                       </>
                     ) : fornecedor ? (
@@ -204,28 +206,16 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                     {responsavel || <span style={{ color: '#94a3b8' }}>—</span>}
                   </td>
                   <td data-role="action" style={td}>
-                    <button
+                    <AppButton
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => navigate(acao.targetUrl)}
                       data-testid={`instrumentos-action-${item.id}`}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.3rem',
-                        padding: '0.4rem 0.75rem',
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        fontSize: '0.76rem',
-                        fontWeight: 700,
-                        color: '#0c326f',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                      }}
                     >
                       {acao.label}
                       <ChevronRight size={13} />
-                    </button>
+                    </AppButton>
                   </td>
                 </tr>
               );

@@ -1,5 +1,4 @@
 import React from 'react';
-import { UserPlus } from 'lucide-react';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
@@ -7,7 +6,8 @@ import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../../carteira/CarteiraRowLink';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { ActionButton } from '../../../design-system/components/ActionButton';
+import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
@@ -206,7 +206,7 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                             {ata.numeroAta}
                           </CarteiraIdLink>
                           {ata.fornecedorNome && (
-                            <div title={ata.fornecedorNome} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            <div title={ata.fornecedorNome} style={carteiraSubtitle}>
                               {ata.fornecedorNome}
                             </div>
                           )}
@@ -233,7 +233,7 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                             {ata.vinculados.length ? `${plural(ata.vinculados.length, 'vinculado', 'vinculados')} (vão junto)` : 'Nenhum vinculado'}
                           </span>
                           {ata.provaveis.length > 0 && (
-                            <span title={`Prováveis: ${listar(ata.provaveis)}`} style={{ color: '#b45309', fontWeight: 700 }}>
+                            <span title={`Prováveis: ${listar(ata.provaveis)}`} style={{ color: 'var(--color-warning-text)', fontWeight: 700 }}>
                               {plural(ata.provaveis.length, 'provável', 'prováveis')} a vincular
                             </span>
                           )}
@@ -241,14 +241,12 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                       </td>
                       {podeAtribuir && (
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button
+                          <ActionButton action="atribuir"
                             type="button"
+                            size="sm"
                             onClick={() => onAtribuir([ata])}
                             data-testid={`ata-sem-gestor-atribuir-${ata.numeroAta}`}
-                            style={{ ...carteiraButton, color: '#15803d', borderColor: '#bbf7d0', background: '#f0fdf4' }}
-                          >
-                            <UserPlus size={13} /> Atribuir
-                          </button>
+                           />
                         </td>
                       )}
                     </tr>

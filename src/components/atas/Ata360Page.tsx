@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useBackTarget, useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { AlertTriangle, Layers, Link2, ListTodo, Plus } from 'lucide-react';
+import { AlertTriangle, Layers, Link2, ListTodo } from 'lucide-react';
 import { buildAtaItemPath, uasgFromAtaKey, useAta, useAtaItemSaldos, useAtaLinkedContracts } from '../../hooks/useAta';
 import { useBackfillItemSenasp } from '../../hooks/useSyncItemSenasp';
 import { useAtaTaskPlan } from '../../hooks/useAtaTaskPlan';
@@ -21,7 +21,7 @@ import { Instrument360TabPanel } from '../instrument360/Instrument360TabPanel';
 import { useInstrumentTab } from '../instrument360/useInstrumentTab';
 import { LinkContractModal, type LinkableAtaItemOption } from '../modals/LinkContractModal';
 import { useUnlinkContractFromItem } from '../../hooks/useUnlinkContractFromItem';
-import { useToast, useConfirmDialog } from '../../design-system';
+import { ActionButton, useToast, useConfirmDialog } from '../../design-system';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
@@ -173,16 +173,13 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
       numeroCompra: arp.numeroCompra,
       anoCompra: arp.anoCompra
     },
-    fornecedorCnpjs: itens.map((i) => i.niFornecedor).filter(Boolean)
+    fornecedorCnpjs: itens.map((i) => i.niFornecedor).filter(Boolean),
+    fornecedorNomes: itens.map((i) => i.nomeRazaoSocialFornecedor).filter(Boolean)
   };
   const linkButton = canEditLinks && itens.length > 0 ? (
-    <button
-      type="button"
-      onClick={() => setIsLinkModalOpen(true)}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.85rem', backgroundColor: '#0c326f', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-    >
-      <Plus size={14} /> Vincular Contrato
-    </button>
+    <ActionButton action="vincular" type="button" size="sm" onClick={() => setIsLinkModalOpen(true)}>
+      Vincular Contrato
+    </ActionButton>
   ) : null;
 
   const allTabs: { id: Ata360Tab; label: string }[] = [

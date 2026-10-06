@@ -49,10 +49,10 @@ export const InstrumentAlertBadge: React.FC<{ children: React.ReactNode; testId?
       borderRadius: '999px',
       fontSize: compact ? '0.75rem' : '0.78rem',
       fontWeight: 700,
-      color: '#b91c1c',
+      color: 'var(--color-danger-text)',
       // O selo compacto vive na barra azul-marinho: precisa de fundo claro para o vermelho ter contraste.
-      background: compact ? '#fef2f2' : 'transparent',
-      border: compact ? '1px solid #fecaca' : '1px solid #b91c1c',
+      background: compact ? 'var(--color-danger-bg)' : 'transparent',
+      border: compact ? '1px solid var(--color-danger-border)' : '1px solid var(--color-danger-text)',
       whiteSpace: 'nowrap'
     }}
   >

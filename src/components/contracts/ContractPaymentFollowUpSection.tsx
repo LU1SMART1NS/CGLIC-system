@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Ban, Calendar, ChevronDown, ChevronUp, Clock, DollarSign, Plus, Trash2, User } from 'lucide-react';
+import { Calendar, Clock, DollarSign, User } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 import { useContractPaymentFollowUp } from '../../hooks/useContractPaymentFollowUp';
@@ -7,7 +7,7 @@ import { useContractManager } from '../../hooks/useContractManager';
 import { describeResponsavel } from './planTaskEditing';
 import { getPaymentStatusDisplay } from '../../utils/paymentStatusDisplay';
 import { useAuth } from '../../context/AuthContext';
-import { AppButton, EmptyState, NoticeBar, StatusBadge, WorkflowStepper, useConfirmDialog, useToast, type WorkflowStep } from '../../design-system';
+import { ActionButton, EmptyState, NoticeBar, StatusBadge, WorkflowStepper, useConfirmDialog, useToast, type WorkflowStep } from '../../design-system';
 import { CancelCycleModal, CreateCycleModal, MarcoModal, marcoActionLabel } from './payment/PaymentCycleModals';
 import { PaymentCycleDocuments, PaymentCycleHistory } from './payment/PaymentCycleDetails';
 import { isoToBR } from './payment/paymentFormUtils';
@@ -168,9 +168,9 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
           />
         )}
         {canEdit && (
-          <AppButton variant="primary" size="sm" icon={<Plus size={16} />} onClick={() => setIsModalOpen(true)} style={{ marginLeft: 'auto' }}>
+          <ActionButton action="novo" size="sm" onClick={() => setIsModalOpen(true)} style={{ marginLeft: 'auto' }}>
             Registrar Atesto / Faturamento
-          </AppButton>
+          </ActionButton>
         )}
       </div>
 
@@ -218,13 +218,13 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     <span style={{ color: '#c2410c', fontWeight: 600 }}>Gestor do contrato não cadastrado</span>
                   )}
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#0f172a' }}>
-                    <DollarSign size={13} color="#059669" /> Valor Atestado:{' '}
+                    <DollarSign size={13} color="var(--color-success)" /> Valor Atestado:{' '}
                     <strong>{cycle.input.valorAtesto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     <Calendar size={13} /> Vencimento da fatura: <strong>{isoToBR(cycle.input.dataVencimentoFatura)}</strong>
                     {cycle.prazos?.diasUteisAteVencimento !== undefined && cycle.status !== 'PAGO' && cycle.status !== 'CANCELADO' && (
-                      <span style={{ color: cycle.prazos.diasUteisAteVencimento < 0 ? '#dc2626' : '#475569' }}>
+                      <span style={{ color: cycle.prazos.diasUteisAteVencimento < 0 ? 'var(--color-danger)' : '#475569' }}>
                         ({cycle.prazos.diasUteisAteVencimento < 0 ? `${Math.abs(cycle.prazos.diasUteisAteVencimento)}d vencida` : `${cycle.prazos.diasUteisAteVencimento}d úteis`})
                       </span>
                     )}
@@ -234,47 +234,37 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
               <div className="payment-cycle-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {canEdit && acao && (
-                  <AppButton
-                    variant="outline"
+                  <ActionButton
+                    action="avancarEtapa"
                     size="sm"
-                    
-                    icon={<ArrowRight size={15} />}
                     onClick={() => setMarcoCycleKey(cycle.cycleKey)}
                     title={acao}>
                     <span className="payment-action-label">{acao}</span>
-                  </AppButton>
+                  </ActionButton>
                 )}
                 {canEdit && !isPaymentCycleEncerrado(cycle.status) && (
-                  <AppButton
-                    variant="ghostDanger"
+                  <ActionButton
+                    action="cancelarCiclo"
                     size="sm"
-                    
-                    icon={<Ban size={15} />}
                     onClick={() => setCancelCycleKey(cycle.cycleKey)}
                     title="Cancelar ciclo">
                     <span className="payment-action-label">Cancelar ciclo</span>
-                  </AppButton>
+                  </ActionButton>
                 )}
                 {isAdmin && (
-                  <AppButton
-                    variant="ghostDanger"
+                  <ActionButton action="excluir"
                     size="sm"
-                    
-                    icon={<Trash2 size={15} />}
                     onClick={() => void handleDelete(cycle)}
                     title="Excluir ciclo definitivamente">
                     <span className="payment-action-label">Excluir</span>
-                  </AppButton>
+                  </ActionButton>
                 )}
-                <AppButton
-                  variant="outline"
+                <ActionButton action={isExpanded ? 'recolher' : 'expandir'}
                   size="sm"
-                  
-                  icon={isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                   onClick={() => toggleExpand(cycle.cycleKey)}
                   title={isExpanded ? 'Ocultar documentos e histórico' : 'Ver documentos e histórico'}>
                     <span className="payment-action-label">{isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}</span>
-                  </AppButton>
+                  </ActionButton>
               </div>
             </div>
 

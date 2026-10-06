@@ -7,9 +7,9 @@ describe('resolveInviteRedirect — allow-list de origem do redirectTo do convit
     expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
   });
 
-  it('origin permitido (Vercel produção — domínio anterior, mantido temporariamente) -> redirectTo correto', () => {
+  it('domínio anterior (protegido por SSO da Vercel) -> redirectTo aponta ao domínio canônico', () => {
     const result = resolveInviteRedirect('https://cglic-lu1smart1ns-projects.vercel.app');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic-lu1smart1ns-projects.vercel.app/definir-senha' });
+    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
   });
 
   it('origin permitido (localhost de desenvolvimento) -> redirectTo correto', () => {
@@ -18,8 +18,8 @@ describe('resolveInviteRedirect — allow-list de origem do redirectTo do convit
   });
 
   it('tolera barra final na origem recebida', () => {
-    const result = resolveInviteRedirect('https://cglic-lu1smart1ns-projects.vercel.app/');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic-lu1smart1ns-projects.vercel.app/definir-senha' });
+    const result = resolveInviteRedirect('https://cglic.vercel.app/');
+    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
   });
 
   it('origin não permitido (domínio arbitrário) -> convite rejeitado, sem redirectTo', () => {

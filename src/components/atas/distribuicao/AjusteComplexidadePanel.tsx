@@ -1,7 +1,6 @@
 import React from 'react';
-import { Check, Loader2, RotateCcw, X } from 'lucide-react';
 import { AnchoredPanel } from '../../../design-system/components/AnchoredPanel';
-import { carteiraButton } from '../../carteira/carteiraStyles';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { useRemoverComplexidadeAjuste, useSalvarComplexidadeAjuste } from '../../../hooks/useComplexidadeAjustes';
 import { MOTIVOS_AJUSTE, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import type { DistribuicaoItem } from './distribuicaoEquipe';
@@ -49,9 +48,7 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
         <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
           Complexidade {item.tipo === 'ATA' ? 'da ata' : 'do contrato'} {item.numero}
         </strong>
-        <button type="button" onClick={onClose} aria-label="Fechar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: '0.25rem' }}>
-          <X size={15} />
-        </button>
+        <ActionButton action="fechar" iconOnly onClick={onClose} type="button" size="xs" />
       </div>
 
       <div style={{ fontSize: '0.78rem', color: '#475569' }}>
@@ -69,8 +66,8 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
               justifyContent: 'center',
               gap: '0.3rem',
               minHeight: '40px',
-              border: `1px solid ${nivel === n ? '#0c326f' : '#cbd5e1'}`,
-              background: nivel === n ? '#eff6ff' : '#ffffff',
+              border: `1px solid ${nivel === n ? 'var(--primary)' : '#cbd5e1'}`,
+              background: nivel === n ? 'var(--color-info-bg)' : '#ffffff',
               borderRadius: '6px',
               fontSize: '0.8rem',
               fontWeight: 700,
@@ -95,7 +92,7 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
             value={motivoOpcao}
             onChange={(e) => setMotivoOpcao(e.target.value)}
             data-testid="ajuste-motivo"
-            style={{ fontSize: '0.82rem', padding: '0.45rem 0.5rem', border: '1px solid #0c326f', borderRadius: '6px', background: '#ffffff' }}
+            style={{ fontSize: '0.82rem', padding: '0.45rem 0.5rem', border: '1px solid var(--primary)', borderRadius: '6px', background: '#ffffff' }}
           >
             <option value="">Selecione o motivo...</option>
             {MOTIVOS_AJUSTE.map((m) => (
@@ -112,46 +109,37 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
               onChange={(e) => setMotivoTexto(e.target.value)}
               placeholder="Descreva o motivo"
               data-testid="ajuste-motivo-texto"
-              style={{ fontSize: '16px', padding: '0.45rem 0.5rem', border: '1px solid #0c326f', borderRadius: '6px' }}
+              style={{ fontSize: '16px', padding: '0.45rem 0.5rem', border: '1px solid var(--primary)', borderRadius: '6px' }}
             />
           )}
         </div>
       )}
 
       {erro && (
-        <div role="alert" style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 600 }}>
+        <div role="alert" style={{ fontSize: '0.75rem', color: 'var(--color-danger-text)', fontWeight: 600 }}>
           Erro ao salvar: {erro.message}
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap' }}>
         {ajustada ? (
-          <button type="button" onClick={handleVoltar} disabled={ocupado} data-testid="ajuste-voltar-automatica" style={{ ...carteiraButton, color: '#475569' }}>
-            <RotateCcw size={13} /> Voltar à automática
-          </button>
+          <ActionButton action="desfazer" type="button" size="sm" onClick={handleVoltar} disabled={ocupado} data-testid="ajuste-voltar-automatica">
+            Voltar à automática
+          </ActionButton>
         ) : (
           <span />
         )}
         <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <button type="button" onClick={onClose} disabled={ocupado} style={{ ...carteiraButton, color: '#475569' }}>
-            Cancelar
-          </button>
-          <button
+          <ActionButton action="cancelar" type="button" size="sm" onClick={onClose} disabled={ocupado} />
+          <ActionButton
+            action="salvar"
             type="button"
+            size="sm"
             onClick={handleSalvar}
             disabled={!podeSalvar}
             data-testid="ajuste-salvar"
-            style={{
-              ...carteiraButton,
-              background: '#0c326f',
-              borderColor: '#0c326f',
-              color: '#ffffff',
-              opacity: podeSalvar ? 1 : 0.6,
-              cursor: podeSalvar ? 'pointer' : 'not-allowed'
-            }}
-          >
-            {salvar.isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Salvar
-          </button>
+            isLoading={salvar.isPending}
+          />
         </div>
       </div>
     </AnchoredPanel>

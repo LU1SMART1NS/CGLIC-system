@@ -8,7 +8,7 @@ import { formatItemKeyLabel, parseItemKey } from '../../utils/itemKeyParts';
 import type { ContractEmpenhoItemLink } from '../../services/contractEmpenhoItemLinksService';
 import type { ContractDashboardRecord } from '../../types';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
-import { AppButton, DataTable, EmptyState, ErrorState, NoticeBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
+import { ActionButton, AppButton, DataTable, EmptyState, ErrorState, NoticeBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
 
 interface ContractFinancialExecutionSectionProps {
   contract: ContractDashboardRecord;
@@ -106,13 +106,13 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const linksOf = (e: EmpenhoRow) => (e.empenho_id ? linksByEmpenho.get(e.empenho_id) ?? [] : []);
 
   const columns: Column<EmpenhoRow>[] = [
-    { key: 'numero', header: 'Empenho', priority: 'primary', render: (e) => <strong style={{ color: '#0c326f' }}>{e.numero_oficial || 'N/A'}</strong> },
-    { key: 'credor', header: 'Credor', render: (e) => e.credor_nome || '—' },
-    { key: 'data', header: 'Emissão', render: (e) => formatDate(e.data_emissao) },
-    { key: 'empenhado', header: 'Empenhado', align: 'right', render: (e) => formatCurrency(e.valor_empenhado) },
-    { key: 'liquidado', header: 'Liquidado', align: 'right', render: (e) => formatCurrency(e.valor_liquidado) },
-    { key: 'pago', header: 'Pago', align: 'right', render: (e) => formatCurrency(e.valor_pago) },
-    { key: 'saldo', header: 'Saldo a executar', align: 'right', render: (e) => formatCurrency(Math.max(0, e.valor_empenhado - e.valor_pago)) },
+    { key: 'numero', header: 'Empenho', sortValue: (e) => e.numero_oficial, priority: 'primary', render: (e) => <strong style={{ color: 'var(--primary)' }}>{e.numero_oficial || 'N/A'}</strong> },
+    { key: 'credor', header: 'Credor', sortValue: (e) => e.credor_nome, render: (e) => e.credor_nome || '—' },
+    { key: 'data', header: 'Emissão', sortValue: (e) => e.data_emissao, render: (e) => formatDate(e.data_emissao) },
+    { key: 'empenhado', header: 'Empenhado', sortValue: (e) => e.valor_empenhado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(e.valor_empenhado) },
+    { key: 'liquidado', header: 'Liquidado', sortValue: (e) => e.valor_liquidado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(e.valor_liquidado) },
+    { key: 'pago', header: 'Pago', sortValue: (e) => e.valor_pago, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(e.valor_pago) },
+    { key: 'saldo', header: 'Saldo a executar', sortValue: (e) => Math.max(0, e.valor_empenhado - e.valor_pago), sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(Math.max(0, e.valor_empenhado - e.valor_pago)) },
     {
       key: 'item',
       header: 'Item da ata',
@@ -180,15 +180,14 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
             const path = pendente ? itemPath(pendente.itemKey) : null;
             if (!path) return null;
             return (
-              <AppButton
-                variant="outline"
+              <ActionButton
+                action="confirmar"
                 size="sm"
-                icon={<ArrowRight size={15} />}
                 onClick={() => navigate(path)}
                 title="Confirmar a quantidade no item da ata"
               >
                 <span className="payment-action-label">Confirmar quantidade</span>
-              </AppButton>
+              </ActionButton>
             );
           }}
         />

@@ -206,14 +206,14 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                           <span
                             data-testid={`itens-pendentes-${row.key}`}
                             title="Empenhos vinculados ao item que ainda esperam a quantidade ser confirmada; não contam no empenhado."
-                            style={{ fontSize: '0.75rem', fontWeight: 800, color: '#b45309', background: '#fffbeb', padding: '0.1rem 0.4rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
+                            style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', padding: '0.1rem 0.4rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
                           >
                             {row.empenhosPendentes} {row.empenhosPendentes === 1 ? 'pendente' : 'pendentes'}
                           </span>
                         )}
                       </div>
                       {comUnidade && (
-                        <div style={{ ...subtle, color: '#0c326f' }}>
+                        <div style={{ ...subtle, color: 'var(--primary)' }}>
                           {unidadeNome ?? 'Unidade'}: <strong>{formatNumber(alocadoUnidade)}</strong> alocado
                         </div>
                       )}

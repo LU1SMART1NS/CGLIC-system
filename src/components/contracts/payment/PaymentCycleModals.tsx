@@ -1,6 +1,5 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { AppButton, Modal, NoticeBar } from '../../../design-system';
+import { ActionButton, AppButton, Modal, NoticeBar } from '../../../design-system';
 import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 import type { CreatePaymentCycleInput, RegisterPaymentMarcoInput } from '../../../adapters/paymentCycleRpcAdapter';
 import { ResponsavelField, type ResponsavelValue } from '../ResponsavelField';
@@ -82,9 +81,9 @@ const JustificativaField: React.FC<{ id: string; value: string; onChange: (v: st
  */
 const FooterButtons: React.FC<{ formId: string; onCancel: () => void; saving: boolean; submitLabel: string }> = ({ formId, onCancel, saving, submitLabel }) => (
   <>
-    <AppButton type="button" variant="outline" onClick={onCancel} disabled={saving}>
+    <ActionButton action="cancelar" type="button" onClick={onCancel} disabled={saving}>
       Cancelar
-    </AppButton>
+    </ActionButton>
     <AppButton type="submit" form={formId} variant="primary" disabled={saving} isLoading={saving}>
       {saving ? 'Salvando...' : submitLabel}
     </AppButton>
@@ -209,24 +208,22 @@ export const CreateCycleModal: React.FC<{
               <Field id={`payment-doc-valor-${idx}`} label="Valor (R$)">
                 <input id={`payment-doc-valor-${idx}`} className="form-input" type="text" inputMode="numeric" placeholder="0,00" value={d.valor} onChange={(e) => updateDoc(idx, { valor: formatCurrencyInputBR(e.target.value) })} />
               </Field>
-              <AppButton
+              <ActionButton action="remover"
                 type="button"
-                variant="ghostDanger"
                 size="sm"
-                icon={<Trash2 size={15} />}
                 disabled={idx === 0}
                 onClick={() => setDocs((prev) => prev.filter((_, i) => i !== idx))}
                 title="Remover documento"
                 className="payment-doc-remove"
               >
                 <span className="payment-doc-remove__label">Remover</span>
-              </AppButton>
+              </ActionButton>
             </div>
           ))}
           <div>
-            <AppButton type="button" variant="outline" size="sm" icon={<Plus size={14} />} onClick={() => setDocs((prev) => [...prev, { tipo: 'Nota Fiscal Eletrônica', numero: '', sei: '', valor: '' }])}>
+            <ActionButton action="adicionar" type="button" size="sm" onClick={() => setDocs((prev) => [...prev, { tipo: 'Nota Fiscal Eletrônica', numero: '', sei: '', valor: '' }])}>
               Adicionar documento
-            </AppButton>
+            </ActionButton>
           </div>
         </div>
 

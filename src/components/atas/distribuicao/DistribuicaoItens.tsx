@@ -1,9 +1,9 @@
 import React from 'react';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
-import { ArrowLeftRight, ArrowRight, UserPlus } from 'lucide-react';
+import { ArrowLeftRight, UserPlus } from 'lucide-react';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
-import { carteiraButton } from '../../carteira/carteiraStyles';
-import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
+import { ActionButton } from '../../../design-system/components/ActionButton';
+import { AppButton } from '../../../design-system/components/AppButton';
 import { buildAtaPath } from '../../../hooks/useAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import type { DistribuicaoItem, DistribuicaoLinha } from './distribuicaoEquipe';
@@ -13,8 +13,8 @@ import type { ContratoAVincular } from './contratosSemAta';
 import { formatDateBR } from '../../../utils/format';
 
 const ETIQUETA_COMPLEXIDADE: Record<NivelComplexidade, { color: string; bg: string }> = {
-  ALTA: { color: '#ffffff', bg: '#0c326f' },
-  MEDIA: { color: '#0c326f', bg: '#dbe6f7' },
+  ALTA: { color: '#ffffff', bg: 'var(--primary)' },
+  MEDIA: { color: 'var(--primary)', bg: '#dbe6f7' },
   BAIXA: { color: '#475569', bg: '#f1f5f9' }
 };
 
@@ -52,7 +52,7 @@ function tituloComplexidade(c: Complexidade): string {
 }
 
 /**
- * Atas e contratos vigentes de um gestor, os mais urgentes primeiro. Marcar itens e transferir
+ * Atas e contratos vigentes de um gestor, atas primeiro, depois contratos, cada grupo pelo prazo. Marcar itens e transferir
  * só eles (o gestor da ata se propaga aos contratos vinculados, como nas carteiras).
  */
 export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, canAssign, onTransfer, canAjustar = false, aVincular = [] }) => {
@@ -106,25 +106,26 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
             Selecionar os {shown.length} exibidos
           </label>
         ) : (
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>Mais urgentes primeiro</span>
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>Atas primeiro, depois contratos</span>
         )}
         {canAssign && selected.size > 0 && (
-          <button
+          <AppButton
             type="button"
+            variant="primary"
+            size="sm"
             onClick={transferSelected}
             data-testid="distribuicao-transferir-selecionados"
-            style={{ ...carteiraButton, color: '#ffffff', background: '#0c326f', borderColor: '#0c326f' }}
+            icon={isSemGestor ? <UserPlus size={14} /> : <ArrowLeftRight size={14} />}
           >
-            {isSemGestor ? <UserPlus size={13} /> : <ArrowLeftRight size={13} />}{' '}
             {isSemGestor ? 'Atribuir' : 'Transferir'} {selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}
-          </button>
+          </AppButton>
         )}
       </div>
 
       {aVincular.length > 0 && (
         <div
           data-testid="distribuicao-a-vincular"
-          style={{ fontSize: '0.78rem', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
+          style={{ fontSize: '0.78rem', color: 'var(--color-info-text-strong)', background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
         >
           <strong>{aVincular.length} {aVincular.length === 1 ? 'contrato a vincular' : 'contratos a vincular'}</strong> nas atas deste gestor
           (mesma compra e fornecedor). O vínculo é feito na Ata 360 e o contrato passa a ser dele:{' '}
@@ -145,7 +146,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
             <li
               key={itemId(item)}
               data-testid={`distribuicao-item-${itemId(item)}`}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.5rem 0', borderTop: '1px solid #e2e8f0', background: checked ? '#eff6ff' : undefined }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.5rem 0', borderTop: '1px solid #e2e8f0', background: checked ? 'var(--color-info-bg)' : undefined }}
             >
               {canAssign && (
                 <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', cursor: 'pointer' }}>
@@ -171,7 +172,8 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                       borderRadius: '4px',
                       whiteSpace: 'nowrap',
                       border: 'none',
-                      ...ETIQUETA_COMPLEXIDADE[item.complexidade.nivel]
+                      color: ETIQUETA_COMPLEXIDADE[item.complexidade.nivel].color,
+                      background: ETIQUETA_COMPLEXIDADE[item.complexidade.nivel].bg
                     };
                     const rotulo = `${ROTULO_COMPLEXIDADE[item.complexidade.nivel]}${item.complexidade.ajuste ? ' · ajustada' : ''}`;
                     return canAjustar ? (
@@ -195,12 +197,6 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                     {item.complexidade.motivo}
                   </span>
                 </div>
-                <div
-                  title={item.objeto}
-                  style={{ fontSize: '0.78rem', color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-                >
-                  {item.objeto || '—'}
-                </div>
               </div>
               <CarteiraPrazoPill faixa={item.faixa} diasRestantes={item.dias} />
               <span style={{ fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
@@ -209,17 +205,14 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                 ) : (
                   <>
                     {item.urgentes > 0 && (
-                      <span style={{ color: '#b91c1c' }}>{item.urgentes} {item.urgentes === 1 ? 'urgente' : 'urgentes'}</span>
+                      <span style={{ color: 'var(--color-danger-text)' }}>{item.urgentes} {item.urgentes === 1 ? 'urgente' : 'urgentes'}</span>
                     )}
                     {item.urgentes > 0 && item.acompanhar > 0 && <span style={{ color: '#94a3b8' }}> · </span>}
-                    {item.acompanhar > 0 && <span style={{ color: '#b45309' }}>{item.acompanhar} a acompanhar</span>}
+                    {item.acompanhar > 0 && <span style={{ color: 'var(--color-warning-text)' }}>{item.acompanhar} a acompanhar</span>}
                   </>
                 )}
               </span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, minWidth: '64px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrencyCompact(item.valor)}</span>
-              <button type="button" onClick={() => navigate(itemPath(item))} style={carteiraButton}>
-                Abrir <ArrowRight size={13} />
-              </button>
+              <ActionButton action="abrir" type="button" size="sm" onClick={() => navigate(itemPath(item))} />
             </li>
           );
         })}
@@ -228,9 +221,9 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.78rem', color: '#64748b' }}>
         <span>Mostrando {shown.length} de {linha.itens.length}</span>
         {shown.length < linha.itens.length && (
-          <button type="button" onClick={() => setVisible((v) => v + MORE_SIZE)} data-testid="distribuicao-mostrar-mais" style={carteiraButton}>
+          <AppButton type="button" variant="outline" size="sm" onClick={() => setVisible((v) => v + MORE_SIZE)} data-testid="distribuicao-mostrar-mais">
             Mostrar mais {Math.min(MORE_SIZE, linha.itens.length - shown.length)}
-          </button>
+          </AppButton>
         )}
       </div>
       {ajustando && <AjusteComplexidadePanel item={ajustando.item} anchorRect={ajustando.anchor} onClose={() => setAjustando(null)} />}

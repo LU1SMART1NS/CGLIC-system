@@ -31,7 +31,7 @@ export const CarteiraIdLink: React.FC<{ onClick: () => void; label: string; titl
     aria-label={label}
     title={title}
     data-testid={testId}
-    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 800, color: '#0c326f', cursor: 'pointer', textAlign: 'left' }}
+    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 800, color: 'var(--primary)', cursor: 'pointer', textAlign: 'left' }}
   >
     {children}
   </button>

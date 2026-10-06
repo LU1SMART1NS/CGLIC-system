@@ -35,7 +35,7 @@ export const CarteiraSortButton: React.FC<CarteiraSortButtonProps> = ({ label, s
         font: 'inherit',
         letterSpacing: 'inherit',
         textTransform: 'inherit',
-        color: ativo ? '#0c326f' : 'inherit',
+        color: ativo ? 'var(--primary)' : 'inherit',
         cursor: 'pointer'
       }}
     >
@@ -49,13 +49,16 @@ interface CarteiraSortHeaderProps extends SortState {
   label: string;
   sortKey: string;
   align?: 'left' | 'right';
+  /** Explicação da coluna, mostrada ao parar o mouse no cabeçalho. */
+  hint?: string;
 }
 
 /** Cabeçalho de coluna que ordena a tabela ao clicar. */
-export const CarteiraSortHeader: React.FC<CarteiraSortHeaderProps> = ({ label, sortKey, align = 'left', ...sort }) => {
+export const CarteiraSortHeader: React.FC<CarteiraSortHeaderProps> = ({ label, sortKey, align = 'left', hint, ...sort }) => {
   const ativo = sort.activeKey === sortKey && sort.activeDir !== null;
   return (
     <th
+      title={hint}
       style={{ ...carteiraTh, textAlign: align }}
       aria-sort={ativo ? (sort.activeDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >

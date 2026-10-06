@@ -30,6 +30,8 @@ describe('preverVinculo', () => {
     expect(preverVinculo(entrada({ apiQuantidades: new Map() }))).toMatchObject({ status: 'REVISAR', motivo: expect.stringContaining('não lista os itens') });
     expect(preverVinculo(entrada({ apiQuantidades: new Map([[9, 5]]) }))).toMatchObject({ status: 'REVISAR', motivo: expect.stringContaining('Nenhum item') });
     expect(preverVinculo(entrada({ apiQuantidades: undefined, apiErro: true }))).toMatchObject({ status: 'REVISAR', motivo: expect.stringContaining('não respondeu') });
+    // Ata de outra compra: os números dos itens da API não são os da ata, mesmo que coincidam.
+    expect(preverVinculo(entrada({ compraDiferente: true }))).toMatchObject({ status: 'REVISAR', motivo: expect.stringContaining('outra compra') });
   });
 
   it('CONFERINDO enquanto a API não respondeu', () => {

@@ -19,7 +19,7 @@ export const ContractsPortfolioHeader: React.FC<ContractsPortfolioHeaderProps> =
     <PageHeader
       title="Carteira de Contratos"
       subtitle="Todos os contratos, com vigência, valor, gestor e pendências em aberto."
-      icon={<FileText size={26} color="#0c326f" aria-hidden="true" />}
+      icon={<FileText size={26} color="var(--primary)" aria-hidden="true" />}
       actions={
         <HeaderRefreshAction
           onRefresh={onRefresh}

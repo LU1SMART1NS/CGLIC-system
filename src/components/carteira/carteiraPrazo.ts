@@ -56,9 +56,9 @@ export function formatDiasRestantes(dias: number | null): string {
 
 export const PRAZO_COLORS: Record<PrazoFaixa, { color: string; bg: string }> = {
   EXPIRADO: { color: '#475569', bg: '#f1f5f9' },
-  CRITICO: { color: '#b91c1c', bg: '#fef2f2' },
-  ATENCAO: { color: '#b45309', bg: '#fffbeb' },
-  REGULAR: { color: '#15803d', bg: '#f0fdf4' },
+  CRITICO: { color: 'var(--color-danger-text)', bg: 'var(--color-danger-bg)' },
+  ATENCAO: { color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  REGULAR: { color: 'var(--color-success-text)', bg: 'var(--color-success-bg)' },
   SEM_DATA: { color: '#64748b', bg: '#f8fafc' }
 };
 

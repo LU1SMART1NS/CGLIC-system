@@ -7,10 +7,12 @@ import type {
 import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 import { getPaymentStatusDisplay } from '../../utils/paymentStatusDisplay';
 import { formatCurrency, formatDateBR } from '../../utils/format';
-import { AppButton, EmptyState, ErrorState, FilterBar, StatusBadge } from '../../design-system';
+import { ActionButton, AppButton, EmptyState, ErrorState, FilterBar, StatusBadge } from '../../design-system';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
-import { carteiraButton, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { PAGAMENTO_RULES } from '../../config/alertRules';
 
 export interface ManagementPaymentsOverviewProps {
@@ -38,6 +40,16 @@ export const getWorkflowStatusDisplay = getPaymentStatusDisplay;
  * 5. Tratamento de loading (skeleton), erro explícito e empty state.
  */
 const PAGE_SIZE = 15;
+
+const CYCLE_SORT_COLUMNS: Record<string, CarteiraSortColumn<PaymentFollowUpCycle>> = {
+  contrato: { value: (c) => `${c.contractKey} ${c.competencia ?? ''}` },
+  atesto: { value: (c) => c.input?.documentoAtestoSei },
+  valor: { value: (c) => c.input?.valorAtesto, firstDir: 'desc' },
+  situacao: { value: (c) => getWorkflowStatusDisplay(c.status).label },
+  // Encerrados não têm prazo correndo: ficam por último; vencidos (negativos) vêm primeiro.
+  prazo: { value: (c) => (c.status === 'PAGO' || c.status === 'CANCELADO' ? null : c.prazos?.diasUteisAteVencimento) },
+  ob: { value: (c) => c.input?.numeroOrdemBancaria }
+};
 
 export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProps> = ({
   readModel: propReadModel,
@@ -101,11 +113,14 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
     return list;
   }, [payments, filter, searchQuery]);
 
-  React.useEffect(() => setPage(1), [filter, searchQuery]);
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(filteredCycles.length / PAGE_SIZE)));
+  const { sorted: sortedCycles, sortKey, sortDir, toggle } = useCarteiraSort(filteredCycles, CYCLE_SORT_COLUMNS);
+  const sort = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
+
+  React.useEffect(() => setPage(1), [filter, searchQuery, sortKey, sortDir]);
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(sortedCycles.length / PAGE_SIZE)));
   const pageCycles = useMemo(
-    () => filteredCycles.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [filteredCycles, currentPage]
+    () => sortedCycles.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [sortedCycles, currentPage]
   );
 
   // 1. Estado de Loading (Skeleton)
@@ -287,7 +302,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Com pendência</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#d97706', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-warning)', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['COM_PENDENCIA'] || 0}
             </div>
           </div>
@@ -308,14 +323,14 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>4. Pago</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#166534', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-success-text-strong)', marginTop: '0.2rem' }}>
               {distribuicaoPorEstado['PAGO'] || 0}
             </div>
           </div>
 
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem 0.75rem', textAlign: 'center' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Exceções</span>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#b91c1c', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-danger-text)', marginTop: '0.2rem' }}>
               {(distribuicaoPorEstado['DEVOLVIDO'] || 0) + (distribuicaoPorEstado['CANCELADO'] || 0)}
             </div>
           </div>
@@ -366,16 +381,13 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
             testId="payments-filter-empty"
             title="Nenhum ciclo de pagamento corresponde ao filtro ou busca selecionada."
             action={
-              <AppButton
-                variant="outline"
+              <ActionButton action="limparFiltros"
                 size="sm"
                 onClick={() => {
                   setFilter('TODOS');
                   setSearchQuery('');
                 }}
-              >
-                Limpar filtros e busca
-              </AppButton>
+              >Limpar filtros e busca</ActionButton>
             }
           />
         ) : (
@@ -383,12 +395,12 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
             <table className="carteira-stack" data-testid="payments-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={carteiraTh}>Contrato / Competência</th>
-                  <th style={carteiraTh}>Atesto / Processo SEI</th>
-                  <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor do atesto</th>
-                  <th style={carteiraTh}>Situação</th>
-                  <th style={carteiraTh}>Prazos e SLA</th>
-                  <th style={carteiraTh}>Ordem Bancária (OB)</th>
+                  <CarteiraSortHeader label="Contrato / Competência" sortKey="contrato" {...sort} />
+                  <CarteiraSortHeader label="Atesto / Processo SEI" sortKey="atesto" {...sort} />
+                  <CarteiraSortHeader label="Valor do atesto" sortKey="valor" align="right" {...sort} />
+                  <CarteiraSortHeader label="Situação" sortKey="situacao" {...sort} />
+                  <CarteiraSortHeader label="Prazos e SLA" sortKey="prazo" {...sort} />
+                  <CarteiraSortHeader label="Ordem Bancária (OB)" sortKey="ob" {...sort} />
                   <th style={{ ...carteiraTh, textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
@@ -414,7 +426,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Proc: {cycle.input.numeroProcessoPagamentoSei}</div>
                         )}
                         {cycle.input?.responsavelNome && (
-                          <div style={{ fontSize: '0.75rem', color: '#0284c7', marginTop: '0.15rem' }}>Resp: {cycle.input.responsavelNome}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-info-text)', marginTop: '0.15rem' }}>Resp: {cycle.input.responsavelNome}</div>
                         )}
                       </td>
 
@@ -434,7 +446,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                             FATURA VENCIDA ({Math.abs(diasVenc)}d úteis)
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.75rem', fontWeight: diasVenc <= 3 ? 700 : 400, color: diasVenc <= 3 ? '#d97706' : '#475569' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: diasVenc <= 3 ? 700 : 400, color: diasVenc <= 3 ? 'var(--color-warning)' : '#475569' }}>
                             Vence em {diasVenc} {diasVenc === 1 ? 'dia útil' : 'dias úteis'}
                           </span>
                         )}
@@ -448,7 +460,7 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
                       <td data-label="Ordem bancária" style={{ ...carteiraTd, verticalAlign: 'top' }}>
                         {cycle.input?.numeroOrdemBancaria ? (
                           <div>
-                            <div style={{ fontWeight: 700, color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--color-success-text)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                               <CheckCircle2 size={13} aria-hidden="true" />
                               <span>{cycle.input.numeroOrdemBancaria}</span>
                             </div>
@@ -463,14 +475,15 @@ export const ManagementPaymentsOverview: React.FC<ManagementPaymentsOverviewProp
 
                       <td data-role="action" style={{ ...carteiraTd, verticalAlign: 'top', textAlign: 'right' }}>
                         {onNavigateContract && (
-                          <button
+                          <AppButton
                             type="button"
+                            variant="link"
+                            size="sm"
                             data-testid={`btn-navigate-payment-${cycle.cycleKey}`}
                             onClick={() => onNavigateContract(cycle.contractKey)}
-                            style={carteiraButton}
                           >
                             Ver contrato <ExternalLink size={12} aria-hidden="true" />
-                          </button>
+                          </AppButton>
                         )}
                       </td>
                     </tr>

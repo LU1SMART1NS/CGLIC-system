@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { Eye, FileText, Loader2, Trash2 } from 'lucide-react';
-import { AppButton } from '../../design-system/components/AppButton';
+import { FileText } from 'lucide-react';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 
@@ -76,7 +76,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', flex: '1 1 260px', minWidth: 0 }}>
-            <div style={{ padding: '0.3rem', background: '#eff6ff', borderRadius: '6px', color: '#0c326f', marginTop: '0.1rem' }}>
+            <div style={{ padding: '0.3rem', background: 'var(--color-info-bg)', borderRadius: '6px', color: 'var(--primary)', marginTop: '0.1rem' }}>
               <FileText size={15} />
             </div>
             <div>
@@ -95,24 +95,22 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
 
           <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
             {link.isOficial && (
-              <AppButton
-                variant="outline"
+              <ActionButton
+                action="verDetalhes"
                 size="sm"
                 iconOnly
-                icon={<Eye size={15} />}
+                label="Ver detalhes do contrato"
                 onClick={() => navigate(`/contratos/${encodeURIComponent(link.contractKey)}`)}
-                title="Ver detalhes do contrato"
               />
             )}
             {onUnlink && (
-              <AppButton
-                variant="ghostDanger"
+              <ActionButton
+                action="desvincular"
                 size="sm"
                 iconOnly
-                icon={unlinkingId === link.linkId ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={15} />}
+                label="Desvincular contrato deste item da ata"
                 onClick={() => onUnlink(link)}
-                disabled={unlinkingId === link.linkId}
-                title="Desvincular contrato deste item da ata"
+                isLoading={unlinkingId === link.linkId}
               />
             )}
           </div>

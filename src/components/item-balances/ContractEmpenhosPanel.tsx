@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Check, RotateCcw } from 'lucide-react';
-import { AppButton, DataTable, StatusBadge, type Column } from '../../design-system';
+import { ActionButton, DataTable, StatusBadge, type Column } from '../../design-system';
 import { formatCurrency } from '../../utils/format';
 import { formatNumber } from './itemBalanceUtils';
 import { summarizeContractExecution } from '../../utils/itemExecutionSummary';
@@ -60,16 +59,15 @@ const PendingConfirm: React.FC<{
         onChange={(e) => setValue(e.target.value)}
         style={{ width: '72px', padding: '0.25rem 0.4rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
       />
-      <AppButton
-        variant="outline"
+      <ActionButton
+        action="confirmar"
         size="sm"
-        icon={<Check size={13} />}
         onClick={() => parsed != null && !invalid && onConfirm(vinculo, parsed)}
         disabled={busy || invalid}
         title={sugerida != null && value.trim() === '' ? 'Aceitar a quantidade sugerida pelo valor do empenho' : 'Confirmar esta quantidade'}
       >
         {sugerida != null && value.trim() === '' ? 'Aceitar' : 'Confirmar'}
-      </AppButton>
+      </ActionButton>
     </div>
   );
 };
@@ -96,9 +94,10 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
     {
       key: 'empenho',
       header: 'Empenho',
+      sortValue: (v) => v.empenho.numero,
       render: (v) => (
         <>
-          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0c326f' }}>{v.empenho.numero}</span>
+          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--primary)' }}>{v.empenho.numero}</span>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             UASG {v.empenho.uasg}{v.empenho.dataEmissao ? ` • ${v.empenho.dataEmissao.split('-').reverse().join('/')}` : ''}
           </div>
@@ -108,12 +107,16 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
     {
       key: 'valor',
       header: 'Valor',
+      sortValue: (v) => v.empenho.valorEmpenhado,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (v) => formatCurrency(v.empenho.valorEmpenhado)
     },
     {
       key: 'qtd',
       header: 'Qtd',
+      sortValue: (v) => v.quantidade ?? v.quantidadeSugerida,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (v) =>
         v.quantidade != null ? (
@@ -129,6 +132,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
     {
       key: 'estado',
       header: 'Estado',
+      sortValue: (v) => ESTADO_LABEL[estadoDoVinculo(v)],
       render: (v) => {
         const estado = estadoDoVinculo(v);
         return <StatusBadge label={ESTADO_LABEL[estado]} variant={ESTADO_VARIANT[estado]} size="sm" dot={false} />;
@@ -156,7 +160,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
               width: '100%',
               maxWidth: '200px',
               borderColor: current ? 'var(--primary)' : '#cbd5e1',
-              background: current ? '#eff6ff' : '#ffffff'
+              background: current ? 'var(--color-info-bg)' : '#ffffff'
             }}
           >
             <option value="">Não vinculado</option>
@@ -178,9 +182,9 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
         if (v.quantidade == null) return <PendingConfirm vinculo={v} busy={busy} onConfirm={onConfirm} />;
         if (v.fonte === 'USUARIO') {
           return (
-            <AppButton variant="ghost" size="sm" icon={<RotateCcw size={13} />} onClick={() => onConfirm(v, null)} disabled={busy} title="Voltar a pendente">
+            <ActionButton action="desfazer" size="sm" onClick={() => onConfirm(v, null)} disabled={busy} title="Voltar a pendente">
               Desfazer
-            </AppButton>
+            </ActionButton>
           );
         }
         return null;
@@ -209,16 +213,14 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
           )}
         </div>
         {canEdit && aceitaveis.length > 0 && (
-          <AppButton
-            variant="outline"
+          <ActionButton action="aplicarSugestao"
             size="sm"
-            icon={<Check size={13} />}
             onClick={() => onConfirmAll(aceitaveis)}
             disabled={busy}
             title="Confirma a quantidade sugerida de todos os empenhos pendentes deste contrato"
           >
             Aceitar todas as sugestões ({formatNumber(aceitaveis.reduce((s, v) => s + (v.quantidadeSugerida ?? 0), 0))} un)
-          </AppButton>
+          </ActionButton>
         )}
       </div>
 

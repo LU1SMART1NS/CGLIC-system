@@ -1,4 +1,5 @@
 import type { ContractDashboardRecord } from '../../types';
+import { contratoDoFornecedorDaAta } from '../../utils/fornecedorMatch';
 
 /** Critérios da Ata usados para sugerir contratos no LinkContractModal. */
 export interface ContractSuggestionCriteria {
@@ -11,6 +12,8 @@ export interface ContractSuggestionCriteria {
   };
   /** CNPJs dos fornecedores dos itens da Ata. */
   fornecedorCnpjs?: string[];
+  /** Razões sociais dos fornecedores: comparam o fornecedor estrangeiro, que não tem CNPJ. */
+  fornecedorNomes?: string[];
 }
 
 export type ContractSuggestionReason = 'compra' | 'fornecedor';
@@ -63,8 +66,7 @@ export function getContractSuggestionReasons(
     reasons.push('compra');
   }
 
-  const cnpj = digits(contract.fornecedorCnpjCpf);
-  if (cnpj && (criteria.fornecedorCnpjs || []).some((c) => digits(c) === cnpj)) {
+  if (contratoDoFornecedorDaAta({ cnpj: contract.fornecedorCnpjCpf, nome: contract.fornecedorNome }, { cnpjs: criteria.fornecedorCnpjs, nomes: criteria.fornecedorNomes })) {
     reasons.push('fornecedor');
   }
 

@@ -41,11 +41,12 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
     {
       key: 'orgao',
       header: 'Órgão não participante',
+      sortValue: (ade) => splitUnidade(ade.unidadeNaoParticipante).nome,
       render: (ade) => {
         const { codigo, nome } = splitUnidade(ade.unidadeNaoParticipante);
         return (
           <>
-            <div style={{ fontWeight: 700, color: '#0c326f' }}>{nome || 'Órgão não informado'}</div>
+            <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{nome || 'Órgão não informado'}</div>
             {codigo && <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>UASG: {codigo}</div>}
           </>
         );
@@ -54,6 +55,8 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
     {
       key: 'aprovada',
       header: 'Qtd. aprovada',
+      sortValue: (ade) => ade.quantidadeAprovadaAdesao,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (ade) =>
         ade.quantidadeAprovadaAdesao == null ? (
@@ -66,6 +69,8 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
       // Art. 86, § 4º: cada órgão não participante pode aderir a até 50% do quantitativo do item.
       key: 'percentual',
       header: 'Do item (máx. 50%)',
+      sortValue: (ade) => (ade.quantidadeAprovadaAdesao == null || quantidadeItem <= 0 ? null : ade.quantidadeAprovadaAdesao / quantidadeItem),
+      sortFirstDir: 'desc',
       width: '200px',
       render: (ade) => {
         if (ade.quantidadeAprovadaAdesao == null || quantidadeItem <= 0) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
@@ -83,6 +88,8 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
     {
       key: 'data',
       header: 'Aprovação',
+      sortValue: (ade) => ade.dataAprovacaoAnalise,
+      sortFirstDir: 'desc',
       render: (ade) => (
         <span style={{ color: 'var(--text-secondary)' }}>
           {ade.dataAprovacaoAnalise ? formatDate(ade.dataAprovacaoAnalise) : '-'}

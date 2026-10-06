@@ -60,11 +60,11 @@ export interface MotivoInfo {
 }
 
 const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
-  ATA_CRITICA: { label: 'Saldo em Atenção', color: '#059669', bg: '#ecfdf5' },
-  PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: '#dc2626', bg: '#fef2f2' },
-  REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: '#b45309', bg: '#fffbeb' },
-  TAREFA_ATRASADA: { label: 'Tarefa Atrasada', color: '#991b1b', bg: '#fef2f2' },
-  TAREFA_PROXIMA: { label: 'Tarefa Próxima', color: '#b45309', bg: '#fffbeb' },
+  ATA_CRITICA: { label: 'Saldo em Atenção', color: 'var(--color-success)', bg: '#ecfdf5' },
+  PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
+  REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  TAREFA_ATRASADA: { label: 'Tarefa Atrasada', color: 'var(--color-danger-text-strong)', bg: 'var(--color-danger-bg)' },
+  TAREFA_PROXIMA: { label: 'Tarefa Próxima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   LEMBRETE: { label: 'Planejamento da Vigência', color: '#475569', bg: '#f1f5f9' }
 };
 

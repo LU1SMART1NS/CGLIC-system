@@ -19,6 +19,17 @@ const criteria = buildItemSuggestionCriteria(
 );
 
 describe('itemContractSuggestions', () => {
+  it('item de fornecedor estrangeiro sugere o contrato da mesma compra pelo nome', () => {
+    const crit = buildItemSuggestionCriteria(
+      { idCompra: '20033105900332024', codigoUnidadeGerenciadora: '200331', numeroCompra: '90033', anoCompra: '2024' },
+      { niFornecedor: 'ESTRANG0000348', nomeRazaoSocialFornecedor: 'Axon Enterprise, Inc.' }
+    );
+    const axon = official({ id: 'AX', idCompra: '20033105900332024', fornecedorCnpjCpf: 'EXAXONEN1', fornecedorNome: 'AXON  INTERPRISE' });
+    const outro = official({ id: 'OUT', idCompra: '20033105900332024', fornecedorCnpjCpf: 'EXOUTRO', fornecedorNome: 'OUTRA EMPRESA GMBH' });
+    const { suggestions } = buildItemContractSuggestions({ officialContracts: [axon, outro], criteria: crit });
+    expect(suggestions.map((s) => s.contractKey)).toEqual([contractKeyOf(axon)]);
+  });
+
   it('resolve o contrato do PNCP no catálogo e usa a chave do catálogo', () => {
     const cat = official({ id: 'CAT-1', numeroControlePncp: '00394494000136-2-000015/2026' });
     const { suggestions } = buildItemContractSuggestions({
