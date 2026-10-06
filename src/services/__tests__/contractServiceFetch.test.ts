@@ -3,7 +3,8 @@ import {
   fetchContractsForDashboard,
   clearContractsCache,
   isContractsListPartial,
-  subscribeContractsPartial
+  subscribeContractsPartial,
+  deriveIdCompraContratosGov
 } from '../contractService';
 
 const UASG = '200331';
@@ -196,5 +197,56 @@ describe('fetchContractsForDashboard — fontes, cache e lista incompleta', () =
     await fetchContractsForDashboard(UASG, false);
     expect(listener).toHaveBeenCalledTimes(1);
     unsubscribe();
+  });
+});
+
+describe('deriveIdCompraContratosGov — compra de origem a partir do Contratos.gov.br', () => {
+  it('monta o idCompra oficial: UASG da compra + modalidade + número + ano', () => {
+    expect(deriveIdCompraContratosGov({ unidade_compra: '200331', codigo_modalidade: '05', licitacao_numero: '90024/2024' })).toBe('20033105900242024');
+  });
+
+  it('completa zeros à esquerda no número e na modalidade', () => {
+    expect(deriveIdCompraContratosGov({ unidade_compra: '200109', codigo_modalidade: '5', licitacao_numero: '23/2023' })).toBe('20010905000232023');
+  });
+
+  it('aceita o número sem barra quando vem com 9 dígitos', () => {
+    expect(deriveIdCompraContratosGov({ unidade_compra: '200331', codigo_modalidade: '06', licitacao_numero: '001132026' })).toBe('20033106001132026');
+  });
+
+  it('não inventa a compra quando falta campo ou o formato é estranho', () => {
+    expect(deriveIdCompraContratosGov({ codigo_modalidade: '05', licitacao_numero: '90024/2024' })).toBeUndefined();
+    expect(deriveIdCompraContratosGov({ unidade_compra: '200331', licitacao_numero: '90024/2024' })).toBeUndefined();
+    expect(deriveIdCompraContratosGov({ unidade_compra: '200331', codigo_modalidade: '05' })).toBeUndefined();
+    expect(deriveIdCompraContratosGov({ unidade_compra: '200331', codigo_modalidade: '05', licitacao_numero: '90024/24' })).toBeUndefined();
+    expect(deriveIdCompraContratosGov({ unidade_compra: '200331', codigo_modalidade: '05', licitacao_numero: '123456/2024' })).toBeUndefined();
+    expect(deriveIdCompraContratosGov({ unidade_compra: '2003', codigo_modalidade: '05', licitacao_numero: '90024/2024' })).toBeUndefined();
+  });
+});
+
+describe('fetchContractsForDashboard — idCompra do contrato', () => {
+  beforeEach(() => {
+    clearContractsCache();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const comCompra = (numero: string) => ({ ...govContrato(numero), unidade_compra: '200331', codigo_modalidade: '05', licitacao_numero: '90024/2024' });
+
+  it('contrato que só existe no Contratos.gov.br já sai com a compra de origem', async () => {
+    mockFetch({ gov: async () => jsonResponse([comCompra('00200/2026')]) });
+    const [c] = await fetchContractsForDashboard(UASG, false);
+    expect(c.idCompra).toBe('20033105900242024');
+  });
+
+  it('sem os campos de compra no Contratos.gov.br, o Compras.gov.br completa o idCompra', async () => {
+    mockFetch({
+      gov: async () => jsonResponse([govContrato('00001/2022')]),
+      compras: async () => jsonResponse({ resultado: [{ ...comprasContrato('00001/2022'), dataVigenciaInicial: '2022-01-10', idCompra: '20033105000012022' }], paginasRestantes: 0 })
+    });
+    const result = await fetchContractsForDashboard(UASG, false);
+    expect(result.find((c) => c.numero === '00001/2022')?.idCompra).toBe('20033105000012022');
   });
 });
