@@ -1149,6 +1149,8 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
   .carteira-stack td[data-role='expand'] { order: 100; justify-content: center; }
   .carteira-stack td[data-role='expand'] button { min-width: 100%; justify-content: center; }
   .carteira-stack td[data-role='action'] { order: 99; }
+  /* Caixa de seleção em lote: no canto do cartão, sem rótulo. */
+  .carteira-stack td[data-role='select'] { position: absolute; top: 0.75rem; right: 0.75rem; }
   .carteira-stack td[data-role='action'] { display: block; padding-top: 0.5rem !important; border-top: 1px solid #f1f5f9 !important; }
   .carteira-stack td[data-role='action'] button { width: 100%; min-height: 44px; justify-content: center; }
   .carteira-stack tr.carteira-expanded {

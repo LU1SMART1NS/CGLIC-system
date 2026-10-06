@@ -15,7 +15,7 @@ import {
   dismissContractSuggestionRpc,
   restoreContractSuggestionRpc
 } from '../adapters/arpContractLinkRpcAdapter';
-import { displayContractNumber } from '../utils/contractNumber';
+import { displayContractNumber, formatContractKey } from '../utils/contractNumber';
 
 /**
  * Consulta os vínculos de um item de ARP com contratos oficiais diretamente da SSOT (PostgreSQL).
@@ -280,7 +280,7 @@ export function enrichContractLinks(
         valorUnitarioContrato: link.valorUnitarioApi ?? undefined,
         observacoes: link.observacoes,
         contract,
-        numeroContratoFormatado: displayContractNumber(contract) || `Contrato ${contract.numero}/${contract.ano}`,
+        numeroContratoFormatado: displayContractNumber(contract) || `${contract.numero}/${contract.ano}`,
         uasg,
         orgaoNome,
         fornecedorNome: contract.fornecedorNome || 'Não informado',
@@ -297,7 +297,7 @@ export function enrichContractLinks(
     }
 
     // Caso o contrato oficial ainda não tenha sido sincronizado ou pertença a outra UG
-    const numeroDisplay = parts.length >= 2 ? `${parts[1]}/${parts[2] || ''}` : link.contractKey;
+    const numeroDisplay = formatContractKey(link.contractKey);
 
     return {
       linkId: link.id,
@@ -307,7 +307,7 @@ export function enrichContractLinks(
         quantidadeLidaEm: link.quantidadeLidaEm,
         valorUnitarioContrato: link.valorUnitarioApi ?? undefined,
       observacoes: link.observacoes,
-      numeroContratoFormatado: `Contrato ${numeroDisplay}`,
+      numeroContratoFormatado: numeroDisplay,
       uasg,
       orgaoNome,
       fornecedorNome: 'Contrato Oficial (Aguardando sincronização da UG)',

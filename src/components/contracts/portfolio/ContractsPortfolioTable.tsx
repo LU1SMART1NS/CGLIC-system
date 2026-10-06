@@ -31,6 +31,8 @@ export interface ContractPortfolioRow {
   faixa: PrazoFaixa;
   gestorNome?: string;
   pendencias: DashboardAttentionItem[];
+  /** Números das atas de que o contrato se originou (vínculo por item); vazio = contrato sem ata. */
+  atas?: string[];
 }
 
 interface ContractsPortfolioTableProps {
@@ -144,7 +146,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
           </thead>
           <tbody>
             {pageRows.map((row) => {
-              const { contract, contractKey, diasRestantes, faixa, gestorNome, pendencias } = row;
+              const { contract, contractKey, diasRestantes, faixa, gestorNome, pendencias, atas = [] } = row;
               const isExpanded = expandedKey === contractKey;
               const numDisplay = formatContractNumber(contract);
               const valorVigente = contract.valorGlobal || contract.valorInicial;
@@ -183,6 +185,23 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                         {numDisplay}
                       </CarteiraIdLink>
                       {tipoLabel !== 'Contrato' && <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>{tipoLabel}</span>}
+                      {atas.length > 0 && (
+                        <>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>·</span>
+                          <CarteiraCellFilter
+                            descricao={atas.length === 1 ? `ata ${atas[0]}` : 'estas atas'}
+                            onFilter={onFilter && (() => onFilter('busca', atas[0]))}
+                          >
+                            <span
+                              data-testid={`contracts-ata-${contractKey}`}
+                              title={atas.length === 1 ? undefined : `Atas: ${atas.join(', ')}`}
+                              style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}
+                            >
+                              {atas.length === 1 ? `Ata ${atas[0]}` : `${atas.length} atas`}
+                            </span>
+                          </CarteiraCellFilter>
+                        </>
+                      )}
                       </div>
                       {contract.fornecedorNome && (
                         <CarteiraCellFilter

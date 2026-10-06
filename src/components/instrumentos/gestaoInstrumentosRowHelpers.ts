@@ -18,6 +18,19 @@ export interface InstrumentoInfo {
   label: string;
 }
 
+/** Rótulo único de contrato: tira o prefixo "Contrato " e converte a chave "UASG-número-ano" em "número/ano". */
+export function normalizeContratoLabel(raw: string): string {
+  const text = raw.trim().replace(/^contrato\s+/i, '');
+  const key = text.match(/^\d{6}-(\d+)-(\d{4})$/);
+  return key ? `${key[1]}/${key[2]}` : text;
+}
+
+/** Rótulo único de ata: "ARP 00011/2026" e "Ata 00011/2026 — Item 3" viram "Ata 00011/2026". */
+export function normalizeAtaLabel(raw: string): string {
+  const text = raw.trim().replace(/\s+[—-]\s+item\s+\S+$/i, '').replace(/^(arp|ata)\s+/i, '');
+  return `Ata ${text}`;
+}
+
 /**
  * Deriva o instrumento (Ata ou Contrato) e seu tipo a partir dos campos já existentes no item.
  *
@@ -27,13 +40,13 @@ export interface InstrumentoInfo {
  */
 export function getInstrumentoInfo(item: DashboardAttentionItem): InstrumentoInfo {
   if (item.arpKey) {
-    return { tipo: 'ARP', label: item.numeroContrato || (item.numeroAta ? `Ata ${item.numeroAta}` : item.title) };
+    return { tipo: 'ARP', label: item.numeroContrato || item.numeroAta ? normalizeAtaLabel(item.numeroContrato || item.numeroAta || '') : item.title };
   }
   if (item.numeroAta) {
     return { tipo: 'ARP', label: `Ata ${item.numeroAta}` };
   }
   if (item.contractKey || item.numeroContrato) {
-    return { tipo: 'Contrato', label: item.numeroContrato || item.contractKey || '—' };
+    return { tipo: 'Contrato', label: normalizeContratoLabel(item.numeroContrato || item.contractKey || '—') };
   }
   return { tipo: 'Contrato', label: item.title };
 }

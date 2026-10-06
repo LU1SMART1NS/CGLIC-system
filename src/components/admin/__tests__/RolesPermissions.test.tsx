@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ROLES_QUERY_KEY } from '../../../hooks/useRoles';
+import { SYSTEM_ROLES } from '../../../types/user';
 import { RolesPermissions, ProfileDetailContent, PROFILE_DEFINITIONS } from '../RolesPermissions';
+
+function renderPage() {
+  const client = new QueryClient();
+  client.setQueryData(ROLES_QUERY_KEY, SYSTEM_ROLES);
+  return renderToStaticMarkup(
+    <QueryClientProvider client={client}>
+      <RolesPermissions />
+    </QueryClientProvider>
+  );
+}
 
 function findProfile(id: 'admin' | 'gestor' | 'gestor_saldos' | 'leitor') {
   const profile = PROFILE_DEFINITIONS.find((p) => p.id === id);
@@ -10,7 +23,7 @@ function findProfile(id: 'admin' | 'gestor' | 'gestor_saldos' | 'leitor') {
 
 describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio)', () => {
   describe('1-3. Página e cards dos quatro perfis', () => {
-    const html = renderToStaticMarkup(<RolesPermissions />);
+    const html = renderPage();
 
     it('1. renderiza o título "Perfis" e a descrição institucional', () => {
       expect(html).toContain('Perfis');
@@ -18,8 +31,8 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
     });
 
     it('2. renderiza exatamente os quatro perfis nativos', () => {
-      expect(html).toContain('Coordenador');
-      expect(html).toContain('Gestor de Atas e Contratos');
+      expect(html).toContain('Coordenador / Diretor');
+      expect(html).toContain('Gestor / Fiscal de Contrato');
       expect(html).toContain('Gestor de Saldo');
       expect(html).toContain('Consulta / Auditoria');
     });
@@ -51,7 +64,9 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
       expect(html).toContain('Unidades internas');
       expect(html).toContain('Usuários e servidores');
       expect(html).toContain('Perfis');
-      expect(html).toContain('Todas as unidades');
+      expect(html).toContain('Todas as atas e todos os contratos');
+      expect(html).toContain('Distribuição');
+      expect(html).toContain('Modelos de gestão, alertas e feriados');
     });
 
     it('6. detalhe do Gestor de Atas e Contratos mostra Atas, Contratos e Execução financeira', () => {
@@ -62,12 +77,13 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
       expect(html).toContain('Execução financeira');
       expect(html).toContain('Atas atribuídas (com os contratos vinculados) e contratos avulsos atribuídos individualmente');
 
-      expect(html).not.toContain('Alocações');
-      expect(html).not.toContain('Unidades internas');
+      expect(html).toContain('Consulta; vincula empenhos à unidade interna, sem alterar as alocações');
+      expect(html).not.toContain('Gestão completa');
       expect(html).not.toContain('Usuários e servidores');
+      expect(html).not.toContain('Distribuição');
     });
 
-    it('7. detalhe do Gestor de Saldo mostra somente Alocações e Unidades internas', () => {
+    it('7. detalhe do Gestor de Saldo mostra Alocações e Unidades internas (gestão) e Atas/Itens (consulta), sem contratos nem financeiro', () => {
       const html = renderToStaticMarkup(<ProfileDetailContent profile={findProfile('gestor_saldos')} />);
 
       expect(html).toContain('Alocações');
@@ -79,11 +95,11 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
       expect(html).not.toContain('Execução financeira');
     });
 
-    it('8. detalhe de Consulta/Auditoria mostra suas quatro áreas de consulta', () => {
+    it('8. detalhe de Consulta/Auditoria mostra só áreas de consulta', () => {
       const html = renderToStaticMarkup(<ProfileDetailContent profile={findProfile('leitor')} />);
 
       expect(html).toContain('Consulta');
-      expect(html).toContain('Informações disponíveis para consulta');
+      expect(html).toContain('somente leitura');
       expect(html).not.toContain('Usuários e servidores');
       expect(html).not.toContain('Perfis');
     });
@@ -95,7 +111,7 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
   });
 
   describe('9-13. Complexidade legada removida', () => {
-    const html = renderToStaticMarkup(<RolesPermissions />);
+    const html = renderPage();
 
     it('9. não existem checkboxes (antiga matriz de 18 flags)', () => {
       expect(html).not.toContain('type="checkbox"');

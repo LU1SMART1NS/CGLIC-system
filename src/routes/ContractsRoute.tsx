@@ -77,7 +77,7 @@ export const ContractsRoute: React.FC = () => {
     const queryDigits = query.replace(/\D/g, '');
 
     return allRows
-      .filter(({ contract, contractKey, faixa, gestorNome, pendencias }) => {
+      .filter(({ contract, contractKey, faixa, gestorNome, pendencias, atas }) => {
         if (!matchesStatusFilter(faixa, filterState.status)) return false;
         if (filterState.pendencia === 'COM_PENDENCIA' && pendencias.length === 0) return false;
         if (filterState.unidade !== TODAS_UNIDADES && !unidadesDoContrato.get(contractKey)?.has(filterState.unidade)) return false;
@@ -90,6 +90,7 @@ export const ContractsRoute: React.FC = () => {
             String(contract.ano || '').toLowerCase().includes(query) ||
             String(contract.numeroFormatado || '').toLowerCase().includes(query) ||
             String(contract.fornecedorNome || '').toLowerCase().includes(query) ||
+            (atas || []).some((ata) => ata.toLowerCase().includes(query)) ||
             (queryDigits.length >= 3 && fornCnpj.includes(queryDigits)) ||
             String(contract.objeto || '').toLowerCase().includes(query);
           if (!matchesQuery) return false;

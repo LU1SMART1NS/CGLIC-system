@@ -55,6 +55,26 @@ describe('ItensPortfolioTable', () => {
     expect(html).not.toContain('pendente');
   });
 
+  it('mostra só o número do item, a descrição em frase normal e não repete o fornecedor', () => {
+    const html = renderToStaticMarkup(
+      <ItensPortfolioTable
+        rows={[row({ item: { ...row().item, descricaoItem: 'TABLET, TELA SUPERIOR A 10 POL, MEMÓRIA RAM MÍNIMO 8 GB', nomeRazaoSocialFornecedor: 'VANGUARDA INFORMATICA LTDA' } as ArpItemRecord })]}
+        totalItens={1}
+        unidade="TODAS"
+        onSelectItem={noop}
+        onResetFilters={noop}
+      />
+    );
+    // Sem o prefixo "Item": o número do item já é o identificador da coluna.
+    expect(html).not.toContain('>Item 00001<');
+    expect(html).toContain('>00001<');
+    // Descrição que vem toda em maiúsculas é exibida em frase normal (o title guarda o original).
+    expect(html).toContain('Tablet, tela superior a 10 pol');
+    expect(html).toContain('title="TABLET, TELA SUPERIOR A 10 POL, MEMÓRIA RAM MÍNIMO 8 GB"');
+    // O fornecedor é o mesmo para todos os itens da ata: não se repete na linha (a busca ainda o encontra).
+    expect(html).not.toContain('VANGUARDA INFORMATICA LTDA');
+  });
+
   it('avisa os empenhos ainda sem quantidade confirmada', () => {
     const html = renderToStaticMarkup(
       <ItensPortfolioTable rows={[row({ empenhosPendentes: 2 })]} totalItens={1} unidade="TODAS" onSelectItem={noop} onResetFilters={noop} />

@@ -21,7 +21,7 @@ describe('gestaoInstrumentosRowHelpers — classificação de tipo ARP × Contra
     const info = getInstrumentoInfo(item);
 
     expect(info.tipo).toBe('ARP');
-    expect(info.label).toBe('ARP 00011/2026');
+    expect(info.label).toBe('Ata 00011/2026');
   });
 
   it('classifica como ARP um item de saldo crítico (arpKey + numeroAta, sem numeroContrato)', () => {
@@ -53,7 +53,19 @@ describe('gestaoInstrumentosRowHelpers — classificação de tipo ARP × Contra
     const info = getInstrumentoInfo(item);
 
     expect(info.tipo).toBe('Contrato');
-    expect(info.label).toBe('Contrato 98/2026');
+    expect(info.label).toBe('98/2026');
+  });
+
+  it('unifica o rótulo de contrato (chave interna e prefixo) em número/ano', () => {
+    const base = { id: 'x', category: 'PAGAMENTO_CRITICO', severity: 'ATENCAO', title: 't' } as const;
+    expect(getInstrumentoInfo({ ...base, contractKey: '200330-00067-2021' }).label).toBe('00067/2021');
+    expect(getInstrumentoInfo({ ...base, contractKey: 'k', numeroContrato: 'Contrato 00065/2021' }).label).toBe('00065/2021');
+    expect(getInstrumentoInfo({ ...base, contractKey: 'k', numeroContrato: '00065/2021' }).label).toBe('00065/2021');
+  });
+
+  it('unifica o rótulo de ata, sem o sufixo de item', () => {
+    const base = { id: 'x', category: 'ATA_CRITICA', severity: 'ATENCAO', title: 't', arpKey: 'a' } as const;
+    expect(getInstrumentoInfo({ ...base, numeroContrato: 'Ata 00011/2026 — Item 3' }).label).toBe('Ata 00011/2026');
   });
 
   it('não confunde tarefa de contrato (sem arpKey) com ARP', () => {

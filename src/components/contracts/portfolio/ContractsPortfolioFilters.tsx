@@ -65,7 +65,7 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
   return (
     <CarteiraFilterBar
       busca={filters.busca}
-      searchPlaceholder="Buscar por contrato, fornecedor, CNPJ..."
+      searchPlaceholder="Buscar por contrato, ata, fornecedor, CNPJ..."
       onChangeBusca={(value) => onChangeFilter('busca', value)}
       hasActiveFilters={hasActiveFilters}
       onResetFilters={onResetFilters}

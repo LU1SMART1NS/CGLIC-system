@@ -233,7 +233,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
 
     // Instrumentos da UASG 200331 continuam presentes (consolidação, não substituição)
     expect(html).toContain('Ata 12/2026');
-    expect(html).toContain('Contrato 15/2026');
+    expect(html).toContain('15/2026');
 
     // Tabs somam os itens das duas unidades (1 da 200330 + 5 da 200331 = 6)
     expect(html).toContain('Todas (6)');
@@ -316,7 +316,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     // Instrumento + tipo
     expect(html).toContain('Ata 12/2026');
     expect(html).toContain('ARP');
-    expect(html).toContain('Contrato 15/2026');
+    expect(html).toContain('15/2026');
     expect(html).toContain('Contrato');
 
     // Objeto/Fornecedor real (enriquecido via availableFilters/useAllContractManagers)
