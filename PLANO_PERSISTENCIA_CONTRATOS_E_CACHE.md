@@ -290,3 +290,24 @@ As etapas 1 a 6 cabem num único conjunto de commits na `v3.0`. A etapa 5 pode i
 - Correções: itens repetidos ficam com a publicação mais recente; descrição vazia usa o nome do material; identificador que não é CNPJ/CPF fica vazio; consultas de itens repetidas são compartilhadas; 429/5xx esperam e tentam de novo (2, 4, 8 s); na sincronização a recusa conta como falha (PARCIAL); 2 atas em paralelo em vez de 5.
 - Resultado às 12:48: SUCESSO nas duas UASGs, nenhuma recusa 429, 191 atas e 657 itens, nenhuma ata sem itens, cerca de 1 min 40 s.
 - Pendente: ampliar `itens_ata.fornecedor_cnpj_cpf` (VARCHAR(20)) exige recriar `v_arp_item_saldo_detalhado`; hoje o identificador estrangeiro fica vazio.
+
+**06/10/2026 — item 4: telas não sincronizam mais ao abrir.**
+
+Removidos os disparos automáticos que consultavam as APIs do governo e gravavam no banco ao abrir uma tela (antes, em cada navegador e a cada abertura):
+
+| Tela | Disparo removido | Como fica |
+| :--- | :--- | :--- |
+| Visão Geral | releitura dos saldos dos itens, uma vez por sessão | atualização global em segundo plano, sob a trava (recurso `saldos_itens`, validade 6 h); o coordenador força pelo botão |
+| Ata 360 | gravação do quantitativo SENASP item a item | coberto pela atualização global |
+| Item | quantitativo SENASP; quantidade contratada e empenhos de cada contrato vinculado | botão Atualizar do Item (gestor e coordenador); quantidade e SENASP também pela atualização global |
+| Contrato 360 | busca dos empenhos quando o contrato não tinha nenhum | botão Atualizar empenhos do contrato e atualização em lote da Execução Financeira |
+
+- `saldosItensSyncService.ts`: relê a quantidade contratada dos vínculos vencidos (mais de 6 h) e grava o quantitativo SENASP pendente. Falhas parciais ficam registradas no banco e aparecem como PARCIAL. Usa `UASG_TODAS = '000000'` na tabela de controle.
+- `useSincronizacaoEmSegundoPlano`: terceira etapa (saldos), depois de contratos e atas. Troquei a guarda de "uma vez por sessão" por uma execução única em andamento: no modo de desenvolvimento do React o efeito roda duas vezes e a segunda era ignorada, deixando a primeira pela metade.
+- Verificado no navegador, navegando entre telas: abrir Item, Ata 360, Contrato 360 e Visão Geral não faz mais nenhuma chamada de gravação (RPC) nem consulta de empenhos; a Visão Geral abre sem nenhuma chamada às APIs.
+
+**Achado, fora do item 4: leituras ao vivo nas telas de detalhe.** Ainda há consultas de leitura (não de gravação) às APIs ao abrir:
+- Item: unidades do item (Compras.gov.br), contratos no PNCP e adesões.
+- Ata 360: data de assinatura (Compras.gov.br) e dados da compra no PNCP.
+- Contrato 360: cerca de 10 chamadas (garantias, histórico e responsáveis no Contratos.gov.br; contrato no PNCP; adesões; busca de contratos por compra, 4 chamadas ao Compras.gov.br).
+Esses dados não estão no banco. Resolver é o item de persistir esses painéis (próximo passo).

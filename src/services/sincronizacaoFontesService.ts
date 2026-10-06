@@ -11,7 +11,13 @@
 
 import { supabase } from './supabaseClient';
 
-export type RecursoSincronizado = 'contratos' | 'atas';
+export type RecursoSincronizado = 'contratos' | 'atas' | 'saldos_itens';
+
+/**
+ * UASG usada nos recursos que valem para todas as carteiras (ex.: 'saldos_itens', que lê os contratos
+ * vinculados de todas as atas). A tabela exige 6 dígitos; "000000" não é uma UASG real.
+ */
+export const UASG_TODAS = '000000';
 export type StatusConclusao = 'SUCESSO' | 'PARCIAL' | 'ERRO';
 
 /** Validade dos dados no banco: passado isso, a próxima abertura de quem pode gravar sincroniza. */

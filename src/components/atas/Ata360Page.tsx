@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom';
 import { useBackTarget, useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { AlertTriangle, Layers, Link2, ListTodo } from 'lucide-react';
 import { buildAtaItemPath, uasgFromAtaKey, useAta, useAtaItemSaldos, useAtaLinkedContracts } from '../../hooks/useAta';
-import { useBackfillItemSenasp } from '../../hooks/useSyncItemSenasp';
 import { useAtaTaskPlan } from '../../hooks/useAtaTaskPlan';
 import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
 import { useAuth } from '../../context/AuthContext';
@@ -68,13 +67,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(arp.numeroAtaRegistroPreco));
   // Mesma regra das RPCs link/unlink_contract_to_item_atomic (has_role gestor/admin)
   const canEditLinks = role === 'admin' || role === 'gestor';
-  // Grava o quantitativo SENASP dos itens que ainda usam o homologado da ata como base.
-  useBackfillItemSenasp({
-    enabled: canEditLinks && !loadingSaldos,
-    numeroAta: arp?.numeroAtaRegistroPreco,
-    uasg: arp?.codigoUnidadeGerenciadora,
-    numerosItem: saldos.filter((s: any) => s.quantidade_senasp == null && s.numero_item != null).map((s: any) => String(s.numero_item))
-  });
+  // O quantitativo SENASP dos itens é gravado em segundo plano (useSincronizacaoEmSegundoPlano); a tela só lê.
 
   const [isLinkModalOpen, setIsLinkModalOpen] = React.useState(false);
   const unlinkMutation = useUnlinkContractFromItem();
