@@ -179,7 +179,7 @@ serve(async (req) => {
       const LEGACY_CHECK_ROLES = new Set(["admin", "gestor", "leitor"]);
       const legacyRole = LEGACY_CHECK_ROLES.has(dbRole) ? dbRole : "leitor";
 
-      await supabaseAdmin
+      const { error: roleUpsertError } = await supabaseAdmin
         .from("user_roles")
         .upsert(
           {
@@ -190,6 +190,15 @@ serve(async (req) => {
           { onConflict: "user_id,role" }
         );
 
+      // O convite já foi enviado, mas sem perfil o usuário ficaria sem autoridade (fail-closed) e o
+      // administrador não saberia. Reenviar o convite refaz esta gravação (idempotente).
+      if (roleUpsertError) {
+        return jsonError(
+          "O convite foi enviado, mas não foi possível gravar o perfil do usuário. Use \"Reenviar convite\" para tentar de novo.",
+          500
+        );
+      }
+
       // Fase 3A: atribuição opcional de escopo no próprio convite (mesma
       // semântica de substituição de manage-user/index.ts).
       if (scope && typeof scope === "object") {
@@ -199,7 +208,14 @@ serve(async (req) => {
           typeof scopeType === "string" && scopeType.trim() &&
           typeof scopeValue === "string" && scopeValue.trim()
         ) {
+          // Substituição por domínio (igual a manage-user): num reenvio, o escopo anterior é trocado, não duplicado.
           await supabaseAdmin
+            .from("user_scope_assignments")
+            .delete()
+            .eq("user_id", invitedUserId)
+            .eq("domain", domain.trim());
+
+          const { error: scopeInsertError } = await supabaseAdmin
             .from("user_scope_assignments")
             .insert({
               user_id: invitedUserId,
@@ -207,6 +223,13 @@ serve(async (req) => {
               scope_type: scopeType.trim(),
               scope_value: scopeValue.trim()
             });
+
+          if (scopeInsertError) {
+            return jsonError(
+              "O convite e o perfil foram gravados, mas não foi possível gravar o escopo do usuário. Use \"Reenviar convite\" para tentar de novo.",
+              500
+            );
+          }
         }
       }
     }
