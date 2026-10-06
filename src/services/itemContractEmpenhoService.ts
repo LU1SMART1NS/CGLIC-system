@@ -13,6 +13,7 @@ import { normalizeFromContratosGov } from './empenhoNormalizationService';
 import { deduceEmpenhoQuantity } from './balanceService';
 import { saveEmpenhoSoberanoM17 } from './empenhoSyncService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import {
   syncItemContractEmpenhosRpc,
   type ItemContractEmpenhoInput
@@ -93,7 +94,10 @@ async function linkEmpenhoToContract(contractKey: string, empenhoId: string, val
     p_empenho_id: empenhoId,
     p_valor_vinculado: valor && valor > 0 ? valor : null
   });
-  if (error) console.warn(`[itemContractEmpenhoService] Falha ao vincular o empenho ${empenhoId} ao contrato ${contractKey}:`, error);
+  // Sem o vínculo, a aba Financeiro do contrato não mostra o empenho: interrompe antes de mexer no item.
+  if (error) {
+    throw new Error(`Empenho gravado, mas não vinculado ao contrato ${contractKey}: ${mapPostgresErrorToAppError(error).message}`);
+  }
 }
 
 export interface SyncItemContractEmpenhosParams {

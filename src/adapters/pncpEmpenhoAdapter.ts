@@ -4,6 +4,7 @@
  * e delegar para a normalização determinística em NormalizedEmpenho[].
  *
  * Invariante: Zero persistência, zero decisão de reconciliação, zero acesso direto ao banco.
+ * Falha da fonte (rede, tempo, 429 ou 5xx) é propagada como exceção.
  */
 
 import { fetchPncpContractEmpenhos } from '../services/api';
@@ -19,7 +20,7 @@ export interface PncpAdapterOptions {
 }
 
 /**
- * Consulta e normaliza todos os empenhos do contrato via PNCP
+ * Consulta e normaliza todos os empenhos do contrato via PNCP. Lança erro quando a fonte falha.
  */
 export async function fetchAndNormalizePncpEmpenhos(
   options: PncpAdapterOptions
@@ -30,27 +31,16 @@ export async function fetchAndNormalizePncpEmpenhos(
     return [];
   }
 
-  try {
-    const rawEmpenhos = await fetchPncpContractEmpenhos(cnpj, String(ano), String(sequencialContrato));
-    if (!Array.isArray(rawEmpenhos) || rawEmpenhos.length === 0) {
-      return [];
-    }
-
-    const normalizedList: NormalizedEmpenho[] = [];
-
-    for (const emp of rawEmpenhos) {
-      const normalized = normalizeFromPncp(emp, {
-        contractKey,
-        uasg,
-        ano: typeof ano === 'number' ? ano : parseInt(String(ano), 10)
-      });
-
-      normalizedList.push(normalized);
-    }
-
-    return normalizedList;
-  } catch (error) {
-    console.warn(`[PncpEmpenhoAdapter] Falha ao consultar empenhos PNCP do contrato ${contractKey}:`, error);
+  const rawEmpenhos = await fetchPncpContractEmpenhos(cnpj, String(ano), String(sequencialContrato));
+  if (!Array.isArray(rawEmpenhos) || rawEmpenhos.length === 0) {
     return [];
   }
+
+  return rawEmpenhos.map((emp) =>
+    normalizeFromPncp(emp, {
+      contractKey,
+      uasg,
+      ano: typeof ano === 'number' ? ano : parseInt(String(ano), 10)
+    })
+  );
 }

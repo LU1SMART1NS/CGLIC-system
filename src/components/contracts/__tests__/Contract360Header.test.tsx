@@ -194,7 +194,7 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
       <Contract360Header contract={mockContract} userRole="gestor" />
     );
 
-    expect(html).toContain('Nenhum empenho encontrado nas bases oficiais para este contrato.');
+    expect(html).toContain('O Contratos.gov.br respondeu que este contrato não tem empenho.');
   });
 
   it('6. deve exibir banner de feedback COM_DIVERGENCIAS informando conflitos detectados', () => {

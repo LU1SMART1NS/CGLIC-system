@@ -7,6 +7,8 @@ import { formatItemKeyLabel, parseItemKey } from '../../utils/itemKeyParts';
 import type { ContractEmpenhoItemLink } from '../../services/contractEmpenhoItemLinksService';
 import type { ContractDashboardRecord } from '../../types';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
+import { useSincronizacaoEmpenhosContrato } from '../../hooks/useSincronizacaoEmpenhosContrato';
+import type { SincronizacaoEmpenhosContrato } from '../../services/contratoEmpenhosSincronizacaoService';
 import { ActionButton, AppButton, DataTable, EmptyState, ErrorState, NoticeBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
 
 interface ContractFinancialExecutionSectionProps {
@@ -31,6 +33,40 @@ const formatDate = (val?: string | null) => {
 };
 
 type EmpenhoRow = ReturnType<typeof useContractFinancialSummary>['empenhosList'][number];
+
+/** Data e hora local, ex.: 06/10/2026 14:25. */
+const formatDataHora = (val?: string | null) => {
+  if (!val) return '—';
+  const d = new Date(val);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+/** A última tentativa de atualizar os empenhos falhou (toda ou em parte)? */
+const ultimaTentativaFalhou = (sync?: SincronizacaoEmpenhosContrato | null) =>
+  sync?.situacao === 'ERRO' || sync?.situacao === 'PARCIAL';
+
+/** Linha com a data da consulta e, se a última tentativa falhou, o motivo. */
+const SituacaoSincronizacaoEmpenhos: React.FC<{ sync?: SincronizacaoEmpenhosContrato | null }> = ({ sync }) => {
+  if (!sync) return null;
+  if (ultimaTentativaFalhou(sync)) {
+    return (
+      <NoticeBar tone={sync.situacao === 'ERRO' ? 'danger' : 'warning'} testId="contract-financial-sync-failed">
+        A última atualização dos empenhos, em {formatDataHora(sync.tentativaEm)},{' '}
+        {sync.situacao === 'ERRO' ? 'falhou' : 'ficou incompleta'}
+        {sync.mensagem ? `: ${sync.mensagem}` : '.'}{' '}
+        {sync.ultimoSucessoEm
+          ? `Os dados abaixo são da consulta de ${formatDataHora(sync.ultimoSucessoEm)}.`
+          : 'Os empenhos deste contrato ainda não foram consultados com sucesso.'}
+      </NoticeBar>
+    );
+  }
+  return (
+    <span data-testid="contract-financial-sync-ok" style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+      Empenhos consultados no Contratos.gov.br em {formatDataHora(sync.ultimoSucessoEm || sync.tentativaEm)}.
+    </span>
+  );
+};
 
 /** Situação da quantidade do empenho nos itens da ata: pendente se algum item ainda espera confirmação. */
 function quantidadeEstado(links: ContractEmpenhoItemLink[]): { label: string; variant: 'success' | 'info' | 'warning' } {
@@ -57,6 +93,8 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
 
   // Empenhos de Contratos.gov/Compras.gov + v_empenhos_resumo, deduplicados por canonical_key
   const { empenhosList, summary: financialSummary, isLoading, isError, refetch } = useContractFinancialSummary(contract, contractKey);
+  // Quando e com que resultado os empenhos deste contrato foram consultados nas fontes oficiais.
+  const { data: sync } = useSincronizacaoEmpenhosContrato(contractKey);
 
   // Abrir o contrato só lê o que está gravado. Os empenhos são buscados nas bases oficiais pelo botão
   // "Atualizar empenhos" (no topo do contrato) ou pela atualização em lote da Execução Financeira.
@@ -76,18 +114,37 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   }
 
   if (empenhosList.length === 0 || !financialSummary) {
-    return (
-      <EmptyState
-        icon={<Receipt size={28} />}
-        title="Nenhum empenho vinculado a este contrato"
-        description="Nenhum empenho deste contrato está gravado no sistema. Use Atualizar empenhos, no topo, para buscar nas bases oficiais."
-        action={
-          <AppButton variant="outline" size="sm" icon={<ArrowRight size={14} />} onClick={() => navigate(empenhosUrl)}>
-            Consultar em Empenhos
-          </AppButton>
+    // Três casos diferentes: a fonte respondeu que não há empenho; a consulta falhou; nunca foi consultado.
+    const vazio = sync?.situacao === 'SEM_EMPENHOS'
+      ? {
+          title: 'O Contratos.gov.br não tem empenho para este contrato',
+          description: `Consulta feita em ${formatDataHora(sync.tentativaEm)}. Use Atualizar empenhos, no topo, para consultar de novo.`
         }
-        testId="contract-financial-empty"
-      />
+      : ultimaTentativaFalhou(sync) && !sync?.ultimoSucessoEm
+        ? {
+            title: 'Os empenhos deste contrato não puderam ser consultados',
+            description: `${sync?.mensagem || 'A fonte oficial não respondeu.'} Isto não indica ausência de empenhos. Use Atualizar empenhos, no topo, para tentar de novo.`
+          }
+        : {
+            title: 'Nenhum empenho vinculado a este contrato',
+            description: 'Nenhum empenho deste contrato está gravado no sistema. Use Atualizar empenhos, no topo, para buscar nas bases oficiais.'
+          };
+    const avisoFalha = ultimaTentativaFalhou(sync) && sync?.ultimoSucessoEm;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {avisoFalha && <SituacaoSincronizacaoEmpenhos sync={sync} />}
+        <EmptyState
+          icon={<Receipt size={28} />}
+          title={vazio.title}
+          description={vazio.description}
+          action={
+            <AppButton variant="outline" size="sm" icon={<ArrowRight size={14} />} onClick={() => navigate(empenhosUrl)}>
+              Consultar em Empenhos
+            </AppButton>
+          }
+          testId="contract-financial-empty"
+        />
+      </div>
     );
   }
 
@@ -137,6 +194,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <SituacaoSincronizacaoEmpenhos sync={sync} />
       {pendentes.length > 0 && (
         <NoticeBar testId="contract-financial-pending">
           <strong>{pendentes.length}</strong>{' '}

@@ -1130,6 +1130,33 @@ export async function fetchContratosGovData(
   return { items: [] };
 }
 
+/** Tempo máximo de espera pela lista de empenhos de um contrato (Contratos.gov.br e PNCP). */
+export const TEMPO_LIMITE_EMPENHOS_MS = 30_000;
+/** Tempo máximo de espera pela minuta de um empenho. */
+const TEMPO_LIMITE_DETALHE_EMPENHO_MS = 15_000;
+
+/** Erro de uma consulta que não terminou no tempo limite. Quem chama pode tentar de novo. */
+export class TempoEsgotadoError extends Error {
+  constructor(fonte: string, ms: number) {
+    super(`${fonte} não respondeu em ${Math.round(ms / 1000)} s.`);
+    this.name = 'TempoEsgotadoError';
+  }
+}
+
+/** fetch que desiste depois de `ms` milissegundos, com mensagem legível em falha de rede ou de tempo. */
+async function fetchComTempoLimite(url: string, ms: number, fonte: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } catch (err: any) {
+    if (controller.signal.aborted) throw new TempoEsgotadoError(fonte, ms);
+    throw new Error(`Falha de rede ao consultar o ${fonte}: ${err?.message || err}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Consulta empenhos do contrato no Contratos.gov.br (comprasnet)
  * Endpoint: GET /api/contrato/{contrato_id}/empenhos
@@ -1137,16 +1164,24 @@ export async function fetchContratosGovData(
 export async function fetchContratosGovEmpenhos(
   contratoId: string | number
 ): Promise<ContratosGovEmpenhoRecord[]> {
-  try {
-    const res = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/empenhos`);
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {
-    console.warn(`Falha na consulta de empenhos do contrato no Contratos.gov.br (id=${contratoId})`, e);
+  // Lista vazia só quando o Contratos.gov.br respondeu que o contrato não tem empenho (HTTP 200 com []).
+  // Falha de rede, tempo esgotado ou HTTP de erro viram exceção: quem chama não pode confundir
+  // "a fonte falhou" com "o contrato não tem empenho" (a sincronização do item apagaria os empenhos dele).
+  const res = await fetchComTempoLimite(
+    `/api-contratos-gov/api/contrato/${contratoId}/empenhos`,
+    TEMPO_LIMITE_EMPENHOS_MS,
+    'Contratos.gov.br'
+  );
+  if (!res.ok) {
+    throw new Error(`Contratos.gov.br respondeu ${res.status} ao listar os empenhos do contrato (id ${contratoId}).`);
   }
-  return [];
+  const data = await res.json().catch(() => {
+    throw new Error(`Contratos.gov.br devolveu uma resposta ilegível para os empenhos do contrato (id ${contratoId}).`);
+  });
+  if (!Array.isArray(data)) {
+    throw new Error(`Contratos.gov.br devolveu um formato inesperado para os empenhos do contrato (id ${contratoId}).`);
+  }
+  return data;
 }
 
 /**
@@ -1213,8 +1248,13 @@ export async function fetchContratosGovGarantias(
 export async function fetchContratoEmpenhoDetalhe(
   empenhoId: string | number
 ): Promise<{ itens_minuta?: any[] } | null> {
+  // A minuta exige token no Contratos.gov.br (401 sem ele): null quando não vem, sem interromper a sincronização.
   try {
-    const res = await fetch(`/api-contratos-gov/api/v1/contrato/empenho/consultar/${empenhoId}`);
+    const res = await fetchComTempoLimite(
+      `/api-contratos-gov/api/v1/contrato/empenho/consultar/${empenhoId}`,
+      TEMPO_LIMITE_DETALHE_EMPENHO_MS,
+      'Contratos.gov.br'
+    );
     if (res.ok) {
       const data = await res.json();
       return data;
@@ -1897,23 +1937,23 @@ export async function fetchPncpContractEmpenhos(
 ): Promise<PncpContractEmpenho[]> {
   const url = `/api-pncp/api/pncp/v1/orgaos/${cnpj}/contratos/${ano}/${sequencialContrato}/empenhos`;
 
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      return [];
-    }
-    const data = await response.json();
-    if (Array.isArray(data)) {
-      return data;
-    }
-    if (data && Array.isArray(data.data)) {
-      return data.data;
-    }
-    return [];
-  } catch (error) {
-    console.warn("Falha na consulta de empenhos do contrato PNCP.", error);
+  const response = await fetchComTempoLimite(url, TEMPO_LIMITE_EMPENHOS_MS, 'PNCP');
+  // 404 é a resposta do PNCP para "nenhum empenho do contrato"; 400, parâmetro que o PNCP não aceita.
+  // Nos dois casos não há o que ler. Limite de requisições (429) e erro do servidor são falha da fonte.
+  if (response.status === 429 || response.status >= 500) {
+    throw new Error(`PNCP respondeu ${response.status} ao listar os empenhos do contrato.`);
+  }
+  if (!response.ok) {
     return [];
   }
+  const data = await response.json().catch(() => null);
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (data && Array.isArray(data.data)) {
+    return data.data;
+  }
+  return [];
 }
 
 /**
