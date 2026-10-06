@@ -3,7 +3,8 @@ import {
   ataTemFornecedorConhecido,
   contratoDoFornecedorDaAta,
   documentoFiscalValido,
-  nomesDeFornecedorParecidos
+  nomesDeFornecedorParecidos,
+  credorDiferenteDoFornecedor
 } from '../fornecedorMatch';
 
 describe('documentoFiscalValido', () => {
@@ -69,5 +70,33 @@ describe('ataTemFornecedorConhecido', () => {
   it('desconhecido quando não há nada', () => {
     expect(ataTemFornecedorConhecido({})).toBe(false);
     expect(ataTemFornecedorConhecido({ cnpjs: [''], nomes: ['  '] })).toBe(false);
+  });
+});
+
+describe('credorDiferenteDoFornecedor', () => {
+  const equilibrio = { cnpj: '12.124.712/0001-00', nome: 'EQUILIBRIO EQUIPAMENTOS DE PROTECAO AMBIENTAL LTDA' };
+
+  it('acusa a NE da HPE no contrato da Equilíbrio (caso real do contrato 00145/2025)', () => {
+    expect(credorDiferenteDoFornecedor({ cnpj: '54.305.743/0011-70', nome: 'HPE AUTOMOTORES DO BRASIL LTDA' }, equilibrio)).toBe(true);
+  });
+
+  it('matriz e filial são a mesma empresa (mesma raiz de CNPJ)', () => {
+    expect(credorDiferenteDoFornecedor({ cnpj: '12124712000281', nome: 'OUTRO NOME' }, equilibrio)).toBe(false);
+  });
+
+  it('CPF compara o documento inteiro; CPF × CNPJ é diferente', () => {
+    expect(credorDiferenteDoFornecedor({ cnpj: '123.456.789-09' }, { cnpj: '12345678909' })).toBe(false);
+    expect(credorDiferenteDoFornecedor({ cnpj: '123.456.789-09' }, { cnpj: '123.456.789-10' })).toBe(true);
+    expect(credorDiferenteDoFornecedor({ cnpj: '12345678909' }, equilibrio)).toBe(true);
+  });
+
+  it('sem documento válido, compara o nome (estrangeiro)', () => {
+    expect(credorDiferenteDoFornecedor({ cnpj: 'EXAXONEN1', nome: 'AXON ENTERPRISE, INC.' }, { cnpj: 'ESTRANG0000348', nome: 'Axon Interprise' })).toBe(false);
+    expect(credorDiferenteDoFornecedor({ cnpj: 'EXAXONEN1', nome: 'AXON ENTERPRISE, INC.' }, { cnpj: '', nome: 'MOTOROLA SOLUTIONS' })).toBe(true);
+  });
+
+  it('sem dado suficiente não acusa', () => {
+    expect(credorDiferenteDoFornecedor({}, equilibrio)).toBe(false);
+    expect(credorDiferenteDoFornecedor({ cnpj: '54.305.743/0011-70' }, {})).toBe(false);
   });
 });

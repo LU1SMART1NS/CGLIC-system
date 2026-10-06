@@ -200,6 +200,8 @@ export interface OrchestrationResult {
   vinculos_contrato_removidos?: number;
   /** Números das NEs desvinculadas. */
   vinculos_removidos_numeros?: string[];
+  /** NEs listadas pela fonte e não vinculadas porque a equipe as descartou neste contrato (migration 85). */
+  vinculos_ignorados_numeros?: string[];
   divergencias: ConflitoCampo[];
   pendencias: VinculoPendente[];
   erros: Array<{ origem?: string; erro: string }>;
