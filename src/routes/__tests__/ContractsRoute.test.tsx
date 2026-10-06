@@ -20,6 +20,21 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
+// Situação da sincronização dos contratos (consulta ao banco): fora do teste, carteira em dia.
+vi.mock('../../hooks/useSincronizacaoContratos', () => ({
+  useSincronizacaoContratos: () => ({
+    ultimoSucessoEm: null,
+    nuncaSincronizado: false,
+    incompleta: false,
+    fontesComFalha: [],
+    emAndamentoNoBanco: false,
+    sincronizando: false,
+    podeForcar: false,
+    atualizar: vi.fn(),
+    isAtualizando: false
+  })
+}));
+
 // Unidades internas dos contratos vêm de consultas à parte (alocações e vínculos): aqui ficam fora do teste.
 vi.mock('../../hooks/useCarteiraItens', () => ({
   useCarteiraItens: () => ({ unidades: [], unidadesDoContrato: new Map(), rows: [], resumoPorAta: new Map(), isLoading: false })

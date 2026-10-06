@@ -84,8 +84,9 @@ export function getManagementDashboardQueryOptions(
   return {
     queryKey: MANAGEMENT_DASHBOARD_QUERY_KEY(norm),
     queryFn: async () => fetchManagementDashboardData(norm, currentDate),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    // Todas as fontes vêm do banco; a sincronização de contratos invalida esta query ao terminar.
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false
   };
 }
@@ -95,9 +96,10 @@ export function getManagementDashboardQueryOptions(
  * (CGLIC 3.0 — Fase 8-B/8-I)
  */
 export function useManagementDashboard(
-  filtersOrUasg?: string | ManagementDashboardFilters
+  filtersOrUasg?: string | ManagementDashboardFilters,
+  opts: { enabled?: boolean } = {}
 ): UseManagementDashboardResult {
-  const options = getManagementDashboardQueryOptions(filtersOrUasg);
+  const options = { ...getManagementDashboardQueryOptions(filtersOrUasg), enabled: opts.enabled ?? true };
 
   const {
     data,

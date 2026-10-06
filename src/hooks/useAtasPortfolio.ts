@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo, useState } from 'react';
+import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { fetchArpItems } from '../services/api';
 import { fetchAtasWithAllocationsSet, fetchAtasWithEmpenhosSet } from '../services/dbCacheService';
-import { runFullSync, checkAndTriggerAutoSync, getLastSyncMetadata } from '../services/syncService';
+import { RECURSO_ATAS, sincronizarAtas } from '../services/syncService';
+import { useAuth } from '../context/AuthContext';
+import { chaveStatusSincronizacao, podeForcarAtualizacao, useSituacaoSincronizacao } from './useSituacaoSincronizacao';
 import { getArpVigenciaStatus } from '../services/temporalEngineService';
 import { classifyPrazo } from '../components/carteira/carteiraPrazo';
 import { buildAtaSaldoStats } from '../components/atas/ataSaldoStats';
@@ -10,18 +12,26 @@ import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import { buildAtaKey, getAtaSourceQueryOptions, useAllAtaItemSaldos } from './useAta';
 import { useAllAtaManagers } from './useAtaManagers';
 import { useAssignedManagementScope } from './useAssignedManagementScope';
-import type { ArpRecord, ArpItemRecord, FilterParams, SyncMetadata } from '../types';
-
-/** Janela de vigência consultada na sincronização com Compras.gov.br / PNCP. */
-const SYNC_PARAMS: FilterParams = {
-  dataVigenciaInicialMin: '2024-01-01',
-  dataVigenciaInicialMax: '2028-08-21',
-  codigoUnidadeGerenciadora: UASGS_CGLIC[1],
-  numeroAtaRegistroPreco: ''
-};
+import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 
 const EMPENHOS_SET_KEY = ['atas-with-empenhos-set'] as const;
 const ALLOCATIONS_SET_KEY = ['atas-with-allocations-set'] as const;
+
+/** Relê do banco tudo o que a sincronização das atas pode ter mudado (inclusive o cache da Ata 360). */
+export async function invalidarDadosDeAtas(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['ata-detail-source'] }),
+    queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] }),
+    queryClient.invalidateQueries({ queryKey: EMPENHOS_SET_KEY }),
+    queryClient.invalidateQueries({ queryKey: ALLOCATIONS_SET_KEY }),
+    queryClient.invalidateQueries({ queryKey: ['management-dashboard'] }),
+    queryClient.invalidateQueries({ queryKey: chaveStatusSincronizacao(RECURSO_ATAS) })
+  ]);
+}
+
+function relerAtas(queryClient: QueryClient) {
+  void invalidarDadosDeAtas(queryClient);
+}
 
 export type SyncProgress = { step: string; percent: number; current?: number; total?: number };
 
@@ -144,54 +154,48 @@ export function useAtasPortfolio() {
   }, [arps, saldos200330, saldos200331]);
 
   // Recarrega do banco tudo o que a sincronização pode ter mudado (inclusive o cache da Ata 360).
-  const reload = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['ata-detail-source'] }),
-      queryClient.invalidateQueries({ queryKey: EMPENHOS_SET_KEY }),
-      queryClient.invalidateQueries({ queryKey: ALLOCATIONS_SET_KEY })
-    ]);
-  }, [queryClient]);
+  const reload = useCallback(() => invalidarDadosDeAtas(queryClient), [queryClient]);
 
-  // Sincronização com as fontes oficiais.
-  const [syncOverride, setSyncOverride] = useState<SyncMetadata | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  // Sincronização com as fontes oficiais: em segundo plano para todos (useSincronizacaoEmSegundoPlano),
+  // e pelo botão só para o coordenador, que força a atualização.
+  const { role } = useAuth();
+  const podeForcar = podeForcarAtualizacao(role);
+  const situacao = useSituacaoSincronizacao(RECURSO_ATAS, relerAtas);
+  const [isAtualizando, setIsAtualizando] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const syncInfo: SyncMetadata = syncOverride ?? loadedSources[0]?.syncInfo ?? getLastSyncMetadata();
+  const isSyncing = isAtualizando || situacao.sincronizando;
+
+  /** Data da última sincronização completa, lida do banco; antes da primeira, a gravada nas próprias atas. */
+  const syncInfo: SyncMetadata = {
+    ...(loadedSources[0]?.syncInfo ?? { isCachedInDb: false }),
+    ultimoSyncEm: situacao.ultimoSucessoEm ?? loadedSources[0]?.syncInfo?.ultimoSyncEm,
+    status: isSyncing ? 'SYNCING' : situacao.incompleta ? 'ERROR' : 'SUCCESS'
+  };
 
   const triggerSync = useCallback(async () => {
-    setIsSyncing(true);
+    if (!podeForcar) {
+      await reload();
+      return;
+    }
+    setIsAtualizando(true);
     setSyncError(null);
     setSyncProgress({ step: 'Iniciando sincronização...', percent: 5 });
     try {
       let firstError: string | undefined;
       for (const uasg of UASGS_CGLIC) {
-        const result = await runFullSync({ ...SYNC_PARAMS, codigoUnidadeGerenciadora: uasg }, (p) => setSyncProgress(p));
-        if (!result.success) firstError ||= result.error || 'Erro durante sincronização';
+        const result = await sincronizarAtas(uasg, { forcar: true, onProgress: (p) => setSyncProgress(p) });
+        if (result.status === 'ERRO') firstError ||= result.erro;
       }
       await reload();
-      setSyncOverride(getLastSyncMetadata());
       if (firstError) setSyncError(firstError);
     } catch (err: any) {
       setSyncError(err.message || 'Falha ao sincronizar com APIs governamentais');
     } finally {
-      setIsSyncing(false);
+      setIsAtualizando(false);
       setSyncProgress(null);
     }
-  }, [reload]);
-
-  // Banco vazio na primeira carga: dispara a sincronização automática (se a última passou do intervalo).
-  const autoSyncChecked = useRef(false);
-  useEffect(() => {
-    if (isLoading || autoSyncChecked.current) return;
-    autoSyncChecked.current = true;
-    if (arps.length > 0) return;
-    for (const uasg of UASGS_CGLIC) {
-      checkAndTriggerAutoSync(uasg, () => {
-        queryClient.invalidateQueries({ queryKey: getAtaSourceQueryOptions(uasg).queryKey });
-      });
-    }
-  }, [isLoading, arps.length, queryClient]);
+  }, [podeForcar, reload]);
 
   return {
     /** Todas as atas carregadas (sem o escopo do gestor). */
@@ -212,6 +216,8 @@ export function useAtasPortfolio() {
     isSyncing,
     syncProgress,
     syncError,
+    /** Situação da última sincronização das atas no banco (falha, fontes, horários). */
+    situacaoSincronizacao: situacao,
     triggerSync,
     reload
   };

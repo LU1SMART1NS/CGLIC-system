@@ -5,6 +5,7 @@ import { useMediaQuery } from '../../design-system/hooks/useMediaQuery';
 import { Header } from '../Header';
 import { Sidebar } from './Sidebar';
 import { AreaTabs } from './AreaTabs';
+import { useSincronizacaoEmSegundoPlano } from '../../hooks/useSincronizacaoEmSegundoPlano';
 
 export interface AppShellContextValue {
   onOpenExportModal: () => void;
@@ -20,6 +21,9 @@ export const AppShell: React.FC<AppShellProps> = ({
   onOpenExportModal,
   onOpenDepartmentsModal
 }) => {
+  // Gestor e coordenador: atualizam contratos e atas no banco em segundo plano quando passam da validade.
+  useSincronizacaoEmSegundoPlano();
+
   // < 768px: o menu chave vira barra inferior.
   const isMobile = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
 

@@ -10,10 +10,15 @@ vi.mock('../useContractsDashboard', () => ({
 vi.mock('../useContractContratosGov', () => ({
   useContratoGov: vi.fn()
 }));
-// Os testes chamam o hook direto, fora de um componente: useMemo vira a própria conta.
+vi.mock('../../context/AuthContext', () => ({
+  useAuth: () => ({ role: 'leitor' })
+}));
+// Os testes chamam o hook direto, fora de um componente: useMemo vira a própria conta, e o efeito
+// (gravar no banco o contrato completado) não roda.
 vi.mock('react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react')>()),
-  useMemo: (fn: () => unknown) => fn()
+  useMemo: (fn: () => unknown) => fn(),
+  useEffect: () => undefined
 }));
 
 const mockContracts: ContractDashboardRecord[] = [

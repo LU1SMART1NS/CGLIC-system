@@ -337,35 +337,9 @@ function mergeComprasGovRecord(contractsMap: Map<string, ContractDashboardRecord
   }
 }
 
-async function loadContractsForDashboard(cleanUasg: string, cacheKey: string): Promise<ContractDashboardRecord[]> {
-  // As duas fontes são consultadas ao mesmo tempo: a espera é a da fonte mais lenta, não a soma.
-  const [contratosGov, comprasGov] = await Promise.all([
-    fetchContratosGovList(cleanUasg),
-    fetchComprasGovList(cleanUasg)
-  ]);
-
-  const partial = !contratosGov.ok || !comprasGov.ok;
-
-  // Lista incompleta: parte do que já se sabia (última lista completa), para não encolher a carteira.
-  const contractsMap = new Map<string, ContractDashboardRecord>();
-  if (partial) {
-    for (const record of CONTRATOS_ULTIMA_COMPLETA.get(cleanUasg) ?? []) contractsMap.set(record.id, record);
-  }
-
-  // O Contratos.gov.br entra primeiro; o Compras.gov.br completa os campos que faltarem e traz o que só existe nele.
-  for (const c of contratosGov.list) {
-    const record = mapContratosGovRecord(c, cleanUasg);
-    if (record) contractsMap.set(record.id, record);
-  }
-  for (const c of comprasGov.list) {
-    mergeComprasGovRecord(contractsMap, c, cleanUasg);
-  }
-
-  // Contratos manuais (tabela contratos_manuais) deixaram de ser carregados: o cadastro manual
-  // foi retirado e o resíduo aparecia como "Vigente" sem data de fim, divergindo das carteiras.
-
-  const result = Array.from(contractsMap.values());
-  result.sort((a, b) => {
+/** Ordem da carteira: ano mais recente primeiro e, no mesmo ano, número maior primeiro. */
+export function ordenarContratos(contracts: ContractDashboardRecord[]): ContractDashboardRecord[] {
+  return contracts.sort((a, b) => {
     const anoA = parseInt(String(a.ano), 10) || 0;
     const anoB = parseInt(String(b.ano), 10) || 0;
     if (anoB !== anoA) return anoB - anoA;
@@ -373,6 +347,75 @@ async function loadContractsForDashboard(cleanUasg: string, cacheKey: string): P
     const numB = parseInt(b.numero.replace(/\D/g, ''), 10) || 0;
     return numB - numA;
   });
+}
+
+export const FONTE_CONTRATOS_GOV = 'Contratos.gov.br';
+export const FONTE_COMPRAS_GOV = 'Compras.gov.br';
+
+interface RespostaFontes {
+  contratosGov: { list: any[]; ok: boolean };
+  comprasGov: { list: any[]; ok: boolean };
+}
+
+/** Consulta as duas fontes oficiais ao mesmo tempo: a espera é a da fonte mais lenta, não a soma. */
+async function consultarFontes(cleanUasg: string): Promise<RespostaFontes> {
+  const [contratosGov, comprasGov] = await Promise.all([
+    fetchContratosGovList(cleanUasg),
+    fetchComprasGovList(cleanUasg)
+  ]);
+  return { contratosGov, comprasGov };
+}
+
+/**
+ * Junta as respostas das fontes sobre uma base de contratos já conhecidos. O Contratos.gov.br
+ * substitui o registro; o Compras.gov.br só completa campos vazios e acrescenta o que só existe nele.
+ */
+function montarContratos(
+  resposta: RespostaFontes,
+  cleanUasg: string,
+  base: ContractDashboardRecord[]
+): { contracts: ContractDashboardRecord[]; fontesComFalha: string[] } {
+  const contractsMap = new Map<string, ContractDashboardRecord>();
+  for (const record of base) contractsMap.set(record.id, { ...record });
+  for (const c of resposta.contratosGov.list) {
+    const record = mapContratosGovRecord(c, cleanUasg);
+    if (record) contractsMap.set(record.id, record);
+  }
+  for (const c of resposta.comprasGov.list) {
+    mergeComprasGovRecord(contractsMap, c, cleanUasg);
+  }
+
+  // Contratos manuais (tabela contratos_manuais) deixaram de ser carregados: o cadastro manual
+  // foi retirado e o resíduo aparecia como "Vigente" sem data de fim, divergindo das carteiras.
+
+  const fontesComFalha = [
+    ...(resposta.contratosGov.ok ? [] : [FONTE_CONTRATOS_GOV]),
+    ...(resposta.comprasGov.ok ? [] : [FONTE_COMPRAS_GOV])
+  ];
+  return { contracts: ordenarContratos(Array.from(contractsMap.values())), fontesComFalha };
+}
+
+/**
+ * Contratos da UASG direto das fontes oficiais, sem cache. `fontesComFalha` lista as fontes que não
+ * responderam. `base`: contratos já conhecidos (por exemplo, os do banco); o que as fontes trazem
+ * atualiza a base, e uma fonte fora do ar não apaga nem empobrece o que já se sabia.
+ * Usada pela sincronização com o banco (contratosOficiaisService).
+ */
+export async function buscarContratosNasFontes(
+  uasg: string,
+  base: ContractDashboardRecord[] = []
+): Promise<{ contracts: ContractDashboardRecord[]; fontesComFalha: string[] }> {
+  const cleanUasg = (uasg || '').trim();
+  return montarContratos(await consultarFontes(cleanUasg), cleanUasg, base);
+}
+
+async function loadContractsForDashboard(cleanUasg: string, cacheKey: string): Promise<ContractDashboardRecord[]> {
+  const resposta = await consultarFontes(cleanUasg);
+  const partial = !resposta.contratosGov.ok || !resposta.comprasGov.ok;
+
+  // Lista incompleta: parte do que já se sabia (última lista completa), para não encolher a carteira.
+  const base = partial ? CONTRATOS_ULTIMA_COMPLETA.get(cleanUasg) ?? [] : [];
+  const result = montarContratos(resposta, cleanUasg, base).contracts;
 
   // Só grava no cache a lista completa: uma lista incompleta ficaria 5 minutos valendo como se fosse a carteira inteira.
   setContractsPartial(cleanUasg, partial);

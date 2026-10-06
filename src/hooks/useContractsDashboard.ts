@@ -1,15 +1,13 @@
-import { useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  fetchContractsForDashboard,
-  clearContractsCache,
-  isContractsListPartial,
-  subscribeContractsPartial
-} from '../services/contractService';
+import { fetchContratosParaTela } from '../services/contratosOficiaisService';
 import type { ContractDashboardRecord } from '../types';
 
-/** Intervalo para tentar de novo enquanto a lista de contratos estiver incompleta (alguma fonte não respondeu). */
-export const CONTRACTS_PARTIAL_RETRY_MS = 30 * 1000;
+/**
+ * A lista só muda quando há sincronização com as fontes oficiais, e a sincronização invalida esta
+ * query ao terminar (useSincronizacaoContratos). Por isso a validade é longa e não há recarga sozinha.
+ */
+export const CONTRACTS_STALE_TIME_MS = 30 * 60 * 1000;
+export const CONTRACTS_GC_TIME_MS = 60 * 60 * 1000;
 
 /**
  * Constrói as opções canônicas de query para o Dashboard de Contratos.
@@ -21,32 +19,23 @@ export function getContractsDashboardQueryOptions(uasg?: string) {
 
   return {
     queryKey: ['contracts-dashboard', cleanUasg] as const,
-    queryFn: async (): Promise<ContractDashboardRecord[]> => {
-      return fetchContractsForDashboard(cleanUasg, false);
-    },
+    queryFn: async (): Promise<ContractDashboardRecord[]> => fetchContratosParaTela(cleanUasg),
     enabled: Boolean(cleanUasg),
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    // Lista incompleta não vai para o cache do serviço: tenta de novo até vir completa.
-    refetchInterval: (): number | false => (isContractsListPartial(cleanUasg) ? CONTRACTS_PARTIAL_RETRY_MS : false),
-    // Ao voltar para a aba com a lista incompleta, consulta de novo (mesmo dentro dos 5 minutos de staleTime).
-    refetchOnWindowFocus: (): boolean | 'always' => (isContractsListPartial(cleanUasg) ? 'always' : true)
+    staleTime: CONTRACTS_STALE_TIME_MS,
+    gcTime: CONTRACTS_GC_TIME_MS,
+    refetchOnWindowFocus: false
   };
 }
 
-/** Alguma das UASGs está com a lista de contratos incompleta (uma das fontes não respondeu). */
-export function useContractsListPartial(uasgs: string[]): boolean {
-  return useSyncExternalStore(
-    subscribeContractsPartial,
-    () => uasgs.some((uasg) => isContractsListPartial(uasg)),
-    () => false
-  );
-}
-
 /**
- * Hook canônico do React Query para listagem de contratos administrativos no Dashboard.
+ * Hook canônico do React Query para listagem de contratos administrativos.
  *
  * Arquitetura:
- * UI / ContractsDashboard -> useContractsDashboard(uasg) -> fetchContractsForDashboard() -> APIs Federais
+ * UI -> useContractsDashboard(uasg) -> fetchContratosParaTela() -> Supabase (contratos_oficiais)
+ * As APIs federais só são consultadas pela sincronização (contratosOficiaisService) ou quando o banco
+ * ainda não tem a carteira.
+ *
+ * `refresh` relê o banco. Quem atualiza com as fontes oficiais é useSincronizacaoContratos.
  */
 export function useContractsDashboard(uasg?: string) {
   const queryClient = useQueryClient();
@@ -57,9 +46,7 @@ export function useContractsDashboard(uasg?: string) {
   );
 
   const refresh = async () => {
-    clearContractsCache(cleanUasg);
     await queryClient.invalidateQueries({ queryKey: ['contracts-dashboard', cleanUasg] });
-    return query.refetch();
   };
 
   return {

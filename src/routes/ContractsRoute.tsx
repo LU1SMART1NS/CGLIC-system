@@ -29,6 +29,8 @@ export const ContractsRoute: React.FC = () => {
     isLoadingScope: isLoadingManagers,
     isFetching,
     isPartial,
+    fontesComFalha,
+    podeForcarAtualizacao,
     error,
     dataUpdatedAt,
     refresh
@@ -120,7 +122,8 @@ export const ContractsRoute: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <ContractsPortfolioHeader
-        onRefresh={() => refresh()}
+        // Só o coordenador atualiza com as fontes oficiais; os demais perfis já leem o banco atualizado.
+        onRefresh={podeForcarAtualizacao ? () => void refresh() : undefined}
         isRefreshing={isFetching}
         lastUpdated={dataUpdatedAt}
       />
@@ -133,7 +136,14 @@ export const ContractsRoute: React.FC = () => {
         </div>
       ) : (
         <>
-          {isPartial && <ContractsPartialNotice onRetry={() => refresh()} isRetrying={isFetching} />}
+          {isPartial && (
+            <ContractsPartialNotice
+              fontesComFalha={fontesComFalha}
+              ultimoSucessoEm={typeof dataUpdatedAt === 'string' ? dataUpdatedAt : null}
+              onRetry={podeForcarAtualizacao ? () => void refresh() : undefined}
+              isRetrying={isFetching}
+            />
+          )}
 
           <ContractsPortfolioSummary
             vigentes={summaryMetrics.vigentes}

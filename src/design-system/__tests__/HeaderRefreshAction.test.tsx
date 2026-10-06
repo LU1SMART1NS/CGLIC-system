@@ -4,7 +4,8 @@ import { HeaderRefreshAction } from '../components/HeaderRefreshAction';
 
 describe('HeaderRefreshAction — Design System', () => {
   it('deve renderizar o indicador "Atualizado às HH:MM" e o botão "Atualizar"', () => {
-    const fixedDate = new Date('2026-09-25T10:15:00.000Z');
+    const fixedDate = new Date();
+    fixedDate.setHours(10, 15, 0, 0);
     const html = renderToStaticMarkup(
       <HeaderRefreshAction
         onRefresh={vi.fn()}
@@ -18,6 +19,22 @@ describe('HeaderRefreshAction — Design System', () => {
     expect(html).toContain('test-refresh-action');
     // Indicador verde quando ocioso
     expect(html).toContain('background-color:#22c55e');
+  });
+
+  it('sem onRefresh (perfis que não atualizam), mostra só a data, sem o botão', () => {
+    const html = renderToStaticMarkup(
+      <HeaderRefreshAction lastUpdated={new Date(2026, 8, 25, 10, 15)} dataTestId="test-refresh-action" />
+    );
+    expect(html).toContain('Atualizado em 25/09 às 10:15');
+    expect(html).not.toContain('<button');
+    expect(html).toContain('test-refresh-action-indicador');
+  });
+
+  it('atualização de outro dia mostra a data junto com a hora', () => {
+    const html = renderToStaticMarkup(
+      <HeaderRefreshAction onRefresh={vi.fn()} lastUpdated={new Date(2026, 8, 25, 10, 15)} />
+    );
+    expect(html).toContain('Atualizado em 25/09 às 10:15');
   });
 
   it('deve exibir estado de carregamento quando isRefreshing for true', () => {
