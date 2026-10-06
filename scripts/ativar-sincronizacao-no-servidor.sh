@@ -34,6 +34,8 @@ echo "Função:  $URL_FUNCAO"
 echo
 echo "Isto vai ALTERAR o projeto de produção: secret da função, implantação da função, migrations 76 e 77"
 echo "(extensões pg_cron e pg_net, funções do banco e 6 jobs) e dois secrets no Vault."
+SEM_PERGUNTAS=""
+if [ "${1:-}" = "--sim" ]; then SEM_PERGUNTAS="--yes"; fi
 if [ "${1:-}" != "--sim" ]; then
   read -r -p "Continuar? [s/N] " resposta
   [ "$resposta" = "s" ] || [ "$resposta" = "S" ] || { echo "Cancelado."; exit 0; }
@@ -54,7 +56,7 @@ npm run --silent deploy:sincronizar-fontes
 echo "    ok"
 
 echo "3/6 Aplicando as migrations pendentes (76 e 77)..."
-supabase db push --linked
+supabase db push --linked ${SEM_PERGUNTAS}
 echo "    ok"
 
 echo "4/6 Gravando endereço e segredo no Vault do banco..."

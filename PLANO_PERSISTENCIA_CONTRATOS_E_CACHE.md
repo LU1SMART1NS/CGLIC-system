@@ -372,3 +372,12 @@ Pede confirmação e, em ordem: define o secret da função, implanta a função
 - Tirar a sincronização do navegador de gestor e coordenador (`useSincronizacaoEmSegundoPlano`); enquanto isso, as duas convivem sem problema, pela trava.
 - O botão "Atualizar" do coordenador passar a chamar a função (`forcar: true`) em vez de rodar no navegador.
 - Fechar a escrita aberta a qualquer usuário logado em `atas_registro_preco` e `itens_ata` (a sincronização no servidor deixa de precisar dela).
+
+### Ativado em produção (06/10/2026, 14:3x)
+`npm run ativar:sincronizacao-no-servidor` rodou sem erro:
+- função `sincronizar-fontes` implantada e secret `CRON_SECRET` definido; migrations 76 e 77 aplicadas; `sincronizacao_url` e `sincronizacao_segredo` no Vault; 6 jobs ativos.
+- **Acesso às fontes a partir do Supabase (us-west-2): funciona.** O teste dry da UASG 200330 retornou HTTP 200 com 42 contratos e nenhuma fonte com falha, em 1,2 s. O medo de bloqueio de região não se confirmou.
+- **Caminho do agendamento ponta a ponta:** `disparar_sincronizacao()` → `pg_net` → função respondeu 202 "aceito, origem agendamento".
+- Como os dados estavam em dia (contratos 14:30, atas 12:48, saldos 13:21), as próximas execuções reais do agendamento só agem quando vencer a validade de 6 h: atas a partir do :15 depois das 18:48, saldos depois das 19:21, contratos depois das 20:30. Até lá, a hora cheia só confere e responde "nada a fazer".
+- O script ganhou `--sim` sem perguntas (também no `db push --yes`), para rodar sem terminal interativo.
+- **Primeira sincronização real feita pelo servidor (14:40):** com a validade de contratos 200330 marcada como vencida, o disparo do agendamento reservou a trava, leu as fontes, gravou 42 contratos pela chave de service role e concluiu com SUCESSO em cerca de 5 s. Caminho de gravação do servidor comprovado em produção.
