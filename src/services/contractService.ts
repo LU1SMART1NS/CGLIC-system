@@ -112,6 +112,34 @@ function parseMoney(val: any): number {
 }
 
 /**
+ * idCompra oficial (17 dígitos: UASG da compra 6 + modalidade 2 + número 5 + ano 4) a partir dos campos do
+ * Contratos.gov.br (`unidade_compra`, `codigo_modalidade`, `licitacao_numero`). O Compras.gov.br, que traz o
+ * idCompra pronto, demora a publicar os contratos novos: sem esta derivação eles ficavam sem compra e a Central
+ * não reconhecia a ata de origem. Devolve undefined quando algum campo falta ou não tem o formato esperado.
+ */
+export function deriveIdCompraContratosGov(c: any): string | undefined {
+  const uasgCompra = String(c?.unidade_compra ?? '').replace(/\D/g, '');
+  const modalidade = String(c?.codigo_modalidade ?? '').replace(/\D/g, '');
+  const licitacao = String(c?.licitacao_numero ?? '').trim();
+  if (uasgCompra.length !== 6 || !modalidade || modalidade.length > 2 || !licitacao) return undefined;
+
+  let numero: string;
+  let ano: string;
+  const partes = licitacao.split('/');
+  if (partes.length === 2) {
+    numero = partes[0].replace(/\D/g, '');
+    ano = partes[1].replace(/\D/g, '');
+  } else {
+    const d = licitacao.replace(/\D/g, '');
+    if (d.length !== 9) return undefined;
+    numero = d.slice(0, 5);
+    ano = d.slice(5);
+  }
+  if (!numero || numero.length > 5 || !/^(19|20)\d{2}$/.test(ano)) return undefined;
+  return `${uasgCompra}${modalidade.padStart(2, '0')}${numero.padStart(5, '0')}${ano}`;
+}
+
+/**
  * Monta o registro do painel a partir de um contrato do Contratos.gov.br, venha ele da lista da UG
  * ou da consulta por número. Devolve null quando o número não permite derivar a identidade.
  */
@@ -147,6 +175,8 @@ export function mapContratosGovRecord(c: any, uasgPadrao: string): ContractDashb
     processo: c.processo || c.licitacao_numero,
     fornecedorNome: c.fornecedor?.nome || c.nomeRazaoSocialFornecedor,
     fornecedorCnpjCpf: c.fornecedor?.cnpj_cpf_idgener || c.niFornecedor,
+    // Compra de origem já no Contratos.gov.br; o Compras.gov.br só completa quando ela não pôde ser derivada.
+    idCompra: deriveIdCompraContratosGov(c),
     valorGlobal: parseMoney(c.valor_global || c.valor_inicial),
     valorInicial: parseMoney(c.valor_inicial),
     dataAssinatura: c.data_assinatura,
