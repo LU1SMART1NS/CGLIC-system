@@ -73,6 +73,9 @@ export const EmpenhosBatchSyncPanel: React.FC<EmpenhosBatchSyncPanelProps> = ({
                 {batchSummary.parciais > 0 ? `, ${batchSummary.parciais} parcial(is)` : ''}
                 {batchSummary.comErro > 0 ? `, ${batchSummary.comErro} com falha` : ''}.{' '}
                 {batchSummary.empenhosPersistidos} empenho(s) gravado(s).
+                {batchSummary.vinculosRemovidos > 0
+                  ? ` ${batchSummary.vinculosRemovidos} vínculo(s) removido(s) porque o Contratos.gov.br não lista mais a NE no contrato.`
+                  : ''}
                 {batchSummary.novasTentativas > 0 ? ` ${batchSummary.novasTentativas} contrato(s) tiveram nova tentativa.` : ''}
               </span>
             </>

@@ -335,7 +335,15 @@ describe('empenhoOrchestrationService — Testes Unitários de Orquestração On
         total_contratos_vinculados: 1,
         total_conflitos: 0,
         erros: [],
-        reconciliados: []
+        reconciliados: [],
+        ids_por_chave: { '200331-2026-2026NE142': 'uuid-142' }
+      });
+      const conjunto = vi.spyOn(syncService, 'syncContractEmpenhosM17').mockResolvedValue({
+        inseridos: 1,
+        atualizados: 0,
+        removidos: 0,
+        removidos_numeros: [],
+        remocao_bloqueada: 0
       });
 
       const result = await orchestrateContractEmpenhoSync({
@@ -352,6 +360,9 @@ describe('empenhoOrchestrationService — Testes Unitários de Orquestração On
       expect(result.status).toBe('SUCESSO');
       expect(result.empenhos_persistidos).toBe(1);
       expect(result.vinculos_contrato_criados).toBe(1);
+      // Empenhos gravados sem vínculo um a um; o conjunto do contrato vai de uma vez, removendo ausentes.
+      expect(syncService.syncReconciledBatch).toHaveBeenCalledWith(expect.any(Array), { vincularContratos: false });
+      expect(conjunto).toHaveBeenCalledWith(expect.any(String), [{ empenho_id: 'uuid-142', valor_vinculado: expect.any(Number) }], true);
       expect(result.fontes_consultadas).toContain('CONTRATOSNET');
       expect(result.fontes_consultadas).toContain('PNCP');
     });
@@ -377,7 +388,15 @@ describe('empenhoOrchestrationService — Testes Unitários de Orquestração On
         total_contratos_vinculados: 1,
         total_conflitos: 0,
         erros: [],
-        reconciliados: []
+        reconciliados: [],
+        ids_por_chave: { '200331-2026-2026NE999': 'uuid-142' }
+      });
+      const conjunto = vi.spyOn(syncService, 'syncContractEmpenhosM17').mockResolvedValue({
+        inseridos: 1,
+        atualizados: 0,
+        removidos: 0,
+        removidos_numeros: [],
+        remocao_bloqueada: 0
       });
 
       const result = await orchestrateContractEmpenhoSync({
@@ -389,6 +408,9 @@ describe('empenhoOrchestrationService — Testes Unitários de Orquestração On
       expect(result.status).toBe('SUCESSO');
       expect(result.vinculos_item_criados).toBe(0); // Sem item de ata
       expect(result.vinculos_contrato_criados).toBe(1);
+      // Empenhos gravados sem vínculo um a um; o conjunto do contrato vai de uma vez, removendo ausentes.
+      expect(syncService.syncReconciledBatch).toHaveBeenCalledWith(expect.any(Array), { vincularContratos: false });
+      expect(conjunto).toHaveBeenCalledWith(expect.any(String), [{ empenho_id: 'uuid-142', valor_vinculado: expect.any(Number) }], true);
     });
   });
 

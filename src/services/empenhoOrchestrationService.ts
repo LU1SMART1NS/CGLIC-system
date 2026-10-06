@@ -14,7 +14,7 @@ import { fetchAndNormalizeComprasGovEmpenhos } from '../adapters/comprasGovEmpen
 import { fetchAndNormalizeContratosGovEmpenhos } from '../adapters/contratosGovEmpenhoAdapter';
 import { fetchAndNormalizePncpEmpenhos } from '../adapters/pncpEmpenhoAdapter';
 import { reconcileNormalizedEmpenhos } from './empenhoReconciliationService';
-import { syncReconciledBatch } from './empenhoSyncService';
+import { syncReconciledBatch, syncContractEmpenhosM17, vincularEmpenhosAoContratoUmAUm, rpcInexistente } from './empenhoSyncService';
 import type {
   OrchestrationTarget,
   ItemTarget,
@@ -451,8 +451,55 @@ export async function orchestrateContractEmpenhoSync(
   // C. Reconciliação
   const reconciledList = reconcileNormalizedEmpenhos(allNormalized);
 
-  // D. Persistência M17
-  const syncSummary = await syncReconciledBatch(reconciledList);
+  // D. Persistência M17: grava os empenhos; os vínculos com o contrato vão de uma vez em E.
+  const syncSummary = await syncReconciledBatch(reconciledList, { vincularContratos: false });
+
+  // E. Vínculos do contrato = o que o Contratos.gov.br listou (substitui o conjunto).
+  // Só quando a fonte respondeu. Remove os ausentes só se todos os empenhos lidos foram gravados:
+  // um empenho que falhou ficaria de fora da lista e seria desvinculado por engano.
+  let vinculosInseridos = 0;
+  let vinculosAtualizados = 0;
+  let vinculosRemovidos = 0;
+  let removidosNumeros: string[] = [];
+  if (fontesConsultadas.includes('CONTRATOSNET')) {
+    const ids = syncSummary.ids_por_chave ?? {};
+    const conjunto = reconciledList
+      .filter((rec) => ids[rec.canonical_key])
+      .map((rec) => ({
+        empenho_id: ids[rec.canonical_key],
+        numero: rec.numero_oficial,
+        valor_vinculado: rec.contract_links.find((l) => l.contract_key === contractKey)?.valor_vinculado ?? rec.valor_empenhado ?? 0
+      }));
+    const todosGravados = conjunto.length === reconciledList.length;
+    try {
+      const r = await syncContractEmpenhosM17(
+        contractKey,
+        conjunto.map(({ empenho_id, valor_vinculado }) => ({ empenho_id, valor_vinculado })),
+        todosGravados
+      );
+      if (r) {
+        vinculosInseridos = r.inseridos;
+        vinculosAtualizados = r.atualizados;
+        vinculosRemovidos = r.removidos;
+        removidosNumeros = r.removidos_numeros;
+        if (r.remocao_bloqueada > 0) {
+          erros.push({
+            origem: 'CONTRATOSNET',
+            erro: `O Contratos.gov.br não listou nenhum empenho para este contrato, mas ele tem ${r.remocao_bloqueada} vinculado(s) no sistema; nenhum foi removido. Confira o contrato no Contratos.gov.br.`
+          });
+        }
+      }
+    } catch (err: any) {
+      if (rpcInexistente(err)) {
+        // Migration 81 ainda não aplicada: vincula um por vez, como antes, sem remover nada.
+        const r = await vincularEmpenhosAoContratoUmAUm(contractKey, conjunto);
+        vinculosInseridos = r.vinculados;
+        for (const falha of r.falhas) syncSummary.erros.push({ erro: falha });
+      } else {
+        erros.push({ origem: 'BANCO', erro: `Vínculos do contrato não gravados: ${err?.message || 'erro do banco.'}` });
+      }
+    }
+  }
 
   const divergencias: ConflitoCampo[] = [];
   const pendencias: VinculoPendente[] = [...pendenciasPncp];
@@ -481,7 +528,10 @@ export async function orchestrateContractEmpenhoSync(
     empenhos_persistidos: syncSummary.total_salvos,
     empenhos_atualizados: syncSummary.total_processados - syncSummary.total_salvos,
     vinculos_item_criados: syncSummary.total_itens_vinculados,
-    vinculos_contrato_criados: syncSummary.total_contratos_vinculados,
+    vinculos_contrato_criados: vinculosInseridos,
+    vinculos_contrato_atualizados: vinculosAtualizados,
+    vinculos_contrato_removidos: vinculosRemovidos,
+    vinculos_removidos_numeros: removidosNumeros,
     divergencias,
     pendencias,
     erros,

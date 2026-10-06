@@ -21,6 +21,7 @@ const resumo = (over: Partial<BatchSyncSummary> = {}): BatchSyncSummary => ({
   comErro: 4,
   empenhosPersistidos: 1180,
   divergentesPncp: [],
+  vinculosRemovidos: 0,
   novasTentativas: 6,
   cancelado: false,
   falhas: [],

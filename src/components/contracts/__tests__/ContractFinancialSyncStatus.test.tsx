@@ -95,4 +95,30 @@ describe('ContractFinancialExecutionSection: situação da sincronização', () 
     expect(html).toContain('Empenhos consultados no Contratos.gov.br em 06/10/2026');
     expect(html).not.toContain('contract-financial-sync-failed');
   });
+
+  it('NE compartilhada: mostra o outro contrato e o valor que entra inteiro nos dois', () => {
+    vi.mocked(useContractFinancialSummary).mockReturnValue({
+      ...comEmpenho,
+      empenhosList: [{ ...comEmpenho.empenhosList[0], outros_contratos: ['200331-00005-2017'] }]
+    } as any);
+    vi.mocked(useSincronizacaoEmpenhosContrato).mockReturnValue({ data: sync({}) } as any);
+    const html = render();
+    expect(html).toContain('contract-financial-ne-compartilhada');
+    expect(html).toContain('também em');
+    expect(html).toContain('00005/2017');
+    expect(html).toContain('contract-financial-compartilhadas');
+    expect(html).toContain('entra inteiro no total de');
+  });
+
+  it('aviso da consulta (vínculo removido) aparece sem rótulo de PNCP', () => {
+    vi.mocked(useContractFinancialSummary).mockReturnValue(comEmpenho as any);
+    vi.mocked(useSincronizacaoEmpenhosContrato).mockReturnValue({
+      data: sync({ mensagem: '1 empenho(s) desvinculado(s) porque o Contratos.gov.br não os lista mais neste contrato: 2024NE000029.' })
+    } as any);
+    const html = render();
+    expect(html).toContain('contract-financial-sync-pncp');
+    expect(html).toContain('1 empenho(s) desvinculado(s)');
+    expect(html).not.toContain('Conferência com o PNCP: 1 empenho');
+  });
 });
+

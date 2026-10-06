@@ -58,14 +58,25 @@ export function pendenciasPncp(result: Pick<OrchestrationResult, 'pendencias'>):
   return (result.pendencias ?? []).filter((p) => p.contexto?.fonte === 'PNCP').map((p) => p.motivo);
 }
 
+/** Aviso dos vínculos removidos porque o Contratos.gov.br não lista mais as NEs no contrato. */
+export function avisoVinculosRemovidos(result: Pick<OrchestrationResult, 'vinculos_contrato_removidos' | 'vinculos_removidos_numeros'>): string | undefined {
+  const n = result.vinculos_contrato_removidos ?? 0;
+  if (n <= 0) return undefined;
+  const numeros = (result.vinculos_removidos_numeros ?? []).join(', ');
+  return `${n} empenho(s) desvinculado(s) porque o Contratos.gov.br não os lista mais neste contrato${numeros ? `: ${numeros}` : ''}.`;
+}
+
 /**
- * Mensagem gravada com a situação: o erro, se houver; senão, o aviso da conferência com o PNCP.
+ * Mensagem gravada com a situação: o erro, se houver; senão, os avisos (vínculos removidos e
+ * conferência com o PNCP).
  */
-export function mensagemParaRegistro(result: Pick<OrchestrationResult, 'erros' | 'resumo_sync' | 'pendencias'>): string | undefined {
+export function mensagemParaRegistro(
+  result: Pick<OrchestrationResult, 'erros' | 'resumo_sync' | 'pendencias' | 'vinculos_contrato_removidos' | 'vinculos_removidos_numeros'>
+): string | undefined {
   const erro = mensagemDoResultado(result);
   if (erro) return erro;
-  const pncp = pendenciasPncp(result);
-  return pncp.length > 0 ? pncp.join(' ') : undefined;
+  const avisos = [avisoVinculosRemovidos(result), ...pendenciasPncp(result)].filter(Boolean);
+  return avisos.length > 0 ? avisos.join(' ') : undefined;
 }
 
 /**

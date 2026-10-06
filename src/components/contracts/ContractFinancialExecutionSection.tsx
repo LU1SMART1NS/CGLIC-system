@@ -4,6 +4,7 @@ import { ArrowRight, Layers, Receipt } from 'lucide-react';
 import { useContractEmpenhoItemLinks } from '../../hooks/useContractEmpenhoItemLinks';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { formatItemKeyLabel, parseItemKey } from '../../utils/itemKeyParts';
+import { numeroDaChave } from '../../utils/contractKeyUtils';
 import type { ContractEmpenhoItemLink } from '../../services/contractEmpenhoItemLinksService';
 import type { ContractDashboardRecord } from '../../types';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
@@ -66,13 +67,13 @@ const SituacaoSincronizacaoEmpenhos: React.FC<{ sync?: SincronizacaoEmpenhosCont
       Empenhos consultados no Contratos.gov.br em {formatDataHora(sync.ultimoSucessoEm || sync.tentativaEm)}.
     </span>
   );
-  // Sem erro, a mensagem é o aviso da conferência com o PNCP (nada do PNCP é gravado).
+  // Sem erro, a mensagem traz os avisos da consulta: vínculos removidos e conferência com o PNCP.
   if (!sync.mensagem) return consultados;
   return (
     <>
       {consultados}
       <NoticeBar tone="info" testId="contract-financial-sync-pncp">
-        Conferência com o PNCP: {sync.mensagem}
+        {sync.mensagem}
       </NoticeBar>
     </>
   );
@@ -128,7 +129,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
     const vazio = sync?.situacao === 'SEM_EMPENHOS'
       ? {
           title: 'O Contratos.gov.br não tem empenho para este contrato',
-          description: `Consulta feita em ${formatDataHora(sync.tentativaEm)}.${sync.mensagem ? ` Conferência com o PNCP: ${sync.mensagem}` : ''} Use Atualizar empenhos, no topo, para consultar de novo.`
+          description: `Consulta feita em ${formatDataHora(sync.tentativaEm)}.${sync.mensagem ? ` ${sync.mensagem}` : ''} Use Atualizar empenhos, no topo, para consultar de novo.`
         }
       : ultimaTentativaFalhou(sync) && !sync?.ultimoSucessoEm
         ? {
@@ -167,8 +168,36 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
 
   const linksOf = (e: EmpenhoRow) => (e.empenho_id ? linksByEmpenho.get(e.empenho_id) ?? [] : []);
 
+  // NE que o Contratos.gov.br lista em mais de um contrato: o valor entra inteiro em cada um. Não há
+  // rateio oficial; o aviso mostra quanto do total está nessas NEs.
+  const compartilhadas = empenhosList.filter((e) => (e.outros_contratos?.length ?? 0) > 0);
+  const valorCompartilhado = compartilhadas.reduce((acc, e) => acc + (e.valor_empenhado || 0), 0);
+
   const columns: Column<EmpenhoRow>[] = [
-    { key: 'numero', header: 'Empenho', sortValue: (e) => e.numero_oficial, priority: 'primary', render: (e) => <strong style={{ color: 'var(--primary)' }}>{e.numero_oficial || 'N/A'}</strong> },
+    {
+      key: 'numero',
+      header: 'Empenho',
+      sortValue: (e) => e.numero_oficial,
+      priority: 'primary',
+      render: (e) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+          <strong style={{ color: 'var(--primary)' }}>{e.numero_oficial || 'N/A'}</strong>
+          {(e.outros_contratos?.length ?? 0) > 0 && (
+            <span data-testid="contract-financial-ne-compartilhada" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              também em{' '}
+              {e.outros_contratos!.map((k, i) => (
+                <React.Fragment key={k}>
+                  {i > 0 && ', '}
+                  <AppButton variant="link" size="xs" type="button" onClick={() => navigate(`/contratos/${encodeURIComponent(k)}`)}>
+                    {numeroDaChave(k)}
+                  </AppButton>
+                </React.Fragment>
+              ))}
+            </span>
+          )}
+        </div>
+      )
+    },
     { key: 'credor', header: 'Credor', sortValue: (e) => e.credor_nome, render: (e) => e.credor_nome || '—' },
     { key: 'data', header: 'Emissão', sortValue: (e) => e.data_emissao, render: (e) => formatDate(e.data_emissao) },
     { key: 'empenhado', header: 'Empenhado', sortValue: (e) => e.valor_empenhado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(e.valor_empenhado) },
@@ -205,6 +234,15 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <SituacaoSincronizacaoEmpenhos sync={sync} />
+      {compartilhadas.length > 0 && (
+        <NoticeBar tone="info" testId="contract-financial-compartilhadas">
+          <strong>{compartilhadas.length}</strong>{' '}
+          {compartilhadas.length === 1 ? 'empenho desta lista também está vinculado' : 'empenhos desta lista também estão vinculados'} a outro
+          contrato, porque o Contratos.gov.br os lista nos dois. O valor{' '}
+          {compartilhadas.length === 1 ? 'dele' : 'deles'}, <strong>{formatCurrency(valorCompartilhado)}</strong>, entra inteiro no total de
+          cada contrato.
+        </NoticeBar>
+      )}
       {pendentes.length > 0 && (
         <NoticeBar testId="contract-financial-pending">
           <strong>{pendentes.length}</strong>{' '}

@@ -18,6 +18,8 @@ export interface NormalizedContractEmpenho {
   valor_pago: number;
   valor_rpinscrito: number;
   situacao: string;
+  /** Chaves dos outros contratos a que a mesma NE está vinculada (vazio se só neste). */
+  outros_contratos?: string[];
 }
 
 export function prepareContractEmpenhosList(
@@ -68,7 +70,8 @@ export function prepareContractEmpenhosList(
     valor_liquidado: Number(e.valor_liquidado ?? 0),
     valor_pago: Number(e.valor_pago ?? 0),
     valor_rpinscrito: Number(e.valor_rpinscrito ?? 0),
-    situacao: e.situacao || 'EMITIDO'
+    situacao: e.situacao || 'EMITIDO',
+    outros_contratos: Array.isArray(e.outros_contratos) ? e.outros_contratos.map(String) : []
   }));
 
   // Mescla e deduplica por canonical_key (prevenção rigorosa contra double counting)
