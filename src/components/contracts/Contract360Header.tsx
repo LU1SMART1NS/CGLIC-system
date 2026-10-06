@@ -65,7 +65,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
 }) => {
   const navigate = useNavigateWithOrigin();
 
-  const back = useBackTarget({ path: '/contratos', label: 'Voltar para Contratos' });
+  const back = useBackTarget({ path: '/contratos', label: 'Voltar para Carteira' });
   const handleBack = onBack ?? back.back;
 
   const contractKey = chaveDoContrato(contract) || contract.numeroControlePncp || 'unknown-contract';

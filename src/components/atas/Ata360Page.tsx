@@ -38,7 +38,7 @@ interface Ata360PageProps {
 export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: uasgProp }) => {
   const { ataKey: paramAtaKey } = useParams<{ ataKey: string }>();
   const navigate = useNavigateWithOrigin();
-  const back = useBackTarget({ path: '/atas', label: 'Voltar para Atas' });
+  const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const ataKey = ataKeyOverride || (paramAtaKey ? decodeURIComponent(paramAtaKey) : undefined);
   // A chave canônica é "NUMERO-UASG" (ex.: 00059/2025-200331): sem prop, usa a UASG da chave.
   const uasg = uasgProp || uasgFromAtaKey(ataKey) || UASG_LINK_LEGADO;
