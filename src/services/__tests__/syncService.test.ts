@@ -174,6 +174,15 @@ describe('coletarEGravarAtas — incremental e com orçamento de tempo', () => {
     expect(api.fetchArpItems).toHaveBeenCalledTimes(2);
   });
 
+  it('entre as que precisam, as de itens lidos há mais tempo vêm antes (releitura forçada que estoura o tempo continua de onde parou)', async () => {
+    vi.mocked(api.fetchArpsDasFontes).mockResolvedValueOnce([ata(1), ata(2), ata(3)]);
+    vi.mocked(dbCache.fetchEstadoAtasNoBanco).mockResolvedValueOnce(new Map([
+      ['00001/2025', estado(2, 1)], ['00002/2025', estado(2, 6)], ['00003/2025', estado(2, 3)]
+    ]));
+    await coletarEGravarAtas(params, { forcar: true, agora: () => AGORA });
+    expect(vi.mocked(api.fetchArpItems).mock.calls.map((c) => c[2])).toEqual(['00002/2025', '00003/2025', '00001/2025']);
+  });
+
   it('as atas sem itens vão primeiro', async () => {
     vi.mocked(api.fetchArpsDasFontes).mockResolvedValueOnce([ata(1), ata(2), ata(3)]);
     vi.mocked(dbCache.fetchEstadoAtasNoBanco).mockResolvedValueOnce(new Map([

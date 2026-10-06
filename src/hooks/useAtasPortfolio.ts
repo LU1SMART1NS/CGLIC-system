@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { fetchArpItems } from '../services/api';
 import { fetchAtasWithAllocationsSet, fetchAtasWithEmpenhosSet } from '../services/dbCacheService';
-import { RECURSO_ATAS, sincronizarAtas } from '../services/syncService';
+import { RECURSO_ATAS } from '../services/syncService';
+import { useAtualizacaoNoServidor } from './useAtualizacaoNoServidor';
 import { useAuth } from '../context/AuthContext';
 import { chaveStatusSincronizacao, podeForcarAtualizacao, useSituacaoSincronizacao } from './useSituacaoSincronizacao';
 import { getArpVigenciaStatus } from '../services/temporalEngineService';
@@ -156,13 +157,15 @@ export function useAtasPortfolio() {
   // Recarrega do banco tudo o que a sincronização pode ter mudado (inclusive o cache da Ata 360).
   const reload = useCallback(() => invalidarDadosDeAtas(queryClient), [queryClient]);
 
-  // Sincronização com as fontes oficiais: em segundo plano para todos (useSincronizacaoEmSegundoPlano),
-  // e pelo botão só para o coordenador, que força a atualização.
+  // Sincronização com as fontes oficiais: o servidor faz de hora em hora (agendamento do banco), e o botão
+  // só do coordenador pede a atualização forçada ao servidor e espera terminar.
   const { role } = useAuth();
   const podeForcar = podeForcarAtualizacao(role);
   const situacao = useSituacaoSincronizacao(RECURSO_ATAS, relerAtas);
   const [isAtualizando, setIsAtualizando] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  // O servidor não informa progresso: o cabeçalho mostra "Atualizando...".
+  const syncProgress: SyncProgress | null = null;
+  const atualizarNoServidor = useAtualizacaoNoServidor();
   const [syncError, setSyncError] = useState<string | null>(null);
   const isSyncing = isAtualizando || situacao.sincronizando;
 
@@ -180,22 +183,14 @@ export function useAtasPortfolio() {
     }
     setIsAtualizando(true);
     setSyncError(null);
-    setSyncProgress({ step: 'Iniciando sincronização...', percent: 5 });
     try {
-      let firstError: string | undefined;
-      for (const uasg of UASGS_CGLIC) {
-        const result = await sincronizarAtas(uasg, { forcar: true, onProgress: (p) => setSyncProgress(p) });
-        if (result.status === 'ERRO') firstError ||= result.erro;
-      }
+      const { erro } = await atualizarNoServidor(RECURSO_ATAS, UASGS_CGLIC);
       await reload();
-      if (firstError) setSyncError(firstError);
-    } catch (err: any) {
-      setSyncError(err.message || 'Falha ao sincronizar com APIs governamentais');
+      if (erro) setSyncError(erro);
     } finally {
       setIsAtualizando(false);
-      setSyncProgress(null);
     }
-  }, [podeForcar, reload]);
+  }, [podeForcar, reload, atualizarNoServidor]);
 
   return {
     /** Todas as atas carregadas (sem o escopo do gestor). */

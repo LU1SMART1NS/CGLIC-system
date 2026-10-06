@@ -98,11 +98,17 @@ export async function coletarEGravarAtas(
   const gravou = await cacheArpsInDb(atas);
   if (!gravou) throw new Error('Não foi possível gravar as atas no banco.');
 
-  // Só as atas que precisam de itens; as sem itens primeiro, para o orçamento de tempo não deixá-las de fora.
+  // Só as atas que precisam de itens. Ordem: as sem itens primeiro, depois as de itens lidos há mais tempo.
+  // Assim o orçamento de tempo não deixa de fora as que mais precisam, e uma releitura forçada que estourou o
+  // tempo continua de onde parou quando o coordenador clica de novo (as já relidas passam a ser as mais novas).
   const momento = agora();
+  const leitura = (numero: string) => {
+    const e = estadoNoBanco.get(numero);
+    return e && e.itens > 0 && e.itensLidosEmMaisAntigo ? Date.parse(e.itensLidosEmMaisAntigo) || 0 : 0;
+  };
   const pendentes = atas
     .filter((arp) => ataPrecisaDeItens(arp, estadoNoBanco.get(arp.numeroAtaRegistroPreco), momento, forcar))
-    .sort((a, b) => (estadoNoBanco.get(a.numeroAtaRegistroPreco)?.itens ? 1 : 0) - (estadoNoBanco.get(b.numeroAtaRegistroPreco)?.itens ? 1 : 0));
+    .sort((a, b) => leitura(a.numeroAtaRegistroPreco) - leitura(b.numeroAtaRegistroPreco));
 
   let falhasConsulta = 0;
   let falhasGravacao = 0;

@@ -389,3 +389,20 @@ Pede confirmação e, em ordem: define o secret da função, implanta a função
 - A leitura dos itens (`lerItensDoContrato`) é a mesma que alimenta a quantidade dos vínculos com a ata: uma fonte só.
 - O Contrato 360 ganhou a aba Itens, que lê só do banco e mostra o item da ata vinculado a cada item, avisando o vínculo que aponta para um item que o contrato não tem.
 - Primeira execução (15:31): 200330 completa (42 contratos); 200331 leu 302 de 1.057 em 100 s. O restante entra nas próximas execuções horárias.
+
+---
+
+## 11. Navegador sem sincronização; só o servidor grava atas e itens
+
+**06/10/2026 — limpeza depois da ativação da sincronização no servidor.**
+
+O que o navegador deixa de fazer:
+- **Sincronizar em segundo plano.** Sai `useSincronizacaoEmSegundoPlano` (e a chamada no `AppShell`). Os jobs do servidor já cobrem tudo que ele fazia: contratos, atas, saldos dos itens e itens dos contratos (o servidor ainda faz empenhos, faturas e ordens bancárias).
+- **Rodar a sincronização no botão "Atualizar".** O botão do coordenador (Carteira de Contratos, Visão Geral, Carteira de Atas, Central de Distribuição) passa a chamar a Edge Function com `forcar: true` (`src/services/sincronizacaoNoServidorService.ts`) e espera terminar lendo `sincronizacao_fontes`, comparando a tentativa gravada (sem usar o relógio do navegador). Se a função recusar (não é coordenador, sessão expirada, sem conexão), o aviso sai como toast. Se a trava estiver com outra execução, ou os dados acabaram de ser atualizados, ele para de esperar em 30 s e avisa; o limite total é 170 s.
+- **Gravar atas e itens no banco.** `cacheArpsInDb` e `cacheArpItemsInDb` só gravam quando `ehServidor` é verdadeiro (o cliente do navegador exporta `false`; o do pacote da função, `true`). A tela do Item deixa de gravar a ata e o item ao abrir (`ItemBalances`). O script de empacotamento falha se a trava do navegador entrar no pacote do servidor.
+
+**Migration 84 (fecha a falha de segurança):** as policies "Sync Write" de `atas_registro_preco` e `itens_ata` davam escrita total a qualquer usuário logado, inclusive o perfil de consulta. Saem, entra uma policy só de leitura para logados (a leitura continua igual) e os privilégios de escrita de `anon` e `authenticated` são revogados na tabela. Escrevem o servidor (`service_role`) e as funções `SECURITY DEFINER`; conferido que nenhuma função `SECURITY INVOKER` grava nessas tabelas. Testada no banco real, dentro de uma transação desfeita: usuário logado lê as 191 atas e não consegue inserir, atualizar nem apagar; o servidor lê e grava.
+
+**Releitura forçada de itens de atas** passa a andar pelos itens lidos há mais tempo primeiro. Se estourar o orçamento de 100 s, o próximo clique continua de onde parou, em vez de repetir as mesmas atas.
+
+**Ordem para publicar** (importa): 1) mesclar o PR, que publica o app sem as gravações do navegador; 2) `npm run deploy:sincronizar-fontes` (função com a nova ordem de leitura); 3) `supabase db push --linked` (migration 84). Aplicar a 84 antes de o app novo estar no ar faria o navegador antigo falhar ao gravar atas.
