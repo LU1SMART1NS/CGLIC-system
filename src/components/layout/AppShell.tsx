@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { Suspense, useEffect, useRef } from 'react';
 import { Outlet } from 'react-router-dom';
 import { breakpoints } from '../../design-system/tokens';
 import { useMediaQuery } from '../../design-system/hooks/useMediaQuery';
 import { Header } from '../Header';
 import { Sidebar } from './Sidebar';
 import { AreaTabs } from './AreaTabs';
+import { SkeletonLoader } from '../../design-system';
 import { useSincronizacaoEmSegundoPlano } from '../../hooks/useSincronizacaoEmSegundoPlano';
 
 export interface AppShellContextValue {
@@ -83,7 +84,10 @@ export const AppShell: React.FC<AppShellProps> = ({
 
         <main className="app-main" style={{ flex: 1 }}>
           <AreaTabs />
-          <Outlet context={contextValue} />
+          {/* As telas são pacotes separados: o menu e o cabeçalho ficam na tela enquanto a página carrega. */}
+          <Suspense fallback={<div role="status" aria-label="Carregando a página" style={{ padding: '1.5rem 0' }}><SkeletonLoader /></div>}>
+            <Outlet context={contextValue} />
+          </Suspense>
         </main>
       </div>
 

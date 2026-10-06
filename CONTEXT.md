@@ -63,7 +63,7 @@ Quando uma Nota de Empenho cadastrada como `MANUAL` passa a ser retornada pela A
 
 ## 3. Entidades do Domínio
 
-Todas as interfaces e contratos de tipo TypeScript estão centralizados em [`src/types/index.ts`](file:///c:/Users/daniel.junior/.gemini/antigravity/scratch/SaldoARP/src/types/index.ts):
+Todas as interfaces e contratos de tipo TypeScript estão centralizados em [`src/types/index.ts`](src/types/index.ts):
 
 ### 3.1. `Empenho`
 Representa a Nota de Empenho emitida contra um item da Ata:
@@ -193,12 +193,12 @@ A aplicação utiliza uma arquitetura **BFF (Backend-For-Frontend) Serverless**:
 ```
 
 ### Arquivos Principais:
-1. [`vercel.json`](file:///c:/Users/daniel.junior/.gemini/antigravity/scratch/SaldoARP/vercel.json): Configura os proxies reversos em tempo de execução para contornar problemas de CORS:
+1. [`vercel.json`](vercel.json): Configura os proxies reversos em tempo de execução para contornar problemas de CORS:
    - `/api-arp/*` $\to$ `https://dadosabertos.compras.gov.br/*`
    - `/api-pncp/*` $\to$ `https://pncp.gov.br/*`
    - `/api-contratos-gov/*` $\to$ `https://contratos.comprasnet.gov.br/*`
-2. [`src/services/api.ts`](file:///c:/Users/daniel.junior/.gemini/antigravity/scratch/SaldoARP/src/services/api.ts): Camada de integração com sanitização de parâmetros, fallback por UASG/Ano e agregação de dados.
-3. [`src/services/balanceService.ts`](file:///c:/Users/daniel.junior/.gemini/antigravity/scratch/SaldoARP/src/services/balanceService.ts): **Motor matemático oficial** isolado (cálculo de saldo $\mathbf{Saldo} = \mathbf{Qtd} - \sum \mathbf{Empenhos}$, conciliação e matching inteligente).
+2. [`src/services/api.ts`](src/services/api.ts): Camada de integração com sanitização de parâmetros, fallback por UASG/Ano e agregação de dados.
+3. [`src/services/balanceService.ts`](src/services/balanceService.ts): **Motor matemático oficial** isolado (cálculo de saldo $\mathbf{Saldo} = \mathbf{Qtd} - \sum \mathbf{Empenhos}$, conciliação e matching inteligente).
 
 ---
 
@@ -207,9 +207,9 @@ A aplicação utiliza uma arquitetura **BFF (Backend-For-Frontend) Serverless**:
 A persistência do sistema é **híbrida (Supabase PostgreSQL + LocalStorage Fallback)**:
 
 ### Serviços de Banco de Dados:
-- [`src/services/dbCacheService.ts`](file:///c:/Users/daniel.junior/.gemini/antigravity/scratch/SaldoARP/src/services/dbCacheService.ts): Cache relacional das Atas e Itens consultados.
-- [`src/services/allocationService.ts`](file:///c:/Users/daniel.junior/.gemini/antigravity/scratch/SaldoARP/src/services/allocationService.ts): CRUD de alocações departamentais, empenhos manuais, contratos manuais e tabela associativa `contrato_empenho`.
-- [`src/services/unitService.ts`](file:///c:/Users/daniel.junior/.gemini/antigravity/scratch/SaldoARP/src/services/unitService.ts): Gestão do catálogo oficial de unidades internas.
+- [`src/services/dbCacheService.ts`](src/services/dbCacheService.ts): Cache relacional das Atas e Itens consultados.
+- [`src/services/allocationService.ts`](src/services/allocationService.ts): CRUD de alocações departamentais, empenhos manuais, contratos manuais e tabela associativa `contrato_empenho`.
+- [`src/services/unitService.ts`](src/services/unitService.ts): Gestão do catálogo oficial de unidades internas.
 
 ### Schema Relacional no Supabase (PostgreSQL):
 ```sql
@@ -293,7 +293,7 @@ npm run build
 
 ## 8. Links e Ambientes Oficiais
 
-- **Ambiente de Produção (Vercel)**: [https://saldo-arp.vercel.app](https://saldo-arp.vercel.app)
-- **Repositório GitHub**: [https://github.com/vileganhon-sourc/SaldoARP](https://github.com/vileganhon-sourc/SaldoARP)
+- **Ambiente de Produção (Vercel)**: [https://cglic.vercel.app](https://cglic.vercel.app)
+- **Repositório GitHub**: [https://github.com/LU1SMART1NS/CGLIC-system](https://github.com/LU1SMART1NS/CGLIC-system)
 - **Branch Principal de Produção**: `main`
 - **Branch de Release da Versão 2**: `v2.0`
