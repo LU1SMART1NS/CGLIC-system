@@ -47,6 +47,42 @@ export function reconcileNormalizedEmpenhos(
 }
 
 /**
+ * Entre os registros de UMA fonte que caem na mesma chave canônica, o que vale. A chave normaliza o
+ * número (caixa e zeros à esquerda), então dois documentos da fonte podem colidir: em 06/10/2026, o
+ * contrato 00009/2013 listava 2024NE000372 (R$ 516,30, pago) e 2024ne000372 (R$ 0,00) com ids
+ * diferentes. Ficar com o primeiro da lista perdia o valor real conforme a ordem da resposta.
+ *
+ * Vale o de maior valor empenhado (o de valor zero é o resto); empate fica com o primeiro, para o
+ * resultado não depender da ordem. Mais de um registro vira conflito registrado.
+ */
+export function registroDaFonte(
+  group: NormalizedEmpenho[],
+  fonte: EmpenhoFonteOrigem,
+  conflitos?: ConflitoCampo[]
+): NormalizedEmpenho | undefined {
+  const candidatos = group.filter((g) => g.fonte_origem === fonte);
+  if (candidatos.length <= 1) return candidatos[0];
+
+  const vencedor = candidatos.reduce((melhor, atual) =>
+    (atual.valor_empenhado ?? 0) > (melhor.valor_empenhado ?? 0) ? atual : melhor
+  );
+  const descartados = candidatos.filter((c) => c !== vencedor);
+  conflitos?.push({
+    campo: 'numero_oficial',
+    tipo: 'IDENTIDADE',
+    valor_primario: vencedor.numero_oficial,
+    valor_secundario: descartados.map((d) => `${d.numero_oficial} (R$ ${(d.valor_empenhado ?? 0).toFixed(2)})`).join(', '),
+    fonte_primaria: fonte,
+    fonte_secundaria: fonte,
+    resolvido_automaticamente: true,
+    descricao: `A fonte lista ${candidatos.length} documentos para o mesmo número de empenho (${candidatos
+      .map((c) => `${c.numero_oficial}: R$ ${(c.valor_empenhado ?? 0).toFixed(2)}`)
+      .join('; ')}). Prevaleceu o de maior valor.`
+  });
+  return vencedor;
+}
+
+/**
  * Reconcilia um grupo de leituras da mesma canonical_key
  */
 function reconcileSingleEmpenhoGroup(
@@ -59,10 +95,10 @@ function reconcileSingleEmpenhoGroup(
   );
 
   // Classifica leituras por autoridade de fonte
-  const comprasGovRec = group.find(g => g.fonte_origem === 'COMPRASNET');
-  const contratosGovRec = group.find(g => g.fonte_origem === 'CONTRATOSNET');
-  const pncpRec = group.find(g => g.fonte_origem === 'PNCP');
-  const manualRec = group.find(g => g.fonte_origem === 'MANUAL');
+  const comprasGovRec = registroDaFonte(group, 'COMPRASNET', conflitos);
+  const contratosGovRec = registroDaFonte(group, 'CONTRATOSNET', conflitos);
+  const pncpRec = registroDaFonte(group, 'PNCP', conflitos);
+  const manualRec = registroDaFonte(group, 'MANUAL', conflitos);
 
   // Determina fonte primária de referência para campos cadastrais
   const primaryCadastral = contratosGovRec || comprasGovRec || pncpRec || manualRec || group[0];
