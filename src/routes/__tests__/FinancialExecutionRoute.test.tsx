@@ -36,8 +36,10 @@ vi.mock('../../hooks/useContractsDashboard', () => ({
 }));
 
 vi.mock('../../hooks/useBatchSyncContractEmpenhos', () => ({
+  contratosParaSincronizar: vi.fn(() => []),
   useBatchSyncContractEmpenhos: vi.fn(() => ({
     run: vi.fn(),
+    retryFailed: vi.fn(),
     cancel: vi.fn(),
     isRunning: false,
     progress: null,
@@ -199,5 +201,23 @@ describe('FinancialExecutionRoute — FASE 9-I: Empenhos & Execução', () => {
     expect(html).toContain('Empresa Delta Serviços Ltda');
     expect(html).toContain('Contrato 12/2025');
     expect(html).toContain('Ver contrato');
+  });
+
+  it('3. mostra as abas das UASGs 200331 e 200330, com o painel da 200331 aberto', () => {
+    vi.mocked(managementHookModule.useManagementDashboard).mockReturnValue({
+      readModel: mockFinancialReadModel,
+      data: mockFinancialReadModel,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      refresh: vi.fn()
+    });
+
+    const html = renderToStaticMarkup(<FinancialExecutionRoute />);
+
+    expect(html).toContain('UASG 200331');
+    expect(html).toContain('UASG 200330');
+    expect(managementHookModule.useManagementDashboard).toHaveBeenCalledWith(expect.objectContaining({ uasg: '200331' }));
   });
 });

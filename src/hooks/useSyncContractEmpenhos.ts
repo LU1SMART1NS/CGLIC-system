@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { orchestrateContractEmpenhoSync } from '../services/empenhoOrchestrationService';
+import { sincronizarEmpenhosDoContrato } from '../services/contratoEmpenhosSincronizacaoService';
+import { SINCRONIZACAO_EMPENHOS_QUERY_KEY } from './useSincronizacaoEmpenhosContrato';
 import { refreshLinkedItemsOfContract, type ContractForItemsRefresh, type ContractItemsRefreshSummary } from '../services/contractItemsRefreshService';
 import type { OrchestrationResult, ContractTarget } from '../types/empenhoSync';
 
@@ -18,7 +19,7 @@ export interface SyncContractEmpenhosParams {
  * 
  * Invariantes Invioláveis:
  * 1. O hook NÃO contém lógica contábil, de normalização ou reconciliação.
- * 2. Delega integralmente a execução para `orchestrateContractEmpenhoSync`.
+ * 2. Delega integralmente a execução para `sincronizarEmpenhosDoContrato` (orquestração + registro da situação).
  * 3. Invalida exclusivamente as query keys necessárias (M18 e detalhes do contrato).
  */
 export function useSyncContractEmpenhos(contractKey: string) {
@@ -32,7 +33,7 @@ export function useSyncContractEmpenhos(contractKey: string) {
         contratoId: params?.contratoId,
         pncpParams: params?.pncpParams
       };
-      const result = await orchestrateContractEmpenhoSync(target);
+      const result = await sincronizarEmpenhosDoContrato(target);
       if (!params?.refreshItems) return result;
       // Os empenhos do contrato já estão gravados; a parte do item não pode desfazer isso se falhar.
       try {
@@ -54,6 +55,7 @@ export function useSyncContractEmpenhos(contractKey: string) {
       queryClient.invalidateQueries({ queryKey: ['contract-item-quantities'] });
       queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
       queryClient.invalidateQueries({ queryKey: ['contract-events', contractKey] });
+      queryClient.invalidateQueries({ queryKey: SINCRONIZACAO_EMPENHOS_QUERY_KEY(contractKey) });
     }
   });
 }

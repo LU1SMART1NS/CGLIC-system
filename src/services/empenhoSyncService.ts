@@ -112,6 +112,8 @@ export async function persistReconciledEmpenhoM17(
   is_new: boolean;
   items_linked: number;
   contracts_linked: number;
+  /** Vínculos que a RPC recusou: o empenho foi gravado, mas não ficou ligado ao item/contrato. */
+  falhas_vinculo: string[];
 }> {
   if (!isSupabaseConfigured || !supabase) {
     throw mapPostgresErrorToAppError(
@@ -123,6 +125,7 @@ export async function persistReconciledEmpenhoM17(
   const { empenhoId, isNew } = await saveEmpenhoSoberanoM17(reconciled);
   let itemsLinked = 0;
   let contractsLinked = 0;
+  const falhasVinculo: string[] = [];
 
   // 2. Vínculo Físico Quantitativo com Itens de Ata (M17: link_empenho_to_item_atomic)
   for (const itemLink of reconciled.item_links) {
@@ -139,6 +142,9 @@ export async function persistReconciledEmpenhoM17(
 
     if (linkItemError) {
       console.warn(`[EmpenhoSyncService] Falha ao vincular empenho ${empenhoId} ao item ${itemLink.item_key}:`, linkItemError);
+      falhasVinculo.push(
+        `Empenho ${reconciled.numero_oficial} gravado, mas não vinculado ao item ${itemLink.item_key}: ${mapPostgresErrorToAppError(linkItemError).message}`
+      );
     } else {
       itemsLinked++;
     }
@@ -154,6 +160,9 @@ export async function persistReconciledEmpenhoM17(
 
     if (linkContractError) {
       console.warn(`[EmpenhoSyncService] Falha ao vincular empenho ${empenhoId} ao contrato ${contractLink.contract_key}:`, linkContractError);
+      falhasVinculo.push(
+        `Empenho ${reconciled.numero_oficial} gravado, mas não vinculado ao contrato ${contractLink.contract_key}: ${mapPostgresErrorToAppError(linkContractError).message}`
+      );
     } else {
       contractsLinked++;
     }
@@ -164,7 +173,8 @@ export async function persistReconciledEmpenhoM17(
     empenho_id: empenhoId,
     is_new: isNew,
     items_linked: itemsLinked,
-    contracts_linked: contractsLinked
+    contracts_linked: contractsLinked,
+    falhas_vinculo: falhasVinculo
   };
 }
 
@@ -188,6 +198,9 @@ export async function syncReconciledBatch(
         totalSalvos++;
         totalItensVinculados += result.items_linked;
         totalContratosVinculados += result.contracts_linked;
+      }
+      for (const falha of result.falhas_vinculo ?? []) {
+        erros.push({ canonical_key: rec.canonical_key, erro: falha });
       }
     } catch (err: any) {
       erros.push({

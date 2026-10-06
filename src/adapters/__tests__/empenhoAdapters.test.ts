@@ -126,14 +126,42 @@ describe('Empenho Adapters — Testes Unitários de Integração de Fontes (FASE
       expect(result[0].item_links![0].numero_item_minuta).toBe('1');
     });
 
-    it('deve tratar falhas de rede com resiliência sem propagar exceção', async () => {
+    it('propaga a falha da fonte: lista vazia significa só "contrato sem empenho"', async () => {
       vi.spyOn(api, 'fetchContratosGovEmpenhos').mockRejectedValue(new Error('HTTP 429: Rate limit'));
 
+      await expect(
+        fetchAndNormalizeContratosGovEmpenhos({
+          contratoId: 999,
+          contractKey: '12/2026'
+        })
+      ).rejects.toThrow('HTTP 429: Rate limit');
+    });
+
+    it('sem contexto de item não busca a minuta (ela só serve para a quantidade do item)', async () => {
+      vi.spyOn(api, 'fetchContratosGovEmpenhos').mockResolvedValue([
+        { id: 1, numero: '2026NE000142', unidade_gestora: '200331', data_emissao: '2026-02-15', empenhado: '10,00' } as any
+      ]);
+      const detalhe = vi.spyOn(api, 'fetchContratoEmpenhoDetalhe').mockResolvedValue(null);
+
+      const result = await fetchAndNormalizeContratosGovEmpenhos({ contratoId: 1, contractKey: '200331-00012-2026' });
+      expect(result).toHaveLength(1);
+      expect(detalhe).not.toHaveBeenCalled();
+    });
+
+    it('para de pedir a minuta depois da primeira recusa (exige token no Contratos.gov.br)', async () => {
+      vi.spyOn(api, 'fetchContratosGovEmpenhos').mockResolvedValue([
+        { id: 1, numero: '2026NE000142', unidade_gestora: '200331', data_emissao: '2026-02-15', empenhado: '10,00' } as any,
+        { id: 2, numero: '2026NE000143', unidade_gestora: '200331', data_emissao: '2026-02-16', empenhado: '20,00' } as any
+      ]);
+      const detalhe = vi.spyOn(api, 'fetchContratoEmpenhoDetalhe').mockResolvedValue(null);
+
       const result = await fetchAndNormalizeContratosGovEmpenhos({
-        contratoId: 999,
-        contractKey: '12/2026'
+        contratoId: 1,
+        contractKey: '200331-00012-2026',
+        itemContext: { numeroAta: '00001/2026', uasg: '200331', numeroItem: '1' }
       });
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(2);
+      expect(detalhe).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -163,16 +191,17 @@ describe('Empenho Adapters — Testes Unitários de Integração de Fontes (FASE
       expect(result[0].contract_links![0].contract_key).toBe('12/2026');
     });
 
-    it('deve tratar falhas de rede com resiliência', async () => {
+    it('propaga a falha da fonte', async () => {
       vi.spyOn(api, 'fetchPncpContractEmpenhos').mockRejectedValue(new Error('Timeout'));
 
-      const result = await fetchAndNormalizePncpEmpenhos({
-        cnpj: '00394494000136',
-        ano: 2026,
-        sequencialContrato: 1,
-        contractKey: '12/2026'
-      });
-      expect(result).toEqual([]);
+      await expect(
+        fetchAndNormalizePncpEmpenhos({
+          cnpj: '00394494000136',
+          ano: 2026,
+          sequencialContrato: 1,
+          contractKey: '12/2026'
+        })
+      ).rejects.toThrow('Timeout');
     });
   });
 });

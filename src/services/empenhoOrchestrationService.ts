@@ -30,6 +30,20 @@ import type {
   EmpenhoSyncSummary
 } from '../types/empenhoSync';
 
+/** Id interno do Contratos.gov.br: só dígitos (ex.: 745812). A chave do contrato não serve. */
+export function contratoIdValido(contratoId?: number | string | null): contratoId is number | string {
+  return contratoId !== undefined && contratoId !== null && /^\d+$/.test(String(contratoId).trim());
+}
+
+/** Parâmetros que o PNCP aceita: CNPJ com 14 dígitos, ano com 4 e sequencial numérico. */
+export function pncpParamsValidos(params: { cnpj: string; ano: number | string; sequencialContrato: number | string }): boolean {
+  return (
+    /^\d{14}$/.test(String(params.cnpj ?? '').trim()) &&
+    /^\d{4}$/.test(String(params.ano ?? '').trim()) &&
+    /^\d+$/.test(String(params.sequencialContrato ?? '').trim())
+  );
+}
+
 /**
  * 1. Orquestração On-Demand por Item de Ata de Registro de Preços
  */
@@ -356,7 +370,14 @@ export async function orchestrateContractEmpenhoSync(
   const erros: Array<{ origem?: string; erro: string }> = [];
 
   // A. Consulta Contratos.gov.br
-  if (contratoId) {
+  // O id é o número interno do Contratos.gov.br. Sem ele (ou com a chave do contrato no lugar),
+  // os empenhos não podem ser lidos: isso é erro, não "contrato sem empenho".
+  if (!contratoIdValido(contratoId)) {
+    erros.push({
+      origem: 'CONTRATOSNET',
+      erro: 'Contrato sem o identificador do Contratos.gov.br: os empenhos não puderam ser consultados.'
+    });
+  } else {
     try {
       const contratosGovEmpenhos = await fetchAndNormalizeContratosGovEmpenhos({
         contratoId,
@@ -368,12 +389,14 @@ export async function orchestrateContractEmpenhoSync(
     } catch (err: any) {
       erros.push({ origem: 'CONTRATOSNET', erro: err?.message || 'Falha ao consultar Contratos.gov' });
     }
-  } else {
-    fontesNaoAplicaveis.push('CONTRATOSNET (contratoId não disponível)');
   }
 
   // B. Consulta PNCP
-  if (pncpParams?.cnpj && pncpParams?.ano && pncpParams?.sequencialContrato) {
+  // Só com CNPJ de 14 dígitos e sequencial numérico: fora disso o PNCP recusa (HTTP 400) e a consulta
+  // não diz nada sobre os empenhos do contrato.
+  if (pncpParams && !pncpParamsValidos(pncpParams)) {
+    fontesNaoAplicaveis.push('PNCP (CNPJ ou sequencial do contrato fora do formato do PNCP)');
+  } else if (pncpParams?.cnpj && pncpParams?.ano && pncpParams?.sequencialContrato) {
     try {
       const pncpEmpenhos = await fetchAndNormalizePncpEmpenhos({
         cnpj: pncpParams.cnpj,

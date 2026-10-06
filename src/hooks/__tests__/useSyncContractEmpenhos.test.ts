@@ -121,14 +121,21 @@ describe('useSyncContractEmpenhos Hook — Integração UI Contrato 360°', () =
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['management-dashboard']
     });
-    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(10);
+    // Situação da sincronização mostrada na aba de empenhos do contrato
+    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['contrato-empenhos-sincronizacao', '200331-00015-2026']
+    });
+    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(11);
   });
 
-  it('3. deve propagar erros de execução se o orquestrador falhar', async () => {
+  it('3. falha inesperada do orquestrador vira resultado ERRO com a mensagem (e é registrada, não lançada)', async () => {
     const errorObj = new Error('Falha de conexão com fontes oficiais');
     vi.mocked(orchestrationModule.orchestrateContractEmpenhoSync).mockRejectedValueOnce(errorObj);
 
     const mutation = useSyncContractEmpenhos('200331-00015-2026');
-    await expect(mutation.mutateAsync()).rejects.toThrow('Falha de conexão com fontes oficiais');
+    const result = await mutation.mutateAsync();
+    expect(result.status).toBe('ERRO');
+    expect(result.erros[0].erro).toBe('Falha de conexão com fontes oficiais');
+    expect(result.empenhos_persistidos).toBe(0);
   });
 });

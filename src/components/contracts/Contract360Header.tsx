@@ -3,6 +3,7 @@ import { useBackTarget, useNavigateWithOrigin } from '../../hooks/useDetailOrigi
 import { ExternalLink } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import { useSyncContractEmpenhos } from '../../hooks/useSyncContractEmpenhos';
+import { mensagemDoResultado } from '../../services/contratoEmpenhosSincronizacaoService';
 import { useAuth } from '../../context/AuthContext';
 import type { OrchestrationStatus } from '../../types/empenhoSync';
 import { useContractManager } from '../../hooks/useContractManager';
@@ -104,7 +105,8 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
         : undefined;
 
     syncMutation.mutate({
-      contratoId: contract.contratoId || contract.id,
+      // Só o id do Contratos.gov.br: a chave do contrato no lugar dele faz a consulta falhar.
+      contratoId: contract.contratoId,
       pncpParams,
       refreshItems: canRefreshItems ? contract : undefined
     });
@@ -142,9 +144,14 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
           } empenho(s) processado(s) e atualizado(s) com sucesso.${itensResumo}`
         };
       case 'SEM_DADOS':
-        return { tone: 'info', message: `Nenhum empenho encontrado nas bases oficiais para este contrato.${itensResumo}` };
-      case 'SUCESSO_PARCIAL':
-        return { tone: 'warning', message: `Sincronização concluída parcialmente. Algumas bases externas estavam temporariamente indisponíveis.${itensResumo}` };
+        return { tone: 'info', message: `O Contratos.gov.br respondeu que este contrato não tem empenho.${itensResumo}` };
+      case 'SUCESSO_PARCIAL': {
+        const motivo = syncMutation.data ? mensagemDoResultado(syncMutation.data) : undefined;
+        return {
+          tone: 'warning',
+          message: `Sincronização parcial: ${syncMutation.data?.empenhos_persistidos ?? 0} empenho(s) gravado(s).${motivo ? ` ${motivo}` : ''}${itensResumo}`
+        };
+      }
       case 'COM_DIVERGENCIAS':
         return {
           tone: 'warning',

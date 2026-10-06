@@ -131,6 +131,12 @@ describe('syncItemContractEmpenhos', () => {
     expect(summary.removidos).toBe(2);
   });
 
+  it('falha da API não apaga os empenhos do item (antes virava lista vazia e substituía o conjunto)', async () => {
+    vi.mocked(api.fetchContratosGovEmpenhos).mockRejectedValueOnce(new Error('Contratos.gov.br não respondeu em 30 s.'));
+    await expect(syncItemContractEmpenhos(params)).rejects.toThrow(/não respondeu/);
+    expect(rpcAdapter.syncItemContractEmpenhosRpc).not.toHaveBeenCalled();
+  });
+
   it('falha de forma clara quando o contrato não existe no Contratos.gov', async () => {
     vi.mocked(api.fetchContratosGovData).mockResolvedValueOnce({ items: [] });
     await expect(

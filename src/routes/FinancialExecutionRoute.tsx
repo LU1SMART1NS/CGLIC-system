@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PageContainer } from '../design-system/components/PageContainer';
 import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
-import { Banknote, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Banknote } from 'lucide-react';
 import { ManagementFinancialExecution } from '../components/dashboard/ManagementFinancialExecution';
+import { EmpenhosBatchSyncPanel } from '../components/dashboard/EmpenhosBatchSyncPanel';
 import { useManagementDashboard } from '../hooks/useManagementDashboard';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
-import { useBatchSyncContractEmpenhos } from '../hooks/useBatchSyncContractEmpenhos';
+import { useBatchSyncContractEmpenhos, contratosParaSincronizar } from '../hooks/useBatchSyncContractEmpenhos';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../design-system/components/HeaderRefreshAction';
 import { ActionButton } from '../design-system/components/ActionButton';
-import { colors, shapes } from '../design-system/tokens';
+import { Tabs } from '../design-system/components/Tabs';
+import { UASGS_CGLIC } from '../config/unidadesGestoras';
 
 // Mesmo critério de autorização de sincronização usado no botão individual
 // de Contract360Header.tsx, aplicado aqui à sincronização em lote.
@@ -26,16 +28,32 @@ export const FinancialExecutionRoute: React.FC = () => {
   // migration 20260925000023), agora derivado também das Atas atribuídas
   // (ata_managers): mesmo recorte aplicado em ContractsRoute.tsx e na Visão
   // Geral, agora também na execução financeira agregada aqui.
+  // Painel de uma UASG por vez: somar os dois contaria duas vezes o empenho emitido por uma UASG e
+  // ligado a contrato da outra (o recorte por UASG mantém os dois casos).
+  const [uasg, setUasg] = useState<string>('200331');
   const { contractKeys: assignedContractKeys, ataKeys: assignedAtaKeys, isLoading: isLoadingManagers } =
-    useAssignedManagementScope('200331');
+    useAssignedManagementScope(uasg);
 
   const { readModel, isLoading: isLoadingDashboard, isFetching, isError, error, refresh, dataUpdatedAt } =
-    useManagementDashboard({ uasg: '200331', assignedContractKeys, assignedAtaKeys });
+    useManagementDashboard({ uasg, assignedContractKeys, assignedAtaKeys });
   const isLoading = isLoadingDashboard || isLoadingManagers;
 
-  const { data: allContracts } = useContractsDashboard('200331');
-  const { run: runBatchSync, cancel: cancelBatchSync, isRunning: isSyncingAll, progress: batchProgress, summary: batchSummary, resetSummary } =
-    useBatchSyncContractEmpenhos();
+  // O lote cobre as duas UASGs da CGLIC, qualquer que seja a aba aberta.
+  const { data: contracts200330 } = useContractsDashboard(UASGS_CGLIC[0]);
+  const { data: contracts200331 } = useContractsDashboard(UASGS_CGLIC[1]);
+  const contratosDoLote = useMemo(
+    () => contratosParaSincronizar(contracts200331, contracts200330),
+    [contracts200330, contracts200331]
+  );
+  const {
+    run: runBatchSync,
+    retryFailed,
+    cancel: cancelBatchSync,
+    isRunning: isSyncingAll,
+    progress: batchProgress,
+    summary: batchSummary,
+    resetSummary
+  } = useBatchSyncContractEmpenhos();
 
   const [showBatchPanel, setShowBatchPanel] = useState(false);
 
@@ -45,14 +63,18 @@ export const FinancialExecutionRoute: React.FC = () => {
 
   const handleBatchSync = async () => {
     if (!isAuthorizedToSync || isSyncingAll) return;
-    const contracts = (allContracts || []).filter((c) => c.statusVigencia !== 'Expirado');
     setShowBatchPanel(true);
     resetSummary();
-    await runBatchSync(contracts);
+    await runBatchSync(contratosDoLote);
     refresh();
   };
 
-  const batchTone = !batchSummary ? colors.semantic.info : batchSummary.erro ? colors.semantic.warning : colors.semantic.success;
+  const handleRetryFailed = async () => {
+    if (!isAuthorizedToSync || isSyncingAll) return;
+    resetSummary();
+    await retryFailed();
+    refresh();
+  };
 
   return (
     <PageContainer>
@@ -67,12 +89,12 @@ export const FinancialExecutionRoute: React.FC = () => {
               action="sincronizar"
               size="sm"
               onClick={handleBatchSync}
-              disabled={!isAuthorizedToSync || isSyncingAll || !allContracts?.length}
+              disabled={!isAuthorizedToSync || isSyncingAll || contratosDoLote.length === 0}
               isLoading={isSyncingAll}
               title={
                 !isAuthorizedToSync
                   ? 'Você não possui permissão para sincronizar empenhos.'
-                  : 'Sincronizar empenhos de todos os contratos ativos nas fontes governamentais oficiais (Contratos.gov.br / PNCP)'
+                  : `Sincronizar os empenhos dos ${contratosDoLote.length} contratos não expirados das UASGs 200330 e 200331 com o Contratos.gov.br`
               }
               data-testid="financial-execution-batch-sync-btn"
             >
@@ -91,64 +113,25 @@ export const FinancialExecutionRoute: React.FC = () => {
       />
 
       {showBatchPanel && (
-        <div
-          role="status"
-          data-testid="financial-execution-batch-panel"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '0.75rem',
-            padding: '0.75rem 1rem',
-            marginBottom: '1.25rem',
-            borderRadius: shapes.radius.md,
-            border: `1px solid ${batchTone.border}`,
-            backgroundColor: batchTone.bg,
-            color: batchTone.text
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', fontWeight: 600 }}>
-            {isSyncingAll ? (
-              <>
-                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                <span>
-                  Sincronizando contratos {batchProgress?.current ?? 0}/{batchProgress?.total ?? 0}
-                  {batchProgress?.percent !== undefined ? ` (${batchProgress.percent}%)` : ''}
-                </span>
-              </>
-            ) : batchSummary ? (
-              <>
-                {batchSummary.erro > 0 ? (
-                  <XCircle size={16} />
-                ) : (
-                  <CheckCircle2 size={16} />
-                )}
-                <span>
-                  Sincronização {batchSummary.cancelado ? 'cancelada' : 'concluída'}:{' '}
-                  {batchSummary.sucesso + batchSummary.parcial + batchSummary.comDivergencias} de {batchSummary.totalContratos}{' '}
-                  contrato(s) com sucesso, {batchSummary.semDados} sem dados nas fontes, {batchSummary.erro} com erro.{' '}
-                  {batchSummary.empenhosPersistidos} empenho(s) persistido(s)/atualizado(s).
-                </span>
-              </>
-            ) : null}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {isSyncingAll && (
-              <ActionButton action="cancelar" size="sm" onClick={cancelBatchSync} />
-            )}
-            {!isSyncingAll && (
-              <ActionButton
-                action="fechar"
-                iconOnly
-                type="button"
-                label="Fechar notificação"
-                onClick={() => setShowBatchPanel(false)}
-              />
-            )}
-          </div>
-        </div>
+        <EmpenhosBatchSyncPanel
+          isSyncingAll={isSyncingAll}
+          batchProgress={batchProgress}
+          batchSummary={batchSummary}
+          isAuthorizedToSync={isAuthorizedToSync}
+          onCancel={cancelBatchSync}
+          onRetryFailed={handleRetryFailed}
+          onClose={() => setShowBatchPanel(false)}
+          onOpenContract={handleNavigateContract}
+        />
       )}
+
+      <Tabs
+        tabs={UASGS_CGLIC.slice().reverse().map((u) => ({ id: u, label: `UASG ${u}` }))}
+        activeTabId={uasg}
+        onTabChange={setUasg}
+        ariaLabel="UASG exibida no painel"
+        testId="financial-execution-uasg-tabs"
+      />
 
       <ManagementFinancialExecution
         readModel={readModel}

@@ -4,6 +4,8 @@
  * e delegar para a normalização determinística em NormalizedEmpenho[].
  *
  * Invariante: Zero persistência, zero decisão de reconciliação, zero acesso direto ao banco.
+ * Falha da fonte (rede, tempo, HTTP de erro) é propagada como exceção: lista vazia significa
+ * que o Contratos.gov.br respondeu que o contrato não tem empenho.
  */
 
 import { fetchContratosGovEmpenhos, fetchContratoEmpenhoDetalhe } from '../services/api';
@@ -14,6 +16,10 @@ export interface ContratosGovAdapterOptions {
   contratoId: number | string;
   contractKey: string;
   targetItemNum?: number;
+  /**
+   * Busca a minuta (itens) de cada empenho. Padrão: só quando há `itemContext`, porque a minuta
+   * só serve para a quantidade do item; no fluxo do contrato ela não é usada.
+   */
   fetchDetails?: boolean;
   itemContext?: {
     numeroAta?: string;
@@ -25,7 +31,8 @@ export interface ContratosGovAdapterOptions {
 }
 
 /**
- * Consulta e normaliza todos os empenhos do contrato via Contratos.gov.br
+ * Consulta e normaliza todos os empenhos do contrato via Contratos.gov.br.
+ * Lança erro quando a fonte falha.
  */
 export async function fetchAndNormalizeContratosGovEmpenhos(
   options: ContratosGovAdapterOptions
@@ -34,54 +41,52 @@ export async function fetchAndNormalizeContratosGovEmpenhos(
     contratoId,
     contractKey,
     targetItemNum,
-    fetchDetails = true,
     itemContext,
     unitPrice,
     historicoPrecos
   } = options;
+  const fetchDetails = options.fetchDetails ?? Boolean(itemContext);
 
   if (!contratoId || !contractKey) {
     return [];
   }
 
-  try {
-    const rawEmpenhos = await fetchContratosGovEmpenhos(contratoId);
-    if (!Array.isArray(rawEmpenhos) || rawEmpenhos.length === 0) {
-      return [];
+  const rawEmpenhos = await fetchContratosGovEmpenhos(contratoId);
+  if (rawEmpenhos.length === 0) {
+    return [];
+  }
+
+  const normalizedList: NormalizedEmpenho[] = [];
+  // A minuta exige token no Contratos.gov.br: se a primeira não vem, não insiste nos demais empenhos.
+  let minutaDisponivel = fetchDetails;
+
+  for (const emp of rawEmpenhos) {
+    const enrichedEmp = { ...emp };
+
+    if (minutaDisponivel && emp.id) {
+      try {
+        const detalhe = await fetchContratoEmpenhoDetalhe(emp.id);
+        if (detalhe && detalhe.itens_minuta) {
+          enrichedEmp.itens_minuta = detalhe.itens_minuta;
+        } else if (!detalhe) {
+          minutaDisponivel = false;
+        }
+      } catch (detailErr) {
+        minutaDisponivel = false;
+        console.warn(`[ContratosGovEmpenhoAdapter] Detalhe de empenho ${emp.id} não obtido:`, detailErr);
+      }
     }
 
-    const normalizedList: NormalizedEmpenho[] = [];
-
-    for (const emp of rawEmpenhos) {
-      let enrichedEmp = { ...emp };
-
-      // Se solicitado, busca detalhes individuais na minuta para obter quantidade física
-      if (fetchDetails && emp.id) {
-        try {
-          const detalhe = await fetchContratoEmpenhoDetalhe(emp.id);
-          if (detalhe && detalhe.itens_minuta) {
-            enrichedEmp.itens_minuta = detalhe.itens_minuta;
-          }
-        } catch (detailErr) {
-          // Continua com o registro base se falhar detalhe da minuta
-          console.warn(`[ContratosGovEmpenhoAdapter] Detalhe de empenho ${emp.id} não obtido:`, detailErr);
-        }
-      }
-
-      const normalized = normalizeFromContratosGov(enrichedEmp, {
+    normalizedList.push(
+      normalizeFromContratosGov(enrichedEmp, {
         contractKey,
         targetItemNum,
         itemContext,
         unitPrice,
         historicoPrecos
-      });
-
-      normalizedList.push(normalized);
-    }
-
-    return normalizedList;
-  } catch (error) {
-    console.warn(`[ContratosGovEmpenhoAdapter] Falha ao consultar empenhos do contrato ${contratoId}:`, error);
-    return [];
+      })
+    );
   }
+
+  return normalizedList;
 }
