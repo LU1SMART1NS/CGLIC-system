@@ -202,3 +202,15 @@ export function resolveContractKey(
   // Não inventamos silenciosamente — retornamos INVALIDO explicitamente.
   return { key: '', uasg: uasgNorm, numero: '', ano: '', tipo: 'INVALIDO', deterministico: false };
 }
+
+/**
+ * Chave de gestão de um contrato já mapeado: o `id` do registro (que os mapeamentos montam com
+ * resolveContractKey) e, se faltar, a mesma derivação canônica. Vazia quando não dá para derivar.
+ * Use esta função em vez de montar `${uasg}-${numero}-${ano}` no ponto de uso.
+ */
+export function chaveDoContrato(
+  contract: { id?: string | null; uasg?: string | number | null; numero?: string | null; ano?: string | number | null }
+): string {
+  if (contract.id) return contract.id;
+  return resolveContractKey(contract.uasg, contract.numero, contract.ano ?? null).key;
+}

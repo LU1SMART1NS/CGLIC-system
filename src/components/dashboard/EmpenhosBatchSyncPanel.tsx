@@ -34,6 +34,7 @@ export const EmpenhosBatchSyncPanel: React.FC<EmpenhosBatchSyncPanelProps> = ({
   onOpenContract
 }) => {
   const falhasDoLote = batchSummary?.falhas ?? [];
+  const divergentesPncp = batchSummary?.divergentesPncp ?? [];
   const batchTone = !batchSummary ? colors.semantic.info : falhasDoLote.length > 0 ? colors.semantic.warning : colors.semantic.success;
 
   return (
@@ -115,6 +116,26 @@ export const EmpenhosBatchSyncPanel: React.FC<EmpenhosBatchSyncPanelProps> = ({
           ))}
           {falhasDoLote.length > FALHAS_VISIVEIS && <li>e mais {falhasDoLote.length - FALHAS_VISIVEIS} contrato(s).</li>}
         </ul>
+      )}
+
+      {!isSyncingAll && divergentesPncp.length > 0 && (
+        <div data-testid="financial-execution-batch-pncp" style={{ fontSize: '0.8rem', fontWeight: 400 }}>
+          <strong>
+            {divergentesPncp.length} contrato(s) com empenho no PNCP que não está no Contratos.gov.br
+          </strong>{' '}
+          (nada foi gravado a partir do PNCP; confira no contrato):
+          <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem' }}>
+            {divergentesPncp.slice(0, FALHAS_VISIVEIS).map((d) => (
+              <li key={d.contractKey}>
+                <AppButton variant="link" size="xs" type="button" onClick={() => onOpenContract(d.contractKey)}>
+                  {d.numero} (UASG {d.uasg})
+                </AppButton>
+                : {d.avisos.join(' ')}
+              </li>
+            ))}
+            {divergentesPncp.length > FALHAS_VISIVEIS && <li>e mais {divergentesPncp.length - FALHAS_VISIVEIS} contrato(s).</li>}
+          </ul>
+        </div>
       )}
     </div>
   );

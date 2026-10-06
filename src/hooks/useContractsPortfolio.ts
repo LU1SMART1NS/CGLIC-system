@@ -10,6 +10,7 @@ import { getContractDaysRemaining } from '../services/dashboardService';
 import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import type { ContractPortfolioRow } from '../components/contracts/portfolio/ContractsPortfolioTable';
 import type { DashboardAttentionItem } from '../types/managementDashboard';
+import { chaveDoContrato } from '../utils/contractKeyUtils';
 
 /** UASGs consolidadas — mesmo escopo já usado na Visão Geral (/instrumentos), para que os painéis reportem os mesmos números. */
 const UASGS = UASGS_CGLIC;
@@ -111,7 +112,7 @@ export function useContractsPortfolio() {
   // Contratos enriquecidos com prazo, gestor e pendências (base única para cards, filtros e tabela).
   const rows = useMemo<ContractPortfolioRow[]>(() => {
     return contracts.map((contract) => {
-      const contractKey = contract.id || `${contract.uasg || '200331'}-${contract.numero}-${contract.ano}`;
+      const contractKey = chaveDoContrato(contract);
       const diasRestantes = getContractDaysRemaining(contract.dataVigenciaFim);
       const faixa = classifyPrazo(diasRestantes, contract.statusVigencia === 'Expirado');
       return {

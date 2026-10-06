@@ -231,10 +231,13 @@ export function normalizeFromContratosGov(
     };
     unitPrice?: number;
     historicoPrecos?: Array<{ dataTermo: string; valorUnitario: number }>;
+    /** UASG do contrato, usada quando o empenho não informa a unidade gestora emitente. */
+    uasgFallback?: string;
   }
 ): NormalizedEmpenho {
   const rawNumero = record.numero || '';
-  const uasg = normalizeUasgEmitente(record.unidade_gestora);
+  // Sem unidade gestora no registro, a do contrato (mesma regra do fluxo do item); 200331 só em último caso.
+  const uasg = normalizeUasgEmitente(record.unidade_gestora || context?.uasgFallback);
   const dataEmissao = normalizeIsoDate(record.data_emissao);
   const ano = normalizeAnoExercicio(null, dataEmissao, rawNumero);
   const numeroNorm = normalizeEmpenhoNumero(rawNumero);

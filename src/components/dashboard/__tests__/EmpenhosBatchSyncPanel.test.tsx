@@ -20,6 +20,7 @@ const resumo = (over: Partial<BatchSyncSummary> = {}): BatchSyncSummary => ({
   parciais: 1,
   comErro: 4,
   empenhosPersistidos: 1180,
+  divergentesPncp: [],
   novasTentativas: 6,
   cancelado: false,
   falhas: [],
@@ -59,6 +60,23 @@ describe('EmpenhosBatchSyncPanel', () => {
     expect(html).toContain('Contratos.gov.br não respondeu em 30 s.');
     expect(html).toContain(' parcial: ');
     expect(html).toContain('e mais 2 contrato(s).');
+  });
+
+  it('mostra os contratos com empenho no PNCP que não está no Contratos.gov.br, deixando claro que nada foi gravado', () => {
+    const html = renderToStaticMarkup(
+      <EmpenhosBatchSyncPanel
+        {...props}
+        batchSummary={resumo({
+          divergentesPncp: [
+            { contractKey: '200331-00205-2026', numero: '00205/2026', uasg: '200331', avisos: ['Empenho 2026NE000999 consta no PNCP para este contrato, mas não no Contratos.gov.br.'] }
+          ]
+        })}
+      />
+    );
+    expect(html).toContain('1 contrato(s) com empenho no PNCP que não está no Contratos.gov.br');
+    expect(html).toContain('nada foi gravado a partir do PNCP');
+    expect(html).toContain('00205/2026 (UASG 200331)');
+    expect(html).toContain('2026NE000999');
   });
 
   it('sem falhas não mostra o botão de tentar de novo', () => {

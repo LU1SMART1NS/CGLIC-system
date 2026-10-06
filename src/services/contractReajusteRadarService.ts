@@ -23,6 +23,7 @@ import {
 } from './temporalEngineService';
 import { getEventCanonicalDate } from './contractValueEvolutionService';
 import { REAJUSTE_RULES } from '../config/alertRules';
+import { chaveDoContrato } from '../utils/contractKeyUtils';
 
 /**
  * 1. Gera chave determinística e idempotente para o alerta de radar de reajuste.
@@ -82,10 +83,7 @@ export function evaluateContractReajusteRadar(params: {
     return null;
   }
 
-  const contractKey =
-    contract.contractKey ||
-    contract.id ||
-    `${contract.uasg || ''}-${contract.numero || ''}-${contract.ano || ''}`;
+  const contractKey = contract.contractKey || chaveDoContrato(contract);
 
   const anoContrato = typeof contract.ano === 'number'
     ? contract.ano

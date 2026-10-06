@@ -1,29 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { buildContractTarget, resumirLote, contratosParaSincronizar } from '../useBatchSyncContractEmpenhos';
+import { resumirLote, contratosParaSincronizar } from '../useBatchSyncContractEmpenhos';
 import type { ContractDashboardRecord } from '../../types';
 import type { OrchestrationResult, OrchestrationStatus } from '../../types/empenhoSync';
 
 const contrato = (over: Partial<ContractDashboardRecord>): ContractDashboardRecord =>
   ({ id: '200331-00296-2026', uasg: '200331', numero: '00296/2026', ano: '2026', numeroFormatado: '00296/2026', statusVigencia: 'Vigente', ...over }) as any;
 
-const resultado = (status: OrchestrationStatus, erro?: string, persistidos = 0): OrchestrationResult =>
+const resultado = (status: OrchestrationStatus, erro?: string, persistidos = 0, pendencias: any[] = []): OrchestrationResult =>
   ({
     status,
     empenhos_persistidos: persistidos,
     erros: erro ? [{ origem: 'CONTRATOSNET', erro }] : [],
+    pendencias,
     resumo_sync: { erros: [] }
   }) as any;
-
-describe('buildContractTarget', () => {
-  it('manda só o id do Contratos.gov.br, nunca a chave do contrato no lugar dele', () => {
-    expect(buildContractTarget(contrato({ contratoId: 1027808 })).contratoId).toBe(1027808);
-    expect(buildContractTarget(contrato({ contratoId: undefined })).contratoId).toBeUndefined();
-  });
-
-  it('sem id de registro usa a chave canônica do contrato', () => {
-    expect(buildContractTarget(contrato({ id: '', numero: '00052/2018', ano: '2018', uasg: '200330' })).contractKey).toBe('200330-00052-2018');
-  });
-});
 
 describe('resumirLote', () => {
   it('conta cada situação e lista só PARCIAL e ERRO como falhas', () => {
@@ -43,6 +33,38 @@ describe('resumirLote', () => {
     expect(s.falhas).toEqual([
       { contractKey: 'd', numero: '00021/2017', uasg: '200331', situacao: 'ERRO', erro: 'Contratos.gov.br não respondeu em 30 s.' },
       { contractKey: 'e', numero: '00296/2026', uasg: '200330', situacao: 'PARCIAL', erro: 'não vinculado' }
+    ]);
+  });
+});
+
+describe('resumirLote: conferência com o PNCP', () => {
+  it('lista os contratos com empenho só no PNCP, sem contar falha de conferência', () => {
+    const s = resumirLote(
+      [
+        {
+          contract: contrato({ id: 'a', numeroFormatado: '00205/2026' }),
+          contractKey: 'a',
+          result: resultado('SUCESSO', undefined, 1, [
+            { tipo: 'CONTRATO', motivo: 'Empenho 2026NE000999 consta no PNCP para este contrato, mas não no Contratos.gov.br.', contexto: { fonte: 'PNCP' } }
+          ])
+        },
+        {
+          contract: contrato({ id: 'b' }),
+          contractKey: 'b',
+          result: resultado('SUCESSO', undefined, 1, [
+            { tipo: 'CONTRATO', motivo: 'Conferência com o PNCP não feita: PNCP respondeu 503 ao listar os empenhos do contrato.', contexto: { fonte: 'PNCP' } }
+          ])
+        },
+        { contract: contrato({ id: 'c' }), contractKey: 'c', result: resultado('SUCESSO', undefined, 1, [{ tipo: 'ITEM', motivo: 'outro' }]) }
+      ],
+      3,
+      0,
+      false
+    );
+    expect(s.atualizados).toBe(3);
+    expect(s.falhas).toEqual([]);
+    expect(s.divergentesPncp).toEqual([
+      { contractKey: 'a', numero: '00205/2026', uasg: '200331', avisos: ['Empenho 2026NE000999 consta no PNCP para este contrato, mas não no Contratos.gov.br.'] }
     ]);
   });
 });

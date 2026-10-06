@@ -28,6 +28,8 @@ export interface ContratosGovAdapterOptions {
   };
   unitPrice?: number;
   historicoPrecos?: Array<{ dataTermo: string; valorUnitario: number }>;
+  /** UASG do contrato: compõe a chave do empenho que vier sem unidade gestora emitente. */
+  uasgFallback?: string;
 }
 
 /**
@@ -43,7 +45,8 @@ export async function fetchAndNormalizeContratosGovEmpenhos(
     targetItemNum,
     itemContext,
     unitPrice,
-    historicoPrecos
+    historicoPrecos,
+    uasgFallback
   } = options;
   const fetchDetails = options.fetchDetails ?? Boolean(itemContext);
 
@@ -83,7 +86,8 @@ export async function fetchAndNormalizeContratosGovEmpenhos(
         targetItemNum,
         itemContext,
         unitPrice,
-        historicoPrecos
+        historicoPrecos,
+        uasgFallback
       })
     );
   }

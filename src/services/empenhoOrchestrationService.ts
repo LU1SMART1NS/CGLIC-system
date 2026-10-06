@@ -45,6 +45,27 @@ export function pncpParamsValidos(params: { cnpj: string; ano: number | string; 
 }
 
 /**
+ * Empenhos que o PNCP lista para o contrato e o Contratos.gov.br não. A comparação é por ano e
+ * número (sem UASG, que o PNCP não informa). Cada um vira uma pendência; nada é gravado.
+ */
+export function conferirComPncp(pncp: NormalizedEmpenho[], oficiais: NormalizedEmpenho[]): VinculoPendente[] {
+  const conhecidos = new Set(oficiais.map((e) => `${e.ano}-${e.numero_normalizado}`));
+  const vistos = new Set<string>();
+  const pendencias: VinculoPendente[] = [];
+  for (const e of pncp) {
+    const chave = `${e.ano}-${e.numero_normalizado}`;
+    if (!e.numero_normalizado || conhecidos.has(chave) || vistos.has(chave)) continue;
+    vistos.add(chave);
+    pendencias.push({
+      tipo: 'CONTRATO',
+      motivo: `Empenho ${e.numero_oficial} consta no PNCP para este contrato, mas não no Contratos.gov.br.`,
+      contexto: { fonte: 'PNCP', numero: e.numero_oficial, valor: e.valor_empenhado ?? null }
+    });
+  }
+  return pendencias;
+}
+
+/**
  * 1. Orquestração On-Demand por Item de Ata de Registro de Preços
  */
 export async function orchestrateItemEmpenhoSync(
@@ -109,6 +130,7 @@ export async function orchestrateItemEmpenhoSync(
   }
 
   // B. Consulta Contratos Vinculados e PNCP
+  const pncpLidos: NormalizedEmpenho[] = [];
   if (target.contracts && target.contracts.length > 0) {
     for (const c of target.contracts) {
       if (c.contratoId) {
@@ -146,7 +168,8 @@ export async function orchestrateItemEmpenhoSync(
           if (!fontesConsultadas.includes('PNCP')) {
             fontesConsultadas.push('PNCP');
           }
-          allNormalized.push(...pncpEmpenhos);
+          // Só confere: o PNCP não informa a UASG emitente, e gravar criaria a NE com chave errada.
+          pncpLidos.push(...pncpEmpenhos);
         } catch (err: any) {
           erros.push({ origem: 'PNCP', erro: err?.message || `Falha PNCP contrato ${c.contractKey}` });
         }
@@ -164,7 +187,7 @@ export async function orchestrateItemEmpenhoSync(
 
   // E. Consolidação de Conflitos e Pendências
   const divergencias: ConflitoCampo[] = [];
-  const pendencias: VinculoPendente[] = [];
+  const pendencias: VinculoPendente[] = conferirComPncp(pncpLidos, allNormalized);
   for (const rec of reconciledList) {
     divergencias.push(...rec.conflitos);
     pendencias.push(...rec.vinculos_pendentes);
@@ -382,7 +405,8 @@ export async function orchestrateContractEmpenhoSync(
       const contratosGovEmpenhos = await fetchAndNormalizeContratosGovEmpenhos({
         contratoId,
         contractKey,
-        itemContext
+        itemContext,
+        uasgFallback: uasg
       });
       fontesConsultadas.push('CONTRATOSNET');
       allNormalized.push(...contratosGovEmpenhos);
@@ -391,12 +415,19 @@ export async function orchestrateContractEmpenhoSync(
     }
   }
 
-  // B. Consulta PNCP
-  // Só com CNPJ de 14 dígitos e sequencial numérico: fora disso o PNCP recusa (HTTP 400) e a consulta
-  // não diz nada sobre os empenhos do contrato.
-  if (pncpParams && !pncpParamsValidos(pncpParams)) {
+  // B. Conferência com o PNCP (nunca grava)
+  // O PNCP não informa a UASG que emitiu o empenho, e a chave do empenho depende dela: gravar o que
+  // vem dele criaria a mesma NE com outra chave (ou sobrescreveria uma NE de mesmo número da outra
+  // UASG). Ele só confere a lista do Contratos.gov.br: o que estiver no PNCP e não estiver lá vira
+  // pendência para a equipe olhar. Só confere quando o Contratos.gov.br respondeu.
+  const pendenciasPncp: VinculoPendente[] = [];
+  if (!pncpParams) {
+    fontesNaoAplicaveis.push('PNCP (contrato sem o id do PNCP)');
+  } else if (!pncpParamsValidos(pncpParams)) {
     fontesNaoAplicaveis.push('PNCP (CNPJ ou sequencial do contrato fora do formato do PNCP)');
-  } else if (pncpParams?.cnpj && pncpParams?.ano && pncpParams?.sequencialContrato) {
+  } else if (!fontesConsultadas.includes('CONTRATOSNET')) {
+    fontesNaoAplicaveis.push('PNCP (sem a lista do Contratos.gov.br, não há o que conferir)');
+  } else {
     try {
       const pncpEmpenhos = await fetchAndNormalizePncpEmpenhos({
         cnpj: pncpParams.cnpj,
@@ -406,12 +437,15 @@ export async function orchestrateContractEmpenhoSync(
         uasg
       });
       fontesConsultadas.push('PNCP');
-      allNormalized.push(...pncpEmpenhos);
+      pendenciasPncp.push(...conferirComPncp(pncpEmpenhos, allNormalized));
     } catch (err: any) {
-      erros.push({ origem: 'PNCP', erro: err?.message || 'Falha ao consultar PNCP' });
+      // Falha da conferência não muda o resultado da sincronização: os empenhos vêm do Contratos.gov.br.
+      pendenciasPncp.push({
+        tipo: 'CONTRATO',
+        motivo: `Conferência com o PNCP não feita: ${err?.message || 'o PNCP não respondeu.'}`,
+        contexto: { fonte: 'PNCP' }
+      });
     }
-  } else {
-    fontesNaoAplicaveis.push('PNCP (parâmetros de controle PNCP não informados)');
   }
 
   // C. Reconciliação
@@ -421,7 +455,7 @@ export async function orchestrateContractEmpenhoSync(
   const syncSummary = await syncReconciledBatch(reconciledList);
 
   const divergencias: ConflitoCampo[] = [];
-  const pendencias: VinculoPendente[] = [];
+  const pendencias: VinculoPendente[] = [...pendenciasPncp];
   for (const rec of reconciledList) {
     divergencias.push(...rec.conflitos);
     pendencias.push(...rec.vinculos_pendentes);
