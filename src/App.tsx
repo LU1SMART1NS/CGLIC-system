@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { SelectionProvider, useSelection } from './context/SelectionContext';
@@ -6,30 +6,34 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, ConfirmProvider } from './design-system';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import fnspLogo from './assets/fnsp-logo.png';
-import { GestaoInstrumentosRoute } from './routes/GestaoInstrumentosRoute';
-import { ArpSearchRoute } from './routes/ArpSearchRoute';
-import { ItemBalancesRoute } from './routes/ItemBalancesRoute';
-import { ItensRoute } from './routes/ItensRoute';
-import { DistribuicaoEquipeRoute } from './routes/DistribuicaoEquipeRoute';
-import { ContractsRoute } from './routes/ContractsRoute';
-import { Contract360Route } from './routes/Contract360Route';
-import { Ata360Route } from './routes/Ata360Route';
-import { ModelosGestaoRoute } from './routes/ModelosGestaoRoute';
-import { UsersRoute } from './routes/UsersRoute';
-import { RolesRoute } from './routes/RolesRoute';
-import { DepartmentsRoute } from './routes/DepartmentsRoute';
-import { PaymentsRoute } from './routes/PaymentsRoute';
-import { FinancialExecutionRoute } from './routes/FinancialExecutionRoute';
 import { LoginRoute } from './routes/LoginRoute';
-import { DefinirSenhaRoute } from './routes/DefinirSenhaRoute';
-import { RedefinirSenhaRoute } from './routes/RedefinirSenhaRoute';
 import { RequireRole } from './components/auth/RequireRole';
+import { AuthLoading } from './components/auth/AuthLayout';
 import { AlertRulesGate } from './components/layout/AlertRulesGate';
-import { AlertRulesRoute } from './routes/AlertRulesRoute';
-import { HolidaysRoute } from './routes/HolidaysRoute';
-import { ExportExcelModal } from './components/modals/ExportExcelModal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
+
+// Cada tela vira um pacote próprio, baixado só quando a rota é aberta. O ExportExcelModal leva o exceljs
+// junto e só é baixado quando o modal abre. A tela de login fica no pacote principal (é a primeira de quem ainda não entrou).
+const GestaoInstrumentosRoute = lazy(() => import('./routes/GestaoInstrumentosRoute').then((m) => ({ default: m.GestaoInstrumentosRoute })));
+const ArpSearchRoute = lazy(() => import('./routes/ArpSearchRoute').then((m) => ({ default: m.ArpSearchRoute })));
+const ItemBalancesRoute = lazy(() => import('./routes/ItemBalancesRoute').then((m) => ({ default: m.ItemBalancesRoute })));
+const ItensRoute = lazy(() => import('./routes/ItensRoute').then((m) => ({ default: m.ItensRoute })));
+const DistribuicaoEquipeRoute = lazy(() => import('./routes/DistribuicaoEquipeRoute').then((m) => ({ default: m.DistribuicaoEquipeRoute })));
+const ContractsRoute = lazy(() => import('./routes/ContractsRoute').then((m) => ({ default: m.ContractsRoute })));
+const Contract360Route = lazy(() => import('./routes/Contract360Route').then((m) => ({ default: m.Contract360Route })));
+const Ata360Route = lazy(() => import('./routes/Ata360Route').then((m) => ({ default: m.Ata360Route })));
+const ModelosGestaoRoute = lazy(() => import('./routes/ModelosGestaoRoute').then((m) => ({ default: m.ModelosGestaoRoute })));
+const UsersRoute = lazy(() => import('./routes/UsersRoute').then((m) => ({ default: m.UsersRoute })));
+const RolesRoute = lazy(() => import('./routes/RolesRoute').then((m) => ({ default: m.RolesRoute })));
+const DepartmentsRoute = lazy(() => import('./routes/DepartmentsRoute').then((m) => ({ default: m.DepartmentsRoute })));
+const PaymentsRoute = lazy(() => import('./routes/PaymentsRoute').then((m) => ({ default: m.PaymentsRoute })));
+const FinancialExecutionRoute = lazy(() => import('./routes/FinancialExecutionRoute').then((m) => ({ default: m.FinancialExecutionRoute })));
+const DefinirSenhaRoute = lazy(() => import('./routes/DefinirSenhaRoute').then((m) => ({ default: m.DefinirSenhaRoute })));
+const RedefinirSenhaRoute = lazy(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
+const AlertRulesRoute = lazy(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
+const HolidaysRoute = lazy(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
+const ExportExcelModal = lazy(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
 const AuthRedirectHandler: React.FC = () => {
   const navigate = useNavigate();
@@ -158,168 +162,174 @@ const AppContent: React.FC = () => {
   return (
     <div className="app-container">
       <AuthRedirectHandler />
-      <Routes>
-        {/* Rotas Públicas de Acesso e Credenciamento */}
-        <Route path="/login" element={<LoginRoute />} />
-        <Route path="/definir-senha" element={<DefinirSenhaRoute />} />
-        <Route path="/redefinir-senha" element={<RedefinirSenhaRoute />} />
+      <Suspense fallback={<AuthLoading />}>
+        <Routes>
+          {/* Rotas Públicas de Acesso e Credenciamento */}
+          <Route path="/login" element={<LoginRoute />} />
+          <Route path="/definir-senha" element={<DefinirSenhaRoute />} />
+          <Route path="/redefinir-senha" element={<RedefinirSenhaRoute />} />
 
-        {/* Rotas Protegidas do Sistema */}
-        <Route
-          element={
-            <ProtectedLayout>
-              <AppShell
-                onOpenExportModal={() => setIsExportModalOpen(true)}
-              />
-            </ProtectedLayout>
-          }
-        >
-          <Route path="/" element={<LegacyRouteRedirect to="/instrumentos" />} />
+          {/* Rotas Protegidas do Sistema */}
           <Route
-            path="/instrumentos"
             element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
-                <GestaoInstrumentosRoute />
-              </RequireRole>
+              <ProtectedLayout>
+                <AppShell
+                  onOpenExportModal={() => setIsExportModalOpen(true)}
+                />
+              </ProtectedLayout>
             }
-          />
-          <Route
-            path="/atas"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
-                <ArpSearchRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/itens"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
-                <ItensRoute />
-              </RequireRole>
-            }
-          />
-          {/* Páginas antigas da Carteira, absorvidas pela aba Itens (unidade interna é filtro). */}
-          <Route path="/atas/saldos-unidade" element={<LegacyRouteRedirect to="/itens" />} />
-          <Route path="/atas/orgaos-participantes" element={<LegacyRouteRedirect to="/itens" />} />
-          <Route
-            path="/atas/distribuicao"
-            element={
-              <RequireRole allowedRoles={['admin', 'leitor']}>
-                <DistribuicaoEquipeRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/configuracoes/modelos"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor']}>
-                <ModelosGestaoRoute />
-              </RequireRole>
-            }
-          />
-          <Route path="/atas/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=atas" />} />
-          <Route path="/contratos/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=contratos" />} />
-          <Route
-            path="/atas/detalhe/:ataKey"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
-                <Ata360Route />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/atas/detalhe/:ataKey/itens/:numeroItem"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
-                <ItemBalancesRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/contratos"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
-                <ContractsRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/contratos/:contractKey"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
-                <Contract360Route />
-              </RequireRole>
-            }
-          />
-          <Route path="/prazos" element={<LegacyRouteRedirect to="/instrumentos" />} />
-          <Route
-            path="/pagamentos"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
-                <PaymentsRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/empenhos"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
-                <FinancialExecutionRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/departamentos"
-            element={
-              <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
-                <DepartmentsRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/usuarios"
-            element={
-              <RequireRole allowedRoles={['admin']}>
-                <UsersRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/perfis"
-            element={
-              <RequireRole allowedRoles={['admin']}>
-                <RolesRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/regras-alertas"
-            element={
-              <RequireRole allowedRoles={['admin']}>
-                <AlertRulesRoute />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/feriados"
-            element={
-              <RequireRole allowedRoles={['admin']}>
-                <HolidaysRoute />
-              </RequireRole>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+          >
+            <Route path="/" element={<LegacyRouteRedirect to="/instrumentos" />} />
+            <Route
+              path="/instrumentos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                  <GestaoInstrumentosRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/atas"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                  <ArpSearchRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/itens"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                  <ItensRoute />
+                </RequireRole>
+              }
+            />
+            {/* Páginas antigas da Carteira, absorvidas pela aba Itens (unidade interna é filtro). */}
+            <Route path="/atas/saldos-unidade" element={<LegacyRouteRedirect to="/itens" />} />
+            <Route path="/atas/orgaos-participantes" element={<LegacyRouteRedirect to="/itens" />} />
+            <Route
+              path="/atas/distribuicao"
+              element={
+                <RequireRole allowedRoles={['admin', 'leitor']}>
+                  <DistribuicaoEquipeRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/configuracoes/modelos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor']}>
+                  <ModelosGestaoRoute />
+                </RequireRole>
+              }
+            />
+            <Route path="/atas/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=atas" />} />
+            <Route path="/contratos/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=contratos" />} />
+            <Route
+              path="/atas/detalhe/:ataKey"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                  <Ata360Route />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/atas/detalhe/:ataKey/itens/:numeroItem"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                  <ItemBalancesRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/contratos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                  <ContractsRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/contratos/:contractKey"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                  <Contract360Route />
+                </RequireRole>
+              }
+            />
+            <Route path="/prazos" element={<LegacyRouteRedirect to="/instrumentos" />} />
+            <Route
+              path="/pagamentos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                  <PaymentsRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/empenhos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                  <FinancialExecutionRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/departamentos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                  <DepartmentsRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/usuarios"
+              element={
+                <RequireRole allowedRoles={['admin']}>
+                  <UsersRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/perfis"
+              element={
+                <RequireRole allowedRoles={['admin']}>
+                  <RolesRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/regras-alertas"
+              element={
+                <RequireRole allowedRoles={['admin']}>
+                  <AlertRulesRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/feriados"
+              element={
+                <RequireRole allowedRoles={['admin']}>
+                  <HolidaysRoute />
+                </RequireRole>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </Suspense>
 
-      <ExportExcelModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        atas={globalArps}
-        itemsByAta={globalItemsByAta}
-        selectedAta={selectedArp}
-      />
+      {isExportModalOpen && (
+        <Suspense fallback={null}>
+          <ExportExcelModal
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+            atas={globalArps}
+            itemsByAta={globalItemsByAta}
+            selectedAta={selectedArp}
+          />
+        </Suspense>
+      )}
 
       {!isPublicAuthRoute && <AppFooter />}
     </div>
