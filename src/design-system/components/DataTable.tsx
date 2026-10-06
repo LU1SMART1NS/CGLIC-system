@@ -3,6 +3,7 @@ import { colors, shapes, spacing, breakpoints } from '../tokens';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { CarteiraSortButton } from '../../components/carteira/CarteiraSortHeader';
 import { sortRows, type SortDir, type SortValue } from '../../components/carteira/useCarteiraSort';
+import { abrirAoClicarNaLinha } from '../../components/carteira/CarteiraRowLink';
 
 export interface Column<T> {
   key: string;
@@ -50,6 +51,12 @@ export interface DataTableProps<T> {
   rowActionsHeader?: string;
   /** Estilo extra por linha/cartão (ex.: opacidade de registros inativos). */
   rowStyle?: (item: T, index: number) => React.CSSProperties | undefined;
+  /**
+   * Linha clicável: devolve o que abrir ao clicar naquela linha, ou nada quando ela não tem destino. A linha toda
+   * é o clique (padrão das carteiras); botões e links dentro dela seguem com a ação própria. Para o teclado, ponha
+   * um link (CarteiraIdLink) numa das células.
+   */
+  rowOpen?: (item: T, index: number) => (() => void) | null | undefined;
 }
 
 const hideClass = (col: { hideBelow?: 'sm' | 'md' }) =>
@@ -69,9 +76,14 @@ export function DataTable<T>({
   renderMobileCard,
   rowActions,
   rowActionsHeader = 'Ações',
-  rowStyle
+  rowStyle,
+  rowOpen
 }: DataTableProps<T>) {
   const isMobile = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
+  const clickOf = (item: T, idx: number) => {
+    const abrir = rowOpen?.(item, idx);
+    return abrir ? abrirAoClicarNaLinha(abrir) : undefined;
+  };
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
 
   // Ordenação estável: sem escolha (ou no terceiro clique) vale a ordem em que `data` chegou.
@@ -118,8 +130,9 @@ export function DataTable<T>({
                 <li
                   key={key}
                   data-testid={`${testId}-row-${key}`}
-                  className="ds-table-cards__item"
+                  className={`ds-table-cards__item${rowOpen?.(item, idx) ? ' action-row--go' : ''}`}
                   style={rowStyle?.(item, idx)}
+                  onClick={clickOf(item, idx)}
                 >
                   {renderMobileCard ? (
                     renderMobileCard(item, idx)
@@ -213,7 +226,9 @@ export function DataTable<T>({
               <tr
                 key={keyExtractor(item, idx)}
                 data-testid={`${testId}-row-${keyExtractor(item, idx)}`}
+                className={rowOpen?.(item, idx) ? 'carteira-row-link' : undefined}
                 style={rowStyle?.(item, idx)}
+                onClick={clickOf(item, idx)}
               >
                 {columns.map((col) => (
                   <td

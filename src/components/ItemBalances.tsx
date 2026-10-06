@@ -65,6 +65,7 @@ import { quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
+import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract } from '../types';
 import { STATUS_A_VENCER, formatStatusVigencia } from '../utils/statusVigencia';
 
@@ -1010,7 +1011,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
                                 return (
                                   <React.Fragment key={`${c.numeroContrato}-${idx}`}>
-                                    <tr style={{ background: isExpanded ? '#f8fafc' : 'transparent' }}>
+                                    <tr
+                                      data-testid={`vinculado-row-${idx}`}
+                                      className={c.contractKey ? 'carteira-row-link' : undefined}
+                                      onClick={c.contractKey ? abrirAoClicarNaLinha(() => navigate(`/contratos/${encodeURIComponent(c.contractKey)}`)) : undefined}
+                                      style={{ background: isExpanded ? '#f8fafc' : 'transparent' }}
+                                    >
                                       <td data-role="expand" style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                                         <ActionButton action={isExpanded ? 'recolher' : 'expandir'} iconOnly label={isExpanded ? "Recolher empenhos" : "Expandir empenhos"}
                                           onClick={() => toggleContractExpansion(c)}
@@ -1018,7 +1024,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                         />
                                       </td>
                                       <td data-label="Contrato" style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', color: 'var(--primary)' }}>
-                                        {displayNumeroContrato}
+                                        {c.contractKey ? (
+                                          <CarteiraIdLink
+                                            onClick={() => navigate(`/contratos/${encodeURIComponent(c.contractKey)}`)}
+                                            label={`Abrir o contrato ${displayNumeroContrato}`}
+                                            title="Ver detalhes do contrato"
+                                            testId={`vinculado-open-${idx}`}
+                                          >
+                                            {displayNumeroContrato}
+                                          </CarteiraIdLink>
+                                        ) : (
+                                          displayNumeroContrato
+                                        )}
                                       </td>
                                       <td data-label="Unidade" style={{ fontSize: '0.85rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -1091,15 +1108,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                       </td>
                                       <td data-role="action" style={{ textAlign: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                                          {c.contractKey && (
-                                            <ActionButton action="verDetalhes"
-                                              size="sm"
-                                              onClick={() => navigate(`/contratos/${encodeURIComponent(c.contractKey)}`)}
-                                              title="Ver detalhes do contrato"
-                                            >
-                                              <span className="payment-action-label">Detalhes</span>
-                                            </ActionButton>
-                                          )}
                                           {contractUrl ? (
                                             <AppButton
                                               variant="outline"

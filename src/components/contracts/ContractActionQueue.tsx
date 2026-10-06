@@ -1,7 +1,8 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight, Check, CheckCircle2, ChevronRight } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import { propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { ContractTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
@@ -13,7 +14,7 @@ import { useUpdateContractTask } from '../../hooks/useUpdateContractTask';
 import { useReminderDismissals } from '../../hooks/useReminderDismissals';
 import type { ContractActionItem, ContractActionQueue as ActionQueueData } from '../../services/contractActionQueueService';
 
-export type Contract360Tab = 'acoes' | 'plano' | 'pagamentos' | 'financeiro' | 'historico';
+export type Contract360Tab = 'acoes' | 'plano' | 'itens' | 'financeiro' | 'pagamentos' | 'historico';
 
 interface ContractActionQueueProps {
   queue: ActionQueueData;
@@ -87,7 +88,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
       case 'PAGAMENTO':
       case 'EMPENHO':
       case 'REAJUSTE':
-        return rowGo(item) ? <span className="action-row__go" aria-hidden="true"><ChevronRight size={18} /></span> : null;
+        return rowGo(item) ? <SetaDaLinha /> : null;
       case 'LEMBRETE':
         return (
           <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -167,17 +168,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
                 <div
                   key={item.id}
                   data-action-id={item.id}
-                  className={target ? 'action-row--go' : undefined}
-                  {...(target ? {
-                    role: 'button',
-                    tabIndex: 0,
-                    title: target.label,
-                    'aria-label': `${target.label}: ${item.title}`,
-                    onClick: target.go,
-                    onKeyDown: (e: React.KeyboardEvent) => {
-                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); target.go(); }
-                    }
-                  } : {})}
+                  {...propsDeLinhaClicavel(target?.go, target?.label ?? '', { rotulo: target ? `${target.label}: ${item.title}` : undefined })}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

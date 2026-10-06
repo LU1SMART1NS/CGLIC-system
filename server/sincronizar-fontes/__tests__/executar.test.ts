@@ -10,6 +10,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     sincronizarContratos: vi.fn(async () => sucesso(3)),
     sincronizarAtas: vi.fn(async () => sucesso(5)),
     sincronizarSaldosItens: vi.fn(async () => sucesso(7)),
+    sincronizarItensContratos: vi.fn(async () => sucesso(11)),
+    contarItensContratosPendentes: vi.fn(async () => ({ contratos: 40, pendentes: 12 })),
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
     buscarContratosNasFontes: vi.fn(async () => ({ contracts: [{}, {}] as any, fontesComFalha: ['Compras.gov.br'] })),
@@ -35,6 +37,7 @@ describe('validarPedido', () => {
     [{ recurso: 'x' }, /Recurso inválido/],
     [{ recurso: 'contratos' }, /UASG inválida/],
     [{ recurso: 'atas', uasg: '090014' }, /UASG inválida/],
+    [{ recurso: 'itens_contratos' }, /UASG inválida/],
     ['texto', /Corpo/],
     [undefined, /Corpo/]
   ])('recusa %j', (corpo, erro) => {
@@ -83,6 +86,21 @@ describe('executarPedido', () => {
     const d = deps();
     await executarPedido({ recurso: 'saldos_itens', forcar: false }, d);
     expect(d.sincronizarSaldosItens).toHaveBeenCalledWith({ forcar: false });
+  });
+
+  it('itens dos contratos: chama a sincronização da UASG com orçamento de tempo', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'itens_contratos', uasg: '200330', forcar: true }, d);
+    expect(d.sincronizarItensContratos).toHaveBeenCalledWith('200330', { forcar: true, orcamentoMs: 100_000 });
+    expect(r).toMatchObject({ dry: false, recurso: 'itens_contratos', resultado: { status: 'SUCESSO', total: 11 } });
+  });
+
+  it('dry dos itens dos contratos: só conta a fila de leitura; não sincroniza', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'itens_contratos', uasg: '200331', dry: true }, d);
+    expect(d.contarItensContratosPendentes).toHaveBeenCalledWith('200331');
+    expect(r).toMatchObject({ dry: true, consulta: { contratos: 40, pendentes: 12 } });
+    expect(d.sincronizarItensContratos).not.toHaveBeenCalled();
   });
 
   it('dry de contratos: só consulta as fontes e conta; não grava nem usa a trava', async () => {
