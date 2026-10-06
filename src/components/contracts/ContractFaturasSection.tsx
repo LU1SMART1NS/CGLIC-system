@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText } from 'lucide-react';
 import { fetchFaturasDoContrato, type FaturaDoContrato } from '../../services/faturasService';
+import { useSincronizacaoEmpenhosContrato } from '../../hooks/useSincronizacaoEmpenhosContrato';
 import { DataTable, EmptyState, ErrorState, NoticeBar, StatusBadge, SummaryBar, type Column } from '../../design-system';
 
 interface ContractFaturasSectionProps {
@@ -47,6 +48,10 @@ export const ContractFaturasSection: React.FC<ContractFaturasSectionProps> = ({ 
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false
   });
+  // O cruzamento fatura × empenho vinculado só vale depois que os empenhos do contrato foram consultados
+  // com sucesso: antes disso toda NE citada aparece "sem vínculo" só porque nada foi gravado ainda.
+  const { data: syncEmpenhos, isLoading: carregandoEmpenhos } = useSincronizacaoEmpenhosContrato(contractKey);
+  const empenhosConsultados = Boolean(syncEmpenhos?.ultimoSucessoEm);
 
   if (isLoading) {
     return <DataTable columns={[]} data={[]} keyExtractor={() => ''} isLoading testId="contract-faturas-loading" />;
@@ -148,7 +153,13 @@ export const ContractFaturasSection: React.FC<ContractFaturasSectionProps> = ({ 
           Faturas consultadas no Contratos.gov.br em {dataHora(data.sincronizadoEm)}; ordens bancárias do Tesouro (STA).
         </span>
       )}
-      {nesSemVinculo.length > 0 && (
+      {nesSemVinculo.length > 0 && !empenhosConsultados && !carregandoEmpenhos && (
+        <NoticeBar tone="info" testId="contract-faturas-empenhos-nao-consultados">
+          Os empenhos deste contrato ainda não foram consultados no Contratos.gov.br, então as faturas ainda não podem ser conferidas com
+          os empenhos vinculados. A sincronização do servidor faz essa consulta; para fazer agora, use Atualizar empenhos, no topo.
+        </NoticeBar>
+      )}
+      {nesSemVinculo.length > 0 && empenhosConsultados && (
         <NoticeBar tone="warning" testId="contract-faturas-ne-sem-vinculo">
           {comNeSemVinculo.length === 1 ? '1 fatura cita' : `${comNeSemVinculo.length} faturas citam`} empenho que não está vinculado a este
           contrato no sistema: <strong>{nesSemVinculo.join(', ')}</strong>. Use Atualizar empenhos, no topo, e confira o contrato no
