@@ -164,7 +164,7 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
     expect(html).not.toContain('Acesso não autorizado');
   });
 
-  it('1b. aba "Itens" mostra a tabela de saldo com ação para abrir o item', () => {
+  it('1b. aba "Itens" mostra a tabela de saldo com a linha clicável para abrir o item', () => {
     mockSearch = 'aba=itens';
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
       user: { id: 'admin-user' } as any,
@@ -184,7 +184,8 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
 
     expect(html).toContain('data-testid="ata-items-table"');
     expect(html).toContain('Colete Balístico Nível III-A');
-    expect(html).toContain('Ver saldo');
+    expect(html).toContain('carteira-row-link');
+    expect(html).toContain('Ver o saldo do item');
   });
 
   it('2. bloqueia o acesso quando o gestor logado não é o gestor titular da Ata', () => {

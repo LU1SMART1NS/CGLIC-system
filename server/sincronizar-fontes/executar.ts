@@ -11,6 +11,11 @@ import { sincronizarSaldosItens } from '../../src/services/saldosItensSyncServic
 import { sincronizarEmpenhosDaCarteira, selecionarContratos, contratosComEmpenhoAPagar } from '../../src/services/empenhosCarteiraService';
 import { fetchContratosOficiaisDoBanco } from '../../src/services/contratosOficiaisService';
 import { fetchContratosGovEmpenhos } from '../../src/services/api';
+import {
+  contarItensContratosPendentes,
+  ORCAMENTO_ITENS_CONTRATOS_MS,
+  sincronizarItensContratos
+} from '../../src/services/itensContratosSyncService';
 import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFontesService';
 
 /**
@@ -19,12 +24,12 @@ import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFon
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'empenhos'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'empenhos'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
   recurso: RecursoDoServidor;
-  /** Obrigatória para contratos, atas e empenhos; saldos_itens vale para todas as carteiras. */
+  /** Obrigatória para contratos, atas, itens_contratos e empenhos; saldos_itens vale para todas as carteiras. */
   uasg?: string;
   /** Ignora a validade (só o coordenador). */
   forcar?: boolean;
@@ -43,6 +48,8 @@ export interface DependenciasDeExecucao {
   sincronizarEmpenhosDaCarteira: typeof sincronizarEmpenhosDaCarteira;
   /** Teste de acesso (dry) dos empenhos: contratos elegíveis da carteira e a lista de um deles. */
   consultarEmpenhosDeTeste: (uasg: string) => Promise<Record<string, unknown>>;
+  sincronizarItensContratos: typeof sincronizarItensContratos;
+  contarItensContratosPendentes: typeof contarItensContratosPendentes;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
   fetchArpsDasFontes: typeof fetchArpsDasFontes;
   agora: () => number;
@@ -66,6 +73,8 @@ const PADRAO: DependenciasDeExecucao = {
   sincronizarSaldosItens,
   sincronizarEmpenhosDaCarteira,
   consultarEmpenhosDeTeste,
+  sincronizarItensContratos,
+  contarItensContratosPendentes,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
   agora: () => Date.now()
@@ -114,6 +123,8 @@ export async function executarPedido(
         numeroAtaRegistroPreco: ''
       });
       consulta = { atas: atas.length };
+    } else if (pedido.recurso === 'itens_contratos') {
+      consulta = { ...(await deps.contarItensContratosPendentes(uasg as string)) };
     } else if (pedido.recurso === 'empenhos') {
       consulta = await deps.consultarEmpenhosDeTeste(uasg as string);
     } else {
@@ -125,7 +136,10 @@ export async function executarPedido(
   let resultado: ResultadoSincronizacao;
   if (pedido.recurso === 'contratos') resultado = await deps.sincronizarContratos(uasg as string, { forcar: pedido.forcar });
   else if (pedido.recurso === 'atas') resultado = await deps.sincronizarAtas(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
-  else if (pedido.recurso === 'empenhos') resultado = await deps.sincronizarEmpenhosDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
-  else resultado = await deps.sincronizarSaldosItens({ forcar: pedido.forcar });
+  else if (pedido.recurso === 'itens_contratos') {
+    resultado = await deps.sincronizarItensContratos(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_ITENS_CONTRATOS_MS });
+  } else if (pedido.recurso === 'empenhos') {
+    resultado = await deps.sincronizarEmpenhosDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
+  } else resultado = await deps.sincronizarSaldosItens({ forcar: pedido.forcar });
   return { ...base, dry: false, duracaoMs: deps.agora() - inicio, resultado };
 }

@@ -6,6 +6,7 @@ import {
   DollarSign,
   History,
   ListTodo,
+  Package,
   Receipt
 } from 'lucide-react';
 import { useContract } from '../../hooks/useContract';
@@ -26,10 +27,12 @@ import { ContractPaymentFollowUpSection } from './ContractPaymentFollowUpSection
 import { ContractFinancialExecutionSection } from './ContractFinancialExecutionSection';
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
+import { ContractItemsSection } from './ContractItemsSection';
+import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 
-const TAB_IDS: Contract360Tab[] = ['acoes', 'plano', 'pagamentos', 'financeiro', 'historico'];
+const TAB_IDS: Contract360Tab[] = ['acoes', 'plano', 'itens', 'financeiro', 'pagamentos', 'historico'];
 
 interface Contract360PageProps {
   contractKeyOverride?: string;
@@ -61,6 +64,10 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   );
 
   const { queue, isLoading: loadingQueue } = useContractActionQueue(contract, plan);
+
+  // Itens do contrato: lidos do banco (a sincronização grava), com o vínculo de cada um à ata.
+  const itensDoContrato = useItensDoContrato(resolvedContractKey, Boolean(contract));
+  const totalItens = itensDoContrato.data?.itens.length ?? 0;
 
   const { activeTab, goToTab, tabsRef } = useInstrumentTab<Contract360Tab>({ tabs: TAB_IDS, defaultTab: 'acoes' });
 
@@ -130,8 +137,9 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   const tabs: { id: Contract360Tab; label: string }[] = [
     { id: 'acoes', label: queue.items.length > 0 ? `Ações (${queue.items.length})` : 'Ações' },
     { id: 'plano', label: 'Plano de gestão' },
+    { id: 'itens', label: totalItens > 0 ? `Itens (${totalItens})` : 'Itens' },
+    { id: 'financeiro', label: 'Orçamentário' },
     { id: 'pagamentos', label: 'Pagamentos' },
-    { id: 'financeiro', label: 'Financeiro' },
     { id: 'historico', label: 'Histórico' }
   ];
 
@@ -182,6 +190,22 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
             icon={ListTodo}
           >
             <ContractTasksSection contract={contract} plan={plan} isLoading={loadingPlan} />
+          </InstrumentSection>
+        )}
+
+        {activeTab === 'itens' && (
+          <InstrumentSection
+            id="contract-items-section"
+            title="Itens do contrato"
+            subtitle="Itens como a fonte oficial informa, com o item da ata a que cada um está vinculado"
+            icon={Package}
+          >
+            <ContractItemsSection
+              dados={itensDoContrato.data}
+              isLoading={itensDoContrato.isLoading}
+              error={itensDoContrato.error}
+              onRetry={() => void itensDoContrato.refetch()}
+            />
           </InstrumentSection>
         )}
 

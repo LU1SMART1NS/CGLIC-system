@@ -10,7 +10,8 @@ import type { ContractDashboardRecord } from '../../types';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
 import { useSincronizacaoEmpenhosContrato } from '../../hooks/useSincronizacaoEmpenhosContrato';
 import type { SincronizacaoEmpenhosContrato } from '../../services/contratoEmpenhosSincronizacaoService';
-import { ActionButton, AppButton, DataTable, EmptyState, ErrorState, NoticeBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
+import { CarteiraIdLink } from '../carteira/CarteiraRowLink';
+import { AppButton, DataTable, EmptyState, ErrorState, NoticeBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
 
 interface ContractFinancialExecutionSectionProps {
   contract: ContractDashboardRecord;
@@ -212,9 +213,16 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
         if (links.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-            {links.map((l) => (
-              <span key={l.itemKey}>{formatItemKeyLabel(l.itemKey)}</span>
-            ))}
+            {links.map((l) => {
+              const path = itemPath(l.itemKey);
+              return path ? (
+                <CarteiraIdLink key={l.itemKey} onClick={() => navigate(path)} label={`Abrir ${formatItemKeyLabel(l.itemKey)}`} title="Abrir o item na ata">
+                  {formatItemKeyLabel(l.itemKey)}
+                </CarteiraIdLink>
+              ) : (
+                <span key={l.itemKey}>{formatItemKeyLabel(l.itemKey)}</span>
+              );
+            })}
           </div>
         );
       }
@@ -246,7 +254,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
       {pendentes.length > 0 && (
         <NoticeBar testId="contract-financial-pending">
           <strong>{pendentes.length}</strong>{' '}
-          {pendentes.length === 1 ? 'empenho com quantidade pendente' : 'empenhos com quantidade pendente'} de confirmação no item da ata. Use a seta da linha para abrir o item.
+          {pendentes.length === 1 ? 'empenho com quantidade pendente' : 'empenhos com quantidade pendente'} de confirmação no item da ata. Clique na linha para abrir o item.
         </NoticeBar>
       )}
       <SummaryBar
@@ -275,21 +283,12 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           data={empenhosList}
           keyExtractor={(e, i) => e.canonical_key || e.numero_oficial || String(i)}
           testId="contract-financial-table"
-          rowActionsHeader="Ação"
-          rowActions={(e) => {
-            const pendente = linksOf(e).find((l) => l.quantidade == null);
-            const path = pendente ? itemPath(pendente.itemKey) : null;
-            if (!path) return null;
-            return (
-              <ActionButton
-                action="confirmar"
-                size="sm"
-                onClick={() => navigate(path)}
-                title="Confirmar a quantidade no item da ata"
-              >
-                <span className="payment-action-label">Confirmar quantidade</span>
-              </ActionButton>
-            );
+          // A linha abre o item da ata do empenho (o que espera confirmação primeiro).
+          rowOpen={(e) => {
+            const links = linksOf(e);
+            const alvo = links.find((l) => l.quantidade == null) ?? links[0];
+            const path = alvo ? itemPath(alvo.itemKey) : null;
+            return path ? () => navigate(path) : null;
           }}
         />
       </div>

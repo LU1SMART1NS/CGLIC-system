@@ -3,6 +3,7 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { FileText } from 'lucide-react';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
+import { CarteiraIdLink, propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 
 interface AtaLinkedContractsProps {
@@ -59,10 +60,14 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-      {linkedContracts.map((link) => (
+      {linkedContracts.map((link) => {
+        const abrir = link.isOficial ? () => navigate(`/contratos/${encodeURIComponent(link.contractKey)}`) : null;
+        return (
         <div
           key={link.linkId}
           data-testid="ata-linked-contract"
+          // A linha tem o botão de desvincular; quem usa teclado chega pelo número do contrato.
+          {...propsDeLinhaClicavel(abrir, 'Ver detalhes do contrato', { teclado: 'link' })}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -80,7 +85,13 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
               <FileText size={15} />
             </div>
             <div>
-              <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{link.numeroContratoFormatado}</strong>
+              {abrir ? (
+                <CarteiraIdLink onClick={abrir} label={`Abrir o contrato ${link.numeroContratoFormatado}`} title="Ver detalhes do contrato" testId="ata-linked-contract-open">
+                  {link.numeroContratoFormatado}
+                </CarteiraIdLink>
+              ) : (
+                <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{link.numeroContratoFormatado}</strong>
+              )}
               <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
                 {link.fornecedorNome} {link.valorGlobal ? `• ${formatCurrency(link.valorGlobal)}` : ''}
               </p>
@@ -94,15 +105,6 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-            {link.isOficial && (
-              <ActionButton
-                action="verDetalhes"
-                size="sm"
-                iconOnly
-                label="Ver detalhes do contrato"
-                onClick={() => navigate(`/contratos/${encodeURIComponent(link.contractKey)}`)}
-              />
-            )}
             {onUnlink && (
               <ActionButton
                 action="desvincular"
@@ -113,9 +115,11 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
                 isLoading={unlinkingId === link.linkId}
               />
             )}
+            {abrir && <SetaDaLinha />}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
