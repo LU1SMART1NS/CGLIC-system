@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { ActionButton } from '../../design-system/components/ActionButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { classifyArpItemSaldo } from '../../services/balanceService';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraTableShell, carteiraTd } from '../carteira/carteiraStyles';
+import { abrirAoClicarNaLinha, CarteiraIdLink } from '../carteira/CarteiraRowLink';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { saldoBarColor } from './ataSaldoStats';
@@ -20,7 +20,7 @@ interface AtaItemsTableProps {
     saldo_disponivel?: number;
     percentual_consumido?: number;
   }>;
-  /** Abre o detalhe de saldo do item. */
+  /** Abre o detalhe de saldo do item (clique na linha ou no número do item). */
   onSelectItem?: (item: ArpItemRecord) => void;
 }
 
@@ -85,16 +85,31 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
               <CarteiraSortHeader label="Consumido" sortKey="consumido" align="right" {...sort} />
               <CarteiraSortHeader label="Saldo" sortKey="saldo" align="right" {...sort} />
               <CarteiraSortHeader label="Saldo usado" sortKey="usado" {...sort} />
-              {onSelectItem && <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>}
             </tr>
           </thead>
           <tbody>
             {sorted.map(({ item, qtdHomologada, qtdConsumida, saldoDisponivel, percentualConsumido }) => {
               return (
-                <tr key={item.numeroItem} data-testid={`ata-item-row-${item.numeroItem}`}>
+                <tr
+                  key={item.numeroItem}
+                  data-testid={`ata-item-row-${item.numeroItem}`}
+                  className={onSelectItem ? 'carteira-row-link' : undefined}
+                  onClick={onSelectItem ? abrirAoClicarNaLinha(() => onSelectItem(item)) : undefined}
+                >
                   <td style={{ ...carteiraTd, maxWidth: '520px', minWidth: '260px' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
-                      <span style={{ fontWeight: 800, flexShrink: 0 }}>{item.numeroItem}</span>
+                      {onSelectItem ? (
+                        <CarteiraIdLink
+                          onClick={() => onSelectItem(item)}
+                          label={`Ver o saldo do item ${item.numeroItem}`}
+                          title="Ver o saldo do item"
+                          testId={`ata-item-open-${item.numeroItem}`}
+                        >
+                          {item.numeroItem}
+                        </CarteiraIdLink>
+                      ) : (
+                        <span style={{ fontWeight: 800, flexShrink: 0 }}>{item.numeroItem}</span>
+                      )}
                       <span
                         title={item.descricaoItem}
                         style={{ fontWeight: 600, color: '#334155', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
@@ -115,19 +130,6 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
                       </div>
                     </div>
                   </td>
-                  {onSelectItem && (
-                    <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <ActionButton
-                        action="verDetalhes"
-                        size="sm"
-                        onClick={() => onSelectItem(item)}
-                        data-testid={`ata-item-open-${item.numeroItem}`}
-                        title="Ver saldo do item"
-                      >
-                        <span className="payment-action-label">Ver saldo do item</span>
-                      </ActionButton>
-                    </td>
-                  )}
                 </tr>
               );
             })}

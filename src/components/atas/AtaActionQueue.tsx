@@ -1,5 +1,6 @@
 import React from 'react';
-import { ArrowRight, Check, CheckCircle2, ChevronRight } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import { propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { AtaTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
@@ -50,7 +51,7 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
   const renderAction = (item: AtaActionItem) => {
     switch (item.kind) {
       case 'SALDO':
-        return <span className="action-row__go" aria-hidden="true"><ChevronRight size={18} /></span>;
+        return <SetaDaLinha />;
       case 'TAREFA':
         if (!item.taskId) return null;
         return (
@@ -139,17 +140,7 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
               <div
                 key={item.id}
                 data-action-id={item.id}
-                className={go ? 'action-row--go' : undefined}
-                {...(go ? {
-                  role: 'button',
-                  tabIndex: 0,
-                  title: 'Ver itens',
-                  'aria-label': `Ver itens: ${item.title}`,
-                  onClick: go,
-                  onKeyDown: (e: React.KeyboardEvent) => {
-                    if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(); }
-                  }
-                } : {})}
+                {...propsDeLinhaClicavel(go, 'Ver itens', { rotulo: `Ver itens: ${item.title}` })}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

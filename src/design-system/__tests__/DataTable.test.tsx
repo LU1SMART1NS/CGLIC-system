@@ -87,4 +87,19 @@ describe('DataTable — modos desktop e mobile', () => {
     expect(html).not.toContain('data-testid="sort-nome"');
     expect(html).toContain('aria-sort="none"');
   });
+
+  it('rowOpen: só a linha com destino vira clicável (tabela e cartão); sem rowOpen nada muda', () => {
+    const abrir = () => undefined;
+    const rowOpen = (r: Row) => (r.id === '1' ? abrir : null);
+    mockMobile(false);
+    const tabela = renderToStaticMarkup(<DataTable<Row> testId="t" columns={columns} data={data} keyExtractor={(r) => r.id} rowOpen={rowOpen} />);
+    expect(tabela).toMatch(/data-testid="t-row-1"[^>]*class="carteira-row-link"|class="carteira-row-link"[^>]*data-testid="t-row-1"/);
+    expect(tabela).not.toMatch(/data-testid="t-row-2"[^>]*carteira-row-link/);
+    mockMobile(true);
+    const cartoes = renderToStaticMarkup(<DataTable<Row> testId="t" columns={columns} data={data} keyExtractor={(r) => r.id} rowOpen={rowOpen} />);
+    expect(cartoes).toContain('ds-table-cards__item action-row--go');
+    expect((cartoes.match(/action-row--go/g) ?? []).length).toBe(1);
+    mockMobile(false);
+    expect(renderToStaticMarkup(<DataTable<Row> columns={columns} data={data} keyExtractor={(r) => r.id} />)).not.toContain('carteira-row-link');
+  });
 });
