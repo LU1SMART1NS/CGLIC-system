@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase, isSupabaseConfigured, ehServidor } from './supabaseClient';
 import type { DbAta } from './supabaseClient';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 
@@ -10,7 +10,8 @@ import { SUPPLEMENTAL_PNCP_ATAS, deduplicarItensPorNumero } from './api';
  * Devolve false se a gravação falhou (a sincronização usa isso; os demais chamadores ignoram).
  */
 export async function cacheArpsInDb(arps: ArpRecord[]): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase || !arps || arps.length === 0) return false;
+  // No navegador não grava: a escrita em atas_registro_preco é só do servidor (migration 84).
+  if (!ehServidor || !isSupabaseConfigured || !supabase || !arps || arps.length === 0) return false;
 
   try {
     const rows = arps.map((arp) => ({
@@ -285,7 +286,8 @@ export function cnpjCpfParaGravar(valor?: string | null): string | null {
 }
 
 export async function cacheArpItemsInDb(ataNumero: string, uasg: string, items: ArpItemRecord[]): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase || !items || items.length === 0) return false;
+  // No navegador não grava: a escrita em itens_ata é só do servidor (migration 84).
+  if (!ehServidor || !isSupabaseConfigured || !supabase || !items || items.length === 0) return false;
 
   try {
     // 1. Obter id da Ata

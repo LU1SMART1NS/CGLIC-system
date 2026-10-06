@@ -38,7 +38,7 @@ interface Ata360PageProps {
 export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: uasgProp }) => {
   const { ataKey: paramAtaKey } = useParams<{ ataKey: string }>();
   const navigate = useNavigateWithOrigin();
-  const back = useBackTarget({ path: '/atas', label: 'Voltar para Atas' });
+  const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const ataKey = ataKeyOverride || (paramAtaKey ? decodeURIComponent(paramAtaKey) : undefined);
   // A chave canônica é "NUMERO-UASG" (ex.: 00059/2025-200331): sem prop, usa a UASG da chave.
   const uasg = uasgProp || uasgFromAtaKey(ataKey) || UASG_LINK_LEGADO;
@@ -67,7 +67,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(arp.numeroAtaRegistroPreco));
   // Mesma regra das RPCs link/unlink_contract_to_item_atomic (has_role gestor/admin)
   const canEditLinks = role === 'admin' || role === 'gestor';
-  // O quantitativo SENASP dos itens é gravado em segundo plano (useSincronizacaoEmSegundoPlano); a tela só lê.
+  // O quantitativo SENASP dos itens é gravado em segundo plano (pelo servidor, de hora em hora); a tela só lê.
 
   const [isLinkModalOpen, setIsLinkModalOpen] = React.useState(false);
   const unlinkMutation = useUnlinkContractFromItem();

@@ -11,6 +11,9 @@ import { lerAmbiente } from './ambiente';
 const url = lerAmbiente('SUPABASE_URL');
 const chaveServico = lerAmbiente('SUPABASE_SERVICE_ROLE_KEY');
 
+/** Só o servidor grava as atas e os itens das atas (o cliente do navegador exporta false). */
+export const ehServidor = true;
+
 export const isSupabaseConfigured = Boolean(url && chaveServico);
 
 export const supabase = isSupabaseConfigured

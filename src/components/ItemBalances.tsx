@@ -3,7 +3,6 @@ import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Building2, ExternalLink } from 'lucide-react';
 import { getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
-import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
 import { type InternalDepartment } from '../services/unitService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
 import { useItemAdesoes } from '../hooks/useItemAdesoes';
@@ -496,9 +495,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     setExpandedContracts(prev => ({ ...prev, [key]: !isCurrentlyExpanded, [canKey]: !isCurrentlyExpanded }));
   };
 
+  // Guarda no navegador o resumo do item (outras telas usam). A ata e os itens no banco são gravados só pelo
+  // servidor (sincronização agendada); abrir um item não grava mais nada lá.
   useEffect(() => {
-    cacheArpsInDb([arp]);
-    cacheArpItemsInDb(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, [item]);
     try {
       const meta = JSON.stringify({ valorUnitario: item.valorUnitario, descricaoItem: item.descricaoItem });
       localStorage.setItem(`saldoarp-item-meta-${arp.numeroAtaRegistroPreco}-${item.numeroItem}`, meta);

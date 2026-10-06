@@ -10,6 +10,13 @@ const isTest = import.meta.env.MODE === 'test';
 
 export const isSupabaseConfigured = !isTest && Boolean(supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http'));
 
+/**
+ * Quem grava as atas e os itens das atas é o servidor (sincronização agendada, chave de service role): a
+ * escrita nessas tabelas é fechada para o usuário logado (migration 84). No pacote da Edge Function este
+ * módulo é trocado por server/sincronizar-fontes/supabaseServidor.ts, que exporta `ehServidor = true`.
+ */
+export const ehServidor = false;
+
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;

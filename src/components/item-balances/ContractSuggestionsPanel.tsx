@@ -4,6 +4,8 @@ import { ActionButton, AppButton, StatusBadge, SectionHeader, DataTable, type Co
 import { formatCnpj } from '../../utils/format';
 import { formatNumber } from './itemBalanceUtils';
 import { formatNumeroContrato, displayContractNumber } from '../../utils/contractNumber';
+import { CarteiraIdLink } from '../carteira/CarteiraRowLink';
+import { formatPncpContractUrl } from '../../utils/pncpUtils';
 import type { ItemContractSuggestion } from '../../utils/itemContractSuggestions';
 
 interface ContractSuggestionsPanelProps {
@@ -29,6 +31,14 @@ const fornecedorOf = (s: ItemContractSuggestion) => ({
   cnpj: s.contract?.fornecedorCnpjCpf || s.pncp?.niFornecedor || ''
 });
 
+const pncpUrlOf = (s: ItemContractSuggestion): string =>
+  formatPncpContractUrl(
+    s.pncp?.numeroControlePncp || s.contract?.numeroControlePncp,
+    s.pncp?.linkVisualizacao || s.contract?.linkPncp
+  );
+
+const abrirNoPncp = (url: string) => () => window.open(url, '_blank', 'noopener,noreferrer');
+
 const SOURCE_LABEL = { pncp: 'PNCP', catalogo: 'Mesma compra e fornecedor' } as const;
 
 export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> = ({
@@ -50,7 +60,16 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
       key: 'numero',
       header: 'Número do contrato',
       sortValue: (s) => displayNumero(s),
-      render: (s) => <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: 'var(--primary)' }}>{displayNumero(s)}</span>
+      render: (s) => {
+        const url = pncpUrlOf(s);
+        return url ? (
+          <CarteiraIdLink onClick={abrirNoPncp(url)} label={`Abrir o contrato ${displayNumero(s)} no PNCP`} title="Abrir o contrato no PNCP">
+            {displayNumero(s)}
+          </CarteiraIdLink>
+        ) : (
+          <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: 'var(--primary)' }}>{displayNumero(s)}</span>
+        );
+      }
     },
     {
       key: 'unidade',
@@ -123,6 +142,10 @@ export const ContractSuggestionsPanel: React.FC<ContractSuggestionsPanelProps> =
       columns={buildColumns(isDismissed)}
       data={list}
       keyExtractor={(s) => s.contractKey}
+      rowOpen={(s) => {
+        const url = pncpUrlOf(s);
+        return url ? abrirNoPncp(url) : null;
+      }}
       testId={isDismissed ? 'contract-dismissed-table' : 'contract-suggestions-table'}
     />
   );

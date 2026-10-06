@@ -18,14 +18,14 @@ describe('isDetailPath: só telas de detalhe recebem a origem', () => {
 });
 
 describe('originLabel: nome do destino do Voltar', () => {
-  it('nomeia as páginas de lista, ignorando os filtros', () => {
-    expect(originLabel('/atas?situacao=CRITICO')).toBe('Atas');
-    expect(originLabel('/contratos?busca=2024&gestor=Maria')).toBe('Contratos');
+  it('nomeia as páginas de lista, ignorando os filtros; Atas, Contratos e Itens são abas da Carteira', () => {
+    expect(originLabel('/atas?situacao=CRITICO')).toBe('Carteira');
+    expect(originLabel('/contratos?busca=2024&gestor=Maria')).toBe('Carteira');
     expect(originLabel('/pagamentos')).toBe('Pagamentos');
     expect(originLabel('/empenhos')).toBe('Empenhos e Execução');
     expect(originLabel('/atas/distribuicao')).toBe('Distribuição');
-    expect(originLabel('/itens')).toBe('Itens');
-    expect(originLabel('/itens?unidade=cglic')).toBe('Itens');
+    expect(originLabel('/itens')).toBe('Carteira');
+    expect(originLabel('/itens?unidade=cglic')).toBe('Carteira');
     expect(originLabel('/instrumentos')).toBe('Visão Geral');
   });
 

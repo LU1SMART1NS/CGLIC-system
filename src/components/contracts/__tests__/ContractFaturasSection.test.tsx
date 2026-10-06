@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 vi.mock('@tanstack/react-query', async (orig) => ({ ...(await orig<typeof import('@tanstack/react-query')>()), useQuery: vi.fn() }));
+vi.mock('../../../hooks/useSincronizacaoEmpenhosContrato', () => ({ useSincronizacaoEmpenhosContrato: vi.fn() }));
 import { useQuery } from '@tanstack/react-query';
+import { useSincronizacaoEmpenhosContrato } from '../../../hooks/useSincronizacaoEmpenhosContrato';
 import { ContractFaturasSection } from '../ContractFaturasSection';
 
 const f = (over: any = {}) => ({
@@ -15,8 +17,15 @@ const resumo = { faturas: 2, valorFaturado: 1663.38, valorLiquidado: 1663.38, va
 const render = () => renderToStaticMarkup(<ContractFaturasSection contractKey="200331-00021-2017" />);
 const dados = (data: any) => vi.mocked(useQuery).mockReturnValue({ data, isLoading: false, isError: false, refetch: vi.fn() } as any);
 
+const empenhos = (sync: any, isLoading = false) =>
+  vi.mocked(useSincronizacaoEmpenhosContrato).mockReturnValue({ data: sync, isLoading } as any);
+const consultados = { situacao: 'OK', ultimoSucessoEm: '2026-10-06T19:50:00Z', tentativaEm: '2026-10-06T19:50:00Z' };
+
 describe('ContractFaturasSection', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    empenhos(consultados);
+  });
 
   it('nunca consultadas: diz que ainda não foram consultadas', () => {
     dados({ faturas: [], resumo: null, sincronizadoEm: null });
@@ -48,4 +57,38 @@ describe('ContractFaturasSection', () => {
     expect(html).toContain('2023NE000280');
     expect(html).toContain('1 fatura(s) deste contrato estão nesse caso');
   });
+
+  const comNeSemVinculo = () => dados({ faturas: [f({ empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2023NE000280' })], resumo, sincronizadoEm: '2026-10-06T20:22:00Z' });
+
+  it('empenhos do contrato nunca consultados: não acusa NE sem vínculo, diz que a conferência espera a consulta', () => {
+    comNeSemVinculo();
+    empenhos(null);
+    const html = render();
+    expect(html).not.toContain('contract-faturas-ne-sem-vinculo');
+    expect(html).toContain('contract-faturas-empenhos-nao-consultados');
+    expect(html).toContain('ainda não foram consultados');
+  });
+
+  it('só tentativas com falha, nenhum sucesso: também não acusa', () => {
+    comNeSemVinculo();
+    empenhos({ situacao: 'ERRO', ultimoSucessoEm: null, tentativaEm: '2026-10-06T19:50:00Z' });
+    const html = render();
+    expect(html).not.toContain('contract-faturas-ne-sem-vinculo');
+    expect(html).toContain('contract-faturas-empenhos-nao-consultados');
+  });
+
+  it('enquanto a situação dos empenhos carrega, não mostra nenhum dos dois avisos', () => {
+    comNeSemVinculo();
+    empenhos(undefined, true);
+    const html = render();
+    expect(html).not.toContain('contract-faturas-ne-sem-vinculo');
+    expect(html).not.toContain('contract-faturas-empenhos-nao-consultados');
+  });
+
+  it('sem NE sem vínculo, não mostra o aviso de empenhos não consultados', () => {
+    dados({ faturas: [f()], resumo, sincronizadoEm: '2026-10-06T20:22:00Z' });
+    empenhos(null);
+    expect(render()).not.toContain('contract-faturas-empenhos-nao-consultados');
+  });
 });
+
