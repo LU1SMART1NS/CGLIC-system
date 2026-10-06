@@ -70,12 +70,19 @@ describe('resumirLote: conferência com o PNCP', () => {
 });
 
 describe('contratosParaSincronizar (UASGs 200330 e 200331)', () => {
-  it('junta as duas carteiras, tira os expirados e não repete a mesma chave', () => {
+  it('junta as duas carteiras com o critério do servidor e não repete a mesma chave', () => {
     const lista = contratosParaSincronizar(
-      [contrato({ id: '200331-00296-2026' }), contrato({ id: '200331-00021-2017', statusVigencia: 'Expirado' })],
-      [contrato({ id: '200330-00065-2021', uasg: '200330' }), contrato({ id: '200331-00296-2026' })],
-      undefined
+      [
+        [
+          contrato({ id: '200331-00296-2026', dataVigenciaFim: '2027-10-02' }),
+          contrato({ id: '200331-00021-2017', dataVigenciaFim: '2022-12-01' }),
+          contrato({ id: '200331-00135-2025', dataVigenciaFim: '2026-09-30' })
+        ],
+        [contrato({ id: '200330-00065-2021', uasg: '200330', dataVigenciaFim: '2026-11-10' }), contrato({ id: '200331-00296-2026' })],
+        undefined
+      ],
+      { hoje: '2026-10-06', comEmpenhoAPagar: new Set() }
     );
-    expect(lista.map((c) => c.id)).toEqual(['200331-00296-2026', '200330-00065-2021']);
+    expect(lista.map((c) => c.id)).toEqual(['200331-00296-2026', '200331-00135-2025', '200330-00065-2021']);
   });
 });

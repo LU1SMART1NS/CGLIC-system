@@ -10,6 +10,11 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()]
 }));
 
+vi.mock('@tanstack/react-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
+  useQuery: vi.fn(() => ({ data: undefined }))
+}));
+
 vi.mock('../../hooks/useManagementDashboard', () => ({
   useManagementDashboard: vi.fn()
 }));

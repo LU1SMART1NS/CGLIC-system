@@ -11,7 +11,7 @@
 
 import { supabase } from './supabaseClient';
 
-export type RecursoSincronizado = 'contratos' | 'atas' | 'saldos_itens';
+export type RecursoSincronizado = 'contratos' | 'atas' | 'saldos_itens' | 'empenhos';
 
 /**
  * UASG usada nos recursos que valem para todas as carteiras (ex.: 'saldos_itens', que lê os contratos

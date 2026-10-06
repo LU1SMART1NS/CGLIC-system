@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PageContainer } from '../design-system/components/PageContainer';
 import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Banknote } from 'lucide-react';
@@ -14,6 +15,7 @@ import { HeaderRefreshAction } from '../design-system/components/HeaderRefreshAc
 import { ActionButton } from '../design-system/components/ActionButton';
 import { Tabs } from '../design-system/components/Tabs';
 import { UASGS_CGLIC } from '../config/unidadesGestoras';
+import { contratosComEmpenhoAPagar } from '../services/empenhosCarteiraService';
 
 // Mesmo critério de autorização de sincronização usado no botão individual
 // de Contract360Header.tsx, aplicado aqui à sincronização em lote.
@@ -41,9 +43,20 @@ export const FinancialExecutionRoute: React.FC = () => {
   // O lote cobre as duas UASGs da CGLIC, qualquer que seja a aba aberta.
   const { data: contracts200330 } = useContractsDashboard(UASGS_CGLIC[0]);
   const { data: contracts200331 } = useContractsDashboard(UASGS_CGLIC[1]);
+  // Vencidos antigos entram se ainda têm empenho vinculado não pago por inteiro.
+  const { data: comEmpenhoAPagar } = useQuery({
+    queryKey: ['contratos-com-empenho-a-pagar'],
+    queryFn: contratosComEmpenhoAPagar,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false
+  });
   const contratosDoLote = useMemo(
-    () => contratosParaSincronizar(contracts200331, contracts200330),
-    [contracts200330, contracts200331]
+    () =>
+      contratosParaSincronizar([contracts200331, contracts200330], {
+        hoje: new Date().toISOString().slice(0, 10),
+        comEmpenhoAPagar: comEmpenhoAPagar ?? new Set()
+      }),
+    [contracts200330, contracts200331, comEmpenhoAPagar]
   );
   const {
     run: runBatchSync,
@@ -94,7 +107,7 @@ export const FinancialExecutionRoute: React.FC = () => {
               title={
                 !isAuthorizedToSync
                   ? 'Você não possui permissão para sincronizar empenhos.'
-                  : `Sincronizar os empenhos dos ${contratosDoLote.length} contratos não expirados das UASGs 200330 e 200331 com o Contratos.gov.br`
+                  : `Sincronizar com o Contratos.gov.br os empenhos de ${contratosDoLote.length} contratos das UASGs 200330 e 200331: vigentes, vencidos há até 24 meses e vencidos com empenho ainda não pago`
               }
               data-testid="financial-execution-batch-sync-btn"
             >
