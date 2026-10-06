@@ -27,6 +27,12 @@ export const FONTE_EMPENHOS_CONTRATOS = 'Empenhos dos contratos (Contratos.gov.b
 export const VALIDADE_EMPENHOS = '6 hours';
 /** Contrato consultado há menos disso não é consultado de novo numa execução sem forçar. */
 export const RECONSULTA_HORAS = 20;
+/**
+ * Contrato cuja última tentativa falhou ou ficou incompleta (ERRO ou PARCIAL) volta a ser tentado depois
+ * disto, e não depois de RECONSULTA_HORAS: o contrato 00065/2021 ficou PARCIAL por falha de comunicação e
+ * esperaria 19 horas por uma nova leitura.
+ */
+export const RETENTATIVA_HORAS = 1;
 /** Contrato vencido há até tantos meses continua entrando: a execução segue depois do fim da vigência. */
 export const JANELA_VENCIDOS_MESES = 24;
 const PAGINA = 1000;
@@ -112,12 +118,27 @@ export async function contratosComEmpenhoAPagar(): Promise<Set<string>> {
   return new Set(vinculos.filter((v) => aPagar.has(String(v.empenho_id))).map((v) => String(v.contract_key)));
 }
 
+/**
+ * Instante que a fila usa para cada contrato. Tentativa com sucesso conta pela data dela; ERRO ou PARCIAL
+ * é recuado para que o contrato fique elegível RETENTATIVA_HORAS depois da tentativa (e passe à frente
+ * dos consultados com sucesso, que esperam RECONSULTA_HORAS).
+ */
+export function instanteDaFila(tentativaEm: string, situacao?: string | null): string {
+  if (situacao !== 'ERRO' && situacao !== 'PARCIAL') return tentativaEm;
+  const t = new Date(tentativaEm).getTime();
+  if (Number.isNaN(t)) return tentativaEm;
+  return new Date(t - (RECONSULTA_HORAS - RETENTATIVA_HORAS) * 3600_000).toISOString();
+}
+
 /** Última tentativa de sincronização de cada contrato (tabela da migration 80; vazia se ela não existir). */
 export async function fetchTentativasEmpenhos(): Promise<Map<string, string>> {
   if (!isSupabaseConfigured || !supabase) return new Map();
   try {
-    const linhas = await lerPaginado<{ contract_key: string; tentativa_em: string }>('contrato_empenhos_sincronizacao', 'contract_key, tentativa_em');
-    return new Map(linhas.map((l) => [String(l.contract_key), String(l.tentativa_em)]));
+    const linhas = await lerPaginado<{ contract_key: string; tentativa_em: string; situacao: string | null }>(
+      'contrato_empenhos_sincronizacao',
+      'contract_key, tentativa_em, situacao'
+    );
+    return new Map(linhas.map((l) => [String(l.contract_key), instanteDaFila(String(l.tentativa_em), l.situacao)]));
   } catch (err) {
     console.warn('[empenhosCarteira] situação dos contratos não lida; todos contam como nunca consultados:', err);
     return new Map();
