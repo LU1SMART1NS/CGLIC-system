@@ -1,6 +1,6 @@
 import React from 'react';
-import { AlertCircle, ArrowLeft, Loader2, Search } from 'lucide-react';
-import { AppButton } from '../../design-system';
+import { AlertCircle, Loader2, Search } from 'lucide-react';
+import { ActionButton, AppButton } from '../../design-system';
 import { colors, shapes, typography } from '../../design-system/tokens';
 import { Instrument360Page } from './Instrument360Page';
 
@@ -86,9 +86,7 @@ export const InstrumentPageState: React.FC<InstrumentPageStateProps> = ({
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
             {onRetry && <AppButton onClick={onRetry}>Tentar novamente</AppButton>}
             {onBack && (
-              <AppButton variant={onRetry ? 'outline' : 'primary'} icon={<ArrowLeft size={16} />} onClick={onBack}>
-                {backLabel}
-              </AppButton>
+              <ActionButton action="voltar" onClick={onBack}>{backLabel}</ActionButton>
             )}
           </div>
         )}

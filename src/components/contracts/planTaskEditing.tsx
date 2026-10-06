@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { stripNumeracaoManual } from '../../utils/planNumbering';
-import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 
 /**
  * Peças de edição do Plano de Gestão, compartilhadas por contratos e Atas.
@@ -52,14 +53,9 @@ export const ConfirmDeleteButton: React.FC<{
 
   if (!confirming) {
     return (
-      <AppButton
+      <ActionButton action="excluir" iconOnly label={label}
         type="button"
-        variant="ghostDanger"
         size="sm"
-        iconOnly
-        icon={<Trash2 size={15} />}
-        title={label}
-        aria-label={label}
         onClick={() => setConfirming(true)}
         disabled={disabled}
       />
@@ -69,21 +65,15 @@ export const ConfirmDeleteButton: React.FC<{
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--color-danger-text)' }}>
       {confirmMessage}
-      <AppButton
+      <ActionButton action="excluir"
         type="button"
-        variant="danger"
         size="sm"
         disabled={disabled}
         onClick={() => {
           setConfirming(false);
           onConfirm();
-        }}
-      >
-        Excluir
-      </AppButton>
-      <AppButton type="button" variant="outline" size="sm" onClick={() => setConfirming(false)}>
-        Cancelar
-      </AppButton>
+        }} />
+      <ActionButton action="cancelar" type="button" size="sm" onClick={() => setConfirming(false)} />
     </span>
   );
 };
@@ -115,9 +105,9 @@ export const AddTaskForm: React.FC<{
   if (!open) {
     return (
       <div style={{ paddingTop: '0.6rem' }}>
-        <AppButton type="button" variant="ghost" size="sm" icon={<Plus size={13} />} onClick={() => setOpen(true)}>
+        <ActionButton action="adicionar" type="button" size="sm" onClick={() => setOpen(true)}>
           Adicionar tarefa
-        </AppButton>
+        </ActionButton>
       </div>
     );
   }
@@ -173,7 +163,7 @@ export const AddTaskForm: React.FC<{
           {gestorNome ? `Responsável: ${gestorNome} (gestor). Você pode alterar depois.` : 'Você pode definir o responsável depois.'}
         </span>
         <span style={{ display: 'inline-flex', gap: '0.5rem' }}>
-          <AppButton type="button" variant="outline" size="sm" onClick={reset}>Cancelar</AppButton>
+          <ActionButton action="cancelar" type="button" size="sm" onClick={reset} />
           <AppButton type="submit" variant="primary" size="sm" disabled={!nome.trim() || isPending} isLoading={isPending}>
             Criar tarefa
           </AppButton>
@@ -234,15 +224,10 @@ export const MacrotaskHeader: React.FC<{
             onChange={(e) => setDraft(e.target.value)}
             style={{ ...inputStyle, maxWidth: '360px' }}
           />
-          <AppButton type="submit" variant="ghost" size="sm" iconOnly icon={<Check size={15} />} title="Salvar nome" aria-label="Salvar nome" />
-          <AppButton
+          <ActionButton action="salvar" iconOnly label="Salvar nome" type="submit" size="sm" />
+          <ActionButton action="cancelar" iconOnly label="Cancelar edição do nome"
             type="button"
-            variant="ghost"
             size="sm"
-            iconOnly
-            icon={<X size={15} />}
-            title="Cancelar"
-            aria-label="Cancelar edição do nome"
             onClick={() => {
               setDraft(nome);
               setEditing(false);
@@ -255,14 +240,9 @@ export const MacrotaskHeader: React.FC<{
 
       {!editing && (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
-          <AppButton
+          <ActionButton action="renomear" iconOnly label="Renomear etapa"
             type="button"
-            variant="ghost"
             size="sm"
-            iconOnly
-            icon={<Pencil size={14} />}
-            title="Renomear etapa"
-            aria-label="Renomear etapa"
             onClick={() => {
               setDraft(nome);
               setEditing(true);
@@ -292,9 +272,9 @@ export const AddMacrotaskForm: React.FC<{
   if (!open) {
     return (
       <div>
-        <AppButton type="button" variant="outline" size="sm" icon={<Plus size={13} />} onClick={() => setOpen(true)}>
+        <ActionButton action="adicionar" type="button" size="sm" onClick={() => setOpen(true)}>
           Nova etapa
-        </AppButton>
+        </ActionButton>
       </div>
     );
   }
@@ -322,17 +302,13 @@ export const AddMacrotaskForm: React.FC<{
       <AppButton type="submit" variant="primary" size="sm" disabled={!nome.trim() || isPending} isLoading={isPending}>
         Criar etapa
       </AppButton>
-      <AppButton
+      <ActionButton action="cancelar"
         type="button"
-        variant="outline"
         size="sm"
         onClick={() => {
           setNome('');
           setOpen(false);
-        }}
-      >
-        Cancelar
-      </AppButton>
+        }} />
     </form>
   );
 };
@@ -419,15 +395,10 @@ export const ModuleGroupHeader: React.FC<{
             onChange={(e) => setDraft(e.target.value)}
             style={{ ...inputStyle, maxWidth: '360px' }}
           />
-          <AppButton type="submit" variant="ghost" size="sm" iconOnly icon={<Check size={15} />} title="Salvar nome" aria-label="Salvar nome do módulo" />
-          <AppButton
+          <ActionButton action="salvar" iconOnly label="Salvar nome do módulo" type="submit" size="sm" />
+          <ActionButton action="cancelar" iconOnly label="Cancelar edição do nome do módulo"
             type="button"
-            variant="ghost"
             size="sm"
-            iconOnly
-            icon={<X size={15} />}
-            title="Cancelar"
-            aria-label="Cancelar edição do nome do módulo"
             onClick={() => {
               setDraft(nome);
               setRenaming(false);
@@ -460,32 +431,22 @@ export const ModuleGroupHeader: React.FC<{
         summary
       )}
       {onRename && !renaming && (
-        <AppButton
+        <ActionButton action="renomear" iconOnly label={`Renomear módulo ${nome}`}
           type="button"
-          variant="ghost"
           size="sm"
-          iconOnly
-          icon={<Pencil size={14} />}
           onClick={() => {
             setDraft(nome);
             setRenaming(true);
           }}
           disabled={isPending}
-          title="Renomear módulo"
-          aria-label={`Renomear módulo ${nome}`}
         />
       )}
       {onDelete && (
-        <AppButton
+        <ActionButton action="excluir" iconOnly label={`Excluir módulo ${nome}`}
           type="button"
-          variant="ghostDanger"
           size="sm"
-          iconOnly
-          icon={<Trash2 size={15} />}
           onClick={onDelete}
           disabled={isPending}
-          title="Excluir módulo"
-          aria-label={`Excluir módulo ${nome}`}
         />
       )}
     </div>

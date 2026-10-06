@@ -25,6 +25,7 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
     {
       key: 'orgao',
       header: 'Órgão',
+      sortValue: (r) => r.nome,
       render: (r) => (
         <>
           <div style={{ fontWeight: 700 }}>{r.nome}</div>
@@ -38,12 +39,16 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
     {
       key: 'registrado',
       header: 'Registrado',
+      sortValue: (r) => r.registrado,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (r) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.registrado)}</span>
     },
     {
       key: 'consumido',
       header: 'Consumido',
+      sortValue: (r) => r.consumido,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (r) => (
         <>
@@ -55,6 +60,8 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
     {
       key: 'saldo',
       header: 'Saldo',
+      sortValue: (r) => r.saldo,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (r) => (
         <span style={{ fontFamily: 'monospace', fontWeight: 700, color: r.saldo < 0 ? 'var(--danger)' : 'var(--success)' }}>
@@ -65,6 +72,8 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
     {
       key: 'consumo',
       header: 'Consumo',
+      sortValue: (r) => (r.registrado > 0 ? r.consumido / r.registrado : 0),
+      sortFirstDir: 'desc',
       width: '180px',
       render: (r) => <ProgressBar value={r.consumido} max={r.registrado || 1} height="6px" testId={`consumo-${r.codigo}`} />
     }

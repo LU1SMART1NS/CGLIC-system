@@ -52,7 +52,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
         <div style={{ marginTop: spacing.xs }}>
           <AppButton
             type="button"
-            variant="ghostDanger"
+            variant="outline"
             size="sm"
             icon={<RotateCcw size={14} aria-hidden="true" />}
             onClick={onRetry}

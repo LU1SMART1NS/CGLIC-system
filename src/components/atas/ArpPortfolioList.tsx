@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { AtaCardSkeleton } from '../cards/AtaCardSkeleton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { buildAtaKey } from '../../hooks/useAta';
@@ -12,8 +12,8 @@ import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
 import { AppButton } from '../../design-system/components/AppButton';
-import { IconButton } from '../../design-system/components/IconButton';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { ActionButton } from '../../design-system/components/ActionButton';
+import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
@@ -209,7 +209,9 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                 <React.Fragment key={card.key}>
                   <tr data-testid={`arp-row-${numeroAta}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirAta)}>
                     <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
-                      <IconButton
+                      <ActionButton
+                        action={isExpanded ? 'recolher' : 'expandir'}
+                        iconOnly
                         type="button"
                         size="xs"
                         onClick={() => {
@@ -219,7 +221,6 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         expanded={isExpanded}
                         label={isExpanded ? 'Recolher itens da ata' : 'Expandir itens da ata'}
                         data-testid={`arp-expand-${numeroAta}`}
-                        icon={isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                       />
                     </td>
                     <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
@@ -232,7 +233,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                           descricao={`fornecedor ${card.fornecedorNome}`}
                           onFilter={onFilter ? () => onFilter('busca', card.fornecedorNome) : undefined}
                         >
-                          <div title={card.fornecedorNome} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.fornecedorNome}</div>
+                          <div title={card.fornecedorNome} style={carteiraSubtitle}>{card.fornecedorNome}</div>
                         </CarteiraCellFilter>
                       )}
                       </div>

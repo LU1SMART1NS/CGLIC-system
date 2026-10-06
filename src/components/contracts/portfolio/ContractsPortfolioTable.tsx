@@ -1,9 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
-import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { EmptyState } from '../../../design-system/components/EmptyState';
-import { AppButton } from '../../../design-system/components/AppButton';
-import { IconButton } from '../../../design-system/components/IconButton';
+import { ActionButton } from '../../../design-system/components/ActionButton';
 import { SeverityBadge } from '../../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../../services/temporalEngineService';
 import { formatContractNumber } from '../../../utils/contractNumber';
@@ -13,7 +11,7 @@ import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { formatCurrency } from '../../carteira/carteiraFormat';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { situacaoDaFaixa, type PrazoFaixa } from '../../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../../carteira/CarteiraCellFilter';
@@ -164,13 +162,11 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                 <React.Fragment key={contractKey}>
                   <tr data-testid={`contracts-row-${contractKey}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirContrato)}>
                     <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
-                      <IconButton
+                      <ActionButton action={isExpanded ? 'recolher' : 'expandir'} iconOnly label={isExpanded ? 'Recolher detalhes do contrato' : 'Expandir detalhes do contrato'}
                         type="button"
                         onClick={() => setExpandedKey(isExpanded ? null : contractKey)}
                         expanded={isExpanded}
-                        label={isExpanded ? 'Recolher detalhes do contrato' : 'Expandir detalhes do contrato'}
                         data-testid={`contracts-expand-${contractKey}`}
-                        icon={isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                       />
                     </td>
                     <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
@@ -208,7 +204,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                           descricao={`fornecedor ${contract.fornecedorNome}`}
                           onFilter={onFilter && (() => onFilter('busca', contract.fornecedorNome || ''))}
                         >
-                          <div title={contract.fornecedorNome} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{contract.fornecedorNome}</div>
+                          <div title={contract.fornecedorNome} style={carteiraSubtitle}>{contract.fornecedorNome}</div>
                         </CarteiraCellFilter>
                       )}
                       </div>
@@ -307,14 +303,9 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                                       {p.badgeLabel || p.description || p.title}
                                     </span>
                                   </div>
-                                  <AppButton
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => navigate(acao.targetUrl)}
-                                  >
-                                    {acao.label} <ArrowRight size={13} />
-                                  </AppButton>
+                                  <ActionButton action="abrir" type="button" size="sm" onClick={() => navigate(acao.targetUrl)}>
+                                    {acao.label}
+                                  </ActionButton>
                                 </div>
                               );
                             })

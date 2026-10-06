@@ -1,6 +1,6 @@
 import React from 'react';
 import { useBackTarget, useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ExternalLink, RefreshCw } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import { useSyncContractEmpenhos } from '../../hooks/useSyncContractEmpenhos';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +11,7 @@ import { MissingValue } from '../instrument360/MissingValue';
 import { getContractDaysRemaining } from '../../services/dashboardService';
 import { formatContractNumber } from '../../utils/contractNumber';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
-import { AppButton, NoticeBar, type NoticeBarTone } from '../../design-system';
+import { ActionButton, AppButton, NoticeBar, type NoticeBarTone } from '../../design-system';
 import { pncpLinkStyle } from '../atas/Ata360Header';
 import { Instrument360Hero, instrumentSituationLabel } from '../instrument360/Instrument360Hero';
 import { formatCnpj, formatCurrency } from '../../utils/format';
@@ -197,10 +197,9 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
           )}
           {/* Empenhos de contrato não são atualizados automaticamente: este é o único
               gatilho por contrato (o lote fica em Execução Financeira). */}
-          <AppButton
-            variant="outline"
+          <ActionButton
+            action="sincronizar"
             size="sm"
-            icon={<RefreshCw size={14} className={syncMutation.isPending ? 'spin-animation' : ''} />}
             onClick={handleSync}
             disabled={!isAuthorized || syncMutation.isPending}
             isLoading={syncMutation.isPending}
@@ -211,7 +210,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
             }
           >
             {syncMutation.isPending ? 'Atualizando...' : 'Atualizar empenhos'}
-          </AppButton>
+          </ActionButton>
         </>
       }
       notice={

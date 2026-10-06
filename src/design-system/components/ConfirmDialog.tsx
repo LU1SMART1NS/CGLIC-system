@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppButton } from './AppButton';
+import { ActionButton } from './ActionButton';
 import { Modal } from './Modal';
 import { colors, typography } from '../tokens';
 
@@ -37,9 +38,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     testId="confirm-dialog"
     footer={
       <>
-        <AppButton variant="outline" onClick={onCancel} disabled={isLoading}>
-          {cancelLabel}
-        </AppButton>
+        <ActionButton action="cancelar" label={cancelLabel} onClick={onCancel} disabled={isLoading} />
         <AppButton variant={tone === 'danger' ? 'danger' : 'primary'} onClick={onConfirm} isLoading={isLoading}>
           {confirmLabel}
         </AppButton>

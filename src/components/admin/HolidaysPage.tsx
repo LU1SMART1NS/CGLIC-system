@@ -1,9 +1,10 @@
 import React from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
-import { CalendarOff, ChevronLeft, ChevronRight, CopyPlus, Download, Edit2, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
+import { CalendarOff, CopyPlus, Download } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { Modal } from '../../design-system/components/Modal';
@@ -24,7 +25,6 @@ import {
 } from '../../services/holidayService';
 import { formatDateBR, parseDateBRT } from '../../services/temporalEngineService';
 import { DataTable } from '../../design-system/components/DataTable';
-import { IconButton } from '../../design-system/components/IconButton';
 import { AppInput, AppSelect } from '../../design-system/components/FormFields';
 import { AdminListShell } from './shared/AdminListShell';
 
@@ -159,9 +159,7 @@ export const HolidaysPage: React.FC = () => {
             >
               Copiar de {year - 1}{copyCandidates.length > 0 ? ` (${copyCandidates.length})` : ''}
             </AppButton>
-            <AppButton icon={<Plus size={15} />} onClick={() => setEditing({ form: emptyForm(year) })} disabled={isBusy} data-testid="holidays-new">
-              Nova data
-            </AppButton>
+            <ActionButton action="novo" label="Nova data" onClick={() => setEditing({ form: emptyForm(year) })} disabled={isBusy} data-testid="holidays-new" />
           </>
         }
       />
@@ -179,9 +177,9 @@ export const HolidaysPage: React.FC = () => {
         countLabel={String(yearRecords.length)}
         stripActions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <AppButton variant="outline" size="sm" iconOnly icon={<ChevronLeft size={15} />} onClick={() => setYear((y) => y - 1)} aria-label="Ano anterior" />
+            <ActionButton action="anterior" iconOnly label="Ano anterior" onClick={() => setYear((y) => y - 1)} />
             <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary)', minWidth: '4ch', textAlign: 'center' }} data-testid="holidays-year">{year}</span>
-            <AppButton variant="outline" size="sm" iconOnly icon={<ChevronRight size={15} />} onClick={() => setYear((y) => y + 1)} aria-label="Próximo ano" />
+            <ActionButton action="proximo" iconOnly label="Próximo ano" onClick={() => setYear((y) => y + 1)} />
           </div>
         }
         isLoading={isLoading}
@@ -199,15 +197,17 @@ export const HolidaysPage: React.FC = () => {
             {
               key: 'data',
               header: 'Data',
+              sortValue: (r) => r.data,
               width: '120px',
               priority: 'primary',
               render: (r) => <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{formatDateBR(r.data)}</span>
             },
-            { key: 'dia', header: 'Dia', width: '110px', render: (r) => <span style={{ color: '#64748b' }}>{weekdayOf(r.data)}</span> },
-            { key: 'nome', header: 'Nome', render: (r) => r.nome },
+            { key: 'dia', header: 'Dia', width: '110px', sortValue: (r) => new Date(`${r.data}T12:00:00`).getDay(), render: (r) => <span style={{ color: '#64748b' }}>{weekdayOf(r.data)}</span> },
+            { key: 'nome', header: 'Nome', sortValue: (r) => r.nome, render: (r) => r.nome },
             {
               key: 'tipo',
               header: 'Tipo',
+              sortValue: (r) => HOLIDAY_TIPO_LABEL[r.tipo],
               width: '170px',
               render: (r) => (
                 <StatusBadge size="sm" label={HOLIDAY_TIPO_LABEL[r.tipo]} variant={r.tipo === 'NACIONAL' ? 'info' : r.tipo === 'DISTRITAL' ? 'purple' : 'neutral'} />
@@ -229,26 +229,28 @@ export const HolidaysPage: React.FC = () => {
           ]}
           rowActions={(r) => (
             <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-              <IconButton
+              <ActionButton
+                action={r.ativo ? 'ocultar' : 'verDetalhes'}
+                iconOnly
                 label={`${r.ativo ? 'Desativar' : 'Reativar'} ${r.nome}`}
                 title={r.ativo ? 'Desativar (passa a contar como dia útil)' : 'Reativar'}
-                icon={r.ativo ? <EyeOff size={16} /> : <Eye size={16} />}
                 onClick={() => handleToggle(r)}
                 disabled={isBusy}
                 data-testid={`holiday-toggle-${r.data}`}
               />
-              <IconButton
+              <ActionButton
+                action="editar"
+                iconOnly
                 label={`Editar ${r.nome}`}
-                icon={<Edit2 size={16} />}
                 onClick={() => setEditing({ original: r.data, form: { data: r.data, nome: r.nome, tipo: r.tipo, ativo: r.ativo, meioExpediente: r.meioExpediente } })}
                 disabled={isBusy}
               />
-              <IconButton
+              <ActionButton
+                action="excluir"
+                iconOnly
                 label={`Excluir ${r.nome}`}
-                icon={<Trash2 size={16} />}
                 onClick={() => handleDelete(r)}
                 disabled={isBusy}
-                style={{ color: 'var(--color-danger-solid)' }}
               />
             </div>
           )}
@@ -264,8 +266,8 @@ export const HolidaysPage: React.FC = () => {
         testId="holiday-form"
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-            <AppButton variant="outline" onClick={() => setEditing(null)} disabled={isBusy}>Cancelar</AppButton>
-            <AppButton onClick={handleSaveForm} disabled={!formValid || isBusy} isLoading={isBusy} data-testid="holiday-form-save">Salvar</AppButton>
+            <ActionButton action="cancelar" onClick={() => setEditing(null)} disabled={isBusy} />
+            <ActionButton action="salvar" onClick={handleSaveForm} disabled={!formValid || isBusy} isLoading={isBusy} data-testid="holiday-form-save" />
           </div>
         }
       >

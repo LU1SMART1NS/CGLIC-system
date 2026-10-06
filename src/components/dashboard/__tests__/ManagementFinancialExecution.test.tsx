@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderToStaticMarkup } from 'react-dom/server';
+import type { ReactElement } from 'react';
+import { renderToStaticMarkup as renderMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { ManagementFinancialExecution } from '../ManagementFinancialExecution';
 import * as managementHookModule from '../../../hooks/useManagementDashboard';
 import type { ManagementDashboardReadModel } from '../../../types/managementDashboard';
+
+// A ordenação das colunas guarda o estado na URL, então a tabela precisa de um Router.
+const renderToStaticMarkup = (el: ReactElement) => renderMarkup(<MemoryRouter>{el}</MemoryRouter>);
 
 vi.mock('../../../hooks/useManagementDashboard', () => ({
   useManagementDashboard: vi.fn()

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { AppButton, DataTable, NoticeBar, SectionHeader, Timeline, type Column, type TimelineEventItem } from '../../../design-system';
+import { Plus } from 'lucide-react';
+import { ActionButton, AppButton, DataTable, NoticeBar, SectionHeader, Timeline, type Column, type TimelineEventItem } from '../../../design-system';
 import type { PaymentCycleDocument, PaymentCycleEvent, PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 import { TIPOS_DOCUMENTO_RECEBIDO } from './PaymentCycleModals';
 import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR } from './paymentFormUtils';
@@ -41,17 +41,17 @@ export const PaymentCycleDocuments: React.FC<{
   };
 
   const columns: Column<PaymentCycleDocument>[] = [
-    { key: 'tipo', header: 'Documento', render: (d) => d.tipo },
-    { key: 'numero', header: 'Nº', render: (d) => d.numero || '—' },
-    { key: 'sei', header: 'Id. SEI', render: (d) => <strong>{d.sei}</strong> },
-    { key: 'valor', header: 'Valor', align: 'right', render: (d) => formatCurrency(d.valor) },
+    { key: 'tipo', header: 'Documento', sortValue: (d) => d.tipo, render: (d) => d.tipo },
+    { key: 'numero', header: 'Nº', sortValue: (d) => d.numero, render: (d) => d.numero || '—' },
+    { key: 'sei', header: 'Id. SEI', sortValue: (d) => d.sei, render: (d) => <strong>{d.sei}</strong> },
+    { key: 'valor', header: 'Valor', align: 'right', sortValue: (d) => d.valor, sortFirstDir: 'desc', render: (d) => formatCurrency(d.valor) },
     {
       key: 'acao',
       header: 'Ação',
       align: 'right',
       render: (d) =>
         editavel && d.sei !== cycle.input.documentoAtestoSei ? (
-          <AppButton variant="ghostDanger" size="sm" iconOnly icon={<Trash2 size={15} />} onClick={() => void onRemove(d.id)} title="Remover documento" />
+          <ActionButton action="remover" iconOnly label="Remover documento" size="sm" onClick={() => void onRemove(d.id)} />
         ) : null
     }
   ];

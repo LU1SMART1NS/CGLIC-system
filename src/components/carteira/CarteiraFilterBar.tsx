@@ -1,6 +1,6 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
-import { AppButton } from '../../design-system/components/AppButton';
+import { Search } from 'lucide-react';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraFilterButton, type CarteiraFilterOption } from './CarteiraFilterButton';
 import { SEM_GESTOR, TODOS_GESTORES } from './carteiraGestor';
 
@@ -55,16 +55,13 @@ export const CarteiraFilterBar: React.FC<CarteiraFilterBarProps> = ({
       {children}
 
       {hasActiveFilters && (
-        <AppButton
+        <ActionButton
+          action="limpar"
           type="button"
-          variant="ghostDanger"
           size="sm"
           onClick={onResetFilters}
           data-testid={`${testIdPrefix}-reset-filters-btn`}
-          icon={<X size={14} />}
-        >
-          Limpar
-        </AppButton>
+        />
       )}
     </div>
 

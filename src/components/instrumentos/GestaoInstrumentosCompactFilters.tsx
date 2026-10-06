@@ -1,6 +1,6 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
-import { AppButton } from '../../design-system/components/AppButton';
+import { Search } from 'lucide-react';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import type { DashboardAttentionSeverity } from '../../types/managementDashboard';
 
 export interface GestaoInstrumentosCompactFiltersState {
@@ -83,16 +83,11 @@ export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompac
         </select>
 
         {hasActiveFilters && (
-          <AppButton
+          <ActionButton action="limpar"
             type="button"
-            variant="ghostDanger"
             size="sm"
             onClick={onResetFilters}
-            data-testid="instrumentos-reset-filters-btn"
-            icon={<X size={14} />}
-          >
-            Limpar
-          </AppButton>
+            data-testid="instrumentos-reset-filters-btn" />
         )}
       </div>
 

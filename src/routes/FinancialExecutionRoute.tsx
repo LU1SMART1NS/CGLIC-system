@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PageContainer } from '../design-system/components/PageContainer';
 import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
-import { Banknote, RefreshCw, Loader2, CheckCircle2, XCircle, X } from 'lucide-react';
+import { Banknote, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { ManagementFinancialExecution } from '../components/dashboard/ManagementFinancialExecution';
 import { useManagementDashboard } from '../hooks/useManagementDashboard';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
@@ -10,8 +10,7 @@ import { useBatchSyncContractEmpenhos } from '../hooks/useBatchSyncContractEmpen
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../design-system/components/HeaderRefreshAction';
-import { AppButton } from '../design-system/components/AppButton';
-import { IconButton } from '../design-system/components/IconButton';
+import { ActionButton } from '../design-system/components/ActionButton';
 import { colors, shapes } from '../design-system/tokens';
 
 // Mesmo critério de autorização de sincronização usado no botão individual
@@ -64,13 +63,12 @@ export const FinancialExecutionRoute: React.FC = () => {
         icon={<Banknote size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <AppButton
-              variant="outline"
+            <ActionButton
+              action="sincronizar"
               size="sm"
               onClick={handleBatchSync}
               disabled={!isAuthorizedToSync || isSyncingAll || !allContracts?.length}
               isLoading={isSyncingAll}
-              icon={<RefreshCw size={13} />}
               title={
                 !isAuthorizedToSync
                   ? 'Você não possui permissão para sincronizar empenhos.'
@@ -79,7 +77,7 @@ export const FinancialExecutionRoute: React.FC = () => {
               data-testid="financial-execution-batch-sync-btn"
             >
               {isSyncingAll ? 'Sincronizando...' : 'Sincronizar Todos os Empenhos'}
-            </AppButton>
+            </ActionButton>
 
             <HeaderRefreshAction
               onRefresh={() => refresh()}
@@ -137,15 +135,14 @@ export const FinancialExecutionRoute: React.FC = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {isSyncingAll && (
-              <AppButton variant="ghost" size="sm" onClick={cancelBatchSync}>
-                Cancelar
-              </AppButton>
+              <ActionButton action="cancelar" size="sm" onClick={cancelBatchSync} />
             )}
             {!isSyncingAll && (
-              <IconButton
+              <ActionButton
+                action="fechar"
+                iconOnly
                 type="button"
                 label="Fechar notificação"
-                icon={<X size={14} />}
                 onClick={() => setShowBatchPanel(false)}
               />
             )}

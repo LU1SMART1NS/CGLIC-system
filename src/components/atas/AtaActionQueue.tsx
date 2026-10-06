@@ -1,9 +1,10 @@
 import React from 'react';
-import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, ChevronRight } from 'lucide-react';
 import type { AtaTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { useUpdateAtaTask } from '../../hooks/useUpdateAtaTask';
@@ -49,25 +50,19 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
   const renderAction = (item: AtaActionItem) => {
     switch (item.kind) {
       case 'SALDO':
-        return (
-          <AppButton variant="outline" size="sm"  icon={<ArrowRight size={15} />} onClick={() => onGoTo('itens')} title="Ver itens" >
-              <span className="payment-action-label">Ver itens</span>
-            </AppButton>
-        );
+        return <span className="action-row__go" aria-hidden="true"><ChevronRight size={18} /></span>;
       case 'TAREFA':
         if (!item.taskId) return null;
         return (
-          <AppButton
-            variant="outline"
+          <ActionButton
+            action="concluir"
             size="sm"
-            
-            icon={<Check size={15} />}
             onClick={() => updateMutation.mutate({ taskId: item.taskId!, status: 'CONCLUIDA' })}
             disabled={updateMutation.isPending}
             title="Concluir"
           >
               <span className="payment-action-label">Concluir</span>
-            </AppButton>
+            </ActionButton>
         );
       case 'LEMBRETE':
         return (
@@ -138,10 +133,23 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
           </div>
 
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
-            {queue.items.map((item, idx) => (
+            {queue.items.map((item, idx) => {
+              const go = item.kind === 'SALDO' ? () => onGoTo('itens') : null;
+              return (
               <div
                 key={item.id}
                 data-action-id={item.id}
+                className={go ? 'action-row--go' : undefined}
+                {...(go ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  title: 'Ver itens',
+                  'aria-label': `Ver itens: ${item.title}`,
+                  onClick: go,
+                  onKeyDown: (e: React.KeyboardEvent) => {
+                    if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(); }
+                  }
+                } : {})}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -165,7 +173,8 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
                 </div>
                 <div>{renderAction(item)}</div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { FilterBar } from '../../design-system/components/FilterBar';
 import { Modal } from '../../design-system/components/Modal';
 import { AppInput, AppSelect } from '../../design-system/components/FormFields';
@@ -12,7 +13,7 @@ import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { DataTable } from '../../design-system/components/DataTable';
-import { Plus, Building2, Sparkles } from 'lucide-react';
+import { Building2, Sparkles } from 'lucide-react';
 import { useDepartments } from '../../hooks/useDepartments';
 import { useSaveDepartment } from '../../hooks/useSaveDepartment';
 import { useDeleteDepartment } from '../../hooks/useDeleteDepartment';
@@ -198,9 +199,7 @@ export const DepartmentsManagementPage: React.FC = () => {
         icon={<Building2 size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           canManage ? (
-            <AppButton icon={<Plus size={15} />} onClick={handleNew} data-testid="departments-new">
-              Nova unidade
-            </AppButton>
+            <ActionButton action="novo" label="Nova unidade" onClick={handleNew} data-testid="departments-new" />
           ) : undefined
         }
       />
@@ -289,6 +288,7 @@ export const DepartmentsManagementPage: React.FC = () => {
             {
               key: 'sigla',
               header: 'Sigla',
+              sortValue: (d) => d.sigla,
               width: '180px',
               priority: 'primary',
               render: (d) => (
@@ -297,7 +297,7 @@ export const DepartmentsManagementPage: React.FC = () => {
                 </span>
               )
             },
-            { key: 'nomeCompleto', header: 'Nome completo / Diretoria', mobileLabel: 'Nome', render: (d) => d.nomeCompleto }
+            { key: 'nomeCompleto', header: 'Nome completo / Diretoria', mobileLabel: 'Nome', sortValue: (d) => d.nomeCompleto, render: (d) => d.nomeCompleto }
           ]}
           rowActions={
             canManage
@@ -323,9 +323,7 @@ export const DepartmentsManagementPage: React.FC = () => {
         title={editingId ? 'Editar unidade oficial' : 'Nova unidade oficial'}
         footer={
           <>
-            <AppButton type="button" variant="outline" onClick={closeModal} disabled={isSubmitting}>
-              Cancelar
-            </AppButton>
+            <ActionButton action="cancelar" type="button" onClick={closeModal} disabled={isSubmitting} />
             <AppButton type="submit" form="departments-form" disabled={isSubmitting} isLoading={saveMutation.isPending}>
               {editingId ? 'Salvar alterações' : 'Adicionar unidade'}
             </AppButton>

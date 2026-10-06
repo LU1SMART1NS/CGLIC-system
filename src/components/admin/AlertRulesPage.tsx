@@ -1,9 +1,9 @@
 import React from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
-import { BellRing, RotateCcw, Scale } from 'lucide-react';
+import { BellRing, Scale } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../design-system/components/PageHeader';
-import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { useConfirmDialog, useToast } from '../../design-system';
 import {
   ALERT_RULE_DEFAULTS,
@@ -14,7 +14,6 @@ import {
 } from '../../config/alertRules';
 import { saveAlertSettings } from '../../services/alertSettingsService';
 import { DataTable } from '../../design-system/components/DataTable';
-import { IconButton } from '../../design-system/components/IconButton';
 import { AdminListShell } from './shared/AdminListShell';
 
 /** Limites que vêm de lei ou decreto: aparecem só como referência, nunca editáveis. */
@@ -86,23 +85,22 @@ export const AlertRulesPage: React.FC = () => {
         icon={<BellRing size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
-            <AppButton
-              variant="outline"
-              icon={<RotateCcw size={15} />}
+            <ActionButton
+              action="restaurar"
+              label="Restaurar padrão"
               onClick={() => resetToDefaults(ALERT_RULE_DEFINITIONS.map((d) => d.key))}
               disabled={differsFromDefault === 0 || isSaving}
               data-testid="alert-rules-reset-all"
-            >
-              Restaurar padrão
-            </AppButton>
-            <AppButton
+            />
+            <ActionButton
+              action="salvar"
               onClick={handleSave}
               disabled={hasErrors || changedKeys.length === 0 || isSaving}
               isLoading={isSaving}
               data-testid="alert-rules-save"
             >
               Salvar{changedKeys.length > 0 ? ` (${changedKeys.length})` : ''}
-            </AppButton>
+            </ActionButton>
           </>
         }
       />
@@ -175,10 +173,11 @@ export const AlertRulesPage: React.FC = () => {
               rowActions={(def) => {
                 const isDefault = parsed[def.key] === ALERT_RULE_DEFAULTS[def.key];
                 return (
-                  <IconButton
+                  <ActionButton
+                    action="restaurar"
+                    iconOnly
                     label={`Voltar ao padrão: ${def.label}`}
                     title="Voltar ao padrão"
-                    icon={<RotateCcw size={16} />}
                     onClick={() => resetToDefaults([def.key])}
                     disabled={isDefault || isSaving}
                   />

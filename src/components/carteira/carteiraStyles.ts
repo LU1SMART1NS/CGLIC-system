@@ -40,3 +40,14 @@ export const carteiraSelect: React.CSSProperties = {
   fontWeight: 600,
   cursor: 'pointer'
 };
+
+/** Segunda linha da célula de identificação (fornecedor/objeto), limitada a 2 linhas: igual em todas as carteiras. */
+export const carteiraSubtitle: React.CSSProperties = {
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  color: '#475569',
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden'
+};

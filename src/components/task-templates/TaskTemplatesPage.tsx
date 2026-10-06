@@ -2,11 +2,6 @@ import React, { useState } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import {
   Plus,
-  Trash2,
-  Edit2,
-  Check,
-  ChevronDown,
-  ChevronUp,
   ClipboardList,
   AlertCircle,
   Layers,
@@ -17,7 +12,7 @@ import { AppCard } from '../../design-system/components/AppCard';
 import { AppButton } from '../../design-system/components/AppButton';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { Modal } from '../../design-system/components/Modal';
-import { IconButton } from '../../design-system/components/IconButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
@@ -74,12 +69,13 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
     <>
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '0.75rem', background: '#ffffff', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.65rem 0.85rem', background: '#f8fafc', borderBottom: open ? '1px solid #e2e8f0' : 'none' }}>
-        <IconButton
+        <ActionButton
+          action={open ? 'recolher' : 'expandir'}
+          iconOnly
           type="button"
           onClick={() => setOpen(!open)}
           label={open ? 'Recolher macrotarefa' : 'Expandir macrotarefa'}
           expanded={open}
-          icon={open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         />
 
         {editingMacroNome !== null ? (
@@ -91,12 +87,11 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
               style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.85rem', padding: '0.3rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
               autoFocus
             />
-            <IconButton
+            <ActionButton
+              action="salvar"
+              iconOnly
               type="button"
-              variant="success"
               onClick={handleRenameMacro}
-              label="Salvar"
-              icon=<Check size={16} />
             />
           </>
         ) : (
@@ -106,15 +101,17 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
               {macro.tarefas.length} tarefa{macro.tarefas.length !== 1 ? 's' : ''}
             </span>
-            <IconButton
+            <ActionButton
+              action="renomear"
+              iconOnly
               type="button"
               onClick={() => setEditingMacroNome(macro.nome)}
               label="Renomear macrotarefa"
-              icon=<Edit2 size={14} />
             />
-            <IconButton
+            <ActionButton
+              action="excluir"
+              iconOnly
               type="button"
-              variant="ghostDanger"
               onClick={async () => {
                 const ok = await confirm({
                   title: 'Excluir macrotarefa',
@@ -128,7 +125,6 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                 });
               }}
               label="Excluir macrotarefa"
-              icon=<Trash2 size={14} />
             />
           </>
         )}
@@ -179,19 +175,20 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                         autoFocus
                         style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', padding: '0.25rem 0.5rem', border: '1px solid #93c5fd', borderRadius: '6px', outline: 'none' }}
                       />
-                      <IconButton
+                      <ActionButton
+                        action="salvar"
+                        iconOnly
                         type="button"
-                        variant="success"
                         onClick={() => handleRenameTask(task)}
                         disabled={saveTask.isPending}
-                        label="Salvar"
-                        icon=<Check size={14} />
                       />
                     </>
                   ) : (
                     <>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
-                      <IconButton
+                      <ActionButton
+                        action="renomear"
+                        iconOnly
                         type="button"
                         onClick={() => {
                           saveTask.reset();
@@ -199,13 +196,13 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                           setEditingTaskId(task.id);
                         }}
                         label="Renomear tarefa"
-                        icon=<Edit2 size={13} />
                       />
                     </>
                   )}
-                  <IconButton
+                  <ActionButton
+                    action="excluir"
+                    iconOnly
                     type="button"
-                    variant="ghostDanger"
                     onClick={async () => {
                       const ok = await confirm({
                         title: 'Excluir tarefa',
@@ -219,7 +216,6 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                       });
                     }}
                     label="Excluir tarefa"
-                    icon=<Trash2 size={13} />
                   />
                 </div>
               ))}
@@ -238,17 +234,14 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
               onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); }}
               style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.8rem', padding: '0.4rem 0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
             />
-            <AppButton
+            <ActionButton
+              action="adicionar"
               type="button"
-              variant="secondary"
               size="sm"
-              icon={<Plus size={13} />}
               onClick={handleAddTask}
               disabled={!newTaskNome.trim() || saveTask.isPending}
               isLoading={saveTask.isPending}
-            >
-              Adicionar
-            </AppButton>
+            />
           </div>
 
           {saveTask.isError && (
@@ -303,9 +296,7 @@ const TemplateFormModal: React.FC<{
       title={template ? 'Editar modelo' : copy.createLabel}
       footer={
         <>
-          <AppButton type="button" variant="outline" onClick={onClose} disabled={saveTemplate.isPending}>
-            Cancelar
-          </AppButton>
+          <ActionButton action="cancelar" type="button" onClick={onClose} disabled={saveTemplate.isPending} />
           <AppButton type="submit" form="template-form" disabled={!nome.trim() || saveTemplate.isPending} isLoading={saveTemplate.isPending}>
             {template ? 'Salvar alterações' : 'Criar modelo'}
           </AppButton>
@@ -373,12 +364,13 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
     <AppCard style={{ borderLeft: template.ativo ? '4px solid var(--primary)' : '4px solid #94a3b8' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '240px' }}>
-          <IconButton
+          <ActionButton
+            action={expanded ? 'recolher' : 'expandir'}
+            iconOnly
             type="button"
             onClick={() => setExpanded(!expanded)}
             label={expanded ? 'Recolher modelo' : 'Expandir modelo'}
             expanded={expanded}
-            icon={expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -402,27 +394,25 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <ActionButton
+            action="editar"
+            type="button"
+            size="sm"
+            onClick={() => setEditing(true)}
+            title="Editar nome e descrição"
+          />
           <AppButton
             type="button"
             variant="outline"
-            size="sm"
-            icon={<Edit2 size={14} />}
-            onClick={() => setEditing(true)}
-            title="Editar nome e descrição"
-          >
-            Editar
-          </AppButton>
-          <AppButton
-            type="button"
-            variant="secondary"
             size="sm"
             onClick={handleToggleAtivo}
           >
             {template.ativo ? 'Desativar' : 'Ativar'}
           </AppButton>
-          <IconButton
+          <ActionButton
+            action="excluir"
+            iconOnly
             label={`Excluir modelo ${template.nome}`}
-            icon={<Trash2 size={16} />}
             onClick={async () => {
               const ok = await confirm({
                 title: 'Excluir modelo',
@@ -435,7 +425,6 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
                 onError: err => toast.error(`Erro ao excluir modelo: ${err.message || 'Erro desconhecido'}`)
               });
             }}
-            style={{ color: 'var(--color-danger)' }}
           />
         </div>
       </div>
@@ -530,9 +519,7 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
             </h2>
             <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{copy.activeHint}</span>
           </div>
-          <AppButton icon={<Plus size={15} />} onClick={() => setCreating(true)} data-testid="template-new">
-            Novo modelo
-          </AppButton>
+          <ActionButton action="novo" label="Novo modelo" onClick={() => setCreating(true)} data-testid="template-new" />
         </div>
 
         {isLoading ? (

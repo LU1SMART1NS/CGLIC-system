@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, KeyRound, LogOut, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabaseClient';
-import { AppButton } from '../design-system';
+import { ActionButton, AppButton } from '../design-system';
 import { MIN_PASSWORD_LENGTH, PasswordInput, traduzirErroAuth } from './auth/AuthLayout';
 
 /** Nome exibido: cadastro (nome / full_name) ou, na falta, a parte local do e-mail. */
@@ -65,7 +65,7 @@ const ChangePasswordModal: React.FC<{ email: string; onClose: () => void }> = ({
         {ok ? (
           <div className="user-modal__body" role="status">
             <p>Senha alterada com sucesso.</p>
-            <AppButton type="button" fullWidth style={{ marginTop: '0.75rem' }} onClick={onClose}>Fechar</AppButton>
+            <ActionButton action="fechar" type="button" fullWidth style={{ marginTop: '0.75rem' }} onClick={onClose} />
           </div>
         ) : (
           <form className="user-modal__body" onSubmit={submit} noValidate>

@@ -1271,7 +1271,16 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 /* No desktop o botão com rótulo oculto mantém o formato quadrado compacto de antes */
 @media (min-width: 768px) {
   .ds-btn:has(.payment-action-label) { min-width: 32px; min-height: 32px; padding: 0 0.4rem !important; }
+  /* Sem texto vira ícone solto: sem borda nem fundo, como todo botão de ícone do catálogo */
+  .ds-btn--outline:has(.payment-action-label) { --btn-bg: transparent; --btn-border: transparent; --btn-hover: #f1f5f9; }
 }
+
+/* Linha das filas de ação que leva a outra tela: a linha inteira é o clique */
+.action-row--go { cursor: pointer; }
+.action-row--go:hover { box-shadow: inset 0 0 0 999px rgba(15, 23, 42, 0.03); }
+.action-row--go:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.action-row__go { display: inline-flex; color: #94a3b8; }
+.action-row--go:hover .action-row__go { color: var(--primary); }
 
 /* Item da Ata (Fase 3 / L5) */
 @media (max-width: 767px) {

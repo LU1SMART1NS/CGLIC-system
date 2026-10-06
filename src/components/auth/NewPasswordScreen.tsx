@@ -7,7 +7,7 @@ import {
   AuthAlert, AuthLayout, AuthLoading, AuthSpinner, MIN_PASSWORD_LENGTH,
   PasswordChecklist, PasswordInput, traduzirErroAuth
 } from './AuthLayout';
-import { AppButton } from '../../design-system';
+import { ActionButton, AppButton } from '../../design-system';
 
 interface NewPasswordScreenProps {
   title: string;
@@ -55,9 +55,7 @@ export const NewPasswordScreen: React.FC<NewPasswordScreenProps> = ({
           <AppButton type="button" size="lg" fullWidth onClick={() => navigate('/login?recuperar')}>
             Solicitar novo link
           </AppButton>
-          <AppButton type="button" variant="link" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/login')}>
-            Voltar para o login
-          </AppButton>
+          <ActionButton action="voltar" label="Voltar para o login" type="button" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/login')} />
         </div>
       </AuthLayout>
     );

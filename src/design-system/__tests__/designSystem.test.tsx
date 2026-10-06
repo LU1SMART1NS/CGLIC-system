@@ -206,7 +206,7 @@ describe('SaldoARP 3.0 — Design System Foundation (Fase 9-C1)', () => {
       expect(html).toContain('200331 - DTI');
       expect(html).toContain('Críticos');
       expect(html).toContain('3');
-      expect(html).toContain('Limpar Filtros');
+      expect(html).toContain('Limpar filtros');
     });
   });
 

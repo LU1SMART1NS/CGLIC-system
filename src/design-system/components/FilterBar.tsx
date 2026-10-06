@@ -1,6 +1,6 @@
 import React from 'react';
-import { Search, X, Filter } from 'lucide-react';
-import { AppButton } from './AppButton';
+import { Search, Filter } from 'lucide-react';
+import { ActionButton } from './ActionButton';
 import { colors, shapes, typography, spacing } from '../tokens';
 
 export interface FilterOption {
@@ -136,16 +136,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
         {/* Limpar Filtros */}
         {hasActiveFilters && onClearFilters && (
-          <AppButton
+          <ActionButton
+            action="limparFiltros"
             type="button"
-            variant="ghostDanger"
             size="sm"
-            icon={<X size={12} aria-hidden="true" />}
             onClick={onClearFilters}
             data-testid="filter-bar-clear-btn"
-          >
-            <span>Limpar Filtros</span>
-          </AppButton>
+          />
         )}
       </div>
 

@@ -1,6 +1,6 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
@@ -136,16 +136,12 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
       ref={setHeroEl}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <AppButton
+        <ActionButton action="voltar"
           type="button"
-          variant="outline"
           size="sm"
           onClick={onBack}
           data-testid={backTestId}
-          icon={<ArrowLeft size={14} />}
-        >
-          {backLabel}
-        </AppButton>
+        >{backLabel}</ActionButton>
         {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
       </div>
 

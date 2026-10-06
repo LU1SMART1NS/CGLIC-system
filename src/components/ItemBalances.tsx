@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
-import { Building2, Plus, Trash2, ExternalLink, ChevronRight, ChevronDown, Eye } from 'lucide-react';
+import { Building2, ExternalLink } from 'lucide-react';
 import { getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
 import { cacheArpsInDb, cacheArpItemsInDb } from '../services/dbCacheService';
@@ -45,8 +45,7 @@ import {
   suggestionToContractRecord,
   type ItemContractSuggestion
 } from '../utils/itemContractSuggestions';
-import { AppButton, EmptyState, SectionHeader } from '../design-system';
-import { IconButton } from '../design-system/components/IconButton';
+import { ActionButton, AppButton, EmptyState, SectionHeader } from '../design-system';
 
 import { LinkContractModal } from './modals/LinkContractModal';
 import { ContractSuggestionsPanel } from './item-balances/ContractSuggestionsPanel';
@@ -895,15 +894,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                 icon={<Building2 size={16} />}
                 countBadge={linkedContractsCount}
                 actions={canEditData ? (
-                  <AppButton
-                    variant="primary"
+                  <ActionButton action="vincular"
                     size="sm"
-                    icon={<Plus size={14} />}
                     onClick={() => { setLinkingSuggestion(null); setIsLinkContractModalOpen(true); }}
                     title="Vincular a este item um contrato oficial existente da UASG"
-                  >
-                    Vincular Contrato
-                  </AppButton>
+                  >Vincular Contrato</ActionButton>
                 ) : undefined}
               />
 
@@ -1033,11 +1028,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                   <React.Fragment key={`${c.numeroContrato}-${idx}`}>
                                     <tr style={{ background: isExpanded ? '#f8fafc' : 'transparent' }}>
                                       <td data-role="expand" style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                                        <IconButton
+                                        <ActionButton action={isExpanded ? 'recolher' : 'expandir'} iconOnly label={isExpanded ? "Recolher empenhos" : "Expandir empenhos"}
                                           onClick={() => toggleContractExpansion(c)}
-                                          label={isExpanded ? "Recolher empenhos" : "Expandir empenhos"}
                                           expanded={isExpanded}
-                                          icon={isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                         />
                                       </td>
                                       <td data-label="Contrato" style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', color: 'var(--primary)' }}>
@@ -1115,20 +1108,17 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                       <td data-role="action" style={{ textAlign: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
                                           {c.contractKey && (
-                                            <AppButton
-                                              variant="outline"
+                                            <ActionButton action="verDetalhes"
                                               size="sm"
-                                              
-                                              icon={<Eye size={15} />}
                                               onClick={() => navigate(`/contratos/${encodeURIComponent(c.contractKey)}`)}
                                               title="Ver detalhes do contrato"
                                             >
                                               <span className="payment-action-label">Detalhes</span>
-                                            </AppButton>
+                                            </ActionButton>
                                           )}
                                           {contractUrl ? (
                                             <AppButton
-                                              variant="ghost"
+                                              variant="outline"
                                               size="sm"
                                               
                                               icon={<ExternalLink size={15} />}
@@ -1139,30 +1129,24 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                             </AppButton>
                                           ) : null}
                                           {canEditData && c._isOfficialLink && c._linkId && (
-                                            <AppButton
-                                              variant="ghostDanger"
+                                            <ActionButton action="desvincular"
                                               size="sm"
-                                              
-                                              icon={<Trash2 size={15} />}
                                               onClick={() => handleUnlinkOfficialContract(c._linkId, c.contractKey)}
                                               disabled={unlinkContractMutation.isPending}
                                               title="Desvincular contrato deste item"
                                             >
                                               <span className="payment-action-label">Desvincular</span>
-                                            </AppButton>
+                                            </ActionButton>
                                           )}
                                           {canEditData && c._isManual && c._manualId && (
-                                            <AppButton
-                                              variant="ghostDanger"
+                                            <ActionButton action="excluir"
                                               size="sm"
-                                              
-                                              icon={<Trash2 size={15} />}
                                               onClick={() => handleDeleteManualContrato(c._manualId)}
                                               disabled={deleteManualContractMutation.isPending}
                                               title="Excluir contrato manual"
                                             >
                                               <span className="payment-action-label">Excluir</span>
-                                            </AppButton>
+                                            </ActionButton>
                                           )}
                                         </div>
                                       </td>

@@ -1,11 +1,11 @@
 import { classifyArpItemSaldo } from '../../services/balanceService';
 import React from 'react';
-import { ExternalLink, RefreshCw } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { Instrument360Hero } from '../instrument360/Instrument360Hero';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
 import { useAtaManager } from '../../hooks/useAtaManagers';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
-import { AppButton } from '../../design-system';
+import { ActionButton, AppButton } from '../../design-system';
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
 import { formatCnpj, formatCurrency, formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { differenceInDays, formatDateBR, parseDateBRT } from '../../services/temporalEngineService';
@@ -139,17 +139,16 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
               <ExternalLink size={13} /> Edital no PNCP
             </a>
           )}
-          <AppButton
-            variant="outline"
+          <ActionButton
+            action="sincronizar"
             size="sm"
-            icon={<RefreshCw size={14} className={busy ? 'spin-animation' : ''} />}
             onClick={handleAction}
             disabled={busy}
             isLoading={busy}
             title="Recarrega os dados desta tela e, para gestores, relê da API a quantidade e os empenhos dos contratos vinculados"
           >
             {busy ? 'Atualizando...' : 'Atualizar'}
-          </AppButton>
+          </ActionButton>
         </>
       }
       eyebrow={[`UASG ${arp.codigoUnidadeGerenciadora}`, arp.nomeUnidadeGerenciadora].filter(Boolean).join(' · ')}

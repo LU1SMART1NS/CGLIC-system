@@ -1,6 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
-import { AppButton } from './AppButton';
+import { ActionButton } from './ActionButton';
 
 export type NoticeBarTone = 'warning' | 'info' | 'success' | 'danger';
 
@@ -49,7 +48,7 @@ export const NoticeBar: React.FC<NoticeBarProps> = ({ tone = 'warning', children
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
         {action}
         {onDismiss && (
-          <AppButton variant="ghost" size="sm" iconOnly icon={<X size={14} />} onClick={onDismiss} title="Fechar aviso" />
+          <ActionButton action="fechar" iconOnly label="Fechar aviso" onClick={onDismiss} />
         )}
       </span>
     </div>

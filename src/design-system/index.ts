@@ -30,6 +30,8 @@ export * from './components/PageHeader';
 export * from './components/PageContainer';
 export * from './components/AnchoredPanel';
 export * from './components/IconButton';
+export * from './components/ActionButton';
+export * from './actions';
 export * from './components/FormFields';
 export * from './components/Tooltip';
 export * from './components/HeaderRefreshAction';

@@ -1,11 +1,12 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, ChevronRight } from 'lucide-react';
 import type { ContractTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { useUpdateContractTask } from '../../hooks/useUpdateContractTask';
@@ -58,50 +59,35 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
     );
   }
 
+  /** Itens que só levam a outra tela: a linha inteira é o clique (sem botão de seta). */
+  const rowGo = (item: ContractActionItem): { label: string; go: () => void } | null => {
+    switch (item.kind) {
+      case 'PAGAMENTO': return { label: 'Abrir ciclo', go: () => onGoTo('pagamentos') };
+      case 'REAJUSTE': return { label: 'Ver histórico', go: () => onGoTo('historico') };
+      case 'EMPENHO': return item.href ? { label: 'Confirmar a quantidade no item da ata', go: () => navigate(item.href!) } : null;
+      default: return null;
+    }
+  };
+
   const renderAction = (item: ContractActionItem) => {
     switch (item.kind) {
       case 'TAREFA': {
         if (!item.taskId) return null;
         return (
-          <AppButton
-            variant="outline"
+          <ActionButton action="concluir"
             size="sm"
-            
-            icon={<Check size={15} />}
             onClick={() => updateMutation.mutate({ taskId: item.taskId!, status: 'CONCLUIDA' })}
             disabled={updateMutation.isPending}
             title="Concluir"
           >
               <span className="payment-action-label">Concluir</span>
-            </AppButton>
+            </ActionButton>
         );
       }
       case 'PAGAMENTO':
-        return (
-          <AppButton variant="outline" size="sm"  icon={<ArrowRight size={15} />} onClick={() => onGoTo('pagamentos')} title="Abrir ciclo" >
-              <span className="payment-action-label">Abrir ciclo</span>
-            </AppButton>
-        );
       case 'EMPENHO':
-        if (!item.href) return null;
-        return (
-          <AppButton
-            variant="outline"
-            size="sm"
-            
-            icon={<ArrowRight size={15} />}
-            onClick={() => navigate(item.href!)}
-            title="Confirmar a quantidade no item da ata"
-          >
-              <span className="payment-action-label">Confirmar quantidade</span>
-            </AppButton>
-        );
       case 'REAJUSTE':
-        return (
-          <AppButton variant="outline" size="sm"  icon={<ArrowRight size={15} />} onClick={() => onGoTo('historico')} title="Ver histórico" >
-              <span className="payment-action-label">Ver histórico</span>
-            </AppButton>
-        );
+        return rowGo(item) ? <span className="action-row__go" aria-hidden="true"><ChevronRight size={18} /></span> : null;
       case 'LEMBRETE':
         return (
           <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -176,10 +162,22 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
             {queue.items.map((item, idx) => {
               const isHighlighted = item.id === highlightedId;
+              const target = rowGo(item);
               return (
                 <div
                   key={item.id}
                   data-action-id={item.id}
+                  className={target ? 'action-row--go' : undefined}
+                  {...(target ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    title: target.label,
+                    'aria-label': `${target.label}: ${item.title}`,
+                    onClick: target.go,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); target.go(); }
+                    }
+                  } : {})}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

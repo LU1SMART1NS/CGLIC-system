@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { FileSpreadsheet, ListChecks } from 'lucide-react';
+import { ListChecks } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
-import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
@@ -142,9 +142,7 @@ export const ItensPortfolio: React.FC = () => {
         icon={<ListChecks size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
-            <AppButton variant="outline" icon={<FileSpreadsheet size={14} />} onClick={() => setIsExportOpen(true)} data-testid="itens-export-btn">
-              Exportar Relatório
-            </AppButton>
+            <ActionButton action="exportar" label="Exportar Relatório" onClick={() => setIsExportOpen(true)} data-testid="itens-export-btn" />
           </>
         }
       />

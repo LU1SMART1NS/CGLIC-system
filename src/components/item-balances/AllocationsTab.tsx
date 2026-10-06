@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Edit2, Plus, Trash2 } from 'lucide-react';
+import { Building2, Plus } from 'lucide-react';
 import {
   AlertCard,
-  AppButton,
+  ActionButton, AppButton,
   DataTable,
   EmptyState,
   Modal,
@@ -130,17 +130,22 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
     {
       key: 'unidade',
       header: 'Unidade interna',
+      sortValue: (r) => r.unitName,
       render: (r) => <span style={{ fontWeight: 700 }}>{r.unitName}</span>
     },
     {
       key: 'alocado',
       header: 'Alocado',
+      sortValue: (r) => r.allocatedQty,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (r) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.allocatedQty)}</span>
     },
     {
       key: 'empenhado',
       header: 'Empenhado',
+      sortValue: (r) => r.empenhado,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (r) => (
         <>
@@ -156,6 +161,8 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
     {
       key: 'aEmpenhar',
       header: 'A empenhar',
+      sortValue: (r) => r.allocatedQty - r.empenhado,
+      sortFirstDir: 'desc',
       align: 'right',
       render: (r) => {
         const balance = r.allocatedQty - r.empenhado;
@@ -169,6 +176,8 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
     {
       key: 'consumo',
       header: 'Consumo',
+      sortValue: (r) => (r.allocatedQty > 0 ? r.empenhado / r.allocatedQty : 0),
+      sortFirstDir: 'desc',
       width: '180px',
       render: (r) => {
         const percent = r.allocatedQty > 0 ? (r.empenhado / r.allocatedQty) * 100 : 0;
@@ -184,8 +193,8 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
             width: '110px',
             render: (r: AllocationRow) => (
               <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
-                <AppButton variant="outline" size="sm" iconOnly icon={<Edit2 size={14} />} onClick={() => openEdit(r.id)} disabled={saving} title={`Editar a alocação de ${r.unitName}`} />
-                <AppButton variant="ghostDanger" size="sm" iconOnly icon={<Trash2 size={14} />} onClick={() => onDelete(r.id)} disabled={saving} title={`Excluir a alocação de ${r.unitName}`} />
+                <ActionButton action="editar" iconOnly label={`Editar a alocação de ${r.unitName}`} size="sm" onClick={() => openEdit(r.id)} disabled={saving} />
+                <ActionButton action="excluir" iconOnly label={`Excluir a alocação de ${r.unitName}`} size="sm" onClick={() => onDelete(r.id)} disabled={saving} />
               </div>
             )
           }
@@ -271,9 +280,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
           testId="allocation-modal"
           footer={
             <>
-              <AppButton type="button" variant="outline" size="sm" onClick={closeModal} disabled={saving}>
-                {semUnidadeDisponivel ? 'Fechar' : 'Cancelar'}
-              </AppButton>
+              <ActionButton action={semUnidadeDisponivel ? 'fechar' : 'cancelar'} type="button" size="sm" onClick={closeModal} disabled={saving} />
               {!semUnidadeDisponivel && (
                 <AppButton type="submit" form="allocation-form" variant="primary" size="sm" isLoading={saving} disabled={saving}>
                   {editingId ? 'Salvar' : 'Alocar'}

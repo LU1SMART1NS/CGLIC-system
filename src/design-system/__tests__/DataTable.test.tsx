@@ -73,4 +73,18 @@ describe('DataTable — modos desktop e mobile', () => {
     const empty = renderToStaticMarkup(<DataTable<Row> columns={columns} data={[]} keyExtractor={(r) => r.id} emptyMessage="Sem dados" />);
     expect(empty).toContain('Sem dados');
   });
+
+  it('só as colunas com sortValue ganham botão de ordenação', () => {
+    mockMobile(false);
+    const html = renderToStaticMarkup(
+      <DataTable<Row>
+        columns={[{ key: 'sigla', header: 'Sigla', sortValue: (r) => r.sigla }, { key: 'nome', header: 'Nome completo' }]}
+        data={data}
+        keyExtractor={(r) => r.id}
+      />
+    );
+    expect(html).toContain('data-testid="sort-sigla"');
+    expect(html).not.toContain('data-testid="sort-nome"');
+    expect(html).toContain('aria-sort="none"');
+  });
 });

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, MailCheck } from 'lucide-react';
+import { ArrowRight, MailCheck } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { resetUserPassword } from '../services/userService';
@@ -8,7 +8,7 @@ import {
   AuthAlert, AuthLayout, AuthLoading, PasswordInput,
   isErroDeInfraestrutura, traduzirErroAuth
 } from '../components/auth/AuthLayout';
-import { AppButton } from '../design-system';
+import { ActionButton, AppButton } from '../design-system';
 
 export const LoginRoute: React.FC = () => {
   const { user, loading } = useAuth();
@@ -129,9 +129,7 @@ export const LoginRoute: React.FC = () => {
   if (showForgot) {
     return (
       <AuthLayout>
-        <AppButton type="button" variant="link" className="auth-back" icon={<ArrowLeft size={15} />} onClick={closeForgot}>
-          Voltar para o login
-        </AppButton>
+        <ActionButton action="voltar" label="Voltar para o login" type="button" className="auth-back" onClick={closeForgot} />
 
         {forgotSentTo ? (
           <div className="auth-state">
@@ -141,9 +139,7 @@ export const LoginRoute: React.FC = () => {
               Se houver uma conta para <strong>{forgotSentTo}</strong>, você receberá em alguns minutos um link para
               criar uma nova senha. Confira também a caixa de spam.
             </p>
-            <AppButton type="button" variant="outline" size="lg" fullWidth onClick={closeForgot}>
-              Voltar para o login
-            </AppButton>
+            <ActionButton action="voltar" label="Voltar para o login" type="button" size="lg" fullWidth onClick={closeForgot} />
           </div>
         ) : (
           <>

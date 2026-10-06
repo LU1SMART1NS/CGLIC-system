@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { colors, shapes, spacing, breakpoints } from '../tokens';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { CarteiraSortButton } from '../../components/carteira/CarteiraSortHeader';
+import { sortRows, type SortDir, type SortValue } from '../../components/carteira/useCarteiraSort';
 
 export interface Column<T> {
   key: string;
@@ -20,6 +22,10 @@ export interface Column<T> {
   hideBelow?: 'sm' | 'md';
   /** Rótulo no cartão mobile (padrão: header). */
   mobileLabel?: string;
+  /** Valor usado para ordenar por esta coluna; sem ele a coluna não ordena. Vazio vai sempre para o fim. */
+  sortValue?: (item: T) => SortValue;
+  /** Sentido do primeiro clique (padrão: crescente; use `desc` para números em que o maior importa). */
+  sortFirstDir?: SortDir;
 }
 
 export interface DataTableProps<T> {
@@ -66,6 +72,20 @@ export function DataTable<T>({
   rowStyle
 }: DataTableProps<T>) {
   const isMobile = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
+  const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
+
+  // Ordenação estável: sem escolha (ou no terceiro clique) vale a ordem em que `data` chegou.
+  const rows = useMemo(() => {
+    const col = sort ? columns.find((c) => c.key === sort.key) : undefined;
+    return sort && col?.sortValue ? sortRows(data, { value: col.sortValue }, sort.dir) : data;
+  }, [data, columns, sort]);
+
+  const toggleSort = (key: string) =>
+    setSort((atual) => {
+      const first = columns.find((c) => c.key === key)?.sortFirstDir ?? 'asc';
+      if (!atual || atual.key !== key) return { key, dir: first };
+      return atual.dir === first ? { key, dir: first === 'asc' ? 'desc' : 'asc' } : null;
+    });
 
   if (isLoading) {
     return (
@@ -88,11 +108,11 @@ export function DataTable<T>({
 
     return (
       <div data-testid={testId} className={`data-table-container ds-table-cards ${className}`.trim()}>
-        {data.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="ds-table-cards__empty" style={{ color: colors.text.muted }}>{emptyMessage}</p>
         ) : (
           <ul className="ds-table-cards__list">
-            {data.map((item, idx) => {
+            {rows.map((item, idx) => {
               const key = keyExtractor(item, idx);
               return (
                 <li
@@ -162,23 +182,34 @@ export function DataTable<T>({
               <th
                 key={col.key}
                 className={hideClass(col)}
+                aria-sort={col.sortValue ? (sort?.key === col.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
                 style={{ textAlign: col.align || 'left', width: col.width, minWidth: col.minWidth, whiteSpace: col.nowrap ? 'nowrap' : undefined }}
               >
-                {col.header}
+                {col.sortValue ? (
+                  <CarteiraSortButton
+                    label={col.header}
+                    sortKey={col.key}
+                    activeKey={sort?.key ?? null}
+                    activeDir={sort?.dir ?? null}
+                    onSort={toggleSort}
+                  />
+                ) : (
+                  col.header
+                )}
               </th>
             ))}
             {rowActions && <th style={{ textAlign: 'right' }}>{rowActionsHeader}</th>}
           </tr>
         </thead>
         <tbody>
-          {data.length === 0 ? (
+          {rows.length === 0 ? (
             <tr>
               <td colSpan={colSpan} className="ds-table__empty" style={{ color: colors.text.muted }}>
                 {emptyMessage}
               </td>
             </tr>
           ) : (
-            data.map((item, idx) => (
+            rows.map((item, idx) => (
               <tr
                 key={keyExtractor(item, idx)}
                 data-testid={`${testId}-row-${keyExtractor(item, idx)}`}
