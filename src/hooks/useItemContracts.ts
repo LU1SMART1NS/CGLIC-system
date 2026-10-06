@@ -1,7 +1,26 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchPncpContracts } from '../services/api';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { fetchPncpContracts, type ProvedorListaContratosGov } from '../services/api';
 import type { PncpContract } from '../types';
-import { cnpjDaUasg } from '../config/unidadesGestoras';
+import { cnpjDaUasg, UASGS_CGLIC } from '../config/unidadesGestoras';
+import { getContractsDashboardQueryOptions } from './useContractsDashboard';
+
+/**
+ * Lista de contratos da UG no formato do Contratos.gov.br, lida do cache da tela e do banco (campo `raw` de
+ * cada contrato). Só vale para as UASGs da CGLIC, cujos contratos são sincronizados; para outra UASG devolve
+ * null e a busca baixa da API. Sem isso, abrir o item baixava ~3 MB do Contratos.gov.br (20 a 35 s) só para
+ * sugerir contratos.
+ */
+export function criarProvedorListaContratosGov(queryClient: QueryClient): ProvedorListaContratosGov {
+  return async (uasg) => {
+    if (!UASGS_CGLIC.includes(uasg)) return null;
+    const contratos = await queryClient.ensureQueryData(getContractsDashboardQueryOptions(uasg));
+    // Só os registros que vieram da lista do Contratos.gov.br (têm licitacao_numero); os do Compras.gov.br não.
+    const lista = contratos
+      .map((c) => c.raw)
+      .filter((raw) => raw && typeof raw === 'object' && 'licitacao_numero' in raw);
+    return lista.length > 0 ? lista : null;
+  };
+}
 
 /**
  * Constrói as opções canônicas de query para consulta de contratos PNCP de um item de ARP.
@@ -18,7 +37,8 @@ export function getItemContractsQueryOptions(
   sequencialAta?: string,
   fallbackParams?: any,
   fornecedorInfo?: any,
-  numeroAtaRegistroPreco?: string
+  numeroAtaRegistroPreco?: string,
+  listaContratosGov?: ProvedorListaContratosGov
 ) {
   const isEnabled = Boolean(numeroAta && uasg && numeroItem);
 
@@ -43,7 +63,8 @@ export function getItemContractsQueryOptions(
         numeroItem.trim(),
         fallbackParams,
         fornecedorInfo,
-        numeroAtaRegistroPreco || numeroAta
+        numeroAtaRegistroPreco || numeroAta,
+        listaContratosGov
       );
 
       return contracts || [];
@@ -71,6 +92,7 @@ export function useItemContracts(
   fornecedorInfo?: any,
   numeroAtaRegistroPreco?: string
 ) {
+  const queryClient = useQueryClient();
   return useQuery<PncpContract[], Error>(
     getItemContractsQueryOptions(
       numeroAta,
@@ -82,7 +104,8 @@ export function useItemContracts(
       sequencialAta,
       fallbackParams,
       fornecedorInfo,
-      numeroAtaRegistroPreco
+      numeroAtaRegistroPreco,
+      criarProvedorListaContratosGov(queryClient)
     )
   );
 }

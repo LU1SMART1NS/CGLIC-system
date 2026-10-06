@@ -27,6 +27,16 @@ describe('useItemContracts Hook / Query Options - Testes Unitários de Contratos
     expect(options.staleTime).toBe(300000); // 5 min
   });
 
+  it('repassa à busca o provedor da lista de contratos (lida do banco, sem baixar da API)', async () => {
+    vi.mocked(api.fetchPncpContracts).mockResolvedValueOnce([] as any);
+    const provedor = vi.fn();
+    const options = getItemContractsQueryOptions(
+      '00041/2025', '200331', '1', '00394494000136', '2025', '41', '3', undefined, undefined, undefined, provedor
+    );
+    await options.queryFn();
+    expect(vi.mocked(api.fetchPncpContracts).mock.calls[0][8]).toBe(provedor);
+  });
+
   it('deve chamar fetchPncpContracts com parâmetros normalizados e retornar contratos', async () => {
     const mockContracts = [
       {
@@ -64,7 +74,8 @@ describe('useItemContracts Hook / Query Options - Testes Unitários de Contratos
       '1',
       fallbackParams,
       fornecedorInfo,
-      '00041/2025'
+      '00041/2025',
+      undefined
     );
     expect(result).toEqual(mockContracts);
   });

@@ -1268,11 +1268,19 @@ export interface SupplierFilterInfo {
 }
 
 /**
+ * Lista de contratos da UG no formato do Contratos.gov.br (`/contrato/ug/{uasg}`), vinda de onde já está
+ * guardada (o banco). Devolve null quando não tem a lista, e então a busca baixa da API como antes.
+ * Baixar da API leva de 20 a 35 s e pesa cerca de 3 MB; o banco tem a mesma lista (campo `raw`).
+ */
+export type ProvedorListaContratosGov = (uasg: string) => Promise<any[] | null>;
+
+/**
  * Consulta de contingência para contratos vinculados à Compra/Licitação
  * utilizando as Unidades Gestoras 200331 e 200330 e desduplicação por chave canônica.
  */
 export async function fetchComprasGovContratosByPurchase(
-  params: FallbackPurchaseParams
+  params: FallbackPurchaseParams,
+  listaContratosGov?: ProvedorListaContratosGov
 ): Promise<any[]> {
   const contractsMap = new Map<string, any>();
   const candidateUasgs = Array.from(new Set([
@@ -1383,6 +1391,11 @@ export async function fetchComprasGovContratosByPurchase(
   for (const uasg of candidateUasgs) {
     try {
       let ugContratos = contratosGovUgListCache.get(uasg);
+      if (!ugContratos && listaContratosGov) {
+        // Lista que já está no banco: evita o download de ~3 MB (20 a 35 s) a cada abertura do item.
+        const doBanco = await listaContratosGov(uasg).catch(() => null);
+        if (doBanco && doBanco.length > 0) ugContratos = doBanco;
+      }
       if (!ugContratos) {
         const res = await fetch(`/api-contratos-gov/api/contrato/ug/${uasg}`);
         if (res.ok) {
@@ -1561,7 +1574,8 @@ export async function fetchPncpContracts(
   numeroItemDesejado?: string,
   fallbackParams?: FallbackPurchaseParams,
   fornecedorInfo?: SupplierFilterInfo,
-  numeroAtaRegistroPreco?: string
+  numeroAtaRegistroPreco?: string,
+  listaContratosGov?: ProvedorListaContratosGov
 ): Promise<PncpContract[]> {
   const contractsMergedMap = new Map<string, any>();
   const effectiveCnpj = (cnpj || fallbackParams?.numeroControlePncpCompra?.match(/^(\d{14})/)?.[1] || fallbackParams?.numeroControlePncpAta?.match(/^(\d{14})/)?.[1] || '').trim();
@@ -1621,7 +1635,7 @@ export async function fetchPncpContracts(
   // 2. Sempre complementar/unificar com contratos vinculados à compra no Compras.gov.br e Contratos.gov.br
   if (fallbackParams) {
     try {
-      const purchaseContracts = await fetchComprasGovContratosByPurchase(fallbackParams);
+      const purchaseContracts = await fetchComprasGovContratosByPurchase(fallbackParams, listaContratosGov);
       purchaseContracts.forEach((c: any) => {
         const canKey = getCanonicalContractKey(c.numeroContrato, c.anoContrato, c.numeroControlePncpContrato);
         if (canKey) {

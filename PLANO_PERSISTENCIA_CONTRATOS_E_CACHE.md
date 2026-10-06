@@ -311,3 +311,19 @@ Removidos os disparos automáticos que consultavam as APIs do governo e gravavam
 - Ata 360: data de assinatura (Compras.gov.br) e dados da compra no PNCP.
 - Contrato 360: cerca de 10 chamadas (garantias, histórico e responsáveis no Contratos.gov.br; contrato no PNCP; adesões; busca de contratos por compra, 4 chamadas ao Compras.gov.br).
 Esses dados não estão no banco. Resolver é o item de persistir esses painéis (próximo passo).
+
+**06/10/2026 — medição das telas de detalhe e correção do gargalo do Item.**
+
+Medido no navegador, por tela, depois de recarregar a página (cache em memória vazio):
+
+| Tela | Chamadas às APIs | Mais lenta | Termina em |
+| :--- | :--- | :--- | :--- |
+| Visão Geral e carteiras | 0 | , | , |
+| Ata 360 | 2 | 250 ms | 0,3 s |
+| Contrato 360 | 5 | 260 ms | 2,4 s |
+| Item | 26 a 28 | **34 s** (lista completa de contratos da UG no Contratos.gov.br, ~3 MB) | 34 s |
+
+O gargalo era uma só chamada: para sugerir contratos ao item, `fetchComprasGovContratosByPurchase` baixava `/contrato/ug/{uasg}` inteiro e filtrava no navegador pelo número da compra. Essa mesma lista já está no banco (campo `raw` de `contratos_oficiais`). Agora a busca recebe um provedor (`criarProvedorListaContratosGov`) que lê do cache da tela e do banco; só baixa da API se o banco não tiver a lista ou se a UASG não for da CGLIC.
+
+- Resultado idêntico ao antigo para a mesma compra (4 contratos nos dois caminhos); 32,7 s caiu para 3,8 s com o cache frio (inclui a primeira leitura do banco) e o pior caso da tela passou a ser uma chamada de 1,5 s.
+- **Conclusão sobre persistir os painéis de detalhe:** com a medição, não é necessário agora. Ata 360 e Contrato 360 fazem poucas chamadas pequenas; o Item ainda faz cerca de 26, mas nenhuma passa de 1,5 s. Só vale revisitar se o uso real mostrar lentidão nessas telas.
