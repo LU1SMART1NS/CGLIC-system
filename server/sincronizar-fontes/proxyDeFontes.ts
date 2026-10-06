@@ -1,6 +1,6 @@
 /**
  * No navegador, os serviços de sincronização chamam as fontes oficiais por endereços relativos
- * (/api-arp, /api-pncp, /api-contratos-gov) que o Vite (desenvolvimento) e a Vercel (produção) repassam aos
+ * (/api-arp, /api-pncp, /api-contratos-gov, /api-sta) que o Vite (desenvolvimento) e a Vercel (produção) repassam aos
  * servidores do governo, por causa do CORS. No servidor não há CORS nem proxy: este módulo traduz esses
  * endereços para os reais, os mesmos de vite.config.ts e vercel.json.
  */
@@ -8,7 +8,9 @@
 export const DESTINOS_DAS_FONTES: ReadonlyArray<readonly [prefixo: string, destino: string]> = [
   ['/api-arp/', 'https://dadosabertos.compras.gov.br/'],
   ['/api-pncp/', 'https://pncp.gov.br/'],
-  ['/api-contratos-gov/', 'https://contratos.comprasnet.gov.br/']
+  ['/api-contratos-gov/', 'https://contratos.comprasnet.gov.br/'],
+  // Tesouro Nacional (STA): ordens bancárias por documento de origem (NP)
+  ['/api-sta/', 'https://sta.api.gov.br/']
 ];
 
 /** Identificação honesta do robô nas fontes oficiais. */

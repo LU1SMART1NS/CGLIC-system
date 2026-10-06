@@ -10,7 +10,8 @@ import { JANELA_VIGENCIA_ATAS, sincronizarAtas } from '../../src/services/syncSe
 import { sincronizarSaldosItens } from '../../src/services/saldosItensSyncService';
 import { sincronizarEmpenhosDaCarteira, selecionarContratos, contratosComEmpenhoAPagar } from '../../src/services/empenhosCarteiraService';
 import { fetchContratosOficiaisDoBanco } from '../../src/services/contratosOficiaisService';
-import { fetchContratosGovEmpenhos } from '../../src/services/api';
+import { fetchContratosGovEmpenhos, fetchContratosGovFaturas, fetchOrdensBancariasDaNp } from '../../src/services/api';
+import { sincronizarFaturasDaCarteira, sincronizarOrdensBancariasDaCarteira } from '../../src/services/faturasService';
 import {
   contarItensContratosPendentes,
   ORCAMENTO_ITENS_CONTRATOS_MS,
@@ -24,12 +25,12 @@ import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFon
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'empenhos'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'empenhos', 'faturas', 'ordens_bancarias'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
   recurso: RecursoDoServidor;
-  /** Obrigatória para contratos, atas, itens_contratos e empenhos; saldos_itens vale para todas as carteiras. */
+  /** Obrigatória para todos os recursos, exceto saldos_itens, que vale para todas as carteiras. */
   uasg?: string;
   /** Ignora a validade (só o coordenador). */
   forcar?: boolean;
@@ -48,6 +49,10 @@ export interface DependenciasDeExecucao {
   sincronizarEmpenhosDaCarteira: typeof sincronizarEmpenhosDaCarteira;
   /** Teste de acesso (dry) dos empenhos: contratos elegíveis da carteira e a lista de um deles. */
   consultarEmpenhosDeTeste: (uasg: string) => Promise<Record<string, unknown>>;
+  sincronizarFaturasDaCarteira: typeof sincronizarFaturasDaCarteira;
+  sincronizarOrdensBancariasDaCarteira: typeof sincronizarOrdensBancariasDaCarteira;
+  /** Teste de acesso (dry) de faturas e ordens bancárias: lê um contrato e uma NP, sem gravar. */
+  consultarFaturasDeTeste: (uasg: string) => Promise<Record<string, unknown>>;
   sincronizarItensContratos: typeof sincronizarItensContratos;
   contarItensContratosPendentes: typeof contarItensContratosPendentes;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
@@ -67,12 +72,33 @@ async function consultarEmpenhosDeTeste(uasg: string): Promise<Record<string, un
   return { carteira: carteira.length, elegiveis: elegiveis.length, amostra: amostra?.id ?? null, empenhosDaAmostra };
 }
 
+/** Teste de acesso de faturas e OBs, sem gravar: faturas de um contrato elegível e as OBs de uma NP delas. */
+async function consultarFaturasDeTeste(uasg: string): Promise<Record<string, unknown>> {
+  const carteira = await fetchContratosOficiaisDoBanco(uasg);
+  const elegiveis = selecionarContratos([carteira], {
+    hoje: new Date().toISOString().slice(0, 10),
+    comEmpenhoAPagar: await contratosComEmpenhoAPagar()
+  });
+  for (const c of elegiveis.slice(0, 20)) {
+    if (!/^\d+$/.test(String(c.contratoId ?? ''))) continue;
+    const faturas = await fetchContratosGovFaturas(c.contratoId as string | number);
+    const np = faturas.map((f) => String(f?.sfadrao_id ?? '')).find((n) => /^\d{4}NP\d{6}$/.test(n));
+    if (!np) continue;
+    const obs = await fetchOrdensBancariasDaNp(uasg, np);
+    return { elegiveis: elegiveis.length, amostra: c.id, faturas: faturas.length, np, ordensBancarias: obs.length };
+  }
+  return { elegiveis: elegiveis.length, amostra: null, observacao: 'Nenhum dos 20 primeiros contratos tem fatura com NP.' };
+}
+
 const PADRAO: DependenciasDeExecucao = {
   sincronizarContratos,
   sincronizarAtas,
   sincronizarSaldosItens,
   sincronizarEmpenhosDaCarteira,
   consultarEmpenhosDeTeste,
+  sincronizarFaturasDaCarteira,
+  sincronizarOrdensBancariasDaCarteira,
+  consultarFaturasDeTeste,
   sincronizarItensContratos,
   contarItensContratosPendentes,
   buscarContratosNasFontes,
@@ -127,6 +153,8 @@ export async function executarPedido(
       consulta = { ...(await deps.contarItensContratosPendentes(uasg as string)) };
     } else if (pedido.recurso === 'empenhos') {
       consulta = await deps.consultarEmpenhosDeTeste(uasg as string);
+    } else if (pedido.recurso === 'faturas' || pedido.recurso === 'ordens_bancarias') {
+      consulta = await deps.consultarFaturasDeTeste(uasg as string);
     } else {
       consulta = { observacao: 'saldos_itens não tem consulta de teste; usa os contratos e as atas já gravados.' };
     }
@@ -140,6 +168,10 @@ export async function executarPedido(
     resultado = await deps.sincronizarItensContratos(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_ITENS_CONTRATOS_MS });
   } else if (pedido.recurso === 'empenhos') {
     resultado = await deps.sincronizarEmpenhosDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
+  } else if (pedido.recurso === 'faturas') {
+    resultado = await deps.sincronizarFaturasDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
+  } else if (pedido.recurso === 'ordens_bancarias') {
+    resultado = await deps.sincronizarOrdensBancariasDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
   } else resultado = await deps.sincronizarSaldosItens({ forcar: pedido.forcar });
   return { ...base, dry: false, duracaoMs: deps.agora() - inicio, resultado };
 }

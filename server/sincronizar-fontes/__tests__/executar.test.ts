@@ -14,6 +14,9 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarItensContratosPendentes: vi.fn(async () => ({ contratos: 40, pendentes: 12 })),
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
+    sincronizarFaturasDaCarteira: vi.fn(async () => sucesso(13)),
+    sincronizarOrdensBancariasDaCarteira: vi.fn(async () => sucesso(15)),
+    consultarFaturasDeTeste: vi.fn(async () => ({ elegiveis: 6, faturas: 14, np: '2025NP000545', ordensBancarias: 1 })),
     buscarContratosNasFontes: vi.fn(async () => ({ contracts: [{}, {}] as any, fontesComFalha: ['Compras.gov.br'] })),
     fetchArpsDasFontes: vi.fn(async () => [{}, {}, {}] as any),
     agora: () => (t += 1000),
@@ -44,6 +47,28 @@ describe('validarPedido', () => {
     const r = validarPedido(corpo);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erro).toMatch(erro);
+  });
+});
+
+describe('recursos faturas e ordens_bancarias', () => {
+  it('exigem UASG da CGLIC', () => {
+    expect(validarPedido({ recurso: 'faturas', uasg: '200331' })).toMatchObject({ ok: true });
+    expect(validarPedido({ recurso: 'ordens_bancarias' })).toMatchObject({ ok: false });
+  });
+
+  it('chamam a sincronização da carteira com o orçamento de tempo', async () => {
+    const d = deps();
+    await executarPedido({ recurso: 'faturas', uasg: '200331' }, d);
+    await executarPedido({ recurso: 'ordens_bancarias', uasg: '200330', forcar: true }, d);
+    expect(d.sincronizarFaturasDaCarteira).toHaveBeenCalledWith('200331', { forcar: undefined, orcamentoMs: 100_000 });
+    expect(d.sincronizarOrdensBancariasDaCarteira).toHaveBeenCalledWith('200330', { forcar: true, orcamentoMs: 100_000 });
+  });
+
+  it('dry: só consulta, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'ordens_bancarias', uasg: '200331', dry: true }, d);
+    expect(d.sincronizarOrdensBancariasDaCarteira).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { np: '2025NP000545', ordensBancarias: 1 } });
   });
 });
 
