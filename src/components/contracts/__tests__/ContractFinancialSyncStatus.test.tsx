@@ -6,9 +6,20 @@ vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => 
 vi.mock('../../../hooks/useContractEmpenhoItemLinks', () => ({ useContractEmpenhoItemLinks: () => ({ data: [] }) }));
 vi.mock('../../../hooks/useContractFinancialSummary', () => ({ useContractFinancialSummary: vi.fn() }));
 vi.mock('../../../hooks/useSincronizacaoEmpenhosContrato', () => ({ useSincronizacaoEmpenhosContrato: vi.fn() }));
+vi.mock('../../../hooks/useVinculoEmpenhosContrato', () => {
+  const mut = () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, variables: undefined });
+  return {
+    useDescartesEmpenhoContrato: vi.fn(() => ({ data: [] })),
+    useAcoesVinculoEmpenho: () => ({ descartar: mut(), restaurar: mut(), vincular: mut(), desvincular: mut() }),
+    useBuscaEmpenhoPorNumero: () => ({ data: [], isLoading: false, isError: false })
+  };
+});
+vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'leitor' })) }));
 
 import { useContractFinancialSummary } from '../../../hooks/useContractFinancialSummary';
 import { useSincronizacaoEmpenhosContrato } from '../../../hooks/useSincronizacaoEmpenhosContrato';
+import { useDescartesEmpenhoContrato } from '../../../hooks/useVinculoEmpenhosContrato';
+import { useAuth } from '../../../context/AuthContext';
 import { ContractFinancialExecutionSection } from '../ContractFinancialExecutionSection';
 
 const contract = { id: '200331-00021-2017', uasg: '200331', numero: '00021/2017', ano: '2017' } as any;
@@ -122,3 +133,79 @@ describe('ContractFinancialExecutionSection: situação da sincronização', () 
   });
 });
 
+describe('ContractFinancialExecutionSection: vínculo híbrido', () => {
+  const equilibrio = { ...contract, id: '200331-00145-2025', numero: '00145/2025', fornecedorNome: 'EQUILIBRIO EQUIPAMENTOS DE PROTECAO AMBIENTAL LTDA', fornecedorCnpjCpf: '12.124.712/0001-00' };
+  const linha = (over: any) => ({ canonical_key: over.numero_oficial, data_emissao: '2025-10-29', valor_liquidado: 0, valor_pago: 0, origem_vinculo: 'FONTE', ...over });
+  const lista = {
+    ...comEmpenho,
+    empenhosList: [
+      linha({ empenho_id: 'eq', numero_oficial: '2025NE000265', credor_nome: 'EQUILIBRIO EQUIPAMENTOS', credor_cnpj_cpf: '12.124.712/0001-00', valor_empenhado: 1523200 }),
+      linha({ empenho_id: 'hpe', numero_oficial: '2024NE000765', credor_nome: 'HPE AUTOMOTORES DO BRASIL LTDA', credor_cnpj_cpf: '54.305.743/0011-70', valor_empenhado: 567513.93 }),
+      linha({ empenho_id: 'man', numero_oficial: '2025NE000999', credor_nome: 'EQUILIBRIO EQUIPAMENTOS', credor_cnpj_cpf: '12.124.712/0001-00', valor_empenhado: 27200, origem_vinculo: 'MANUAL', vinculado_por_nome: 'Maria', motivo_manual: 'Conferido no SIAFI' })
+    ]
+  };
+  const renderEq = () => renderToStaticMarkup(<ContractFinancialExecutionSection contract={equilibrio} contractKey={equilibrio.id} />);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useSincronizacaoEmpenhosContrato).mockReturnValue({ data: null } as any);
+    vi.mocked(useContractFinancialSummary).mockReturnValue(lista as any);
+  });
+
+  it('alerta a NE cujo credor não é o fornecedor do contrato, só nela', () => {
+    vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
+    const html = renderEq();
+    expect(html).toContain('contract-financial-credor-divergente');
+    expect(html.match(/data-testid="contract-financial-credor-diverge"/g)).toHaveLength(1);
+    expect(html).toContain('<strong>2024NE000765</strong>');
+    expect(html).toContain('Um gestor pode conferir');
+  });
+
+  it('marca o vínculo feito pela equipe e explica que a sincronização não o remove', () => {
+    vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
+    const html = renderEq();
+    expect(html).toContain('contract-financial-vinculo-manual');
+    expect(html).toContain('contract-financial-manuais');
+  });
+
+  it('leitor não vê as ações; gestor vê descartar nos da fonte e desvincular no manual', () => {
+    vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
+    let html = renderEq();
+    expect(html).not.toContain('contract-financial-descartar');
+    expect(html).not.toContain('contract-financial-vincular');
+
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
+    html = renderEq();
+    expect(html.match(/data-testid="contract-financial-descartar"/g)).toHaveLength(2);
+    expect(html.match(/data-testid="contract-financial-desvincular"/g)).toHaveLength(1);
+    expect(html).toContain('contract-financial-vincular');
+    expect(html).toContain('use Não é deste contrato na linha');
+  });
+
+  it('lista os descartados com motivo e autor; restaurar só para gestor', () => {
+    vi.mocked(useDescartesEmpenhoContrato).mockReturnValue({
+      data: [{ contractKey: equilibrio.id, empenhoId: 'x', motivo: 'Credor é a HPE', descartadoPorNome: 'Maria', descartadoEm: '2026-10-06T20:00:00Z', numeroOficial: '2024NE000765', credorNome: 'HPE AUTOMOTORES', valorEmpenhado: 567513.93 }]
+    } as any);
+    vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
+    let html = renderEq();
+    expect(html).toContain('Empenhos descartados');
+    expect(html).toContain('Credor é a HPE');
+    expect(html).toContain('contract-financial-restaurar');
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
+    html = renderEq();
+    expect(html).toContain('Empenhos descartados');
+    expect(html).not.toContain('contract-financial-restaurar');
+  });
+
+  it('contrato sem empenho: gestor pode vincular à mão e vê os descartados', () => {
+    vi.mocked(useContractFinancialSummary).mockReturnValue(vazio as any);
+    vi.mocked(useDescartesEmpenhoContrato).mockReturnValue({
+      data: [{ contractKey: equilibrio.id, empenhoId: 'x', motivo: 'Credor é a HPE', numeroOficial: '2024NE000765' }]
+    } as any);
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
+    const html = renderEq();
+    expect(html).toContain('contract-financial-empty');
+    expect(html).toContain('contract-financial-vincular');
+    expect(html).toContain('contract-financial-descartados');
+  });
+});

@@ -241,6 +241,11 @@ export interface SyncContractEmpenhosRpcResult {
   removidos_numeros: string[];
   /** Vínculos que não foram removidos porque a fonte devolveu lista vazia. */
   remocao_bloqueada: number;
+  /** NEs que a fonte lista no contrato, mas a equipe descartou (migration 85): não vinculadas. */
+  ignorados_descartados?: number;
+  ignorados_numeros?: string[];
+  /** Vínculos feitos à mão que a fonte passou a listar (viraram FONTE). */
+  promovidos?: number;
 }
 
 /** A RPC não existe no banco (migration ainda não aplicada): PostgREST responde PGRST202. */
@@ -297,7 +302,10 @@ export async function syncContractEmpenhosM17(
     atualizados: Number(data?.atualizados ?? 0),
     removidos: Number(data?.removidos ?? 0),
     removidos_numeros: Array.isArray(data?.removidos_numeros) ? data.removidos_numeros.map(String) : [],
-    remocao_bloqueada: Number(data?.remocao_bloqueada ?? 0)
+    remocao_bloqueada: Number(data?.remocao_bloqueada ?? 0),
+    ignorados_descartados: Number(data?.ignorados_descartados ?? 0),
+    ignorados_numeros: Array.isArray(data?.ignorados_numeros) ? data.ignorados_numeros.map(String) : [],
+    promovidos: Number(data?.promovidos ?? 0)
   };
 }
 

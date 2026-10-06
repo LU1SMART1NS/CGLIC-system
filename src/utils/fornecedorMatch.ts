@@ -100,3 +100,23 @@ export function contratoDoFornecedorDaAta(contrato: FornecedorDoContrato, ata: F
   }
   return (ata.nomes || []).some((n) => nomesDeFornecedorParecidos(contrato.nome, n));
 }
+
+/**
+ * O credor da nota de empenho é outra empresa, não o fornecedor do contrato? Serve para alertar vínculo
+ * suspeito vindo do Contratos.gov.br (ex.: NE da HPE Automotores listada no contrato da Equilíbrio).
+ *
+ * - CNPJ × CNPJ: compara a raiz (8 primeiros dígitos), porque matriz e filial são a mesma empresa.
+ * - CPF × CPF: compara o documento inteiro. CNPJ × CPF: diferente.
+ * - Sem documento válido dos dois lados (estrangeiro ou dado ausente): compara o nome.
+ * - Sem dado suficiente: não acusa (falso alarme custa mais que o silêncio aqui).
+ */
+export function credorDiferenteDoFornecedor(credor: FornecedorDoContrato, fornecedor: FornecedorDoContrato): boolean {
+  const dc = onlyDigits(credor.cnpj);
+  const df = onlyDigits(fornecedor.cnpj);
+  if (documentoFiscalValido(dc) && documentoFiscalValido(df)) {
+    if (dc.length !== df.length) return true;
+    return dc.length === 14 ? dc.slice(0, 8) !== df.slice(0, 8) : dc !== df;
+  }
+  if (tokensDoNome(credor.nome).length === 0 || tokensDoNome(fornecedor.nome).length === 0) return false;
+  return !nomesDeFornecedorParecidos(credor.nome, fornecedor.nome);
+}

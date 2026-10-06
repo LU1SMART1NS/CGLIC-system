@@ -461,6 +461,7 @@ export async function orchestrateContractEmpenhoSync(
   let vinculosAtualizados = 0;
   let vinculosRemovidos = 0;
   let removidosNumeros: string[] = [];
+  let ignoradosNumeros: string[] = [];
   if (fontesConsultadas.includes('CONTRATOSNET')) {
     const ids = syncSummary.ids_por_chave ?? {};
     const conjunto = reconciledList
@@ -482,6 +483,7 @@ export async function orchestrateContractEmpenhoSync(
         vinculosAtualizados = r.atualizados;
         vinculosRemovidos = r.removidos;
         removidosNumeros = r.removidos_numeros;
+        ignoradosNumeros = r.ignorados_numeros ?? [];
         if (r.remocao_bloqueada > 0) {
           erros.push({
             origem: 'CONTRATOSNET',
@@ -532,6 +534,7 @@ export async function orchestrateContractEmpenhoSync(
     vinculos_contrato_atualizados: vinculosAtualizados,
     vinculos_contrato_removidos: vinculosRemovidos,
     vinculos_removidos_numeros: removidosNumeros,
+    vinculos_ignorados_numeros: ignoradosNumeros,
     divergencias,
     pendencias,
     erros,

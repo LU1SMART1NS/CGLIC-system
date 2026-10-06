@@ -66,16 +66,25 @@ export function avisoVinculosRemovidos(result: Pick<OrchestrationResult, 'vincul
   return `${n} empenho(s) desvinculado(s) porque o Contratos.gov.br não os lista mais neste contrato${numeros ? `: ${numeros}` : ''}.`;
 }
 
+/** Aviso das NEs que a fonte lista no contrato, mas a equipe descartou (não foram vinculadas). */
+export function avisoEmpenhosDescartados(result: Pick<OrchestrationResult, 'vinculos_ignorados_numeros'>): string | undefined {
+  const numeros = result.vinculos_ignorados_numeros ?? [];
+  if (numeros.length === 0) return undefined;
+  return numeros.length === 1
+    ? `O Contratos.gov.br lista ${numeros[0]} neste contrato, mas a equipe a descartou; ela continua fora do contrato.`
+    : `O Contratos.gov.br lista ${numeros.length} empenhos neste contrato que a equipe descartou (${numeros.join(', ')}); eles continuam fora do contrato.`;
+}
+
 /**
- * Mensagem gravada com a situação: o erro, se houver; senão, os avisos (vínculos removidos e
- * conferência com o PNCP).
+ * Mensagem gravada com a situação: o erro, se houver; senão, os avisos (vínculos removidos, empenhos
+ * descartados pela equipe e conferência com o PNCP).
  */
 export function mensagemParaRegistro(
-  result: Pick<OrchestrationResult, 'erros' | 'resumo_sync' | 'pendencias' | 'vinculos_contrato_removidos' | 'vinculos_removidos_numeros'>
+  result: Pick<OrchestrationResult, 'erros' | 'resumo_sync' | 'pendencias' | 'vinculos_contrato_removidos' | 'vinculos_removidos_numeros' | 'vinculos_ignorados_numeros'>
 ): string | undefined {
   const erro = mensagemDoResultado(result);
   if (erro) return erro;
-  const avisos = [avisoVinculosRemovidos(result), ...pendenciasPncp(result)].filter(Boolean);
+  const avisos = [avisoVinculosRemovidos(result), avisoEmpenhosDescartados(result), ...pendenciasPncp(result)].filter(Boolean);
   return avisos.length > 0 ? avisos.join(' ') : undefined;
 }
 

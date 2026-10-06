@@ -20,6 +20,13 @@ export interface NormalizedContractEmpenho {
   situacao: string;
   /** Chaves dos outros contratos a que a mesma NE está vinculada (vazio se só neste). */
   outros_contratos?: string[];
+  /** CNPJ/CPF do credor da NE (para alertar credor diferente do fornecedor do contrato). */
+  credor_cnpj_cpf?: string;
+  /** FONTE: listado pelo Contratos.gov.br. MANUAL: vinculado pela equipe (migration 85). */
+  origem_vinculo?: 'FONTE' | 'MANUAL';
+  vinculado_por_nome?: string;
+  motivo_manual?: string;
+  vinculado_em?: string;
 }
 
 export function prepareContractEmpenhosList(
@@ -71,7 +78,12 @@ export function prepareContractEmpenhosList(
     valor_pago: Number(e.valor_pago ?? 0),
     valor_rpinscrito: Number(e.valor_rpinscrito ?? 0),
     situacao: e.situacao || 'EMITIDO',
-    outros_contratos: Array.isArray(e.outros_contratos) ? e.outros_contratos.map(String) : []
+    outros_contratos: Array.isArray(e.outros_contratos) ? e.outros_contratos.map(String) : [],
+    credor_cnpj_cpf: e.credor_cnpj_cpf || undefined,
+    origem_vinculo: e.origem_vinculo === 'MANUAL' ? ('MANUAL' as const) : ('FONTE' as const),
+    vinculado_por_nome: e.vinculado_por_nome || undefined,
+    motivo_manual: e.motivo_manual || undefined,
+    vinculado_em: e.vinculado_em || undefined
   }));
 
   // Mescla e deduplica por canonical_key (prevenção rigorosa contra double counting)
