@@ -6,6 +6,7 @@ import {
   type ContractSuggestionCriteria
 } from '../components/modals/linkContractSuggestions';
 import { chaveDoContrato } from './contractKeyUtils';
+import type { ItemNosContratos } from '../services/itensContratoService';
 
 /** De onde a sugestão veio. Uma mesma sugestão pode ter as duas origens. */
 export type ItemContractSuggestionSource = 'pncp' | 'catalogo';
@@ -28,8 +29,16 @@ export interface ItemContractSuggestion {
 }
 
 export interface ItemContractSuggestionInput {
-  /** Contratos obtidos automaticamente para o item (useItemContracts). */
+  /**
+   * Contratos de fora do catálogo (PNCP/Compras.gov). A tela do Item não usa mais: a medição de 07/10/2026 mostrou
+   * que eles não acham contrato da CGLIC além do catálogo e traziam contratos de outros órgãos.
+   */
   pncpContracts?: PncpContract[];
+  /**
+   * O item nos itens gravados dos contratos (itens_contrato): contrato com itens lidos que não tem o item não é
+   * sugerido; a quantidade da sugestão vem daqui.
+   */
+  itemNosContratos?: ItemNosContratos;
   /** Catálogo oficial de contratos da UASG (useContractsDashboard). */
   officialContracts?: ContractDashboardRecord[];
   /** Compra da Ata e CNPJ do fornecedor do item. */
@@ -146,6 +155,34 @@ function catalogMatchesItem(contract: ContractDashboardRecord, criteria?: Contra
   return contratoDoFornecedorDaAta({ cnpj: contract.fornecedorCnpjCpf, nome: contract.fornecedorNome }, fornecedores);
 }
 
+/** Contratos do catálogo que casam com a compra e o fornecedor do item (candidatos, antes do filtro pelo item). */
+export function contratosCandidatosDoItem(
+  official: ContractDashboardRecord[] | undefined,
+  criteria?: ContractSuggestionCriteria
+): ContractDashboardRecord[] {
+  return (official || []).filter((c) => catalogMatchesItem(c, criteria));
+}
+
+/**
+ * O contrato tem este item? Só diz "não" quando os itens do contrato foram lidos e o item não está entre eles;
+ * sem leitura, o contrato continua candidato (não some por falta de dado).
+ */
+function contratoTemOItem(contract: ContractDashboardRecord, itemNos?: ItemNosContratos): boolean {
+  if (!itemNos) return true;
+  const chaves = [contractKeyOf(contract), contract.id].filter(Boolean).map((k) => norm(String(k)));
+  if (!chaves.some((k) => itemNos.comItensLidos.has(k))) return true;
+  return chaves.some((k) => itemNos.quantidadePorContrato.has(k));
+}
+
+function quantidadeNoContrato(contract: ContractDashboardRecord, itemNos?: ItemNosContratos): number | undefined {
+  if (!itemNos) return undefined;
+  for (const k of [contractKeyOf(contract), contract.id]) {
+    const qtd = k ? itemNos.quantidadePorContrato.get(norm(String(k))) : undefined;
+    if (qtd !== undefined && qtd > 0) return qtd;
+  }
+  return undefined;
+}
+
 /**
  * Reúne o que antes era "contratos automáticos" (PNCP/Compras.gov) e a sugestão
  * da Ata numa única lista de sugestões por item, sem os já vinculados.
@@ -186,10 +223,9 @@ export function buildItemContractSuggestions(input: ItemContractSuggestionInput)
     }
   }
 
-  for (const contract of official) {
-    if (catalogMatchesItem(contract, input.criteria)) {
-      add(contractKeyOf(contract), 'catalogo', { contract });
-    }
+  for (const contract of contratosCandidatosDoItem(official, input.criteria)) {
+    if (!contratoTemOItem(contract, input.itemNosContratos)) continue;
+    add(contractKeyOf(contract), 'catalogo', { contract, quantidadeContratada: quantidadeNoContrato(contract, input.itemNosContratos) });
   }
 
   const suggestions: ItemContractSuggestion[] = [];

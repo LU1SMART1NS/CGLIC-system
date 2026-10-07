@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Building2, ExternalLink } from 'lucide-react';
-import { getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
+import { getCanonicalContractKey } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
 import { type InternalDepartment } from '../services/unitService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
 import { escolherAdesoes, useItemAdesoes } from '../hooks/useItemAdesoes';
 import { useDepartments } from '../hooks/useDepartments';
-import { useItemContracts } from '../hooks/useItemContracts';
 import { useItemAllocations } from '../hooks/useItemAllocations';
 import { useSaveAllocations } from '../hooks/useSaveAllocations';
 import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
@@ -34,13 +33,13 @@ import type { ItemEmpenhoVinculo } from '../types/itemEmpenhoVinculo';
 import { useDismissContractSuggestion } from '../hooks/useDismissContractSuggestion';
 import { useRestoreContractSuggestion } from '../hooks/useRestoreContractSuggestion';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
+import { useItemNosContratos } from '../hooks/useItensDoContrato';
 import { enrichContractLinks } from '../services/arpContractLinkService';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
-import { cnpjDaUasg } from '../config/unidadesGestoras';
 import {
   buildItemContractSuggestions,
   buildItemSuggestionCriteria,
-  quantidadesPorContrato,
+  contratosCandidatosDoItem,
   suggestionToContractRecord,
   type ItemContractSuggestion
 } from '../utils/itemContractSuggestions';
@@ -194,7 +193,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     item.numeroItem,
     canonicalItemKey
   );
-  const { data: officialDashboardContracts = [] } = useContractsDashboard(arp.codigoUnidadeGerenciadora);
+  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = useContractsDashboard(arp.codigoUnidadeGerenciadora);
   const unlinkContractMutation = useUnlinkContractFromItem();
   const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
@@ -271,90 +270,28 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     return available ? available.sigla : (deps[0]?.sigla || '');
   };
 
-  const pncpParams = useMemo(() => {
-    const parsed = parsePncpIdentifiers(arp);
-    if (parsed) return parsed;
-
-    if (arp.linkAtaPNCP) {
-      const match = arp.linkAtaPNCP.match(/atas\/(\d+)\/(\d+)\/(\d+)\/(\d+)/);
-      if (match) {
-        return {
-          cnpj: match[1],
-          ano: match[2],
-          sequencial: match[3],
-          sequencialAta: match[4]
-        };
-      }
-    }
-
-    if (arp.numeroControlePncpAta) {
-      const parts = arp.numeroControlePncpAta.split('-');
-      if (parts.length >= 4) {
-        const cnpj = parts[0];
-        const purchasePart = parts[2];
-        const purchaseMatch = purchasePart.split('/');
-        const sequencial = purchaseMatch[0];
-        const ano = purchaseMatch[1] || arp.dataVigenciaInicial?.split('-')[0];
-        const lastPart = parts[parts.length - 1];
-        const sequencialAta = parseInt(lastPart, 10).toString();
-        
-        return { cnpj, ano, sequencial, sequencialAta };
-      }
-    }
-
-    // Extrai sequencial da ata diretamente (ex: "00003/2026" -> sequencialAta = "3")
-    const ataMatch = (arp.numeroAtaRegistroPreco || '').split('/');
-    if (ataMatch.length === 2 && !isNaN(parseInt(ataMatch[0], 10))) {
-      return {
-        cnpj: cnpjDaUasg(arp.codigoUnidadeGerenciadora),
-        ano: ataMatch[1] || arp.anoCompra || '',
-        sequencial: arp.numeroCompra || '',
-        sequencialAta: parseInt(ataMatch[0], 10).toString()
-      };
-    }
-
-    return null;
-  }, [arp]);
-
-  const fallbackParams = useMemo(() => ({
-    codigoOrgao: arp.codigoOrgao,
-    codigoUnidadeGestora: arp.codigoUnidadeGerenciadora,
-    idCompra: arp.idCompra,
-    numeroCompra: arp.numeroCompra,
-    anoCompra: arp.anoCompra,
-    codigoModalidadeCompra: arp.codigoModalidadeCompra,
-    dataVigenciaInicial: arp.dataVigenciaInicial,
-    numeroControlePncpCompra: arp.numeroControlePncpCompra
-  }), [arp]);
-
-  const fornecedorInfo = useMemo(() => ({
-    niFornecedor: item.niFornecedor,
-    nomeFornecedor: item.nomeRazaoSocialFornecedor
-  }), [item]);
-
-  const {
-    data: contracts = [],
-    isLoading: contractsLoading,
-    error: contractsQueryError,
-    refetch: refetchContracts
-  } = useItemContracts(
-    arp.numeroAtaRegistroPreco,
-    arp.codigoUnidadeGerenciadora,
-    item.numeroItem,
-    pncpParams?.cnpj,
-    pncpParams?.ano,
-    pncpParams?.sequencial,
-    pncpParams?.sequencialAta,
-    fallbackParams,
-    fornecedorInfo,
-    arp.numeroAtaRegistroPreco
+  // Sugestões de contrato: só do banco (contratos da UASG com a mesma compra e o mesmo fornecedor), filtradas pelo
+  // número do item nos itens gravados dos contratos. A consulta ao vivo ao PNCP/Compras.gov saiu: na medição de
+  // 07/10/2026 ela não achou contrato da CGLIC além do banco e sugeria contratos de outros órgãos.
+  const criteriosSugestao = useMemo(() => buildItemSuggestionCriteria(arp, item), [arp, item]);
+  const chavesCandidatas = useMemo(
+    () => contratosCandidatosDoItem(officialDashboardContracts, criteriosSugestao).map((c) => contractKeyOf(c)),
+    [officialDashboardContracts, criteriosSugestao]
   );
-  const contractsError = contractsQueryError ? (contractsQueryError.message || 'Falha ao buscar contratos do PNCP.') : null;
+  const {
+    data: itemNosContratos,
+    isLoading: itemNosContratosLoading,
+    error: itemNosContratosError,
+    refetch: refetchItemNosContratos
+  } = useItemNosContratos(chavesCandidatas, parseInt(String(item.numeroItem ?? ''), 10));
+  const contractsLoading = officialContractsLoading || itemNosContratosLoading;
+  const contractsError = itemNosContratosError ? (itemNosContratosError.message || 'Falha ao ler os itens dos contratos.') : null;
 
-  // Vínculos confirmados; a quantidade do item no contrato vem da API, não do vínculo
+  // Vínculos confirmados; a quantidade do item no contrato é a gravada no vínculo (relida pelo servidor a cada 6 horas),
+  // a mesma das telas de Ata e dos painéis.
   const enrichedOfficialLinks = useMemo(() => {
-    return enrichContractLinks(contractLinks, officialDashboardContracts, quantidadesPorContrato(contracts, officialDashboardContracts));
-  }, [contractLinks, officialDashboardContracts, contracts]);
+    return enrichContractLinks(contractLinks, officialDashboardContracts);
+  }, [contractLinks, officialDashboardContracts]);
 
   // Empenhos do item que vieram dos contratos vinculados (arp_item_empenhos), com a quantidade de cada um.
   const { data: empenhoVinculos = [], isLoading: vinculosLoading } = useItemEmpenhoVinculos(canonicalItemKey);
@@ -414,7 +351,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   };
 
   const handleRefresh = async () => {
-    refetchContracts();
+    refetchItemNosContratos();
     loadManualData();
     if (!canEditData) return;
     // Quantitativo SENASP deste item (as demais leituras são em segundo plano).
@@ -434,7 +371,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     }
   };
 
-  // Sugestões de contrato (PNCP + catálogo), sem os já vinculados nem os descartados
+  // Sugestões de contrato (catálogo do banco), sem os já vinculados nem os descartados
   const { data: dismissedSuggestions = [] } = useDismissedContractSuggestions(canonicalItemKey);
   // Não sugerir: contrato já vinculado a ata de outra compra, ou com este item em outra ata (cada item do contrato
   // pertence a uma só ata, migration 86), ou marcado pelo coordenador como "não pertence a ata".
@@ -457,14 +394,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const restoreSuggestionMutation = useRestoreContractSuggestion();
   const { suggestions: contractSuggestions, dismissed: dismissedContractSuggestions } = useMemo(
     () => buildItemContractSuggestions({
-      pncpContracts: contracts,
       officialContracts: officialDashboardContracts,
-      criteria: buildItemSuggestionCriteria(arp, item),
+      itemNosContratos,
+      criteria: criteriosSugestao,
       linkedContractKeys: contractLinks.map((l) => l.contractKey),
       dismissedContractKeys: dismissedSuggestions.map((d) => d.contractKey),
       excludedContractKeys: naoSugerir
     }),
-    [contracts, officialDashboardContracts, arp, item, contractLinks, dismissedSuggestions, naoSugerir]
+    [officialDashboardContracts, itemNosContratos, criteriosSugestao, contractLinks, dismissedSuggestions, naoSugerir]
   );
 
   const handleSuggestionMutationError = (action: string, err: any) => {

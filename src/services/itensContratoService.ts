@@ -148,3 +148,49 @@ export async function fetchNumerosDosItensDosContratos(contractKeys: string[]): 
   }
   return mapa;
 }
+
+/** Um item da ata nos contratos candidatos: em quais contratos dá para saber e quanto cada um tem do item. */
+export interface ItemNosContratos {
+  /**
+   * Contratos (chave em maiúsculas) com itens gravados que trazem o número do item: só neles dá para dizer se o
+   * item está ou não. Contrato não lido, ou com itens sem número (a API às vezes não informa), fica fora.
+   */
+  comItensLidos: Set<string>;
+  /** Quantidade do item em cada contrato (chave em maiúsculas), somando as posições com esse número de item. */
+  quantidadePorContrato: Map<string, number>;
+}
+
+/**
+ * Onde o item da ata aparece entre os contratos informados, pelos itens gravados (itens_contrato). Em lotes de
+ * 100 contratos, paginando (o banco devolve no máximo 1000 linhas por consulta).
+ */
+export async function fetchItemNosContratos(contractKeys: string[], numeroItem: number): Promise<ItemNosContratos> {
+  const resultado: ItemNosContratos = { comItensLidos: new Set(), quantidadePorContrato: new Map() };
+  const chaves = Array.from(new Set(contractKeys.map((k) => (k || '').trim()).filter(Boolean)));
+  if (!supabase || chaves.length === 0 || !Number.isInteger(numeroItem)) return resultado;
+  const PAGINA = 1000;
+  for (let i = 0; i < chaves.length; i += 100) {
+    const lote = chaves.slice(i, i + 100);
+    for (let desde = 0; ; desde += PAGINA) {
+      const { data, error } = await supabase
+        .from('itens_contrato')
+        .select('contract_key, numero_item, quantidade, posicao')
+        .in('contract_key', lote)
+        .not('numero_item', 'is', null)
+        .order('contract_key', { ascending: true })
+        .order('posicao', { ascending: true })
+        .range(desde, desde + PAGINA - 1);
+      if (error) throw error;
+      for (const r of (data ?? []) as any[]) {
+        const key = String(r.contract_key).toUpperCase();
+        resultado.comItensLidos.add(key);
+        if (numeroOuNulo(r.numero_item) !== numeroItem) continue;
+        const qtd = numeroOuNulo(r.quantidade);
+        if (qtd === null) continue;
+        resultado.quantidadePorContrato.set(key, (resultado.quantidadePorContrato.get(key) ?? 0) + qtd);
+      }
+      if (!data || data.length < PAGINA) break;
+    }
+  }
+  return resultado;
+}
