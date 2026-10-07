@@ -1,8 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CreditCard } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
+import { ActionButton } from '../../design-system/components/ActionButton';
+import { useToast } from '../../design-system';
+import { useAuth } from '../../context/AuthContext';
+import { createPaymentCycleRpc, type CreatePaymentCycleInput } from '../../adapters/paymentCycleRpcAdapter';
+import { CreateCycleModal } from '../contracts/payment/PaymentCycleModals';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
@@ -29,7 +35,7 @@ export interface PagamentosFilterState {
 }
 
 const TODOS = 'TODOS';
-const ETAPAS: EtapaPagamento[] = ['NA_CGLIC', 'NA_CGOFI', 'EM_ANDAMENTO', 'AGUARDANDO_OB', 'ERRO_SIAFI', 'PAGA', 'CANCELADA'];
+const ETAPAS: EtapaPagamento[] = ['NA_CGLIC', 'ERRO_SIAFI', 'DEVOLVIDO_CORRECAO', 'NA_CGOFI', 'EM_ANDAMENTO', 'AGUARDANDO_OB', 'PAGA', 'CANCELADA'];
 
 /**
  * Segmentos: o que precisa de ação da equipe (ciclo na CGLIC, erro no SIAFI), o que anda sem a CGLIC (na CGOFI, fatura
@@ -39,6 +45,7 @@ type GrupoPagamento = 'ACAO' | 'TRAMITACAO' | 'PAGA';
 const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
   NA_CGLIC: 'ACAO',
   ERRO_SIAFI: 'ACAO',
+  DEVOLVIDO_CORRECAO: 'TRAMITACAO',
   NA_CGOFI: 'TRAMITACAO',
   EM_ANDAMENTO: 'TRAMITACAO',
   AGUARDANDO_OB: 'TRAMITACAO',
@@ -48,6 +55,7 @@ const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
 const ROTULO_ETAPA: Record<EtapaPagamento, string> = {
   NA_CGLIC: 'Na CGLIC',
   ERRO_SIAFI: 'Erro no SIAFI',
+  DEVOLVIDO_CORRECAO: 'Devolvido para correção',
   NA_CGOFI: 'Na CGOFI',
   EM_ANDAMENTO: 'Não liquidada',
   AGUARDANDO_OB: 'Aguardando OB',
@@ -80,7 +88,23 @@ export const PagamentosCarteira: React.FC = () => {
   const navigate = useNavigateWithOrigin();
   const sincronizacao = useSincronizacaoPagamentos();
   const { rows: todos, isLoading, isFetching, error, refetch } = usePagamentosCarteira();
-  const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
+  const { contrato, lista: contratos, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
+  const { user, role } = useAuth();
+  const podeAbrirCiclo = role === 'gestor' || role === 'admin';
+  const [abrindoCiclo, setAbrindoCiclo] = useState(false);
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const registradoPorNome = (user?.user_metadata as { full_name?: string } | undefined)?.full_name || user?.email || undefined;
+
+  const abrirCiclo = async (input: CreatePaymentCycleInput) => {
+    await createPaymentCycleRpc(input);
+    toast.success('Ciclo de pagamento aberto.');
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['financeiro-ciclos-em-aberto'] }),
+      queryClient.invalidateQueries({ queryKey: ['contract-payment-cycles', input.contractKey] }),
+      queryClient.invalidateQueries({ queryKey: ['management-dashboard'] })
+    ]);
+  };
   const { filters, setFilter, setFilters, resetFilters } = useCarteiraFilters(PAGAMENTOS_FILTER_SCHEMA);
 
   // Perfil gestor: só os pagamentos dos próprios contratos.
@@ -161,6 +185,8 @@ export const PagamentosCarteira: React.FC = () => {
         subtitle="Ciclos da CGLIC e faturas dos contratos, da liquidação no SIAFI à ordem bancária."
         icon={<CreditCard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
+          <>
+          {podeAbrirCiclo && <ActionButton action="novo" onClick={() => setAbrindoCiclo(true)} label="Abrir ciclo" data-testid="pagamentos-abrir-ciclo" />}
           <HeaderRefreshAction
             onRefresh={sincronizacao.podeForcar ? () => void sincronizacao.atualizar() : undefined}
             isRefreshing={sincronizacao.sincronizando || isFetching}
@@ -172,6 +198,7 @@ export const PagamentosCarteira: React.FC = () => {
             }
             dataTestId="payments-refresh-btn"
           />
+          </>
         }
       />
 
@@ -196,7 +223,7 @@ export const PagamentosCarteira: React.FC = () => {
                 dot: n('ERRO_SIAFI') > 0 ? 'var(--color-danger)' : undefined,
                 title: 'Ciclos com a CGLIC (conferência, pendência, envio) e faturas com erro no SIAFI'
               },
-              { id: 'TRAMITACAO', label: 'Em tramitação', count: nGrupo('TRAMITACAO'), title: 'Na CGOFI, faturas ainda não liquidadas e liquidadas aguardando a ordem bancária' },
+              { id: 'TRAMITACAO', label: 'Em tramitação', count: nGrupo('TRAMITACAO'), title: 'Devolvidos para correção, na CGOFI, faturas ainda não liquidadas e liquidadas aguardando a ordem bancária' },
               { id: 'PAGA', label: 'Pagas', count: nGrupo('PAGA'), title: 'Faturas cuja nota de pagamento tem ordem bancária válida' },
               { id: TODOS, label: 'Todas', count: itens.length }
             ]}
@@ -251,6 +278,13 @@ export const PagamentosCarteira: React.FC = () => {
           />
         </>
       )}
+      <CreateCycleModal
+        isOpen={abrindoCiclo}
+        onClose={() => setAbrindoCiclo(false)}
+        contratos={escopo ? contratos.filter((c) => escopo.has(c.contractKey)) : contratos}
+        registradoPorNome={registradoPorNome}
+        onSubmit={abrirCiclo}
+      />
     </PageContainer>
   );
 };

@@ -11,8 +11,11 @@ import { mapPostgresErrorToAppError } from './rpcErrorAdapter';
 import type {
   RpcContractPaymentCycleRow,
   RpcCreatePaymentCycleResult,
+  RpcPaymentCycleChecklistRow,
   RpcPaymentCycleDocumentRow,
   RpcPaymentCycleEventRow,
+  RpcPaymentCycleFaturaRow,
+  RpcPaymentCycleItemRow,
   RpcPaymentCycleInfoResult,
   RpcPaymentCycleMarcoResult
 } from '../types/rpc';
@@ -67,50 +70,64 @@ export async function fetchPaymentCyclesForContracts(contractKeys: string[]): Pr
 export async function fetchPaymentCycleDetails(cycleIds: string[]): Promise<{
   documentos: RpcPaymentCycleDocumentRow[];
   eventos: RpcPaymentCycleEventRow[];
+  itens: RpcPaymentCycleItemRow[];
+  checklist: RpcPaymentCycleChecklistRow[];
+  faturas: RpcPaymentCycleFaturaRow[];
 }> {
   const ids = Array.from(new Set((cycleIds || []).filter(Boolean)));
-  if (!isSupabaseConfigured || !supabase || ids.length === 0) return { documentos: [], eventos: [] };
+  if (!isSupabaseConfigured || !supabase || ids.length === 0) return { documentos: [], eventos: [], itens: [], checklist: [], faturas: [] };
 
-  const [docs, events] = await Promise.all([
+  const [docs, events, itens, checklist, faturas] = await Promise.all([
     supabase.from('contract_payment_cycle_documents').select('*').in('cycle_id', ids).order('created_at', { ascending: true }),
-    supabase.from('contract_payment_cycle_events').select('*').in('cycle_id', ids).order('created_at', { ascending: true })
+    supabase.from('contract_payment_cycle_events').select('*').in('cycle_id', ids).order('created_at', { ascending: true }),
+    supabase.from('contract_payment_cycle_itens').select('*').in('cycle_id', ids).order('ordem', { ascending: true }),
+    supabase.from('contract_payment_cycle_checklist').select('*').in('cycle_id', ids),
+    supabase.from('contract_payment_cycle_faturas').select('*').in('cycle_id', ids)
   ]);
-  if (docs.error) throw mapPostgresErrorToAppError(docs.error);
-  if (events.error) throw mapPostgresErrorToAppError(events.error);
+  for (const r of [docs, events, itens, checklist, faturas]) {
+    if (r.error) throw mapPostgresErrorToAppError(r.error);
+  }
   return {
     documentos: (docs.data || []) as RpcPaymentCycleDocumentRow[],
-    eventos: (events.data || []) as RpcPaymentCycleEventRow[]
+    eventos: (events.data || []) as RpcPaymentCycleEventRow[],
+    itens: (itens.data || []) as RpcPaymentCycleItemRow[],
+    checklist: (checklist.data || []) as RpcPaymentCycleChecklistRow[],
+    faturas: (faturas.data || []) as RpcPaymentCycleFaturaRow[]
   };
 }
 
-export interface CreatePaymentCycleDocumentInput {
-  tipo: string;
-  numero?: string;
-  sei: string;
-  valor?: number;
+/** Nota fiscal do item "DO PAGAMENTO" (Portaria 50, Anexo II). */
+export interface CreatePaymentCycleItemInput {
+  notaFiscal: string;
+  notaFiscalSei?: string;
+  atestoSei: string;
+  empenhoCanonicalKey: string;
+  subelemento?: string;
+  valorBruto: number;
+  jurosMulta?: number;
+  glosa?: number;
+  desconto?: number;
+  justificativaJuros?: string;
 }
 
 export interface CreatePaymentCycleInput {
   contractKey: string;
-  competencia: string;
+  /** Data do atesto: início dos prazos (recebimento da nota pela Administração). */
+  dataAssinaturaAtesto: string;
+  /** Chegada do processo à CGLIC. */
   dataRecebimento: string;
   dataVencimentoFatura: string;
-  valorAtesto: number;
-  documentos: CreatePaymentCycleDocumentInput[];
+  /** Um processo SEI por pagamento (Portaria 50 art. 5º § 1º). */
+  numeroProcessoPagamentoSei: string;
+  itens: CreatePaymentCycleItemInput[];
   prazoConferenciaAte?: string;
   /** Prazo padrão de Regras de Alertas, para o servidor saber se o prazo foi alongado. */
   prazoPadrao?: string;
   justificativaPrazo?: string;
-  dataAssinaturaAtesto?: string;
-  empenhoCanonicalKey?: string;
-  numeroProcessoPagamentoSei?: string;
-  numeroProcessoContratoSei?: string;
-  titularNome?: string;
   responsavelNome?: string;
   responsavelUserId?: string;
   observacoes?: string;
   registradoPorNome?: string;
-  applyTaskTemplate?: boolean;
 }
 
 async function callRpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
@@ -131,33 +148,35 @@ async function callRpc<T>(name: string, args: Record<string, unknown>): Promise<
 export function createPaymentCycleRpc(input: CreatePaymentCycleInput): Promise<RpcCreatePaymentCycleResult> {
   return callRpc<RpcCreatePaymentCycleResult>('create_payment_cycle_atomic', {
     p_contract_key: input.contractKey,
-    p_competencia: input.competencia,
+    p_data_assinatura_atesto: input.dataAssinaturaAtesto,
     p_data_recebimento: input.dataRecebimento,
     p_data_vencimento_fatura: input.dataVencimentoFatura,
-    p_valor_atesto: input.valorAtesto,
-    p_documentos: input.documentos.map((d) => ({
-      tipo: d.tipo,
-      numero: d.numero ?? null,
-      sei: d.sei,
-      valor: d.valor ?? null
+    p_numero_processo_pagamento_sei: input.numeroProcessoPagamentoSei,
+    p_itens: input.itens.map((i) => ({
+      nota_fiscal: i.notaFiscal,
+      nota_fiscal_sei: i.notaFiscalSei ?? null,
+      atesto_sei: i.atestoSei,
+      empenho_canonical_key: i.empenhoCanonicalKey,
+      subelemento: i.subelemento ?? null,
+      valor_bruto: i.valorBruto,
+      juros_multa: i.jurosMulta ?? 0,
+      glosa: i.glosa ?? 0,
+      desconto: i.desconto ?? 0,
+      justificativa_juros: i.justificativaJuros ?? null
     })),
     p_prazo_conferencia_ate: input.prazoConferenciaAte ?? null,
     p_prazo_padrao: input.prazoPadrao ?? null,
     p_justificativa_prazo: input.justificativaPrazo ?? null,
-    p_data_assinatura_atesto: input.dataAssinaturaAtesto ?? null,
-    p_empenho_canonical_key: input.empenhoCanonicalKey ?? null,
-    p_numero_processo_pagamento_sei: input.numeroProcessoPagamentoSei ?? null,
-    p_numero_processo_contrato_sei: input.numeroProcessoContratoSei ?? null,
-    p_titular_nome: input.titularNome ?? null,
     p_responsavel_nome: input.responsavelNome ?? null,
     p_responsavel_user_id: input.responsavelUserId ?? null,
     p_observacoes: input.observacoes ?? null,
-    p_registrado_por_nome: input.registradoPorNome ?? null,
-    p_apply_task_template: input.applyTaskTemplate ?? true
+    p_registrado_por_nome: input.registradoPorNome ?? null
   });
 }
 
-export type PaymentMarco = 'CONFERIDO' | 'PENDENCIA' | 'ENVIADO_CGOFI' | 'DEVOLVIDO' | 'PAGO' | 'CANCELADO';
+export type PaymentMarco =
+  | 'CONFERIDO' | 'PENDENCIA' | 'RETORNO' | 'ENVIADO_CGOFI' | 'DEVOLVIDO' | 'PAGO' | 'CANCELADO'
+  | 'ENVIADO_COLOG' | 'PRORROGACAO_LIQUIDACAO';
 
 export interface RegisterPaymentMarcoInput {
   cycleKey: string;
@@ -170,8 +189,12 @@ export interface RegisterPaymentMarcoInput {
   prazoNovo?: string;
   prazoPadrao?: string;
   justificativa?: string;
-  /** Conferência em ordem: confirma a verificação de SICAF / CNDs do credor. */
-  regularidadeVerificada?: boolean;
+  /** Checklist do Anexo I (conferência e devolução). */
+  checklist?: Array<{ item: string; resposta: 'SIM' | 'NAO' | 'NA'; sei?: string }>;
+  /** Envio à CGOFI: faturas do Contratos.gov.br pagas por este ciclo. */
+  faturas?: number[];
+  /** Envio à CGOFI: também à COLOG (bens a incorporar). */
+  enviarColog?: boolean;
   registradoPorNome?: string;
 }
 
@@ -192,7 +215,9 @@ export function registerPaymentMarcoRpc(input: RegisterPaymentMarcoInput): Promi
     p_prazo_padrao: input.prazoPadrao ?? null,
     p_justificativa: input.justificativa ?? null,
     p_registrado_por_nome: input.registradoPorNome ?? null,
-    p_regularidade_verificada: input.regularidadeVerificada ?? null
+    p_checklist: input.checklist ?? null,
+    p_faturas: input.faturas && input.faturas.length > 0 ? input.faturas : null,
+    p_enviar_colog: input.enviarColog ?? false
   });
 }
 

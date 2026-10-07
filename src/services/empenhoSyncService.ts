@@ -281,6 +281,21 @@ export async function vincularEmpenhosAoContratoUmAUm(
 }
 
 /**
+ * Grava a natureza de despesa e o plano interno dos empenhos (migration 87). Devolve quantos foram atualizados;
+ * null sem Supabase configurado.
+ */
+export async function gravarClassificacaoEmpenhos(
+  itens: Array<{ empenho_id: string; natureza_despesa?: string; plano_interno?: string }>
+): Promise<number | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  const comDados = itens.filter((i) => i.natureza_despesa || i.plano_interno);
+  if (comDados.length === 0) return 0;
+  const { data, error } = await supabase.rpc('gravar_classificacao_empenhos', { p_itens: comDados });
+  if (error) throw Object.assign(mapPostgresErrorToAppError(error), { details: error });
+  return Number(data ?? 0);
+}
+
+/**
  * Grava de uma vez o conjunto de empenhos do contrato (migration 81: sync_contract_empenhos_atomic):
  * insere, atualiza o valor (inclusive para 0) e, com `removerAusentes`, remove os que não vieram.
  * Devolve null sem Supabase configurado; lança o erro da RPC já traduzido.

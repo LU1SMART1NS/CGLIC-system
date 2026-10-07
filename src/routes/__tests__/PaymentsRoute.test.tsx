@@ -6,6 +6,11 @@ import * as financeiroModule from '../../hooks/useFinanceiroCarteira';
 import { montarPagamentosCarteira, type FaturaCarteira } from '../../services/financeiroCarteiraService';
 import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 
+vi.mock('@tanstack/react-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
+  useQuery: vi.fn(() => ({ data: undefined, isLoading: false, refetch: vi.fn() })),
+  useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() }))
+}));
 vi.mock('../../hooks/useFinanceiroCarteira', () => ({ usePagamentosCarteira: vi.fn(), useSincronizacaoPagamentos: vi.fn() }));
 vi.mock('../../hooks/useContractsPortfolio', () => ({
   useContractsPortfolio: vi.fn(() => ({

@@ -45,6 +45,21 @@ export function useContratosDoFinanceiro() {
   /** Perfil gestor: só as chaves da carteira dele. Demais perfis: sem recorte (null). */
   const escopo = useMemo(() => (role === 'gestor' ? new Set(porChave.keys()) : null), [role, porChave]);
 
+  /** Contratos para abrir um ciclo de pagamento: vigentes primeiro, depois pelo número. */
+  const lista = useMemo(
+    () =>
+      rows
+        .map((r) => ({
+          contractKey: r.contractKey,
+          numero: formatContractNumber(r.contract),
+          fornecedorNome: r.contract.fornecedorNome || undefined,
+          gestorNome: r.gestorNome,
+          expirado: r.faixa === 'EXPIRADO'
+        }))
+        .sort((a, b) => Number(a.expirado) - Number(b.expirado) || b.numero.split('/').reverse().join('/').localeCompare(a.numero.split('/').reverse().join('/'))),
+    [rows]
+  );
+
   const contrato = useCallback(
     (contractKey: string): ContratoDoFinanceiro => porChave.get(contractKey) ?? { numero: numeroDaChave(contractKey) },
     [porChave]
@@ -52,6 +67,7 @@ export function useContratosDoFinanceiro() {
 
   return {
     contrato,
+    lista,
     escopo,
     showGestorFilter,
     isLoading: isLoading || (role === 'gestor' && isLoadingScope)

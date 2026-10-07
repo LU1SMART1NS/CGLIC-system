@@ -12,7 +12,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
-import type { RpcContractPaymentCycleRow } from '../types/rpc';
+import type { RpcContractPaymentCycleRow, RpcPaymentCycleItemRow } from '../types/rpc';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
 
 const PAGINA = 1000;
@@ -198,10 +198,11 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
 // -----------------------------------------------------------------------------------------------------
 
 /** Etapa do pagamento: as duas primeiras vêm do ciclo da CGLIC; as demais, da fatura no SIAFI e no Tesouro. */
-export type EtapaPagamento = 'NA_CGLIC' | 'NA_CGOFI' | 'EM_ANDAMENTO' | 'AGUARDANDO_OB' | 'ERRO_SIAFI' | 'PAGA' | 'CANCELADA';
+export type EtapaPagamento =
+  | 'NA_CGLIC' | 'DEVOLVIDO_CORRECAO' | 'NA_CGOFI' | 'EM_ANDAMENTO' | 'AGUARDANDO_OB' | 'ERRO_SIAFI' | 'PAGA' | 'CANCELADA';
 
 export type PagamentoCarteiraRow =
-  | { tipo: 'CICLO'; chave: string; contractKey: string; etapa: EtapaPagamento; ciclo: PaymentFollowUpCycle }
+  | { tipo: 'CICLO'; chave: string; contractKey: string; etapa: EtapaPagamento; ciclo: PaymentFollowUpCycle; faturas: FaturaCarteira[] }
   | { tipo: 'FATURA'; chave: string; contractKey: string; etapa: EtapaPagamento; fatura: FaturaCarteira };
 
 export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'dataLiquidacao' | 'situacao'>): EtapaPagamento {
@@ -216,27 +217,52 @@ export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'da
 export function etapaDoCiclo(ciclo: Pick<PaymentFollowUpCycle, 'status'>): EtapaPagamento | null {
   switch (ciclo.status) {
     case 'RECEBIDO':
-    case 'COM_PENDENCIA':
     case 'CONFERIDO':
     case 'DEVOLVIDO':
       return 'NA_CGLIC';
+    case 'COM_PENDENCIA':
+      return 'DEVOLVIDO_CORRECAO';
     case 'ENVIADO_CGOFI':
       return 'NA_CGOFI';
+    case 'LIQUIDADO':
+      return 'AGUARDANDO_OB';
     default:
       return null;
   }
 }
 
-export function montarPagamentosCarteira(ciclos: PaymentFollowUpCycle[], faturas: FaturaCarteira[]): PagamentoCarteiraRow[] {
+/**
+ * Ciclos em aberto e faturas, cada um na sua linha. A fatura ligada a um ciclo em aberto sai da lista: ela aparece
+ * dentro da linha do ciclo (o ciclo mostra a etapa da CGLIC; a liquidação e a OB vêm da fatura).
+ */
+export function montarPagamentosCarteira(
+  ciclos: PaymentFollowUpCycle[],
+  faturas: FaturaCarteira[],
+  ligacoes: Array<{ cycle_id: string; id_fatura: number }> = []
+): PagamentoCarteiraRow[] {
   const rows: PagamentoCarteiraRow[] = [];
+  const faturaPorId = new Map(faturas.map((f) => [f.idFatura, f]));
+  const emCicloAberto = new Set<number>();
   for (const ciclo of ciclos) {
     const etapa = etapaDoCiclo(ciclo);
-    if (etapa) rows.push({ tipo: 'CICLO', chave: `ciclo-${ciclo.cycleKey}`, contractKey: ciclo.contractKey, etapa, ciclo });
+    if (!etapa) continue;
+    const doCiclo = ligacoes
+      .filter((l) => l.cycle_id === ciclo.id)
+      .map((l) => faturaPorId.get(Number(l.id_fatura)))
+      .filter((f): f is FaturaCarteira => Boolean(f));
+    doCiclo.forEach((f) => emCicloAberto.add(f.idFatura));
+    rows.push({ tipo: 'CICLO', chave: `ciclo-${ciclo.cycleKey}`, contractKey: ciclo.contractKey, etapa, ciclo, faturas: doCiclo });
   }
   for (const fatura of faturas) {
+    if (emCicloAberto.has(fatura.idFatura)) continue;
     rows.push({ tipo: 'FATURA', chave: `fatura-${fatura.idFatura}`, contractKey: fatura.contractKey, etapa: etapaDaFatura(fatura), fatura });
   }
   return rows;
+}
+
+/** Faturas ligadas a ciclos (migration 87). */
+export async function fetchLigacoesCicloFatura(): Promise<Array<{ cycle_id: string; id_fatura: number }>> {
+  return lerTudo<{ cycle_id: string; id_fatura: number }>('contract_payment_cycle_faturas', 'cycle_id, id_fatura', 'id_fatura');
 }
 
 export async function fetchCiclosEmAberto(): Promise<PaymentFollowUpCycle[]> {
@@ -244,8 +270,14 @@ export async function fetchCiclosEmAberto(): Promise<PaymentFollowUpCycle[]> {
   const { data, error } = await supabase
     .from('contract_payment_cycles')
     .select('*')
-    .in('status', ['RECEBIDO', 'COM_PENDENCIA', 'CONFERIDO', 'DEVOLVIDO', 'ENVIADO_CGOFI'])
+    .in('status', ['RECEBIDO', 'COM_PENDENCIA', 'CONFERIDO', 'DEVOLVIDO', 'ENVIADO_CGOFI', 'LIQUIDADO'])
     .order('criado_em', { ascending: false });
   if (error) throw mapPostgresErrorToAppError(error);
-  return ((data ?? []) as RpcContractPaymentCycleRow[]).map((row) => rowToPaymentFollowUpCycle(row));
+  const rows = (data ?? []) as RpcContractPaymentCycleRow[];
+  // Itens "DO PAGAMENTO": a linha do ciclo mostra as notas fiscais.
+  const ids = rows.map((r) => r.id);
+  const itens = ids.length > 0 ? await supabase.from('contract_payment_cycle_itens').select('*').in('cycle_id', ids) : { data: [], error: null };
+  if (itens.error) throw mapPostgresErrorToAppError(itens.error);
+  const doCiclo = (id: string) => ((itens.data ?? []) as RpcPaymentCycleItemRow[]).filter((i) => i.cycle_id === id);
+  return rows.map((row) => rowToPaymentFollowUpCycle(row, { itens: doCiclo(row.id) }));
 }

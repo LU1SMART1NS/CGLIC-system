@@ -107,7 +107,18 @@ export const PAGAMENTO_RULES = {
   /** Avisar nas Ações quando faltar até N dias úteis para o prazo da etapa da CGLIC (conferir ou enviar). */
   etapaAvisoAteDiasUteis: 2,
   /** Cobrar a CGOFI quando o processo está há mais de N dias úteis sem Ordem Bancária. */
-  cgofiSemRespostaAcimaDeDiasUteis: 5
+  cgofiSemRespostaAcimaDeDiasUteis: 5,
+  /** IN SEGES 77/2022 art. 7º, I: liquidação em até N dias úteis do recebimento da nota (a data do atesto). */
+  liquidacaoMaxDiasUteis: 10,
+  /** IN SEGES 77/2022 art. 7º, II: pagamento em até N dias úteis da liquidação. */
+  pagamentoMaxDiasUteis: 10,
+  /** Portaria DGFNSP 50/2025 art. 5º: o processo chega com pelo menos N dias úteis antes do vencimento. */
+  chegadaMinimaDiasUteis: 8,
+  /**
+   * IN 77 art. 7º § 2º: prazos pela metade para despesa até o limite do art. 75, II da Lei 14.133 (em reais,
+   * atualizado todo ano por decreto). Valor de 2025 (Decreto 12.343/2024); confira o vigente.
+   */
+  limitePequenoValorReais: 62725
 };
 
 // -----------------------------------------------------------------------------
@@ -147,7 +158,7 @@ export function isLembreteNaJanela(params: { diasRestantes: number; atrasado: bo
 // Parametrização (Administração > Regras de Alertas)
 // -----------------------------------------------------------------------------
 
-export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'horas';
+export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'horas' | 'R$';
 
 export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'sincronizacao';
 
@@ -212,6 +223,10 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'pagamento.enviarPadraoDiasUteis', group: 'pagamentos', label: 'Prazo padrão para enviar à CGOFI', hint: 'Dias úteis desde a conferência. O gestor pode alongar com justificativa.', unit: 'dias úteis', min: 1, max: 30 },
   { key: 'pagamento.etapaAvisoAteDiasUteis', group: 'pagamentos', label: 'Avisar o prazo da etapa quando faltar', hint: 'Dias úteis para conferir ou enviar à CGOFI. Depois do prazo, o aviso fica urgente.', unit: 'dias úteis', min: 0, max: 15 },
   { key: 'pagamento.cgofiSemRespostaAcimaDeDiasUteis', group: 'pagamentos', label: 'Cobrar a CGOFI após', hint: 'Dias úteis desde o envio sem ordem bancária.', unit: 'dias úteis', min: 1, max: 60 },
+  { key: 'pagamento.liquidacaoMaxDiasUteis', group: 'pagamentos', label: 'Prazo de liquidação', hint: 'Do atesto à liquidação no SIAFI (IN 77, art. 7º, I).', unit: 'dias úteis', min: 1, max: 30 },
+  { key: 'pagamento.pagamentoMaxDiasUteis', group: 'pagamentos', label: 'Prazo de pagamento', hint: 'Da liquidação à ordem bancária (IN 77, art. 7º, II).', unit: 'dias úteis', min: 1, max: 30 },
+  { key: 'pagamento.chegadaMinimaDiasUteis', group: 'pagamentos', label: 'Chegada mínima antes do vencimento', hint: 'Antecedência do processo em relação ao vencimento (Portaria DGFNSP 50/2025, art. 5º).', unit: 'dias úteis', min: 0, max: 30 },
+  { key: 'pagamento.limitePequenoValorReais', group: 'pagamentos', label: 'Limite de pequeno valor', hint: 'Até este valor do contrato os prazos de liquidação e pagamento caem pela metade (IN 77, art. 7º, § 2º; art. 75, II da Lei 14.133, atualizado todo ano).', unit: 'R$', min: 1, max: 10000000 },
 
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }
 ];

@@ -463,7 +463,7 @@ export interface RpcUpdateAtaTaskResult {
 // ==============================================================================
 
 export type PaymentCycleStatusValue =
-  | 'RECEBIDO' | 'COM_PENDENCIA' | 'CONFERIDO' | 'ENVIADO_CGOFI' | 'DEVOLVIDO' | 'PAGO' | 'CANCELADO';
+  | 'RECEBIDO' | 'COM_PENDENCIA' | 'CONFERIDO' | 'ENVIADO_CGOFI' | 'DEVOLVIDO' | 'LIQUIDADO' | 'PAGO' | 'CANCELADO';
 
 export interface RpcContractPaymentCycleRow {
   id: string;
@@ -497,6 +497,47 @@ export interface RpcContractPaymentCycleRow {
   atualizado_em: string;
   concluido_em?: string | null;
   concluido_por?: string | null;
+  /** Migration 87: liquidação e NP lidas da fatura pela conciliação; envio à COLOG; prorrogação da liquidação. */
+  data_liquidacao?: string | null;
+  numero_np?: string | null;
+  colog_enviado_em?: string | null;
+  colog_sei?: string | null;
+  liquidacao_prorrogada?: boolean | null;
+}
+
+/** Item "DO PAGAMENTO" do ciclo (Portaria 50, Anexo II). */
+export interface RpcPaymentCycleItemRow {
+  id: string;
+  cycle_id: string;
+  ordem: number;
+  nota_fiscal: string;
+  nota_fiscal_sei?: string | null;
+  atesto_sei: string;
+  empenho_canonical_key: string;
+  subelemento?: string | null;
+  valor_bruto: number | string;
+  juros_multa: number | string;
+  glosa: number | string;
+  desconto: number | string;
+  valor_a_pagar: number | string;
+  justificativa_juros?: string | null;
+}
+
+/** Resposta do checklist do Anexo I da Portaria 50. */
+export interface RpcPaymentCycleChecklistRow {
+  cycle_id: string;
+  item: string;
+  resposta: 'SIM' | 'NAO' | 'NA';
+  sei?: string | null;
+  conferido_em: string;
+  conferido_por_nome?: string | null;
+}
+
+/** Fatura do Contratos.gov.br paga pelo ciclo. */
+export interface RpcPaymentCycleFaturaRow {
+  cycle_id: string;
+  id_fatura: number;
+  vinculado_por: 'USUARIO' | 'SISTEMA';
 }
 
 export interface RpcPaymentCycleDocumentRow {
@@ -524,6 +565,8 @@ export interface RpcPaymentCycleEventRow {
   justificativa?: string | null;
   regularidade_verificada?: boolean | null;
   registrado_por_nome?: string | null;
+  /** Registrado pela conciliação do sistema (migration 87). */
+  automatico?: boolean | null;
   created_at: string;
 }
 

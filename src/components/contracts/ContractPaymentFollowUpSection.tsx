@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Calendar, Clock, DollarSign, User } from 'lucide-react';
 import type { ContractDashboardRecord } from '../../types';
 import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
@@ -8,8 +8,13 @@ import { describeResponsavel } from './planTaskEditing';
 import { getPaymentStatusDisplay } from '../../utils/paymentStatusDisplay';
 import { useAuth } from '../../context/AuthContext';
 import { ActionButton, EmptyState, NoticeBar, StatusBadge, WorkflowStepper, useConfirmDialog, useToast, type WorkflowStep } from '../../design-system';
-import { CancelCycleModal, CreateCycleModal, MarcoModal, marcoActionLabel } from './payment/PaymentCycleModals';
-import { PaymentCycleDocuments, PaymentCycleHistory } from './payment/PaymentCycleDetails';
+import { CancelCycleModal, CreateCycleModal, MarcoSimplesModal, type MarcoSimples } from './payment/PaymentCycleModals';
+import { useEmpenhosDoContrato } from './payment/cicloPagamentoShared';
+import { ConferenciaModal } from './payment/ConferenciaModal';
+import { EnvioCgofiModal } from './payment/EnvioCgofiModal';
+import { PaymentCycleChecklist, PaymentCycleDocuments, PaymentCycleHistory, PaymentCycleItens, PaymentCyclePrazosLegais } from './payment/PaymentCycleDetails';
+import { calcularPrazosLegais } from '../../services/prazosLegaisPagamento';
+import { ehBemAIncorporar } from '../../services/cicloPagamentoApoioService';
 import { isoToBR } from './payment/paymentFormUtils';
 import { isPaymentCycleEncerrado } from '../../services/paymentFollowUpService';
 
@@ -20,17 +25,12 @@ interface ContractPaymentFollowUpSectionProps {
   contractKey: string;
 }
 
-/**
- * Checklist real do ciclo: o servidor instancia um plano de tarefas por ciclo
- * (contract_task_plans, chave = cycleKey). Reutiliza a linha de tarefa do plano
- * de gestão, com seletor de status (Pendente / Em andamento / Concluída / N/A).
- * As 5 etapas são fixas (alimentam o stepper): só as tarefas são editáveis.
- * Enquanto o plano não existe, mostra o template canônico somente-leitura.
- */
+/** Marcos do ciclo. Liquidado e Pago entram sozinhos (conciliação com a fatura e a ordem bancária). */
 const MARCOS: Array<{ id: string; title: string }> = [
   { id: 'recebido', title: 'Recebido' },
   { id: 'conferido', title: 'Conferido' },
   { id: 'enviado', title: 'Enviado à CGOFI' },
+  { id: 'liquidado', title: 'Liquidado' },
   { id: 'pago', title: 'Pago' }
 ];
 
@@ -41,9 +41,29 @@ const MARCOS_CUMPRIDOS: Record<PaymentFollowUpCycle['status'], number> = {
   DEVOLVIDO: 1,
   CONFERIDO: 2,
   ENVIADO_CGOFI: 3,
-  PAGO: 4,
+  LIQUIDADO: 4,
+  PAGO: 5,
   CANCELADO: 0
 };
+
+/** Próxima ação do ciclo, conforme a situação. */
+type AcaoDoCiclo = 'CONFERIR' | 'RETORNO' | 'ENVIAR' | 'RESULTADO_CGOFI';
+function proximaAcao(cycle: PaymentFollowUpCycle): { acao: AcaoDoCiclo; label: string } | null {
+  switch (cycle.status) {
+    case 'RECEBIDO':
+    case 'DEVOLVIDO':
+      return { acao: 'CONFERIR', label: 'Conferir' };
+    case 'COM_PENDENCIA':
+      return { acao: 'RETORNO', label: 'Recebido de volta' };
+    case 'CONFERIDO':
+      return { acao: 'ENVIAR', label: 'Enviar à CGOFI' };
+    case 'ENVIADO_CGOFI':
+    case 'LIQUIDADO':
+      return { acao: 'RESULTADO_CGOFI', label: 'Registrar resultado da CGOFI' };
+    default:
+      return null;
+  }
+}
 
 function buildMarcoSteps(cycle: PaymentFollowUpCycle): WorkflowStep[] {
   const cumpridos = MARCOS_CUMPRIDOS[cycle.status];
@@ -58,6 +78,7 @@ function buildMarcoSteps(cycle: PaymentFollowUpCycle): WorkflowStep[] {
     if (idx === 0) return cycle.input.dataRecebimento;
     if (idx === 1) return cycle.input.dataConferencia;
     if (idx === 2) return cycle.input.dataEnvioCgofi;
+    if (idx === 3) return cycle.input.dataLiquidacao;
     return cycle.input.dataOrdemBancaria;
   };
 
@@ -69,6 +90,7 @@ function buildMarcoSteps(cycle: PaymentFollowUpCycle): WorkflowStep[] {
     let subtitle: string | undefined;
     if (feito && data) subtitle = isoToBR(data);
     else if (idx === 3 && alvo && !cancelado) subtitle = `cobrar a partir de ${isoToBR(alvo)}`;
+    else if (idx >= 3 && !cancelado && !feito) subtitle = 'pelo sistema';
     else if (alvo && !cancelado) subtitle = `até ${isoToBR(alvo)}`;
     return {
       id: marco.id,
@@ -88,7 +110,7 @@ function etapaMessage(cycle: PaymentFollowUpCycle): { tone: 'info' | 'warning' |
   const alvo = isoToBR(etapa.dataAlvo);
   const prefixo =
     etapa.etapa === 'CONFERENCIA'
-      ? cycle.status === 'COM_PENDENCIA' ? 'Conferência com pendência' : 'Conferir a documentação'
+      ? cycle.status === 'COM_PENDENCIA' ? 'Devolvido para correção; conferir de novo' : 'Conferir a documentação'
       : etapa.etapa === 'ENVIO' ? 'Enviar à CGOFI'
       : 'Acompanhando a CGOFI';
   if (etapa.dono === 'CGOFI') {
@@ -102,12 +124,15 @@ function etapaMessage(cycle: PaymentFollowUpCycle): { tone: 'info' | 'warning' |
 }
 
 function describeDocuments(cycle: PaymentFollowUpCycle): string {
+  const itens = cycle.itens ?? [];
+  if (itens.length > 0) return itens.map((i) => `NF ${i.notaFiscal}`).join(' · ');
   const documentos = cycle.documentos ?? [];
   if (documentos.length === 0) return cycle.input.observacoes || 'Termo de Atesto';
   return documentos.map((d) => (d.numero ? `${d.tipo} nº ${d.numero}` : d.tipo)).join(' · ');
 }
 
 export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSectionProps> = ({
+  contract,
   contractKey
 }) => {
   const {
@@ -130,10 +155,22 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
   const registradoPorNome = (user?.user_metadata as { full_name?: string } | undefined)?.full_name || user?.email || undefined;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [marcoCycleKey, setMarcoCycleKey] = useState<string | null>(null);
+  const [acaoAberta, setAcaoAberta] = useState<{ cycleKey: string; acao: AcaoDoCiclo | MarcoSimples } | null>(null);
   const [expandedCycles, setExpandedCycles] = useState<Record<string, boolean>>({});
   const [cancelCycleKey, setCancelCycleKey] = useState<string | null>(null);
-  const marcoCycle = cycles.find((c) => c.cycleKey === marcoCycleKey) ?? null;
+  const acaoCycle = cycles.find((c) => c.cycleKey === acaoAberta?.cycleKey) ?? null;
+  const abrir = (cycleKey: string, acao: AcaoDoCiclo | MarcoSimples) => setAcaoAberta({ cycleKey, acao });
+  const fechar = () => setAcaoAberta(null);
+
+  // Natureza de despesa dos empenhos: bem a incorporar (ND 449052) vai também à COLOG.
+  const { data: empenhos = [] } = useEmpenhosDoContrato(contractKey);
+  const bensDoContrato = useMemo(() => new Set(empenhos.filter((e) => ehBemAIncorporar(e.naturezaDespesa)).map((e) => e.canonicalKey)), [empenhos]);
+  const temBem = (cycle: PaymentFollowUpCycle) =>
+    (cycle.itens ?? []).some((i) => bensDoContrato.has(i.empenhoCanonicalKey)) ||
+    Boolean(cycle.input.empenhoCanonicalKey && bensDoContrato.has(cycle.input.empenhoCanonicalKey));
+  const hojeISO = new Date().toISOString().slice(0, 10);
+  const contratoVigente = contract?.dataVigenciaFim ? contract.dataVigenciaFim.slice(0, 10) >= hojeISO : undefined;
+  const valorContrato = contract?.valorGlobal || contract?.valorInicial || null;
   const cancelCycle = cycles.find((c) => c.cycleKey === cancelCycleKey) ?? null;
 
   const handleDelete = async (cycle: PaymentFollowUpCycle) => {
@@ -169,7 +206,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
         )}
         {canEdit && (
           <ActionButton action="novo" size="sm" onClick={() => setIsModalOpen(true)} style={{ marginLeft: 'auto' }}>
-            Registrar Atesto / Faturamento
+            Abrir ciclo de pagamento
           </ActionButton>
         )}
       </div>
@@ -178,7 +215,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
         <EmptyState
           icon={<Clock size={28} />}
           title="Nenhum ciclo de faturamento/atesto em acompanhamento."
-          description="Quando o Fiscal Técnico emitir um Termo de Atesto no SEI, registre o ciclo aqui para acompanhar os prazos de conferência e envio à CGOFI."
+          description="Quando o processo de pagamento chegar à CGLIC, abra o ciclo aqui: conferência pelo checklist da Portaria 50, envio à CGOFI e o pagamento identificado pelo sistema."
           testId="payment-empty-state"
         />
       )}
@@ -187,8 +224,12 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
         const isExpanded = Boolean(expandedCycles[cycle.cycleKey]);
         const statusStyle = getPaymentStatusDisplay(cycle.status);
         const responsavel = describeResponsavel(cycle.input.responsavelNome, gestorNome);
-        const acao = marcoActionLabel(cycle);
+        const acao = proximaAcao(cycle);
         const etapa = etapaMessage(cycle);
+        const prazosLegais = calcularPrazosLegais(cycle, { valorContrato });
+        const encerrado = isPaymentCycleEncerrado(cycle.status);
+        const podeProrrogar = !cycle.input.liquidacaoProrrogada && ['RECEBIDO', 'COM_PENDENCIA', 'CONFERIDO', 'DEVOLVIDO', 'ENVIADO_CGOFI'].includes(cycle.status);
+        const cologPendente = temBem(cycle) && !cycle.input.cologEnviadoEm && ['ENVIADO_CGOFI', 'LIQUIDADO', 'PAGO'].includes(cycle.status);
 
         return (
           <div
@@ -208,7 +249,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     Id. SEI: <strong>{cycle.input.documentoAtestoSei}</strong>
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <Calendar size={13} /> Recebido em <strong>{isoToBR(cycle.input.dataRecebimento)}</strong>
+                    <Calendar size={13} /> Atesto <strong>{isoToBR(cycle.input.dataAssinaturaAtesto)}</strong> · chegou em{' '}
+                    <strong>{isoToBR(cycle.input.dataRecebimento)}</strong>
                   </span>
                   {responsavel ? (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -218,7 +260,7 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     <span style={{ color: '#c2410c', fontWeight: 600 }}>Gestor do contrato não cadastrado</span>
                   )}
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#0f172a' }}>
-                    <DollarSign size={13} color="var(--color-success)" /> Valor Atestado:{' '}
+                    <DollarSign size={13} color="var(--color-success)" /> A pagar:{' '}
                     <strong>{cycle.input.valorAtesto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -237,9 +279,19 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                   <ActionButton
                     action="avancarEtapa"
                     size="sm"
-                    onClick={() => setMarcoCycleKey(cycle.cycleKey)}
-                    title={acao}>
-                    <span className="payment-action-label">{acao}</span>
+                    onClick={() => abrir(cycle.cycleKey, acao.acao)}
+                    title={acao.label}>
+                    <span className="payment-action-label">{acao.label}</span>
+                  </ActionButton>
+                )}
+                {canEdit && cologPendente && (
+                  <ActionButton action="avancarEtapa" size="sm" onClick={() => abrir(cycle.cycleKey, 'ENVIADO_COLOG')} title="Enviar à COLOG">
+                    <span className="payment-action-label">Enviar à COLOG</span>
+                  </ActionButton>
+                )}
+                {canEdit && podeProrrogar && (
+                  <ActionButton action="editar" size="sm" onClick={() => abrir(cycle.cycleKey, 'PRORROGACAO_LIQUIDACAO')} title="Prorrogar o prazo de liquidação">
+                    <span className="payment-action-label">Prorrogar liquidação</span>
                   </ActionButton>
                 )}
                 {canEdit && !isPaymentCycleEncerrado(cycle.status) && (
@@ -272,6 +324,33 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
               <WorkflowStepper steps={buildMarcoSteps(cycle)} testId={`payment-stepper-${cycle.cycleKey}`} />
             </div>
 
+            {!encerrado && (prazosLegais.chegada.fora || prazosLegais.liquidacao.estourou || prazosLegais.riscoExtincao || cologPendente) && (
+              <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {prazosLegais.chegada.fora && (
+                  <NoticeBar tone="warning" testId={`payment-chegada-${cycle.cycleKey}`}>
+                    Chegou com {prazosLegais.chegada.diasUteisAteVencimento} dia(s) útil(eis) até o vencimento; a Portaria 50 (art. 5º) pede no mínimo{' '}
+                    {prazosLegais.chegada.minimo}. O atraso nasceu antes da CGLIC.
+                  </NoticeBar>
+                )}
+                {prazosLegais.liquidacao.estourou && !prazosLegais.liquidacao.concluido && (
+                  <NoticeBar tone="danger" testId={`payment-liquidacao-${cycle.cycleKey}`}>
+                    Prazo de liquidação passou: {prazosLegais.liquidacao.diasUteis} dias úteis desde o atesto, teto de {prazosLegais.liquidacao.teto}{' '}
+                    (IN 77, art. 7º, I).
+                  </NoticeBar>
+                )}
+                {prazosLegais.riscoExtincao && (
+                  <NoticeBar tone="danger" testId={`payment-extincao-${cycle.cycleKey}`}>
+                    Mais de 2 meses desde o atesto sem pagamento: o contratado pode pedir a extinção do contrato (IN 77, art. 11).
+                  </NoticeBar>
+                )}
+                {cologPendente && (
+                  <NoticeBar tone="info" testId={`payment-colog-${cycle.cycleKey}`}>
+                    Bem a incorporar (ND 449052): o processo ainda não foi enviado à COLOG (Portaria 50, art. 5º, § 5º).
+                  </NoticeBar>
+                )}
+              </div>
+            )}
+
             {(etapa || (cycle.alerts && cycle.alerts.length > 0)) && (
               <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {etapa && (
@@ -296,6 +375,9 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
             {isExpanded && (
               <div style={{ padding: '1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <PaymentCyclePrazosLegais cycle={cycle} prazos={prazosLegais} />
+                <PaymentCycleItens cycle={cycle} />
+                <PaymentCycleChecklist cycle={cycle} />
                 <PaymentCycleDocuments cycle={cycle} canEdit={canEdit} onAdd={addDocument} onRemove={removeDocument} />
                 <PaymentCycleHistory cycle={cycle} />
               </div>
@@ -318,9 +400,24 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
         registradoPorNome={registradoPorNome}
         onSubmit={registerMarco}
       />
-      <MarcoModal
-        cycle={marcoCycle}
-        onClose={() => setMarcoCycleKey(null)}
+      <ConferenciaModal
+        cycle={acaoAberta?.acao === 'CONFERIR' ? acaoCycle : null}
+        contratoVigente={contratoVigente}
+        onClose={fechar}
+        registradoPorNome={registradoPorNome}
+        onSubmit={registerMarco}
+      />
+      <EnvioCgofiModal
+        cycle={acaoAberta?.acao === 'ENVIAR' ? acaoCycle : null}
+        contratoIdGov={contract?.contratoId ?? null}
+        onClose={fechar}
+        registradoPorNome={registradoPorNome}
+        onSubmit={registerMarco}
+      />
+      <MarcoSimplesModal
+        cycle={acaoAberta && !['CONFERIR', 'ENVIAR'].includes(acaoAberta.acao) ? acaoCycle : null}
+        marco={acaoAberta && !['CONFERIR', 'ENVIAR'].includes(acaoAberta.acao) ? (acaoAberta.acao as MarcoSimples) : null}
+        onClose={fechar}
         registradoPorNome={registradoPorNome}
         onSubmit={registerMarco}
       />

@@ -6,6 +6,7 @@ import { dataBR, diasDesde } from './financeiroFormat';
 /** Ordem das etapas (para ordenar pela coluna Etapa). */
 export const ORDEM_ETAPA: Record<EtapaPagamento, number> = {
   NA_CGLIC: 0,
+  DEVOLVIDO_CORRECAO: 1,
   NA_CGOFI: 1,
   EM_ANDAMENTO: 2,
   ERRO_SIAFI: 3,
@@ -36,21 +37,40 @@ const dias = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`;
 /** O que a tabela mostra de cada linha (ciclo da CGLIC ou fatura do Contratos.gov.br). */
 export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date()): LinhaPagamento {
   if (row.tipo === 'CICLO') {
-    const { ciclo } = row;
+    const { ciclo, faturas } = row;
     const status = getPaymentStatusDisplay(ciclo.status);
     const etapaAtual = ciclo.etapaAtual;
     const atraso = etapaAtual?.atrasado ? Math.abs(etapaAtual.diasUteisRestantes) : 0;
+    const nfs =
+      faturas.length > 0
+        ? faturas.map((f) => f.numero ?? f.idFatura).join(', ')
+        : (ciclo.itens ?? []).length > 0
+          ? (ciclo.itens ?? []).map((i) => i.notaFiscal).join(', ')
+          : null;
+    const liquidado = ciclo.status === 'LIQUIDADO' && ciclo.input.dataLiquidacao;
+    const diasLiquidado = liquidado ? diasDesde(ciclo.input.dataLiquidacao!, hoje) : 0;
     return {
-      documento: `Atesto ${ciclo.input.documentoAtestoSei || 'sem SEI'}`,
-      referencia: null,
-      empenho: ciclo.input.empenhoCanonicalKey ?? null,
+      documento: nfs ? `NF ${nfs}` : `Atesto ${ciclo.input.documentoAtestoSei || 'sem SEI'}`,
+      referencia: faturas[0]?.referencia ?? null,
+      empenho: faturas.find((f) => f.empenhos)?.empenhos ?? (ciclo.input.empenhoCanonicalKey?.split('-').pop() || null),
       valor: ciclo.input.valorAtesto,
       etapa: {
         label: status.label,
         variant: status.variant,
-        detalhe: ciclo.input.responsavelNome ? `Resp.: ${ciclo.input.responsavelNome}` : null
+        detalhe: liquidado
+          ? ciclo.input.numeroNp ?? null
+          : ciclo.input.responsavelNome
+            ? `Resp.: ${ciclo.input.responsavelNome}`
+            : null
       },
-      prazo: etapaAtual
+      prazo: liquidado
+        ? {
+            texto: `Liquidada em ${dataBR(ciclo.input.dataLiquidacao)}`,
+            detalhe: `aguardando OB há ${dias(diasLiquidado)}`,
+            atrasado: diasLiquidado > 5,
+            ordem: ciclo.input.dataLiquidacao ?? null
+          }
+        : etapaAtual
         ? {
             texto: `${ETAPA_DO_CICLO[etapaAtual.etapa]} ${dataBR(etapaAtual.dataAlvo)}`,
             detalhe: etapaAtual.atrasado ? `atrasado ${diasUteis(atraso)}` : diasUteis(etapaAtual.diasUteisRestantes),
@@ -59,7 +79,7 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
           }
         : { texto: '—', detalhe: null, atrasado: false, ordem: null },
       ano: ciclo.input.dataRecebimento?.slice(0, 4) ?? null,
-      busca: [ciclo.input.documentoAtestoSei, ciclo.input.numeroProcessoPagamentoSei, ciclo.input.responsavelNome, ciclo.input.empenhoCanonicalKey]
+      busca: [ciclo.input.documentoAtestoSei, ciclo.input.numeroProcessoPagamentoSei, ciclo.input.responsavelNome, ciclo.input.empenhoCanonicalKey, ciclo.input.numeroNp, nfs]
         .filter(Boolean)
         .join(' ')
     };

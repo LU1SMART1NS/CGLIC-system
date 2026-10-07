@@ -5,7 +5,7 @@
  * - UI-01: Renderização dos ciclos e seus metadados (documentos, atesto, status, responsável).
  * - UI-02: Exibição do estado vazio ("Nenhum ciclo de faturamento/atesto em acompanhamento").
  * - UI-03: Renderização de múltiplos ciclos no mesmo contrato.
- * - E2E-01: Acompanhamento pelos quatro marcos (recebido, conferido, enviado, pago) e prazo da etapa, sem checklist.
+ * - E2E-01: Acompanhamento pelos cinco marcos (recebido, conferido, enviado, liquidado e pago) e prazo da etapa, sem checklist.
  * - FIN-01: Informação financeira mantida como somente leitura.
  */
 
@@ -27,6 +27,13 @@ import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 // QueryClientProvider em runtime real. Nos testes de componente (renderização
 // estática, sem interação), mockamos o hook diretamente, no mesmo padrão já
 // usado para outros hooks baseados em React Query neste projeto.
+// Os formulários do ciclo leem empenhos e faturas pelo React Query: aqui sem dados.
+vi.mock('@tanstack/react-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
+  useQuery: vi.fn(() => ({ data: undefined, isLoading: false, refetch: vi.fn() })),
+  useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() }))
+}));
+
 vi.mock('../../../hooks/useContractPaymentFollowUp', () => ({
   useContractPaymentFollowUp: vi.fn()
 }));
@@ -140,7 +147,7 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
     expect(html).not.toContain('ciclos ativos');
     expect(html).not.toContain('payment-active-count');
     // Um único botão de registro (o do topo); o estado vazio só explica
-    expect(html.split('Registrar Atesto / Faturamento').length - 1).toBe(1);
+    expect(html.split('Abrir ciclo de pagamento').length - 1).toBe(1);
     expect(html).not.toContain('Registrar Primeiro Ciclo');
   });
 
@@ -175,7 +182,7 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
     expect(html).toContain('Termo de Atesto · Nota Fiscal Eletrônica nº 1234');
     expect(html).toContain('Id. SEI:');
     expect(html).toContain('12345678');
-    expect(html).toContain('Recebido em');
+    expect(html).toContain('chegou em');
     expect(html).not.toContain('Competência');
   });
 
@@ -191,20 +198,20 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
     expect(html).not.toContain('payment-tasks-');
   });
 
-  it('mostra os quatro marcos e o prazo da etapa em curso, com o dono (CGLIC) da conferência', () => {
+  it('mostra os cinco marcos e o prazo da etapa em curso, com o dono (CGLIC) da conferência', () => {
     vi.mocked(paymentFollowUpHookModule.useContractPaymentFollowUp).mockReturnValue(hookResult([baseCycle]));
 
     const html = renderToStaticMarkup(
       <ContractPaymentFollowUpSection contract={mockContract} contractKey="200331-50-2024" />
     );
 
-    for (const marco of ['Recebido', 'Conferido', 'Enviado à CGOFI', 'Pago']) {
+    for (const marco of ['Recebido', 'Conferido', 'Enviado à CGOFI', 'Liquidado', 'Pago']) {
       expect(html).toContain(marco);
     }
     expect(html).toContain('Em conferência');
     expect(html).toContain('Conferir a documentação até 17/09/2026');
     expect(html).toContain('faltam 4 dias úteis');
-    expect(html).toContain('title="Registrar conferência"');
+    expect(html).toContain('title="Conferir"');
   });
 
   it('depois do envio, a CGOFI é a dona do prazo: a CGLIC só acompanha e cobra', () => {
@@ -243,7 +250,7 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
       <ContractPaymentFollowUpSection contract={mockContract} contractKey="200331-50-2024" />
     );
     expect(html).toContain('Pago (OB emitida)');
-    expect(html).not.toContain('title="Registrar conferência"');
+    expect(html).not.toContain('title="Conferir"');
     expect(html).not.toContain('title="Enviar à CGOFI"');
   });
 
@@ -255,8 +262,8 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
       <ContractPaymentFollowUpSection contract={mockContract} contractKey="200331-50-2024" />
     );
 
-    expect(html).not.toContain('Registrar Atesto / Faturamento');
-    expect(html).not.toContain('title="Registrar conferência"');
+    expect(html).not.toContain('Abrir ciclo de pagamento');
+    expect(html).not.toContain('title="Conferir"');
     expect(html).toContain('Termo de Atesto');
   });
 

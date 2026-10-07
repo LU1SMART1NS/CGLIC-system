@@ -2,6 +2,14 @@ import React from 'react';
 import { ActionButton, AppButton, Modal, NoticeBar } from '../../../design-system';
 import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 import type { CreatePaymentCycleInput, RegisterPaymentMarcoInput } from '../../../adapters/paymentCycleRpcAdapter';
+import {
+  empenhosSemSaldo,
+  errorMessage,
+  margemDaChegada,
+  useEmpenhosDoContrato,
+  type ContratoParaCiclo
+} from './cicloPagamentoShared';
+import { PAGAMENTO_RULES } from '../../../config/alertRules';
 import { ResponsavelField, type ResponsavelValue } from '../ResponsavelField';
 import {
   formatCurrencyInputBR,
@@ -14,23 +22,9 @@ import {
   todayISO
 } from './paymentFormUtils';
 
-export const TIPOS_DOCUMENTO_RECEBIDO = [
-  'Termo de Atesto',
-  'Nota Fiscal Eletrônica',
-  'Nota Fiscal',
-  'Fatura',
-  'Apólice de Seguro',
-  'Boleto Bancário',
-  'Guia de Recolhimento',
-  'Multa',
-  'Ofício',
-  'Recibo',
-  'RPA'
-];
+const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const errorMessage = (err: unknown, fallback: string) => (err as { message?: string } | null)?.message || fallback;
-
-const Field: React.FC<{ id: string; label: string; children: React.ReactNode; hint?: React.ReactNode }> = ({ id, label, children, hint }) => (
+export const Field: React.FC<{ id: string; label: string; children: React.ReactNode; hint?: React.ReactNode }> = ({ id, label, children, hint }) => (
   <div className="form-group">
     <label className="form-label" htmlFor={id}>{label}</label>
     {children}
@@ -39,12 +33,13 @@ const Field: React.FC<{ id: string; label: string; children: React.ReactNode; hi
 );
 
 /** Campo de data dd/mm/aaaa com máscara. */
-const DateField: React.FC<{ id: string; label: string; value: string; onChange: (v: string) => void; hint?: React.ReactNode }> = ({
+export const DateField: React.FC<{ id: string; label: string; value: string; onChange: (v: string) => void; hint?: React.ReactNode; required?: boolean }> = ({
   id,
   label,
   value,
   onChange,
-  hint
+  hint,
+  required = true
 }) => (
   <Field id={id} label={label} hint={hint}>
     <input
@@ -56,22 +51,21 @@ const DateField: React.FC<{ id: string; label: string; value: string; onChange: 
       maxLength={10}
       value={value}
       onChange={(e) => onChange(maskDateInputBR(e.target.value))}
-      required
+      required={required}
     />
   </Field>
 );
 
-const JustificativaField: React.FC<{ id: string; value: string; onChange: (v: string) => void; hint: string }> = ({ id, value, onChange, hint }) => (
-  <Field id={id} label="Justificativa do prazo *" hint={hint}>
-    <input
-      id={id}
-      className="form-input"
-      type="text"
-      placeholder="Ex.: aguardando regularização no SICAF"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      required
-    />
+export const JustificativaField: React.FC<{ id: string; value: string; onChange: (v: string) => void; hint: string; label?: string; placeholder?: string }> = ({
+  id,
+  value,
+  onChange,
+  hint,
+  label = 'Justificativa do prazo *',
+  placeholder = 'Ex.: aguardando regularização no SICAF'
+}) => (
+  <Field id={id} label={label} hint={hint}>
+    <input id={id} className="form-input" type="text" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} required />
   </Field>
 );
 
@@ -79,40 +73,72 @@ const JustificativaField: React.FC<{ id: string; value: string; onChange: (v: st
  * Ações dos modais. Vão na prop `footer` do Modal (fixa, sempre visível, empilhada em 44px no celular);
  * o botão de envio usa `form` para submeter o formulário do corpo.
  */
-const FooterButtons: React.FC<{ formId: string; onCancel: () => void; saving: boolean; submitLabel: string }> = ({ formId, onCancel, saving, submitLabel }) => (
+export const FooterButtons: React.FC<{ formId: string; onCancel: () => void; saving: boolean; submitLabel: string; disabled?: boolean }> = ({
+  formId,
+  onCancel,
+  saving,
+  submitLabel,
+  disabled
+}) => (
   <>
     <ActionButton action="cancelar" type="button" onClick={onCancel} disabled={saving}>
       Cancelar
     </ActionButton>
-    <AppButton type="submit" form={formId} variant="primary" disabled={saving} isLoading={saving}>
+    <AppButton type="submit" form={formId} variant="primary" disabled={saving || disabled} isLoading={saving}>
       {saving ? 'Salvando...' : submitLabel}
     </AppButton>
   </>
 );
 
 // -----------------------------------------------------------------------------
-// Registrar ciclo
+// Abrir ciclo
 // -----------------------------------------------------------------------------
-interface DocRow {
-  tipo: string;
-  numero: string;
-  sei: string;
-  valor: string;
+interface ItemRow {
+  notaFiscal: string;
+  notaFiscalSei: string;
+  atestoSei: string;
+  empenho: string;
+  subelemento: string;
+  bruto: string;
+  juros: string;
+  glosa: string;
+  desconto: string;
+  justificativaJuros: string;
 }
+
+const itemVazio = (empenho = ''): ItemRow => ({
+  notaFiscal: '',
+  notaFiscalSei: '',
+  atestoSei: '',
+  empenho,
+  subelemento: '',
+  bruto: '',
+  juros: '',
+  glosa: '',
+  desconto: '',
+  justificativaJuros: ''
+});
+
+const aPagar = (i: ItemRow) =>
+  (parseCurrencyInputBR(i.bruto) ?? 0) + (parseCurrencyInputBR(i.juros) ?? 0) - (parseCurrencyInputBR(i.glosa) ?? 0) - (parseCurrencyInputBR(i.desconto) ?? 0);
 
 export const CreateCycleModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  contractKey: string;
+  /** Contrato fixo (tela do Contrato); sem ele, o usuário escolhe em `contratos` (aba Pagamentos). */
+  contractKey?: string;
+  contratos?: ContratoParaCiclo[];
   gestorNome?: string;
   registradoPorNome?: string;
   onSubmit: (input: CreatePaymentCycleInput) => Promise<void>;
-}> = ({ isOpen, onClose, contractKey, gestorNome, registradoPorNome, onSubmit }) => {
+}> = ({ isOpen, onClose, contractKey: contratoFixo, contratos = [], gestorNome: gestorFixo, registradoPorNome, onSubmit }) => {
   const hoje = todayISO();
-  const [dataRecebimento, setDataRecebimento] = React.useState(isoToBR(hoje));
+  const [contrato, setContrato] = React.useState(contratoFixo ?? '');
+  const [processo, setProcesso] = React.useState('');
+  const [dataAtesto, setDataAtesto] = React.useState('');
+  const [dataChegada, setDataChegada] = React.useState(isoToBR(hoje));
   const [vencimento, setVencimento] = React.useState('');
-  const [valor, setValor] = React.useState('');
-  const [docs, setDocs] = React.useState<DocRow[]>([{ tipo: 'Termo de Atesto', numero: '', sei: '', valor: '' }]);
+  const [itens, setItens] = React.useState<ItemRow[]>([itemVazio()]);
   const [responsavel, setResponsavel] = React.useState<ResponsavelValue>({ nome: '' });
   const [prazo, setPrazo] = React.useState('');
   const [prazoTocado, setPrazoTocado] = React.useState(false);
@@ -120,140 +146,243 @@ export const CreateCycleModal: React.FC<{
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const recebimentoISO = parseDateInputBR(dataRecebimento);
-  const vencimentoISO = parseDateInputBR(vencimento);
-  const padraoISO = recebimentoISO ? prazoPadraoISO('CONFERENCIA', recebimentoISO) : '';
+  React.useEffect(() => {
+    if (contratoFixo) setContrato(contratoFixo);
+  }, [contratoFixo]);
 
-  // O prazo acompanha o recebimento até o usuário escolher outra data.
+  const contractKey = contratoFixo ?? contrato;
+  const gestorNome = gestorFixo ?? contratos.find((c) => c.contractKey === contractKey)?.gestorNome;
+  const { data: empenhos = [], isLoading: carregandoEmpenhos } = useEmpenhosDoContrato(contractKey || undefined);
+
+  // Com um só empenho com saldo, ele já vem escolhido.
+  React.useEffect(() => {
+    const comSaldo = empenhos.filter((e) => e.saldo > 0);
+    if (comSaldo.length === 1) setItens((prev) => prev.map((i) => (i.empenho ? i : { ...i, empenho: comSaldo[0].canonicalKey })));
+  }, [empenhos]);
+
+  const chegadaISO = parseDateInputBR(dataChegada);
+  const atestoISO = parseDateInputBR(dataAtesto);
+  const vencimentoISO = parseDateInputBR(vencimento);
+  const padraoISO = chegadaISO ? prazoPadraoISO('CONFERENCIA', chegadaISO) : '';
+
   React.useEffect(() => {
     if (!prazoTocado && padraoISO) setPrazo(isoToBR(padraoISO));
   }, [padraoISO, prazoTocado]);
 
   const prazoISO = parseDateInputBR(prazo);
   const alongado = Boolean(prazoISO && padraoISO && prazoExigeJustificativa({ prazoISO, padraoISO }));
+  const margem = chegadaISO && vencimentoISO ? margemDaChegada(chegadaISO, vencimentoISO) : null;
+  const foraDoPrazo = margem !== null && margem < PAGAMENTO_RULES.chegadaMinimaDiasUteis;
+  const total = itens.reduce((s, i) => s + aPagar(i), 0);
+  const semSaldo = empenhosSemSaldo(itens.map((i) => ({ empenho: i.empenho, valor: aPagar(i) })), empenhos);
 
-  const updateDoc = (idx: number, patch: Partial<DocRow>) =>
-    setDocs((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
+  const updateItem = (idx: number, patch: Partial<ItemRow>) => setItens((prev) => prev.map((i, n) => (n === idx ? { ...i, ...patch } : i)));
+
+  const limpar = () => {
+    setProcesso('');
+    setDataAtesto('');
+    setDataChegada(isoToBR(todayISO()));
+    setVencimento('');
+    setItens([itemVazio()]);
+    setResponsavel({ nome: '' });
+    setPrazoTocado(false);
+    setJustificativa('');
+    setError(null);
+    if (!contratoFixo) setContrato('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recebimentoISO || !vencimentoISO) return;
-    if (!docs.some((d) => d.tipo === 'Termo de Atesto')) {
-      setError('Entre os documentos deve haver o Termo de Atesto, com o Id. SEI dele.');
-      return;
-    }
+    if (!contractKey) return setError('Escolha o contrato.');
+    if (!atestoISO || !chegadaISO || !vencimentoISO) return setError('Preencha as datas completas (dd/mm/aaaa).');
+    if (atestoISO > chegadaISO) return setError('A chegada à CGLIC não pode ser anterior ao atesto.');
+    if (itens.some((i) => aPagar(i) < 0)) return setError('Glosa e desconto não podem passar do valor bruto mais juros.');
     setSaving(true);
     setError(null);
     try {
       await onSubmit({
         contractKey,
-        competencia: recebimentoISO.slice(0, 7),
-        dataRecebimento: recebimentoISO,
+        dataAssinaturaAtesto: atestoISO,
+        dataRecebimento: chegadaISO,
         dataVencimentoFatura: vencimentoISO,
-        valorAtesto: parseCurrencyInputBR(valor) ?? 0,
-        documentos: docs.map((d) => ({
-          tipo: d.tipo,
-          numero: d.numero.trim() || undefined,
-          sei: d.sei.trim(),
-          valor: parseCurrencyInputBR(d.valor)
+        numeroProcessoPagamentoSei: processo.trim(),
+        itens: itens.map((i) => ({
+          notaFiscal: i.notaFiscal.trim(),
+          notaFiscalSei: i.notaFiscalSei.trim() || undefined,
+          atestoSei: i.atestoSei.trim(),
+          empenhoCanonicalKey: i.empenho,
+          subelemento: i.subelemento.trim() || undefined,
+          valorBruto: parseCurrencyInputBR(i.bruto) ?? 0,
+          jurosMulta: parseCurrencyInputBR(i.juros) ?? 0,
+          glosa: parseCurrencyInputBR(i.glosa) ?? 0,
+          desconto: parseCurrencyInputBR(i.desconto) ?? 0,
+          justificativaJuros: (parseCurrencyInputBR(i.juros) ?? 0) > 0 ? i.justificativaJuros.trim() : undefined
         })),
         prazoConferenciaAte: prazoISO || undefined,
         prazoPadrao: padraoISO || undefined,
         justificativaPrazo: alongado ? justificativa.trim() : undefined,
         responsavelNome: responsavel.nome.trim() || undefined,
         responsavelUserId: responsavel.nome.trim() ? responsavel.userId : undefined,
-        registradoPorNome,
-        // O acompanhamento de pagamento é feito pelos marcos; tarefas ficam no Plano de gestão.
-        applyTaskTemplate: false
+        registradoPorNome
       });
-      setDocs([{ tipo: 'Termo de Atesto', numero: '', sei: '', valor: '' }]);
-      setValor('');
-      setVencimento('');
-      setResponsavel({ nome: '' });
-      setPrazoTocado(false);
-      setJustificativa('');
+      limpar();
       onClose();
     } catch (err) {
-      setError(errorMessage(err, 'Não foi possível registrar o ciclo. Tente novamente.'));
+      setError(errorMessage(err, 'Não foi possível abrir o ciclo. Tente novamente.'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Registrar documentos recebidos" size="lg" dismissible={!saving} testId="payment-cycle-modal" footer={<FooterButtons formId="payment-cycle-form" onCancel={onClose} saving={saving} submitLabel="Registrar ciclo" />}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Abrir ciclo de pagamento"
+      size="lg"
+      dismissible={!saving}
+      testId="payment-cycle-modal"
+      footer={<FooterButtons formId="payment-cycle-form" onCancel={onClose} saving={saving} submitLabel="Abrir ciclo" />}
+    >
       <form id="payment-cycle-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div className="form-grid">
-          <DateField id="payment-recebimento" label="Data de recebimento *" value={dataRecebimento} onChange={setDataRecebimento} hint="Início da contagem do prazo de conferência." />
-          <DateField id="payment-vencimento" label="Vencimento da fatura *" value={vencimento} onChange={setVencimento} />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>Documentos recebidos *</div>
-          {docs.map((d, idx) => (
-            <div key={idx} data-testid={`payment-doc-row-${idx}`} className={`payment-doc-row${idx > 0 ? ' payment-doc-row--followup' : ''}`}>
-              <Field id={`payment-doc-tipo-${idx}`} label="Tipo">
-                <select id={`payment-doc-tipo-${idx}`} className="form-input" value={d.tipo} onChange={(e) => updateDoc(idx, { tipo: e.target.value })} required>
-                  {TIPOS_DOCUMENTO_RECEBIDO.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field id={`payment-doc-numero-${idx}`} label="Nº">
-                <input id={`payment-doc-numero-${idx}`} className="form-input" type="text" placeholder="1234" value={d.numero} onChange={(e) => updateDoc(idx, { numero: e.target.value })} />
-              </Field>
-              <Field id={`payment-doc-sei-${idx}`} label="Id. SEI *">
-                <input id={`payment-doc-sei-${idx}`} className="form-input" type="text" placeholder="12345678" value={d.sei} onChange={(e) => updateDoc(idx, { sei: e.target.value })} required />
-              </Field>
-              <Field id={`payment-doc-valor-${idx}`} label="Valor (R$)">
-                <input id={`payment-doc-valor-${idx}`} className="form-input" type="text" inputMode="numeric" placeholder="0,00" value={d.valor} onChange={(e) => updateDoc(idx, { valor: formatCurrencyInputBR(e.target.value) })} />
-              </Field>
-              <ActionButton action="remover"
-                type="button"
-                size="sm"
-                disabled={idx === 0}
-                onClick={() => setDocs((prev) => prev.filter((_, i) => i !== idx))}
-                title="Remover documento"
-                className="payment-doc-remove"
-              >
-                <span className="payment-doc-remove__label">Remover</span>
-              </ActionButton>
-            </div>
-          ))}
-          <div>
-            <ActionButton action="adicionar" type="button" size="sm" onClick={() => setDocs((prev) => [...prev, { tipo: 'Nota Fiscal Eletrônica', numero: '', sei: '', valor: '' }])}>
-              Adicionar documento
-            </ActionButton>
-          </div>
+          {!contratoFixo && (
+            <Field id="payment-contrato" label="Contrato *">
+              <select id="payment-contrato" className="form-input" value={contrato} onChange={(e) => { setContrato(e.target.value); setItens([itemVazio()]); }} required>
+                <option value="">Escolha o contrato</option>
+                {contratos.map((c) => (
+                  <option key={c.contractKey} value={c.contractKey}>
+                    {c.numero}{c.fornecedorNome ? ` · ${c.fornecedorNome}` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <Field id="payment-processo" label="Processo SEI de pagamento *" hint="Um processo por pagamento (Portaria 50, art. 5º, § 1º).">
+            <input id="payment-processo" className="form-input" type="text" placeholder="08020.000000/2026-00" value={processo} onChange={(e) => setProcesso(e.target.value)} required />
+          </Field>
         </div>
 
         <div className="form-grid">
-          <Field id="payment-valor-atesto" label="Valor atestado (R$) *">
-            <input id="payment-valor-atesto" className="form-input" type="text" inputMode="numeric" placeholder="Ex: 15.450,00" value={valor} onChange={(e) => setValor(formatCurrencyInputBR(e.target.value))} required />
-          </Field>
+          <DateField id="payment-atesto" label="Data do atesto *" value={dataAtesto} onChange={setDataAtesto} hint="Início dos prazos de liquidação e pagamento." />
+          <DateField id="payment-chegada" label="Chegada à CGLIC *" value={dataChegada} onChange={setDataChegada} hint="Início do prazo de conferência." />
+          <DateField id="payment-vencimento" label="Vencimento contratual *" value={vencimento} onChange={setVencimento} />
+        </div>
+        {foraDoPrazo && (
+          <NoticeBar tone="warning" testId="payment-chegada-fora-prazo">
+            Chegou com {margem} {margem === 1 ? 'dia útil' : 'dias úteis'} até o vencimento; a Portaria 50 (art. 5º) pede no mínimo{' '}
+            {PAGAMENTO_RULES.chegadaMinimaDiasUteis}. Isso fica registrado no ciclo.
+          </NoticeBar>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>Do pagamento (Portaria 50, Anexo II) *</div>
+          {contractKey && !carregandoEmpenhos && empenhos.length === 0 && (
+            <NoticeBar tone="warning" testId="payment-sem-empenho">
+              Este contrato não tem empenho vinculado no sistema. Atualize os empenhos do contrato antes de abrir o ciclo.
+            </NoticeBar>
+          )}
+          {itens.map((item, idx) => {
+            const juros = parseCurrencyInputBR(item.juros) ?? 0;
+            return (
+              <div key={idx} data-testid={`payment-item-${idx}`} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', background: '#f8fafc' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: '0.6rem' }}>
+                  <Field id={`item-nf-${idx}`} label="Nota fiscal *">
+                    <input id={`item-nf-${idx}`} className="form-input" type="text" value={item.notaFiscal} onChange={(e) => updateItem(idx, { notaFiscal: e.target.value })} required />
+                  </Field>
+                  <Field id={`item-nf-sei-${idx}`} label="SEI da nota">
+                    <input id={`item-nf-sei-${idx}`} className="form-input" type="text" value={item.notaFiscalSei} onChange={(e) => updateItem(idx, { notaFiscalSei: e.target.value })} />
+                  </Field>
+                  <Field id={`item-atesto-${idx}`} label="SEI do atesto *">
+                    <input id={`item-atesto-${idx}`} className="form-input" type="text" value={item.atestoSei} onChange={(e) => updateItem(idx, { atestoSei: e.target.value })} required />
+                  </Field>
+                  <Field id={`item-empenho-${idx}`} label="Empenho *">
+                    <select id={`item-empenho-${idx}`} className="form-input" value={item.empenho} onChange={(e) => updateItem(idx, { empenho: e.target.value })} required disabled={!contractKey}>
+                      <option value="">{carregandoEmpenhos ? 'Carregando...' : 'Escolha'}</option>
+                      {empenhos.map((e) => (
+                        <option key={e.canonicalKey} value={e.canonicalKey}>
+                          {e.numero} · saldo {moeda(e.saldo)}{e.naturezaDespesa ? ` · ND ${e.naturezaDespesa}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field id={`item-sub-${idx}`} label="Subelemento">
+                    <input id={`item-sub-${idx}`} className="form-input" type="text" inputMode="numeric" maxLength={8} placeholder="Ex.: 52" value={item.subelemento} onChange={(e) => updateItem(idx, { subelemento: e.target.value.replace(/\D/g, '') })} />
+                  </Field>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))', gap: '0.6rem', alignItems: 'end' }}>
+                  <Field id={`item-bruto-${idx}`} label="Valor bruto *">
+                    <input id={`item-bruto-${idx}`} className="form-input" type="text" inputMode="numeric" placeholder="0,00" value={item.bruto} onChange={(e) => updateItem(idx, { bruto: formatCurrencyInputBR(e.target.value) })} required />
+                  </Field>
+                  <Field id={`item-juros-${idx}`} label="Juros/multa">
+                    <input id={`item-juros-${idx}`} className="form-input" type="text" inputMode="numeric" placeholder="0,00" value={item.juros} onChange={(e) => updateItem(idx, { juros: formatCurrencyInputBR(e.target.value) })} />
+                  </Field>
+                  <Field id={`item-glosa-${idx}`} label="Glosa">
+                    <input id={`item-glosa-${idx}`} className="form-input" type="text" inputMode="numeric" placeholder="0,00" value={item.glosa} onChange={(e) => updateItem(idx, { glosa: formatCurrencyInputBR(e.target.value) })} />
+                  </Field>
+                  <Field id={`item-desconto-${idx}`} label="Desconto">
+                    <input id={`item-desconto-${idx}`} className="form-input" type="text" inputMode="numeric" placeholder="0,00" value={item.desconto} onChange={(e) => updateItem(idx, { desconto: formatCurrencyInputBR(e.target.value) })} />
+                  </Field>
+                  <div className="form-group">
+                    <span className="form-label">A pagar</span>
+                    <strong style={{ fontSize: '0.95rem', padding: '0.45rem 0' }}>{moeda(aPagar(item))}</strong>
+                  </div>
+                </div>
+                {juros > 0 && (
+                  <JustificativaField
+                    id={`item-just-juros-${idx}`}
+                    label="Justificativa dos juros/multa *"
+                    placeholder="Ex.: atraso causado por ..."
+                    value={item.justificativaJuros}
+                    onChange={(v) => updateItem(idx, { justificativaJuros: v })}
+                    hint="Pagamento com juros ou multa exige justificativa (Portaria 50, art. 5º, § 7º)."
+                  />
+                )}
+                {itens.length > 1 && (
+                  <div>
+                    <ActionButton action="remover" type="button" size="sm" onClick={() => setItens((prev) => prev.filter((_, n) => n !== idx))}>
+                      Remover nota
+                    </ActionButton>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <ActionButton action="adicionar" type="button" size="sm" onClick={() => setItens((prev) => [...prev, itemVazio(prev[prev.length - 1]?.empenho)])}>
+              Adicionar nota fiscal
+            </ActionButton>
+            <span style={{ fontSize: '0.85rem', color: '#334155' }}>
+              Total a pagar: <strong>{moeda(total)}</strong>
+            </span>
+          </div>
+          {semSaldo.length > 0 && (
+            <NoticeBar tone="warning" testId="payment-empenho-sem-saldo">
+              O valor passa do saldo de {semSaldo.join(', ')} (empenhado menos o já pago por fatura). Na conferência, o item "Nota de
+              empenho" virá marcado como "Não".
+            </NoticeBar>
+          )}
+        </div>
+
+        <div className="form-grid">
           <Field
             id="payment-cycle-responsavel"
             label="Servidor designado"
-            hint={
-              gestorNome
-                ? 'Com o gestor do contrato selecionado, o ciclo acompanha automaticamente uma troca de Gestor Titular.'
-                : 'Este contrato ainda não tem Gestor Titular. Defina-o no topo da página ou informe um responsável aqui.'
-            }
+            hint={gestorNome ? 'Com o gestor do contrato selecionado, o ciclo acompanha uma troca de Gestor Titular.' : 'Contrato sem Gestor Titular: informe um responsável.'}
           >
             <ResponsavelField id="payment-cycle-responsavel" value={responsavel} onChange={setResponsavel} gestorNome={gestorNome} gestorLabel="gestor do contrato" />
           </Field>
+          <DateField
+            id="payment-prazo-conferencia"
+            label="Conferir a documentação até *"
+            value={prazo}
+            onChange={(v) => {
+              setPrazo(v);
+              setPrazoTocado(true);
+            }}
+            hint={padraoISO ? `Prazo padrão: ${isoToBR(padraoISO)}.` : undefined}
+          />
         </div>
-
-        <DateField
-          id="payment-prazo-conferencia"
-          label="Conferir a documentação até *"
-          value={prazo}
-          onChange={(v) => {
-            setPrazo(v);
-            setPrazoTocado(true);
-          }}
-          hint={padraoISO ? `Prazo padrão: ${isoToBR(padraoISO)}.` : undefined}
-        />
         {alongado && (
           <JustificativaField id="payment-prazo-justificativa" value={justificativa} onChange={setJustificativa} hint="Prazo além do padrão exige justificativa." />
         )}
@@ -265,102 +394,73 @@ export const CreateCycleModal: React.FC<{
 };
 
 // -----------------------------------------------------------------------------
-// Registrar o próximo marco
+// Marcos simples: recebido de volta, resultado da CGOFI, envio à COLOG, prorrogação da liquidação
 // -----------------------------------------------------------------------------
-type Resultado = 'EM_ORDEM' | 'COM_PENDENCIA' | 'PAGO' | 'DEVOLVIDO';
+export type MarcoSimples = 'RETORNO' | 'RESULTADO_CGOFI' | 'ENVIADO_COLOG' | 'PRORROGACAO_LIQUIDACAO';
 
-export function marcoActionLabel(cycle: PaymentFollowUpCycle): string | null {
-  switch (cycle.status) {
-    case 'RECEBIDO':
-    case 'COM_PENDENCIA':
-    case 'DEVOLVIDO':
-      return 'Registrar conferência';
-    case 'CONFERIDO':
-      return 'Enviar à CGOFI';
-    case 'ENVIADO_CGOFI':
-      return 'Registrar resultado da CGOFI';
-    default:
-      return null;
-  }
-}
+const TITULO_MARCO: Record<MarcoSimples, string> = {
+  RETORNO: 'Recebido de volta',
+  RESULTADO_CGOFI: 'Resultado da CGOFI',
+  ENVIADO_COLOG: 'Enviar à COLOG',
+  PRORROGACAO_LIQUIDACAO: 'Prorrogar o prazo de liquidação'
+};
 
-export const MarcoModal: React.FC<{
+export const MarcoSimplesModal: React.FC<{
   cycle: PaymentFollowUpCycle | null;
+  marco: MarcoSimples | null;
   onClose: () => void;
   registradoPorNome?: string;
   onSubmit: (input: RegisterPaymentMarcoInput) => Promise<void>;
-}> = ({ cycle, onClose, registradoPorNome, onSubmit }) => {
-  const status = cycle?.status;
-  const fase = status === 'CONFERIDO' ? 'ENVIO' : status === 'ENVIADO_CGOFI' ? 'CGOFI' : 'CONFERENCIA';
-  const [resultado, setResultado] = React.useState<Resultado>(fase === 'CGOFI' ? 'PAGO' : 'EM_ORDEM');
+}> = ({ cycle, marco, onClose, registradoPorNome, onSubmit }) => {
+  const [resultado, setResultado] = React.useState<'PAGO' | 'DEVOLVIDO'>('PAGO');
   const [data, setData] = React.useState(isoToBR(todayISO()));
   const [sei, setSei] = React.useState('');
   const [numeroOb, setNumeroOb] = React.useState('');
   const [motivo, setMotivo] = React.useState('');
-  const [origem, setOrigem] = React.useState<'FORNECEDOR' | 'FISCAL'>('FORNECEDOR');
   const [prazo, setPrazo] = React.useState('');
   const [prazoTocado, setPrazoTocado] = React.useState(false);
   const [justificativa, setJustificativa] = React.useState('');
-  const [regularidade, setRegularidade] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Cada vez que um ciclo é aberto, o formulário recomeça com os padrões da etapa.
   React.useEffect(() => {
-    if (!cycle) return;
-    setResultado(fase === 'CGOFI' ? 'PAGO' : 'EM_ORDEM');
+    setResultado('PAGO');
     setData(isoToBR(todayISO()));
     setSei('');
     setNumeroOb('');
     setMotivo('');
-    setOrigem('FORNECEDOR');
     setPrazoTocado(false);
     setJustificativa('');
-    setRegularidade(false);
     setError(null);
-  }, [cycle?.cycleKey, status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cycle?.cycleKey, marco]);
 
   const dataISO = parseDateInputBR(data);
-
-  // Qual prazo este formulário define: enviar (após conferir), cobrar a CGOFI (após enviar) ou nova conferência
-  // (pendência ou devolução).
-  const alvoEtapa: 'ENVIO' | 'COBRANCA_CGOFI' | 'CONFERENCIA' | null =
-    fase === 'CONFERENCIA' ? (resultado === 'COM_PENDENCIA' ? 'CONFERENCIA' : 'ENVIO')
-    : fase === 'ENVIO' ? 'COBRANCA_CGOFI'
-    : resultado === 'DEVOLVIDO' ? 'CONFERENCIA'
-    : null;
-
-  const padraoISO = dataISO && alvoEtapa ? prazoPadraoISO(alvoEtapa, dataISO) : '';
+  const precisaPrazo = marco === 'RETORNO' || (marco === 'RESULTADO_CGOFI' && resultado === 'DEVOLVIDO');
+  const padraoISO = dataISO && precisaPrazo ? prazoPadraoISO('CONFERENCIA', dataISO) : '';
   React.useEffect(() => {
     if (!prazoTocado) setPrazo(padraoISO ? isoToBR(padraoISO) : '');
   }, [padraoISO, prazoTocado]);
 
-  if (!cycle) return null;
+  if (!cycle || !marco) return null;
 
   const prazoISO = parseDateInputBR(prazo);
-  const usaMotivoComoJustificativa = resultado === 'COM_PENDENCIA' || resultado === 'DEVOLVIDO';
-  const alongado =
-    Boolean(prazoISO && padraoISO) &&
-    prazoExigeJustificativa({ prazoISO, padraoISO });
-  const pedeJustificativa = alongado && !usaMotivoComoJustificativa;
-
-  const titulo = marcoActionLabel(cycle) || 'Registrar marco';
+  const alongado = marco === 'RETORNO' && Boolean(prazoISO && padraoISO && prazoExigeJustificativa({ prazoISO, padraoISO }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dataISO) return;
+    const comum = { cycleKey: cycle.cycleKey, data: dataISO, registradoPorNome };
     let input: RegisterPaymentMarcoInput;
-    const comum = { cycleKey: cycle.cycleKey, data: dataISO, registradoPorNome, prazoPadrao: padraoISO || undefined };
-    if (fase === 'CONFERENCIA' && resultado === 'COM_PENDENCIA') {
-      input = { ...comum, marco: 'PENDENCIA', motivo: motivo.trim(), origemPendencia: origem, prazoNovo: prazoISO || undefined };
-    } else if (fase === 'CONFERENCIA') {
-      input = { ...comum, marco: 'CONFERIDO', regularidadeVerificada: regularidade, prazoNovo: prazoISO || undefined, justificativa: pedeJustificativa ? justificativa.trim() : undefined };
-    } else if (fase === 'ENVIO') {
-      input = { ...comum, marco: 'ENVIADO_CGOFI', sei: sei.trim(), prazoNovo: prazoISO || undefined, justificativa: pedeJustificativa ? justificativa.trim() : undefined };
+    if (marco === 'RETORNO') {
+      input = { ...comum, marco: 'RETORNO', prazoNovo: prazoISO || undefined, prazoPadrao: padraoISO || undefined, justificativa: alongado ? justificativa.trim() : undefined };
+    } else if (marco === 'ENVIADO_COLOG') {
+      input = { ...comum, marco: 'ENVIADO_COLOG', sei: sei.trim() };
+    } else if (marco === 'PRORROGACAO_LIQUIDACAO') {
+      input = { ...comum, marco: 'PRORROGACAO_LIQUIDACAO', justificativa: justificativa.trim() };
     } else if (resultado === 'DEVOLVIDO') {
-      input = { ...comum, marco: 'DEVOLVIDO', motivo: motivo.trim(), prazoNovo: prazoISO || undefined };
+      input = { ...comum, marco: 'DEVOLVIDO', motivo: motivo.trim(), prazoNovo: prazoISO || undefined, prazoPadrao: padraoISO || undefined };
     } else {
-      input = { ...comum, marco: 'PAGO', numeroOb: numeroOb.trim() };
+      input = { ...comum, marco: 'PAGO', numeroOb: numeroOb.trim(), justificativa: justificativa.trim() || undefined };
     }
     setSaving(true);
     setError(null);
@@ -375,96 +475,80 @@ export const MarcoModal: React.FC<{
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={titulo} size="md" dismissible={!saving} testId="payment-marco-modal" footer={<FooterButtons formId="payment-marco-form" onCancel={onClose} saving={saving} submitLabel="Registrar" />}>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={TITULO_MARCO[marco]}
+      size="md"
+      dismissible={!saving}
+      testId="payment-marco-modal"
+      footer={<FooterButtons formId="payment-marco-form" onCancel={onClose} saving={saving} submitLabel="Registrar" />}
+    >
       <form id="payment-marco-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {fase === 'CONFERENCIA' && (
-          <Field id="marco-resultado" label="Resultado da conferência">
-            <select id="marco-resultado" className="form-input" value={resultado} onChange={(e) => { setResultado(e.target.value as Resultado); setPrazoTocado(false); }}>
-              <option value="EM_ORDEM">Em ordem</option>
-              <option value="COM_PENDENCIA">Com pendência</option>
-            </select>
-          </Field>
+        {marco === 'RESULTADO_CGOFI' && (
+          <>
+            <NoticeBar tone="info" testId="payment-conciliacao-info">
+              O sistema registra sozinho a liquidação e o pagamento quando a fatura do ciclo ganha NP e ordem bancária no
+              Contratos.gov.br e no Tesouro. Use este registro só para devolução ou para lançar uma OB que o sistema ainda não achou.
+            </NoticeBar>
+            <Field id="marco-resultado" label="Resultado">
+              <select id="marco-resultado" className="form-input" value={resultado} onChange={(e) => { setResultado(e.target.value as 'PAGO' | 'DEVOLVIDO'); setPrazoTocado(false); }}>
+                <option value="PAGO">Pago (ordem bancária emitida)</option>
+                <option value="DEVOLVIDO">Devolvido pela CGOFI</option>
+              </select>
+            </Field>
+          </>
         )}
-        {fase === 'CONFERENCIA' && resultado === 'EM_ORDEM' && (
-          <label htmlFor="marco-regularidade" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.85rem', color: '#334155' }}>
-            <input
-              id="marco-regularidade"
-              type="checkbox"
-              checked={regularidade}
-              onChange={(e) => setRegularidade(e.target.checked)}
-              required
-              style={{ marginTop: '0.2rem' }}
-            />
-            <span>
-              Regularidade fiscal e trabalhista do credor verificada (SICAF / CNDs) *
-              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>
-                Se encontrou pendência (por exemplo, CND vencida), escolha "Com pendência" acima.
-              </span>
-            </span>
-          </label>
-        )}
-        {fase === 'CGOFI' && (
-          <Field id="marco-resultado" label="Resultado">
-            <select id="marco-resultado" className="form-input" value={resultado} onChange={(e) => { setResultado(e.target.value as Resultado); setPrazoTocado(false); }}>
-              <option value="PAGO">Pago (ordem bancária emitida)</option>
-              <option value="DEVOLVIDO">Devolvido pela CGOFI</option>
-            </select>
-          </Field>
+        {marco === 'PRORROGACAO_LIQUIDACAO' && (
+          <NoticeBar tone="info" testId="payment-prorrogacao-info">
+            O prazo de liquidação pode ser prorrogado uma vez, por igual período, quando houver diligência (IN 77, art. 7º, § 3º).
+          </NoticeBar>
         )}
 
         <DateField
           id="marco-data"
-          label={fase === 'ENVIO' ? 'Data de envio à CGOFI *' : resultado === 'PAGO' ? 'Data da ordem bancária *' : 'Data *'}
+          label={marco === 'RESULTADO_CGOFI' && resultado === 'PAGO' ? 'Data da ordem bancária *' : marco === 'RETORNO' ? 'Recebido de volta em *' : 'Data *'}
           value={data}
           onChange={(v) => { setData(v); setPrazoTocado(false); }}
         />
 
-        {fase === 'ENVIO' && (
-          <Field id="marco-sei" label="SEI do despacho *">
-            <input id="marco-sei" className="form-input" type="text" placeholder="Ex: 12345678" value={sei} onChange={(e) => setSei(e.target.value)} required />
+        {marco === 'ENVIADO_COLOG' && (
+          <Field id="marco-sei" label="SEI do despacho à COLOG *">
+            <input id="marco-sei" className="form-input" type="text" value={sei} onChange={(e) => setSei(e.target.value)} required />
           </Field>
         )}
-
-        {resultado === 'PAGO' && (
-          <Field id="marco-ob" label="Número da ordem bancária *">
-            <input id="marco-ob" className="form-input" type="text" placeholder="Ex: 2026OB800123" value={numeroOb} onChange={(e) => setNumeroOb(e.target.value)} required />
+        {marco === 'RESULTADO_CGOFI' && resultado === 'PAGO' && (
+          <>
+            <Field id="marco-ob" label="Número da ordem bancária *">
+              <input id="marco-ob" className="form-input" type="text" placeholder="Ex: 2026OB800123" value={numeroOb} onChange={(e) => setNumeroOb(e.target.value.toUpperCase())} required />
+            </Field>
+            <Field id="marco-just-ob" label="Justificativa (só se a OB ainda não aparece no Tesouro)">
+              <input id="marco-just-ob" className="form-input" type="text" value={justificativa} onChange={(e) => setJustificativa(e.target.value)} />
+            </Field>
+          </>
+        )}
+        {marco === 'RESULTADO_CGOFI' && resultado === 'DEVOLVIDO' && (
+          <Field id="marco-motivo" label="Motivo da devolução *">
+            <input id="marco-motivo" className="form-input" type="text" placeholder="Ex.: falta a consulta da NF-e" value={motivo} onChange={(e) => setMotivo(e.target.value)} required />
           </Field>
         )}
-
-        {resultado === 'COM_PENDENCIA' && (
-          <Field id="marco-origem" label="De quem é a pendência?">
-            <select id="marco-origem" className="form-input" value={origem} onChange={(e) => setOrigem(e.target.value as 'FORNECEDOR' | 'FISCAL')}>
-              <option value="FORNECEDOR">Do fornecedor</option>
-              <option value="FISCAL">Do fiscal (CGLIC)</option>
-            </select>
-          </Field>
-        )}
-
-        {usaMotivoComoJustificativa && (
-          <Field id="marco-motivo" label={resultado === 'DEVOLVIDO' ? 'Motivo da devolução *' : 'Motivo da pendência *'}>
-            <input id="marco-motivo" className="form-input" type="text" placeholder="Ex.: CND vencida" value={motivo} onChange={(e) => setMotivo(e.target.value)} required />
-          </Field>
-        )}
-
-        {alvoEtapa && (
+        {precisaPrazo && (
           <DateField
             id="marco-prazo"
-            label={
-              alvoEtapa === 'ENVIO' ? 'Enviar à CGOFI até *'
-              : alvoEtapa === 'COBRANCA_CGOFI' ? 'Cobrar a CGOFI em *'
-              : 'Conferir novamente até *'
-            }
+            label="Conferir novamente até *"
             value={prazo}
             onChange={(v) => { setPrazo(v); setPrazoTocado(true); }}
-            hint={
-              alvoEtapa === 'COBRANCA_CGOFI'
-                ? `Padrão: ${isoToBR(padraoISO)}. O prazo de pagamento é da CGOFI; esta é a data em que a CGLIC passa a cobrar.`
-                : padraoISO ? `Prazo padrão: ${isoToBR(padraoISO)}.` : undefined
-            }
+            hint={padraoISO ? `Prazo padrão: ${isoToBR(padraoISO)}.` : undefined}
           />
         )}
-        {pedeJustificativa && (
-          <JustificativaField id="marco-justificativa" value={justificativa} onChange={setJustificativa} hint="Prazo além do padrão exige justificativa." />
+        {(alongado || marco === 'PRORROGACAO_LIQUIDACAO') && (
+          <JustificativaField
+            id="marco-justificativa"
+            label={marco === 'PRORROGACAO_LIQUIDACAO' ? 'Justificativa (diligência) *' : 'Justificativa do prazo *'}
+            value={justificativa}
+            onChange={setJustificativa}
+            hint={marco === 'PRORROGACAO_LIQUIDACAO' ? 'Diga qual diligência exige mais prazo.' : 'Prazo além do padrão exige justificativa.'}
+          />
         )}
 
         {error && <NoticeBar tone="danger" testId="payment-marco-error">{error}</NoticeBar>}
@@ -511,7 +595,8 @@ export const CancelCycleModal: React.FC<{
     <Modal isOpen onClose={onClose} title="Cancelar ciclo" size="md" dismissible={!saving} testId="payment-cancel-modal" footer={<FooterButtons formId="payment-cancel-form" onCancel={onClose} saving={saving} submitLabel="Cancelar ciclo" />}>
       <form id="payment-cancel-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <NoticeBar tone="warning" testId="payment-cancel-note">
-          O ciclo continua no histórico, marcado como cancelado, e deixa de contar nos ciclos ativos e nos alertas.
+          O ciclo continua no histórico, marcado como cancelado, e deixa de contar nos ciclos ativos e nos alertas. As faturas
+          ligadas a ele ficam livres para outro ciclo.
         </NoticeBar>
         <Field id="cancel-motivo" label="Motivo do cancelamento *">
           <input

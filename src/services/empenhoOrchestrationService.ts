@@ -14,7 +14,7 @@ import { fetchAndNormalizeComprasGovEmpenhos } from '../adapters/comprasGovEmpen
 import { fetchAndNormalizeContratosGovEmpenhos } from '../adapters/contratosGovEmpenhoAdapter';
 import { fetchAndNormalizePncpEmpenhos } from '../adapters/pncpEmpenhoAdapter';
 import { reconcileNormalizedEmpenhos } from './empenhoReconciliationService';
-import { syncReconciledBatch, syncContractEmpenhosM17, vincularEmpenhosAoContratoUmAUm, rpcInexistente } from './empenhoSyncService';
+import { syncReconciledBatch, syncContractEmpenhosM17, vincularEmpenhosAoContratoUmAUm, rpcInexistente, gravarClassificacaoEmpenhos } from './empenhoSyncService';
 import type {
   OrchestrationTarget,
   ItemTarget,
@@ -500,6 +500,20 @@ export async function orchestrateContractEmpenhoSync(
       } else {
         erros.push({ origem: 'BANCO', erro: `Vínculos do contrato não gravados: ${err?.message || 'erro do banco.'}` });
       }
+    }
+  }
+
+  // F. Natureza de despesa e plano interno (migration 87): decidem, por exemplo, o envio à COLOG dos bens a
+  // incorporar. Falha aqui não muda o resultado da sincronização dos empenhos.
+  if (fontesConsultadas.includes('CONTRATOSNET')) {
+    const ids = syncSummary.ids_por_chave ?? {};
+    const classificacao = allNormalized
+      .filter((n) => n.fonte_origem === 'CONTRATOSNET' && ids[n.canonical_key])
+      .map((n) => ({ empenho_id: ids[n.canonical_key], natureza_despesa: n.natureza_despesa, plano_interno: n.plano_interno }));
+    try {
+      await gravarClassificacaoEmpenhos(classificacao);
+    } catch (err: any) {
+      if (!rpcInexistente(err)) console.warn('[empenhos] Natureza de despesa não gravada:', err?.message || err);
     }
   }
 
