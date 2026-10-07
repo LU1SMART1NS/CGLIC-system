@@ -8,6 +8,7 @@ import {
   fetchCiclosEmAberto,
   fetchEmpenhosCarteira,
   fetchFaturasCarteira,
+  fetchLigacoesCicloFatura,
   montarPagamentosCarteira
 } from '../services/financeiroCarteiraService';
 
@@ -15,7 +16,8 @@ import {
 export const FINANCEIRO_QUERY_KEYS = {
   faturas: ['financeiro-faturas'] as const,
   empenhos: ['financeiro-empenhos'] as const,
-  ciclos: ['financeiro-ciclos-em-aberto'] as const
+  ciclos: ['financeiro-ciclos-em-aberto'] as const,
+  ligacoes: ['financeiro-faturas-em-ciclo'] as const
 };
 
 const OPCOES = { staleTime: 10 * 60 * 1000, gcTime: 30 * 60 * 1000, refetchOnWindowFocus: false } as const;
@@ -51,13 +53,17 @@ export function useEmpenhosCarteira() {
 export function usePagamentosCarteira() {
   const faturas = useFaturasCarteira();
   const ciclos = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.ciclos, queryFn: fetchCiclosEmAberto, ...OPCOES });
-  const rows = useMemo(() => montarPagamentosCarteira(ciclos.data ?? [], faturas.data ?? []), [ciclos.data, faturas.data]);
+  const ligacoes = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.ligacoes, queryFn: fetchLigacoesCicloFatura, ...OPCOES });
+  const rows = useMemo(
+    () => montarPagamentosCarteira(ciclos.data ?? [], faturas.data ?? [], ligacoes.data ?? []),
+    [ciclos.data, faturas.data, ligacoes.data]
+  );
   return {
     rows,
     isLoading: faturas.isLoading || ciclos.isLoading,
-    isFetching: faturas.isFetching || ciclos.isFetching,
+    isFetching: faturas.isFetching || ciclos.isFetching || ligacoes.isFetching,
     error: (faturas.error || ciclos.error) as Error | null,
-    refetch: () => Promise.all([faturas.refetch(), ciclos.refetch()])
+    refetch: () => Promise.all([faturas.refetch(), ciclos.refetch(), ligacoes.refetch()])
   };
 }
 

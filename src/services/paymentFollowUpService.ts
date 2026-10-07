@@ -20,6 +20,7 @@ import type {
   PaymentCycleEvent,
   PaymentCycleEventTipo,
   PaymentCycleInput,
+  PaymentCycleItem,
   PaymentCyclePrazos,
   PaymentEtapaPrazo,
   PaymentFollowUpCycle,
@@ -27,7 +28,14 @@ import type {
   PaymentAlert
 } from '../types/paymentFollowUp';
 import type { FinancialBalances } from '../types/financialExecution';
-import type { RpcContractPaymentCycleRow, RpcPaymentCycleDocumentRow, RpcPaymentCycleEventRow } from '../types/rpc';
+import type {
+  RpcContractPaymentCycleRow,
+  RpcPaymentCycleChecklistRow,
+  RpcPaymentCycleDocumentRow,
+  RpcPaymentCycleEventRow,
+  RpcPaymentCycleFaturaRow,
+  RpcPaymentCycleItemRow
+} from '../types/rpc';
 import { PAGAMENTO_RULES } from '../config/alertRules';
 
 /**
@@ -366,7 +374,25 @@ export function rowToPaymentEvent(row: RpcPaymentCycleEventRow): PaymentCycleEve
     justificativa: row.justificativa ?? undefined,
     regularidadeVerificada: row.regularidade_verificada ?? undefined,
     registradoPorNome: row.registrado_por_nome ?? undefined,
+    automatico: row.automatico ?? undefined,
     criadoEm: row.created_at
+  };
+}
+
+export function rowToPaymentItem(row: RpcPaymentCycleItemRow): PaymentCycleItem {
+  return {
+    id: row.id,
+    notaFiscal: row.nota_fiscal,
+    notaFiscalSei: row.nota_fiscal_sei ?? undefined,
+    atestoSei: row.atesto_sei,
+    empenhoCanonicalKey: row.empenho_canonical_key,
+    subelemento: row.subelemento ?? undefined,
+    valorBruto: Number(row.valor_bruto) || 0,
+    jurosMulta: Number(row.juros_multa) || 0,
+    glosa: Number(row.glosa) || 0,
+    desconto: Number(row.desconto) || 0,
+    valorAPagar: Number(row.valor_a_pagar) || 0,
+    justificativaJuros: row.justificativa_juros ?? undefined
   };
 }
 
@@ -383,6 +409,9 @@ export function rowToPaymentFollowUpCycle(
     empenhoBalances?: Partial<FinancialBalances>;
     documentos?: RpcPaymentCycleDocumentRow[];
     eventos?: RpcPaymentCycleEventRow[];
+    itens?: RpcPaymentCycleItemRow[];
+    checklist?: RpcPaymentCycleChecklistRow[];
+    faturas?: RpcPaymentCycleFaturaRow[];
   }
 ): PaymentFollowUpCycle {
   const input: PaymentCycleInput = {
@@ -408,7 +437,12 @@ export function rowToPaymentFollowUpCycle(
     dataEnvioCgofi: row.data_envio_cgofi ?? undefined,
     numeroOrdemBancaria: row.numero_ordem_bancaria ?? undefined,
     dataOrdemBancaria: row.data_ordem_bancaria ?? undefined,
-    observacoes: row.observacoes ?? undefined
+    observacoes: row.observacoes ?? undefined,
+    dataLiquidacao: row.data_liquidacao ?? undefined,
+    numeroNp: row.numero_np ?? undefined,
+    cologEnviadoEm: row.colog_enviado_em ?? undefined,
+    cologSei: row.colog_sei ?? undefined,
+    liquidacaoProrrogada: Boolean(row.liquidacao_prorrogada)
   };
 
   const cycle = buildPaymentFollowUpCycle(input, {
@@ -422,6 +456,15 @@ export function rowToPaymentFollowUpCycle(
       .sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
   });
 
+  cycle.itens = [...(options?.itens ?? [])].sort((a, b) => a.ordem - b.ordem).map(rowToPaymentItem);
+  cycle.checklist = (options?.checklist ?? []).map((c) => ({
+    item: c.item,
+    resposta: c.resposta,
+    sei: c.sei ?? undefined,
+    conferidoEm: c.conferido_em,
+    conferidoPorNome: c.conferido_por_nome ?? undefined
+  }));
+  cycle.faturas = (options?.faturas ?? []).map((f) => ({ idFatura: Number(f.id_fatura), vinculadoPor: f.vinculado_por }));
   cycle.id = row.id;
   cycle.criadoEm = row.criado_em;
   cycle.atualizadoEm = row.atualizado_em;

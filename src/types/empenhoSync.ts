@@ -68,6 +68,10 @@ export interface NormalizedEmpenho {
   fonte_origem: EmpenhoFonteOrigem;
   identificador_fonte?: string;
   url_oficial?: string;
+  /** Natureza de despesa do Contratos.gov.br, ex.: "449052 - EQUIPAMENTOS E MATERIAL PERMANENTE". */
+  natureza_despesa?: string;
+  /** Plano interno do Contratos.gov.br (mostra, por exemplo, emenda parlamentar). */
+  plano_interno?: string;
   item_links?: NormalizedItemLink[];
   contract_links?: NormalizedContractLink[];
   vinculos_pendentes?: VinculoPendente[];

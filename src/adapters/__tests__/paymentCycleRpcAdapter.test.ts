@@ -55,53 +55,32 @@ describe('paymentCycleRpcAdapter (Fase 10-A.2 — persistência canônica de con
   });
 
   describe('createPaymentCycleRpc', () => {
-    it('chama create_payment_cycle_atomic com todos os campos mapeados e aplica o template por padrão', async () => {
+    const entrada = {
+      contractKey: 'C1',
+      dataAssinaturaAtesto: '2026-08-29',
+      dataRecebimento: '2026-09-01',
+      dataVencimentoFatura: '2026-09-20',
+      numeroProcessoPagamentoSei: '08020.012345/2026-11',
+      itens: [{ notaFiscal: '231', atestoSei: 'Doc 1', empenhoCanonicalKey: '200331-2026-2026NE412', valorBruto: 10000, glosa: 100 }]
+    };
+
+    it('chama create_payment_cycle_atomic com a data do atesto, o processo SEI e os itens "DO PAGAMENTO"', async () => {
       const mockResult = {
         success: true,
-        cycle: { id: 'uuid-1', cycle_key: 'C1-PGTO-202609-DOC1', contract_key: 'C1', competencia: '2026-09', status: 'RECEBIDO', criado_em: 'x' },
-        task_plan: { success: true, plan_id: 'plan-1' }
+        cycle: { id: 'uuid-1', cycle_key: 'C1-PGTO-202608-DOC1', contract_key: 'C1', competencia: '2026-08', status: 'RECEBIDO', criado_em: 'x' }
       };
       mockRpc.mockResolvedValueOnce({ data: mockResult, error: null });
 
-      const result = await createPaymentCycleRpc({
-        contractKey: 'C1',
-        competencia: '2026-09',
-        dataRecebimento: '2026-09-01',
-        dataVencimentoFatura: '2026-09-20',
-        valorAtesto: 10000,
-        documentos: [{ tipo: 'Termo de Atesto', sei: 'Doc 1' }]
-      });
+      const result = await createPaymentCycleRpc(entrada);
 
       expect(mockRpc).toHaveBeenCalledWith('create_payment_cycle_atomic', expect.objectContaining({
         p_contract_key: 'C1',
-        p_competencia: '2026-09',
+        p_data_assinatura_atesto: '2026-08-29',
         p_data_recebimento: '2026-09-01',
-        p_documentos: [{ tipo: 'Termo de Atesto', numero: null, sei: 'Doc 1', valor: null }],
-        p_valor_atesto: 10000,
-        p_apply_task_template: true
+        p_numero_processo_pagamento_sei: '08020.012345/2026-11',
+        p_itens: [expect.objectContaining({ nota_fiscal: '231', atesto_sei: 'Doc 1', empenho_canonical_key: '200331-2026-2026NE412', valor_bruto: 10000, glosa: 100, juros_multa: 0 })]
       }));
-      expect(result.cycle.cycle_key).toBe('C1-PGTO-202609-DOC1');
-    });
-
-    it('permite desativar a aplicação automática do template (applyTaskTemplate: false)', async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: { success: true, cycle: { id: 'x' }, task_plan: null },
-        error: null
-      });
-
-      await createPaymentCycleRpc({
-        contractKey: 'C1',
-        competencia: '2026-09',
-        dataRecebimento: '2026-09-01',
-        dataVencimentoFatura: '2026-09-20',
-        valorAtesto: 10000,
-        documentos: [{ tipo: 'Termo de Atesto', sei: 'Doc 1' }],
-        applyTaskTemplate: false
-      });
-
-      expect(mockRpc).toHaveBeenCalledWith('create_payment_cycle_atomic', expect.objectContaining({
-        p_apply_task_template: false
-      }));
+      expect(result.cycle.cycle_key).toBe('C1-PGTO-202608-DOC1');
     });
 
     it('mapeia erro PAYMENT_CYCLE_ALREADY_EXISTS (idempotência) sem criar duplicata', async () => {
@@ -109,17 +88,7 @@ describe('paymentCycleRpcAdapter (Fase 10-A.2 — persistência canônica de con
         data: null,
         error: { message: 'PAYMENT_CYCLE_ALREADY_EXISTS: Já existe um ciclo...', code: '23505' }
       });
-
-      await expect(
-        createPaymentCycleRpc({
-          contractKey: 'C1',
-          competencia: '2026-09',
-          dataRecebimento: '2026-09-01',
-          dataVencimentoFatura: '2026-09-20',
-          valorAtesto: 10000,
-          documentos: [{ tipo: 'Termo de Atesto', sei: 'Doc 1' }]
-        })
-      ).rejects.toMatchObject({ code: 'PAYMENT_CYCLE_ALREADY_EXISTS' });
+      await expect(createPaymentCycleRpc(entrada)).rejects.toMatchObject({ code: 'PAYMENT_CYCLE_ALREADY_EXISTS' });
     });
   });
 
@@ -157,15 +126,24 @@ describe('paymentCycleRpcAdapter (Fase 10-A.2 — persistência canônica de con
       expect(result.cycle.status).toBe('ENVIADO_CGOFI');
     });
 
-    it('na conferência em ordem envia a confirmação de SICAF / CNDs', async () => {
+    it('na conferência envia o checklist do Anexo I', async () => {
       mockRpc.mockResolvedValueOnce({
         data: { success: true, cycle: { id: 'x', cycle_key: 'C1', status: 'CONFERIDO' } },
         error: null
       });
-      await registerPaymentMarcoRpc({ cycleKey: 'C1', marco: 'CONFERIDO', data: '2026-09-02', regularidadeVerificada: true });
+      await registerPaymentMarcoRpc({ cycleKey: 'C1', marco: 'CONFERIDO', data: '2026-09-02', checklist: [{ item: 'SICAF', resposta: 'SIM', sei: '123' }] });
       expect(mockRpc).toHaveBeenCalledWith('register_payment_cycle_marco_atomic', expect.objectContaining({
         p_marco: 'CONFERIDO',
-        p_regularidade_verificada: true
+        p_checklist: [{ item: 'SICAF', resposta: 'SIM', sei: '123' }]
+      }));
+    });
+
+    it('no envio à CGOFI manda as faturas e o envio à COLOG', async () => {
+      mockRpc.mockResolvedValueOnce({ data: { success: true, cycle: { id: 'x', cycle_key: 'C1', status: 'ENVIADO_CGOFI' } }, error: null });
+      await registerPaymentMarcoRpc({ cycleKey: 'C1', marco: 'ENVIADO_CGOFI', data: '2026-09-02', sei: '1', faturas: [605039], enviarColog: true });
+      expect(mockRpc).toHaveBeenCalledWith('register_payment_cycle_marco_atomic', expect.objectContaining({
+        p_faturas: [605039],
+        p_enviar_colog: true
       }));
     });
 

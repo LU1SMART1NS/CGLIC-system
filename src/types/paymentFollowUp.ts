@@ -15,6 +15,7 @@ export type PaymentWorkflowStatus =
   | 'CONFERIDO'       // Conferência concluída, pronto para enviar à CGOFI
   | 'ENVIADO_CGOFI'   // Processo na CGOFI; a CGLIC só acompanha
   | 'DEVOLVIDO'       // Devolvido pela CGOFI; volta à conferência
+  | 'LIQUIDADO'       // Liquidado no SIAFI (lido da fatura pela conciliação); aguarda a OB
   | 'PAGO'            // Ordem Bancária emitida
   | 'CANCELADO';      // Cancelado por anulação do atesto ou rescisão
 
@@ -74,6 +75,37 @@ export interface PaymentCycleInput {
   numeroOrdemBancaria?: string;         // Número da Ordem Bancária SIAFI (ex: '2026OB800123')
   dataOrdemBancaria?: string;           // Data da emissão da OB (YYYY-MM-DD)
   observacoes?: string;
+  dataLiquidacao?: string;              // Liquidação no SIAFI (da fatura, pela conciliação)
+  numeroNp?: string;                    // Nota(s) de pagamento das faturas do ciclo
+  cologEnviadoEm?: string;              // Envio à COLOG (bens a incorporar)
+  cologSei?: string;
+  liquidacaoProrrogada?: boolean;       // Prazo de liquidação prorrogado (IN 77 art. 7º § 3º)
+}
+
+/** Item "DO PAGAMENTO" (Portaria 50, Anexo II). */
+export interface PaymentCycleItem {
+  id: string;
+  notaFiscal: string;
+  notaFiscalSei?: string;
+  atestoSei: string;
+  empenhoCanonicalKey: string;
+  subelemento?: string;
+  valorBruto: number;
+  jurosMulta: number;
+  glosa: number;
+  desconto: number;
+  valorAPagar: number;
+  justificativaJuros?: string;
+}
+
+export type ChecklistResposta = 'SIM' | 'NAO' | 'NA';
+
+export interface PaymentChecklistAnswer {
+  item: string;
+  resposta: ChecklistResposta;
+  sei?: string;
+  conferidoEm?: string;
+  conferidoPorNome?: string;
 }
 
 /**
@@ -99,7 +131,8 @@ export interface PaymentCycleDocument {
 }
 
 export type PaymentCycleEventTipo =
-  | 'RECEBIDO' | 'CONFERIDO' | 'PENDENCIA' | 'ENVIADO_CGOFI' | 'DEVOLVIDO' | 'PAGO' | 'CANCELADO' | 'PRAZO_ALONGADO';
+  | 'RECEBIDO' | 'CONFERIDO' | 'PENDENCIA' | 'RETORNO' | 'ENVIADO_CGOFI' | 'DEVOLVIDO' | 'LIQUIDADO' | 'PAGO' | 'OB_CANCELADA'
+  | 'CANCELADO' | 'PRAZO_ALONGADO' | 'PRORROGACAO_LIQUIDACAO' | 'ENVIADO_COLOG' | 'FATURA_VINCULADA';
 
 /** Registro do histórico do ciclo: marcos, pendências e prazos alongados. */
 export interface PaymentCycleEvent {
@@ -116,6 +149,8 @@ export interface PaymentCycleEvent {
   /** Na conferência: SICAF / CNDs do credor verificados. */
   regularidadeVerificada?: boolean;
   registradoPorNome?: string;
+  /** Registrado pela conciliação do sistema. */
+  automatico?: boolean;
   criadoEm: string;
 }
 
@@ -146,6 +181,10 @@ export interface PaymentFollowUpCycle {
   /** Documentos recebidos e histórico; ausentes nas listas consolidadas do painel. */
   documentos?: PaymentCycleDocument[];
   eventos?: PaymentCycleEvent[];
+  /** Itens "DO PAGAMENTO", checklist do Anexo I e faturas do Contratos.gov.br (migration 87). */
+  itens?: PaymentCycleItem[];
+  checklist?: PaymentChecklistAnswer[];
+  faturas?: Array<{ idFatura: number; vinculadoPor: 'USUARIO' | 'SISTEMA' }>;
   alerts: PaymentAlert[];
   criadoEm: string;
   atualizadoEm: string;

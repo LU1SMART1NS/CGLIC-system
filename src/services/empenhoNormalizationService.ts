@@ -340,6 +340,8 @@ export function normalizeFromContratosGov(
     credor_cnpj_cpf: credorCnpj,
     fonte_origem: 'CONTRATOSNET',
     identificador_fonte: record.id ? String(record.id) : undefined,
+    natureza_despesa: record.naturezadespesa?.trim() || undefined,
+    plano_interno: record.planointerno?.trim() || undefined,
     contract_links: contractLinks.length > 0 ? contractLinks : undefined,
     item_links: itemLinks.length > 0 ? itemLinks : undefined,
     vinculos_pendentes: vinculosPendentes.length > 0 ? vinculosPendentes : undefined

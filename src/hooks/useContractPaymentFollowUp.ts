@@ -29,8 +29,11 @@ import type {
 import type { FinancialBalances } from '../types/financialExecution';
 import type {
   RpcContractPaymentCycleRow,
+  RpcPaymentCycleChecklistRow,
   RpcPaymentCycleDocumentRow,
-  RpcPaymentCycleEventRow
+  RpcPaymentCycleEventRow,
+  RpcPaymentCycleFaturaRow,
+  RpcPaymentCycleItemRow
 } from '../types/rpc';
 import { isPaymentCycleEncerrado, rowToPaymentFollowUpCycle } from '../services/paymentFollowUpService';
 import {
@@ -54,6 +57,9 @@ interface PaymentCyclesData {
   rows: RpcContractPaymentCycleRow[];
   documentos: RpcPaymentCycleDocumentRow[];
   eventos: RpcPaymentCycleEventRow[];
+  itens: RpcPaymentCycleItemRow[];
+  checklist: RpcPaymentCycleChecklistRow[];
+  faturas: RpcPaymentCycleFaturaRow[];
 }
 
 export interface UseContractPaymentFollowUpOptions {
@@ -91,8 +97,8 @@ export function useContractPaymentFollowUp(
     queryKey: paymentCyclesQueryKey(contractKey),
     queryFn: async () => {
       const rows = await fetchPaymentCyclesForContract(contractKey);
-      const { documentos, eventos } = await fetchPaymentCycleDetails(rows.map((r) => r.id));
-      return { rows, documentos, eventos };
+      const detalhes = await fetchPaymentCycleDetails(rows.map((r) => r.id));
+      return { rows, ...detalhes };
     },
     enabled: Boolean(contractKey),
     staleTime: 60 * 1000
@@ -105,7 +111,10 @@ export function useContractPaymentFollowUp(
         baseDate,
         empenhoBalances: financialBalances,
         documentos: data.documentos.filter((d) => d.cycle_id === row.id),
-        eventos: data.eventos.filter((e) => e.cycle_id === row.id)
+        eventos: data.eventos.filter((e) => e.cycle_id === row.id),
+        itens: data.itens.filter((i) => i.cycle_id === row.id),
+        checklist: data.checklist.filter((c) => c.cycle_id === row.id),
+        faturas: data.faturas.filter((f) => f.cycle_id === row.id)
       })
     );
   }, [data, baseDate, financialBalances]);
@@ -115,6 +124,8 @@ export function useContractPaymentFollowUp(
     // Fila de ações, painel gerencial e tela geral de Pagamentos leem os mesmos ciclos
     queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
     queryClient.invalidateQueries({ queryKey: ['financeiro-ciclos-em-aberto'] });
+    queryClient.invalidateQueries({ queryKey: ['financeiro-faturas-em-ciclo'] });
+    queryClient.invalidateQueries({ queryKey: ['ciclo-faturas-disponiveis'] });
   }, [queryClient, contractKey]);
 
   const createMutation = useMutation({ mutationFn: createPaymentCycleRpc, onSuccess: invalidate });

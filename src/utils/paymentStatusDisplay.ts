@@ -13,10 +13,11 @@ export interface PaymentStatusDisplay {
 /** Fonte única de rótulo e cor da situação do ciclo de pagamento (tela do contrato e /pagamentos). */
 const MAP: Record<PaymentWorkflowStatus, { label: string; variant: StatusBadgeVariant }> = {
   RECEBIDO: { label: 'Em conferência', variant: 'info' },
-  COM_PENDENCIA: { label: 'Com pendência', variant: 'warning' },
+  COM_PENDENCIA: { label: 'Devolvido para correção', variant: 'warning' },
   CONFERIDO: { label: 'Conferido', variant: 'purple' },
   ENVIADO_CGOFI: { label: 'Na CGOFI', variant: 'info' },
   DEVOLVIDO: { label: 'Devolvido pela CGOFI', variant: 'danger' },
+  LIQUIDADO: { label: 'Liquidado · aguardando OB', variant: 'info' },
   PAGO: { label: 'Pago (OB emitida)', variant: 'success' },
   CANCELADO: { label: 'Cancelado', variant: 'neutral' }
 };

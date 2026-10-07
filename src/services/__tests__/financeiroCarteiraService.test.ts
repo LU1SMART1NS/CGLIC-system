@@ -80,12 +80,27 @@ describe('etapas do pagamento', () => {
     expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Pendente' })).toBe('EM_ANDAMENTO');
   });
 
-  it('ciclo: conferência na CGLIC, enviado na CGOFI; pago e cancelado saem da lista', () => {
-    expect(etapaDoCiclo({ status: 'COM_PENDENCIA' })).toBe('NA_CGLIC');
+  it('ciclo: conferência na CGLIC, devolvido em correção, enviado na CGOFI, liquidado aguardando OB; pago e cancelado saem', () => {
+    expect(etapaDoCiclo({ status: 'RECEBIDO' })).toBe('NA_CGLIC');
+    expect(etapaDoCiclo({ status: 'COM_PENDENCIA' })).toBe('DEVOLVIDO_CORRECAO');
+    expect(etapaDoCiclo({ status: 'LIQUIDADO' })).toBe('AGUARDANDO_OB');
     expect(etapaDoCiclo({ status: 'DEVOLVIDO' })).toBe('NA_CGLIC');
     expect(etapaDoCiclo({ status: 'ENVIADO_CGOFI' })).toBe('NA_CGOFI');
     const fechados = [{ status: 'PAGO' }, { status: 'CANCELADO' }] as unknown as PaymentFollowUpCycle[];
     expect(montarPagamentosCarteira(fechados, [])).toHaveLength(0);
+  });
+
+  it('fatura ligada a ciclo em aberto aparece dentro do ciclo, não duplicada', () => {
+    const fatura = {
+      idFatura: 7, contractKey: 'K', numero: '231', tipo: 'Nota Fiscal', emissao: '2026-09-01', vencimento: null, valorLiquido: 10,
+      dataLiquidacao: null, situacao: 'Pendente', cancelada: false, np: null, referencia: '09/2026', ordensBancarias: null,
+      obEmissao: null, paga: false, npContratos: 0, empenhos: '2026NE000412'
+    };
+    const ciclo = { id: 'c1', cycleKey: 'C1', contractKey: 'K', status: 'ENVIADO_CGOFI', input: { valorAtesto: 10 } } as unknown as PaymentFollowUpCycle;
+    const rows = montarPagamentosCarteira([ciclo], [fatura], [{ cycle_id: 'c1', id_fatura: 7 }]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].tipo).toBe('CICLO');
+    expect(descreverLinha(rows[0]).documento).toBe('NF 231');
   });
 
   it('fatura liquidada conta os dias aguardando OB', () => {
