@@ -36,6 +36,8 @@ export interface ItemHeroMetrics {
   quantidadeTotalAta?: number;
   /** Órgãos com quantidade registrada no item (gerenciador e participantes). */
   orgaosParticipantes?: number;
+  /** O Compras.gov.br não respondeu e não há cópia das adesões: o saldo para adesões não é conhecido. */
+  adesoesSemDados?: boolean;
 }
 
 export interface ItemHeroProps {
@@ -205,10 +207,12 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           />
           <HealthTile
             label="Saldo para adesões"
-            value={aceitaAdesao ? `${formatNumber(metrics.saldoAdesoes)} un` : 'Não aceita'}
+            value={!aceitaAdesao ? 'Não aceita' : metrics.adesoesSemDados ? 'Sem dados' : `${formatNumber(metrics.saldoAdesoes)} un`}
             hint={
               aceitaAdesao
-                ? metrics.saldoAdesoes === metrics.limiteAdesao
+                ? metrics.adesoesSemDados
+                  ? 'Compras.gov.br sem resposta'
+                  : metrics.saldoAdesoes === metrics.limiteAdesao
                   ? 'ver caronas'
                   : `de ${formatNumber(metrics.limiteAdesao)} · ver caronas`
                 : 'adesão não prevista no item'

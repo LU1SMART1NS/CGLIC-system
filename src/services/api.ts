@@ -2005,7 +2005,9 @@ export async function fetchPncpContractEmpenhos(
 export async function fetchAdesoesItem(
   numeroAta: string,
   unidadeGerenciadora: string,
-  numeroItem: string
+  numeroItem: string,
+  /** falharSeErro: lança em vez de devolver vazio (a sincronização não pode confundir falha com "sem adesões"). */
+  opts: { falharSeErro?: boolean } = {}
 ): Promise<AdesoesItemResponse> {
   const formattedItem = (numeroItem || '').toString().padStart(5, '0');
   
@@ -2041,8 +2043,10 @@ export async function fetchAdesoesItem(
             if (fbData.resultado && fbData.resultado.length > 0) {
               allRecords.push(...fbData.resultado);
             }
+            break;
           }
         }
+        if (opts.falharSeErro) throw new Error(`HTTP error! status: ${response.status}`);
         break;
       }
 
@@ -2065,6 +2069,7 @@ export async function fetchAdesoesItem(
       paginasRestantes: 0
     };
   } catch (error) {
+    if (opts.falharSeErro) throw error;
     console.warn("Falha na consulta de adesões do item (caronas).", error);
     return { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 };
   }

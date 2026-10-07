@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { itensParaLer, unidadeParaGravar, type ItemDaCarteira, type LeituraDaCopia } from '../unidadesItensSyncService';
+import { describe, it, expect, vi } from 'vitest';
+import { adesaoParaGravar, itensParaLer, lerItemNasFontes, unidadeParaGravar, type ItemDaCarteira, type LeituraDaCopia } from '../unidadesItensSyncService';
 import type { UnidadeItemRecord } from '../../types';
 
 const AGORA = Date.parse('2026-10-07T15:00:00Z');
@@ -76,5 +76,42 @@ describe('unidadeParaGravar', () => {
       aceitaAdesao: false,
       dataHoraExclusao: null
     });
+  });
+});
+
+describe('lerItemNasFontes', () => {
+  const it0 = item('00036/2024-200331-00002', '2026-10-22');
+  const resp = (resultado: any[]) => ({ resultado, totalRegistros: resultado.length, totalPaginas: 1, paginasRestantes: 0 });
+
+  it('órgãos vieram: lê as adesões com falharSeErro e grava a lista (mesmo vazia)', async () => {
+    const adesoes = vi.fn(async () => resp([]));
+    const r = await lerItemNasFontes(it0, { unidades: vi.fn(async () => resp([{ codigoUnidade: '200331' }])), adesoes } as any);
+    expect(adesoes).toHaveBeenCalledWith('00036/2024', '200331', '00002', { falharSeErro: true });
+    expect(r).toEqual({ linha: { item_key: it0.itemKey, unidades: [{ codigoUnidade: '200331' }], adesoes: [] }, falhaAdesoes: false });
+  });
+
+  it('órgãos vazios (API fora do ar): nem consulta as adesões; a cópia delas fica', async () => {
+    const adesoes = vi.fn();
+    const r = await lerItemNasFontes(it0, { unidades: vi.fn(async () => resp([])), adesoes } as any);
+    expect(adesoes).not.toHaveBeenCalled();
+    expect(r.linha).not.toHaveProperty('adesoes');
+    expect(r.falhaAdesoes).toBe(false);
+  });
+
+  it('falha nas adesões: grava os órgãos, não mexe nas adesões e conta a falha', async () => {
+    const r = await lerItemNasFontes(it0, {
+      unidades: vi.fn(async () => resp([{ codigoUnidade: '200331' }])),
+      adesoes: vi.fn(async () => { throw new Error('HTTP 500'); })
+    } as any);
+    expect(r.linha.unidades).toHaveLength(1);
+    expect(r.linha).not.toHaveProperty('adesoes');
+    expect(r.falhaAdesoes).toBe(true);
+  });
+});
+
+describe('adesaoParaGravar', () => {
+  it('guarda só os campos que a tela usa', () => {
+    expect(adesaoParaGravar({ unidadeNaoParticipante: '929777 - X', quantidadeAprovadaAdesao: null, dataAprovacaoAnalise: '2026-01-01', extra: 1 } as any))
+      .toEqual({ unidadeNaoParticipante: '929777 - X', quantidadeAprovadaAdesao: null, dataAprovacaoAnalise: '2026-01-01' });
   });
 });
