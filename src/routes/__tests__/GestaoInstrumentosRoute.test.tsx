@@ -34,6 +34,10 @@ vi.mock('../../hooks/useRefreshItemSaldos', () => ({
   useRefreshItemSaldos: () => ({ refresh: vi.fn(), isRefreshing: false })
 }));
 
+vi.mock('../../hooks/useAvisosPagamento', () => ({
+  useAvisosPagamentoGerais: () => ({ avisos: [], isLoading: false })
+}));
+
 const mockReadModel: ManagementDashboardReadModel = {
   uasg: '200331',
   dataCalculo: '2026-09-24T12:00:00Z',

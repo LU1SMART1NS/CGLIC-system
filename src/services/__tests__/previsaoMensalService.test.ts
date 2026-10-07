@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  compararPrevistoPago,
   ehEmendaPeloPlanoInterno,
   mesDaProximaPrevisao,
   montarPrevisao,
@@ -129,5 +130,26 @@ describe('tabela para o SEI', () => {
     expect(l[0]).toBe(['Contrato', 'Contratada', 'CNPJ', 'UG do empenho', 'Nota de empenho', 'Subitem', 'Valor'].join('\t'));
     expect(l[1]).toBe(['00094/2022', 'MIRANDA', '24.929.614/0001-10', '200331', '2026NE000412', '', '1.234,50'].join('\t'));
     expect(l[2]).toBe(['TOTAL', '', '', '', '', '', '1.234,50'].join('\t'));
+  });
+});
+
+describe('previsto × pago', () => {
+  it('soma o previsto do envio e as faturas com OB no mês, por contrato, incluindo os pagos fora da previsão', () => {
+    const linhas = [
+      { contract_key: 'A', valor: 100 },
+      { contract_key: 'A', valor: 50 },
+      { contract_key: 'B', valor: 300 }
+    ];
+    const faturas = [
+      fatura({ idFatura: 1, contractKey: 'A', paga: true, obEmissao: '2026-11-10', valorLiquido: 150 }),
+      fatura({ idFatura: 2, contractKey: 'C', paga: true, obEmissao: '2026-11-12', valorLiquido: 80 }),
+      fatura({ idFatura: 3, contractKey: 'B', paga: true, obEmissao: '2026-12-01', valorLiquido: 300 }),
+      fatura({ idFatura: 4, contractKey: 'A', paga: true, obEmissao: '2026-11-20', valorLiquido: 10, cancelada: true })
+    ];
+    const r = compararPrevistoPago(linhas, faturas, '2026-11');
+    expect(r.find((l) => l.contractKey === 'A')).toMatchObject({ previsto: 150, pago: 150, faturasPagas: 1 });
+    expect(r.find((l) => l.contractKey === 'B')).toMatchObject({ previsto: 300, pago: 0 });
+    expect(r.find((l) => l.contractKey === 'C')).toMatchObject({ previsto: 0, pago: 80 });
+    expect(r[0].contractKey).toBe('B'); // maior diferença primeiro
   });
 });

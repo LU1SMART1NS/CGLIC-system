@@ -63,7 +63,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
   /** Itens que só levam a outra tela: a linha inteira é o clique (sem botão de seta). */
   const rowGo = (item: ContractActionItem): { label: string; go: () => void } | null => {
     switch (item.kind) {
-      case 'PAGAMENTO': return { label: 'Abrir ciclo', go: () => onGoTo('pagamentos') };
+      case 'PAGAMENTO': return { label: item.id.startsWith('AVISO-') ? 'Ver pagamentos do contrato' : 'Abrir ciclo', go: () => onGoTo('pagamentos') };
       case 'REAJUSTE': return { label: 'Ver histórico', go: () => onGoTo('historico') };
       case 'EMPENHO': return item.href ? { label: 'Confirmar a quantidade no item da ata', go: () => navigate(item.href!) } : null;
       default: return null;

@@ -50,6 +50,8 @@ export type DashboardAttentionCategory =
   | 'TAREFA_ATRASADA'
   | 'TAREFA_PROXIMA'
   | 'PAGAMENTO_CRITICO'
+  /** Expectativa de pagamento: previsão mensal a enviar, nota mensal que não chegou, entrega prevista sem nota. */
+  | 'PAGAMENTO_PREVISTO'
   | 'REAJUSTE_RADAR'
   | 'ATA_CRITICA'
   | 'LEMBRETE';

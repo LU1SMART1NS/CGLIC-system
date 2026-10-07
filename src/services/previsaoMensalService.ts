@@ -287,6 +287,41 @@ export function montarPrevisao(d: DadosDaPrevisao): LinhaPrevisao[] {
   return linhas;
 }
 
+export interface PrevistoPagoContrato {
+  contractKey: string;
+  previsto: number;
+  pago: number;
+  /** Faturas pagas no mês (OB emitida no mês). */
+  faturasPagas: number;
+}
+
+/**
+ * Previsto × pago de um mês com envio registrado: o que foi informado à DGFNSP (as linhas do envio) contra as faturas
+ * com ordem bancária emitida no mês, por contrato. Entram também os contratos pagos que não estavam na previsão.
+ */
+export function compararPrevistoPago(linhasEnviadas: Array<Record<string, unknown>>, faturas: FaturaCarteira[], mes: string): PrevistoPagoContrato[] {
+  const porContrato = new Map<string, PrevistoPagoContrato>();
+  const doContrato = (k: string) => {
+    let c = porContrato.get(k);
+    if (!c) porContrato.set(k, (c = { contractKey: k, previsto: 0, pago: 0, faturasPagas: 0 }));
+    return c;
+  };
+  for (const l of linhasEnviadas) {
+    const k = typeof l.contract_key === 'string' ? l.contract_key : null;
+    if (k) doContrato(k).previsto += Number(l.valor) || 0;
+  }
+  for (const f of faturas) {
+    if (f.cancelada || !f.paga || !(f.obEmissao ?? '').startsWith(mes)) continue;
+    const c = doContrato(f.contractKey);
+    c.pago += f.valorLiquido;
+    c.faturasPagas += 1;
+  }
+  const arred = (v: number) => Math.round(v * 100) / 100;
+  return [...porContrato.values()]
+    .map((c) => ({ ...c, previsto: arred(c.previsto), pago: arred(c.pago) }))
+    .sort((a, b) => Math.abs(b.pago - b.previsto) - Math.abs(a.pago - a.previsto));
+}
+
 /** Tabela "previsão de pagamentos" para colar no documento do SEI (colunas da Portaria 50, § 2º, III). */
 export function textoParaSei(
   linhas: LinhaPrevisao[],
