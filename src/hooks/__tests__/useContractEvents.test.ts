@@ -2,7 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ContractDashboardRecord } from '../../types';
 
 const fetchHistorico = vi.fn();
-vi.mock('../../services/api', () => ({ fetchContratosGovHistorico: (...args: unknown[]) => fetchHistorico(...args) }));
+const lerCopia = vi.fn();
+vi.mock('../../services/api', () => ({
+  fetchContratosGovHistorico: (...args: unknown[]) => fetchHistorico(...args),
+  fetchContratosGovResponsaveis: vi.fn(),
+  fetchContratosGovGarantias: vi.fn()
+}));
+vi.mock('../../services/contratoDetalhesCopiaService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/contratoDetalhesCopiaService')>()),
+  lerCopiaDetalheContrato: (...args: unknown[]) => lerCopia(...args)
+}));
 
 import { getContractEventsQueryOptions } from '../useContractEvents';
 
@@ -31,29 +40,53 @@ const HISTORICO = [
 const run = (c: ContractDashboardRecord) => getContractEventsQueryOptions(c).queryFn();
 
 describe('getContractEventsQueryOptions: histórico do Contratos.gov.br', () => {
-  beforeEach(() => fetchHistorico.mockReset());
+  beforeEach(() => {
+    fetchHistorico.mockReset();
+    lerCopia.mockReset();
+  });
 
   it('junta a celebração aos termos do histórico', async () => {
     fetchHistorico.mockResolvedValue(HISTORICO);
-    const events = await run(contrato());
-    expect(fetchHistorico).toHaveBeenCalledWith(299693);
-    expect(events.map((e) => e.tipoEvento)).toEqual(['CELEBRACAO', 'PRORROGACAO']);
+    const r = await run(contrato());
+    expect(fetchHistorico).toHaveBeenCalledWith(299693, { falharSeErro: true });
+    expect(r.eventos.map((e) => e.tipoEvento)).toEqual(['CELEBRACAO', 'PRORROGACAO']);
+    expect(r.historico).toEqual({ origem: 'API', copiadoEm: null });
+    expect(lerCopia).not.toHaveBeenCalled();
   });
 
-  it('se a API falha (lista vazia), mostra só a celebração', async () => {
+  it('API respondeu vazio: só a celebração, sem aviso', async () => {
     fetchHistorico.mockResolvedValue([]);
-    expect((await run(contrato())).map((e) => e.tipoEvento)).toEqual(['CELEBRACAO']);
+    const r = await run(contrato());
+    expect(r.eventos.map((e) => e.tipoEvento)).toEqual(['CELEBRACAO']);
+    expect(r.historico.origem).toBe('API');
+  });
+
+  it('API falhou: usa a cópia guardada, com a data', async () => {
+    fetchHistorico.mockRejectedValue(new Error('503'));
+    lerCopia.mockResolvedValue({ dados: HISTORICO, copiadoEm: '2026-10-05T17:32:00Z' });
+    const r = await run(contrato());
+    expect(lerCopia).toHaveBeenCalledWith('110099-00009-2024', 'historico');
+    expect(r.eventos.map((e) => e.tipoEvento)).toEqual(['CELEBRACAO', 'PRORROGACAO']);
+    expect(r.historico).toEqual({ origem: 'COPIA', copiadoEm: '2026-10-05T17:32:00Z' });
+  });
+
+  it('API falhou e sem cópia: só a celebração, marcado como falha', async () => {
+    fetchHistorico.mockRejectedValue(new Error('503'));
+    lerCopia.mockResolvedValue(null);
+    const r = await run(contrato());
+    expect(r.eventos.map((e) => e.tipoEvento)).toEqual(['CELEBRACAO']);
+    expect(r.historico.origem).toBe('FALHA');
   });
 
   it('não consulta contratos de outra fonte nem sem id', async () => {
-    await run(contrato({ fonteDados: 'Compras.gov.br' }));
+    expect((await run(contrato({ fonteDados: 'Compras.gov.br' }))).historico.origem).toBe('NAO_CONSULTADO');
     await run(contrato({ contratoId: undefined }));
     expect(fetchHistorico).not.toHaveBeenCalled();
   });
 
   it('não duplica quando o contrato já traz aditivos em raw', async () => {
-    const events = await run(contrato({ raw: { termos_aditivos: [{ sequencial: 1, tipo: 'Termo Aditivo' }] } }));
+    const r = await run(contrato({ raw: { termos_aditivos: [{ sequencial: 1, tipo: 'Termo Aditivo' }] } }));
     expect(fetchHistorico).not.toHaveBeenCalled();
-    expect(events).toHaveLength(2);
+    expect(r.eventos).toHaveLength(2);
   });
 });

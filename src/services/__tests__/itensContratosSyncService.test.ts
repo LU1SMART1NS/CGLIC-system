@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { contratosParaLer, leituraParaGravar } from '../itensContratosSyncService';
+import { contratosParaLer, leituraParaGravar, leiturasConsiderandoDetalhes, temDetalhesACopiar } from '../itensContratosSyncService';
 import type { ContractDashboardRecord } from '../../types';
 
 const AGORA = Date.parse('2026-10-06T15:00:00Z');
@@ -61,5 +61,32 @@ describe('leituraParaGravar', () => {
 
   it('leitura vazia segue sem fonte e sem itens', () => {
     expect(leituraParaGravar('x', { fonte: null, itens: [] })).toEqual({ contract_key: 'x', fonte: null, itens: [] });
+  });
+});
+
+describe('leiturasConsiderandoDetalhes', () => {
+  const comId = (id: string, fim: string) => ({ id, dataVigenciaFim: fim, contratoId: 999732, fonteDados: 'Contratos.gov.br' }) as ContractDashboardRecord;
+  const vigente = comId('200331-00010-2026', '2027-06-30');
+  const encerrado = comId('200331-00002-2020', '2021-01-31');
+  const semId = { ...vigente, id: '200331-00011-2026', contratoId: undefined } as ContractDashboardRecord;
+  const lido = iso(AGORA - HORA);
+
+  it('vigente do Contratos.gov.br sem cópia dos detalhes entra como nunca lido', () => {
+    const itens = new Map([[vigente.id, lido], [encerrado.id, lido], [semId.id, lido]]);
+    const r = leiturasConsiderandoDetalhes([vigente, encerrado, semId], itens, new Map(), AGORA);
+    expect(r.has(vigente.id)).toBe(false);
+    expect(r.get(encerrado.id)).toBe(lido);
+    expect(r.get(semId.id)).toBe(lido);
+  });
+
+  it('com cópia dos detalhes, vale a leitura dos itens', () => {
+    const r = leiturasConsiderandoDetalhes([vigente], new Map([[vigente.id, lido]]), new Map([[vigente.id, lido]]), AGORA);
+    expect(r.get(vigente.id)).toBe(lido);
+  });
+
+  it('temDetalhesACopiar: só vigente e com id do Contratos.gov.br', () => {
+    expect(temDetalhesACopiar(vigente, AGORA)).toBe(true);
+    expect(temDetalhesACopiar(encerrado, AGORA)).toBe(false);
+    expect(temDetalhesACopiar(semId, AGORA)).toBe(false);
   });
 });

@@ -35,7 +35,8 @@ function prorrogavelHint(raw: unknown): string | null {
  * (e os termos do histórico), valor atual, financeiro e pendências.
  */
 export const ContractHealthStrip: React.FC<ContractHealthStripProps> = ({ contract, contractKey, counts, onOpenActions, onOpenFinanceiro }) => {
-  const { data: eventos } = useContractEvents(contract);
+  const { data: dadosEventos } = useContractEvents(contract);
+  const eventos = dadosEventos?.eventos;
   const lifeline = React.useMemo(() => buildContractLifeline(contract, undefined, eventos), [contract, eventos]);
   const financial = useContractFinancialSummary(contract, contractKey);
 
