@@ -128,7 +128,8 @@ serve(async (req) => {
       {
         data: {
           nome: cleanNome,
-          perfil: cleanPerfil
+          perfil: cleanPerfil,
+          senha_pendente: true
         },
         redirectTo
       }
@@ -141,7 +142,7 @@ serve(async (req) => {
         return jsonError(inviteError.message, 400);
       }
 
-      let existing: { id: string; email_confirmed_at?: string | null; last_sign_in_at?: string | null } | undefined;
+      let existing: { id: string; email_confirmed_at?: string | null; last_sign_in_at?: string | null; user_metadata?: Record<string, unknown> } | undefined;
       for (let page = 1; page <= 20 && !existing; page++) {
         const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
         if (listError) return jsonError(listError.message, 400);
@@ -160,6 +161,11 @@ serve(async (req) => {
       const supabaseAnon = createClient(supabaseUrl, anonKey);
       const { error: resendError } = await supabaseAnon.auth.resetPasswordForEmail(cleanEmail, { redirectTo });
       if (resendError) return jsonError(resendError.message, 400);
+
+      // Convites antigos não têm a marca; garante que a senha continue pendente até ser criada.
+      await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+        user_metadata: { ...(existing.user_metadata ?? {}), senha_pendente: true }
+      });
 
       invitedUserId = existing.id;
     } else {

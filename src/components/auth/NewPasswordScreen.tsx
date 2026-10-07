@@ -88,7 +88,7 @@ export const NewPasswordScreen: React.FC<NewPasswordScreenProps> = ({
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({ password, data: { senha_pendente: false } });
       if (error) {
         setErrorMsg(traduzirErroAuth(error));
         setIsSubmitting(false);
