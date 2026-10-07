@@ -17,6 +17,11 @@ import {
   ORCAMENTO_ITENS_CONTRATOS_MS,
   sincronizarItensContratos
 } from '../../src/services/itensContratosSyncService';
+import {
+  contarUnidadesItensPendentes,
+  ORCAMENTO_UNIDADES_ITENS_MS,
+  sincronizarUnidadesItens
+} from '../../src/services/unidadesItensSyncService';
 import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFontesService';
 
 /**
@@ -25,7 +30,7 @@ import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFon
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'empenhos', 'faturas', 'ordens_bancarias'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'empenhos', 'faturas', 'ordens_bancarias'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
@@ -55,6 +60,8 @@ export interface DependenciasDeExecucao {
   consultarFaturasDeTeste: (uasg: string) => Promise<Record<string, unknown>>;
   sincronizarItensContratos: typeof sincronizarItensContratos;
   contarItensContratosPendentes: typeof contarItensContratosPendentes;
+  sincronizarUnidadesItens: typeof sincronizarUnidadesItens;
+  contarUnidadesItensPendentes: typeof contarUnidadesItensPendentes;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
   fetchArpsDasFontes: typeof fetchArpsDasFontes;
   agora: () => number;
@@ -101,6 +108,8 @@ const PADRAO: DependenciasDeExecucao = {
   consultarFaturasDeTeste,
   sincronizarItensContratos,
   contarItensContratosPendentes,
+  sincronizarUnidadesItens,
+  contarUnidadesItensPendentes,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
   agora: () => Date.now()
@@ -151,6 +160,8 @@ export async function executarPedido(
       consulta = { atas: atas.length };
     } else if (pedido.recurso === 'itens_contratos') {
       consulta = { ...(await deps.contarItensContratosPendentes(uasg as string)) };
+    } else if (pedido.recurso === 'unidades_itens') {
+      consulta = { ...(await deps.contarUnidadesItensPendentes(uasg as string)) };
     } else if (pedido.recurso === 'empenhos') {
       consulta = await deps.consultarEmpenhosDeTeste(uasg as string);
     } else if (pedido.recurso === 'faturas' || pedido.recurso === 'ordens_bancarias') {
@@ -166,6 +177,8 @@ export async function executarPedido(
   else if (pedido.recurso === 'atas') resultado = await deps.sincronizarAtas(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
   else if (pedido.recurso === 'itens_contratos') {
     resultado = await deps.sincronizarItensContratos(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_ITENS_CONTRATOS_MS });
+  } else if (pedido.recurso === 'unidades_itens') {
+    resultado = await deps.sincronizarUnidadesItens(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_UNIDADES_ITENS_MS });
   } else if (pedido.recurso === 'empenhos') {
     resultado = await deps.sincronizarEmpenhosDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
   } else if (pedido.recurso === 'faturas') {

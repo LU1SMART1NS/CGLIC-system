@@ -48,3 +48,13 @@ export function formatCnpj(doc?: string | null): string {
   if (digits.length === 11) return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
   return doc || '';
 }
+
+/** Data e hora no horário de Brasília: "07/10/2026 às 14:32". Texto inválido volta como veio. */
+export function formatDataHoraBR(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const opts = { timeZone: 'America/Sao_Paulo' } as const;
+  const data = d.toLocaleDateString('pt-BR', opts);
+  const hora = d.toLocaleTimeString('pt-BR', { ...opts, hour: '2-digit', minute: '2-digit' });
+  return `${data} às ${hora}`;
+}

@@ -29,9 +29,33 @@ describe('UnidadesTab', () => {
     expect(out).toContain('Compras.gov');
   });
 
-  it('mostra erro e estado vazio', () => {
+  it('mostra erro', () => {
     expect(html({ error: 'API fora' })).toContain('API fora');
-    expect(html({ sortedUnidades: [] })).toContain('Nenhum órgão encontrado');
+  });
+
+  it('sem órgãos e sem cópia: avisa, cita a base do saldo e não mostra régua com zero', () => {
+    const out = html({ sortedUnidades: [], origem: 'SEM_DADOS', baseSemOrgaos: 30 });
+    expect(out).toContain('unidades-sem-dados');
+    expect(out).toContain('ainda não há cópia guardada');
+    expect(out).toContain('quantitativo homologado do item (30 un)');
+    expect(out).toContain('Nenhum órgão para mostrar');
+    expect(out).not.toContain('unidades-summary');
+    expect(out).not.toContain('unidades-copia');
+  });
+
+  it('cópia guardada: mostra a lista e a data da leitura', () => {
+    const out = html({ origem: 'COPIA', copiadoEm: '2026-10-05T17:32:00Z' });
+    expect(out).toContain('unidades-copia');
+    expect(out).toContain('última cópia guardada, lida em 05/10/2026 às 14:32');
+    expect(out).toContain('unidades-table');
+    expect(out).toContain('690 de 801');
+    expect(out).not.toContain('unidades-sem-dados');
+  });
+
+  it('lista ao vivo da API: sem aviso', () => {
+    const out = html({ origem: 'API' });
+    expect(out).not.toContain('unidades-copia');
+    expect(out).not.toContain('unidades-sem-dados');
   });
 
   it('em carregamento mostra o texto no lugar dos números', () => {

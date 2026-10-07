@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getItemUnidadesQueryOptions } from '../useItemUnidades';
 import * as api from '../../services/api';
+import * as copia from '../../services/unidadesItensSyncService';
 
 vi.mock('../../services/api', () => ({
   fetchUnidadesItem: vi.fn()
+}));
+vi.mock('../../services/unidadesItensSyncService', () => ({
+  lerCopiaUnidadesItem: vi.fn()
 }));
 
 describe('useItemUnidades Hook / Query Options - Testes Unitários de Contrato e Fallbacks', () => {
@@ -58,49 +62,41 @@ describe('useItemUnidades Hook / Query Options - Testes Unitários de Contrato e
     const result = await options.queryFn();
 
     expect(api.fetchUnidadesItem).toHaveBeenCalledWith('00041/2025', '200331', '1');
-    expect(result).toEqual(mockResultado);
+    expect(result).toEqual({ unidades: mockResultado, origem: 'API', copiadoEm: null });
+    expect(copia.lerCopiaUnidadesItem).not.toHaveBeenCalled();
   });
 
-  it('deve acionar o fallback gracioso para a Unidade Gerenciadora se a API retornar resultado vazio', async () => {
-    vi.mocked(api.fetchUnidadesItem).mockResolvedValueOnce({
-      resultado: [],
-      totalRegistros: 0,
-      paginasTotais: 0
-    } as any);
+  it('API vazia: usa a cópia guardada pelo servidor, com a data', async () => {
+    vi.mocked(api.fetchUnidadesItem).mockResolvedValueOnce({ resultado: [], totalRegistros: 0 } as any);
+    const unidadesCopia = [{ codigoUnidade: '200331', quantidadeRegistrada: 30 }] as any[];
+    vi.mocked(copia.lerCopiaUnidadesItem).mockResolvedValueOnce({ unidades: unidadesCopia, copiadoEm: '2026-10-05T17:32:00Z' });
 
-    const mockArp = {
-      numeroAtaRegistroPreco: '00041/2025',
-      codigoUnidadeGerenciadora: '200331',
-      nomeUnidadeGerenciadora: 'MINISTÉRIO DA JUSTIÇA E SEGURANÇA PÚBLICA'
-    };
+    const result = await getItemUnidadesQueryOptions('00036/2024', '200331', '2').queryFn();
 
-    const mockItem = {
-      numeroItem: '2',
-      codigoPdm: 99999,
-      descricaoItem: 'Notebook Corporativo',
-      nomeRazaoSocialFornecedor: 'Dell Computadores',
-      quantidadeHomologadaItem: 250,
-      maximoAdesao: 500
-    };
+    expect(copia.lerCopiaUnidadesItem).toHaveBeenCalledWith('00036/2024-200331-00002');
+    expect(result).toEqual({ unidades: unidadesCopia, origem: 'COPIA', copiadoEm: '2026-10-05T17:32:00Z' });
+  });
 
-    const options = getItemUnidadesQueryOptions('00041/2025', '200331', '2', mockArp as any, mockItem as any);
-    const result = await options.queryFn();
+  it('API vazia e sem cópia: lista vazia, sem montar a gerenciadora no lugar', async () => {
+    vi.mocked(api.fetchUnidadesItem).mockResolvedValueOnce({ resultado: [], totalRegistros: 0 } as any);
+    vi.mocked(copia.lerCopiaUnidadesItem).mockResolvedValueOnce(null);
 
-    expect(api.fetchUnidadesItem).toHaveBeenCalledWith('00041/2025', '200331', '2');
-    expect(result.length).toBe(1);
-    expect(result[0].tipoUnidade).toBe('GERENCIADORA');
-    expect(result[0].codigoUnidade).toBe('200331');
-    expect(result[0].quantidadeRegistrada).toBe(250);
-    expect(result[0].qtdLimiteAdesao).toBe(500);
-    expect(result[0].descricaoItem).toBe('Notebook Corporativo');
-    expect(result[0].fornecedor).toBe('Dell Computadores');
-    expect(result[0].aceitaAdesao).toBe(true);
+    const result = await getItemUnidadesQueryOptions('00036/2024', '200331', '00002').queryFn();
+    expect(result).toEqual({ unidades: [], origem: 'SEM_DADOS', copiadoEm: null });
+  });
+
+  it('falha ao ler a cópia não derruba a tela: fica sem dados', async () => {
+    vi.mocked(api.fetchUnidadesItem).mockResolvedValueOnce({ resultado: [], totalRegistros: 0 } as any);
+    vi.mocked(copia.lerCopiaUnidadesItem).mockRejectedValueOnce(new Error('rede'));
+
+    const result = await getItemUnidadesQueryOptions('00036/2024', '200331', '2').queryFn();
+    expect(result.origem).toBe('SEM_DADOS');
   });
 
   it('deve retornar lista vazia se os parâmetros forem vazios durante a execução de queryFn', async () => {
     const options = getItemUnidadesQueryOptions('', '', '');
     const result = await options.queryFn();
-    expect(result).toEqual([]);
+    expect(result).toEqual({ unidades: [], origem: 'SEM_DADOS', copiadoEm: null });
     expect(api.fetchUnidadesItem).not.toHaveBeenCalled();
   });
 });

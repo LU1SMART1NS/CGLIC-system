@@ -1,9 +1,11 @@
 import React from 'react';
 import { Users } from 'lucide-react';
-import { DataTable, EmptyState, ErrorState, ProgressBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
+import { DataTable, EmptyState, ErrorState, NoticeBar, ProgressBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
 import { formatNumber } from './itemBalanceUtils';
+import { formatDataHoraBR } from '../../utils/format';
 import { summarizeParticipantes, type ParticipanteRow } from '../../utils/participantesSummary';
 import type { UnidadeItemRecord } from '../../types';
+import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
 
 export interface UnidadesTabProps {
   loading: boolean;
@@ -13,11 +15,26 @@ export interface UnidadesTabProps {
   ugUasg: string;
   /** Contratado nos contratos vinculados ao item (consumo do órgão gerenciador). */
   contratadoUG: number;
+  /** De onde veio a lista: Compras.gov.br agora, cópia guardada ou nenhuma. */
+  origem?: OrigemUnidadesItem;
+  /** Quando a cópia foi lida do Compras.gov.br (origem COPIA). */
+  copiadoEm?: string | null;
+  /** Base do saldo usada quando não há órgãos (o homologado do item): citada no aviso. */
+  baseSemOrgaos?: number;
 }
 
 const FONTE_LABEL = { CONTRATOS: 'contratos vinculados', COMPRASGOV: 'Compras.gov' } as const;
 
-export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sortedUnidades, ugUasg, contratadoUG }) => {
+export const UnidadesTab: React.FC<UnidadesTabProps> = ({
+  loading,
+  error,
+  sortedUnidades,
+  ugUasg,
+  contratadoUG,
+  origem = 'API',
+  copiadoEm = null,
+  baseSemOrgaos
+}) => {
   const summary = summarizeParticipantes(sortedUnidades, { ugUasg, contratadoUG });
   const { senasp } = summary;
 
@@ -87,9 +104,25 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
     );
   }
 
+  const semOrgaos = !loading && summary.rows.length === 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="unidades-tab">
-      <SummaryBar
+      {!loading && origem === 'COPIA' && copiadoEm && (
+        <NoticeBar tone="info" testId="unidades-copia">
+          O Compras.gov.br não devolveu os órgãos deste item agora. A lista abaixo é a última cópia guardada, lida em {formatDataHoraBR(copiadoEm)}.
+        </NoticeBar>
+      )}
+      {semOrgaos && origem === 'SEM_DADOS' && (
+        <NoticeBar tone="warning" testId="unidades-sem-dados">
+          O Compras.gov.br não devolveu os órgãos deste item e ainda não há cópia guardada.
+          {baseSemOrgaos != null && baseSemOrgaos > 0
+            ? ` Enquanto isso, o saldo usa como base o quantitativo homologado do item (${formatNumber(baseSemOrgaos)} un).`
+            : ''}{' '}
+          Tente Atualizar mais tarde.
+        </NoticeBar>
+      )}
+      {!semOrgaos && <SummaryBar
         testId="unidades-summary"
         loading={loading}
         loadingLabel="Buscando os órgãos participantes no Compras.gov..."
@@ -102,17 +135,17 @@ export const UnidadesTab: React.FC<UnidadesTabProps> = ({ loading, error, sorted
           { label: 'Ata completa', value: `${formatNumber(summary.registrado)} registrados` }
         ]}
         progress={{ value: senasp.consumido, max: senasp.registrado || 1 }}
-      />
+      />}
 
       <div>
         <SectionHeader
           title="Órgãos participantes"
-          subtitle="Quantitativo registrado por órgão; a régua acima considera só o quantitativo SENASP (UASGs 200330 e 200331). O gerenciador consome o contratado nos contratos vinculados; os demais, o que o Compras.gov registra."
+          subtitle={semOrgaos ? undefined : 'Quantitativo registrado por órgão; a régua acima considera só o quantitativo SENASP (UASGs 200330 e 200331). O gerenciador consome o contratado nos contratos vinculados; os demais, o que o Compras.gov registra.'}
           icon={<Users size={16} />}
-          countBadge={summary.rows.length}
+          countBadge={semOrgaos ? undefined : summary.rows.length}
         />
-        {!loading && summary.rows.length === 0 ? (
-          <EmptyState title="Nenhum órgão encontrado" description="O Compras.gov não devolveu os órgãos deste item." />
+        {semOrgaos ? (
+          <EmptyState title="Nenhum órgão para mostrar" description="" />
         ) : (
           <DataTable columns={columns} data={summary.rows} keyExtractor={(r) => r.codigo} isLoading={loading} testId="unidades-table" />
         )}
