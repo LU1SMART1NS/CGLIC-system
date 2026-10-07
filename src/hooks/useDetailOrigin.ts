@@ -33,7 +33,7 @@ export function originLabel(path: string): string | null {
     case '/itens': return 'Carteira';
     case '/atas/distribuicao': return 'Distribuição';
     case '/pagamentos': return 'Pagamentos';
-    case '/empenhos': return 'Empenhos e Execução';
+    case '/empenhos': return 'Empenhos';
     default: break;
   }
   if (/^\/atas\/detalhe\/[^/]+\/itens\/[^/]+/.test(pathname)) return 'o item';

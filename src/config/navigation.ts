@@ -57,7 +57,7 @@ export interface NavItem {
  * - Visão Geral: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
- * - Financeiro: Pagamentos (/pagamentos) · Empenhos e Execução (/empenhos)
+ * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos)
  * - Configurações (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
@@ -132,21 +132,21 @@ export const navigationConfig: NavItem[] = [
     status: 'active',
     children: [
       {
+        id: 'execucao-empenhos',
+        label: 'Empenhos',
+        icon: FileSpreadsheet,
+        route: '/empenhos',
+        status: 'active',
+        matchPrefixes: ['/empenhos'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
+      },
+      {
         id: 'execucao-pagamentos',
         label: 'Pagamentos',
         icon: Receipt,
         status: 'active',
         route: '/pagamentos',
         matchPrefixes: ['/pagamentos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
-      },
-      {
-        id: 'execucao-empenhos',
-        label: 'Empenhos e Execução',
-        icon: FileSpreadsheet,
-        route: '/empenhos',
-        status: 'active',
-        matchPrefixes: ['/empenhos'],
         allowedRoles: ['admin', 'gestor', 'leitor']
       }
     ]
@@ -278,7 +278,7 @@ const staticRouteLabels: Record<string, string> = {
   '/contratos': 'Carteira de Contratos',
   '/configuracoes/modelos': 'Modelos de Gestão',
   '/pagamentos': 'Pagamentos',
-  '/empenhos': 'Empenhos e Execução',
+  '/empenhos': 'Empenhos',
   '/admin/departamentos': 'Unidades Internas',
   '/admin/usuarios': 'Usuários e Servidores',
   '/admin/perfis': 'Perfis e Permissões'

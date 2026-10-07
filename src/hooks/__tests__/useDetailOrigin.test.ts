@@ -22,7 +22,7 @@ describe('originLabel: nome do destino do Voltar', () => {
     expect(originLabel('/atas?situacao=CRITICO')).toBe('Carteira');
     expect(originLabel('/contratos?busca=2024&gestor=Maria')).toBe('Carteira');
     expect(originLabel('/pagamentos')).toBe('Pagamentos');
-    expect(originLabel('/empenhos')).toBe('Empenhos e Execução');
+    expect(originLabel('/empenhos')).toBe('Empenhos');
     expect(originLabel('/atas/distribuicao')).toBe('Distribuição');
     expect(originLabel('/itens')).toBe('Carteira');
     expect(originLabel('/itens?unidade=cglic')).toBe('Carteira');

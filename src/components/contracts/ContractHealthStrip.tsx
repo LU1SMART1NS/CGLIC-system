@@ -102,7 +102,7 @@ export const ContractHealthStrip: React.FC<ContractHealthStripProps> = ({ contra
           <LifelineRule lifeline={lifeline} testId="contract-lifeline" tone={prazo.tone} />
         </HealthTile>
         <HealthTile label="Valor atual" value={formatCurrencyCompact(valorGlobal)} hint={valorHints} tooltip={valorTooltip} testId="health-valor" />
-        <HealthTile label="Financeiro" value={pagoValue} hint={financeiroHint} onClick={onOpenFinanceiro} testId="health-pago" />
+        <HealthTile label="Empenhos" value={pagoValue} hint={financeiroHint} onClick={onOpenFinanceiro} testId="health-pago" />
         <PendenciasTile counts={counts} onClick={onOpenActions} testId="health-pendencias" />
       </HealthTileGrid>
     </div>
