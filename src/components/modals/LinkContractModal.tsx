@@ -23,6 +23,9 @@ import {
 } from './linkContractSuggestions';
 import { formatStatusVigencia } from '../../utils/statusVigencia';
 import { chaveDoContrato } from '../../utils/contractKeyUtils';
+import { itensEmOutraAta, outrasAtasPorContrato, podeEntrarEmMaisUmaAta, textoOutrasAtas } from '../../utils/contratoVariasAtas';
+import { useAuth } from '../../context/AuthContext';
+import { useSaveContractManager } from '../../hooks/useSaveContractManager';
 
 /** Item da Ata selecionável quando o modal é aberto a partir da Ata 360 (vários itens). */
 export interface LinkableAtaItemOption {
@@ -55,6 +58,11 @@ interface LinkContractModalProps {
   suggestionCriteria?: ContractSuggestionCriteria;
   /** Abre direto no passo 2 com este contrato (vindo de uma sugestão). */
   initialContract?: ContractDashboardRecord | null;
+  /**
+   * Compra da ata, para aceitar o contrato que já está em outra ata da mesma compra. Sem ela vale a de
+   * `suggestionCriteria`; sem nenhuma, o contrato já vinculado a outra ata fica bloqueado.
+   */
+  compraDaAta?: ContractSuggestionCriteria['compra'];
 }
 
 const SUGGESTION_LABEL: Record<ContractSuggestionReason, string> = {
@@ -88,7 +96,8 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   itemUnitPrice,
   itemOptions,
   suggestionCriteria,
-  initialContract
+  initialContract,
+  compraDaAta
 }) => {
   const isAtaMode = Boolean(itemOptions && itemOptions.length > 0);
   const cleanUasg = (uasg || '').trim();
@@ -99,7 +108,11 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   const linkItemsMutation = useLinkContractToItems();
   const syncEmpenhosMutation = useSyncItemContractEmpenhos();
   const syncQuantityMutation = useSyncContractItemQuantity();
+  const saveContractManager = useSaveContractManager();
   const toast = useToast();
+  // Só o coordenador decide o gestor do contrato; o gestor vincula e o coordenador é avisado (migration 86).
+  const { role } = useAuth();
+  const isCoordenador = role === 'admin';
 
   // Estados locais do formulário
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,22 +121,30 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   // Modo Ata: marcações feitas pelo usuário (sobrescrevem a marcação sugerida pela API)
   const [checkedOverrides, setCheckedOverrides] = useState<Record<string, boolean>>({});
+  // Contrato em atas de gestores diferentes, vinculado pelo coordenador: quem fica com o contrato.
+  const [gestorEscolhido, setGestorEscolhido] = useState<'CONTRATO' | 'ATA' | null>(null);
   const itemQuantities = useContractItemQuantities(isAtaMode ? selectedContract : null);
 
-  // Regras de vínculo da CGLIC: um contrato pertence a uma só ata (o banco recusa vincular a outra) e o
-  // contrato marcado pelo coordenador como "não pertence a ata" sai das sugestões. Ao vincular, o contrato
-  // herda o gestor da ata (gatilho no banco, migration 69) — o passo 2 avisa.
+  // Regras de vínculo da CGLIC: cada item do contrato pertence a uma só ata, e o contrato pode estar em várias atas da
+  // mesma compra (migration 86; o banco recusa o resto). O contrato marcado pelo coordenador como "não pertence a ata"
+  // sai das sugestões. Ao vincular, o contrato herda o gestor da ata (migrations 69, 70 e 86) — o passo 2 avisa.
   const { data: todosVinculos = [] } = useArpItemContractLinks(isOpen);
   const { data: semAta = {} } = useContratosSemAta();
   const { data: ataManagers } = useAllAtaManagers();
   const { data: contractManagers } = useAllContractManagers(cleanUasg);
-  const ataDeOutroVinculo = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const l of todosVinculos) {
-      if (l.ataKey !== numeroAta) map.set(l.contractKey.toUpperCase(), l.ataKey);
+  const outrasAtas = useMemo(() => outrasAtasPorContrato(numeroAta, todosVinculos), [todosVinculos, numeroAta]);
+  // Já em ata de outra compra: bloqueado. Já em outra ata da mesma compra: pode entrar nesta com outros itens.
+  const { ataDeOutroVinculo, tambemEmOutrasAtas } = useMemo(() => {
+    const bloqueio = new Map<string, string>();
+    const tambem = new Map<string, NonNullable<ReturnType<typeof outrasAtas.get>>>();
+    const porChave = new Map(officialContracts.map((c) => [chaveDoContrato(c).toUpperCase(), c]));
+    for (const [key, outras] of outrasAtas) {
+      const contrato = porChave.get(key);
+      if (contrato && podeEntrarEmMaisUmaAta(contrato, compraDaAta ?? suggestionCriteria?.compra, outras)) tambem.set(key, outras);
+      else bloqueio.set(key, outras[0].numeroAta);
     }
-    return map;
-  }, [todosVinculos, numeroAta]);
+    return { ataDeOutroVinculo: bloqueio, tambemEmOutrasAtas: tambem };
+  }, [outrasAtas, officialContracts, compraDaAta, suggestionCriteria]);
   const { data: descartesAta = {} } = useDescartesAtaContrato();
   const descartadosParaEstaAta = useMemo(() => {
     const ataKey = `${numeroAta}-${(uasg || '').trim()}`;
@@ -169,12 +190,13 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     return aplicarRestricoesDeVinculo(rankContractsBySuggestion(filtered, suggestionCriteria), {
       contractKeyOf: chaveDoContrato,
       ataDeOutroVinculo,
+      tambemEmOutrasAtas,
       naoPertencemAAta,
       descartadosParaEstaAta
     });
-  }, [officialContracts, searchTerm, existingLinkedContractKeys, selectedContract, isAtaMode, suggestionCriteria, ataDeOutroVinculo, naoPertencemAAta, descartadosParaEstaAta]);
+  }, [officialContracts, searchTerm, existingLinkedContractKeys, selectedContract, isAtaMode, suggestionCriteria, ataDeOutroVinculo, tambemEmOutrasAtas, naoPertencemAAta, descartadosParaEstaAta]);
 
-  const isPending = linkMutation.isPending || linkItemsMutation.isPending;
+  const isPending = linkMutation.isPending || linkItemsMutation.isPending || saveContractManager.isPending;
 
   const suggestedCount = filteredContracts.filter((r) => r.reasons.length > 0).length;
 
@@ -188,17 +210,44 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     setObservacoes('');
     setFormError(null);
     setCheckedOverrides({});
+    setGestorEscolhido(null);
     onClose();
   };
 
-  // Contrato escolhido já vinculado a outra ata (ex.: veio pronto de uma sugestão): o banco recusaria o vínculo.
+  // Contrato escolhido já vinculado a ata de outra compra (ex.: veio pronto de uma sugestão): o banco recusaria o vínculo.
   const ataBloqueandoSelecionado = selectedContract ? ataDeOutroVinculo.get(contractKeyOf(selectedContract).toUpperCase()) : undefined;
+  const outrasDoSelecionado = (selectedContract && tambemEmOutrasAtas.get(contractKeyOf(selectedContract).toUpperCase())) || [];
+  // Itens do contrato que já estão em outra ata: não podem entrar nesta.
+  const itensJaEmOutraAta = itensEmOutraAta(outrasDoSelecionado);
+  // Modo Item: o item fixo já está em outra ata para este contrato.
+  const ataDoItemFixo = !isAtaMode && numeroItem != null ? itensJaEmOutraAta.get(parseInt(String(numeroItem), 10)) : undefined;
   const gestorDaAta = ataManagers?.[numeroAta]?.gestorNome;
   const gestorAtualDoContrato = selectedContract ? contractManagers?.[contractKeyOf(selectedContract)]?.gestorNome : undefined;
+  // Contrato já em outra ata e com gestor diferente do desta: o contrato fica como está; o coordenador decide.
+  const gestoresDiferentes =
+    outrasDoSelecionado.length > 0 && Boolean(gestorDaAta) && Boolean(gestorAtualDoContrato) && gestorDaAta !== gestorAtualDoContrato;
+  const faltaEscolherGestor = gestoresDiferentes && isCoordenador && gestorEscolhido === null;
+
+  /** O coordenador escolheu o gestor desta ata: o contrato passa a ser dele (o banco deixou o contrato como estava). */
+  const aplicarGestorEscolhido = async (contract: ContractDashboardRecord) => {
+    if (!(gestoresDiferentes && isCoordenador && gestorEscolhido === 'ATA' && gestorDaAta)) return;
+    try {
+      await saveContractManager.mutateAsync({
+        uasg: contract.uasg,
+        numero: contract.numero,
+        ano: Number(contract.ano),
+        gestorNome: gestorDaAta,
+        gestorUserId: ataManagers?.[numeroAta]?.gestorUserId ?? null
+      });
+    } catch (err: any) {
+      toast.error(`Contrato vinculado, mas o gestor não foi trocado: ${err?.message || 'erro desconhecido'}. Troque na Central de Distribuição.`);
+    }
+  };
 
   const handleSelectContract = (contract: ContractDashboardRecord) => {
     setSelectedContract(contract);
     setCheckedOverrides({});
+    setGestorEscolhido(null);
     setFormError(null);
   };
 
@@ -217,8 +266,9 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     onlyDigits(i.fornecedorCnpj) === onlyDigits(selectedContract!.fornecedorCnpjCpf);
 
   // Marcação inicial: os itens que a API lista; sem dados da API, os do mesmo fornecedor
+  const ataDoItem = (i: LinkableAtaItemOption) => itensJaEmOutraAta.get(itemNumber(i));
   const isItemChecked = (i: LinkableAtaItemOption) =>
-    !isItemLinked(i) && (checkedOverrides[i.itemKey] ?? (apiListsItems ? isListedByApi(i) : isSameSupplier(i)));
+    !isItemLinked(i) && !ataDoItem(i) && (checkedOverrides[i.itemKey] ?? (apiListsItems ? isListedByApi(i) : isSameSupplier(i)));
 
   const checkedItems = isAtaMode && !itemQuantities.isLoading ? itemOptions!.filter(isItemChecked) : [];
 
@@ -288,6 +338,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
         itemKeys: checkedItems.map((i) => i.itemKey),
         observacoes: observacoes.trim() || undefined
       });
+      await aplicarGestorEscolhido(selectedContract);
       syncEmpenhosInBackground(
         selectedContract,
         checkedItems.map((i) => ({ numeroItem: i.numeroItem, unitPrice: i.valorUnitario }))
@@ -304,6 +355,11 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 
     if (!selectedContract) {
       setFormError('Por favor, selecione um contrato oficial da lista.');
+      return;
+    }
+
+    if (faltaEscolherGestor) {
+      setFormError('Escolha quem fica com o contrato.');
       return;
     }
 
@@ -325,6 +381,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
         contractKey,
         observacoes: observacoes.trim() || undefined
       });
+      await aplicarGestorEscolhido(selectedContract);
       if (numeroItem != null) {
         syncEmpenhosInBackground(selectedContract, [{ numeroItem: String(numeroItem), unitPrice: itemUnitPrice }]);
       }
@@ -399,12 +456,12 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto' }} className="link-contract-list">
-                  {filteredContracts.map(({ contract: c, reasons, vinculadoAOutraAta, naoPertenceAAta, descartadoParaEstaAta }) => (
+                  {filteredContracts.map(({ contract: c, reasons, vinculadoAOutraAta, tambemEmOutrasAtas: tambem, naoPertenceAAta, descartadoParaEstaAta }) => (
                     <div
                       key={contractKeyOf(c)}
                       data-testid="link-contract-option"
                       aria-disabled={vinculadoAOutraAta ? true : undefined}
-                      title={vinculadoAOutraAta ? `Este contrato já está vinculado à ata ${vinculadoAOutraAta}. Um contrato pertence a uma só ata.` : undefined}
+                      title={vinculadoAOutraAta ? `Este contrato já está vinculado à ata ${vinculadoAOutraAta}, de outra compra. Um contrato só fica em várias atas da mesma compra.` : undefined}
                       onClick={() => {
                         if (!vinculadoAOutraAta) handleSelectContract(c);
                       }}
@@ -451,6 +508,15 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                           {vinculadoAOutraAta && (
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
                               Vinculado à ata {vinculadoAOutraAta}
+                            </span>
+                          )}
+                          {tambem && (
+                            <span
+                              data-testid="link-contract-tambem-em"
+                              title="Este contrato já tem itens em outra ata da mesma compra. Cada item fica na sua ata."
+                              style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: 'var(--color-info-bg)', color: 'var(--color-info-text-strong)', border: '1px solid var(--color-info-border)' }}
+                            >
+                              Também na {textoOutrasAtas(tambem)}
                             </span>
                           )}
                           {descartadoParaEstaAta && (
@@ -539,35 +605,92 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                 </div>
               </div>
 
-              {/* Regra de vínculo: contrato de outra ata é recusado; vincular leva o gestor da ata para o contrato */}
+              {/* Regras de vínculo: cada item do contrato numa só ata, várias atas só da mesma compra; o gestor segue a ata,
+                  menos quando o contrato já está numa ata de outro gestor (o coordenador decide) */}
               {ataBloqueandoSelecionado ? (
                 <div style={{ marginBottom: '1rem' }} data-testid="link-contract-outra-ata">
                   <AlertCard
                     severity="CRITICA"
-                    title={`Este contrato já está vinculado à ata ${ataBloqueandoSelecionado}. Um contrato pertence a uma só ata; desvincule lá antes, se for o caso.`}
+                    title={`Este contrato já está vinculado à ata ${ataBloqueandoSelecionado}, que não é da mesma compra desta ata. Um contrato só fica em várias atas da mesma compra; desvincule lá antes, se for o caso.`}
+                  />
+                </div>
+              ) : ataDoItemFixo ? (
+                <div style={{ marginBottom: '1rem' }} data-testid="link-contract-item-em-outra-ata">
+                  <AlertCard
+                    severity="CRITICA"
+                    title={`O item ${numeroItem} deste contrato já está vinculado à ata ${ataDoItemFixo}. Cada item do contrato pertence a uma só ata.`}
                   />
                 </div>
               ) : (
-                <p
-                  data-testid="link-contract-heranca"
-                  style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: 'var(--color-info-text-strong)', background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
-                >
-                  {gestorDaAta ? (
-                    <>
-                      Ao vincular, este contrato passa a ser gerido por <strong>{gestorDaAta}</strong>, gestor da ata.
-                      {gestorAtualDoContrato && gestorAtualDoContrato !== gestorDaAta && (
-                        <> Hoje ele está com <strong>{gestorAtualDoContrato}</strong>; o coordenador será avisado da mudança.</>
-                      )}
-                    </>
-                  ) : gestorAtualDoContrato ? (
-                    <>
-                      A ata ainda não tem gestor: ao vincular, ela passa a ser de <strong>{gestorAtualDoContrato}</strong>, gestor deste contrato,
-                      e os outros contratos da ata acompanham. O coordenador será avisado.
-                    </>
-                  ) : (
-                    <>A ata e o contrato ainda não têm gestor: eles recebem o gestor quando o coordenador atribuir a ata.</>
+                <>
+                  {outrasDoSelecionado.length > 0 && (
+                    <p data-testid="link-contract-tambem-na-ata" style={{ margin: '0 0 0.6rem 0', fontSize: '0.8rem', color: 'var(--color-info-text-strong)', background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: '6px', padding: '0.5rem 0.65rem' }}>
+                      Este contrato também está na <strong>{textoOutrasAtas(outrasDoSelecionado)}</strong>. Cada item fica na sua ata.
+                    </p>
                   )}
-                </p>
+                  {gestoresDiferentes && isCoordenador ? (
+                    <fieldset data-testid="link-contract-escolha-gestor" style={{ margin: '0 0 1rem 0', border: 0, padding: 0 }}>
+                      <legend style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.2rem' }}>
+                        Quem fica com o contrato? <span style={{ color: 'var(--color-danger)' }}>*</span>
+                      </legend>
+                      <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.76rem', color: '#64748b' }}>
+                        As atas têm gestores diferentes. As atas continuam com os gestores que já têm.
+                      </p>
+                      {([
+                        { valor: 'CONTRATO' as const, nome: gestorAtualDoContrato, dica: `Já cuida deste contrato (${textoOutrasAtas(outrasDoSelecionado)})` },
+                        { valor: 'ATA' as const, nome: gestorDaAta, dica: `Gestor da ata ${numeroAta}` }
+                      ]).map((o) => (
+                        <label
+                          key={o.valor}
+                          style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.55rem 0.75rem', marginBottom: '0.4rem', borderRadius: '8px', cursor: 'pointer', border: gestorEscolhido === o.valor ? '1px solid var(--primary)' : '1px solid #cbd5e1', background: gestorEscolhido === o.valor ? 'var(--primary-light)' : '#ffffff' }}
+                        >
+                          <input
+                            type="radio"
+                            name="link-contract-gestor"
+                            value={o.valor}
+                            checked={gestorEscolhido === o.valor}
+                            onChange={() => setGestorEscolhido(o.valor)}
+                            data-testid={`link-contract-gestor-${o.valor.toLowerCase()}`}
+                            style={{ marginTop: '0.2rem', accentColor: 'var(--primary)' }}
+                          />
+                          <span style={{ fontSize: '0.82rem' }}>
+                            <strong style={{ display: 'block', color: '#1e293b' }}>{o.nome}</strong>
+                            <span style={{ color: '#64748b' }}>{o.dica}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  ) : gestoresDiferentes ? (
+                    <p
+                      data-testid="link-contract-heranca"
+                      style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
+                    >
+                      O contrato <strong>continua com {gestorAtualDoContrato}</strong>. Esta ata é de <strong>{gestorDaAta}</strong>: o coordenador será
+                      avisado de que o contrato está em atas de gestores diferentes e decide quem fica com ele.
+                    </p>
+                  ) : (
+                    <p
+                      data-testid="link-contract-heranca"
+                      style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: 'var(--color-info-text-strong)', background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)', borderRadius: '6px', padding: '0.5rem 0.65rem' }}
+                    >
+                      {gestorDaAta ? (
+                        <>
+                          Ao vincular, este contrato passa a ser gerido por <strong>{gestorDaAta}</strong>, gestor da ata.
+                          {gestorAtualDoContrato && gestorAtualDoContrato !== gestorDaAta && (
+                            <> Hoje ele está com <strong>{gestorAtualDoContrato}</strong>; o coordenador será avisado da mudança.</>
+                          )}
+                        </>
+                      ) : gestorAtualDoContrato ? (
+                        <>
+                          A ata ainda não tem gestor: ao vincular, ela passa a ser de <strong>{gestorAtualDoContrato}</strong>, gestor deste contrato,
+                          e os outros contratos da ata acompanham. O coordenador será avisado.
+                        </>
+                      ) : (
+                        <>A ata e o contrato ainda não têm gestor: eles recebem o gestor quando o coordenador atribuir a ata.</>
+                      )}
+                    </p>
+                  )}
+                </>
               )}
 
               {/* Item fixo (modo Item) */}
@@ -597,7 +720,9 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto' }} className="link-contract-list">
                       {itemOptions!.map((i) => {
+                        const emOutraAta = ataDoItem(i);
                         const linked = isItemLinked(i);
+                        const travado = linked || Boolean(emOutraAta);
                         const checked = isItemChecked(i);
                         const listed = isListedByApi(i);
                         const apiQty = apiQuantityOf(i);
@@ -605,13 +730,13 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                           <div
                             key={i.itemKey}
                             data-testid="link-contract-item-row"
-                            style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.65rem', border: '1px solid #e2e8f0', borderRadius: '6px', background: linked ? '#f8fafc' : '#ffffff', opacity: linked ? 0.7 : 1 }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.65rem', border: '1px solid #e2e8f0', borderRadius: '6px', background: travado ? '#f8fafc' : '#ffffff', opacity: travado ? 0.7 : 1 }}
                           >
                             <input
                               type="checkbox"
                               aria-label={`Item ${i.numeroItem}`}
                               checked={checked}
-                              disabled={linked}
+                              disabled={travado}
                               onChange={(e) => setCheckedOverrides((prev) => ({ ...prev, [i.itemKey]: e.target.checked }))}
                             />
                             <div style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}>
@@ -619,12 +744,17 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                                 Item {i.numeroItem}
                                 {isSameSupplier(i) && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: 'var(--color-warning-text)' }}>mesmo fornecedor</span>}
                                 {linked && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: '#64748b' }}>já vinculado</span>}
+                                {!linked && emOutraAta && (
+                                  <span data-testid="link-contract-item-na-outra-ata" style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: '#64748b' }}>
+                                    já está na ata {emOutraAta}
+                                  </span>
+                                )}
                               </div>
                               <div style={{ color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {i.descricao || 'Sem descrição'}
                                 {i.fornecedorNome ? ` (${i.fornecedorNome})` : ''}
                               </div>
-                              {!linked && checked && apiListsItems && !listed && (
+                              {!travado && checked && apiListsItems && !listed && (
                                 <div style={{ color: 'var(--color-warning-text)', fontSize: '0.75rem' }}>A API oficial não lista este item neste contrato.</div>
                               )}
                             </div>
@@ -667,7 +797,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                 <ActionButton action="cancelar" type="button" onClick={handleClose} disabled={isPending} />
                 <ActionButton action="vincular"
                   type="submit"
-                  disabled={isPending || Boolean(ataBloqueandoSelecionado) || (isAtaMode && checkedItems.length === 0)}
+                  disabled={isPending || Boolean(ataBloqueandoSelecionado) || Boolean(ataDoItemFixo) || faltaEscolherGestor || (isAtaMode && checkedItems.length === 0)}
                   isLoading={isPending}
                 >
                   {isAtaMode && checkedItems.length > 1 ? `Vincular a ${checkedItems.length} itens` : 'Vincular Contrato'}

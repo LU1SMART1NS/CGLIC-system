@@ -4,8 +4,12 @@ import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 /** Aviso ao coordenador (public.distribuicao_avisos, migration 70): um vínculo mudou o gestor de uma ata ou contrato. */
 export interface DistribuicaoAviso {
   id: string;
-  /** CONTRATO_REALINHADO: o contrato passou ao gestor da ata. ATA_ASSUMIU_GESTOR: a ata, sem gestor, passou ao gestor do contrato. */
-  tipo: 'CONTRATO_REALINHADO' | 'ATA_ASSUMIU_GESTOR';
+  /**
+   * CONTRATO_REALINHADO: o contrato passou ao gestor da ata. ATA_ASSUMIU_GESTOR: a ata, sem gestor, passou ao gestor do
+   * contrato. GESTORES_DIFERENTES (migration 86): o contrato está também numa ata de outro gestor e ficou como estava
+   * (`gestorAnterior` = gestor do contrato, `gestorNovo` = gestor da ata); o coordenador decide.
+   */
+  tipo: 'CONTRATO_REALINHADO' | 'ATA_ASSUMIU_GESTOR' | 'GESTORES_DIFERENTES';
   ataKey: string;
   contractKey?: string;
   gestorAnterior?: string;
@@ -41,8 +45,9 @@ export async function fetchAvisosDistribuicao(): Promise<DistribuicaoAviso[]> {
   }
 }
 
-export async function marcarAvisosDistribuicaoLidos(): Promise<void> {
+/** Sem ids, marca todos menos os GESTORES_DIFERENTES (esses só saem quando o coordenador decide). */
+export async function marcarAvisosDistribuicaoLidos(ids?: string[]): Promise<void> {
   if (!isSupabaseConfigured || !supabase) throw new Error('NETWORK_OR_CONFIG_ERROR: Supabase não está configurado');
-  const { error } = await supabase.rpc('marcar_avisos_distribuicao_lidos');
+  const { error } = await supabase.rpc('marcar_avisos_distribuicao_lidos', ids && ids.length > 0 ? { p_ids: ids } : {});
   if (error) throw mapPostgresErrorToAppError(error);
 }

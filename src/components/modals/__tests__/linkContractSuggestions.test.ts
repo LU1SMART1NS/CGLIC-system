@@ -105,4 +105,14 @@ describe('aplicarRestricoesDeVinculo', () => {
     expect(r.map((x) => x.contract.id)).toEqual(['SUG', 'DESCARTADO']);
     expect(r[1]).toMatchObject({ reasons: [], descartadoParaEstaAta: true });
   });
+
+  it('contrato já em outra ata da mesma compra continua escolhível e é sinalizado (migration 86)', () => {
+    const r = aplicarRestricoesDeVinculo([{ contract: c('C33'), reasons: ['compra', 'fornecedor'] }], {
+      contractKeyOf: keyOf,
+      ataDeOutroVinculo: new Map(),
+      tambemEmOutrasAtas: new Map([['C33', [{ numeroAta: '00053/2025', itens: [10] }]]]),
+      naoPertencemAAta: new Set()
+    });
+    expect(r).toEqual([{ contract: c('C33'), reasons: ['compra', 'fornecedor'], tambemEmOutrasAtas: [{ numeroAta: '00053/2025', itens: [10] }] }]);
+  });
 });

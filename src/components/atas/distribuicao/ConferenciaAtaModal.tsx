@@ -11,7 +11,8 @@ import type { PlanoVinculo } from '../../../services/vinculoEmMassaService';
 import { formatDateBR } from '../../../utils/format';
 import { normalizeItemKey } from '../../../utils/itemKeyUtils';
 import { sugerirAtas, type FilaAta, type ItemFila } from './contratosSemAta';
-import { efeitoGestorDoVinculo, preverVinculo, type ItemDaAta } from './vinculoEmMassa';
+import { efeitoGestorVariasAtas, preverVinculo, type ItemDaAta } from './vinculoEmMassa';
+import { useAllAtaManagers } from '../../../hooks/useAtaManagers';
 
 interface ConferenciaAtaModalProps {
   contrato: ItemFila;
@@ -54,7 +55,7 @@ const Campo: React.FC<{ rotulo: string; children: React.ReactNode; limitar?: boo
  * sobretudo, os itens que a API oficial confirma) e as ações Vincular e "Esta não é a ata". É o único lugar de vincular
  * pela Central: os itens confirmados pela API vêm marcados e os demais itens da ata podem ser marcados à mão.
  */
-export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contrato, ata, itensDaAta, podeAgir, onClose }) => {
+export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contrato, ata, itensDaAta: todosOsItensDaAta, podeAgir, onClose }) => {
   const toast = useToast();
   const lote = useVinculoEmMassa();
   const descartar = useDescartarAta();
@@ -62,6 +63,11 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
   const motivo = sugerirAtas(contrato, [ata]).sugestoes[0]?.motivo;
   const fornecedorBate = motivo === 'FORNECEDOR' || motivo === 'COMPRA_E_FORNECEDOR';
   const compraBate = motivo === 'COMPRA' || motivo === 'COMPRA_E_FORNECEDOR';
+  // Vínculo parcial (migration 86): o contrato já tem itens em outras atas; esses itens não entram nesta.
+  const vinculadas = (contrato.atasVinculadas ?? []).filter((v) => v.numeroAta !== ata.numeroAta);
+  const ataDoItem = new Map(vinculadas.flatMap((v) => v.itens.map((n) => [n, v.numeroAta] as const)));
+  const itensDaAta = todosOsItensDaAta.filter((i) => !ataDoItem.has(parseInt(i.numeroItem, 10)));
+  const itensEmOutraAta = todosOsItensDaAta.filter((i) => ataDoItem.has(parseInt(i.numeroItem, 10)));
 
   const consulta = useQuery({
     queryKey: ['contract-item-quantities', `${contrato.contract.uasg}-${contrato.contract.numero}-${contrato.contract.ano}`] as const,
@@ -81,7 +87,13 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
     apiErro: consulta.isError,
     compraDiferente: !compraBate
   });
-  const efeito = efeitoGestorDoVinculo(contrato.gestorNome, ata.gestorNome);
+  const efeito = efeitoGestorVariasAtas(contrato.gestorNome, [
+    ...vinculadas.map((v) => ({ numeroAta: v.numeroAta, gestorNome: v.gestorNome, jaVinculada: true })),
+    { numeroAta: ata.numeroAta, gestorNome: ata.gestorNome }
+  ]);
+  // Atas de gestores diferentes: o coordenador escolhe aqui quem fica com o contrato.
+  const [gestorEscolhido, setGestorEscolhido] = React.useState<string | null>(null);
+  const { data: ataManagers } = useAllAtaManagers();
 
   // Itens marcados: começa pelos que a API confirma (uma vez, quando a consulta responde); o coordenador ajusta.
   // Em outra compra a API não vale: nada vem marcado e nenhuma quantidade da API é gravada.
@@ -107,7 +119,11 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
   const ocupado = lote.estado.rodando || descartar.isPending;
 
   const vincular = async () => {
-    if (itensMarcados.length === 0) return;
+    if (itensMarcados.length === 0 || (efeito.conflito && !gestorEscolhido)) return;
+    const gestorFinal =
+      efeito.conflito && gestorEscolhido && gestorEscolhido !== contrato.gestorNome
+        ? { nome: gestorEscolhido, userId: Object.values(ataManagers ?? {}).find((m) => m.gestorNome === gestorEscolhido)?.gestorUserId ?? null }
+        : undefined;
     const plano: PlanoVinculo = {
       contractKey: contrato.contractKey,
       numero: contrato.numero,
@@ -119,7 +135,8 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
         numeroItem: i.numeroItem,
         valorUnitario: i.valorUnitario,
         quantidade: api?.get(parseInt(i.numeroItem, 10)) ?? null
-      }))
+      })),
+      ...(gestorFinal ? { gestorFinal } : {})
     };
     const [resultado] = await lote.executar([plano]);
     if (resultado?.ok) {
@@ -165,8 +182,14 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
                 size="sm"
                 isLoading={lote.estado.rodando}
                 onClick={vincular}
-                disabled={ocupado || itensMarcados.length === 0 || consulta.isLoading}
-                title={itensMarcados.length === 0 ? 'Marque os itens que o contrato cobre' : 'Vincular o contrato aos itens marcados'}
+                disabled={ocupado || itensMarcados.length === 0 || consulta.isLoading || (efeito.conflito && !gestorEscolhido)}
+                title={
+                  itensMarcados.length === 0
+                    ? 'Marque os itens que o contrato cobre'
+                    : efeito.conflito && !gestorEscolhido
+                      ? 'Escolha quem fica com o contrato'
+                      : 'Vincular o contrato aos itens marcados'
+                }
                 data-testid="conferencia-vincular"
               >
                 {itensMarcados.length > 0 && !algumConfirmado ? 'Vincular mesmo assim' : 'Vincular'}
@@ -208,15 +231,49 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
           ) : (
             <SinalLinha sinal="NAO">{previsao.motivo}</SinalLinha>
           )}
-          <SinalLinha sinal="NEUTRO">{efeito.texto}</SinalLinha>
+          {vinculadas.map((v) => (
+            <SinalLinha key={v.numeroAta} sinal="NEUTRO">
+              O contrato também está na ata {v.numeroAta} ({v.itens.length === 1 ? 'item' : 'itens'} {v.itens.join(', ')}). Cada item fica na sua ata.
+            </SinalLinha>
+          ))}
+          {efeito.textos.map((t) => (
+            <SinalLinha key={t} sinal="NEUTRO">
+              {t}
+            </SinalLinha>
+          ))}
         </section>
 
-        {itensDaAta.length > 0 && (
+        {efeito.conflito && podeAgir && (
+          <fieldset data-testid="conferencia-escolha-gestor" style={{ margin: 0, border: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <legend style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.15rem' }}>Quem fica com o contrato?</legend>
+            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>As atas têm gestores diferentes. As atas continuam com os gestores que já têm.</div>
+            {efeito.candidatos.map((g) => (
+              <label
+                key={g}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.75rem', borderRadius: '8px', cursor: 'pointer', border: gestorEscolhido === g ? '1px solid var(--primary)' : '1px solid #cbd5e1', background: gestorEscolhido === g ? 'var(--primary-light)' : '#ffffff', fontSize: '0.84rem' }}
+              >
+                <input type="radio" name="conferencia-gestor" checked={gestorEscolhido === g} onChange={() => setGestorEscolhido(g)} disabled={ocupado} style={{ accentColor: 'var(--primary)' }} />
+                <strong>{g}</strong>
+                <span style={{ color: '#64748b' }}>{g === contrato.gestorNome ? 'já cuida deste contrato' : g === ata.gestorNome ? `gestor da ata ${ata.numeroAta}` : 'gestor de outra ata do contrato'}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+
+        {todosOsItensDaAta.length > 0 && (
           <section aria-label="Itens cobertos pelo contrato" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }} data-testid="conferencia-itens">
             <div>
               <strong style={{ fontSize: '0.88rem' }}>Itens cobertos por este contrato</strong>
               <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Os itens que a API oficial lista no contrato já vêm marcados. Marque outros só se tiver certeza.</div>
             </div>
+            {itensEmOutraAta.map((i) => (
+              <div key={`outra-${i.numeroItem}`} style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.55rem 0.75rem', border: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '8px', color: '#64748b', fontSize: '0.84rem' }}>
+                <input type="checkbox" checked={false} disabled aria-label={`Item ${i.numeroItem}, já na ata ${ataDoItem.get(parseInt(i.numeroItem, 10))}`} />
+                <span>
+                  <strong>Item {i.numeroItem}</strong> · já está na ata {ataDoItem.get(parseInt(i.numeroItem, 10))}
+                </span>
+              </div>
+            ))}
             {itensDaAta.map((i) => {
               const ok = confirmado(i.numeroItem);
               const qtd = api?.get(parseInt(i.numeroItem, 10));

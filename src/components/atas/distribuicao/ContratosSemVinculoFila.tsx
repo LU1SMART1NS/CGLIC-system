@@ -29,7 +29,18 @@ import { DescartadosLista } from './DescartadosLista';
 import { EscolherAtaModal } from './EscolherAtaModal';
 import { SELECIONADA_BG, SelecaoCell, SelecaoHeaderCell, useSelecaoFila } from './DistribuicaoSelecao';
 import { contemBusca, PAGE_SIZE, TODAS } from './filaComum';
-import { efeitoGestorDoVinculo, preverVinculo, semZeros, textoItemQtd, type ItemDaAta, type PrevisaoVinculo } from './vinculoEmMassa';
+import {
+  efeitoGestorDoVinculo,
+  efeitoGestorVariasAtas,
+  ordemDasAtas,
+  preverVinculoVariasAtas,
+  semZeros,
+  textoItemQtd,
+  type EfeitoGestorVariasAtas,
+  type ItemDaAta,
+  type PrevisaoVariasAtas
+} from './vinculoEmMassa';
+import { useAllAtaManagers } from '../../../hooks/useAtaManagers';
 
 /** Mesma chave do hook useContractItemQuantities: a consulta é compartilhada com o modal "Vincular Contrato". */
 const chaveApi = (c: Pick<ContractDashboardRecord, 'uasg' | 'numero' | 'ano'>) => `${c.uasg}-${c.numero}-${c.ano}`;
@@ -83,7 +94,7 @@ const chave = (l: Linha) => l.contractKey;
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 /** Resultado da conferência pela API, numa linha curta embaixo da ata. */
-const StatusApi: React.FC<{ previsao: PrevisaoVinculo; testId: string }> = ({ previsao, testId }) => {
+const StatusApi: React.FC<{ previsao: PrevisaoVariasAtas; testId: string; parcial?: boolean }> = ({ previsao, testId, parcial }) => {
   if (previsao.status === 'CONFERINDO') {
     return (
       <span data-testid={testId} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: '#64748b' }}>
@@ -92,11 +103,14 @@ const StatusApi: React.FC<{ previsao: PrevisaoVinculo; testId: string }> = ({ pr
     );
   }
   if (previsao.status === 'PRONTO') {
-    const itens = previsao.itens;
-    const texto =
-      itens.length === 1
-        ? `Item ${semZeros(itens[0].numeroItem)} · Qtd ${itens[0].quantidade != null ? itens[0].quantidade.toLocaleString('pt-BR') : '—'}`
-        : `${itens.length} itens confirmados`;
+    const itens = previsao.porAta.flatMap((p) => p.itens);
+    const texto = parcial
+      ? `Vínculo parcial: falta ${itens.length === 1 ? 'o item' : 'os itens'} ${itens.map((i) => semZeros(i.numeroItem)).join(', ')}`
+      : previsao.porAta.length > 1
+        ? `Pronto: ${previsao.porAta.length} atas, ${itens.length} itens confirmados`
+        : itens.length === 1
+          ? `Item ${semZeros(itens[0].numeroItem)} · Qtd ${itens[0].quantidade != null ? itens[0].quantidade.toLocaleString('pt-BR') : '—'}`
+          : `${itens.length} itens confirmados`;
     return (
       <span data-testid={testId} title={itens.map(textoItemQtd).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--color-success-text)' }}>
         <CheckCircle2 size={11} aria-hidden="true" /> {texto}
@@ -198,9 +212,9 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chave, PAGE_SIZE);
   const sort = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
 
-  // Itens do contrato na API oficial, só das linhas da página com uma ata provável que tem itens: é a conferência do lote.
+  // Itens do contrato na API oficial, só das linhas da página com ata provável que tem itens: é a conferência do lote.
   const paraConsultar = React.useMemo(
-    () => pageItems.filter((l) => l.fortes.length === 1 && itensDaAta(l.fortes[0].numeroAta, l.fortes[0].uasg).length > 0),
+    () => pageItems.filter((l) => l.grupo === 'ATA_PROVAVEL' && l.fortes.some((s) => itensDaAta(s.numeroAta, s.uasg).length > 0)),
     [pageItems, itensDaAta]
   );
   const consultas = useQueries({
@@ -213,23 +227,38 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
   });
   const consultaPorContrato = React.useMemo(() => new Map(paraConsultar.map((l, i) => [l.contractKey, consultas[i]])), [paraConsultar, consultas]);
 
-  /** Previsão do vínculo (só para ata provável); a das linhas de outras páginas sai do cache da consulta. */
-  const previsaoDe = (l: Linha): PrevisaoVinculo | null => {
+  /**
+   * Previsão do vínculo (só para ata provável): cada item do contrato vai para a ata provável que o tem (contrato em
+   * mais de uma ata, migration 86). A das linhas de outras páginas sai do cache da consulta.
+   */
+  const previsaoDe = (l: Linha): PrevisaoVariasAtas | null => {
     if (l.grupo !== 'ATA_PROVAVEL') return null;
-    const ata = ataDaLinha(l) as AtaSugerida;
     const consulta = consultaPorContrato.get(l.contractKey);
     const doCache = queryClient.getQueryData<ContractItemQuantities>(['contract-item-quantities', chaveApi(l.contract)]);
-    return preverVinculo({
-      numeroAta: ata.numeroAta,
-      uasg: ata.uasg,
-      atasProvaveis: l.fortes.length,
-      itensDaAta: itensDaAta(ata.numeroAta, ata.uasg),
+    return preverVinculoVariasAtas({
+      atas: l.fortes.map((s) => ({ numeroAta: s.numeroAta, uasg: s.uasg, itensDaAta: itensDaAta(s.numeroAta, s.uasg) })),
       apiQuantidades: consulta?.data ?? doCache,
       apiCarregando: consulta ? consulta.isLoading : false,
-      apiErro: consulta?.isError
+      apiErro: consulta?.isError,
+      itensJaVinculados: new Set((l.atasVinculadas ?? []).flatMap((a) => a.itens))
     });
   };
-  const pronta = (l: Linha) => previsaoDe(l)?.status === 'PRONTO';
+  const gestorDaSugestao = (l: Linha, numeroAta: string, uasg: string) => l.fortes.find((s) => s.numeroAta === numeroAta && s.uasg === uasg)?.gestorNome;
+  /** Efeito no gestor: atas já vinculadas + atas que o vínculo vai gravar (ou a ata da linha, antes da previsão). */
+  const efeitoDe = (l: Linha, previsao: PrevisaoVariasAtas | null): EfeitoGestorVariasAtas => {
+    const novas =
+      previsao?.status === 'PRONTO'
+        ? previsao.porAta.map((p) => ({ numeroAta: p.numeroAta, gestorNome: gestorDaSugestao(l, p.numeroAta, p.uasg) }))
+        : [ataDaLinha(l)].filter((a): a is AtaSugerida => Boolean(a)).map((a) => ({ numeroAta: a.numeroAta, gestorNome: a.gestorNome }));
+    const ja = (l.atasVinculadas ?? []).map((a) => ({ numeroAta: a.numeroAta, gestorNome: a.gestorNome, jaVinculada: true }));
+    return efeitoGestorVariasAtas(l.gestorNome, [...ja, ...novas]);
+  };
+  // Atas de gestores diferentes: o coordenador escolhe na linha quem fica com o contrato.
+  const [gestorEscolhido, setGestorEscolhido] = React.useState<Record<string, string>>({});
+  const pronta = (l: Linha) => {
+    const previsao = previsaoDe(l);
+    return previsao?.status === 'PRONTO' && (!efeitoDe(l, previsao).conflito || Boolean(gestorEscolhido[l.contractKey]));
+  };
   const decidivel = (l: Linha) => l.grupo === 'PARCIAL' || l.grupo === 'SEM_PISTA';
   const selecionavel = (l: Linha) => pronta(l) || decidivel(l);
 
@@ -239,36 +268,50 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
   const selecionadasProntas = selecionadas.filter(pronta);
   const selecionadasDecisao = selecionadas.filter(decidivel);
 
-  const planoDe = (l: Linha): PlanoVinculo | null => {
+  const { data: ataManagers } = useAllAtaManagers();
+  const userIdDoGestor = (nome: string) => Object.values(ataManagers ?? {}).find((m) => m.gestorNome === nome)?.gestorUserId ?? null;
+
+  /** Um plano por ata, na ordem que leva o banco ao gestor certo; com conflito, o gestor escolhido vai no último. */
+  const planosDe = (l: Linha): PlanoVinculo[] => {
     const previsao = previsaoDe(l);
-    if (previsao?.status !== 'PRONTO') return null;
-    const ata = ataDaLinha(l) as AtaSugerida;
-    return {
+    if (previsao?.status !== 'PRONTO' || !pronta(l)) return [];
+    const ordenadas = ordemDasAtas(
+      l.gestorNome,
+      previsao.porAta.map((p) => ({ ...p, gestorNome: gestorDaSugestao(l, p.numeroAta, p.uasg) }))
+    );
+    const escolhido = efeitoDe(l, previsao).conflito ? gestorEscolhido[l.contractKey] : undefined;
+    return ordenadas.map((p, i) => ({
       contractKey: l.contractKey,
       numero: l.numero,
       contract: l.contract,
-      numeroAta: ata.numeroAta,
-      uasg: ata.uasg,
-      itens: previsao.itens.map((i) => ({ itemKey: i.itemKey, numeroItem: i.numeroItem, valorUnitario: i.valorUnitario, quantidade: i.quantidade }))
-    };
+      numeroAta: p.numeroAta,
+      uasg: p.uasg,
+      itens: p.itens.map((it) => ({ itemKey: it.itemKey, numeroItem: it.numeroItem, valorUnitario: it.valorUnitario, quantidade: it.quantidade })),
+      // Sempre grava o escolhido no fim: o primeiro vínculo ainda é de "ata única" e o banco pode ter levado o contrato
+      // ao gestor dessa ata antes de o contrato estar nas outras.
+      ...(escolhido && i === ordenadas.length - 1 ? { gestorFinal: { nome: escolhido, userId: userIdDoGestor(escolhido) } } : {})
+    }));
   };
 
   const vincular = async (alvo: Linha[]) => {
-    const prontos = alvo.map((l) => ({ linha: l, plano: planoDe(l) })).filter((x): x is { linha: Linha; plano: PlanoVinculo } => Boolean(x.plano));
+    const prontos = alvo.flatMap((l) => planosDe(l).map((plano) => ({ linha: l, plano })));
     if (prontos.length === 0) {
       toast.error('Nenhum dos contratos marcados está pronto para vincular. Clique no nome da ata para conferir um a um.');
       return;
     }
-    const efeitos = prontos.map((x) => efeitoGestorDoVinculo(x.linha.gestorNome, ataDaLinha(x.linha)?.gestorNome));
+    const contratosNoLote = new Set(prontos.map((x) => x.plano.contractKey)).size;
+    const linhasNoLote = alvo.filter((l) => planosDe(l).length > 0);
+    const efeitos = linhasNoLote.filter((l) => planosDe(l).length === 1 && !l.atasVinculadas).map((l) => efeitoGestorDoVinculo(l.gestorNome, ataDaLinha(l)?.gestorNome));
     const muda = efeitos.filter((e) => e.tipo === 'MUDA').length;
     const ataAssume = efeitos.filter((e) => e.tipo === 'ATA_ASSUME').length;
+    const variasAtas = linhasNoLote.filter((l) => planosDe(l).length > 1 || l.atasVinculadas);
     const ok = await confirmDialog({
-      title: prontos.length === 1 ? 'Vincular contrato à ata' : `Vincular ${prontos.length} contratos às atas`,
+      title: prontos.length === 1 ? 'Vincular contrato à ata' : contratosNoLote === 1 ? `Vincular o contrato a ${prontos.length} atas` : `Vincular ${contratosNoLote} contratos às atas`,
       message: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }} data-testid="sem-vinculo-confirmar-lista">
             {prontos.map((x) => (
-              <div key={x.plano.contractKey}>
+              <div key={`${x.plano.contractKey}|${x.plano.numeroAta}`}>
                 <strong>Contrato {x.plano.numero} ↔ Ata {x.plano.numeroAta}</strong>
                 {x.plano.itens.map((i) => (
                   <div key={i.itemKey} style={{ paddingLeft: '1.1rem', fontSize: '0.85rem', color: '#334155' }}>
@@ -278,19 +321,30 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
               </div>
             ))}
           </div>
-          <span>A quantidade contratada passa a contar no saldo e {prontos.length === 1 ? 'o contrato passa' : 'os contratos passam'} ao gestor da ata.</span>
+          <span>
+            A quantidade contratada passa a contar no saldo
+            {variasAtas.length < linhasNoLote.length ? <> e {linhasNoLote.length - variasAtas.length === 1 ? 'o contrato de uma ata só passa' : 'os contratos de uma ata só passam'} ao gestor da ata</> : null}.
+          </span>
+          {variasAtas.map((l) => (
+            <span key={l.contractKey} style={{ color: '#334155' }}>
+              Contrato {l.numero} em mais de uma ata:{' '}
+              {gestorEscolhido[l.contractKey] && efeitoDe(l, previsaoDe(l)).conflito
+                ? `fica com ${gestorEscolhido[l.contractKey]}.`
+                : `${efeitoDe(l, previsaoDe(l)).textos.join('; ')}.`}
+            </span>
+          ))}
           {muda > 0 && <strong style={{ color: 'var(--color-warning-text)' }}>{plural(muda, 'contrato muda', 'contratos mudam')} de gestor para seguir a ata.</strong>}
           {ataAssume > 0 && (
             <strong style={{ color: 'var(--color-warning-text)' }}>{plural(ataAssume, 'ata sem gestor passa', 'atas sem gestor passam')} a ser do gestor do contrato vinculado.</strong>
           )}
         </div>
       ),
-      confirmLabel: prontos.length === 1 ? 'Vincular' : `Vincular ${prontos.length}`
+      confirmLabel: contratosNoLote === 1 ? 'Vincular' : `Vincular ${contratosNoLote}`
     });
     if (!ok) return;
     const resultados = await lote.executar(prontos.map((x) => x.plano));
     selecao.limpar();
-    const feitos = resultados.filter((r) => r.ok).length;
+    const feitos = new Set(resultados.filter((r) => r.ok).map((r) => r.contractKey)).size;
     if (feitos > 0) toast.success(`${plural(feitos, 'contrato vinculado', 'contratos vinculados')}.`);
   };
 
@@ -381,14 +435,14 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {falhas.length ? <AlertTriangle size={16} color="var(--color-danger-text)" aria-hidden="true" /> : <CheckCircle2 size={16} color="var(--color-success-text)" aria-hidden="true" />}
                 <strong>
-                  {plural(estado.resultados.filter((r) => r.ok).length, 'contrato vinculado', 'contratos vinculados')} ({estado.resultados.reduce((n, r) => n + r.itens, 0)} itens)
+                  {plural(new Set(estado.resultados.filter((r) => r.ok).map((r) => r.contractKey)).size, 'contrato vinculado', 'contratos vinculados')} ({estado.resultados.reduce((n, r) => n + r.itens, 0)} itens)
                   {falhas.length > 0 && `, ${plural(falhas.length, 'falha', 'falhas')}`}
                   {estado.resultados.length < estado.total && ` — parou em ${estado.resultados.length} de ${estado.total}`}
                 </strong>
                 <ActionButton action="fechar" iconOnly label="Fechar resumo" onClick={lote.limpar} style={{ marginLeft: 'auto' }} />
               </div>
-              {falhas.map((r) => (
-                <div key={r.contractKey} style={{ color: 'var(--color-danger-text-strong)' }}>
+              {falhas.map((r, i) => (
+                <div key={`${r.contractKey}|${i}`} style={{ color: 'var(--color-danger-text-strong)' }}>
                   Contrato {r.numero}: {r.erro}
                 </div>
               ))}
@@ -489,7 +543,9 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                   const previsao = previsaoDe(l);
                   const marcada = selecao.selecionadas.has(chave(l));
                   const conf = confirmacoes[l.contractKey];
-                  const efeito = l.grupo === 'ATA_PROVAVEL' ? efeitoGestorDoVinculo(l.gestorNome, ata?.gestorNome) : null;
+                  const efeito = l.grupo === 'ATA_PROVAVEL' ? efeitoDe(l, previsao) : null;
+                  // Mais de uma ata (ou vínculo parcial): uma linha por ata com os itens de cada uma.
+                  const porAta = previsao?.status === 'PRONTO' && (previsao.porAta.length > 1 || l.atasVinculadas) ? previsao.porAta : null;
                   return (
                     <tr key={chave(l)} data-testid={`sem-vinculo-${l.contractKey}`} style={marcada ? { background: SELECIONADA_BG } : undefined}>
                       {podeAgir && (
@@ -513,7 +569,26 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                       </td>
                       <td data-label="Ata provável" style={{ ...carteiraTd, minWidth: '190px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
-                          {l.grupo === 'ATA_PROVAVEL' && ata && (
+                          {l.grupo === 'ATA_PROVAVEL' && (l.atasVinculadas ?? []).map((v) => (
+                            <span key={`ja-${v.numeroAta}`} data-testid={`sem-vinculo-ja-vinculada-${l.contractKey}-${v.numeroAta}`} style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                              Ata {v.numeroAta} → {v.itens.length === 1 ? 'item' : 'itens'} {v.itens.join(', ')} vinculado{v.itens.length === 1 ? '' : 's'}
+                            </span>
+                          ))}
+                          {l.grupo === 'ATA_PROVAVEL' && porAta && (
+                            <>
+                              {porAta.map((p) => {
+                                const s = l.fortes.find((f) => f.numeroAta === p.numeroAta && f.uasg === p.uasg);
+                                return (
+                                  <span key={`${p.numeroAta}|${p.uasg}`} data-testid={`sem-vinculo-por-ata-${l.contractKey}-${p.numeroAta}`} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                    {s ? nomeAta(l, s) : <strong>Ata {p.numeroAta}</strong>}
+                                    <span style={{ fontSize: '0.78rem', color: '#334155' }}>→ {p.itens.map(textoItemQtd).join(' · ')}</span>
+                                  </span>
+                                );
+                              })}
+                              {previsao && <StatusApi previsao={previsao} parcial={Boolean(l.atasVinculadas)} testId={`sem-vinculo-api-${l.contractKey}`} />}
+                            </>
+                          )}
+                          {l.grupo === 'ATA_PROVAVEL' && ata && !porAta && (
                             <>
                               {l.fortes.length > 1 ? (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -551,13 +626,38 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                         </div>
                       </td>
                       <td data-label="Gestor" style={{ ...carteiraTd, fontSize: '0.78rem', color: efeito?.atencao ? 'var(--color-warning-text)' : '#0f172a', fontWeight: efeito?.atencao ? 700 : 500 }}>
-                        {efeito ? efeito.texto : l.gestorNome || <span style={{ color: 'var(--color-warning-text)' }}>sem gestor</span>}
+                        {efeito ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            {efeito.textos.map((t) => (
+                              <span key={t}>{t}</span>
+                            ))}
+                            {efeito.conflito && podeAgir && (
+                              <select
+                                value={gestorEscolhido[l.contractKey] ?? ''}
+                                onChange={(e) => setGestorEscolhido((prev) => ({ ...prev, [l.contractKey]: e.target.value }))}
+                                aria-label={`Quem fica com o contrato ${l.numero}`}
+                                data-testid={`sem-vinculo-gestor-${l.contractKey}`}
+                                style={{ ...carteiraSelect, flex: 'none', maxWidth: '200px', fontWeight: 500 }}
+                              >
+                                <option value="">Quem fica com o contrato?</option>
+                                {efeito.candidatos.map((g) => (
+                                  <option key={g} value={g}>
+                                    {g}
+                                    {g === l.gestorNome ? ' (atual)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        ) : (
+                          l.gestorNome || <span style={{ color: 'var(--color-warning-text)' }}>sem gestor</span>
+                        )}
                       </td>
                       {podeAgir && (
                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                             {/* Ordem fixa: Vincular · Escolher ata · Conferir · Descartar (ou Não pertence). Conferir e o último só com ícone. */}
-                            {l.grupo === 'ATA_PROVAVEL' && previsao?.status === 'PRONTO' && (
+                            {l.grupo === 'ATA_PROVAVEL' && pronta(l) && (
                               <ActionButton action="vincular" size="sm" onClick={() => vincular([l])} disabled={ocupado} title="Vincular este contrato à ata" data-testid={`sem-vinculo-vincular-${l.contractKey}`} />
                             )}
                             {(l.grupo === 'ATA_PROVAVEL' || decidivel(l)) && (

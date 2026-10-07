@@ -26,6 +26,7 @@ import { ataDeOrigem } from '../../services/pncpContratoService';
 import { isUasgCglic } from '../../config/unidadesGestoras';
 import { fiscaisAtivos, garantiaAviso, garantiaMaisLonga, type GarantiaResumo } from '../../services/contractResponsaveisService';
 import { chaveDoContrato } from '../../utils/contractKeyUtils';
+import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 
 interface Contract360HeaderProps {
   contract: ContractDashboardRecord;
@@ -81,6 +82,20 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   // Ata de origem: o PNCP diz de qual ata o contrato decorre; os dados dessa ata dão o número e a UASG.
   const { data: ataPncp } = useAtaPncp({ numeroControlePncpAta: pncp?.numeroControlePncpAta });
   const ataOrigem = ataDeOrigem(ataPncp);
+  // Contrato em mais de uma ata (migration 86): os vínculos dos itens dizem as atas e o item de cada uma.
+  const { data: itensDoContrato } = useItensDoContrato(contractKey);
+  const atasVinculadas = React.useMemo(() => {
+    const porAta = new Map<string, { numeroAta: string; uasg: string; itens: number[] }>();
+    for (const v of itensDoContrato?.vinculos ?? []) {
+      const k = `${v.numeroAta}-${v.uasgAta}`;
+      const a = porAta.get(k) ?? { numeroAta: v.numeroAta, uasg: v.uasgAta, itens: [] };
+      if (!a.itens.includes(v.numeroItem)) a.itens.push(v.numeroItem);
+      porAta.set(k, a);
+    }
+    return Array.from(porAta.values())
+      .map((a) => ({ ...a, itens: a.itens.sort((x, y) => x - y) }))
+      .sort((a, b) => a.numeroAta.localeCompare(b.numeroAta));
+  }, [itensDoContrato]);
 
   // RBAC: gestor, coordenador e admin possuem permissão
   const isAuthorized =
@@ -239,7 +254,30 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       }
       objeto={contract.objeto}
       origin={
-        ataOrigem
+        atasVinculadas.length > 1
+          ? {
+              label: 'Atas de origem',
+              value: (
+                <span data-testid="contract-atas-de-origem" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.1rem' }}>
+                  {atasVinculadas.map((a) => (
+                    <span key={`${a.numeroAta}-${a.uasg}`}>
+                      {isUasgCglic(a.uasg) ? (
+                        <AppButton type="button" variant="link" size="sm" onClick={() => navigate(buildAtaPath(a.numeroAta, a.uasg))}>
+                          nº {a.numeroAta}
+                        </AppButton>
+                      ) : (
+                        <span>nº {a.numeroAta}</span>
+                      )}
+                      <span style={{ color: '#64748b', fontWeight: 500 }}>
+                        {' '}
+                        · {a.itens.length === 1 ? 'item' : 'itens'} {a.itens.join(', ')}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              )
+            }
+          : ataOrigem
           ? {
               label: 'Ata de origem',
               value:

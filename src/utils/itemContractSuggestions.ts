@@ -39,7 +39,8 @@ export interface ItemContractSuggestionInput {
   /** contract_key das sugestões já descartadas no item. */
   dismissedContractKeys?: string[];
   /**
-   * contract_key que nunca são sugeridos: já vinculados a outra ata (um contrato pertence a uma só ata) ou
+   * contract_key que nunca são sugeridos: já vinculados a ata de outra compra ou com este item em outra ata (cada item
+   * do contrato pertence a uma só ata, migration 86) ou
    * marcados pelo coordenador como "não pertence a ata".
    */
   excludedContractKeys?: string[];

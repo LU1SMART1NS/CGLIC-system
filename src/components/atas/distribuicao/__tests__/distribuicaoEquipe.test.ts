@@ -155,6 +155,23 @@ describe('buildDistribuicaoEquipe', () => {
       { numeroAta: '00002/2025', gestorAta: 'Bruno', contractKey: '200331-00002-2025', numeroContrato: '00002', gestorContrato: 'Carla' }
     ]);
   });
+  it('contrato em duas atas com o gestor de uma delas não diverge; com gestor de nenhuma, diverge nas duas', () => {
+    const { divergencias } = buildDistribuicaoEquipe({
+      atas: [ata('00053/2025', 'Daniel'), ata('00025/2025', 'Ana')],
+      contratos: [contrato('200331-00033-2026', 'Daniel'), contrato('200331-00034-2026', 'Carla')],
+      links: [
+        { ataKey: '00053/2025', contractKey: '200331-00033-2026' },
+        { ataKey: '00025/2025', contractKey: '200331-00033-2026' },
+        { ataKey: '00053/2025', contractKey: '200331-00034-2026' },
+        { ataKey: '00025/2025', contractKey: '200331-00034-2026' }
+      ],
+      attentionItems: []
+    });
+    expect(divergencias.map((d) => [d.contractKey, d.numeroAta])).toEqual([
+      ['200331-00034-2026', '00025/2025'],
+      ['200331-00034-2026', '00053/2025']
+    ]);
+  });
 });
 
 describe('ajuste manual de complexidade', () => {

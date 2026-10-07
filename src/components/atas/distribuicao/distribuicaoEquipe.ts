@@ -251,6 +251,19 @@ export function buildDistribuicaoEquipe(input: {
 
   const divergencias: DistribuicaoDivergencia[] = [];
   const vistos = new Set<string>();
+  // Contrato em mais de uma ata (migration 86): com o gestor de uma delas, não diverge (o coordenador escolheu quem fica).
+  const gestoresDasAtasDoContrato = new Map<string, Set<string>>();
+  const atasDoContrato = new Map<string, Set<string>>();
+  for (const { ataKey, contractKey } of input.links) {
+    const atasDele = atasDoContrato.get(contractKey) ?? new Set<string>();
+    atasDele.add(ataKey);
+    atasDoContrato.set(contractKey, atasDele);
+    const g = ataPorNumero.get(ataKey)?.gestorNome;
+    if (!g) continue;
+    const set = gestoresDasAtasDoContrato.get(contractKey) ?? new Set<string>();
+    set.add(g);
+    gestoresDasAtasDoContrato.set(contractKey, set);
+  }
   for (const { ataKey, contractKey } of input.links) {
     const par = `${ataKey}|${contractKey}`;
     if (vistos.has(par)) continue;
@@ -258,6 +271,8 @@ export function buildDistribuicaoEquipe(input: {
     const contrato = contratoPorChave.get(contractKey);
     const ata = ataPorNumero.get(ataKey);
     if (!contrato || !ata) continue;
+    const variasAtas = (atasDoContrato.get(contractKey)?.size ?? 0) > 1;
+    if (variasAtas && contrato.gestorNome && gestoresDasAtasDoContrato.get(contractKey)?.has(contrato.gestorNome)) continue;
     if ((ata.gestorNome || '') !== (contrato.gestorNome || '')) {
       divergencias.push({
         numeroAta: ata.numeroAta,
