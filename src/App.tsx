@@ -28,6 +28,7 @@ const UsersRoute = lazy(() => import('./routes/UsersRoute').then((m) => ({ defau
 const RolesRoute = lazy(() => import('./routes/RolesRoute').then((m) => ({ default: m.RolesRoute })));
 const DepartmentsRoute = lazy(() => import('./routes/DepartmentsRoute').then((m) => ({ default: m.DepartmentsRoute })));
 const PaymentsRoute = lazy(() => import('./routes/PaymentsRoute').then((m) => ({ default: m.PaymentsRoute })));
+const PrevisaoRoute = lazy(() => import('./routes/PrevisaoRoute').then((m) => ({ default: m.PrevisaoRoute })));
 const FinancialExecutionRoute = lazy(() => import('./routes/FinancialExecutionRoute').then((m) => ({ default: m.FinancialExecutionRoute })));
 const DefinirSenhaRoute = lazy(() => import('./routes/DefinirSenhaRoute').then((m) => ({ default: m.DefinirSenhaRoute })));
 const RedefinirSenhaRoute = lazy(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
@@ -263,6 +264,14 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                   <PaymentsRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/previsao"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                  <PrevisaoRoute />
                 </RequireRole>
               }
             />
