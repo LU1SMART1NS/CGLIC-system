@@ -5,7 +5,7 @@ import { getCanonicalContractKey, parsePncpIdentifiers } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
 import { type InternalDepartment } from '../services/unitService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
-import { useItemAdesoes } from '../hooks/useItemAdesoes';
+import { escolherAdesoes, useItemAdesoes } from '../hooks/useItemAdesoes';
 import { useDepartments } from '../hooks/useDepartments';
 import { useItemContracts } from '../hooks/useItemContracts';
 import { useItemAllocations } from '../hooks/useItemAllocations';
@@ -100,7 +100,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const error = unidadesQueryError ? (unidadesQueryError.message || 'Erro ao buscar saldos por unidade.') : null;
 
   const {
-    data: adesoes = [],
+    data: leituraAdesoes,
     isLoading: adesoesLoading,
     error: adesoesQueryError
   } = useItemAdesoes(
@@ -108,6 +108,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     arp.codigoUnidadeGerenciadora,
     item.numeroItem
   );
+  // A resposta vazia só vale como "nenhuma adesão" quando os órgãos do item vieram da API agora.
+  const adesoesDoItem = React.useMemo(
+    () => escolherAdesoes(leituraAdesoes, loading ? undefined : unidadesDoItem?.origem),
+    [leituraAdesoes, loading, unidadesDoItem?.origem]
+  );
+  const adesoes = adesoesDoItem.adesoes;
   const adesoesError = adesoesQueryError ? (adesoesQueryError.message || 'Falha ao buscar as adesões do item.') : null;
 
   // Aba no endereço (?aba=), com o mesmo comportamento das telas de Ata e Contrato.
@@ -825,7 +831,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
           empenhosPendentes: empenhoVinculos.filter((v) => v.quantidade == null).length,
           quantidadeAlocada: totalAllocatedSum,
           quantidadeTotalAta: item.quantidadeHomologadaItem || totalRegistrado,
-          orgaosParticipantes: unidades.length
+          orgaosParticipantes: unidades.length,
+          adesoesSemDados: !loading && !adesoesLoading && adesoesDoItem.origem === 'SEM_DADOS'
         }}
         referencia={comprasGovReferencia}
         onGoTo={(tab) => setActiveTab(tab)}
@@ -835,10 +842,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       <Instrument360Tabs
         ref={tabsRef}
         tabs={[
-          { id: 'unidades', label: `Órgãos participantes (${sortedUnidades.length})` },
+          { id: 'unidades', label: unidadesDoItem?.origem === 'SEM_DADOS' ? 'Órgãos participantes' : `Órgãos participantes (${sortedUnidades.length})` },
           { id: 'alocacao', label: `Alocação interna (${allocations.length})` },
           { id: 'contratos', label: `Contratos e empenhos (${contractsCount})` },
-          { id: 'adesoes', label: `Adesões (${adesoes.length})` }
+          { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` }
         ]}
         active={activeTab}
         onSelect={(tab) => setActiveTab(tab)}
@@ -1234,9 +1241,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
           />
         ) : (
           <AdesoesTab
-            adesoesLoading={adesoesLoading}
+            adesoesLoading={adesoesLoading || loading}
             adesoesError={adesoesError}
             adesoes={adesoes}
+            origem={adesoesDoItem.origem}
+            copiadoEm={adesoesDoItem.copiadoEm}
             item={item}
             totalAdesaoAprovada={totalAdesaoAprovada}
             limiteAdesao={totalLimiteAdesao}

@@ -115,6 +115,13 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     expect(html).not.toContain('Não aceita adesão');
   });
 
+  it('8c. adesões sem dados (Compras.gov.br fora do ar, sem cópia): não mostra o teto como saldo', () => {
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, adesoesSemDados: true }} />);
+
+    expect(html).toContain('Sem dados');
+    expect(html).toContain('Compras.gov.br sem resposta');
+  });
+
   it('9. Compras.gov acima do contratado destaca a diferença', () => {
     const html = renderToStaticMarkup(
       <ItemHero {...baseProps} referencia={{ status: 'ACIMA', consumido: 37, delta: 7 }} />

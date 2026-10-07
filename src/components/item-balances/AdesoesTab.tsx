@@ -1,8 +1,10 @@
 import React from 'react';
 import { Share2 } from 'lucide-react';
 import { formatNumber, formatCurrency, formatDate } from './itemBalanceUtils';
+import { formatDataHoraBR } from '../../utils/format';
 import type { AdesaoItemRecord, ArpItemRecord } from '../../types';
-import { DataTable, EmptyState, ErrorState, ProgressBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
+import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
+import { DataTable, EmptyState, ErrorState, NoticeBar, ProgressBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
 
 export interface AdesoesTabProps {
   adesoesLoading: boolean;
@@ -13,6 +15,10 @@ export interface AdesoesTabProps {
   totalAdesaoAprovada: number;
   /** Teto de adesões do item (maximoAdesao, limite da gerenciadora ou 2× o homologado). */
   limiteAdesao: number;
+  /** De onde veio a lista: Compras.gov.br agora, cópia guardada ou nenhuma. */
+  origem?: OrigemUnidadesItem;
+  /** Quando a cópia foi lida do Compras.gov.br (origem COPIA). */
+  copiadoEm?: string | null;
 }
 
 /** Separa "929777 - SECRETARIA ..." em código da UASG e nome do órgão. */
@@ -27,8 +33,11 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
   adesoes,
   item,
   totalAdesaoAprovada,
-  limiteAdesao
+  limiteAdesao,
+  origem = 'API',
+  copiadoEm = null
 }) => {
+  const semDados = !adesoesLoading && origem === 'SEM_DADOS';
   const saldoAdesoes = Math.max(0, limiteAdesao - totalAdesaoAprovada);
   const semQuantidade = adesoes.filter((a) => a.quantidadeAprovadaAdesao == null).length;
   const quantidadeItem = Number(item.quantidadeHomologadaItem) || 0;
@@ -108,7 +117,20 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="adesoes-tab">
-      <SummaryBar
+      {!adesoesLoading && origem === 'COPIA' && copiadoEm && (
+        <NoticeBar tone="info" testId="adesoes-copia">
+          O Compras.gov.br não respondeu agora.{' '}
+          {adesoes.length > 0
+            ? `A lista abaixo é a última cópia guardada, lida em ${formatDataHoraBR(copiadoEm)}.`
+            : `Na última leitura, em ${formatDataHoraBR(copiadoEm)}, o item não tinha adesões.`}
+        </NoticeBar>
+      )}
+      {semDados && (
+        <NoticeBar tone="warning" testId="adesoes-sem-dados">
+          O Compras.gov.br não respondeu e ainda não há cópia guardada das adesões deste item: não dá para saber se houve carona. Tente Atualizar mais tarde.
+        </NoticeBar>
+      )}
+      {!semDados && <SummaryBar
         testId="adesoes-summary"
         loading={adesoesLoading}
         loadingLabel="Consultando adesões de carona no Compras.gov..."
@@ -124,16 +146,18 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
             : [])
         ]}
         progress={{ value: totalAdesaoAprovada, max: limiteAdesao || 1 }}
-      />
+      />}
 
       <div>
         <SectionHeader
           title="Adesões e caronas"
           subtitle="Órgãos não participantes que aderiram à ata (Art. 86 da Lei 14.133/2021): até 50% do quantitativo do item por órgão e 200% no total da ata."
           icon={<Share2 size={16} />}
-          countBadge={adesoes.length}
+          countBadge={semDados ? undefined : adesoes.length}
         />
-        {!adesoesLoading && adesoes.length === 0 ? (
+        {semDados ? (
+          <EmptyState title="Nenhuma adesão para mostrar" description="" icon={<Share2 size={36} color="#94a3b8" />} />
+        ) : !adesoesLoading && adesoes.length === 0 ? (
           <EmptyState
             title="Nenhuma carona externa registrada"
             description={`Nenhum órgão não participante teve adesão aprovada para o Item ${item.numeroItem} no Compras.gov.br.`}

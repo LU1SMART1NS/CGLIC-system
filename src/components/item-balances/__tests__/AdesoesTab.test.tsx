@@ -63,6 +63,31 @@ describe('AdesoesTab', () => {
     expect(erro).toContain('API indisponível');
   });
 
+  it('API fora do ar e sem cópia: avisa e não afirma "nenhuma carona"', () => {
+    const out = renderToStaticMarkup(<AdesoesTab {...baseProps} adesoes={[]} totalAdesaoAprovada={0} origem="SEM_DADOS" />);
+    expect(out).toContain('adesoes-sem-dados');
+    expect(out).toContain('não dá para saber se houve carona');
+    expect(out).not.toContain('Nenhuma carona externa registrada');
+    expect(out).not.toContain('adesoes-summary');
+  });
+
+  it('cópia guardada: mostra a lista e a data; cópia vazia diz que o item não tinha adesões', () => {
+    const comLista = renderToStaticMarkup(<AdesoesTab {...baseProps} origem="COPIA" copiadoEm="2026-10-05T17:32:00Z" />);
+    expect(comLista).toContain('adesoes-copia');
+    expect(comLista).toContain('última cópia guardada, lida em 05/10/2026 às 14:32');
+    expect(comLista).toContain('INCRA-SEDE/DF');
+
+    const vazia = renderToStaticMarkup(<AdesoesTab {...baseProps} adesoes={[]} totalAdesaoAprovada={0} origem="COPIA" copiadoEm="2026-10-05T17:32:00Z" />);
+    expect(vazia).toContain('Na última leitura, em 05/10/2026 às 14:32, o item não tinha adesões.');
+    expect(vazia).toContain('Nenhuma carona externa registrada');
+  });
+
+  it('lista ao vivo: sem aviso', () => {
+    const out = html();
+    expect(out).not.toContain('adesoes-copia');
+    expect(out).not.toContain('adesoes-sem-dados');
+  });
+
   it('mostra o carregamento no resumo', () => {
     expect(html({ adesoesLoading: true })).toContain('Consultando adesões de carona');
   });
