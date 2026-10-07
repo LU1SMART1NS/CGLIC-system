@@ -3,6 +3,7 @@ import {
   buildItemContractSuggestions,
   buildItemSuggestionCriteria,
   contractKeyOf,
+  contratosCandidatosDoItem,
   quantidadesPorContrato
 } from '../itemContractSuggestions';
 import type { ContractDashboardRecord, PncpContract } from '../../types';
@@ -177,5 +178,40 @@ describe('quantidadesPorContrato', () => {
     });
     expect(suggestions.map((s) => s.contractKey)).toEqual(['LIVRE']);
     expect(dismissed).toHaveLength(0);
+  });
+});
+
+describe('sugestões só do banco, filtradas pelo item (itens_contrato)', () => {
+  const daCompra = (id: string) =>
+    official({ id, numero: id.split('-')[1], idCompra: '20033105900452024', fornecedorCnpjCpf: '12345678000190', fornecedorNome: 'FORNECEDOR' });
+  const comItem = daCompra('200331-00010-2026');
+  const outroItem = daCompra('200331-00011-2026');
+  const semLeitura = daCompra('200331-00012-2026');
+  const k = (c: ContractDashboardRecord) => contractKeyOf(c).toUpperCase();
+
+  const itemNosContratos = {
+    comItensLidos: new Set([k(comItem), k(outroItem)]),
+    quantidadePorContrato: new Map([[k(comItem), 27]])
+  };
+
+  it('candidatos = mesma compra e fornecedor, antes do filtro pelo item', () => {
+    expect(contratosCandidatosDoItem([comItem, outroItem, official({ id: 'X', idCompra: '20033105999992024' })], criteria).map((c) => c.id))
+      .toEqual([comItem.id, outroItem.id]);
+  });
+
+  it('não sugere contrato com itens lidos que não tem o item; mantém o ainda não lido', () => {
+    const { suggestions } = buildItemContractSuggestions({ officialContracts: [comItem, outroItem, semLeitura], criteria, itemNosContratos });
+    expect(suggestions.map((s) => s.contractKey)).toEqual([contractKeyOf(comItem), contractKeyOf(semLeitura)]);
+  });
+
+  it('a quantidade da sugestão vem dos itens gravados; sem leitura, fica sem quantidade', () => {
+    const { suggestions } = buildItemContractSuggestions({ officialContracts: [comItem, semLeitura], criteria, itemNosContratos });
+    expect(suggestions[0]).toMatchObject({ sources: ['catalogo'], quantidadeContratada: 27, linkable: true });
+    expect(suggestions[1].quantidadeContratada).toBeUndefined();
+  });
+
+  it('sem os itens dos contratos (ainda carregando), sugere pela compra e fornecedor, como antes', () => {
+    const { suggestions } = buildItemContractSuggestions({ officialContracts: [comItem, outroItem], criteria });
+    expect(suggestions).toHaveLength(2);
   });
 });
