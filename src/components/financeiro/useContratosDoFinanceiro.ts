@@ -8,6 +8,10 @@ export interface ContratoDoFinanceiro {
   numero: string;
   fornecedorNome?: string;
   gestorNome?: string;
+  /** Vigência encerrada. */
+  expirado?: boolean;
+  /** Valor global (ou inicial) do contrato. */
+  valor?: number;
 }
 
 /** "200331-00094-2022" → "00094/2022" (quando o contrato não está na carteira carregada). */
@@ -36,7 +40,9 @@ export function useContratosDoFinanceiro() {
       map.set(r.contractKey, {
         numero: formatContractNumber(r.contract),
         fornecedorNome: r.contract.fornecedorNome || undefined,
-        gestorNome: r.gestorNome
+        gestorNome: r.gestorNome,
+        expirado: r.faixa === 'EXPIRADO',
+        valor: r.contract.valorGlobal || r.contract.valorInicial || undefined
       });
     }
     return map;

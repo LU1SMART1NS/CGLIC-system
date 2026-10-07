@@ -13,6 +13,7 @@ import { useEmpenhosDoContrato } from './payment/cicloPagamentoShared';
 import { ConferenciaModal } from './payment/ConferenciaModal';
 import { EnvioCgofiModal } from './payment/EnvioCgofiModal';
 import { EscolherFaturaModal } from './payment/EscolherFaturaModal';
+import { ExpectativaPagamentoContrato } from './payment/ExpectativaPagamentoContrato';
 import { PaymentCycleChecklist, PaymentCycleDocuments, PaymentCycleHistory, PaymentCycleItens, PaymentCyclePrazosLegais } from './payment/PaymentCycleDetails';
 import { calcularPrazosLegais } from '../../services/prazosLegaisPagamento';
 import { ehBemAIncorporar } from '../../services/cicloPagamentoApoioService';
@@ -197,6 +198,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
 
   return (
     <div id="contract-payment-followup-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <ExpectativaPagamentoContrato contractKey={contractKey} canEdit={canEdit} registradoPorNome={registradoPorNome} />
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
         {cycles.length > 0 && (
           <StatusBadge

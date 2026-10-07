@@ -27,7 +27,7 @@ export async function invalidarFinanceiro(queryClient: QueryClient): Promise<voi
   await Promise.all(Object.values(FINANCEIRO_QUERY_KEYS).map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
-function useFaturasCarteira() {
+export function useFaturasCarteira() {
   return useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.faturas, queryFn: fetchFaturasCarteira, ...OPCOES });
 }
 
