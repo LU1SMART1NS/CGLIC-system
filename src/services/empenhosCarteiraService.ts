@@ -33,6 +33,12 @@ export const RECONSULTA_HORAS = 20;
  * esperaria 19 horas por uma nova leitura.
  */
 export const RETENTATIVA_HORAS = 1;
+/**
+ * Falha mais antiga que isto não mantém a execução aberta: a reserva do banco só libera nova execução
+ * depois da validade (6 h) quando a anterior terminou em sucesso, e um contrato que falha sempre (ex.:
+ * sem id no Contratos.gov.br) faria a execução ficar PARCIAL para sempre.
+ */
+export const JANELA_FALHA_ABERTA_HORAS = 6;
 /** Contrato vencido há até tantos meses continua entrando: a execução segue depois do fim da vigência. */
 export const JANELA_VENCIDOS_MESES = 24;
 const PAGINA = 1000;
@@ -130,19 +136,53 @@ export function instanteDaFila(tentativaEm: string, situacao?: string | null): s
   return new Date(t - (RECONSULTA_HORAS - RETENTATIVA_HORAS) * 3600_000).toISOString();
 }
 
-/** Última tentativa de sincronização de cada contrato (tabela da migration 80; vazia se ela não existir). */
-export async function fetchTentativasEmpenhos(): Promise<Map<string, string>> {
-  if (!isSupabaseConfigured || !supabase) return new Map();
+export interface SituacoesEmpenhos {
+  /** Instante que a fila usa para cada contrato (ver instanteDaFila). */
+  tentativas: Map<string, string>;
+  /** Contratos cuja última tentativa foi ERRO ou PARCIAL há menos de JANELA_FALHA_ABERTA_HORAS. */
+  comFalhaRecente: Set<string>;
+}
+
+/** Situação gravada de cada contrato (tabela da migration 80; vazia se ela não existir). */
+export async function fetchSituacoesEmpenhos(agora: number = Date.now()): Promise<SituacoesEmpenhos> {
+  if (!isSupabaseConfigured || !supabase) return { tentativas: new Map(), comFalhaRecente: new Set() };
   try {
     const linhas = await lerPaginado<{ contract_key: string; tentativa_em: string; situacao: string | null }>(
       'contrato_empenhos_sincronizacao',
       'contract_key, tentativa_em, situacao'
     );
-    return new Map(linhas.map((l) => [String(l.contract_key), instanteDaFila(String(l.tentativa_em), l.situacao)]));
+    const limite = agora - JANELA_FALHA_ABERTA_HORAS * 3600_000;
+    return {
+      tentativas: new Map(linhas.map((l) => [String(l.contract_key), instanteDaFila(String(l.tentativa_em), l.situacao)])),
+      comFalhaRecente: new Set(
+        linhas
+          .filter((l) => (l.situacao === 'ERRO' || l.situacao === 'PARCIAL') && new Date(l.tentativa_em).getTime() >= limite)
+          .map((l) => String(l.contract_key))
+      )
+    };
   } catch (err) {
     console.warn('[empenhosCarteira] situação dos contratos não lida; todos contam como nunca consultados:', err);
-    return new Map();
+    return { tentativas: new Map(), comFalhaRecente: new Set() };
   }
+}
+
+/** Última tentativa de sincronização de cada contrato (tabela da migration 80; vazia se ela não existir). */
+export async function fetchTentativasEmpenhos(): Promise<Map<string, string>> {
+  return (await fetchSituacoesEmpenhos()).tentativas;
+}
+
+/**
+ * Contratos elegíveis com falha recente que ainda não estão na fila (esperam RETENTATIVA_HORAS). Enquanto
+ * houver algum, a execução termina PARCIAL e a reserva do banco libera a próxima em 30 minutos, em vez de
+ * esperar a validade de 6 horas de uma execução bem-sucedida.
+ */
+export function falhasEsperandoNovaTentativa(
+  elegiveis: ContractDashboardRecord[],
+  fila: ContractDashboardRecord[],
+  comFalhaRecente: Set<string>
+): ContractDashboardRecord[] {
+  const naFila = new Set(fila.map((c) => chaveDoContrato(c)));
+  return elegiveis.filter((c) => comFalhaRecente.has(chaveDoContrato(c)) && !naFila.has(chaveDoContrato(c)));
 }
 
 export interface OpcoesCarteira {
@@ -230,20 +270,25 @@ export async function sincronizarEmpenhosDaCarteira(uasg: string, opts: OpcoesCa
   const agora = opts.agora ?? (() => Date.now());
   const hoje = opts.hoje ?? (() => new Date(agora()).toISOString().slice(0, 10));
   return executarComReserva(RECURSO_EMPENHOS, uasg, { forcar: opts.forcar, validade: VALIDADE_EMPENHOS }, async () => {
-    const [carteira, comEmpenhoAPagar, tentativas] = await Promise.all([
+    const [carteira, comEmpenhoAPagar, situacoes] = await Promise.all([
       fetchContratosOficiaisDoBanco(uasg),
       contratosComEmpenhoAPagar(),
-      fetchTentativasEmpenhos()
+      fetchSituacoesEmpenhos(agora())
     ]);
     if (carteira.length === 0) {
       return { status: 'ERRO', erro: 'A carteira de contratos da UASG está vazia no banco: sincronize os contratos antes.' };
     }
     const elegiveis = selecionarContratos([carteira], { hoje: hoje(), comEmpenhoAPagar });
-    const fila = ordenarParaSincronizar(elegiveis, tentativas, { agora: agora(), forcar: opts.forcar });
+    const fila = ordenarParaSincronizar(elegiveis, situacoes.tentativas, { agora: agora(), forcar: opts.forcar });
+    const esperando = falhasEsperandoNovaTentativa(elegiveis, fila, situacoes.comFalhaRecente);
     const parcial = await processarFila(fila, opts);
     const resumo: ResumoCarteira = { elegiveis: elegiveis.length, naFila: fila.length, ...parcial };
-    const mensagem = mensagemDaCarteira(resumo);
-    if (resumo.parciais || resumo.comErro || resumo.adiados) {
+    const mensagem =
+      mensagemDaCarteira(resumo).slice(0, -1) +
+      (esperando.length > 0
+        ? `, ${esperando.length} contrato(s) com falha recente esperam ${RETENTATIVA_HORAS} h para uma nova tentativa.`
+        : '.');
+    if (resumo.parciais || resumo.comErro || resumo.adiados || esperando.length > 0) {
       return { status: 'PARCIAL', total: resumo.processados, fontesComFalha: [FONTE_EMPENHOS_CONTRATOS], mensagem };
     }
     return { status: 'SUCESSO', total: resumo.processados, fontesComFalha: [], mensagem };
