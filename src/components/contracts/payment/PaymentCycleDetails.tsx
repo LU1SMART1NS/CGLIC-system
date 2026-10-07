@@ -253,6 +253,17 @@ export const PaymentCyclePrazosLegais: React.FC<{ cycle: PaymentFollowUpCycle; p
         <SectionHeader title="Prazos legais" />
         {prazos.pequenoValor && <StatusBadge label="Pequeno valor: prazos pela metade" variant="info" size="sm" dot={false} />}
       </div>
+      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+        Limite do art. 75, II da Lei 14.133 em {prazos.limite.ano}:{' '}
+        {prazos.limite.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ({prazos.limite.decreto}). Até ele, os prazos de
+        liquidação e pagamento caem pela metade (IN 77, art. 7º, § 2º).
+      </div>
+      {prazos.limite.desatualizado && (
+        <NoticeBar tone="warning" testId="payment-limite-desatualizado">
+          Ainda não há no sistema o decreto que atualiza o limite do art. 75, II para o ano do atesto; está valendo o de {prazos.limite.ano}.
+          Peça para cadastrar o decreto novo.
+        </NoticeBar>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.6rem' }}>
         {cards.map((c) => (
           <div key={c.id} data-testid={`payment-prazo-${c.id}`} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.55rem 0.7rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>

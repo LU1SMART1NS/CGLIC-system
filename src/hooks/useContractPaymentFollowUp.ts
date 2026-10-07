@@ -45,6 +45,7 @@ import {
   removePaymentDocumentRpc,
   updatePaymentCycleInfoRpc,
   deletePaymentCycleRpc,
+  ligarFaturasCicloRpc,
   type CreatePaymentCycleInput,
   type RegisterPaymentMarcoInput
 } from '../adapters/paymentCycleRpcAdapter';
@@ -82,6 +83,8 @@ export interface UseContractPaymentFollowUpResult {
   /** Exclusão definitiva (só admin). */
   deleteCycle: (cycleKey: string) => Promise<void>;
   updateCycleInfo: (input: { cycleKey: string; responsavelNome?: string; responsavelUserId?: string; observacoes?: string }) => Promise<void>;
+  /** Escolhe (ou troca) as faturas de um ciclo já enviado à CGOFI. */
+  ligarFaturas: (input: { cycleKey: string; faturas: number[]; justificativa?: string; registradoPorNome?: string }) => Promise<void>;
   refetch: () => void;
 }
 
@@ -134,6 +137,14 @@ export function useContractPaymentFollowUp(
   const removeDocMutation = useMutation({ mutationFn: removePaymentDocumentRpc, onSuccess: invalidate });
   const infoMutation = useMutation({ mutationFn: updatePaymentCycleInfoRpc, onSuccess: invalidate });
   const deleteMutation = useMutation({ mutationFn: deletePaymentCycleRpc, onSuccess: invalidate });
+  const faturasMutation = useMutation({ mutationFn: ligarFaturasCicloRpc, onSuccess: invalidate });
+
+  const ligarFaturas = useCallback(
+    async (input: { cycleKey: string; faturas: number[]; justificativa?: string; registradoPorNome?: string }): Promise<void> => {
+      await faturasMutation.mutateAsync(input);
+    },
+    [faturasMutation]
+  );
 
   const registerPaymentCycle = useCallback(
     async (input: CreatePaymentCycleInput): Promise<void> => {
@@ -190,6 +201,7 @@ export function useContractPaymentFollowUp(
     removeDocument,
     updateCycleInfo,
     deleteCycle,
+    ligarFaturas,
     refetch: refetchQuery
   };
 }

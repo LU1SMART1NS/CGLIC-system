@@ -1,5 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchEmpenhosDoContratoParaPagamento, type EmpenhoParaPagamento, type FaturaParaCiclo } from '../../../services/cicloPagamentoApoioService';
+import React from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  buscarFaturasDoContratoAgora,
+  fetchEmpenhosDoContratoParaPagamento,
+  fetchFaturasParaCiclo,
+  type EmpenhoParaPagamento,
+  type FaturaParaCiclo
+} from '../../../services/cicloPagamentoApoioService';
 import type { PaymentCycleItem, PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 import { differenceInBusinessDays, parseDateBRT } from '../../../services/temporalEngineService';
 
@@ -89,3 +96,64 @@ export function faturasSugeridas(faturas: FaturaParaCiclo[], cycle: PaymentFollo
   return exatas.length === 1 ? [exatas[0].idFatura] : [];
 }
 
+
+/**
+ * Faturas do contrato para o ciclo (envio à CGOFI ou escolha depois do envio): lista com as que citam um empenho do
+ * ciclo primeiro, sugestão inicial, seleção, soma contra o valor do ciclo e "Buscar faturas agora".
+ */
+export function useFaturasDoCiclo(cycle: PaymentFollowUpCycle | null, contratoIdGov: string | number | null | undefined, opts: { incluirPagas?: boolean } = {}) {
+  const queryClient = useQueryClient();
+  const contractKey = cycle?.contractKey;
+  const incluirPagas = Boolean(opts.incluirPagas);
+  const { data: faturas = [], isLoading, refetch } = useQuery({
+    queryKey: ['ciclo-faturas-disponiveis', contractKey, incluirPagas],
+    queryFn: () => fetchFaturasParaCiclo(contractKey as string, { incluirPagas }),
+    enabled: Boolean(contractKey),
+    staleTime: 60 * 1000
+  });
+  const { data: empenhos = [] } = useEmpenhosDoContrato(contractKey);
+  const [selecionadas, setSelecionadas] = React.useState<number[]>([]);
+  const [tocou, setTocou] = React.useState(false);
+  const [buscando, setBuscando] = React.useState(false);
+  const [aviso, setAviso] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setTocou(false);
+    setAviso(null);
+  }, [cycle?.cycleKey]);
+  React.useEffect(() => {
+    if (cycle && !tocou) setSelecionadas(faturasSugeridas(faturas, cycle));
+  }, [faturas, cycle, tocou]);
+
+  const empenhosDoCiclo = new Set((cycle?.itens ?? []).map((i) => i.empenhoCanonicalKey).concat(cycle?.input.empenhoCanonicalKey ?? []));
+  const numerosDoCiclo = empenhos.filter((e) => empenhosDoCiclo.has(e.canonicalKey)).map((e) => e.numero);
+  const citaEmpenho = (f: FaturaParaCiclo) => numerosDoCiclo.some((n) => Boolean(f.empenhos?.includes(n)));
+  const lista = [...faturas].sort((a, b) => Number(citaEmpenho(b)) - Number(citaEmpenho(a)));
+  const soma = faturas.filter((f) => selecionadas.includes(f.idFatura)).reduce((s, f) => s + f.valorLiquido, 0);
+  const divergente = Boolean(cycle) && selecionadas.length > 0 && Math.abs(soma - (cycle?.input.valorAtesto ?? 0)) >= 0.01;
+
+  const alternar = (id: number) => {
+    setTocou(true);
+    setSelecionadas((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const buscarAgora = async () => {
+    if (!contratoIdGov || !contractKey) return;
+    setBuscando(true);
+    setAviso(null);
+    try {
+      const n = await buscarFaturasDoContratoAgora(contractKey, contratoIdGov);
+      await refetch();
+      void queryClient.invalidateQueries({ queryKey: ['financeiro-faturas'] });
+      setAviso(`Faturas do contrato consultadas agora no Contratos.gov.br: ${n} gravada(s).`);
+    } catch (err) {
+      setAviso(errorMessage(err, 'O Contratos.gov.br não respondeu. Tente de novo em instantes.'));
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  return { lista, isLoading, selecionadas, alternar, soma, divergente, empenhos, empenhosDoCiclo, buscarAgora, buscando, aviso, podeBuscar: Boolean(contratoIdGov) };
+}
+
+export type FaturasDoCicloState = ReturnType<typeof useFaturasDoCiclo>;

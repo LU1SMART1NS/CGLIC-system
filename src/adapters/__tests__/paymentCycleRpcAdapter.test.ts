@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  ligarFaturasCicloRpc,
   fetchPaymentCyclesForContract,
   createPaymentCycleRpc,
   registerPaymentMarcoRpc,
@@ -155,6 +156,15 @@ describe('paymentCycleRpcAdapter (Fase 10-A.2 — persistência canônica de con
       await expect(
         registerPaymentMarcoRpc({ cycleKey: 'C1', marco: 'CONFERIDO', data: '2026-09-02', prazoNovo: '2026-09-30' })
       ).rejects.toMatchObject({ code: 'PRAZO_JUSTIFICATIVA_REQUIRED' });
+    });
+  });
+
+  describe('ligarFaturasCicloRpc', () => {
+    it('chama ligar_faturas_ciclo com as faturas e a justificativa', async () => {
+      mockRpc.mockResolvedValueOnce({ data: { success: true, cycle_key: 'C1', status: 'PAGO' }, error: null });
+      const r = await ligarFaturasCicloRpc({ cycleKey: 'C1', faturas: [1, 2], justificativa: 'glosa', registradoPorNome: 'Ana' });
+      expect(mockRpc).toHaveBeenCalledWith('ligar_faturas_ciclo', { p_cycle_key: 'C1', p_faturas: [1, 2], p_justificativa: 'glosa', p_registrado_por_nome: 'Ana' });
+      expect(r.status).toBe('PAGO');
     });
   });
 

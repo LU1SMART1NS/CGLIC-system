@@ -85,20 +85,24 @@ export interface FaturaParaCiclo {
   situacao: string | null;
   empenhos: string | null;
   liquidada: boolean;
+  paga: boolean;
   /** Ciclo que já paga esta fatura (null = livre). */
   cicloId: string | null;
 }
 
-/** Faturas não canceladas e não pagas do contrato, com o ciclo que já as tem (se algum). */
-export async function fetchFaturasParaCiclo(contractKey: string): Promise<FaturaParaCiclo[]> {
+/**
+ * Faturas não canceladas do contrato, com o ciclo que já as tem (se algum). No envio, só as ainda não pagas; na
+ * escolha depois do envio, também as pagas (a OB pode ter saído antes de a fatura ser ligada ao ciclo).
+ */
+export async function fetchFaturasParaCiclo(contractKey: string, opts: { incluirPagas?: boolean } = {}): Promise<FaturaParaCiclo[]> {
   if (!isSupabaseConfigured || !supabase || !contractKey) return [];
-  const vf = await supabase
+  let consulta = supabase
     .from('v_contrato_faturas')
     .select('id_fatura, numero, referencia, emissao, valor_liquido, situacao, empenhos, data_liquidacao, cancelada, paga')
     .eq('contract_key', contractKey)
-    .eq('cancelada', false)
-    .eq('paga', false)
-    .order('emissao', { ascending: false });
+    .eq('cancelada', false);
+  if (!opts.incluirPagas) consulta = consulta.eq('paga', false);
+  const vf = await consulta.order('emissao', { ascending: false });
   if (vf.error) throw mapPostgresErrorToAppError(vf.error);
   const faturas = (vf.data ?? []) as any[];
   const ids = faturas.map((f) => Number(f.id_fatura));
@@ -117,6 +121,7 @@ export async function fetchFaturasParaCiclo(contractKey: string): Promise<Fatura
     situacao: f.situacao ?? null,
     empenhos: f.empenhos ?? null,
     liquidada: Boolean(f.data_liquidacao),
+    paga: Boolean(f.paga),
     cicloId: ligadas.get(Number(f.id_fatura)) ?? null
   }));
 }

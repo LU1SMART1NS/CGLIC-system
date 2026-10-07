@@ -221,6 +221,21 @@ export function registerPaymentMarcoRpc(input: RegisterPaymentMarcoInput): Promi
   });
 }
 
+/** Escolhe (ou troca) as faturas de um ciclo já enviado à CGOFI e roda a conciliação na hora (migration 88). */
+export function ligarFaturasCicloRpc(input: {
+  cycleKey: string;
+  faturas: number[];
+  justificativa?: string;
+  registradoPorNome?: string;
+}): Promise<{ success: boolean; cycle_key: string; status: string }> {
+  return callRpc('ligar_faturas_ciclo', {
+    p_cycle_key: input.cycleKey,
+    p_faturas: input.faturas,
+    p_justificativa: input.justificativa ?? null,
+    p_registrado_por_nome: input.registradoPorNome ?? null
+  });
+}
+
 export function addPaymentDocumentRpc(input: {
   cycleKey: string;
   tipo: string;

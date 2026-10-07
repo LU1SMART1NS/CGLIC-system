@@ -112,7 +112,7 @@ describe('apoio do ciclo', () => {
 
   it('sugere só a única fatura livre com o valor do ciclo', () => {
     const f = (idFatura: number, valorLiquido: number, cicloId: string | null = null) =>
-      ({ idFatura, numero: String(idFatura), referencia: null, emissao: null, valorLiquido, situacao: null, empenhos: null, liquidada: false, cicloId });
+      ({ idFatura, numero: String(idFatura), referencia: null, emissao: null, valorLiquido, situacao: null, empenhos: null, liquidada: false, paga: false, cicloId });
     const c = ciclo({}, { valorAtesto: 100 });
     expect(faturasSugeridas([f(1, 100), f(2, 50)], c)).toEqual([1]);
     expect(faturasSugeridas([f(1, 100), f(2, 100)], c)).toEqual([]);
@@ -127,5 +127,19 @@ describe('apoio do ciclo', () => {
     expect(linhas[0].split('\t')).toHaveLength(10);
     expect(linhas[1]).toBe(['231', '555', '777', '2026NE412', '52', '1.000,00', '0,00', '10,00', '0,00', '990,00'].join('\t'));
     expect(linhas[2]).toContain('VALOR TOTAL');
+  });
+});
+
+describe('limite do art. 75, II (pequeno valor)', () => {
+  it('usa o valor do decreto do ano do atesto', async () => {
+    const { limiteArt75II } = await import('../../config/limitesLei14133');
+    expect(limiteArt75II('2026-10-01')).toMatchObject({ valor: 65492.11, decreto: 'Decreto 12.807/2025', desatualizado: false });
+    expect(limiteArt75II('2025-03-01')).toMatchObject({ valor: 62725.59, desatualizado: false });
+    expect(limiteArt75II('2027-02-01')).toMatchObject({ ano: 2026, desatualizado: true });
+  });
+
+  it('contrato de R$ 64 mil é pequeno valor em 2026, mas não em 2025', () => {
+    expect(calcularPrazosLegais(ciclo(), { valorContrato: 64000, hoje }).pequenoValor).toBe(true);
+    expect(calcularPrazosLegais(ciclo({}, { dataAssinaturaAtesto: '2025-10-01', dataRecebimento: '2025-10-05' }), { valorContrato: 64000, hoje }).pequenoValor).toBe(false);
   });
 });

@@ -75,6 +75,7 @@ function hookResult(cycles: PaymentFollowUpCycle[] = []): ReturnType<typeof paym
     addDocument: vi.fn().mockResolvedValue(undefined),
     removeDocument: vi.fn().mockResolvedValue(undefined),
     updateCycleInfo: vi.fn().mockResolvedValue(undefined),
+    ligarFaturas: vi.fn().mockResolvedValue(undefined),
     deleteCycle: vi.fn().mockResolvedValue(undefined),
     refetch: vi.fn()
   };
@@ -231,6 +232,22 @@ describe('ContractPaymentFollowUpSection (Fase 7.4-D)', () => {
     expect(html).toContain('Acompanhando a CGOFI: cobrar a partir de 22/09/2026');
     expect(html).toContain('O prazo de pagamento é da CGOFI');
     expect(html).toContain('title="Registrar resultado da CGOFI"');
+    // Enviado sem fatura ligada: aviso e botão para escolher a fatura.
+    expect(html).toContain('Nenhuma fatura ligada a este ciclo');
+    expect(html).toContain('title="Escolher a fatura do ciclo"');
+  });
+
+  it('ciclo enviado com fatura ligada oferece trocar a fatura, sem o aviso', () => {
+    const comFatura: PaymentFollowUpCycle = {
+      ...baseCycle,
+      status: 'ENVIADO_CGOFI',
+      faturas: [{ idFatura: 605039, vinculadoPor: 'USUARIO' }],
+      input: { ...baseCycle.input, dataConferencia: '2026-09-14', dataEnvioCgofi: '2026-09-15', documentoDespachoSei: '555' }
+    };
+    vi.mocked(paymentFollowUpHookModule.useContractPaymentFollowUp).mockReturnValue(hookResult([comFatura]));
+    const html = renderToStaticMarkup(<ContractPaymentFollowUpSection contract={mockContract} contractKey="200331-50-2024" />);
+    expect(html).toContain('title="Trocar a fatura do ciclo"');
+    expect(html).not.toContain('Nenhuma fatura ligada a este ciclo');
   });
 
   it('prazo da CGLIC vencido aparece como alerta; ciclo pago não oferece nova ação', () => {

@@ -9,6 +9,7 @@
  * - IN 77, art. 11: atraso maior que 2 meses da emissão da nota dá ao contratado direito à extinção.
  */
 import { PAGAMENTO_RULES } from '../config/alertRules';
+import { limiteArt75II, type LimiteArt75II } from '../config/limitesLei14133';
 import { differenceInBusinessDays, parseDateBRT } from './temporalEngineService';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
 
@@ -22,6 +23,8 @@ export interface PrazoLegal {
 
 export interface PrazosLegaisDoCiclo {
   pequenoValor: boolean;
+  /** Limite do art. 75, II do ano do atesto (e se o ano ainda não tem decreto cadastrado). */
+  limite: LimiteArt75II & { desatualizado: boolean };
   /** Margem da chegada à CGLIC até o vencimento contratual. */
   chegada: { diasUteisAteVencimento: number; minimo: number; fora: boolean };
   liquidacao: PrazoLegal & { diasComContratado: number; prorrogado: boolean };
@@ -68,7 +71,8 @@ export function calcularPrazosLegais(
   hoje.setHours(0, 0, 0, 0);
   const { input } = cycle;
   const valorReferencia = typeof opts.valorContrato === 'number' && opts.valorContrato > 0 ? opts.valorContrato : input.valorAtesto;
-  const pequenoValor = valorReferencia <= PAGAMENTO_RULES.limitePequenoValorReais;
+  const limite = limiteArt75II(input.dataAssinaturaAtesto || input.dataRecebimento);
+  const pequenoValor = valorReferencia <= limite.valor;
   const divisor = pequenoValor ? 2 : 1;
 
   const atesto = dia(input.dataAssinaturaAtesto) ?? dia(input.dataRecebimento);
@@ -98,6 +102,7 @@ export function calcularPrazosLegais(
 
   return {
     pequenoValor,
+    limite,
     chegada: { diasUteisAteVencimento: margem, minimo, fora: Boolean(chegada && vencimento) && margem < minimo },
     liquidacao: {
       diasUteis: diasLiquidacao,
