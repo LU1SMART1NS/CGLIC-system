@@ -125,7 +125,13 @@ export const SINCRONIZACAO_RULES = {
   /** Itens de contrato vigente são relidos da API quando a última leitura passa de N horas. */
   itensContratoVigenteRelidosEmHoras: 24,
   /** Contrato encerrado quase não muda: os itens são relidos a cada N dias. */
-  itensContratoEncerradoRelidosEmDias: 30
+  itensContratoEncerradoRelidosEmDias: 30,
+  /** Órgãos participantes de item de ata vigente: relidos do Compras.gov.br quando a última leitura passa de N horas. */
+  unidadesItemVigenteRelidasEmHoras: 24,
+  /** Ata encerrada quase não muda: os órgãos do item são relidos a cada N dias. */
+  unidadesItemEncerradoRelidasEmDias: 30,
+  /** Item ainda sem cópia (a API não trouxe órgãos): nova tentativa depois de N horas. */
+  unidadesItemSemCopiaRelidasEmHoras: 6
 };
 
 // -----------------------------------------------------------------------------

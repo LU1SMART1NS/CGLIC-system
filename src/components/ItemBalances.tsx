@@ -67,7 +67,7 @@ import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
-import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract } from '../types';
+import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract, UnidadeItemRecord } from '../types';
 import { STATUS_A_VENCER, formatStatusVigencia } from '../utils/statusVigencia';
 
 interface ItemBalancesProps {
@@ -83,20 +83,20 @@ interface ItemBalancesProps {
 const ITEM_TABS: ItemTab[] = ['unidades', 'alocacao', 'contratos', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
+const EMPTY_UNIDADES: UnidadeItemRecord[] = [];
 
 export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, backLabel, onOpenAta }) => {
 
   const {
-    data: unidades = [],
+    data: unidadesDoItem,
     isLoading: loading,
     error: unidadesQueryError
   } = useItemUnidades(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
-    item.numeroItem,
-    arp,
-    item
+    item.numeroItem
   );
+  const unidades = unidadesDoItem?.unidades ?? EMPTY_UNIDADES;
   const error = unidadesQueryError ? (unidadesQueryError.message || 'Erro ao buscar saldos por unidade.') : null;
 
   const {
@@ -854,6 +854,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
             sortedUnidades={sortedUnidades}
             ugUasg={arp.codigoUnidadeGerenciadora}
             contratadoUG={executionSummary.contratado}
+            origem={unidadesDoItem?.origem ?? 'API'}
+            copiadoEm={unidadesDoItem?.copiadoEm ?? null}
+            baseSemOrgaos={totalUGQty}
           />
         ) : activeTab === 'contratos' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="contratos-tab">

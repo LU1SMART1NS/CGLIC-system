@@ -12,6 +12,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     sincronizarSaldosItens: vi.fn(async () => sucesso(7)),
     sincronizarItensContratos: vi.fn(async () => sucesso(11)),
     contarItensContratosPendentes: vi.fn(async () => ({ contratos: 40, pendentes: 12 })),
+    sincronizarUnidadesItens: vi.fn(async () => sucesso(17)),
+    contarUnidadesItensPendentes: vi.fn(async () => ({ itens: 657, pendentes: 200 })),
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
     sincronizarFaturasDaCarteira: vi.fn(async () => sucesso(13)),
@@ -41,6 +43,7 @@ describe('validarPedido', () => {
     [{ recurso: 'contratos' }, /UASG inválida/],
     [{ recurso: 'atas', uasg: '090014' }, /UASG inválida/],
     [{ recurso: 'itens_contratos' }, /UASG inválida/],
+    [{ recurso: 'unidades_itens', uasg: '123456' }, /UASG inválida/],
     ['texto', /Corpo/],
     [undefined, /Corpo/]
   ])('recusa %j', (corpo, erro) => {
@@ -126,6 +129,21 @@ describe('executarPedido', () => {
     expect(d.contarItensContratosPendentes).toHaveBeenCalledWith('200331');
     expect(r).toMatchObject({ dry: true, consulta: { contratos: 40, pendentes: 12 } });
     expect(d.sincronizarItensContratos).not.toHaveBeenCalled();
+  });
+
+  it('órgãos dos itens: chama a sincronização da UASG com orçamento de tempo', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'unidades_itens', uasg: '200331' }, d);
+    expect(d.sincronizarUnidadesItens).toHaveBeenCalledWith('200331', { forcar: undefined, orcamentoMs: 100_000 });
+    expect(r).toMatchObject({ dry: false, recurso: 'unidades_itens', resultado: { status: 'SUCESSO', total: 17 } });
+  });
+
+  it('dry dos órgãos dos itens: só conta a fila de leitura; não sincroniza', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'unidades_itens', uasg: '200331', dry: true }, d);
+    expect(d.contarUnidadesItensPendentes).toHaveBeenCalledWith('200331');
+    expect(r).toMatchObject({ dry: true, consulta: { itens: 657, pendentes: 200 } });
+    expect(d.sincronizarUnidadesItens).not.toHaveBeenCalled();
   });
 
   it('dry de contratos: só consulta as fontes e conta; não grava nem usa a trava', async () => {
