@@ -26,8 +26,7 @@ import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 // Query (contract_payment_cycles) em vez de localStorage — precisa de um
 // QueryClientProvider em runtime real. Nos testes de componente (renderização
 // estática, sem interação), mockamos o hook diretamente, no mesmo padrão já
-// usado para outros hooks baseados em React Query neste projeto (ver
-// ManagementPaymentsOverview.test.tsx).
+// usado para outros hooks baseados em React Query neste projeto.
 vi.mock('../../../hooks/useContractPaymentFollowUp', () => ({
   useContractPaymentFollowUp: vi.fn()
 }));

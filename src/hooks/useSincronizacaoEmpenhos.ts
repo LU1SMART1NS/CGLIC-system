@@ -11,6 +11,7 @@ export const RECURSO_EMPENHOS = 'empenhos' as const;
 export async function invalidarDadosDeEmpenhos(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['management-dashboard'] }),
+    queryClient.invalidateQueries({ queryKey: ['financeiro-empenhos'] }),
     queryClient.invalidateQueries({ queryKey: ['contratos-com-empenho-a-pagar'] }),
     queryClient.invalidateQueries({ queryKey: ['contrato-empenhos-sincronizacao'] }),
     queryClient.invalidateQueries({ queryKey: chaveStatusSincronizacao(RECURSO_EMPENHOS) })

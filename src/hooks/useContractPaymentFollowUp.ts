@@ -114,6 +114,7 @@ export function useContractPaymentFollowUp(
     queryClient.invalidateQueries({ queryKey: paymentCyclesQueryKey(contractKey) });
     // Fila de ações, painel gerencial e tela geral de Pagamentos leem os mesmos ciclos
     queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['financeiro-ciclos-em-aberto'] });
   }, [queryClient, contractKey]);
 
   const createMutation = useMutation({ mutationFn: createPaymentCycleRpc, onSuccess: invalidate });

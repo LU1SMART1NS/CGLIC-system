@@ -65,6 +65,16 @@ export function useCarteiraFilters<T extends CarteiraFilterState<T>>(schema: Car
     [schema, setSearchParams]
   );
 
+  /** Vários filtros numa só mudança de endereço (duas chamadas seguidas de setFilter perderiam a primeira). */
+  const setFilters = useCallback(
+    (patch: Partial<T>) => {
+      setSearchParams((prev) => writeCarteiraFilters(prev, schema, { ...readCarteiraFilters(prev, schema), ...patch } as T), {
+        replace: true
+      });
+    },
+    [schema, setSearchParams]
+  );
+
   const resetFilters = useCallback(() => {
     setSearchParams(
       (prev) => {
@@ -76,5 +86,5 @@ export function useCarteiraFilters<T extends CarteiraFilterState<T>>(schema: Car
     );
   }, [schema, setSearchParams]);
 
-  return { filters, setFilter, resetFilters };
+  return { filters, setFilter, setFilters, resetFilters };
 }
