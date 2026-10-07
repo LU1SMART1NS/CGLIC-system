@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { ALERT_RULE_DEFAULTS, applyAlertRuleOverrides } from '../config/alertRules';
+import { aplicarLimitesArt75II, type LimiteArt75II } from '../config/limitesLei14133';
 
 /** Sobreposições gravadas em alert_settings (só o que difere do padrão). */
 export async function fetchAlertSettings(): Promise<Record<string, number>> {
@@ -32,8 +33,35 @@ export async function saveAlertSettings(values: Record<string, number>): Promise
   applyAlertRuleOverrides(values);
 }
 
+/** Limite do art. 75, II da Lei 14.133 por ano (migration 88). */
+export async function fetchLimitesArt75II(): Promise<LimiteArt75II[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.from('limites_lei_14133_art75').select('ano, valor, decreto').order('ano');
+  if (error) throw error;
+  return ((data ?? []) as Array<{ ano: number; valor: number | string; decreto: string }>).map((l) => ({
+    ano: Number(l.ano),
+    valor: Number(l.valor),
+    decreto: l.decreto
+  }));
+}
+
+/** Cadastra ou corrige o limite de um ano (só o coordenador) e já passa a usá-lo. */
+export async function salvarLimiteArt75II(limite: LimiteArt75II): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw mapPostgresErrorToAppError(new Error('NETWORK_OR_CONFIG_ERROR: Supabase não está configurado'));
+  }
+  const { error } = await supabase.rpc('salvar_limite_art75', { p_ano: limite.ano, p_valor: limite.valor, p_decreto: limite.decreto });
+  if (error) throw mapPostgresErrorToAppError(error);
+  aplicarLimitesArt75II(await fetchLimitesArt75II());
+}
+
 /** Carrega e aplica as regras do banco. Falha de leitura mantém os padrões do código. */
 export async function loadAndApplyAlertSettings(): Promise<void> {
+  try {
+    aplicarLimitesArt75II(await fetchLimitesArt75II());
+  } catch (err) {
+    console.warn('[alertSettings] Limites do art. 75, II não carregados; usando os do sistema:', err);
+  }
   try {
     applyAlertRuleOverrides(await fetchAlertSettings());
   } catch (err) {

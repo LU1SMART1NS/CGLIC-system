@@ -113,12 +113,7 @@ export const PAGAMENTO_RULES = {
   /** IN SEGES 77/2022 art. 7º, II: pagamento em até N dias úteis da liquidação. */
   pagamentoMaxDiasUteis: 10,
   /** Portaria DGFNSP 50/2025 art. 5º: o processo chega com pelo menos N dias úteis antes do vencimento. */
-  chegadaMinimaDiasUteis: 8,
-  /**
-   * IN 77 art. 7º § 2º: prazos pela metade para despesa até o limite do art. 75, II da Lei 14.133 (em reais,
-   * atualizado todo ano por decreto). Valor de 2025 (Decreto 12.343/2024); confira o vigente.
-   */
-  limitePequenoValorReais: 62725
+  chegadaMinimaDiasUteis: 8
 };
 
 // -----------------------------------------------------------------------------
@@ -158,7 +153,7 @@ export function isLembreteNaJanela(params: { diasRestantes: number; atrasado: bo
 // Parametrização (Administração > Regras de Alertas)
 // -----------------------------------------------------------------------------
 
-export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'horas' | 'R$';
+export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'horas';
 
 export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'sincronizacao';
 
@@ -226,7 +221,6 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'pagamento.liquidacaoMaxDiasUteis', group: 'pagamentos', label: 'Prazo de liquidação', hint: 'Do atesto à liquidação no SIAFI (IN 77, art. 7º, I).', unit: 'dias úteis', min: 1, max: 30 },
   { key: 'pagamento.pagamentoMaxDiasUteis', group: 'pagamentos', label: 'Prazo de pagamento', hint: 'Da liquidação à ordem bancária (IN 77, art. 7º, II).', unit: 'dias úteis', min: 1, max: 30 },
   { key: 'pagamento.chegadaMinimaDiasUteis', group: 'pagamentos', label: 'Chegada mínima antes do vencimento', hint: 'Antecedência do processo em relação ao vencimento (Portaria DGFNSP 50/2025, art. 5º).', unit: 'dias úteis', min: 0, max: 30 },
-  { key: 'pagamento.limitePequenoValorReais', group: 'pagamentos', label: 'Limite de pequeno valor', hint: 'Até este valor do contrato os prazos de liquidação e pagamento caem pela metade (IN 77, art. 7º, § 2º; art. 75, II da Lei 14.133, atualizado todo ano).', unit: 'R$', min: 1, max: 10000000 },
 
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }
 ];

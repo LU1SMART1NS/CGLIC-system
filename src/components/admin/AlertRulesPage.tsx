@@ -15,6 +15,7 @@ import {
 import { saveAlertSettings } from '../../services/alertSettingsService';
 import { DataTable } from '../../design-system/components/DataTable';
 import { AdminListShell } from './shared/AdminListShell';
+import { LimitesArt75Card } from './LimitesArt75Card';
 
 /** Limites que vêm de lei ou decreto: aparecem só como referência, nunca editáveis. */
 const LEGAL_RULES: Array<{ label: string; value: string; source: string }> = [
@@ -206,6 +207,8 @@ export const AlertRulesPage: React.FC = () => {
           ]}
         />
       </AdminListShell>
+
+      <LimitesArt75Card />
     </PageContainer>
   );
 };

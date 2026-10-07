@@ -12,6 +12,7 @@ import { CancelCycleModal, CreateCycleModal, MarcoSimplesModal, type MarcoSimple
 import { useEmpenhosDoContrato } from './payment/cicloPagamentoShared';
 import { ConferenciaModal } from './payment/ConferenciaModal';
 import { EnvioCgofiModal } from './payment/EnvioCgofiModal';
+import { EscolherFaturaModal } from './payment/EscolherFaturaModal';
 import { PaymentCycleChecklist, PaymentCycleDocuments, PaymentCycleHistory, PaymentCycleItens, PaymentCyclePrazosLegais } from './payment/PaymentCycleDetails';
 import { calcularPrazosLegais } from '../../services/prazosLegaisPagamento';
 import { ehBemAIncorporar } from '../../services/cicloPagamentoApoioService';
@@ -142,7 +143,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
     registerMarco,
     addDocument,
     removeDocument,
-    deleteCycle
+    deleteCycle,
+    ligarFaturas
   } = useContractPaymentFollowUp(contractKey);
 
   const { data: manager } = useContractManager(contractKey);
@@ -155,11 +157,11 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
   const registradoPorNome = (user?.user_metadata as { full_name?: string } | undefined)?.full_name || user?.email || undefined;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [acaoAberta, setAcaoAberta] = useState<{ cycleKey: string; acao: AcaoDoCiclo | MarcoSimples } | null>(null);
+  const [acaoAberta, setAcaoAberta] = useState<{ cycleKey: string; acao: AcaoDoCiclo | MarcoSimples | 'ESCOLHER_FATURA' } | null>(null);
   const [expandedCycles, setExpandedCycles] = useState<Record<string, boolean>>({});
   const [cancelCycleKey, setCancelCycleKey] = useState<string | null>(null);
   const acaoCycle = cycles.find((c) => c.cycleKey === acaoAberta?.cycleKey) ?? null;
-  const abrir = (cycleKey: string, acao: AcaoDoCiclo | MarcoSimples) => setAcaoAberta({ cycleKey, acao });
+  const abrir = (cycleKey: string, acao: AcaoDoCiclo | MarcoSimples | 'ESCOLHER_FATURA') => setAcaoAberta({ cycleKey, acao });
   const fechar = () => setAcaoAberta(null);
 
   // Natureza de despesa dos empenhos: bem a incorporar (ND 449052) vai também à COLOG.
@@ -230,6 +232,8 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
         const encerrado = isPaymentCycleEncerrado(cycle.status);
         const podeProrrogar = !cycle.input.liquidacaoProrrogada && ['RECEBIDO', 'COM_PENDENCIA', 'CONFERIDO', 'DEVOLVIDO', 'ENVIADO_CGOFI'].includes(cycle.status);
         const cologPendente = temBem(cycle) && !cycle.input.cologEnviadoEm && ['ENVIADO_CGOFI', 'LIQUIDADO', 'PAGO'].includes(cycle.status);
+        const podeEscolherFatura = ['ENVIADO_CGOFI', 'LIQUIDADO'].includes(cycle.status);
+        const semFatura = podeEscolherFatura && (cycle.faturas ?? []).length === 0;
 
         return (
           <div
@@ -284,6 +288,15 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
                     <span className="payment-action-label">{acao.label}</span>
                   </ActionButton>
                 )}
+                {canEdit && podeEscolherFatura && (
+                  <ActionButton
+                    action="vincular"
+                    size="sm"
+                    onClick={() => abrir(cycle.cycleKey, 'ESCOLHER_FATURA')}
+                    title={semFatura ? 'Escolher a fatura do ciclo' : 'Trocar a fatura do ciclo'}
+                    label={semFatura ? 'Escolher fatura' : 'Trocar fatura'}
+                  />
+                )}
                 {canEdit && cologPendente && (
                   <ActionButton action="avancarEtapa" size="sm" onClick={() => abrir(cycle.cycleKey, 'ENVIADO_COLOG')} title="Enviar à COLOG">
                     <span className="payment-action-label">Enviar à COLOG</span>
@@ -324,8 +337,14 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
               <WorkflowStepper steps={buildMarcoSteps(cycle)} testId={`payment-stepper-${cycle.cycleKey}`} />
             </div>
 
-            {!encerrado && (prazosLegais.chegada.fora || prazosLegais.liquidacao.estourou || prazosLegais.riscoExtincao || cologPendente) && (
+            {!encerrado && (prazosLegais.chegada.fora || prazosLegais.liquidacao.estourou || prazosLegais.riscoExtincao || cologPendente || semFatura) && (
               <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {semFatura && (
+                  <NoticeBar tone="warning" testId={`payment-sem-fatura-${cycle.cycleKey}`}>
+                    Nenhuma fatura ligada a este ciclo. O sistema liga sozinho quando acha uma única fatura com o mesmo empenho e o mesmo
+                    valor; se houver mais de uma, use Escolher fatura para ele acompanhar a liquidação e a OB.
+                  </NoticeBar>
+                )}
                 {prazosLegais.chegada.fora && (
                   <NoticeBar tone="warning" testId={`payment-chegada-${cycle.cycleKey}`}>
                     Chegou com {prazosLegais.chegada.diasUteisAteVencimento} dia(s) útil(eis) até o vencimento; a Portaria 50 (art. 5º) pede no mínimo{' '}
@@ -414,9 +433,16 @@ export const ContractPaymentFollowUpSection: React.FC<ContractPaymentFollowUpSec
         registradoPorNome={registradoPorNome}
         onSubmit={registerMarco}
       />
+      <EscolherFaturaModal
+        cycle={acaoAberta?.acao === 'ESCOLHER_FATURA' ? acaoCycle : null}
+        contratoIdGov={contract?.contratoId ?? null}
+        onClose={fechar}
+        registradoPorNome={registradoPorNome}
+        onSubmit={ligarFaturas}
+      />
       <MarcoSimplesModal
-        cycle={acaoAberta && !['CONFERIR', 'ENVIAR'].includes(acaoAberta.acao) ? acaoCycle : null}
-        marco={acaoAberta && !['CONFERIR', 'ENVIAR'].includes(acaoAberta.acao) ? (acaoAberta.acao as MarcoSimples) : null}
+        cycle={acaoAberta && !['CONFERIR', 'ENVIAR', 'ESCOLHER_FATURA'].includes(acaoAberta.acao) ? acaoCycle : null}
+        marco={acaoAberta && !['CONFERIR', 'ENVIAR', 'ESCOLHER_FATURA'].includes(acaoAberta.acao) ? (acaoAberta.acao as MarcoSimples) : null}
         onClose={fechar}
         registradoPorNome={registradoPorNome}
         onSubmit={registerMarco}
