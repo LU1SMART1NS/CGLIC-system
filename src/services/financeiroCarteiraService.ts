@@ -91,6 +91,8 @@ export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
 
 export interface EmpenhoCarteiraRow {
   empenhoId: string;
+  /** Chave canônica do empenho ({uasg}-{ano}-{número normalizado}), a mesma dos ciclos e das entregas. */
+  canonicalKey?: string | null;
   numero: string;
   ano: number | null;
   uasgEmitente: string | null;
@@ -103,6 +105,9 @@ export interface EmpenhoCarteiraRow {
   saldo: number | null;
   /** Contratos a que o empenho está vinculado (quase sempre um). */
   contractKeys: string[];
+  /** Plano interno e natureza de despesa (migration 87; vazios até a sincronização reler o contrato). */
+  planoInterno?: string | null;
+  naturezaDespesa?: string | null;
 }
 
 export type EmpenhoSaldoSituacao = 'COM_SALDO' | 'SEM_SALDO' | 'SEM_CONSULTA';
@@ -114,6 +119,7 @@ export function situacaoDoSaldo(row: Pick<EmpenhoCarteiraRow, 'saldo'>): Empenho
 
 export interface EmpenhoResumoDb {
   empenho_id: string;
+  canonical_key?: string | null;
   numero_oficial: string | null;
   ano_exercicio: number | null;
   uasg_emitente: string | null;
@@ -164,6 +170,7 @@ export function montarEmpenhosCarteira(
     const valorPago = consultado ? Math.round((pagoPorIdGov.get(String(e.identificador_fonte ?? '')) ?? 0) * 100) / 100 : null;
     rows.push({
       empenhoId: e.empenho_id,
+      canonicalKey: e.canonical_key ?? null,
       numero: e.numero_oficial || '—',
       ano: e.ano_exercicio ?? null,
       uasgEmitente: e.uasg_emitente ?? null,
@@ -180,17 +187,23 @@ export function montarEmpenhosCarteira(
 }
 
 export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<EmpenhoCarteiraRow[]> {
-  const [empenhos, vinculos, faturaEmpenhos, consultados] = await Promise.all([
+  const [empenhos, vinculos, faturaEmpenhos, consultados, classificacao] = await Promise.all([
     lerTudo<EmpenhoResumoDb>(
       'v_empenhos_resumo',
-      'empenho_id, numero_oficial, ano_exercicio, uasg_emitente, data_emissao, valor_empenhado, credor_nome, credor_cnpj_cpf, identificador_fonte',
+      'empenho_id, canonical_key, numero_oficial, ano_exercicio, uasg_emitente, data_emissao, valor_empenhado, credor_nome, credor_cnpj_cpf, identificador_fonte',
       'empenho_id'
     ),
     lerTudo<{ empenho_id: string; contract_key: string }>('contrato_empenhos', 'empenho_id, contract_key', 'empenho_id'),
     lerTudo<FaturaEmpenhoDb>('fatura_empenhos', 'id_fatura, id_empenho_gov, valor', 'id_fatura'),
-    lerTudo<{ contract_key: string }>('contrato_faturas_sincronizacao', 'contract_key', 'contract_key')
+    lerTudo<{ contract_key: string }>('contrato_faturas_sincronizacao', 'contract_key', 'contract_key'),
+    lerTudo<{ id: string; plano_interno: string | null; natureza_despesa: string | null }>('empenhos', 'id, plano_interno, natureza_despesa', 'id')
   ]);
-  return montarEmpenhosCarteira(empenhos, vinculos, faturaEmpenhos, faturas, new Set(consultados.map((c) => c.contract_key)));
+  const porId = new Map(classificacao.map((c) => [String(c.id), c]));
+  return montarEmpenhosCarteira(empenhos, vinculos, faturaEmpenhos, faturas, new Set(consultados.map((c) => c.contract_key))).map((r) => ({
+    ...r,
+    planoInterno: porId.get(r.empenhoId)?.plano_interno ?? null,
+    naturezaDespesa: porId.get(r.empenhoId)?.natureza_despesa ?? null
+  }));
 }
 
 // -----------------------------------------------------------------------------------------------------

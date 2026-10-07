@@ -1,5 +1,5 @@
 import React from 'react';
-import { PrevisaoCarteira } from '../components/financeiro/PrevisaoCarteira';
+import { PrevisaoPagina } from '../components/financeiro/PrevisaoPagina';
 
-/** Financeiro → Previsão (/previsao). */
-export const PrevisaoRoute: React.FC = () => <PrevisaoCarteira />;
+/** Pagamentos → Previsão do mês (/pagamentos/previsao). */
+export const PrevisaoRoute: React.FC = () => <PrevisaoPagina />;

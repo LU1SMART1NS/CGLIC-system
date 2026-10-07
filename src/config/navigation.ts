@@ -14,8 +14,7 @@ import {
   UsersRound,
   Briefcase,
   ListChecks,
-  Building2,
-  CalendarClock
+  Building2
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -58,7 +57,7 @@ export interface NavItem {
  * - Visão Geral: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
- * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos) · Previsão (/previsao)
+ * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
  * - Configurações (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
@@ -148,16 +147,6 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         route: '/pagamentos',
         matchPrefixes: ['/pagamentos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
-      },
-      {
-        // Previsão mensal de pagamentos (Portaria DGFNSP 50/2025, art. 5º, § 2º, III) e a expectativa de cada contrato.
-        id: 'execucao-previsao',
-        label: 'Previsão',
-        icon: CalendarClock,
-        status: 'active',
-        route: '/previsao',
-        matchPrefixes: ['/previsao'],
         allowedRoles: ['admin', 'gestor', 'leitor']
       }
     ]

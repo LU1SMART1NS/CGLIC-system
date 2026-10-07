@@ -17,3 +17,10 @@ export function diasDesde(v: string, hoje: Date = new Date()): number {
 export function normalizarBusca(v: string): string {
   return v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 }
+
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+/** "2026-11" → "novembro/2026". */
+export function rotuloDoMes(mes: string): string {
+  return `${MESES[Number(mes.slice(5, 7)) - 1]}/${mes.slice(0, 4)}`;
+}

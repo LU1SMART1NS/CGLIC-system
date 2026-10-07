@@ -1,7 +1,4 @@
 import React, { useCallback, useMemo } from 'react';
-import { CalendarClock } from 'lucide-react';
-import { PageContainer } from '../../design-system/components/PageContainer';
-import { PageHeader } from '../../design-system/components/PageHeader';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { NoticeBar, useToast } from '../../design-system';
 import { useAuth } from '../../context/AuthContext';
@@ -40,11 +37,11 @@ const PREVISAO_FILTER_SCHEMA: CarteiraFilterSchema<PrevisaoFilterState> = {
 };
 
 /**
- * Financeiro → Previsão (fase A): como cada contrato vigente costuma ser pago. A marca (mensal, por entrega, eventual)
+ * Pagamentos → Previsão → "Como cada contrato é pago": como cada contrato vigente costuma ser pago. A marca (mensal, por entrega, eventual)
  * alimenta a previsão mensal da Portaria DGFNSP 50/2025 e os avisos de nota que não chegou. Sem marca, o sistema
  * sugere pelo histórico: pago nos 3 últimos meses fechados = mensal; em 2 deles = talvez mensal.
  */
-export const PrevisaoCarteira: React.FC = () => {
+export const PrevisaoContratos: React.FC = () => {
   const navigate = useNavigateWithOrigin();
   const toast = useToast();
   const { user, role } = useAuth();
@@ -125,16 +122,10 @@ export const PrevisaoCarteira: React.FC = () => {
   };
 
   return (
-    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <PageHeader
-        title="Previsão de pagamentos"
-        subtitle="Como cada contrato costuma ser pago: base da previsão mensal da Portaria 50 e dos avisos de nota que não chegou."
-        icon={<CalendarClock size={26} color="var(--primary)" aria-hidden="true" />}
-      />
-
-      <NoticeBar tone="info" testId="previsao-fase-a">
-        A previsão do mês (o que a CGLIC informa à DGFNSP até o último dia útil, Portaria 50, art. 5º, § 2º, III) entra nesta aba na
-        próxima etapa. Agora, confirme como cada contrato é pago. A sugestão olha os pagamentos de {meses.map(rotuloMes).join(', ')}.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <NoticeBar tone="info" testId="previsao-contratos-info">
+        Como cada contrato costuma ser pago. Os mensais entram sozinhos na previsão do mês (valor mensal informado ou média dos 3
+        últimos pagamentos); os por entrega, pelas entregas previstas. A sugestão olha os pagamentos de {meses.map(rotuloMes).join(', ')}.
       </NoticeBar>
 
       {isBusy ? (
@@ -186,6 +177,6 @@ export const PrevisaoCarteira: React.FC = () => {
           />
         </>
       )}
-    </PageContainer>
+    </div>
   );
 };
