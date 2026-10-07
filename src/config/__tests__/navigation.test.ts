@@ -38,12 +38,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       ]);
     });
 
-    it('Financeiro tem as abas Empenhos, Pagamentos e Previsão', () => {
+    it('Financeiro tem as abas Empenhos e Pagamentos (a previsão é um botão em Pagamentos)', () => {
       const area = navigationConfig.find((i) => i.id === 'execucao-financeira')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Empenhos', '/empenhos'],
-        ['Pagamentos', '/pagamentos'],
-        ['Previsão', '/previsao']
+        ['Pagamentos', '/pagamentos']
       ]);
       expect(area.children!.every((c) => c.status === 'active')).toBe(true);
     });

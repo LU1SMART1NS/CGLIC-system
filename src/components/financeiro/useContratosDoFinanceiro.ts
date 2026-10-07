@@ -12,6 +12,7 @@ export interface ContratoDoFinanceiro {
   expirado?: boolean;
   /** Valor global (ou inicial) do contrato. */
   valor?: number;
+  fornecedorCnpj?: string;
 }
 
 /** "200331-00094-2022" → "00094/2022" (quando o contrato não está na carteira carregada). */
@@ -42,7 +43,8 @@ export function useContratosDoFinanceiro() {
         fornecedorNome: r.contract.fornecedorNome || undefined,
         gestorNome: r.gestorNome,
         expirado: r.faixa === 'EXPIRADO',
-        valor: r.contract.valorGlobal || r.contract.valorInicial || undefined
+        valor: r.contract.valorGlobal || r.contract.valorInicial || undefined,
+        fornecedorCnpj: r.contract.fornecedorCnpjCpf || undefined
       });
     }
     return map;

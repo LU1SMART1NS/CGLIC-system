@@ -268,13 +268,15 @@ const AppContent: React.FC = () => {
               }
             />
             <Route
-              path="/previsao"
+              path="/pagamentos/previsao"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                   <PrevisaoRoute />
                 </RequireRole>
               }
             />
+            {/* A previsão era uma aba do Financeiro (PR #56): o endereço antigo leva à lista de contratos dela. */}
+            <Route path="/previsao" element={<Navigate to="/pagamentos/previsao?visao=contratos" replace />} />
             <Route
               path="/empenhos"
               element={

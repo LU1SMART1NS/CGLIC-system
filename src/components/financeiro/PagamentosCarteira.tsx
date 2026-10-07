@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { fetchEnvioPrevisao, mesDaProximaPrevisao, prazoDaPrevisao } from '../../services/previsaoMensalService';
+import { dataBR, rotuloDoMes } from './financeiroFormat';
 import { CreditCard } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -96,6 +99,12 @@ export const PagamentosCarteira: React.FC = () => {
   const toast = useToast();
   const registradoPorNome = (user?.user_metadata as { full_name?: string } | undefined)?.full_name || user?.email || undefined;
 
+  // Botão da previsão do mês (Portaria 50): mostra o mês da próxima previsão e se já foi enviada.
+  const irPara = useNavigate();
+  const mesPrevisao = mesDaProximaPrevisao();
+  const envioPrevisao = useQuery({ queryKey: ['previsao-envio', mesPrevisao], queryFn: () => fetchEnvioPrevisao(mesPrevisao), staleTime: 5 * 60 * 1000 });
+  const rotuloPrevisao = `Previsão de ${rotuloDoMes(mesPrevisao).split('/')[0]} · ${envioPrevisao.data ? 'enviada' : `até ${dataBR(prazoDaPrevisao(mesPrevisao)).slice(0, 5)}`}`;
+
   const abrirCiclo = async (input: CreatePaymentCycleInput) => {
     await createPaymentCycleRpc(input);
     toast.success('Ciclo de pagamento aberto.');
@@ -186,6 +195,7 @@ export const PagamentosCarteira: React.FC = () => {
         icon={<CreditCard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
+          <ActionButton action="abrir" onClick={() => irPara('/pagamentos/previsao')} label={rotuloPrevisao} title="Previsão mensal de pagamentos (Portaria 50, art. 5º, § 2º, III)" data-testid="pagamentos-previsao" />
           {podeAbrirCiclo && <ActionButton action="novo" onClick={() => setAbrindoCiclo(true)} label="Abrir ciclo" data-testid="pagamentos-abrir-ciclo" />}
           <HeaderRefreshAction
             onRefresh={sincronizacao.podeForcar ? () => void sincronizacao.atualizar() : undefined}
