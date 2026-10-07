@@ -9,6 +9,7 @@ import {
   isErroDeInfraestrutura, traduzirErroAuth
 } from '../components/auth/AuthLayout';
 import { ActionButton, AppButton } from '../design-system';
+import { temSenhaPendente } from '../utils/senhaPendente';
 
 export const LoginRoute: React.FC = () => {
   const { user, loading } = useAuth();
@@ -38,7 +39,7 @@ export const LoginRoute: React.FC = () => {
   }
 
   if (user && !devPreview) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={temSenhaPendente(user) ? '/definir-senha' : '/'} replace />;
   }
 
   const openForgot = () => {

@@ -12,6 +12,7 @@ import { AuthLoading } from './components/auth/AuthLayout';
 import { AlertRulesGate } from './components/layout/AlertRulesGate';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
+import { temSenhaPendente } from './utils/senhaPendente';
 
 // Cada tela vira um pacote próprio, baixado só quando a rota é aberta. O ExportExcelModal leva o exceljs
 // junto e só é baixado quando o modal abre. A tela de login fica no pacote principal (é a primeira de quem ainda não entrou).
@@ -149,6 +150,11 @@ const ProtectedLayout: React.FC<{
 
   if (isSupabaseConfigured && !user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Convite aceito, mas a senha ainda não foi criada: só a tela de primeiro acesso.
+  if (temSenhaPendente(user)) {
+    return <Navigate to="/definir-senha" replace />;
   }
 
   return <AlertRulesGate>{children}</AlertRulesGate>;
