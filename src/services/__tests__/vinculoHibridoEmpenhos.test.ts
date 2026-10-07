@@ -10,8 +10,8 @@ const builder: any = {
 vi.mock('../supabaseClient', () => ({ isSupabaseConfigured: true, supabase: { rpc: (...a: any[]) => rpc(...a), from: () => builder } }));
 
 import {
-  descartarEmpenhoDoContrato,
   fetchDescartesEmpenhoContrato,
+  desvincularEmpenhoManual,
   mensagemDoErroDeVinculo,
   numeroDeEmpenhoValido,
   numeroOficialDoEmpenho,
@@ -63,12 +63,6 @@ describe('chamadas ao banco', () => {
     fromResp.error = null;
   });
 
-  it('descartar manda contrato, empenho e motivo', async () => {
-    rpc.mockResolvedValue({ data: { success: true }, error: null });
-    await descartarEmpenhoDoContrato({ contractKey: '200331-00145-2025', empenhoId: 'e1', motivo: 'Credor é a HPE' });
-    expect(rpc).toHaveBeenCalledWith('descartar_empenho_do_contrato', { p_contract_key: '200331-00145-2025', p_empenho_id: 'e1', p_motivo: 'Credor é a HPE' });
-  });
-
   it('vincular NE já gravada manda só o id; NE nova manda os dados', async () => {
     rpc.mockResolvedValue({ data: { numero_oficial: '2024NE000765', empenho_criado: false }, error: null });
     const r = await vincularEmpenhoManual({ contractKey: '200331-00059-2025', motivo: 'Nota da HPE', empenhoId: 'e1' });
@@ -83,8 +77,8 @@ describe('chamadas ao banco', () => {
     expect(mensagemDoErroDeVinculo({ message: 'JA_VINCULADO: Este empenho já está vinculado ao contrato 200331-00145-2025.' })).toBe('Este empenho já está vinculado ao contrato 200331-00145-2025.');
     expect(mensagemDoErroDeVinculo({ code: 'PGRST202', message: 'Could not find the function public.descartar_empenho_do_contrato' })).toMatch(/migration 85/);
     expect(mensagemDoErroDeVinculo({ code: '42501', message: 'UNAUTHORIZED: x' })).toMatch(/gestor ou coordenador/);
-    rpc.mockResolvedValue({ data: null, error: { message: 'VINCULO_MANUAL: Este vínculo foi feito pela equipe; use Desvincular.' } });
-    await expect(descartarEmpenhoDoContrato({ contractKey: 'k', empenhoId: 'e', motivo: 'motivo' })).rejects.toThrow('Este vínculo foi feito pela equipe; use Desvincular.');
+    rpc.mockResolvedValue({ data: null, error: { message: 'VINCULO_DA_FONTE: Este vínculo veio do Contratos.gov.br.' } });
+    await expect(desvincularEmpenhoManual({ contractKey: 'k', empenhoId: 'e' })).rejects.toThrow('Este vínculo veio do Contratos.gov.br.');
   });
 
   it('descartes: junta os dados da NE; sem a tabela, devolve vazio', async () => {

@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   buscarEmpenhosPorNumero,
-  descartarEmpenhoDoContrato,
   desvincularEmpenhoManual,
   fetchDescartesEmpenhoContrato,
   restaurarEmpenhoDoContrato,
@@ -44,15 +43,13 @@ function invalidarEmpenhosDoContrato(queryClient: QueryClient, contractKey: stri
   queryClient.invalidateQueries({ queryKey: ['empenho-por-numero'] });
 }
 
-/** Descartar, restaurar, vincular à mão e desvincular: as quatro ações da equipe sobre o vínculo. */
+/**
+ * Restaurar, vincular à mão e desvincular. Vínculo errado vindo do Contratos.gov.br não se descarta mais
+ * aqui: corrige-se na fonte e a sincronização traz a correção. Restaurar fica para os descartes antigos.
+ */
 export function useAcoesVinculoEmpenho(contractKey: string) {
   const queryClient = useQueryClient();
   const aoTerminar = () => invalidarEmpenhosDoContrato(queryClient, contractKey);
-  const descartar = useMutation({
-    mutationFn: (p: { empenhoId: string; motivo: string }) => descartarEmpenhoDoContrato({ contractKey, ...p }),
-    retry: 0,
-    onSettled: aoTerminar
-  });
   const restaurar = useMutation({
     mutationFn: (empenhoId: string) => restaurarEmpenhoDoContrato({ contractKey, empenhoId }),
     retry: 0,
@@ -68,5 +65,5 @@ export function useAcoesVinculoEmpenho(contractKey: string) {
     retry: 0,
     onSettled: aoTerminar
   });
-  return { descartar, restaurar, vincular, desvincular };
+  return { restaurar, vincular, desvincular };
 }
