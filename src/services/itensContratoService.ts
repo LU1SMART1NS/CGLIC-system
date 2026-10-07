@@ -115,3 +115,36 @@ export function cruzarItensComVinculos(dados: Pick<ItensDoContrato, 'itens' | 'v
   const vinculosSemItem = dados.itens.length > 0 ? dados.vinculos.filter((v) => !usados.has(v.numeroItem)) : [];
   return { vinculoPorPosicao, vinculosSemItem };
 }
+
+/**
+ * Números dos itens de vários contratos (itens_contrato), para a Central ver se um contrato vinculado ainda tem item
+ * sem ata. Em lotes de 100 contratos; o banco devolve no máximo 1000 linhas por consulta, então pagina.
+ */
+export async function fetchNumerosDosItensDosContratos(contractKeys: string[]): Promise<Map<string, number[]>> {
+  const mapa = new Map<string, number[]>();
+  const chaves = Array.from(new Set(contractKeys.map((k) => (k || '').trim()).filter(Boolean)));
+  if (!supabase || chaves.length === 0) return mapa;
+  const PAGINA = 1000;
+  for (let i = 0; i < chaves.length; i += 100) {
+    const lote = chaves.slice(i, i + 100);
+    for (let desde = 0; ; desde += PAGINA) {
+      const { data, error } = await supabase
+        .from('itens_contrato')
+        .select('contract_key, numero_item, posicao')
+        .in('contract_key', lote)
+        .order('contract_key', { ascending: true })
+        .order('posicao', { ascending: true })
+        .range(desde, desde + PAGINA - 1);
+      if (error) throw error;
+      for (const r of (data ?? []) as any[]) {
+        const n = numeroOuNulo(r.numero_item);
+        if (n === null) continue;
+        const lista = mapa.get(r.contract_key) ?? [];
+        if (!lista.includes(n)) lista.push(n);
+        mapa.set(r.contract_key, lista);
+      }
+      if (!data || data.length < PAGINA) break;
+    }
+  }
+  return mapa;
+}

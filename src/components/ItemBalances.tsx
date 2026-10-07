@@ -44,6 +44,8 @@ import {
   suggestionToContractRecord,
   type ItemContractSuggestion
 } from '../utils/itemContractSuggestions';
+import { itensEmOutraAta, outrasAtasPorContrato, podeEntrarEmMaisUmaAta } from '../utils/contratoVariasAtas';
+import { chaveDoContrato as contractKeyOf } from '../utils/contractKeyUtils';
 import { ActionButton, AppButton, EmptyState, SectionHeader } from '../design-system';
 
 import { LinkContractModal } from './modals/LinkContractModal';
@@ -428,17 +430,23 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   // Sugestões de contrato (PNCP + catálogo), sem os já vinculados nem os descartados
   const { data: dismissedSuggestions = [] } = useDismissedContractSuggestions(canonicalItemKey);
-  // Não sugerir: contrato já vinculado a outra ata (um contrato pertence a uma só ata) ou marcado pelo
-  // coordenador como "não pertence a ata".
+  // Não sugerir: contrato já vinculado a ata de outra compra, ou com este item em outra ata (cada item do contrato
+  // pertence a uma só ata, migration 86), ou marcado pelo coordenador como "não pertence a ata".
   const { data: todosVinculos = [] } = useArpItemContractLinks();
   const { data: contratosSemAta = {} } = useContratosSemAta();
-  const naoSugerir = useMemo(
-    () => [
-      ...todosVinculos.filter((l) => l.ataKey !== arp?.numeroAtaRegistroPreco).map((l) => l.contractKey),
-      ...Object.keys(contratosSemAta)
-    ],
-    [todosVinculos, contratosSemAta, arp?.numeroAtaRegistroPreco]
-  );
+  const naoSugerir = useMemo(() => {
+    const numeroAta = arp?.numeroAtaRegistroPreco || '';
+    const compra = arp ? buildItemSuggestionCriteria(arp, item).compra : undefined;
+    const esteItem = parseInt(String(item?.numeroItem ?? ''), 10);
+    const porChave = new Map(officialDashboardContracts.map((c) => [contractKeyOf(c).toUpperCase(), c]));
+    const fora: string[] = [];
+    for (const [key, outras] of outrasAtasPorContrato(numeroAta, todosVinculos)) {
+      const contrato = porChave.get(key);
+      const podeEntrar = Boolean(contrato) && podeEntrarEmMaisUmaAta(contrato!, compra, outras) && !itensEmOutraAta(outras).has(esteItem);
+      if (!podeEntrar) fora.push(key);
+    }
+    return [...fora, ...Object.keys(contratosSemAta)];
+  }, [todosVinculos, contratosSemAta, arp, item, officialDashboardContracts]);
   const dismissSuggestionMutation = useDismissContractSuggestion();
   const restoreSuggestionMutation = useRestoreContractSuggestion();
   const { suggestions: contractSuggestions, dismissed: dismissedContractSuggestions } = useMemo(
@@ -1244,6 +1252,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         uasg={arp.codigoUnidadeGerenciadora}
         itemUnitPrice={item.valorUnitario}
         existingLinkedContractKeys={enrichedOfficialLinks.map(l => l.contractKey)}
+        compraDaAta={buildItemSuggestionCriteria(arp, item).compra}
       />
     </Instrument360Page>
   );

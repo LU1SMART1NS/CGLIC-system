@@ -33,6 +33,9 @@ vi.mock('../../../hooks/useAtaPncp', () => ({
   useAtaPncp: vi.fn()
 }));
 
+vi.mock('../../../hooks/useItensDoContrato', () => ({
+  useItensDoContrato: vi.fn(() => ({ data: undefined }))
+}));
 vi.mock('../../../hooks/useContractManager', () => ({
   useContractManager: () => ({ data: { gestorNome: 'Maria Fiscal' }, isLoading: false })
 }));

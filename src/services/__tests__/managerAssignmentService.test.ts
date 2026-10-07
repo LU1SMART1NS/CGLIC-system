@@ -14,7 +14,7 @@ import {
 const links = [
   { ataKey: '00001/2025', contractKey: '200331-00010-2025' },
   { ataKey: '00001/2025', contractKey: '200331-00011-2025' },
-  // contrato 00011 também usa itens da ata 00002 → as duas atas ficam no mesmo grupo
+  // contrato 00011 também usa itens da ata 00002 → contrato em duas atas (migration 86): não liga as atas
   { ataKey: '00002/2025', contractKey: '200331-00011-2025' },
   { ataKey: '00002/2025', contractKey: '200331-00012-2025' },
   // grupo independente
@@ -22,10 +22,17 @@ const links = [
 ];
 
 describe('resolveManagerPropagation — gestor da ata = gestor dos contratos vinculados', () => {
-  it('a partir de uma ata alcança os contratos dela e, por eles, as demais atas ligadas', () => {
+  it('a partir de uma ata alcança os contratos só dela; o contrato em duas atas fica com o banco e não leva a outra ata', () => {
     expect(resolveManagerPropagation([{ tipo: 'ATA', ataKey: '00001/2025' }], links)).toEqual({
-      ataKeys: ['00001/2025', '00002/2025'],
-      contractKeys: ['200331-00010-2025', '200331-00011-2025', '200331-00012-2025']
+      ataKeys: ['00001/2025'],
+      contractKeys: ['200331-00010-2025']
+    });
+  });
+
+  it('contrato em duas atas muda sozinho: as atas continuam com os gestores que têm', () => {
+    expect(resolveManagerPropagation([{ tipo: 'CONTRATO', contractKey: '200331-00011-2025' }], links)).toEqual({
+      ataKeys: [],
+      contractKeys: ['200331-00011-2025']
     });
   });
 
@@ -55,8 +62,8 @@ describe('resolveManagerPropagation — gestor da ata = gestor dos contratos vin
       ],
       links
     );
-    expect(result.ataKeys).toEqual(['00001/2025', '00002/2025', '00009/2025']);
-    expect(result.contractKeys).toHaveLength(4);
+    expect(result.ataKeys).toEqual(['00002/2025', '00009/2025']);
+    expect(result.contractKeys).toEqual(['200330-00090-2025', '200331-00012-2025']);
   });
 });
 
@@ -95,18 +102,21 @@ describe('assignManagerWithPropagation', () => {
 
   it('segue gravando o restante quando um item falha e devolve a falha', async () => {
     vi.mocked(saveContractManagerRpc).mockImplementation(async (input: any) => {
-      if (input.numero === '00011') throw new Error('UNAUTHORIZED');
+      if (input.numero === '00010') throw new Error('UNAUTHORIZED');
       return {} as any;
     });
 
     const result = await assignManagerWithPropagation({
-      targets: [{ tipo: 'ATA', ataKey: '00001/2025' }],
+      targets: [
+        { tipo: 'ATA', ataKey: '00001/2025' },
+        { tipo: 'ATA', ataKey: '00002/2025' }
+      ],
       gestorNome: 'João',
       links
     });
 
     expect(result.atualizados.atas).toHaveLength(2);
-    expect(result.atualizados.contratos).toHaveLength(2);
-    expect(result.falhas).toEqual([{ chave: '200331-00011-2025', tipo: 'CONTRATO', erro: 'UNAUTHORIZED' }]);
+    expect(result.atualizados.contratos).toEqual(['200331-00012-2025']);
+    expect(result.falhas).toEqual([{ chave: '200331-00010-2025', tipo: 'CONTRATO', erro: 'UNAUTHORIZED' }]);
   });
 });

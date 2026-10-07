@@ -171,6 +171,12 @@ export function extractAtaKeyFromItemKey(itemKey: string): string | null {
 export interface ArpItemContractLinkPair {
   ataKey: string;
   contractKey: string;
+  /** Chave do item da ata ("00059/2025-200331-00011"). */
+  itemKey?: string;
+  /** UASG da ata, tirada da chave do item. */
+  uasg?: string;
+  /** Número do item na ata (= número do item na compra e no contrato). */
+  numeroItem?: number;
 }
 
 /**
@@ -195,7 +201,8 @@ export async function fetchAllArpItemContractLinks(): Promise<ArpItemContractLin
     for (const row of data) {
       const ataKey = extractAtaKeyFromItemKey(row.item_key);
       if (ataKey && row.contract_key) {
-        pairs.push({ ataKey, contractKey: row.contract_key });
+        const [, uasg, item] = String(row.item_key).trim().split('-');
+        pairs.push({ ataKey, contractKey: row.contract_key, itemKey: row.item_key, uasg, numeroItem: parseInt(item, 10) });
       }
     }
     return pairs;

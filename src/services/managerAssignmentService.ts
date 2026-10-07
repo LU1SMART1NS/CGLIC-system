@@ -8,9 +8,12 @@ import type { ContractDashboardRecord } from '../types';
  *
  * Regra de negócio: o gestor de uma Ata é também o gestor dos contratos
  * vinculados a ela (arp_item_contract_links). Alterar o gestor de uma Ata OU
- * de um contrato atualiza todo o grupo ligado a eles — a Ata, os contratos
- * da Ata e, se um contrato pertencer a mais de uma Ata, também essas Atas e
- * os contratos delas.
+ * de um contrato atualiza o grupo ligado a eles — a Ata e os contratos da Ata.
+ *
+ * Contrato em mais de uma Ata (migration 86): ele não leva a troca de uma Ata
+ * para a outra. As Atas continuam com os gestores que têm; trocar a Ata deixa
+ * o contrato com o banco (acompanha se as outras Atas dele concordam, senão o
+ * coordenador é avisado) e trocar o contrato muda só o contrato.
  */
 
 export type ManagerTarget = { tipo: 'ATA'; ataKey: string } | { tipo: 'CONTRATO'; contractKey: string };
@@ -40,11 +43,14 @@ export function resolveManagerPropagation(targets: ManagerTarget[], links: ArpIt
     if (next.tipo === 'ATA') {
       if (atas.has(next.ataKey)) continue;
       atas.add(next.ataKey);
-      for (const c of contractsByAta.get(next.ataKey) || []) queue.push({ tipo: 'CONTRATO', contractKey: c });
+      for (const c of contractsByAta.get(next.ataKey) || []) {
+        if ((atasByContract.get(c)?.size ?? 0) <= 1) queue.push({ tipo: 'CONTRATO', contractKey: c });
+      }
     } else {
       if (contracts.has(next.contractKey)) continue;
       contracts.add(next.contractKey);
-      for (const a of atasByContract.get(next.contractKey) || []) queue.push({ tipo: 'ATA', ataKey: a });
+      const atasDele = atasByContract.get(next.contractKey);
+      if (atasDele && atasDele.size === 1) for (const a of atasDele) queue.push({ tipo: 'ATA', ataKey: a });
     }
   }
 

@@ -16,7 +16,7 @@ export function useAvisosDistribuicao(enabled: boolean) {
 export function useMarcarAvisosLidos() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: marcarAvisosDistribuicaoLidos,
+    mutationFn: (ids?: string[]) => marcarAvisosDistribuicaoLidos(ids),
     retry: 0,
     onSettled: () => queryClient.invalidateQueries({ queryKey: AVISOS_DISTRIBUICAO_KEY })
   });

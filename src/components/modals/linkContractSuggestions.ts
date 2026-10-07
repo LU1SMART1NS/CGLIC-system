@@ -1,5 +1,6 @@
 import type { ContractDashboardRecord } from '../../types';
 import { contratoDoFornecedorDaAta } from '../../utils/fornecedorMatch';
+import type { OutraAtaDoContrato } from '../../utils/contratoVariasAtas';
 
 /** Critérios da Ata usados para sugerir contratos no LinkContractModal. */
 export interface ContractSuggestionCriteria {
@@ -108,8 +109,10 @@ export function ataLinkCoverage(
 export interface ContratoParaVincular {
   contract: ContractDashboardRecord;
   reasons: ContractSuggestionReason[];
-  /** Número da ata a que o contrato já está vinculado (outra ata): não pode ser escolhido. */
+  /** Número da ata de OUTRA compra a que o contrato já está vinculado: não pode ser escolhido. */
   vinculadoAOutraAta?: string;
+  /** Outras atas da mesma compra em que o contrato já está (pode entrar nesta também, com outros itens). */
+  tambemEmOutrasAtas?: OutraAtaDoContrato[];
   /** O coordenador marcou que o contrato não pertence a ata: não é sugerido (vincular desfaz a marcação). */
   naoPertenceAAta?: boolean;
   /** O coordenador descartou esta ata para o contrato (Central de Distribuição): não é sugerido para ela. */
@@ -118,7 +121,8 @@ export interface ContratoParaVincular {
 
 /**
  * Aplica as regras de vínculo à lista já ordenada por sugestão:
- * - um contrato pertence a uma só ata: o já vinculado a outra ata perde a sugestão, vai para o fim e fica bloqueado;
+ * - cada item do contrato pertence a uma só ata (migration 86): o contrato já vinculado a uma ata de outra compra perde a
+ *   sugestão, vai para o fim e fica bloqueado; o já vinculado a outra ata da mesma compra continua escolhível e é sinalizado;
  * - o marcado "não pertence a ata" ou descartado para esta ata perde a sugestão (continua pesquisável).
  * A ordem relativa dentro de cada grupo é preservada.
  */
@@ -126,8 +130,10 @@ export function aplicarRestricoesDeVinculo(
   ranked: Array<{ contract: ContractDashboardRecord; reasons: ContractSuggestionReason[] }>,
   opts: {
     contractKeyOf: (c: ContractDashboardRecord) => string;
-    /** contract_key (maiúsculas) → número da ata a que já está vinculado, só para atas diferentes desta. */
+    /** contract_key (maiúsculas) → número da ata de outra compra a que já está vinculado (bloqueia). */
     ataDeOutroVinculo: Map<string, string>;
+    /** contract_key (maiúsculas) → outras atas da mesma compra em que já está (só sinaliza). */
+    tambemEmOutrasAtas?: Map<string, OutraAtaDoContrato[]>;
     /** contract_key (maiúsculas) dos contratos marcados "não pertence a ata". */
     naoPertencemAAta: Set<string>;
     /** contract_key (maiúsculas) dos contratos que o coordenador descartou para ESTA ata. */
@@ -152,7 +158,12 @@ export function aplicarRestricoesDeVinculo(
       demais.push({ contract: row.contract, reasons: [], descartadoParaEstaAta: true });
       continue;
     }
-    (row.reasons.length > 0 ? sugeridos : demais).push({ contract: row.contract, reasons: row.reasons });
+    const tambem = opts.tambemEmOutrasAtas?.get(key);
+    (row.reasons.length > 0 ? sugeridos : demais).push({
+      contract: row.contract,
+      reasons: row.reasons,
+      ...(tambem && tambem.length > 0 ? { tambemEmOutrasAtas: tambem } : {})
+    });
   }
   return [...sugeridos, ...demais, ...bloqueados];
 }

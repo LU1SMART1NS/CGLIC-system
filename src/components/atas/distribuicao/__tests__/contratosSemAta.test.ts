@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPendenciasDistribuicao, sugerirAtas, type FilaAta, type FilaContrato } from '../contratosSemAta';
+import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParcial, sugerirAtas, type FilaAta, type FilaContrato } from '../contratosSemAta';
 import type { ContractDashboardRecord } from '../../../../types';
 
 // idCompra do contrato = UASG + modalidade + número da compra + ano (formato do Compras.gov.br)
@@ -72,7 +72,7 @@ describe('buildPendenciasDistribuicao', () => {
         ata('00003/2025', { numeroCompra: '90033', cnpjs: ['33333333000133'], gestorNome: 'Ana' }),
         ata('00009/2020', { faixa: 'EXPIRADO', numeroCompra: '90099', cnpjs: ['99999999000199'] }) // encerrada, nada a distribuir
       ],
-      ataDoContrato: new Map([['vinculado', '00001/2025']]),
+      vinculosDoContrato: new Map([['vinculado', [{ numeroAta: '00001/2025', uasg: '200331', itens: [1] }]]]),
       naoPertencemAAta: new Set(['marcado'])
     });
 
@@ -100,7 +100,7 @@ describe('buildPendenciasDistribuicao', () => {
         ata('00002/2025'), // as duas casam com "varias" (compra e fornecedor iguais)
         ata('00003/2025', { numeroCompra: '90033', cnpjs: ['33333333000133'], gestorNome: 'Ana' })
       ],
-      ataDoContrato: new Map(),
+      vinculosDoContrato: new Map(),
       naoPertencemAAta: new Set()
     });
     expect(p.aVincular.map((i) => [i.contractKey, i.situacao])).toEqual([
@@ -118,7 +118,7 @@ describe('buildPendenciasDistribuicao', () => {
     const p = buildPendenciasDistribuicao({
       contratos: [contrato('duas'), contrato('uma')],
       atas: [ata('00001/2025'), ata('00002/2025')], // as duas casam com os dois contratos
-      ataDoContrato: new Map(),
+      vinculosDoContrato: new Map(),
       naoPertencemAAta: new Set(),
       descartes: new Set(['duas|00001/2025-200331', 'uma|00001/2025-200331', 'uma|00002/2025-200331'])
     });
@@ -131,6 +131,62 @@ describe('buildPendenciasDistribuicao', () => {
       ['duas', '00001/2025-200331'],
       ['uma', '00001/2025-200331'],
       ['uma', '00002/2025-200331']
+    ]);
+  });
+
+  it('vínculo parcial: o contrato vinculado com item ainda fora das atas volta para "A vincular" com a ata que tem esse item', () => {
+    const c = contrato('c33', { gestorNome: 'Daniel' });
+    const atas = [ata('00053/2025', { numerosItens: [10] }), ata('00025/2025', { numerosItens: [11], gestorNome: 'Ana' }), ata('00007/2025', { numerosItens: [3] })];
+    const vinculosDoContrato = new Map([['c33', [{ numeroAta: '00053/2025', uasg: '200331', itens: [10], gestorNome: 'Daniel' }]]]);
+    const p = buildPendenciasDistribuicao({ contratos: [c], atas, vinculosDoContrato, itensDoContrato: new Map([['c33', [10, 11]]]), naoPertencemAAta: new Set() });
+    expect(p.aVincular).toHaveLength(1);
+    expect(p.aVincular[0]).toMatchObject({ contractKey: 'c33', situacao: 'UNICA', itensFaltando: [11] });
+    expect(p.aVincular[0].sugestoes.map((s) => s.numeroAta)).toEqual(['00025/2025']);
+    expect(p.aVincularPorGestor.get('Ana')?.map((x) => x.numeroAta)).toEqual(['00025/2025']);
+
+    // Todos os itens já vinculados, ou sem os itens do contrato no banco: sai da fila, como sempre.
+    const completo = buildPendenciasDistribuicao({ contratos: [c], atas, vinculosDoContrato, itensDoContrato: new Map([['c33', [10]]]), naoPertencemAAta: new Set() });
+    expect(completo.aVincular).toEqual([]);
+    const semItens = buildPendenciasDistribuicao({ contratos: [c], atas, vinculosDoContrato, naoPertencemAAta: new Set() });
+    expect(semItens.aVincular).toEqual([]);
+    // A ata com o item que falta foi descartada: sai da fila.
+    const descartada = buildPendenciasDistribuicao({
+      contratos: [c],
+      atas,
+      vinculosDoContrato,
+      itensDoContrato: new Map([['c33', [10, 11]]]),
+      naoPertencemAAta: new Set(),
+      descartes: new Set(['c33|00025/2025-200331'])
+    });
+    expect(descartada.aVincular).toEqual([]);
+  });
+
+  it('só confere os itens dos contratos vinculados que têm outra ata provável', () => {
+    const vinculosDoContrato = new Map([
+      ['c33', [{ numeroAta: '00053/2025', uasg: '200331', itens: [10] }]],
+      ['sozinho', [{ numeroAta: '00053/2025', uasg: '200331', itens: [1] }]]
+    ]);
+    expect(
+      contratosParaConferirParcial({
+        contratos: [contrato('c33'), contrato('sozinho', SEM_PISTA), contrato('sem-vinculo')],
+        atas: [ata('00053/2025'), ata('00025/2025')],
+        vinculosDoContrato
+      })
+    ).toEqual(['c33']);
+  });
+
+  it('agrupa os vínculos por contrato e ata, com os itens e o gestor da ata', () => {
+    const m = agruparVinculos(
+      [
+        { ataKey: '00053/2025', contractKey: 'c33', uasg: '200331', numeroItem: 10 },
+        { ataKey: '00025/2025', contractKey: 'c33', uasg: '200331', numeroItem: 11 },
+        { ataKey: '00025/2025', contractKey: 'c33', uasg: '200331', numeroItem: 11 }
+      ],
+      (n) => (n === '00025/2025' ? 'Ana' : undefined)
+    );
+    expect(m.get('c33')).toEqual([
+      { numeroAta: '00053/2025', uasg: '200331', itens: [10], gestorNome: undefined },
+      { numeroAta: '00025/2025', uasg: '200331', itens: [11], gestorNome: 'Ana' }
     ]);
   });
 });

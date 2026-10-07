@@ -44,6 +44,8 @@ export interface FilaAta {
   /** Fim da vigência (YYYY-MM-DD). */
   vigenciaFim?: string;
   itens: number;
+  /** Números dos itens da ata no banco (vínculo parcial: a ata tem algum item que falta ao contrato?). */
+  numerosItens?: number[];
 }
 
 export type MotivoSugestao = 'COMPRA_E_FORNECEDOR' | 'COMPRA' | 'FORNECEDOR';
@@ -58,9 +60,24 @@ export interface AtaSugerida {
 /** UNICA: uma ata com mesma compra e fornecedor; VARIAS: mais de uma; PARCIAL: só compra ou só fornecedor; NENHUMA: sem pista. */
 export type SituacaoFila = 'UNICA' | 'VARIAS' | 'PARCIAL' | 'NENHUMA';
 
+/** Ata a que o contrato já está vinculado, com os itens do contrato nela. */
+export interface AtaVinculada {
+  numeroAta: string;
+  uasg?: string;
+  itens: number[];
+  gestorNome?: string;
+}
+
 export interface ItemFila extends FilaContrato {
   situacao: SituacaoFila;
   sugestoes: AtaSugerida[];
+  /**
+   * Vínculo parcial (migration 86): o contrato já está nestas atas, mas ainda tem itens fora delas que estão numa ata
+   * provável (as `sugestoes`). Ex.: 00033/2026 com o item 10 na Ata 53 e o item 11 ainda por vincular na Ata 25.
+   */
+  atasVinculadas?: AtaVinculada[];
+  /** Itens do contrato ainda sem ata (só no vínculo parcial). */
+  itensFaltando?: number[];
 }
 
 export interface AtaSemGestor {
@@ -146,12 +163,77 @@ export function sugerirAtas(contrato: Pick<FilaContrato, 'idCompra' | 'fornecedo
   return { situacao, sugestoes: sugestoes.slice(0, MAX_SUGESTOES) };
 }
 
+/**
+ * Vínculo parcial: o contrato já está em alguma ata, mas tem item que ainda não está em nenhuma e que aparece numa ata
+ * provável (mesma compra e fornecedor) ainda não vinculada. Sem os itens do contrato no banco, não há como saber: nulo.
+ */
+export function vinculoParcial(contrato: FilaContrato, vinculadas: AtaVinculada[], itensDoContrato: number[] | undefined, atas: FilaAta[]): ItemFila | null {
+  if (!itensDoContrato || itensDoContrato.length === 0) return null;
+  const ja = new Set(vinculadas.flatMap((v) => v.itens));
+  const faltando = Array.from(new Set(itensDoContrato.filter((n) => !ja.has(n)))).sort((a, b) => a - b);
+  if (faltando.length === 0) return null;
+  const vinculada = (a: FilaAta) => vinculadas.some((v) => v.numeroAta === a.numeroAta && (!v.uasg || v.uasg === a.uasg));
+  const candidatas = atas.filter((a) => !vinculada(a) && (a.numerosItens ?? []).some((n) => faltando.includes(n)));
+  const sugestoes = sugerirAtas(contrato, candidatas).sugestoes.filter((s) => s.motivo === 'COMPRA_E_FORNECEDOR');
+  if (sugestoes.length === 0) return null;
+  return { ...contrato, situacao: sugestoes.length === 1 ? 'UNICA' : 'VARIAS', sugestoes, atasVinculadas: vinculadas, itensFaltando: faltando };
+}
+
+/**
+ * Contratos já vinculados que têm outra ata provável (mesma compra e fornecedor) ainda não vinculada nem descartada:
+ * só deles a Central busca os itens no banco para ver se o vínculo está incompleto.
+ */
+export function contratosParaConferirParcial(input: {
+  contratos: FilaContrato[];
+  atas: FilaAta[];
+  vinculosDoContrato: Map<string, AtaVinculada[]>;
+  descartes?: Set<string>;
+}): string[] {
+  const descartes = input.descartes ?? new Set<string>();
+  const chaves: string[] = [];
+  for (const contrato of input.contratos) {
+    if (!isVigente(contrato.faixa)) continue;
+    const vinculadas = input.vinculosDoContrato.get(contrato.contractKey);
+    if (!vinculadas || vinculadas.length === 0) continue;
+    const outras = input.atas.filter(
+      (a) => !descartes.has(`${contrato.contractKey}|${a.numeroAta}-${a.uasg}`) && !vinculadas.some((v) => v.numeroAta === a.numeroAta && (!v.uasg || v.uasg === a.uasg))
+    );
+    if (sugerirAtas(contrato, outras).sugestoes.some((s) => s.motivo === 'COMPRA_E_FORNECEDOR')) chaves.push(contrato.contractKey);
+  }
+  return chaves.sort();
+}
+
+/** Vínculos item × contrato agrupados por contrato e ata, com o gestor de cada ata. */
+export function agruparVinculos(
+  vinculos: Array<{ ataKey: string; contractKey: string; uasg?: string; numeroItem?: number }>,
+  gestorDaAta: (numeroAta: string) => string | undefined
+): Map<string, AtaVinculada[]> {
+  const mapa = new Map<string, AtaVinculada[]>();
+  for (const v of vinculos) {
+    const lista = mapa.get(v.contractKey) ?? [];
+    let ata = lista.find((a) => a.numeroAta === v.ataKey && a.uasg === v.uasg);
+    if (!ata) {
+      ata = { numeroAta: v.ataKey, uasg: v.uasg, itens: [], gestorNome: gestorDaAta(v.ataKey) };
+      lista.push(ata);
+    }
+    if (v.numeroItem != null && Number.isFinite(v.numeroItem) && !ata.itens.includes(v.numeroItem)) ata.itens.push(v.numeroItem);
+    mapa.set(v.contractKey, lista);
+  }
+  for (const lista of mapa.values()) for (const a of lista) a.itens.sort((x, y) => x - y);
+  return mapa;
+}
+
 export function buildPendenciasDistribuicao(input: {
   contratos: FilaContrato[];
   /** Todas as atas carregadas (inclusive encerradas: o contrato costuma durar mais que a ata). */
   atas: FilaAta[];
-  /** contract_key → número da ata a que está vinculado (arp_item_contract_links). */
-  ataDoContrato: Map<string, string>;
+  /** contract_key → atas a que já está vinculado, com os itens (arp_item_contract_links). */
+  vinculosDoContrato: Map<string, AtaVinculada[]>;
+  /**
+   * contract_key → números dos itens do contrato (itens_contrato, migration 78). Só dos contratos vinculados que têm
+   * outra ata provável; sem os itens, o contrato vinculado sai da fila como sempre.
+   */
+  itensDoContrato?: Map<string, number[]>;
   /** contract_key marcados "não pertence a ata". */
   naoPertencemAAta: Set<string>;
   /** "contract_key|NÚMERO-UASG" das atas que o coordenador descartou para o contrato. */
@@ -175,12 +257,22 @@ export function buildPendenciasDistribuicao(input: {
 
   for (const contrato of input.contratos) {
     if (!isVigente(contrato.faixa)) continue;
-    const ataVinculada = input.ataDoContrato.get(contrato.contractKey);
-    if (ataVinculada) {
-      push(vinculadosPorAta, ataVinculada, contrato.numero);
+    const descartadaPara = (a: FilaAta) => descartes.has(`${contrato.contractKey}|${a.numeroAta}-${a.uasg}`);
+    const vinculadas = input.vinculosDoContrato.get(contrato.contractKey);
+    if (vinculadas && vinculadas.length > 0) {
+      for (const v of vinculadas) push(vinculadosPorAta, v.numeroAta, contrato.numero);
+      const parcial = vinculoParcial(contrato, vinculadas, input.itensDoContrato?.get(contrato.contractKey), input.atas.filter((a) => !descartadaPara(a)));
+      if (!parcial) continue;
+      for (const ata of parcial.sugestoes) {
+        push(provaveisPorAta, ata.numeroAta, contrato.numero);
+        if (ata.gestorNome) {
+          push(aVincularPorGestor, ata.gestorNome, { contractKey: contrato.contractKey, numero: contrato.numero, numeroAta: ata.numeroAta, uasg: ata.uasg });
+          totalAVincular++;
+        }
+      }
+      aVincular.push(parcial);
       continue;
     }
-    const descartadaPara = (a: FilaAta) => descartes.has(`${contrato.contractKey}|${a.numeroAta}-${a.uasg}`);
     // Atas descartadas para o contrato não entram nas sugestões; sobrando outra ata provável, ele segue em "A vincular".
     const item: ItemFila = { ...contrato, ...sugerirAtas(contrato, input.atas.filter((a) => !descartadaPara(a))) };
     if (input.naoPertencemAAta.has(contrato.contractKey)) {

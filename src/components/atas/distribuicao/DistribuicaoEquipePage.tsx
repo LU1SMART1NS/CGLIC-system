@@ -17,7 +17,8 @@ import type { ItemDaAta } from './vinculoEmMassa';
 import { DivergenciasFila } from './DivergenciasFila';
 import { AvisosVinculoBanner } from './AvisosVinculoBanner';
 import { EquipeFila } from './EquipeFila';
-import { buildPendenciasDistribuicao, type ContratoAVincular, type FilaAta } from './contratosSemAta';
+import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParcial, type ContratoAVincular, type FilaAta, type FilaContrato } from './contratosSemAta';
+import { useNumerosDosItensDosContratos } from '../../../hooks/useItensDoContrato';
 import { FILAS, FILA_INICIAL, type Fila } from './filaComum';
 import { useContratosSemAta } from '../../../hooks/useContratosSemAta';
 import { useDescartesAtaContrato } from '../../../hooks/useDescartesAtaContrato';
@@ -120,7 +121,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
           faixa: prazo.faixa,
           dias: prazo.dias,
           vigenciaFim: arp.dataVigenciaFinal,
-          itens: itens.length
+          itens: itens.length,
+          numerosItens: itens.map((i) => parseInt(i.numeroItem, 10)).filter((n) => Number.isFinite(n))
         };
       }),
     [atas.arps, atas.itemsByAta, atas.gestorByAta]
@@ -128,10 +130,9 @@ export const DistribuicaoEquipePage: React.FC = () => {
 
   // Pendências de distribuição: atas sem gestor, contratos sem gestor e sem ata e contratos a vincular por
   // gestor. Atas encerradas entram nas sugestões (o contrato costuma durar mais que a ata de onde veio).
-  const pendencias = useMemo(() => {
-    const ataDoContrato = new Map(links.map((l) => [l.contractKey, l.ataKey]));
-    return buildPendenciasDistribuicao({
-      contratos: contratos.rows.map((row) => ({
+  const contratosFila = useMemo<FilaContrato[]>(
+    () =>
+      contratos.rows.map((row) => ({
         contractKey: row.contractKey,
         numero: formatContractNumber(row.contract),
         fornecedorNome: row.contract.fornecedorNome,
@@ -143,12 +144,30 @@ export const DistribuicaoEquipePage: React.FC = () => {
         gestorNome: row.gestorNome,
         contract: row.contract
       })),
-      atas: atasFila,
-      ataDoContrato,
-      naoPertencemAAta: new Set(Object.keys(confirmacoesSemAta)),
-      descartes: new Set(Object.keys(descartesAta))
-    });
-  }, [contratos.rows, atasFila, links, confirmacoesSemAta, descartesAta]);
+    [contratos.rows]
+  );
+  const vinculosDoContrato = useMemo(() => agruparVinculos(links, (n) => atas.gestorByAta[n]), [links, atas.gestorByAta]);
+  const descartes = useMemo(() => new Set(Object.keys(descartesAta)), [descartesAta]);
+  const gestorPorContrato = useMemo(() => new Map(contratos.rows.map((r) => [r.contractKey, r.gestorNome])), [contratos.rows]);
+  const gestorDoContrato = React.useCallback((contractKey: string) => gestorPorContrato.get(contractKey), [gestorPorContrato]);
+  // Contrato em mais de uma ata (migration 86): os vinculados com outra ata provável podem estar com item faltando.
+  const paraConferirParcial = useMemo(
+    () => contratosParaConferirParcial({ contratos: contratosFila, atas: atasFila, vinculosDoContrato, descartes }),
+    [contratosFila, atasFila, vinculosDoContrato, descartes]
+  );
+  const { data: itensDoContrato } = useNumerosDosItensDosContratos(paraConferirParcial);
+  const pendencias = useMemo(
+    () =>
+      buildPendenciasDistribuicao({
+        contratos: contratosFila,
+        atas: atasFila,
+        vinculosDoContrato,
+        itensDoContrato,
+        naoPertencemAAta: new Set(Object.keys(confirmacoesSemAta)),
+        descartes
+      }),
+    [contratosFila, atasFila, vinculosDoContrato, itensDoContrato, confirmacoesSemAta, descartes]
+  );
   const atasPorChave = useMemo(() => new Map(atasFila.map((a) => [`${a.numeroAta}-${a.uasg}`, a])), [atasFila]);
   const ataDe = React.useCallback((numeroAta: string, uasg: string) => atasPorChave.get(`${numeroAta}-${uasg}`), [atasPorChave]);
   const aVincularDe = (gestorNome: string): ContratoAVincular[] => pendencias.aVincularPorGestor.get(gestorNome) || [];
@@ -248,7 +267,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
             />
           )}
 
-          <AvisosVinculoBanner podeVer={canAssign} />
+          <AvisosVinculoBanner podeVer={canAssign} gestorDoContrato={gestorDoContrato} gestorDaAta={(ataKey) => atas.gestorByAta[ataKey]} />
 
           <CarteiraSegmentTabs segments={segmentos} active={aba} onSelect={trocarAba} testIdPrefix="distribuicao-aba" ariaLabel="Filas de distribuição" />
 

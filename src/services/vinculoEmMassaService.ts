@@ -1,6 +1,7 @@
 import { saveArpContractItemLinks } from './arpContractLinkService';
 import { syncContractItemQuantity } from './contractItemQuantitySyncService';
 import { syncItemContractEmpenhos } from './itemContractEmpenhoService';
+import { saveContractManagerRpc } from '../adapters/contractManagementRpcAdapter';
 import type { ContractDashboardRecord } from '../types';
 
 /** Um contrato a vincular a itens de uma ata (os mesmos passos do modal "Vincular Contrato" da Ata 360). */
@@ -12,6 +13,11 @@ export interface PlanoVinculo {
   uasg: string;
   /** `quantidade` (lida da API na conferência) só serve para mostrar ao usuário; o vínculo lê de novo ao gravar. */
   itens: Array<{ itemKey: string; numeroItem: string; valorUnitario?: number; quantidade?: number | null }>;
+  /**
+   * Contrato em atas de gestores diferentes: o gestor que o coordenador escolheu. Gravado depois do vínculo (o banco
+   * deixa o contrato como estava quando ele já está em outra ata; migration 86). Só no último plano do contrato.
+   */
+  gestorFinal?: { nome: string; userId?: string | null };
 }
 
 export interface ResultadoVinculo {
@@ -45,6 +51,19 @@ export async function vincularContrato(plano: PlanoVinculo): Promise<ResultadoVi
   }
 
   const avisos: string[] = [];
+  if (plano.gestorFinal) {
+    try {
+      await saveContractManagerRpc({
+        uasg: plano.contract.uasg,
+        numero: plano.contract.numero,
+        ano: Number(plano.contract.ano),
+        gestorNome: plano.gestorFinal.nome,
+        gestorUserId: plano.gestorFinal.userId ?? null
+      });
+    } catch {
+      avisos.push(`gestor ${plano.gestorFinal.nome} (troque na Central)`);
+    }
+  }
   for (const item of plano.itens) {
     let unitPrice = item.valorUnitario;
     try {
