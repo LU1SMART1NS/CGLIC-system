@@ -156,10 +156,6 @@ export function payloadDaNovaNota(n: NovaNotaEmpenho): Record<string, unknown> {
   };
 }
 
-export async function descartarEmpenhoDoContrato(input: { contractKey: string; empenhoId: string; motivo: string }) {
-  return chamar('descartar_empenho_do_contrato', { p_contract_key: input.contractKey, p_empenho_id: input.empenhoId, p_motivo: input.motivo });
-}
-
 export async function restaurarEmpenhoDoContrato(input: { contractKey: string; empenhoId: string }) {
   return chamar('restaurar_empenho_do_contrato', { p_contract_key: input.contractKey, p_empenho_id: input.empenhoId });
 }

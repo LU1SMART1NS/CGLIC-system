@@ -158,7 +158,7 @@ describe('ContractFinancialExecutionSection: vínculo híbrido', () => {
     expect(html).toContain('contract-financial-credor-divergente');
     expect(html.match(/data-testid="contract-financial-credor-diverge"/g)).toHaveLength(1);
     expect(html).toContain('<strong>2024NE000765</strong>');
-    expect(html).toContain('Um gestor pode conferir');
+    expect(html).toContain('retire a nota do contrato no Contratos.gov.br');
   });
 
   it('marca o vínculo feito pela equipe e explica que a sincronização não o remove', () => {
@@ -168,18 +168,19 @@ describe('ContractFinancialExecutionSection: vínculo híbrido', () => {
     expect(html).toContain('contract-financial-manuais');
   });
 
-  it('leitor não vê as ações; gestor vê descartar nos da fonte e desvincular no manual', () => {
+  it('leitor não vê as ações; gestor só desvincula o manual e não descarta o que veio da fonte', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
     let html = renderEq();
-    expect(html).not.toContain('contract-financial-descartar');
+    expect(html).not.toContain('contract-financial-desvincular');
     expect(html).not.toContain('contract-financial-vincular');
 
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     html = renderEq();
-    expect(html.match(/data-testid="contract-financial-descartar"/g)).toHaveLength(2);
+    expect(html).not.toContain('contract-financial-descartar');
+    expect(html).not.toContain('descartar-empenho-modal');
     expect(html.match(/data-testid="contract-financial-desvincular"/g)).toHaveLength(1);
     expect(html).toContain('contract-financial-vincular');
-    expect(html).toContain('use Não é deste contrato na linha');
+    expect(html).toContain('retire a nota do contrato no Contratos.gov.br');
   });
 
   it('lista os descartados com motivo e autor; restaurar só para gestor', () => {
