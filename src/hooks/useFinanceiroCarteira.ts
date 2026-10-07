@@ -27,8 +27,8 @@ export async function invalidarFinanceiro(queryClient: QueryClient): Promise<voi
   await Promise.all(Object.values(FINANCEIRO_QUERY_KEYS).map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
-export function useFaturasCarteira() {
-  return useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.faturas, queryFn: fetchFaturasCarteira, ...OPCOES });
+export function useFaturasCarteira(opts: { enabled?: boolean } = {}) {
+  return useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.faturas, queryFn: fetchFaturasCarteira, enabled: opts.enabled ?? true, ...OPCOES });
 }
 
 /** Empenhos dos contratos, com o pago somado pelas faturas com OB. */

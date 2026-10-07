@@ -113,7 +113,13 @@ export const PAGAMENTO_RULES = {
   /** IN SEGES 77/2022 art. 7º, II: pagamento em até N dias úteis da liquidação. */
   pagamentoMaxDiasUteis: 10,
   /** Portaria DGFNSP 50/2025 art. 5º: o processo chega com pelo menos N dias úteis antes do vencimento. */
-  chegadaMinimaDiasUteis: 8
+  chegadaMinimaDiasUteis: 8,
+  /** Avisar a previsão mensal (Portaria DGFNSP 50/2025 art. 5º, § 2º, III) quando faltar até N dias úteis para o prazo. */
+  previsaoAvisoAntesDiasUteis: 5,
+  /** Contrato marcado como mensal: a nota da competência anterior deve chegar até o dia N do mês. */
+  notaMensalAteDia: 10,
+  /** Entrega prevista: avisar quando passar N dias úteis da data sem nota. */
+  entregaToleranciaDiasUteis: 5
 };
 
 // -----------------------------------------------------------------------------
@@ -159,7 +165,7 @@ export function isLembreteNaJanela(params: { diasRestantes: number; atrasado: bo
 // Parametrização (Administração > Regras de Alertas)
 // -----------------------------------------------------------------------------
 
-export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'horas';
+export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'dia do mês' | 'horas';
 
 export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'sincronizacao';
 
@@ -227,6 +233,9 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'pagamento.liquidacaoMaxDiasUteis', group: 'pagamentos', label: 'Prazo de liquidação', hint: 'Do atesto à liquidação no SIAFI (IN 77, art. 7º, I).', unit: 'dias úteis', min: 1, max: 30 },
   { key: 'pagamento.pagamentoMaxDiasUteis', group: 'pagamentos', label: 'Prazo de pagamento', hint: 'Da liquidação à ordem bancária (IN 77, art. 7º, II).', unit: 'dias úteis', min: 1, max: 30 },
   { key: 'pagamento.chegadaMinimaDiasUteis', group: 'pagamentos', label: 'Chegada mínima antes do vencimento', hint: 'Antecedência do processo em relação ao vencimento (Portaria DGFNSP 50/2025, art. 5º).', unit: 'dias úteis', min: 0, max: 30 },
+  { key: 'pagamento.previsaoAvisoAntesDiasUteis', group: 'pagamentos', label: 'Avisar a previsão mensal quando faltar', hint: 'Dias úteis até o último dia útil do mês (Portaria DGFNSP 50/2025, art. 5º, § 2º, III).', unit: 'dias úteis', min: 0, max: 20 },
+  { key: 'pagamento.notaMensalAteDia', group: 'pagamentos', label: 'Nota de contrato mensal chega até o dia', hint: 'Depois desse dia, o contrato marcado como mensal sem nota do mês anterior vira aviso.', unit: 'dia do mês', min: 1, max: 28 },
+  { key: 'pagamento.entregaToleranciaDiasUteis', group: 'pagamentos', label: 'Tolerância da entrega prevista', hint: 'Dias úteis depois da data prevista sem nota até virar aviso.', unit: 'dias úteis', min: 0, max: 30 },
 
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }
 ];

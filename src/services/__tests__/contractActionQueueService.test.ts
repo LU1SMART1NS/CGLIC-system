@@ -165,4 +165,15 @@ describe('buildContractActionQueue', () => {
       expect(q.items.some((i) => i.kind === 'EMPENHO')).toBe(false);
     });
   });
+
+  describe('expectativa de pagamento', () => {
+    it('nota mensal que não chegou vira ação de pagamento com a gravidade do aviso', () => {
+      const q = buildContractActionQueue({
+        contract, contractKey: KEY, plan: null,
+        avisosPagamento: [{ id: 'AVISO-NOTA-MENSAL-x', tipo: 'NOTA_MENSAL_NAO_CHEGOU', severity: 'URGENTE', title: 'Nota de setembro ainda não chegou', description: 'd', badgeLabel: 'Nota de setembro não chegou', contractKey: KEY, diasRelevantes: -12, targetUrl: '/x' }]
+      });
+      expect(q.items.find((i) => i.id === 'AVISO-NOTA-MENSAL-x')).toMatchObject({ kind: 'PAGAMENTO', severity: 'URGENTE', badgeLabel: 'Nota de setembro não chegou' });
+      expect(q.counts.URGENTE).toBeGreaterThanOrEqual(1);
+    });
+  });
 });

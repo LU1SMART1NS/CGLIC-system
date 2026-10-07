@@ -15,6 +15,7 @@ import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '..
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
 import { dataBR, normalizarBusca, rotuloDoMes } from './financeiroFormat';
 import { AjustarLinhaModal, IncluirLinhaModal, RegistrarEnvioModal } from './PrevisaoMesModais';
+import { PrevistoPagoMes } from './PrevistoPagoMes';
 
 
 interface FiltrosPrevisaoMes {
@@ -101,6 +102,9 @@ export const PrevisaoMes: React.FC = () => {
   hoje.setHours(0, 0, 0, 0);
   const diasAtePrazo = differenceInBusinessDays(parseDateBRT(prazo) ?? hoje, hoje);
   const prazoPassou = (parseDateBRT(prazo)?.getTime() ?? 0) < hoje.getTime();
+  // Previsto × pago: só quando o mês já começou e a previsão dele foi enviada.
+  const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+  const mostrarPrevistoPago = Boolean(envio) && mes <= mesAtual;
 
   const copiar = async () => {
     const paraCopiar = lista.filter((l) => !l.retirada && !l.semValor);
@@ -151,6 +155,7 @@ export const PrevisaoMes: React.FC = () => {
           {prazoPassou ? 'o prazo passou' : diasAtePrazo === 0 ? 'vence hoje' : `faltam ${diasAtePrazo} ${diasAtePrazo === 1 ? 'dia útil' : 'dias úteis'}`} · ainda não enviada.
         </NoticeBar>
       )}
+      {mostrarPrevistoPago && envio && <PrevistoPagoMes mes={mes} envio={envio} contrato={contrato} escopo={escopo} />}
       {totalEmendas > 0 && (
         <NoticeBar tone={prazoEmenda ? 'info' : 'warning'} testId="previsao-emendas">
           Emendas parlamentares nesta previsão: {formatCurrency(totalEmendas)}.{' '}

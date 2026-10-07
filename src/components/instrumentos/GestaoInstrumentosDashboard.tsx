@@ -6,6 +6,7 @@ import { useAllContractManagers } from '../../hooks/useAllContractManagers';
 import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
 import { useRefreshItemSaldos } from '../../hooks/useRefreshItemSaldos';
 import { useSincronizacaoContratos } from '../../hooks/useSincronizacaoContratos';
+import { avisoComoItemDeAtencao, useAvisosPagamentoGerais } from '../../hooks/useAvisosPagamento';
 import { useAuth } from '../../context/AuthContext';
 import { GestaoInstrumentosHeader } from './GestaoInstrumentosHeader';
 import { GestaoInstrumentosSummaryCards, type GestaoInstrumentosCardId } from './GestaoInstrumentosSummaryCards';
@@ -26,7 +27,7 @@ const UASGS = UASGS_CGLIC;
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
   SALDOS: ['ATA_CRITICA'],
   REAJUSTES: ['REAJUSTE_RADAR'],
-  PAGAMENTOS: ['PAGAMENTO_CRITICO'],
+  PAGAMENTOS: ['PAGAMENTO_CRITICO', 'PAGAMENTO_PREVISTO'],
   TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA'],
   LEMBRETES: ['LEMBRETE']
 };
@@ -105,6 +106,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // Gestor de Saldo (domínio de alocações, sem contratos): enxerga só os alertas de saldo das Atas.
   const { role } = useAuth();
   const saldosOnly = role === 'gestor_saldos';
+  // Expectativa de pagamento (Portaria 50): avisos calculados na tela a partir das marcas dos contratos.
+  const { avisos: avisosPagamento } = useAvisosPagamentoGerais({ enabled: !saldosOnly });
 
   const allItems = useMemo<AttentionItemWithUasg[]>(() => {
     const merged: AttentionItemWithUasg[] = [];
@@ -116,9 +119,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         merged.push({ ...item, uasg });
       }
     }
+    for (const a of avisosPagamento) merged.push(avisoComoItemDeAtencao(a, UASGS[0]));
     return merged;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, saldosOnly]);
+  }, [dash200330.readModel, dash200331.readModel, saldosOnly, avisosPagamento]);
 
   const tabCounts = useMemo(() => {
     return {

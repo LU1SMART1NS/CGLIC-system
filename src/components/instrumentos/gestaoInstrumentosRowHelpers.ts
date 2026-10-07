@@ -14,7 +14,7 @@ export function getLookupKey(item: AttentionItemWithUasg): string {
 }
 
 export interface InstrumentoInfo {
-  tipo: 'ARP' | 'Contrato';
+  tipo: 'ARP' | 'Contrato' | 'Pagamentos';
   label: string;
 }
 
@@ -39,6 +39,9 @@ export function normalizeAtaLabel(raw: string): string {
  * do centralPrazosService — mas o instrumento em atenção continua sendo a Ata, não um contrato.
  */
 export function getInstrumentoInfo(item: DashboardAttentionItem): InstrumentoInfo {
+  if (item.category === 'PAGAMENTO_PREVISTO' && !item.contractKey) {
+    return { tipo: 'Pagamentos', label: 'Previsão mensal' };
+  }
   if (item.arpKey) {
     return { tipo: 'ARP', label: item.numeroContrato || item.numeroAta ? normalizeAtaLabel(item.numeroContrato || item.numeroAta || '') : item.title };
   }
@@ -62,6 +65,7 @@ export interface MotivoInfo {
 const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   ATA_CRITICA: { label: 'Saldo em Atenção', color: 'var(--color-success)', bg: '#ecfdf5' },
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
+  PAGAMENTO_PREVISTO: { label: 'Pagamento Previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   TAREFA_ATRASADA: { label: 'Tarefa Atrasada', color: 'var(--color-danger-text-strong)', bg: 'var(--color-danger-bg)' },
   TAREFA_PROXIMA: { label: 'Tarefa Próxima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
@@ -129,6 +133,8 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
       return { label: 'Verificar Saldo', targetUrl: ataItemUrl(item) };
     case 'PAGAMENTO_CRITICO':
       return { label: 'Abrir Pagamento', targetUrl: '/pagamentos' };
+    case 'PAGAMENTO_PREVISTO':
+      return { label: item.contractKey ? 'Abrir Pagamentos do Contrato' : 'Abrir Previsão', targetUrl: item.targetUrl || '/pagamentos' };
     case 'REAJUSTE_RADAR':
       return { label: 'Analisar Reajuste', targetUrl: contractItemUrl(item) };
     case 'TAREFA_ATRASADA':

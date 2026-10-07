@@ -7,6 +7,8 @@ import { useReminderDismissals } from './useReminderDismissals';
 import { buildAtaItemPath } from './useAta';
 import { formatItemKeyLabel, parseItemKey } from '../utils/itemKeyParts';
 import { getContractManagementKey } from '../services/contractManagementService';
+import { parseDateBRT } from '../services/temporalEngineService';
+import { useAvisosPagamentoDoContrato } from './useAvisosPagamento';
 
 const EMPTY_QUEUE: ContractActionQueue = {
   items: [],
@@ -23,6 +25,9 @@ export function useContractActionQueue(
   const { cycles, isLoading } = useContractPaymentFollowUp(contractKey);
   const { dismissedIds } = useReminderDismissals('CONTRATO', contractKey);
   const { data: itemLinks } = useContractEmpenhoItemLinks(contractKey);
+  const fimVigencia = parseDateBRT(contract?.dataVigenciaFim);
+  const vigente = Boolean(contract) && !(fimVigencia && fimVigencia.getTime() < new Date().setHours(0, 0, 0, 0));
+  const avisosPagamento = useAvisosPagamentoDoContrato(contractKey, cycles, vigente);
 
   const pendingEmpenhos = useMemo(() => {
     const out: PendingEmpenhoQuantity[] = [];
@@ -41,8 +46,8 @@ export function useContractActionQueue(
   }, [itemLinks]);
 
   const queue = useMemo(
-    () => (contract ? buildContractActionQueue({ contract, contractKey, plan, paymentCycles: cycles, pendingEmpenhos, dismissedReminderIds: dismissedIds }) : EMPTY_QUEUE),
-    [contract, contractKey, plan, cycles, pendingEmpenhos, dismissedIds]
+    () => (contract ? buildContractActionQueue({ contract, contractKey, plan, paymentCycles: cycles, pendingEmpenhos, avisosPagamento, dismissedReminderIds: dismissedIds }) : EMPTY_QUEUE),
+    [contract, contractKey, plan, cycles, pendingEmpenhos, avisosPagamento, dismissedIds]
   );
 
   return { queue, contractKey, isLoading };

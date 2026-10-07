@@ -6,6 +6,7 @@ import { calculateAttentionSummary } from './dashboardService';
 import { buildCentralPrazosItems } from './centralPrazosService';
 import { parseDateBRT } from './temporalEngineService';
 import { isLembreteNaJanela } from '../config/alertRules';
+import type { AvisoPagamento } from './avisosPagamentoService';
 
 export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE' | 'EMPENHO';
 
@@ -76,10 +77,12 @@ export function buildContractActionQueue(params: {
   plan: ContractTaskPlan | null;
   paymentCycles?: PaymentFollowUpCycle[];
   pendingEmpenhos?: PendingEmpenhoQuantity[];
+  /** Expectativa de pagamento: nota mensal que não chegou, entrega prevista sem nota (avisosPagamentoService). */
+  avisosPagamento?: AvisoPagamento[];
   dismissedReminderIds?: string[];
   currentDate?: Date;
 }): ContractActionQueue {
-  const { contractKey, plan, paymentCycles = [], pendingEmpenhos = [], dismissedReminderIds = [], currentDate } = params;
+  const { contractKey, plan, paymentCycles = [], pendingEmpenhos = [], avisosPagamento = [], dismissedReminderIds = [], currentDate } = params;
   const dismissed = new Set(dismissedReminderIds);
   const dispensados: ContractActionItem[] = [];
   // Vigência encerrada: os lembretes de prorrogação (D-180/D-60) perdem o sentido.
@@ -165,6 +168,19 @@ export function buildContractActionQueue(params: {
       description: e.itemLabel,
       badgeLabel: 'Pendente',
       href: e.href
+    });
+  }
+
+  for (const a of avisosPagamento) {
+    items.push({
+      id: a.id,
+      kind: 'PAGAMENTO',
+      severity: a.severity,
+      title: a.title,
+      description: a.description,
+      badgeLabel: a.badgeLabel,
+      diasRelevantes: a.diasRelevantes,
+      dataAlvo: a.dataAlvo
     });
   }
 
