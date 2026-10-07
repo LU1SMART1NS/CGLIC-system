@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { FinancialExecutionRoute } from '../FinancialExecutionRoute';
+import * as sincronizacaoModule from '../../hooks/useSincronizacaoEmpenhos';
 import * as managementHookModule from '../../hooks/useManagementDashboard';
 import type { ManagementDashboardReadModel } from '../../types/managementDashboard';
 
@@ -40,16 +41,12 @@ vi.mock('../../hooks/useContractsDashboard', () => ({
   }))
 }));
 
-vi.mock('../../hooks/useBatchSyncContractEmpenhos', () => ({
-  contratosParaSincronizar: vi.fn(() => []),
-  useBatchSyncContractEmpenhos: vi.fn(() => ({
-    run: vi.fn(),
-    retryFailed: vi.fn(),
-    cancel: vi.fn(),
-    isRunning: false,
-    progress: null,
-    summary: null,
-    resetSummary: vi.fn()
+vi.mock('../../hooks/useSincronizacaoEmpenhos', () => ({
+  useSincronizacaoEmpenhos: vi.fn(() => ({
+    podeForcar: true,
+    sincronizando: false,
+    ultimoSucessoEm: null,
+    atualizar: vi.fn()
   }))
 }));
 
@@ -170,9 +167,34 @@ describe('FinancialExecutionRoute — FASE 9-I: Empenhos & Execução', () => {
 
     const html = renderToStaticMarkup(<FinancialExecutionRoute />);
 
-    expect(html).toContain('Empenhos e Execução');
-    expect(html).toContain('Execução financeira oficial dos empenhos, liquidações e pagamentos');
+    expect(html).toContain('Empenhos');
+    expect(html).toContain('Execução oficial dos empenhos, liquidações e pagamentos');
     expect(html).toContain('Atualizar');
+  });
+
+  it('1b. perfil que não força a atualização vê só o indicador, sem botão nem lote', () => {
+    vi.mocked(managementHookModule.useManagementDashboard).mockReturnValue({
+      readModel: mockFinancialReadModel,
+      data: mockFinancialReadModel,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      refresh: vi.fn()
+    });
+    vi.mocked(sincronizacaoModule.useSincronizacaoEmpenhos).mockReturnValue({
+      podeForcar: false,
+      sincronizando: false,
+      ultimoSucessoEm: '2026-10-07T08:44:00Z',
+      atualizar: vi.fn()
+    } as never);
+
+    const html = renderToStaticMarkup(<FinancialExecutionRoute />);
+
+    expect(html).toContain('Atualizado');
+    expect(html).not.toContain('data-testid="financial-execution-refresh-btn"');
+    expect(html).toContain('financial-execution-refresh-btn-indicador');
+    expect(html).not.toContain('Sincronizar Todos');
   });
 
   it('2. deve encapsular o ManagementFinancialExecution e renderizar o funil e os saldos', () => {

@@ -38,11 +38,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       ]);
     });
 
-    it('Financeiro tem as abas Pagamentos e Empenhos e Execução', () => {
+    it('Financeiro tem as abas Empenhos e Pagamentos', () => {
       const area = navigationConfig.find((i) => i.id === 'execucao-financeira')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
-        ['Pagamentos', '/pagamentos'],
-        ['Empenhos e Execução', '/empenhos']
+        ['Empenhos', '/empenhos'],
+        ['Pagamentos', '/pagamentos']
       ]);
       expect(area.children!.every((c) => c.status === 'active')).toBe(true);
     });
@@ -137,7 +137,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const crumbs = getBreadcrumbs('/empenhos');
       expect(crumbs).toEqual([
         { label: 'Visão Geral', route: '/instrumentos' },
-        { label: 'Empenhos e Execução', route: '/empenhos' }
+        { label: 'Empenhos', route: '/empenhos' }
       ]);
     });
 
@@ -259,7 +259,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Itens');
       expect(labels).toContain('Modelos de Gestão');
       expect(labels).toContain('Pagamentos');
-      expect(labels).toContain('Empenhos e Execução');
+      expect(labels).toContain('Empenhos');
 
       // A distribuição por gestor é visão de coordenação: o gestor já vê só a própria carteira.
       expect(labels).not.toContain('Distribuição');
@@ -285,7 +285,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       // Configurações aparece só com o cadastro de unidades internas, que ele mantém
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);
       expect(labels).not.toContain('Pagamentos');
-      expect(labels).not.toContain('Empenhos e Execução');
+      expect(labels).not.toContain('Empenhos');
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
 
@@ -302,7 +302,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Atas');
       expect(labels).toContain('Contratos');
       expect(labels).toContain('Pagamentos');
-      expect(labels).toContain('Empenhos e Execução');
+      expect(labels).toContain('Empenhos');
       expect(labels).toContain('Itens');
       expect(labels).toContain('Distribuição');
 

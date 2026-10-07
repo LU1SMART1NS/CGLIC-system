@@ -14,7 +14,7 @@ describe('FASE 9-J — Homologação Integrada do Frontend com Dados Reais', () 
       { path: '/itens', expectedBreadcrumb: 'Carteira de Itens' },
       { path: '/contratos', expectedBreadcrumb: 'Carteira de Contratos' },
       { path: '/contratos/200331-00132-2024', expectedBreadcrumb: 'Contrato 200331-00132-2024' },
-      { path: '/empenhos', expectedBreadcrumb: 'Empenhos e Execução' },
+      { path: '/empenhos', expectedBreadcrumb: 'Empenhos' },
       { path: '/pagamentos', expectedBreadcrumb: 'Pagamentos' }
     ];
 

@@ -140,7 +140,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
     { id: 'acoes', label: queue.items.length > 0 ? `Ações (${queue.items.length})` : 'Ações' },
     { id: 'plano', label: 'Plano de gestão' },
     { id: 'itens', label: totalItens > 0 ? `Itens (${totalItens})` : 'Itens' },
-    { id: 'financeiro', label: 'Orçamentário' },
+    { id: 'financeiro', label: 'Empenhos' },
     { id: 'pagamentos', label: 'Pagamentos' },
     { id: 'historico', label: 'Histórico' }
   ];
