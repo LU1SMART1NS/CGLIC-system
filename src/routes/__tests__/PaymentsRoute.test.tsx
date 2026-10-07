@@ -1,180 +1,109 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { PaymentsRoute } from '../PaymentsRoute';
-import * as managementHookModule from '../../hooks/useManagementDashboard';
-import type { ManagementDashboardReadModel } from '../../types/managementDashboard';
+import * as financeiroModule from '../../hooks/useFinanceiroCarteira';
+import { montarPagamentosCarteira, type FaturaCarteira } from '../../services/financeiroCarteiraService';
+import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 
-vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
-  useLocation: () => ({ pathname: '/pagamentos' }),
-  useSearchParams: () => [new URLSearchParams(), vi.fn()]
+vi.mock('../../hooks/useFinanceiroCarteira', () => ({ usePagamentosCarteira: vi.fn(), useSincronizacaoPagamentos: vi.fn() }));
+vi.mock('../../hooks/useContractsPortfolio', () => ({
+  useContractsPortfolio: vi.fn(() => ({
+    rows: [{ contractKey: '200331-00094-2022', contract: { numero: '00094', ano: 2022, fornecedorNome: 'MIRANDA TURISMO' }, gestorNome: 'Marina Costa' }],
+    isLoading: false,
+    isLoadingScope: false
+  }))
 }));
+vi.mock('../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'admin' })) }));
 
-vi.mock('../../hooks/useManagementDashboard', () => ({
-  useManagementDashboard: vi.fn()
-}));
+const fatura = (over: Partial<FaturaCarteira>): FaturaCarteira => ({
+  idFatura: 1,
+  contractKey: '200331-00094-2022',
+  numero: '202600000000231',
+  tipo: 'Nota Fiscal',
+  emissao: '2026-09-10',
+  vencimento: '2026-10-10',
+  valorLiquido: 112002.91,
+  dataLiquidacao: null,
+  situacao: 'Pendente',
+  cancelada: false,
+  np: null,
+  referencia: '09/2026',
+  ordensBancarias: null,
+  obEmissao: null,
+  paga: false,
+  npContratos: 0,
+  empenhos: '2026NE000412',
+  ...over
+});
 
-vi.mock('../../hooks/useAllContractManagers', () => ({
-  useAllContractManagers: vi.fn(() => ({ data: {}, isLoading: false }))
-}));
+const ciclo = {
+  cycleKey: 'C1',
+  contractKey: '200331-00094-2022',
+  competencia: '2026-10',
+  status: 'RECEBIDO',
+  input: { contractKey: '200331-00094-2022', documentoAtestoSei: '4512345', valorAtesto: 5000, dataRecebimento: '2026-10-07', responsavelNome: 'Ana Souza' },
+  etapaAtual: { etapa: 'CONFERENCIA', dono: 'CGLIC', dataAlvo: '2026-10-09', diasUteisRestantes: 2, atrasado: false },
+  alerts: []
+} as unknown as PaymentFollowUpCycle;
 
-vi.mock('../../hooks/useAtaManagers', () => ({
-  useAllAtaManagers: vi.fn(() => ({ data: {}, isLoading: false })),
-  useArpItemContractLinks: vi.fn(() => ({ data: [], isLoading: false }))
-}));
+const render = (url = '/pagamentos') =>
+  renderToStaticMarkup(
+    <MemoryRouter initialEntries={[url]}>
+      <PaymentsRoute />
+    </MemoryRouter>
+  );
 
-describe('PaymentsRoute — FASE 9-H: Pagamentos / Faturamento & CGOFI', () => {
+describe('Financeiro → Pagamentos', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.mocked(financeiroModule.useSincronizacaoPagamentos).mockReturnValue({
+      podeForcar: true,
+      sincronizando: false,
+      ultimoSucessoEm: null,
+      atualizar: vi.fn()
+    } as never);
+    vi.mocked(financeiroModule.usePagamentosCarteira).mockReturnValue({
+      rows: montarPagamentosCarteira(
+        [ciclo],
+        [
+          fatura({}),
+          fatura({ idFatura: 2, numero: 'NF-LIQ', dataLiquidacao: '2026-10-01', np: '2026NP000811', situacao: 'Siafi Apropriado' }),
+          fatura({ idFatura: 3, numero: 'NF-PAGA', dataLiquidacao: '2026-09-01', paga: true, ordensBancarias: '2026OB018840', obEmissao: '2026-09-03' })
+        ]
+      ),
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn()
+    } as never);
   });
 
-  const mockPaymentsReadModel: ManagementDashboardReadModel = {
-    uasg: '200331',
-    dataCalculo: '2026-09-24T10:00:00.000Z',
-    executive: {
-      totalContratos: 5,
-      contratosAtivos: 4,
-      contratosEncerrados: 1,
-      contratosEmProrrogacao: 0,
-      valorOriginalTotal: 1000000,
-      valorVigenteTotal: 1100000,
-      deltaAcumuladoTotal: 100000,
-      percentualVariacaoAcumulada: 10
-    },
-    deadlines: {
-      vencendo30Dias: 0,
-      vencendo60Dias: 0,
-      vencendo90Dias: 0,
-      contratosVencidos: 0,
-      prorrogaçõesEmCurso: 0,
-      itensVencendo: []
-    },
-    attention: {
-      totalAlertasAtivos: 2,
-      criticalCount: 1,
-      overdueTasksCount: 0,
-      upcomingTasksCount: 0,
-      paymentAlertsCount: 1,
-      reajusteAlertsCount: 0,
-      atasCriticasCount: 0,
-      radarsReajuste: [],
-      radarsUrgentesCount: 0,
-      pagamentosCriticosCount: 1,
-      tarefasVencidasCount: 0,
-      prazosKpis: {} as any,
-      items: []
-    },
-    financial: {
-      totalEmpenhado: 500000,
-      totalLiquidado: 300000,
-      totalPago: 200000,
-      saldoALiquidar: 200000,
-      saldoAPagar: 100000,
-      saldoNaoExecutado: 300000,
-      totalRpInscrito: 0,
-      totalRpPago: 0,
-      saldoRpPendente: 0,
-      taxaLiquidacaoPercentual: 60,
-      taxaPagamentoPercentual: 66.67,
-      burnRateMensalDisponivel: false
-    },
-    arp: {
-      totalAtas: 2,
-      totalItens: 4,
-      itensCriticosCount: 0,
-      topItensConsumidos: []
-    },
-    payments: {
-      totalCiclos: 2,
-      ciclosAbertosCount: 1,
-      ciclosConcluidosCount: 1,
-      ciclosCriticosCount: 1,
-      ciclosAtrasoCgofiCount: 0,
-      faturasVencidasCount: 1,
-      faturasVenceHojeCount: 0,
-      faturasProximasVencimentoCount: 0,
-      envioCgofiAtrasadoCount: 0,
-      documentacaoPendenteCount: 1,
-      margemEnvioEstreitaCount: 0,
-      distribuicaoPorEstado: {
-        RECEBIDO: 0,
-        COM_PENDENCIA: 1,
-        CONFERIDO: 0,
-        ENVIADO_CGOFI: 0,
-        DEVOLVIDO: 0,
-        PAGO: 1,
-        CANCELADO: 0
-      },
-      ciclosRecentes: [],
-      ciclosAbertosDetalhe: [
-        {
-          cycleKey: '102025-PGTO-202609-NF100',
-          contractKey: '102025',
-          competencia: '2026-09',
-          status: 'COM_PENDENCIA',
-          input: {
-            contractKey: '102025',
-            competencia: '2026-09',
-            dataRecebimento: '2026-09-10',
-            dataAssinaturaAtesto: '2026-09-10',
-            dataVencimentoFatura: '2026-09-20',
-            documentoAtestoSei: 'Doc SEI 100200',
-            numeroProcessoPagamentoSei: '08200.000100/2026-10',
-            valorAtesto: 45000,
-            responsavelNome: 'Carlos Analista'
-          },
-          prazos: {
-            diasUteisAteVencimento: -4,
-            janelaTotalDiasUteis: 8,
-            diasSemRespostaCgofi: 0,
-            margemEnvioDiasUteis: -4,
-            isVencida: true,
-            statusPrazo: 'VENCIDO'
-          },
-          alerts: [],
-          criadoEm: '2026-09-10T09:00:00Z',
-          atualizadoEm: '2026-09-24T09:00:00Z'
-        }
-      ],
-      tempoMedioCgofiDisponivel: true,
-      tempoMedioCgofiDias: 3.2
-    }
-  };
-
-  it('1. deve renderizar a página de pagamentos com título padronizado e botão de atualizar', () => {
-    vi.mocked(managementHookModule.useManagementDashboard).mockReturnValue({
-      readModel: mockPaymentsReadModel,
-      data: mockPaymentsReadModel,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    });
-
-    const html = renderToStaticMarkup(<PaymentsRoute />);
-
-    expect(html).toContain('Pagamentos');
-    expect(html).toContain('Acompanhamento operacional do ciclo de faturamento, liquidação de atestos');
-    expect(html).toContain('Atualizar');
+  it('abre em "Precisa de ação" com o ciclo da CGLIC; segmentos agrupam as etapas', () => {
+    const html = render();
+    expect(html).toContain('data-testid="pagamentos-situacao-ACAO"');
+    expect(html).toMatch(/Precisa de ação<span[^>]*>1</);
+    // Em tramitação: a fatura não liquidada e a liquidada aguardando OB.
+    expect(html).toMatch(/Em tramitação<span[^>]*>2</);
+    expect(html).toMatch(/Pagas<span[^>]*>1</);
+    expect(html).toContain('data-testid="pagamentos-filter-etapa"');
+    expect(html).toContain('Atesto 4512345');
+    expect(html).toContain('Conferir até 09/10/2026');
+    expect(html).not.toContain('NF-PAGA');
+    expect(html).toContain('carteira-row-link');
   });
 
-  it('2. deve encapsular o componente ManagementPaymentsOverview e exibir os ciclos', () => {
-    vi.mocked(managementHookModule.useManagementDashboard).mockReturnValue({
-      readModel: mockPaymentsReadModel,
-      data: mockPaymentsReadModel,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    });
+  it('faturas liquidadas mostram a NP; pagas mostram a OB', () => {
+    const liquidadas = render('/pagamentos?situacao=TRAMITACAO&etapa=AGUARDANDO_OB');
+    expect(liquidadas).toContain('2026NP000811');
+    const pagas = render('/pagamentos?situacao=PAGA');
+    expect(pagas).toContain('2026OB018840');
+    expect(pagas).toContain('OB em 03/09/2026');
+  });
 
-    const html = renderToStaticMarkup(<PaymentsRoute />);
-
-    expect(html).toContain('Contrato 102025');
-    expect(html).toContain('Doc SEI 100200');
-    expect(html).toContain('Carlos Analista');
-    expect(html).toContain('45.000,00');
+  it('não mostra os quadros antigos de CGOFI nem o fluxo de tramitação', () => {
+    const html = render('/pagamentos?situacao=TODOS');
+    expect(html).not.toContain('Gargalo CGOFI');
+    expect(html).not.toContain('Fluxo Operacional');
+    expect(html).not.toContain('Ver contrato');
   });
 });

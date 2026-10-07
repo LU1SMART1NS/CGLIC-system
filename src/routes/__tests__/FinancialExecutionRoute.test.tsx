@@ -1,250 +1,118 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { FinancialExecutionRoute } from '../FinancialExecutionRoute';
 import * as sincronizacaoModule from '../../hooks/useSincronizacaoEmpenhos';
-import * as managementHookModule from '../../hooks/useManagementDashboard';
-import type { ManagementDashboardReadModel } from '../../types/managementDashboard';
+import * as financeiroModule from '../../hooks/useFinanceiroCarteira';
+import * as authModule from '../../context/AuthContext';
+import type { EmpenhoCarteiraRow } from '../../services/financeiroCarteiraService';
 
-vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
-  useLocation: () => ({ pathname: '/empenhos' }),
-  useSearchParams: () => [new URLSearchParams(), vi.fn()]
-}));
-
-vi.mock('@tanstack/react-query', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
-  useQuery: vi.fn(() => ({ data: undefined }))
-}));
-
-vi.mock('../../hooks/useManagementDashboard', () => ({
-  useManagementDashboard: vi.fn()
-}));
-
-vi.mock('../../hooks/useAllContractManagers', () => ({
-  useAllContractManagers: vi.fn(() => ({ data: {}, isLoading: false }))
-}));
-
-vi.mock('../../hooks/useAtaManagers', () => ({
-  useAllAtaManagers: vi.fn(() => ({ data: {}, isLoading: false })),
-  useArpItemContractLinks: vi.fn(() => ({ data: [], isLoading: false }))
-}));
-
-vi.mock('../../hooks/useContractsDashboard', () => ({
-  useContractsDashboard: vi.fn(() => ({
-    data: [],
-    isLoading: false,
-    isFetching: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-    refresh: vi.fn()
-  }))
-}));
-
-vi.mock('../../hooks/useSincronizacaoEmpenhos', () => ({
-  useSincronizacaoEmpenhos: vi.fn(() => ({
-    podeForcar: true,
-    sincronizando: false,
-    ultimoSucessoEm: null,
-    atualizar: vi.fn()
-  }))
-}));
-
-vi.mock('../../context/AuthContext', () => ({
-  useAuth: vi.fn(() => ({
-    user: { id: 'admin-user' },
-    session: null,
-    loading: false,
-    role: 'admin',
-    roleStatus: 'ready',
-    signOut: vi.fn()
-  }))
-}));
-
-const mockFinancialReadModel: ManagementDashboardReadModel = {
-  uasg: '200331',
-  dataCalculo: '2026-09-24T12:00:00Z',
-  executive: {
-    totalContratos: 10,
-    contratosAtivos: 8,
-    contratosEncerrados: 2,
-    contratosEmProrrogacao: 1,
-    valorOriginalTotal: 5000000,
-    valorVigenteTotal: 5500000,
-    deltaAcumuladoTotal: 500000,
-    percentualVariacaoAcumulada: 10
-  },
-  deadlines: {
-    vencendo30Dias: 0,
-    vencendo60Dias: 1,
-    vencendo90Dias: 2,
-    contratosVencidos: 0,
-    prorrogaçõesEmCurso: 1,
-    itensVencendo: []
-  },
-  attention: {
-    totalAlertasAtivos: 1,
-    criticalCount: 0,
-    overdueTasksCount: 0,
-    upcomingTasksCount: 0,
-    paymentAlertsCount: 0,
-    reajusteAlertsCount: 0,
-    atasCriticasCount: 0,
-    radarsReajuste: [],
-    radarsUrgentesCount: 0,
-    pagamentosCriticosCount: 0,
-    tarefasVencidasCount: 0,
-    prazosKpis: {} as any,
-    items: []
-  },
-  financial: {
-    totalEmpenhado: 4000000,
-    totalLiquidado: 2800000,
-    totalPago: 2400000,
-    saldoALiquidar: 1200000,
-    saldoAPagar: 400000,
-    saldoNaoExecutado: 1600000,
-    totalRpInscrito: 300000,
-    totalRpPago: 100000,
-    saldoRpPendente: 200000,
-    rppInscrito: 200000,
-    rppPago: 80000,
-    rpnpInscrito: 100000,
-    rpnpPago: 20000,
-    taxaLiquidacaoPercentual: 70.00,
-    taxaPagamentoPercentual: 85.71,
-    taxaPagamentoSobreEmpenhadoPercentual: 60.00,
-    topEmpenhos: [
-      {
-        empenhoKey: '2026NE000500',
-        numeroEmpenho: '2026NE000500',
-        ano: 2026,
-        contratoNumero: '12/2025',
-        fornecedorNome: 'Empresa Delta Serviços Ltda',
-        valorEmpenhado: 2500000,
-        valorLiquidado: 1750000,
-        valorPago: 1500000,
-        saldoALiquidar: 750000,
-        saldoAPagar: 250000,
-        saldoNaoExecutado: 1000000,
-        percentualExecutado: 60.00
-      }
+vi.mock('../../hooks/useFinanceiroCarteira', () => ({ useEmpenhosCarteira: vi.fn() }));
+vi.mock('../../hooks/useSincronizacaoEmpenhos', () => ({ useSincronizacaoEmpenhos: vi.fn() }));
+vi.mock('../../hooks/useContractsPortfolio', () => ({
+  useContractsPortfolio: vi.fn(() => ({
+    rows: [
+      { contractKey: '200331-00094-2022', contract: { numero: '00094', ano: 2022, fornecedorNome: 'MIRANDA TURISMO' }, gestorNome: 'Marina Costa' }
     ],
-    burnRateMensalDisponivel: false
-  },
-  arp: {
-    totalAtas: 2,
-    totalItens: 8,
-    itensCriticosCount: 0,
-    topItensConsumidos: []
-  },
-  payments: {
-    totalCiclos: 2,
-    ciclosAbertosCount: 1,
-    ciclosConcluidosCount: 1,
-    ciclosCriticosCount: 0,
-    ciclosAtrasoCgofiCount: 0,
-    ciclosRecentes: [],
-    tempoMedioCgofiDisponivel: false
-  }
-};
+    isLoading: false,
+    isLoadingScope: false
+  }))
+}));
+vi.mock('../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'admin' })) }));
 
-describe('FinancialExecutionRoute — FASE 9-I: Empenhos & Execução', () => {
+const empenho = (over: Partial<EmpenhoCarteiraRow>): EmpenhoCarteiraRow => ({
+  empenhoId: 'e1',
+  numero: '2026NE000027',
+  ano: 2026,
+  uasgEmitente: '200331',
+  dataEmissao: '2026-01-07',
+  credorNome: 'MIRANDA TURISMO',
+  credorDocumento: '24.929.614/0001-10',
+  valorEmpenhado: 1000,
+  valorPago: 400,
+  saldo: 600,
+  contractKeys: ['200331-00094-2022'],
+  ...over
+});
+
+const render = (url = '/empenhos') =>
+  renderToStaticMarkup(
+    <MemoryRouter initialEntries={[url]}>
+      <FinancialExecutionRoute />
+    </MemoryRouter>
+  );
+
+describe('Financeiro → Empenhos', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.mocked(sincronizacaoModule.useSincronizacaoEmpenhos).mockReturnValue({
+      podeForcar: true,
+      sincronizando: false,
+      ultimoSucessoEm: null,
+      atualizar: vi.fn()
+    } as never);
+    vi.mocked(financeiroModule.useEmpenhosCarteira).mockReturnValue({
+      rows: [
+        empenho({}),
+        empenho({ empenhoId: 'e2', numero: '2025NE000010', ano: 2025, valorPago: 1000, saldo: 0 }),
+        empenho({ empenhoId: 'e3', numero: '2024NE000005', ano: 2024, uasgEmitente: '200330', contractKeys: ['200330-00020-2020'] })
+      ],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn()
+    } as never);
+    vi.mocked(authModule.useAuth).mockReturnValue({ role: 'admin' } as never);
   });
 
-  it('1. deve renderizar a página com título padronizado e botão de atualizar', () => {
-    vi.mocked(managementHookModule.useManagementDashboard).mockReturnValue({
-      readModel: mockFinancialReadModel,
-      data: mockFinancialReadModel,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    });
-
-    const html = renderToStaticMarkup(<FinancialExecutionRoute />);
-
+  it('segue a moldura da Carteira: segmentos de saldo, filtros em botão e linha clicável', () => {
+    const html = render();
     expect(html).toContain('Empenhos');
-    expect(html).toContain('Execução oficial dos empenhos, liquidações e pagamentos');
-    expect(html).toContain('Atualizar');
+    expect(html).toContain('data-testid="empenhos-saldo-COM_SALDO"');
+    expect(html).toMatch(/Com saldo<span[^>]*>2</);
+    expect(html).toMatch(/Sem saldo<span[^>]*>1</);
+    expect(html).toContain('data-testid="empenhos-filter-ano"');
+    expect(html).toContain('data-testid="empenhos-filter-gestor"');
+    expect(html).toContain('carteira-row-link');
+    // Padrão "Com saldo": o empenho todo pago fica de fora.
+    expect(html).toContain('2026NE000027');
+    expect(html).not.toContain('2025NE000010');
+    // Número do contrato e gestor vêm da carteira; contrato fora dela usa a chave.
+    expect(html).toContain('00094/2022');
+    expect(html).toContain('Marina Costa');
+    expect(html).toContain('00020/2020');
   });
 
-  it('1b. perfil que não força a atualização vê só o indicador, sem botão nem lote', () => {
-    vi.mocked(managementHookModule.useManagementDashboard).mockReturnValue({
-      readModel: mockFinancialReadModel,
-      data: mockFinancialReadModel,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    });
+  it('não mostra os quadros antigos nem as abas de UASG', () => {
+    const html = render();
+    expect(html).not.toContain('Total liquidado');
+    expect(html).not.toContain('Restos a Pagar');
+    expect(html).not.toContain('financial-execution-uasg-tabs');
+    expect(html).not.toContain('Ver contrato');
+  });
+
+  it('filtros vêm do endereço', () => {
+    const html = render('/empenhos?saldo=TODOS&ano=2025');
+    expect(html).toContain('2025NE000010');
+    expect(html).not.toContain('2026NE000027');
+  });
+
+  it('perfil gestor vê só os empenhos dos próprios contratos e não tem filtro de gestor', () => {
+    vi.mocked(authModule.useAuth).mockReturnValue({ role: 'gestor' } as never);
+    const html = render('/empenhos?saldo=TODOS');
+    expect(html).toContain('2026NE000027');
+    expect(html).not.toContain('2024NE000005');
+    expect(html).not.toContain('data-testid="empenhos-filter-gestor"');
+  });
+
+  it('perfil que não força a atualização vê só o indicador', () => {
     vi.mocked(sincronizacaoModule.useSincronizacaoEmpenhos).mockReturnValue({
       podeForcar: false,
       sincronizando: false,
       ultimoSucessoEm: '2026-10-07T08:44:00Z',
       atualizar: vi.fn()
     } as never);
-
-    const html = renderToStaticMarkup(<FinancialExecutionRoute />);
-
+    const html = render();
     expect(html).toContain('Atualizado');
     expect(html).not.toContain('data-testid="financial-execution-refresh-btn"');
-    expect(html).toContain('financial-execution-refresh-btn-indicador');
-    expect(html).not.toContain('Sincronizar Todos');
-  });
-
-  it('2. deve encapsular o ManagementFinancialExecution e renderizar o funil e os saldos', () => {
-    vi.mocked(managementHookModule.useManagementDashboard).mockReturnValue({
-      readModel: mockFinancialReadModel,
-      data: mockFinancialReadModel,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    });
-
-    const html = renderToStaticMarkup(<FinancialExecutionRoute />);
-
-    // Funil
-    expect(html).toContain('4.000.000,00'); // Empenhado
-    expect(html).toContain('2.800.000,00'); // Liquidado
-    expect(html).toContain('2.400.000,00'); // Pago
-
-    // Saldos
-    expect(html).toContain('Saldo a Liquidar');
-    expect(html).toContain('1.200.000,00');
-    expect(html).toContain('Saldo a Pagar');
-    expect(html).toContain('400.000,00');
-    expect(html).toContain('Saldo Não Executado');
-    expect(html).toContain('1.600.000,00');
-
-    // Tabela
-    expect(html).toContain('2026NE000500');
-    expect(html).toContain('Empresa Delta Serviços Ltda');
-    expect(html).toContain('Contrato 12/2025');
-    expect(html).toContain('Ver contrato');
-  });
-
-  it('3. mostra as abas das UASGs 200331 e 200330, com o painel da 200331 aberto', () => {
-    vi.mocked(managementHookModule.useManagementDashboard).mockReturnValue({
-      readModel: mockFinancialReadModel,
-      data: mockFinancialReadModel,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    });
-
-    const html = renderToStaticMarkup(<FinancialExecutionRoute />);
-
-    expect(html).toContain('UASG 200331');
-    expect(html).toContain('UASG 200330');
-    expect(managementHookModule.useManagementDashboard).toHaveBeenCalledWith(expect.objectContaining({ uasg: '200331' }));
   });
 });
