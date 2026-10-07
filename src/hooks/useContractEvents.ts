@@ -4,6 +4,24 @@ import { buildContractEventsFromOfficialData } from '../services/contractEventSe
 import { buildContractEventsFromHistorico } from '../services/contractHistoricoService';
 import { fetchContratosGovHistorico } from '../services/api';
 import { getContractManagementKey } from '../services/contractManagementService';
+import { lerComCopia, lerCopiaDetalheContrato } from '../services/contratoDetalhesCopiaService';
+import type { ContratosGovHistoricoRecord } from '../types/contractHistorico';
+
+/**
+ * De onde veio o histórico (termos aditivos e apostilamentos) do Contratos.gov.br:
+ * - NAO_CONSULTADO: o contrato não é de lá, ou os termos já vieram no registro;
+ * - API: lido agora; COPIA: a consulta falhou e vale a cópia guardada (copiadoEm);
+ * - FALHA: a consulta falhou e não há cópia (os eventos mostram só o que o registro do contrato tem).
+ */
+export interface OrigemHistoricoContrato {
+  origem: 'NAO_CONSULTADO' | 'API' | 'COPIA' | 'FALHA';
+  copiadoEm: string | null;
+}
+
+export interface EventosDoContrato {
+  eventos: ContractEvent[];
+  historico: OrigemHistoricoContrato;
+}
 
 /**
  * Constrói as opções canônicas de query para os Eventos Formais de um Contrato (Fase 5.3).
@@ -22,8 +40,9 @@ export function getContractEventsQueryOptions(
 
   return {
     queryKey: ['contract-events', contractKey] as const,
-    queryFn: async (): Promise<ContractEvent[]> => {
-      if (!contract) return [];
+    queryFn: async (): Promise<EventosDoContrato> => {
+      const naoConsultado: OrigemHistoricoContrato = { origem: 'NAO_CONSULTADO', copiadoEm: null };
+      if (!contract) return { eventos: [], historico: naoConsultado };
 
       // Extrai aditivos oficiais quando disponíveis nos dados oficiais brutos do contrato
       const aditivosRaw = Array.isArray(contract.raw?.termos_aditivos)
@@ -39,11 +58,22 @@ export function getContractEventsQueryOptions(
       const contratoId = contract.contratoId;
       const fromContratosGov = String(contract.fonteDados || '').includes('Contratos.gov');
       if (aditivosRaw.length > 0 || !fromContratosGov || contratoId === undefined || contratoId === '') {
-        return baseEvents;
+        return { eventos: baseEvents, historico: naoConsultado };
       }
 
-      const historico = await fetchContratosGovHistorico(contratoId);
-      return [...baseEvents, ...buildContractEventsFromHistorico(contract, historico)];
+      try {
+        const leitura = await lerComCopia(
+          () => fetchContratosGovHistorico(contratoId, { falharSeErro: true }),
+          () => lerCopiaDetalheContrato<ContratosGovHistoricoRecord[]>(contract.id ?? '', 'historico')
+        );
+        return {
+          eventos: [...baseEvents, ...buildContractEventsFromHistorico(contract, leitura.dados)],
+          historico: { origem: leitura.origem, copiadoEm: leitura.copiadoEm }
+        };
+      } catch (err) {
+        console.warn(`Histórico do contrato ${contract.id} indisponível e sem cópia guardada.`, err);
+        return { eventos: baseEvents, historico: { origem: 'FALHA', copiadoEm: null } };
+      }
     },
     enabled: isEnabled,
     staleTime: 5 * 60 * 1000 // 5 minutos
@@ -57,5 +87,5 @@ export function useContractEvents(
   contract?: ContractDashboardRecord | null,
   enabled: boolean = true
 ) {
-  return useQuery<ContractEvent[], Error>(getContractEventsQueryOptions(contract, enabled));
+  return useQuery<EventosDoContrato, Error>(getContractEventsQueryOptions(contract, enabled));
 }

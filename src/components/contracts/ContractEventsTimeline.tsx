@@ -27,7 +27,8 @@ import { useContractEvents } from '../../hooks/useContractEvents';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { formatCurrencyBRL } from '../../utils/ataGrouping';
 import { buildContractValueEvolutionModel } from '../../services/contractValueEvolutionService';
-import { AppButton, DataTable, EmptyState, ErrorState, SectionHeader, StatusBadge } from '../../design-system';
+import { AppButton, DataTable, EmptyState, ErrorState, NoticeBar, SectionHeader, StatusBadge } from '../../design-system';
+import { formatDataHoraBR } from '../../utils/format';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 
 interface ContractEventsTimelineProps {
@@ -226,15 +227,18 @@ export function sortEventsChronologically(events: ContractEvent[]): ContractEven
   });
 }
 
+const SEM_EVENTOS: ContractEvent[] = [];
+
 export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
   contract,
   eventsOverride,
   isLoadingOverride
 }) => {
-  const { data: queriedEvents = [], isLoading: loadingEvents, isError, error } = useContractEvents(contract);
+  const { data: dadosEventos, isLoading: loadingEvents, isError, error } = useContractEvents(contract);
   const [filter, setFilter] = useState<TimelineFilterType>('TODOS');
 
-  const rawEvents = eventsOverride || queriedEvents;
+  const rawEvents = eventsOverride || dadosEventos?.eventos || SEM_EVENTOS;
+  const origemHistorico = eventsOverride ? undefined : dadosEventos?.historico;
   const isLoading = isLoadingOverride ?? loadingEvents;
 
   // Read Model da Evolução do Valor Contratual (Fase 7.5-C1)
@@ -289,6 +293,20 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
 
   return (
     <div>
+      {origemHistorico?.origem === 'COPIA' && origemHistorico.copiadoEm && (
+        <div style={{ marginBottom: '1rem' }}>
+          <NoticeBar tone="info" testId="contract-events-copia">
+            O Contratos.gov.br não respondeu agora. Os termos aditivos e apostilamentos abaixo são da última cópia guardada, lida em {formatDataHoraBR(origemHistorico.copiadoEm)}.
+          </NoticeBar>
+        </div>
+      )}
+      {origemHistorico?.origem === 'FALHA' && (
+        <div style={{ marginBottom: '1rem' }}>
+          <NoticeBar tone="warning" testId="contract-events-falha">
+            O Contratos.gov.br não respondeu e ainda não há cópia guardada do histórico deste contrato: os termos aditivos e apostilamentos podem estar faltando. Tente de novo mais tarde.
+          </NoticeBar>
+        </div>
+      )}
       {/* Só aparece quando há aditamento com impacto no valor; sem isso, repetiria o valor global do cabeçalho */}
       {valueEvolution.totalEventosMonetarios > 0 && (
         <div

@@ -272,12 +272,12 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
     it('B. mostra o fiscal técnico e o substituto ativos no rodapé, sem CPF', () => {
       vi.mocked(responsaveisHookModule.useContractResponsaveis).mockReturnValue({
         isSuccess: true,
-        data: [
+        data: { origem: 'API', copiadoEm: null, dados: [
           { id: 1, usuario: '***.111.111-** - ANA GESTORA', funcao_id: 'Gestor', situacao: 'Ativo' },
           { id: 2, usuario: '***.222.222-** - ELIANA FISCAL', funcao_id: 'Fiscal Técnico', situacao: 'Ativo' },
           { id: 3, usuario: '***.333.333-** - FABIO SUPLENTE', funcao_id: 'Fiscal Técnico Substituto', situacao: 'Ativo' },
           { id: 4, usuario: '***.444.444-** - CARLOS ANTIGO', funcao_id: 'Fiscal Técnico', situacao: 'Inativo' }
-        ]
+        ] }
       } as any);
       const html = render();
       expect(html).toContain('Fiscal técnico');
@@ -291,19 +291,19 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
     });
 
     it('C. API respondeu sem fiscal: "Fiscal técnico" aparece como não informado', () => {
-      vi.mocked(responsaveisHookModule.useContractResponsaveis).mockReturnValue({ isSuccess: true, data: [] } as any);
+      vi.mocked(responsaveisHookModule.useContractResponsaveis).mockReturnValue({ isSuccess: true, data: { origem: 'API', copiadoEm: null, dados: [] } } as any);
       const html = render();
       expect(html).toContain('Fiscal técnico');
-      expect(html).toContain('Não informado');
+      expect(html).toMatch(/Fiscal técnico<\/dt><dd[^>]*>Não informado/);
     });
 
     it('D. garantia aparece na linha de datas, com tipo e valor na dica', () => {
       vi.mocked(garantiasHookModule.useContractGarantias).mockReturnValue({
         isSuccess: true,
-        data: [
+        data: { origem: 'API', copiadoEm: null, dados: [
           { id: 1, tipo: 'Depósito Caução', valor: '16.518,66', vencimento: '2027-03-31' },
           { id: 2, tipo: 'Fiança Bancária', valor: '66.074,64', vencimento: '2024-11-19' }
-        ]
+        ] }
       } as any);
       const html = render();
       expect(html).toContain('Garantia');
@@ -319,7 +319,7 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
     it('E. garantia que vence antes do fim da vigência leva aviso', () => {
       vi.mocked(garantiasHookModule.useContractGarantias).mockReturnValue({
         isSuccess: true,
-        data: [{ id: 1, tipo: 'Seguro-garantia', valor: '1.000,00', vencimento: '2999-01-01' }]
+        data: { origem: 'API', copiadoEm: null, dados: [{ id: 1, tipo: 'Seguro-garantia', valor: '1.000,00', vencimento: '2999-01-01' }] }
       } as any);
       const encurta = renderToStaticMarkup(
         <Contract360Header contract={{ ...mockContract, dataVigenciaFim: '3000-01-01' }} userRole="gestor" />
@@ -328,8 +328,36 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
     });
 
     it('F. sem garantia na API, a linha de datas não mostra garantia', () => {
-      vi.mocked(garantiasHookModule.useContractGarantias).mockReturnValue({ isSuccess: true, data: [] } as any);
+      vi.mocked(garantiasHookModule.useContractGarantias).mockReturnValue({ isSuccess: true, data: { origem: 'API', copiadoEm: null, dados: [] } } as any);
       expect(render()).not.toContain('Garantia');
+    });
+
+    it('F2. consulta falhou e sem cópia: diz que a fonte não respondeu, em vez de "sem fiscal" ou sumir a garantia', () => {
+      vi.mocked(responsaveisHookModule.useContractResponsaveis).mockReturnValue({ isSuccess: false, isError: true } as any);
+      vi.mocked(garantiasHookModule.useContractGarantias).mockReturnValue({ isSuccess: false, isError: true } as any);
+      const html = render();
+      expect(html).toContain('Fiscal técnico');
+      expect(html).toContain('sem resposta do Contratos.gov.br');
+      expect(html).toMatch(/Fiscal técnico<\/dt><dd[^>]*>sem resposta do Contratos\.gov\.br</);
+      expect(html).not.toMatch(/Fiscal técnico<\/dt><dd[^>]*>Não informado/);
+      expect(html).toContain('Garantia');
+      expect(html).toContain('sem resposta da fonte');
+      expect(html).toContain('não há cópia guardada das garantias');
+    });
+
+    it('F3. consulta falhou com cópia guardada: mostra a cópia com a data', () => {
+      vi.mocked(responsaveisHookModule.useContractResponsaveis).mockReturnValue({
+        isSuccess: true,
+        data: { origem: 'COPIA', copiadoEm: '2026-10-05T17:32:00Z', dados: [{ id: 2, usuario: 'ELIANA FISCAL', funcao_id: 'Fiscal Técnico', situacao: 'Ativo' }] }
+      } as any);
+      vi.mocked(garantiasHookModule.useContractGarantias).mockReturnValue({
+        isSuccess: true,
+        data: { origem: 'COPIA', copiadoEm: '2026-10-05T17:32:00Z', dados: [{ id: 1, tipo: 'Depósito Caução', valor: '1,00', vencimento: '2027-03-31' }] }
+      } as any);
+      const html = render();
+      expect(html).toContain('ELIANA FISCAL (cópia de 05/10/2026 às 14:32)');
+      expect(html).toContain('até 31/03/2027');
+      expect(html).toContain('cópia lida em 05/10/2026 às 14:32');
     });
   });
   describe('divulgação e Id no PNCP', () => {

@@ -26,7 +26,7 @@ const evento = (qualificacoes: string[]) =>
   ({ fonteOrigem: 'Contratos.gov.br', rawOfficialData: { qualificacao_termo: qualificacoes.map((descricao) => ({ descricao })) } }) as any;
 
 describe('ContractHealthStrip: valor atual', () => {
-  beforeEach(() => vi.mocked(eventsModule.useContractEvents).mockReturnValue({ data: [] } as any));
+  beforeEach(() => vi.mocked(eventsModule.useContractEvents).mockReturnValue({ data: { eventos: [], historico: { origem: 'API', copiadoEm: null } } } as any));
 
   it('mostra valor atual, inicial com variação e o acumulado só no tooltip', () => {
     const html = render();
@@ -39,7 +39,7 @@ describe('ContractHealthStrip: valor atual', () => {
 
   it('conta os termos de acréscimo/supressão e os reajustes do histórico', () => {
     vi.mocked(eventsModule.useContractEvents).mockReturnValue({
-      data: [evento(['ACRÉSCIMO / SUPRESSÃO']), evento(['ACRÉSCIMO / SUPRESSÃO', 'REAJUSTE']), evento(['VIGÊNCIA'])]
+      data: { eventos: [evento(['ACRÉSCIMO / SUPRESSÃO']), evento(['ACRÉSCIMO / SUPRESSÃO', 'REAJUSTE']), evento(['VIGÊNCIA'])], historico: { origem: 'API', copiadoEm: null } }
     } as any);
     const html = render();
     expect(html).toContain('2 termos de acréscimo/supressão · 1 reajuste');

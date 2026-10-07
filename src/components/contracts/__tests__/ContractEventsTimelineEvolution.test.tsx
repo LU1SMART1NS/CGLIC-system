@@ -7,7 +7,7 @@ import type { ContractDashboardRecord, ContractEvent } from '../../../types';
 // Mock do hook useContractEvents para controle determinístico dos testes
 vi.mock('../../../hooks/useContractEvents', () => ({
   useContractEvents: () => ({
-    data: [],
+    data: { eventos: [], historico: { origem: 'API', copiadoEm: null } },
     isLoading: false,
     isError: false,
     error: null

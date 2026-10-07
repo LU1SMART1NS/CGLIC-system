@@ -7,6 +7,10 @@
  * encerrado lido há mais de 30 dias, a menos que o coordenador force. Um contrato por vez, para respeitar o
  * limite das APIs, e dentro de um orçamento de tempo: o que não couber fica para a próxima execução (PARCIAL),
  * como na sincronização das atas.
+ *
+ * Dos contratos vigentes do Contratos.gov.br, lê também histórico, responsáveis e garantias e grava a cópia
+ * (contratos_detalhes_copia, migration 93) que o Contrato 360 usa quando a consulta ao vivo falha. Contrato
+ * vigente ainda sem essa cópia entra na fila como nunca lido.
  */
 import { supabase } from './supabaseClient';
 import { fetchContratosOficiaisDoBanco } from './contratosOficiaisService';
@@ -18,10 +22,18 @@ import {
   type ResultadoSincronizacao
 } from './sincronizacaoFontesService';
 import { SINCRONIZACAO_RULES } from '../config/alertRules';
+import {
+  fetchLeiturasDetalhes,
+  gravarDetalhesContratos,
+  lerDetalhesDoContrato,
+  type DetalhesParaGravar
+} from './contratoDetalhesCopiaService';
+import { contratosGovId } from './contractResponsaveisService';
 import type { ContractDashboardRecord } from '../types';
 
 export const RECURSO_ITENS_CONTRATOS = 'itens_contratos' as const;
 export const FONTE_ITENS_CONTRATOS = 'Itens dos contratos';
+export const FONTE_DETALHES_CONTRATOS = 'Histórico, responsáveis e garantias dos contratos';
 
 /** Tempo máximo consultando APIs numa execução (a Edge Function tem 150 s; a trava vale 10 minutos). */
 export const ORCAMENTO_ITENS_CONTRATOS_MS = 100_000;
@@ -36,6 +48,29 @@ const DIA_MS = 24 * HORA_MS;
 function estaVigente(contract: ContractDashboardRecord, agora: number): boolean {
   const fim = contract.dataVigenciaFim ? Date.parse(String(contract.dataVigenciaFim).slice(0, 10)) : NaN;
   return Number.isNaN(fim) || fim >= agora - DIA_MS;
+}
+
+/** O contrato tem histórico, responsáveis e garantias a copiar: vigente e vindo do Contratos.gov.br. */
+export function temDetalhesACopiar(contract: ContractDashboardRecord, agora: number): boolean {
+  return contratosGovId(contract) !== undefined && estaVigente(contract, agora);
+}
+
+/**
+ * Leituras para a fila: a dos itens, menos a dos contratos com detalhes a copiar que ainda não têm cópia deles
+ * (esses entram como nunca lidos). `detalhes`: chave em maiúsculas -> última tentativa dos detalhes.
+ */
+export function leiturasConsiderandoDetalhes(
+  contratos: ContractDashboardRecord[],
+  leiturasItens: Map<string, string>,
+  detalhes: Map<string, string>,
+  agora: number
+): Map<string, string> {
+  const leituras = new Map(leiturasItens);
+  for (const contract of contratos) {
+    const key = (contract.id || '').trim().toUpperCase();
+    if (key && temDetalhesACopiar(contract, agora) && !detalhes.has(key)) leituras.delete(key);
+  }
+  return leituras;
 }
 
 /**
@@ -109,7 +144,8 @@ async function gravar(uasg: string, lote: Array<ReturnType<typeof leituraParaGra
 /** Quantos contratos da carteira estão na fila de leitura (modo de teste do servidor; não grava nada). */
 export async function contarItensContratosPendentes(uasg: string, agora: number = Date.now()): Promise<{ contratos: number; pendentes: number }> {
   const contratos = await fetchContratosOficiaisDoBanco((uasg || '').trim());
-  const fila = contratosParaLer(contratos, await fetchLeituras(), { agora });
+  const leituras = leiturasConsiderandoDetalhes(contratos, await fetchLeituras(), await fetchLeiturasDetalhes(), agora);
+  const fila = contratosParaLer(contratos, leituras, { agora });
   return { contratos: contratos.length, pendentes: fila.length };
 }
 
@@ -128,12 +164,15 @@ export async function sincronizarItensContratos(
     async () => {
       const inicio = agora();
       const contratos = await fetchContratosOficiaisDoBanco(cleanUasg);
-      const fila = contratosParaLer(contratos, await fetchLeituras(), { agora: inicio, forcar: opts.forcar });
+      const leituras = leiturasConsiderandoDetalhes(contratos, await fetchLeituras(), await fetchLeiturasDetalhes(), inicio);
+      const fila = contratosParaLer(contratos, leituras, { agora: inicio, forcar: opts.forcar });
 
       let gravados = 0;
       let falhas = 0;
+      let falhasDetalhes = 0;
       let pendentes = 0;
       let lote: Array<ReturnType<typeof leituraParaGravar>> = [];
+      let loteDetalhes: DetalhesParaGravar[] = [];
 
       for (let i = 0; i < fila.length; i++) {
         if (agora() - inicio > orcamento) {
@@ -147,18 +186,42 @@ export async function sincronizarItensContratos(
           falhas++;
           console.warn(`[itensContratos] itens do contrato ${contract.id} não puderam ser lidos:`, mensagemDeErro(err));
         }
+        if (temDetalhesACopiar(contract, inicio)) {
+          try {
+            const { linha, falhas: f } = await lerDetalhesDoContrato(contract.id, contratosGovId(contract) as string | number);
+            if (f.length > 0) {
+              falhasDetalhes++;
+              console.warn(`[itensContratos] contrato ${contract.id}: falha ao ler ${f.join(', ')} no Contratos.gov.br.`);
+            }
+            loteDetalhes.push(linha);
+          } catch (err) {
+            falhasDetalhes++;
+            console.warn(`[itensContratos] detalhes do contrato ${contract.id} não puderam ser lidos:`, mensagemDeErro(err));
+          }
+        }
         if (lote.length >= LOTE_GRAVACAO) {
           gravados += await gravar(cleanUasg, lote);
           lote = [];
         }
+        if (loteDetalhes.length >= LOTE_GRAVACAO) {
+          await gravarDetalhesContratos(cleanUasg, loteDetalhes);
+          loteDetalhes = [];
+        }
       }
       gravados += await gravar(cleanUasg, lote);
+      await gravarDetalhesContratos(cleanUasg, loteDetalhes);
 
       const problemas: string[] = [];
       if (falhas > 0) problemas.push(`${falhas} ${falhas === 1 ? 'contrato não teve os itens lidos' : 'contratos não tiveram os itens lidos'}`);
+      if (falhasDetalhes > 0) problemas.push(`${falhasDetalhes} ${falhasDetalhes === 1 ? 'contrato não teve' : 'contratos não tiveram'} histórico, responsáveis ou garantias lidos por completo`);
       if (pendentes > 0) problemas.push(`${pendentes} ${pendentes === 1 ? 'contrato ficou' : 'contratos ficaram'} para a próxima execução`);
       return problemas.length > 0
-        ? { status: 'PARCIAL', total: gravados, fontesComFalha: falhas > 0 ? [FONTE_ITENS_CONTRATOS] : [], mensagem: `${problemas.join(' e ')}.` }
+        ? {
+            status: 'PARCIAL',
+            total: gravados,
+            fontesComFalha: [...(falhas > 0 ? [FONTE_ITENS_CONTRATOS] : []), ...(falhasDetalhes > 0 ? [FONTE_DETALHES_CONTRATOS] : [])],
+            mensagem: `${problemas.join(' e ')}.`
+          }
         : { status: 'SUCESSO', total: gravados, fontesComFalha: [] };
     }
   );

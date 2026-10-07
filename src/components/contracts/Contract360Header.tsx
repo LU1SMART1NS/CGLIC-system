@@ -15,7 +15,7 @@ import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { ActionButton, AppButton, NoticeBar, type NoticeBarTone } from '../../design-system';
 import { pncpLinkStyle } from '../atas/Ata360Header';
 import { Instrument360Hero, instrumentSituationLabel } from '../instrument360/Instrument360Hero';
-import { formatCnpj, formatCurrency } from '../../utils/format';
+import { formatCnpj, formatCurrency, formatDataHoraBR } from '../../utils/format';
 import { formatDateISO } from '../../services/temporalEngineService';
 import { useContractResponsaveis } from '../../hooks/useContractResponsaveis';
 import { useContractGarantias } from '../../hooks/useContractGarantias';
@@ -196,11 +196,17 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   const categoria = typeof categoriaRaw === 'string' ? categoriaRaw : undefined;
 
   // Fiscais e garantia vêm do Contratos.gov.br (uma consulta cada, ao abrir o contrato). Enquanto não
-  // chegam, ou se falharem, não aparece nada: "Não informado" só vale quando a API respondeu e veio vazio.
-  const { data: responsaveis, isSuccess: responsaveisOk } = useContractResponsaveis(contract);
-  const { data: garantiasRows } = useContractGarantias(contract);
-  const fiscais = fiscaisAtivos(responsaveis);
-  const garantia = garantiaMaisLonga(garantiasRows);
+  // chegam, não aparece nada; se a consulta falhar, vale a cópia guardada pelo servidor (com a data) e, sem
+  // cópia, a linha diz que a fonte não respondeu. "Não informado" só quando a API respondeu e veio vazio.
+  const { data: responsaveis, isSuccess: responsaveisOk, isError: responsaveisFalhou } = useContractResponsaveis(contract);
+  const { data: garantias, isError: garantiasFalhou } = useContractGarantias(contract);
+  const fiscais = fiscaisAtivos(responsaveis?.dados);
+  const garantia = garantiaMaisLonga(garantias?.dados);
+  const notaCopiaFiscais = responsaveis?.origem === 'COPIA' && responsaveis.copiadoEm ? ` (cópia de ${formatDataHoraBR(responsaveis.copiadoEm)})` : '';
+  const notaCopiaGarantia =
+    garantias?.origem === 'COPIA' && garantias.copiadoEm
+      ? `O Contratos.gov.br não respondeu agora; cópia lida em ${formatDataHoraBR(garantias.copiadoEm)}. `
+      : '';
   const hoje = formatDateISO(new Date());
 
   return (
@@ -315,10 +321,16 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
           ? [{
               label: 'Garantia',
               value: `até ${formatDateBR(garantia.principal.vencimento)}`,
-              title: garantiaDetalhe(garantia, hoje),
+              title: notaCopiaGarantia + garantiaDetalhe(garantia, hoje),
               risk: garantiaAviso(garantia, contract.dataVigenciaFim, hoje)
             }]
-          : [])
+          : garantiasFalhou
+            ? [{
+                label: 'Garantia',
+                value: <MissingValue>sem resposta da fonte</MissingValue>,
+                title: 'O Contratos.gov.br não respondeu e não há cópia guardada das garantias deste contrato.'
+              }]
+            : [])
       ]}
       identifiersTestId="contract-header-metadata"
       identifiers={[
@@ -326,9 +338,11 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
         { label: 'Categoria', value: categoria },
         ...(responsaveisOk
           ? fiscais.length > 0
-            ? fiscais.map((grupo) => ({ label: grupo.label, value: grupo.nomes.join(', ') }))
-            : [{ label: 'Fiscal técnico', value: undefined }]
-          : []),
+            ? fiscais.map((grupo) => ({ label: grupo.label, value: grupo.nomes.join(', ') + notaCopiaFiscais }))
+            : [{ label: 'Fiscal técnico', value: notaCopiaFiscais ? `Não informado${notaCopiaFiscais}` : undefined }]
+          : responsaveisFalhou
+            ? [{ label: 'Fiscal técnico', value: 'sem resposta do Contratos.gov.br' }]
+            : []),
         // Sem Id conhecido o campo some: não há o que mostrar, e "Não informado" aqui seria só ruído.
         ...(numeroControlePncp ? [{ label: 'Id PNCP', value: numeroControlePncp }] : [])
       ]}

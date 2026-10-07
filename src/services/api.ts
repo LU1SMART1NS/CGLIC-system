@@ -1226,23 +1226,35 @@ export async function fetchOrdensBancariasDaNp(ug: string, np: string, gestao = 
   return data;
 }
 
+/** Opção das consultas por contrato: lançar em vez de devolver vazio, para a falha não virar "não há". */
+export interface OpcoesLeituraContratosGov {
+  falharSeErro?: boolean;
+}
+
+/** Lê uma lista do Contratos.gov.br. Sem `falharSeErro`, a falha vira lista vazia (comportamento antigo). */
+async function lerListaContratosGov<T>(url: string, descricao: string, opts: OpcoesLeituraContratosGov): Promise<T[]> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`O Contratos.gov.br respondeu ${res.status} ao consultar ${descricao}.`);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error(`O Contratos.gov.br devolveu um formato inesperado para ${descricao}.`);
+    return data as T[];
+  } catch (e) {
+    if (opts.falharSeErro) throw e;
+    console.warn(`Falha na consulta de ${descricao} no Contratos.gov.br`, e);
+    return [];
+  }
+}
+
 /**
  * Consulta o histórico do contrato (celebração, termos aditivos e apostilamentos) no Contratos.gov.br
  * Endpoint: GET /api/contrato/{contrato_id}/historico
  */
 export async function fetchContratosGovHistorico(
-  contratoId: string | number
+  contratoId: string | number,
+  opts: OpcoesLeituraContratosGov = {}
 ): Promise<ContratosGovHistoricoRecord[]> {
-  try {
-    const res = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/historico`);
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {
-    console.warn(`Falha na consulta do histórico do contrato no Contratos.gov.br (id=${contratoId})`, e);
-  }
-  return [];
+  return lerListaContratosGov(`/api-contratos-gov/api/contrato/${contratoId}/historico`, `histórico do contrato (id=${contratoId})`, opts);
 }
 
 /**
@@ -1250,18 +1262,10 @@ export async function fetchContratosGovHistorico(
  * Endpoint: GET /api/contrato/{contrato_id}/responsaveis
  */
 export async function fetchContratosGovResponsaveis(
-  contratoId: string | number
+  contratoId: string | number,
+  opts: OpcoesLeituraContratosGov = {}
 ): Promise<ContratosGovResponsavelRecord[]> {
-  try {
-    const res = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/responsaveis`);
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {
-    console.warn(`Falha na consulta dos responsáveis do contrato no Contratos.gov.br (id=${contratoId})`, e);
-  }
-  return [];
+  return lerListaContratosGov(`/api-contratos-gov/api/contrato/${contratoId}/responsaveis`, `responsáveis do contrato (id=${contratoId})`, opts);
 }
 
 /**
@@ -1269,18 +1273,10 @@ export async function fetchContratosGovResponsaveis(
  * Endpoint: GET /api/contrato/{contrato_id}/garantias
  */
 export async function fetchContratosGovGarantias(
-  contratoId: string | number
+  contratoId: string | number,
+  opts: OpcoesLeituraContratosGov = {}
 ): Promise<ContratosGovGarantiaRecord[]> {
-  try {
-    const res = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/garantias`);
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {
-    console.warn(`Falha na consulta das garantias do contrato no Contratos.gov.br (id=${contratoId})`, e);
-  }
-  return [];
+  return lerListaContratosGov(`/api-contratos-gov/api/contrato/${contratoId}/garantias`, `garantias do contrato (id=${contratoId})`, opts);
 }
 
 /**
