@@ -42,13 +42,13 @@ export interface DistribuicaoDoEmpenho {
   sugestao: SugestaoDeItem[];
 }
 
-const MIGRATION_AUSENTE = 'A distribuição por item ainda não está disponível: falta aplicar no banco a migration 94.';
+const MIGRATION_AUSENTE = 'O vínculo do empenho aos itens ainda não está disponível: falta aplicar no banco a migration 94.';
 
 /** Mensagem legível de um erro das RPCs da migration 94 (tira o código do começo). */
 export function mensagemDoErroDeDistribuicao(error: any): string {
   if (rpcInexistente(error)) return MIGRATION_AUSENTE;
   const bruta = String(error?.message ?? error ?? '');
-  if (/UNAUTHORIZED/.test(bruta) || error?.code === '42501') return 'Só gestor ou coordenador distribui empenhos entre os itens.';
+  if (/UNAUTHORIZED/.test(bruta) || error?.code === '42501') return 'Só gestor ou coordenador vincula empenhos aos itens do contrato.';
   return bruta.replace(/^[A-Z_]+:\s*/, '') || 'O banco recusou a operação.';
 }
 

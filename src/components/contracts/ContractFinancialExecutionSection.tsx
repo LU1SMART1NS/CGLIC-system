@@ -215,7 +215,7 @@ export const EmpenhoDetalhe: React.FC<{
           O contrato não tem itens numerados na fonte oficial: a nota fica no contrato inteiro, sem divisão por item.
         </span>
       ) : d.situacao === 'SEM_VALOR' ? (
-        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>A nota está com valor zero e não tem o que distribuir.</span>
+        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>A nota está com valor zero e não tem o que vincular aos itens.</span>
       ) : (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem 1.25rem', fontSize: '0.82rem' }}>
@@ -223,11 +223,11 @@ export const EmpenhoDetalhe: React.FC<{
               Valor da nota <strong>{brlCurto(d.valorNota)}</strong>
             </span>
             <span>
-              Distribuído <strong>{brlCurto(fechada ? d.valorDistribuido : d.situacao === 'REVISAR' ? d.valorDistribuido : 0)}</strong>
+              Vinculado aos itens <strong>{brlCurto(fechada ? d.valorDistribuido : d.situacao === 'REVISAR' ? d.valorDistribuido : 0)}</strong>
             </span>
             {fechada ? (
               <StatusBadge
-                label={d.origem === 'AUTO' ? 'Automática: contrato de um item' : `por ${d.distribuidoPorNome || 'usuário'}${d.distribuidoEm ? ` em ${formatDate(d.distribuidoEm)}` : ''}`}
+                label={d.origem === 'AUTO' ? 'Vinculada automaticamente: contrato de um item' : `por ${d.distribuidoPorNome || 'usuário'}${d.distribuidoEm ? ` em ${formatDate(d.distribuidoEm)}` : ''}`}
                 variant="info"
                 size="sm"
                 dot={false}
@@ -244,7 +244,7 @@ export const EmpenhoDetalhe: React.FC<{
                 onClick={() => onDistribuir(d)}
                 data-testid={`empenho-distribuir-${empenho.numero_oficial}`}
               >
-                {fechada ? 'Editar distribuição' : 'Distribuir'}
+                {fechada ? 'Editar o vínculo aos itens' : 'Vincular aos itens'}
               </AppButton>
             )}
             {podeEditar && fechada && d.origem === 'USUARIO' && (
@@ -414,17 +414,17 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
       {
         onSuccess: () => {
           setDistribuindo(null);
-          toast.success(`${alvo.numeroOficial} distribuída entre ${parcelas.length === 1 ? '1 item' : `${parcelas.length} itens`}.`);
+          toast.success(`${alvo.numeroOficial} vinculada a ${parcelas.length === 1 ? '1 item' : `${parcelas.length} itens`} do contrato.`);
         }
       }
     );
   };
   const desfazerDistribuicao = async (d: DistribuicaoDoEmpenho) => {
     const ok = await confirm({
-      title: 'Desfazer distribuição',
+      title: 'Desfazer o vínculo aos itens',
       message: (
         <>
-          A nota <strong>{d.numeroOficial}</strong> volta para "a distribuir" e sai do empenhado dos itens até ser distribuída de novo.
+          A nota <strong>{d.numeroOficial}</strong> volta para "a vincular aos itens" e sai do empenhado dos itens até ser vinculada de novo.
         </>
       ),
       confirmLabel: 'Desfazer',
@@ -432,8 +432,8 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
     });
     if (!ok) return;
     acoesDistribuicao.desfazer.mutate(d.contratoEmpenhoId, {
-      onSuccess: () => toast.success(`Distribuição de ${d.numeroOficial} desfeita.`),
-      onError: (err: any) => toast.error(err?.message || 'Não foi possível desfazer a distribuição.')
+      onSuccess: () => toast.success(`Vínculo de ${d.numeroOficial} aos itens desfeito.`),
+      onError: (err: any) => toast.error(err?.message || 'Não foi possível desfazer o vínculo aos itens.')
     });
   };
 
@@ -661,7 +661,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
             action={
               podeEditar && proximaADistribuir ? (
                 <AppButton variant="outline" size="sm" onClick={() => abrirDistribuicao(proximaADistribuir)}>
-                  Distribuir a próxima
+                  Vincular a próxima aos itens
                 </AppButton>
               ) : undefined
             }
@@ -669,17 +669,17 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
             {aDistribuir.length > 0 && (
               <>
                 <strong>{aDistribuir.length}</strong>{' '}
-                {aDistribuir.length === 1 ? 'nota ainda não foi distribuída' : 'notas ainda não foram distribuídas'} entre os itens do contrato (
+                {aDistribuir.length === 1 ? 'nota ainda não foi vinculada' : 'notas ainda não foram vinculadas'} aos itens do contrato (
                 {formatCurrency(aDistribuir.reduce((s, d) => s + d.valorNota, 0))}).{' '}
               </>
             )}
             {aRever.length > 0 && (
               <>
-                <strong>{aRever.length}</strong> {aRever.length === 1 ? 'distribuição precisa' : 'distribuições precisam'} ser revista
+                <strong>{aRever.length}</strong> {aRever.length === 1 ? 'vínculo aos itens precisa' : 'vínculos aos itens precisam'} ser revisto
                 {aRever.length === 1 ? '' : 's'}.{' '}
               </>
             )}
-            Não entram no empenhado dos itens até serem distribuídas.
+            Não entram no empenhado dos itens até serem vinculadas.
           </NoticeBar>
         )}
         {faturasComNeFora.length > 0 && (
@@ -737,7 +737,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
 
       <div>
         <SectionHeader
-          title="Notas de empenho vinculadas"
+          title="Notas de empenho do contrato"
           icon={<Layers size={16} />}
           countBadge={empenhosList.length}
           actions={botaoVincular}

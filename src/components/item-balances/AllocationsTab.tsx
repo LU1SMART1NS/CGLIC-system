@@ -241,7 +241,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
       <div>
         <SectionHeader
           title="Alocações"
-          subtitle={`Quantitativo da UG ${ugUasg} distribuído às unidades internas.`}
+          subtitle={`Quantitativo da UG ${ugUasg} alocado às unidades internas.`}
           icon={<Building2 size={16} />}
           countBadge={rows.length}
           actions={
@@ -262,7 +262,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
         {rows.length === 0 ? (
           <EmptyState
             title="Nenhuma alocação interna neste item"
-            description={canManage ? 'Use o botão Alocar para distribuir o quantitativo às unidades internas.' : 'Ainda não há quantitativo alocado às unidades internas.'}
+            description={canManage ? 'Use o botão Alocar para alocar o quantitativo às unidades internas.' : 'Ainda não há quantitativo alocado às unidades internas.'}
           />
         ) : (
           <DataTable columns={columns} data={rows} keyExtractor={(r) => r.id} testId="allocations-table" />

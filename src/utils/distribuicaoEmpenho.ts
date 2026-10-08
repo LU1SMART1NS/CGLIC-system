@@ -67,9 +67,9 @@ export function sugestaoCurta(tipo: TipoSugestao | null, sugestao: SugestaoDeIte
 export function rotuloDaSituacao(d: DistribuicaoDoEmpenho): { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' } {
   switch (d.situacao) {
     case 'DISTRIBUIDA':
-      return { label: d.origem === 'AUTO' ? 'Automática' : 'Distribuída', variant: 'success' };
+      return { label: d.origem === 'AUTO' ? 'Vinculada automaticamente' : 'Vinculada', variant: 'success' };
     case 'A_DISTRIBUIR':
-      return { label: 'A distribuir', variant: 'warning' };
+      return { label: 'A vincular', variant: 'warning' };
     case 'REVISAR':
       return { label: 'Revisar', variant: 'danger' };
     case 'SEM_ITENS':
@@ -84,8 +84,8 @@ export function motivoDaRevisao(d: DistribuicaoDoEmpenho): string | null {
   if (d.motivoRevisao === 'VALOR_MUDOU') {
     const antes = d.valorNaDistribuicao ?? d.valorDistribuido;
     const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    return `O valor da nota mudou de ${brl(antes)} para ${brl(d.valorNota)} depois da distribuição. Distribua de novo.`;
+    return `O valor da nota mudou de ${brl(antes)} para ${brl(d.valorNota)} depois do vínculo aos itens. Vincule de novo.`;
   }
-  if (d.motivoRevisao === 'ITEM_FORA_DO_CONTRATO') return 'A distribuição usa um item que o contrato não tem mais. Distribua de novo.';
+  if (d.motivoRevisao === 'ITEM_FORA_DO_CONTRATO') return 'O vínculo usa um item que o contrato não tem mais. Vincule de novo.';
   return null;
 }
