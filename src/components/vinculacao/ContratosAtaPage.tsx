@@ -80,6 +80,7 @@ export const ContratosAtaPage: React.FC = () => {
       <PageHeader
         title="Contratos a vincular à ata"
         subtitle="Contratos sem item de ata vinculado, com a ata provável pela compra e pelo fornecedor. Vinculado, o contrato segue o gestor da ata."
+        hint={'Contratos vigentes ainda sem vínculo com ata. Clique no nome da ata para conferir e vincular; os que a API confirma podem ser vinculados vários de uma vez. Se a ata certa não foi sugerida, use "Escolher ata". Se o contrato não veio de ata, marque "Não pertence a nenhuma ata" e escolha o gestor.'}
         icon={<Link2 size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction

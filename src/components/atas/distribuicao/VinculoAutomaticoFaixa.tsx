@@ -64,7 +64,7 @@ export const VinculoAutomaticoFaixa: React.FC<VinculoAutomaticoFaixaProps> = ({ 
           </span>
         </span>
       </div>
-      {podeRodar && <ActionButton action="simular" size="sm" label="Simular agora" onClick={() => setSimulando(true)} data-testid="vinculo-automatico-simular" />}
+      {podeRodar && <ActionButton action="simular" iconOnly label="Simular agora" onClick={() => setSimulando(true)} data-testid="vinculo-automatico-simular" />}
       {simulando && <SimularVinculoModal onClose={() => setSimulando(false)} />}
     </section>
   );
