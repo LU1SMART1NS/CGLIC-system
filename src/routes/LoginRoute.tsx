@@ -130,7 +130,9 @@ export const LoginRoute: React.FC = () => {
   if (showForgot) {
     return (
       <AuthLayout>
-        <ActionButton action="voltar" label="Voltar para o login" type="button" className="auth-back" onClick={closeForgot} />
+        {!forgotSentTo && (
+          <ActionButton action="voltar" label="Voltar para o login" type="button" className="auth-back" onClick={closeForgot} />
+        )}
 
         {forgotSentTo ? (
           <div className="auth-state">
