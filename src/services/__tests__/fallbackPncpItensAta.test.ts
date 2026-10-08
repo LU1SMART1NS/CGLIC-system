@@ -30,6 +30,7 @@ function mockFetch(opcoes: { atasNaCompra: number | AtaDaCompra[] | 'falha'; ite
       return json({ data: atas.map((a) => ({ sequencialAta: a.seq, numeroAtaRegistroPreco: String(a.seq).padStart(5, '0'), anoAta: 2025, cancelado: !!a.cancelado })), totalRegistros: atas.length });
     }
     const res = url.match(/\/itens\/(\d+)\/resultados$/);
+    if (res && opcoes.fornecedorDoItem?.(Number(res[1])) === 'FALHA') return new Response('', { status: 429 });
     if (res) return json(resultado(opcoes.fornecedorDoItem ? opcoes.fornecedorDoItem(Number(res[1])) : '11111111000111'));
     if (/\/itens\?tamanhoPagina=500$/.test(url)) return json(itensDaCompra(opcoes.itens ?? 2));
     throw new Error(`URL não prevista no teste: ${url}`);
@@ -89,6 +90,12 @@ describe('fetchArpItems — fallback do PNCP só quando os itens são certamente
     const r = await fetchArpItems('2026-03-02', '200331', '00005/2026', ctxAta5, { estrito: true });
     expect(r.resultado).toEqual([]);
     expect(chamadas.some((u) => /\/compras\/2025\/1576\/itens/.test(u))).toBe(false);
+  });
+
+  it('PNCP não entregou o resultado de um item: ata sem itens (não grava itens sem fornecedor)', async () => {
+    mockFetch({ atasNaCompra: 1, itens: 3, fornecedorDoItem: (n) => (n === 2 ? 'FALHA' : '11111111000111') });
+    const r = await fetchArpItems('2025-09-01', '200331', '00069/2025', ctxAta69, { estrito: true });
+    expect(r.resultado).toEqual([]);
   });
 
   it('lista de atas da compra incompleta (total maior que o devolvido): na dúvida, ata sem itens', async () => {

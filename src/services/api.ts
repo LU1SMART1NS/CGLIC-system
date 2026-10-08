@@ -208,7 +208,14 @@ export async function fetchArpsDasFontes(params: FilterParams): Promise<ArpRecor
   // Falha do PNCP não derruba a lista do Compras.gov.br: essas atas entram na próxima execução.
   if (params.codigoUnidadeGerenciadora) {
     try {
-      for (const arp of await fetchAtasSoNoPncp(params.codigoUnidadeGerenciadora, Array.from(allArpsMap.values()))) {
+      const prazo = Date.now() + PRAZO_ATAS_SO_NO_PNCP_MS;
+      // O prazo é conferido entre chamadas; a corrida corta uma chamada pendurada perto do fim (até 30 s cada).
+      let cortar: ReturnType<typeof setTimeout> | undefined;
+      const soNoPncp = await Promise.race([
+        fetchAtasSoNoPncp(params.codigoUnidadeGerenciadora, Array.from(allArpsMap.values()), new Date(), prazo),
+        new Promise<never>((_, rejeitar) => { cortar = setTimeout(() => rejeitar(new Error('prazo da busca no PNCP esgotado')), PRAZO_ATAS_SO_NO_PNCP_MS + 5_000); })
+      ]).finally(() => clearTimeout(cortar));
+      for (const arp of soNoPncp) {
         allArpsMap.set(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`, arp);
       }
     } catch (err) {
@@ -499,6 +506,13 @@ const MODALIDADE_COMPRAS_POR_PNCP: Record<number, string> = { 4: '03', 5: '03', 
 
 const formatarDataPncp = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '');
 
+/**
+ * Tempo máximo da busca de atas que só estão no PNCP, dentro da lista de atas. Cada chamada pode ficar pendurada até
+ * 30 s (proxy de fontes do servidor); sem prazo, em 08/10/2026 a lista inteira passou dos 150 s da Edge Function.
+ * Estourado, as atas que faltaram entram na próxima execução.
+ */
+export const PRAZO_ATAS_SO_NO_PNCP_MS = 45_000;
+
 /** Número da ata no formato do Compras.gov.br ("00043/2026"). */
 export function numeroAtaDoPncp(ata: Pick<PncpAtaDaLista, 'numeroAtaRegistroPreco' | 'anoAta'>): string {
   return `${String(ata.numeroAtaRegistroPreco).replace(/\D/g, '').padStart(5, '0')}/${ata.anoAta}`;
@@ -509,7 +523,7 @@ export function numeroAtaDoPncp(ata: Pick<PncpAtaDaLista, 'numeroAtaRegistroPrec
  * consulta: pedem-se o último ano e o próximo, o que cobre toda ata vigente hoje ou que começa no próximo ano.
  * Lança erro se o PNCP recusar (a lista sairia incompleta).
  */
-async function fetchListaAtasPncpDaUasg(uasg: string, agora: Date): Promise<PncpAtaDaLista[]> {
+async function fetchListaAtasPncpDaUasg(uasg: string, agora: Date, prazo: number): Promise<PncpAtaDaLista[]> {
   const cnpj = cnpjDaUasg(uasg);
   if (!cnpj) return [];
   const dia = 24 * 60 * 60 * 1000;
@@ -520,6 +534,7 @@ async function fetchListaAtasPncpDaUasg(uasg: string, agora: Date): Promise<Pncp
   const atas: PncpAtaDaLista[] = [];
   for (const [inicio, fim] of janelas) {
     for (let pagina = 1; ; pagina++) {
+      if (Date.now() > prazo) throw new Error('prazo da lista de atas do PNCP esgotado');
       const url = `/api-pncp/api/consulta/v1/atas${buildQueryString({
         dataInicial: formatarDataPncp(inicio),
         dataFinal: formatarDataPncp(fim),
@@ -528,7 +543,7 @@ async function fetchListaAtasPncpDaUasg(uasg: string, agora: Date): Promise<Pncp
         pagina,
         tamanhoPagina: 50
       })}`;
-      const res = await fetchComNovaTentativa(url, 'PNCP', 3);
+      const res = await fetchComNovaTentativa(url, 'PNCP', 2);
       if (res.status === 204) break;
       if (!res.ok) throw new FonteIndisponivelError('PNCP', res.status);
       const data = await res.json();
@@ -546,14 +561,18 @@ async function fetchListaAtasPncpDaUasg(uasg: string, agora: Date): Promise<Pncp
  * O Compras.gov.br demora semanas para receber as atas publicadas pelo Contratos.gov.br; o PNCP as tem no mesmo dia.
  * Quando o mesmo número aparece mais de uma vez (ata cancelada e publicada de novo), vale a não cancelada mais recente.
  * Número da compra e modalidade vêm do cadastro da compra no PNCP; valor e quantidade de itens, dos itens que se
- * consegue atribuir à ata com certeza (itensDaAtaPeloPncp). Lança erro se a lista do PNCP não vier.
+ * consegue atribuir à ata com certeza (itensDaAtaPeloPncp). Ata cuja compra ou itens o PNCP não entregou fica para a
+ * próxima execução: gravá-la assim trocaria o número da compra pelo sequencial do PNCP e o valor por zero.
+ * Vão primeiro as não canceladas e as publicadas há menos tempo; esgotado o `prazo` (ms desde 1970), devolve as que já
+ * montou. Lança erro se a lista do PNCP não vier.
  */
 export async function fetchAtasSoNoPncp(
   uasg: string,
   conhecidas: Array<Pick<ArpRecord, 'numeroAtaRegistroPreco' | 'numeroControlePncpAta'>>,
-  agora: Date = new Date()
+  agora: Date = new Date(),
+  prazo: number = Date.now() + PRAZO_ATAS_SO_NO_PNCP_MS
 ): Promise<ArpRecord[]> {
-  const lista = await fetchListaAtasPncpDaUasg(uasg, agora);
+  const lista = await fetchListaAtasPncpDaUasg(uasg, agora, prazo);
   const numerosConhecidos = new Set(conhecidas.map((a) => a.numeroAtaRegistroPreco));
   const controlesConhecidos = new Set(conhecidas.map((a) => a.numeroControlePncpAta).filter(Boolean));
 
@@ -568,8 +587,14 @@ export async function fetchAtasSoNoPncp(
     if (melhor) porNumero.set(numero, ata);
   }
 
+  const ordem = Array.from(porNumero.entries()).sort(([, a], [, b]) =>
+    Number(!!a.cancelado) - Number(!!b.cancelado) || String(b.dataPublicacaoPncp || '').localeCompare(String(a.dataPublicacaoPncp || '')));
   const novas: ArpRecord[] = [];
-  for (const [numero, ata] of porNumero) {
+  for (const [numero, ata] of ordem) {
+    if (Date.now() > prazo) {
+      console.warn(`[atas] prazo da busca no PNCP esgotado; ${ordem.length - novas.length} ata(s) ficam para a próxima execução.`);
+      break;
+    }
     const ctrl = parsePncpControlNumber(ata.numeroControlePNCPAta);
     if (!ctrl) continue;
     const ctrlCompra = ata.numeroControlePNCPCompra || `${ctrl.cnpj}-1-${String(ctrl.seqCompra).padStart(6, '0')}/${ctrl.anoCompra}`;
@@ -577,9 +602,13 @@ export async function fetchAtasSoNoPncp(
     const itens = ata.cancelado ? [] : await itensDaAtaPeloPncp({
       anoCompra: ctrl.anoCompra, seqCompra: ctrl.seqCompra, seqAta: ctrl.seqAta, numeroAta: numero, uasg, cnpj: ctrl.cnpj
     });
-    // O número da compra do Compras.gov.br é o que os contratos citam; sem ele, fica o sequencial do PNCP.
-    const numeroCompra = compra?.numeroCompra || String(ctrl.seqCompra);
-    const codigoModalidade = compra?.modalidadeId !== undefined ? MODALIDADE_COMPRAS_POR_PNCP[compra.modalidadeId] || '' : '';
+    if (!compra || !itens) {
+      console.warn(`[atas] ata ${numero}: o PNCP não entregou ${!compra ? 'o cadastro da compra' : 'os itens'}; fica para a próxima execução.`);
+      continue;
+    }
+    // O número da compra do Compras.gov.br é o que os contratos citam; sem ele (o PNCP não informa), o sequencial do PNCP.
+    const numeroCompra = compra.numeroCompra || String(ctrl.seqCompra);
+    const codigoModalidade = compra.modalidadeId !== undefined ? MODALIDADE_COMPRAS_POR_PNCP[compra.modalidadeId] || '' : '';
     novas.push({
       numeroAtaRegistroPreco: numero,
       codigoUnidadeGerenciadora: uasg,
@@ -591,7 +620,7 @@ export async function fetchAtasSoNoPncp(
       numeroCompra,
       anoCompra: ctrl.anoCompra,
       codigoModalidadeCompra: codigoModalidade,
-      nomeModalidadeCompra: compra?.modalidadeNome || '',
+      nomeModalidadeCompra: compra.modalidadeNome || '',
       dataAssinatura: ata.dataAssinatura || '',
       dataVigenciaInicial: (ata.vigenciaInicio || '').split('T')[0],
       dataVigenciaFinal: (ata.vigenciaFim || '').split('T')[0],
@@ -605,7 +634,7 @@ export async function fetchAtasSoNoPncp(
       ataExcluido: false,
       numeroControlePncpAta: ata.numeroControlePNCPAta,
       numeroControlePncpCompra: ctrlCompra,
-      idCompra: codigoModalidade && compra?.numeroCompra ? `${uasg}${codigoModalidade}${compra.numeroCompra}${ctrl.anoCompra}` : '',
+      idCompra: codigoModalidade && compra.numeroCompra ? `${uasg}${codigoModalidade}${compra.numeroCompra}${ctrl.anoCompra}` : '',
       dataVigenciaFinalPncp: (ata.vigenciaFim || '').split('T')[0] || undefined,
       isCanceladaPncp: !!ata.cancelado,
       prorrogadaPncp: false,
@@ -685,6 +714,7 @@ export function fetchAtasDaCompraPncp(anoCompra: string, seqCompra: number, cust
  * fornecedor da ata. Atribui os itens quando o fornecedor da ata é conhecido (FORNECEDOR_DAS_ATAS_PNCP) ou quando a
  * única ata não cancelada da compra é esta e todos os itens são de um fornecedor. Em 06/10/2026 uma regra mais frouxa
  * gravou itens de outra ata em sete atas: melhor ata sem itens do que itens alheios.
+ * Devolve null quando o PNCP não respondeu (não dá para saber); [] quando respondeu e os itens não são atribuíveis.
  */
 export async function itensDaAtaPeloPncp(ata: {
   anoCompra: string;
@@ -694,15 +724,15 @@ export async function itensDaAtaPeloPncp(ata: {
   numeroAta: string;
   uasg: string;
   cnpj?: string;
-}): Promise<ArpItemRecord[]> {
+}): Promise<ArpItemRecord[] | null> {
   const { anoCompra, seqCompra, seqAta, numeroAta, uasg, cnpj } = ata;
   const fornecedor = FORNECEDOR_DAS_ATAS_PNCP.find((s) => matchAtaNumber(s.numeroAta, numeroAta) && matchAtaNumber(numeroAta, s.numeroAta));
-  if (fornecedor) return fetchPncpCompraItems(anoCompra, seqCompra, numeroAta, uasg, fornecedor.cnpjFornecedor, cnpj);
+  if (fornecedor) return consultarItensDaCompraPncp(anoCompra, seqCompra, numeroAta, uasg, fornecedor.cnpjFornecedor, cnpj);
 
   const atasDaCompra = await fetchAtasDaCompraPncp(anoCompra, seqCompra, cnpj);
   if (!atasDaCompra) {
     console.warn(`Ata ${numeroAta}: o PNCP não informou as atas da compra ${seqCompra}/${anoCompra}; itens não carregados pelo PNCP.`);
-    return [];
+    return null;
   }
   const vigentes = atasDaCompra.filter((a) => !a.cancelado);
   const ehEstaAta = (a: PncpAtaDaCompra) => seqAta !== undefined
@@ -712,7 +742,8 @@ export async function itensDaAtaPeloPncp(ata: {
     console.warn(`Ata ${numeroAta}: a compra ${seqCompra}/${anoCompra} tem ${vigentes.length} ata(s) não cancelada(s) no PNCP e a ata não informa o fornecedor; itens não carregados pelo PNCP.`);
     return [];
   }
-  const itensDaCompra = await fetchPncpCompraItems(anoCompra, seqCompra, numeroAta, uasg, undefined, cnpj);
+  const itensDaCompra = await consultarItensDaCompraPncp(anoCompra, seqCompra, numeroAta, uasg, undefined, cnpj);
+  if (!itensDaCompra) return null;
   const itens = itensSeUmFornecedor(itensDaCompra);
   if (itens.length === 0 && itensDaCompra.length > 0) {
     console.warn(`Ata ${numeroAta}: a compra ${seqCompra}/${anoCompra} tem mais de um fornecedor e a ata não informa qual é o dela; itens não carregados pelo PNCP.`);
@@ -720,6 +751,7 @@ export async function itensDaAtaPeloPncp(ata: {
   return itens;
 }
 
+/** Itens da compra no PNCP; [] quando a consulta falha (as telas seguem sem itens). */
 export async function fetchPncpCompraItems(
   anoCompra: string,
   seqCompra: number | string,
@@ -728,6 +760,25 @@ export async function fetchPncpCompraItems(
   targetSupplierCnpj?: string,
   customCnpj?: string
 ): Promise<ArpItemRecord[]> {
+  return (await consultarItensDaCompraPncp(anoCompra, seqCompra, numeroAta, uasg, targetSupplierCnpj, customCnpj)) ?? [];
+}
+
+/** Resultados (fornecedor e valor homologado) consultados ao mesmo tempo: o PNCP recusa rajadas (429). */
+const RESULTADOS_EM_PARALELO = 5;
+
+/**
+ * Itens da compra no PNCP, com fornecedor e valores homologados. Devolve null quando a lista ou o resultado de algum
+ * item não veio (429, 5xx, rede): sem o fornecedor de todos os itens não dá para saber de quem são, e valor e
+ * quantidade sairiam errados. Item sem resultado publicado (404 ou lista vazia) não é falha. Falha não fica guardada.
+ */
+async function consultarItensDaCompraPncp(
+  anoCompra: string,
+  seqCompra: number | string,
+  numeroAta: string,
+  uasg: string,
+  targetSupplierCnpj?: string,
+  customCnpj?: string
+): Promise<ArpItemRecord[] | null> {
   const cleanTargetCnpj = (targetSupplierCnpj || '').replace(/\D/g, '');
   const cnpj = (customCnpj || CNPJ_SENASP).replace(/\D/g, '');
   const cacheKey = `${cnpj}-${anoCompra}-${seqCompra}-${numeroAta}-${uasg}-${cleanTargetCnpj}`;
@@ -739,12 +790,12 @@ export async function fetchPncpCompraItems(
     // Sem tamanhoPagina o PNCP devolve só 10 itens: a checagem de "um fornecedor só" olhava só esses e deixava passar.
     const itemsUrl = `/api-pncp/api/pncp/v1/orgaos/${cnpj}/compras/${anoCompra}/${seqCompra}/itens?tamanhoPagina=500`;
     const res = await fetch(itemsUrl);
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const itemsData = await res.json();
-    if (!Array.isArray(itemsData)) return [];
+    if (!Array.isArray(itemsData)) return null;
 
-    const arpItems: ArpItemRecord[] = await Promise.all(
-      itemsData.map(async (it: any) => {
+    let resultadoFalhou = false;
+    const montarItem = async (it: any): Promise<ArpItemRecord> => {
         let niFornecedor = '';
         let nomeRazaoSocialFornecedor = '';
         let valorUnitario = it.valorUnitarioEstimado || 0;
@@ -754,8 +805,9 @@ export async function fetchPncpCompraItems(
         try {
           const resUrl = `/api-pncp/api/pncp/v1/orgaos/${cnpj}/compras/${anoCompra}/${seqCompra}/itens/${it.numeroItem}/resultados`;
           const resResponse = await fetch(resUrl);
+          if (!resResponse.ok && resResponse.status !== 404) resultadoFalhou = true;
           if (resResponse.ok) {
-            const resultsData = await resResponse.json();
+            const resultsData = await resResponse.json().catch(() => null);
             if (Array.isArray(resultsData) && resultsData.length > 0) {
               const r = resultsData[0];
               niFornecedor = r.niFornecedor || '';
@@ -765,7 +817,9 @@ export async function fetchPncpCompraItems(
               if (r.quantidadeHomologada) quantidadeHomologada = r.quantidadeHomologada;
             }
           }
-        } catch {}
+        } catch {
+          resultadoFalhou = true;
+        }
 
         return {
           numeroAtaRegistroPreco: numeroAta,
@@ -807,8 +861,15 @@ export async function fetchPncpCompraItems(
           codigoPdm: 0,
           nomePdm: it.descricao || ''
         } as ArpItemRecord;
-      })
-    );
+    };
+    const arpItems: ArpItemRecord[] = [];
+    for (let i = 0; i < itemsData.length; i += RESULTADOS_EM_PARALELO) {
+      arpItems.push(...await Promise.all(itemsData.slice(i, i + RESULTADOS_EM_PARALELO).map(montarItem)));
+    }
+    if (resultadoFalhou) {
+      console.warn(`Itens da compra ${seqCompra}/${anoCompra}: o PNCP não entregou o resultado de algum item; itens não carregados.`);
+      return null;
+    }
 
     let filteredItems = arpItems;
     if (cleanTargetCnpj) {
@@ -819,7 +880,7 @@ export async function fetchPncpCompraItems(
     return filteredItems;
   } catch (e) {
     console.warn(`Erro ao carregar itens da compra ${seqCompra}/${anoCompra} no PNCP:`, e);
-    return [];
+    return null;
   }
 }
 
@@ -978,9 +1039,9 @@ export async function fetchArpItems(
 
       // 3.5. Itens pelo PNCP, só quando é certo que são desta ata (regra em itensDaAtaPeloPncp).
       if (anoCompra && seqCompra) {
-        foundItems = await itensDaAtaPeloPncp({
+        foundItems = (await itensDaAtaPeloPncp({
           anoCompra, seqCompra, seqAta, numeroAta: numeroAtaRegistroPreco, uasg: codigoUnidadeGerenciadora, cnpj: cnpjDaCompra
-        });
+        })) ?? [];
       }
     }
 

@@ -35,6 +35,8 @@ interface Cenario {
   listaFalha?: boolean;
   /** Atas do Compras.gov.br. */
   compras?: unknown[];
+  compraFalha?: boolean;
+  resultadoFalha?: boolean;
 }
 
 function mockPncp(c: Cenario) {
@@ -49,6 +51,7 @@ function mockPncp(c: Cenario) {
       return json({ data: c.paginas[pagina - 1] || [], totalPaginas: c.paginas.length });
     }
     const compra = url.match(/\/api-pncp\/api\/consulta\/v1\/orgaos\/\d+\/compras\/2025\/(\d+)$/);
+    if (compra && c.compraFalha) return new Response('', { status: 429 });
     if (compra) return json({ numeroCompra: '90039', modalidadeId: 6, modalidadeNome: 'Pregão - Eletrônico', processo: '08020005997202524' });
     const atas = url.match(/\/compras\/2025\/(\d+)\/atas$/);
     if (atas) {
@@ -56,6 +59,7 @@ function mockPncp(c: Cenario) {
       return json({ data: lista, totalRegistros: lista.length });
     }
     if (/\/itens\?tamanhoPagina=500$/.test(url)) return json([{ numeroItem: 1, descricao: 'Touca', quantidade: 10, valorUnitarioEstimado: 1 }]);
+    if (/\/itens\/\d+\/resultados$/.test(url) && c.resultadoFalha) return new Response('', { status: 429 });
     if (/\/itens\/\d+\/resultados$/.test(url)) return json([{ niFornecedor: '11111111000111', nomeRazaoSocialFornecedor: 'ACME', valorTotalHomologado: 500, quantidadeHomologada: 10 }]);
     if (url.startsWith('/api-arp/')) return json({ resultado: c.compras || [], paginasRestantes: 0 });
     throw new Error(`URL não prevista no teste: ${url}`);
@@ -138,6 +142,35 @@ describe('fetchAtasSoNoPncp', () => {
     mockPncp({ paginas: [[ataDaLista('00042', 1667, 1)], [ataDaLista('00043', 1667, 2)]] });
     const atas = await fetchAtasSoNoPncp('200331', [], AGORA);
     expect(atas.map((a) => a.numeroAtaRegistroPreco).sort()).toEqual(['00042/2026', '00043/2026']);
+  });
+
+  it('cadastro da compra não veio: a ata fica para a próxima execução (não grava o sequencial como número da compra)', async () => {
+    mockPncp({ paginas: [[ataDaLista('00044', 1664, 1)]], atasDaCompra: { 1664: [{ sequencialAta: 1 }] }, compraFalha: true });
+    expect(await fetchAtasSoNoPncp('200331', [], AGORA)).toEqual([]);
+  });
+
+  it('resultado de um item não veio: a ata fica para a próxima execução (não grava valor zero)', async () => {
+    mockPncp({ paginas: [[ataDaLista('00044', 1664, 1)]], atasDaCompra: { 1664: [{ sequencialAta: 1 }] }, resultadoFalha: true });
+    expect(await fetchAtasSoNoPncp('200331', [], AGORA)).toEqual([]);
+  });
+
+  it('prazo esgotado: não consulta mais nada', async () => {
+    const chamadas = mockPncp({ paginas: [[ataDaLista('00044', 1664, 1)]] });
+    await expect(fetchAtasSoNoPncp('200331', [], AGORA, Date.now() - 1)).rejects.toThrow('prazo');
+    expect(chamadas).toEqual([]);
+  });
+
+  it('não canceladas e mais recentes primeiro', async () => {
+    mockPncp({
+      paginas: [[
+        ataDaLista('00005', 1576, 1, { cancelado: true, dataPublicacaoPncp: '2026-02-27T10:00:00' }),
+        ataDaLista('00069', 1102, 1, { anoAta: 2025, dataPublicacaoPncp: '2025-12-26T10:00:00' }),
+        ataDaLista('00044', 1664, 1, { dataPublicacaoPncp: '2026-09-04T10:00:00' })
+      ]],
+      atasDaCompra: { 1102: [{ sequencialAta: 1 }], 1664: [{ sequencialAta: 1 }] }
+    });
+    const atas = await fetchAtasSoNoPncp('200331', [], AGORA);
+    expect(atas.map((a) => a.numeroAtaRegistroPreco)).toEqual(['00044/2026', '00069/2025', '00005/2026']);
   });
 
   it('UASG fora do CGLIC: não consulta o PNCP', async () => {
