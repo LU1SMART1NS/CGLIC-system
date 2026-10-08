@@ -230,6 +230,7 @@ export function useBatchSyncContractEmpenhos() {
           queryClient.invalidateQueries({ queryKey: ['contract-events', key] });
           queryClient.invalidateQueries({ queryKey: ['contract-empenhos', key] });
           queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links', key] });
+          queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao', key] });
           queryClient.invalidateQueries({ queryKey: SINCRONIZACAO_EMPENHOS_QUERY_KEY(key) });
         }
       }

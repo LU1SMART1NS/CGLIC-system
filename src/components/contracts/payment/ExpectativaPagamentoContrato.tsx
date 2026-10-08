@@ -1,8 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { ActionButton, DataTable, Modal, NoticeBar, SectionHeader, StatusBadge, useToast, type Column } from '../../../design-system';
-import { fetchFaturasDoContrato } from '../../../services/faturasService';
-import { FATURAS_DO_CONTRATO_QUERY_KEY } from '../ContractFaturasSection';
+import { useFaturasDoContrato } from '../../../hooks/useFaturasDoContrato';
 import { useExpectativasPagamento } from '../../../hooks/useExpectativasPagamento';
 import {
   historicoDePagamentos,
@@ -31,13 +29,7 @@ export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEd
 }) => {
   const toast = useToast();
   const { marcas, entregas, definir, salvarEntrega, cancelarEntrega } = useExpectativasPagamento();
-  const { data: faturasContrato } = useQuery({
-    queryKey: FATURAS_DO_CONTRATO_QUERY_KEY(contractKey),
-    queryFn: () => fetchFaturasDoContrato(contractKey),
-    enabled: Boolean(contractKey),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false
-  });
+  const { data: faturasContrato } = useFaturasDoContrato(contractKey);
 
   const marca = marcas.get(contractKey);
   const meses = useMemo(() => ultimosMesesFechados(), []);

@@ -3,7 +3,18 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { SincronizacaoEmpenhosContrato } from '../../../services/contratoEmpenhosSincronizacaoService';
 
 vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => vi.fn() }));
-vi.mock('../../../hooks/useContractEmpenhoItemLinks', () => ({ useContractEmpenhoItemLinks: () => ({ data: [] }) }));
+vi.mock('../../../hooks/useDistribuicaoEmpenhos', () => {
+  const mut = () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, variables: undefined });
+  return {
+    useDistribuicoesEmpenhoContrato: vi.fn(() => ({ data: [] })),
+    useAcoesDistribuicaoEmpenho: () => ({ distribuir: mut(), desfazer: mut() })
+  };
+});
+vi.mock('../../../hooks/useItensDoContrato', () => ({ useItensDoContrato: vi.fn(() => ({ data: undefined })) }));
+vi.mock('../../../hooks/useFaturasDoContrato', async (orig) => ({
+  ...(await orig<typeof import('../../../hooks/useFaturasDoContrato')>()),
+  useFaturasDoContrato: vi.fn(() => ({ data: undefined }))
+}));
 vi.mock('../../../hooks/useContractFinancialSummary', () => ({ useContractFinancialSummary: vi.fn() }));
 vi.mock('../../../hooks/useSincronizacaoEmpenhosContrato', () => ({ useSincronizacaoEmpenhosContrato: vi.fn() }));
 vi.mock('../../../hooks/useVinculoEmpenhosContrato', () => {
@@ -20,7 +31,11 @@ import { useContractFinancialSummary } from '../../../hooks/useContractFinancial
 import { useSincronizacaoEmpenhosContrato } from '../../../hooks/useSincronizacaoEmpenhosContrato';
 import { useDescartesEmpenhoContrato } from '../../../hooks/useVinculoEmpenhosContrato';
 import { useAuth } from '../../../context/AuthContext';
-import { ContractFinancialExecutionSection } from '../ContractFinancialExecutionSection';
+import { useDistribuicoesEmpenhoContrato } from '../../../hooks/useDistribuicaoEmpenhos';
+import { useItensDoContrato } from '../../../hooks/useItensDoContrato';
+import { useFaturasDoContrato } from '../../../hooks/useFaturasDoContrato';
+import { ContractFinancialExecutionSection, EmpenhoDetalhe } from '../ContractFinancialExecutionSection';
+import type { DistribuicaoDoEmpenho } from '../../../services/distribuicaoEmpenhoService';
 
 const contract = { id: '200331-00021-2017', uasg: '200331', numero: '00021/2017', ano: '2017' } as any;
 
@@ -208,5 +223,141 @@ describe('ContractFinancialExecutionSection: vínculo híbrido', () => {
     expect(html).toContain('contract-financial-empty');
     expect(html).toContain('contract-financial-vincular');
     expect(html).toContain('contract-financial-descartados');
+  });
+});
+
+describe('ContractFinancialExecutionSection: divisão da nota entre os itens do contrato', () => {
+  const dist = (over: Partial<DistribuicaoDoEmpenho> = {}): DistribuicaoDoEmpenho => ({
+    contratoEmpenhoId: 'ce1',
+    contractKey: contract.id,
+    empenhoId: 'e1',
+    numeroOficial: '2022NE000245',
+    valorNota: 1000,
+    itensNoContrato: 2,
+    situacao: 'A_DISTRIBUIR',
+    motivoRevisao: null,
+    origem: null,
+    valorNaDistribuicao: null,
+    valorDistribuido: 0,
+    parcelas: [],
+    distribuidoPorNome: null,
+    distribuidoEm: null,
+    observacao: null,
+    sugestaoTipo: 'MULTIPLO_DO_PRECO',
+    sugestao: [{ numeroItem: 13, quantidade: 4 }],
+    ...over
+  });
+  const itens = {
+    itens: [
+      { posicao: 1, numeroItem: 13, descricao: 'Placa balística', tipo: 'Material', quantidade: 79, valorUnitario: 250, valorTotal: 19750 },
+      { posicao: 2, numeroItem: 43, descricao: 'Capacete balístico', tipo: 'Material', quantidade: 10, valorUnitario: 3500, valorTotal: 35000 }
+    ],
+    vinculos: [{ itemKey: '200331-00021-2024-00013', numeroAta: '00021/2024', uasgAta: '200331', numeroItem: 13 }],
+    leitura: null
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useContractFinancialSummary).mockReturnValue(comEmpenho as any);
+    vi.mocked(useSincronizacaoEmpenhosContrato).mockReturnValue({ data: sync({}) } as any);
+    vi.mocked(useItensDoContrato).mockReturnValue({ data: itens } as any);
+  });
+
+  it('nota a distribuir: selo na coluna, sugestão e aviso no resumo com o botão para o gestor', () => {
+    vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({ data: [dist()] } as any);
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
+    const html = render();
+    expect(html).toContain('A distribuir');
+    expect(html).toContain('sugestão: 4 un do item 13');
+    expect(html).toContain('contract-financial-a-distribuir');
+    expect(html).toContain('Distribuir a próxima');
+    // A linha abre os detalhes pela setinha.
+    expect(html).toContain('contract-financial-table-expand-2022NE000245');
+  });
+
+  it('leitor vê o aviso, mas não o botão de distribuir', () => {
+    vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({ data: [dist()] } as any);
+    vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
+    const html = render();
+    expect(html).toContain('contract-financial-a-distribuir');
+    expect(html).not.toContain('Distribuir a próxima');
+  });
+
+  it('nota distribuída mostra os itens na coluna e não gera aviso', () => {
+    vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({
+      data: [dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }] })]
+    } as any);
+    const html = render();
+    expect(html).toContain('Distribuída');
+    expect(html).toContain('item 13');
+    expect(html).not.toContain('contract-financial-a-distribuir');
+  });
+
+  it('fatura que cita NE fora do contrato aparece no resumo e leva à aba Pagamentos', () => {
+    vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({ data: [] } as any);
+    vi.mocked(useFaturasDoContrato).mockReturnValue({
+      data: { faturas: [{ idFatura: 7, numero: '1490', empenhos: '2024NE000412', empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2024NE000412', valor: 10 }], resumo: null, sincronizadoEm: null }
+    } as any);
+    const html = renderToStaticMarkup(<ContractFinancialExecutionSection contract={contract} contractKey={contract.id} onAbrirFatura={vi.fn()} />);
+    expect(html).toContain('contract-financial-fatura-ne-fora');
+    expect(html).toContain('2024NE000412');
+    expect(html).toContain('Ver a fatura');
+  });
+
+  const detalhe = (d: DistribuicaoDoEmpenho | undefined, podeEditar = true, faturas: any[] = []) =>
+    renderToStaticMarkup(
+      <EmpenhoDetalhe
+        empenho={comEmpenho.empenhosList[0] as any}
+        distribuicao={d}
+        itens={[
+          { numeroItem: 13, descricao: 'Placa balística', tipo: 'Material', quantidade: 79, valorUnitario: 250, valorTotal: 19750 },
+          { numeroItem: 43, descricao: 'Capacete balístico', tipo: 'Material', quantidade: 10, valorUnitario: 3500, valorTotal: 35000 }
+        ]}
+        vinculoPorItem={new Map([[13, itens.vinculos[0]]])}
+        faturas={faturas}
+        podeEditar={podeEditar}
+        desfazendo={false}
+        onDistribuir={vi.fn()}
+        onDesfazer={vi.fn()}
+        onAbrirItem={vi.fn()}
+        onAbrirFatura={vi.fn()}
+      />
+    );
+
+  it('detalhes da nota distribuída: parcela, quantidade, item da ata e faturas que citam a nota', () => {
+    const html = detalhe(
+      dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }], distribuidoPorNome: 'Maria' }),
+      true,
+      [{ idFatura: 7, numero: '1203', valor: 500, paga: true, cancelada: false, dataLiquidacao: '2026-03-20' }]
+    );
+    expect(html).toMatch(/R\$\s1\.000,00/);
+    expect(html).toContain('4 un');
+    expect(html).toContain('de 79 contratadas');
+    expect(html).toContain('Ata 00021/2024 · item 13');
+    expect(html).toContain('sem vínculo');
+    expect(html).toContain('por Maria');
+    expect(html).toContain('Editar distribuição');
+    expect(html).toContain('Desfazer');
+    expect(html).toContain('fatura 1203');
+  });
+
+  it('distribuição automática (contrato de um item) não oferece editar nem desfazer', () => {
+    const html = detalhe(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }] }));
+    expect(html).toContain('Automática: contrato de um item');
+    expect(html).not.toContain('Editar distribuição');
+    expect(html).not.toContain('Desfazer');
+  });
+
+  it('nota a rever explica o motivo e oferece distribuir de novo', () => {
+    const html = detalhe(dist({ situacao: 'REVISAR', motivoRevisao: 'VALOR_MUDOU', origem: 'USUARIO', valorNaDistribuicao: 800, valorDistribuido: 800, parcelas: [{ numeroItem: 13, valor: 800 }] }));
+    expect(html).toContain('O valor da nota mudou de R$');
+    expect(html).toContain('>Distribuir<');
+  });
+
+  it('contrato sem itens numerados: a nota fica no contrato inteiro', () => {
+    const html = detalhe(dist({ situacao: 'SEM_ITENS', itensNoContrato: 0 }));
+    expect(html).toContain('não tem itens numerados');
+    expect(html).not.toContain('Distribuir');
+    expect(html).toContain('nenhuma fatura cita esta nota');
   });
 });

@@ -4,7 +4,6 @@ import { useBackTarget } from '../../hooks/useDetailOrigin';
 import {
   AlertTriangle,
   DollarSign,
-  FileText,
   History,
   ListTodo,
   Package,
@@ -24,9 +23,10 @@ import { useInstrumentTab } from '../instrument360/useInstrumentTab';
 import { ContractActionQueue, type Contract360Tab } from './ContractActionQueue';
 import { ContractHealthStrip } from './ContractHealthStrip';
 import { useContractActionQueue } from '../../hooks/useContractActionQueue';
-import { ContractPaymentFollowUpSection } from './ContractPaymentFollowUpSection';
+import { ContractPagamentosSection } from './ContractPagamentosSection';
 import { ContractFinancialExecutionSection } from './ContractFinancialExecutionSection';
-import { ContractFaturasSection } from './ContractFaturasSection';
+import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
+import { useFaturasDoContrato } from '../../hooks/useFaturasDoContrato';
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
 import { ContractItemsSection } from './ContractItemsSection';
@@ -71,7 +71,17 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   const itensDoContrato = useItensDoContrato(resolvedContractKey, Boolean(contract));
   const totalItens = itensDoContrato.data?.itens.length ?? 0;
 
-  const { activeTab, goToTab, tabsRef } = useInstrumentTab<Contract360Tab>({ tabs: TAB_IDS, defaultTab: 'acoes' });
+  const { activeTab, goToTab, tabsRef, searchParams } = useInstrumentTab<Contract360Tab>({ tabs: TAB_IDS, defaultTab: 'acoes' });
+  // Linha a abrir na aba (?abrir=): a nota de empenho ou a fatura que a outra aba mandou abrir.
+  const abrir = searchParams.get('abrir');
+  const abrirEmpenho = (numero: string) => goToTab('financeiro', { abrir: numero });
+  const abrirFatura = (idFatura: number) => goToTab('pagamentos', { abrir: String(idFatura) });
+
+  // Contadores das abas, como "Contratos e empenhos (3)" no item (mesmas consultas das abas, em cache).
+  const { empenhosList } = useContractFinancialSummary(contract ?? ({} as NonNullable<typeof contract>), resolvedContractKey);
+  const { data: faturasDoContrato } = useFaturasDoContrato(resolvedContractKey);
+  const totalEmpenhos = empenhosList.length;
+  const totalFaturas = faturasDoContrato?.faturas.length ?? 0;
 
   // Escopo ASSIGNED do perfil "gestor" (role_domain_scopes.contracts,
   // migration 20260925000023): a listagem em ContractsRoute.tsx já esconde
@@ -140,8 +150,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
     { id: 'acoes', label: queue.items.length > 0 ? `Ações (${queue.items.length})` : 'Ações' },
     { id: 'plano', label: 'Plano de gestão' },
     { id: 'itens', label: totalItens > 0 ? `Itens (${totalItens})` : 'Itens' },
-    { id: 'financeiro', label: 'Empenhos' },
-    { id: 'pagamentos', label: 'Pagamentos' },
+    { id: 'financeiro', label: totalEmpenhos > 0 ? `Empenhos (${totalEmpenhos})` : 'Empenhos' },
+    { id: 'pagamentos', label: totalFaturas > 0 ? `Pagamentos (${totalFaturas})` : 'Pagamentos' },
     { id: 'historico', label: 'Histórico' }
   ];
 
@@ -213,23 +223,17 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
 
         {activeTab === 'pagamentos' && (
           <InstrumentSection
-            id="contract-payment-followup-section"
-            title="Acompanhamento de pagamentos"
-            subtitle="Atestos, faturamento e tramitação na CGOFI (o CGLIC acompanha; a CGOFI executa o pagamento)"
+            id="contract-pagamentos-section"
+            title="Pagamentos"
+            subtitle="Atestos conferidos pela CGLIC, faturas no Contratos.gov.br, liquidação no SIAFI e ordem bancária no Tesouro (o CGLIC acompanha; a CGOFI executa o pagamento)"
             icon={DollarSign}
           >
-            <ContractPaymentFollowUpSection contract={contract} contractKey={resolvedContractKey} />
-          </InstrumentSection>
-        )}
-
-        {activeTab === 'pagamentos' && (
-          <InstrumentSection
-            id="contract-faturas-section"
-            title="Faturas e ordens bancárias"
-            subtitle="Faturas no Contratos.gov.br, liquidação no SIAFI e pagamento no Tesouro (dados oficiais, atualizados pelo servidor)"
-            icon={FileText}
-          >
-            <ContractFaturasSection contractKey={resolvedContractKey} />
+            <ContractPagamentosSection
+              contract={contract}
+              contractKey={resolvedContractKey}
+              abrirFatura={abrir}
+              onAbrirEmpenho={abrirEmpenho}
+            />
           </InstrumentSection>
         )}
 
@@ -237,10 +241,15 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
           <InstrumentSection
             id="contract-financial-execution-section"
             title="Execução financeira e empenhos"
-            subtitle="Empenhos emitidos, liquidação, pagamento e saldos de execução"
+            subtitle="Notas de empenho do contrato, como se dividem entre os itens e quanto já foi liquidado e pago"
             icon={Receipt}
           >
-            <ContractFinancialExecutionSection contract={contract} contractKey={resolvedContractKey} />
+            <ContractFinancialExecutionSection
+              contract={contract}
+              contractKey={resolvedContractKey}
+              abrirEmpenho={abrir}
+              onAbrirFatura={abrirFatura}
+            />
           </InstrumentSection>
         )}
 

@@ -127,7 +127,9 @@ describe('useSyncContractEmpenhos Hook — Integração UI Contrato 360°', () =
     });
     // O id do Contratos.gov.br pode ter sido completado e gravado no registro do contrato
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['contracts-dashboard'] });
-    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(12);
+    // A divisão das notas entre os itens do contrato (migration 94) muda com os empenhos.
+    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['contrato-empenho-distribuicao', '200331-00015-2026'] });
+    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(13);
   });
 
   it('3. falha inesperada do orquestrador vira resultado ERRO com a mensagem (e é registrada, não lançada)', async () => {

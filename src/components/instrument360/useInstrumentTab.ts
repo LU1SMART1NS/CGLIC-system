@@ -31,11 +31,12 @@ export function useInstrumentTab<T extends string>(options: { tabs: readonly T[]
   const tabsRef = React.useRef<HTMLDivElement>(null);
   const activeTab = resolveInstrumentTab(searchParams.get('aba'), tabs, defaultTab, aliases);
 
-  const goToTab = (tab: T) => {
+  /** `extra` vai junto no endereço (ex.: `{ abrir: '2024NE000337' }` para a aba abrir aquela linha). */
+  const goToTab = (tab: T, extra?: Record<string, string>) => {
     // Mantém o state da navegação: é nele que viaja a origem do Voltar.
-    setSearchParams(tabSearchParams(tab, defaultTab), { replace: true, state: location.state });
+    setSearchParams({ ...tabSearchParams(tab, defaultTab), ...extra }, { replace: true, state: location.state });
     scrollToDock(tabsRef.current);
   };
 
-  return { activeTab, goToTab, tabsRef };
+  return { activeTab, goToTab, tabsRef, searchParams };
 }
