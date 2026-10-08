@@ -50,6 +50,8 @@ interface VincularEmpenhoModalProps {
   idsVinculados: Set<string>;
   isLoading: boolean;
   erro?: string;
+  /** Número da NE já preenchido e procurado ao abrir (fila "Empenhos ao contrato"). */
+  numeroInicial?: string;
   onVincular: (pedido: PedidoDeVinculo) => void;
   onFechar: () => void;
 }
@@ -62,11 +64,12 @@ export const VincularEmpenhoModal: React.FC<VincularEmpenhoModalProps> = ({
   idsVinculados,
   isLoading,
   erro,
+  numeroInicial,
   onVincular,
   onFechar
 }) => {
-  const [numero, setNumero] = React.useState('');
-  const [procurado, setProcurado] = React.useState('');
+  const [numero, setNumero] = React.useState(numeroInicial ?? '');
+  const [procurado, setProcurado] = React.useState(numeroInicial && numeroDeEmpenhoValido(numeroInicial) ? numeroInicial.trim() : '');
   const [escolha, setEscolha] = React.useState('');
   const [uasg, setUasg] = React.useState(contrato.uasg || UASGS_CGLIC[0]);
   const [dataEmissao, setDataEmissao] = React.useState('');
@@ -77,8 +80,8 @@ export const VincularEmpenhoModal: React.FC<VincularEmpenhoModalProps> = ({
 
   React.useEffect(() => {
     if (!isOpen) return;
-    setNumero('');
-    setProcurado('');
+    setNumero(numeroInicial ?? '');
+    setProcurado(numeroInicial && numeroDeEmpenhoValido(numeroInicial) ? numeroInicial.trim() : '');
     setEscolha('');
     setUasg(contrato.uasg || UASGS_CGLIC[0]);
     setDataEmissao('');
@@ -86,7 +89,7 @@ export const VincularEmpenhoModal: React.FC<VincularEmpenhoModalProps> = ({
     setCredorNome(contrato.fornecedorNome || '');
     setCredorCnpj(contrato.fornecedorCnpjCpf || '');
     setMotivo('');
-  }, [isOpen, contrato.uasg, contrato.fornecedorNome, contrato.fornecedorCnpjCpf]);
+  }, [isOpen, numeroInicial, contrato.uasg, contrato.fornecedorNome, contrato.fornecedorCnpjCpf]);
 
   const busca = useBuscaEmpenhoPorNumero(procurado, isOpen && numeroDeEmpenhoValido(procurado));
   const encontrados = busca.data ?? [];

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { ContractsPartialNotice } from '../../carteira/ContractsPartialNotice';
 import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
@@ -9,30 +9,25 @@ import { HeaderRefreshAction } from '../../../design-system/components/HeaderRef
 import { SkeletonLoader } from '../../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../../design-system/components/ErrorState';
 import { EmptyState } from '../../../design-system/components/EmptyState';
+import { AppButton, NoticeBar } from '../../../design-system';
+import { useNavigate } from 'react-router-dom';
 import { canAssignManager } from '../../carteira/ManagerAssign';
 import { AtribuirGestorModal } from './AtribuirGestorModal';
 import { AtasSemGestorFila } from './AtasSemGestorFila';
-import { ContratosSemVinculoFila } from './ContratosSemVinculoFila';
-import type { ItemDaAta } from './vinculoEmMassa';
 import { DivergenciasFila } from './DivergenciasFila';
 import { AvisosVinculoBanner } from './AvisosVinculoBanner';
 import { EquipeFila } from './EquipeFila';
-import { VinculoAutomaticoFaixa } from './VinculoAutomaticoFaixa';
-import { useMotivosVinculoManual } from '../../../hooks/useVinculoAutomatico';
-import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParcial, type ContratoAVincular, type FilaAta, type FilaContrato } from './contratosSemAta';
-import { useNumerosDosItensDosContratos } from '../../../hooks/useItensDoContrato';
+import type { ContratoAVincular } from './contratosSemAta';
 import { FILAS, FILA_INICIAL, type Fila } from './filaComum';
-import { useContratosSemAta } from '../../../hooks/useContratosSemAta';
-import { useDescartesAtaContrato } from '../../../hooks/useDescartesAtaContrato';
+import { usePendenciasVinculoAta } from './usePendenciasVinculoAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { useAuth } from '../../../context/AuthContext';
-import { useAtasPortfolio, getArpPrazo } from '../../../hooks/useAtasPortfolio';
-import { useContractsPortfolio } from '../../../hooks/useContractsPortfolio';
-import { useArpItemContractLinks } from '../../../hooks/useAtaManagers';
+import { getArpPrazo } from '../../../hooks/useAtasPortfolio';
 import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
 import { formatContractNumber } from '../../../utils/contractNumber';
 import { buildDistribuicaoEquipe } from './distribuicaoEquipe';
 import { mesesDeVigencia } from './complexidade';
+import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
 
 const AMBAR = 'var(--color-warning)';
 const VERMELHO = 'var(--color-danger)';
@@ -46,32 +41,29 @@ function categoriaDoContrato(raw: unknown): string | undefined {
 }
 
 /**
- * Central de Distribuição, no padrão das carteiras: filas de trabalho em abas com contagem (Atas sem gestor,
- * Contratos sem ata, A vincular, Gestor diferente da ata) e a carga de cada gestor (Equipe). A aba fica na URL.
+ * Central de Distribuição, no padrão das carteiras: atas e contratos para gestores. Filas em abas com contagem
+ * (Atas sem gestor, Gestor diferente da ata) e a carga de cada gestor (Equipe). A aba fica na URL. O vínculo de
+ * contrato à ata saiu daqui para o menu Vinculação.
  */
 export const DistribuicaoEquipePage: React.FC = () => {
-  const atas = useAtasPortfolio();
-  const contratos = useContractsPortfolio();
-  const { data: links = [], isLoading: linksLoading } = useArpItemContractLinks();
+  const { atas, contratos, links, pendencias, totalSemVinculo, gestorDoContrato, isBusy, refresh } = usePendenciasVinculoAta();
   // Só quem pode atribuir (admin) vê as ações de transferir; o leitor acompanha.
   const { role } = useAuth();
   const canAssign = canAssignManager(role);
   // Ajuste manual de complexidade: só o coordenador (a RPC também exige admin).
   const canAjustar = role === 'admin';
   const { data: ajustes } = useComplexidadeAjustes();
-  const { data: confirmacoesSemAta = {}, isLoading: semAtaLoading } = useContratosSemAta();
-  const { data: descartesAta = {} } = useDescartesAtaContrato();
-  const { data: motivosManual } = useMotivosVinculoManual();
+  const navigate = useNavigate();
 
   // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void; provaveis?: number } | null>(null);
 
   // Fila aberta (?aba=); trocar de fila limpa a busca, os filtros e a ordenação da anterior.
   const [searchParams, setSearchParams] = useSearchParams();
-  const abaParam = searchParams.get('aba') as Fila | null;
-  // "A vincular" virou parte de "Contratos sem vínculo": endereços antigos caem na fila unificada.
-  const abaPedida = (abaParam as string) === 'A_VINCULAR' ? 'CONTRATOS' : abaParam;
-  const abaDaUrl: Fila = abaPedida && (FILAS as readonly string[]).includes(abaPedida) ? (abaPedida as Fila) : FILA_INICIAL;
+  const abaParam = searchParams.get('aba');
+  // "Contratos sem vínculo" e "A vincular" moraram aqui: os endereços antigos levam à fila do menu Vinculação.
+  const vaiParaVinculacao = abaParam === 'CONTRATOS' || abaParam === 'A_VINCULAR';
+  const abaDaUrl: Fila = abaParam && (FILAS as readonly string[]).includes(abaParam) ? (abaParam as Fila) : FILA_INICIAL;
   const trocarAba = (nova: Fila) => setSearchParams(nova === FILA_INICIAL ? {} : { aba: nova }, { replace: true });
 
   const distribuicao = useMemo(
@@ -105,86 +97,9 @@ export const DistribuicaoEquipePage: React.FC = () => {
     [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes]
   );
 
-  const atasFila = useMemo<FilaAta[]>(
-    () =>
-      atas.arps.map((arp) => {
-        const itens = atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`] || [];
-        const prazo = getArpPrazo(arp);
-        return {
-          numeroAta: arp.numeroAtaRegistroPreco,
-          uasg: arp.codigoUnidadeGerenciadora,
-          idCompra: arp.idCompra,
-          numeroCompra: arp.numeroCompra,
-          anoCompra: arp.anoCompra,
-          cnpjs: Array.from(new Set(itens.map((i) => (i.niFornecedor || '').replace(/\D/g, '')).filter(Boolean))),
-          fornecedorNomes: Array.from(new Set(itens.map((i) => i.nomeRazaoSocialFornecedor).filter(Boolean))),
-          gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
-          objeto: arp.objeto,
-          fornecedorNome: itens[0]?.nomeRazaoSocialFornecedor,
-          faixa: prazo.faixa,
-          dias: prazo.dias,
-          vigenciaFim: arp.dataVigenciaFinal,
-          itens: itens.length,
-          numerosItens: itens.map((i) => parseInt(i.numeroItem, 10)).filter((n) => Number.isFinite(n))
-        };
-      }),
-    [atas.arps, atas.itemsByAta, atas.gestorByAta]
-  );
-
-  // Pendências de distribuição: atas sem gestor, contratos sem gestor e sem ata e contratos a vincular por
-  // gestor. Atas encerradas entram nas sugestões (o contrato costuma durar mais que a ata de onde veio).
-  const contratosFila = useMemo<FilaContrato[]>(
-    () =>
-      contratos.rows.map((row) => ({
-        contractKey: row.contractKey,
-        numero: formatContractNumber(row.contract),
-        fornecedorNome: row.contract.fornecedorNome,
-        fornecedorCnpj: row.contract.fornecedorCnpjCpf,
-        idCompra: row.contract.idCompra,
-        objeto: row.contract.objeto,
-        faixa: row.faixa,
-        dias: row.diasRestantes,
-        gestorNome: row.gestorNome,
-        contract: row.contract
-      })),
-    [contratos.rows]
-  );
-  const vinculosDoContrato = useMemo(() => agruparVinculos(links, (n) => atas.gestorByAta[n]), [links, atas.gestorByAta]);
-  const descartes = useMemo(() => new Set(Object.keys(descartesAta)), [descartesAta]);
-  const gestorPorContrato = useMemo(() => new Map(contratos.rows.map((r) => [r.contractKey, r.gestorNome])), [contratos.rows]);
-  const gestorDoContrato = React.useCallback((contractKey: string) => gestorPorContrato.get(contractKey), [gestorPorContrato]);
-  // Contrato em mais de uma ata (migration 86): os vinculados com outra ata provável podem estar com item faltando.
-  const paraConferirParcial = useMemo(
-    () => contratosParaConferirParcial({ contratos: contratosFila, atas: atasFila, vinculosDoContrato, descartes }),
-    [contratosFila, atasFila, vinculosDoContrato, descartes]
-  );
-  const { data: itensDoContrato } = useNumerosDosItensDosContratos(paraConferirParcial);
-  const pendencias = useMemo(
-    () =>
-      buildPendenciasDistribuicao({
-        contratos: contratosFila,
-        atas: atasFila,
-        vinculosDoContrato,
-        itensDoContrato,
-        naoPertencemAAta: new Set(Object.keys(confirmacoesSemAta)),
-        descartes
-      }),
-    [contratosFila, atasFila, vinculosDoContrato, itensDoContrato, confirmacoesSemAta, descartes]
-  );
-  const atasPorChave = useMemo(() => new Map(atasFila.map((a) => [`${a.numeroAta}-${a.uasg}`, a])), [atasFila]);
-  const ataDe = React.useCallback((numeroAta: string, uasg: string) => atasPorChave.get(`${numeroAta}-${uasg}`), [atasPorChave]);
   const aVincularDe = (gestorNome: string): ContratoAVincular[] => pendencias.aVincularPorGestor.get(gestorNome) || [];
-  /** Itens da ata no banco, para a Central prever os itens do vínculo em massa. */
-  const itensDaAta = React.useCallback(
-    (numeroAta: string, uasg: string): ItemDaAta[] =>
-      (atas.itemsByAta[`${numeroAta}-${uasg}`] || []).map((i) => ({ numeroItem: i.numeroItem, valorUnitario: i.valorUnitario, descricao: i.descricaoItem })),
-    [atas.itemsByAta]
-  );
 
-  const refresh = () => {
-    void contratos.refresh();
-    atas.reload();
-  };
+  if (vaiParaVinculacao) return <Navigate to={ROTAS_VINCULACAO.contratos} replace />;
 
   if (contratos.error && !contratos.hasAnyData && atas.arps.length === 0) {
     return (
@@ -198,13 +113,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
     );
   }
 
-  // Só mostra números com atas, contratos e vínculos carregados: totais parciais enganariam a leitura da carga.
-  const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading || semAtaLoading;
   const { divergencias, totais } = distribuicao;
   // "Gestor diferente da ata" só aparece quando há caso: o vínculo automático não cria divergência (migration 95).
   const aba: Fila = abaDaUrl === 'DIVERGENCIAS' && divergencias.length === 0 ? FILA_INICIAL : abaDaUrl;
   const totalInstrumentos = totais.atas.vigentes + totais.contratos.vigentes;
-  const totalSemVinculo = pendencias.aVincular.length + pendencias.precisamDecisao.length;
   // A carteira sem gestor fica nas filas; a Equipe mostra só quem tem carteira.
   const linhasEquipe = distribuicao.linhas.filter((l) => l.gestorNome !== null);
 
@@ -216,13 +128,6 @@ export const DistribuicaoEquipePage: React.FC = () => {
       count: pendencias.atasSemGestor.length,
       dot: pendencias.atasSemGestor.length ? AMBAR : undefined,
       title: 'Vigentes e encerradas que ainda têm contratos'
-    },
-    {
-      id: 'CONTRATOS' as const,
-      label: 'Contratos sem vínculo',
-      count: totalSemVinculo,
-      dot: totalSemVinculo ? AMBAR : undefined,
-      title: 'Vincule à ata provável (vários de uma vez quando a API confirma) ou marque que não pertencem a nenhuma ata'
     },
     ...(divergencias.length > 0
       ? [
@@ -277,6 +182,20 @@ export const DistribuicaoEquipePage: React.FC = () => {
           )}
 
           <AvisosVinculoBanner podeVer={canAssign} gestorDoContrato={gestorDoContrato} gestorDaAta={(ataKey) => atas.gestorByAta[ataKey]} />
+          {totalSemVinculo > 0 && (
+            <NoticeBar
+              tone="info"
+              testId="distribuicao-contratos-sem-vinculo"
+              action={
+                <AppButton variant="outline" size="sm" onClick={() => navigate(ROTAS_VINCULACAO.contratos)}>
+                  Abrir Vinculação
+                </AppButton>
+              }
+            >
+              <strong>{totalSemVinculo}</strong> {totalSemVinculo === 1 ? 'contrato ainda não tem' : 'contratos ainda não têm'} item de ata vinculado. O vínculo é
+              feito no menu Vinculação; quando vinculado, o contrato segue o gestor da ata.
+            </NoticeBar>
+          )}
 
           <CarteiraSegmentTabs segments={segmentos} active={aba} onSelect={trocarAba} testIdPrefix="distribuicao-aba" ariaLabel="Filas de distribuição" />
 
@@ -301,28 +220,6 @@ export const DistribuicaoEquipePage: React.FC = () => {
                   origem: null,
                   done,
                   provaveis: lista.reduce((n, ata) => n + ata.provaveis.length, 0)
-                })
-              }
-            />
-          )}
-
-          {aba === 'CONTRATOS' && <VinculoAutomaticoFaixa links={links} paraEquipe={totalSemVinculo} podeRodar={role === 'admin'} />}
-
-          {aba === 'CONTRATOS' && (
-            <ContratosSemVinculoFila
-              motivos={motivosManual}
-              pendencias={pendencias}
-              confirmacoes={confirmacoesSemAta}
-              podeAgir={canAssign}
-              ataDe={ataDe}
-              atas={atasFila}
-              itensDaAta={itensDaAta}
-              onAtribuir={(lista, done) =>
-                setTransferencia({
-                  targets: lista.map((item) => ({ tipo: 'CONTRATO' as const, contractKey: item.contractKey })),
-                  // Lote com gestores diferentes ("não pertence" já atribuídos) sai como "Atribuir gestor".
-                  origem: lista.length === 1 ? lista[0].gestorNome ?? null : null,
-                  done
                 })
               }
             />

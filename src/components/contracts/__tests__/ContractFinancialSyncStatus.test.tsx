@@ -232,6 +232,8 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     contractKey: contract.id,
     empenhoId: 'e1',
     numeroOficial: '2022NE000245',
+    dataEmissao: '2022-03-01',
+    uasgEmitente: '200331',
     valorNota: 1000,
     itensNoContrato: 2,
     situacao: 'A_DISTRIBUIR',

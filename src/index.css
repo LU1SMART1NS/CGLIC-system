@@ -654,6 +654,14 @@ h1, h2, h3, h4 {
   color: #64748b;
 }
 .app-rail-link[data-active='true'] { color: var(--primary); font-weight: 800; }
+/* Pendências da área (menu Vinculação): número no canto do ícone. */
+.app-rail-link { position: relative; }
+.app-rail-count {
+  position: absolute; top: 0.2rem; right: 0.35rem;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--color-warning-solid, #ffcd07); color: #1f1300; box-shadow: 0 0 0 2px #ffffff;
+  font-size: 0.65rem; font-weight: 800; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums;
+}
 .app-rail-link[data-active='true'] .app-rail-icon { background: rgba(12, 50, 111, 0.1); color: var(--primary); }
 .app-bottom-nav {
   position: fixed;

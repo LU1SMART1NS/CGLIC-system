@@ -18,6 +18,7 @@ import { situacaoDoSaldo, type EmpenhoCarteiraRow } from '../../services/finance
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
 import { normalizarBusca } from './financeiroFormat';
 import { EmpenhosCarteiraTable } from './EmpenhosCarteiraTable';
+import { useSituacaoDistribuicaoPorEmpenho } from '../../hooks/useVinculacaoEmpenhos';
 
 export interface EmpenhosFilterState {
   saldo: string;
@@ -57,6 +58,8 @@ export const EmpenhosCarteira: React.FC = () => {
   const { rows: todos, isLoading, isFetching, error, refetch } = useEmpenhosCarteira();
   const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(EMPENHOS_FILTER_SCHEMA);
+  // Coluna "Itens": situação do vínculo de cada nota aos itens do contrato (o trabalho fica no menu Vinculação).
+  const { data: situacaoItens } = useSituacaoDistribuicaoPorEmpenho();
 
   // Perfil gestor: só os empenhos dos próprios contratos.
   const rows = useMemo(
@@ -201,6 +204,7 @@ export const EmpenhosCarteira: React.FC = () => {
             onResetFilters={resetFilters}
             onFilter={setFilter}
             canFilterGestor={showGestorFilter}
+            itensDe={(empenhoId) => situacaoItens?.get(empenhoId)}
           />
         </>
       )}

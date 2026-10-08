@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, ExternalLink, Loader2, MinusCircle } from 'lucide-react';
-import { ActionButton, AppButton, Modal } from '../../../design-system';
+import { ActionButton, AppButton, Modal, NoticeBar } from '../../../design-system';
 import { useToast } from '../../../design-system/components/Toast';
 import { useDescartarAta } from '../../../hooks/useDescartesAtaContrato';
 import { buildAtaPath } from '../../../hooks/useAta';
@@ -20,8 +20,10 @@ interface ConferenciaAtaModalProps {
   ata: FilaAta;
   /** Itens da ata no banco (a lista para marcar). */
   itensDaAta: ItemDaAta[];
-  /** Só o coordenador vincula e descarta. */
+  /** Vincula os itens (coordenador e gestor). */
   podeAgir: boolean;
+  /** Descarta a ata e escolhe o gestor quando as atas têm gestores diferentes (só o coordenador). Padrão: igual a `podeAgir`. */
+  podeDecidir?: boolean;
   onClose: () => void;
 }
 
@@ -55,7 +57,9 @@ const Campo: React.FC<{ rotulo: string; children: React.ReactNode; limitar?: boo
  * sobretudo, os itens que a API oficial confirma) e as ações Vincular e "Esta não é a ata". É o único lugar de vincular
  * pela Central: os itens confirmados pela API vêm marcados e os demais itens da ata podem ser marcados à mão.
  */
-export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contrato, ata, itensDaAta: todosOsItensDaAta, podeAgir, onClose }) => {
+export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contrato, ata, itensDaAta: todosOsItensDaAta, podeAgir, podeDecidir = podeAgir, onClose }) => {
+  // Sem poder decidir o gestor, o conflito não trava: o banco mantém a regra (a ata prevalece e o coordenador é avisado).
+  const precisaEscolherGestor = (conflito: boolean) => podeDecidir && conflito;
   const toast = useToast();
   const lote = useVinculoEmMassa();
   const descartar = useDescartarAta();
@@ -119,9 +123,9 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
   const ocupado = lote.estado.rodando || descartar.isPending;
 
   const vincular = async () => {
-    if (itensMarcados.length === 0 || (efeito.conflito && !gestorEscolhido)) return;
+    if (itensMarcados.length === 0 || (precisaEscolherGestor(efeito.conflito) && !gestorEscolhido)) return;
     const gestorFinal =
-      efeito.conflito && gestorEscolhido && gestorEscolhido !== contrato.gestorNome
+      podeDecidir && efeito.conflito && gestorEscolhido && gestorEscolhido !== contrato.gestorNome
         ? { nome: gestorEscolhido, userId: Object.values(ataManagers ?? {}).find((m) => m.gestorNome === gestorEscolhido)?.gestorUserId ?? null }
         : undefined;
     const plano: PlanoVinculo = {
@@ -174,19 +178,21 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
           </AppButton>
           {podeAgir && (
             <>
-              <ActionButton action="descartar" size="sm" onClick={naoEhEstaAta} disabled={ocupado} title="Este contrato não pertence a esta ata: ela deixa de ser sugerida" data-testid="conferencia-descartar">
-                Esta não é a ata
-              </ActionButton>
+              {podeDecidir && (
+                <ActionButton action="descartar" size="sm" onClick={naoEhEstaAta} disabled={ocupado} title="Este contrato não pertence a esta ata: ela deixa de ser sugerida" data-testid="conferencia-descartar">
+                  Esta não é a ata
+                </ActionButton>
+              )}
               <ActionButton
                 action="vincular"
                 size="sm"
                 isLoading={lote.estado.rodando}
                 onClick={vincular}
-                disabled={ocupado || itensMarcados.length === 0 || consulta.isLoading || (efeito.conflito && !gestorEscolhido)}
+                disabled={ocupado || itensMarcados.length === 0 || consulta.isLoading || (precisaEscolherGestor(efeito.conflito) && !gestorEscolhido)}
                 title={
                   itensMarcados.length === 0
                     ? 'Marque os itens que o contrato cobre'
-                    : efeito.conflito && !gestorEscolhido
+                    : precisaEscolherGestor(efeito.conflito) && !gestorEscolhido
                       ? 'Escolha quem fica com o contrato'
                       : 'Vincular o contrato aos itens marcados'
                 }
@@ -243,7 +249,13 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
           ))}
         </section>
 
-        {efeito.conflito && podeAgir && (
+        {efeito.conflito && podeAgir && !podeDecidir && (
+          <NoticeBar tone="info" testId="conferencia-gestor-coordenador">
+            As atas têm gestores diferentes. O vínculo segue a regra do sistema (o contrato fica com o gestor da ata) e o coordenador é avisado para
+            decidir quem fica com o contrato.
+          </NoticeBar>
+        )}
+        {efeito.conflito && podeDecidir && (
           <fieldset data-testid="conferencia-escolha-gestor" style={{ margin: 0, border: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <legend style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.15rem' }}>Quem fica com o contrato?</legend>
             <div style={{ fontSize: '0.78rem', color: '#64748b' }}>As atas têm gestores diferentes. As atas continuam com os gestores que já têm.</div>

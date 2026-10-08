@@ -64,7 +64,7 @@ export function sugestaoCurta(tipo: TipoSugestao | null, sugestao: SugestaoDeIte
 }
 
 /** Rótulo e cor da situação da nota na coluna "Itens do contrato". */
-export function rotuloDaSituacao(d: DistribuicaoDoEmpenho): { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' } {
+export function rotuloDaSituacao(d: Pick<DistribuicaoDoEmpenho, 'situacao' | 'origem'>): { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' } {
   switch (d.situacao) {
     case 'DISTRIBUIDA':
       return { label: d.origem === 'AUTO' ? 'Vinculada automaticamente' : 'Vinculada', variant: 'success' };

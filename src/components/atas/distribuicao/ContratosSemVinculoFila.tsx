@@ -131,8 +131,10 @@ const StatusApi: React.FC<{ previsao: PrevisaoVariasAtas; testId: string; parcia
 interface ContratosSemVinculoFilaProps {
   pendencias: PendenciasDistribuicao;
   confirmacoes: Record<string, ContratoSemAtaConfirmacao>;
-  /** Só o coordenador vincula, descarta, marca e atribui; o leitor consulta. */
+  /** Vincula contrato à ata (coordenador e gestor); o leitor consulta. */
   podeAgir: boolean;
+  /** Decide pelo contrato: descartar ata, marcar "não pertence", atribuir gestor (só o coordenador). Padrão: igual a `podeAgir`. */
+  podeDecidir?: boolean;
   /** Abre o "Para quem atribuo?" para os contratos. */
   onAtribuir: (itens: ItemFila[], done?: () => void) => void;
   /** Itens da ata no banco (a previsão do vínculo cruza com os itens do contrato na API). */
@@ -151,7 +153,7 @@ interface ContratosSemVinculoFilaProps {
  * parcial e os sem pista (o coordenador confere a ata ou marca "não pertence a nenhuma ata" e escolhe o gestor). O nome
  * da ata abre o painel de conferência; descartar tira a ata das sugestões do contrato.
  */
-export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = ({ pendencias, confirmacoes, podeAgir, onAtribuir, itensDaAta, ataDe: ataCompleta, atas, motivos }) => {
+export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = ({ pendencias, confirmacoes, podeAgir, podeDecidir = podeAgir, onAtribuir, itensDaAta, ataDe: ataCompleta, atas, motivos }) => {
   const navigate = useNavigateWithOrigin();
   const queryClient = useQueryClient();
   const confirmDialog = useConfirmDialog();
@@ -281,7 +283,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
     const previsao = previsaoDe(l);
     return previsao?.status === 'PRONTO' && (!efeitoDe(l, previsao).conflito || Boolean(gestorEscolhido[l.contractKey]));
   };
-  const decidivel = (l: Linha) => l.grupo === 'PARCIAL' || l.grupo === 'SEM_PISTA';
+  const decidivel = (l: Linha) => podeDecidir && (l.grupo === 'PARCIAL' || l.grupo === 'SEM_PISTA');
   const selecionavel = (l: Linha) => pronta(l) || decidivel(l);
 
   const chavesSelecionaveisDaPagina = pageItems.filter(selecionavel).map(chave);
@@ -673,7 +675,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                             {efeito.textos.map((t) => (
                               <span key={t}>{t}</span>
                             ))}
-                            {efeito.conflito && podeAgir && (
+                            {efeito.conflito && podeDecidir && (
                               <select
                                 value={gestorEscolhido[l.contractKey] ?? ''}
                                 onChange={(e) => setGestorEscolhido((prev) => ({ ...prev, [l.contractKey]: e.target.value }))}
@@ -702,7 +704,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                             {l.grupo === 'ATA_PROVAVEL' && pronta(l) && (
                               <ActionButton action="vincular" size="sm" onClick={() => vincular([l])} disabled={ocupado} title="Vincular este contrato à ata" data-testid={`sem-vinculo-vincular-${l.contractKey}`} />
                             )}
-                            {(l.grupo === 'ATA_PROVAVEL' || decidivel(l)) && (
+                            {(l.grupo === 'ATA_PROVAVEL' || l.grupo === 'PARCIAL' || l.grupo === 'SEM_PISTA') && (
                               <ActionButton
                                 action="escolherAta"
                                 size="sm"
@@ -725,7 +727,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                               // Sem pista não há ata para conferir: reserva o lugar para os ícones seguintes ficarem alinhados.
                               l.grupo === 'SEM_PISTA' && <span aria-hidden="true" style={{ display: 'inline-block', width: '32px', flexShrink: 0 }} />
                             )}
-                            {l.grupo === 'ATA_PROVAVEL' && (
+                            {l.grupo === 'ATA_PROVAVEL' && podeDecidir && (
                               <ActionButton action="descartar" iconOnly onClick={() => descartarAta(l)} disabled={ocupado || descartar.isPending} title={`Este contrato não pertence a esta ata (${ata?.numeroAta})`} data-testid={`sem-vinculo-descartar-${l.contractKey}`} />
                             )}
                             {decidivel(l) && (
@@ -738,7 +740,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                                 data-testid={`sem-vinculo-nao-pertence-${l.contractKey}`}
                               />
                             )}
-                            {l.grupo === 'NAO_PERTENCE' && (
+                            {l.grupo === 'NAO_PERTENCE' && podeDecidir && (
                               <>
                                 {!l.gestorNome && (
                                   <ActionButton action="atribuir" size="sm" label="Atribuir gestor" onClick={() => onAtribuir([l])} title="Escolher o gestor do contrato" />
@@ -759,7 +761,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
         </div>
       )}
 
-      <DescartadosLista descartados={pendencias.descartados} podeRestaurar={podeAgir} testIdPrefix="sem-vinculo" />
+      <DescartadosLista descartados={pendencias.descartados} podeRestaurar={podeDecidir} testIdPrefix="sem-vinculo" />
 
       {escolhendo && (
         <EscolherAtaModal
@@ -780,6 +782,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
           ata={conferindo.ata}
           itensDaAta={itensDaAta(conferindo.ata.numeroAta, conferindo.ata.uasg)}
           podeAgir={podeAgir}
+          podeDecidir={podeDecidir}
           onClose={() => setConferindo(null)}
         />
       )}

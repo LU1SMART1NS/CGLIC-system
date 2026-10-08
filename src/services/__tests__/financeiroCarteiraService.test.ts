@@ -94,7 +94,7 @@ describe('etapas do pagamento', () => {
     const fatura = {
       idFatura: 7, contractKey: 'K', numero: '231', tipo: 'Nota Fiscal', emissao: '2026-09-01', vencimento: null, valorLiquido: 10,
       dataLiquidacao: null, situacao: 'Pendente', cancelada: false, np: null, referencia: '09/2026', ordensBancarias: null,
-      obEmissao: null, paga: false, npContratos: 0, empenhos: '2026NE000412'
+      obEmissao: null, paga: false, npContratos: 0, empenhos: '2026NE000412', empenhosSemVinculo: 0, empenhosSemVinculoNumeros: null
     };
     const ciclo = { id: 'c1', cycleKey: 'C1', contractKey: 'K', status: 'ENVIADO_CGOFI', input: { valorAtesto: 10 } } as unknown as PaymentFollowUpCycle;
     const rows = montarPagamentosCarteira([ciclo], [fatura], [{ cycle_id: 'c1', id_fatura: 7 }]);
@@ -108,7 +108,7 @@ describe('etapas do pagamento', () => {
       {
         idFatura: 9, contractKey: 'K', numero: '1', tipo: 'Nota Fiscal', emissao: '2026-09-01', vencimento: null, valorLiquido: 10,
         dataLiquidacao: '2026-10-01', situacao: 'Siafi Apropriado', cancelada: false, np: '2026NP000001', referencia: null,
-        ordensBancarias: null, obEmissao: null, paga: false, npContratos: 2, empenhos: null
+        ordensBancarias: null, obEmissao: null, paga: false, npContratos: 2, empenhos: null, empenhosSemVinculo: 0, empenhosSemVinculoNumeros: null
       }
     ]);
     const linha = descreverLinha(row, new Date(2026, 9, 7));

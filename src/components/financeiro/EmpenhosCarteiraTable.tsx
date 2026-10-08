@@ -3,7 +3,7 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrency } from '../carteira/carteiraFormat';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd } from '../carteira/carteiraStyles';
+import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
@@ -12,6 +12,9 @@ import type { EmpenhoCarteiraRow } from '../../services/financeiroCarteiraServic
 import type { ContratoDoFinanceiro } from './useContratosDoFinanceiro';
 import { dataBR } from './financeiroFormat';
 import type { EmpenhosFilterState } from './EmpenhosCarteira';
+import { StatusBadge } from '../../design-system/components/StatusBadge';
+import type { SituacaoDistribuicaoEmpenho } from '../../services/distribuicaoEmpenhoService';
+import { rotuloDaSituacao } from '../../utils/distribuicaoEmpenho';
 
 interface EmpenhosCarteiraTableProps {
   rows: EmpenhoCarteiraRow[];
@@ -21,6 +24,8 @@ interface EmpenhosCarteiraTableProps {
   onResetFilters: () => void;
   onFilter: <K extends keyof EmpenhosFilterState>(key: K, value: EmpenhosFilterState[K]) => void;
   canFilterGestor: boolean;
+  /** Situação da divisão por item de cada NE (por id do empenho); sem ela a coluna "Itens" mostra traço. */
+  itensDe?: (empenhoId: string) => SituacaoDistribuicaoEmpenho | undefined;
   pageSize?: number;
 }
 
@@ -54,6 +59,7 @@ export const EmpenhosCarteiraTable: React.FC<EmpenhosCarteiraTableProps> = ({
   onResetFilters,
   onFilter,
   canFilterGestor,
+  itensDe,
   pageSize = 20
 }) => {
   const sortColumns = React.useMemo<Record<string, CarteiraSortColumn<EmpenhoCarteiraRow>>>(
@@ -103,6 +109,7 @@ export const EmpenhosCarteiraTable: React.FC<EmpenhosCarteiraTableProps> = ({
               <CarteiraSortHeader label="Empenhado" sortKey="empenhado" align="right" {...sortProps} />
               <CarteiraSortHeader label="Pago" sortKey="pago" align="right" {...sortProps} />
               <CarteiraSortHeader label="Saldo" sortKey="saldo" align="right" {...sortProps} />
+              <th style={carteiraTh} title="Situação do vínculo da nota aos itens do contrato">Itens</th>
               <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sortProps} />
             </tr>
           </thead>
@@ -158,6 +165,14 @@ export const EmpenhosCarteiraTable: React.FC<EmpenhosCarteiraTableProps> = ({
                   </td>
                   <td data-label="Saldo" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800 }}>
                     {row.saldo === null ? <span style={{ color: '#94a3b8' }}>—</span> : formatCurrency(row.saldo)}
+                  </td>
+                  <td data-label="Itens" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                    {(() => {
+                      const s = itensDe?.(row.empenhoId);
+                      if (!s || s.situacao === 'SEM_ITENS' || s.situacao === 'SEM_VALOR') return <span style={{ color: '#94a3b8' }}>—</span>;
+                      const r = rotuloDaSituacao(s);
+                      return <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />;
+                    })()}
                   </td>
                   <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                     {principal.gestorNome ? (

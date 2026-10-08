@@ -14,7 +14,10 @@ import {
   UsersRound,
   Briefcase,
   ListChecks,
-  Building2
+  Building2,
+  Link2,
+  FileSignature,
+  Boxes
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -57,6 +60,8 @@ export interface NavItem {
  * - Visão Geral: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
+ * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
+ * - Vinculação: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
  * - Configurações (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
@@ -122,6 +127,60 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/itens'],
         allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+      }
+    ]
+  },
+  {
+    // Quanto de cada item da ata vai para cada unidade interna (trabalho do gestor de saldos).
+    id: 'alocacao',
+    label: 'Alocação',
+    icon: Boxes,
+    status: 'active',
+    children: [
+      {
+        id: 'alocacao-itens',
+        label: 'Itens às unidades',
+        icon: Boxes,
+        route: '/alocacao',
+        status: 'active',
+        matchPrefixes: ['/alocacao'],
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+      }
+    ]
+  },
+  {
+    // Filas de vínculo: ligar uma coisa à outra. "Distribuição" (Visão Geral) fica só com atas e contratos para gestores.
+    id: 'vinculacao',
+    label: 'Vinculação',
+    icon: Link2,
+    status: 'active',
+    children: [
+      {
+        id: 'vinculacao-contratos',
+        label: 'Contratos à ata',
+        icon: FileText,
+        route: '/vinculacao/contratos',
+        status: 'active',
+        matchPrefixes: ['/vinculacao/contratos'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
+      },
+      {
+        id: 'vinculacao-empenhos-contrato',
+        label: 'Empenhos ao contrato',
+        icon: FileSignature,
+        route: '/vinculacao/empenhos-contrato',
+        status: 'active',
+        matchPrefixes: ['/vinculacao/empenhos-contrato'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
+      },
+      {
+        id: 'vinculacao-empenhos-itens',
+        label: 'Empenhos aos itens',
+        icon: FileSpreadsheet,
+        route: '/vinculacao/empenhos-itens',
+        status: 'active',
+        matchPrefixes: ['/vinculacao/empenhos-itens'],
+        allowedRoles: ['admin', 'gestor', 'leitor']
       }
     ]
   },
@@ -279,6 +338,10 @@ const staticRouteLabels: Record<string, string> = {
   '/configuracoes/modelos': 'Modelos de Gestão',
   '/pagamentos': 'Pagamentos',
   '/empenhos': 'Empenhos',
+  '/vinculacao/contratos': 'Contratos à ata',
+  '/vinculacao/empenhos-itens': 'Empenhos aos itens',
+  '/vinculacao/empenhos-contrato': 'Empenhos ao contrato',
+  '/alocacao': 'Alocação',
   '/admin/departamentos': 'Unidades Internas',
   '/admin/usuarios': 'Usuários e Servidores',
   '/admin/perfis': 'Perfis e Permissões'

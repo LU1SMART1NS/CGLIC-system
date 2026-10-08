@@ -39,6 +39,8 @@ const fatura = (over: Partial<FaturaCarteira>): FaturaCarteira => ({
   paga: false,
   npContratos: 0,
   empenhos: '2026NE000412',
+  empenhosSemVinculo: 0,
+  empenhosSemVinculoNumeros: null,
   ...over
 });
 
