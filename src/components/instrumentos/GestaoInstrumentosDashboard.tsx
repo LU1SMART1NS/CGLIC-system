@@ -18,6 +18,7 @@ import { ErrorState } from '../../design-system/components/ErrorState';
 import type { DashboardAttentionCategory } from '../../types/managementDashboard';
 import { getLookupKey, getInstrumentoInfo, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
+import { AvisosResolvidosLista, useResolverAviso } from '../avisos/ResolverAviso';
 
 type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 
@@ -109,20 +110,27 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // Expectativa de pagamento (Portaria 50): avisos calculados na tela a partir das marcas dos contratos.
   const { avisos: avisosPagamento } = useAvisosPagamentoGerais({ enabled: !saldosOnly });
 
-  const allItems = useMemo<AttentionItemWithUasg[]>(() => {
-    const merged: AttentionItemWithUasg[] = [];
+  // ✓ Resolvido: a separação usa a lista viva de avisos resolvidos, para o aviso sumir na hora
+  // (a Visão Geral já vem do banco sem os resolvidos, mas fica em cache por alguns minutos).
+  const resolucao = useResolverAviso();
+  const { porChave: avisosResolvidos, tarefasConcluidas } = resolucao;
+
+  const { allItems, itensResolvidos } = useMemo(() => {
+    const ativos: AttentionItemWithUasg[] = [];
+    const resolvidos: AttentionItemWithUasg[] = [];
     for (const uasg of UASGS) {
       const dash = uasg === UASGS[0] ? dash200330 : dash200331;
-      const items = dash.readModel?.attention?.items || [];
-      for (const item of items) {
+      const attention = dash.readModel?.attention;
+      for (const item of [...(attention?.items || []), ...(attention?.resolvidos || [])]) {
         if (saldosOnly && item.category !== 'ATA_CRITICA') continue;
-        merged.push({ ...item, uasg });
+        if (item.taskId && tarefasConcluidas.has(item.taskId)) continue;
+        (item.avisoChave && avisosResolvidos.has(item.avisoChave) ? resolvidos : ativos).push({ ...item, uasg });
       }
     }
-    for (const a of avisosPagamento) merged.push(avisoComoItemDeAtencao(a, UASGS[0]));
-    return merged;
+    for (const a of avisosPagamento) ativos.push(avisoComoItemDeAtencao(a, UASGS[0]));
+    return { allItems: ativos, itensResolvidos: resolvidos };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, saldosOnly, avisosPagamento]);
+  }, [dash200330.readModel, dash200331.readModel, saldosOnly, avisosPagamento, avisosResolvidos, tarefasConcluidas]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -337,8 +345,24 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           fornecedorByKey={fornecedorByKey}
           responsavelByContractKey={responsavelByContractKey}
           onResetFilters={handleResetFilters}
+          onResolver={resolucao.abrir}
+          podeResolverAlvo={resolucao.podeResolverAlvo}
         />
       )}
+
+      <AvisosResolvidosLista
+        itens={itensResolvidos.map((item) => ({
+          chave: item.avisoChave!,
+          titulo: item.objetoItem || item.title,
+          contexto: `${getInstrumentoInfo(item).label} · UASG ${item.uasg}`
+        }))}
+        porChave={avisosResolvidos}
+        podeReexibir={resolucao.podeResolver}
+        onReexibir={(chave) => resolucao.reexibir.mutate({ chave })}
+        reexibindo={resolucao.reexibir.isPending}
+        testId="instrumentos-avisos-resolvidos"
+      />
+      {resolucao.dialog}
     </PageContainer>
   );
 };

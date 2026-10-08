@@ -7,6 +7,7 @@ import { buildCentralPrazosItems } from './centralPrazosService';
 import { parseDateBRT } from './temporalEngineService';
 import { isLembreteNaJanela } from '../config/alertRules';
 import type { AvisoPagamento } from './avisosPagamentoService';
+import { chaveAvisoLembrete } from './avisosResolvidosService';
 
 export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE';
 
@@ -23,13 +24,15 @@ export interface ContractActionItem {
   macrotaskName?: string;
   executionMode?: TaskExecutionMode;
   sistemaDestino?: string;
+  /** Chave para marcar como resolvido (reajuste e lembrete); tarefa se resolve concluindo. */
+  avisoChave?: string;
 }
 
 export interface ContractActionQueue {
   items: ContractActionItem[];
   counts: Record<SeverityLevel, number>;
   tarefasSemPrazo: number;
-  /** Lembretes que o gestor marcou como resolvidos (não entram em items/counts). */
+  /** Avisos marcados como resolvidos (não entram em items/counts). */
   dispensados: ContractActionItem[];
 }
 
@@ -65,11 +68,11 @@ export function buildContractActionQueue(params: {
   paymentCycles?: PaymentFollowUpCycle[];
   /** Expectativa de pagamento: nota mensal que não chegou, entrega prevista sem nota (avisosPagamentoService). */
   avisosPagamento?: AvisoPagamento[];
-  dismissedReminderIds?: string[];
+  /** Chaves de avisos_resolvidos. */
+  avisosResolvidos?: ReadonlySet<string>;
   currentDate?: Date;
 }): ContractActionQueue {
-  const { contractKey, plan, paymentCycles = [], avisosPagamento = [], dismissedReminderIds = [], currentDate } = params;
-  const dismissed = new Set(dismissedReminderIds);
+  const { contractKey, plan, paymentCycles = [], avisosPagamento = [], avisosResolvidos = new Set<string>(), currentDate } = params;
   const dispensados: ContractActionItem[] = [];
   // Vigência encerrada: os lembretes de prorrogação (D-180/D-60) perdem o sentido.
   const fimVigencia = parseDateBRT(params.contract.dataVigenciaFim);
@@ -99,16 +102,17 @@ export function buildContractActionQueue(params: {
 
   const items: ContractActionItem[] = [];
 
-  const { items: funnelItems } = calculateAttentionSummary({
+  const { items: funnelItems, resolvidos = [] } = calculateAttentionSummary({
     contracts: [contract],
     plans,
     paymentCycles,
+    avisosResolvidos,
     currentDate
   });
-  for (const f of funnelItems) {
+  for (const f of [...funnelItems, ...resolvidos]) {
     const kind = KIND_BY_CATEGORY[f.category];
     if (!kind) continue;
-    items.push(
+    (resolvidos.includes(f) ? dispensados : items).push(
       withTaskDetails({
         id: f.id,
         kind,
@@ -118,7 +122,8 @@ export function buildContractActionQueue(params: {
         badgeLabel: f.badgeLabel,
         diasRelevantes: f.diasRelevantes,
         dataAlvo: f.dataAlvo,
-        taskId: f.taskId
+        taskId: f.taskId,
+        avisoChave: f.avisoChave
       })
     );
   }
@@ -138,9 +143,10 @@ export function buildContractActionQueue(params: {
         description: p.acaoDescricao,
         badgeLabel: lembreteLabel(p.diasRestantes, atrasado),
         diasRelevantes: p.diasRestantes,
-        dataAlvo: p.dataAlvo
+        dataAlvo: p.dataAlvo,
+        avisoChave: chaveAvisoLembrete(p.id)
       };
-      (dismissed.has(lembrete.id) ? dispensados : items).push(lembrete);
+      (avisosResolvidos.has(lembrete.avisoChave!) ? dispensados : items).push(lembrete);
     }
   }
 

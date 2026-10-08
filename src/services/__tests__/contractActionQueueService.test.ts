@@ -130,10 +130,11 @@ describe('buildContractActionQueue', () => {
 
   describe('lembretes de prazo legal (D-180/D-60)', () => {
     it('lembretes dispensados saem de items/counts e vão para dispensados', () => {
-      const ids = queue.items.filter((i) => i.kind === 'LEMBRETE').map((i) => i.id);
-      expect(ids.length).toBeGreaterThan(0);
+      const lembretes = queue.items.filter((i) => i.kind === 'LEMBRETE');
+      expect(lembretes.length).toBeGreaterThan(0);
+      const ids = lembretes.map((i) => i.id);
 
-      const q = buildContractActionQueue({ contract, contractKey: KEY, plan, dismissedReminderIds: [ids[0]] });
+      const q = buildContractActionQueue({ contract, contractKey: KEY, plan, avisosResolvidos: new Set([lembretes[0].avisoChave!]) });
       expect(q.items.some((i) => i.id === ids[0])).toBe(false);
       expect(q.dispensados.map((i) => i.id)).toEqual([ids[0]]);
       expect(q.counts.INFO).toBe(queue.counts.INFO - 1);

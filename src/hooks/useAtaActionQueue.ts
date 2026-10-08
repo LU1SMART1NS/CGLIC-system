@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { ArpRecord, AtaTaskPlan } from '../types';
 import { buildAtaActionQueue, type AtaActionQueue, type AtaItemSaldoInput } from '../services/ataActionQueueService';
-import { useReminderDismissals } from './useReminderDismissals';
+import { useAvisosResolvidos } from './useAvisosResolvidos';
 
 const EMPTY_QUEUE: AtaActionQueue = {
   items: [],
@@ -15,10 +15,11 @@ export function useAtaActionQueue(
   saldos: AtaItemSaldoInput[],
   plan: AtaTaskPlan | null
 ): AtaActionQueue {
-  const { dismissedIds } = useReminderDismissals('ATA', arp?.numeroAtaRegistroPreco || '');
+  const { porChave } = useAvisosResolvidos();
+  const resolvidos = useMemo(() => new Set(porChave.keys()), [porChave]);
 
   return useMemo(
-    () => (arp ? buildAtaActionQueue({ arp, saldos, plan, dismissedReminderIds: dismissedIds }) : EMPTY_QUEUE),
-    [arp, saldos, plan, dismissedIds]
+    () => (arp ? buildAtaActionQueue({ arp, saldos, plan, avisosResolvidos: resolvidos }) : EMPTY_QUEUE),
+    [arp, saldos, plan, resolvidos]
   );
 }

@@ -74,6 +74,11 @@ export interface DashboardAttentionItem {
   dataAlvo?: string;
   targetUrl?: string;
   badgeLabel?: string;
+  /**
+   * Chave para marcar o aviso como resolvido (avisosResolvidosService): saldo, reajuste e lembrete.
+   * Tarefa se resolve concluindo-a; pagamento, registrando a etapa (sem chave).
+   */
+  avisoChave?: string;
   /** Alertas de saldo: descrição do item da Ata e seu fornecedor (a coluna Objeto/Fornecedor prefere estes). */
   objetoItem?: string;
   fornecedorNome?: string;
@@ -96,6 +101,8 @@ export interface ManagementDashboardAttentionSummary {
   tarefasVencidasCount: number;
   prazosKpis: CentralPrazosKPIs;
   items: DashboardAttentionItem[];
+  /** Avisos marcados como resolvidos (avisos_resolvidos): fora de items e das contagens. */
+  resolvidos?: DashboardAttentionItem[];
 }
 
 export interface ManagementDashboardEmpenhoDetail {

@@ -46,7 +46,8 @@ import { classifyPrazo } from '../components/carteira/carteiraPrazo';
 import { buildContractEventsFromOfficialData } from './contractEventService';
 import { fetchContratosParaTela } from './contratosOficiaisService';
 import { fetchArpsFromDb } from './dbCacheService';
-import { fetchAllContractManagers, fetchAllContractTaskPlans, fetchAllDismissedReminders, type AllDismissedReminders } from './contractManagementService';
+import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
+import { chaveAvisoLembrete, chaveAvisoReajuste, chaveAvisoSaldo, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -212,8 +213,8 @@ export function calculateAttentionSummary(params: {
   plans?: Record<string, ContractTaskPlan>;
   /** Planos de gestão das Atas, indexados por número da ata (ata_task_plans.ata_key). */
   ataPlans?: Record<string, AtaTaskPlan>;
-  /** Lembretes marcados como "Resolvido" na Visão 360 do contrato/ata: não entram na lista. */
-  dismissedReminders?: AllDismissedReminders;
+  /** Chaves dos avisos marcados como resolvidos (avisos_resolvidos): saem de items e vão para resolvidos. */
+  avisosResolvidos?: ReadonlySet<string>;
   eventsMap?: Record<string, ContractEvent[]>;
   paymentCycles?: PaymentFollowUpCycle[];
   arpItems?: Array<{ percentual_consumido?: number }>;
@@ -225,7 +226,7 @@ export function calculateAttentionSummary(params: {
     managers = {},
     plans = {},
     ataPlans = {},
-    dismissedReminders = { CONTRATO: {}, ATA: {} },
+    avisosResolvidos = new Set<string>(),
     eventsMap = {},
     paymentCycles = [],
     arpItems = [],
@@ -389,11 +390,7 @@ export function calculateAttentionSummary(params: {
     if (fim && fim.getTime() < today) continue; // vigência encerrada: lembrete perde o sentido
     if (!isLembreteNaJanela({ diasRestantes: pItem.diasRestantes, atrasado, isAta })) continue;
 
-    const entityKey = isAta ? arpRec?.numeroAtaRegistroPreco : pItem.contractKey;
-    if (!entityKey) continue;
-    // Ids de dispensa gravados pelas filas 360 (Ata: id puro; Contrato: prefixo ACT-LEMBRETE-).
-    const dismissedId = isAta ? pItem.id : `ACT-LEMBRETE-${pItem.id}`;
-    if (dismissedReminders[isAta ? 'ATA' : 'CONTRATO'][entityKey]?.includes(dismissedId)) continue;
+    if (!(isAta ? arpRec?.numeroAtaRegistroPreco : pItem.contractKey)) continue;
 
     const dias = pItem.diasRestantes;
     items.push({
@@ -402,6 +399,7 @@ export function calculateAttentionSummary(params: {
       severity: 'INFO',
       title: pItem.regraNome,
       description: `${pItem.identificadorFormatado} — ${pItem.acaoDescricao}`,
+      avisoChave: chaveAvisoLembrete(pItem.id),
       contractKey: isAta ? undefined : pItem.contractKey,
       numeroContrato: pItem.identificadorFormatado,
       arpKey: isAta ? pItem.arpKey : undefined,
@@ -486,6 +484,7 @@ export function calculateAttentionSummary(params: {
     items.push({
       id: `ATT-REAJUSTE-${alert.contractKey}-${alert.ciclo}`,
       category: 'REAJUSTE_RADAR',
+      avisoChave: chaveAvisoReajuste(alert.contractKey, alert.ciclo),
       severity,
       title: alert.titulo || 'Radar de Reajuste / Repactuação',
       description: `Contrato ${numDisplay} — ${alert.descricao || ''}`,
@@ -515,6 +514,7 @@ export function calculateAttentionSummary(params: {
       id: `ATT-ARP-ITEM-${itemKey}`,
       category: 'ATA_CRITICA',
       severity,
+      avisoChave: numAta && numItem ? chaveAvisoSaldo(numAta, uasgItem, numItem, severity) : undefined,
       title: `Consumo Crítico em Ata (${roundedPerc.toFixed(1)}%)`,
       description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}`,
       arpKey: itemKey,
@@ -544,6 +544,7 @@ export function calculateAttentionSummary(params: {
       id: `ATT-ARP-ITEM-${itemKey}`,
       category: 'ATA_CRITICA',
       severity: saldoClass.severity,
+      avisoChave: numAta && numItem ? chaveAvisoSaldo(numAta, uasgItem, numItem, saldoClass.severity) : undefined,
       title: `Saldo em atenção em Ata (${saldoClass.percentualConsumido.toFixed(1)}%)`,
       description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}`,
       arpKey: itemKey,
@@ -592,11 +593,12 @@ export function calculateAttentionSummary(params: {
 
   // Deduplicação determinística rigorosa
   const deduplicatedItems: import('../types/managementDashboard').DashboardAttentionItem[] = [];
+  const resolvidos: import('../types/managementDashboard').DashboardAttentionItem[] = [];
   const seenAttentionIds = new Set<string>();
   for (const it of items) {
     if (!seenAttentionIds.has(it.id)) {
       seenAttentionIds.add(it.id);
-      deduplicatedItems.push(it);
+      (it.avisoChave && avisosResolvidos.has(it.avisoChave) ? resolvidos : deduplicatedItems).push(it);
     }
   }
 
@@ -642,7 +644,8 @@ export function calculateAttentionSummary(params: {
     pagamentosCriticosCount,
     tarefasVencidasCount,
     prazosKpis,
-    items: deduplicatedItems
+    items: deduplicatedItems,
+    resolvidos
   };
 }
 
@@ -1034,7 +1037,7 @@ export function buildManagementDashboardReadModel(params: {
   managers?: Record<string, ContractManager>;
   plans?: Record<string, ContractTaskPlan>;
   ataPlans?: Record<string, AtaTaskPlan>;
-  dismissedReminders?: AllDismissedReminders;
+  avisosResolvidos?: ReadonlySet<string>;
   eventsMap?: Record<string, ContractEvent[]>;
   empenhos?: Array<any>;
   itemsSaldo?: Array<any>;
@@ -1287,7 +1290,7 @@ export function buildManagementDashboardReadModel(params: {
     managers: filteredManagers,
     plans: filteredPlans,
     ataPlans: filteredAtaPlans,
-    dismissedReminders: params.dismissedReminders,
+    avisosResolvidos: params.avisosResolvidos,
     eventsMap: filteredEventsMap,
     paymentCycles: filteredPaymentCycles,
     arpItems: filteredItemsSaldo,
@@ -1335,7 +1338,7 @@ export async function fetchManagementDashboardData(
     managers,
     plans,
     ataPlans,
-    dismissedReminders,
+    avisosResolvidos,
     empenhosResumo,
     arpItemsSaldo
   ] = await Promise.all([
@@ -1359,7 +1362,7 @@ export async function fetchManagementDashboardData(
       console.warn('Erro ao consultar planos de gestão das atas para o dashboard:', err);
       return {} as Record<string, AtaTaskPlan>;
     }),
-    fetchAllDismissedReminders(),
+    fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))),
     fetchEmpenhosResumoFromDb(cleanUasg).catch((err) => {
       console.error('Erro ao consultar empenhos para o dashboard:', err);
       return [] as any[];
@@ -1379,7 +1382,7 @@ export async function fetchManagementDashboardData(
     managers,
     plans,
     ataPlans,
-    dismissedReminders,
+    avisosResolvidos,
     empenhos: empenhosResumo,
     itemsSaldo: arpItemsSaldo,
     paymentCycles,
