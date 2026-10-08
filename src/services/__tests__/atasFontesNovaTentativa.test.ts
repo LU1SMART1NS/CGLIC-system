@@ -3,7 +3,13 @@ import { fetchArpsDasFontes, fetchArpItems, limparCachesAtas } from '../api';
 import { mensagemDeErro } from '../sincronizacaoFontesService';
 import { resumirSincronizacao } from '../../hooks/useSituacaoSincronizacao';
 
-// UASG 200330: sem atas suplementares do PNCP; atas sem número de controle: sem consulta de vigência.
+// Atas sem número de controle: sem consulta de vigência. O PNCP (atas que só estão lá) responde vazio.
+const pncpVazio = () => new Response(null, { status: 204 });
+/** Compras.gov.br responde na ordem dada; o PNCP responde vazio. */
+const comprasEmOrdem = (...respostas: Array<() => Response | Promise<never>>) => {
+  let i = 0;
+  return vi.fn().mockImplementation(async (url: string) => (url.startsWith('/api-pncp/') ? pncpVazio() : respostas[i++]()));
+};
 const params = {
   codigoUnidadeGerenciadora: '200330',
   dataVigenciaInicialMin: '2025-01-01',
@@ -28,12 +34,12 @@ describe('fetchArpsDasFontes — nova tentativa', () => {
   });
 
   it('conexão caiu uma vez: tenta de novo após 2 s e segue', async () => {
-    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(respostaComUmaAta());
+    const fetchMock = comprasEmOrdem(() => Promise.reject(new TypeError('Failed to fetch')), respostaComUmaAta);
     vi.stubGlobal('fetch', fetchMock);
     const promessa = fetchArpsDasFontes(params);
     await vi.advanceTimersByTimeAsync(2000);
     const atas = await promessa;
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api-arp/'))).toHaveLength(2);
     expect(atas).toHaveLength(1);
   });
 
@@ -46,9 +52,7 @@ describe('fetchArpsDasFontes — nova tentativa', () => {
   });
 
   it('fonte respondeu 503 uma vez: tenta de novo', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response('', { status: 503 }))
-      .mockResolvedValueOnce(respostaComUmaAta());
+    const fetchMock = comprasEmOrdem(() => new Response('', { status: 503 }), respostaComUmaAta);
     vi.stubGlobal('fetch', fetchMock);
     const promessa = fetchArpsDasFontes(params);
     await vi.advanceTimersByTimeAsync(2000);

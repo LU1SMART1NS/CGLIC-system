@@ -2,7 +2,7 @@ import type { ArpResponse, ArpItemsResponse, ArpItemRecord, UnidadesItemResponse
 import { cacheArpsInDb, cacheArpItemsInDb, fetchArpsFromDb } from './dbCacheService';
 import type { ContratosGovHistoricoRecord } from '../types/contractHistorico';
 import type { ContratosGovResponsavelRecord, ContratosGovGarantiaRecord } from '../types/contractResponsaveis';
-import { CNPJ_SENASP } from '../config/unidadesGestoras';
+import { CNPJ_SENASP, cnpjDaUasg, codigoOrgaoDaUasg } from '../config/unidadesGestoras';
 
 const BASE_URL = '/api-arp/modulo-arp';
 
@@ -204,12 +204,15 @@ export async function fetchArpsDasFontes(params: FilterParams): Promise<ArpRecor
     }
   }
 
-  // Carregar Atas publicadas via Contratos.gov.br diretamente do PNCP
-  const supplementalArps = await fetchSupplementalPncpArps(params.codigoUnidadeGerenciadora);
-  for (const sArp of supplementalArps) {
-    const key = `${sArp.numeroAtaRegistroPreco}-${sArp.codigoUnidadeGerenciadora}`;
-    if (!allArpsMap.has(key)) {
-      allArpsMap.set(key, sArp);
+  // Atas que o PNCP já publicou e o Compras.gov.br ainda não entrega (ex.: 00042, 00043 e 00044/2026 em out/2026).
+  // Falha do PNCP não derruba a lista do Compras.gov.br: essas atas entram na próxima execução.
+  if (params.codigoUnidadeGerenciadora) {
+    try {
+      for (const arp of await fetchAtasSoNoPncp(params.codigoUnidadeGerenciadora, Array.from(allArpsMap.values()))) {
+        allArpsMap.set(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`, arp);
+      }
+    } catch (err) {
+      console.warn(`[atas] lista de atas do PNCP da UASG ${params.codigoUnidadeGerenciadora} não consultada; atas que só estão no PNCP ficam para a próxima execução.`, err);
     }
   }
 
@@ -227,7 +230,7 @@ export async function fetchArpsDasFontes(params: FilterParams): Promise<ArpRecor
 export function limparCachesAtas(): void {
   arpsMemoryCache.clear();
   pncpVigenciaCache.clear();
-  supplementalPncpArpsCache = null;
+  pncpCompraCache.clear();
   pncpCompraItemsCache.clear();
   pncpAtasDaCompraCache.clear();
   memoryItemsCache.clear();
@@ -293,26 +296,58 @@ export interface PncpAtaVigenciaInfo {
 }
 
 const pncpVigenciaCache = new Map<string, PncpAtaVigenciaInfo>();
-let supplementalPncpArpsCache: ArpRecord[] | null = null;
 const pncpCompraItemsCache = new Map<string, ArpItemRecord[]>();
+
+/** Cadastro da compra no PNCP: o que o sistema usa dele. */
+export interface PncpCompraInfo {
+  /** Número da compra no Compras.gov.br ("90039"), o mesmo que os contratos citam. Não é o sequencial do PNCP. */
+  numeroCompra?: string;
+  modalidadeId?: number;
+  modalidadeNome?: string;
+  processo?: string;
+}
+
+/** Cadastro da compra por número de controle (promessa guardada; falha não fica guardada). */
+const pncpCompraCache = new Map<string, Promise<PncpCompraInfo | null>>();
+
+/**
+ * Cadastro da compra no PNCP. Devolve null quando a consulta falhou (tentar de novo depois).
+ * Endpoint: GET /api-pncp/api/consulta/v1/orgaos/{cnpj}/compras/{ano}/{seqCompra}
+ */
+export function fetchPncpCompra(numeroControlePncpCompra?: string): Promise<PncpCompraInfo | null> {
+  const match = (numeroControlePncpCompra || '').match(/^(\d{14})-1-0*(\d+)\/(\d{4})$/);
+  if (!match) return Promise.resolve(null);
+  const chave = `${match[1]}-${match[2]}/${match[3]}`;
+  const emCache = pncpCompraCache.get(chave);
+  if (emCache) return emCache;
+  const promessa = (async (): Promise<PncpCompraInfo | null> => {
+    try {
+      const res = await fetch(`/api-pncp/api/consulta/v1/orgaos/${match[1]}/compras/${match[3]}/${match[2]}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        numeroCompra: typeof data?.numeroCompra === 'string' ? data.numeroCompra.trim() : undefined,
+        modalidadeId: typeof data?.modalidadeId === 'number' ? data.modalidadeId : undefined,
+        modalidadeNome: typeof data?.modalidadeNome === 'string' ? data.modalidadeNome : undefined,
+        processo: typeof data?.processo === 'string' ? data.processo.trim() : ''
+      };
+    } catch {
+      return null;
+    }
+  })();
+  pncpCompraCache.set(chave, promessa);
+  promessa.then((r) => { if (r === null) pncpCompraCache.delete(chave); });
+  return promessa;
+}
 
 /**
  * Processo administrativo da compra, lido do cadastro da compra no PNCP (campo `processo`, só dígitos).
  * O Compras.gov.br não o traz para atas e itens. O número pertence à compra: ata, itens e contratos dela o dividem.
  * Devolve o texto ('' quando o PNCP responde mas não informa) ou null quando a consulta falhou (tentar de novo depois).
- * Endpoint: GET /api-pncp/api/consulta/v1/orgaos/{cnpj}/compras/{ano}/{seqCompra}
  */
 export async function fetchPncpProcessoCompra(numeroControlePncpCompra?: string): Promise<string | null> {
-  const match = (numeroControlePncpCompra || '').match(/^(\d{14})-1-0*(\d+)\/(\d{4})$/);
-  if (!match) return null;
-  try {
-    const res = await fetch(`/api-pncp/api/consulta/v1/orgaos/${match[1]}/compras/${match[3]}/${match[2]}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return typeof data?.processo === 'string' ? data.processo.trim() : '';
-  } catch {
-    return null;
-  }
+  const compra = await fetchPncpCompra(numeroControlePncpCompra);
+  return compra ? compra.processo ?? '' : null;
 }
 
 /**
@@ -429,79 +464,155 @@ export async function enrichArpsBatchWithPncpVigencia(
   return results;
 }
 
-export const SUPPLEMENTAL_PNCP_ATAS = [
-  { anoCompra: '2025', seqCompra: 1102, seqAta: 1, numeroAta: '00069/2025' },
-  { anoCompra: '2025', seqCompra: 1576, seqAta: 2, numeroAta: '00023/2026' },
+/**
+ * Fornecedor de atas cuja compra gerou várias atas e que o Compras.gov.br não entregou quando foram cadastradas.
+ * O PNCP lista os itens da compra, não da ata, e não diz o fornecedor da ata: sem esta indicação os itens dessas
+ * atas não são atribuídos. Só para esse caso; atas novas entram sozinhas pela lista do PNCP (fetchAtasSoNoPncp).
+ */
+export const FORNECEDOR_DAS_ATAS_PNCP = [
   { anoCompra: '2025', seqCompra: 1665, seqAta: 1, numeroAta: '00039/2026', cnpjFornecedor: '03871566000349' },
-  { anoCompra: '2025', seqCompra: 1665, seqAta: 2, numeroAta: '00040/2026', cnpjFornecedor: '03622266000164' },
-  { anoCompra: '2025', seqCompra: 1331, seqAta: 1, numeroAta: '00041/2026' }
+  { anoCompra: '2025', seqCompra: 1665, seqAta: 2, numeroAta: '00040/2026', cnpjFornecedor: '03622266000164' }
 ];
 
-export async function fetchSupplementalPncpArps(targetUasg?: string): Promise<ArpRecord[]> {
-  if (targetUasg && targetUasg !== '200331') return [];
-  if (supplementalPncpArpsCache && supplementalPncpArpsCache.length > 0) {
-    return supplementalPncpArpsCache;
+/** Ata como a lista de atas do PNCP a devolve (/api/consulta/v1/atas). */
+interface PncpAtaDaLista {
+  numeroControlePNCPAta: string;
+  numeroControlePNCPCompra?: string;
+  numeroAtaRegistroPreco: string;
+  anoAta: number | string;
+  cancelado?: boolean;
+  dataAssinatura?: string;
+  vigenciaInicio?: string;
+  vigenciaFim?: string;
+  dataPublicacaoPncp?: string;
+  dataInclusao?: string;
+  dataAtualizacao?: string;
+  dataAtualizacaoGlobal?: string;
+  objetoContratacao?: string;
+  nomeOrgao?: string;
+  codigoUnidadeOrgao?: string;
+  nomeUnidadeOrgao?: string;
+}
+
+/** Modalidade do PNCP → código de modalidade do Compras.gov.br (parte do identificador da compra). */
+const MODALIDADE_COMPRAS_POR_PNCP: Record<number, string> = { 4: '03', 5: '03', 6: '05', 7: '05', 8: '06', 9: '07' };
+
+const formatarDataPncp = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '');
+
+/** Número da ata no formato do Compras.gov.br ("00043/2026"). */
+export function numeroAtaDoPncp(ata: Pick<PncpAtaDaLista, 'numeroAtaRegistroPreco' | 'anoAta'>): string {
+  return `${String(ata.numeroAtaRegistroPreco).replace(/\D/g, '').padStart(5, '0')}/${ata.anoAta}`;
+}
+
+/**
+ * Atas da UASG publicadas no PNCP, de todas as páginas. O PNCP filtra pela vigência e aceita no máximo 365 dias por
+ * consulta: pedem-se o último ano e o próximo, o que cobre toda ata vigente hoje ou que começa no próximo ano.
+ * Lança erro se o PNCP recusar (a lista sairia incompleta).
+ */
+async function fetchListaAtasPncpDaUasg(uasg: string, agora: Date): Promise<PncpAtaDaLista[]> {
+  const cnpj = cnpjDaUasg(uasg);
+  if (!cnpj) return [];
+  const dia = 24 * 60 * 60 * 1000;
+  const janelas = [
+    [new Date(agora.getTime() - 364 * dia), agora],
+    [new Date(agora.getTime() + dia), new Date(agora.getTime() + 365 * dia)]
+  ];
+  const atas: PncpAtaDaLista[] = [];
+  for (const [inicio, fim] of janelas) {
+    for (let pagina = 1; ; pagina++) {
+      const url = `/api-pncp/api/consulta/v1/atas${buildQueryString({
+        dataInicial: formatarDataPncp(inicio),
+        dataFinal: formatarDataPncp(fim),
+        cnpj,
+        codigoUnidadeAdministrativa: uasg,
+        pagina,
+        tamanhoPagina: 50
+      })}`;
+      const res = await fetchComNovaTentativa(url, 'PNCP', 3);
+      if (res.status === 204) break;
+      if (!res.ok) throw new FonteIndisponivelError('PNCP', res.status);
+      const data = await res.json();
+      const lista: PncpAtaDaLista[] = Array.isArray(data?.data) ? data.data : [];
+      atas.push(...lista);
+      if (lista.length === 0 || pagina >= (Number(data?.totalPaginas) || 1)) break;
+    }
+  }
+  return atas.filter((a) => !a.codigoUnidadeOrgao || String(a.codigoUnidadeOrgao) === uasg);
+}
+
+/**
+ * Atas da UASG que estão no PNCP e não vieram do Compras.gov.br (`conhecidas`). Uma ata é conhecida pelo número de
+ * controle PNCP ou pelo número: o PNCP às vezes numera diferente (a 00068/2024 do Compras.gov.br é a "90068" no PNCP).
+ * O Compras.gov.br demora semanas para receber as atas publicadas pelo Contratos.gov.br; o PNCP as tem no mesmo dia.
+ * Quando o mesmo número aparece mais de uma vez (ata cancelada e publicada de novo), vale a não cancelada mais recente.
+ * Número da compra e modalidade vêm do cadastro da compra no PNCP; valor e quantidade de itens, dos itens que se
+ * consegue atribuir à ata com certeza (itensDaAtaPeloPncp). Lança erro se a lista do PNCP não vier.
+ */
+export async function fetchAtasSoNoPncp(
+  uasg: string,
+  conhecidas: Array<Pick<ArpRecord, 'numeroAtaRegistroPreco' | 'numeroControlePncpAta'>>,
+  agora: Date = new Date()
+): Promise<ArpRecord[]> {
+  const lista = await fetchListaAtasPncpDaUasg(uasg, agora);
+  const numerosConhecidos = new Set(conhecidas.map((a) => a.numeroAtaRegistroPreco));
+  const controlesConhecidos = new Set(conhecidas.map((a) => a.numeroControlePncpAta).filter(Boolean));
+
+  const porNumero = new Map<string, PncpAtaDaLista>();
+  for (const ata of lista) {
+    const numero = numeroAtaDoPncp(ata);
+    if (numerosConhecidos.has(numero) || controlesConhecidos.has(ata.numeroControlePNCPAta)) continue;
+    const atual = porNumero.get(numero);
+    const melhor = !atual
+      || (!!atual.cancelado && !ata.cancelado)
+      || (!!atual.cancelado === !!ata.cancelado && String(ata.dataPublicacaoPncp || '') > String(atual.dataPublicacaoPncp || ''));
+    if (melhor) porNumero.set(numero, ata);
   }
 
-  const cnpj = CNPJ_SENASP;
-  const supplemental: ArpRecord[] = [];
-
-  await Promise.all(
-    SUPPLEMENTAL_PNCP_ATAS.map(async (item) => {
-      try {
-        const url = `/api-pncp/api/pncp/v1/orgaos/${cnpj}/compras/${item.anoCompra}/${item.seqCompra}/atas/${item.seqAta}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const d = await res.json();
-          const anoAta = String(d.anoAta || item.numeroAta.split('/')[1]);
-          const numAta = String(d.numeroAtaRegistroPreco || item.numeroAta.split('/')[0]).padStart(5, '0');
-          const fullNumAta = `${numAta}/${anoAta}`;
-
-          // Obter itens específicos da Ata para calcular valorTotal e quantidadeItens exatos
-          const itemsOfAta = await fetchPncpCompraItems(item.anoCompra, item.seqCompra, fullNumAta, '200331', item.cnpjFornecedor);
-          const totalVal = itemsOfAta.reduce((acc, it) => acc + (it.valorTotal || 0), 0);
-
-          const arpRec: ArpRecord = {
-            numeroAtaRegistroPreco: fullNumAta,
-            codigoUnidadeGerenciadora: d.unidadeOrgao?.codigoUnidade || '200331',
-            nomeUnidadeGerenciadora: d.unidadeOrgao?.nomeUnidade || 'SECRETARIA NACIONAL DE SEGURANCA PUBLICA - SENASP',
-            codigoOrgao: 30911,
-            nomeOrgao: 'SECRETARIA NACIONAL DE SEGURANCA PUBLICA',
-            linkAtaPNCP: `https://pncp.gov.br/app/atas/${cnpj}/${item.anoCompra}/${item.seqCompra}/${item.seqAta}`,
-            linkCompraPNCP: `https://pncp.gov.br/app/editais/${cnpj}/${item.anoCompra}/${String(item.seqCompra).padStart(6, '0')}`,
-            numeroCompra: String(item.seqCompra),
-            anoCompra: item.anoCompra,
-            codigoModalidadeCompra: '05',
-            nomeModalidadeCompra: d.modalidadeNome || 'Pregão',
-            dataAssinatura: d.dataAssinatura || '',
-            dataVigenciaInicial: d.dataVigenciaInicio || '',
-            dataVigenciaFinal: d.dataVigenciaFim || '',
-            valorTotal: totalVal,
-            statusAta: 'Ata de Registro de Preços',
-            objeto: d.objetoCompra || '',
-            quantidadeItens: itemsOfAta.length || 1,
-            dataHoraAtualizacao: d.dataAtualizacao || '',
-            dataHoraInclusao: d.dataInclusao || '',
-            dataHoraExclusao: null,
-            ataExcluido: false,
-            numeroControlePncpAta: d.numeroControlePNCP || `${cnpj}-1-${String(item.seqCompra).padStart(6, '0')}/${item.anoCompra}-${String(item.seqAta).padStart(6, '0')}`,
-            numeroControlePncpCompra: d.numeroControlePncpCompra || `${cnpj}-1-${String(item.seqCompra).padStart(6, '0')}/${item.anoCompra}`,
-            idCompra: `20033105${String(item.seqCompra)}${item.anoCompra}`,
-            dataVigenciaFinalPncp: d.dataVigenciaFim,
-            isCanceladaPncp: !!d.cancelado,
-            prorrogadaPncp: false,
-            dataAtualizacaoPncp: d.dataAtualizacao || d.dataAtualizacaoGlobal
-          };
-          supplemental.push(arpRec);
-        }
-      } catch (e) {
-        console.warn(`Erro ao carregar Ata suplementar PNCP ${item.numeroAta}:`, e);
-      }
-    })
-  );
-
-  supplementalPncpArpsCache = supplemental;
-  return supplemental;
+  const novas: ArpRecord[] = [];
+  for (const [numero, ata] of porNumero) {
+    const ctrl = parsePncpControlNumber(ata.numeroControlePNCPAta);
+    if (!ctrl) continue;
+    const ctrlCompra = ata.numeroControlePNCPCompra || `${ctrl.cnpj}-1-${String(ctrl.seqCompra).padStart(6, '0')}/${ctrl.anoCompra}`;
+    const compra = await fetchPncpCompra(ctrlCompra);
+    const itens = ata.cancelado ? [] : await itensDaAtaPeloPncp({
+      anoCompra: ctrl.anoCompra, seqCompra: ctrl.seqCompra, seqAta: ctrl.seqAta, numeroAta: numero, uasg, cnpj: ctrl.cnpj
+    });
+    // O número da compra do Compras.gov.br é o que os contratos citam; sem ele, fica o sequencial do PNCP.
+    const numeroCompra = compra?.numeroCompra || String(ctrl.seqCompra);
+    const codigoModalidade = compra?.modalidadeId !== undefined ? MODALIDADE_COMPRAS_POR_PNCP[compra.modalidadeId] || '' : '';
+    novas.push({
+      numeroAtaRegistroPreco: numero,
+      codigoUnidadeGerenciadora: uasg,
+      nomeUnidadeGerenciadora: ata.nomeUnidadeOrgao || '',
+      codigoOrgao: Number(codigoOrgaoDaUasg(uasg)) || 0,
+      nomeOrgao: ata.nomeOrgao || '',
+      linkAtaPNCP: `https://pncp.gov.br/app/atas/${ctrl.cnpj}/${ctrl.anoCompra}/${ctrl.seqCompra}/${ctrl.seqAta}`,
+      linkCompraPNCP: `https://pncp.gov.br/app/editais/${ctrl.cnpj}/${ctrl.anoCompra}/${String(ctrl.seqCompra).padStart(6, '0')}`,
+      numeroCompra,
+      anoCompra: ctrl.anoCompra,
+      codigoModalidadeCompra: codigoModalidade,
+      nomeModalidadeCompra: compra?.modalidadeNome || '',
+      dataAssinatura: ata.dataAssinatura || '',
+      dataVigenciaInicial: (ata.vigenciaInicio || '').split('T')[0],
+      dataVigenciaFinal: (ata.vigenciaFim || '').split('T')[0],
+      valorTotal: itens.reduce((acc, it) => acc + (it.valorTotal || 0), 0),
+      statusAta: ata.cancelado ? 'Cancelada' : 'Ata de Registro de Preços',
+      objeto: ata.objetoContratacao || '',
+      quantidadeItens: itens.length,
+      dataHoraAtualizacao: ata.dataAtualizacaoGlobal || ata.dataAtualizacao || '',
+      dataHoraInclusao: ata.dataInclusao || '',
+      dataHoraExclusao: null,
+      ataExcluido: false,
+      numeroControlePncpAta: ata.numeroControlePNCPAta,
+      numeroControlePncpCompra: ctrlCompra,
+      idCompra: codigoModalidade && compra?.numeroCompra ? `${uasg}${codigoModalidade}${compra.numeroCompra}${ctrl.anoCompra}` : '',
+      dataVigenciaFinalPncp: (ata.vigenciaFim || '').split('T')[0] || undefined,
+      isCanceladaPncp: !!ata.cancelado,
+      prorrogadaPncp: false,
+      dataAtualizacaoPncp: ata.dataAtualizacaoGlobal || ata.dataAtualizacao
+    });
+  }
+  return novas;
 }
 
 export function parsePncpControlNumber(ctrl?: string): { cnpj: string; seqCompra: number; anoCompra: string; seqAta: number } | null {
@@ -532,42 +643,81 @@ export function itensSeUmFornecedor<T extends { niFornecedor?: string; nomeRazao
   return chaves.size <= 1 ? items : [];
 }
 
-/** Quantas atas cada compra tem no PNCP (promessa guardada por compra; falha não fica guardada). */
-const pncpAtasDaCompraCache = new Map<string, Promise<number | null>>();
+/** Ata da compra como o PNCP a lista em /compras/{ano}/{seq}/atas. */
+export interface PncpAtaDaCompra {
+  sequencialAta?: number;
+  numeroAtaRegistroPreco?: string;
+  anoAta?: number | string;
+  cancelado?: boolean;
+}
+
+/** Atas de cada compra no PNCP (promessa guardada por compra; falha não fica guardada). */
+const pncpAtasDaCompraCache = new Map<string, Promise<PncpAtaDaCompra[] | null>>();
 
 /**
- * Quantas atas a compra gerou. Primeiro conta nas atas já lidas nesta execução (pelo número de controle PNCP);
- * se ali há só uma ou nenhuma, confirma no PNCP (/compras/{ano}/{seq}/atas). Devolve null quando não dá para saber.
+ * Atas que a compra gerou, canceladas inclusive (/compras/{ano}/{seq}/atas).
+ * Devolve null quando não dá para saber (consulta falhou ou a lista veio incompleta).
  */
-export function contarAtasDaCompra(anoCompra: string, seqCompra: number, customCnpj?: string): Promise<number | null> {
-  const conhecidas = new Set<string>();
-  for (const list of arpsMemoryCache.values()) {
-    for (const a of list) {
-      const p = parsePncpControlNumber(a.numeroControlePncpAta);
-      if (p && p.anoCompra === String(anoCompra) && p.seqCompra === seqCompra) conhecidas.add(a.numeroAtaRegistroPreco);
-    }
-  }
-  if (conhecidas.size >= 2) return Promise.resolve(conhecidas.size);
-
+export function fetchAtasDaCompraPncp(anoCompra: string, seqCompra: number, customCnpj?: string): Promise<PncpAtaDaCompra[] | null> {
   const cnpj = (customCnpj || CNPJ_SENASP).replace(/\D/g, '');
   const chave = `${cnpj}-${anoCompra}-${seqCompra}`;
   const emCache = pncpAtasDaCompraCache.get(chave);
   if (emCache) return emCache;
-  const promessa = (async (): Promise<number | null> => {
+  const promessa = (async (): Promise<PncpAtaDaCompra[] | null> => {
     try {
       const res = await fetch(`/api-pncp/api/pncp/v1/orgaos/${cnpj}/compras/${anoCompra}/${seqCompra}/atas`);
       if (!res.ok) return null;
       const d = await res.json();
-      if (typeof d?.totalRegistros === 'number') return d.totalRegistros;
-      if (Array.isArray(d?.data)) return d.data.length;
-      return null;
+      if (!Array.isArray(d?.data)) return null;
+      if (typeof d.totalRegistros === 'number' && d.totalRegistros > d.data.length) return null;
+      return d.data as PncpAtaDaCompra[];
     } catch {
       return null;
     }
   })();
   pncpAtasDaCompraCache.set(chave, promessa);
-  promessa.then((n) => { if (n === null) pncpAtasDaCompraCache.delete(chave); });
+  promessa.then((r) => { if (r === null) pncpAtasDaCompraCache.delete(chave); });
   return promessa;
+}
+
+/**
+ * Itens da ata pelo PNCP, só quando é certo que são dela. O PNCP lista os itens da compra, não da ata, e não diz o
+ * fornecedor da ata. Atribui os itens quando o fornecedor da ata é conhecido (FORNECEDOR_DAS_ATAS_PNCP) ou quando a
+ * única ata não cancelada da compra é esta e todos os itens são de um fornecedor. Em 06/10/2026 uma regra mais frouxa
+ * gravou itens de outra ata em sete atas: melhor ata sem itens do que itens alheios.
+ */
+export async function itensDaAtaPeloPncp(ata: {
+  anoCompra: string;
+  seqCompra: number;
+  /** Sequencial da ata na compra (do número de controle PNCP); sem ele, compara pelo número da ata. */
+  seqAta?: number;
+  numeroAta: string;
+  uasg: string;
+  cnpj?: string;
+}): Promise<ArpItemRecord[]> {
+  const { anoCompra, seqCompra, seqAta, numeroAta, uasg, cnpj } = ata;
+  const fornecedor = FORNECEDOR_DAS_ATAS_PNCP.find((s) => matchAtaNumber(s.numeroAta, numeroAta) && matchAtaNumber(numeroAta, s.numeroAta));
+  if (fornecedor) return fetchPncpCompraItems(anoCompra, seqCompra, numeroAta, uasg, fornecedor.cnpjFornecedor, cnpj);
+
+  const atasDaCompra = await fetchAtasDaCompraPncp(anoCompra, seqCompra, cnpj);
+  if (!atasDaCompra) {
+    console.warn(`Ata ${numeroAta}: o PNCP não informou as atas da compra ${seqCompra}/${anoCompra}; itens não carregados pelo PNCP.`);
+    return [];
+  }
+  const vigentes = atasDaCompra.filter((a) => !a.cancelado);
+  const ehEstaAta = (a: PncpAtaDaCompra) => seqAta !== undefined
+    ? a.sequencialAta === seqAta
+    : !!a.numeroAtaRegistroPreco && matchAtaNumber(numeroAtaDoPncp({ numeroAtaRegistroPreco: a.numeroAtaRegistroPreco, anoAta: a.anoAta ?? '' }), numeroAta);
+  if (vigentes.length !== 1 || !ehEstaAta(vigentes[0])) {
+    console.warn(`Ata ${numeroAta}: a compra ${seqCompra}/${anoCompra} tem ${vigentes.length} ata(s) não cancelada(s) no PNCP e a ata não informa o fornecedor; itens não carregados pelo PNCP.`);
+    return [];
+  }
+  const itensDaCompra = await fetchPncpCompraItems(anoCompra, seqCompra, numeroAta, uasg, undefined, cnpj);
+  const itens = itensSeUmFornecedor(itensDaCompra);
+  if (itens.length === 0 && itensDaCompra.length > 0) {
+    console.warn(`Ata ${numeroAta}: a compra ${seqCompra}/${anoCompra} tem mais de um fornecedor e a ata não informa qual é o dela; itens não carregados pelo PNCP.`);
+  }
+  return itens;
 }
 
 export async function fetchPncpCompraItems(
@@ -789,7 +939,7 @@ export async function fetchArpItems(
       let pncpCtrl = typeof arpContext === 'string' ? arpContext : arpContext?.numeroControlePncpAta;
       let anoCompra = typeof arpContext === 'object' ? arpContext?.anoCompra : undefined;
       let seqCompra = typeof arpContext === 'object' ? (arpContext?.numeroCompra ? parseInt(arpContext.numeroCompra, 10) : undefined) : undefined;
-      let cnpjFornecedor: string | undefined;
+      let seqAta: number | undefined;
 
       // 3.2. Se não veio no contexto, verifica no cache da memória das atas
       if (!pncpCtrl && !seqCompra) {
@@ -805,49 +955,32 @@ export async function fetchArpItems(
       }
 
       // 3.3. Se temos o controle PNCP, decompõe os identificadores
+      let cnpjDaCompra: string | undefined;
       if (pncpCtrl) {
         const parsed = parsePncpControlNumber(pncpCtrl);
         if (parsed) {
           anoCompra = parsed.anoCompra;
           seqCompra = parsed.seqCompra;
+          seqAta = parsed.seqAta;
+          cnpjDaCompra = parsed.cnpj;
         }
       }
 
-      // 3.4. Se ainda não temos a compra, verifica na lista de suplementares pré-mapeadas
-      if (!seqCompra || !anoCompra) {
-        const cleanTargetAta = numeroAtaRegistroPreco.split('/')[0].replace(/\D/g, '').replace(/^0+/, '');
-        const supp = SUPPLEMENTAL_PNCP_ATAS.find(s => {
-          const sNum = s.numeroAta.split('/')[0].replace(/\D/g, '').replace(/^0+/, '');
-          return sNum === cleanTargetAta;
-        });
-        if (supp) {
-          anoCompra = supp.anoCompra;
-          seqCompra = supp.seqCompra;
-          cnpjFornecedor = supp.cnpjFornecedor;
+      // 3.4. Sem o controle PNCP, as atas de fornecedor conhecido têm a compra anotada
+      if (!pncpCtrl) {
+        const conhecida = FORNECEDOR_DAS_ATAS_PNCP.find(s => matchAtaNumber(s.numeroAta, numeroAtaRegistroPreco) && matchAtaNumber(numeroAtaRegistroPreco, s.numeroAta));
+        if (conhecida) {
+          anoCompra = conhecida.anoCompra;
+          seqCompra = conhecida.seqCompra;
+          seqAta = conhecida.seqAta;
         }
       }
 
-      // 3.5. Busca itens na API do PNCP se possuir ano e sequência da compra.
-      // O PNCP lista os itens da compra, não da ata. Uma compra pode gerar várias atas (até do mesmo fornecedor, como
-      // matriz e filial com itens diferentes), e o PNCP não diz de qual ata é cada item. Por isso só se atribuem itens
-      // pelo PNCP quando o fornecedor da ata é conhecido (lista suplementar) ou quando a compra gerou uma ata só e todos
-      // os itens são de um fornecedor. Em 06/10/2026 a regra antiga gravou itens de outra ata em sete atas: a lista do
-      // PNCP vinha com 10 itens só, todos do mesmo fornecedor, e a trava passou. Melhor ata sem itens do que itens alheios.
+      // 3.5. Itens pelo PNCP, só quando é certo que são desta ata (regra em itensDaAtaPeloPncp).
       if (anoCompra && seqCompra) {
-        if (cnpjFornecedor) {
-          foundItems = await fetchPncpCompraItems(anoCompra, seqCompra, numeroAtaRegistroPreco, codigoUnidadeGerenciadora, cnpjFornecedor);
-        } else {
-          const atasDaCompra = await contarAtasDaCompra(anoCompra, seqCompra);
-          if (atasDaCompra === 1) {
-            const itensDaCompra = await fetchPncpCompraItems(anoCompra, seqCompra, numeroAtaRegistroPreco, codigoUnidadeGerenciadora);
-            foundItems = itensSeUmFornecedor(itensDaCompra);
-            if (foundItems.length === 0 && itensDaCompra.length > 0) {
-              console.warn(`Ata ${numeroAtaRegistroPreco}: a compra ${seqCompra}/${anoCompra} tem mais de um fornecedor e a ata não informa qual é o dela; itens não carregados pelo PNCP.`);
-            }
-          } else {
-            console.warn(`Ata ${numeroAtaRegistroPreco}: a compra ${seqCompra}/${anoCompra} tem ${atasDaCompra === null ? 'número desconhecido de' : atasDaCompra} atas no PNCP e a ata não informa o fornecedor; itens não carregados pelo PNCP.`);
-          }
-        }
+        foundItems = await itensDaAtaPeloPncp({
+          anoCompra, seqCompra, seqAta, numeroAta: numeroAtaRegistroPreco, uasg: codigoUnidadeGerenciadora, cnpj: cnpjDaCompra
+        });
       }
     }
 
@@ -949,21 +1082,6 @@ export async function fetchArpItemsBatch(params: FilterParams): Promise<Record<s
           currentPage++;
         } else {
           hasMorePages = false;
-        }
-      }
-    }
-
-    // Carregar itens das atas suplementares do PNCP
-    const suppArps = await fetchSupplementalPncpArps(params.codigoUnidadeGerenciadora);
-    for (const supp of SUPPLEMENTAL_PNCP_ATAS) {
-      const sArp = suppArps.find(a => a.numeroAtaRegistroPreco.includes(supp.numeroAta));
-      if (sArp) {
-        const key = `${sArp.numeroAtaRegistroPreco}-${sArp.codigoUnidadeGerenciadora}`;
-        if (!itemsMap[key] || itemsMap[key].length === 0) {
-          const suppItems = await fetchPncpCompraItems(supp.anoCompra, supp.seqCompra, sArp.numeroAtaRegistroPreco, sArp.codigoUnidadeGerenciadora, supp.cnpjFornecedor);
-          if (suppItems.length > 0) {
-            itemsMap[key] = suppItems;
-          }
         }
       }
     }

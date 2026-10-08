@@ -3,7 +3,7 @@ import type { DbAta } from './supabaseClient';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../utils/pncpUtils';
-import { SUPPLEMENTAL_PNCP_ATAS, deduplicarItensPorNumero } from './api';
+import { FORNECEDOR_DAS_ATAS_PNCP, deduplicarItensPorNumero } from './api';
 
 /**
  * Persiste registros de ARPs buscados das APIs governamentais no Supabase.
@@ -194,7 +194,7 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
           } as ArpItemRecord));
 
           const cleanNumAta = (d.numero_ata || '').replace(/^0+/, '');
-          const supp = SUPPLEMENTAL_PNCP_ATAS.find(s => s.numeroAta.replace(/^0+/, '') === cleanNumAta || s.numeroAta === d.numero_ata);
+          const supp = FORNECEDOR_DAS_ATAS_PNCP.find(s => s.numeroAta.replace(/^0+/, '') === cleanNumAta || s.numeroAta === d.numero_ata);
           if (supp && supp.cnpjFornecedor) {
             const cleanTargetCnpj = supp.cnpjFornecedor.replace(/\D/g, '');
             itemsByAta[key] = mappedItems.filter((it: any) => (it.niFornecedor || '').replace(/\D/g, '') === cleanTargetCnpj);
