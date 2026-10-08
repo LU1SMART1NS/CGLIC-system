@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { ActionButton, DataTable, StatusBadge, type Column } from '../../design-system';
-import { formatCurrency } from '../../utils/format';
 import { formatNumber } from './itemBalanceUtils';
 import { summarizeContractExecution } from '../../utils/itemExecutionSummary';
 import { estadoDoVinculo, type ItemEmpenhoVinculo } from '../../types/itemEmpenhoVinculo';
@@ -103,14 +102,6 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
           </div>
         </>
       )
-    },
-    {
-      key: 'valor',
-      header: 'Valor',
-      sortValue: (v) => v.empenho.valorEmpenhado,
-      sortFirstDir: 'desc',
-      align: 'right',
-      render: (v) => formatCurrency(v.empenho.valorEmpenhado)
     },
     {
       key: 'qtd',
