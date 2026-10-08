@@ -93,7 +93,7 @@ export const PagamentosCarteiraTable: React.FC<PagamentosCarteiraTableProps> = (
             {pageItems.map((item) => {
               const { row, linha, contrato } = item;
               const fornecedor = contrato.fornecedorNome;
-              const sub = [linha.documento, linha.referencia ? `ref. ${linha.referencia}` : null, fornecedor].filter(Boolean).join(' · ');
+              const sub = [linha.documento, linha.referencia ? `ref. ${linha.referencia}` : null, fornecedor?.toUpperCase()].filter(Boolean).join(' · ');
               return (
                 <tr key={row.chave} data-testid={`pagamentos-row-${row.chave}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(() => onOpen(item))}>
                   <td data-role="id" style={{ ...carteiraTd, minWidth: '240px', maxWidth: '380px' }}>

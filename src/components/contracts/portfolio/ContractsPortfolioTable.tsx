@@ -11,7 +11,7 @@ import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { formatCurrency } from '../../carteira/carteiraFormat';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { situacaoDaFaixa, type PrazoFaixa } from '../../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../../carteira/CarteiraCellFilter';
@@ -204,7 +204,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                           descricao={`fornecedor ${contract.fornecedorNome}`}
                           onFilter={onFilter && (() => onFilter('busca', contract.fornecedorNome || ''))}
                         >
-                          <div title={contract.fornecedorNome} style={carteiraSubtitle}>{contract.fornecedorNome}</div>
+                          <div title={contract.fornecedorNome} style={carteiraFornecedor}>{contract.fornecedorNome}</div>
                         </CarteiraCellFilter>
                       )}
                       </div>

@@ -17,7 +17,7 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
 import { formatCurrency } from '../carteira/carteiraFormat';
@@ -201,7 +201,7 @@ export const EmpenhosContratoPage: React.FC = () => {
                           </td>
                           <td data-label="Contrato" style={{ ...carteiraTd, minWidth: '180px', maxWidth: '300px' }}>
                             <strong>{c.numero}</strong>
-                            <div style={carteiraSubtitle} title={c.fornecedorNome}>
+                            <div style={carteiraFornecedor} title={c.fornecedorNome}>
                               {c.fornecedorNome ?? '—'}
                             </div>
                           </td>

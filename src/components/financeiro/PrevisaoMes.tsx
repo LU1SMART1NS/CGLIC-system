@@ -11,7 +11,7 @@ import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { formatCurrency, formatCurrencyCompact } from '../carteira/carteiraFormat';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
 import { dataBR, normalizarBusca, rotuloDoMes } from './financeiroFormat';
 import { AjustarLinhaModal, IncluirLinhaModal, RegistrarEnvioModal } from './PrevisaoMesModais';
@@ -251,7 +251,7 @@ export const PrevisaoMes: React.FC = () => {
                         <tr key={l.chave} data-testid={`previsao-linha-${l.chave}`} style={{ opacity: l.retirada ? 0.6 : 1 }}>
                           <td data-role="id" style={{ ...carteiraTd, minWidth: '220px', maxWidth: '340px' }}>
                             <div style={{ fontWeight: 800, color: 'var(--primary)' }}>{c.numero}</div>
-                            <div title={c.fornecedorNome} style={carteiraSubtitle}>
+                            <div title={c.fornecedorNome} style={carteiraFornecedor}>
                               {c.fornecedorNome}
                               {c.fornecedorCnpj ? ` · ${c.fornecedorCnpj}` : ''}
                             </div>

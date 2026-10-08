@@ -18,7 +18,7 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
 import { formatCurrency, formatCurrencyCompact } from '../carteira/carteiraFormat';
@@ -311,7 +311,7 @@ export const EmpenhosItensPage: React.FC = () => {
                             <AppButton variant="link" size="xs" type="button" onClick={() => abrirContrato(d)} title="Abrir o contrato com esta nota aberta">
                               {c.numero}
                             </AppButton>
-                            <div style={carteiraSubtitle} title={c.fornecedorNome}>
+                            <div style={carteiraFornecedor} title={c.fornecedorNome}>
                               {c.fornecedorNome ?? '—'}
                             </div>
                             <div style={subtle}>

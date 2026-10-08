@@ -842,7 +842,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                         )}
                                       </td>
                                       <td data-label="Fornecedor" style={{ fontSize: '0.82rem' }}>
-                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.nomeRazaoSocialFornecedor}</div>
+                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', textTransform: 'uppercase' }}>{c.nomeRazaoSocialFornecedor}</div>
                                         <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                                           CNPJ: {c.niFornecedor?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") || '-'}
                                         </div>

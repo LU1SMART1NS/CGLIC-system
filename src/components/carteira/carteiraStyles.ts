@@ -51,3 +51,9 @@ export const carteiraSubtitle: React.CSSProperties = {
   WebkitBoxOrient: 'vertical',
   overflow: 'hidden'
 };
+
+/** Subtítulo com o nome do fornecedor: sempre em maiúsculas, como o PNCP traz (só exibição; o dado não muda). */
+export const carteiraFornecedor: React.CSSProperties = {
+  ...carteiraSubtitle,
+  textTransform: 'uppercase'
+};

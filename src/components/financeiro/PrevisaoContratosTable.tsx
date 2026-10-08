@@ -4,7 +4,7 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrency } from '../carteira/carteiraFormat';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import type { TipoExpectativa } from '../../services/expectativaPagamentoService';
 import { dataBR } from './financeiroFormat';
@@ -90,7 +90,7 @@ export const PrevisaoContratosTable: React.FC<{
                     <CarteiraIdLink onClick={() => onOpen(l)} label={`Ver os pagamentos do contrato ${l.numero}`} title="Ver os pagamentos do contrato">
                       {l.numero}
                     </CarteiraIdLink>
-                    {l.fornecedorNome && <div title={l.fornecedorNome} style={carteiraSubtitle}>{l.fornecedorNome}</div>}
+                    {l.fornecedorNome && <div title={l.fornecedorNome} style={carteiraFornecedor}>{l.fornecedorNome}</div>}
                   </td>
                   <td data-label="3 meses" style={{ ...carteiraTd, minWidth: '250px', whiteSpace: 'nowrap' }}>
                     <Historico linha={l} meses={meses} />
