@@ -63,7 +63,8 @@ import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
-import { quantitativoSenasp } from '../utils/quantitativoSenasp';
+import { quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
+import { useAtaItemSaldos } from '../hooks/useAta';
 import { UnidadesTab } from './item-balances/UnidadesTab';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
@@ -98,6 +99,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     item.numeroItem
   );
   const unidades = unidadesDoItem?.unidades ?? EMPTY_UNIDADES;
+  const { saldos: saldosDaAta } = useAtaItemSaldos(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
   const error = unidadesQueryError ? (unidadesQueryError.message || 'Erro ao buscar saldos por unidade.') : null;
 
   const {
@@ -479,7 +481,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   };
 
   // Quantitativo SENASP: base única de saldo, régua e alocação (o total da ata é só referência).
-  const totalUGQty = quantitativoSenasp(unidades, arp.codigoUnidadeGerenciadora, Number(item.quantidadeHomologadaItem) || 0);
+  // Sem os órgãos do item (API de unidades vazia), vale o quantitativo SENASP gravado no banco, o mesmo
+  // da aba Itens da ata; o homologado da ata só entra se o item nunca foi sincronizado.
+  const saldoDoItem = saldosDaAta.find((s: any) => Number(s.numero_item) === Number(item.numeroItem));
+  const totalUGQty = quantitativoSenasp(
+    unidades,
+    arp.codigoUnidadeGerenciadora,
+    saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) : Number(item.quantidadeHomologadaItem) || 0
+  );
 
   const handleStartNewAllocation = () => {
     setEditingId(null);
