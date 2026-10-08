@@ -239,14 +239,13 @@ export const ItensUnidadesPage: React.FC = () => {
                           <td data-role="id" style={{ ...carteiraTd, minWidth: '240px', maxWidth: '380px' }}>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
                               <CarteiraIdLink onClick={() => abrirItem(r)} label={`Abrir o item ${r.item.numeroItem} da ata ${r.arp.numeroAtaRegistroPreco}`} title="Abrir o item na aba Alocação interna">
-                                {Number(r.item.numeroItem)}
+                                {r.item.numeroItem}
                               </CarteiraIdLink>
                               <span style={subtle}>·</span>
                               <CarteiraCellFilter descricao={`ata ${r.arp.numeroAtaRegistroPreco}`} onFilter={() => setFilter('busca', r.arp.numeroAtaRegistroPreco)}>
-                                <span style={{ ...subtle, fontWeight: 700 }}>Ata {r.arp.numeroAtaRegistroPreco}</span>
-                              </CarteiraCellFilter>
-                              <CarteiraCellFilter descricao={`UASG ${r.arp.codigoUnidadeGerenciadora}`} onFilter={() => setFilter('uasg', r.arp.codigoUnidadeGerenciadora)}>
-                                <span style={subtle}>UASG {r.arp.codigoUnidadeGerenciadora}</span>
+                                <span style={{ ...subtle, fontWeight: 700 }} title={`UASG ${r.arp.codigoUnidadeGerenciadora}`}>
+                                  Ata {r.arp.numeroAtaRegistroPreco}
+                                </span>
                               </CarteiraCellFilter>
                               {r.faixa === 'EXPIRADO' && <span style={subtle}>· ata encerrada</span>}
                             </div>
