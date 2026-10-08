@@ -57,8 +57,6 @@ export const UsersManagement: React.FC = () => {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
-  const isGestorSaldoSelecionado = formPerfil === GESTOR_SALDO_ROLE_ID;
-
   const handleOpenCreateModal = () => {
     setEditingUser(null);
     setFormNome('');
@@ -311,9 +309,6 @@ export const UsersManagement: React.FC = () => {
                       <Shield size={12} />
                       {getPerfilDisplayLabel(user.perfil, roles)}
                     </span>
-                    {user.perfil === GESTOR_SALDO_ROLE_ID && (
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Todas as Atas</span>
-                    )}
                   </div>
                 );
               }
@@ -432,20 +427,6 @@ export const UsersManagement: React.FC = () => {
                   </option>
                 ))}
               </AppSelect>
-
-              {isGestorSaldoSelecionado && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.85rem', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '8px' }}>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#0f766e', fontWeight: 700 }}>
-                    Gestor de Saldo
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#0f766e' }}>
-                    Gerencia as alocações internas de todas as Atas.
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
-                    Permissões: {GESTOR_SALDO_PERMISSIONS_DESCRIPTION.join(', ')}. Nenhum acesso a contratos, financeiro, departamentos ou administração do sistema.
-                  </p>
-                </div>
-              )}
 
             </form>
       </Modal>
