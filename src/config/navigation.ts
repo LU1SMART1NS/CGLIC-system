@@ -117,7 +117,7 @@ export const navigationConfig: NavItem[] = [
         route: '/contratos',
         status: 'active',
         matchPrefixes: ['/contratos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
         id: 'itens-carteira',
@@ -197,7 +197,7 @@ export const navigationConfig: NavItem[] = [
         route: '/empenhos',
         status: 'active',
         matchPrefixes: ['/empenhos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
         id: 'execucao-pagamentos',
