@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
 import { getAtaSourceQueryOptions } from '../../hooks/useAta';
@@ -9,6 +9,7 @@ import { useCarteiraItens } from '../../hooks/useCarteiraItens';
 import { usePendenciasVinculoAta } from '../atas/distribuicao/usePendenciasVinculoAta';
 import { useDistribuicaoDaCarteira } from '../atas/distribuicao/useDistribuicaoDaCarteira';
 import { contarItensAAlocar, definirContagemExtra } from './contagemExtras';
+import { carregarCarteiraParaOMenu, ESPERA_CARGA_DO_MENU_MS } from './cargaDaCarteiraDoMenu';
 
 /**
  * Calcula os contratos sem ata (os mesmos da fila da Vinculação) e, para o coordenador, as filas da Central de
@@ -48,14 +49,26 @@ const CalculoItensAAlocar: React.FC = () => {
 };
 
 /**
- * Invisível. Espia o cache (sem buscar nada) para saber se as atas e os contratos já foram carregados no navegador;
- * só então monta os cálculos pesados, que passam a ler o cache. Assim o menu não dispara a carga da carteira em toda
- * tela: o número aparece depois que o usuário abre a Carteira, o Painel ou uma página de Vinculação ou Alocação.
+ * Invisível. Espia o cache para saber se as atas e os contratos já estão no navegador; só então monta os cálculos
+ * pesados, que passam a ler o cache. Se o usuário entrou por uma tela que não carrega a carteira (ex.: Visão Geral),
+ * ela é carregada uma vez, em segundo plano, alguns segundos depois de abrir o sistema; daí os números aparecem em
+ * qualquer tela.
  */
 export const ContagensDaCarteira: React.FC = () => {
   const { role } = useAuth();
+  const queryClient = useQueryClient();
   const contaContratos = role === 'admin' || role === 'gestor';
   const contaItens = role === 'admin' || role === 'gestor_saldos';
+
+  React.useEffect(() => {
+    if (!contaContratos && !contaItens) return undefined;
+    const t = setTimeout(() => {
+      carregarCarteiraParaOMenu(queryClient, { contratos: contaContratos }).catch(() => {
+        // Sem a carteira, o menu mostra só o que as consultas leves já sabem.
+      });
+    }, ESPERA_CARGA_DO_MENU_MS);
+    return () => clearTimeout(t);
+  }, [queryClient, contaContratos, contaItens]);
 
   const atas = useQueries({ queries: UASGS_CGLIC.map((uasg) => ({ ...getAtaSourceQueryOptions(uasg), enabled: false })) });
   const contratos = useQueries({ queries: UASGS_CGLIC.map((uasg) => ({ ...getContractsDashboardQueryOptions(uasg), enabled: false })) });
