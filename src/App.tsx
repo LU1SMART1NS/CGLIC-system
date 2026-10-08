@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { SelectionProvider, useSelection } from './context/SelectionContext';
@@ -13,33 +13,36 @@ import { AlertRulesGate } from './components/layout/AlertRulesGate';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 import { temSenhaPendente } from './utils/senhaPendente';
+import { lazyComRecarga } from './utils/recargaAposPublicacao';
+import { FalhaTelaBoundary } from './components/layout/FalhaTelaBoundary';
 
 // Cada tela vira um pacote próprio, baixado só quando a rota é aberta. O ExportExcelModal leva o exceljs
 // junto e só é baixado quando o modal abre. A tela de login fica no pacote principal (é a primeira de quem ainda não entrou).
-const GestaoInstrumentosRoute = lazy(() => import('./routes/GestaoInstrumentosRoute').then((m) => ({ default: m.GestaoInstrumentosRoute })));
-const ArpSearchRoute = lazy(() => import('./routes/ArpSearchRoute').then((m) => ({ default: m.ArpSearchRoute })));
-const ItemBalancesRoute = lazy(() => import('./routes/ItemBalancesRoute').then((m) => ({ default: m.ItemBalancesRoute })));
-const ItensRoute = lazy(() => import('./routes/ItensRoute').then((m) => ({ default: m.ItensRoute })));
-const DistribuicaoEquipeRoute = lazy(() => import('./routes/DistribuicaoEquipeRoute').then((m) => ({ default: m.DistribuicaoEquipeRoute })));
-const ContratosAtaPage = lazy(() => import('./components/vinculacao/ContratosAtaPage').then((m) => ({ default: m.ContratosAtaPage })));
-const EmpenhosItensPage = lazy(() => import('./components/vinculacao/EmpenhosItensPage').then((m) => ({ default: m.EmpenhosItensPage })));
-const EmpenhosContratoPage = lazy(() => import('./components/vinculacao/EmpenhosContratoPage').then((m) => ({ default: m.EmpenhosContratoPage })));
-const ItensUnidadesPage = lazy(() => import('./components/alocacao/ItensUnidadesPage').then((m) => ({ default: m.ItensUnidadesPage })));
-const ContractsRoute = lazy(() => import('./routes/ContractsRoute').then((m) => ({ default: m.ContractsRoute })));
-const Contract360Route = lazy(() => import('./routes/Contract360Route').then((m) => ({ default: m.Contract360Route })));
-const Ata360Route = lazy(() => import('./routes/Ata360Route').then((m) => ({ default: m.Ata360Route })));
-const ModelosGestaoRoute = lazy(() => import('./routes/ModelosGestaoRoute').then((m) => ({ default: m.ModelosGestaoRoute })));
-const UsersRoute = lazy(() => import('./routes/UsersRoute').then((m) => ({ default: m.UsersRoute })));
-const RolesRoute = lazy(() => import('./routes/RolesRoute').then((m) => ({ default: m.RolesRoute })));
-const DepartmentsRoute = lazy(() => import('./routes/DepartmentsRoute').then((m) => ({ default: m.DepartmentsRoute })));
-const PaymentsRoute = lazy(() => import('./routes/PaymentsRoute').then((m) => ({ default: m.PaymentsRoute })));
-const PrevisaoRoute = lazy(() => import('./routes/PrevisaoRoute').then((m) => ({ default: m.PrevisaoRoute })));
-const FinancialExecutionRoute = lazy(() => import('./routes/FinancialExecutionRoute').then((m) => ({ default: m.FinancialExecutionRoute })));
-const DefinirSenhaRoute = lazy(() => import('./routes/DefinirSenhaRoute').then((m) => ({ default: m.DefinirSenhaRoute })));
-const RedefinirSenhaRoute = lazy(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
-const AlertRulesRoute = lazy(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
-const HolidaysRoute = lazy(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
-const ExportExcelModal = lazy(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
+// Se o pacote sumiu numa publicação nova, lazyComRecarga recarrega a página uma vez.
+const GestaoInstrumentosRoute = lazyComRecarga(() => import('./routes/GestaoInstrumentosRoute').then((m) => ({ default: m.GestaoInstrumentosRoute })));
+const ArpSearchRoute = lazyComRecarga(() => import('./routes/ArpSearchRoute').then((m) => ({ default: m.ArpSearchRoute })));
+const ItemBalancesRoute = lazyComRecarga(() => import('./routes/ItemBalancesRoute').then((m) => ({ default: m.ItemBalancesRoute })));
+const ItensRoute = lazyComRecarga(() => import('./routes/ItensRoute').then((m) => ({ default: m.ItensRoute })));
+const DistribuicaoEquipeRoute = lazyComRecarga(() => import('./routes/DistribuicaoEquipeRoute').then((m) => ({ default: m.DistribuicaoEquipeRoute })));
+const ContratosAtaPage = lazyComRecarga(() => import('./components/vinculacao/ContratosAtaPage').then((m) => ({ default: m.ContratosAtaPage })));
+const EmpenhosItensPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosItensPage').then((m) => ({ default: m.EmpenhosItensPage })));
+const EmpenhosContratoPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosContratoPage').then((m) => ({ default: m.EmpenhosContratoPage })));
+const ItensUnidadesPage = lazyComRecarga(() => import('./components/alocacao/ItensUnidadesPage').then((m) => ({ default: m.ItensUnidadesPage })));
+const ContractsRoute = lazyComRecarga(() => import('./routes/ContractsRoute').then((m) => ({ default: m.ContractsRoute })));
+const Contract360Route = lazyComRecarga(() => import('./routes/Contract360Route').then((m) => ({ default: m.Contract360Route })));
+const Ata360Route = lazyComRecarga(() => import('./routes/Ata360Route').then((m) => ({ default: m.Ata360Route })));
+const ModelosGestaoRoute = lazyComRecarga(() => import('./routes/ModelosGestaoRoute').then((m) => ({ default: m.ModelosGestaoRoute })));
+const UsersRoute = lazyComRecarga(() => import('./routes/UsersRoute').then((m) => ({ default: m.UsersRoute })));
+const RolesRoute = lazyComRecarga(() => import('./routes/RolesRoute').then((m) => ({ default: m.RolesRoute })));
+const DepartmentsRoute = lazyComRecarga(() => import('./routes/DepartmentsRoute').then((m) => ({ default: m.DepartmentsRoute })));
+const PaymentsRoute = lazyComRecarga(() => import('./routes/PaymentsRoute').then((m) => ({ default: m.PaymentsRoute })));
+const PrevisaoRoute = lazyComRecarga(() => import('./routes/PrevisaoRoute').then((m) => ({ default: m.PrevisaoRoute })));
+const FinancialExecutionRoute = lazyComRecarga(() => import('./routes/FinancialExecutionRoute').then((m) => ({ default: m.FinancialExecutionRoute })));
+const DefinirSenhaRoute = lazyComRecarga(() => import('./routes/DefinirSenhaRoute').then((m) => ({ default: m.DefinirSenhaRoute })));
+const RedefinirSenhaRoute = lazyComRecarga(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
+const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
+const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
+const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
 const AuthRedirectHandler: React.FC = () => {
   const navigate = useNavigate();
@@ -173,6 +176,7 @@ const AppContent: React.FC = () => {
   return (
     <div className="app-container">
       <AuthRedirectHandler />
+      <FalhaTelaBoundary>
       <Suspense fallback={<AuthLoading />}>
         <Routes>
           {/* Rotas Públicas de Acesso e Credenciamento */}
@@ -373,6 +377,7 @@ const AppContent: React.FC = () => {
           </Route>
         </Routes>
       </Suspense>
+      </FalhaTelaBoundary>
 
       {isExportModalOpen && (
         <Suspense fallback={null}>
