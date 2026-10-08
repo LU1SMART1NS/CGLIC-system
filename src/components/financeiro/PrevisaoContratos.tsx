@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
-import { NoticeBar, useToast } from '../../design-system';
+import { InfoHint, useToast } from '../../design-system';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useFaturasCarteira } from '../../hooks/useFinanceiroCarteira';
@@ -123,11 +123,6 @@ export const PrevisaoContratos: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <NoticeBar tone="info" testId="previsao-contratos-info">
-        Como cada contrato costuma ser pago. Os mensais entram sozinhos na previsão do mês (valor mensal informado ou média dos 3
-        últimos pagamentos); os por entrega, pelas entregas previstas. A sugestão olha os pagamentos de {meses.map(rotuloMes).join(', ')}.
-      </NoticeBar>
-
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando contratos...">
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
@@ -164,6 +159,10 @@ export const PrevisaoContratos: React.FC = () => {
             {showGestorFilter && (
               <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="previsao-filter-gestor" />
             )}
+            <InfoHint
+              testId="previsao-contratos-info"
+              content={`Como cada contrato costuma ser pago. Os mensais entram sozinhos na previsão do mês (valor mensal informado ou média dos 3 últimos pagamentos); os por entrega, pelas entregas previstas. A sugestão olha os pagamentos de ${meses.map(rotuloMes).join(', ')}.`}
+            />
           </CarteiraFilterBar>
 
           <PrevisaoContratosTable

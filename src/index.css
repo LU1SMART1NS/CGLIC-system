@@ -1139,6 +1139,17 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
   white-space: normal; text-align: left; pointer-events: none;
 }
 
+/* Ícone ⓘ de ajuda (InfoHint): a explicação abre abaixo do ícone, mais larga que a dica comum. */
+.ds-infohint { display: inline-flex; align-items: center; vertical-align: middle; }
+.ds-infohint__btn {
+  display: inline-flex; align-items: center; justify-content: center; padding: 2px; border: 0; border-radius: 50%;
+  background: transparent; color: #64748b; cursor: help; line-height: 0;
+}
+.ds-infohint__btn:hover, .ds-infohint__btn:focus-visible { color: var(--primary, #0c326f); }
+.ds-infohint .ds-tooltip__bubble {
+  bottom: auto; top: calc(100% + 6px); left: -8px; transform: none; max-width: min(360px, calc(100vw - 32px));
+}
+
 /* ==========================================================================
    Abas roláveis (Fase 2 / P5 — F2-16)
    ========================================================================== */

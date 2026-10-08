@@ -3,7 +3,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import { ActionButton, NoticeBar } from '../../design-system';
+import { ActionButton } from '../../design-system';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
@@ -154,6 +154,7 @@ export const ItensUnidadesPage: React.FC = () => {
       <PageHeader
         title="Itens a alocar às unidades internas"
         subtitle="Quanto de cada item da ata cada unidade interna recebeu, comparado ao quantitativo SENASP."
+        hint="Alocado é o que as unidades internas receberam, comparado ao quantitativo SENASP do item (a mesma conta da Carteira › Itens). Só o coordenador e o gestor de saldos alocam; os demais perfis consultam."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}
       />
 
@@ -203,11 +204,6 @@ export const ItensUnidadesPage: React.FC = () => {
             <CarteiraFilterButton label="UASG" value={filters.uasg} emptyValue={TODOS} options={[...uasgs.keys()].sort().map((u) => ({ value: u, label: u, count: uasgs.get(u) }))} onChange={(v) => setFilter('uasg', v)} testId="vinc-itens-filter-uasg" />
             {showGestorFilter && <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="vinc-itens-filter-gestor" />}
           </CarteiraFilterBar>
-
-          <NoticeBar tone="info" testId="vinc-itens-aviso">
-            Alocado é o que as unidades internas receberam, comparado ao quantitativo SENASP do item (a mesma conta da Carteira › Itens). Só o coordenador e o
-            gestor de saldos alocam; os demais perfis consultam.
-          </NoticeBar>
 
           {base.length === 0 ? (
             <EmptyState title="Nenhum item com quantitativo SENASP na sua carteira." description="Os itens aparecem aqui depois que o saldo da ata é sincronizado." testId="vinc-itens-vazio" />

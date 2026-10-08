@@ -26,7 +26,7 @@ import { formatDateBR } from '../../services/temporalEngineService';
 import { classifyTaskAttention } from '../contracts/taskAttentionDisplay';
 import { severityFromAttentionPriorityLevel } from '../../services/severityService';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
-import { ActionButton, AppButton, DataTable, EmptyState, Modal, NoticeBar, SummaryBar, useConfirmDialog } from '../../design-system';
+import { ActionButton, AppButton, DataTable, EmptyState, InfoHint, Modal, SummaryBar, useConfirmDialog } from '../../design-system';
 
 /**
  * Plano de gestão: mesma tela para Contrato e Ata. O componente só desenha; quem usa informa por
@@ -571,9 +571,6 @@ export const TaskPlanSection: React.FC<{
 
       {showApplyModel && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
-          <NoticeBar tone="info" testId="task-plan-apply-note">
-            As etapas e tarefas do modelo são acrescentadas ao plano atual; nada do que já existe é alterado.
-          </NoticeBar>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <select
               aria-label="Modelo de gestão a acrescentar"
@@ -600,6 +597,7 @@ export const TaskPlanSection: React.FC<{
             >
               Acrescentar ao plano
             </AppButton>
+            <InfoHint testId="task-plan-apply-note" content="As etapas e tarefas do modelo são acrescentadas ao plano atual; nada do que já existe é alterado." />
           </div>
         </div>
       )}
