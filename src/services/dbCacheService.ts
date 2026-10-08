@@ -61,6 +61,15 @@ export async function gravarProcessoDaAta(numeroAta: string, codigoUasg: string,
 }
 
 /**
+ * A ata está cancelada? O banco guarda isso em status_ata ('Cancelada', do Compras.gov.br ou do PNCP). As telas
+ * olham `isCanceladaPncp`, que não tem coluna: sem esta tradução, uma ata cancelada com vigência futura (00005/2026)
+ * aparecia como vigente e com saldo.
+ */
+export function ataCanceladaNoBanco(statusAta?: string | null): boolean {
+  return /cancelad/i.test(statusAta || '');
+}
+
+/**
  * Consulta ARPs diretamente do banco Supabase
  */
 export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): Promise<{ arps: ArpRecord[]; syncInfo: SyncMetadata }> {
@@ -108,7 +117,8 @@ export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): 
         numeroControlePncpAta: d.numero_controle_pncp || '',
         numeroControlePncpCompra: '',
         idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
-        processoCompra: d.processo_compra ?? undefined
+        processoCompra: d.processo_compra ?? undefined,
+        isCanceladaPncp: ataCanceladaNoBanco(d.status_ata)
       }));
 
       const syncInfo: SyncMetadata = {
@@ -232,7 +242,8 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
           numeroControlePncpAta: d.numero_controle_pncp || '',
           numeroControlePncpCompra: '',
           idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
-          processoCompra: d.processo_compra ?? undefined
+          processoCompra: d.processo_compra ?? undefined,
+          isCanceladaPncp: ataCanceladaNoBanco(d.status_ata)
         };
       });
 
