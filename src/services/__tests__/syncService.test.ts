@@ -279,4 +279,16 @@ describe('processo da compra das atas', () => {
     expect(dbCache.gravarProcessoDaAta).toHaveBeenCalledTimes(1);
     expect(dbCache.gravarProcessoDaAta).toHaveBeenCalledWith(ata(1).numeroAtaRegistroPreco, UASG, '08020001450202479');
   });
+
+  it('o passo do processo tem relógio próprio: leitura lenta da lista não o impede de consultar', async () => {
+    let t = 0;
+    const agora = () => t;
+    vi.mocked(api.fetchArpsDasFontes).mockImplementationOnce(async () => { t += 60_000; return [comCompra(1)]; });
+    vi.mocked(dbCache.fetchEstadoAtasNoBanco).mockResolvedValueOnce(new Map());
+    vi.mocked(dbCache.cacheArpsInDb).mockResolvedValueOnce(true);
+    vi.mocked(api.fetchPncpProcessoCompra).mockResolvedValueOnce('08020001450202479');
+    vi.mocked(api.fetchArpItems).mockResolvedValue({ resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 });
+    await coletarEGravarAtas(params, { agora, orcamentoMs: 100_000 });
+    expect(dbCache.gravarProcessoDaAta).toHaveBeenCalledWith(ata(1).numeroAtaRegistroPreco, UASG, '08020001450202479');
+  });
 });
