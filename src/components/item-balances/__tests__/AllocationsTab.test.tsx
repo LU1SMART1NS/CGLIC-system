@@ -2,7 +2,8 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
-import { AllocationsTab, AllocationUnavailableNotice } from '../AllocationsTab';
+import { AllocationsTab } from '../AllocationsTab';
+import { CatalogoVazioAviso } from '../../alocacao/AlocarUnidadeModal';
 
 const departments = [
   { id: 'd1', sigla: 'DSUSP', nomeCompleto: 'Diretoria do Sistema Único', ativo: true },
@@ -11,29 +12,19 @@ const departments = [
 
 const base: React.ComponentProps<typeof AllocationsTab> = {
   ugUasg: '200331',
+  item: { numeroAta: '00041/2024', uasg: '200331', numeroItem: '1', quantitativoSenasp: 801 },
   totalUG: 801,
   totalAllocated: 300,
   remaining: 501,
   percentAllocated: 37.4,
   rows: [
-    { id: 'a1', unitName: 'DSUSP', allocatedQty: 300, empenhado: 120, pendentes: 2, pendentesSugerido: 11 }
+    { id: 'a1', unitName: 'DSUSP', allocatedQty: 300, empenhado: 120, pendentes: 2, pendentesSugerido: 11, vinculados: 3 }
   ],
   semUnidade: { empenhado: 0, count: 0 },
   departments,
   departmentsLoading: false,
   canManage: true,
-  editingId: null,
-  unitName: 'DGE',
-  onUnitChange: vi.fn(),
-  qty: '',
-  onQtyChange: vi.fn(),
-  onSubmit: vi.fn().mockResolvedValue(true),
-  onStartNew: vi.fn(),
-  onCancelEdit: vi.fn(),
-  saving: false,
   error: null,
-  onEdit: vi.fn(),
-  onDelete: vi.fn(),
   onGoToContracts: vi.fn()
 };
 
@@ -65,7 +56,7 @@ describe('AllocationsTab', () => {
   });
 
   it('a empenhar negativo (empenhado acima do alocado) aparece em vermelho', () => {
-    const out = html({ rows: [{ id: 'a1', unitName: 'DSUSP', allocatedQty: 10, empenhado: 25, pendentes: 0, pendentesSugerido: 0 }] });
+    const out = html({ rows: [{ id: 'a1', unitName: 'DSUSP', allocatedQty: 10, empenhado: 25, pendentes: 0, pendentesSugerido: 0, vinculados: 0 }] });
     expect(out).toContain('-15');
     expect(out).toContain('var(--danger)');
   });
@@ -80,24 +71,27 @@ describe('AllocationsTab', () => {
 
   it('o botão Alocar fica ativo mesmo sem unidade disponível: a explicação vem ao clicar', () => {
     const todas = html({ rows: [
-      { id: 'a1', unitName: 'DSUSP', allocatedQty: 1, empenhado: 0, pendentes: 0, pendentesSugerido: 0 },
-      { id: 'a2', unitName: 'DGE', allocatedQty: 1, empenhado: 0, pendentes: 0, pendentesSugerido: 0 }
+      { id: 'a1', unitName: 'DSUSP', allocatedQty: 1, empenhado: 0, pendentes: 0, pendentesSugerido: 0, vinculados: 0 },
+      { id: 'a2', unitName: 'DGE', allocatedQty: 1, empenhado: 0, pendentes: 0, pendentesSugerido: 0, vinculados: 0 }
     ] });
     expect(todas).toContain('title="Alocar quantitativo a uma unidade interna"');
     expect(todas).not.toMatch(/aria-disabled="true"[^>]*title="Alocar quantitativo/);
     expect(html({ departments: [] })).not.toMatch(/aria-disabled="true"[^>]*title="Alocar quantitativo/);
   });
 
-  it('a explicação diz o que fazer quando todas as unidades já foram alocadas', () => {
-    const out = renderToStaticMarkup(<MemoryRouter><AllocationUnavailableNotice catalogEmpty={false} /></MemoryRouter>);
-    expect(out).toContain('Todas as unidades do catálogo já têm alocação neste item');
-    expect(out).toContain('use o lápis na tabela');
-    expect(out).toContain('href="/admin/departamentos"');
-    expect(out).not.toContain('target="_blank"');
+  it('com empenho vinculado a lixeira fica desativada e diz por quê; sem empenho fica ativa', () => {
+    const out = html({ rows: [
+      { id: 'a1', unitName: 'DSUSP', allocatedQty: 300, empenhado: 120, pendentes: 2, pendentesSugerido: 11, vinculados: 3 },
+      { id: 'a2', unitName: 'DGE', allocatedQty: 50, empenhado: 0, pendentes: 0, pendentesSugerido: 0, vinculados: 0 }
+    ] });
+    expect(out).toContain('DSUSP tem 3 empenhos vinculados. Para remover, desvincule os empenhos na aba Contratos e empenhos.');
+    expect(out).toMatch(/aria-label="DSUSP tem 3 empenhos vinculados[^"]*"[^>]*disabled=""|disabled=""[^>]*aria-label="DSUSP tem 3 empenhos vinculados/);
+    expect(out).toContain('Excluir a alocação de DGE');
+    expect(out).not.toMatch(/disabled=""[^>]*aria-label="Excluir a alocação de DGE"|aria-label="Excluir a alocação de DGE"[^>]*disabled=""/);
   });
 
   it('a explicação diz o que fazer quando o catálogo está vazio', () => {
-    const out = renderToStaticMarkup(<MemoryRouter><AllocationUnavailableNotice catalogEmpty /></MemoryRouter>);
+    const out = renderToStaticMarkup(<MemoryRouter><CatalogoVazioAviso /></MemoryRouter>);
     expect(out).toContain('catálogo de Unidades Internas está vazio');
   });
 

@@ -26,7 +26,7 @@ describe('summarizeAllocationExecution', () => {
     const r = summarizeAllocationExecution(allocations, [v('2026NE000039', 8), v('2026NE000096', null, 4)], {
       '2026NE000039': 'a1', '2026NE000096': 'a1'
     });
-    expect(r.porAlocacao.get('a1')).toEqual({ empenhado: 8, pendentes: 1, pendentesSugerido: 4 });
+    expect(r.porAlocacao.get('a1')).toEqual({ empenhado: 8, pendentes: 1, pendentesSugerido: 4, vinculados: 2 });
   });
 
   it('empenho confirmado sem unidade vai para semUnidade; pendente sem unidade não', () => {

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Plus } from 'lucide-react';
+import { AlocarUnidadeModal, type ItemParaAlocar } from '../alocacao/AlocarUnidadeModal';
 import {
   AlertCard,
   ActionButton, AppButton,
   DataTable,
   EmptyState,
-  Modal,
   NoticeBar,
   ProgressBar,
   SectionHeader,
@@ -23,11 +23,15 @@ export interface AllocationRow {
   empenhado: number;
   pendentes: number;
   pendentesSugerido: number;
+  /** Empenhos do item vinculados à unidade (confirmados ou não): com algum, a alocação não pode ser removida. */
+  vinculados: number;
 }
 
 interface AllocationsTabProps {
   /** UASG gerenciadora do item (de onde vem o quantitativo a alocar). */
   ugUasg: string;
+  /** Item da ata, para a janela "Alocação do item". */
+  item: ItemParaAlocar;
   totalUG: number;
   totalAllocated: number;
   remaining: number;
@@ -38,44 +42,15 @@ interface AllocationsTabProps {
   departments: InternalDepartment[];
   departmentsLoading: boolean;
   canManage: boolean;
-
-  editingId: string | null;
-  unitName: string;
-  onUnitChange: (sigla: string) => void;
-  qty: number | '';
-  onQtyChange: (qty: number | '') => void;
-  /** Valida e grava; resolve verdadeiro quando gravou (a janela fecha só nesse caso). */
-  onSubmit: () => Promise<boolean>;
-  /** Prepara o formulário para uma nova alocação (limpa edição, quantidade e erro). */
-  onStartNew: () => void;
-  /** Descarta a edição em andamento. */
-  onCancelEdit: () => void;
-  saving: boolean;
+  /** Erro de gravação vindo da página (ex.: vínculo de empenho). */
   error: string | null;
 
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
   onGoToContracts: () => void;
 }
 
-const norm = (s: string) => s.trim().toLowerCase();
-
-/** Explica, dentro da janela, por que não há unidade disponível para alocar (e como resolver). */
-export const AllocationUnavailableNotice: React.FC<{ catalogEmpty: boolean }> = ({ catalogEmpty }) => (
-  <div data-testid="allocation-unavailable" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.88rem', color: '#334155' }}>
-    <p style={{ margin: 0 }}>
-      {catalogEmpty
-        ? 'O catálogo de Unidades Internas está vazio. Cadastre as unidades para poder alocar quantitativo.'
-        : 'Todas as unidades do catálogo já têm alocação neste item. Para alocar a outra unidade, cadastre-a em Unidades Internas; para mudar a quantidade de uma já alocada, use o lápis na tabela.'}
-    </p>
-    <Link to="/admin/departamentos" style={{ fontWeight: 700, color: 'var(--primary)', textDecoration: 'none' }}>
-      Abrir Unidades Internas
-    </Link>
-  </div>
-);
-
 export const AllocationsTab: React.FC<AllocationsTabProps> = ({
   ugUasg,
+  item,
   totalUG,
   totalAllocated,
   remaining,
@@ -85,46 +60,12 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
   departments,
   departmentsLoading,
   canManage,
-  editingId,
-  unitName,
-  onUnitChange,
-  qty,
-  onQtyChange,
-  onSubmit,
-  onStartNew,
-  onCancelEdit,
-  saving,
   error,
-  onEdit,
-  onDelete,
   onGoToContracts
 }) => {
-  const [modalOpen, setModalOpen] = useState(false);
-
-  const allocatedNames = new Set(rows.filter((r) => r.id !== editingId).map((r) => norm(r.unitName)));
-  const allUnitsAllocated = departments.length > 0 && departments.every((d) => allocatedNames.has(norm(d.sigla)));
+  // Janela aberta: sem foco (Alocar), com foco numa linha (lápis) ou com a linha já marcada para remover (lixeira).
+  const [janela, setJanela] = useState<{ focoId?: string; removerId?: string } | null>(null);
   const catalogoVazio = !departmentsLoading && departments.length === 0;
-  const semUnidadeDisponivel = catalogoVazio || (allUnitsAllocated && !editingId);
-  const editingRow = editingId ? rows.find((r) => r.id === editingId) : undefined;
-  const disponivelParaAlocar = remaining + (editingRow?.allocatedQty ?? 0);
-
-  const openNew = () => {
-    onStartNew();
-    setModalOpen(true);
-  };
-  const openEdit = (id: string) => {
-    onEdit(id);
-    setModalOpen(true);
-  };
-  const closeModal = () => {
-    if (saving) return;
-    setModalOpen(false);
-    onCancelEdit();
-  };
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (await onSubmit()) setModalOpen(false);
-  };
 
   const columns: Column<AllocationRow>[] = [
     {
@@ -193,8 +134,19 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
             width: '110px',
             render: (r: AllocationRow) => (
               <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
-                <ActionButton action="editar" iconOnly label={`Editar a alocação de ${r.unitName}`} size="sm" onClick={() => openEdit(r.id)} disabled={saving} />
-                <ActionButton action="excluir" iconOnly label={`Excluir a alocação de ${r.unitName}`} size="sm" onClick={() => onDelete(r.id)} disabled={saving} />
+                <ActionButton action="editar" iconOnly label={`Editar a alocação de ${r.unitName}`} size="sm" onClick={() => setJanela({ focoId: r.id })} />
+                <ActionButton
+                  action="excluir"
+                  iconOnly
+                  label={
+                    r.vinculados > 0
+                      ? `${r.unitName} tem ${r.vinculados} ${r.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, desvincule os empenhos na aba Contratos e empenhos.`
+                      : `Excluir a alocação de ${r.unitName}`
+                  }
+                  size="sm"
+                  onClick={() => setJanela({ removerId: r.id })}
+                  disabled={r.vinculados > 0}
+                />
               </div>
             )
           }
@@ -227,7 +179,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
         )}
       </SummaryBar>
 
-      {error && !modalOpen && <AlertCard severity="CRITICA" title={error} testId="allocation-error" />}
+      {error && !janela && <AlertCard severity="CRITICA" title={error} testId="allocation-error" />}
 
       {canManage && catalogoVazio && (
         <EmptyState
@@ -250,7 +202,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
                 variant="primary"
                 size="sm"
                 icon={<Plus size={14} />}
-                onClick={openNew}
+                onClick={() => setJanela({})}
                 disabled={departmentsLoading}
                 title="Alocar quantitativo a uma unidade interna"
               >
@@ -270,69 +222,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
       </div>
 
       {canManage && (
-        <Modal
-          isOpen={modalOpen}
-          onClose={closeModal}
-          title={editingId ? 'Editar alocação' : 'Alocar quantitativo'}
-          subtitle={`UG ${ugUasg} • disponível para alocar: ${formatNumber(disponivelParaAlocar)} un`}
-          size="md"
-          dismissible={!saving}
-          testId="allocation-modal"
-          footer={
-            <>
-              <ActionButton action={semUnidadeDisponivel ? 'fechar' : 'cancelar'} type="button" size="sm" onClick={closeModal} disabled={saving} />
-              {!semUnidadeDisponivel && (
-                <AppButton type="submit" form="allocation-form" variant="primary" size="sm" isLoading={saving} disabled={saving}>
-                  {editingId ? 'Salvar' : 'Alocar'}
-                </AppButton>
-              )}
-            </>
-          }
-        >
-          {semUnidadeDisponivel ? (
-            <AllocationUnavailableNotice catalogEmpty={catalogoVazio} />
-          ) : (
-          <form id="allocation-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {error && <AlertCard severity="CRITICA" title={error} testId="allocation-modal-error" />}
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-              Unidade interna
-              <select
-                className="form-input"
-                value={unitName}
-                onChange={(e) => onUnitChange(e.target.value)}
-                required
-                style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.85rem', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
-              >
-                {departments.map((d) => {
-                  const isAllocated = allocatedNames.has(norm(d.sigla));
-                  return (
-                    <option key={d.id} value={d.sigla} disabled={isAllocated}>
-                      {d.sigla} — {d.nomeCompleto}{isAllocated ? ' (já alocada)' : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-              Quantidade
-              <input
-                type="number"
-                className="form-input"
-                min="1"
-                max={Math.max(disponivelParaAlocar, 1)}
-                placeholder="Ex: 50"
-                value={qty}
-                onChange={(e) => onQtyChange(e.target.value === '' ? '' : Number(e.target.value))}
-                required
-                style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%' }}
-              />
-            </label>
-            <Link to="/admin/departamentos" style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', textDecoration: 'none' }}>
-              Gerenciar Unidades Internas
-            </Link>
-          </form>
-          )}
-        </Modal>
+        <AlocarUnidadeModal item={janela ? item : null} focoId={janela?.focoId} removerId={janela?.removerId} onFechar={() => setJanela(null)} />
       )}
     </div>
   );
