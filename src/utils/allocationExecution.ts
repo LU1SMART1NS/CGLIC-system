@@ -1,11 +1,11 @@
 import { normalizeEmpenhoNumero } from '../services/empenhoNormalizationService';
-import type { EmpenhoDoItem } from './empenhoDoItem';
+import type { EmpenhoDoItem, ParcelaDoItem } from './empenhoDoItem';
 
 /** Execução de uma alocação interna: o que a unidade empenhou, pelas parcelas deste item nas notas ligadas a ela. */
 export interface AllocationExecution {
   /** Soma das quantidades das parcelas deste item nas notas ligadas à unidade. */
   empenhado: number;
-  /** Notas do item ligadas à unidade, vinculadas aos itens ou ainda a vincular (impedem remover a unidade). */
+  /** Notas do item ligadas à unidade com quantidade definida (impedem remover a unidade). */
   vinculados: number;
 }
 
@@ -16,12 +16,13 @@ export interface AllocationExecutionSummary {
 }
 
 /**
- * Cruza o empenho do item (parcelas das notas vinculadas aos itens e notas ainda a vincular) com a ligação
- * nota → unidade interna (empenho_links, guardada pelo número da nota; a comparação ignora zeros e separadores).
+ * Cruza o empenho do item (parcelas das notas vinculadas aos itens) com a ligação nota → unidade interna
+ * (empenho_links, guardada pelo número da nota; a comparação ignora zeros e separadores). Só conta a nota com
+ * quantidade definida neste item: sem quantidade, a nota não pode estar numa unidade (ver vinculosSemQuantidade).
  */
 export function summarizeAllocationExecution(
   allocations: Array<{ id: string }>,
-  empenho: Pick<EmpenhoDoItem, 'parcelas' | 'aVincular'>,
+  empenho: Pick<EmpenhoDoItem, 'parcelas'>,
   empenhoLinks: Record<string, string>
 ): AllocationExecutionSummary {
   const validIds = new Set(allocations.map((a) => a.id));
@@ -44,21 +45,43 @@ export function summarizeAllocationExecution(
       }
       continue;
     }
+    if (p.quantidade == null) continue;
     const exec = porAlocacao.get(allocationId)!;
-    exec.empenhado += p.quantidade ?? 0;
+    exec.empenhado += p.quantidade;
     if (!contadas.has(numero)) {
       exec.vinculados += 1;
       contadas.add(numero);
     }
   }
-  // Nota ainda a vincular aos itens, já ligada a uma unidade: não soma empenhado, mas segura a unidade.
-  for (const d of empenho.aVincular) {
-    const numero = normalizeEmpenhoNumero(d.numeroOficial);
-    const allocationId = unitByNumero.get(numero);
-    if (!allocationId || contadas.has(numero)) continue;
-    porAlocacao.get(allocationId)!.vinculados += 1;
-    contadas.add(numero);
-  }
 
   return { porAlocacao, semUnidade };
+}
+
+/** Quantidade deste item em cada nota (pelo número normalizado); só entram as parcelas com quantidade. */
+export function quantidadePorNota(parcelas: Array<Pick<ParcelaDoItem, 'numeroOficial' | 'quantidade'>>): Map<string, number> {
+  const porNota = new Map<string, number>();
+  for (const p of parcelas) {
+    if (p.quantidade == null) continue;
+    const numero = normalizeEmpenhoNumero(p.numeroOficial);
+    porNota.set(numero, (porNota.get(numero) ?? 0) + p.quantidade);
+  }
+  return porNota;
+}
+
+/**
+ * Ligações nota → unidade de notas que não têm (ou deixaram de ter) quantidade neste item: saiu do item, voltou a
+ * vincular ou o item não tem preço no contrato. Devolve as ligações que ficam e as que saem; nulo quando nada muda.
+ */
+export function vinculosSemQuantidade(
+  links: Record<string, string>,
+  parcelas: Array<Pick<ParcelaDoItem, 'numeroOficial' | 'quantidade'>>
+): { restantes: Record<string, string>; removidos: Array<{ numero: string; allocationId: string }> } | null {
+  const comQuantidade = quantidadePorNota(parcelas);
+  const restantes: Record<string, string> = {};
+  const removidos: Array<{ numero: string; allocationId: string }> = [];
+  for (const [numero, allocationId] of Object.entries(links)) {
+    if (comQuantidade.has(normalizeEmpenhoNumero(numero))) restantes[numero] = allocationId;
+    else removidos.push({ numero, allocationId });
+  }
+  return removidos.length > 0 ? { restantes, removidos } : null;
 }

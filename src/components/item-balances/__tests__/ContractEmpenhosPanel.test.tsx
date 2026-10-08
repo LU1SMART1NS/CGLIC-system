@@ -83,6 +83,34 @@ describe('ContractEmpenhosPanel (notas do contrato para este item)', () => {
     expect(html({ allocationOptions: [] })).toContain('Sem unidades alocadas');
   });
 
+  it('unidade onde a nota não cabe fica desabilitada; a unidade atual da nota continua escolhível', () => {
+    // Nota 2024NE000337: 342 un deste item.
+    const opcoes = [
+      { id: 'a1', unitName: 'DFNSP', saldoQty: 100 },
+      { id: 'a2', unitName: 'DIOPI', saldoQty: 400 },
+      { id: 'a3', unitName: 'CGLIC', saldoQty: 0 }
+    ];
+    const out = html({ allocationOptions: opcoes, linkedAllocationId: () => 'a3' });
+    expect(out).toContain('<option value="a1" disabled="">DFNSP (saldo 100 un · não cabe)</option>');
+    expect(out).toContain('<option value="a2">DIOPI (saldo 400 un)</option>');
+    // Já ligada à CGLIC: o saldo 0 já desconta esta nota.
+    expect(out).toContain('<option value="a3" selected="">CGLIC (saldo 0 un)</option>');
+  });
+
+  it('nota sem quantidade neste item: a unidade fica travada até a quantidade ser definida', () => {
+    const semPreco = montarEmpenhoDoItem({
+      numeroItem: 43,
+      contratos: [{ contractKey: 'K', valorUnitario: null, distribuicoes: [nota({ ne: '2024NE000337', valor_nota: 1000, situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numero_item: 43, valor: 1000 }] })] }]
+    }).porContrato.get('K');
+    const out = html({ execucao: semPreco });
+    expect(out).toContain('Defina a quantidade primeiro');
+    expect(out).not.toContain('DFNSP');
+  });
+
+  it('quem não é gestor nem coordenador vê a unidade, mas não muda', () => {
+    expect(html({ canLinkEmpenhos: false })).toContain('Só o gestor e o coordenador escolhem a unidade interna da nota.');
+  });
+
   it('contrato sem itens na fonte: avisa que as notas não têm divisão por item', () => {
     const semItens = montarEmpenhoDoItem({
       numeroItem: 43,

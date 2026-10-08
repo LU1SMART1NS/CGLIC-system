@@ -12,7 +12,7 @@ import { montarEmpenhoDoItem, type EmpenhoDoItem } from '../utils/empenhoDoItem'
  * unitário do item em cada contrato) e as notas de cada contrato (o mesmo cache do Contrato 360 e da Vinculação, que
  * as ações de vincular invalidam).
  */
-export function useEmpenhoDoItem(itemKey: string): { data: EmpenhoDoItem; isLoading: boolean } {
+export function useEmpenhoDoItem(itemKey: string): { data: EmpenhoDoItem; isLoading: boolean; isReady: boolean } {
   const partes = itemKey ? parseItemKey(itemKey) : null;
   const links = useQuery(getItemContractLinksQueryOptions(partes?.numeroAta, partes?.uasg, partes?.itemNum, itemKey));
   const contratos = useMemo(() => {
@@ -37,5 +37,10 @@ export function useEmpenhoDoItem(itemKey: string): { data: EmpenhoDoItem; isLoad
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [contratos, assinatura, partes?.itemNumInteger]
   );
-  return { data, isLoading: links.isLoading || notas.some((q) => q.isLoading) };
+  return {
+    data,
+    isLoading: links.isLoading || notas.some((q) => q.isLoading),
+    // Tudo lido sem erro: só então dá para concluir que uma nota não tem quantidade neste item.
+    isReady: links.isSuccess && notas.every((q) => q.isSuccess)
+  };
 }
