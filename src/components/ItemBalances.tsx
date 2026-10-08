@@ -993,9 +993,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                       </td>
                                       <td data-label="Unidade" style={{ fontSize: '0.85rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                          {resolvedOrgaoName}
+                                          {contractUasg ? null : resolvedOrgaoName}
                                           {contractUasg ? (
-                                            <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', color: 'var(--color-info-text)', fontWeight: 600, background: 'var(--color-info-bg)', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid var(--color-info-border)' }}>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--color-info-text)', fontWeight: 600, background: 'var(--color-info-bg)', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid var(--color-info-border)' }}>
                                               UASG: {contractUasg}
                                             </span>
                                           ) : null}
