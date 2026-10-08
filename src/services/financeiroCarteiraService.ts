@@ -56,12 +56,15 @@ export interface FaturaCarteira {
   paga: boolean;
   npContratos: number;
   empenhos: string | null;
+  /** NEs citadas pela fatura que não estão vinculadas ao contrato no sistema (quantidade e números). */
+  empenhosSemVinculo: number;
+  empenhosSemVinculoNumeros: string | null;
 }
 
 export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
   const linhas = await lerTudo<any>(
     'v_contrato_faturas',
-    'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos',
+    'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros',
     'id_fatura'
   );
   return linhas.map((f) => ({
@@ -81,7 +84,9 @@ export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
     obEmissao: f.ob_emissao ?? null,
     paga: Boolean(f.paga),
     npContratos: Number(f.np_contratos ?? 0),
-    empenhos: f.empenhos ?? null
+    empenhos: f.empenhos ?? null,
+    empenhosSemVinculo: Number(f.empenhos_sem_vinculo ?? 0),
+    empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null
   }));
 }
 

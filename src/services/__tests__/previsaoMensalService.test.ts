@@ -15,7 +15,7 @@ import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 const fatura = (o: Partial<FaturaCarteira>): FaturaCarteira => ({
   idFatura: 1, contractKey: 'A', numero: '231', tipo: 'Nota Fiscal', emissao: '2026-10-01', vencimento: null, valorLiquido: 100,
   dataLiquidacao: null, situacao: 'Pendente', cancelada: false, np: null, referencia: '09/2026', ordensBancarias: null,
-  obEmissao: null, paga: false, npContratos: 0, empenhos: '2026NE000412', ...o
+  obEmissao: null, paga: false, npContratos: 0, empenhos: '2026NE000412', empenhosSemVinculo: 0, empenhosSemVinculoNumeros: null, ...o
 });
 const empenho = (o: Partial<EmpenhoCarteiraRow>): EmpenhoCarteiraRow => ({
   empenhoId: 'e1', canonicalKey: '200331-2026-2026NE412', numero: '2026NE000412', ano: 2026, uasgEmitente: '200331', dataEmissao: '2026-01-01',

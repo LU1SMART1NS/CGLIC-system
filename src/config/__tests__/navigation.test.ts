@@ -8,14 +8,16 @@ function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] 
 
 describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', () => {
   describe('Menu chave com 4 áreas e páginas como abas', () => {
-    it('deve conter as 4 áreas do menu chave, com Configurações no pé', () => {
+    it('deve conter as 6 áreas do menu chave, com Configurações no pé', () => {
       expect(navigationConfig.map((item) => item.id)).toEqual([
         'visao-geral',
         'carteira',
+        'alocacao',
+        'vinculacao',
         'execucao-financeira',
         'configuracoes'
       ]);
-      expect(navigationConfig.map((item) => item.label)).toEqual(['Visão Geral', 'Carteira', 'Financeiro', 'Configurações']);
+      expect(navigationConfig.map((item) => item.label)).toEqual(['Visão Geral', 'Carteira', 'Alocação', 'Vinculação', 'Financeiro', 'Configurações']);
       expect(navigationConfig.find((i) => i.id === 'configuracoes')?.placement).toBe('bottom');
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
@@ -36,6 +38,23 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Contratos', '/contratos'],
         ['Itens', '/itens']
       ]);
+    });
+
+    it('Alocação tem uma página só (itens às unidades); Vinculação tem as três filas de vínculo na ordem do caminho', () => {
+      const alocacao = navigationConfig.find((i) => i.id === 'alocacao')!;
+      expect(alocacao.children!.map((c) => [c.label, c.route])).toEqual([['Itens às unidades', '/alocacao']]);
+      const area = navigationConfig.find((i) => i.id === 'vinculacao')!;
+      expect(area.children!.map((c) => [c.label, c.route])).toEqual([
+        ['Contratos à ata', '/vinculacao/contratos'],
+        ['Empenhos ao contrato', '/vinculacao/empenhos-contrato'],
+        ['Empenhos aos itens', '/vinculacao/empenhos-itens']
+      ]);
+      // O gestor de saldos vê a Alocação e não a Vinculação.
+      const saldos = filterNavigationByRole(navigationConfig, 'gestor_saldos').map((i) => i.id);
+      expect(saldos).toContain('alocacao');
+      expect(saldos).not.toContain('vinculacao');
+      // Página única: a área não mostra abas no topo.
+      expect(findAreaForTabs(filterNavigationByRole(navigationConfig, 'admin'), '/alocacao')?.children).toHaveLength(1);
     });
 
     it('Financeiro tem as abas Empenhos e Pagamentos (a previsão é um botão em Pagamentos)', () => {

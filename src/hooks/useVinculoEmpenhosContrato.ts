@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { FINANCEIRO_QUERY_KEYS } from './useFinanceiroCarteira';
 import {
   buscarEmpenhosPorNumero,
   desvincularEmpenhoManual,
@@ -42,6 +43,8 @@ function invalidarEmpenhosDoContrato(queryClient: QueryClient, contractKey: stri
   queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao', contractKey] });
   queryClient.invalidateQueries({ queryKey: ['contract-events', contractKey] });
   queryClient.invalidateQueries({ queryKey: ['empenho-por-numero'] });
+  // A fila "Empenhos ao contrato" (menu Vinculação) e o número no menu vêm das faturas: a nota vinculada sai da lista.
+  queryClient.invalidateQueries({ queryKey: FINANCEIRO_QUERY_KEYS.faturas });
 }
 
 /**

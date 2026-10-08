@@ -18,11 +18,12 @@ export function useDistribuicoesEmpenhoContrato(contractKey: string) {
   });
 }
 
-/** Distribuir e desfazer. Atualiza a aba e o empenhado por item (ata e carteira). */
+/** Vincular aos itens e desfazer. Atualiza a aba, a fila e o empenhado por item (ata e carteira). */
 export function useAcoesDistribuicaoEmpenho(contractKey: string) {
   const queryClient = useQueryClient();
   const aoTerminar = () => {
-    queryClient.invalidateQueries({ queryKey: DISTRIBUICAO_EMPENHOS_KEY(contractKey) });
+    // O prefixo cobre o contrato, a fila do menu Vinculação e a coluna da carteira de Empenhos.
+    queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao'] });
     queryClient.invalidateQueries({ queryKey: ['contract-events', contractKey] });
   };
   const distribuir = useMutation({

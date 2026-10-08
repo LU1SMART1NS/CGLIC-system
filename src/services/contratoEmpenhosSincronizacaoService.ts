@@ -239,6 +239,17 @@ function mapRow(row: any): SincronizacaoEmpenhosContrato {
 }
 
 /** Situação gravada para o contrato; null quando nunca foi sincronizado (ou a tabela não existe ainda). */
+/** Contratos cujos empenhos já foram consultados com sucesso ao menos uma vez (ultimo_sucesso_em). */
+export async function fetchContratosComEmpenhosConsultados(): Promise<Set<string>> {
+  if (!isSupabaseConfigured || !supabase) return new Set();
+  const { data, error } = await supabase.from('contrato_empenhos_sincronizacao').select('contract_key').not('ultimo_sucesso_em', 'is', null);
+  if (error) {
+    console.warn('[contratoEmpenhosSincronizacao] Lista de contratos consultados não lida:', error);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r: any) => String(r.contract_key)));
+}
+
 export async function fetchSincronizacaoEmpenhos(contractKey: string): Promise<SincronizacaoEmpenhosContrato | null> {
   if (!isSupabaseConfigured || !supabase || !contractKey) return null;
   const { data, error } = await supabase

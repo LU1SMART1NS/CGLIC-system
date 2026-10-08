@@ -21,6 +21,10 @@ const ArpSearchRoute = lazy(() => import('./routes/ArpSearchRoute').then((m) => 
 const ItemBalancesRoute = lazy(() => import('./routes/ItemBalancesRoute').then((m) => ({ default: m.ItemBalancesRoute })));
 const ItensRoute = lazy(() => import('./routes/ItensRoute').then((m) => ({ default: m.ItensRoute })));
 const DistribuicaoEquipeRoute = lazy(() => import('./routes/DistribuicaoEquipeRoute').then((m) => ({ default: m.DistribuicaoEquipeRoute })));
+const ContratosAtaPage = lazy(() => import('./components/vinculacao/ContratosAtaPage').then((m) => ({ default: m.ContratosAtaPage })));
+const EmpenhosItensPage = lazy(() => import('./components/vinculacao/EmpenhosItensPage').then((m) => ({ default: m.EmpenhosItensPage })));
+const EmpenhosContratoPage = lazy(() => import('./components/vinculacao/EmpenhosContratoPage').then((m) => ({ default: m.EmpenhosContratoPage })));
+const ItensUnidadesPage = lazy(() => import('./components/alocacao/ItensUnidadesPage').then((m) => ({ default: m.ItensUnidadesPage })));
 const ContractsRoute = lazy(() => import('./routes/ContractsRoute').then((m) => ({ default: m.ContractsRoute })));
 const Contract360Route = lazy(() => import('./routes/Contract360Route').then((m) => ({ default: m.Contract360Route })));
 const Ata360Route = lazy(() => import('./routes/Ata360Route').then((m) => ({ default: m.Ata360Route })));
@@ -219,6 +223,40 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'leitor']}>
                   <DistribuicaoEquipeRoute />
+                </RequireRole>
+              }
+            />
+            <Route path="/vinculacao" element={<Navigate to="/vinculacao/contratos" replace />} />
+            <Route
+              path="/vinculacao/contratos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                  <ContratosAtaPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/vinculacao/empenhos-itens"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                  <EmpenhosItensPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/vinculacao/empenhos-contrato"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                  <EmpenhosContratoPage />
+                </RequireRole>
+              }
+            />
+            <Route path="/vinculacao/itens-unidades" element={<Navigate to="/alocacao" replace />} />
+            <Route
+              path="/alocacao"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                  <ItensUnidadesPage />
                 </RequireRole>
               }
             />

@@ -25,6 +25,8 @@ export interface DistribuicaoDoEmpenho {
   contractKey: string;
   empenhoId: string;
   numeroOficial: string;
+  dataEmissao: string | null;
+  uasgEmitente: string | null;
   valorNota: number;
   itensNoContrato: number;
   situacao: SituacaoDistribuicao;
@@ -64,6 +66,8 @@ export function mapDistribuicao(r: any): DistribuicaoDoEmpenho {
     contractKey: String(r.contract_key ?? ''),
     empenhoId: String(r.empenho_id),
     numeroOficial: String(r.numero_oficial ?? ''),
+    dataEmissao: r.data_emissao ?? null,
+    uasgEmitente: r.uasg_emitente ?? null,
     valorNota: numero(r.valor_nota),
     itensNoContrato: numero(r.itens_no_contrato),
     situacao: r.situacao as SituacaoDistribuicao,
@@ -90,6 +94,50 @@ export async function fetchDistribuicoesDoContrato(contractKey: string): Promise
     throw new Error(error.message);
   }
   return (data ?? []).map(mapDistribuicao);
+}
+
+/** Para o cache: dias que uma nota vinculada pela equipe fica em "Vinculadas pela equipe". */
+export const DIAS_VINCULADAS_RECENTES = 30;
+
+/**
+ * Fila do menu Vinculação: notas a vincular aos itens (A_DISTRIBUIR e REVISAR) de todos os contratos e as que a
+ * equipe vinculou nos últimos dias. Contratos de um item só (AUTO) ficam de fora.
+ */
+export async function fetchDistribuicoesParaVincular(): Promise<DistribuicaoDoEmpenho[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const desde = new Date(Date.now() - DIAS_VINCULADAS_RECENTES * 86400000).toISOString();
+  const { data, error } = await supabase
+    .from('v_contrato_empenho_distribuicao')
+    .select('*')
+    .or(`situacao.in.(A_DISTRIBUIR,REVISAR),and(origem.eq.USUARIO,distribuido_em.gte.${desde})`);
+  if (error) {
+    if (rpcInexistente(error) || error.code === '42P01') return [];
+    throw new Error(error.message);
+  }
+  return (data ?? []).map(mapDistribuicao);
+}
+
+export interface SituacaoDistribuicaoEmpenho {
+  empenhoId: string;
+  contractKey: string;
+  situacao: SituacaoDistribuicao;
+  origem: 'AUTO' | 'USUARIO' | null;
+}
+
+/** Situação da divisão por item de cada NE (coluna "Itens" da carteira de Empenhos). */
+export async function fetchSituacaoDistribuicaoPorEmpenho(): Promise<SituacaoDistribuicaoEmpenho[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.from('v_contrato_empenho_distribuicao').select('empenho_id, contract_key, situacao, origem');
+  if (error) {
+    if (rpcInexistente(error) || error.code === '42P01') return [];
+    throw new Error(error.message);
+  }
+  return (data ?? []).map((r: any) => ({
+    empenhoId: String(r.empenho_id),
+    contractKey: String(r.contract_key),
+    situacao: r.situacao as SituacaoDistribuicao,
+    origem: (r.origem ?? null) as SituacaoDistribuicaoEmpenho['origem']
+  }));
 }
 
 function requireSupabase() {

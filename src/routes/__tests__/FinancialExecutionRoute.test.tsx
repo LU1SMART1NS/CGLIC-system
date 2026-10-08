@@ -9,6 +9,7 @@ import type { EmpenhoCarteiraRow } from '../../services/financeiroCarteiraServic
 
 vi.mock('../../hooks/useFinanceiroCarteira', () => ({ useEmpenhosCarteira: vi.fn() }));
 vi.mock('../../hooks/useSincronizacaoEmpenhos', () => ({ useSincronizacaoEmpenhos: vi.fn() }));
+vi.mock('../../hooks/useVinculacaoEmpenhos', () => ({ useSituacaoDistribuicaoPorEmpenho: () => ({ data: new Map([['e1', { empenhoId: 'e1', contractKey: 'K', situacao: 'A_DISTRIBUIR', origem: null }]]) }) }));
 vi.mock('../../hooks/useContractsPortfolio', () => ({
   useContractsPortfolio: vi.fn(() => ({
     rows: [
@@ -66,6 +67,8 @@ describe('Financeiro → Empenhos', () => {
 
   it('segue a moldura da Carteira: segmentos de saldo, filtros em botão e linha clicável', () => {
     const html = render();
+    // Coluna Itens: a situação do vínculo da nota aos itens (o trabalho fica no menu Vinculação).
+    expect(html).toContain('A vincular');
     expect(html).toContain('Empenhos');
     expect(html).toContain('data-testid="empenhos-saldo-COM_SALDO"');
     expect(html).toMatch(/Com saldo<span[^>]*>2</);
