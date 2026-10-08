@@ -9,8 +9,8 @@
  * cada usuário e só disparava com o banco de atas vazio (na prática, nunca rodava).
  */
 
-import { fetchArpsDasFontes, fetchArpItems, limparCachesAtas } from './api';
-import { cacheArpsInDb, cacheArpItemsInDb, fetchEstadoAtasNoBanco, type EstadoAtaNoBanco } from './dbCacheService';
+import { fetchArpsDasFontes, fetchArpItems, fetchPncpProcessoCompra, limparCachesAtas } from './api';
+import { cacheArpsInDb, cacheArpItemsInDb, fetchEstadoAtasNoBanco, gravarProcessoDaAta, type EstadoAtaNoBanco } from './dbCacheService';
 import {
   executarComReserva,
   uasgsSincronizandoAgoraDe,
@@ -33,6 +33,10 @@ export const JANELA_VIGENCIA_ATAS = {
  * consultas por excesso de requisições (429); as consultas repetidas agora são reaproveitadas.
  */
 const ITENS_EM_PARALELO = 2;
+
+/** Consultas do processo da compra (PNCP) por execução. O número não muda: após a primeira carga quase nada resta a consultar. */
+export const PROCESSOS_POR_EXECUCAO = 40;
+const PROCESSOS_EM_PARALELO = 4;
 
 export const FONTE_ITENS_ATAS = 'Itens das atas';
 
@@ -73,6 +77,43 @@ export function ataPrecisaDeItens(arp: ArpRecord, estado: EstadoAtaNoBanco | und
 }
 
 /**
+ * Atas cujo processo da compra ainda não foi consultado no PNCP (nulo no banco) e que têm o identificador da
+ * compra para consultar. '' no banco quer dizer que o PNCP já respondeu sem processo: não se consulta de novo.
+ */
+export function atasSemProcessoConsultado(atas: ArpRecord[], estado: Map<string, EstadoAtaNoBanco>): ArpRecord[] {
+  return atas.filter((arp) => {
+    const gravado = estado.get(arp.numeroAtaRegistroPreco)?.processoCompra;
+    return (gravado === null || gravado === undefined) && Boolean(arp.numeroControlePncpCompra);
+  });
+}
+
+/**
+ * Lê no PNCP e grava o processo da compra das atas que ainda não o têm. A consulta é por compra (várias atas
+ * da mesma compra repetem o número). Falha de consulta ou de gravação não derruba a sincronização: a ata fica
+ * sem número e a próxima execução tenta de novo.
+ */
+async function completarProcessoDasAtas(
+  atas: ArpRecord[],
+  estado: Map<string, EstadoAtaNoBanco>,
+  prazoEsgotado: () => boolean
+): Promise<void> {
+  const pendentes = atasSemProcessoConsultado(atas, estado).slice(0, PROCESSOS_POR_EXECUCAO);
+  const porCompra = new Map<string, string | null>();
+  for (let i = 0; i < pendentes.length; i += PROCESSOS_EM_PARALELO) {
+    if (prazoEsgotado()) return;
+    await Promise.all(
+      pendentes.slice(i, i + PROCESSOS_EM_PARALELO).map(async (arp) => {
+        const compra = arp.numeroControlePncpCompra;
+        if (!porCompra.has(compra)) porCompra.set(compra, await fetchPncpProcessoCompra(compra));
+        const processo = porCompra.get(compra);
+        if (processo === null || processo === undefined) return;
+        await gravarProcessoDaAta(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, processo);
+      })
+    );
+  }
+}
+
+/**
  * Consulta as atas e os itens nas fontes oficiais e grava no banco. Não apaga nada: ata ou item que
  * some de uma resposta continua no banco. Lança erro se a lista de atas não vier ou não for gravada.
  * A lista de atas é sempre relida (é uma consulta só); os itens, só das atas que precisam (ataPrecisaDeItens).
@@ -97,6 +138,9 @@ export async function coletarEGravarAtas(
   onProgress?.({ step: 'Gravando atas...', percent: 35, current: 0, total: atas.length });
   const gravou = await cacheArpsInDb(atas);
   if (!gravou) throw new Error('Não foi possível gravar as atas no banco.');
+
+  // Processo da compra (PNCP). Usa só uma fração do orçamento de tempo: os itens vêm depois e são o principal.
+  await completarProcessoDasAtas(atas, estadoNoBanco, () => orcamentoMs !== undefined && agora() - inicio > orcamentoMs / 4);
 
   // Só as atas que precisam de itens. Ordem: as sem itens primeiro, depois as de itens lidos há mais tempo.
   // Assim o orçamento de tempo não deixa de fora as que mais precisam, e uma releitura forçada que estourou o

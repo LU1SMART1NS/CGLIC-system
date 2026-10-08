@@ -297,6 +297,25 @@ let supplementalPncpArpsCache: ArpRecord[] | null = null;
 const pncpCompraItemsCache = new Map<string, ArpItemRecord[]>();
 
 /**
+ * Processo administrativo da compra, lido do cadastro da compra no PNCP (campo `processo`, só dígitos).
+ * O Compras.gov.br não o traz para atas e itens. O número pertence à compra: ata, itens e contratos dela o dividem.
+ * Devolve o texto ('' quando o PNCP responde mas não informa) ou null quando a consulta falhou (tentar de novo depois).
+ * Endpoint: GET /api-pncp/api/consulta/v1/orgaos/{cnpj}/compras/{ano}/{seqCompra}
+ */
+export async function fetchPncpProcessoCompra(numeroControlePncpCompra?: string): Promise<string | null> {
+  const match = (numeroControlePncpCompra || '').match(/^(\d{14})-1-0*(\d+)\/(\d{4})$/);
+  if (!match) return null;
+  try {
+    const res = await fetch(`/api-pncp/api/consulta/v1/orgaos/${match[1]}/compras/${match[3]}/${match[2]}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.processo === 'string' ? data.processo.trim() : '';
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Consulta a vigência oficial atualizada da Ata diretamente no PNCP com cache em memória
  * Endpoint: GET /api-pncp/api/pncp/v1/orgaos/{cnpj}/compras/{ano}/{seqCompra}/atas/{seqAta}
  */

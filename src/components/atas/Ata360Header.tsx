@@ -14,6 +14,7 @@ import { useAtaAssinatura } from '../../hooks/useAtaAssinatura';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
 import { MissingValue } from '../instrument360/MissingValue';
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
+import { formatProcessoSei } from '../../utils/format';
 import { classifyPrazo, type PrazoFaixa } from '../carteira/carteiraPrazo';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { Instrument360Hero, instrumentSituationLabel } from '../instrument360/Instrument360Hero';
@@ -180,6 +181,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       ]}
       identifiersTestId="ata-header-metadata"
       identifiers={[
+        { label: 'Processo', value: formatProcessoSei(arp.processoCompra) || undefined },
         { label: 'Modalidade', value: arp.nomeModalidadeCompra },
         { label: 'Compra', value: arp.numeroCompra && arp.anoCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : undefined },
         // Só aparece quando o PNCP informa: ausente não quer dizer que não aceita.

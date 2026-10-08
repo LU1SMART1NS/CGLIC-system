@@ -43,6 +43,24 @@ export async function cacheArpsInDb(arps: ArpRecord[]): Promise<boolean> {
 }
 
 /**
+ * Grava o processo da compra de uma ata (só o servidor). Atualiza só essa coluna: a ata em si já foi gravada
+ * pela lista, e reenviá-la aqui poderia apagar campos que esta chamada não conhece.
+ */
+export async function gravarProcessoDaAta(numeroAta: string, codigoUasg: string, processo: string): Promise<boolean> {
+  if (!ehServidor || !isSupabaseConfigured || !supabase) return false;
+  const { error } = await supabase
+    .from('atas_registro_preco')
+    .update({ processo_compra: processo })
+    .eq('numero_ata', numeroAta)
+    .eq('codigo_uasg', codigoUasg);
+  if (error) {
+    console.warn(`Não foi possível gravar o processo da ata ${numeroAta}`, error);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Consulta ARPs diretamente do banco Supabase
  */
 export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): Promise<{ arps: ArpRecord[]; syncInfo: SyncMetadata }> {
@@ -89,7 +107,8 @@ export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): 
         ataExcluido: false,
         numeroControlePncpAta: d.numero_controle_pncp || '',
         numeroControlePncpCompra: '',
-        idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`
+        idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
+        processoCompra: d.processo_compra ?? undefined
       }));
 
       const syncInfo: SyncMetadata = {
@@ -212,7 +231,8 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
           ataExcluido: false,
           numeroControlePncpAta: d.numero_controle_pncp || '',
           numeroControlePncpCompra: '',
-          idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`
+          idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
+          processoCompra: d.processo_compra ?? undefined
         };
       });
 
@@ -245,6 +265,8 @@ export interface EstadoAtaNoBanco {
   itens: number;
   /** Leitura mais antiga entre os itens da ata (ISO), ou null se não há itens. */
   itensLidosEmMaisAntigo: string | null;
+  /** Processo da compra já gravado; null = ainda não consultado no PNCP (vazio = o PNCP não informa). */
+  processoCompra?: string | null;
 }
 
 /**
@@ -257,12 +279,12 @@ export async function fetchEstadoAtasNoBanco(uasg: string): Promise<Map<string, 
   try {
     const { data, error } = await supabase
       .from('atas_registro_preco')
-      .select('numero_ata, itens_ata(ultimo_sync_em)')
+      .select('numero_ata, processo_compra, itens_ata(ultimo_sync_em)')
       .eq('codigo_uasg', uasg);
     if (error) throw error;
-    for (const linha of (data ?? []) as Array<{ numero_ata: string; itens_ata: Array<{ ultimo_sync_em: string | null }> | null }>) {
+    for (const linha of (data ?? []) as Array<{ numero_ata: string; processo_compra: string | null; itens_ata: Array<{ ultimo_sync_em: string | null }> | null }>) {
       const lidos = (linha.itens_ata ?? []).map((i) => i.ultimo_sync_em).filter((t): t is string => Boolean(t)).sort();
-      estado.set(linha.numero_ata, { itens: linha.itens_ata?.length ?? 0, itensLidosEmMaisAntigo: lidos[0] ?? null });
+      estado.set(linha.numero_ata, { itens: linha.itens_ata?.length ?? 0, itensLidosEmMaisAntigo: lidos[0] ?? null, processoCompra: linha.processo_compra ?? null });
     }
   } catch (err) {
     console.warn('Não foi possível ler o estado das atas no banco; os itens de todas serão relidos.', err);

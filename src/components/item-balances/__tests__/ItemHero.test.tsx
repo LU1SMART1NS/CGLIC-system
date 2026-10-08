@@ -122,6 +122,15 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     expect(html).toContain('Compras.gov.br sem resposta');
   });
 
+  it('o rodapé mostra o processo da compra da ata, formatado; sem ele, "Não informado"', () => {
+    const com = renderToStaticMarkup(<ItemHero {...baseProps} arp={{ ...baseProps.arp, processoCompra: '08020001450202479' } as any} />);
+    expect(com).toContain('Processo');
+    expect(com).toContain('08020.001450/2024-79');
+    const sem = renderToStaticMarkup(<ItemHero {...baseProps} arp={{ ...baseProps.arp, processoCompra: undefined } as any} />);
+    expect(sem).toContain('Processo');
+    expect(sem).not.toContain('08020.001450/2024-79');
+  });
+
   it('9. Compras.gov acima do contratado destaca a diferença', () => {
     const html = renderToStaticMarkup(
       <ItemHero {...baseProps} referencia={{ status: 'ACIMA', consumido: 37, delta: 7 }} />
