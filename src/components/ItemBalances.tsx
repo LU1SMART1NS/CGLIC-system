@@ -45,7 +45,7 @@ import {
 } from '../utils/itemContractSuggestions';
 import { itensEmOutraAta, outrasAtasPorContrato, podeEntrarEmMaisUmaAta } from '../utils/contratoVariasAtas';
 import { chaveDoContrato as contractKeyOf } from '../utils/contractKeyUtils';
-import { ActionButton, AppButton, EmptyState, SectionHeader } from '../design-system';
+import { ActionButton, AppButton, EmptyState, NoticeBar, SectionHeader } from '../design-system';
 
 import { LinkContractModal } from './modals/LinkContractModal';
 import { ContractSuggestionsPanel } from './item-balances/ContractSuggestionsPanel';
@@ -55,7 +55,7 @@ import { Instrument360Page } from './instrument360/Instrument360Page';
 import { Instrument360TabPanel } from './instrument360/Instrument360TabPanel';
 import { useInstrumentTab } from './instrument360/useInstrumentTab';
 import { AllocationsTab, type AllocationRow } from './item-balances/AllocationsTab';
-import { summarizeAllocationExecution } from '../utils/allocationExecution';
+import { summarizeAllocationExecution, vinculosSemQuantidade } from '../utils/allocationExecution';
 import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryStrip';
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
@@ -126,13 +126,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     aliases: { empenhos: 'contratos' }
   });
 
-  // Mesmas regras do backend: alocações e vínculo empenho→unidade exigem allocations.manage
-  // (admin e gestor de saldos); contratos e empenhos manuais, admin e gestor.
+  // Mesmas regras do backend: alocações exigem allocations.manage (admin e gestor de saldos); escolher a unidade
+  // interna da nota é do gestor e do coordenador (allocations.link_empenho, migration 98); contratos e empenhos
+  // manuais, admin e gestor.
   const { role } = useAuth();
   const toast = useToast();
   const confirm = useConfirmDialog();
   const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
-  const canLinkEmpenhos = canManageAllocations || role === 'gestor';
+  const canLinkEmpenhos = role === 'admin' || role === 'gestor';
   const canEditData = role === 'admin' || role === 'gestor';
   // Quantitativo SENASP do item (base do saldo na Ata, nos dashboards e na central de prazos): é gravado em
   // segundo plano para todos os itens; aqui só o botão Atualizar relê o deste item.
@@ -150,7 +151,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const allocations = allocationsState?.allocations ?? EMPTY_ALLOCATIONS;
 
   const {
-    data: empenhoLinksState
+    data: empenhoLinksState,
+    isSuccess: empenhoLinksCarregados
   } = useItemEmpenhoLinks(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
@@ -277,7 +279,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   // Empenho do item: as parcelas deste item nas notas vinculadas aos itens dos contratos (migration 94) e as notas que
   // ainda faltam vincular. As notas dos contratos chegam pela sincronização do servidor, de hora em hora.
-  const { data: empenhoDoItem, isLoading: vinculosLoading } = useEmpenhoDoItem(canonicalItemKey);
+  const { data: empenhoDoItem, isLoading: vinculosLoading, isReady: empenhoDoItemPronto } = useEmpenhoDoItem(canonicalItemKey);
   const [notaParaVincular, setNotaParaVincular] = useState<DistribuicaoDoEmpenho | null>(null);
 
   // Relê da API, para cada contrato vinculado, a quantidade contratada (que entra no saldo). Só roda pelo botão
@@ -527,6 +529,27 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     [allocations, allocationExecution]
   );
 
+  // Nota sem quantidade neste item (saiu do item, voltou a vincular, item sem preço) não fica em unidade interna:
+  // com tudo lido sem erro, quem pode mexer no vínculo desfaz a ligação e a aba avisa quais notas saíram.
+  const [vinculosDesfeitos, setVinculosDesfeitos] = useState<Array<{ numero: string; unidade: string }>>([]);
+  const limpezaTentada = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!empenhoDoItemPronto || !empenhoLinksCarregados || !(canLinkEmpenhos || canManageAllocations)) return;
+    if (saveEmpenhoLinksMutation.isPending) return;
+    const limpeza = vinculosSemQuantidade(empenhoLinks, empenhoDoItem.parcelas);
+    if (!limpeza) return;
+    const assinatura = `${empenhoLinkVersion}:${limpeza.removidos.map((r) => r.numero).join(',')}`;
+    if (limpezaTentada.current === assinatura) return;
+    limpezaTentada.current = assinatura;
+    const nomes = new Map(allocations.map((a) => [a.id, a.unitName]));
+    const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
+    saveEmpenhoLinksMutation
+      .mutateAsync({ itemKey, links: limpeza.restantes, expectedVersion: empenhoLinkVersion })
+      .then(() => setVinculosDesfeitos((antes) => [...antes, ...limpeza.removidos.map((r) => ({ numero: r.numero, unidade: nomes.get(r.allocationId) ?? 'unidade removida' }))]))
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empenhoDoItemPronto, empenhoLinksCarregados, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
+
   const totalAllocatedSum = allocations.reduce((acc, curr) => acc + curr.allocatedQty, 0);
   const remainingUGQty = totalUGQty - totalAllocatedSum;
   const percentAllocated = totalUGQty > 0 ? (totalAllocatedSum / totalUGQty) * 100 : 0;
@@ -614,6 +637,17 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                   onVincularAosItens={canEditData ? abrirVinculacaoDoItem : undefined}
                 />
               </div>
+
+              {vinculosDesfeitos.length > 0 && (
+                <NoticeBar tone="info" testId="vinculos-unidade-desfeitos">
+                  {vinculosDesfeitos.length === 1 ? 'Esta nota ficou' : 'Estas notas ficaram'} sem quantidade neste item e
+                  {vinculosDesfeitos.length === 1 ? ' saiu da unidade interna' : ' saíram da unidade interna'}:{' '}
+                  {vinculosDesfeitos.map((v) => `${v.numero} (${v.unidade})`).join(', ')}. Defina a quantidade antes de escolher a unidade de novo.
+                </NoticeBar>
+              )}
+              {allocationError && (
+                <NoticeBar tone="danger" testId="vinculo-unidade-erro">{allocationError}</NoticeBar>
+              )}
 
               <ContractSuggestionsPanel
                 suggestions={contractSuggestions}

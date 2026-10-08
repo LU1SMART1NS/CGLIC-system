@@ -69,3 +69,21 @@ describe('podeConterItem', () => {
     expect(podeConterItem({ sugestaoTipo: 'SEM_SUGESTAO', sugestao: [] }, 43)).toBe(true);
   });
 });
+
+describe('ordem fixa das notas do item', () => {
+  const dist = (ordem: string[]) =>
+    ordem.map((ne) => nota({ ne, data_emissao: ne.endsWith('9') ? '2024-12-01' : '2024-12-27', situacao: 'DISTRIBUIDA', origem: 'USUARIO', parcelas: [{ numero_item: 43, valor: 3500 }] }));
+
+  it('a ordem não depende da ordem em que o banco devolve as notas (mais recentes primeiro, empate pelo número)', () => {
+    const a = montarEmpenhoDoItem({ numeroItem: 43, contratos: [{ contractKey: 'K', valorUnitario: 3500, distribuicoes: dist(['2024NE000339', '2024NE000341', '2024NE000340']) }] });
+    const b = montarEmpenhoDoItem({ numeroItem: 43, contratos: [{ contractKey: 'K', valorUnitario: 3500, distribuicoes: dist(['2024NE000340', '2024NE000339', '2024NE000341']) }] });
+    const esperado = ['2024NE000340', '2024NE000341', '2024NE000339'];
+    expect(a.parcelas.map((p) => p.numeroOficial)).toEqual(esperado);
+    expect(b.parcelas.map((p) => p.numeroOficial)).toEqual(esperado);
+  });
+
+  it('as notas a vincular também têm ordem fixa', () => {
+    const f = (ordem: string[]) => montarEmpenhoDoItem({ numeroItem: 43, contratos: [{ contractKey: 'K', valorUnitario: 3500, distribuicoes: ordem.map((ne) => nota({ ne })) }] }).porContrato.get('K')!.aVincular.map((d) => d.numeroOficial);
+    expect(f(['2024NE000330', '2024NE000320'])).toEqual(f(['2024NE000320', '2024NE000330']));
+  });
+});

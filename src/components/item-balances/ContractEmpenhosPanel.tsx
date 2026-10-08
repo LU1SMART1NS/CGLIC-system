@@ -113,6 +113,31 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
       render: (p) => {
         if (allocationOptions.length === 0) return <span style={subtle}>Sem unidades alocadas</span>;
         const current = linkedAllocationId(p.numeroOficial);
+        const semQuantidade = p.quantidade == null;
+        const estilo: React.CSSProperties = {
+          padding: '0.2rem 0.4rem',
+          fontSize: '0.75rem',
+          height: 'auto',
+          width: '100%',
+          maxWidth: '220px',
+          borderColor: current ? 'var(--primary)' : '#cbd5e1',
+          background: current ? 'var(--color-info-bg)' : '#ffffff'
+        };
+        // A nota só vai para uma unidade depois de ter quantidade neste item, e só para uma unidade onde ela cabe.
+        if (semQuantidade) {
+          return (
+            <select
+              disabled
+              className="form-input"
+              aria-label={`Unidade interna da nota ${p.numeroOficial}`}
+              title="A unidade interna só pode ser escolhida depois que a quantidade da nota neste item estiver definida."
+              style={{ ...estilo, borderColor: '#cbd5e1', background: '#f1f5f9' }}
+            >
+              <option value="">Defina a quantidade primeiro</option>
+            </select>
+          );
+        }
+        const quantidade = p.quantidade ?? 0;
         return (
           <select
             value={current}
@@ -120,22 +145,19 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
             disabled={busy || !canLinkEmpenhos}
             className="form-input"
             aria-label={`Unidade interna da nota ${p.numeroOficial}`}
-            style={{
-              padding: '0.2rem 0.4rem',
-              fontSize: '0.75rem',
-              height: 'auto',
-              width: '100%',
-              maxWidth: '200px',
-              borderColor: current ? 'var(--primary)' : '#cbd5e1',
-              background: current ? 'var(--color-info-bg)' : '#ffffff'
-            }}
+            title={canLinkEmpenhos ? undefined : 'Só o gestor e o coordenador escolhem a unidade interna da nota.'}
+            style={estilo}
           >
             <option value="">Sem unidade</option>
-            {allocationOptions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.unitName} (saldo {formatNumber(a.saldoQty)} un)
-              </option>
-            ))}
+            {allocationOptions.map((a) => {
+              // O saldo da unidade já desconta esta nota quando ela está ligada a ela.
+              const cabe = a.saldoQty + (a.id === current ? quantidade : 0) >= quantidade;
+              return (
+                <option key={a.id} value={a.id} disabled={!cabe && a.id !== current}>
+                  {a.unitName} (saldo {formatNumber(a.saldoQty)} un{cabe ? '' : ' · não cabe'})
+                </option>
+              );
+            })}
           </select>
         );
       }
