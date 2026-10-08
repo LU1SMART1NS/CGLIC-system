@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useRef } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { breakpoints } from '../../design-system/tokens';
 import { useMediaQuery } from '../../design-system/hooks/useMediaQuery';
 import { Header } from '../Header';
@@ -7,6 +7,7 @@ import { Sidebar } from './Sidebar';
 import { AreaTabs } from './AreaTabs';
 import { SkeletonLoader } from '../../design-system';
 import { useVoltarAoTopoAoTrocarDePagina } from '../../hooks/useVoltarAoTopoAoTrocarDePagina';
+import { FalhaTelaBoundary } from './FalhaTelaBoundary';
 
 export interface AppShellContextValue {
   onOpenExportModal: () => void;
@@ -23,6 +24,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onOpenDepartmentsModal
 }) => {
   useVoltarAoTopoAoTrocarDePagina();
+  const { pathname } = useLocation();
 
   // < 768px: o menu chave vira barra inferior.
   const isMobile = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
@@ -84,9 +86,12 @@ export const AppShell: React.FC<AppShellProps> = ({
         <main className="app-main" style={{ flex: 1 }}>
           <AreaTabs />
           {/* As telas são pacotes separados: o menu e o cabeçalho ficam na tela enquanto a página carrega. */}
-          <Suspense fallback={<div role="status" aria-label="Carregando a página" style={{ padding: '1.5rem 0' }}><SkeletonLoader /></div>}>
-            <Outlet context={contextValue} />
-          </Suspense>
+          {/* Se a tela falhar, o aviso aparece no lugar dela e o menu continua de pé; trocar de tela limpa o aviso. */}
+          <FalhaTelaBoundary key={pathname}>
+            <Suspense fallback={<div role="status" aria-label="Carregando a página" style={{ padding: '1.5rem 0' }}><SkeletonLoader /></div>}>
+              <Outlet context={contextValue} />
+            </Suspense>
+          </FalhaTelaBoundary>
         </main>
       </div>
 
