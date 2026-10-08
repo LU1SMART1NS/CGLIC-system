@@ -5,7 +5,7 @@ import type { ItemExecutionSummary } from '../../../utils/itemExecutionSummary';
 
 const summary: ItemExecutionSummary = {
   homologado: 4863, contratado: 690, contratosSemQuantidade: 0, saldoAta: 4173,
-  empenhado: 0, pendentes: 13, pendentesSugerido: 690, aEmpenhar: 690
+  empenhado: 0, aEmpenhar: 690, notasAVincular: 4, valorAVincular: 245000, contratosSemItens: 0, valorSemDivisao: 0
 };
 
 const html = (over: Partial<Parameters<typeof ItemExecutionSummaryStrip>[0]> = {}) =>
@@ -24,22 +24,32 @@ describe('ItemExecutionSummaryStrip', () => {
     expect(out).not.toContain('kpi-card');
   });
 
-  it('avisa as pendências do item e oferece aceitar todas as sugestões a quem edita', () => {
-    const out = html({ canEdit: true, aceitaveis: 13, onAcceptAll: vi.fn() });
-    expect(out).toContain('empenhos-pendentes-banner');
-    expect(out).toContain('empenhos pendentes de confirmação');
-    expect(out).toContain('690 un sugeridas pelo valor');
-    expect(out).toContain('Aceitar todas as sugestões do item');
+  it('avisa as notas ainda a vincular aos itens e leva à Vinculação quem pode vincular', () => {
+    const out = html({ onVincularAosItens: vi.fn() });
+    expect(out).toContain('item-notas-a-vincular');
+    expect(out).toContain('ainda não foram vinculadas');
+    expect(out).toMatch(/R\$\s245\.000,00/);
+    expect(out).toContain('Vincular aos itens');
+    // Sem confirmação de quantidade por item.
+    expect(out).not.toContain('Aceitar');
+    expect(out).not.toContain('pendentes de confirmação');
   });
 
-  it('quem não edita vê o aviso mas não o botão', () => {
-    const out = html({ canEdit: false, aceitaveis: 13, onAcceptAll: vi.fn() });
-    expect(out).toContain('empenhos-pendentes-banner');
-    expect(out).not.toContain('Aceitar todas');
+  it('quem não vincula vê o aviso mas não o botão', () => {
+    const out = html();
+    expect(out).toContain('item-notas-a-vincular');
+    expect(out).not.toContain('Vincular aos itens');
   });
 
-  it('sem pendências não mostra o aviso', () => {
-    expect(html({ summary: { ...summary, pendentes: 0, pendentesSugerido: 0 } })).not.toContain('empenhos-pendentes-banner');
+  it('sem notas a vincular não mostra o aviso', () => {
+    expect(html({ summary: { ...summary, notasAVincular: 0, valorAVincular: 0 } })).not.toContain('item-notas-a-vincular');
+  });
+
+  it('contrato sem itens na fonte: avisa que as notas não têm divisão por item e não contam', () => {
+    const out = html({ summary: { ...summary, contratosSemItens: 1, valorSemDivisao: 7500 } });
+    expect(out).toContain('item-contratos-sem-itens');
+    expect(out).toContain('sem divisão por item');
+    expect(out).toMatch(/R\$\s7\.500,00/);
   });
 
   it('avisa quando faltam quantidades de contratos ainda não lidas', () => {

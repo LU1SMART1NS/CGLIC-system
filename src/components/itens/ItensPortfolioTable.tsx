@@ -202,15 +202,6 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                             ? `${formatNumber(row.empenhado)} · sem qtd. contratada`
                             : `${formatNumber(row.empenhado)} de ${formatNumber(row.contratada)}`}
                         </span>
-                        {row.empenhosPendentes > 0 && (
-                          <span
-                            data-testid={`itens-pendentes-${row.key}`}
-                            title="Empenhos vinculados ao item que ainda esperam a quantidade ser confirmada; não contam no empenhado."
-                            style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', padding: '0.1rem 0.4rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
-                          >
-                            {row.empenhosPendentes} {row.empenhosPendentes === 1 ? 'pendente' : 'pendentes'}
-                          </span>
-                        )}
                       </div>
                       {comUnidade && (
                         <div style={{ ...subtle, color: 'var(--primary)' }}>

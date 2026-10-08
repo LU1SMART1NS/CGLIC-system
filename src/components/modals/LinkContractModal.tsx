@@ -7,7 +7,6 @@ import { useContratosSemAta } from '../../hooks/useContratosSemAta';
 import { useLinkContractToItem } from '../../hooks/useLinkContractToItem';
 import { useLinkContractToItems } from '../../hooks/useLinkContractToItems';
 import { useContractItemQuantities } from '../../hooks/useContractItemQuantities';
-import { useSyncItemContractEmpenhos } from '../../hooks/useSyncItemContractEmpenhos';
 import { useSyncContractItemQuantity } from '../../hooks/useSyncContractItemQuantity';
 import type { ContractDashboardRecord } from '../../types';
 import { formatCnpj } from '../../utils/format';
@@ -106,7 +105,6 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   const { data: officialContracts = [], isLoading: loadingContracts } = useContractsDashboard(cleanUasg);
   const linkMutation = useLinkContractToItem();
   const linkItemsMutation = useLinkContractToItems();
-  const syncEmpenhosMutation = useSyncItemContractEmpenhos();
   const syncQuantityMutation = useSyncContractItemQuantity();
   const saveContractManager = useSaveContractManager();
   const toast = useToast();
@@ -272,54 +270,27 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 
   const checkedItems = isAtaMode && !itemQuantities.isLoading ? itemOptions!.filter(isItemChecked) : [];
 
-  // Depois de vincular, lê da API a quantidade contratada (que entra no saldo do item) e os empenhos
-  // do contrato, para cada item, sem travar o fechamento do modal.
-  const syncEmpenhosInBackground = (
-    contract: ContractDashboardRecord,
-    targets: Array<{ numeroItem: string; unitPrice?: number }>
-  ) => {
+  // Depois de vincular, lê da API a quantidade contratada de cada item (entra no saldo), sem travar o fechamento do
+  // modal. O empenho do item vem do vínculo das notas aos itens do contrato, não de uma cópia por item.
+  const syncEmpenhosInBackground = (contract: ContractDashboardRecord, targets: Array<{ numeroItem: string; unitPrice?: number }>) => {
     void (async () => {
       let failedQty = 0;
-      let failedEmp = 0;
       for (const t of targets) {
-        // O preço unitário do próprio contrato (lido junto com a quantidade) é a base certa da estimativa dos empenhos.
-        let unitPrice = t.unitPrice;
         try {
-          const q = await syncQuantityMutation.mutateAsync({
+          await syncQuantityMutation.mutateAsync({
             numeroAta,
             uasg: cleanUasg,
             numeroItem: t.numeroItem,
             contractKey: contractKeyOf(contract),
             contract
           });
-          if (q.valorUnitario) unitPrice = q.valorUnitario;
         } catch (err) {
           failedQty++;
           console.warn('Quantidade contratada não sincronizada para o item', t.numeroItem, err);
         }
-        try {
-          await syncEmpenhosMutation.mutateAsync({
-            numeroAta,
-            uasg: cleanUasg,
-            numeroItem: t.numeroItem,
-            contract: {
-              contractKey: contractKeyOf(contract),
-              uasg: contract.uasg,
-              numero: contract.numero,
-              ano: contract.ano,
-              contratoId: contract.contratoId
-            },
-            unitPrice
-          });
-        } catch (err) {
-          failedEmp++;
-          console.warn('Empenhos do contrato não sincronizados para o item', t.numeroItem, err);
-        }
       }
       if (failedQty > 0) {
         toast.error(`Contrato vinculado, mas a quantidade contratada de ${failedQty} ${failedQty === 1 ? 'item' : 'itens'} não pôde ser lida da API; o saldo só considera o contrato depois disso. Ela é lida de novo ao abrir o item.`);
-      } else if (failedEmp > 0) {
-        toast.error(`Contrato vinculado, mas os empenhos de ${failedEmp} ${failedEmp === 1 ? 'item' : 'itens'} não puderam ser lidos da API. Tente novamente mais tarde.`);
       }
     })();
   };

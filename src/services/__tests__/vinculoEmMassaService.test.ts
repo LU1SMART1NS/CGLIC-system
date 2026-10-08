@@ -2,11 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../arpContractLinkService', () => ({ saveArpContractItemLinks: vi.fn() }));
 vi.mock('../contractItemQuantitySyncService', () => ({ syncContractItemQuantity: vi.fn() }));
-vi.mock('../itemContractEmpenhoService', () => ({ syncItemContractEmpenhos: vi.fn() }));
 
 import { saveArpContractItemLinks } from '../arpContractLinkService';
 import { syncContractItemQuantity } from '../contractItemQuantitySyncService';
-import { syncItemContractEmpenhos } from '../itemContractEmpenhoService';
 import { executarVinculos, vincularContrato, type PlanoVinculo } from '../vinculoEmMassaService';
 
 const plano = (contractKey: string, itens = ['00001', '00004']): PlanoVinculo => ({
@@ -23,15 +21,13 @@ describe('vinculoEmMassaService', () => {
     vi.resetAllMocks();
     vi.mocked(saveArpContractItemLinks).mockResolvedValue(2);
     vi.mocked(syncContractItemQuantity).mockResolvedValue({ quantidade: 5, valorUnitario: 12, listado: true });
-    vi.mocked(syncItemContractEmpenhos).mockResolvedValue({ lidos: 0, sincronizados: 0, removidos: 0, pendentes: 0 } as any);
   });
 
-  it('vincula todos os itens de uma vez e lê quantidade e empenhos de cada item, usando o preço do contrato', async () => {
+  it('vincula todos os itens de uma vez e lê a quantidade de cada item', async () => {
     const r = await vincularContrato(plano('c1'));
     expect(r).toMatchObject({ ok: true, itens: 2, avisos: [] });
     expect(saveArpContractItemLinks).toHaveBeenCalledWith(expect.objectContaining({ contractKey: 'c1', itemKeys: ['00059/2025-200331-00001', '00059/2025-200331-00004'] }));
     expect(syncContractItemQuantity).toHaveBeenCalledTimes(2);
-    expect(syncItemContractEmpenhos).toHaveBeenCalledWith(expect.objectContaining({ numeroItem: '00004', unitPrice: 12 }));
   });
 
   it('falha no vínculo (ex.: contrato de outra ata) não lê a API e vira erro do contrato', async () => {
@@ -43,10 +39,9 @@ describe('vinculoEmMassaService', () => {
 
   it('falha ao ler a API depois de vincular vira aviso: o vínculo vale', async () => {
     vi.mocked(syncContractItemQuantity).mockRejectedValueOnce(new Error('API'));
-    vi.mocked(syncItemContractEmpenhos).mockRejectedValue(new Error('API'));
     const r = await vincularContrato(plano('c1'));
     expect(r.ok).toBe(true);
-    expect(r.avisos).toEqual(['quantidade do item 00001', 'empenhos do item 00001', 'empenhos do item 00004']);
+    expect(r.avisos).toEqual(['quantidade do item 00001']);
   });
 
   it('o lote segue depois de uma falha, em sequência, e informa o progresso', async () => {

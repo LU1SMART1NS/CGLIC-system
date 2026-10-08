@@ -20,10 +20,9 @@ export interface AllocationRow {
   id: string;
   unitName: string;
   allocatedQty: number;
+  /** Soma das parcelas deste item nas notas ligadas à unidade. */
   empenhado: number;
-  pendentes: number;
-  pendentesSugerido: number;
-  /** Empenhos do item vinculados à unidade (confirmados ou não): com algum, a alocação não pode ser removida. */
+  /** Notas do item ligadas à unidade (vinculadas aos itens ou a vincular): com alguma, a alocação não pode ser removida. */
   vinculados: number;
 }
 
@@ -88,16 +87,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
       sortValue: (r) => r.empenhado,
       sortFirstDir: 'desc',
       align: 'right',
-      render: (r) => (
-        <>
-          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.empenhado)}</span>
-          {r.pendentes > 0 && (
-            <div style={{ fontSize: '0.75rem', color: 'var(--warning)' }} title="Empenhos vinculados à unidade sem quantidade confirmada; não entram no empenhado">
-              {r.pendentes} {r.pendentes === 1 ? 'pendente' : 'pendentes'}
-            </div>
-          )}
-        </>
-      )
+      render: (r) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.empenhado)}</span>
     },
     {
       key: 'aEmpenhar',
@@ -169,12 +159,12 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
             testId="empenhos-sem-unidade"
             action={
               <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
-                Vincular em Contratos e empenhos
+                Escolher a unidade em Contratos e empenhos
               </AppButton>
             }
           >
-            <strong>{semUnidade.count}</strong> {semUnidade.count === 1 ? 'empenho confirmado' : 'empenhos confirmados'} ({formatNumber(semUnidade.empenhado)} un)
-            ainda sem unidade interna. Não entram no empenhado das unidades até serem vinculados.
+            <strong>{semUnidade.count}</strong> {semUnidade.count === 1 ? 'nota vinculada a este item está' : 'notas vinculadas a este item estão'} ({formatNumber(semUnidade.empenhado)} un)
+            sem unidade interna. Não entram no empenhado das unidades até a unidade ser escolhida.
           </NoticeBar>
         )}
       </SummaryBar>

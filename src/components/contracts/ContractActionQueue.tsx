@@ -1,6 +1,5 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
 import { propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { ContractTaskPlan } from '../../types';
@@ -35,14 +34,12 @@ const KIND_LABELS: Record<ContractActionItem['kind'], string> = {
   TAREFA: 'Tarefa',
   PAGAMENTO: 'Pagamento',
   REAJUSTE: 'Reajuste / repactuação',
-  LEMBRETE: 'Prazo legal',
-  EMPENHO: 'Execução do contrato'
+  LEMBRETE: 'Prazo legal'
 };
 
 export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue, contractKey, plan, isLoading = false, onGoTo }) => {
   const updateMutation = useUpdateContractTask(contractKey);
   const { dismiss, restore } = useReminderDismissals('CONTRATO', contractKey);
-  const navigate = useNavigateWithOrigin();
   const [searchParams] = useSearchParams();
   const highlightedId = searchParams.get('item');
 
@@ -65,7 +62,6 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
     switch (item.kind) {
       case 'PAGAMENTO': return { label: item.id.startsWith('AVISO-') ? 'Ver pagamentos do contrato' : 'Abrir ciclo', go: () => onGoTo('pagamentos') };
       case 'REAJUSTE': return { label: 'Ver histórico', go: () => onGoTo('historico') };
-      case 'EMPENHO': return item.href ? { label: 'Confirmar a quantidade no item da ata', go: () => navigate(item.href!) } : null;
       default: return null;
     }
   };
@@ -86,7 +82,6 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
         );
       }
       case 'PAGAMENTO':
-      case 'EMPENHO':
       case 'REAJUSTE':
         return rowGo(item) ? <SetaDaLinha /> : null;
       case 'LEMBRETE':

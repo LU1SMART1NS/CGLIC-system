@@ -31,9 +31,8 @@ export interface CarteiraItemRow {
   nivelAlocacao: NivelAtendimento;
   /** Soma da quantidade do item nos contratos vinculados; nula quando nenhum vínculo tem a quantidade lida. */
   contratada: number | null;
+  /** Soma das parcelas deste item nas notas vinculadas aos itens dos contratos (em unidades). */
   empenhado: number;
-  /** Empenhos vinculados ao item ainda sem quantidade confirmada (não contam no empenhado). */
-  empenhosPendentes: number;
   nivelEmpenho: NivelAtendimento;
 }
 
@@ -112,12 +111,10 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
   }
 
   const empenhadoPorItem = new Map<string, number>();
-  const pendentesPorItem = new Map<string, number>();
   for (const e of empenhos) {
     const chave = chaveItemDeItemKey(e.itemKey);
     if (!chave) continue;
-    if (e.quantidade != null) empenhadoPorItem.set(chave, (empenhadoPorItem.get(chave) ?? 0) + e.quantidade);
-    else pendentesPorItem.set(chave, (pendentesPorItem.get(chave) ?? 0) + 1);
+    empenhadoPorItem.set(chave, (empenhadoPorItem.get(chave) ?? 0) + e.quantidade);
   }
 
   const rows: CarteiraItemRow[] = [];
@@ -161,7 +158,6 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
         nivelAlocacao: nivelAlocacao(alocado, senasp),
         contratada,
         empenhado,
-        empenhosPendentes: pendentesPorItem.get(chave) ?? 0,
         nivelEmpenho: nivelEmpenho(empenhado, contratada)
       });
     }

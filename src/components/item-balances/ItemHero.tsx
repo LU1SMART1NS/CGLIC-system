@@ -28,8 +28,8 @@ export interface ItemHeroMetrics {
   limiteAdesao: number;
   valorFinanceiroDisponivel: number;
   valorFinanceiroConsumido: number;
-  /** Vínculos de empenho ainda sem quantidade confirmada. */
-  empenhosPendentes?: number;
+  /** Notas dos contratos do item ainda a vincular aos itens, que podem conter este item. */
+  notasAVincular?: number;
   /** Soma das alocações internas do quantitativo SENASP. */
   quantidadeAlocada?: number;
   /** Total registrado do item na ata, somando todos os órgãos. */
@@ -101,7 +101,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   const saldoTone: SeverityLevel | undefined =
     status.faixa === 'CRITICO' || status.faixa === 'EXPIRADO' ? 'CRITICA' : status.faixa === 'ATENCAO' ? 'ATENCAO' : undefined;
   const saldoBadge = status.faixa === 'EXPIRADO' ? 'Esgotado' : undefined;
-  const empenhosPendentes = metrics.empenhosPendentes ?? 0;
+  const notasAVincular = metrics.notasAVincular ?? 0;
 
   // Alocação interna: o quantitativo SENASP (`itemTotalQty`) menos o que já foi distribuído às unidades internas.
   const alocada = metrics.quantidadeAlocada ?? 0;
@@ -147,7 +147,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             onClick={handleAction}
             disabled={busy}
             isLoading={busy}
-            title="Recarrega os dados desta tela e, para gestores, relê da API a quantidade e os empenhos dos contratos vinculados"
+            title="Recarrega os dados desta tela e, para gestores, relê da API a quantidade do item nos contratos vinculados (as notas de empenho vêm da sincronização do servidor)"
           >
             {busy ? 'Atualizando...' : 'Atualizar'}
           </ActionButton>
@@ -230,11 +230,11 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             testId="item-health-alocacao"
           />
           <HealthTile
-            label="Empenhos pendentes"
-            value={String(empenhosPendentes)}
-            hint="a confirmar"
-            tooltip="Empenhos vinculados ao item que ainda aguardam confirmação de quantidade"
-            tone={empenhosPendentes > 0 ? 'ATENCAO' : undefined}
+            label="Notas a vincular"
+            value={String(notasAVincular)}
+            hint="aos itens do contrato"
+            tooltip="Notas de empenho dos contratos deste item que ainda não foram vinculadas aos itens e podem conter este item"
+            tone={notasAVincular > 0 ? 'ATENCAO' : undefined}
             onClick={() => onGoTo('contratos')}
             testId="item-health-empenhos"
           />

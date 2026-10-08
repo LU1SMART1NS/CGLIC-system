@@ -8,9 +8,9 @@ const gravadas = [
   { id: 'a3', unitName: 'CAEP', allocatedQty: 20000, empenhadaQty: 0 }
 ];
 const exec = new Map<string, AllocationExecution>([
-  ['a1', { empenhado: 122400, pendentes: 1, pendentesSugerido: 10, vinculados: 4 }],
-  ['a2', { empenhado: 0, pendentes: 0, pendentesSugerido: 0, vinculados: 0 }],
-  ['a3', { empenhado: 0, pendentes: 1, pendentesSugerido: 5, vinculados: 1 }]
+  ['a1', { empenhado: 122400, vinculados: 4 }],
+  ['a2', { empenhado: 0, vinculados: 0 }],
+  ['a3', { empenhado: 0, vinculados: 1 }]
 ]);
 const TOTAL = 312200;
 const iniciais = () => linhasIniciais(gravadas, exec);

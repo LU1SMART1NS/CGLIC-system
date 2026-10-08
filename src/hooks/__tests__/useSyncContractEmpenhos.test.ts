@@ -129,7 +129,11 @@ describe('useSyncContractEmpenhos Hook — Integração UI Contrato 360°', () =
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['contracts-dashboard'] });
     // A divisão das notas entre os itens do contrato (migration 94) muda com os empenhos.
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['contrato-empenho-distribuicao', '200331-00015-2026'] });
-    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(13);
+    // O empenhado dos itens na Carteira (vínculo automático das notas de contrato de um item).
+    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['contrato-empenho-distribuicao', 'carteira-itens'] });
+    // Sem as chaves da cópia antiga por item (arp_item_empenhos), que saiu.
+    expect(mockQueryClient.invalidateQueries).not.toHaveBeenCalledWith({ queryKey: ['item-empenho-vinculos'] });
+    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(12);
   });
 
   it('3. falha inesperada do orquestrador vira resultado ERRO com a mensagem (e é registrada, não lançada)', async () => {

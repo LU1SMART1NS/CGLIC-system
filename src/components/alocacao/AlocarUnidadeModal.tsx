@@ -4,7 +4,7 @@ import { ActionButton, AlertCard, AppButton, Modal } from '../../design-system';
 import { useDepartments } from '../../hooks/useDepartments';
 import { useItemAllocations } from '../../hooks/useItemAllocations';
 import { useItemEmpenhoLinks } from '../../hooks/useItemEmpenhoLinks';
-import { useItemEmpenhoVinculos } from '../../hooks/useItemEmpenhoVinculos';
+import { useEmpenhoDoItem } from '../../hooks/useEmpenhoDoItem';
 import { useSaveAllocations } from '../../hooks/useSaveAllocations';
 import { useSaveEmpenhoLinks } from '../../hooks/useSaveEmpenhoLinks';
 import { summarizeAllocationExecution } from '../../utils/allocationExecution';
@@ -64,7 +64,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const { data: departments = [], isLoading: departmentsLoading } = useDepartments();
   const { data: estado, isLoading: alocacoesLoading } = useItemAllocations(item.numeroAta, item.uasg, item.numeroItem);
   const { data: linksState, isLoading: linksLoading } = useItemEmpenhoLinks(item.numeroAta, item.uasg, item.numeroItem);
-  const { data: vinculos = [], isLoading: vinculosLoading } = useItemEmpenhoVinculos(itemKey);
+  const { data: empenhoDoItem, isLoading: vinculosLoading } = useEmpenhoDoItem(itemKey);
   const salvarAlocacoes = useSaveAllocations();
   const salvarLinks = useSaveEmpenhoLinks();
   const carregando = departmentsLoading || alocacoesLoading || linksLoading || vinculosLoading;
@@ -74,9 +74,9 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const iniciais = React.useMemo(() => {
     if (carregando) return null;
     const gravadas = estado?.allocations ?? [];
-    const exec = summarizeAllocationExecution(gravadas, vinculos, linksState?.links ?? {});
+    const exec = summarizeAllocationExecution(gravadas, empenhoDoItem, linksState?.links ?? {});
     return linhasIniciais(gravadas, exec.porAlocacao).map((l) => (l.id === removerId && l.vinculados === 0 ? { ...l, removida: true } : l));
-  }, [carregando, estado, vinculos, linksState, removerId]);
+  }, [carregando, estado, empenhoDoItem, linksState, removerId]);
   const [editadas, setEditadas] = React.useState<LinhaAlocacao[] | null>(null);
   const linhas = editadas ?? iniciais;
   const setLinhas = (f: (ls: LinhaAlocacao[]) => LinhaAlocacao[]) => setEditadas((prev) => f(prev ?? iniciais ?? []));

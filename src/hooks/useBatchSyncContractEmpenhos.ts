@@ -1,3 +1,4 @@
+import { CARTEIRA_EMPENHOS_KEY } from './useCarteiraItens';
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -223,13 +224,13 @@ export function useBatchSyncContractEmpenhos() {
         setSummary(stats);
         queryClient.invalidateQueries({ queryKey: ['v_empenhos_resumo'] });
         queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
-        queryClient.invalidateQueries({ queryKey: ['item-empenho-vinculos'] });
+        // Vínculo automático das notas de contrato de um item: muda o empenhado dos itens na Carteira.
+        queryClient.invalidateQueries({ queryKey: CARTEIRA_EMPENHOS_KEY });
         for (const key of porChave.keys()) {
           queryClient.invalidateQueries({ queryKey: ['contract', key] });
           queryClient.invalidateQueries({ queryKey: ['v_contrato_empenhos_lastro', key] });
           queryClient.invalidateQueries({ queryKey: ['contract-events', key] });
           queryClient.invalidateQueries({ queryKey: ['contract-empenhos', key] });
-          queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links', key] });
           queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao', key] });
           queryClient.invalidateQueries({ queryKey: SINCRONIZACAO_EMPENHOS_QUERY_KEY(key) });
         }
