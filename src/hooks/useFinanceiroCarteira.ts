@@ -50,10 +50,11 @@ export function useEmpenhosCarteira() {
 }
 
 /** Ciclos de pagamento em aberto e todas as faturas, cada um na sua linha. */
-export function usePagamentosCarteira() {
-  const faturas = useFaturasCarteira();
-  const ciclos = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.ciclos, queryFn: fetchCiclosEmAberto, ...OPCOES });
-  const ligacoes = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.ligacoes, queryFn: fetchLigacoesCicloFatura, ...OPCOES });
+export function usePagamentosCarteira(opts: { enabled?: boolean } = {}) {
+  const enabled = opts.enabled ?? true;
+  const faturas = useFaturasCarteira({ enabled });
+  const ciclos = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.ciclos, queryFn: fetchCiclosEmAberto, enabled, ...OPCOES });
+  const ligacoes = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.ligacoes, queryFn: fetchLigacoesCicloFatura, enabled, ...OPCOES });
   const rows = useMemo(
     () => montarPagamentosCarteira(ciclos.data ?? [], faturas.data ?? [], ligacoes.data ?? []),
     [ciclos.data, faturas.data, ligacoes.data]

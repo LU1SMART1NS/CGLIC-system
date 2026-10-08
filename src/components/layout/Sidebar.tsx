@@ -5,6 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useContagemVinculacao } from '../vinculacao/useContagemVinculacao';
 import { useContagensExtras } from '../vinculacao/contagemExtras';
 import { ContagensDaCarteira } from '../vinculacao/ContagensDaCarteira';
+import { useContagemFinanceiro } from '../financeiro/useContagemFinanceiro';
+import { pendenciasDoMenu, type PendenciaDaArea } from './pendenciasDoMenu';
 
 interface SidebarProps {
   /** 'rail' = trilha de ícones à esquerda (desktop); 'bottom' = barra inferior (celular). */
@@ -52,10 +54,12 @@ export function rememberAreaVisit(areas: NavItem[], pathname: string, search: st
   }
 }
 
-const AreaItem: React.FC<{ area: NavItem; pathname: string; contagem?: number | null }> = ({ area, pathname, contagem }) => {
+const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: PendenciaDaArea }> = ({ area, pathname, pendencia }) => {
   const active = isItemActive(area, pathname);
   const Icon = area.icon;
-  const target = areaTarget(area) ?? '/';
+  // Com pendência, a área abre direto nela; sem pendência, na última página usada.
+  const target = pendencia?.destino ?? areaTarget(area) ?? '/';
+  const contagem = pendencia?.contagem;
 
   return (
     <div className="app-rail-item">
@@ -72,7 +76,11 @@ const AreaItem: React.FC<{ area: NavItem; pathname: string; contagem?: number | 
         )}
         <span className="app-rail-label">{area.label}</span>
         {contagem ? (
-          <span className="app-rail-count" aria-label={`${contagem} ${area.id === 'alocacao' ? 'itens a alocar' : 'pendências de vínculo'}`} data-testid={`rail-count-${area.id}`}>
+          <span
+            className={`app-rail-count${pendencia?.vermelho ? ' app-rail-count--urgente' : ''}`}
+            aria-label={`${contagem} ${contagem === 1 ? 'pendência' : 'pendências'}${pendencia?.vermelho ? ', com prazo vencido ou erro' : ''}`}
+            data-testid={`rail-count-${area.id}`}
+          >
             {contagem > 999 ? '999+' : contagem}
           </span>
         ) : null}
@@ -88,11 +96,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
   // roleStatus 'loading' é tratado como role=null (só itens públicos aparecem
   // até a role real resolver) — mesmo princípio fail-closed do backend.
   const areas = useMemo(() => filterNavigationByRole(navigationConfig, role), [role]);
-  const pendenciasEmpenhos = useContagemVinculacao();
+  const empenhos = useContagemVinculacao();
+  const financeiro = useContagemFinanceiro();
   const extras = useContagensExtras();
-  // Vinculação: as duas filas de empenho (consultas leves) mais os contratos sem ata, quando a carteira já está carregada.
-  const pendenciasVinculo = pendenciasEmpenhos === null && extras.contratosAta === null ? null : (pendenciasEmpenhos ?? 0) + (extras.contratosAta ?? 0);
-  const contagemDa = (id: string) => (id === 'vinculacao' ? pendenciasVinculo : id === 'alocacao' ? extras.itensAAlocar : undefined);
+  const pendencias = useMemo(() => pendenciasDoMenu({ empenhos, financeiro, extras }), [empenhos, financeiro, extras]);
 
   // Registra antes de montar os links, para o da área atual já apontar para a página aberta (idempotente).
   rememberAreaVisit(areas, pathname, search);
@@ -108,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
         </Link>
       )}
       {top.map((area) => (
-        <AreaItem key={area.id} area={area} pathname={pathname} contagem={contagemDa(area.id)} />
+        <AreaItem key={area.id} area={area} pathname={pathname} pendencia={pendencias[area.id]} />
       ))}
       <ContagensDaCarteira />
       {mode === 'rail' && <div className="app-rail-spacer" />}

@@ -7,15 +7,30 @@ import { getContractsDashboardQueryOptions } from '../../hooks/useContractsDashb
 import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
 import { useCarteiraItens } from '../../hooks/useCarteiraItens';
 import { usePendenciasVinculoAta } from '../atas/distribuicao/usePendenciasVinculoAta';
+import { useDistribuicaoDaCarteira } from '../atas/distribuicao/useDistribuicaoDaCarteira';
 import { contarItensAAlocar, definirContagemExtra } from './contagemExtras';
 
-/** Calcula os contratos sem ata (os mesmos da fila) e entrega o número ao menu. */
-const CalculoContratosAta: React.FC = () => {
-  const { totalSemVinculo, isBusy } = usePendenciasVinculoAta();
+/**
+ * Calcula os contratos sem ata (os mesmos da fila da Vinculação) e, para o coordenador, as filas da Central de
+ * Distribuição (atas sem gestor e gestor diferente da ata), e entrega os números ao menu.
+ */
+const CalculoDaCarteira: React.FC<{ contaDistribuicao: boolean }> = ({ contaDistribuicao }) => {
+  const { atas, contratos, links, pendencias, totalSemVinculo, isBusy } = usePendenciasVinculoAta();
+  const { divergencias } = useDistribuicaoDaCarteira({ atas, contratos, links });
+  const atasSemGestor = pendencias.atasSemGestor.length;
   React.useEffect(() => {
     definirContagemExtra('contratosAta', isBusy ? null : totalSemVinculo);
-  }, [isBusy, totalSemVinculo]);
-  React.useEffect(() => () => definirContagemExtra('contratosAta', null), []);
+    definirContagemExtra('atasSemGestor', isBusy || !contaDistribuicao ? null : atasSemGestor);
+    definirContagemExtra('gestorDiferente', isBusy || !contaDistribuicao ? null : divergencias.length);
+  }, [isBusy, totalSemVinculo, contaDistribuicao, atasSemGestor, divergencias.length]);
+  React.useEffect(
+    () => () => {
+      definirContagemExtra('contratosAta', null);
+      definirContagemExtra('atasSemGestor', null);
+      definirContagemExtra('gestorDiferente', null);
+    },
+    []
+  );
   return null;
 };
 
@@ -49,7 +64,7 @@ export const ContagensDaCarteira: React.FC = () => {
 
   return (
     <>
-      {contaContratos && atasNoCache && contratosNoCache && <CalculoContratosAta />}
+      {contaContratos && atasNoCache && contratosNoCache && <CalculoDaCarteira contaDistribuicao={role === 'admin'} />}
       {contaItens && atasNoCache && <CalculoItensAAlocar />}
     </>
   );

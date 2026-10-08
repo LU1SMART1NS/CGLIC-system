@@ -22,7 +22,7 @@ import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../car
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
-import type { EtapaPagamento } from '../../services/financeiroCarteiraService';
+import { GRUPO_DA_ETAPA, type EtapaPagamento, type GrupoPagamento } from '../../services/financeiroCarteiraService';
 import { useContratosDoFinanceiro, uasgDaChave } from './useContratosDoFinanceiro';
 import { normalizarBusca } from './financeiroFormat';
 import { descreverLinha } from './pagamentoLinha';
@@ -40,21 +40,6 @@ export interface PagamentosFilterState {
 const TODOS = 'TODOS';
 const ETAPAS: EtapaPagamento[] = ['NA_CGLIC', 'ERRO_SIAFI', 'DEVOLVIDO_CORRECAO', 'NA_CGOFI', 'EM_ANDAMENTO', 'AGUARDANDO_OB', 'PAGA', 'CANCELADA'];
 
-/**
- * Segmentos: o que precisa de ação da equipe (ciclo na CGLIC, erro no SIAFI), o que anda sem a CGLIC (na CGOFI, fatura
- * ainda não liquidada, liquidada esperando OB) e o que já foi pago. Cancelada só aparece em Todas.
- */
-type GrupoPagamento = 'ACAO' | 'TRAMITACAO' | 'PAGA';
-const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
-  NA_CGLIC: 'ACAO',
-  ERRO_SIAFI: 'ACAO',
-  DEVOLVIDO_CORRECAO: 'TRAMITACAO',
-  NA_CGOFI: 'TRAMITACAO',
-  EM_ANDAMENTO: 'TRAMITACAO',
-  AGUARDANDO_OB: 'TRAMITACAO',
-  PAGA: 'PAGA',
-  CANCELADA: null
-};
 const ROTULO_ETAPA: Record<EtapaPagamento, string> = {
   NA_CGLIC: 'Na CGLIC',
   ERRO_SIAFI: 'Erro no SIAFI',

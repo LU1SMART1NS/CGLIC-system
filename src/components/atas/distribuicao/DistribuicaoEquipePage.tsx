@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { ContractsPartialNotice } from '../../carteira/ContractsPartialNotice';
@@ -22,23 +22,13 @@ import { FILAS, FILA_INICIAL, type Fila } from './filaComum';
 import { usePendenciasVinculoAta } from './usePendenciasVinculoAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { useAuth } from '../../../context/AuthContext';
-import { getArpPrazo } from '../../../hooks/useAtasPortfolio';
 import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
-import { formatContractNumber } from '../../../utils/contractNumber';
-import { buildDistribuicaoEquipe } from './distribuicaoEquipe';
-import { mesesDeVigencia } from './complexidade';
+import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
 
 const AMBAR = 'var(--color-warning)';
 const VERMELHO = 'var(--color-danger)';
 
-
-/** Categoria do contrato: `categoria` no Contratos.gov.br, `nomeCategoria` no Compras.gov.br. */
-function categoriaDoContrato(raw: unknown): string | undefined {
-  const r = raw as { categoria?: unknown; nomeCategoria?: unknown } | undefined;
-  const c = r?.categoria ?? r?.nomeCategoria;
-  return typeof c === 'string' ? c : undefined;
-}
 
 /**
  * Central de Distribuição, no padrão das carteiras: atas e contratos para gestores. Filas em abas com contagem
@@ -66,36 +56,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const abaDaUrl: Fila = abaParam && (FILAS as readonly string[]).includes(abaParam) ? (abaParam as Fila) : FILA_INICIAL;
   const trocarAba = (nova: Fila) => setSearchParams(nova === FILA_INICIAL ? {} : { aba: nova }, { replace: true });
 
-  const distribuicao = useMemo(
-    () =>
-      buildDistribuicaoEquipe({
-        atas: atas.scopedArps.map((arp) => ({
-          numeroAta: arp.numeroAtaRegistroPreco,
-          uasg: arp.codigoUnidadeGerenciadora,
-          objeto: arp.objeto,
-          dias: getArpPrazo(arp).dias,
-          faixa: getArpPrazo(arp).faixa,
-          valor: Number(arp.valorTotal) || 0,
-          gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
-          itens: (atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`] || []).length
-        })),
-        contratos: contratos.rows.map((row) => ({
-          contractKey: row.contractKey,
-          numero: formatContractNumber(row.contract),
-          objeto: row.contract.objeto,
-          dias: row.diasRestantes,
-          faixa: row.faixa,
-          valor: row.contract.valorGlobal || row.contract.valorInicial || 0,
-          gestorNome: row.gestorNome,
-          categoria: categoriaDoContrato(row.contract.raw),
-          mesesVigencia: mesesDeVigencia(row.contract.dataVigenciaInicio, row.contract.dataVigenciaFim)
-        })),
-        links,
-        attentionItems: contratos.attentionItems,
-        ajustes
-      }),
-    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes]
-  );
+  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes });
 
   const aVincularDe = (gestorNome: string): ContratoAVincular[] => pendencias.aVincularPorGestor.get(gestorNome) || [];
 
