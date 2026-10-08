@@ -99,14 +99,16 @@ describe('números novos: Financeiro e Visão Geral', () => {
     expect(menu()).toMatch(/class="app-rail-count"[^>]*data-testid="rail-count-execucao-financeira"[^>]*>2</);
   });
 
-  it('Visão Geral (coordenador): atas sem gestor + gestor diferente, e o clique abre a Central', () => {
+  it('Visão Geral (coordenador): atas sem gestor + gestor diferente no número, e o clique abre sempre o Painel', () => {
     definirContagemExtra('atasSemGestor', 182);
     definirContagemExtra('gestorDiferente', 2);
     const html = menu();
     expect(html).toMatch(/data-testid="rail-count-visao-geral"[^>]*>184</);
-    expect(html).toContain('href="/atas/distribuicao"');
+    expect(html).toContain('href="/instrumentos"');
+    expect(html).not.toContain('href="/atas/distribuicao');
     definirContagemExtra('atasSemGestor', 0);
-    expect(menu()).toContain('href="/atas/distribuicao?aba=DIVERGENCIAS"');
+    expect(menu()).toContain('href="/instrumentos"');
+    expect(menu()).not.toContain('href="/atas/distribuicao');
   });
 
   it('Vinculação abre na primeira fila com pendência', () => {

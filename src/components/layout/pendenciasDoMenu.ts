@@ -21,10 +21,11 @@ export interface FontesDoMenu {
 export function pendenciasDoMenu({ empenhos, financeiro, extras }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
   const r: Record<string, PendenciaDaArea | undefined> = {};
 
-  // Visão Geral (coordenador): as filas da Central de Distribuição.
+  // Visão Geral (coordenador): o número soma as filas da Central de Distribuição, mas o clique abre sempre no Painel;
+  // a Distribuição fica a uma aba de distância.
   const atas = extras.atasSemGestor ?? 0;
   const diverg = extras.gestorDiferente ?? 0;
-  if (atas + diverg > 0) r['visao-geral'] = { contagem: atas + diverg, destino: atas > 0 ? '/atas/distribuicao' : '/atas/distribuicao?aba=DIVERGENCIAS' };
+  if (atas + diverg > 0) r['visao-geral'] = { contagem: atas + diverg, destino: '/instrumentos' };
 
   // Alocação: itens sem alocação ou alocados em parte.
   if ((extras.itensAAlocar ?? 0) > 0) r.alocacao = { contagem: extras.itensAAlocar!, destino: ROTA_ALOCACAO };
