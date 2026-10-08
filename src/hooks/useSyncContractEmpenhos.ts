@@ -59,6 +59,7 @@ export function useSyncContractEmpenhos(contractKey: string) {
       queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['contract-empenhos', contractKey] });
       queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links', contractKey] });
+      queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao', contractKey] });
       // Itens da ata ligados ao contrato: empenhos, quantidades e saldos
       queryClient.invalidateQueries({ queryKey: ['item-empenho-vinculos'] });
       queryClient.invalidateQueries({ queryKey: ['contract-item-quantities'] });

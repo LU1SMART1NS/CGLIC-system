@@ -39,6 +39,7 @@ function invalidarEmpenhosDoContrato(queryClient: QueryClient, contractKey: stri
   queryClient.invalidateQueries({ queryKey: ['v_empenhos_resumo'] });
   queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
   queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links', contractKey] });
+  queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao', contractKey] });
   queryClient.invalidateQueries({ queryKey: ['contract-events', contractKey] });
   queryClient.invalidateQueries({ queryKey: ['empenho-por-numero'] });
 }

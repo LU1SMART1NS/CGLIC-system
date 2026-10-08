@@ -103,3 +103,52 @@ describe('DataTable — modos desktop e mobile', () => {
     expect(renderToStaticMarkup(<DataTable<Row> columns={columns} data={data} keyExtractor={(r) => r.id} />)).not.toContain('carteira-row-link');
   });
 });
+
+describe('DataTable — linha com detalhes (renderExpanded)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const detalhe = (r: Row) => <p>Detalhe de {r.sigla}</p>;
+
+  it('desktop: setinha em cada linha; só a linha aberta mostra os detalhes logo abaixo', () => {
+    mockMobile(false);
+    const html = renderToStaticMarkup(
+      <DataTable<Row>
+        testId="t"
+        columns={columns}
+        data={data}
+        keyExtractor={(r) => r.id}
+        renderExpanded={detalhe}
+        expandedKeys={new Set(['2'])}
+        expandLabel={(r) => r.sigla}
+      />
+    );
+    expect(html).toContain('data-testid="t-expand-1"');
+    expect(html).toContain('aria-label="Abrir detalhes de CGLIC"');
+    expect(html).toContain('aria-label="Recolher detalhes de DGE"');
+    expect(html).toContain('data-testid="t-detail-2"');
+    expect(html).not.toContain('t-detail-1');
+    expect(html).toContain('Detalhe de DGE');
+    expect(html).not.toContain('Detalhe de CGLIC');
+    // A linha toda é clicável e a aberta fica marcada.
+    expect(html).toContain('carteira-row-link');
+    expect(html).toContain('ds-table__row--open');
+    // A célula de detalhes ocupa a largura toda (setinha + colunas).
+    expect(html).toContain('colSpan="4"');
+  });
+
+  it('mobile: o cartão aberto mostra os detalhes e o botão de recolher', () => {
+    mockMobile(true);
+    const html = renderToStaticMarkup(
+      <DataTable<Row> testId="t" columns={columns} data={data} keyExtractor={(r) => r.id} renderExpanded={detalhe} expandedKeys={new Set(['1'])} />
+    );
+    expect(html).toContain('Detalhe de CGLIC');
+    expect(html).not.toContain('Detalhe de DGE');
+    expect(html).toContain('t-expand-2');
+  });
+
+  it('sem renderExpanded, nada muda: sem setinha nem coluna extra', () => {
+    mockMobile(false);
+    const html = renderToStaticMarkup(<DataTable<Row> testId="t" columns={columns} data={data} keyExtractor={(r) => r.id} />);
+    expect(html).not.toContain('t-expand-');
+    expect(html).not.toContain('aria-label="Detalhes"');
+  });
+});

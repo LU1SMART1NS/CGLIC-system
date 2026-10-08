@@ -4,6 +4,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { CarteiraSortButton } from '../../components/carteira/CarteiraSortHeader';
 import { sortRows, type SortDir, type SortValue } from '../../components/carteira/useCarteiraSort';
 import { abrirAoClicarNaLinha } from '../../components/carteira/CarteiraRowLink';
+import { ActionButton } from './ActionButton';
 
 export interface Column<T> {
   key: string;
@@ -57,6 +58,16 @@ export interface DataTableProps<T> {
    * um link (CarteiraIdLink) numa das células.
    */
   rowOpen?: (item: T, index: number) => (() => void) | null | undefined;
+  /**
+   * Detalhes da linha, abertos logo abaixo dela (setinha à esquerda, como a aba Contratos e empenhos do item).
+   * Sem `rowOpen`, clicar na linha também abre e fecha.
+   */
+  renderExpanded?: (item: T, index: number) => React.ReactNode;
+  /** Chaves das linhas abertas, quando quem usa a tabela controla (ex.: abrir uma linha vinda de outra aba). */
+  expandedKeys?: ReadonlySet<string>;
+  onToggleExpand?: (key: string) => void;
+  /** Nome da linha para o leitor de tela ("Abrir detalhes de ..."). */
+  expandLabel?: (item: T, index: number) => string;
 }
 
 const hideClass = (col: { hideBelow?: 'sm' | 'md' }) =>
@@ -77,12 +88,47 @@ export function DataTable<T>({
   rowActions,
   rowActionsHeader = 'Ações',
   rowStyle,
-  rowOpen
+  rowOpen,
+  renderExpanded,
+  expandedKeys,
+  onToggleExpand,
+  expandLabel
 }: DataTableProps<T>) {
   const isMobile = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
+  const [internalExpanded, setInternalExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const expanded = expandedKeys ?? internalExpanded;
+  const toggleExpand = (key: string) => {
+    if (onToggleExpand) onToggleExpand(key);
+    if (!expandedKeys) {
+      setInternalExpanded((atual) => {
+        const prox = new Set(atual);
+        if (prox.has(key)) prox.delete(key);
+        else prox.add(key);
+        return prox;
+      });
+    }
+  };
+  const openOf = (item: T, idx: number): (() => void) | null | undefined =>
+    rowOpen ? rowOpen(item, idx) : renderExpanded ? () => toggleExpand(keyExtractor(item, idx)) : undefined;
   const clickOf = (item: T, idx: number) => {
-    const abrir = rowOpen?.(item, idx);
+    const abrir = openOf(item, idx);
     return abrir ? abrirAoClicarNaLinha(abrir) : undefined;
+  };
+  const expandButton = (item: T, idx: number) => {
+    const key = keyExtractor(item, idx);
+    const aberto = expanded.has(key);
+    const nome = expandLabel?.(item, idx);
+    return (
+      <ActionButton
+        action={aberto ? 'recolher' : 'expandir'}
+        iconOnly
+        size="sm"
+        expanded={aberto}
+        label={`${aberto ? 'Recolher' : 'Abrir'} detalhes${nome ? ` de ${nome}` : ''}`}
+        onClick={() => toggleExpand(key)}
+        data-testid={`${testId}-expand-${key}`}
+      />
+    );
   };
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
 
@@ -130,7 +176,7 @@ export function DataTable<T>({
                 <li
                   key={key}
                   data-testid={`${testId}-row-${key}`}
-                  className={`ds-table-cards__item${rowOpen?.(item, idx) ? ' action-row--go' : ''}`}
+                  className={`ds-table-cards__item${openOf(item, idx) ? ' action-row--go' : ''}`}
                   style={rowStyle?.(item, idx)}
                   onClick={clickOf(item, idx)}
                 >
@@ -162,7 +208,17 @@ export function DataTable<T>({
                       )}
                     </>
                   )}
-                  {rowActions && <div className="ds-table-cards__actions">{rowActions(item, idx)}</div>}
+                  {(rowActions || renderExpanded) && (
+                    <div className="ds-table-cards__actions">
+                      {rowActions?.(item, idx)}
+                      {renderExpanded && expandButton(item, idx)}
+                    </div>
+                  )}
+                  {renderExpanded && expanded.has(key) && (
+                    <div className="ds-table__detail" data-testid={`${testId}-detail-${key}`}>
+                      {renderExpanded(item, idx)}
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -172,7 +228,7 @@ export function DataTable<T>({
     );
   }
 
-  const colSpan = columns.length + (rowActions ? 1 : 0);
+  const colSpan = columns.length + (rowActions ? 1 : 0) + (renderExpanded ? 1 : 0);
 
   return (
     <div
@@ -191,6 +247,7 @@ export function DataTable<T>({
       >
         <thead>
           <tr>
+            {renderExpanded && <th style={{ width: '44px' }} aria-label="Detalhes" />}
             {columns.map((col) => (
               <th
                 key={col.key}
@@ -222,26 +279,39 @@ export function DataTable<T>({
               </td>
             </tr>
           ) : (
-            rows.map((item, idx) => (
-              <tr
-                key={keyExtractor(item, idx)}
-                data-testid={`${testId}-row-${keyExtractor(item, idx)}`}
-                className={rowOpen?.(item, idx) ? 'carteira-row-link' : undefined}
-                style={rowStyle?.(item, idx)}
-                onClick={clickOf(item, idx)}
-              >
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    className={hideClass(col)}
-                    style={{ textAlign: col.align || 'left', minWidth: col.minWidth, whiteSpace: col.nowrap ? 'nowrap' : undefined }}
+            rows.map((item, idx) => {
+              const key = keyExtractor(item, idx);
+              const aberto = Boolean(renderExpanded && expanded.has(key));
+              return (
+                <React.Fragment key={key}>
+                  <tr
+                    data-testid={`${testId}-row-${key}`}
+                    className={[openOf(item, idx) ? 'carteira-row-link' : '', aberto ? 'ds-table__row--open' : ''].filter(Boolean).join(' ') || undefined}
+                    style={rowStyle?.(item, idx)}
+                    onClick={clickOf(item, idx)}
                   >
-                    {cell(col, item, idx)}
-                  </td>
-                ))}
-                {rowActions && <td style={{ textAlign: 'right' }}>{rowActions(item, idx)}</td>}
-              </tr>
-            ))
+                    {renderExpanded && <td data-role="expand" style={{ textAlign: 'center', paddingRight: 0 }}>{expandButton(item, idx)}</td>}
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
+                        className={hideClass(col)}
+                        style={{ textAlign: col.align || 'left', minWidth: col.minWidth, whiteSpace: col.nowrap ? 'nowrap' : undefined }}
+                      >
+                        {cell(col, item, idx)}
+                      </td>
+                    ))}
+                    {rowActions && <td style={{ textAlign: 'right' }}>{rowActions(item, idx)}</td>}
+                  </tr>
+                  {aberto && (
+                    <tr className="ds-table__detail-row" data-testid={`${testId}-detail-${key}`}>
+                      <td colSpan={colSpan} className="ds-table__detail">
+                        {renderExpanded!(item, idx)}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })
           )}
         </tbody>
       </table>
