@@ -290,7 +290,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(config?.children?.map((c) => c.label)).toEqual(['Modelos de Gestão', 'Unidades Internas']);
     });
 
-    it('Gestor de Saldo (gestor_saldos) vê Visão Geral (restrita a saldos), Atas e Itens — nada de Contratos, Financeiro, Usuários ou Perfis', () => {
+    it('Gestor de Saldo (gestor_saldos) vê Visão Geral (restrita a saldos), Atas, Itens, Contratos e Empenhos — sem Pagamentos, Usuários ou Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor_saldos');
       const labels = flatLabels(visible);
 
@@ -299,17 +299,17 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
       expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Atas');
-      expect(labels).not.toContain('Contratos');
+      expect(labels).toContain('Contratos');
       expect(labels).not.toContain('Modelos de Gestão');
       // Configurações aparece só com o cadastro de unidades internas, que ele mantém
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);
       expect(labels).not.toContain('Pagamentos');
-      expect(labels).not.toContain('Empenhos');
+      expect(labels).toContain('Empenhos');
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
 
-      // Área que ficaria vazia (Financeiro) some inteiramente
-      expect(labels).not.toContain('Financeiro');
+      // Financeiro aparece só com Empenhos (Pagamentos segue fechado)
+      expect(labels).toContain('Financeiro');
       expect(labels).toContain('Carteira');
     });
 
