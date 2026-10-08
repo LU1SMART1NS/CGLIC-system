@@ -41,9 +41,9 @@ describe('textos da distribuição', () => {
     expect(textoDaSugestao('SEM_SUGESTAO', [])).toBeNull();
   });
 
-  it('rótulo da situação: automática e manual aparecem diferentes', () => {
-    expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO' })).label).toBe('Automática');
-    expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO' })).label).toBe('Distribuída');
+  it('rótulo da situação: vínculo automático e manual aparecem diferentes', () => {
+    expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO' })).label).toBe('Vinculada automaticamente');
+    expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO' })).label).toBe('Vinculada');
     expect(rotuloDaSituacao(dist({ situacao: 'REVISAR' })).variant).toBe('danger');
   });
 

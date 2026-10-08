@@ -263,32 +263,33 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     vi.mocked(useItensDoContrato).mockReturnValue({ data: itens } as any);
   });
 
-  it('nota a distribuir: selo na coluna, sugestão e aviso no resumo com o botão para o gestor', () => {
+  it('nota a vincular aos itens: selo na coluna, sugestão e aviso no resumo com o botão para o gestor', () => {
     vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({ data: [dist()] } as any);
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     const html = render();
-    expect(html).toContain('A distribuir');
+    expect(html).toContain('A vincular');
     expect(html).toContain('sugestão: 4 un do item 13');
     expect(html).toContain('contract-financial-a-distribuir');
-    expect(html).toContain('Distribuir a próxima');
+    expect(html).toContain('Vincular a próxima aos itens');
     // A linha abre os detalhes pela setinha.
     expect(html).toContain('contract-financial-table-expand-2022NE000245');
   });
 
-  it('leitor vê o aviso, mas não o botão de distribuir', () => {
+  it('leitor vê o aviso, mas não o botão de vincular aos itens', () => {
     vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({ data: [dist()] } as any);
     vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
     const html = render();
     expect(html).toContain('contract-financial-a-distribuir');
-    expect(html).not.toContain('Distribuir a próxima');
+    expect(html).not.toContain('Vincular a próxima aos itens');
   });
 
-  it('nota distribuída mostra os itens na coluna e não gera aviso', () => {
+  it('nota vinculada aos itens mostra os itens na coluna e não gera aviso', () => {
     vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({
       data: [dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }] })]
     } as any);
     const html = render();
-    expect(html).toContain('Distribuída');
+    expect(html).toContain('Vinculada');
+    expect(html).not.toContain('Distribu');
     expect(html).toContain('item 13');
     expect(html).not.toContain('contract-financial-a-distribuir');
   });
@@ -324,7 +325,7 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
       />
     );
 
-  it('detalhes da nota distribuída: parcela, quantidade, item da ata e faturas que citam a nota', () => {
+  it('detalhes da nota vinculada aos itens: parcela, quantidade, item da ata e faturas que citam a nota', () => {
     const html = detalhe(
       dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }], distribuidoPorNome: 'Maria' }),
       true,
@@ -336,28 +337,28 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).toContain('Ata 00021/2024 · item 13');
     expect(html).toContain('sem vínculo');
     expect(html).toContain('por Maria');
-    expect(html).toContain('Editar distribuição');
+    expect(html).toContain('Editar o vínculo aos itens');
     expect(html).toContain('Desfazer');
     expect(html).toContain('fatura 1203');
   });
 
-  it('distribuição automática (contrato de um item) não oferece editar nem desfazer', () => {
+  it('vínculo automático (contrato de um item) não oferece editar nem desfazer', () => {
     const html = detalhe(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }] }));
-    expect(html).toContain('Automática: contrato de um item');
-    expect(html).not.toContain('Editar distribuição');
+    expect(html).toContain('Vinculada automaticamente: contrato de um item');
+    expect(html).not.toContain('Editar o vínculo aos itens');
     expect(html).not.toContain('Desfazer');
   });
 
-  it('nota a rever explica o motivo e oferece distribuir de novo', () => {
+  it('nota a rever explica o motivo e oferece vincular de novo', () => {
     const html = detalhe(dist({ situacao: 'REVISAR', motivoRevisao: 'VALOR_MUDOU', origem: 'USUARIO', valorNaDistribuicao: 800, valorDistribuido: 800, parcelas: [{ numeroItem: 13, valor: 800 }] }));
     expect(html).toContain('O valor da nota mudou de R$');
-    expect(html).toContain('>Distribuir<');
+    expect(html).toContain('>Vincular aos itens<');
   });
 
   it('contrato sem itens numerados: a nota fica no contrato inteiro', () => {
     const html = detalhe(dist({ situacao: 'SEM_ITENS', itensNoContrato: 0 }));
     expect(html).toContain('não tem itens numerados');
-    expect(html).not.toContain('Distribuir');
+    expect(html).not.toContain('Vincular aos itens');
     expect(html).toContain('nenhuma fatura cita esta nota');
   });
 });

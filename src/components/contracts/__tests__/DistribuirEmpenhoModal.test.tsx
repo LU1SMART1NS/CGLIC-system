@@ -47,7 +47,9 @@ describe('DistribuirEmpenhoModal', () => {
 
   it('mostra a nota, a sugestão, um campo por item e o que já veio de outras notas', () => {
     const html = render();
-    expect(html).toContain('Distribuir 2024NE000337 entre os itens');
+    expect(html).toContain('Vincular 2024NE000337 aos itens do contrato');
+    expect(html).toContain('Salvar o vínculo');
+    expect(html).not.toContain('Distribu');
     expect(html).toContain('Contrato 00002/2025');
     expect(html).toContain('Igual ao total do item 43');
     expect(html).toContain('distribuir-valor-13');

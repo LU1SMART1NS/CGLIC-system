@@ -12,7 +12,7 @@ const EPS = 0.005;
 const OBS_MAX = 500;
 
 interface DistribuirEmpenhoModalProps {
-  /** Nota a distribuir; nula fecha a janela. */
+  /** Nota a vincular aos itens; nula fecha a janela. */
   distribuicao: DistribuicaoDoEmpenho | null;
   numeroContrato: string;
   itens: ItemNumerado[];
@@ -25,11 +25,11 @@ interface DistribuirEmpenhoModalProps {
 }
 
 /**
- * O gestor reparte o valor da NE entre os itens do contrato. A quantidade sai do valor ÷ preço do item e só
+ * O gestor vincula a NE aos itens do contrato, repartindo o valor entre eles. A quantidade sai do valor ÷ preço do item e só
  * serve de conferência; salva quando a soma fecha com o valor da nota (protótipo aprovado em 08/10/2026).
  */
 export const DistribuirEmpenhoModal: React.FC<DistribuirEmpenhoModalProps> = (props) =>
-  // Uma janela por nota: abre já com a distribuição atual (editar) ou vazia.
+  // Uma janela por nota: abre já com o vínculo atual (editar) ou vazia.
   props.distribuicao ? <JanelaDistribuir key={props.distribuicao.contratoEmpenhoId} {...props} d={props.distribuicao} /> : null;
 
 const JanelaDistribuir: React.FC<DistribuirEmpenhoModalProps & { d: DistribuicaoDoEmpenho }> = ({
@@ -71,8 +71,8 @@ const JanelaDistribuir: React.FC<DistribuirEmpenhoModalProps & { d: Distribuicao
     <Modal
       isOpen
       onClose={onFechar}
-      title={`Distribuir ${d.numeroOficial} entre os itens`}
-      subtitle={`Contrato ${numeroContrato} · valor da nota ${brl(d.valorNota)}`}
+      title={`Vincular ${d.numeroOficial} aos itens do contrato`}
+      subtitle={`Contrato ${numeroContrato} · valor da nota ${brl(d.valorNota)} · diga quanto do valor vai para cada item`}
       size="xl"
       dismissible={!isLoading}
       testId="distribuir-empenho-modal"
@@ -85,15 +85,15 @@ const JanelaDistribuir: React.FC<DistribuirEmpenhoModalProps & { d: Distribuicao
             {invalido
               ? 'Há um valor inválido. Use o formato 1.234,56.'
               : fecha
-                ? `Distribuído ${brl(soma)} de ${brl(d.valorNota)} · fecha com a nota`
+                ? `Vinculado aos itens ${brl(soma)} de ${brl(d.valorNota)} · fecha com a nota`
                 : soma > d.valorNota + EPS
-                  ? `Distribuído ${brl(soma)}: passa do valor da nota em ${brl(soma - d.valorNota)}`
-                  : `Distribuído ${brl(soma)} de ${brl(d.valorNota)} · falta ${brl(falta)}`}
+                  ? `Vinculado aos itens ${brl(soma)}: passa do valor da nota em ${brl(soma - d.valorNota)}`
+                  : `Vinculado aos itens ${brl(soma)} de ${brl(d.valorNota)} · falta ${brl(falta)}`}
           </span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <ActionButton action="cancelar" size="sm" onClick={onFechar} disabled={isLoading} />
             <AppButton variant="primary" size="sm" onClick={salvar} disabled={!fecha || obsLonga || isLoading} isLoading={isLoading} data-testid="distribuir-salvar">
-              Salvar distribuição
+              Salvar o vínculo
             </AppButton>
           </div>
         </div>
@@ -104,8 +104,8 @@ const JanelaDistribuir: React.FC<DistribuirEmpenhoModalProps & { d: Distribuicao
         {revisao && <NoticeBar tone="warning">{revisao}</NoticeBar>}
         {jaDistribuida && !revisao && d.origem === 'USUARIO' && (
           <NoticeBar tone="info">
-            Distribuída por {d.distribuidoPorNome || 'usuário'}
-            {d.distribuidoEm ? ` em ${new Date(d.distribuidoEm).toLocaleDateString('pt-BR')}` : ''}. Salvar substitui a distribuição.
+            Vinculada aos itens por {d.distribuidoPorNome || 'usuário'}
+            {d.distribuidoEm ? ` em ${new Date(d.distribuidoEm).toLocaleDateString('pt-BR')}` : ''}. Salvar substitui o vínculo atual.
           </NoticeBar>
         )}
 
