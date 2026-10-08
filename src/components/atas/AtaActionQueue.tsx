@@ -1,15 +1,13 @@
 import React from 'react';
-import { ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { AtaTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { AppButton } from '../../design-system/components/AppButton';
-import { ActionButton } from '../../design-system/components/ActionButton';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
-import { useUpdateAtaTask } from '../../hooks/useUpdateAtaTask';
-import { useReminderDismissals } from '../../hooks/useReminderDismissals';
+import { AvisosResolvidosLista, BotaoResolvido, EspacoResolvido, useResolverAviso, type AlvoResolucao } from '../avisos/ResolverAviso';
 import type { AtaActionItem, AtaActionQueue as AtaActionQueueData } from '../../services/ataActionQueueService';
 
 export type Ata360Tab = 'acoes' | 'plano' | 'itens' | 'contratos';
@@ -37,8 +35,7 @@ const KIND_LABELS: Record<AtaActionItem['kind'], string> = {
 
 /** Fila única da Ata 360 — mesmo layout da ContractActionQueue do Contrato 360. */
 export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, plan, isLoading = false, onGoTo }) => {
-  const updateMutation = useUpdateAtaTask(ataKey);
-  const { dismiss, restore } = useReminderDismissals('ATA', ataKey);
+  const { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo } = useResolverAviso();
 
   if (isLoading) {
     return (
@@ -48,37 +45,30 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
     );
   }
 
+  const alvoDe = (item: AtaActionItem): AlvoResolucao | null => {
+    const contexto = `Ata ${ataKey} · ${KIND_LABELS[item.kind]}`;
+    if (item.kind === 'TAREFA') return item.taskId ? { tipo: 'TAREFA_ATA', taskId: item.taskId, titulo: item.title, contexto } : null;
+    return item.avisoChave ? { tipo: 'AVISO', chave: item.avisoChave, titulo: item.title, contexto } : null;
+  };
+
+  /** ✓ Resolvido em todo aviso (tarefa: conclui no plano); a seta leva ao lugar do aviso. */
   const renderAction = (item: AtaActionItem) => {
+    const alvo = alvoDe(item);
+    const check = alvo && podeResolverAlvo(alvo) ? <BotaoResolvido onClick={() => abrir(alvo)} testId={`resolver-${item.id}`} /> : <EspacoResolvido />;
     switch (item.kind) {
       case 'SALDO':
-        return <SetaDaLinha />;
-      case 'TAREFA':
-        if (!item.taskId) return null;
         return (
-          <ActionButton
-            action="concluir"
-            size="sm"
-            onClick={() => updateMutation.mutate({ taskId: item.taskId!, status: 'CONCLUIDA' })}
-            disabled={updateMutation.isPending}
-            title="Concluir"
-          >
-              <span className="payment-action-label">Concluir</span>
-            </ActionButton>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            {check}
+            <SetaDaLinha />
+          </div>
         );
+      case 'TAREFA':
+        return check;
       case 'LEMBRETE':
         return (
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <AppButton
-              variant="outline"
-              size="sm"
-              
-              icon={<Check size={15} />}
-              onClick={() => dismiss.mutate({ itemId: item.id })}
-              disabled={dismiss.isPending}
-              title="Resolvido: já resolvido ou não se aplica, o lembrete some deste ciclo de vigência"
-            >
-              <span className="payment-action-label">Resolvido</span>
-            </AppButton>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            {check}
             <AppButton
               variant="outline"
               size="sm"
@@ -94,7 +84,13 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
     }
   };
 
+  /** Linha de baixo: tipo, detalhe do nível (ex.: 100,0% consumido, vencida há 3 dias) e o resto. */
   const subtitle = (item: AtaActionItem) => {
+    const [tipo, ...resto] = subtitleBase(item).split(' · ');
+    return [tipo, item.badgeLabel, ...resto].filter(Boolean).join(' · ');
+  };
+
+  const subtitleBase = (item: AtaActionItem) => {
     if (item.kind === 'TAREFA') {
       return [KIND_LABELS.TAREFA, item.macrotaskName].filter(Boolean).join(' · ');
     }
@@ -152,8 +148,8 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
                   flexWrap: 'wrap'
                 }}
               >
-                <div style={{ flex: '0 1 120px', minWidth: 0 }}>
-                  <SeverityBadge severity={item.severity} customLabel={item.badgeLabel} />
+                <div style={{ flex: 'none' }}>
+                  <SeverityBadge severity={item.severity} customLabel={item.badgeLabel} iconOnly />
                 </div>
                 <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                   <div title={item.title} style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title}</div>
@@ -170,23 +166,14 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
         </>
       )}
 
-      {queue.dispensados.length > 0 && (
-        <details data-testid="dismissed-reminders" style={{ fontSize: '0.8rem', color: '#475569' }}>
-          <summary style={{ cursor: 'pointer' }}>
-            {queue.dispensados.length === 1 ? '1 lembrete marcado como resolvido' : `${queue.dispensados.length} lembretes marcados como resolvidos`}
-          </summary>
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {queue.dispensados.map((item) => (
-              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <span style={{ flex: '1 1 220px', minWidth: 0 }}>{item.title}</span>
-                <AppButton type="button" variant="link" size="sm" onClick={() => restore.mutate({ itemId: item.id })} disabled={restore.isPending}>
-                  Reexibir
-                </AppButton>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
+      <AvisosResolvidosLista
+        itens={queue.dispensados.filter((d) => d.avisoChave).map((d) => ({ chave: d.avisoChave!, titulo: d.title, contexto: KIND_LABELS[d.kind] }))}
+        porChave={porChave}
+        podeReexibir={podeResolver}
+        onReexibir={(chave) => reexibir.mutate({ chave })}
+        reexibindo={reexibir.isPending}
+        testId="dismissed-reminders"
+      />
 
       {queue.tarefasSemPrazo > 0 && (
         <AppButton type="button" variant="link" size="sm" onClick={() => onGoTo('plano')} style={{ alignSelf: 'flex-start' }}>
@@ -195,6 +182,7 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
             : `${queue.tarefasSemPrazo} tarefas do plano estão sem prazo definido — definir no plano`}
         </AppButton>
       )}
+      {dialog}
     </div>
   );
 };

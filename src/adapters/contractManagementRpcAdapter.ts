@@ -428,28 +428,24 @@ export async function deleteContractTaskRpc(id: string): Promise<RpcGenericDelet
 }
 
 // -------------------------------------------------------------
-// Lembretes de prazo legal dispensados pelo gestor (Contrato 360 e Ata 360)
+// Avisos marcados como resolvidos (Visão Geral, Ata 360 e Contrato 360)
 // -------------------------------------------------------------
-export type ReminderEntityType = 'CONTRATO' | 'ATA';
-
-export interface ReminderDismissalInput {
-  entityType: ReminderEntityType;
-  entityKey: string;
-  itemId: string;
+export interface ResolverAvisoInput {
+  chave: string;
+  tipo: 'SALDO' | 'REAJUSTE' | 'LEMBRETE';
+  justificativa: string;
 }
 
-function reminderArgs(input: ReminderDismissalInput) {
-  return {
-    p_entity_type: input.entityType,
-    p_entity_key: requireField(input.entityKey, 'O contrato ou a Ata é obrigatório.'),
-    p_item_id: requireField(input.itemId, 'O lembrete é obrigatório.')
-  };
+export async function resolverAvisoRpc(input: ResolverAvisoInput): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('resolver_aviso', {
+    p_chave: requireField(input.chave, 'Aviso não identificado.'),
+    p_tipo: input.tipo,
+    p_justificativa: requireField(input.justificativa, 'A justificativa é obrigatória.')
+  });
 }
 
-export async function dismissReminderRpc(input: ReminderDismissalInput): Promise<{ success: boolean }> {
-  return callPlanRpc<{ success: boolean }>('dismiss_reminder_atomic', reminderArgs(input));
-}
-
-export async function restoreReminderRpc(input: ReminderDismissalInput): Promise<{ success: boolean }> {
-  return callPlanRpc<{ success: boolean }>('restore_reminder_atomic', reminderArgs(input));
+export async function reexibirAvisoRpc(chave: string): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('reexibir_aviso', {
+    p_chave: requireField(chave, 'Aviso não identificado.')
+  });
 }

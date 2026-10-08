@@ -6,6 +6,7 @@ import { differenceInBusinessDays, parseDateBRT } from './temporalEngineService'
 import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import { classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { toSentenceCaseIfAllCaps } from '../utils/textCase';
+import { chaveAvisoLembrete, chaveAvisoSaldo } from './avisosResolvidosService';
 
 export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE';
 
@@ -21,13 +22,15 @@ export interface AtaActionItem {
   taskId?: string;
   macrotaskName?: string;
   numeroItem?: string;
+  /** Chave para marcar como resolvido (saldo e lembrete); tarefa se resolve concluindo. */
+  avisoChave?: string;
 }
 
 export interface AtaActionQueue {
   items: AtaActionItem[];
   counts: Record<SeverityLevel, number>;
   tarefasSemPrazo: number;
-  /** Lembretes que o gestor marcou como resolvidos (não entram em items/counts). */
+  /** Avisos marcados como resolvidos (não entram em items/counts). */
   dispensados: AtaActionItem[];
 }
 
@@ -71,11 +74,11 @@ export function buildAtaActionQueue(params: {
   arp: ArpRecord;
   saldos?: AtaItemSaldoInput[];
   plan?: AtaTaskPlan | null;
-  dismissedReminderIds?: string[];
+  /** Chaves de avisos_resolvidos. */
+  avisosResolvidos?: ReadonlySet<string>;
   currentDate?: Date;
 }): AtaActionQueue {
-  const { arp, saldos = [], plan = null, dismissedReminderIds = [], currentDate } = params;
-  const dismissed = new Set(dismissedReminderIds);
+  const { arp, saldos = [], plan = null, avisosResolvidos = new Set<string>(), currentDate } = params;
   const items: AtaActionItem[] = [];
   const dispensados: AtaActionItem[] = [];
 
@@ -84,15 +87,17 @@ export function buildAtaActionQueue(params: {
     const { percentualConsumido, isCritico, isProximoLimite, severity } = classifyArpItemSaldo(percentualDoSaldo(s));
     if (!isCritico && !isProximoLimite) continue;
     const numeroItem = String(s.numero_item ?? '');
-    items.push({
+    const saldo: AtaActionItem = {
       id: `ATA-SALDO-${arp.numeroAtaRegistroPreco}-${numeroItem}`,
       kind: 'SALDO',
       severity,
       title: `Item ${numeroItem}${s.descricao_item ? ` · ${toSentenceCaseIfAllCaps(s.descricao_item)}` : ''}`,
       description: isCritico ? 'Saldo físico crítico: avaliar nova licitação ou remanejamento' : 'Saldo físico próximo do limite',
       badgeLabel: `${percentualConsumido.toFixed(1)}% consumido`,
-      numeroItem
-    });
+      numeroItem,
+      avisoChave: chaveAvisoSaldo(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, numeroItem, severity)
+    };
+    (avisosResolvidos.has(saldo.avisoChave!) ? dispensados : items).push(saldo);
   }
 
   // 2. Tarefas do plano de gestão
@@ -131,7 +136,6 @@ export function buildAtaActionQueue(params: {
       if (p.tipoItem !== 'GATILHO_OPERACIONAL') continue;
       const atrasado = p.estadoTemporal === 'ATRASADO';
       if (!isLembreteNaJanela({ diasRestantes: p.diasRestantes, atrasado, isAta: true })) continue;
-      // Mesmo id do lembrete usado na dispensa ("Resolvido"), para preservar o que já foi marcado.
       const lembrete: AtaActionItem = {
         id: p.id,
         kind: 'LEMBRETE',
@@ -140,9 +144,10 @@ export function buildAtaActionQueue(params: {
         description: p.acaoDescricao,
         badgeLabel: lembreteLabel(p.diasRestantes, atrasado),
         diasRelevantes: p.diasRestantes,
-        dataAlvo: p.dataAlvo
+        dataAlvo: p.dataAlvo,
+        avisoChave: chaveAvisoLembrete(p.id)
       };
-      (dismissed.has(lembrete.id) ? dispensados : items).push(lembrete);
+      (avisosResolvidos.has(lembrete.avisoChave!) ? dispensados : items).push(lembrete);
     }
   }
 

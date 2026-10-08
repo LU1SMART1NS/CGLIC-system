@@ -86,12 +86,27 @@ describe('buildAtaActionQueue — fila única da Ata 360', () => {
     expect(queue.counts.CRITICA).toBe(2);
   });
 
-  it('lembretes dispensados saem da fila e vão para "dispensados"', () => {
-    const base = buildAtaActionQueue({ arp, currentDate: HOJE });
-    const primeiro = base.items.find((i) => i.kind === 'LEMBRETE')!;
-    const queue = buildAtaActionQueue({ arp, dismissedReminderIds: [primeiro.id], currentDate: HOJE });
-    expect(queue.items.find((i) => i.id === primeiro.id)).toBeUndefined();
-    expect(queue.dispensados.map((d) => d.id)).toContain(primeiro.id);
+  it('avisos resolvidos (lembrete e saldo) saem da fila e vão para "dispensados"', () => {
+    const saldos = [{ numero_item: '1', percentual_consumido: 100 }];
+    const base = buildAtaActionQueue({ arp, saldos, currentDate: HOJE });
+    const lembrete = base.items.find((i) => i.kind === 'LEMBRETE')!;
+    const saldo = base.items.find((i) => i.kind === 'SALDO')!;
+    expect(lembrete.avisoChave).toMatch(/^LEMBRETE::ARP::/);
+    expect(saldo.avisoChave).toMatch(/^SALDO::/);
+    const queue = buildAtaActionQueue({ arp, saldos, avisosResolvidos: new Set([lembrete.avisoChave!, saldo.avisoChave!]), currentDate: HOJE });
+    expect(queue.items.find((i) => i.id === lembrete.id || i.id === saldo.id)).toBeUndefined();
+    expect(queue.dispensados.map((d) => d.id)).toEqual(expect.arrayContaining([lembrete.id, saldo.id]));
+  });
+
+  it('saldo resolvido volta quando o nível piora', () => {
+    const atencao = buildAtaActionQueue({ arp, saldos: [{ numero_item: '00007', percentual_consumido: 60 }], currentDate: HOJE }).items[0];
+    const pior = buildAtaActionQueue({
+      arp,
+      saldos: [{ numero_item: '7', percentual_consumido: 100 }],
+      avisosResolvidos: new Set([atencao.avisoChave!]),
+      currentDate: HOJE
+    });
+    expect(pior.items.filter((i) => i.kind === 'SALDO')).toHaveLength(1);
   });
 
   it('ata encerrada não gera lembretes de planejamento', () => {

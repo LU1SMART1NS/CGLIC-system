@@ -16,8 +16,10 @@ import {
   getPrazoLabel,
   getAcaoInfo,
   getLookupKey,
+  getAlvoResolucao,
   type AttentionItemWithUasg
 } from './gestaoInstrumentosRowHelpers';
+import { BotaoResolvido, EspacoResolvido, type AlvoResolucao } from '../avisos/ResolverAviso';
 
 interface GestaoInstrumentosTableProps {
   items: AttentionItemWithUasg[];
@@ -26,6 +28,9 @@ interface GestaoInstrumentosTableProps {
   responsavelByContractKey: Map<string, string>;
   onResetFilters: () => void;
   pageSize?: number;
+  /** ✓ Resolvido: abre a justificativa. Sem esta prop (ou sem permissão) a coluna mostra só o botão de ir. */
+  onResolver?: (alvo: AlvoResolucao) => void;
+  podeResolverAlvo?: (alvo: AlvoResolucao) => boolean;
 }
 
 const SEVERIDADE_ORDEM: Record<string, number> = { CRITICA: 0, URGENTE: 1, ATENCAO: 2, INFO: 3 };
@@ -56,7 +61,9 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
   fornecedorByKey,
   responsavelByContractKey,
   onResetFilters,
-  pageSize = 10
+  pageSize = 10,
+  onResolver,
+  podeResolverAlvo
 }) => {
   const navigate = useNavigateWithOrigin();
   const [page, setPage] = useState(1);
@@ -159,7 +166,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
               return (
                 <tr key={item.id} data-testid={`instrumentos-row-${item.id}`}>
                   <td data-role="id" style={td}>
-                    <SeverityBadge severity={item.severity} />
+                    <SeverityBadge severity={item.severity} iconOnly />
                   </td>
                   <td data-label="UASG" style={{ ...td, fontWeight: 700, color: '#475569' }} data-testid={`instrumentos-uasg-${item.id}`}>
                     {item.uasg}
@@ -206,16 +213,25 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                     {responsavel || <span style={{ color: '#94a3b8' }}>—</span>}
                   </td>
                   <td data-role="action" style={td}>
-                    <AppButton
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(acao.targetUrl)}
-                      data-testid={`instrumentos-action-${item.id}`}
-                    >
-                      {acao.label}
-                      <ChevronRight size={13} />
-                    </AppButton>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'nowrap' }}>
+                      <AppButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(acao.targetUrl)}
+                        data-testid={`instrumentos-action-${item.id}`}
+                        title={item.category === 'PAGAMENTO_CRITICO' || item.category === 'PAGAMENTO_PREVISTO' ? 'O aviso some sozinho quando a etapa do pagamento é registrada' : undefined}
+                      >
+                        {acao.label}
+                        <ChevronRight size={13} />
+                      </AppButton>
+                      {(() => {
+                        const alvo = onResolver ? getAlvoResolucao(item) : null;
+                        return alvo && (podeResolverAlvo?.(alvo) ?? true)
+                          ? <BotaoResolvido onClick={() => onResolver!(alvo)} testId={`instrumentos-resolver-${item.id}`} />
+                          : <EspacoResolvido />;
+                      })()}
+                    </div>
                   </td>
                 </tr>
               );

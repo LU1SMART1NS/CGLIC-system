@@ -336,13 +336,11 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       const base = calculateAttentionSummary({ arps: [vigente], currentDate: now }).items.filter((i) => i.category === 'LEMBRETE');
       expect(base.length).toBeGreaterThan(0);
       expect(base.every((i) => i.severity === 'INFO' && i.numeroAta === '00041/2026')).toBe(true);
-      const dismissedIds = base.map((i) => i.id.replace('ATT-LEMBRETE-', ''));
-      const after = calculateAttentionSummary({
-        arps: [vigente],
-        dismissedReminders: { CONTRATO: {}, ATA: { '00041/2026': dismissedIds } },
-        currentDate: now
-      }).items.filter((i) => i.category === 'LEMBRETE');
-      expect(after).toEqual([]);
+      const chaves = base.map((i) => i.avisoChave!);
+      expect(chaves.every((c) => c.startsWith('LEMBRETE::ARP::00041/2026-'))).toBe(true);
+      const after = calculateAttentionSummary({ arps: [vigente], avisosResolvidos: new Set(chaves), currentDate: now });
+      expect(after.items.filter((i) => i.category === 'LEMBRETE')).toEqual([]);
+      expect(after.resolvidos?.map((i) => i.id).sort()).toEqual(base.map((i) => i.id).sort());
     });
 
     it('inclui saldo de item entre 70% e 85% como atenção', () => {
@@ -352,6 +350,17 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
         currentDate: now
       });
       expect(items.find((i) => i.category === 'ATA_CRITICA')).toMatchObject({ severity: 'ATENCAO' });
+    });
+
+    it('saldo resolvido sai da lista e volta quando o nível piora (mesma chave da Ata 360)', () => {
+      const item = (pct: number) => ({ percentual_consumido: pct, numero_ata: '00041/2026', numero_item: '00001', codigo_uasg: '200331' }) as any;
+      const atencao = calculateAttentionSummary({ arps: [arp], arpItems: [item(75)], currentDate: now }).items[0];
+      expect(atencao.avisoChave).toBe('SALDO::00041/2026-200331::1::ATENCAO');
+      const resolvido = calculateAttentionSummary({ arps: [arp], arpItems: [item(75)], avisosResolvidos: new Set([atencao.avisoChave!]), currentDate: now });
+      expect(resolvido.items.filter((i) => i.category === 'ATA_CRITICA')).toEqual([]);
+      expect(resolvido.resolvidos).toHaveLength(1);
+      const piorou = calculateAttentionSummary({ arps: [arp], arpItems: [item(100)], avisosResolvidos: new Set([atencao.avisoChave!]), currentDate: now });
+      expect(piorou.items.filter((i) => i.category === 'ATA_CRITICA')).toHaveLength(1);
     });
   });
 

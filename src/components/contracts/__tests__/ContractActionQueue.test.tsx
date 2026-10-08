@@ -9,15 +9,15 @@ import { buildContractActionQueue } from '../../../services/contractActionQueueS
 
 let mockCycles: PaymentFollowUpCycle[] = [];
 
-vi.mock('../../../hooks/useUpdateContractTask', () => ({
-  useUpdateContractTask: () => ({ mutate: vi.fn(), isPending: false })
-}));
-
-vi.mock('../../../hooks/useReminderDismissals', () => ({
-  useReminderDismissals: () => ({
-    dismissedIds: [],
-    dismiss: { mutate: vi.fn(), isPending: false },
-    restore: { mutate: vi.fn(), isPending: false }
+vi.mock('../../avisos/ResolverAviso', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../avisos/ResolverAviso')>()),
+  useResolverAviso: () => ({
+    abrir: vi.fn(),
+    dialog: null,
+    porChave: new Map(),
+    reexibir: { mutate: vi.fn(), isPending: false },
+    podeResolver: true,
+    podeResolverAlvo: () => true
   })
 }));
 
@@ -91,21 +91,25 @@ describe('ContractActionQueue', () => {
     expect(html).toContain('Tudo em dia com este contrato');
   });
 
-  it('mostra tarefa vencida como crítica, com o resumo e o botão Concluir', () => {
+  it('mostra tarefa vencida como crítica, com o resumo e o ✓ Resolvido (conclui a tarefa)', () => {
     mockCycles = [];
     const html = render(baseContract, planWith(inDays(-3)));
     expect(html).toContain('Atestar nota fiscal');
     expect(html).toContain('data-testid="severity-badge-critica"');
+    // Na linha, a prioridade é só o ícone; o nível e o detalhe ficam na dica.
+    expect(html).toMatch(/data-testid="severity-badge-critica"[^>]*role="img"[^>]*aria-label="Crítica: Vencida/);
     expect(html).toContain('data-testid="queue-count-critica"');
     expect(html).toContain('1 crítica');
-    expect(html).toContain('Tarefa · Fiscalização');
-    expect(html).toContain('Concluir');
+    // Ícone só: o detalhe do nível passa para a linha de baixo
+    expect(html).toContain('Tarefa · Vencida (-3 d.u.) · Fiscalização');
+    expect(html).toContain('aria-label="Crítica: Vencida (-3 d.u.)"');
+    expect(html).toContain('data-testid="resolver-ATT-TASK-OVERDUE-');
   });
 
-  it('usa o mesmo botão "Concluir" em tarefa de confirmação', () => {
+  it('usa o mesmo ✓ Resolvido em tarefa de confirmação', () => {
     mockCycles = [];
     const html = render(baseContract, planWith(inDays(2), 'CONFIRMACAO'));
-    expect(html).toContain('Concluir');
+    expect(html).toContain('aria-label="Resolvido"');
     expect(html).not.toContain('Confirmar oficialmente');
     expect(html).toContain('1 urgente');
   });
@@ -123,6 +127,8 @@ describe('ContractActionQueue', () => {
     const html = render(baseContract, null);
     expect(html).toContain('Fatura Vencida (123)');
     expect(html).toContain('Abrir ciclo');
+    // Pagamento não tem Resolvido: some ao registrar a etapa.
+    expect(html).not.toContain('aria-label="Resolvido"');
   });
 
   it('mostra lembrete de prazo legal como informativo, com "Aplicar modelo" quando não há plano', () => {

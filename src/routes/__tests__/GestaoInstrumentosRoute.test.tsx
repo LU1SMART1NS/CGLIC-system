@@ -38,6 +38,19 @@ vi.mock('../../hooks/useAvisosPagamento', () => ({
   useAvisosPagamentoGerais: () => ({ avisos: [], isLoading: false })
 }));
 
+vi.mock('../../components/avisos/ResolverAviso', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../components/avisos/ResolverAviso')>()),
+  useResolverAviso: () => ({
+    abrir: vi.fn(),
+    dialog: null,
+    porChave: new Map(),
+    reexibir: { mutate: vi.fn(), isPending: false },
+    podeResolver: true,
+    podeResolverAlvo: () => true,
+    tarefasConcluidas: new Set()
+  })
+}));
+
 const mockReadModel: ManagementDashboardReadModel = {
   uasg: '200331',
   dataCalculo: '2026-09-24T12:00:00Z',
@@ -324,10 +337,10 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
       />
     );
 
-    // Prioridade
-    expect(html).toContain('CRÍTICA');
-    expect(html).toContain('URGENTE');
-    expect(html).toContain('ATENÇÃO');
+    // Prioridade: só o ícone, com o nível na dica
+    expect(html).toContain('aria-label="Crítica"');
+    expect(html).toContain('aria-label="Urgente"');
+    expect(html).toContain('aria-label="Atenção"');
 
     // Coluna UASG
     expect(html).toContain('200331');

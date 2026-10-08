@@ -1,4 +1,5 @@
 import { buildAtaPath } from '../../hooks/useAta';
+import type { AlvoResolucao } from '../avisos/ResolverAviso';
 import type { DashboardAttentionCategory, DashboardAttentionItem } from '../../types/managementDashboard';
 
 /** Item de atenção enriquecido com a UASG de origem (a Gestão de Instrumentos consolida 200330 e 200331). */
@@ -143,4 +144,19 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
     default:
       return { label: 'Visualizar', targetUrl: item.targetUrl || '/contratos' };
   }
+}
+
+/**
+ * O que o ✓ da linha resolve: saldo, reajuste e lembrete pela chave do aviso; tarefa, concluindo-a.
+ * Pagamento não tem Resolvido (some ao registrar a etapa): null.
+ */
+export function getAlvoResolucao(item: AttentionItemWithUasg): AlvoResolucao | null {
+  const instrumento = getInstrumentoInfo(item);
+  const titulo = item.objetoItem || item.title;
+  const contexto = `${instrumento.label} · UASG ${item.uasg}`;
+  if (item.avisoChave) return { tipo: 'AVISO', chave: item.avisoChave, titulo, contexto };
+  if ((item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA') && item.taskId) {
+    return { tipo: item.id.startsWith('ATT-ATA-TASK-') ? 'TAREFA_ATA' : 'TAREFA_CONTRATO', taskId: item.taskId, titulo, contexto };
+  }
+  return null;
 }

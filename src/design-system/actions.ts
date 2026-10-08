@@ -42,6 +42,8 @@ export const ACTIONS = {
   renomear: { label: 'Renomear', icon: Pencil, variant: 'outline' },
   conferir: { label: 'Conferir', icon: Search, variant: 'outline' },
   concluir: { label: 'Concluir', icon: Check, variant: 'outline' },
+  resolvido: { label: 'Resolvido', icon: Check, variant: 'outline' },
+  reexibir: { label: 'Reexibir', icon: RotateCcw, variant: 'outline' },
   restaurar: { label: 'Restaurar', icon: RotateCcw, variant: 'outline' },
   desfazer: { label: 'Desfazer', icon: RotateCcw, variant: 'outline' },
   verDetalhes: { label: 'Ver', icon: Eye, variant: 'outline' },
