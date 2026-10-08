@@ -17,6 +17,8 @@ import type { ItemDaAta } from './vinculoEmMassa';
 import { DivergenciasFila } from './DivergenciasFila';
 import { AvisosVinculoBanner } from './AvisosVinculoBanner';
 import { EquipeFila } from './EquipeFila';
+import { VinculoAutomaticoFaixa } from './VinculoAutomaticoFaixa';
+import { useMotivosVinculoManual } from '../../../hooks/useVinculoAutomatico';
 import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParcial, type ContratoAVincular, type FilaAta, type FilaContrato } from './contratosSemAta';
 import { useNumerosDosItensDosContratos } from '../../../hooks/useItensDoContrato';
 import { FILAS, FILA_INICIAL, type Fila } from './filaComum';
@@ -59,6 +61,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const { data: ajustes } = useComplexidadeAjustes();
   const { data: confirmacoesSemAta = {}, isLoading: semAtaLoading } = useContratosSemAta();
   const { data: descartesAta = {} } = useDescartesAtaContrato();
+  const { data: motivosManual } = useMotivosVinculoManual();
 
   // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void; provaveis?: number } | null>(null);
@@ -68,7 +71,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const abaParam = searchParams.get('aba') as Fila | null;
   // "A vincular" virou parte de "Contratos sem vínculo": endereços antigos caem na fila unificada.
   const abaPedida = (abaParam as string) === 'A_VINCULAR' ? 'CONTRATOS' : abaParam;
-  const aba: Fila = abaPedida && (FILAS as readonly string[]).includes(abaPedida) ? (abaPedida as Fila) : FILA_INICIAL;
+  const abaDaUrl: Fila = abaPedida && (FILAS as readonly string[]).includes(abaPedida) ? (abaPedida as Fila) : FILA_INICIAL;
   const trocarAba = (nova: Fila) => setSearchParams(nova === FILA_INICIAL ? {} : { aba: nova }, { replace: true });
 
   const distribuicao = useMemo(
@@ -198,6 +201,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // Só mostra números com atas, contratos e vínculos carregados: totais parciais enganariam a leitura da carga.
   const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading || semAtaLoading;
   const { divergencias, totais } = distribuicao;
+  // "Gestor diferente da ata" só aparece quando há caso: o vínculo automático não cria divergência (migration 95).
+  const aba: Fila = abaDaUrl === 'DIVERGENCIAS' && divergencias.length === 0 ? FILA_INICIAL : abaDaUrl;
   const totalInstrumentos = totais.atas.vigentes + totais.contratos.vigentes;
   const totalSemVinculo = pendencias.aVincular.length + pendencias.precisamDecisao.length;
   // A carteira sem gestor fica nas filas; a Equipe mostra só quem tem carteira.
@@ -219,13 +224,17 @@ export const DistribuicaoEquipePage: React.FC = () => {
       dot: totalSemVinculo ? AMBAR : undefined,
       title: 'Vincule à ata provável (vários de uma vez quando a API confirma) ou marque que não pertencem a nenhuma ata'
     },
-    {
-      id: 'DIVERGENCIAS' as const,
-      label: 'Gestor diferente da ata',
-      count: divergencias.length,
-      dot: divergencias.length ? VERMELHO : undefined,
-      title: 'Contratos vinculados fora da regra'
-    }
+    ...(divergencias.length > 0
+      ? [
+          {
+            id: 'DIVERGENCIAS' as const,
+            label: 'Gestor diferente da ata',
+            count: divergencias.length,
+            dot: VERMELHO,
+            title: 'Contratos vinculados fora da regra'
+          }
+        ]
+      : [])
   ];
 
   return (
@@ -297,8 +306,11 @@ export const DistribuicaoEquipePage: React.FC = () => {
             />
           )}
 
+          {aba === 'CONTRATOS' && <VinculoAutomaticoFaixa links={links} paraEquipe={totalSemVinculo} podeRodar={role === 'admin'} />}
+
           {aba === 'CONTRATOS' && (
             <ContratosSemVinculoFila
+              motivos={motivosManual}
               pendencias={pendencias}
               confirmacoes={confirmacoesSemAta}
               podeAgir={canAssign}

@@ -25,6 +25,7 @@ import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
+import { mensagemDesvincular } from '../../utils/vinculoAutomatico';
 
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos'];
 // Gestor de Saldo (domínio de alocações) só precisa chegar aos itens da ata.
@@ -78,7 +79,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const handleUnlink = async (link: EnrichedArpItemContract) => {
     const ok = await confirm({
       title: 'Desvincular contrato',
-      message: `Desvincular o ${link.numeroContratoFormatado} do item ${link.itemKey.split('-').pop()} desta ata?`,
+      message: mensagemDesvincular(link.numeroContratoFormatado, link.itemKey.split('-').pop() || '', link.origem),
       confirmLabel: 'Desvincular',
       tone: 'danger'
     });

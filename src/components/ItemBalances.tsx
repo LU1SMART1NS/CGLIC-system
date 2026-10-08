@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { mensagemDesvincular } from '../utils/vinculoAutomatico';
+import { OrigemVinculoBadge } from './vinculos/OrigemVinculoBadge';
 import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Building2, ExternalLink } from 'lucide-react';
 import { getCanonicalContractKey } from '../services/api';
@@ -231,8 +233,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     }
   };
 
-  const handleUnlinkOfficialContract = async (linkId: string, contractKey?: string) => {
-    if (await confirm({ title: 'Desvincular contrato', message: 'Tem certeza que deseja desvincular este contrato oficial deste item da ata?', tone: 'danger', confirmLabel: 'Desvincular' })) {
+  const handleUnlinkOfficialContract = async (linkId: string, contractKey?: string, numeroContrato?: string, origem?: string) => {
+    if (await confirm({ title: 'Desvincular contrato', message: mensagemDesvincular(numeroContrato || contractKey || '', String(item.numeroItem ?? ''), origem), tone: 'danger', confirmLabel: 'Desvincular' })) {
       try {
         await unlinkContractMutation.mutateAsync({
           linkId,
@@ -871,6 +873,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                         _isManual: false,
                         _isOfficialLink: true,
                         _linkId: oc.linkId,
+                        _origem: oc.origem,
                         contractKey: oc.contractKey
                       };
                     });
@@ -890,6 +893,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                             _manualId: existing._manualId || c._manualId,
                             _isOfficialLink: existing._isOfficialLink || c._isOfficialLink,
                             _linkId: existing._linkId || c._linkId,
+                            _origem: existing._origem || c._origem,
                             contractKey: existing.contractKey || c.contractKey,
                             quantidadeContratada: c.quantidadeContratada ?? existing.quantidadeContratada,
                             linkVisualizacao: existing.linkVisualizacao || c.linkVisualizacao
@@ -1058,6 +1062,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                           {c._isManual && (
                                             <StatusBadge label="Manual" variant="warning" size="sm" dot={false} />
                                           )}
+                                          {c._isOfficialLink && <OrigemVinculoBadge origem={c._origem} />}
                                         </div>
                                       </td>
                                       <td data-role="action" style={{ textAlign: 'center' }}>
@@ -1077,7 +1082,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                           {canEditData && c._isOfficialLink && c._linkId && (
                                             <ActionButton action="desvincular"
                                               size="sm"
-                                              onClick={() => handleUnlinkOfficialContract(c._linkId, c.contractKey)}
+                                              onClick={() => handleUnlinkOfficialContract(c._linkId, c.contractKey, c.numeroContrato, c._origem)}
                                               disabled={unlinkContractMutation.isPending}
                                               title="Desvincular contrato deste item"
                                             >

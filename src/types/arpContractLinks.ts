@@ -14,9 +14,13 @@ export interface ArpItemContractLink {
   valorUnitarioApi?: number | null;
   /** Quando a quantidade foi lida da API; ausente = ainda não sincronizada. */
   quantidadeLidaEm?: string;
+  /** AUTOMATICO = feito pelo sistema (regra de compra, fornecedor e item; migration 95); MANUAL = feito pela equipe. */
+  origem?: OrigemVinculo;
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type OrigemVinculo = 'AUTOMATICO' | 'MANUAL';
 
 /**
  * Parâmetros para criação ou atualização atômica de um vínculo.
@@ -42,6 +46,8 @@ export interface EnrichedArpItemContract {
   /** Preço unitário do item no contrato (cópia lida da API); base da estimativa de quantidade dos empenhos. */
   valorUnitarioContrato?: number;
   observacoes?: string;
+  /** Quem fez o vínculo: o sistema ou a equipe. */
+  origem?: OrigemVinculo;
   // Dados oficiais derivados diretamente do catálogo governamental
   contract?: ContractDashboardRecord;
   numeroContratoFormatado: string;

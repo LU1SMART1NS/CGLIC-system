@@ -34,4 +34,12 @@ describe('AtaLinkedContracts', () => {
     expect(html).not.toContain('action-row__go');
     expect(html).toContain('00173/2026');
   });
+  it('mostra quem fez o vínculo', () => {
+    const auto = renderToStaticMarkup(<AtaLinkedContracts linkedContracts={[link({ origem: 'AUTOMATICO' })]} />);
+    expect(auto).toContain('Vinculado pelo sistema');
+    const manual = renderToStaticMarkup(<AtaLinkedContracts linkedContracts={[link({ origem: 'MANUAL' })]} />);
+    expect(manual).toContain('Vinculado à mão');
+    const semMigration = renderToStaticMarkup(<AtaLinkedContracts linkedContracts={[link()]} />);
+    expect(semMigration).not.toContain('Vinculado');
+  });
 });

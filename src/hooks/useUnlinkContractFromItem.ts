@@ -45,6 +45,9 @@ export function useUnlinkContractFromItem() {
       queryClient.invalidateQueries({ queryKey: ['item-empenho-vinculos'] });
       queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links'] });
       queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
+      // Desvincular grava o par como sugestão descartada (migration 95): o sistema não o refaz.
+      queryClient.invalidateQueries({ queryKey: ['item-contract-dismissals'] });
+      queryClient.invalidateQueries({ queryKey: ['vinculo-automatico'] });
     }
   });
 }
