@@ -5,12 +5,10 @@ import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Building2, ExternalLink } from 'lucide-react';
 import { getCanonicalContractKey } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
-import { type InternalDepartment } from '../services/unitService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
 import { escolherAdesoes, useItemAdesoes } from '../hooks/useItemAdesoes';
 import { useDepartments } from '../hooks/useDepartments';
 import { useItemAllocations } from '../hooks/useItemAllocations';
-import { useSaveAllocations } from '../hooks/useSaveAllocations';
 import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
 import { useSaveEmpenhoLinks } from '../hooks/useSaveEmpenhoLinks';
 import { useItemManualContracts } from '../hooks/useItemManualContracts';
@@ -150,9 +148,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     item.numeroItem
   );
   const allocations = allocationsState?.allocations ?? EMPTY_ALLOCATIONS;
-  const allocationVersion = allocationsState?.version ?? 1;
-
-  const saveAllocationsMutation = useSaveAllocations();
 
   const {
     data: empenhoLinksState
@@ -166,10 +161,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const saveEmpenhoLinksMutation = useSaveEmpenhoLinks();
 
-  const [newUnitName, setNewUnitName] = useState<string>('');
-
-  const [newAllocatedQty, setNewAllocatedQty] = useState<number | ''>('');
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [allocationError, setAllocationError] = useState<string | null>(null);
 
   const deleteManualContractMutation = useDeleteManualContract();
@@ -260,19 +251,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     isLoading: departmentsLoading
   } = useDepartments();
 
-  const getFirstAvailableUnitSigla = (
-    deps: InternalDepartment[],
-    allocs: InternalAllocation[],
-    excludeId: string | null = null
-  ): string => {
-    const allocatedUnits = new Set(
-      allocs
-        .filter(a => a.id !== excludeId)
-        .map(a => a.unitName.trim().toLowerCase())
-    );
-    const available = deps.find(d => !allocatedUnits.has(d.sigla.trim().toLowerCase()));
-    return available ? available.sigla : (deps[0]?.sigla || '');
-  };
 
   // Sugestões de contrato: só do banco (contratos da UASG com a mesma compra e o mesmo fornecedor), filtradas pelo
   // número do item nos itens gravados dos contratos. A consulta ao vivo ao PNCP/Compras.gov saiu: na medição de
@@ -460,26 +438,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     } catch {}
   }, [item]);
 
-  const saveAllocationsToStorage = async (newAllocations: InternalAllocation[]): Promise<boolean> => {
-    const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
-    try {
-      setAllocationError(null);
-      await saveAllocationsMutation.mutateAsync({
-        itemKey,
-        allocations: newAllocations,
-        expectedVersion: allocationVersion
-      });
-      return true;
-    } catch (err: any) {
-      if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        setAllocationError('Conflito de concorrência: as alocações foram modificadas por outro usuário. Recarregue a página antes de salvar novamente.');
-      } else {
-        setAllocationError(err?.message || 'Erro ao salvar alocações.');
-      }
-      return false;
-    }
-  };
-
   // Quantitativo SENASP: base única de saldo, régua e alocação (o total da ata é só referência).
   // Sem os órgãos do item (API de unidades vazia), vale o quantitativo SENASP gravado no banco, o mesmo
   // da aba Itens da ata; o homologado da ata só entra se o item nunca foi sincronizado.
@@ -489,126 +447,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     arp.codigoUnidadeGerenciadora,
     saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) : Number(item.quantidadeHomologadaItem) || 0
   );
-
-  const handleStartNewAllocation = () => {
-    setEditingId(null);
-    setNewUnitName(getFirstAvailableUnitSigla(departments, allocations, null));
-    setNewAllocatedQty('');
-    setAllocationError(null);
-  };
-
-  const handleAddAllocation = async (): Promise<boolean> => {
-    setAllocationError(null);
-
-    const fallbackUnit = getFirstAvailableUnitSigla(departments, allocations, editingId);
-    const chosenUnit = (newUnitName || fallbackUnit).trim();
-
-    if (!chosenUnit) {
-      setAllocationError('Selecione uma unidade interna oficial.');
-      return false;
-    }
-
-    // Validação de duplicidade: não permitir alocar a mesma unidade mais de uma vez
-    const isDuplicate = allocations.some(
-      a => a.id !== editingId && a.unitName.trim().toLowerCase() === chosenUnit.toLowerCase()
-    );
-
-    if (isDuplicate) {
-      setAllocationError(`A unidade "${chosenUnit}" já possui uma alocação cadastrada para este item. Edite a alocação existente na tabela abaixo ou selecione outra unidade.`);
-      return false;
-    }
-
-    const allocQty = Number(newAllocatedQty);
-
-    if (isNaN(allocQty) || allocQty <= 0) {
-      setAllocationError('A quantidade alocada deve ser um número maior que zero.');
-      return false;
-    }
-
-    const currentAllocatedSum = allocations
-      .filter(a => a.id !== editingId)
-      .reduce((sum, current) => sum + current.allocatedQty, 0);
-
-    if (currentAllocatedSum + allocQty > totalUGQty) {
-      const available = totalUGQty - currentAllocatedSum;
-      setAllocationError(`Limite excedido! O quantitativo total da Unidade Gerenciadora para este item é de ${formatNumber(totalUGQty)} unidades. Você só pode alocar mais ${formatNumber(available)} unidades.`);
-      return false;
-    }
-
-    let updatedList: InternalAllocation[];
-    if (editingId) {
-      updatedList = allocations.map(a => 
-        a.id === editingId 
-          ? { ...a, unitName: chosenUnit, allocatedQty: allocQty }
-          : a
-      );
-    } else {
-      const newAlloc: InternalAllocation = {
-        id: Date.now().toString(),
-        unitName: chosenUnit,
-        allocatedQty: allocQty,
-        empenhadaQty: 0
-      };
-      updatedList = [...allocations, newAlloc];
-    }
-
-    const saved = await saveAllocationsToStorage(updatedList);
-    if (saved) {
-      setEditingId(null);
-      setNewUnitName(getFirstAvailableUnitSigla(departments, updatedList, null));
-      setNewAllocatedQty('');
-    }
-    return saved;
-  };
-
-  const handleEditAllocation = (alloc: InternalAllocation) => {
-    setEditingId(alloc.id);
-    setNewUnitName(alloc.unitName);
-    setNewAllocatedQty(alloc.allocatedQty);
-    setAllocationError(null);
-  };
-
-  const handleDeleteAllocation = (id: string) => {
-    const updated = allocations.filter(a => a.id !== id);
-    saveAllocationsToStorage(updated);
-    if (editingId === id) {
-      setEditingId(null);
-      const nextAvailable = getFirstAvailableUnitSigla(departments, updated, null);
-      setNewUnitName(nextAvailable);
-      setNewAllocatedQty('');
-    } else {
-      const nextAvailable = getFirstAvailableUnitSigla(departments, updated, editingId);
-      setNewUnitName(nextAvailable);
-    }
-
-    // Clean up any empenho links referencing this deleted department
-    const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
-    const cleanedLinks = { ...empenhoLinks };
-    let hasChanges = false;
-    for (const empenhoUnit in cleanedLinks) {
-      if (cleanedLinks[empenhoUnit] === id) {
-        delete cleanedLinks[empenhoUnit];
-        hasChanges = true;
-      }
-    }
-    if (hasChanges) {
-      saveEmpenhoLinksMutation.mutateAsync({
-        itemKey,
-        links: cleanedLinks,
-        expectedVersion: empenhoLinkVersion
-      }).catch(err => {
-        console.warn('Erro ao atualizar vínculos de empenhos após exclusão de alocação:', err);
-      });
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    const nextAvailable = getFirstAvailableUnitSigla(departments, allocations, null);
-    setNewUnitName(nextAvailable);
-    setNewAllocatedQty('');
-    setAllocationError(null);
-  };
 
   const handleConfirmEmpenhoQuantity = async (v: ItemEmpenhoVinculo, quantidade: number | null) => {
     try {
@@ -730,7 +568,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         allocatedQty: a.allocatedQty,
         empenhado: exec?.empenhado ?? 0,
         pendentes: exec?.pendentes ?? 0,
-        pendentesSugerido: exec?.pendentesSugerido ?? 0
+        pendentesSugerido: exec?.pendentesSugerido ?? 0,
+        vinculados: exec?.vinculados ?? 0
       };
     }),
     [allocations, allocationExecution]
@@ -1164,6 +1003,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         ) : activeTab === 'alocacao' ? (
           <AllocationsTab
             ugUasg={arp.codigoUnidadeGerenciadora}
+            item={{
+              numeroAta: arp.numeroAtaRegistroPreco,
+              uasg: arp.codigoUnidadeGerenciadora,
+              numeroItem: String(item.numeroItem),
+              descricao: item.descricaoItem,
+              quantitativoSenasp: totalUGQty
+            }}
             totalUG={totalUGQty}
             totalAllocated={totalAllocatedSum}
             remaining={remainingUGQty}
@@ -1173,21 +1019,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
             departments={departments}
             departmentsLoading={departmentsLoading}
             canManage={canManageAllocations}
-            editingId={editingId}
-            unitName={newUnitName || getFirstAvailableUnitSigla(departments, allocations, editingId)}
-            onUnitChange={setNewUnitName}
-            qty={newAllocatedQty}
-            onQtyChange={setNewAllocatedQty}
-            onSubmit={handleAddAllocation}
-            onStartNew={handleStartNewAllocation}
-            onCancelEdit={handleCancelEdit}
-            saving={saveAllocationsMutation.isPending || saveEmpenhoLinksMutation.isPending}
             error={allocationError}
-            onEdit={(id) => {
-              const alloc = allocations.find((a) => a.id === id);
-              if (alloc) handleEditAllocation(alloc);
-            }}
-            onDelete={handleDeleteAllocation}
             onGoToContracts={() => setActiveTab('contratos')}
           />
         ) : (

@@ -8,6 +8,8 @@ export interface AllocationExecution {
   /** Empenhos vinculados à alocação que ainda não têm quantidade confirmada (não contam no empenhado). */
   pendentes: number;
   pendentesSugerido: number;
+  /** Empenhos do item vinculados à alocação, com ou sem quantidade confirmada (impedem remover a unidade). */
+  vinculados: number;
 }
 
 export interface AllocationExecutionSummary {
@@ -32,7 +34,7 @@ export function summarizeAllocationExecution(
   }
 
   const porAlocacao = new Map<string, AllocationExecution>(
-    allocations.map((a) => [a.id, { empenhado: 0, pendentes: 0, pendentesSugerido: 0 }])
+    allocations.map((a) => [a.id, { empenhado: 0, pendentes: 0, pendentesSugerido: 0, vinculados: 0 }])
   );
   const semUnidade = { empenhado: 0, count: 0 };
 
@@ -46,6 +48,7 @@ export function summarizeAllocationExecution(
       continue;
     }
     const exec = porAlocacao.get(allocationId)!;
+    exec.vinculados += 1;
     if (v.quantidade != null) {
       exec.empenhado += v.quantidade;
     } else {
