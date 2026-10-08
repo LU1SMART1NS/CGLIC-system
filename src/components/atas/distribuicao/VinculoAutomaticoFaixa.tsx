@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { Modal } from '../../../design-system/components/Modal';
+import { InfoHint } from '../../../design-system/components/InfoHint';
 import { useRodarVinculoAutomatico, useUltimaExecucaoVinculo } from '../../../hooks/useVinculoAutomatico';
 import type { ResumoVinculoAutomatico } from '../../../services/vinculoAutomaticoService';
 import { contarVinculosAutomaticos, frasesHerancaGestor } from '../../../utils/vinculoAutomatico';
@@ -44,10 +45,15 @@ export const VinculoAutomaticoFaixa: React.FC<VinculoAutomaticoFaixaProps> = ({ 
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0, flex: '1 1 420px' }}>
-        <strong style={{ fontSize: '0.92rem', color: 'var(--color-info-text-strong)' }}>Vínculo automático</strong>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+          <strong style={{ fontSize: '0.92rem', color: 'var(--color-info-text-strong)' }}>Vínculo automático</strong>
+          <InfoHint
+            content="O sistema vincula sozinho o contrato à ata quando a compra, o fornecedor e os itens batem. Roda toda hora."
+            testId="vinculo-automatico-hint"
+          />
+        </span>
         <span style={{ fontSize: '0.8rem', color: '#334155' }}>
-          O sistema vincula sozinho o contrato à ata quando a compra, o fornecedor e os itens batem. Roda toda hora.
-          {ultima ? ` Última execução: ${formatDataHoraBR(ultima.executadoEm)}.` : ' Ainda não rodou.'}
+          {ultima ? `Última execução: ${formatDataHoraBR(ultima.executadoEm)}.` : 'Ainda não rodou.'}
         </span>
         <span data-testid="vinculo-automatico-numeros" style={{ fontSize: '0.8rem', color: '#0f172a', display: 'flex', flexWrap: 'wrap', gap: '0.2rem 1rem', fontVariantNumeric: 'tabular-nums' }}>
           <span><strong>{fmt(total.vinculos)}</strong> {total.vinculos === 1 ? 'vínculo feito' : 'vínculos feitos'} pelo sistema</span>
