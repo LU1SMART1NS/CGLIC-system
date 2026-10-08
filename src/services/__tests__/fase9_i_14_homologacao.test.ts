@@ -39,12 +39,6 @@ describe('FASE 9-I.14 — Homologação Funcional dos Dados Reais de Empenhos', 
       .select('*', { count: 'exact', head: true });
     expect(linkErr).toBeNull();
     expect(linksCount).toBe(2432);
-
-    const { count: arpEmpenhosCount, error: arpErr } = await supabase
-      .from('arp_item_empenhos')
-      .select('*', { count: 'exact', head: true });
-    expect(arpErr).toBeNull();
-    expect(arpEmpenhosCount).toBe(0);
   });
 
   it('2. Deve validar o cálculo dos KPIs financeiros oficiais sem Double Counting', async (ctx) => {

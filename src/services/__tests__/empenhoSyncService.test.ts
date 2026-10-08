@@ -31,7 +31,7 @@ describe('empenhoSyncService — Testes Unitários de Persistência M17 e Orques
   });
 
   describe('1. Persistência Soberana Exclusiva via RPCs M17 (Inviolabilidade Arquitetural)', () => {
-    it('deve chamar save_empenho_soberano_atomic, link_empenho_to_item_atomic e link_empenho_to_contract_atomic', async () => {
+    it('deve chamar save_empenho_soberano_atomic e link_empenho_to_contract_atomic, sem gravar vínculo com o item da ata', async () => {
       const empenhoUuid = '11111111-2222-3333-4444-555555555555';
 
       mockRpc.mockImplementation((rpcName: string, params: any) => {
@@ -44,9 +44,6 @@ describe('empenhoSyncService — Testes Unitários de Persistência M17 e Orques
             },
             error: null
           });
-        }
-        if (rpcName === 'link_empenho_to_item_atomic') {
-          return Promise.resolve({ data: { success: true, link_id: 'link-1' }, error: null });
         }
         if (rpcName === 'link_empenho_to_contract_atomic') {
           return Promise.resolve({ data: { success: true, link_id: 'link-ctr-1' }, error: null });
@@ -91,11 +88,10 @@ describe('empenhoSyncService — Testes Unitários de Persistência M17 e Orques
 
       expect(result.success).toBe(true);
       expect(result.empenho_id).toBe(empenhoUuid);
-      expect(result.items_linked).toBe(1);
       expect(result.contracts_linked).toBe(1);
 
       // Verificação das chamadas RPC M17
-      expect(mockRpc).toHaveBeenCalledTimes(3);
+      expect(mockRpc).toHaveBeenCalledTimes(2);
       expect(mockRpc).toHaveBeenCalledWith('save_empenho_soberano_atomic', expect.objectContaining({
         p_empenho: expect.objectContaining({
           uasg_emitente: '200331',
@@ -105,14 +101,8 @@ describe('empenhoSyncService — Testes Unitários de Persistência M17 e Orques
           valor_empenhado: 25000
         })
       }));
-      expect(mockRpc).toHaveBeenCalledWith('link_empenho_to_item_atomic', {
-        p_item_key: '00037/2026-200331-00001',
-        p_empenho_id: empenhoUuid,
-        p_quantidade_consumida: 50,
-        p_tipo_consumo: 'ORDINARIO',
-        p_numero_item_minuta: null,
-        p_observacoes: null
-      });
+      // O vínculo com o item vem da distribuição pelos itens do contrato (migration 94); a RPC antiga foi apagada (migration 99).
+      expect(mockRpc).not.toHaveBeenCalledWith('link_empenho_to_item_atomic', expect.anything());
       expect(mockRpc).toHaveBeenCalledWith('link_empenho_to_contract_atomic', {
         p_contract_key: '12/2026',
         p_empenho_id: empenhoUuid,
@@ -187,7 +177,7 @@ describe('empenhoSyncService — Testes Unitários de Persistência M17 e Orques
 
       expect(summary.total_processados).toBe(1);
       expect(summary.total_salvos).toBe(1);
-      expect(summary.total_itens_vinculados).toBe(1);
+      expect(summary.total_itens_vinculados).toBe(0); // nota → item vem da distribuição (migration 94)
       expect(summary.total_contratos_vinculados).toBe(1);
       expect(summary.erros).toHaveLength(0);
     });

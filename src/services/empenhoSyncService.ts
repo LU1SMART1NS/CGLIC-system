@@ -3,7 +3,7 @@
  * Orquestra o fluxo completo: Adapters -> Normalização -> Reconciliação -> M17 RPCs -> M16 SSOT.
  *
  * Invariante Inviolável: Toda persistência é realizada EXCLUSIVAMENTE via RPCs M17
- * (save_empenho_soberano_atomic, link_empenho_to_item_atomic, link_empenho_to_contract_atomic).
+ * (save_empenho_soberano_atomic, link_empenho_to_contract_atomic).
  * Zero INSERT/UPDATE direto em tabelas M16.
  */
 
@@ -118,9 +118,8 @@ export async function persistReconciledEmpenhoM17(
   success: boolean;
   empenho_id: string;
   is_new: boolean;
-  items_linked: number;
   contracts_linked: number;
-  /** Vínculos que a RPC recusou: o empenho foi gravado, mas não ficou ligado ao item/contrato. */
+  /** Vínculos que a RPC recusou: o empenho foi gravado, mas não ficou ligado ao contrato. */
   falhas_vinculo: string[];
 }> {
   if (!isSupabaseConfigured || !supabase) {
@@ -131,34 +130,12 @@ export async function persistReconciledEmpenhoM17(
 
   // 1. Persistência Soberana da Nota de Empenho (M17: save_empenho_soberano_atomic)
   const { empenhoId, isNew } = await saveEmpenhoSoberanoM17(reconciled);
-  let itemsLinked = 0;
   let contractsLinked = 0;
   const falhasVinculo: string[] = [];
 
-  // 2. Vínculo Físico Quantitativo com Itens de Ata (M17: link_empenho_to_item_atomic)
-  for (const itemLink of reconciled.item_links) {
-    // Quantidade deduzida por valor é estimativa: não vira consumo oficial do item (fica como sugestão no fluxo por contrato).
-    if (itemLink.is_deduzido) continue;
-    const { error: linkItemError } = await supabase.rpc('link_empenho_to_item_atomic', {
-      p_item_key: itemLink.item_key,
-      p_empenho_id: empenhoId,
-      p_quantidade_consumida: itemLink.quantidade_consumida,
-      p_tipo_consumo: itemLink.tipo_consumo || 'ORDINARIO',
-      p_numero_item_minuta: itemLink.numero_item_minuta || null,
-      p_observacoes: itemLink.observacoes || null
-    });
+  // O vínculo da nota com o item vem da distribuição pelos itens do contrato (migration 94), não daqui.
 
-    if (linkItemError) {
-      console.warn(`[EmpenhoSyncService] Falha ao vincular empenho ${empenhoId} ao item ${itemLink.item_key}:`, linkItemError);
-      falhasVinculo.push(
-        `Empenho ${reconciled.numero_oficial} gravado, mas não vinculado ao item ${itemLink.item_key}: ${mapPostgresErrorToAppError(linkItemError).message}`
-      );
-    } else {
-      itemsLinked++;
-    }
-  }
-
-  // 3. Vínculo Financeiro de Lastro com Contratos (M17: link_empenho_to_contract_atomic)
+  // 2. Vínculo Financeiro de Lastro com Contratos (M17: link_empenho_to_contract_atomic)
   for (const contractLink of opts.vincularContratos === false ? [] : reconciled.contract_links) {
     const { error: linkContractError } = await supabase.rpc('link_empenho_to_contract_atomic', {
       p_contract_key: contractLink.contract_key,
@@ -181,7 +158,6 @@ export async function persistReconciledEmpenhoM17(
     success: true,
     empenho_id: empenhoId,
     is_new: isNew,
-    items_linked: itemsLinked,
     contracts_linked: contractsLinked,
     falhas_vinculo: falhasVinculo
   };
@@ -196,7 +172,6 @@ export async function syncReconciledBatch(
 ): Promise<EmpenhoSyncSummary> {
   const idsPorChave: Record<string, string> = {};
   let totalSalvos = 0;
-  let totalItensVinculados = 0;
   let totalContratosVinculados = 0;
   let totalConflitos = 0;
   const erros: Array<{ canonical_key?: string; erro: string }> = [];
@@ -208,7 +183,6 @@ export async function syncReconciledBatch(
       if (result.success) {
         idsPorChave[rec.canonical_key] = result.empenho_id;
         totalSalvos++;
-        totalItensVinculados += result.items_linked;
         totalContratosVinculados += result.contracts_linked;
       }
       for (const falha of result.falhas_vinculo ?? []) {
@@ -225,7 +199,8 @@ export async function syncReconciledBatch(
   return {
     total_processados: reconciledList.length,
     total_salvos: totalSalvos,
-    total_itens_vinculados: totalItensVinculados,
+    // Nota → item vem da distribuição pelos itens do contrato (migration 94).
+    total_itens_vinculados: 0,
     total_contratos_vinculados: totalContratosVinculados,
     total_conflitos: totalConflitos,
     erros,

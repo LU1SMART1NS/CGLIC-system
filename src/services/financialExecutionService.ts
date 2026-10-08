@@ -9,7 +9,7 @@
  * 
  * Invariantes Invioláveis:
  * - Não cria entidades artificiais de liquidação ou pagamento.
- * - Valores de débito físico em public.arp_item_empenhos e itens de ata permanecem 100% isolados.
+ * - O empenho por item fica na distribuição das notas pelos itens do contrato (migration 94), fora deste cálculo.
  * - Toda agregação pré-agrupa por empenho antes de relacionar a contratos.
  */
 
