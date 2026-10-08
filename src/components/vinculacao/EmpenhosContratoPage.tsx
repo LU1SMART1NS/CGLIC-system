@@ -16,6 +16,7 @@ import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
+import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
@@ -208,7 +209,13 @@ export const EmpenhosContratoPage: React.FC = () => {
                           <td data-label="Valor da fatura" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>{formatCurrency(l.fatura.valorLiquido)}</td>
                           {showGestorFilter && (
                             <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                              {c.gestorNome ?? <span style={{ color: 'var(--color-warning-text)' }}>sem gestor</span>}
+                              {c.gestorNome ? (
+                                <CarteiraCellFilter descricao={`gestor ${c.gestorNome}`} onFilter={() => setFilter('gestor', c.gestorNome!)}>
+                                  <span>{c.gestorNome}</span>
+                                </CarteiraCellFilter>
+                              ) : (
+                                <span style={{ color: '#94a3b8' }}>—</span>
+                              )}
                             </td>
                           )}
                           <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>

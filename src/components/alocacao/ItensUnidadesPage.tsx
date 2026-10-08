@@ -18,7 +18,9 @@ import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
+import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, canFilterByGestor, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
 import { comparePrazo } from '../carteira/carteiraPrazo';
@@ -51,6 +53,9 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
 };
 const AMBAR = 'var(--color-warning)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
+const clamp2: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
+/** "00059/2025" → "2025/00059": ordena pelo ano e depois pelo número (igual à Carteira › Itens). */
+const ataOrdem = (numero: string) => numero.split('/').reverse().join('/');
 
 /** Alocado do quantitativo SENASP: número e barra (âmbar enquanto parcial, verde quando completo). */
 const AlocadoBar: React.FC<{ row: CarteiraItemRow }> = ({ row }) => {
@@ -121,7 +126,7 @@ export const ItensUnidadesPage: React.FC = () => {
 
   const colunas = useMemo<Record<string, CarteiraSortColumn<CarteiraItemRow>>>(
     () => ({
-      item: { value: (r) => `${r.arp.numeroAtaRegistroPreco}-${String(r.item.numeroItem).padStart(5, '0')}` },
+      item: { value: (r) => `${ataOrdem(r.arp.numeroAtaRegistroPreco)}-${String(Number(r.item.numeroItem)).padStart(5, '0')}` },
       senasp: { value: (r) => r.quantitativoSenasp, firstDir: 'desc' },
       alocado: { value: (r) => (r.quantitativoSenasp > 0 ? r.alocado / r.quantitativoSenasp : 0), firstDir: 'desc' },
       falta: { value: (r) => r.quantitativoSenasp - r.alocado, firstDir: 'desc' },
@@ -220,7 +225,6 @@ export const ItensUnidadesPage: React.FC = () => {
                   <thead>
                     <tr>
                       <CarteiraSortHeader label="Item" sortKey="item" {...sort} />
-                      <th style={carteiraTh}>Descrição</th>
                       <CarteiraSortHeader label="Quantitativo SENASP" sortKey="senasp" align="right" {...sort} />
                       <CarteiraSortHeader label="Alocado" sortKey="alocado" {...sort} />
                       <th style={carteiraTh}>Unidades</th>
@@ -236,15 +240,22 @@ export const ItensUnidadesPage: React.FC = () => {
                       const unidadesDoItem = Object.entries(r.alocadoPorUnidade).filter(([, q]) => q > 0);
                       return (
                         <tr key={r.key} data-testid={`vinc-itens-row-${r.key}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(() => abrirItem(r))}>
-                          <td data-role="id" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                            <CarteiraIdLink onClick={() => abrirItem(r)} label={`Abrir o item ${r.item.numeroItem} da ata ${r.arp.numeroAtaRegistroPreco}`} title="Abrir o item na aba Alocação interna">
-                              Ata {r.arp.numeroAtaRegistroPreco} · item {Number(r.item.numeroItem)}
-                            </CarteiraIdLink>
-                            <div style={subtle}>UASG {r.arp.codigoUnidadeGerenciadora}{r.faixa === 'EXPIRADO' ? ' · ata encerrada' : ''}</div>
-                          </td>
-                          <td data-label="Descrição" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '340px' }}>
-                            <div style={carteiraSubtitle} title={r.item.descricaoItem}>
-                              {r.item.descricaoItem || '—'}
+                          <td data-role="id" style={{ ...carteiraTd, minWidth: '240px', maxWidth: '380px' }}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              <CarteiraIdLink onClick={() => abrirItem(r)} label={`Abrir o item ${r.item.numeroItem} da ata ${r.arp.numeroAtaRegistroPreco}`} title="Abrir o item na aba Alocação interna">
+                                {Number(r.item.numeroItem)}
+                              </CarteiraIdLink>
+                              <span style={subtle}>·</span>
+                              <CarteiraCellFilter descricao={`ata ${r.arp.numeroAtaRegistroPreco}`} onFilter={() => setFilter('busca', r.arp.numeroAtaRegistroPreco)}>
+                                <span style={{ ...subtle, fontWeight: 700 }}>Ata {r.arp.numeroAtaRegistroPreco}</span>
+                              </CarteiraCellFilter>
+                              <CarteiraCellFilter descricao={`UASG ${r.arp.codigoUnidadeGerenciadora}`} onFilter={() => setFilter('uasg', r.arp.codigoUnidadeGerenciadora)}>
+                                <span style={subtle}>UASG {r.arp.codigoUnidadeGerenciadora}</span>
+                              </CarteiraCellFilter>
+                              {r.faixa === 'EXPIRADO' && <span style={subtle}>· ata encerrada</span>}
+                            </div>
+                            <div title={r.item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp2 }}>
+                              {toSentenceCaseIfAllCaps(r.item.descricaoItem) || '—'}
                             </div>
                           </td>
                           <td data-label="Quantitativo SENASP" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatNumber(r.quantitativoSenasp)} un</td>
@@ -262,7 +273,13 @@ export const ItensUnidadesPage: React.FC = () => {
                           </td>
                           {showGestorFilter && (
                             <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                              {r.gestorNome ?? <span style={{ color: 'var(--color-warning-text)' }}>sem gestor</span>}
+                              {r.gestorNome ? (
+                                <CarteiraCellFilter descricao={`gestor ${r.gestorNome}`} onFilter={() => setFilter('gestor', r.gestorNome!)}>
+                                  <span>{r.gestorNome}</span>
+                                </CarteiraCellFilter>
+                              ) : (
+                                <span style={{ color: '#94a3b8' }}>—</span>
+                              )}
                             </td>
                           )}
                           {podeAlocar && (
