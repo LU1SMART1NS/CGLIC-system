@@ -53,6 +53,7 @@ export interface DbAta {
   data_vigencia_final?: string;
   status_ata?: string;
   numero_controle_pncp?: string;
+  processo_compra?: string | null;
   data_hora_atualizacao_api?: string;
   ultimo_sync_em?: string;
 }

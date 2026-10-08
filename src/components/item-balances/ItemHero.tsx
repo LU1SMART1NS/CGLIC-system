@@ -7,7 +7,7 @@ import { useAtaManager } from '../../hooks/useAtaManagers';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { ActionButton, AppButton } from '../../design-system';
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
-import { formatCnpj, formatCurrency, formatCurrencyCompact, formatNumber } from '../../utils/format';
+import { formatCnpj, formatCurrency, formatProcessoSei, formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { differenceInDays, formatDateBR, parseDateBRT } from '../../services/temporalEngineService';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { pncpLinkStyle } from '../atas/Ata360Header';
@@ -187,6 +187,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
       ]}
       identifiersTestId="item-header-metadata"
       identifiers={[
+        { label: 'Processo', value: formatProcessoSei(arp.processoCompra) || undefined },
         { label: 'Tipo', value: item.tipoItem },
         { label: 'Código do item', value: item.codigoItem ? String(item.codigoItem) : undefined },
         { label: 'Valor unitário', value: Number(item.valorUnitario) > 0 ? formatCurrency(item.valorUnitario) : undefined },

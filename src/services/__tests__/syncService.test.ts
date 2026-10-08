@@ -12,12 +12,14 @@ vi.mock('../supabaseClient', () => {
 vi.mock('../api', () => ({
   fetchArpsDasFontes: vi.fn(),
   fetchArpItems: vi.fn(),
+  fetchPncpProcessoCompra: vi.fn(),
   limparCachesAtas: vi.fn()
 }));
 
 vi.mock('../dbCacheService', () => ({
   cacheArpsInDb: vi.fn(),
   cacheArpItemsInDb: vi.fn(),
+  gravarProcessoDaAta: vi.fn(),
   fetchEstadoAtasNoBanco: vi.fn()
 }));
 
@@ -28,6 +30,7 @@ import {
   sincronizarAtas,
   uasgsSincronizandoAtasAgora,
   ataPrecisaDeItens,
+  atasSemProcessoConsultado,
   JANELA_VIGENCIA_ATAS,
   ITENS_VALIDADE_DIAS
 } from '../syncService';
@@ -244,5 +247,36 @@ describe('sincronizarAtas — trava no banco', () => {
     expect(r.status).toBe('ERRO');
     expect(chamadas('concluir_sincronizacao')[0]).toMatchObject({ p_status: 'ERRO', p_mensagem: 'Compras.gov.br respondeu 503 na consulta de atas.' });
     expect(uasgsSincronizandoAtasAgora()).toEqual([]);
+  });
+});
+
+describe('processo da compra das atas', () => {
+  const comCompra = (n: number) => ataCom(n, { numeroControlePncpCompra: `00394494000136-1-${String(n).padStart(6, '0')}/2025` });
+  const semProcesso: { itens: number; itensLidosEmMaisAntigo: string | null; processoCompra: string | null } = { itens: 0, itensLidosEmMaisAntigo: null, processoCompra: null };
+
+  it('só consulta o PNCP para a ata que ainda não tem o processo consultado', () => {
+    const estadoBanco = new Map([
+      [ata(1).numeroAtaRegistroPreco, { ...semProcesso, processoCompra: '08020001450202479' }],
+      [ata(2).numeroAtaRegistroPreco, { ...semProcesso, processoCompra: '' }],
+      [ata(3).numeroAtaRegistroPreco, semProcesso]
+    ]);
+    const pendentes = atasSemProcessoConsultado([comCompra(1), comCompra(2), comCompra(3), comCompra(4)], estadoBanco);
+    // 1 já tem, 2 o PNCP já respondeu sem processo, 3 não consultada, 4 é nova (sem registro no banco)
+    expect(pendentes.map((a) => a.numeroAtaRegistroPreco)).toEqual([ata(3).numeroAtaRegistroPreco, ata(4).numeroAtaRegistroPreco]);
+  });
+
+  it('ata sem o identificador da compra não é consultada', () => {
+    expect(atasSemProcessoConsultado([ataCom(1, { numeroControlePncpCompra: '' })], new Map())).toEqual([]);
+  });
+
+  it('a coleta grava o processo uma vez por compra e ignora consulta que falhou', async () => {
+    vi.mocked(api.fetchArpsDasFontes).mockResolvedValueOnce([comCompra(1), comCompra(2)]);
+    vi.mocked(dbCache.fetchEstadoAtasNoBanco).mockResolvedValueOnce(new Map());
+    vi.mocked(dbCache.cacheArpsInDb).mockResolvedValueOnce(true);
+    vi.mocked(api.fetchPncpProcessoCompra).mockResolvedValueOnce('08020001450202479').mockResolvedValueOnce(null);
+    vi.mocked(api.fetchArpItems).mockResolvedValue({ resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 });
+    await coletarEGravarAtas(params);
+    expect(dbCache.gravarProcessoDaAta).toHaveBeenCalledTimes(1);
+    expect(dbCache.gravarProcessoDaAta).toHaveBeenCalledWith(ata(1).numeroAtaRegistroPreco, UASG, '08020001450202479');
   });
 });

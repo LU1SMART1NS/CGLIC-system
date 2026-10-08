@@ -58,3 +58,17 @@ export function formatDataHoraBR(iso: string): string {
   const hora = d.toLocaleTimeString('pt-BR', { ...opts, hour: '2-digit', minute: '2-digit' });
   return `${data} às ${hora}`;
 }
+
+/**
+ * Número de processo SEI com a máscara oficial (NNNNN.NNNNNN/AAAA-DD). O PNCP entrega só os 17 dígitos
+ * (ex.: 08020001450202479). Texto que não tem 17 dígitos (processo de outro sistema, já formatado) fica como veio.
+ */
+export function formatProcessoSei(valor?: string | null): string {
+  const texto = (valor || '').trim();
+  if (!texto) return '';
+  const digitos = texto.replace(/\D/g, '');
+  if (/^\d+$/.test(texto) && digitos.length === 17) {
+    return `${digitos.slice(0, 5)}.${digitos.slice(5, 11)}/${digitos.slice(11, 15)}-${digitos.slice(15)}`;
+  }
+  return texto;
+}

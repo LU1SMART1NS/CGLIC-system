@@ -31,6 +31,8 @@ export interface ArpRecord {
   numeroControlePncpAta: string;
   numeroControlePncpCompra: string;
   idCompra: string;
+  /** Processo administrativo da compra (PNCP), só dígitos. Vazio = o PNCP não informa; ausente = ainda não consultado. */
+  processoCompra?: string;
   dataVigenciaFinalPncp?: string;
   isCanceladaPncp?: boolean;
   prorrogadaPncp?: boolean;

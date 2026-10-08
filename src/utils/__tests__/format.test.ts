@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatCurrencyRounded, formatNumber, formatPercent, formatCnpj, formatDateBR } from '../format';
+import { formatCurrency, formatCurrencyRounded, formatNumber, formatPercent, formatCnpj, formatDateBR, formatProcessoSei } from '../format';
 
 const nbsp = (s: string) => s.replace(/ /g, ' ');
 
@@ -13,6 +13,13 @@ describe('format', () => {
     expect(formatNumber(4863)).toBe('4.863');
     expect(formatNumber(null)).toBe('0');
     expect(formatPercent(42.54)).toBe('42,5%');
+  });
+  it('formata o número do processo SEI vindo do PNCP (17 dígitos)', () => {
+    expect(formatProcessoSei('08020001450202479')).toBe('08020.001450/2024-79');
+    expect(formatProcessoSei('08020.001450/2024-79')).toBe('08020.001450/2024-79');
+    expect(formatProcessoSei('123/2024')).toBe('123/2024');
+    expect(formatProcessoSei('')).toBe('');
+    expect(formatProcessoSei(undefined)).toBe('');
   });
   it('formata CNPJ e CPF', () => {
     expect(formatCnpj('27975551000399')).toBe('27.975.551/0003-99');
