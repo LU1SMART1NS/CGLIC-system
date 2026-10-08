@@ -3,7 +3,7 @@ import type { DistribuicaoDoEmpenho } from '../services/distribuicaoEmpenhoServi
 /**
  * Empenho de um item da ata a partir do vínculo das notas aos itens do contrato (migration 94). O item da ata
  * corresponde ao item do contrato com o mesmo número; só notas com vínculo fechado (DISTRIBUIDA) contam no empenhado.
- * Substitui a cópia antiga por item (arp_item_empenhos), que punha toda nota do contrato em todos os itens.
+ * Substitui a cópia antiga por item (arp_item_empenhos, apagada na migration 99), que punha toda nota do contrato em todos os itens.
  */
 
 /** Parte de uma nota vinculada a este item. */
