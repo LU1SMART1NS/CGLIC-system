@@ -229,6 +229,7 @@ export function limparCachesAtas(): void {
   pncpVigenciaCache.clear();
   supplementalPncpArpsCache = null;
   pncpCompraItemsCache.clear();
+  pncpAtasDaCompraCache.clear();
   memoryItemsCache.clear();
   itensComprasQueryCache.clear();
 }
@@ -512,6 +513,44 @@ export function itensSeUmFornecedor<T extends { niFornecedor?: string; nomeRazao
   return chaves.size <= 1 ? items : [];
 }
 
+/** Quantas atas cada compra tem no PNCP (promessa guardada por compra; falha não fica guardada). */
+const pncpAtasDaCompraCache = new Map<string, Promise<number | null>>();
+
+/**
+ * Quantas atas a compra gerou. Primeiro conta nas atas já lidas nesta execução (pelo número de controle PNCP);
+ * se ali há só uma ou nenhuma, confirma no PNCP (/compras/{ano}/{seq}/atas). Devolve null quando não dá para saber.
+ */
+export function contarAtasDaCompra(anoCompra: string, seqCompra: number, customCnpj?: string): Promise<number | null> {
+  const conhecidas = new Set<string>();
+  for (const list of arpsMemoryCache.values()) {
+    for (const a of list) {
+      const p = parsePncpControlNumber(a.numeroControlePncpAta);
+      if (p && p.anoCompra === String(anoCompra) && p.seqCompra === seqCompra) conhecidas.add(a.numeroAtaRegistroPreco);
+    }
+  }
+  if (conhecidas.size >= 2) return Promise.resolve(conhecidas.size);
+
+  const cnpj = (customCnpj || CNPJ_SENASP).replace(/\D/g, '');
+  const chave = `${cnpj}-${anoCompra}-${seqCompra}`;
+  const emCache = pncpAtasDaCompraCache.get(chave);
+  if (emCache) return emCache;
+  const promessa = (async (): Promise<number | null> => {
+    try {
+      const res = await fetch(`/api-pncp/api/pncp/v1/orgaos/${cnpj}/compras/${anoCompra}/${seqCompra}/atas`);
+      if (!res.ok) return null;
+      const d = await res.json();
+      if (typeof d?.totalRegistros === 'number') return d.totalRegistros;
+      if (Array.isArray(d?.data)) return d.data.length;
+      return null;
+    } catch {
+      return null;
+    }
+  })();
+  pncpAtasDaCompraCache.set(chave, promessa);
+  promessa.then((n) => { if (n === null) pncpAtasDaCompraCache.delete(chave); });
+  return promessa;
+}
+
 export async function fetchPncpCompraItems(
   anoCompra: string,
   seqCompra: number | string,
@@ -528,7 +567,8 @@ export async function fetchPncpCompraItems(
   }
 
   try {
-    const itemsUrl = `/api-pncp/api/pncp/v1/orgaos/${cnpj}/compras/${anoCompra}/${seqCompra}/itens`;
+    // Sem tamanhoPagina o PNCP devolve só 10 itens: a checagem de "um fornecedor só" olhava só esses e deixava passar.
+    const itemsUrl = `/api-pncp/api/pncp/v1/orgaos/${cnpj}/compras/${anoCompra}/${seqCompra}/itens?tamanhoPagina=500`;
     const res = await fetch(itemsUrl);
     if (!res.ok) return [];
     const itemsData = await res.json();
@@ -768,16 +808,25 @@ export async function fetchArpItems(
         }
       }
 
-      // 3.5. Busca itens na API do PNCP se possuir ano e sequência da compra
+      // 3.5. Busca itens na API do PNCP se possuir ano e sequência da compra.
+      // O PNCP lista os itens da compra, não da ata. Uma compra pode gerar várias atas (até do mesmo fornecedor, como
+      // matriz e filial com itens diferentes), e o PNCP não diz de qual ata é cada item. Por isso só se atribuem itens
+      // pelo PNCP quando o fornecedor da ata é conhecido (lista suplementar) ou quando a compra gerou uma ata só e todos
+      // os itens são de um fornecedor. Em 06/10/2026 a regra antiga gravou itens de outra ata em sete atas: a lista do
+      // PNCP vinha com 10 itens só, todos do mesmo fornecedor, e a trava passou. Melhor ata sem itens do que itens alheios.
       if (anoCompra && seqCompra) {
-        foundItems = await fetchPncpCompraItems(anoCompra, seqCompra, numeroAtaRegistroPreco, codigoUnidadeGerenciadora, cnpjFornecedor);
-        // Uma compra pode gerar várias atas, cada uma de um fornecedor. Sem o fornecedor da ata, não dá para saber quais
-        // itens são dela: melhor não gravar nada do que gravar itens de outra ata (e ficar para sempre no banco).
-        if (!cnpjFornecedor) {
-          const itensDaCompra = foundItems;
-          foundItems = itensSeUmFornecedor(foundItems);
-          if (foundItems.length === 0 && itensDaCompra.length > 0) {
-            console.warn(`Ata ${numeroAtaRegistroPreco}: a compra ${seqCompra}/${anoCompra} tem mais de um fornecedor e a ata não informa qual é o dela; itens não carregados pelo PNCP.`);
+        if (cnpjFornecedor) {
+          foundItems = await fetchPncpCompraItems(anoCompra, seqCompra, numeroAtaRegistroPreco, codigoUnidadeGerenciadora, cnpjFornecedor);
+        } else {
+          const atasDaCompra = await contarAtasDaCompra(anoCompra, seqCompra);
+          if (atasDaCompra === 1) {
+            const itensDaCompra = await fetchPncpCompraItems(anoCompra, seqCompra, numeroAtaRegistroPreco, codigoUnidadeGerenciadora);
+            foundItems = itensSeUmFornecedor(itensDaCompra);
+            if (foundItems.length === 0 && itensDaCompra.length > 0) {
+              console.warn(`Ata ${numeroAtaRegistroPreco}: a compra ${seqCompra}/${anoCompra} tem mais de um fornecedor e a ata não informa qual é o dela; itens não carregados pelo PNCP.`);
+            }
+          } else {
+            console.warn(`Ata ${numeroAtaRegistroPreco}: a compra ${seqCompra}/${anoCompra} tem ${atasDaCompra === null ? 'número desconhecido de' : atasDaCompra} atas no PNCP e a ata não informa o fornecedor; itens não carregados pelo PNCP.`);
           }
         }
       }
