@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { typography, spacing } from '../tokens';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { InfoHint } from './InfoHint';
 
 /** Espaço à direita das abas da área (AreaTabs): no desktop, as ações da página sobem para lá. */
 export const AREA_TABS_ACTIONS_ID = 'area-tabs-actions';
@@ -11,6 +12,8 @@ export interface PageHeaderProps {
   subtitle?: string;
   icon?: React.ReactNode;
   badge?: React.ReactNode;
+  /** Explicação detalhada, mostrada sob demanda num ícone ⓘ ao lado do título. */
+  hint?: string;
   actions?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
@@ -21,6 +24,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   subtitle,
   icon,
   badge,
+  hint,
   actions,
   className,
   style
@@ -67,6 +71,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           }}>
             {title}
           </h1>
+          {hint && <InfoHint content={hint} testId="page-header-hint" />}
           {badge && <div>{badge}</div>}
         </div>
         {subtitle && (

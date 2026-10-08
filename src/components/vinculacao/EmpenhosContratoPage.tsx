@@ -3,7 +3,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import { ActionButton, AppButton, NoticeBar, useToast } from '../../design-system';
+import { ActionButton, AppButton, useToast } from '../../design-system';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useFaturasCarteira } from '../../hooks/useFinanceiroCarteira';
@@ -138,7 +138,11 @@ export const EmpenhosContratoPage: React.FC = () => {
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <VinculacaoPageHeader title="Empenhos a vincular ao contrato" subtitle="Notas que uma fatura cita, mas que não estão vinculadas ao contrato no sistema." />
+      <VinculacaoPageHeader
+        title="Empenhos a vincular ao contrato"
+        subtitle="Notas que uma fatura cita, mas que não estão vinculadas ao contrato no sistema."
+        hint="Ou a nota falta no contrato (vincule à mão, como no Contrato 360), ou a fatura está no contrato errado (corrija no Contratos.gov.br; a sincronização traz a correção). Contratos cujos empenhos ainda não foram consultados não entram."
+      />
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando faturas...">
@@ -159,11 +163,6 @@ export const EmpenhosContratoPage: React.FC = () => {
             <CarteiraFilterButton label="UASG" value={filters.uasg} emptyValue={TODOS} options={[...uasgs.keys()].sort().map((u) => ({ value: u, label: u, count: uasgs.get(u) }))} onChange={(v) => setFilter('uasg', v)} testId="vinc-ne-contrato-filter-uasg" />
             {showGestorFilter && <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="vinc-ne-contrato-filter-gestor" />}
           </CarteiraFilterBar>
-
-          <NoticeBar tone="info" testId="vinc-ne-contrato-aviso">
-            Ou a nota falta no contrato (vincule à mão, como no Contrato 360), ou a fatura está no contrato errado (corrija no Contratos.gov.br; a
-            sincronização traz a correção). Contratos cujos empenhos ainda não foram consultados não entram.
-          </NoticeBar>
 
           {todas.length === 0 ? (
             <EmptyState title="Nenhuma fatura cita empenho fora do contrato." description="Quando o Contratos.gov.br trouxer uma fatura com nota que não está no contrato, ela aparece aqui." testId="vinc-ne-contrato-vazio" />

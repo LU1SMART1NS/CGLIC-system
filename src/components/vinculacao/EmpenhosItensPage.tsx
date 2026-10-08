@@ -4,7 +4,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import { ActionButton, AppButton, AppTextarea, Modal, NoticeBar, StatusBadge, useToast } from '../../design-system';
+import { ActionButton, AppButton, AppTextarea, Modal, StatusBadge, useToast } from '../../design-system';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../hooks/useVinculacaoEmpenhos';
@@ -176,6 +176,7 @@ export const EmpenhosItensPage: React.FC = () => {
       <VinculacaoPageHeader
         title="Empenhos a vincular aos itens"
         subtitle="Notas de empenho de contratos com dois ou mais itens. Cada nota só entra no empenhado do item depois de vinculada aos itens."
+        hint="Notas de contratos de um item só são vinculadas ao item pelo servidor, sem clique, e não aparecem aqui."
       />
 
       {isBusy ? (
@@ -238,12 +239,6 @@ export const EmpenhosItensPage: React.FC = () => {
             />
             {showGestorFilter && <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="vinc-empenhos-filter-gestor" />}
           </CarteiraFilterBar>
-
-          {filters.fila === 'A_VINCULAR' && (
-            <NoticeBar tone="info" testId="vinc-empenhos-aviso-auto">
-              Notas de contratos de um item só são vinculadas ao item pelo servidor, sem clique, e não aparecem aqui.
-            </NoticeBar>
-          )}
 
           {podeVincular && selecionadas.length > 0 && (
             <div
