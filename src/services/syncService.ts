@@ -35,7 +35,9 @@ export const JANELA_VIGENCIA_ATAS = {
 const ITENS_EM_PARALELO = 2;
 
 /** Consultas do processo da compra (PNCP) por execução. O número não muda: após a primeira carga quase nada resta a consultar. */
-export const PROCESSOS_POR_EXECUCAO = 40;
+export const PROCESSOS_POR_EXECUCAO = 100;
+/** Tempo máximo do passo do processo, contado do início dele (não da sincronização: a lista de atas já gasta boa parte do orçamento). */
+export const PROCESSOS_TEMPO_MAXIMO_MS = 30_000;
 const PROCESSOS_EM_PARALELO = 4;
 
 export const FONTE_ITENS_ATAS = 'Itens das atas';
@@ -95,9 +97,13 @@ export function atasSemProcessoConsultado(atas: ArpRecord[], estado: Map<string,
 async function completarProcessoDasAtas(
   atas: ArpRecord[],
   estado: Map<string, EstadoAtaNoBanco>,
-  prazoEsgotado: () => boolean
+  agora: () => number,
+  fimDoOrcamento: number | undefined
 ): Promise<void> {
   const pendentes = atasSemProcessoConsultado(atas, estado).slice(0, PROCESSOS_POR_EXECUCAO);
+  if (pendentes.length === 0) return;
+  const inicioDoPasso = agora();
+  const prazoEsgotado = () => agora() - inicioDoPasso > PROCESSOS_TEMPO_MAXIMO_MS || (fimDoOrcamento !== undefined && agora() > fimDoOrcamento);
   const porCompra = new Map<string, string | null>();
   for (let i = 0; i < pendentes.length; i += PROCESSOS_EM_PARALELO) {
     if (prazoEsgotado()) return;
@@ -139,8 +145,8 @@ export async function coletarEGravarAtas(
   const gravou = await cacheArpsInDb(atas);
   if (!gravou) throw new Error('Não foi possível gravar as atas no banco.');
 
-  // Processo da compra (PNCP). Usa só uma fração do orçamento de tempo: os itens vêm depois e são o principal.
-  await completarProcessoDasAtas(atas, estadoNoBanco, () => orcamentoMs !== undefined && agora() - inicio > orcamentoMs / 4);
+  // Processo da compra (PNCP). Tem tempo próprio e para antes de gastar o orçamento todo: os itens vêm depois e são o principal.
+  await completarProcessoDasAtas(atas, estadoNoBanco, agora, orcamentoMs !== undefined ? inicio + orcamentoMs * 0.7 : undefined);
 
   // Só as atas que precisam de itens. Ordem: as sem itens primeiro, depois as de itens lidos há mais tempo.
   // Assim o orçamento de tempo não deixa de fora as que mais precisam, e uma releitura forçada que estourou o
