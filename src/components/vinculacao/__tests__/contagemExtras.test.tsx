@@ -122,3 +122,20 @@ describe('números novos: Financeiro e Visão Geral', () => {
     expect(html).not.toContain('href="/pagamentos"');
   });
 });
+
+describe('carga da carteira para o menu', () => {
+  it('carrega atas e contratos de cada UASG para quem conta contratos', async () => {
+    const { carregarCarteiraParaOMenu } = await import('../cargaDaCarteiraDoMenu');
+    const prefetchQuery = vi.fn(() => Promise.resolve());
+    await carregarCarteiraParaOMenu({ prefetchQuery } as any, { contratos: true });
+    const chaves = prefetchQuery.mock.calls.map((c: any[]) => c[0].queryKey.join(':'));
+    expect(chaves).toEqual(['ata-detail-source:200330', 'contracts-dashboard:200330', 'ata-detail-source:200331', 'contracts-dashboard:200331']);
+  });
+
+  it('gestor de saldos carrega só as atas', async () => {
+    const { carregarCarteiraParaOMenu } = await import('../cargaDaCarteiraDoMenu');
+    const prefetchQuery = vi.fn(() => Promise.resolve());
+    await carregarCarteiraParaOMenu({ prefetchQuery } as any, { contratos: false });
+    expect(prefetchQuery.mock.calls.map((c: any[]) => c[0].queryKey[0])).toEqual(['ata-detail-source', 'ata-detail-source']);
+  });
+});
