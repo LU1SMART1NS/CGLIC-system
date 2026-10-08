@@ -14,9 +14,13 @@ export function contarItensAAlocar(rows: Pick<CarteiraItemRow, 'quantitativoSena
 export interface ContagensExtras {
   contratosAta: number | null;
   itensAAlocar: number | null;
+  /** Central de Distribuição (só o coordenador): atas sem gestor e contratos com gestor diferente da ata. */
+  atasSemGestor: number | null;
+  gestorDiferente: number | null;
 }
 
-let estado: ContagensExtras = { contratosAta: null, itensAAlocar: null };
+const VAZIO: ContagensExtras = { contratosAta: null, itensAAlocar: null, atasSemGestor: null, gestorDiferente: null };
+let estado: ContagensExtras = VAZIO;
 const ouvintes = new Set<() => void>();
 
 export function definirContagemExtra(chave: keyof ContagensExtras, valor: number | null) {
@@ -38,6 +42,6 @@ export function useContagensExtras(): ContagensExtras {
 
 /** Para os testes. */
 export function zerarContagensExtras() {
-  estado = { contratosAta: null, itensAAlocar: null };
+  estado = VAZIO;
   ouvintes.forEach((o) => o());
 }

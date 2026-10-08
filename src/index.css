@@ -662,6 +662,8 @@ h1, h2, h3, h4 {
   background: var(--color-warning-solid, #ffcd07); color: #1f1300; box-shadow: 0 0 0 2px #ffffff;
   font-size: 0.65rem; font-weight: 800; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums;
 }
+/* Financeiro com prazo da CGLIC vencido ou fatura com erro no SIAFI. */
+.app-rail-count--urgente { background: var(--color-danger-solid, #e52207); color: #ffffff; }
 .app-rail-link[data-active='true'] .app-rail-icon { background: rgba(12, 50, 111, 0.1); color: var(--primary); }
 .app-bottom-nav {
   position: fixed;

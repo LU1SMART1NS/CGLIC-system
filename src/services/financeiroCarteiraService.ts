@@ -232,6 +232,34 @@ export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'da
 }
 
 /** Etapa do ciclo em aberto; ciclo pago ou cancelado não entra na lista (a fatura dele já aparece). */
+/**
+ * Segmentos de Pagamentos: o que precisa de ação da equipe (ciclo na CGLIC, erro no SIAFI), o que anda sem a CGLIC (na
+ * CGOFI, fatura ainda não liquidada, liquidada esperando OB) e o que já foi pago. Cancelada só aparece em Todas.
+ */
+export type GrupoPagamento = 'ACAO' | 'TRAMITACAO' | 'PAGA';
+export const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
+  NA_CGLIC: 'ACAO',
+  ERRO_SIAFI: 'ACAO',
+  DEVOLVIDO_CORRECAO: 'TRAMITACAO',
+  NA_CGOFI: 'TRAMITACAO',
+  EM_ANDAMENTO: 'TRAMITACAO',
+  AGUARDANDO_OB: 'TRAMITACAO',
+  PAGA: 'PAGA',
+  CANCELADA: null
+};
+
+/**
+ * "Precisa de ação" de Pagamentos, para o número do menu: quantas linhas e se alguma é urgente (fatura com erro no
+ * SIAFI ou ciclo com o prazo da CGLIC vencido).
+ */
+export function resumirPrecisaDeAcao(rows: PagamentoCarteiraRow[]): { total: number; urgente: boolean } {
+  const acao = rows.filter((r) => GRUPO_DA_ETAPA[r.etapa] === 'ACAO');
+  const urgente = acao.some(
+    (r) => r.etapa === 'ERRO_SIAFI' || (r.tipo === 'CICLO' && r.ciclo.etapaAtual?.dono === 'CGLIC' && Boolean(r.ciclo.etapaAtual?.atrasado))
+  );
+  return { total: acao.length, urgente };
+}
+
 export function etapaDoCiclo(ciclo: Pick<PaymentFollowUpCycle, 'status'>): EtapaPagamento | null {
   switch (ciclo.status) {
     case 'RECEBIDO':

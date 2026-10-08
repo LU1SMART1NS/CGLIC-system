@@ -4,12 +4,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { contarItensAAlocar, definirContagemExtra, useContagensExtras, zerarContagensExtras } from '../contagemExtras';
 
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'admin' })) }));
-vi.mock('../useContagemVinculacao', () => ({ useContagemVinculacao: vi.fn(() => 5) }));
+vi.mock('../useContagemVinculacao', () => ({ useContagemVinculacao: vi.fn(() => ({ aosItens: 3, aoContrato: 2 })) }));
+vi.mock('../../financeiro/useContagemFinanceiro', () => ({ useContagemFinanceiro: vi.fn(() => null) }));
 // O espião do cache e os cálculos pesados não rodam no render estático: o que interessa aqui é o número no ícone.
 vi.mock('../ContagensDaCarteira', () => ({ ContagensDaCarteira: () => null }));
 
 import { useAuth } from '../../../context/AuthContext';
 import { useContagemVinculacao } from '../useContagemVinculacao';
+import { useContagemFinanceiro } from '../../financeiro/useContagemFinanceiro';
 import { Sidebar } from '../../layout/Sidebar';
 
 const linha = (o: any) => ({ quantitativoSenasp: 100, faixa: 'REGULAR', nivelAlocacao: 'SEM', ...o });
@@ -39,7 +41,8 @@ describe('número no ícone das áreas', () => {
   beforeEach(() => {
     zerarContagensExtras();
     vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
-    vi.mocked(useContagemVinculacao).mockReturnValue(5);
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 3, aoContrato: 2 });
+    vi.mocked(useContagemFinanceiro).mockReturnValue(null);
   });
 
   it('Vinculação soma as filas de empenho e os contratos sem ata, quando a carteira já foi carregada', () => {
@@ -76,5 +79,46 @@ describe('número no ícone das áreas', () => {
     definirContagemExtra('itensAAlocar', 9);
     renderToStaticMarkup(<Teste />);
     expect(lido).toBe(9);
+  });
+});
+
+describe('números novos: Financeiro e Visão Geral', () => {
+  beforeEach(() => {
+    zerarContagensExtras();
+    vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
+    vi.mocked(useContagemVinculacao).mockReturnValue(null);
+    vi.mocked(useContagemFinanceiro).mockReturnValue(null);
+  });
+
+  it('Financeiro: "Precisa de ação", vermelho quando urgente, e o clique abre Pagamentos', () => {
+    vi.mocked(useContagemFinanceiro).mockReturnValue({ total: 6, urgente: true });
+    const html = menu();
+    expect(html).toMatch(/class="app-rail-count app-rail-count--urgente"[^>]*data-testid="rail-count-execucao-financeira"[^>]*>6</);
+    expect(html).toContain('href="/pagamentos"');
+    vi.mocked(useContagemFinanceiro).mockReturnValue({ total: 2, urgente: false });
+    expect(menu()).toMatch(/class="app-rail-count"[^>]*data-testid="rail-count-execucao-financeira"[^>]*>2</);
+  });
+
+  it('Visão Geral (coordenador): atas sem gestor + gestor diferente, e o clique abre a Central', () => {
+    definirContagemExtra('atasSemGestor', 182);
+    definirContagemExtra('gestorDiferente', 2);
+    const html = menu();
+    expect(html).toMatch(/data-testid="rail-count-visao-geral"[^>]*>184</);
+    expect(html).toContain('href="/atas/distribuicao"');
+    definirContagemExtra('atasSemGestor', 0);
+    expect(menu()).toContain('href="/atas/distribuicao?aba=DIVERGENCIAS"');
+  });
+
+  it('Vinculação abre na primeira fila com pendência', () => {
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0 });
+    expect(menu()).toContain('href="/vinculacao/empenhos-itens"');
+    definirContagemExtra('contratosAta', 1);
+    expect(menu()).toContain('href="/vinculacao/contratos"');
+  });
+
+  it('sem pendência, nada de número e a área volta à página de sempre', () => {
+    const html = menu();
+    expect(html).not.toContain('rail-count-');
+    expect(html).not.toContain('href="/pagamentos"');
   });
 });
