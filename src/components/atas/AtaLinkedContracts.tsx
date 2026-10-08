@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { FileText } from 'lucide-react';
 import { ActionButton } from '../../design-system/components/ActionButton';
+import { OrigemVinculoBadge } from '../vinculos/OrigemVinculoBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { CarteiraIdLink, propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
@@ -95,8 +96,9 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
               <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
                 {link.fornecedorNome} {link.valorGlobal ? `• ${formatCurrency(link.valorGlobal)}` : ''}
               </p>
-              <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.15rem 0 0 0' }}>
+              <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.15rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                 Item {itemNumberFromKey(link.itemKey)}
+                <OrigemVinculoBadge origem={link.origem} mostrarManual />
               </p>
               {link.observacoes && (
                 <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.1rem 0 0 0' }}>Obs. {link.observacoes}</p>

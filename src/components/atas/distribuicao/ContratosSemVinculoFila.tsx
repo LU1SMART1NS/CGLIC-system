@@ -23,6 +23,8 @@ import type { ContratoSemAtaConfirmacao } from '../../../services/contratoSemAta
 import type { PlanoVinculo } from '../../../services/vinculoEmMassaService';
 import type { ContractDashboardRecord } from '../../../types';
 import { formatDateBR } from '../../../utils/format';
+import type { MotivoVinculoManual } from '../../../services/vinculoAutomaticoService';
+import { ROTULO_TIPO_MOTIVO, textoMotivoDaFila, type TextoMotivo, type TipoMotivo } from '../../../utils/vinculoAutomatico';
 import { ConferenciaAtaModal } from './ConferenciaAtaModal';
 import type { AtaSugerida, FilaAta, ItemFila, MotivoSugestao, PendenciasDistribuicao } from './contratosSemAta';
 import { DescartadosLista } from './DescartadosLista';
@@ -75,12 +77,14 @@ interface Filtros {
   busca: string;
   situacao: string;
   gestor: string;
+  motivo: string;
 }
 
 const SCHEMA: CarteiraFilterSchema<Filtros> = {
   busca: { param: 'busca', default: '' },
   situacao: { param: 'situacao', default: TODAS, values: [TODAS, 'ATA_PROVAVEL', 'PARCIAL', 'SEM_PISTA', 'NAO_PERTENCE'] },
-  gestor: { param: 'gestor', default: TODAS }
+  gestor: { param: 'gestor', default: TODAS },
+  motivo: { param: 'motivo', default: TODAS, values: [TODAS, 'GESTOR', 'DADO', 'EQUIPE'] }
 };
 
 const SEM_GESTOR_DA_ATA = '__SEM_GESTOR__';
@@ -137,6 +141,8 @@ interface ContratosSemVinculoFilaProps {
   ataDe: (numeroAta: string, uasg: string) => FilaAta | undefined;
   /** Todas as atas do catálogo (inclusive encerradas), para o "Escolher ata". */
   atas: FilaAta[];
+  /** Por que o vínculo automático (migration 95) deixou cada contrato para a equipe, por chave do contrato. */
+  motivos?: ReadonlyMap<string, MotivoVinculoManual>;
 }
 
 /**
@@ -145,7 +151,7 @@ interface ContratosSemVinculoFilaProps {
  * parcial e os sem pista (o coordenador confere a ata ou marca "não pertence a nenhuma ata" e escolhe o gestor). O nome
  * da ata abre o painel de conferência; descartar tira a ata das sugestões do contrato.
  */
-export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = ({ pendencias, confirmacoes, podeAgir, onAtribuir, itensDaAta, ataDe: ataCompleta, atas }) => {
+export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = ({ pendencias, confirmacoes, podeAgir, onAtribuir, itensDaAta, ataDe: ataCompleta, atas, motivos }) => {
   const navigate = useNavigateWithOrigin();
   const queryClient = useQueryClient();
   const confirmDialog = useConfirmDialog();
@@ -197,16 +203,32 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
   const temAtaSemGestor = pendentes.some((l) => l.fortes.some((s) => !s.gestorNome));
   const contagem = (g: Grupo) => todas.filter((l) => l.grupo === g).length;
 
+  /** Por que o contrato ficou para a equipe (coluna e filtro "Motivo"). */
+  const motivoDe = React.useCallback(
+    (l: Linha): TextoMotivo => {
+      const s = l.fortes[0] ?? l.sugestoes[0];
+      return textoMotivoDaFila(motivos?.get(l.contractKey), l.grupo, {
+        numeroAta: s?.numeroAta,
+        gestorAta: s?.gestorNome,
+        gestorContrato: l.gestorNome,
+        vinculoParcial: Boolean(l.atasVinculadas?.length)
+      });
+    },
+    [motivos]
+  );
+  const contagemMotivo = (t: TipoMotivo) => universo.filter((l) => motivoDe(l).tipo === t).length;
+
   const filtradas = React.useMemo(
     () =>
       universo.filter((l) => {
+        if (filters.motivo !== TODAS && motivoDe(l).tipo !== filters.motivo) return false;
         if (filters.gestor !== TODAS) {
           const bate = l.fortes.some((s) => (filters.gestor === SEM_GESTOR_DA_ATA ? !s.gestorNome : s.gestorNome === filters.gestor));
           if (!bate) return false;
         }
         return contemBusca(filters.busca, l.numero, l.fornecedorNome, l.fornecedorCnpj, l.objeto, ...l.sugestoes.map((s) => s.numeroAta), ...l.sugestoes.map((s) => s.gestorNome));
       }),
-    [universo, filters]
+    [universo, filters, motivoDe]
   );
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, COLUNAS);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chave, PAGE_SIZE);
@@ -474,6 +496,14 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
           testId="sem-vinculo-filter-situacao"
         />
         <CarteiraFilterButton
+          label="Motivo"
+          value={filters.motivo}
+          emptyValue={TODAS}
+          options={(['GESTOR', 'DADO', 'EQUIPE'] as const).map((t) => ({ value: t, label: ROTULO_TIPO_MOTIVO[t], count: contagemMotivo(t) }))}
+          onChange={(v) => setFilter('motivo', v)}
+          testId="sem-vinculo-filter-motivo"
+        />
+        <CarteiraFilterButton
           label="Gestor da ata"
           value={filters.gestor}
           emptyValue={TODAS}
@@ -532,6 +562,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                     />
                   )}
                   <CarteiraSortHeader label="Contrato" sortKey="contrato" {...sort} />
+                  <th style={carteiraTh}>Por que ficou para a equipe</th>
                   <CarteiraSortHeader label="Ata provável" sortKey="ata" {...sort} />
                   <th style={carteiraTh}>Gestor</th>
                   {podeAgir && <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>}
@@ -566,6 +597,17 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                             {l.fornecedorNome}
                           </div>
                         )}
+                      </td>
+                      <td data-label="Por que ficou para a equipe" style={{ ...carteiraTd, minWidth: '220px', maxWidth: '340px' }}>
+                        {(() => {
+                          const m = motivoDe(l);
+                          return (
+                            <div data-testid={`sem-vinculo-motivo-${l.contractKey}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: m.tipo === 'GESTOR' ? 'var(--color-warning-text)' : '#0f172a' }}>{m.titulo}</span>
+                              <span style={{ fontSize: '0.76rem', color: '#475569' }}>{m.detalhe}</span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td data-label="Ata provável" style={{ ...carteiraTd, minWidth: '190px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>

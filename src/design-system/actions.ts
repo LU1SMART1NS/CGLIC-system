@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, ArrowLeftRight, ArrowRight, Ban, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, FileSearch, FileX, Link2, Pencil, Plus,
+  ArrowLeft, ArrowLeftRight, ArrowRight, Ban, Check, FlaskConical, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, FileSearch, FileX, Link2, Pencil, Plus,
   RefreshCw, RotateCcw, Search, Trash2, Unlink, UserCheck, UserPlus, UserX, X, XCircle,
   type LucideIcon
 } from 'lucide-react';
@@ -54,6 +54,7 @@ export const ACTIONS = {
   exportar: { label: 'Exportar', icon: Download, variant: 'outline' },
   copiar: { label: 'Copiar', icon: Copy, variant: 'outline' },
   sincronizar: { label: 'Sincronizar', icon: RefreshCw, variant: 'outline' },
+  simular: { label: 'Simular', icon: FlaskConical, variant: 'outline' },
   escolherAta: { label: 'Escolher ata', icon: FileSearch, variant: 'outline' },
   reativar: { label: 'Reativar', icon: UserCheck, variant: 'outline' },
   atribuir: { label: 'Atribuir', icon: UserPlus, variant: 'outline' },

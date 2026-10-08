@@ -25,6 +25,32 @@ interface LinkRow {
   item_key: string;
   contract_key: string;
   quantidade_lida_em: string | null;
+  origem?: string;
+}
+
+const PAGINA = 1000;
+
+/**
+ * Vínculos que esta rotina relê na API. Os do sistema (origem AUTOMATICO, migration 95) ficam de fora: a quantidade
+ * deles é copiada de itens_contrato a cada hora pelo próprio banco. Paginado: o banco devolve no máximo 1000 linhas.
+ */
+async function fetchLinksParaReler(): Promise<LinkRow[]> {
+  if (!supabase) return [];
+  let colunas = 'id, item_key, contract_key, quantidade_lida_em, origem';
+  const rows: LinkRow[] = [];
+  for (let desde = 0; ; desde += PAGINA) {
+    let { data, error } = await supabase.from('arp_item_contract_links').select(colunas).order('id', { ascending: true }).range(desde, desde + PAGINA - 1);
+    // Antes da migration 95 não existe a coluna origem.
+    if (error && colunas.includes('origem') && String((error as { code?: string }).code) === '42703') {
+      colunas = 'id, item_key, contract_key, quantidade_lida_em';
+      ({ data, error } = await supabase.from('arp_item_contract_links').select(colunas).order('id', { ascending: true }).range(desde, desde + PAGINA - 1));
+    }
+    if (error) throw error;
+    const pagina = (data ?? []) as unknown as LinkRow[];
+    rows.push(...pagina);
+    if (pagina.length < PAGINA) break;
+  }
+  return rows.filter((r) => r.origem !== 'AUTOMATICO');
 }
 
 export function pickStaleLinksByContract(links: LinkRow[], now = Date.now(), force = false): Map<string, LinkRow[]> {
@@ -42,10 +68,7 @@ export async function refreshAllLinkedItemQuantities(options: { force?: boolean;
   const summary: ItemSaldoRefreshSummary = { contratos: 0, itensAtualizados: 0, falhas: [] };
   if (!isSupabaseConfigured || !supabase) return summary;
 
-  const { data, error } = await supabase.from('arp_item_contract_links').select('item_key, contract_key, quantidade_lida_em');
-  if (error) throw error;
-
-  const stale = pickStaleLinksByContract((data ?? []) as LinkRow[], options.now, options.force);
+  const stale = pickStaleLinksByContract(await fetchLinksParaReler(), options.now, options.force);
   if (stale.size === 0) return summary;
 
   const contractsByKey = new Map<string, Awaited<ReturnType<typeof fetchContratosParaTela>>[number]>();
