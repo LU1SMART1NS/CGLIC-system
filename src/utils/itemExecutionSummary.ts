@@ -1,37 +1,29 @@
-import type { ItemEmpenhoVinculo } from '../types/itemEmpenhoVinculo';
+import type { EmpenhoDoItem, ExecucaoNoContrato } from './empenhoDoItem';
 
 const EPS = 0.0001;
-const sameKey = (a?: string | null, b?: string | null) => (a || '').trim().toUpperCase() === (b || '').trim().toUpperCase();
 
-/** Execução de UM contrato no item: quanto foi contratado, empenhado e o que ainda falta confirmar ou empenhar. */
+/** Execução de UM contrato no item: quanto foi contratado, empenhado e quantas notas ainda faltam vincular aos itens. */
 export interface ContractExecution {
   /** Quantidade do item no contrato segundo a API; nula quando ainda não foi lida. */
   contratado: number | null;
-  /** Soma das quantidades dos empenhos já confirmados (API ou gestor). */
+  /** Soma das parcelas deste item nas notas vinculadas aos itens (em unidades). */
   empenhado: number;
-  /** Empenhos sem quantidade confirmada. */
-  pendentes: number;
-  /** Soma das quantidades sugeridas dos empenhos pendentes (estimativa por valor). */
-  pendentesSugerido: number;
+  /** Notas do contrato ainda a vincular aos itens que podem conter este item. */
+  aVincular: number;
+  /** O contrato não tem itens na fonte: as notas não são divididas por item. */
+  semItens: boolean;
   /** Contratado menos empenhado; nulo sem a quantidade contratada. Negativo = empenhado acima do contratado. */
   aEmpenhar: number | null;
 }
 
-export function summarizeContractExecution(
-  contractKey: string,
-  contratado: number | null | undefined,
-  vinculos: ItemEmpenhoVinculo[]
-): ContractExecution {
-  const rows = vinculos.filter((v) => sameKey(v.contractKey, contractKey));
-  const empenhado = rows.reduce((sum, v) => sum + (v.quantidade ?? 0), 0);
-  const pendentesRows = rows.filter((v) => v.quantidade == null);
-  const pendentesSugerido = pendentesRows.reduce((sum, v) => sum + (v.quantidadeSugerida ?? 0), 0);
+export function summarizeContractExecution(contratado: number | null | undefined, execucao: ExecucaoNoContrato | undefined): ContractExecution {
+  const empenhado = execucao?.empenhado ?? 0;
   const base = contratado == null ? null : contratado;
   return {
     contratado: base,
     empenhado,
-    pendentes: pendentesRows.length,
-    pendentesSugerido,
+    aVincular: execucao?.aVincular.length ?? 0,
+    semItens: execucao?.semItens ?? false,
     aEmpenhar: base == null ? null : base - empenhado
   };
 }
@@ -44,31 +36,35 @@ export interface ItemExecutionSummary {
   contratosSemQuantidade: number;
   saldoAta: number;
   empenhado: number;
-  pendentes: number;
-  pendentesSugerido: number;
   aEmpenhar: number;
+  /** Notas dos contratos do item ainda a vincular aos itens que podem conter este item (e o valor delas). */
+  notasAVincular: number;
+  valorAVincular: number;
+  /** Contratos sem itens na fonte e o valor das notas deles (só referência: não conta no empenhado). */
+  contratosSemItens: number;
+  valorSemDivisao: number;
 }
 
 export function summarizeItemExecution(params: {
   homologado: number;
   /** Quantidade contratada de cada contrato vinculado; nulo = ainda não lida. */
   contratados: Array<number | null | undefined>;
-  vinculos: ItemEmpenhoVinculo[];
+  empenho: EmpenhoDoItem;
 }): ItemExecutionSummary {
-  const { homologado, contratados, vinculos } = params;
+  const { homologado, contratados, empenho } = params;
   const contratado = contratados.reduce<number>((sum, q) => sum + (q ?? 0), 0);
-  const contratosSemQuantidade = contratados.filter((q) => q == null).length;
-  const empenhado = vinculos.reduce((sum, v) => sum + (v.quantidade ?? 0), 0);
-  const pendentesRows = vinculos.filter((v) => v.quantidade == null);
+  const execucoes = [...empenho.porContrato.values()];
   return {
     homologado,
     contratado,
-    contratosSemQuantidade,
+    contratosSemQuantidade: contratados.filter((q) => q == null).length,
     saldoAta: homologado - contratado,
-    empenhado,
-    pendentes: pendentesRows.length,
-    pendentesSugerido: pendentesRows.reduce((sum, v) => sum + (v.quantidadeSugerida ?? 0), 0),
-    aEmpenhar: contratado - empenhado
+    empenhado: empenho.empenhado,
+    aEmpenhar: contratado - empenho.empenhado,
+    notasAVincular: empenho.aVincular.length,
+    valorAVincular: empenho.aVincular.reduce((s, d) => s + d.valorNota, 0),
+    contratosSemItens: empenho.contratosSemItens,
+    valorSemDivisao: execucoes.reduce((s, e) => s + e.valorSemDivisao, 0)
   };
 }
 

@@ -19,7 +19,8 @@ const STALE = 2 * 60 * 1000;
 /** Chaves de cache que uma mudança de alocação ou de vínculo precisa invalidar. */
 export const CARTEIRA_ALOCACOES_KEY = ['carteira-alocacoes'] as const;
 export const CARTEIRA_VINCULOS_KEY = ['carteira-vinculos-itens'] as const;
-export const CARTEIRA_EMPENHOS_KEY = ['carteira-empenhos-itens'] as const;
+/** Sob o prefixo do vínculo das notas aos itens: vincular ou desfazer relê o empenhado da carteira. */
+export const CARTEIRA_EMPENHOS_KEY = ['contrato-empenho-distribuicao', 'carteira-itens'] as const;
 
 /**
  * Dados de execução por item da carteira: alocação por unidade interna, quantidade contratada e empenhada.

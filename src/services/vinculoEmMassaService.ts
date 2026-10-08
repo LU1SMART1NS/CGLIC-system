@@ -1,6 +1,5 @@
 import { saveArpContractItemLinks } from './arpContractLinkService';
 import { syncContractItemQuantity } from './contractItemQuantitySyncService';
-import { syncItemContractEmpenhos } from './itemContractEmpenhoService';
 import { saveContractManagerRpc } from '../adapters/contractManagementRpcAdapter';
 import type { ContractDashboardRecord } from '../types';
 
@@ -64,37 +63,18 @@ export async function vincularContrato(plano: PlanoVinculo): Promise<ResultadoVi
       avisos.push(`gestor ${plano.gestorFinal.nome} (troque na Central)`);
     }
   }
+  // Quantidade contratada de cada item (entra no saldo). O empenho do item vem do vínculo das notas aos itens.
   for (const item of plano.itens) {
-    let unitPrice = item.valorUnitario;
     try {
-      const q = await syncContractItemQuantity({
+      await syncContractItemQuantity({
         numeroAta: plano.numeroAta,
         uasg: plano.uasg,
         numeroItem: item.numeroItem,
         contractKey: plano.contractKey,
         contract: plano.contract
       });
-      // O preço unitário do próprio contrato é a base certa da estimativa dos empenhos.
-      if (q.valorUnitario) unitPrice = q.valorUnitario;
     } catch {
       avisos.push(`quantidade do item ${item.numeroItem}`);
-    }
-    try {
-      await syncItemContractEmpenhos({
-        numeroAta: plano.numeroAta,
-        uasg: plano.uasg,
-        numeroItem: item.numeroItem,
-        contract: {
-          contractKey: plano.contractKey,
-          uasg: plano.contract.uasg,
-          numero: plano.contract.numero,
-          ano: plano.contract.ano,
-          contratoId: plano.contract.contratoId
-        },
-        unitPrice
-      });
-    } catch {
-      avisos.push(`empenhos do item ${item.numeroItem}`);
     }
   }
   return { ...base, ok: true, itens: plano.itens.length, avisos };

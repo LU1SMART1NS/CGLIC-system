@@ -2,84 +2,95 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ContractEmpenhosPanel } from '../ContractEmpenhosPanel';
-import type { ItemEmpenhoVinculo } from '../../../types/itemEmpenhoVinculo';
+import { mapDistribuicao } from '../../../services/distribuicaoEmpenhoService';
+import { montarEmpenhoDoItem } from '../../../utils/empenhoDoItem';
 
-const v = (id: string, numero: string, over: Partial<ItemEmpenhoVinculo> = {}): ItemEmpenhoVinculo => ({
-  id, itemKey: '00059/2025-200331-00001', empenhoId: id, quantidade: null, fonte: null,
-  quantidadeSugerida: null, contractKey: '200331-00126-2026',
-  empenho: { canonicalKey: numero, numero, ano: 2026, uasg: '200330', dataEmissao: '2026-03-27', valorEmpenhado: 11152 },
-  ...over
-});
-
-const vinculos = [
-  v('1', '2026NE000039', { quantidade: 8, fonte: 'API' }),
-  v('2', '2026NE000040', { quantidade: 21, fonte: 'USUARIO' }),
-  v('3', '2026NE000051', { quantidadeSugerida: 7 }),
-  v('4', '2026NE000096', { quantidadeSugerida: 4 }),
-  v('5', '2026NE000160', { contractKey: '200331-00160-2026', quantidade: 400, fonte: 'API' })
-];
+// Contrato 00002/2025 (real): item 43 (capacete, R$ 3.500), 13 (placa, R$ 4.900).
+const nota = (o: any) =>
+  mapDistribuicao({ contrato_empenho_id: o.ne, contract_key: 'K', empenho_id: o.ne, numero_oficial: o.ne, valor_nota: 0, parcelas: [], sugestao: [], situacao: 'A_DISTRIBUIR', uasg_emitente: '200331', ...o });
+const execucao = montarEmpenhoDoItem({
+  numeroItem: 43,
+  contratos: [
+    {
+      contractKey: 'K',
+      valorUnitario: 3500,
+      distribuicoes: [
+        nota({ ne: '2024NE000337', data_emissao: '2024-12-27', valor_nota: 1197000, situacao: 'DISTRIBUIDA', origem: 'USUARIO', parcelas: [{ numero_item: 43, valor: 1197000 }], distribuido_por_nome: 'Maria', distribuido_em: '2026-10-07T14:00:00Z' }),
+        nota({ ne: '2024NE000301', valor_nota: 127400, situacao: 'DISTRIBUIDA', origem: 'USUARIO', parcelas: [{ numero_item: 13, valor: 127400 }] }),
+        nota({ ne: '2024NE000330', valor_nota: 147000, sugestao_tipo: 'VARIAS_POSSIBILIDADES', sugestao: [{ numero_item: 13, quantidade: 30 }, { numero_item: 43, quantidade: 42 }] }),
+        nota({ ne: '2024NE000328', valor_nota: 14700, sugestao_tipo: 'MULTIPLO_DO_PRECO', sugestao: [{ numero_item: 13, quantidade: 3 }] })
+      ]
+    }
+  ]
+}).porContrato.get('K');
 
 const base: React.ComponentProps<typeof ContractEmpenhosPanel> = {
-  contractKey: '200331-00126-2026',
-  contratado: 60,
-  vinculos,
+  numeroItem: 43,
+  contratado: 342,
+  execucao,
   loading: false,
-  canEdit: true,
   canLinkEmpenhos: true,
-  allocationOptions: [],
+  allocationOptions: [{ id: 'a1', unitName: 'DFNSP', saldoQty: 0 }],
   linkedAllocationId: () => '',
-  onConfirm: vi.fn(),
-  onConfirmAll: vi.fn(),
   onLinkAllocation: vi.fn(),
+  onVincularAosItens: vi.fn(),
   busy: false
 };
-
 const html = (over: Partial<typeof base> = {}) => renderToStaticMarkup(<ContractEmpenhosPanel {...base} {...over} />);
 
-describe('ContractEmpenhosPanel', () => {
-  it('lista só os empenhos do contrato, com o estado de cada um', () => {
+describe('ContractEmpenhosPanel (notas do contrato para este item)', () => {
+  it('mostra só as notas vinculadas a este item, com parcela, quantidade e quem vinculou', () => {
     const out = html();
-    expect(out).toContain('2026NE000039');
-    expect(out).toContain('2026NE000051');
-    expect(out).not.toContain('2026NE000160');
-    expect(out).toContain('Oficial');
-    expect(out).toContain('Confirmada');
-    expect(out).toContain('Pendente');
+    expect(out).toContain('Notas vinculadas a este item');
+    expect(out).toContain('2024NE000337');
+    expect(out).toMatch(/R\$\s1\.197\.000,00/);
+    expect(out).toContain('342 un');
+    expect(out).toContain('por Maria em 07/10/2026');
+    // Nota de placas (item 13) não aparece como deste item.
+    expect(out).not.toContain('2024NE000301');
   });
 
   it('resume contratado, empenhado e a empenhar do contrato', () => {
     const out = html();
-    expect(out).toContain('Contratado: <strong>60</strong>');
-    expect(out).toContain('Empenhado: <strong>29</strong>');
-    expect(out).toContain('A empenhar: <strong>31</strong>');
-    expect(out).toContain('2 pendentes (11 un sugeridas)');
+    expect(out).toContain('Contratado: <strong>342</strong>');
+    expect(out).toContain('Empenhado: <strong>342</strong>');
+    expect(out).toContain('A empenhar: <strong>0</strong>');
   });
 
-  it('oferece aceitar todas as sugestões, com o total, e aceitar cada pendente', () => {
+  it('lista as notas a vincular, destacando "deste item" na sugestão e marcando as de outro item', () => {
     const out = html();
-    expect(out).toContain('Aceitar todas as sugestões (11 un)');
-    expect(out).toContain('Aceitar');
+    expect(out).toContain('Notas do contrato ainda a vincular aos itens');
+    expect(out).toContain('42 un deste item');
+    expect(out).toContain('2024NE000328');
+    expect(out).toContain('outro item');
+    expect(out).toContain('Vincular aos itens');
   });
 
-  it('oferece desfazer só nas quantidades confirmadas pelo gestor', () => {
-    expect(html()).toContain('Desfazer');
-    expect(html({ vinculos: [vinculos[0]] })).not.toContain('Desfazer');
-  });
-
-  it('quem não edita não vê ações de confirmação', () => {
-    const out = html({ canEdit: false });
+  it('sem confirmação de quantidade por item: nada de Aceitar, Confirmar ou Desfazer', () => {
+    const out = html();
     expect(out).not.toContain('Aceitar');
+    expect(out).not.toContain('Confirmar');
     expect(out).not.toContain('Desfazer');
+    expect(out).not.toContain('Pendente');
   });
 
-  it('mostra a mensagem de vazio quando o contrato não tem empenhos lidos', () => {
-    expect(html({ vinculos: [] })).toContain('Nenhum empenho lido deste contrato');
+  it('quem não vincula não vê o botão Vincular aos itens', () => {
+    expect(html({ onVincularAosItens: undefined })).not.toContain('Vincular aos itens');
   });
 
-  it('sem unidades internas cadastradas avisa em vez de mostrar o seletor', () => {
-    expect(html()).toContain('Sem unidades cadastradas');
-    const out = html({ allocationOptions: [{ id: 'a1', unitName: 'DTI', saldoQty: 10 }] });
-    expect(out).toContain('Não vinculado');
-    expect(out).toContain('DTI');
+  it('a nota vinculada tem o seletor de unidade interna; sem unidades alocadas, avisa', () => {
+    expect(html()).toContain('Unidade interna da nota 2024NE000337');
+    expect(html({ allocationOptions: [] })).toContain('Sem unidades alocadas');
+  });
+
+  it('contrato sem itens na fonte: avisa que as notas não têm divisão por item', () => {
+    const semItens = montarEmpenhoDoItem({
+      numeroItem: 43,
+      contratos: [{ contractKey: 'S', valorUnitario: 3500, distribuicoes: [nota({ ne: 'X', contract_key: 'S', valor_nota: 7500, situacao: 'SEM_ITENS' })] }]
+    }).porContrato.get('S');
+    const out = html({ execucao: semItens });
+    expect(out).toContain('contract-empenhos-sem-itens');
+    expect(out).toContain('sem divisão por item');
+    expect(out).toContain('Nenhuma nota deste contrato foi vinculada a este item ainda.');
   });
 });

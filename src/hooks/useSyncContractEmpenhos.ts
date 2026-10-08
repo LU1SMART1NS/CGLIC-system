@@ -1,3 +1,4 @@
+import { CARTEIRA_EMPENHOS_KEY } from './useCarteiraItens';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sincronizarEmpenhosDoContrato, sincronizarEmpenhosDoRegistro } from '../services/contratoEmpenhosSincronizacaoService';
 import { SINCRONIZACAO_EMPENHOS_QUERY_KEY } from './useSincronizacaoEmpenhosContrato';
@@ -48,7 +49,7 @@ export function useSyncContractEmpenhos(contractKey: string) {
       try {
         return { ...result, itens_refresh: await refreshLinkedItemsOfContract(params.refreshItems, contractKey) };
       } catch (err: any) {
-        return { ...result, itens_refresh: { itens: 0, pendentes: 0, falhas: [{ itemKey: '', motivo: err?.message || 'Itens não atualizados.' }] } };
+        return { ...result, itens_refresh: { itens: 0, falhas: [{ itemKey: '', motivo: err?.message || 'Itens não atualizados.' }] } };
       }
     },
     onSuccess: () => {
@@ -58,10 +59,11 @@ export function useSyncContractEmpenhos(contractKey: string) {
       queryClient.invalidateQueries({ queryKey: ['v_empenhos_resumo'] });
       queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['contract-empenhos', contractKey] });
-      queryClient.invalidateQueries({ queryKey: ['contract-empenho-item-links', contractKey] });
       queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao', contractKey] });
+      // Notas novas de contrato de um item são vinculadas ao item na hora (gatilho da migration 94): muda o empenhado
+      // dos itens na Carteira.
+      queryClient.invalidateQueries({ queryKey: CARTEIRA_EMPENHOS_KEY });
       // Itens da ata ligados ao contrato: empenhos, quantidades e saldos
-      queryClient.invalidateQueries({ queryKey: ['item-empenho-vinculos'] });
       queryClient.invalidateQueries({ queryKey: ['contract-item-quantities'] });
       queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
       queryClient.invalidateQueries({ queryKey: ['contract-events', contractKey] });

@@ -49,8 +49,8 @@ describe('buildCarteiraItemRows', () => {
       ],
       links: [{ itemKey: '00001/2025-200331-00001', contractKey: 'C1', quantidadeContratada: 60 }],
       empenhos: [
-        { itemKey: '00001/2025-200331-00001', quantidade: 60 },
-        { itemKey: '00001/2025-200331-00001', quantidade: null }
+        { itemKey: '00001/2025-200331-00001', quantidade: 40 },
+        { itemKey: '00001/2025-200331-00001', quantidade: 20 }
       ]
     });
 
@@ -61,11 +61,10 @@ describe('buildCarteiraItemRows', () => {
     expect(a.alocadoPorUnidade).toEqual({ cglic: 80 });
     expect(a.nivelAlocacao).toBe('TOTAL');
     expect(a.consumoPct).toBe(25);
-    // Empenho pendente (quantidade nula) não conta.
+    // Soma as quantidades das parcelas do item nas notas vinculadas aos itens.
     expect(a.contratada).toBe(60);
     expect(a.empenhado).toBe(60);
     expect(a.nivelEmpenho).toBe('TOTAL');
-    expect(a.empenhosPendentes).toBe(1);
     expect(a.gestorNome).toBe('Marina');
     // Item 2: sem saldo sincronizado usa o homologado da ata; 10 de 50 = parcial; sem contrato nem empenho.
     expect(b.quantitativoSenasp).toBe(50);

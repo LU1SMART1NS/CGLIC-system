@@ -192,11 +192,11 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     expect(semLink).not.toContain('>nº 90001/2026</button>');
   });
 
-  it('15. empenhos pendentes de confirmação ganham o selo de atenção; zero fica neutro', () => {
-    const com = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, empenhosPendentes: 3 }} />);
-    expect(com).toContain('Empenhos pendentes');
+  it('15. notas a vincular aos itens ganham o selo de atenção; zero fica neutro', () => {
+    const com = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, notasAVincular: 3 }} />);
+    expect(com).toContain('Notas a vincular');
     expect(com).toContain('Atenção');
-    const sem = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, empenhosPendentes: 0 }} />);
+    const sem = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, notasAVincular: 0 }} />);
     expect(sem).not.toContain('Atenção');
   });
 
@@ -282,7 +282,7 @@ describe('ItemHero — alocação interna, participação da SENASP e valor unit
     const html = render({});
     expect(html).toContain('de 100 · 30% contratado');
     expect(html).toContain('title="Saldo de 70 un do quantitativo SENASP de 100 un');
-    expect(html).toContain('a confirmar');
+    expect(html).toContain('aos itens do contrato');
     expect(html).toContain('consumo confere');
   });
 

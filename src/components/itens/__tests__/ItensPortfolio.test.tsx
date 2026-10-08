@@ -31,7 +31,6 @@ const row = (over: Partial<CarteiraItemRow> = {}): CarteiraItemRow => ({
   nivelAlocacao: 'PARCIAL',
   contratada: 50,
   empenhado: 50,
-  empenhosPendentes: 0,
   nivelEmpenho: 'TOTAL',
   ...over
 });
@@ -73,13 +72,6 @@ describe('ItensPortfolioTable', () => {
     expect(html).toContain('title="TABLET, TELA SUPERIOR A 10 POL, MEMÓRIA RAM MÍNIMO 8 GB"');
     // O fornecedor é o mesmo para todos os itens da ata: não se repete na linha (a busca ainda o encontra).
     expect(html).not.toContain('VANGUARDA INFORMATICA LTDA');
-  });
-
-  it('avisa os empenhos ainda sem quantidade confirmada', () => {
-    const html = renderToStaticMarkup(
-      <ItensPortfolioTable rows={[row({ empenhosPendentes: 2 })]} totalItens={1} unidade="TODAS" onSelectItem={noop} onResetFilters={noop} />
-    );
-    expect(html).toContain('2 pendentes');
   });
 
   it('avisa quando o item não tem quantidade contratada', () => {

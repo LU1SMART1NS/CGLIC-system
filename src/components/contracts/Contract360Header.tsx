@@ -128,9 +128,6 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
     if (!itensRefresh || (itensRefresh.itens === 0 && itensRefresh.falhas.length === 0)) return '';
     const ok = itensRefresh.itens - itensRefresh.falhas.length;
     const partes = [`${ok} ${ok === 1 ? 'item da ata atualizado' : 'itens da ata atualizados'}`];
-    if (itensRefresh.pendentes > 0) {
-      partes.push(`${itensRefresh.pendentes} ${itensRefresh.pendentes === 1 ? 'quantidade pendente' : 'quantidades pendentes'} de confirmação`);
-    }
     if (itensRefresh.falhas.length > 0) {
       partes.push(`${itensRefresh.falhas.length} ${itensRefresh.falhas.length === 1 ? 'item não pôde ser atualizado' : 'itens não puderam ser atualizados'}`);
     }

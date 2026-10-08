@@ -18,7 +18,7 @@ const base: React.ComponentProps<typeof AllocationsTab> = {
   remaining: 501,
   percentAllocated: 37.4,
   rows: [
-    { id: 'a1', unitName: 'DSUSP', allocatedQty: 300, empenhado: 120, pendentes: 2, pendentesSugerido: 11, vinculados: 3 }
+    { id: 'a1', unitName: 'DSUSP', allocatedQty: 300, empenhado: 120, vinculados: 3 }
   ],
   semUnidade: { empenhado: 0, count: 0 },
   departments,
@@ -46,17 +46,17 @@ describe('AllocationsTab', () => {
     expect(out).not.toContain('kpi-card');
   });
 
-  it('lista a alocação com empenhado, a empenhar e as pendências da unidade', () => {
+  it('lista a alocação com empenhado e a empenhar da unidade (sem "pendentes": a quantidade vem do vínculo aos itens)', () => {
     const out = html();
     expect(out).toContain('DSUSP');
     expect(out).toContain('300');
     expect(out).toContain('120');
     expect(out).toContain('180');
-    expect(out).toContain('2 pendentes');
+    expect(out).not.toContain('pendente');
   });
 
   it('a empenhar negativo (empenhado acima do alocado) aparece em vermelho', () => {
-    const out = html({ rows: [{ id: 'a1', unitName: 'DSUSP', allocatedQty: 10, empenhado: 25, pendentes: 0, pendentesSugerido: 0, vinculados: 0 }] });
+    const out = html({ rows: [{ id: 'a1', unitName: 'DSUSP', allocatedQty: 10, empenhado: 25, vinculados: 0 }] });
     expect(out).toContain('-15');
     expect(out).toContain('var(--danger)');
   });
@@ -71,8 +71,8 @@ describe('AllocationsTab', () => {
 
   it('o botão Alocar fica ativo mesmo sem unidade disponível: a explicação vem ao clicar', () => {
     const todas = html({ rows: [
-      { id: 'a1', unitName: 'DSUSP', allocatedQty: 1, empenhado: 0, pendentes: 0, pendentesSugerido: 0, vinculados: 0 },
-      { id: 'a2', unitName: 'DGE', allocatedQty: 1, empenhado: 0, pendentes: 0, pendentesSugerido: 0, vinculados: 0 }
+      { id: 'a1', unitName: 'DSUSP', allocatedQty: 1, empenhado: 0, vinculados: 0 },
+      { id: 'a2', unitName: 'DGE', allocatedQty: 1, empenhado: 0, vinculados: 0 }
     ] });
     expect(todas).toContain('title="Alocar quantitativo a uma unidade interna"');
     expect(todas).not.toMatch(/aria-disabled="true"[^>]*title="Alocar quantitativo/);
@@ -81,8 +81,8 @@ describe('AllocationsTab', () => {
 
   it('com empenho vinculado a lixeira fica desativada e diz por quê; sem empenho fica ativa', () => {
     const out = html({ rows: [
-      { id: 'a1', unitName: 'DSUSP', allocatedQty: 300, empenhado: 120, pendentes: 2, pendentesSugerido: 11, vinculados: 3 },
-      { id: 'a2', unitName: 'DGE', allocatedQty: 50, empenhado: 0, pendentes: 0, pendentesSugerido: 0, vinculados: 0 }
+      { id: 'a1', unitName: 'DSUSP', allocatedQty: 300, empenhado: 120, vinculados: 3 },
+      { id: 'a2', unitName: 'DGE', allocatedQty: 50, empenhado: 0, vinculados: 0 }
     ] });
     expect(out).toContain('DSUSP tem 3 empenhos vinculados. Para remover, desvincule os empenhos na aba Contratos e empenhos.');
     expect(out).toMatch(/aria-label="DSUSP tem 3 empenhos vinculados[^"]*"[^>]*disabled=""|disabled=""[^>]*aria-label="DSUSP tem 3 empenhos vinculados/);
@@ -118,21 +118,21 @@ describe('AllocationsTab', () => {
     expect(html({ error: 'Limite excedido!' })).toContain('Limite excedido!');
   });
 
-  it('avisa no topo, com o mesmo desenho da faixa de pendências, dos empenhos confirmados ainda sem unidade', () => {
+  it('avisa no topo, com o mesmo desenho da faixa de pendências, das notas vinculadas a este item ainda sem unidade', () => {
     const out = html({ semUnidade: { empenhado: 34, count: 3 } });
     expect(out).toContain('empenhos-sem-unidade');
     expect(out).toContain('background:var(--color-warning-bg)');
-    expect(out).toContain('empenhos confirmados');
+    expect(out).toContain('notas vinculadas a este item estão');
     expect(out).toContain('(34 un)');
-    expect(out).toContain('Vincular em Contratos e empenhos');
+    expect(out).toContain('Escolher a unidade em Contratos e empenhos');
     expect(html()).not.toContain('empenhos-sem-unidade');
     // fica logo abaixo do resumo, antes da tabela
     expect(out.indexOf('allocations-summary')).toBeLessThan(out.indexOf('empenhos-sem-unidade'));
     expect(out.indexOf('empenhos-sem-unidade')).toBeLessThan(out.indexOf('Alocações'));
   });
 
-  it('no singular o aviso concorda: "1 empenho confirmado"', () => {
-    expect(html({ semUnidade: { empenhado: 5, count: 1 } })).toContain('empenho confirmado');
+  it('no singular o aviso concorda: "1 nota vinculada a este item está"', () => {
+    expect(html({ semUnidade: { empenhado: 5, count: 1 } })).toContain('nota vinculada a este item está');
   });
 
   it('sem alocações mostra o estado vazio', () => {
