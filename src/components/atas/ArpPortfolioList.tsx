@@ -13,7 +13,7 @@ import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
@@ -233,7 +233,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                           descricao={`fornecedor ${card.fornecedorNome}`}
                           onFilter={onFilter ? () => onFilter('busca', card.fornecedorNome) : undefined}
                         >
-                          <div title={card.fornecedorNome} style={carteiraSubtitle}>{card.fornecedorNome}</div>
+                          <div title={card.fornecedorNome} style={carteiraFornecedor}>{card.fornecedorNome}</div>
                         </CarteiraCellFilter>
                       )}
                       </div>

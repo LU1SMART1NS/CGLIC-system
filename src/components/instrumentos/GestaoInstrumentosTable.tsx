@@ -7,7 +7,7 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
-import { carteiraSubtitle, carteiraTh as th, carteiraTd as td } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTh as th, carteiraTd as td } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import {
   getInstrumentoInfo,
@@ -182,11 +182,11 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                       <>
                         <div title={item.objetoItem} style={{ fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.objetoItem}</div>
                         {item.fornecedorNome && (
-                          <div title={item.fornecedorNome} style={carteiraSubtitle}>{item.fornecedorNome}</div>
+                          <div title={item.fornecedorNome} style={carteiraFornecedor}>{item.fornecedorNome}</div>
                         )}
                       </>
                     ) : fornecedor ? (
-                      <span title={fornecedor}>{fornecedor}</span>
+                      <span title={fornecedor} style={{ textTransform: 'uppercase' }}>{fornecedor}</span>
                     ) : (
                       <span style={{ color: '#94a3b8' }}>—</span>
                     )}

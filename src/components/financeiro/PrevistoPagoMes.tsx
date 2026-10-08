@@ -3,7 +3,7 @@ import { ActionButton, StatusBadge } from '../../design-system';
 import { useFaturasCarteira } from '../../hooks/useFinanceiroCarteira';
 import { compararPrevistoPago, type EnvioPrevisao } from '../../services/previsaoMensalService';
 import { formatCurrency } from '../carteira/carteiraFormat';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import type { ContratoDoFinanceiro } from './useContratosDoFinanceiro';
 import { rotuloDoMes } from './financeiroFormat';
 
@@ -79,7 +79,7 @@ export const PrevistoPagoMes: React.FC<{
                     <tr key={l.contractKey} data-testid={`previsto-pago-${l.contractKey}`}>
                       <td data-role="id" style={{ ...carteiraTd, minWidth: '220px', maxWidth: '340px' }}>
                         <div style={{ fontWeight: 800, color: 'var(--primary)' }}>{c.numero}</div>
-                        <div title={c.fornecedorNome} style={carteiraSubtitle}>{c.fornecedorNome}</div>
+                        <div title={c.fornecedorNome} style={carteiraFornecedor}>{c.fornecedorNome}</div>
                       </td>
                       <td data-label="Previsto" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(l.previsto)}</td>
                       <td data-label="Pago" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>

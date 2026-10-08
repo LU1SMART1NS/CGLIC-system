@@ -94,7 +94,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
                 <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{link.numeroContratoFormatado}</strong>
               )}
               <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
-                {link.fornecedorNome} {link.valorGlobal ? `• ${formatCurrency(link.valorGlobal)}` : ''}
+                {link.fornecedorNome?.toUpperCase()} {link.valorGlobal ? `• ${formatCurrency(link.valorGlobal)}` : ''}
               </p>
               <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.15rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                 Item {itemNumberFromKey(link.itemKey)}

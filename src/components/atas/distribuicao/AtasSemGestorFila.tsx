@@ -7,7 +7,7 @@ import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../../carteira/CarteiraRowLink';
 import { ActionButton } from '../../../design-system/components/ActionButton';
-import { carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
@@ -206,7 +206,7 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
                             {ata.numeroAta}
                           </CarteiraIdLink>
                           {ata.fornecedorNome && (
-                            <div title={ata.fornecedorNome} style={carteiraSubtitle}>
+                            <div title={ata.fornecedorNome} style={carteiraFornecedor}>
                               {ata.fornecedorNome}
                             </div>
                           )}

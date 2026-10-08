@@ -7,7 +7,7 @@ import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink } from '../../carteira/CarteiraRowLink';
-import { carteiraSelect, carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraSelect, carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
@@ -589,7 +589,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                           Contrato {l.numero}
                         </CarteiraIdLink>
                         {l.fornecedorNome && (
-                          <div title={l.fornecedorNome} style={carteiraSubtitle}>
+                          <div title={l.fornecedorNome} style={carteiraFornecedor}>
                             {l.fornecedorNome}
                           </div>
                         )}
