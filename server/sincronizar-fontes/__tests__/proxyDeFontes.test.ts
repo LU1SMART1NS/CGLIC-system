@@ -50,6 +50,24 @@ describe('instalarProxyDeFontes', () => {
     expect(original).toHaveBeenCalledWith('https://bouutpmxexvwppcmmhdi.supabase.co/rest/v1/x', { method: 'POST' });
   });
 
+  it('sem sinal do chamador, cada chamada a uma fonte ganha um tempo limite', async () => {
+    const { original, alvo } = instalar();
+    await alvo.fetch('/api-pncp/x');
+    const [, init] = original.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(init.signal?.aborted).toBe(false);
+  });
+
+  it('fonte que não responde no tempo: falha como falha de rede (TypeError), e não segura a execução', async () => {
+    const pendurado = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+    }));
+    const alvo = { fetch: pendurado as unknown as typeof fetch };
+    instalarProxyDeFontes(alvo, 20);
+    await expect(alvo.fetch('/api-arp/modulo-arp/x')).rejects.toThrow(/não respondeu em 0 s.*dadosabertos\.compras\.gov\.br/);
+    await expect(alvo.fetch('/api-arp/modulo-arp/x')).rejects.toBeInstanceOf(TypeError);
+  });
+
   it('restaurar devolve o fetch original', () => {
     const { original, alvo, restaurar } = instalar();
     expect(alvo.fetch).not.toBe(original);

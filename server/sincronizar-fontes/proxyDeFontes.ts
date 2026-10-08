@@ -27,19 +27,41 @@ export function resolverUrlDaFonte(url: string): string {
 type Fetch = typeof fetch;
 
 /**
- * Troca o `fetch` global por um que traduz os endereços das fontes e se identifica. Devolve a função que
- * restaura o original (usada nos testes).
+ * Tempo máximo de uma chamada a uma fonte. Sem isso, uma conexão que a fonte deixa pendurada (PNCP e
+ * Compras.gov.br fazem isso de vez em quando) segura a execução até a Edge Function ser derrubada pelo
+ * limite de 150 s, e a trava da sincronização fica presa por 10 minutos sem nada gravado (08/10/2026).
+ * Com o limite, a chamada falha como falha de rede: a sincronização tenta de novo e, se não der, conclui
+ * com a falha registrada e a trava liberada.
  */
-export function instalarProxyDeFontes(alvo: { fetch: Fetch } = globalThis as unknown as { fetch: Fetch }): () => void {
+export const TEMPO_LIMITE_FONTE_MS = 30_000;
+
+/**
+ * Troca o `fetch` global por um que traduz os endereços das fontes, se identifica e limita o tempo de cada
+ * chamada (quando o chamador não trouxe o próprio sinal de cancelamento). Devolve a função que restaura o
+ * original (usada nos testes).
+ */
+export function instalarProxyDeFontes(
+  alvo: { fetch: Fetch } = globalThis as unknown as { fetch: Fetch },
+  tempoLimiteMs: number = TEMPO_LIMITE_FONTE_MS
+): () => void {
   const original = alvo.fetch;
-  alvo.fetch = ((entrada: RequestInfo | URL, init?: RequestInit) => {
+  alvo.fetch = (async (entrada: RequestInfo | URL, init?: RequestInit) => {
     if (typeof entrada !== 'string') return original(entrada, init);
     const url = resolverUrlDaFonte(entrada);
     if (url === entrada) return original(entrada, init);
     const cabecalhos = new Headers(init?.headers);
     if (!cabecalhos.has('user-agent')) cabecalhos.set('user-agent', USER_AGENT_DA_SINCRONIZACAO);
     if (!cabecalhos.has('accept')) cabecalhos.set('accept', 'application/json');
-    return original(url, { ...init, headers: cabecalhos });
+    const signal = init?.signal ?? AbortSignal.timeout(tempoLimiteMs);
+    try {
+      return await original(url, { ...init, headers: cabecalhos, signal });
+    } catch (err) {
+      // TypeError é o que o fetch lança em falha de rede: a sincronização trata igual (nova tentativa).
+      if ((err as { name?: string })?.name === 'TimeoutError') {
+        throw new TypeError(`A fonte não respondeu em ${Math.round(tempoLimiteMs / 1000)} s: ${url}`);
+      }
+      throw err;
+    }
   }) as Fetch;
   return () => {
     alvo.fetch = original;
