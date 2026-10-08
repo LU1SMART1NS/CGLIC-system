@@ -71,6 +71,11 @@ export function podeConterItem(d: Pick<DistribuicaoDoEmpenho, 'sugestaoTipo' | '
   return d.sugestao[0].numeroItem === numeroItem;
 }
 
+/** Mais recentes primeiro; empate (ou sem data) pelo número da nota. */
+function maisRecenteDepois(a: { dataEmissao: string | null; numeroOficial: string }, b: { dataEmissao: string | null; numeroOficial: string }): number {
+  return (b.dataEmissao ?? '').localeCompare(a.dataEmissao ?? '') || a.numeroOficial.localeCompare(b.numeroOficial);
+}
+
 /** Monta a execução do item em cada contrato vinculado, a partir das notas de cada contrato. */
 export function montarEmpenhoDoItem(input: {
   numeroItem: number;
@@ -111,7 +116,11 @@ export function montarEmpenhoDoItem(input: {
         (podeConterItem(d, input.numeroItem) ? e.aVincular : e.deOutroItem).push(d);
       }
     }
-    e.parcelas.sort((a, b) => (b.dataEmissao ?? '').localeCompare(a.dataEmissao ?? ''));
+    // Ordem fixa: o banco devolve as notas sem ordem e a posição delas muda quando uma é atualizada (ao definir a
+    // quantidade), então desempata pelo número da nota para a linha não pular de lugar.
+    e.parcelas.sort(maisRecenteDepois);
+    e.aVincular.sort(maisRecenteDepois);
+    e.deOutroItem.sort(maisRecenteDepois);
     porContrato.set(c.contractKey, e);
   }
   const todas = [...porContrato.values()];
