@@ -11,7 +11,7 @@ import { canAssignManager } from '../carteira/ManagerAssign';
 import { useAuth } from '../../context/AuthContext';
 import { AtribuirGestorModal } from '../atas/distribuicao/AtribuirGestorModal';
 import { ContratosSemVinculoFila } from '../atas/distribuicao/ContratosSemVinculoFila';
-import { VinculoAutomaticoFaixa } from '../atas/distribuicao/VinculoAutomaticoFaixa';
+import { VinculoAutomaticoSimular } from '../atas/distribuicao/VinculoAutomaticoFaixa';
 import { usePendenciasVinculoAta } from '../atas/distribuicao/usePendenciasVinculoAta';
 import { buildDistribuicaoEquipe } from '../atas/distribuicao/distribuicaoEquipe';
 import { mesesDeVigencia } from '../atas/distribuicao/complexidade';
@@ -80,6 +80,8 @@ export const ContratosAtaPage: React.FC = () => {
       <PageHeader
         title="Contratos a vincular à ata"
         subtitle="Contratos sem item de ata vinculado, com a ata provável pela compra e pelo fornecedor. Vinculado, o contrato segue o gestor da ata."
+        hint={'Contratos vigentes ainda sem vínculo com ata. Clique no nome da ata para conferir e vincular; os que a API confirma podem ser vinculados vários de uma vez. Se a ata certa não foi sugerida, use "Escolher ata". Se o contrato não veio de ata, marque "Não pertence a nenhuma ata" e escolha o gestor.'}
+        badge={role === 'admin' ? <VinculoAutomaticoSimular /> : undefined}
         icon={<Link2 size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
@@ -107,8 +109,6 @@ export const ContratosAtaPage: React.FC = () => {
               isRetrying={contratos.isFetching}
             />
           )}
-
-          <VinculoAutomaticoFaixa links={links} paraEquipe={totalSemVinculo} podeRodar={role === 'admin'} />
 
           {totalSemVinculo === 0 && pendencias.naoPertencem.length === 0 ? (
             <EmptyState

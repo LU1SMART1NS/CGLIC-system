@@ -1,72 +1,24 @@
 import React from 'react';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { Modal } from '../../../design-system/components/Modal';
-import { InfoHint } from '../../../design-system/components/InfoHint';
-import { useRodarVinculoAutomatico, useUltimaExecucaoVinculo } from '../../../hooks/useVinculoAutomatico';
+import { useRodarVinculoAutomatico } from '../../../hooks/useVinculoAutomatico';
 import type { ResumoVinculoAutomatico } from '../../../services/vinculoAutomaticoService';
-import { contarVinculosAutomaticos, frasesHerancaGestor } from '../../../utils/vinculoAutomatico';
-import { formatDataHoraBR } from '../../../utils/format';
+import { frasesHerancaGestor } from '../../../utils/vinculoAutomatico';
 
 const fmt = (n: number) => n.toLocaleString('pt-BR');
 const plural = (n: number, um: string, varios: string) => `${fmt(n)} ${n === 1 ? um : varios}`;
 
-interface VinculoAutomaticoFaixaProps {
-  /** Todos os vínculos item × contrato, com a origem. */
-  links: Array<{ ataKey: string; contractKey: string; origem?: string }>;
-  /** Contratos vigentes que ficaram para a equipe (os da lista abaixo). */
-  paraEquipe: number;
-  /** Só o coordenador simula e roda na hora. */
-  podeRodar: boolean;
-}
-
 /**
- * Topo da fila "Contratos sem vínculo": o que o sistema já vinculou sozinho (migration 95), quando rodou pela última
- * vez e, para o coordenador, "Simular agora".
+ * Botão discreto (só o ícone) ao lado do título de "Contratos a vincular à ata": abre a simulação do vínculo
+ * automático (migration 95). Só o coordenador simula e roda na hora.
  */
-export const VinculoAutomaticoFaixa: React.FC<VinculoAutomaticoFaixaProps> = ({ links, paraEquipe, podeRodar }) => {
-  const { data: ultima } = useUltimaExecucaoVinculo();
+export const VinculoAutomaticoSimular: React.FC = () => {
   const [simulando, setSimulando] = React.useState(false);
-  const total = contarVinculosAutomaticos(links);
-
   return (
-    <section
-      data-testid="vinculo-automatico-faixa"
-      aria-label="Vínculo automático"
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '0.75rem 1.25rem',
-        padding: '0.85rem 1rem',
-        background: 'var(--color-info-bg)',
-        border: '1px solid var(--color-info-border)',
-        borderRadius: '8px'
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0, flex: '1 1 420px' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-          <strong style={{ fontSize: '0.92rem', color: 'var(--color-info-text-strong)' }}>Vínculo automático</strong>
-          <InfoHint
-            content="O sistema vincula sozinho o contrato à ata quando a compra, o fornecedor e os itens batem. Roda toda hora."
-            testId="vinculo-automatico-hint"
-          />
-        </span>
-        <span style={{ fontSize: '0.8rem', color: '#334155' }}>
-          {ultima ? `Última execução: ${formatDataHoraBR(ultima.executadoEm)}.` : 'Ainda não rodou.'}
-        </span>
-        <span data-testid="vinculo-automatico-numeros" style={{ fontSize: '0.8rem', color: '#0f172a', display: 'flex', flexWrap: 'wrap', gap: '0.2rem 1rem', fontVariantNumeric: 'tabular-nums' }}>
-          <span><strong>{fmt(total.vinculos)}</strong> {total.vinculos === 1 ? 'vínculo feito' : 'vínculos feitos'} pelo sistema</span>
-          <span><strong>{fmt(total.contratos)}</strong> {total.contratos === 1 ? 'contrato' : 'contratos'}</span>
-          <span><strong>{fmt(total.atas)}</strong> {total.atas === 1 ? 'ata' : 'atas'}</span>
-          <span>
-            <strong>{fmt(paraEquipe)}</strong> {paraEquipe === 1 ? 'contrato vigente ficou' : 'contratos vigentes ficaram'} para a equipe
-          </span>
-        </span>
-      </div>
-      {podeRodar && <ActionButton action="simular" size="sm" label="Simular agora" onClick={() => setSimulando(true)} data-testid="vinculo-automatico-simular" />}
+    <>
+      <ActionButton action="simular" iconOnly label="Simular vínculo automático" onClick={() => setSimulando(true)} data-testid="vinculo-automatico-simular" />
       {simulando && <SimularVinculoModal onClose={() => setSimulando(false)} />}
-    </section>
+    </>
   );
 };
 

@@ -432,12 +432,6 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
 
   return (
     <section data-testid="distribuicao-sem-vinculo" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-        Contratos vigentes ainda sem vínculo com ata. Clique no nome da ata para conferir e vincular; os que a API confirma podem ser vinculados
-        vários de uma vez. Se a ata certa não foi sugerida, use "Escolher ata". Se o contrato não veio de ata, marque "Não pertence a
-        nenhuma ata" e escolha o gestor.
-      </p>
-
       {(estado.rodando || estado.resultados.length > 0) && (
         <div
           role="status"
