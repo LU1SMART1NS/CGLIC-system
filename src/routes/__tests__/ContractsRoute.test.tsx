@@ -40,6 +40,12 @@ vi.mock('../../hooks/useCarteiraItens', () => ({
   useCarteiraItens: () => ({ unidades: [], unidadesDoContrato: new Map(), rows: [], resumoPorAta: new Map(), isLoading: false })
 }));
 
+// Contratos marcados "não pertence a ata" (consulta ao banco): cada teste escolhe.
+let semAtaConfirmados: Record<string, unknown> = {};
+vi.mock('../../hooks/useContratosSemAta', () => ({
+  useContratosSemAta: () => ({ data: semAtaConfirmados, isLoading: false })
+}));
+
 const mockContracts: ContractDashboardRecord[] = [
   {
     id: '200331-00001-2025',
@@ -109,6 +115,7 @@ const toRows = (contracts: ContractDashboardRecord[]): ContractPortfolioRow[] =>
 describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    semAtaConfirmados = {};
     // Perfil "admin" (escopo GLOBAL) por padrão — mantém o comportamento
     // histórico destes testes (carteira completa, sem filtro por gestor).
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
@@ -323,7 +330,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).not.toContain('Empresa Alfa Serviços');
   });
 
-  it('9b. a atribuição é só na Central: na carteira o admin vê o atalho para lá, não o seletor', () => {
+  it('9b. sem gestor, o admin vê o atalho para onde o gestor se resolve, não o seletor', () => {
     vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockReturnValue({
       data: mockContracts,
       isLoading: false,
@@ -333,12 +340,23 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
       refetch: vi.fn(),
       refresh: vi.fn()
     } as any);
-
+    // 00001/2025 vinculado a ata sem gestor; 00002/2024 sem vínculo (depois, marcado "não pertence a ata").
+    vi.spyOn(useAtaManagersModule, 'useArpItemContractLinks').mockReturnValue({
+      data: [{ ataKey: '00010/2025', contractKey: '200331-00001-2025' }],
+      isLoading: false
+    } as any);
     const html = renderToStaticMarkup(<ContractsRoute />);
 
     expect(html).not.toContain('type="checkbox"');
-    expect(html).toContain('atribuir na Central');
     expect(html).not.toContain('Alterar gestor');
+    expect(html).toContain('Ata sem gestor · Central');
+    expect(html).toContain('Sem ata · vincular');
+    expect(html).not.toContain('atribuir na Central');
+
+    semAtaConfirmados = { '200331-00002-2024': { contractKey: '200331-00002-2024' } };
+    const marcado = renderToStaticMarkup(<ContractsRoute />);
+    expect(marcado).toContain('Sem gestor · atribuir');
+    expect(marcado).not.toContain('Sem ata · vincular');
   });
 
   it('10. perfil "gestor" deve ver apenas os contratos onde é o gestor titular (escopo ASSIGNED)', () => {
