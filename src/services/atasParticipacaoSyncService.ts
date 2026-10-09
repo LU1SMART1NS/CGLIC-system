@@ -18,7 +18,7 @@
  * execução (PARCIAL). Cada compra é gravada assim que termina, então o progresso não se perde.
  */
 import { supabase } from './supabaseClient';
-import { buildQueryString, enrichArpsBatchWithPncpVigencia, fetchComNovaTentativa, splitDateRange } from './api';
+import { buildQueryString, enrichArpWithPncpVigencia, fetchComNovaTentativa, fetchPncpAtaVigencia, splitDateRange } from './api';
 import {
   executarComReserva,
   mensagemDeErro,
@@ -283,7 +283,10 @@ export interface FontesDaParticipacao {
   itensDaAta: (numeroControlePncpAta: string) => Promise<Array<Record<string, unknown>>>;
   unidadesDoItem: (numeroAta: string, uasgGerenciadora: string, numeroItem: string) => Promise<UnidadeItemRecord[]>;
   adesoesDoItem: (numeroAta: string, uasgGerenciadora: string, numeroItem: string, unidade: string) => Promise<AdesaoItemRecord[]>;
-  /** Vigência atualizada (prorrogações) no PNCP; devolve a lista como veio se o PNCP falhar. */
+  /**
+   * Vigência atualizada (prorrogações e cancelamento) no PNCP; a ata cuja consulta falha fica como veio.
+   * Só lê: não pode gravar nada (o teste sem gravar usa as mesmas fontes).
+   */
   vigenciasPncp: (atas: ArpRecord[]) => Promise<ArpRecord[]>;
 }
 
@@ -323,12 +326,18 @@ export const FONTES_PADRAO: FontesDaParticipacao = {
     return d.resultado ?? [];
   },
   async vigenciasPncp(atas) {
-    try {
-      return await enrichArpsBatchWithPncpVigencia(atas);
-    } catch (err) {
-      console.warn('[atasParticipacao] vigência do PNCP não lida; fica a do Compras.gov.br:', mensagemDeErro(err));
-      return atas;
+    // Ata por ata e sem enrichArpsBatchWithPncpVigencia: aquela função grava a lista em atas_registro_preco quando
+    // a vigência muda, e assim as atas de outros órgãos entravam na tabela das atas gerenciadas (09/10/2026).
+    const lidas: ArpRecord[] = [];
+    for (const arp of atas) {
+      try {
+        lidas.push(enrichArpWithPncpVigencia(arp, await fetchPncpAtaVigencia(arp.numeroControlePncpAta)));
+      } catch (err) {
+        console.warn(`[atasParticipacao] vigência do PNCP da ata ${arp.numeroAtaRegistroPreco} não lida; fica a do Compras.gov.br:`, mensagemDeErro(err));
+        lidas.push(arp);
+      }
     }
+    return lidas;
   }
 };
 
