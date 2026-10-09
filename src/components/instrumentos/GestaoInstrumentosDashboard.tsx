@@ -188,12 +188,13 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       totalEmpenhado: sum((rm) => rm.financial.totalEmpenhado),
       // Só CRITICA: é o que o clique no card filtra. Urgentes aparecem na linha própria do card.
       criticalCount: allItems.filter((i) => i.severity === 'CRITICA').length,
-      totalAlertasAtivos: sum((rm) => rm.attention.totalAlertasAtivos),
+      // Gestor de Saldo: o total do banco soma avisos de todo tipo; conta só os de saldo, como a lista.
+      totalAlertasAtivos: saldosOnly ? allItems.length : sum((rm) => rm.attention.totalAlertasAtivos),
       urgenteCount,
       atencaoCount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, allItems]);
+  }, [dash200330.readModel, dash200331.readModel, allItems, saldosOnly]);
 
   const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
     if (activeTab === 'SALDOS') return 'ARP';
