@@ -76,7 +76,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
 
   const { divergencias, totais } = distribuicao;
   // "Gestor diferente da ata" só aparece quando há caso: o vínculo automático não cria divergência (migration 95).
-  const aba: Fila = abaDaUrl === 'DIVERGENCIAS' && divergencias.length === 0 ? FILA_INICIAL : abaDaUrl;
+  // "Histórico sem gestor" também some quando está vazia.
+  const historico = pendencias.atasHistoricoSemGestor;
+  const filaVazia = (abaDaUrl === 'DIVERGENCIAS' && divergencias.length === 0) || (abaDaUrl === 'HISTORICO' && historico.length === 0);
+  const aba: Fila = filaVazia ? FILA_INICIAL : abaDaUrl;
   const totalInstrumentos = totais.atas.vigentes + totais.contratos.vigentes;
   // A carteira sem gestor fica nas filas; a Equipe mostra só quem tem carteira.
   const linhasEquipe = distribuicao.linhas.filter((l) => l.gestorNome !== null);
@@ -90,12 +93,16 @@ export const DistribuicaoEquipePage: React.FC = () => {
       dot: pendencias.atasSemGestor.length ? AMBAR : undefined,
       title: 'Vigentes e encerradas que ainda têm contratos'
     },
-    {
-      id: 'HISTORICO' as const,
-      label: 'Histórico sem gestor',
-      count: pendencias.atasHistoricoSemGestor.length,
-      title: 'Encerradas sem contrato vigente: não pesam na carga'
-    },
+    ...(historico.length > 0
+      ? [
+          {
+            id: 'HISTORICO' as const,
+            label: 'Histórico sem gestor',
+            count: historico.length,
+            title: 'Encerradas sem contrato vigente: não pesam na carga'
+          }
+        ]
+      : []),
     ...(divergencias.length > 0
       ? [
           {
@@ -195,7 +202,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
           {aba === 'HISTORICO' && (
             <AtasSemGestorFila
               historico
-              atas={pendencias.atasHistoricoSemGestor}
+              atas={historico}
               podeAtribuir={canAssign}
               onAtribuir={(lista, done) =>
                 setTransferencia({ targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: ata.numeroAta })), origem: null, done })
