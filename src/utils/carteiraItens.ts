@@ -10,6 +10,7 @@ import type { PrazoFaixa } from '../components/carteira/carteiraPrazo';
 import type { CarteiraItemEmpenho, CarteiraItemLink } from '../services/carteiraItensService';
 import type { GlobalAllocationRecord } from '../services/allocationService';
 import type { ArpItemRecord, ArpRecord } from '../types';
+import { chaveGestaoAta } from './ataIdentidade';
 
 /** Uma linha da aba Itens: o item da ata com prazo da ata, alocação por unidade e empenho. */
 export interface CarteiraItemRow {
@@ -150,7 +151,7 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
         ataKey,
         arp,
         item,
-        gestorNome: gestorByAta[numeroAta],
+        gestorNome: gestorByAta[chaveGestaoAta(numeroAta, uasg)],
         diasRestantes: dias,
         faixa,
         quantitativoSenasp: senasp,

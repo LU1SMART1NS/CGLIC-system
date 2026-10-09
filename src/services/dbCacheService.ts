@@ -4,6 +4,15 @@ import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../utils/pncpUtils';
 import { FORNECEDOR_DAS_ATAS_PNCP, deduplicarItensPorNumero } from './api';
+import { isUasgCglic } from '../config/unidadesGestoras';
+
+/**
+ * Coluna que filtra as atas de uma UASG. UASG da CGLIC = carteira (gerenciadas + atas de outros órgãos em que
+ * a SENASP participa, migration 106); outra UASG = atas gerenciadas por ela (abrir a Ata 360 de uma delas).
+ */
+export function colunaDaUasgDaAta(uasg: string): 'uasg_carteira' | 'codigo_uasg' {
+  return isUasgCglic(uasg) ? 'uasg_carteira' : 'codigo_uasg';
+}
 
 /**
  * Persiste registros de ARPs buscados das APIs governamentais no Supabase.
@@ -81,7 +90,7 @@ export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): 
     let query = supabase.from('atas_registro_preco').select('*');
 
     if (codigoUasg) {
-      query = query.eq('codigo_uasg', codigoUasg);
+      query = query.eq(colunaDaUasgDaAta(codigoUasg), codigoUasg);
     }
     if (numeroAta) {
       query = query.ilike('numero_ata', `%${numeroAta}%`);
@@ -118,7 +127,9 @@ export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): 
         numeroControlePncpCompra: '',
         idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
         processoCompra: d.processo_compra ?? undefined,
-        isCanceladaPncp: ataCanceladaNoBanco(d.status_ata)
+        isCanceladaPncp: ataCanceladaNoBanco(d.status_ata),
+        uasgCarteira: d.uasg_carteira || d.codigo_uasg,
+        papelSenasp: d.papel_senasp || 'GERENCIADORA'
       }));
 
       const syncInfo: SyncMetadata = {
@@ -153,7 +164,7 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
     let query = supabase.from('atas_registro_preco').select('*, itens_ata(*)');
 
     if (uasg) {
-      query = query.eq('codigo_uasg', uasg);
+      query = query.eq(colunaDaUasgDaAta(uasg), uasg);
     }
 
     const { data, error } = await query;
@@ -205,7 +216,7 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
 
           const cleanNumAta = (d.numero_ata || '').replace(/^0+/, '');
           const supp = FORNECEDOR_DAS_ATAS_PNCP.find(s => s.numeroAta.replace(/^0+/, '') === cleanNumAta || s.numeroAta === d.numero_ata);
-          if (supp && supp.cnpjFornecedor) {
+          if (supp && supp.cnpjFornecedor && isUasgCglic(d.codigo_uasg)) {
             const cleanTargetCnpj = supp.cnpjFornecedor.replace(/\D/g, '');
             itemsByAta[key] = mappedItems.filter((it: any) => (it.niFornecedor || '').replace(/\D/g, '') === cleanTargetCnpj);
           } else {
@@ -243,7 +254,9 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
           numeroControlePncpCompra: '',
           idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
           processoCompra: d.processo_compra ?? undefined,
-          isCanceladaPncp: ataCanceladaNoBanco(d.status_ata)
+          isCanceladaPncp: ataCanceladaNoBanco(d.status_ata),
+          uasgCarteira: d.uasg_carteira || d.codigo_uasg,
+          papelSenasp: d.papel_senasp || 'GERENCIADORA'
         };
       });
 

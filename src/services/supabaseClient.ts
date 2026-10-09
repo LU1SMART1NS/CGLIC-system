@@ -56,6 +56,10 @@ export interface DbAta {
   processo_compra?: string | null;
   data_hora_atualizacao_api?: string;
   ultimo_sync_em?: string;
+  /** Carteira da CGLIC (migration 106). */
+  uasg_carteira?: string;
+  /** GERENCIADORA | PARTICIPANTE | ADESAO (migration 106). */
+  papel_senasp?: 'GERENCIADORA' | 'PARTICIPANTE' | 'ADESAO';
 }
 
 export interface DbItemAta {

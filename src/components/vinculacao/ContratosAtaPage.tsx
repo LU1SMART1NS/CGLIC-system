@@ -19,6 +19,7 @@ import { getArpPrazo } from '../../hooks/useAtasPortfolio';
 import { useComplexidadeAjustes } from '../../hooks/useComplexidadeAjustes';
 import { formatContractNumber } from '../../utils/contractNumber';
 import type { ManagerTarget } from '../../services/managerAssignmentService';
+import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
 /**
  * Vinculação → Contratos à ata: contratos sem item de ata vinculado, com a ata provável pela compra e pelo
@@ -46,7 +47,7 @@ export const ContratosAtaPage: React.FC = () => {
               dias: getArpPrazo(arp).dias,
               faixa: getArpPrazo(arp).faixa,
               valor: Number(arp.valorTotal) || 0,
-              gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
+              gestorNome: atas.gestorByAta[chaveGestaoDaArp(arp)],
               itens: (atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`] || []).length
             })),
             contratos: contratos.rows.map((row) => ({

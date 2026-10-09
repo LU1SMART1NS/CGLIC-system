@@ -20,6 +20,8 @@ import { formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { Instrument360Hero, instrumentSituationLabel } from '../instrument360/Instrument360Hero';
 import { HealthTile, HealthTileGrid, LifelineRule } from '../instrument360/HealthStripParts';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
+import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp, papelSenaspDaAta } from '../../utils/ataIdentidade';
+import { SeloPapelSenasp } from './SeloPapelSenasp';
 
 interface Ata360HeaderProps {
   arp: ArpRecord;
@@ -81,7 +83,10 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
 }) => {
   const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
-  const { data: manager, isLoading: loadingManager } = useAtaManager(arp.numeroAtaRegistroPreco);
+  const { data: manager, isLoading: loadingManager } = useAtaManager(chaveGestaoDaArp(arp));
+  // Ata de outro órgão em que a SENASP é participante ou fez adesão (migration 106).
+  const outroOrgao = ataDeOutroOrgao(arp);
+  const papel = papelSenaspDaAta(arp);
   // A divulgação no PNCP só aparece quando o PNCP responde; sem resposta, a linha de datas fica sem ela.
   const { data: pncp, isLoading: loadingPncp } = useAtaPncp(arp);
   // O banco local não guarda a assinatura (só o início da vigência): vem do Compras.gov.br.
@@ -168,6 +173,19 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
           : undefined
       }
       manager={<ManagerInfo label="Gestor da ata" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="ata-manager-info" />}
+      subtitle={
+        outroOrgao ? (
+          <span data-testid="ata-outro-orgao" style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem' }}>
+            <SeloPapelSenasp arp={arp} comUasg={false} />
+            <span>
+              {papel === 'ADESAO'
+                ? 'Ata de outro órgão: a SENASP fez adesão depois da compra, com a quantidade aprovada pela gerenciadora.'
+                : 'Ata de outro órgão: a SENASP participou da compra, com quantidade própria registrada.'}
+            </span>
+          </span>
+        ) : undefined
+      }
+      origin={outroOrgao ? { label: 'Carteira', value: `UASG ${carteiraDaAta(arp)}` } : undefined}
       objeto={arp.objeto}
       dates={[
         // Sem o dado, a linha continua e diz que não foi informado; só espera enquanto a fonte ainda responde.

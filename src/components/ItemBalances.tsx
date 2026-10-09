@@ -76,6 +76,7 @@ import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from
 import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract, UnidadeItemRecord } from '../types';
 import { STATUS_A_VENCER, formatStatusVigencia } from '../utils/statusVigencia';
+import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -207,7 +208,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     item.numeroItem,
     canonicalItemKey
   );
-  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = useContractsDashboard(arp.codigoUnidadeGerenciadora);
+  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = useContractsDashboard(carteiraDaAta(arp));
   const unlinkContractMutation = useUnlinkContractFromItem();
   const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
@@ -362,12 +363,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const { data: todosVinculos = [] } = useArpItemContractLinks();
   const { data: contratosSemAta = {} } = useContratosSemAta();
   const naoSugerir = useMemo(() => {
-    const numeroAta = arp?.numeroAtaRegistroPreco || '';
+    const chaveDaAta = arp ? chaveGestaoDaArp(arp) : '';
     const compra = arp ? buildItemSuggestionCriteria(arp, item).compra : undefined;
     const esteItem = parseInt(String(item?.numeroItem ?? ''), 10);
     const porChave = new Map(officialDashboardContracts.map((c) => [contractKeyOf(c).toUpperCase(), c]));
     const fora: string[] = [];
-    for (const [key, outras] of outrasAtasPorContrato(numeroAta, todosVinculos)) {
+    for (const [key, outras] of outrasAtasPorContrato(chaveDaAta, todosVinculos)) {
       const contrato = porChave.get(key);
       const podeEntrar = Boolean(contrato) && podeEntrarEmMaisUmaAta(contrato!, compra, outras) && !itensEmOutraAta(outras).has(esteItem);
       if (!podeEntrar) fora.push(key);
@@ -604,10 +605,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const remainingUGQty = totalUGQty - totalAllocatedSum;
   const percentAllocated = totalUGQty > 0 ? (totalAllocatedSum / totalUGQty) * 100 : 0;
 
-  // Normaliza e ordena unidades considerando UASGs 200331 e 200330 como GERENCIADORA
+  // Normaliza e ordena unidades considerando UASGs 200331 e 200330 como GERENCIADORA (só nas atas da CGLIC: na ata
+  // de outro órgão a SENASP é participante, e a gerenciadora é o outro órgão).
+  const ataDaCglic = !ataDeOutroOrgao(arp);
   const sortedUnidades = [...unidades].map(uni => {
     const cleanUasg = String(uni.codigoUnidade || '').replace(/\D/g, '');
-    const isUG = uni.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(cleanUasg);
+    const isUG = uni.tipoUnidade === 'GERENCIADORA' || (ataDaCglic && isGerenciadoraUasg(cleanUasg));
     return {
       ...uni,
       tipoUnidade: (isUG ? 'GERENCIADORA' : (uni.tipoUnidade || 'PARTICIPANTE')) as 'GERENCIADORA' | 'PARTICIPANTE'
@@ -1122,6 +1125,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         numeroAta={arp.numeroAtaRegistroPreco}
         numeroItem={item.numeroItem}
         uasg={arp.codigoUnidadeGerenciadora}
+        uasgCarteira={carteiraDaAta(arp)}
         itemUnitPrice={item.valorUnitario}
         existingLinkedContractKeys={enrichedOfficialLinks.map(l => l.contractKey)}
         compraDaAta={buildItemSuggestionCriteria(arp, item).compra}

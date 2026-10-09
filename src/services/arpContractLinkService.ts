@@ -17,6 +17,7 @@ import {
   restoreContractSuggestionRpc
 } from '../adapters/arpContractLinkRpcAdapter';
 import { displayContractNumber, formatContractKey } from '../utils/contractNumber';
+import { chaveGestaoAta } from '../utils/ataIdentidade';
 
 /**
  * Consulta os vínculos de um item de ARP com contratos oficiais diretamente da SSOT (PostgreSQL).
@@ -161,18 +162,22 @@ export async function restoreContractSuggestion(params: DismissContractSuggestio
 }
 
 /**
- * Extrai o número da Ata (ex. "00037/2026") do item_key de um vínculo
+ * Chave de gestão da Ata (gestor, escopo) a partir do item_key de um vínculo
  * (formato "{numeroAta}-{uasg}-{numeroItem}", validado em
- * link_contract_to_item_atomic, migration 20260924000015). Retorna null se o
+ * link_contract_to_item_atomic, migration 20260924000015): o número ("00037/2026") nas atas da CGLIC e
+ * número-UASG ("00005/2025-200342") nas de outros órgãos (migration 106, chaveGestaoAta). Retorna null se o
  * item_key não seguir o formato esperado.
  */
 export function extractAtaKeyFromItemKey(itemKey: string): string | null {
-  const match = /^(\d{5}\/\d{4})-\d{6}-\d{5}$/.exec((itemKey || '').trim());
-  return match ? match[1] : null;
+  const match = /^(\d{5}\/\d{4})-(\d{6})-\d{5}$/.exec((itemKey || '').trim());
+  return match ? chaveGestaoAta(match[1], match[2]) : null;
 }
 
 export interface ArpItemContractLinkPair {
+  /** Chave de gestão da ata (ver extractAtaKeyFromItemKey). */
   ataKey: string;
+  /** Número da ata ("00005/2025"), sem a UASG. */
+  numeroAta?: string;
   contractKey: string;
   /** Chave do item da ata ("00059/2025-200331-00011"). */
   itemKey?: string;
@@ -227,6 +232,7 @@ export async function fetchAllArpItemContractLinks(): Promise<ArpItemContractLin
         const [, uasg, item] = String(row.item_key).trim().split('-');
         pairs.push({
           ataKey,
+          numeroAta: String(row.item_key).trim().split('-')[0],
           contractKey: row.contract_key,
           itemKey: row.item_key,
           uasg,

@@ -26,6 +26,7 @@ import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 import { mensagemDesvincular } from '../../utils/vinculoAutomatico';
+import { carteiraDaAta, chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos'];
 // Gestor de Saldo (domínio de alocações) só precisa chegar aos itens da ata.
@@ -46,11 +47,11 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   const { arp, itens, isLoading, isError, error, refetch } = useAta(ataKey, uasg);
   const { saldos, isLoading: loadingSaldos } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);
-  const { linkedContracts, isLoading: loadingLinks } = useAtaLinkedContracts(arp?.numeroAtaRegistroPreco, uasg);
-  const { data: taskPlan = null, isLoading: loadingTaskPlan } = useAtaTaskPlan(
-    arp?.numeroAtaRegistroPreco || '',
-    Boolean(arp)
-  );
+  // Carteira da CGLIC da ata (nas de outros órgãos, a UASG da SENASP): dela vêm contratos, gestores e escopo.
+  const carteira = arp ? carteiraDaAta(arp) : uasg;
+  const chaveGestao = arp ? chaveGestaoDaArp(arp) : '';
+  const { linkedContracts, isLoading: loadingLinks } = useAtaLinkedContracts(arp?.numeroAtaRegistroPreco, uasg, carteira);
+  const { data: taskPlan = null, isLoading: loadingTaskPlan } = useAtaTaskPlan(chaveGestao, Boolean(arp));
 
   // Escopo ASSIGNED do perfil "gestor" (ata_managers/arp_item_contract_links —
   // ver useAssignedManagementScope.ts), mesma guarda de deep-link já aplicada
@@ -63,9 +64,9 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
     tabs: saldosOnly ? SALDOS_TAB_IDS : TAB_IDS,
     defaultTab: saldosOnly ? 'itens' : 'acoes'
   });
-  const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(uasg);
+  const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(carteira);
   const isScopedRole = role === 'gestor';
-  const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(arp.numeroAtaRegistroPreco));
+  const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(chaveGestao));
   // Mesma regra das RPCs link/unlink_contract_to_item_atomic (has_role gestor/admin)
   const canEditLinks = role === 'admin' || role === 'gestor';
   // O quantitativo SENASP dos itens é gravado em segundo plano (pelo servidor, de hora em hora); a tela só lê.
@@ -217,7 +218,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
           >
             <AtaActionQueue
               queue={queue}
-              ataKey={arp.numeroAtaRegistroPreco}
+              ataKey={chaveGestao}
               plan={taskPlan}
               isLoading={loadingSaldos || loadingTaskPlan}
               onGoTo={(tab) => goToTab(tab)}
@@ -232,7 +233,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
             subtitle="Todas as tarefas do modelo de gestão aplicado, com responsável, prazo e situação"
             icon={ListTodo}
           >
-            <AtaTasksSection ataKey={arp.numeroAtaRegistroPreco} plan={taskPlan} isLoading={loadingTaskPlan} />
+            <AtaTasksSection ataKey={chaveGestao} plan={taskPlan} isLoading={loadingTaskPlan} />
           </InstrumentSection>
         )}
 
@@ -278,6 +279,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
           onClose={() => setIsLinkModalOpen(false)}
           numeroAta={arp.numeroAtaRegistroPreco}
           uasg={arp.codigoUnidadeGerenciadora}
+          uasgCarteira={carteira}
           itemOptions={linkItemOptions}
           suggestionCriteria={linkSuggestionCriteria}
         />

@@ -83,7 +83,7 @@ describe('gestaoInstrumentosRowHelpers — classificação de tipo ARP × Contra
 });
 
 describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo crítico', () => {
-  it('direciona para /atas quando o instrumento é uma ARP com saldo crítico', () => {
+  it('abre a Ata 360 pela UASG da chave do alerta, mesmo sem a carteira', () => {
     const item: DashboardAttentionItem = {
       id: 'ATT-ARP-ITEM-1',
       category: 'ATA_CRITICA',
@@ -93,6 +93,24 @@ describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo c
       numeroAta: '00011/2026'
     };
 
+    expect(getAcaoInfo(item)).toEqual({ label: 'Verificar Saldo', targetUrl: '/atas/detalhe/00011%2F2026-200331?aba=acoes' });
+  });
+
+  it('ata de outro órgão: o link usa a UASG da ata (chave do alerta), não a carteira do painel', () => {
+    const item = {
+      id: 'ATT-ARP-ITEM-2',
+      category: 'ATA_CRITICA',
+      severity: 'URGENTE',
+      title: 'Consumo Crítico em Ata',
+      arpKey: '00005/2025-200342-00001',
+      numeroAta: '00005/2025',
+      uasg: '200331'
+    } as DashboardAttentionItem & { uasg: string };
+    expect(getAcaoInfo(item).targetUrl).toBe('/atas/detalhe/00005%2F2025-200342?aba=acoes');
+  });
+
+  it('sem chave nem UASG, vai para a lista de atas', () => {
+    const item: DashboardAttentionItem = { id: 'x', category: 'ATA_CRITICA', severity: 'URGENTE', title: 't', numeroAta: '00011/2026' };
     expect(getAcaoInfo(item)).toEqual({ label: 'Verificar Saldo', targetUrl: '/atas' });
   });
 

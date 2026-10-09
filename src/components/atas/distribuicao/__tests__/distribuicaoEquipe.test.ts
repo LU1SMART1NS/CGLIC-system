@@ -151,8 +151,8 @@ describe('buildDistribuicaoEquipe', () => {
       attentionItems: []
     });
     expect(divergencias).toEqual([
-      { numeroAta: '00001/2025', gestorAta: 'Ana', contractKey: '200331-00003-2025', numeroContrato: '00003', gestorContrato: undefined },
-      { numeroAta: '00002/2025', gestorAta: 'Bruno', contractKey: '200331-00002-2025', numeroContrato: '00002', gestorContrato: 'Carla' }
+      { numeroAta: '00001/2025', chaveAta: '00001/2025', gestorAta: 'Ana', contractKey: '200331-00003-2025', numeroContrato: '00003', gestorContrato: undefined },
+      { numeroAta: '00002/2025', chaveAta: '00002/2025', gestorAta: 'Bruno', contractKey: '200331-00002-2025', numeroContrato: '00002', gestorContrato: 'Carla' }
     ]);
   });
   it('contrato em duas atas com o gestor de uma delas não diverge; com gestor de nenhuma, diverge nas duas', () => {
@@ -191,5 +191,22 @@ describe('ajuste manual de complexidade', () => {
     expect(ana.equivalente).toBe(4);
     const c = ana.itens.find((i) => i.tipo === 'CONTRATO')!;
     expect(c.complexidade.ajuste?.automatica.nivel).toBe('BAIXA');
+  });
+
+  it('ata de outro órgão com o mesmo número de uma ata da CGLIC: cada uma com o seu gestor e a sua chave', () => {
+    const { linhas, divergencias } = buildDistribuicaoEquipe({
+      atas: [
+        { ...ata('00005/2025', 'Ana'), uasg: '200331' },
+        { ...ata('00005/2025', 'Bruno'), uasg: '200342', chave: '00005/2025-200342' }
+      ],
+      contratos: [contrato('200331-00008-2026', 'Ana')],
+      links: [{ ataKey: '00005/2025-200342', contractKey: '200331-00008-2026' }],
+      attentionItems: []
+    });
+    expect(linhas.find((l) => l.gestorNome === 'Bruno')?.ataKeys).toEqual(['00005/2025-200342']);
+    expect(linhas.find((l) => l.gestorNome === 'Ana')?.ataKeys).toEqual(['00005/2025']);
+    expect(divergencias).toEqual([
+      { numeroAta: '00005/2025', chaveAta: '00005/2025-200342', gestorAta: 'Bruno', contractKey: '200331-00008-2026', numeroContrato: '00008', gestorContrato: 'Ana' }
+    ]);
   });
 });

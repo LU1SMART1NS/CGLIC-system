@@ -125,7 +125,9 @@ async function fetchItensDaCarteira(uasg: string): Promise<ItemDaCarteira[]> {
     const { data, error } = await supabase
       .from('itens_ata')
       .select('id, numero_item, atas_registro_preco!inner(numero_ata, codigo_uasg, data_vigencia_final)')
-      .eq('atas_registro_preco.codigo_uasg', uasg)
+      // Pela carteira: inclui as atas de outros órgãos em que a SENASP participa (migration 106); a chave do item
+      // e a consulta à fonte continuam com a UASG da ata (codigo_uasg).
+      .eq('atas_registro_preco.uasg_carteira', uasg)
       .order('id', { ascending: true })
       .range(from, from + PAGINA - 1);
     if (error) throw error;

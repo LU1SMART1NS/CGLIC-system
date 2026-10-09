@@ -4,6 +4,7 @@ import type { ContractDashboardRecord } from '../../../types';
 import { isVigente } from './distribuicaoEquipe';
 import { classificarAta, type Complexidade } from './complexidade';
 import { contratoDoFornecedorDaAta } from '../../../utils/fornecedorMatch';
+import { chaveGestaoAta } from '../../../utils/ataIdentidade';
 
 /**
  * Pendências de distribuição da Central, pelo caminho da CGLIC: o coordenador atribui ATAS (o servidor recebe
@@ -205,17 +206,21 @@ export function contratosParaConferirParcial(input: {
   return chaves.sort();
 }
 
-/** Vínculos item × contrato agrupados por contrato e ata, com o gestor de cada ata. */
+/**
+ * Vínculos item × contrato agrupados por contrato e ata, com o gestor de cada ata. `ataKey` do vínculo é a chave de
+ * gestão (número nas atas da CGLIC, número-UASG nas de outros órgãos); `gestorDaAta` recebe essa chave.
+ */
 export function agruparVinculos(
-  vinculos: Array<{ ataKey: string; contractKey: string; uasg?: string; numeroItem?: number }>,
-  gestorDaAta: (numeroAta: string) => string | undefined
+  vinculos: Array<{ ataKey: string; numeroAta?: string; contractKey: string; uasg?: string; numeroItem?: number }>,
+  gestorDaAta: (chaveGestao: string) => string | undefined
 ): Map<string, AtaVinculada[]> {
   const mapa = new Map<string, AtaVinculada[]>();
   for (const v of vinculos) {
     const lista = mapa.get(v.contractKey) ?? [];
-    let ata = lista.find((a) => a.numeroAta === v.ataKey && a.uasg === v.uasg);
+    const numeroAta = v.numeroAta || v.ataKey.split('-')[0];
+    let ata = lista.find((a) => a.numeroAta === numeroAta && a.uasg === v.uasg);
     if (!ata) {
-      ata = { numeroAta: v.ataKey, uasg: v.uasg, itens: [], gestorNome: gestorDaAta(v.ataKey) };
+      ata = { numeroAta, uasg: v.uasg, itens: [], gestorNome: gestorDaAta(v.ataKey) };
       lista.push(ata);
     }
     if (v.numeroItem != null && Number.isFinite(v.numeroItem) && !ata.itens.includes(v.numeroItem)) ata.itens.push(v.numeroItem);
@@ -262,11 +267,11 @@ export function buildPendenciasDistribuicao(input: {
     const descartadaPara = (a: FilaAta) => descartes.has(`${contrato.contractKey}|${a.numeroAta}-${a.uasg}`);
     const vinculadas = input.vinculosDoContrato.get(contrato.contractKey);
     if (vinculadas && vinculadas.length > 0) {
-      for (const v of vinculadas) push(vinculadosPorAta, v.numeroAta, contrato.numero);
+      for (const v of vinculadas) push(vinculadosPorAta, chaveGestaoAta(v.numeroAta, v.uasg), contrato.numero);
       const parcial = vinculoParcial(contrato, vinculadas, input.itensDoContrato?.get(contrato.contractKey), input.atas.filter((a) => !descartadaPara(a)));
       if (!parcial) continue;
       for (const ata of parcial.sugestoes) {
-        push(provaveisPorAta, ata.numeroAta, contrato.numero);
+        push(provaveisPorAta, chaveGestaoAta(ata.numeroAta, ata.uasg), contrato.numero);
         if (ata.gestorNome) {
           push(aVincularPorGestor, ata.gestorNome, { contractKey: contrato.contractKey, numero: contrato.numero, numeroAta: ata.numeroAta, uasg: ata.uasg });
           totalAVincular++;
@@ -295,7 +300,7 @@ export function buildPendenciasDistribuicao(input: {
     }
     const fortes = item.sugestoes.filter((s) => s.motivo === 'COMPRA_E_FORNECEDOR');
     for (const ata of fortes) {
-      push(provaveisPorAta, ata.numeroAta, contrato.numero);
+      push(provaveisPorAta, chaveGestaoAta(ata.numeroAta, ata.uasg), contrato.numero);
       if (ata.gestorNome) {
         push(aVincularPorGestor, ata.gestorNome, { contractKey: contrato.contractKey, numero: contrato.numero, numeroAta: ata.numeroAta, uasg: ata.uasg });
         totalAVincular++;
@@ -309,8 +314,8 @@ export function buildPendenciasDistribuicao(input: {
   const atasHistoricoSemGestor: AtaSemGestor[] = [];
   for (const ata of input.atas) {
     if (ata.gestorNome) continue;
-    const vinculados = vinculadosPorAta.get(ata.numeroAta) || [];
-    const provaveis = provaveisPorAta.get(ata.numeroAta) || [];
+    const vinculados = vinculadosPorAta.get(chaveGestaoAta(ata.numeroAta, ata.uasg)) || [];
+    const provaveis = provaveisPorAta.get(chaveGestaoAta(ata.numeroAta, ata.uasg)) || [];
     // Encerrada sem contrato vigente não tem o que distribuir: vai para a fila do histórico.
     const historico = !isVigente(ata.faixa) && vinculados.length === 0 && provaveis.length === 0;
     (historico ? atasHistoricoSemGestor : atasSemGestor).push({

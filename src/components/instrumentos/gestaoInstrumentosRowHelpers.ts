@@ -116,10 +116,16 @@ function contractItemUrl(item: DashboardAttentionItem): string {
   return `/contratos/${encodeURIComponent(item.contractKey)}?item=${encodeURIComponent(item.id)}`;
 }
 
-/** Detalhe da Ata (Ata 360, aba Ações) quando o alerta é de Ata e a UASG é conhecida. */
+/**
+ * Detalhe da Ata (Ata 360, aba Ações) quando o alerta é de Ata e a UASG é conhecida. A UASG da ata vem da chave do
+ * alerta ("NÚMERO-UASG[-ITEM]"); `item.uasg` é a carteira do painel, que nas atas de outros órgãos não é a UASG da
+ * ata (migration 106) e só vale quando o alerta não traz a chave.
+ */
 function ataItemUrl(item: DashboardAttentionItem & { uasg?: string }): string {
-  if (!item.numeroAta || !item.uasg) return '/atas';
-  return buildAtaPath(item.numeroAta, item.uasg, 'acoes');
+  const uasgDaChave = /^\d{5}\/\d{4}-(\d{6})/.exec(String(item.arpKey ?? ''))?.[1];
+  const uasg = uasgDaChave || item.uasg;
+  if (!item.numeroAta || !uasg) return '/atas';
+  return buildAtaPath(item.numeroAta, uasg, 'acoes');
 }
 
 /** Ação contextual em 1 clique, sempre apontando para um fluxo/rota já existente no sistema. */
