@@ -54,6 +54,8 @@ export interface ArpItemsResponse {
   totalRegistros: number;
   totalPaginas: number;
   paginasRestantes: number;
+  /** De onde os itens vieram: Compras.gov.br (fonte oficial da ata) ou PNCP (itens da compra atribuídos à ata). */
+  origem?: 'COMPRAS_GOV' | 'PNCP';
 }
 
 export interface ArpItemRecord {

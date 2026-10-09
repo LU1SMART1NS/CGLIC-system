@@ -56,6 +56,8 @@ export type DashboardAttentionCategory =
   | 'ATA_CRITICA'
   /** Contratado do item ainda sem unidade interna, ou divisão entre unidades a conferir (migration 103). */
   | 'UNIDADE_PENDENTE'
+  /** Ata publicada no PNCP sem fornecedor: o coordenador indica, ou a indicação diverge do Compras.gov.br (migration 107). */
+  | 'FORNECEDOR_PNCP'
   | 'LEMBRETE';
 
 export type DashboardAttentionSeverity = 'CRITICA' | 'URGENTE' | 'ATENCAO' | 'INFO';

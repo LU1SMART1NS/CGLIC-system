@@ -157,7 +157,7 @@ export class FonteIndisponivelError extends Error {
  * vigências do PNCP. Sem cache e sem cair para o banco: se a fonte falhar, lança erro.
  * Usada pela sincronização (sincronizarAtas), que precisa saber se a consulta deu certo.
  */
-export async function fetchArpsDasFontes(params: FilterParams): Promise<ArpRecord[]> {
+export async function fetchArpsDasFontes(params: FilterParams, fornecedor: OpcoesFornecedorPncp = {}): Promise<ArpRecord[]> {
   const chunks = splitDateRange(params.dataVigenciaInicialMin, params.dataVigenciaInicialMax);
   const allArpsMap = new Map<string, ArpRecord>();
 
@@ -212,7 +212,7 @@ export async function fetchArpsDasFontes(params: FilterParams): Promise<ArpRecor
       // O prazo é conferido entre chamadas; a corrida corta uma chamada pendurada perto do fim (até 30 s cada).
       let cortar: ReturnType<typeof setTimeout> | undefined;
       const soNoPncp = await Promise.race([
-        fetchAtasSoNoPncp(params.codigoUnidadeGerenciadora, Array.from(allArpsMap.values()), new Date(), prazo),
+        fetchAtasSoNoPncp(params.codigoUnidadeGerenciadora, Array.from(allArpsMap.values()), new Date(), prazo, fornecedor),
         new Promise<never>((_, rejeitar) => { cortar = setTimeout(() => rejeitar(new Error('prazo da busca no PNCP esgotado')), PRAZO_ATAS_SO_NO_PNCP_MS + 5_000); })
       ]).finally(() => clearTimeout(cortar));
       for (const arp of soNoPncp) {
@@ -472,14 +472,45 @@ export async function enrichArpsBatchWithPncpVigencia(
 }
 
 /**
- * Fornecedor de atas cuja compra gerou várias atas e que o Compras.gov.br não entregou quando foram cadastradas.
- * O PNCP lista os itens da compra, não da ata, e não diz o fornecedor da ata: sem esta indicação os itens dessas
- * atas não são atribuídos. Só para esse caso; atas novas entram sozinhas pela lista do PNCP (fetchAtasSoNoPncp).
+ * Identificador do fornecedor como o PNCP o publica, comparável: CNPJ só com dígitos ou, para fornecedor estrangeiro
+ * (sem CNPJ), o código do SICAF ("ESTRANG0000440"). Comparar só dígitos deixaria passar: "ESTRANG0000440" viraria
+ * "0000440".
  */
-export const FORNECEDOR_DAS_ATAS_PNCP = [
-  { anoCompra: '2025', seqCompra: 1665, seqAta: 1, numeroAta: '00039/2026', cnpjFornecedor: '03871566000349' },
-  { anoCompra: '2025', seqCompra: 1665, seqAta: 2, numeroAta: '00040/2026', cnpjFornecedor: '03622266000164' }
-];
+export function normalizarIdentificadorFornecedor(valor?: string | null): string {
+  return (valor || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/** Fornecedor com resultado publicado nos itens de uma compra do PNCP (candidato a fornecedor de uma ata da compra). */
+export interface CandidatoFornecedorPncp {
+  identificador: string;
+  nome: string;
+  itens: Array<{ numeroItem: number; descricao: string; quantidade: number; valorUnitario: number; valorTotal: number }>;
+}
+
+/**
+ * Ata cujo fornecedor o PNCP não informa e a compra tem mais de uma ata (ou mais de um fornecedor): a sincronização
+ * detecta, grava em atas_fornecedor_pncp e o coordenador indica o fornecedor entre os candidatos.
+ */
+export interface PendenciaFornecedorPncp {
+  numeroControlePncpAta: string;
+  numeroAta: string;
+  uasg: string;
+  numeroControlePncpCompra: string;
+  numeroCompra?: string;
+  anoCompra: string;
+  /** Atas não canceladas que a compra gerou no PNCP. */
+  atasNaCompra: number;
+  candidatos: CandidatoFornecedorPncp[];
+  itensSemResultado: Array<{ numeroItem: number; descricao: string; quantidade: number }>;
+}
+
+/** O que a sincronização passa às consultas do PNCP: a indicação do coordenador e para onde vai a pendência detectada. */
+export interface OpcoesFornecedorPncp {
+  /** Identificador do fornecedor indicado pelo coordenador para a ata (pelo número de controle PNCP da ata). */
+  fornecedorIndicado?: (numeroControlePncpAta: string) => string | undefined;
+  /** Chamado quando os itens não podem ser atribuídos por falta do fornecedor da ata. */
+  aoDetectarPendencia?: (pendencia: PendenciaFornecedorPncp) => void;
+}
 
 /** Ata como a lista de atas do PNCP a devolve (/api/consulta/v1/atas). */
 interface PncpAtaDaLista {
@@ -570,7 +601,8 @@ export async function fetchAtasSoNoPncp(
   uasg: string,
   conhecidas: Array<Pick<ArpRecord, 'numeroAtaRegistroPreco' | 'numeroControlePncpAta'>>,
   agora: Date = new Date(),
-  prazo: number = Date.now() + PRAZO_ATAS_SO_NO_PNCP_MS
+  prazo: number = Date.now() + PRAZO_ATAS_SO_NO_PNCP_MS,
+  fornecedor: OpcoesFornecedorPncp = {}
 ): Promise<ArpRecord[]> {
   const lista = await fetchListaAtasPncpDaUasg(uasg, agora, prazo);
   const numerosConhecidos = new Set(conhecidas.map((a) => a.numeroAtaRegistroPreco));
@@ -599,9 +631,15 @@ export async function fetchAtasSoNoPncp(
     if (!ctrl) continue;
     const ctrlCompra = ata.numeroControlePNCPCompra || `${ctrl.cnpj}-1-${String(ctrl.seqCompra).padStart(6, '0')}/${ctrl.anoCompra}`;
     const compra = await fetchPncpCompra(ctrlCompra);
-    const itens = ata.cancelado ? [] : await itensDaAtaPeloPncp({
-      anoCompra: ctrl.anoCompra, seqCompra: ctrl.seqCompra, seqAta: ctrl.seqAta, numeroAta: numero, uasg, cnpj: ctrl.cnpj
-    });
+    const itens = ata.cancelado ? [] : await itensDaAtaPeloPncp(
+      { anoCompra: ctrl.anoCompra, seqCompra: ctrl.seqCompra, seqAta: ctrl.seqAta, numeroAta: numero, uasg, cnpj: ctrl.cnpj },
+      {
+        fornecedorIndicado: fornecedor.fornecedorIndicado?.(ata.numeroControlePNCPAta),
+        aoDetectarPendencia: fornecedor.aoDetectarPendencia
+          ? (p) => fornecedor.aoDetectarPendencia!({ ...p, numeroControlePncpAta: ata.numeroControlePNCPAta, numeroCompra: compra?.numeroCompra || undefined })
+          : undefined
+      }
+    );
     if (!compra || !itens) {
       console.warn(`[atas] ata ${numero}: o PNCP não entregou ${!compra ? 'o cadastro da compra' : 'os itens'}; fica para a próxima execução.`);
       continue;
@@ -709,25 +747,56 @@ export function fetchAtasDaCompraPncp(anoCompra: string, seqCompra: number, cust
   return promessa;
 }
 
+/** Fornecedores com resultado publicado nos itens da compra, e os itens ainda sem resultado. */
+export function candidatosDaCompra(itensDaCompra: ArpItemRecord[]): Pick<PendenciaFornecedorPncp, 'candidatos' | 'itensSemResultado'> {
+  const porFornecedor = new Map<string, CandidatoFornecedorPncp>();
+  const itensSemResultado: PendenciaFornecedorPncp['itensSemResultado'] = [];
+  for (const it of itensDaCompra) {
+    const numeroItem = Number(it.numeroItem) || 0;
+    const ident = normalizarIdentificadorFornecedor(it.niFornecedor);
+    if (!ident) {
+      itensSemResultado.push({ numeroItem, descricao: it.descricaoItem || '', quantidade: Number(it.quantidadeEstimadaEdital || it.quantidadeHomologadaItem) || 0 });
+      continue;
+    }
+    const candidato = porFornecedor.get(ident) || { identificador: ident, nome: it.nomeRazaoSocialFornecedor || '', itens: [] };
+    candidato.itens.push({
+      numeroItem,
+      descricao: it.descricaoItem || '',
+      quantidade: Number(it.quantidadeHomologadaItem) || 0,
+      valorUnitario: Number(it.valorUnitario) || 0,
+      valorTotal: Number(it.valorTotal) || 0
+    });
+    porFornecedor.set(ident, candidato);
+  }
+  return { candidatos: Array.from(porFornecedor.values()), itensSemResultado };
+}
+
 /**
  * Itens da ata pelo PNCP, só quando é certo que são dela. O PNCP lista os itens da compra, não da ata, e não diz o
- * fornecedor da ata. Atribui os itens quando o fornecedor da ata é conhecido (FORNECEDOR_DAS_ATAS_PNCP) ou quando a
- * única ata não cancelada da compra é esta e todos os itens são de um fornecedor. Em 06/10/2026 uma regra mais frouxa
- * gravou itens de outra ata em sete atas: melhor ata sem itens do que itens alheios.
+ * fornecedor da ata. Atribui os itens quando o coordenador indicou o fornecedor da ata (atas_fornecedor_pncp,
+ * `fornecedorIndicado`) ou quando a única ata não cancelada da compra é esta e todos os itens são de um fornecedor.
+ * Em 06/10/2026 uma regra mais frouxa gravou itens de outra ata em sete atas: melhor ata sem itens do que itens alheios.
+ * Quando não dá para atribuir por falta do fornecedor, informa a pendência (`aoDetectarPendencia`) com os fornecedores
+ * que têm resultado na compra, para o coordenador escolher.
  * Devolve null quando o PNCP não respondeu (não dá para saber); [] quando respondeu e os itens não são atribuíveis.
  */
-export async function itensDaAtaPeloPncp(ata: {
-  anoCompra: string;
-  seqCompra: number;
-  /** Sequencial da ata na compra (do número de controle PNCP); sem ele, compara pelo número da ata. */
-  seqAta?: number;
-  numeroAta: string;
-  uasg: string;
-  cnpj?: string;
-}): Promise<ArpItemRecord[] | null> {
+export async function itensDaAtaPeloPncp(
+  ata: {
+    anoCompra: string;
+    seqCompra: number;
+    /** Sequencial da ata na compra (do número de controle PNCP); sem ele, compara pelo número da ata. */
+    seqAta?: number;
+    numeroAta: string;
+    uasg: string;
+    cnpj?: string;
+  },
+  opts: {
+    fornecedorIndicado?: string;
+    aoDetectarPendencia?: (p: Omit<PendenciaFornecedorPncp, 'numeroControlePncpAta' | 'numeroCompra'>) => void;
+  } = {}
+): Promise<ArpItemRecord[] | null> {
   const { anoCompra, seqCompra, seqAta, numeroAta, uasg, cnpj } = ata;
-  const fornecedor = FORNECEDOR_DAS_ATAS_PNCP.find((s) => matchAtaNumber(s.numeroAta, numeroAta) && matchAtaNumber(numeroAta, s.numeroAta));
-  if (fornecedor) return consultarItensDaCompraPncp(anoCompra, seqCompra, numeroAta, uasg, fornecedor.cnpjFornecedor, cnpj);
+  if (opts.fornecedorIndicado) return consultarItensDaCompraPncp(anoCompra, seqCompra, numeroAta, uasg, opts.fornecedorIndicado, cnpj);
 
   const atasDaCompra = await fetchAtasDaCompraPncp(anoCompra, seqCompra, cnpj);
   if (!atasDaCompra) {
@@ -738,15 +807,30 @@ export async function itensDaAtaPeloPncp(ata: {
   const ehEstaAta = (a: PncpAtaDaCompra) => seqAta !== undefined
     ? a.sequencialAta === seqAta
     : !!a.numeroAtaRegistroPreco && matchAtaNumber(numeroAtaDoPncp({ numeroAtaRegistroPreco: a.numeroAtaRegistroPreco, anoAta: a.anoAta ?? '' }), numeroAta);
+  const cnpjDaCompra = (cnpj || CNPJ_SENASP).replace(/\D/g, '');
+  const pendencia = async (motivo: string) => {
+    console.warn(`Ata ${numeroAta}: ${motivo}; itens não carregados pelo PNCP.`);
+    if (!opts.aoDetectarPendencia) return;
+    const itensDaCompra = await consultarItensDaCompraPncp(anoCompra, seqCompra, numeroAta, uasg, undefined, cnpj);
+    if (!itensDaCompra) return;
+    opts.aoDetectarPendencia({
+      numeroAta,
+      uasg,
+      anoCompra,
+      numeroControlePncpCompra: `${cnpjDaCompra}-1-${String(seqCompra).padStart(6, '0')}/${anoCompra}`,
+      atasNaCompra: vigentes.length,
+      ...candidatosDaCompra(itensDaCompra)
+    });
+  };
   if (vigentes.length !== 1 || !ehEstaAta(vigentes[0])) {
-    console.warn(`Ata ${numeroAta}: a compra ${seqCompra}/${anoCompra} tem ${vigentes.length} ata(s) não cancelada(s) no PNCP e a ata não informa o fornecedor; itens não carregados pelo PNCP.`);
+    await pendencia(`a compra ${seqCompra}/${anoCompra} tem ${vigentes.length} ata(s) não cancelada(s) no PNCP e a ata não informa o fornecedor`);
     return [];
   }
   const itensDaCompra = await consultarItensDaCompraPncp(anoCompra, seqCompra, numeroAta, uasg, undefined, cnpj);
   if (!itensDaCompra) return null;
   const itens = itensSeUmFornecedor(itensDaCompra);
   if (itens.length === 0 && itensDaCompra.length > 0) {
-    console.warn(`Ata ${numeroAta}: a compra ${seqCompra}/${anoCompra} tem mais de um fornecedor e a ata não informa qual é o dela; itens não carregados pelo PNCP.`);
+    await pendencia(`a compra ${seqCompra}/${anoCompra} tem mais de um fornecedor e a ata não informa qual é o dela`);
   }
   return itens;
 }
@@ -779,9 +863,10 @@ async function consultarItensDaCompraPncp(
   targetSupplierCnpj?: string,
   customCnpj?: string
 ): Promise<ArpItemRecord[] | null> {
-  const cleanTargetCnpj = (targetSupplierCnpj || '').replace(/\D/g, '');
+  // Identificador inteiro (CNPJ ou código de estrangeiro "ESTRANG…"), nunca só os dígitos.
+  const alvo = normalizarIdentificadorFornecedor(targetSupplierCnpj);
   const cnpj = (customCnpj || CNPJ_SENASP).replace(/\D/g, '');
-  const cacheKey = `${cnpj}-${anoCompra}-${seqCompra}-${numeroAta}-${uasg}-${cleanTargetCnpj}`;
+  const cacheKey = `${cnpj}-${anoCompra}-${seqCompra}-${numeroAta}-${uasg}-${alvo}`;
   if (pncpCompraItemsCache.has(cacheKey)) {
     return pncpCompraItemsCache.get(cacheKey)!;
   }
@@ -872,8 +957,8 @@ async function consultarItensDaCompraPncp(
     }
 
     let filteredItems = arpItems;
-    if (cleanTargetCnpj) {
-      filteredItems = arpItems.filter(item => (item.niFornecedor || '').replace(/\D/g, '') === cleanTargetCnpj);
+    if (alvo) {
+      filteredItems = arpItems.filter((item) => normalizarIdentificadorFornecedor(item.niFornecedor) === alvo);
     }
 
     pncpCompraItemsCache.set(cacheKey, filteredItems);
@@ -936,7 +1021,7 @@ export async function fetchArpItems(
   codigoUnidadeGerenciadora: string,
   numeroAtaRegistroPreco: string,
   arpContext?: Partial<ArpRecord> | string,
-  opts: { estrito?: boolean } = {}
+  opts: { estrito?: boolean } & OpcoesFornecedorPncp = {}
 ): Promise<ArpItemsResponse> {
   const cacheKey = `${numeroAtaRegistroPreco}-${codigoUnidadeGerenciadora}`;
   if (memoryItemsCache.has(cacheKey)) {
@@ -994,8 +1079,12 @@ export async function fetchArpItems(
       }
     }
 
+    // De onde vieram os itens: a sincronização confere o fornecedor indicado quando a fonte oficial chega.
+    let origem: ArpItemsResponse['origem'] = 'COMPRAS_GOV';
+
     // 3. Se não encontrou no Compras.gov, realiza fallback dinâmico para a compra do PNCP
     if (foundItems.length === 0) {
+      origem = 'PNCP';
       // 3.1. Verifica se foi passado o contexto com número de controle PNCP ou ano/número da compra
       let pncpCtrl = typeof arpContext === 'string' ? arpContext : arpContext?.numeroControlePncpAta;
       let anoCompra = typeof arpContext === 'object' ? arpContext?.anoCompra : undefined;
@@ -1027,21 +1116,19 @@ export async function fetchArpItems(
         }
       }
 
-      // 3.4. Sem o controle PNCP, as atas de fornecedor conhecido têm a compra anotada
-      if (!pncpCtrl) {
-        const conhecida = FORNECEDOR_DAS_ATAS_PNCP.find(s => matchAtaNumber(s.numeroAta, numeroAtaRegistroPreco) && matchAtaNumber(numeroAtaRegistroPreco, s.numeroAta));
-        if (conhecida) {
-          anoCompra = conhecida.anoCompra;
-          seqCompra = conhecida.seqCompra;
-          seqAta = conhecida.seqAta;
-        }
-      }
-
-      // 3.5. Itens pelo PNCP, só quando é certo que são desta ata (regra em itensDaAtaPeloPncp).
+      // 3.4. Itens pelo PNCP, só quando é certo que são desta ata (regra em itensDaAtaPeloPncp): fornecedor indicado
+      // pelo coordenador, ou única ata da compra com um fornecedor só.
       if (anoCompra && seqCompra) {
-        foundItems = (await itensDaAtaPeloPncp({
-          anoCompra, seqCompra, seqAta, numeroAta: numeroAtaRegistroPreco, uasg: codigoUnidadeGerenciadora, cnpj: cnpjDaCompra
-        })) ?? [];
+        const numeroCompraDaAta = typeof arpContext === 'object' ? arpContext?.numeroCompra : undefined;
+        foundItems = (await itensDaAtaPeloPncp(
+          { anoCompra, seqCompra, seqAta, numeroAta: numeroAtaRegistroPreco, uasg: codigoUnidadeGerenciadora, cnpj: cnpjDaCompra },
+          {
+            fornecedorIndicado: pncpCtrl ? opts.fornecedorIndicado?.(pncpCtrl) : undefined,
+            aoDetectarPendencia: opts.aoDetectarPendencia && pncpCtrl
+              ? (p) => opts.aoDetectarPendencia!({ ...p, numeroControlePncpAta: pncpCtrl as string, numeroCompra: numeroCompraDaAta })
+              : undefined
+          }
+        )) ?? [];
       }
     }
 
@@ -1082,7 +1169,8 @@ export async function fetchArpItems(
         resultado: foundItems,
         totalRegistros: foundItems.length,
         totalPaginas: 1,
-        paginasRestantes: 0
+        paginasRestantes: 0,
+        origem
       };
     }
 

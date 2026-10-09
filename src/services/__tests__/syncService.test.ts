@@ -23,8 +23,20 @@ vi.mock('../dbCacheService', () => ({
   fetchEstadoAtasNoBanco: vi.fn()
 }));
 
+// Atas publicadas no PNCP sem fornecedor (atas_fornecedor_pncp): leitura, gravação da pendência e conferência.
+vi.mock('../fornecedorAtaPncpService', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../fornecedorAtaPncpService')>();
+  return {
+    ...real,
+    fetchRegistrosFornecedorPncp: vi.fn().mockResolvedValue([]),
+    gravarPendenciasFornecedorPncp: vi.fn().mockResolvedValue(0),
+    conferirFornecedorPelaFonte: vi.fn().mockResolvedValue(null)
+  };
+});
+
 import * as api from '../api';
 import * as dbCache from '../dbCacheService';
+import * as fornecedorPncp from '../fornecedorAtaPncpService';
 import {
   coletarEGravarAtas,
   sincronizarAtas,
@@ -107,7 +119,47 @@ describe('coletarEGravarAtas', () => {
     const r = await coletarEGravarAtas(params);
     expect(r).toMatchObject({ status: 'PARCIAL', total: 3, mensagem: 'o Compras.gov.br não entregou os itens de 1 ata.' });
     expect(dbCache.cacheArpItemsInDb).toHaveBeenCalledTimes(2);
-    expect(vi.mocked(api.fetchArpItems).mock.calls[0][4]).toEqual({ estrito: true });
+    // Além de `estrito`, a sincronização passa a indicação de fornecedor e o coletor de pendências (atas_fornecedor_pncp).
+    expect(vi.mocked(api.fetchArpItems).mock.calls[0][4]).toEqual(expect.objectContaining({ estrito: true }));
+  });
+
+  it('fornecedor indicado pelo coordenador vai às consultas; pendência detectada é gravada no fim', async () => {
+    const CTRL = '00394494000136-1-001667/2025-000002';
+    vi.mocked(fornecedorPncp.fetchRegistrosFornecedorPncp).mockResolvedValueOnce([
+      { numeroControlePncp: CTRL, numeroAta: '00043/2026', codigoUasg: UASG, estado: 'INDICADO', fornecedorIdentificador: 'ESTRANG0000440', candidatos: [], itensSemResultado: [], detectadoEm: '', atualizadoEm: '' }
+    ]);
+    const a42 = { ...ata(42), numeroControlePncpAta: '00394494000136-1-001667/2025-000001' };
+    vi.mocked(api.fetchArpsDasFontes).mockImplementationOnce(async (_p, opts) => {
+      // A lista do PNCP detecta a pendência da 42 e recebe a indicação da 43.
+      expect(opts?.fornecedorIndicado?.(CTRL)).toBe('ESTRANG0000440');
+      expect(opts?.fornecedorIndicado?.('outra')).toBeUndefined();
+      opts?.aoDetectarPendencia?.({ numeroControlePncpAta: a42.numeroControlePncpAta, numeroAta: a42.numeroAtaRegistroPreco, uasg: UASG, numeroControlePncpCompra: 'c', anoCompra: '2025', atasNaCompra: 2, candidatos: [], itensSemResultado: [] });
+      return [a42];
+    });
+    vi.mocked(api.fetchArpItems).mockResolvedValueOnce({ resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0, origem: 'PNCP' });
+    const r = await coletarEGravarAtas(params);
+    expect(r.status).toBe('SUCESSO');
+    expect(vi.mocked(api.fetchArpItems).mock.calls[0][4]).toMatchObject({ estrito: true });
+    expect(fornecedorPncp.gravarPendenciasFornecedorPncp).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fornecedorPncp.gravarPendenciasFornecedorPncp).mock.calls[0][0].map((p) => p.numeroControlePncpAta)).toEqual([a42.numeroControlePncpAta]);
+    expect(fornecedorPncp.conferirFornecedorPelaFonte).not.toHaveBeenCalled();
+  });
+
+  it('Compras.gov.br publicou a ata: a indicação é conferida e a pendência detectada nesta execução não é gravada', async () => {
+    const CTRL = '00394494000136-1-001667/2025-000002';
+    const registro = { numeroControlePncp: CTRL, numeroAta: '00043/2026', codigoUasg: UASG, estado: 'PENDENTE' as const, candidatos: [], itensSemResultado: [], detectadoEm: '', atualizadoEm: '' };
+    vi.mocked(fornecedorPncp.fetchRegistrosFornecedorPncp).mockResolvedValueOnce([registro]);
+    const a43 = { ...ata(43), numeroControlePncpAta: CTRL };
+    vi.mocked(api.fetchArpsDasFontes).mockImplementationOnce(async (_p, opts) => {
+      opts?.aoDetectarPendencia?.({ numeroControlePncpAta: CTRL, numeroAta: '00043/2026', uasg: UASG, numeroControlePncpCompra: 'c', anoCompra: '2025', atasNaCompra: 2, candidatos: [], itensSemResultado: [] });
+      return [a43];
+    });
+    const itens = [{ numeroItem: '00003', niFornecedor: 'ESTRANG0000440' } as any];
+    vi.mocked(api.fetchArpItems).mockResolvedValueOnce({ resultado: itens, totalRegistros: 1, totalPaginas: 1, paginasRestantes: 0, origem: 'COMPRAS_GOV' });
+    await coletarEGravarAtas(params);
+    expect(fornecedorPncp.conferirFornecedorPelaFonte).toHaveBeenCalledWith(registro, itens);
+    expect(fornecedorPncp.gravarPendenciasFornecedorPncp).not.toHaveBeenCalled();
+    expect(dbCache.cacheArpItemsInDb).toHaveBeenCalledTimes(1);
   });
 
   it('ata sem itens nas fontes não é falha nem tenta gravar itens vazios', async () => {
