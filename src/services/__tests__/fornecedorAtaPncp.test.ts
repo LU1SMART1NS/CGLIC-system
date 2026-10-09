@@ -156,6 +156,31 @@ describe('fetchArpItems — origem dos itens e fornecedor indicado', () => {
   });
 });
 
+describe('fetchArpItems — busca no ano da vigência', () => {
+  beforeEach(() => limparCachesAtas());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('ata de número 2024 com vigência em 2025 e data diferente nos itens: acha no Compras.gov.br pelo ano da vigência (caso 00102/2024)', async () => {
+    const consultas: string[] = [];
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => {
+      consultas.push(url);
+      if (!url.startsWith('/api-arp/')) throw new Error(`não devia consultar o PNCP: ${url}`);
+      const q = new URLSearchParams(url.split('?')[1]);
+      const ini = q.get('dataVigenciaInicialMin');
+      // Os itens estão publicados com vigência inicial 17/01/2025; a ata gravada diz 20/01/2025.
+      const resultado = ini === '2025-01-01'
+        ? [{ numeroAtaRegistroPreco: '00102/2024', numeroItem: '00001', niFornecedor: '14193613000105', nomeRazaoSocialFornecedor: 'KADOSHI', quantidadeHomologadaItem: 7338 }]
+        : [];
+      return json({ resultado, paginasRestantes: 0 });
+    }));
+    const r = await fetchArpItems('2025-01-20', '200331', '00102/2024', { numeroControlePncpAta: `${CNPJ}-1-001169/2024-000005`, anoCompra: '2024', numeroCompra: '90017' }, { estrito: true });
+    expect(r.origem).toBe('COMPRAS_GOV');
+    expect(r.resultado.map((i) => i.numeroItem)).toEqual(['00001']);
+    const janelas = consultas.map((u) => new URLSearchParams(u.split('?')[1])).map((q) => `${q.get('dataVigenciaInicialMin')}..${q.get('dataVigenciaInicialMax')}`);
+    expect(janelas).toEqual(['2025-01-20..2025-01-20', '2024-01-01..2024-12-31', '2025-01-01..2025-12-31']);
+  });
+});
+
 describe('candidatosDaCompra e fornecedorDosItens', () => {
   const item = (n: number, ni: string, nome: string): ArpItemRecord => ({ numeroItem: String(n).padStart(5, '0'), niFornecedor: ni, nomeRazaoSocialFornecedor: nome, descricaoItem: `Item ${n}`, quantidadeHomologadaItem: 10, valorUnitario: 2, valorTotal: 20 } as ArpItemRecord);
 

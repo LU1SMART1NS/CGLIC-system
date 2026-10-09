@@ -1069,9 +1069,13 @@ export async function fetchArpItems(
       matchAtaNumber(item.numeroAtaRegistroPreco, numeroAtaRegistroPreco)
     );
 
-    // 2. Se não encontrou pelo dia exato, busca no ano da Ata no Compras.gov
-    if (foundItems.length === 0 && ataYear) {
-      const yearData = await executeQuery(`${ataYear}-01-01`, `${ataYear}-12-31`);
+    // 2. Se não encontrou pelo dia exato, busca no ano da Ata e, se for outro, no ano da vigência. A data gravada pode
+    // diferir da que o Compras.gov.br usa nos itens (00102/2024: ata 20/01/2025, itens 17/01/2025), e o número da ata
+    // pode ser de um ano e a vigência começar no seguinte; sem o ano da vigência a ata caía no PNCP e ficava sem itens.
+    const anoDaVigencia = cleanDate ? cleanDate.split('-')[0] : '';
+    for (const ano of Array.from(new Set([ataYear, anoDaVigencia].filter(Boolean)))) {
+      if (foundItems.length > 0) break;
+      const yearData = await executeQuery(`${ano}-01-01`, `${ano}-12-31`);
       if (yearData?.resultado) {
         foundItems = yearData.resultado.filter(item =>
           matchAtaNumber(item.numeroAtaRegistroPreco, numeroAtaRegistroPreco)

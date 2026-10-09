@@ -230,6 +230,13 @@ export async function coletarEGravarAtas(
     });
   }
 
+  // Ata que já tem itens gravados recebeu-os de uma fonte que dizia o fornecedor: não é pendência, mesmo que a
+  // releitura de hoje tenha caído no PNCP (a fonte oficial não respondeu ou a busca não a encontrou).
+  for (const arp of atas) {
+    const e = estadoNoBanco.get(arp.numeroAtaRegistroPreco);
+    if (arp.numeroControlePncpAta && e && e.itens > 0) pendencias.delete(arp.numeroControlePncpAta);
+  }
+
   // Pendências de fornecedor detectadas nesta execução (não derrubam a sincronização: a próxima detecta de novo).
   if (pendencias.size > 0) {
     try {
