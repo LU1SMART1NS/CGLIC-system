@@ -30,6 +30,7 @@ import { useFaturasDoContrato } from '../../hooks/useFaturasDoContrato';
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
 import { ContractItemsSection } from './ContractItemsSection';
+import { displayContractNumber } from '../../utils/contractNumber';
 import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
@@ -217,6 +218,10 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
               isLoading={itensDoContrato.isLoading}
               error={itensDoContrato.error}
               onRetry={() => void itensDoContrato.refetch()}
+              contractKey={resolvedContractKey}
+              numeroContrato={displayContractNumber(contract) || `${contract.numero}/${contract.ano}`}
+              podeAjustar={role === 'admin' || role === 'gestor'}
+              linkPortal={contract.linkPncp || undefined}
             />
           </InstrumentSection>
         )}

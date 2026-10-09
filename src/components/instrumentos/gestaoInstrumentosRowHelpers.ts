@@ -65,6 +65,7 @@ export interface MotivoInfo {
 
 const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   ATA_CRITICA: { label: 'Saldo em Atenção', color: 'var(--color-success)', bg: '#ecfdf5' },
+  UNIDADE_PENDENTE: { label: 'Unidades do Contratado', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
   PAGAMENTO_PREVISTO: { label: 'Pagamento Previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
@@ -132,6 +133,8 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
   switch (item.category) {
     case 'ATA_CRITICA':
       return { label: 'Verificar Saldo', targetUrl: ataItemUrl(item) };
+    case 'UNIDADE_PENDENTE':
+      return { label: 'Informar Unidades', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'PAGAMENTO_CRITICO':
       return { label: 'Abrir Pagamento', targetUrl: '/pagamentos' };
     case 'PAGAMENTO_PREVISTO':

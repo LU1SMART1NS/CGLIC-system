@@ -54,6 +54,8 @@ export type DashboardAttentionCategory =
   | 'PAGAMENTO_PREVISTO'
   | 'REAJUSTE_RADAR'
   | 'ATA_CRITICA'
+  /** Contratado do item ainda sem unidade interna, ou divisão entre unidades a conferir (migration 103). */
+  | 'UNIDADE_PENDENTE'
   | 'LEMBRETE';
 
 export type DashboardAttentionSeverity = 'CRITICA' | 'URGENTE' | 'ATENCAO' | 'INFO';

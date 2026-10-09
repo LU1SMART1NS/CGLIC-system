@@ -26,7 +26,7 @@ type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 const UASGS = UASGS_CGLIC;
 
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
-  SALDOS: ['ATA_CRITICA'],
+  SALDOS: ['ATA_CRITICA', 'UNIDADE_PENDENTE'],
   REAJUSTES: ['REAJUSTE_RADAR'],
   PAGAMENTOS: ['PAGAMENTO_CRITICO', 'PAGAMENTO_PREVISTO'],
   TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA'],

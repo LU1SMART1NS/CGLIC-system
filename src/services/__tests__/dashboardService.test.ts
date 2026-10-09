@@ -352,6 +352,36 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(items.find((i) => i.category === 'ATA_CRITICA')).toMatchObject({ severity: 'ATENCAO' });
     });
 
+    it('contratado sem unidade só vira pendência no item que já tem unidade alocada (migration 103)', () => {
+      const item = (over: Record<string, unknown>) =>
+        ({ percentual_consumido: 10, numero_ata: '00041/2026', numero_item: '00001', codigo_uasg: '200331', item_key: '00041/2026-200331-00001', ...over }) as any;
+      const sem = calculateAttentionSummary({ arps: [arp], arpItems: [item({ quantidade_contratada_sem_unidade: 200, tem_alocacao: false })], currentDate: now });
+      expect(sem.items.filter((i) => i.category === 'UNIDADE_PENDENTE')).toEqual([]);
+      const pend = calculateAttentionSummary({ arps: [arp], arpItems: [item({ quantidade_contratada_sem_unidade: 200, tem_alocacao: true })], currentDate: now })
+        .items.find((i) => i.category === 'UNIDADE_PENDENTE');
+      expect(pend).toMatchObject({
+        severity: 'ATENCAO',
+        title: 'Contratado sem unidade interna',
+        badgeLabel: '200 sem unidade',
+        avisoChave: 'SALDO::00041/2026-200331::1::UNIDADE-SEM_UNIDADE-200',
+        targetUrl: '/atas/detalhe/00041%2F2026-200331/itens/00001?aba=contratos'
+      });
+      const conferir = calculateAttentionSummary({
+        arps: [arp],
+        arpItems: [item({ quantidade_contratada_sem_unidade: 0, total_contratos_a_conferir: 2, tem_alocacao: true })],
+        currentDate: now
+      }).items.find((i) => i.category === 'UNIDADE_PENDENTE');
+      expect(conferir).toMatchObject({ severity: 'URGENTE', badgeLabel: '2 a conferir' });
+      const resolvido = calculateAttentionSummary({
+        arps: [arp],
+        arpItems: [item({ quantidade_contratada_sem_unidade: 200, tem_alocacao: true })],
+        avisosResolvidos: new Set([pend!.avisoChave!]),
+        currentDate: now
+      });
+      expect(resolvido.items.filter((i) => i.category === 'UNIDADE_PENDENTE')).toEqual([]);
+      expect(resolvido.resolvidos?.map((i) => i.category)).toContain('UNIDADE_PENDENTE');
+    });
+
     it('saldo resolvido sai da lista e volta quando o nível piora (mesma chave da Ata 360)', () => {
       const item = (pct: number) => ({ percentual_consumido: pct, numero_ata: '00041/2026', numero_item: '00001', codigo_uasg: '200331' }) as any;
       const atencao = calculateAttentionSummary({ arps: [arp], arpItems: [item(75)], currentDate: now }).items[0];
