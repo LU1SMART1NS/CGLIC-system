@@ -20,7 +20,9 @@ export interface AllocationRow {
   id: string;
   unitName: string;
   allocatedQty: number;
-  /** Soma das parcelas deste item nas notas ligadas à unidade. */
+  /** Contratado da unidade no item: soma das divisões dos contratos (migration 103). */
+  contratado: number;
+  /** Soma das parcelas deste item nas notas ligadas à unidade (ou herdadas do contrato). */
   empenhado: number;
   /** Notas do item ligadas à unidade (vinculadas aos itens ou a vincular): com alguma, a alocação não pode ser removida. */
   vinculados: number;
@@ -37,6 +39,12 @@ interface AllocationsTabProps {
   percentAllocated: number;
   rows: AllocationRow[];
   semUnidade: { empenhado: number; count: number };
+  /** Consumo do item: contratado nos contratos vinculados. */
+  contratadoItem: number;
+  /** Contratado ainda sem unidade interna e em quantos contratos. */
+  contratadoSemUnidade: { quantidade: number; contratos: number };
+  /** Contratos com divisão a conferir (soma acima do contrato, unidade sem alocação, quantidade mudou). */
+  contratosAConferir: number;
 
   departments: InternalDepartment[];
   departmentsLoading: boolean;
@@ -56,6 +64,9 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
   percentAllocated,
   rows,
   semUnidade,
+  contratadoItem,
+  contratadoSemUnidade,
+  contratosAConferir,
   departments,
   departmentsLoading,
   canManage,
@@ -82,6 +93,18 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
       render: (r) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{formatNumber(r.allocatedQty)}</span>
     },
     {
+      key: 'contratado',
+      header: 'Contratado',
+      sortValue: (r) => r.contratado,
+      sortFirstDir: 'desc',
+      align: 'right',
+      render: (r) => (
+        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: r.contratado > r.allocatedQty ? 'var(--danger)' : undefined }} title={r.contratado > r.allocatedQty ? 'Contratado acima do alocado' : undefined}>
+          {formatNumber(r.contratado)}
+        </span>
+      )
+    },
+    {
       key: 'empenhado',
       header: 'Empenhado',
       sortValue: (r) => r.empenhado,
@@ -92,27 +115,35 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
     {
       key: 'aEmpenhar',
       header: 'A empenhar',
-      sortValue: (r) => r.allocatedQty - r.empenhado,
+      sortValue: (r) => r.contratado - r.empenhado,
       sortFirstDir: 'desc',
       align: 'right',
       render: (r) => {
-        const balance = r.allocatedQty - r.empenhado;
-        return (
-          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: balance < 0 ? 'var(--danger)' : 'var(--success)' }}>
-            {formatNumber(balance)}
-          </span>
-        );
+        const balance = r.contratado - r.empenhado;
+        return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: balance < 0 ? 'var(--danger)' : undefined }}>{formatNumber(balance)}</span>;
+      }
+    },
+    {
+      key: 'livre',
+      header: 'Livre p/ contratar',
+      sortValue: (r) => r.allocatedQty - r.contratado,
+      sortFirstDir: 'desc',
+      align: 'right',
+      render: (r) => {
+        const livre = r.allocatedQty - r.contratado;
+        return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: livre < 0 ? 'var(--danger)' : 'var(--success)' }}>{formatNumber(livre)}</span>;
       }
     },
     {
       key: 'consumo',
-      header: 'Consumo',
-      sortValue: (r) => (r.allocatedQty > 0 ? r.empenhado / r.allocatedQty : 0),
+      header: 'Contratado do alocado',
+      sortValue: (r) => (r.allocatedQty > 0 ? r.contratado / r.allocatedQty : 0),
       sortFirstDir: 'desc',
-      width: '180px',
+      width: '160px',
       render: (r) => {
-        const percent = r.allocatedQty > 0 ? (r.empenhado / r.allocatedQty) * 100 : 0;
-        return <ProgressBar value={percent} height="6px" testId={`consumo-${r.id}`} />;
+        const percent = r.allocatedQty > 0 ? (r.contratado / r.allocatedQty) * 100 : 0;
+        // A barra para em 100%; o rótulo mostra o percentual real (contratado acima do alocado passa de 100%).
+        return <ProgressBar value={percent} height="6px" showPercent={false} label={`${formatNumber(Math.round(percent * 10) / 10)}%`} testId={`consumo-${r.id}`} />;
       }
     },
     ...(canManage
@@ -129,13 +160,15 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
                   action="excluir"
                   iconOnly
                   label={
-                    r.vinculados > 0
-                      ? `${r.unitName} tem ${r.vinculados} ${r.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, desvincule os empenhos na aba Contratos e empenhos.`
-                      : `Excluir a alocação de ${r.unitName}`
+                    r.contratado > 0
+                      ? `${r.unitName} tem ${formatNumber(r.contratado)} contratados. Para remover, tire a unidade das divisões dos contratos na aba Contratos e empenhos.`
+                      : r.vinculados > 0
+                        ? `${r.unitName} tem ${r.vinculados} ${r.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, desvincule os empenhos na aba Contratos e empenhos.`
+                        : `Excluir a alocação de ${r.unitName}`
                   }
                   size="sm"
                   onClick={() => setJanela({ removerId: r.id })}
-                  disabled={r.vinculados > 0}
+                  disabled={r.vinculados > 0 || r.contratado > 0}
                 />
               </div>
             )
@@ -150,10 +183,32 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
         testId="allocations-summary"
         items={[
           { label: 'Alocado', value: `${formatNumber(totalAllocated)} de ${formatNumber(totalUG)} (${formatNumber(percentAllocated)}%)` },
-          { label: 'A alocar', value: formatNumber(remaining), tone: remaining < 0 ? 'danger' : 'default' }
+          { label: 'A alocar', value: formatNumber(remaining), tone: remaining < 0 ? 'danger' : 'default' },
+          { label: 'Contratado', value: formatNumber(contratadoItem) },
+          { label: 'Empenhado nas unidades', value: formatNumber(rows.reduce((s, r) => s + r.empenhado, 0)) }
         ]}
         progress={{ value: totalAllocated, max: totalUG }}
       >
+        {contratadoSemUnidade.quantidade > 0 && (
+          <NoticeBar
+            testId="contratado-sem-unidade"
+            action={
+              <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
+                Informar unidades em Contratos e empenhos
+              </AppButton>
+            }
+          >
+            <strong>{formatNumber(contratadoSemUnidade.quantidade)}</strong> contratados ainda sem unidade interna
+            {contratadoSemUnidade.contratos > 0 ? ` (${contratadoSemUnidade.contratos} ${contratadoSemUnidade.contratos === 1 ? 'contrato' : 'contratos'})` : ''}.
+            Não entram no contratado das unidades até a unidade ser informada.
+          </NoticeBar>
+        )}
+        {contratosAConferir > 0 && (
+          <NoticeBar tone="danger" testId="contratado-a-conferir">
+            {contratosAConferir === 1 ? '1 contrato tem' : `${contratosAConferir} contratos têm`} divisão entre unidades a conferir: a quantidade do
+            contrato mudou, a soma passa do contrato ou há unidade sem alocação.
+          </NoticeBar>
+        )}
         {semUnidade.count > 0 && (
           <NoticeBar
             testId="empenhos-sem-unidade"
@@ -209,11 +264,47 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
         ) : (
           <DataTable columns={columns} data={rows} keyExtractor={(r) => r.id} testId="allocations-table" />
         )}
+        {contratadoItem > 0 && <ConferenciaDoConsumo contratadoItem={contratadoItem} rows={rows} semUnidade={contratadoSemUnidade.quantidade} />}
       </div>
 
       {canManage && (
         <AlocarUnidadeModal item={janela ? item : null} focoId={janela?.focoId} removerId={janela?.removerId} onFechar={() => setJanela(null)} />
       )}
+    </div>
+  );
+};
+
+/**
+ * Conferência do consumo: o contratado do item (consumo da SENASP) é a soma do contratado das unidades mais o que ainda
+ * não tem unidade. Diferença = divisão a conferir (soma acima do contrato ou unidade sem alocação).
+ */
+const ConferenciaDoConsumo: React.FC<{ contratadoItem: number; rows: AllocationRow[]; semUnidade: number }> = ({ contratadoItem, rows, semUnidade }) => {
+  const partes = rows.filter((r) => r.contratado > 0);
+  const soma = partes.reduce((s, r) => s + r.contratado, 0) + semUnidade;
+  const fecha = Math.abs(soma - contratadoItem) < 0.0001;
+  return (
+    <div
+      data-testid="conferencia-consumo"
+      style={{
+        marginTop: '0.75rem',
+        padding: '0.6rem 0.8rem',
+        borderRadius: '6px',
+        border: '1px solid #e2e8f0',
+        borderLeft: `4px solid ${fecha ? 'var(--color-success-solid)' : 'var(--color-warning)'}`,
+        background: '#f8fafc',
+        fontSize: '0.84rem'
+      }}
+    >
+      <strong>Conferência do consumo</strong>
+      <div style={{ fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', marginTop: '0.2rem' }}>
+        Consumido da SENASP {formatNumber(contratadoItem)} {fecha ? '=' : '≠'}{' '}
+        {[...partes.map((r) => `${r.unitName} ${formatNumber(r.contratado)}`), ...(semUnidade > 0 ? [`sem unidade ${formatNumber(semUnidade)}`] : [])].join(' + ') || '0'}
+      </div>
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.2rem' }}>
+        {fecha
+          ? 'A soma das unidades fecha com o consumo do item. "Sem unidade" é a parte do contratado que ainda espera o gestor.'
+          : 'A soma não fecha: há divisão de contrato a conferir na aba Contratos e empenhos.'}
+      </div>
     </div>
   );
 };

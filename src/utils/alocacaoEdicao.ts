@@ -5,8 +5,9 @@ import type { AllocationExecution } from './allocationExecution';
  * Edição das alocações internas de um item na janela "Alocação do item" (fila Itens às unidades e Item 360).
  * Tudo é editado em memória e gravado de uma vez; as regras ficam aqui para valerem nas duas telas:
  * - a soma não passa do quantitativo SENASP;
- * - a unidade não fica com menos do que já empenhou;
- * - a unidade com empenho vinculado não pode ser removida (antes é preciso desvincular os empenhos).
+ * - a unidade não fica com menos do que já contratou nem do que já empenhou (migration 103);
+ * - a unidade com contrato ou empenho vinculado não pode ser removida (antes é preciso tirá-la das divisões dos
+ *   contratos e desvincular os empenhos).
  */
 export interface LinhaAlocacao {
   id: string;
@@ -16,6 +17,8 @@ export interface LinhaAlocacao {
   /** Quantidade digitada; vazio enquanto o campo está em branco. */
   qtd: number | '';
   empenhado: number;
+  /** Contratado da unidade no item: soma das divisões dos contratos (migration 103). */
+  contratado: number;
   /** Empenhos do item vinculados à unidade (confirmados ou não). */
   vinculados: number;
   removida: boolean;
@@ -24,7 +27,7 @@ export interface LinhaAlocacao {
 
 export interface AvaliacaoLinha {
   alterada: boolean;
-  /** Mínimo que a unidade aceita: o empenhado (e pelo menos 1). */
+  /** Mínimo que a unidade aceita: o maior entre contratado e empenhado (e pelo menos 1). */
   minimo: number;
   abaixoDoMinimo: boolean;
   podeRemover: boolean;
@@ -44,7 +47,12 @@ const fmt = (n: number) => n.toLocaleString('pt-BR');
 const num = (q: number | '') => (q === '' ? 0 : Number(q) || 0);
 export const normUnidade = (s: string) => s.trim().toLowerCase();
 
-export function linhasIniciais(alocacoes: InternalAllocation[], execucao: Map<string, AllocationExecution>): LinhaAlocacao[] {
+export function linhasIniciais(
+  alocacoes: InternalAllocation[],
+  execucao: Map<string, AllocationExecution>,
+  /** Contratado de cada unidade, pelo nome normalizado (normUnidade). */
+  contratadoPorUnidade?: ReadonlyMap<string, number>
+): LinhaAlocacao[] {
   return alocacoes.map((a) => {
     const exec = execucao.get(a.id);
     return {
@@ -53,6 +61,7 @@ export function linhasIniciais(alocacoes: InternalAllocation[], execucao: Map<st
       original: a.allocatedQty,
       qtd: a.allocatedQty,
       empenhado: exec?.empenhado ?? 0,
+      contratado: contratadoPorUnidade?.get(normUnidade(a.unitName)) ?? 0,
       vinculados: exec?.vinculados ?? 0,
       removida: false,
       adicionada: false
@@ -68,11 +77,11 @@ export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: numbe
   let algumaAbaixo = false;
 
   for (const l of linhas) {
-    const minimo = Math.max(1, l.empenhado);
+    const minimo = Math.max(1, l.empenhado, l.contratado ?? 0);
     const abaixoDoMinimo = !l.removida && num(l.qtd) < minimo;
     if (abaixoDoMinimo) algumaAbaixo = true;
     const alterada = !l.adicionada && !l.removida && num(l.qtd) !== l.original;
-    porLinha.set(l.id, { alterada, minimo, abaixoDoMinimo, podeRemover: l.vinculados === 0 });
+    porLinha.set(l.id, { alterada, minimo, abaixoDoMinimo, podeRemover: l.vinculados === 0 && !(l.contratado > 0) });
     if (l.adicionada && !l.removida) mudancas.push(`+ ${l.unitName} ${fmt(num(l.qtd))}`);
     else if (l.removida && !l.adicionada) mudancas.push(`− ${l.unitName}`);
     else if (alterada) mudancas.push(`${l.unitName} ${fmt(l.original)} → ${fmt(num(l.qtd))}`);
@@ -82,7 +91,8 @@ export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: numbe
   if (totalAlocado > quantitativoSenasp) {
     erros.push(`A soma das alocações (${fmt(totalAlocado)}) passa do quantitativo SENASP (${fmt(quantitativoSenasp)}) em ${fmt(totalAlocado - quantitativoSenasp)}. Reduza alguma unidade.`);
   }
-  if (algumaAbaixo) erros.push('Há unidade abaixo do mínimo: a quantidade deve ser maior que zero e não pode ficar abaixo do que a unidade já empenhou.');
+  if (algumaAbaixo) erros.push('Há unidade abaixo do mínimo: a quantidade deve ser maior que zero e não pode ficar abaixo do que a unidade já contratou nem do que já empenhou.');
+  if (linhas.some((l) => l.removida && l.contratado > 0)) erros.push('Unidade com contrato não pode ser removida. Tire a unidade das divisões dos contratos antes, na aba Contratos e empenhos.');
   if (linhas.some((l) => l.removida && l.vinculados > 0)) erros.push('Unidade com empenho vinculado não pode ser removida. Desvincule os empenhos antes.');
 
   return {

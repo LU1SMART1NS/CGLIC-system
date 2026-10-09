@@ -58,6 +58,7 @@ export async function fetchArpItemContractLinks(itemKey: string): Promise<ArpIte
     contractKey: d.contract_key,
     observacoes: d.observacoes || undefined,
     quantidadeContratadaApi: d.quantidade_contratada_api == null ? null : Number(d.quantidade_contratada_api),
+    quantidadeAjustada: d.quantidade_ajustada == null ? null : Number(d.quantidade_ajustada),
     valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
     quantidadeLidaEm: d.quantidade_lida_em || undefined,
     origem: d.origem === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL',
@@ -268,6 +269,7 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
       contractKey: d.contract_key,
       observacoes: d.observacoes || undefined,
       quantidadeContratadaApi: d.quantidade_contratada_api == null ? null : Number(d.quantidade_contratada_api),
+      quantidadeAjustada: d.quantidade_ajustada == null ? null : Number(d.quantidade_ajustada),
       valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
       quantidadeLidaEm: d.quantidade_lida_em || undefined,
       origem: d.origem === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL',
@@ -278,6 +280,17 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
     console.warn('Erro ao carregar contratos vinculados à Ata', err);
     return [];
   }
+}
+
+/**
+ * Quantidade do item no contrato usada no saldo: a ajustada pelo gestor (migration 103) e, sem ajuste, a lida da
+ * fonte (a leitura ao vivo, quando informada, ou a cópia gravada no vínculo).
+ */
+export function quantidadeUsada(
+  link: Pick<ArpItemContractLink, 'contractKey' | 'quantidadeAjustada' | 'quantidadeContratadaApi'>,
+  quantidades?: ReadonlyMap<string, number>
+): number | undefined {
+  return link.quantidadeAjustada ?? quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined;
 }
 
 /**
@@ -312,7 +325,7 @@ export function enrichContractLinks(
         linkId: link.id,
         itemKey: link.itemKey,
         contractKey: link.contractKey,
-        quantidadeContratada: quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined,
+        quantidadeContratada: quantidadeUsada(link, quantidades),
         quantidadeLidaEm: link.quantidadeLidaEm,
         valorUnitarioContrato: link.valorUnitarioApi ?? undefined,
         observacoes: link.observacoes,
@@ -341,7 +354,7 @@ export function enrichContractLinks(
       linkId: link.id,
       itemKey: link.itemKey,
       contractKey: link.contractKey,
-      quantidadeContratada: quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined,
+      quantidadeContratada: quantidadeUsada(link, quantidades),
         quantidadeLidaEm: link.quantidadeLidaEm,
         valorUnitarioContrato: link.valorUnitarioApi ?? undefined,
       observacoes: link.observacoes,

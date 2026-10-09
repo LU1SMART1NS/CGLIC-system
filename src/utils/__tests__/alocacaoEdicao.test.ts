@@ -37,7 +37,7 @@ describe('alocacaoEdicao', () => {
   it('editar, remover e acrescentar aparecem no resumo e podem ser salvos', () => {
     let ls = com(iniciais(), 'a2', { removida: true });
     ls = com(ls, 'a3', { qtd: 50000 });
-    ls = [...ls, { id: 'n1', unitName: 'DPSP', original: 0, qtd: 10000, empenhado: 0, vinculados: 0, removida: false, adicionada: true }];
+    ls = [...ls, { id: 'n1', unitName: 'DPSP', original: 0, qtd: 10000, empenhado: 0, contratado: 0, vinculados: 0, removida: false, adicionada: true }];
     const a = avaliarEdicao(ls, TOTAL);
     expect(a.mudancas).toEqual(['− DIOPI', 'CAEP 20.000 → 50.000', '+ DPSP 10.000']);
     expect(a.porLinha.get('a3')?.alterada).toBe(true);
@@ -59,7 +59,7 @@ describe('alocacaoEdicao', () => {
   it('a unidade não fica abaixo do que já empenhou', () => {
     const a = avaliarEdicao(com(iniciais(), 'a1', { qtd: 100000 }), TOTAL);
     expect(a.porLinha.get('a1')).toMatchObject({ minimo: 122400, abaixoDoMinimo: true });
-    expect(a.erros.join(' ')).toContain('abaixo do que a unidade já empenhou');
+    expect(a.erros.join(' ')).toContain('nem do que já empenhou');
     expect(a.podeSalvar).toBe(false);
     expect(avaliarEdicao(com(iniciais(), 'a1', { qtd: 122400 }), TOTAL).podeSalvar).toBe(true);
   });
@@ -77,6 +77,19 @@ describe('alocacaoEdicao', () => {
     const forcada = avaliarEdicao(com(iniciais(), 'a3', { removida: true }), TOTAL);
     expect(forcada.erros.join(' ')).toContain('não pode ser removida');
     expect(forcada.podeSalvar).toBe(false);
+  });
+
+  it('o contratado da unidade vira o mínimo e impede remover (migration 103)', () => {
+    const contratado = new Map([['diopi', 45000], ['fnsp', 100000]]);
+    const ls = linhasIniciais(gravadas, exec, contratado);
+    expect(ls.map((l) => [l.unitName, l.contratado])).toEqual([['FNSP', 100000], ['DIOPI', 45000], ['CAEP', 0]]);
+    const a = avaliarEdicao(com(ls, 'a2', { qtd: 40000 }), TOTAL);
+    expect(a.porLinha.get('a2')).toMatchObject({ minimo: 45000, abaixoDoMinimo: true, podeRemover: false });
+    expect(a.porLinha.get('a1')?.minimo).toBe(122400);
+    expect(a.podeSalvar).toBe(false);
+    const removida = avaliarEdicao(com(ls, 'a2', { removida: true }), TOTAL);
+    expect(removida.erros.join(' ')).toContain('Unidade com contrato não pode ser removida');
+    expect(avaliarEdicao(com(ls, 'a2', { qtd: 45000 }), TOTAL).podeSalvar).toBe(true);
   });
 
   it('remover limpa só os vínculos antigos que apontavam para a unidade removida', () => {
