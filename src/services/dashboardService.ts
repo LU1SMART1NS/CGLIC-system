@@ -47,7 +47,7 @@ import { buildContractEventsFromOfficialData } from './contractEventService';
 import { fetchContratosParaTela } from './contratosOficiaisService';
 import { fetchArpsFromDb } from './dbCacheService';
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
-import { chaveAvisoLembrete, chaveAvisoReajuste, chaveAvisoSaldo, fetchAvisosResolvidos } from './avisosResolvidosService';
+import { chaveAvisoLembrete, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -554,6 +554,43 @@ export function calculateAttentionSummary(params: {
       contractKey: aItem.contract_key || aItem.contractKey,
       diasRelevantes: 0,
       badgeLabel: `${saldoClass.percentualConsumido.toFixed(1)}% consumido`
+    });
+  }
+
+  // 5b. Contratado por unidade interna (migration 103): no item que já tem unidade alocada, o contratado ainda sem
+  // unidade e a divisão de contrato a conferir. Item sem nenhuma alocação fica de fora: a pendência dele é alocar
+  // (fila Alocação › Itens às unidades), não dividir o contrato.
+  for (const aItem of (arpItems || []) as any[]) {
+    if (!aItem.tem_alocacao) continue;
+    const semUnidade = Number(aItem.quantidade_contratada_sem_unidade) || 0;
+    const aConferir = Number(aItem.total_contratos_a_conferir) || 0;
+    if (semUnidade <= 0 && aConferir <= 0) continue;
+    const numAta = aItem.numero_ata || aItem.numeroAta;
+    const numItem = aItem.numero_item || aItem.numeroItem;
+    const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
+    const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : '');
+    if (!itemKey) continue;
+    const descItem = aItem.descricao_item || aItem.descricaoItem || 'Item de ARP';
+    const conferir = aConferir > 0;
+    const fmt = (n: number) => n.toLocaleString('pt-BR');
+    items.push({
+      id: `ATT-UNIDADE-${itemKey}`,
+      category: 'UNIDADE_PENDENTE',
+      severity: conferir ? 'URGENTE' : 'ATENCAO',
+      avisoChave: numAta && numItem ? chaveAvisoUnidade(numAta, uasgItem, numItem, conferir ? 'CONFERIR' : 'SEM_UNIDADE', conferir ? aConferir : semUnidade) : undefined,
+      title: conferir ? 'Divisão do contratado entre unidades a conferir' : 'Contratado sem unidade interna',
+      description: conferir
+        ? `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${aConferir} ${aConferir === 1 ? 'contrato com divisão' : 'contratos com divisão'} a conferir`
+        : `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${fmt(semUnidade)} contratados ainda sem unidade interna`,
+      arpKey: itemKey,
+      numeroAta: numAta,
+      objetoItem: descItem,
+      fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
+      // Sem prazo: a coluna Prazo mostra "—".
+      targetUrl: numAta && numItem
+        ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}/itens/${encodeURIComponent(String(numItem))}?aba=contratos`
+        : undefined,
+      badgeLabel: conferir ? `${aConferir} a conferir` : `${fmt(semUnidade)} sem unidade`
     });
   }
 
@@ -1340,7 +1377,8 @@ export async function fetchManagementDashboardData(
     ataPlans,
     avisosResolvidos,
     empenhosResumo,
-    arpItemsSaldo
+    arpItemsSaldo,
+    itensComAlocacao
   ] = await Promise.all([
     fetchContratosParaTela(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar contratos para o dashboard:', err);
@@ -1370,8 +1408,14 @@ export async function fetchManagementDashboardData(
     fetchArpItemSaldosFromDb(cleanUasg).catch((err) => {
       console.error('Erro ao consultar saldos de itens de ARP para o dashboard:', err);
       return [] as any[];
+    }),
+    fetchItensComAlocacao().catch((err) => {
+      console.warn('Erro ao consultar os itens com alocação interna para o dashboard:', err);
+      return new Set<string>();
     })
   ]);
+  // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
+  const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
 
   const paymentCycles = await fetchAllPaymentCyclesForDashboard(contracts);
 
@@ -1384,7 +1428,7 @@ export async function fetchManagementDashboardData(
     ataPlans,
     avisosResolvidos,
     empenhos: empenhosResumo,
-    itemsSaldo: arpItemsSaldo,
+    itemsSaldo: arpItemsSaldoComAlocacao,
     paymentCycles,
     filters,
     syncInfo: arpsRes.syncInfo,
@@ -1497,6 +1541,20 @@ export async function fetchEmpenhosResumoFromDb(_uasg?: string): Promise<any[]> 
     console.warn('Erro ao consultar v_empenhos_resumo:', err);
     return [];
   }
+}
+
+/** Chaves dos itens de ata com alguma unidade interna alocada (arp_allocations), em páginas de 1000. */
+export async function fetchItensComAlocacao(): Promise<Set<string>> {
+  const chaves = new Set<string>();
+  if (!isSupabaseConfigured || !supabase) return chaves;
+  const PAGINA = 1000;
+  for (let from = 0; ; from += PAGINA) {
+    const { data, error } = await supabase.from('arp_allocations').select('item_key').order('id', { ascending: true }).range(from, from + PAGINA - 1);
+    if (error) throw error;
+    for (const r of data ?? []) if (r.item_key) chaves.add(r.item_key);
+    if (!data || data.length < PAGINA) break;
+  }
+  return chaves;
 }
 
 /**

@@ -5,8 +5,10 @@ import {
   desfazerDivisaoContrato,
   dividirContratoNasUnidades,
   fetchAjustesDaQuantidade,
+  fetchContratadoDoContrato,
   fetchContratadoDoItem,
   type AjusteDaQuantidade,
+  type ContratadoDoContrato,
   type ContratadoDoItem
 } from '../services/contratadoUnidadeService';
 import { CARTEIRA_ALOCACOES_KEY, CARTEIRA_VINCULOS_KEY } from './useCarteiraItens';
@@ -27,6 +29,20 @@ export function useContratadoDoItem(itemKey: string) {
   return { ...query, data: query.data ?? VAZIO };
 }
 
+export const CONTRATADO_DO_CONTRATO_KEY = (contractKey: string) => ['contratado-do-contrato', contractKey] as const;
+const VAZIO_CONTRATO: ContratadoDoContrato = { porItem: [], saldoPorItem: new Map() };
+
+/** Contrato 360: a quantidade do contrato em cada item da ata (fonte, ajuste, divisão) e o saldo desses itens. */
+export function useContratadoDoContrato(contractKey: string | undefined) {
+  const query = useQuery<ContratadoDoContrato, Error>({
+    queryKey: CONTRATADO_DO_CONTRATO_KEY(contractKey ?? ''),
+    queryFn: () => fetchContratadoDoContrato(contractKey ?? ''),
+    enabled: Boolean(contractKey),
+    staleTime: 60 * 1000
+  });
+  return { ...query, data: query.data ?? VAZIO_CONTRATO };
+}
+
 /** Histórico dos ajustes de um contrato no item (janela Ajustar quantidade). */
 export function useAjustesDaQuantidade(itemKey: string, contractKey: string | null) {
   return useQuery<AjusteDaQuantidade[], Error>({
@@ -45,6 +61,7 @@ export function useAcoesContratado(itemKey: string) {
   const queryClient = useQueryClient();
   const aoTerminar = () => {
     queryClient.invalidateQueries({ queryKey: CONTRATADO_DO_ITEM_KEY(itemKey) });
+    queryClient.invalidateQueries({ queryKey: ['contratado-do-contrato'] });
     queryClient.invalidateQueries({ queryKey: ['contratado-ajustes', itemKey] });
     queryClient.invalidateQueries({ queryKey: ['item-contract-links', itemKey] });
     queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });

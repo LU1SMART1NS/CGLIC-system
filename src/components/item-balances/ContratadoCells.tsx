@@ -11,12 +11,18 @@ const sub: React.CSSProperties = { display: 'block', fontFamily: 'var(--font-fam
  * número do site de onde veio ("No Contratos.gov.br: 480"); sem ajuste, só "do Contratos.gov.br". Se a fonte mudou
  * depois do ajuste, o aviso em vermelho. O link Ajustar abre a janela (gestor e coordenador).
  */
-export const QuantidadeContratadaCelula: React.FC<{ q: QuantidadeDoContrato; onAjustar?: () => void }> = ({ q, onAjustar }) => {
+export const QuantidadeContratadaCelula: React.FC<{
+  q: QuantidadeDoContrato;
+  onAjustar?: () => void;
+  /** Contrato 360: sem ajuste, só o número (a tabela já é a da fonte); com ajuste, a tag e a fonte. */
+  compacta?: boolean;
+}> = ({ q, onAjustar, compacta = false }) => {
   const legenda = legendaDaQuantidade(q);
+  const mostrarLegenda = !compacta || q.ajustada;
   return (
     <div data-testid={`qtd-contratada-${q.contractKey}`}>
       {q.quantidadeContratada != null ? (
-        <span style={{ fontWeight: 700, color: 'var(--success)' }}>{formatNumber(q.quantidadeContratada)}</span>
+        <span style={{ fontWeight: 700, color: compacta ? undefined : 'var(--success)' }}>{formatNumber(q.quantidadeContratada)}</span>
       ) : (
         <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>N/D</span>
       )}{' '}
@@ -25,7 +31,7 @@ export const QuantidadeContratadaCelula: React.FC<{ q: QuantidadeDoContrato; onA
           <StatusBadge label="Ajustada" variant="warning" size="sm" dot={false} testId={`qtd-ajustada-${q.contractKey}`} />
         </span>
       )}
-      <span style={sub}>{legenda.linha}</span>
+      {mostrarLegenda && <span style={sub}>{legenda.linha}</span>}
       {legenda.aviso && <span style={{ ...sub, color: 'var(--danger)' }}>{legenda.aviso}</span>}
       {onAjustar && (
         <AppButton variant="link" size="sm" onClick={onAjustar} data-testid={`qtd-ajustar-${q.contractKey}`} style={{ padding: 0, minHeight: 0, fontSize: '0.75rem' }}>

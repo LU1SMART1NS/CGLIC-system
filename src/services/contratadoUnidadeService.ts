@@ -240,3 +240,50 @@ export async function desfazerDivisaoContrato(p: { itemKey: string; contractKey:
   });
   if (error) throw new Error(mensagemDoErroContratado(error));
 }
+
+/** Saldo do item da ata, o bastante para a janela de ajuste avisar quando o consumo passa da cota. */
+export interface SaldoDoItemParaAjuste {
+  itemKey: string;
+  descricao: string | null;
+  /** Quantitativo SENASP (base do saldo). */
+  cota: number;
+  /** Contratado no item somando todos os contratos. */
+  consumo: number;
+}
+
+export interface ContratadoDoContrato {
+  /** Quantidade do contrato em cada item da ata vinculado a ele. */
+  porItem: QuantidadeDoContrato[];
+  saldoPorItem: Map<string, SaldoDoItemParaAjuste>;
+}
+
+/** Contrato 360: a quantidade do contrato em cada item da ata (fonte, ajuste, divisão) e o saldo desses itens. */
+export async function fetchContratadoDoContrato(contractKey: string): Promise<ContratadoDoContrato> {
+  const key = (contractKey || '').trim();
+  const vazio: ContratadoDoContrato = { porItem: [], saldoPorItem: new Map() };
+  if (!key || !isSupabaseConfigured || !supabase) return vazio;
+  const { data, error } = await supabase.from('v_arp_item_contrato_quantidade').select('*').eq('contract_key', key);
+  if (error) {
+    if (tabelaAusente(error)) return vazio;
+    throw new Error(error.message);
+  }
+  const porItem = (data ?? []).map(mapQuantidadeDoContrato);
+  const itemKeys = [...new Set(porItem.map((q) => q.itemKey))];
+  const saldoPorItem = new Map<string, SaldoDoItemParaAjuste>();
+  if (itemKeys.length > 0) {
+    const saldos = await supabase
+      .from('v_arp_item_saldo_detalhado')
+      .select('item_key, descricao_item, quantidade_base_senasp, quantidade_consumida')
+      .in('item_key', itemKeys);
+    if (saldos.error) throw new Error(saldos.error.message);
+    for (const r of saldos.data ?? []) {
+      saldoPorItem.set(r.item_key, {
+        itemKey: r.item_key,
+        descricao: r.descricao_item ?? null,
+        cota: num(r.quantidade_base_senasp),
+        consumo: num(r.quantidade_consumida)
+      });
+    }
+  }
+  return { porItem, saldoPorItem };
+}
