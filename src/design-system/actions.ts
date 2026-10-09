@@ -38,6 +38,8 @@ export const ACTIONS = {
   voltar: { label: 'Voltar', icon: ArrowLeft, variant: 'outline' },
   limpar: { label: 'Limpar', icon: X, variant: 'outline' },
   limparFiltros: { label: 'Limpar filtros', icon: X, variant: 'outline' },
+  /** Coordenador indica o fornecedor de uma ata que o PNCP publicou sem fornecedor (migration 107). */
+  indicarFornecedor: { label: 'Indicar fornecedor', icon: UserCheck, variant: 'primary' },
   editar: { label: 'Editar', icon: Pencil, variant: 'outline' },
   renomear: { label: 'Renomear', icon: Pencil, variant: 'outline' },
   conferir: { label: 'Conferir', icon: Search, variant: 'outline' },

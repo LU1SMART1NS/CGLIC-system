@@ -39,6 +39,6 @@ describe('ActionButton e catálogo de ações', () => {
     expect(porVariante('ghostDanger').sort()).toEqual(['cancelarCiclo', 'desativar', 'descartar', 'desvincular', 'excluir', 'naoPertence', 'remover']);
     expect(porVariante('success')).toEqual(['aplicarSugestao']);
     expect(porVariante('danger')).toEqual([]);
-    expect(porVariante('primary').sort()).toEqual(['novo', 'salvar', 'vincular']);
+    expect(porVariante('primary').sort()).toEqual(['indicarFornecedor', 'novo', 'salvar', 'vincular']);
   });
 });

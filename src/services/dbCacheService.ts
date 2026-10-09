@@ -3,7 +3,7 @@ import type { DbAta } from './supabaseClient';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../utils/pncpUtils';
-import { FORNECEDOR_DAS_ATAS_PNCP, deduplicarItensPorNumero } from './api';
+import { deduplicarItensPorNumero } from './api';
 import { isUasgCglic } from '../config/unidadesGestoras';
 
 /**
@@ -214,14 +214,9 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
             quantidadeEstimadaEdital: Number(it.quantidade_homologada) || 0
           } as ArpItemRecord));
 
-          const cleanNumAta = (d.numero_ata || '').replace(/^0+/, '');
-          const supp = FORNECEDOR_DAS_ATAS_PNCP.find(s => s.numeroAta.replace(/^0+/, '') === cleanNumAta || s.numeroAta === d.numero_ata);
-          if (supp && supp.cnpjFornecedor && isUasgCglic(d.codigo_uasg)) {
-            const cleanTargetCnpj = supp.cnpjFornecedor.replace(/\D/g, '');
-            itemsByAta[key] = mappedItems.filter((it: any) => (it.niFornecedor || '').replace(/\D/g, '') === cleanTargetCnpj);
-          } else {
-            itemsByAta[key] = mappedItems;
-          }
+          // Os itens do banco já são os da ata: a sincronização só grava itens do fornecedor certo (Compras.gov.br,
+          // ou PNCP com o fornecedor indicado pelo coordenador em atas_fornecedor_pncp).
+          itemsByAta[key] = mappedItems;
         }
 
         const itemsCount = itemsByAta[key] ? itemsByAta[key].length : (d.itens_ata?.length || 0);

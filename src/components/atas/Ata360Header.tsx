@@ -22,6 +22,8 @@ import { HealthTile, HealthTileGrid, LifelineRule } from '../instrument360/Healt
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp, papelSenaspDaAta } from '../../utils/ataIdentidade';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
+import { SeloFornecedorPncp } from './SeloFornecedorPncp';
+import type { RegistroFornecedorPncp } from '../../services/fornecedorAtaPncpService';
 
 interface Ata360HeaderProps {
   arp: ArpRecord;
@@ -35,6 +37,9 @@ interface Ata360HeaderProps {
   onOpenItens: () => void;
   onOpenContratos: () => void;
   onBack?: () => void;
+  /** Ata publicada no PNCP sem fornecedor (atas_fornecedor_pncp): selo no cartão e botão do coordenador. */
+  fornecedorPncp?: RegistroFornecedorPncp | null;
+  onIndicarFornecedor?: () => void;
 }
 
 export const pncpLinkStyle: React.CSSProperties = {
@@ -79,7 +84,9 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   isLoadingSaldos = false,
   onOpenActions,
   onOpenItens,
-  onBack
+  onBack,
+  fornecedorPncp = null,
+  onIndicarFornecedor
 }) => {
   const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
@@ -183,6 +190,8 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
                 : 'Ata de outro órgão: a SENASP participou da compra, com quantidade própria registrada.'}
             </span>
           </span>
+        ) : fornecedorPncp ? (
+          <SeloFornecedorPncp registro={fornecedorPncp} itensNoBanco={itens.length} onIndicar={onIndicarFornecedor} />
         ) : undefined
       }
       origin={outroOrgao ? { label: 'Carteira', value: `UASG ${carteiraDaAta(arp)}` } : undefined}

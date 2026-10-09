@@ -9,8 +9,15 @@
  * cada usuário e só disparava com o banco de atas vazio (na prática, nunca rodava).
  */
 
-import { fetchArpsDasFontes, fetchArpItems, fetchPncpProcessoCompra, limparCachesAtas } from './api';
+import { fetchArpsDasFontes, fetchArpItems, fetchPncpProcessoCompra, limparCachesAtas, type PendenciaFornecedorPncp } from './api';
 import { cacheArpsInDb, cacheArpItemsInDb, fetchEstadoAtasNoBanco, gravarProcessoDaAta, type EstadoAtaNoBanco } from './dbCacheService';
+import {
+  conferirFornecedorPelaFonte,
+  fetchRegistrosFornecedorPncp,
+  gravarPendenciasFornecedorPncp,
+  indicacoesPorControle,
+  type RegistroFornecedorPncp
+} from './fornecedorAtaPncpService';
 import {
   executarComReserva,
   uasgsSincronizandoAgoraDe,
@@ -135,8 +142,24 @@ export async function coletarEGravarAtas(
   // O que o banco já tem, lido ANTES de gravar a lista nova.
   const estadoNoBanco = await fetchEstadoAtasNoBanco(params.codigoUnidadeGerenciadora || '');
 
+  // Atas que o PNCP publicou sem fornecedor (atas_fornecedor_pncp): a indicação do coordenador entra nas consultas
+  // ao PNCP; o que a consulta detectar de novo fica em `pendencias` para gravar no fim.
+  let registrosFornecedor: RegistroFornecedorPncp[] = [];
+  try {
+    registrosFornecedor = await fetchRegistrosFornecedorPncp();
+  } catch (err) {
+    console.warn('[sincronizacao] indicações de fornecedor (atas_fornecedor_pncp) não lidas; as atas sem fornecedor seguem sem itens nesta execução.', err);
+  }
+  const registroPorControle = new Map(registrosFornecedor.map((r) => [r.numeroControlePncp, r]));
+  const indicacoes = indicacoesPorControle(registrosFornecedor);
+  const pendencias = new Map<string, PendenciaFornecedorPncp>();
+  const fornecedor = {
+    fornecedorIndicado: (controle: string) => indicacoes.get(controle),
+    aoDetectarPendencia: (p: PendenciaFornecedorPncp) => { pendencias.set(p.numeroControlePncpAta, p); }
+  };
+
   // Lista das atas, já com as vigências do PNCP. Falha da fonte vira erro (não cai para o banco).
-  const atas = await fetchArpsDasFontes(params);
+  const atas = await fetchArpsDasFontes(params, fornecedor);
   if (atas.length === 0) {
     return { status: 'SUCESSO', total: 0, fontesComFalha: [] };
   }
@@ -173,13 +196,24 @@ export async function coletarEGravarAtas(
       lote.map(async (arp): Promise<'ok' | 'consulta' | 'gravacao'> => {
         let itens;
         try {
-          itens = await fetchArpItems(arp.dataVigenciaInicial, arp.codigoUnidadeGerenciadora, arp.numeroAtaRegistroPreco, arp, { estrito: true });
+          itens = await fetchArpItems(arp.dataVigenciaInicial, arp.codigoUnidadeGerenciadora, arp.numeroAtaRegistroPreco, arp, { estrito: true, ...fornecedor });
         } catch (err) {
           console.warn(`[sincronizacao] itens da ata ${arp.numeroAtaRegistroPreco} não consultados:`, err);
           return 'consulta';
         }
         // Ata sem itens nas fontes não é falha (ex.: compra com vários fornecedores sem indicação de qual é o da ata).
         if (!itens.resultado || itens.resultado.length === 0) return 'ok';
+        // A fonte oficial publicou a ata: a pendência sem indicação sai; a indicação do coordenador é conferida.
+        const registro = arp.numeroControlePncpAta ? registroPorControle.get(arp.numeroControlePncpAta) : undefined;
+        if (registro && itens.origem === 'COMPRAS_GOV') {
+          pendencias.delete(registro.numeroControlePncp);
+          try {
+            const estado = await conferirFornecedorPelaFonte(registro, itens.resultado);
+            if (estado === 'DIVERGENTE') console.warn(`[sincronizacao] ata ${arp.numeroAtaRegistroPreco}: o fornecedor indicado pelo coordenador diverge do que o Compras.gov.br publicou.`);
+          } catch (err) {
+            console.warn(`[sincronizacao] conferência do fornecedor da ata ${arp.numeroAtaRegistroPreco} não gravada:`, err);
+          }
+        }
         const gravouItens = await cacheArpItemsInDb(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, itens.resultado);
         return gravouItens ? 'ok' : 'gravacao';
       })
@@ -194,6 +228,15 @@ export async function coletarEGravarAtas(
       current: feitas,
       total: pendentes.length
     });
+  }
+
+  // Pendências de fornecedor detectadas nesta execução (não derrubam a sincronização: a próxima detecta de novo).
+  if (pendencias.size > 0) {
+    try {
+      await gravarPendenciasFornecedorPncp(Array.from(pendencias.values()));
+    } catch (err) {
+      console.warn('[sincronizacao] pendências de fornecedor (atas_fornecedor_pncp) não gravadas:', err);
+    }
   }
 
   onProgress?.({ step: 'Sincronização concluída!', percent: 100, current: atas.length, total: atas.length });

@@ -5,6 +5,7 @@ import type { AtaTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { AvisosResolvidosLista, BotaoResolvido, EspacoResolvido, useResolverAviso, type AlvoResolucao } from '../avisos/ResolverAviso';
@@ -18,6 +19,10 @@ interface AtaActionQueueProps {
   plan: AtaTaskPlan | null;
   isLoading?: boolean;
   onGoTo: (tab: Ata360Tab) => void;
+  /** Pendência de fornecedor (kind CADASTRO): só o coordenador indica e desfaz. */
+  podeIndicarFornecedor?: boolean;
+  onIndicarFornecedor?: () => void;
+  onDesfazerIndicacao?: () => void;
 }
 
 const COUNT_LABELS: Record<SeverityLevel, [string, string]> = {
@@ -30,11 +35,12 @@ const COUNT_LABELS: Record<SeverityLevel, [string, string]> = {
 const KIND_LABELS: Record<AtaActionItem['kind'], string> = {
   SALDO: 'Saldo do item',
   TAREFA: 'Tarefa',
-  LEMBRETE: 'Planejamento da vigência'
+  LEMBRETE: 'Planejamento da vigência',
+  CADASTRO: 'Cadastro'
 };
 
 /** Fila única da Ata 360 — mesmo layout da ContractActionQueue do Contrato 360. */
-export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, plan, isLoading = false, onGoTo }) => {
+export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, plan, isLoading = false, onGoTo, podeIndicarFornecedor = false, onIndicarFornecedor, onDesfazerIndicacao }) => {
   const { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo } = useResolverAviso();
 
   if (isLoading) {
@@ -47,6 +53,7 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
 
   const alvoDe = (item: AtaActionItem): AlvoResolucao | null => {
     const contexto = `Ata ${ataKey} · ${KIND_LABELS[item.kind]}`;
+    if (item.kind === 'CADASTRO') return null; // sem Resolvido: dispensar deixaria a ata sem itens
     if (item.kind === 'TAREFA') return item.taskId ? { tipo: 'TAREFA_ATA', taskId: item.taskId, titulo: item.title, contexto } : null;
     return item.avisoChave ? { tipo: 'AVISO', chave: item.avisoChave, titulo: item.title, contexto } : null;
   };
@@ -65,6 +72,15 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
         );
       case 'TAREFA':
         return check;
+      case 'CADASTRO':
+        if (!podeIndicarFornecedor) return <EspacoResolvido />;
+        if (item.fornecedorEstado === 'PENDENTE' && onIndicarFornecedor) {
+          return <ActionButton action="indicarFornecedor" size="sm" onClick={onIndicarFornecedor} data-testid="acao-indicar-fornecedor" />;
+        }
+        if (item.fornecedorEstado === 'INDICADO' && onDesfazerIndicacao) {
+          return <ActionButton action="desfazer" size="sm" onClick={onDesfazerIndicacao} data-testid="acao-desfazer-indicacao" />;
+        }
+        return <EspacoResolvido />;
       case 'LEMBRETE':
         return (
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>

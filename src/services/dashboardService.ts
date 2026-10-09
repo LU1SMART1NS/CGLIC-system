@@ -14,6 +14,7 @@
  */
 
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
+import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
 import type {
   ContractDashboardRecord,
   ArpRecord,
@@ -225,6 +226,8 @@ export function calculateAttentionSummary(params: {
   eventsMap?: Record<string, ContractEvent[]>;
   paymentCycles?: PaymentFollowUpCycle[];
   arpItems?: Array<{ percentual_consumido?: number }>;
+  /** Atas publicadas no PNCP sem fornecedor (atas_fornecedor_pncp, migration 107). */
+  fornecedoresPncp?: RegistroFornecedorPncp[];
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -237,6 +240,7 @@ export function calculateAttentionSummary(params: {
     eventsMap = {},
     paymentCycles = [],
     arpItems = [],
+    fornecedoresPncp = [],
     currentDate
   } = params;
 
@@ -297,6 +301,33 @@ export function calculateAttentionSummary(params: {
 
   // E) Construção determinística da lista de sinais de atenção
   const items: import('../types/managementDashboard').DashboardAttentionItem[] = [];
+
+  // 0. Fornecedor da ata não informado pelo PNCP: o coordenador indica (atenção); indicação divergente do
+  // Compras.gov.br (urgente). Sem "Resolvido": some ao indicar ou quando a fonte publicar a ata.
+  const arpsPorControle = new Map(arps.filter((a) => a.numeroControlePncpAta).map((a) => [a.numeroControlePncpAta, a]));
+  for (const r of fornecedoresPncp) {
+    if (r.estado !== 'PENDENTE' && r.estado !== 'DIVERGENTE') continue;
+    const arp = arpsPorControle.get(r.numeroControlePncp);
+    if (!arp) continue; // só atas vigentes da carteira em tela
+    const compra = r.numeroCompra && r.anoCompra ? `${r.numeroCompra}/${r.anoCompra}` : arp.numeroCompra && arp.anoCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : 'não informada';
+    const pendente = r.estado === 'PENDENTE';
+    items.push({
+      id: `ATT-FORNECEDOR-${r.numeroControlePncp}`,
+      category: 'FORNECEDOR_PNCP',
+      severity: pendente ? 'ATENCAO' : 'URGENTE',
+      title: pendente ? 'Fornecedor não informado pelo PNCP' : 'Fornecedor indicado diverge do Compras.gov.br',
+      description: pendente
+        ? `Ata ${arp.numeroAtaRegistroPreco} — a compra ${compra} gerou ${r.atasNaCompra ?? 'mais de uma'} ${r.atasNaCompra === 1 ? 'ata' : 'atas'} e o PNCP não diz qual fornecedor é desta; sem itens até a indicação`
+        : `Ata ${arp.numeroAtaRegistroPreco} — indicado ${r.fornecedorNome || r.fornecedorIdentificador}; o Compras.gov.br publicou ${r.fonteFornecedorNome || r.fonteFornecedorIdentificador}`,
+      arpKey: `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`,
+      numeroAta: arp.numeroAtaRegistroPreco,
+      objetoItem: arp.objeto,
+      fornecedorNome: pendente ? undefined : r.fornecedorNome,
+      targetUrl: `/atas/detalhe/${encodeURIComponent(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`)}?aba=acoes`,
+      badgeLabel: pendente ? 'sem itens' : 'conferir itens'
+    });
+  }
+
 
   // 1. Tarefas Atrasadas e Próximas da Central de Prazos
   //
@@ -1086,6 +1117,7 @@ export function buildManagementDashboardReadModel(params: {
   empenhos?: Array<any>;
   itemsSaldo?: Array<any>;
   paymentCycles?: PaymentFollowUpCycle[];
+  fornecedoresPncp?: RegistroFornecedorPncp[];
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1342,6 +1374,7 @@ export function buildManagementDashboardReadModel(params: {
     eventsMap: filteredEventsMap,
     paymentCycles: filteredPaymentCycles,
     arpItems: filteredItemsSaldo,
+    fornecedoresPncp: params.fornecedoresPncp,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1389,7 +1422,8 @@ export async function fetchManagementDashboardData(
     avisosResolvidos,
     empenhosResumo,
     arpItemsSaldo,
-    itensComAlocacao
+    itensComAlocacao,
+    fornecedoresPncp
   ] = await Promise.all([
     fetchContratosParaTela(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar contratos para o dashboard:', err);
@@ -1423,6 +1457,10 @@ export async function fetchManagementDashboardData(
     fetchItensComAlocacao().catch((err) => {
       console.warn('Erro ao consultar os itens com alocação interna para o dashboard:', err);
       return new Set<string>();
+    }),
+    fetchRegistrosFornecedorPncp().catch((err) => {
+      console.warn('Erro ao consultar as atas sem fornecedor no PNCP para o dashboard:', err);
+      return [] as RegistroFornecedorPncp[];
     })
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
@@ -1441,6 +1479,7 @@ export async function fetchManagementDashboardData(
     empenhos: empenhosResumo,
     itemsSaldo: arpItemsSaldoComAlocacao,
     paymentCycles,
+    fornecedoresPncp,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate
