@@ -118,6 +118,8 @@ export interface DescarteAta {
 
 export interface PendenciasDistribuicao {
   atasSemGestor: AtaSemGestor[];
+  /** Encerradas (ou sem data) sem gestor e sem contrato vigente: nada a acompanhar, mas o coordenador pode fechar o histórico. */
+  atasHistoricoSemGestor: AtaSemGestor[];
   /** Sem vínculo, sem gestor e sem ata provável forte: o coordenador decide (atribui direto ou marca "não pertence a ata"). */
   precisamDecisao: ItemFila[];
   /**
@@ -304,13 +306,14 @@ export function buildPendenciasDistribuicao(input: {
   }
 
   const atasSemGestor: AtaSemGestor[] = [];
+  const atasHistoricoSemGestor: AtaSemGestor[] = [];
   for (const ata of input.atas) {
     if (ata.gestorNome) continue;
     const vinculados = vinculadosPorAta.get(ata.numeroAta) || [];
     const provaveis = provaveisPorAta.get(ata.numeroAta) || [];
-    // Encerrada sem contrato vigente não tem o que distribuir.
-    if (!isVigente(ata.faixa) && vinculados.length === 0 && provaveis.length === 0) continue;
-    atasSemGestor.push({
+    // Encerrada sem contrato vigente não tem o que distribuir: vai para a fila do histórico.
+    const historico = !isVigente(ata.faixa) && vinculados.length === 0 && provaveis.length === 0;
+    (historico ? atasHistoricoSemGestor : atasSemGestor).push({
       numeroAta: ata.numeroAta,
       uasg: ata.uasg,
       objeto: ata.objeto,
@@ -331,6 +334,9 @@ export function buildPendenciasDistribuicao(input: {
       a.numeroAta.localeCompare(b.numeroAta)
   );
 
+  // Histórico: as que venceram por último primeiro.
+  atasHistoricoSemGestor.sort((a, b) => (b.vigenciaFim || '').localeCompare(a.vigenciaFim || '') || a.numeroAta.localeCompare(b.numeroAta));
+
   const porPrazo = (a: ItemFila, b: ItemFila) => diasOrd(a.dias) - diasOrd(b.dias) || a.numero.localeCompare(b.numero);
   // Pista parcial antes de "sem pista": é onde a decisão é menos óbvia.
   precisamDecisao.sort((a, b) => Number(b.situacao === 'PARCIAL') - Number(a.situacao === 'PARCIAL') || porPrazo(a, b));
@@ -339,5 +345,5 @@ export function buildPendenciasDistribuicao(input: {
   naoPertencem.sort((a, b) => a.numero.localeCompare(b.numero));
   descartados.sort((a, b) => a.numero.localeCompare(b.numero) || a.numeroAta.localeCompare(b.numeroAta));
 
-  return { atasSemGestor, precisamDecisao, aVincular, naoPertencem, descartados, aVincularPorGestor, totalAVincular };
+  return { atasSemGestor, atasHistoricoSemGestor, precisamDecisao, aVincular, naoPertencem, descartados, aVincularPorGestor, totalAVincular };
 }
