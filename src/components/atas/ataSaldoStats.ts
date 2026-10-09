@@ -1,5 +1,6 @@
 import { classifyArpItemSaldo } from '../../services/balanceService';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
+import { chaveGestaoAta } from '../../utils/ataIdentidade';
 
 /** Resumo do consumo de saldo dos itens de uma Ata (a partir de arp_item_saldos). */
 export interface AtaSaldoStats {
@@ -16,13 +17,17 @@ export function normalizeItemNumber(value: unknown): string {
   return Number.isFinite(n) ? String(n) : String(value ?? '');
 }
 
-/** Agrupa os saldos por item por número de ata e calcula o resumo de consumo de cada uma. */
+/**
+ * Agrupa os saldos por item pela chave de gestão da ata (número nas atas da CGLIC; número-UASG nas de outros
+ * órgãos, que podem repetir o número de uma ata da CGLIC na mesma carteira) e calcula o resumo de cada uma.
+ */
 export function buildAtaSaldoStats(saldos: Array<any> = []): Record<string, AtaSaldoStats> {
   const result: Record<string, AtaSaldoStats> = {};
 
   for (const saldo of saldos) {
-    const numeroAta: string | undefined = saldo.numero_ata || saldo.numeroAta;
-    if (!numeroAta) continue;
+    const numero: string | undefined = saldo.numero_ata || saldo.numeroAta;
+    if (!numero) continue;
+    const numeroAta = chaveGestaoAta(numero, saldo.codigo_uasg ?? saldo.codigoUasg);
 
     const qtdHomologada = quantidadeBaseSenasp(saldo);
     const qtdConsumida = Number(saldo.quantidade_consumida || 0);

@@ -25,6 +25,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
 import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
+import { chaveGestaoAta } from '../../../utils/ataIdentidade';
 
 const AMBAR = 'var(--color-warning)';
 const VERMELHO = 'var(--color-danger)';
@@ -190,7 +191,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
               podeAtribuir={canAssign}
               onAtribuir={(lista, done) =>
                 setTransferencia({
-                  targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: ata.numeroAta })),
+                  targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: chaveGestaoAta(ata.numeroAta, ata.uasg) })),
                   origem: null,
                   done,
                   provaveis: lista.reduce((n, ata) => n + ata.provaveis.length, 0)
@@ -205,7 +206,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
               atas={historico}
               podeAtribuir={canAssign}
               onAtribuir={(lista, done) =>
-                setTransferencia({ targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: ata.numeroAta })), origem: null, done })
+                setTransferencia({ targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: chaveGestaoAta(ata.numeroAta, ata.uasg) })), origem: null, done })
               }
             />
           )}
@@ -214,7 +215,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
             <DivergenciasFila
               divergencias={divergencias}
               podeAlinhar={canAssign}
-              onAlinhar={(d) => setTransferencia({ targets: [{ tipo: 'ATA', ataKey: d.numeroAta }], origem: d.gestorAta ?? null })}
+              onAlinhar={(d) => setTransferencia({ targets: [{ tipo: 'ATA', ataKey: d.chaveAta }], origem: d.gestorAta ?? null })}
             />
           )}
 

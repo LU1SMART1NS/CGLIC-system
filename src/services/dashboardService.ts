@@ -45,7 +45,14 @@ import { parseDateBRT, differenceInDays, differenceInBusinessDays, getArpVigenci
 import { classifyPrazo } from '../components/carteira/carteiraPrazo';
 import { buildContractEventsFromOfficialData } from './contractEventService';
 import { fetchContratosParaTela } from './contratosOficiaisService';
-import { fetchArpsFromDb } from './dbCacheService';
+import { colunaDaUasgDaAta, fetchArpsFromDb } from './dbCacheService';
+import { chaveGestaoAta, chaveGestaoDaArp, rotuloChaveGestao } from '../utils/ataIdentidade';
+
+/** Chave de gestão da ata de uma linha de saldo (v_arp_item_saldo_detalhado). */
+function chaveDoSaldo(item: any): string {
+  const numero = item?.numero_ata || item?.numeroAta;
+  return numero ? chaveGestaoAta(numero, item?.codigo_uasg || item?.codigoUasg) : '';
+}
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
 import { chaveAvisoLembrete, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
@@ -523,7 +530,7 @@ export function calculateAttentionSummary(params: {
       fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
       contractKey: aItem.contract_key || aItem.contractKey,
       diasRelevantes: 0,
-      targetUrl: numAta ? `/atas/${numAta}` : undefined,
+      targetUrl: numAta ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}` : undefined,
       badgeLabel: `${roundedPerc.toFixed(1)}% consumido`
     });
   }
@@ -599,7 +606,7 @@ export function calculateAttentionSummary(params: {
   // Ata 360 mostra na aba "Ações" nunca chegava à visão global.
   for (const arp of arps) {
     const numAta = arp.numeroAtaRegistroPreco;
-    const plan = numAta ? ataPlans[numAta] : undefined;
+    const plan = numAta ? ataPlans[chaveGestaoDaArp(arp)] : undefined;
     if (!plan) continue;
     for (const macro of plan.macrotarefas) {
       for (const task of macro.tarefas) {
@@ -1108,26 +1115,28 @@ export function buildManagementDashboardReadModel(params: {
     };
   });
 
+  // Filtro "Ata" pela chave de gestão: atas de outros órgãos repetem números de atas da CGLIC (migration 106).
   const seenAtas = new Set<string>();
   const availableAtas: ManagementDashboardFilterOption[] = [];
   for (const a of rawArps) {
     const num = a.numeroAtaRegistroPreco || (a as any).numeroAta || (a as any).numero || (a as any).id;
-    if (num && !seenAtas.has(num)) {
-      seenAtas.add(num);
+    const chave = num ? chaveGestaoAta(num, a.codigoUnidadeGerenciadora) : '';
+    if (chave && !seenAtas.has(chave)) {
+      seenAtas.add(chave);
       availableAtas.push({
-        key: num,
-        label: `Ata ${num}`,
+        key: chave,
+        label: `Ata ${rotuloChaveGestao(chave)}`,
         sublabel: a.objeto
       });
     }
   }
   for (const item of rawItemsSaldo) {
-    const num = item.numero_ata || item.numeroAta;
-    if (num && !seenAtas.has(num)) {
-      seenAtas.add(num);
+    const chave = chaveDoSaldo(item);
+    if (chave && !seenAtas.has(chave)) {
+      seenAtas.add(chave);
       availableAtas.push({
-        key: num,
-        label: `Ata ${num}`,
+        key: chave,
+        label: `Ata ${rotuloChaveGestao(chave)}`,
         sublabel: item.descricao_item
       });
     }
@@ -1204,14 +1213,14 @@ export function buildManagementDashboardReadModel(params: {
 
     filteredItemsSaldo = filteredItemsSaldo.filter((item) => {
       const itemContract = item.contract_key || item.contractKey;
-      const itemAta = item.numero_ata || item.numeroAta;
+      const itemAta = chaveDoSaldo(item);
       return Boolean(
         (itemContract && scopedContractKeys.has(itemContract)) ||
         (itemAta && assignedAtaSet.has(itemAta))
       );
     });
 
-    filteredArps = filteredArps.filter((arp) => assignedAtaSet.has(arp.numeroAtaRegistroPreco));
+    filteredArps = filteredArps.filter((arp) => assignedAtaSet.has(chaveGestaoDaArp(arp)));
 
     filteredManagers = Object.fromEntries(
       Object.entries(filteredManagers).filter(([k]) => scopedContractKeys.has(k))
@@ -1271,8 +1280,9 @@ export function buildManagementDashboardReadModel(params: {
   }
 
   if (f.numeroAta) {
-    filteredArps = filteredArps.filter((a) => (a.numeroAtaRegistroPreco || (a as any).numeroAta || (a as any).numero || (a as any).id) === f.numeroAta);
-    filteredItemsSaldo = filteredItemsSaldo.filter((item) => (item.numero_ata || item.numeroAta) === f.numeroAta);
+    // f.numeroAta é a chave de gestão (filtro "Ata"): o número nas atas da CGLIC, número-UASG nas de outros órgãos.
+    filteredArps = filteredArps.filter((a) => chaveGestaoAta(a.numeroAtaRegistroPreco || (a as any).numeroAta || (a as any).numero || (a as any).id, a.codigoUnidadeGerenciadora) === f.numeroAta);
+    filteredItemsSaldo = filteredItemsSaldo.filter((item) => chaveDoSaldo(item) === f.numeroAta);
 
     // Empenhos vinculados aos itens desta Ata
     const matchingItemKeys = new Set(filteredItemsSaldo.map((i) => i.item_key || i.itemKey));
@@ -1308,13 +1318,14 @@ export function buildManagementDashboardReadModel(params: {
     const dias = getArpVigenciaStatus(arp.dataVigenciaFinal, currentDate)?.diasRestantes ?? null;
     const faixa = classifyPrazo(dias, Boolean(arp.isCanceladaPncp));
     const vigente = faixa !== 'EXPIRADO' && faixa !== 'SEM_DATA';
-    if (!vigente) encerradasAtaNumbers.add(arp.numeroAtaRegistroPreco);
+    if (!vigente) encerradasAtaNumbers.add(chaveGestaoDaArp(arp));
     return vigente;
   });
-  filteredItemsSaldo = filteredItemsSaldo.filter((item) => !encerradasAtaNumbers.has(item.numero_ata || item.numeroAta));
+  // Pela chave de gestão: uma ata encerrada não esconde os itens de outra de mesmo número (migration 106).
+  filteredItemsSaldo = filteredItemsSaldo.filter((item) => !encerradasAtaNumbers.has(chaveDoSaldo(item)));
 
-  // Planos de Ata só dos instrumentos que sobraram após escopo e filtros.
-  const visibleAtaNumbers = new Set(filteredArps.map((a) => a.numeroAtaRegistroPreco));
+  // Planos de Ata (chave = ata_task_plans.ata_key, a chave de gestão) só dos instrumentos que sobraram.
+  const visibleAtaNumbers = new Set(filteredArps.map((a) => chaveGestaoDaArp(a)));
   const filteredAtaPlans = Object.fromEntries(
     Object.entries(rawAtaPlans).filter(([k]) => visibleAtaNumbers.has(k))
   );
@@ -1565,7 +1576,8 @@ export async function fetchArpItemSaldosFromDb(uasg?: string): Promise<any[]> {
   try {
     let query = supabase.from('v_arp_item_saldo_detalhado').select('*');
     if (uasg) {
-      query = query.eq('codigo_uasg', uasg);
+      // Carteira da CGLIC inclui as atas de outros órgãos em que a SENASP participa (migration 106).
+      query = query.eq(colunaDaUasgDaAta(uasg), uasg);
     }
     const { data, error } = await query;
     if (error) {

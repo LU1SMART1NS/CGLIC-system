@@ -32,6 +32,7 @@ import { formatNumber } from '../item-balances/itemBalanceUtils';
 import { Boxes } from 'lucide-react';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AlocarUnidadeModal, type ItemParaAlocar } from './AlocarUnidadeModal';
+import { carteiraDaAta } from '../../utils/ataIdentidade';
 
 interface Filtros {
   nivel: string;
@@ -96,7 +97,8 @@ export const ItensUnidadesPage: React.FC = () => {
   }, [base, filters.vigencia]);
   const uasgs = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of base) m.set(r.arp.codigoUnidadeGerenciadora, (m.get(r.arp.codigoUnidadeGerenciadora) ?? 0) + 1);
+    // Filtro pela carteira da CGLIC (nas atas de outros órgãos, a UASG da ata é a do outro órgão).
+    for (const r of base) m.set(carteiraDaAta(r.arp), (m.get(carteiraDaAta(r.arp)) ?? 0) + 1);
     return m;
   }, [base]);
   const gestores = useMemo(() => listGestores(base.map((r) => r.gestorNome)), [base]);
@@ -109,7 +111,7 @@ export const ItensUnidadesPage: React.FC = () => {
         if (filters.vigencia === 'VIGENTES' && r.faixa === 'EXPIRADO') return false;
         if (filters.vigencia === 'HISTORICO' && r.faixa !== 'EXPIRADO') return false;
         if (filters.unidade !== TODAS_UNIDADES && !(r.alocadoPorUnidade[filters.unidade] > 0)) return false;
-        if (filters.uasg !== TODOS && r.arp.codigoUnidadeGerenciadora !== filters.uasg) return false;
+        if (filters.uasg !== TODOS && carteiraDaAta(r.arp) !== filters.uasg) return false;
         if (showGestorFilter && !matchesGestorFilter(r.gestorNome, filters.gestor)) return false;
         if (q) {
           const casa =

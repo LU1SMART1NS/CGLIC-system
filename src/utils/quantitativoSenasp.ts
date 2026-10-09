@@ -1,9 +1,11 @@
 import { isUasgCglic } from '../config/unidadesGestoras';
 
 /**
- * Quantitativo SENASP de um item: o que a ata registrou para as UASGs que o CGLIC gerencia (200330 e 200331),
- * mais a gerenciadora da ata quando for outra. É a base de toda régua e saldo do sistema; o total da ata
- * (todos os órgãos participantes) é só referência.
+ * Quantitativo SENASP de um item: o que a ata registrou para as UASGs que o CGLIC gerencia (200330 e 200331).
+ * Na ata da CGLIC conta também a unidade gerenciadora (é a própria SENASP). Na ata de outro órgão em que a
+ * SENASP participa (migration 106), a gerenciadora é o outro órgão e NÃO conta. É a base de toda régua e saldo
+ * do sistema; o total da ata (todos os órgãos participantes) é só referência. Mesma regra de
+ * public.senasp_das_unidades().
  */
 const digits = (v?: string | number | null) => String(v ?? '').replace(/\D/g, '');
 
@@ -13,7 +15,9 @@ export function isUnidadeSenasp(
 ): boolean {
   const codigo = digits(unidade.codigoUnidade);
   const ug = digits(ugUasg);
-  return unidade.tipoUnidade === 'GERENCIADORA' || isUasgCglic(codigo) || (ug !== '' && codigo === ug);
+  if (isUasgCglic(codigo)) return true;
+  const ataDaCglic = ug === '' || isUasgCglic(ug);
+  return ataDaCglic && (unidade.tipoUnidade === 'GERENCIADORA' || (ug !== '' && codigo === ug));
 }
 
 /** Soma o registrado das unidades SENASP; sem nenhuma unidade SENASP na lista, usa `fallback` (ex.: homologado do item). */

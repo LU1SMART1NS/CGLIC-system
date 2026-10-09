@@ -18,6 +18,7 @@ import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { SincronizacaoFalhaNotice } from './carteira/SincronizacaoFalhaNotice';
 import type { ArpRecord, ArpItemRecord } from '../types';
+import { chaveGestaoDaArp } from '../utils/ataIdentidade';
 
 interface ArpSearchProps {
   onSelectArp: (arp: ArpRecord) => void;
@@ -101,7 +102,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   }, [scopedArps, resumoPorAta, filterState.statusVigencia]);
 
   const gestoresDisponiveis = useMemo(
-    () => listGestores(scopedArps.map((arp) => gestorByAta[arp.numeroAtaRegistroPreco])),
+    () => listGestores(scopedArps.map((arp) => gestorByAta[chaveGestaoDaArp(arp)])),
     [scopedArps, gestorByAta]
   );
   // O perfil "gestor" já vê só as próprias atas: sem seletor, e um ?gestor= na URL é ignorado.
@@ -123,7 +124,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       if (filterState.unidade !== TODAS_UNIDADES && !execucao?.unidades.has(filterState.unidade)) return false;
 
       // 4. Filtro de Gestor
-      if (showGestorFilter && !matchesGestorFilter(gestorByAta[arp.numeroAtaRegistroPreco], filterState.gestor)) return false;
+      if (showGestorFilter && !matchesGestorFilter(gestorByAta[chaveGestaoDaArp(arp)], filterState.gestor)) return false;
 
       // 5. Busca Textual
       if (filterState.busca.trim().length > 0) {

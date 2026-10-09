@@ -254,6 +254,33 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(ids).not.toContain('ATT-ATA-TASK-t00002/2025');
       expect(rm.attention.items.filter((i) => i.category === 'ATA_CRITICA')).toHaveLength(1);
     });
+
+    it('ata de outro órgão vigente com o número de uma ata da CGLIC vencida: alertas, plano e link próprios', () => {
+      const now = new Date('2026-10-09T12:00:00-03:00');
+      const daCglicVencida = { numeroAtaRegistroPreco: '00005/2025', codigoUnidadeGerenciadora: '200331', dataVigenciaFinal: '2026-01-01' } as ArpRecord;
+      const daPf = {
+        numeroAtaRegistroPreco: '00005/2025', codigoUnidadeGerenciadora: '200342', uasgCarteira: '200331', papelSenasp: 'PARTICIPANTE', dataVigenciaFinal: '2027-10-06'
+      } as ArpRecord;
+      const plan = (key: string) => ({ id: key, ataKey: key, templateNome: 'T', appliedAt: '', progresso: {}, macrotarefas: [{ id: `m${key}`, planId: key, nome: 'M', ordem: 1, tarefas: [{ id: `t${key}`, nome: 'Atrasada', prazo: '2026-09-01', status: 'PENDENTE' }] }] }) as any;
+      const rm = buildManagementDashboardReadModel({
+        uasg: '200331',
+        arps: [daCglicVencida, daPf],
+        ataPlans: { '00005/2025': plan('00005/2025'), '00005/2025-200342': plan('00005/2025-200342') },
+        itemsSaldo: [
+          { item_key: '00005/2025-200331-00001', numero_ata: '00005/2025', codigo_uasg: '200331', numero_item: 1, percentual_consumido: 97 },
+          { item_key: '00005/2025-200342-00001', numero_ata: '00005/2025', codigo_uasg: '200342', numero_item: 1, percentual_consumido: 95 }
+        ],
+        currentDate: now
+      });
+      expect(rm.arp.totalAtas).toBe(1);
+      const ids = rm.attention.items.map((i) => i.id);
+      expect(ids).toContain('ATT-ATA-TASK-t00005/2025-200342');
+      expect(ids).not.toContain('ATT-ATA-TASK-t00005/2025');
+      const criticos = rm.attention.items.filter((i) => i.category === 'ATA_CRITICA');
+      expect(criticos.map((i) => i.arpKey)).toEqual(['00005/2025-200342-00001']);
+      expect(criticos[0].targetUrl).toBe('/atas/detalhe/00005%2F2025-200342');
+      expect(rm.availableFilters?.atas.map((a) => a.key).sort()).toEqual(['00005/2025', '00005/2025-200342']);
+    });
   });
 
   describe('calculateAttentionSummary — prazo da etapa da CGLIC nos ciclos de pagamento', () => {

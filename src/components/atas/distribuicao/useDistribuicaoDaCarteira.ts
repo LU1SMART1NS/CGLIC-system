@@ -5,6 +5,7 @@ import type { ComplexidadeAjuste } from '../../../services/complexidadeAjusteSer
 import { buildDistribuicaoEquipe } from './distribuicaoEquipe';
 import { mesesDeVigencia } from './complexidade';
 import type { usePendenciasVinculoAta } from './usePendenciasVinculoAta';
+import { chaveGestaoDaArp } from '../../../utils/ataIdentidade';
 
 type Carteira = Pick<ReturnType<typeof usePendenciasVinculoAta>, 'atas' | 'contratos' | 'links'>;
 
@@ -25,12 +26,13 @@ export function useDistribuicaoDaCarteira({ atas, contratos, links, ajustes }: C
       buildDistribuicaoEquipe({
         atas: atas.scopedArps.map((arp) => ({
           numeroAta: arp.numeroAtaRegistroPreco,
+          chave: chaveGestaoDaArp(arp),
           uasg: arp.codigoUnidadeGerenciadora,
           objeto: arp.objeto,
           dias: getArpPrazo(arp).dias,
           faixa: getArpPrazo(arp).faixa,
           valor: Number(arp.valorTotal) || 0,
-          gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
+          gestorNome: atas.gestorByAta[chaveGestaoDaArp(arp)],
           itens: (atas.itemsByAta[`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`] || []).length
         })),
         contratos: contratos.rows.map((row) => ({

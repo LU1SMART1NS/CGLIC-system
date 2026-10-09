@@ -98,16 +98,19 @@ export function useAtaItemSaldos(numeroAta?: string, uasg?: string) {
     staleTime: 5 * 60 * 1000
   });
 
+  // A consulta da carteira traz também atas de outros órgãos de mesmo número (migration 106): filtra pela UASG.
   const saldos = (query.data || []).filter(
-    (i: any) => (i.numero_ata || i.numeroAta) === numeroAta
+    (i: any) => (i.numero_ata || i.numeroAta) === numeroAta && String(i.codigo_uasg || i.codigoUasg || cleanUasg) === cleanUasg
   );
 
   return { saldos, isLoading: query.isLoading };
 }
 
 /** Contratos oficiais vinculados a qualquer item de uma Ata (arp_item_contract_links), já enriquecidos. */
-export function useAtaLinkedContracts(numeroAta?: string, uasg?: string) {
+export function useAtaLinkedContracts(numeroAta?: string, uasg?: string, uasgCarteira?: string) {
   const cleanUasg = (uasg || '').trim();
+  // Contratos da carteira da CGLIC: nas atas de outros órgãos, a UASG da ata não tem contratos da SENASP.
+  const carteira = (uasgCarteira || uasg || '').trim();
 
   const linksQuery = useQuery({
     queryKey: ['ata-linked-contracts', numeroAta, cleanUasg] as const,
@@ -115,7 +118,7 @@ export function useAtaLinkedContracts(numeroAta?: string, uasg?: string) {
     enabled: Boolean(numeroAta && cleanUasg)
   });
 
-  const { data: contracts = [] } = useContractsDashboard(cleanUasg);
+  const { data: contracts = [] } = useContractsDashboard(carteira);
 
   const linkedContracts: EnrichedArpItemContract[] = enrichContractLinks(linksQuery.data || [], contracts);
 
