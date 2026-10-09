@@ -72,3 +72,21 @@ describe('atas de mesmo número na mesma carteira', () => {
     ]);
   });
 });
+
+import { contarPorPapel, passaFiltroPapel } from '../ataIdentidade';
+
+describe('filtro Papel da SENASP', () => {
+  const cglic = { codigoUnidadeGerenciadora: '200331', papelSenasp: 'GERENCIADORA' as const };
+  const pf = { codigoUnidadeGerenciadora: '200342', papelSenasp: 'PARTICIPANTE' as const };
+  const prf = { codigoUnidadeGerenciadora: '200109', papelSenasp: 'ADESAO' as const };
+  it('cada opção deixa passar só o seu papel; "Outros órgãos" junta participante e adesão', () => {
+    expect([cglic, pf, prf].filter((a) => passaFiltroPapel(a, 'TODOS'))).toHaveLength(3);
+    expect([cglic, pf, prf].filter((a) => passaFiltroPapel(a, 'GERENCIADORA'))).toEqual([cglic]);
+    expect([cglic, pf, prf].filter((a) => passaFiltroPapel(a, 'OUTROS'))).toEqual([pf, prf]);
+    expect([cglic, pf, prf].filter((a) => passaFiltroPapel(a, 'PARTICIPANTE'))).toEqual([pf]);
+    expect([cglic, pf, prf].filter((a) => passaFiltroPapel(a, 'ADESAO'))).toEqual([prf]);
+  });
+  it('contagem do menu', () => {
+    expect(contarPorPapel([cglic, cglic, pf, prf])).toEqual({ GERENCIADORA: 2, OUTROS: 2, PARTICIPANTE: 1, ADESAO: 1 });
+  });
+});

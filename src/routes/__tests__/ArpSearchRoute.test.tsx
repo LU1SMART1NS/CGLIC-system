@@ -145,7 +145,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
   it('3. deve renderizar a barra de filtros em linha com busca textual e opções', () => {
     const html = renderToStaticMarkup(
       <ArpPortfolioFilters
-        filters={{ statusVigencia: 'TODOS', filtroAlocacao: 'TODOS', filtroEmpenho: 'TODOS', unidade: 'TODAS', gestor: 'TODOS', busca: '' }}
+        filters={{ statusVigencia: 'TODOS', filtroAlocacao: 'TODOS', filtroEmpenho: 'TODOS', unidade: 'TODAS', gestor: 'TODOS', papel: 'TODOS', busca: '' }}
         unidades={[{ chave: 'cglic', nome: 'CGLIC' }]}
         onChangeFilter={vi.fn()}
         onResetFilters={vi.fn()}
@@ -158,6 +158,8 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
     expect(html).toContain('arp-filter-alocacao');
     expect(html).toContain('arp-filter-empenho');
     expect(html).toContain('arp-filter-unidade');
+    expect(html).toContain('arp-filter-papel');
+    expect(html).toContain('Papel da SENASP');
     expect(html).toContain('Alocação');
     expect(html).toContain('Empenho');
     expect(html).toContain('Unidade');
