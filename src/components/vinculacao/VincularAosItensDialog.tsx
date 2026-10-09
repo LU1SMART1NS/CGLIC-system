@@ -3,7 +3,7 @@ import { DistribuirEmpenhoModal } from '../contracts/DistribuirEmpenhoModal';
 import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 import { useAcoesDistribuicaoEmpenho, useDistribuicoesEmpenhoContrato } from '../../hooks/useDistribuicaoEmpenhos';
 import { empenhadoPorItem, itensNumerados } from '../../utils/distribuicaoEmpenho';
-import type { DistribuicaoDoEmpenho, ParcelaDoItem } from '../../services/distribuicaoEmpenhoService';
+import type { DistribuicaoDoEmpenho, QuantidadeNoItem } from '../../services/distribuicaoEmpenhoService';
 import { useToast } from '../../design-system';
 
 interface VincularAosItensDialogProps {
@@ -28,18 +28,18 @@ export const VincularAosItensDialog: React.FC<VincularAosItensDialogProps> = ({ 
   const itens = React.useMemo(() => itensNumerados(itensDoContrato?.itens ?? []), [itensDoContrato]);
 
   React.useEffect(() => {
-    if (nota) acoes.distribuir.reset();
+    if (nota) acoes.vincular.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nota?.contratoEmpenhoId]);
 
   if (!nota) return null;
 
-  const salvar = (parcelas: ParcelaDoItem[], observacao: string) =>
-    acoes.distribuir.mutate(
-      { contratoEmpenhoId: nota.contratoEmpenhoId, parcelas, valorNota: nota.valorNota, observacao },
+  const salvar = (quantidades: QuantidadeNoItem[], observacao: string) =>
+    acoes.vincular.mutate(
+      { contratoEmpenhoId: nota.contratoEmpenhoId, itens: quantidades, observacao },
       {
         onSuccess: () => {
-          toast.success(`${nota.numeroOficial} vinculada a ${parcelas.length === 1 ? '1 item' : `${parcelas.length} itens`} do contrato ${numeroContrato}.`);
+          toast.success(`${nota.numeroOficial} vinculada a ${quantidades.length === 1 ? '1 item' : `${quantidades.length} itens`} do contrato ${numeroContrato}.`);
           onVinculada?.(nota);
           onFechar();
         }
@@ -51,9 +51,9 @@ export const VincularAosItensDialog: React.FC<VincularAosItensDialogProps> = ({ 
       distribuicao={nota}
       numeroContrato={numeroContrato}
       itens={itens}
-      empenhadoOutras={empenhadoPorItem(distribuicoes, nota.contratoEmpenhoId)}
-      isLoading={acoes.distribuir.isPending || (Boolean(nota) && !itensDoContrato)}
-      erro={acoes.distribuir.error?.message}
+      empenhadoOutras={empenhadoPorItem(distribuicoes, itens, nota.contratoEmpenhoId)}
+      isLoading={acoes.vincular.isPending || (Boolean(nota) && !itensDoContrato)}
+      erro={acoes.vincular.error?.message}
       onSalvar={salvar}
       onFechar={onFechar}
     />

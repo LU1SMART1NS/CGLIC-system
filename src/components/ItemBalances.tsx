@@ -27,6 +27,8 @@ import { AjustarQuantidadeModal, type ContratoParaAjustar } from './item-balance
 import { UnidadesDoContratoModal, type ContratoParaDividir } from './item-balances/UnidadesDoContratoModal';
 import { QuantidadeContratadaCelula, UnidadesDoContratoCelula } from './item-balances/ContratadoCells';
 import { VincularAosItensDialog } from './vinculacao/VincularAosItensDialog';
+import { useAcoesDistribuicaoEmpenho } from '../hooks/useDistribuicaoEmpenhos';
+import type { ParcelaDoItem } from '../utils/empenhoDoItem';
 import { ROTAS_VINCULACAO } from './vinculacao/vinculacaoConfig';
 import type { DistribuicaoDoEmpenho } from '../services/distribuicaoEmpenhoService';
 import {
@@ -296,6 +298,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // ainda faltam vincular. As notas dos contratos chegam pela sincronização do servidor, de hora em hora.
   const { data: empenhoDoItem, isLoading: vinculosLoading, isReady: empenhoDoItemPronto } = useEmpenhoDoItem(canonicalItemKey);
   const [notaParaVincular, setNotaParaVincular] = useState<DistribuicaoDoEmpenho | null>(null);
+  // Quantidade da nota no item (migration 104): gravar, conferir e, se a nova quantidade não cabe na unidade, tirar a
+  // nota de lá e avisar.
+  const acoesQuantidade = useAcoesDistribuicaoEmpenho();
+  const [saidasDaUnidade, setSaidasDaUnidade] = useState<Array<{ numero: string; unidade: string; quantidade: number }>>([]);
 
   // Relê da API, para cada contrato vinculado, a quantidade contratada (que entra no saldo). Só roda pelo botão
   // Atualizar: abrir o item não consulta as APIs. A quantidade contratada também é relida em segundo plano para todos
@@ -573,6 +579,27 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empenhoDoItemPronto, empenhoLinksCarregados, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
 
+  const handleInformarQuantidade = (p: ParcelaDoItem, quantidade: number | null, sairDaUnidade: string | null) =>
+    acoesQuantidade.informar.mutate(
+      { contratoEmpenhoId: p.contratoEmpenhoId, numeroItem: p.numeroItem, quantidade },
+      {
+        onSuccess: async () => {
+          toast.success(quantidade == null ? `${p.numeroOficial}: quantidade voltou à calculada.` : `${p.numeroOficial}: ${formatNumber(quantidade)} un neste item.`);
+          if (sairDaUnidade && quantidade != null) {
+            const unidade = allocations.find((a) => a.id === sairDaUnidade)?.unitName ?? 'unidade';
+            await handleLinkEmpenho(p.numeroOficial, '');
+            setSaidasDaUnidade((antes) => [...antes.filter((x) => x.numero !== p.numeroOficial), { numero: p.numeroOficial, unidade, quantidade }]);
+          }
+        },
+        onError: (err: any) => toast.error(err?.message || 'Não foi possível gravar a quantidade.')
+      }
+    );
+  const handleConferirQuantidades = (p: ParcelaDoItem) =>
+    acoesQuantidade.conferir.mutate(p.contratoEmpenhoId, {
+      onSuccess: () => toast.success(`${p.numeroOficial}: quantidade conferida.`),
+      onError: (err: any) => toast.error(err?.message || 'Não foi possível registrar a conferência.')
+    });
+
   const totalAllocatedSum = allocations.reduce((acc, curr) => acc + curr.allocatedQty, 0);
   const remainingUGQty = totalUGQty - totalAllocatedSum;
   const percentAllocated = totalUGQty > 0 ? (totalAllocatedSum / totalUGQty) * 100 : 0;
@@ -666,6 +693,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                   {vinculosDesfeitos.length === 1 ? 'Esta nota ficou' : 'Estas notas ficaram'} sem quantidade neste item e
                   {vinculosDesfeitos.length === 1 ? ' saiu da unidade interna' : ' saíram da unidade interna'}:{' '}
                   {vinculosDesfeitos.map((v) => `${v.numero} (${v.unidade})`).join(', ')}. Defina a quantidade antes de escolher a unidade de novo.
+                </NoticeBar>
+              )}
+              {saidasDaUnidade.length > 0 && (
+                <NoticeBar tone="warning" testId="nota-saiu-da-unidade">
+                  {saidasDaUnidade.map((x) => `A nota ${x.numero} saiu da unidade ${x.unidade}: a nova quantidade (${formatNumber(x.quantidade)} un) não cabe no saldo dela.`).join(' ')}
                 </NoticeBar>
               )}
               {allocationError && (
@@ -1010,7 +1042,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                               linkedAllocationId={(numero) => empenhoLinks[numero] || ''}
                                               onLinkAllocation={handleLinkEmpenho}
                                               onVincularAosItens={canEditData ? setNotaParaVincular : undefined}
-                                              busy={saveEmpenhoLinksMutation.isPending}
+                                              onInformarQuantidade={canEditData ? handleInformarQuantidade : undefined}
+                                              onConferirQuantidades={canEditData ? handleConferirQuantidades : undefined}
+                                              gravandoQuantidade={acoesQuantidade.informar.isPending ? acoesQuantidade.informar.variables?.contratoEmpenhoId : null}
+                                              busy={saveEmpenhoLinksMutation.isPending || acoesQuantidade.conferir.isPending}
                                             />
                                           </div>
                                         </td>

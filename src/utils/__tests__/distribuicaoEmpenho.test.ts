@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { empenhadoPorItem, itensNumerados, motivoDaRevisao, rotuloDaSituacao, textoDaSugestao } from '../distribuicaoEmpenho';
+import { empenhadoPorItem, itensNumerados, motivoDaRevisao, quantidadeDaParcela, quantidadeFoiInformada, quantidadeQuebrada, rotuloDaSituacao, textoDaSugestao } from '../distribuicaoEmpenho';
 import { mapDistribuicao, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
 
 const linha = (over: any) => ({ posicao: 1, numeroItem: 13, descricao: 'Placa', tipo: 'Material', quantidade: 10, valorUnitario: 4900, valorTotal: 49000, ...over });
@@ -22,15 +22,45 @@ describe('itensNumerados', () => {
 });
 
 describe('empenhadoPorItem', () => {
-  it('soma só as notas com distribuição fechada e pode ignorar a nota em edição', () => {
+  const itens = itensNumerados([linha({ numeroItem: 13, valorUnitario: 10 }), linha({ numeroItem: 43, valorUnitario: 5 }), linha({ numeroItem: 50, valorUnitario: null })]);
+  it('soma as quantidades só das notas vinculadas e pode ignorar a nota em edição', () => {
     const ds = [
       mapDistribuicao({ contrato_empenho_id: 'a', empenho_id: '1', situacao: 'DISTRIBUIDA', parcelas: [{ numero_item: 13, valor: 100 }, { numero_item: 43, valor: 50 }] }),
       mapDistribuicao({ contrato_empenho_id: 'b', empenho_id: '2', situacao: 'DISTRIBUIDA', parcelas: [{ numero_item: 13, valor: 30 }] }),
       mapDistribuicao({ contrato_empenho_id: 'c', empenho_id: '3', situacao: 'REVISAR', parcelas: [{ numero_item: 13, valor: 999 }] })
     ];
-    expect(empenhadoPorItem(ds).get(13)).toBe(130);
-    expect(empenhadoPorItem(ds, 'b').get(13)).toBe(100);
-    expect(empenhadoPorItem(ds).get(43)).toBe(50);
+    expect(empenhadoPorItem(ds, itens).get(13)).toBe(13);
+    expect(empenhadoPorItem(ds, itens, 'b').get(13)).toBe(10);
+    expect(empenhadoPorItem(ds, itens).get(43)).toBe(10);
+  });
+
+  it('a quantidade informada vale no lugar da calculada, também sem valor e sem preço', () => {
+    const ds = [
+      mapDistribuicao({ contrato_empenho_id: 'a', empenho_id: '1', situacao: 'DISTRIBUIDA', parcelas: [{ numero_item: 13, valor: 100, quantidade_informada: 7 }] }),
+      mapDistribuicao({ contrato_empenho_id: 'b', empenho_id: '2', situacao: 'DISTRIBUIDA', parcelas: [{ numero_item: 43, valor: null, quantidade_informada: 3 }, { numero_item: 50, valor: null, quantidade_informada: 2 }] })
+    ];
+    expect(empenhadoPorItem(ds, itens).get(13)).toBe(7);
+    expect(empenhadoPorItem(ds, itens).get(43)).toBe(3);
+    expect(empenhadoPorItem(ds, itens).get(50)).toBe(2);
+  });
+});
+
+describe('quantidade da parcela', () => {
+  it('informada, calculada e quebrada', () => {
+    expect(quantidadeDaParcela({ valor: 11750, quantidadeInformada: null }, 2458.16)).toBeCloseTo(4.78, 2);
+    expect(quantidadeDaParcela({ valor: 11750, quantidadeInformada: 5 }, 2458.16)).toBe(5);
+    expect(quantidadeDaParcela({ valor: null, quantidadeInformada: null }, 10)).toBeNull();
+    expect(quantidadeDaParcela({ valor: 100, quantidadeInformada: null }, null)).toBeNull();
+    expect(quantidadeQuebrada(4.78)).toBe(true);
+    expect(quantidadeQuebrada(5)).toBe(false);
+    expect(quantidadeQuebrada(null)).toBe(false);
+  });
+
+  it('marcador Informada só quando a quantidade digitada difere da calculada', () => {
+    expect(quantidadeFoiInformada({ valor: 100, quantidadeInformada: 10 }, 10)).toBe(false);
+    expect(quantidadeFoiInformada({ valor: 100, quantidadeInformada: 9 }, 10)).toBe(true);
+    expect(quantidadeFoiInformada({ valor: null, quantidadeInformada: 9 }, 10)).toBe(true);
+    expect(quantidadeFoiInformada({ valor: 100, quantidadeInformada: null }, 10)).toBe(false);
   });
 });
 
@@ -47,9 +77,10 @@ describe('textos da distribuição', () => {
     expect(rotuloDaSituacao(dist({ situacao: 'REVISAR' })).variant).toBe('danger');
   });
 
-  it('motivo da revisão diz o valor antigo e o novo', () => {
-    const d = mapDistribuicao({ contrato_empenho_id: 'c', empenho_id: 'e', situacao: 'REVISAR', motivo_revisao: 'VALOR_MUDOU', valor_nota: 150, valor_na_distribuicao: 100, parcelas: [] });
+  it('valor mudou: diz o valor antigo e o novo e que as quantidades continuam contando', () => {
+    const d = mapDistribuicao({ contrato_empenho_id: 'c', empenho_id: 'e', situacao: 'DISTRIBUIDA', motivo_revisao: 'VALOR_MUDOU', valor_nota: 150, valor_na_distribuicao: 100, parcelas: [] });
     expect(motivoDaRevisao(d)).toMatch(/mudou de R\$\s100,00 para R\$\s150,00/);
+    expect(motivoDaRevisao(d)).toMatch(/continuam contando/);
   });
 });
 

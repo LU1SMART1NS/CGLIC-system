@@ -39,11 +39,12 @@ const base: React.ComponentProps<typeof ContractEmpenhosPanel> = {
 const html = (over: Partial<typeof base> = {}) => renderToStaticMarkup(<ContractEmpenhosPanel {...base} {...over} />);
 
 describe('ContractEmpenhosPanel (notas do contrato para este item)', () => {
-  it('mostra só as notas vinculadas a este item, com parcela, quantidade e quem vinculou', () => {
+  it('mostra só as notas vinculadas a este item, com quantidade e quem vinculou (sem a parcela em R$)', () => {
     const out = html();
     expect(out).toContain('Notas vinculadas a este item');
     expect(out).toContain('2024NE000337');
-    expect(out).toMatch(/R\$\s1\.197\.000,00/);
+    expect(out).not.toContain('Parcela deste item');
+    expect(out).not.toContain('R$');
     expect(out).toContain('342 un');
     expect(out).toContain('por Maria em 07/10/2026');
     // Nota de placas (item 13) não aparece como deste item.
@@ -105,6 +106,59 @@ describe('ContractEmpenhosPanel (notas do contrato para este item)', () => {
     const out = html({ execucao: semPreco });
     expect(out).toContain('Defina a quantidade primeiro');
     expect(out).not.toContain('DFNSP');
+  });
+
+  it('quem edita vê o campo da quantidade; marcador Informada só quando a quantidade foi digitada', () => {
+    const out = html({ onInformarQuantidade: vi.fn() });
+    expect(out).toMatch(/data-testid="quantidade-nota-2024NE000337"[^>]*value="342"/);
+    expect(out).not.toContain('quantidade-nota-2024NE000337-informada');
+    const informada = montarEmpenhoDoItem({
+      numeroItem: 43,
+      contratos: [{ contractKey: 'K', valorUnitario: 3500, distribuicoes: [nota({ ne: 'N9', valor_nota: 7000, situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numero_item: 43, valor: 7000, quantidade_informada: 3 }] })] }]
+    }).porContrato.get('K');
+    const comInformada = html({ execucao: informada, onInformarQuantidade: vi.fn() });
+    expect(comInformada).toMatch(/data-testid="quantidade-nota-N9"[^>]*value="3"/);
+    expect(comInformada).toContain('quantidade-nota-N9-informada');
+    // Sem a função (leitor), só o número.
+    expect(html({ execucao: informada })).not.toContain('quantidade-nota-N9"');
+    expect(html({ execucao: informada })).toContain('Informada');
+  });
+
+  it('quantidade calculada quebrada pede a quantidade certa', () => {
+    const quebrada = montarEmpenhoDoItem({
+      numeroItem: 1,
+      contratos: [{ contractKey: 'L', valorUnitario: 2458.16, distribuicoes: [nota({ ne: 'L1', contract_key: 'L', valor_nota: 11750, situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numero_item: 1, valor: 11750 }] })] }]
+    }).porContrato.get('L');
+    const out = html({ numeroItem: 1, contratado: 12, execucao: quebrada, onInformarQuantidade: vi.fn() });
+    expect(out).toContain('value="4,78"');
+    expect(out).toContain('A quantidade calculada não é inteira');
+  });
+
+  it('valor da nota mudou: aviso com o valor antigo e o novo; quem edita confere', () => {
+    const mudou = montarEmpenhoDoItem({
+      numeroItem: 43,
+      contratos: [
+        {
+          contractKey: 'K',
+          valorUnitario: 3500,
+          distribuicoes: [nota({ ne: 'M1', valor_nota: 14000, valor_na_distribuicao: 7000, motivo_revisao: 'VALOR_MUDOU', situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numero_item: 43, valor: 14000, quantidade_informada: 2 }] })]
+        }
+      ]
+    }).porContrato.get('K');
+    const out = html({ execucao: mudou, onConferirQuantidades: vi.fn() });
+    expect(out).toContain('contract-empenhos-valor-mudou');
+    expect(out).toMatch(/mudou de R\$\s7\.000,00 para R\$\s14\.000,00/);
+    expect(out).toContain('Quantidade conferida');
+    expect(html({ execucao: mudou })).not.toContain('Quantidade conferida');
+  });
+
+  it('soma das notas acima do contratado: aviso amarelo', () => {
+    expect(html({ contratado: 300 })).toContain('contract-empenhos-acima-do-contratado');
+    expect(html()).not.toContain('contract-empenhos-acima-do-contratado');
+  });
+
+  it('a lista de notas a vincular não mostra o valor da nota', () => {
+    expect(html()).not.toContain('Valor da nota');
   });
 
   it('quem não é gestor nem coordenador vê a unidade, mas não muda', () => {

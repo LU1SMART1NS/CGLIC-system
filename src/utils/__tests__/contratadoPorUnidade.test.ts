@@ -166,8 +166,12 @@ describe('unidade herdada pela nota', () => {
     numeroOficial: numero,
     dataEmissao: null,
     uasgEmitente: null,
+    numeroItem: 1,
     valor: 1,
     quantidade,
+    quantidadeCalculada: quantidade,
+    informada: false,
+    valorMudou: null,
     origem: 'AUTO',
     vinculadaPorNome: null,
     vinculadaEm: null

@@ -1,4 +1,5 @@
 import type { DistribuicaoDoEmpenho } from '../services/distribuicaoEmpenhoService';
+import { quantidadeCalculada, quantidadeFoiInformada } from './distribuicaoEmpenho';
 
 /**
  * Empenho de um item da ata a partir do vínculo das notas aos itens do contrato (migration 94). O item da ata
@@ -14,10 +15,18 @@ export interface ParcelaDoItem {
   numeroOficial: string;
   dataEmissao: string | null;
   uasgEmitente: string | null;
-  /** Valor da nota que foi para este item. */
-  valor: number;
-  /** Valor ÷ preço unitário do item no contrato; nulo sem preço (ex.: serviço). */
+  /** Número do item no contrato (o mesmo da ata). */
+  numeroItem: number;
+  /** Valor da nota que foi para este item; nulo quando a nota foi vinculada só por quantidade a vários itens. */
+  valor: number | null;
+  /** Quantidade usada: a informada pelo gestor, senão valor ÷ preço unitário; nula sem nenhuma das duas. */
   quantidade: number | null;
+  /** Valor ÷ preço unitário do item no contrato; nulo sem valor ou sem preço (ex.: serviço). */
+  quantidadeCalculada: number | null;
+  /** A quantidade foi digitada por alguém e difere da calculada (marcador "Informada"). */
+  informada: boolean;
+  /** O valor da nota mudou depois do vínculo: as quantidades continuam contando, mas pedem conferência. */
+  valorMudou: { antes: number; agora: number } | null;
   origem: 'AUTO' | 'USUARIO' | null;
   vinculadaPorNome: string | null;
   vinculadaEm: string | null;
@@ -92,9 +101,10 @@ export function montarEmpenhoDoItem(input: {
         continue;
       }
       if (d.situacao === 'DISTRIBUIDA') {
-        const valor = d.parcelas.filter((p) => p.numeroItem === input.numeroItem).reduce((s, p) => s + p.valor, 0);
-        if (valor <= EPS) continue;
-        const quantidade = vu ? valor / vu : null;
+        const parcela = d.parcelas.find((p) => p.numeroItem === input.numeroItem);
+        if (!parcela || ((parcela.valor ?? 0) <= EPS && parcela.quantidadeInformada == null)) continue;
+        const calculada = quantidadeCalculada(parcela, vu);
+        const quantidade = parcela.quantidadeInformada ?? calculada;
         e.parcelas.push({
           contratoEmpenhoId: d.contratoEmpenhoId,
           contractKey: c.contractKey,
@@ -102,13 +112,17 @@ export function montarEmpenhoDoItem(input: {
           numeroOficial: d.numeroOficial,
           dataEmissao: d.dataEmissao,
           uasgEmitente: d.uasgEmitente,
-          valor,
+          numeroItem: input.numeroItem,
+          valor: parcela.valor,
           quantidade,
+          quantidadeCalculada: calculada,
+          informada: quantidadeFoiInformada(parcela, vu),
+          valorMudou: d.motivoRevisao === 'VALOR_MUDOU' ? { antes: d.valorNaDistribuicao ?? d.valorDistribuido, agora: d.valorNota } : null,
           origem: d.origem,
           vinculadaPorNome: d.distribuidoPorNome,
           vinculadaEm: d.distribuidoEm
         });
-        e.valorEmpenhado += valor;
+        e.valorEmpenhado += parcela.valor ?? 0;
         if (quantidade != null) e.empenhado += quantidade;
         continue;
       }

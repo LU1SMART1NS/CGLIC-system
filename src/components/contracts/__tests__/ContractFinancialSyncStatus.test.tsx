@@ -7,7 +7,7 @@ vi.mock('../../../hooks/useDistribuicaoEmpenhos', () => {
   const mut = () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, variables: undefined });
   return {
     useDistribuicoesEmpenhoContrato: vi.fn(() => ({ data: [] })),
-    useAcoesDistribuicaoEmpenho: () => ({ distribuir: mut(), desfazer: mut() })
+    useAcoesDistribuicaoEmpenho: () => ({ vincular: mut(), desfazer: mut(), informar: mut(), conferir: mut() })
   };
 });
 vi.mock('../../../hooks/useItensDoContrato', () => ({ useItensDoContrato: vi.fn(() => ({ data: undefined })) }));
@@ -287,7 +287,7 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
 
   it('nota vinculada aos itens mostra os itens na coluna e não gera aviso', () => {
     vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({
-      data: [dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }] })]
+      data: [dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000, quantidadeInformada: null }] })]
     } as any);
     const html = render();
     expect(html).toContain('Vinculada');
@@ -307,7 +307,7 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).toContain('Ver a fatura');
   });
 
-  const detalhe = (d: DistribuicaoDoEmpenho | undefined, podeEditar = true, faturas: any[] = []) =>
+  const detalhe = (d: DistribuicaoDoEmpenho | undefined, podeEditar = true, faturas: any[] = [], extra: Record<string, unknown> = {}) =>
     renderToStaticMarkup(
       <EmpenhoDetalhe
         empenho={comEmpenho.empenhosList[0] as any}
@@ -324,16 +324,19 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
         onDesfazer={vi.fn()}
         onAbrirItem={vi.fn()}
         onAbrirFatura={vi.fn()}
+        {...extra}
       />
     );
 
-  it('detalhes da nota vinculada aos itens: parcela, quantidade, item da ata e faturas que citam a nota', () => {
+  it('detalhes da nota vinculada aos itens: quantidade (sem valor em R$), item da ata e faturas que citam a nota', () => {
     const html = detalhe(
-      dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }], distribuidoPorNome: 'Maria' }),
+      dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000, quantidadeInformada: null }], distribuidoPorNome: 'Maria' }),
       true,
       [{ idFatura: 7, numero: '1203', valor: 500, paga: true, cancelada: false, dataLiquidacao: '2026-03-20' }]
     );
-    expect(html).toMatch(/R\$\s1\.000,00/);
+    expect(html).not.toContain('Valor da nota');
+    expect(html).not.toContain('Vinculado aos itens');
+    expect(html).not.toContain('>Parcela<');
     expect(html).toContain('4 un');
     expect(html).toContain('de 79 contratadas');
     expect(html).toContain('Ata 00021/2024 · item 13');
@@ -345,16 +348,39 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
   });
 
   it('vínculo automático (contrato de um item) não oferece editar nem desfazer', () => {
-    const html = detalhe(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000 }] }));
+    const html = detalhe(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO', valorDistribuido: 1000, parcelas: [{ numeroItem: 13, valor: 1000, quantidadeInformada: null }] }));
     expect(html).toContain('Vinculada automaticamente: contrato de um item');
     expect(html).not.toContain('Editar o vínculo aos itens');
     expect(html).not.toContain('Desfazer');
   });
 
-  it('nota a rever explica o motivo e oferece vincular de novo', () => {
-    const html = detalhe(dist({ situacao: 'REVISAR', motivoRevisao: 'VALOR_MUDOU', origem: 'USUARIO', valorNaDistribuicao: 800, valorDistribuido: 800, parcelas: [{ numeroItem: 13, valor: 800 }] }));
-    expect(html).toContain('O valor da nota mudou de R$');
+  it('nota a rever (item fora do contrato) explica o motivo e oferece vincular de novo', () => {
+    const html = detalhe(dist({ situacao: 'REVISAR', motivoRevisao: 'ITEM_FORA_DO_CONTRATO', origem: 'USUARIO', parcelas: [{ numeroItem: 99, valor: 800, quantidadeInformada: null }] }));
+    expect(html).toContain('item que o contrato não tem mais');
     expect(html).toContain('>Vincular aos itens<');
+  });
+
+  it('valor da nota mudou: a nota continua vinculada, avisa e oferece conferir as quantidades', () => {
+    const d = dist({ situacao: 'DISTRIBUIDA', motivoRevisao: 'VALOR_MUDOU', origem: 'AUTO', valorNota: 1200, valorNaDistribuicao: 1000, parcelas: [{ numeroItem: 13, valor: 1200, quantidadeInformada: 4 }] });
+    const html = detalhe(d, true, [], { onConferir: vi.fn(), onInformarQuantidade: vi.fn() });
+    expect(html).toContain('continuam contando');
+    expect(html).toContain('Quantidades conferidas');
+    expect(html).not.toContain('>Vincular aos itens<');
+    expect(detalhe(d, false, [], { onConferir: vi.fn() })).not.toContain('Quantidades conferidas');
+  });
+
+  it('quem edita vê o campo da quantidade, o marcador Informada e o aviso de quantidade quebrada', () => {
+    const informada = detalhe(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numeroItem: 13, valor: 1000, quantidadeInformada: 5 }] }), true, [], { onInformarQuantidade: vi.fn() });
+    expect(informada).toContain('data-testid="empenho-quantidade-2022NE000245-13"');
+    expect(informada).toContain('value="5"');
+    expect(informada).toContain('Informada');
+    const quebrada = detalhe(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numeroItem: 13, valor: 1195, quantidadeInformada: null }] }), true, [], { onInformarQuantidade: vi.fn() });
+    expect(quebrada).toContain('value="4,78"');
+    expect(quebrada).toContain('não é inteira');
+    expect(quebrada).not.toContain('Informada');
+    const leitor = detalhe(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numeroItem: 13, valor: 1000, quantidadeInformada: 5 }] }), false, [], { onInformarQuantidade: vi.fn() });
+    expect(leitor).not.toContain('empenho-quantidade-2022NE000245-13');
+    expect(leitor).toContain('5 un');
   });
 
   it('contrato sem itens numerados: a nota fica no contrato inteiro', () => {

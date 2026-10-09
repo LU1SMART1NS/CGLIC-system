@@ -8,7 +8,7 @@ import { ActionButton, AppButton, AppTextarea, Modal, StatusBadge, useToast } fr
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../hooks/useVinculacaoEmpenhos';
-import { distribuirEmpenhoNosItens, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
+import { vincularEmpenhoAosItens, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
 import { motivoDaRevisao, rotuloDaSituacao, sugestaoCurta, textoDaSugestao } from '../../utils/distribuicaoEmpenho';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
@@ -21,7 +21,6 @@ import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
-import { formatCurrency, formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { SELECIONADA_BG, SelecaoCell, SelecaoHeaderCell, useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
@@ -110,7 +109,6 @@ export const EmpenhosItensPage: React.FC = () => {
       empenho: { value: (d) => d.numeroOficial },
       contrato: { value: (d) => contrato(d.contractKey).numero.split('/').reverse().join('/') },
       emissao: { value: (d) => d.dataEmissao, firstDir: 'desc' },
-      valor: { value: (d) => d.valorNota, firstDir: 'desc' },
       situacao: { value: (d) => (d.situacao === 'REVISAR' ? 0 : 1) },
       gestor: { value: (d) => contrato(d.contractKey).gestorNome }
     }),
@@ -136,10 +134,9 @@ export const EmpenhosItensPage: React.FC = () => {
     const erros: string[] = [];
     for (const d of selecionadas) {
       try {
-        await distribuirEmpenhoNosItens({
+        await vincularEmpenhoAosItens({
           contratoEmpenhoId: d.contratoEmpenhoId,
-          parcelas: [{ numeroItem: d.sugestao[0].numeroItem, valor: d.valorNota }],
-          valorNota: d.valorNota,
+          itens: [{ numeroItem: d.sugestao[0].numeroItem, quantidade: d.sugestao[0].quantidade }],
           observacao: obsLote
         });
         feitas++;
@@ -168,7 +165,6 @@ export const EmpenhosItensPage: React.FC = () => {
   }
 
   const hasActive = hasActiveCarteiraFilters(SCHEMA, filters) && filters.fila === SCHEMA.fila.default;
-  const valorAVincular = aVincular.reduce((s, d) => s + d.valorNota, 0);
   const isBusy = isLoading || carregandoContratos;
 
   return (
@@ -196,7 +192,6 @@ export const EmpenhosItensPage: React.FC = () => {
               { id: 'A_VINCULAR', label: 'A vincular', count: aVincular.length, dot: aVincular.length ? AMBAR : undefined, title: 'Notas que ainda não entram no empenhado dos itens' },
               { id: 'EQUIPE', label: 'Vinculadas pela equipe', count: daEquipe.length, title: 'Vinculadas aos itens pela equipe nos últimos 30 dias' }
             ]}
-            meta={filters.fila === 'A_VINCULAR' && valorAVincular > 0 ? `${formatCurrencyCompact(valorAVincular)} a vincular` : undefined}
           />
 
           <CarteiraFilterBar
@@ -247,7 +242,7 @@ export const EmpenhosItensPage: React.FC = () => {
               data-testid="vinc-empenhos-selecao"
               style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', padding: '0.55rem 0.85rem', background: SELECIONADA_BG, border: '1px solid var(--color-info-border)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--color-info-text-strong)' }}
             >
-              <strong>{plural(selecionadas.length, 'nota selecionada', 'notas selecionadas')}</strong> · {formatCurrency(selecionadas.reduce((s, d) => s + d.valorNota, 0))}
+              <strong>{plural(selecionadas.length, 'nota selecionada', 'notas selecionadas')}</strong>
               <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <ActionButton action="limpar" size="sm" onClick={selecao.limpar} />
                 <ActionButton action="vincular" size="sm" onClick={() => setConfirmandoLote(true)} data-testid="vinc-empenhos-lote">
@@ -277,7 +272,6 @@ export const EmpenhosItensPage: React.FC = () => {
                       <CarteiraSortHeader label="Empenho" sortKey="empenho" {...sort} />
                       <CarteiraSortHeader label="Contrato" sortKey="contrato" {...sort} />
                       <CarteiraSortHeader label="Emissão" sortKey="emissao" {...sort} />
-                      <CarteiraSortHeader label="Valor da nota" sortKey="valor" align="right" {...sort} />
                       <th style={carteiraTh}>{filters.fila === 'EQUIPE' ? 'Itens' : 'Sugestão'}</th>
                       <CarteiraSortHeader label="Situação" sortKey="situacao" {...sort} />
                       {showGestorFilter && <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sort} />}
@@ -320,11 +314,10 @@ export const EmpenhosItensPage: React.FC = () => {
                             </div>
                           </td>
                           <td data-label="Emissão" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>{dataBR(d.dataEmissao)}</td>
-                          <td data-label="Valor da nota" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>{formatCurrency(d.valorNota)}</td>
                           <td data-label={filters.fila === 'EQUIPE' ? 'Itens' : 'Sugestão'} style={carteiraTd}>
                             {filters.fila === 'EQUIPE' ? (
                               <>
-                                <span>{d.parcelas.map((p) => `item ${p.numeroItem}`).join(', ')}</span>
+                                <span>{d.parcelas.map((p) => `item ${p.numeroItem}${p.quantidadeInformada != null ? ` · ${p.quantidadeInformada} un` : ''}`).join(', ')}</span>
                                 <div style={subtle}>
                                   por {d.distribuidoPorNome || 'usuário'}
                                   {d.distribuidoEm ? ` em ${dataBR(d.distribuidoEm)}` : ''}
@@ -350,7 +343,7 @@ export const EmpenhosItensPage: React.FC = () => {
                             <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
                             {d.situacao === 'REVISAR' && (
                               <div style={subtle} title={motivoDaRevisao(d) ?? undefined}>
-                                {d.motivoRevisao === 'VALOR_MUDOU' ? `valor mudou de ${formatCurrency(d.valorNaDistribuicao ?? d.valorDistribuido)}` : 'item fora do contrato'}
+                                {d.motivoRevisao === 'VALOR_MUDOU' ? 'valor da nota mudou' : 'item fora do contrato'}
                               </div>
                             )}
                           </td>
@@ -391,15 +384,12 @@ export const EmpenhosItensPage: React.FC = () => {
         isOpen={confirmandoLote}
         onClose={() => !gravandoLote && setConfirmandoLote(false)}
         title={`Vincular ${plural(selecionadas.length, 'nota', 'notas')} pela sugestão`}
-        subtitle="Cada nota fica vinculada inteira ao item sugerido. Dá para editar ou desfazer depois, nota a nota."
+        subtitle="Cada nota fica vinculada ao item sugerido, com a quantidade sugerida. Dá para editar ou desfazer depois, nota a nota."
         size="md"
         dismissible={!gravandoLote}
         testId="vinc-empenhos-lote-modal"
         footer={
           <>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginRight: 'auto' }}>
-              Total {formatCurrency(selecionadas.reduce((s, d) => s + d.valorNota, 0))}
-            </span>
             <ActionButton action="cancelar" size="sm" onClick={() => setConfirmandoLote(false)} disabled={gravandoLote} />
             <AppButton variant="primary" size="sm" onClick={() => void vincularLote()} isLoading={gravandoLote} disabled={gravandoLote || selecionadas.length === 0} data-testid="vinc-empenhos-lote-confirmar">
               Vincular {selecionadas.length}
@@ -415,7 +405,9 @@ export const EmpenhosItensPage: React.FC = () => {
                   <strong>{d.numeroOficial}</strong> · {contrato(d.contractKey).numero}
                 </span>
                 <span style={{ whiteSpace: 'nowrap' }}>
-                  {textoDaSugestao(d.sugestaoTipo, d.sugestao)} · <strong>{formatCurrency(d.valorNota)}</strong>
+                  <strong>
+                    {d.sugestao[0]?.quantidade.toLocaleString('pt-BR')} un do item {d.sugestao[0]?.numeroItem}
+                  </strong>
                 </span>
               </div>
             ))}

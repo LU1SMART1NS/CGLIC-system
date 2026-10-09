@@ -2,8 +2,9 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { rpcInexistente } from './empenhoSyncService';
 
 /**
- * Distribuição da nota de empenho entre os itens do contrato (migration 94). Nenhuma fonte aberta diz o item
- * da NE: contrato de um item recebe a nota inteira sozinho (AUTO); nos demais o gestor reparte o valor.
+ * Vínculo da nota de empenho aos itens do contrato (migrations 94 e 104). Nenhuma fonte aberta diz o item da NE:
+ * contrato de um item recebe a nota inteira sozinho (AUTO); nos demais o gestor diz a quantidade de cada item. A
+ * quantidade da nota em um item é a informada pelo gestor, senão a parcela em R$ ÷ preço unitário do item.
  */
 
 export type SituacaoDistribuicao = 'A_DISTRIBUIR' | 'DISTRIBUIDA' | 'REVISAR' | 'SEM_ITENS' | 'SEM_VALOR';
@@ -12,7 +13,16 @@ export type TipoSugestao = 'TOTAL_DO_ITEM' | 'MULTIPLO_DO_PRECO' | 'VARIAS_POSSI
 
 export interface ParcelaDoItem {
   numeroItem: number;
-  valor: number;
+  /** Parte da nota em R$ neste item; nula quando a nota foi vinculada só por quantidade a vários itens. */
+  valor: number | null;
+  /** Quantidade informada pelo gestor (inteira); nula = calculada pelo valor. */
+  quantidadeInformada: number | null;
+}
+
+/** Quantidade de uma nota em um item, para vincular aos itens. */
+export interface QuantidadeNoItem {
+  numeroItem: number;
+  quantidade: number;
 }
 
 export interface SugestaoDeItem {
@@ -33,7 +43,7 @@ export interface DistribuicaoDoEmpenho {
   motivoRevisao: MotivoRevisao | null;
   /** AUTO (contrato de um item) ou USUARIO; nulo enquanto não distribuída. */
   origem: 'AUTO' | 'USUARIO' | null;
-  /** Valor da NE quando foi distribuída (difere do atual se a nota mudou depois). */
+  /** Valor da NE quando foi vinculada ou conferida (difere do atual se a nota mudou depois: aviso, a nota continua contando). */
   valorNaDistribuicao: number | null;
   valorDistribuido: number;
   parcelas: ParcelaDoItem[];
@@ -44,9 +54,9 @@ export interface DistribuicaoDoEmpenho {
   sugestao: SugestaoDeItem[];
 }
 
-const MIGRATION_AUSENTE = 'O vínculo do empenho aos itens ainda não está disponível: falta aplicar no banco a migration 94.';
+const MIGRATION_AUSENTE = 'A quantidade da nota por item ainda não está disponível: falta aplicar no banco a migration 104.';
 
-/** Mensagem legível de um erro das RPCs da migration 94 (tira o código do começo). */
+/** Mensagem legível de um erro das RPCs das migrations 94 e 104 (tira o código do começo). */
 export function mensagemDoErroDeDistribuicao(error: any): string {
   if (rpcInexistente(error)) return MIGRATION_AUSENTE;
   const bruta = String(error?.message ?? error ?? '');
@@ -75,7 +85,11 @@ export function mapDistribuicao(r: any): DistribuicaoDoEmpenho {
     origem: (r.origem ?? null) as DistribuicaoDoEmpenho['origem'],
     valorNaDistribuicao: r.valor_na_distribuicao == null ? null : numero(r.valor_na_distribuicao),
     valorDistribuido: numero(r.valor_distribuido),
-    parcelas: lista(r.parcelas).map((p) => ({ numeroItem: numero(p.numero_item), valor: numero(p.valor) })),
+    parcelas: lista(r.parcelas).map((p) => ({
+      numeroItem: numero(p.numero_item),
+      valor: p.valor == null ? null : numero(p.valor),
+      quantidadeInformada: p.quantidade_informada == null ? null : numero(p.quantidade_informada)
+    })),
     distribuidoPorNome: r.distribuido_por_nome ?? null,
     distribuidoEm: r.distribuido_em ?? null,
     observacao: r.observacao ?? null,
@@ -145,19 +159,29 @@ function requireSupabase() {
   return supabase;
 }
 
-/** Grava a distribuição (substitui a anterior). A soma tem de ser igual ao valor da NE que a tela mostrou. */
-export async function distribuirEmpenhoNosItens(p: {
-  contratoEmpenhoId: string;
-  parcelas: ParcelaDoItem[];
-  valorNota: number;
-  observacao?: string;
-}): Promise<void> {
-  const { error } = await requireSupabase().rpc('distribuir_empenho_nos_itens', {
+/** Vincula a nota aos itens pela quantidade de cada um (substitui o vínculo anterior). */
+export async function vincularEmpenhoAosItens(p: { contratoEmpenhoId: string; itens: QuantidadeNoItem[]; observacao?: string }): Promise<void> {
+  const { error } = await requireSupabase().rpc('vincular_empenho_aos_itens', {
     p_contrato_empenho_id: p.contratoEmpenhoId,
-    p_parcelas: p.parcelas.map((x) => ({ numero_item: x.numeroItem, valor: x.valor })),
-    p_valor_nota: p.valorNota,
+    p_itens: p.itens.map((x) => ({ numero_item: x.numeroItem, quantidade: x.quantidade })),
     p_observacao: p.observacao?.trim() || null
   });
+  if (error) throw new Error(mensagemDoErroDeDistribuicao(error));
+}
+
+/** Grava a quantidade da nota em um item; nula volta à calculada pelo valor. */
+export async function informarQuantidadeEmpenhoItem(p: { contratoEmpenhoId: string; numeroItem: number; quantidade: number | null }): Promise<void> {
+  const { error } = await requireSupabase().rpc('informar_quantidade_empenho_item', {
+    p_contrato_empenho_id: p.contratoEmpenhoId,
+    p_numero_item: p.numeroItem,
+    p_quantidade: p.quantidade
+  });
+  if (error) throw new Error(mensagemDoErroDeDistribuicao(error));
+}
+
+/** O gestor confirma as quantidades depois que o valor da nota mudou. */
+export async function conferirQuantidadesEmpenho(contratoEmpenhoId: string): Promise<void> {
+  const { error } = await requireSupabase().rpc('conferir_quantidades_empenho', { p_contrato_empenho_id: contratoEmpenhoId });
   if (error) throw new Error(mensagemDoErroDeDistribuicao(error));
 }
 
