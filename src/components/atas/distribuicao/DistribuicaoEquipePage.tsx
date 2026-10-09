@@ -32,7 +32,7 @@ const VERMELHO = 'var(--color-danger)';
 
 /**
  * Central de Distribuição, no padrão das carteiras: atas e contratos para gestores. Filas em abas com contagem
- * (Atas sem gestor, Gestor diferente da ata) e a carga de cada gestor (Equipe). A aba fica na URL. O vínculo de
+ * (Atas sem gestor, Histórico sem gestor, Gestor diferente da ata) e a carga de cada gestor (Equipe). A aba fica na URL. O vínculo de
  * contrato à ata saiu daqui para o menu Vinculação.
  */
 export const DistribuicaoEquipePage: React.FC = () => {
@@ -89,6 +89,12 @@ export const DistribuicaoEquipePage: React.FC = () => {
       count: pendencias.atasSemGestor.length,
       dot: pendencias.atasSemGestor.length ? AMBAR : undefined,
       title: 'Vigentes e encerradas que ainda têm contratos'
+    },
+    {
+      id: 'HISTORICO' as const,
+      label: 'Histórico sem gestor',
+      count: pendencias.atasHistoricoSemGestor.length,
+      title: 'Encerradas sem contrato vigente: não pesam na carga'
     },
     ...(divergencias.length > 0
       ? [
@@ -182,6 +188,17 @@ export const DistribuicaoEquipePage: React.FC = () => {
                   done,
                   provaveis: lista.reduce((n, ata) => n + ata.provaveis.length, 0)
                 })
+              }
+            />
+          )}
+
+          {aba === 'HISTORICO' && (
+            <AtasSemGestorFila
+              historico
+              atas={pendencias.atasHistoricoSemGestor}
+              podeAtribuir={canAssign}
+              onAtribuir={(lista, done) =>
+                setTransferencia({ targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: ata.numeroAta })), origem: null, done })
               }
             />
           )}

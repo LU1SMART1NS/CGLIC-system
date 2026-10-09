@@ -30,6 +30,8 @@ export interface LoteAtribuicao {
   complexidade: Record<NivelComplexidade, number>;
   /** Carga equivalente do lote inteiro. */
   equivalente: number;
+  /** Alvos encerrados (ex.: atas do histórico): mudam de gestor, mas ficam fora das contagens acima. */
+  encerrados: number;
 }
 
 export function montarLote(targets: ManagerTarget[], links: ArpItemContractLinkPair[], index: Map<string, ItemIndexado>): LoteAtribuicao {
@@ -37,7 +39,8 @@ export function montarLote(targets: ManagerTarget[], links: ArpItemContractLinkP
   const { ataKeys, contractKeys } = resolveManagerPropagation(targets, links);
   const chaves = [...ataKeys.map((k) => chaveItem('ATA', k)), ...contractKeys.map((k) => chaveItem('CONTRATO', k))];
 
-  const lote: LoteAtribuicao = { itens: [], atas: 0, contratos: 0, vinculados: 0, complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 }, equivalente: 0 };
+  const lote: LoteAtribuicao = { itens: [], atas: 0, contratos: 0, vinculados: 0, complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 }, equivalente: 0, encerrados: 0 };
+  for (const alvo of alvos) if (!index.has(alvo)) lote.encerrados++;
   for (const chave of chaves) {
     const indexado = index.get(chave);
     if (!indexado) continue; // encerrado: muda de gestor, mas não pesa na carga vigente

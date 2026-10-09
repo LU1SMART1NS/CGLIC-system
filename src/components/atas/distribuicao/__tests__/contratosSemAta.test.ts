@@ -76,9 +76,10 @@ describe('buildPendenciasDistribuicao', () => {
       naoPertencemAAta: new Set(['marcado'])
     });
 
-  it('lista atas sem gestor com vinculados e prováveis; ignora encerrada sem contrato', () => {
-    const { atasSemGestor } = base();
+  it('lista atas sem gestor com vinculados e prováveis; a encerrada sem contrato vai para o histórico', () => {
+    const { atasSemGestor, atasHistoricoSemGestor } = base();
     expect(atasSemGestor.map((a) => a.numeroAta)).toEqual(['00001/2025']);
+    expect(atasHistoricoSemGestor.map((a) => a.numeroAta)).toEqual(['00009/2020']);
     expect(atasSemGestor[0]).toMatchObject({ vinculados: ['vinculado'], provaveis: ['provavel-sem-gestor'] });
   });
 
