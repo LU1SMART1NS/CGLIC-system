@@ -145,6 +145,20 @@ describe('coletarEGravarAtas', () => {
     expect(fornecedorPncp.conferirFornecedorPelaFonte).not.toHaveBeenCalled();
   });
 
+  it('ata que já tem itens no banco não vira pendência, mesmo se a releitura caiu no PNCP (caso 00102/2024)', async () => {
+    const CTRL = '00394494000136-1-001169/2024-000005';
+    const a102 = { ...ata(102), numeroAtaRegistroPreco: '00102/2024', numeroControlePncpAta: CTRL };
+    vi.mocked(dbCache.fetchEstadoAtasNoBanco).mockResolvedValueOnce(new Map([['00102/2024', { itens: 1, itensLidosEmMaisAntigo: '2026-10-02T15:32:08Z' } as any]]));
+    vi.mocked(api.fetchArpsDasFontes).mockResolvedValueOnce([a102]);
+    vi.mocked(api.fetchArpItems).mockImplementationOnce(async (_d, _u, _n, _ctx, opts) => {
+      opts?.aoDetectarPendencia?.({ numeroControlePncpAta: CTRL, numeroAta: '00102/2024', uasg: UASG, numeroControlePncpCompra: 'c', anoCompra: '2024', atasNaCompra: 5, candidatos: [], itensSemResultado: [] });
+      return { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0, origem: 'PNCP' };
+    });
+    await coletarEGravarAtas(params);
+    expect(api.fetchArpItems).toHaveBeenCalledTimes(1);
+    expect(fornecedorPncp.gravarPendenciasFornecedorPncp).not.toHaveBeenCalled();
+  });
+
   it('Compras.gov.br publicou a ata: a indicação é conferida e a pendência detectada nesta execução não é gravada', async () => {
     const CTRL = '00394494000136-1-001667/2025-000002';
     const registro = { numeroControlePncp: CTRL, numeroAta: '00043/2026', codigoUasg: UASG, estado: 'PENDENTE' as const, candidatos: [], itensSemResultado: [], detectadoEm: '', atualizadoEm: '' };
