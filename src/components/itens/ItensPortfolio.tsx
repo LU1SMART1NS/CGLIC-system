@@ -21,6 +21,7 @@ import { passaFiltroNivel, type NivelAtendimento } from '../../utils/itemAtendim
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import { ItensPortfolioFilters, ITENS_FILTER_SCHEMA } from './ItensPortfolioFilters';
 import { ItensPortfolioTable } from './ItensPortfolioTable';
+import { contarPorPapel, passaFiltroPapel } from '../../utils/ataIdentidade';
 
 /**
  * Carteira → Itens: todos os itens das atas com vigência da ata, alocação por unidade interna (contra o
@@ -66,6 +67,7 @@ export const ItensPortfolio: React.FC = () => {
       if (!matchesStatusFilter(r.faixa, filters.statusVigencia)) return false;
       if (filters.unidade !== TODAS_UNIDADES && !(r.alocadoPorUnidade[filters.unidade] > 0)) return false;
       if (showGestorFilter && !matchesGestorFilter(r.gestorNome, filters.gestor)) return false;
+      if (!passaFiltroPapel(r.arp, filters.papel)) return false;
       if (query) {
         const { item, arp } = r;
         const cnpj = (item.niFornecedor || '').replace(/\D/g, '');
@@ -79,7 +81,13 @@ export const ItensPortfolio: React.FC = () => {
       }
       return true;
     });
-  }, [rows, filters.busca, filters.statusVigencia, filters.unidade, filters.gestor, showGestorFilter]);
+  }, [rows, filters.busca, filters.statusVigencia, filters.unidade, filters.gestor, filters.papel, showGestorFilter]);
+
+  // Quantos itens da situação escolhida cairiam em cada papel da SENASP (contagem no menu do filtro).
+  const papelCounts = useMemo(
+    () => contarPorPapel(rows.filter((r) => matchesStatusFilter(r.faixa, filters.statusVigencia)).map((r) => r.arp)),
+    [rows, filters.statusVigencia]
+  );
 
   const lista = useMemo(
     () =>
@@ -192,6 +200,7 @@ export const ItensPortfolio: React.FC = () => {
             unidades={unidades}
             alocacaoCounts={nivelCounts.alocacao}
             empenhoCounts={nivelCounts.empenho}
+            papelCounts={papelCounts}
             showGestorFilter={showGestorFilter}
             onChangeFilter={setFilter}
             onResetFilters={resetFilters}
