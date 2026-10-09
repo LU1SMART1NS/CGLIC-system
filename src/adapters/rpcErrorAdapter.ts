@@ -51,6 +51,27 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
     };
   }
 
+  // Antes das checagens por 23503 genérico: a mensagem cita "alocação" e cairia em INVALID_ALLOCATION.
+  if (message.includes('CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS')) {
+    const texto = /CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS:\s*(.+)$/s.exec(message)?.[1]?.trim();
+    return {
+      code: 'CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS',
+      message: texto || 'Esta unidade está em uso e não pode ser excluída. Desative-a para impedir novas alocações.',
+      sqlState: '23503',
+      details: error
+    };
+  }
+
+  if (message.includes('INACTIVE_DEPARTMENT')) {
+    const texto = /INACTIVE_DEPARTMENT:\s*(.+)$/s.exec(message)?.[1]?.trim();
+    return {
+      code: 'INACTIVE_DEPARTMENT',
+      message: texto || 'A unidade está desativada: a alocação dela pode ficar como está ou diminuir, mas não aumentar.',
+      sqlState: '22023',
+      details: error
+    };
+  }
+
   if (message.includes('INVALID_DEPARTMENT') || (sqlState === '23503' && message.includes('department'))) {
     const nome = /Departamento "([^"]+)"/.exec(message)?.[1];
     return {
@@ -90,14 +111,6 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
     };
   }
 
-  if (message.includes('CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS')) {
-    return {
-      code: 'CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS',
-      message: 'Esta unidade possui alocações vinculadas e não pode ser excluída. Desative-a para impedir novas alocações.',
-      sqlState: '23503',
-      details: error
-    };
-  }
 
   if (message.includes('TARGET_DEPARTMENT_NOT_FOUND')) {
     return {

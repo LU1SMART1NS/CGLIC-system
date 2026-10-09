@@ -7,7 +7,8 @@ import type { AllocationExecution } from './allocationExecution';
  * - a soma não passa do quantitativo SENASP;
  * - a unidade não fica com menos do que já contratou nem do que já empenhou (migration 103);
  * - a unidade com contrato ou empenho vinculado não pode ser removida (antes é preciso tirá-la das divisões dos
- *   contratos e desvincular os empenhos).
+ *   contratos e desvincular os empenhos);
+ * - a unidade desativada fica como está ou diminui, mas não aumenta (migration 108).
  */
 export interface LinhaAlocacao {
   id: string;
@@ -23,6 +24,8 @@ export interface LinhaAlocacao {
   vinculados: number;
   removida: boolean;
   adicionada: boolean;
+  /** Unidade desativada no catálogo: só mantém ou diminui (migration 108). */
+  inativa?: boolean;
 }
 
 export interface AvaliacaoLinha {
@@ -30,6 +33,8 @@ export interface AvaliacaoLinha {
   /** Mínimo que a unidade aceita: o maior entre contratado e empenhado (e pelo menos 1). */
   minimo: number;
   abaixoDoMinimo: boolean;
+  /** Unidade desativada com quantidade acima da gravada. */
+  acimaDoGravado: boolean;
   podeRemover: boolean;
 }
 
@@ -75,13 +80,16 @@ export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: numbe
   const porLinha = new Map<string, AvaliacaoLinha>();
   const mudancas: string[] = [];
   let algumaAbaixo = false;
+  const inativasAcima: string[] = [];
 
   for (const l of linhas) {
     const minimo = Math.max(1, l.empenhado, l.contratado ?? 0);
     const abaixoDoMinimo = !l.removida && num(l.qtd) < minimo;
     if (abaixoDoMinimo) algumaAbaixo = true;
+    const acimaDoGravado = !!l.inativa && !l.removida && num(l.qtd) > l.original;
+    if (acimaDoGravado) inativasAcima.push(l.unitName);
     const alterada = !l.adicionada && !l.removida && num(l.qtd) !== l.original;
-    porLinha.set(l.id, { alterada, minimo, abaixoDoMinimo, podeRemover: l.vinculados === 0 && !(l.contratado > 0) });
+    porLinha.set(l.id, { alterada, minimo, abaixoDoMinimo, acimaDoGravado, podeRemover: l.vinculados === 0 && !(l.contratado > 0) });
     if (l.adicionada && !l.removida) mudancas.push(`+ ${l.unitName} ${fmt(num(l.qtd))}`);
     else if (l.removida && !l.adicionada) mudancas.push(`− ${l.unitName}`);
     else if (alterada) mudancas.push(`${l.unitName} ${fmt(l.original)} → ${fmt(num(l.qtd))}`);
@@ -92,6 +100,9 @@ export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: numbe
     erros.push(`A soma das alocações (${fmt(totalAlocado)}) passa do quantitativo SENASP (${fmt(quantitativoSenasp)}) em ${fmt(totalAlocado - quantitativoSenasp)}. Reduza alguma unidade.`);
   }
   if (algumaAbaixo) erros.push('Há unidade abaixo do mínimo: a quantidade deve ser maior que zero e não pode ficar abaixo do que a unidade já contratou nem do que já empenhou.');
+  if (inativasAcima.length > 0) {
+    erros.push(`${inativasAcima.join(', ')} ${inativasAcima.length === 1 ? 'está desativada' : 'estão desativadas'}: a alocação pode ficar como está ou diminuir, mas não aumentar.`);
+  }
   if (linhas.some((l) => l.removida && l.contratado > 0)) erros.push('Unidade com contrato não pode ser removida. Tire a unidade das divisões dos contratos antes, na aba Contratos e empenhos.');
   if (linhas.some((l) => l.removida && l.vinculados > 0)) erros.push('Unidade com empenho vinculado não pode ser removida. Desvincule os empenhos antes.');
 
