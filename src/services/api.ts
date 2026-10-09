@@ -17,7 +17,7 @@ export function setSimulationMode(_value: boolean) {
 /**
  * Encodes query parameters safely.
  */
-function buildQueryString(params: Record<string, string | number | undefined>): string {
+export function buildQueryString(params: Record<string, string | number | undefined>): string {
   const parts: string[] = [];
   for (const key in params) {
     if (params[key] !== undefined && params[key] !== '') {
@@ -115,7 +115,7 @@ function isErroDeRede(err: unknown): boolean {
  * Espera 2 s, depois 4 s, 8 s... (ou o que a fonte pedir em Retry-After, até 15 s).
  * Usado pela sincronização, que não pode tratar recusa da fonte como "não há dados".
  */
-async function fetchComNovaTentativa(url: string, fonte: string, tentativas = 2): Promise<Response> {
+export async function fetchComNovaTentativa(url: string, fonte: string, tentativas = 2): Promise<Response> {
   const esperar = (tentativa: number, response?: Response) => {
     const pedido = Number(response?.headers.get('retry-after'));
     const ms = Number.isFinite(pedido) && pedido > 0 ? Math.min(pedido, 15) * 1000 : 2000 * 2 ** (tentativa - 1);
