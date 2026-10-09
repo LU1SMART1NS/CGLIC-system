@@ -30,6 +30,7 @@ const row = (over: Partial<CarteiraItemRow> = {}): CarteiraItemRow => ({
   alocadoPorUnidade: { cglic: 60 },
   nivelAlocacao: 'PARCIAL',
   contratada: 50,
+  contratadoSemUnidade: 0,
   empenhado: 50,
   nivelEmpenho: 'TOTAL',
   ...over

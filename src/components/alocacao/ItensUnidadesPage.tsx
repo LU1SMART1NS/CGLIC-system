@@ -224,6 +224,7 @@ export const ItensUnidadesPage: React.FC = () => {
                       <CarteiraSortHeader label="Quantitativo SENASP" sortKey="senasp" align="right" {...sort} />
                       <CarteiraSortHeader label="Alocado" sortKey="alocado" {...sort} />
                       <th style={carteiraTh}>Unidades</th>
+                      <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
                       <CarteiraSortHeader label="Falta alocar" sortKey="falta" align="right" {...sort} />
                       <th style={carteiraTh}>Situação</th>
                       {showGestorFilter && <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sort} />}
@@ -259,6 +260,20 @@ export const ItensUnidadesPage: React.FC = () => {
                           </td>
                           <td data-label="Unidades" style={{ ...carteiraTd, fontSize: '0.8rem' }}>
                             {unidadesDoItem.length > 0 ? unidadesDoItem.map(([u, q]) => `${unidades.find((x) => x.chave === u)?.nome ?? u} ${formatNumber(q)}`).join(' · ') : <span style={{ color: '#94a3b8' }}>—</span>}
+                          </td>
+                          <td data-label="Contratado" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                            {r.contratada != null && r.contratada > 0 ? (
+                              <>
+                                {formatNumber(r.contratada)} un
+                                {r.contratadoSemUnidade > 0 && (
+                                  <div style={{ ...subtle, color: 'var(--color-warning-text)' }} title="Contratado que ainda não foi dividido entre as unidades internas">
+                                    {formatNumber(r.contratadoSemUnidade)} sem unidade
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <span style={{ color: '#94a3b8' }}>—</span>
+                            )}
                           </td>
                           <td data-label="Falta alocar" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: falta > 0 ? 'var(--color-warning-text)' : undefined }}>
                             {falta > 0 ? `${formatNumber(falta)} un` : '—'}

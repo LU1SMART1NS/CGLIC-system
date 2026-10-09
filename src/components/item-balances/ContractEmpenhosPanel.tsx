@@ -11,6 +11,14 @@ export interface AllocationOption {
   saldoQty: number;
 }
 
+/** Unidade que recebeu parte deste contrato no item (migration 103). */
+export interface UnidadeDoContrato {
+  id: string;
+  unitName: string;
+  /** Quanto do contrato, neste item, é da unidade. */
+  contratado: number;
+}
+
 interface ContractEmpenhosPanelProps {
   /** Número do item (o mesmo na ata e no contrato), para destacar a sugestão "deste item". */
   numeroItem: number;
@@ -21,6 +29,11 @@ interface ContractEmpenhosPanelProps {
   loading: boolean;
   canLinkEmpenhos: boolean;
   allocationOptions: AllocationOption[];
+  /**
+   * Unidades deste contrato no item. Uma só: a nota herda a unidade, sem escolha. Várias: a escolha fica entre elas,
+   * até o contratado de cada uma neste contrato. Nenhuma (contrato sem divisão): escolhe entre todas as alocadas.
+   */
+  unidadesDoContrato?: UnidadeDoContrato[];
   /** Id da unidade interna a que a nota (pelo número) está ligada. */
   linkedAllocationId: (numeroEmpenho: string) => string;
   onLinkAllocation: (numeroEmpenho: string, allocationId: string) => void;
@@ -52,6 +65,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
   loading,
   canLinkEmpenhos,
   allocationOptions,
+  unidadesDoContrato = [],
   linkedAllocationId,
   onLinkAllocation,
   onVincularAosItens,
@@ -62,6 +76,17 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
   const deOutro = new Set((execucao?.deOutroItem ?? []).map((d) => d.contratoEmpenhoId));
   const empenhado = execucao?.empenhado ?? 0;
   const aEmpenhar = contratado != null ? contratado - empenhado : null;
+
+  // Unidade de cada nota: a ligada à mão ou, sem ela, a herdada do contrato de uma unidade só.
+  const herdadaId = unidadesDoContrato.length === 1 ? unidadesDoContrato[0].id : '';
+  const unidadeEfetiva = (numero: string) => linkedAllocationId(numero) || herdadaId;
+  // Empenhado de cada unidade neste contrato (para o saldo das opções quando o contrato foi dividido).
+  const empenhadoNoContrato = new Map<string, number>();
+  for (const p of parcelas) {
+    const id = unidadeEfetiva(p.numeroOficial);
+    if (id && p.quantidade != null) empenhadoNoContrato.set(id, (empenhadoNoContrato.get(id) ?? 0) + p.quantidade);
+  }
+  const idsDoContrato = new Set(unidadesDoContrato.map((u) => u.id));
 
   const colunasParcelas: Column<ParcelaDoItem>[] = [
     {
@@ -113,6 +138,16 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
       render: (p) => {
         if (allocationOptions.length === 0) return <span style={subtle}>Sem unidades alocadas</span>;
         const current = linkedAllocationId(p.numeroOficial);
+        // Contrato de uma unidade só: a nota herda a unidade, sem escolha (a menos que esteja ligada à mão a outra).
+        if (unidadesDoContrato.length === 1 && p.quantidade != null && (!current || current === herdadaId)) {
+          return (
+            <span data-testid={`unidade-herdada-${p.numeroOficial}`}>
+              <strong>{unidadesDoContrato[0].unitName}</strong>{' '}
+              {!current && <StatusBadge label="do contrato" variant="info" size="sm" dot={false} />}
+              {!current && <div style={subtle}>herdada: o contrato é só da {unidadesDoContrato[0].unitName}</div>}
+            </span>
+          );
+        }
         const semQuantidade = p.quantidade == null;
         const estilo: React.CSSProperties = {
           padding: '0.2rem 0.4rem',
@@ -138,6 +173,37 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
           );
         }
         const quantidade = p.quantidade ?? 0;
+        // Contrato dividido entre várias unidades: só elas, até o contratado de cada uma neste contrato.
+        if (unidadesDoContrato.length > 1) {
+          const fora = current && !idsDoContrato.has(current);
+          return (
+            <>
+              <select
+                value={current}
+                onChange={(e) => onLinkAllocation(p.numeroOficial, e.target.value)}
+                disabled={busy || !canLinkEmpenhos}
+                className="form-input"
+                aria-label={`Unidade interna da nota ${p.numeroOficial}`}
+                title={canLinkEmpenhos ? undefined : 'Só o gestor e o coordenador escolhem a unidade interna da nota.'}
+                style={{ ...estilo, borderColor: fora ? 'var(--danger)' : estilo.borderColor }}
+              >
+                <option value="">Sem unidade</option>
+                {unidadesDoContrato.map((u) => {
+                  // Saldo da unidade neste contrato: o contratado dela menos o já empenhado por ela (sem esta nota).
+                  const saldoNoContrato = u.contratado - (empenhadoNoContrato.get(u.id) ?? 0);
+                  const cabe = saldoNoContrato + (u.id === current ? quantidade : 0) >= quantidade;
+                  return (
+                    <option key={u.id} value={u.id} disabled={!cabe && u.id !== current} title={`Contratado ${formatNumber(u.contratado)} un neste contrato`}>
+                      {u.unitName} (saldo {formatNumber(saldoNoContrato)} un{cabe ? '' : ' · não cabe'})
+                    </option>
+                  );
+                })}
+                {fora && <option value={current}>{allocationOptions.find((a) => a.id === current)?.unitName ?? 'unidade'} (fora do contrato)</option>}
+              </select>
+              {fora && <div style={{ ...subtle, color: 'var(--danger)' }}>a unidade escolhida não está no contrato: confira</div>}
+            </>
+          );
+        }
         return (
           <select
             value={current}

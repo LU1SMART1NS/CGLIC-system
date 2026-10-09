@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
-/** Vínculo item↔contrato com a quantidade do item no contrato (lida da API; nula quando ainda não foi lida). */
+/** Vínculo item↔contrato com a quantidade do item no contrato (ajustada ou da fonte; nula quando nenhuma das duas existe). */
 export interface CarteiraItemLink {
   itemKey: string;
   contractKey: string;
@@ -35,15 +35,15 @@ async function fetchAllRows<T>(table: string, columns: string): Promise<T[]> {
 
 /** Todos os vínculos item↔contrato da carteira (base da quantidade contratada por item e dos contratos de cada unidade). */
 export async function fetchCarteiraItemLinks(): Promise<CarteiraItemLink[]> {
-  const rows = await fetchAllRows<{ item_key: string; contract_key: string; quantidade_contratada_api: number | null }>(
+  // A quantidade usada é a ajustada pelo gestor (migration 103) e, sem ajuste, a lida da fonte.
+  const rows = await fetchAllRows<{ item_key: string; contract_key: string; quantidade_contratada_api: number | null; quantidade_ajustada: number | null }>(
     'arp_item_contract_links',
-    'item_key, contract_key, quantidade_contratada_api'
+    'item_key, contract_key, quantidade_contratada_api, quantidade_ajustada'
   );
-  return rows.map((r) => ({
-    itemKey: r.item_key,
-    contractKey: r.contract_key,
-    quantidadeContratada: r.quantidade_contratada_api == null ? null : Number(r.quantidade_contratada_api)
-  }));
+  return rows.map((r) => {
+    const q = r.quantidade_ajustada ?? r.quantidade_contratada_api;
+    return { itemKey: r.item_key, contractKey: r.contract_key, quantidadeContratada: q == null ? null : Number(q) };
+  });
 }
 
 /**

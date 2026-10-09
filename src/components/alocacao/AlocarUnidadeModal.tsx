@@ -7,6 +7,8 @@ import { useItemEmpenhoLinks } from '../../hooks/useItemEmpenhoLinks';
 import { useEmpenhoDoItem } from '../../hooks/useEmpenhoDoItem';
 import { useSaveAllocations } from '../../hooks/useSaveAllocations';
 import { useSaveEmpenhoLinks } from '../../hooks/useSaveEmpenhoLinks';
+import { useContratadoDoItem } from '../../hooks/useContratadoDoItem';
+import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../../utils/contratadoPorUnidade';
 import { summarizeAllocationExecution } from '../../utils/allocationExecution';
 import { avaliarEdicao, linhasIniciais, listaParaGravar, normUnidade, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
@@ -53,8 +55,8 @@ export const CatalogoVazioAviso: React.FC = () => (
 
 /**
  * Janela "Alocação do item", a mesma na fila Itens às unidades e na aba Alocação interna do Item 360: lista as
- * unidades já alocadas com o empenhado de cada uma, edita a quantidade na linha, remove (só sem empenho vinculado)
- * e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
+ * unidades já alocadas com o contratado e o empenhado de cada uma, edita a quantidade na linha (mínimo = o maior dos
+ * dois), remove (só sem contrato nem empenho vinculado) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
  */
 export const AlocarUnidadeModal: React.FC<AlocarUnidadeModalProps> = ({ item, ...rest }) =>
   item ? <JanelaAlocacao key={`${item.numeroAta}-${item.uasg}-${item.numeroItem}`} item={item} {...rest} /> : null;
@@ -65,18 +67,21 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const { data: estado, isLoading: alocacoesLoading } = useItemAllocations(item.numeroAta, item.uasg, item.numeroItem);
   const { data: linksState, isLoading: linksLoading } = useItemEmpenhoLinks(item.numeroAta, item.uasg, item.numeroItem);
   const { data: empenhoDoItem, isLoading: vinculosLoading } = useEmpenhoDoItem(itemKey);
+  const { data: contratado, isLoading: contratadoLoading } = useContratadoDoItem(itemKey);
   const salvarAlocacoes = useSaveAllocations();
   const salvarLinks = useSaveEmpenhoLinks();
-  const carregando = departmentsLoading || alocacoesLoading || linksLoading || vinculosLoading;
+  const carregando = departmentsLoading || alocacoesLoading || linksLoading || vinculosLoading || contratadoLoading;
   const salvando = salvarAlocacoes.isPending || salvarLinks.isPending;
 
   // Linhas gravadas (derivadas das alocações e dos empenhos); a primeira edição passa a valer no lugar delas.
   const iniciais = React.useMemo(() => {
     if (carregando) return null;
     const gravadas = estado?.allocations ?? [];
-    const exec = summarizeAllocationExecution(gravadas, empenhoDoItem, linksState?.links ?? {});
-    return linhasIniciais(gravadas, exec.porAlocacao).map((l) => (l.id === removerId && l.vinculados === 0 ? { ...l, removida: true } : l));
-  }, [carregando, estado, empenhoDoItem, linksState, removerId]);
+    const exec = summarizeAllocationExecution(gravadas, empenhoDoItem, linksState?.links ?? {}, alocacoesPorContrato(contratado.contratos, gravadas));
+    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades)).map((l) =>
+      l.id === removerId && l.vinculados === 0 && l.contratado === 0 ? { ...l, removida: true } : l
+    );
+  }, [carregando, estado, empenhoDoItem, linksState, removerId, contratado]);
   const [editadas, setEditadas] = React.useState<LinhaAlocacao[] | null>(null);
   const linhas = editadas ?? iniciais;
   const setLinhas = (f: (ls: LinhaAlocacao[]) => LinhaAlocacao[]) => setEditadas((prev) => f(prev ?? iniciais ?? []));
@@ -103,7 +108,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
     // Unidade removida nesta edição e acrescentada de novo: volta a linha original com a nova quantidade.
     const antiga = lista.find((l) => l.removida && normUnidade(l.unitName) === normUnidade(unidadeEscolhida));
     if (antiga) alterar(antiga.id, { removida: false, qtd: n });
-    else setLinhas((ls) => [...ls, { id: Date.now().toString(), unitName: unidadeEscolhida, original: 0, qtd: n, empenhado: 0, vinculados: 0, removida: false, adicionada: true }]);
+    else setLinhas((ls) => [...ls, { id: Date.now().toString(), unitName: unidadeEscolhida, original: 0, qtd: n, empenhado: 0, contratado: 0, vinculados: 0, removida: false, adicionada: true }]);
     setNovaQtd('');
     setErro(null);
   };
@@ -226,6 +231,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                   <thead>
                     <tr>
                       <th style={thStyle}>Unidade interna</th>
+                      <th style={{ ...thStyle, textAlign: 'right' }}>Contratado</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Empenhado</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Alocado</th>
                       <th style={thStyle} aria-label="Ações" />
@@ -243,6 +249,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                             <strong style={{ display: 'block', ...riscado }}>{l.unitName}</strong>
                             {nomeDe(l.unitName) && <small style={{ color: CINZA, fontSize: '0.75rem' }}>{nomeDe(l.unitName)}</small>}
                           </td>
+                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.contratado)}</td>
                           <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.empenhado)}</td>
                           <td style={{ ...td, textAlign: 'right' }}>
                             {l.removida ? (
@@ -262,7 +269,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                   style={{ ...qtdStyle, borderColor: a.abaixoDoMinimo ? 'var(--color-danger-solid)' : '#cbd5e1' }}
                                 />
                                 {a.alterada && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-warning-text)', marginTop: '0.15rem' }}>antes {formatNumber(l.original)}</span>}
-                                {a.abaixoDoMinimo && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>mínimo {formatNumber(a.minimo)}{l.empenhado > 0 ? ' (empenhado)' : ''}</span>}
+                                {a.abaixoDoMinimo && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>mínimo {formatNumber(a.minimo)}{l.contratado > 0 && l.contratado >= l.empenhado ? ' (contratado)' : l.empenhado > 0 ? ' (empenhado)' : ''}</span>}
                               </>
                             )}
                           </td>
@@ -273,7 +280,13 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                               <ActionButton
                                 action="remover"
                                 iconOnly
-                                label={a.podeRemover ? `Remover a alocação de ${l.unitName}` : `${l.unitName} tem ${l.vinculados} ${l.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, desvincule os empenhos na aba Contratos e empenhos.`}
+                                label={
+                                  a.podeRemover
+                                    ? `Remover a alocação de ${l.unitName}`
+                                    : l.contratado > 0
+                                      ? `${l.unitName} tem ${formatNumber(l.contratado)} contratados. Para remover, tire a unidade das divisões dos contratos na aba Contratos e empenhos.`
+                                      : `${l.unitName} tem ${l.vinculados} ${l.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, desvincule os empenhos na aba Contratos e empenhos.`
+                                }
                                 onClick={() => remover(l)}
                                 disabled={salvando || !a.podeRemover}
                                 data-testid={`alocar-unidade-remover-${l.unitName}`}
