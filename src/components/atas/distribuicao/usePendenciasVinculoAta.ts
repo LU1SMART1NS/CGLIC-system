@@ -106,6 +106,8 @@ export function usePendenciasVinculoAta() {
   // Só mostra números com atas, contratos e vínculos carregados: totais parciais enganariam a leitura.
   const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading || semAtaLoading;
   const totalSemVinculo = pendencias.aVincular.length + pendencias.precisamDecisao.length;
+  // Marcados "não pertence a ata" e ainda sem gestor: continuam pendentes na fila da Vinculação.
+  const naoPertencemSemGestor = pendencias.naoPertencem.filter((i) => !i.gestorNome).length;
 
   return {
     atas,
@@ -117,6 +119,7 @@ export function usePendenciasVinculoAta() {
     contratosFila,
     pendencias,
     totalSemVinculo,
+    naoPertencemSemGestor,
     ataDe,
     itensDaAta,
     gestorDoContrato,

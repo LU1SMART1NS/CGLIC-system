@@ -50,7 +50,8 @@ const chaveApi = (c: Pick<ContractDashboardRecord, 'uasg' | 'numero' | 'ano'>) =
 /**
  * ATA_PROVAVEL: mesma compra e mesmo fornecedor de uma ou mais atas (candidato ao vínculo em lote);
  * PARCIAL: só a compra ou só o fornecedor batem; SEM_PISTA: nenhuma ata parecida;
- * NAO_PERTENCE: o coordenador marcou que o contrato não veio de ata (só aparece quando escolhido no filtro).
+ * NAO_PERTENCE: o coordenador marcou que o contrato não veio de ata. Sem gestor, continua na lista principal até
+ * receber um; com gestor, só aparece quando escolhido no filtro.
  */
 type Grupo = 'ATA_PROVAVEL' | 'PARCIAL' | 'SEM_PISTA' | 'NAO_PERTENCE';
 
@@ -182,8 +183,9 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
       ...pendencias.naoPertencem.map((i) => comFortes(i, 'NAO_PERTENCE'))
     ];
   }, [pendencias]);
-  const pendentes = React.useMemo(() => todas.filter((l) => l.grupo !== 'NAO_PERTENCE'), [todas]);
-  // Sem escolha de situação, os pendentes; com escolha, o grupo escolhido (inclusive os marcados).
+  // "Não pertence a ata" sem gestor ainda é pendência (falta escolher o gestor): fica na lista principal.
+  const pendentes = React.useMemo(() => todas.filter((l) => l.grupo !== 'NAO_PERTENCE' || !l.gestorNome), [todas]);
+  // Sem escolha de situação, os pendentes; com escolha, o grupo escolhido (inclusive os marcados com gestor).
   const universo = filters.situacao === TODAS ? pendentes : todas.filter((l) => l.grupo === filters.situacao);
 
   /** Ata que o vínculo usaria: a única provável, a escolhida na linha quando há várias, ou a da pista parcial. */

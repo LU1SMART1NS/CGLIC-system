@@ -16,14 +16,16 @@ import { carregarCarteiraParaOMenu, ESPERA_CARGA_DO_MENU_MS } from './cargaDaCar
  * Distribuição (atas sem gestor e gestor diferente da ata), e entrega os números ao menu.
  */
 const CalculoDaCarteira: React.FC<{ contaDistribuicao: boolean }> = ({ contaDistribuicao }) => {
-  const { atas, contratos, links, pendencias, totalSemVinculo, isBusy } = usePendenciasVinculoAta();
+  const { atas, contratos, links, pendencias, totalSemVinculo, naoPertencemSemGestor, isBusy } = usePendenciasVinculoAta();
+  // Mesmos contratos da lista principal da fila: sem vínculo e "não pertence a ata" ainda sem gestor.
+  const contratosAta = totalSemVinculo + naoPertencemSemGestor;
   const { divergencias } = useDistribuicaoDaCarteira({ atas, contratos, links });
   const atasSemGestor = pendencias.atasSemGestor.length;
   React.useEffect(() => {
-    definirContagemExtra('contratosAta', isBusy ? null : totalSemVinculo);
+    definirContagemExtra('contratosAta', isBusy ? null : contratosAta);
     definirContagemExtra('atasSemGestor', isBusy || !contaDistribuicao ? null : atasSemGestor);
     definirContagemExtra('gestorDiferente', isBusy || !contaDistribuicao ? null : divergencias.length);
-  }, [isBusy, totalSemVinculo, contaDistribuicao, atasSemGestor, divergencias.length]);
+  }, [isBusy, contratosAta, contaDistribuicao, atasSemGestor, divergencias.length]);
   React.useEffect(
     () => () => {
       definirContagemExtra('contratosAta', null);
