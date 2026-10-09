@@ -61,7 +61,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
             }}
           >
             <span>{title}</span>
-            {countBadge && (
+            {countBadge !== undefined && countBadge !== null && countBadge !== false && countBadge !== '' && (
               <span
                 style={{
                   fontSize: typography.fontSize.label,
