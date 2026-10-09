@@ -37,9 +37,8 @@ export interface ItemExecutionSummary {
   saldoAta: number;
   empenhado: number;
   aEmpenhar: number;
-  /** Notas dos contratos do item ainda a vincular aos itens que podem conter este item (e o valor delas). */
+  /** Notas dos contratos do item ainda a vincular aos itens que podem conter este item. */
   notasAVincular: number;
-  valorAVincular: number;
   /** Contratos sem itens na fonte e o valor das notas deles (só referência: não conta no empenhado). */
   contratosSemItens: number;
   valorSemDivisao: number;
@@ -62,7 +61,6 @@ export function summarizeItemExecution(params: {
     empenhado: empenho.empenhado,
     aEmpenhar: contratado - empenho.empenhado,
     notasAVincular: empenho.aVincular.length,
-    valorAVincular: empenho.aVincular.reduce((s, d) => s + d.valorNota, 0),
     contratosSemItens: empenho.contratosSemItens,
     valorSemDivisao: execucoes.reduce((s, e) => s + e.valorSemDivisao, 0)
   };

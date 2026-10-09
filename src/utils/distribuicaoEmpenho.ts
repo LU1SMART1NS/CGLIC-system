@@ -1,5 +1,5 @@
 import type { ItemDoContrato } from '../services/itensContratoService';
-import type { DistribuicaoDoEmpenho, SugestaoDeItem, TipoSugestao } from '../services/distribuicaoEmpenhoService';
+import type { DistribuicaoDoEmpenho, ParcelaDoItem, SugestaoDeItem, TipoSugestao } from '../services/distribuicaoEmpenhoService';
 
 /** Item do contrato pelo número da compra, como a view v_contrato_itens_numerados agrupa. */
 export interface ItemNumerado {
@@ -36,12 +36,36 @@ export function itensNumerados(itens: ItemDoContrato[]): ItemNumerado[] {
     });
 }
 
-/** Empenhado por item: soma das parcelas das notas com distribuição fechada (como v_contrato_itens_execucao). */
-export function empenhadoPorItem(distribuicoes: DistribuicaoDoEmpenho[], ignorar?: string): Map<number, number> {
+/** Quantidade calculada da parcela: valor ÷ preço unitário; nula sem valor ou sem preço (ex.: serviço). */
+export function quantidadeCalculada(p: Pick<ParcelaDoItem, 'valor'>, valorUnitario: number | null | undefined): number | null {
+  return p.valor != null && p.valor > 0 && valorUnitario && valorUnitario > 0 ? p.valor / valorUnitario : null;
+}
+
+/** Quantidade usada da parcela (como v_contrato_itens_execucao): a informada pelo gestor, senão a calculada. */
+export function quantidadeDaParcela(p: Pick<ParcelaDoItem, 'valor' | 'quantidadeInformada'>, valorUnitario: number | null | undefined): number | null {
+  return p.quantidadeInformada ?? quantidadeCalculada(p, valorUnitario);
+}
+
+/** A quantidade foi digitada por alguém (e não é igual à calculada pelo valor). */
+export function quantidadeFoiInformada(p: Pick<ParcelaDoItem, 'valor' | 'quantidadeInformada'>, valorUnitario: number | null | undefined): boolean {
+  if (p.quantidadeInformada == null) return false;
+  const calculada = quantidadeCalculada(p, valorUnitario);
+  return calculada == null || Math.abs(calculada - p.quantidadeInformada) > 1e-6;
+}
+
+/** Quantidade que não é número inteiro (calculada quebrada, ex.: 4,78 un de uma locação). */
+export const quantidadeQuebrada = (q: number | null | undefined) => q != null && Math.abs(q - Math.round(q)) > 1e-6;
+
+/** Empenhado por item, em unidades: soma das quantidades das notas vinculadas (como v_contrato_itens_execucao). */
+export function empenhadoPorItem(distribuicoes: DistribuicaoDoEmpenho[], itens: ItemNumerado[], ignorar?: string): Map<number, number> {
+  const preco = new Map(itens.map((i) => [i.numeroItem, i.valorUnitario]));
   const m = new Map<number, number>();
   for (const d of distribuicoes) {
     if (d.situacao !== 'DISTRIBUIDA' || d.contratoEmpenhoId === ignorar) continue;
-    for (const p of d.parcelas) m.set(p.numeroItem, (m.get(p.numeroItem) ?? 0) + p.valor);
+    for (const p of d.parcelas) {
+      const q = quantidadeDaParcela(p, preco.get(p.numeroItem));
+      if (q != null) m.set(p.numeroItem, (m.get(p.numeroItem) ?? 0) + q);
+    }
   }
   return m;
 }
@@ -79,12 +103,12 @@ export function rotuloDaSituacao(d: Pick<DistribuicaoDoEmpenho, 'situacao' | 'or
   }
 }
 
-/** Por que a distribuição precisa ser revista, em uma frase. */
+/** Por que o vínculo aos itens precisa de atenção, em uma frase. */
 export function motivoDaRevisao(d: DistribuicaoDoEmpenho): string | null {
   if (d.motivoRevisao === 'VALOR_MUDOU') {
     const antes = d.valorNaDistribuicao ?? d.valorDistribuido;
     const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    return `O valor da nota mudou de ${brl(antes)} para ${brl(d.valorNota)} depois do vínculo aos itens. Vincule de novo.`;
+    return `O valor da nota mudou de ${brl(antes)} para ${brl(d.valorNota)} depois do vínculo aos itens. As quantidades continuam contando; confira se ainda estão certas.`;
   }
   if (d.motivoRevisao === 'ITEM_FORA_DO_CONTRATO') return 'O vínculo usa um item que o contrato não tem mais. Vincule de novo.';
   return null;

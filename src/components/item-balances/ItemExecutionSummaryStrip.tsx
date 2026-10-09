@@ -70,7 +70,7 @@ export const ItemExecutionSummaryStrip: React.FC<ItemExecutionSummaryStripProps>
         >
           <strong>{s.notasAVincular}</strong>{' '}
           {s.notasAVincular === 1 ? 'nota dos contratos deste item ainda não foi vinculada' : 'notas dos contratos deste item ainda não foram vinculadas'} aos
-          itens e {s.notasAVincular === 1 ? 'pode conter' : 'podem conter'} este item ({formatCurrency(s.valorAVincular)}). Não entram no empenhado do item até serem
+          itens e {s.notasAVincular === 1 ? 'pode conter' : 'podem conter'} este item. Não entram no empenhado do item até serem
           vinculadas.
         </NoticeBar>
       )}
