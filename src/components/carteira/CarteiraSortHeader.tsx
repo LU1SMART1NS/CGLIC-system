@@ -48,7 +48,7 @@ export const CarteiraSortButton: React.FC<CarteiraSortButtonProps> = ({ label, s
 interface CarteiraSortHeaderProps extends SortState {
   label: string;
   sortKey: string;
-  align?: 'left' | 'right';
+  align?: 'left' | 'right' | 'center';
   /** Explicação da coluna, mostrada ao parar o mouse no cabeçalho. */
   hint?: string;
 }
