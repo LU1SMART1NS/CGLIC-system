@@ -64,6 +64,17 @@ describe('alocacaoEdicao', () => {
     expect(avaliarEdicao(com(iniciais(), 'a1', { qtd: 122400 }), TOTAL).podeSalvar).toBe(true);
   });
 
+  it('unidade desativada fica como está ou diminui, mas não aumenta (migration 108)', () => {
+    const base = com(iniciais(), 'a2', { inativa: true });
+    expect(avaliarEdicao(com(base, 'a2', { qtd: 50000 }), TOTAL).podeSalvar).toBe(true);
+    const acima = avaliarEdicao(com(base, 'a2', { qtd: 60001 }), TOTAL);
+    expect(acima.porLinha.get('a2')!.acimaDoGravado).toBe(true);
+    expect(acima.podeSalvar).toBe(false);
+    expect(acima.erros.join(' ')).toContain('DIOPI está desativada');
+    // Removida não conta como acima.
+    expect(avaliarEdicao(com(base, 'a2', { qtd: 70000, removida: true }), TOTAL).porLinha.get('a2')!.acimaDoGravado).toBe(false);
+  });
+
   it('quantidade em branco ou zero não vale', () => {
     expect(avaliarEdicao(com(iniciais(), 'a2', { qtd: '' }), TOTAL).podeSalvar).toBe(false);
     expect(avaliarEdicao(com(iniciais(), 'a2', { qtd: 0 }), TOTAL).porLinha.get('a2')?.abaixoDoMinimo).toBe(true);

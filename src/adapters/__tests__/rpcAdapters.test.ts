@@ -49,6 +49,19 @@ describe('RPC Persistence Adapters & Error Mapping (Fase 3 & Fase 4.3C.3)', () =
       expect(mapped.sqlState).toBe('22023');
     });
 
+    it('unidade em uso: devolve o texto do banco, sem cair em INVALID_ALLOCATION', () => {
+      const err = { message: 'CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS: A unidade "DGI" está em uso (2 alocação(ões), 0 divisão(ões) do contratado, 0 permissão(ões) de usuário) e não pode ser excluída. Desative-a.', code: '23503' };
+      const mapped = mapPostgresErrorToAppError(err);
+      expect(mapped.code).toBe('CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS');
+      expect(mapped.message).toMatch(/^A unidade "DGI" está em uso/);
+    });
+
+    it('unidade desativada na alocação vira INACTIVE_DEPARTMENT', () => {
+      const mapped = mapPostgresErrorToAppError({ message: 'INACTIVE_DEPARTMENT: A unidade "DGI" está desativada e não pode receber novas alocações.', code: '22023' });
+      expect(mapped.code).toBe('INACTIVE_DEPARTMENT');
+      expect(mapped.message).toBe('A unidade "DGI" está desativada e não pode receber novas alocações.');
+    });
+
     it('deve mapear departamento inválido 23503 para INVALID_DEPARTMENT', () => {
       const err = { message: 'INVALID_DEPARTMENT: Departamento "XYZ" não existe', code: '23503' };
       const mapped = mapPostgresErrorToAppError(err);

@@ -36,7 +36,7 @@ describe('ActionButton e catálogo de ações', () => {
 
   it('hierarquia: destrutivas em vermelho discreto, auxiliares com borda, verde só na sugestão', () => {
     const porVariante = (v: string) => (Object.keys(ACTIONS) as ActionId[]).filter((id) => ACTIONS[id].variant === v);
-    expect(porVariante('ghostDanger').sort()).toEqual(['cancelarCiclo', 'desativar', 'descartar', 'desvincular', 'excluir', 'naoPertence', 'remover']);
+    expect(porVariante('ghostDanger').sort()).toEqual(['cancelarCiclo', 'desativar', 'desativarCadastro', 'descartar', 'desvincular', 'excluir', 'naoPertence', 'remover']);
     expect(porVariante('success')).toEqual(['aplicarSugestao']);
     expect(porVariante('danger')).toEqual([]);
     expect(porVariante('primary').sort()).toEqual(['indicarFornecedor', 'novo', 'salvar', 'vincular']);

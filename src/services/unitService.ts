@@ -46,6 +46,19 @@ export async function fetchDepartments(): Promise<InternalDepartment[]> {
 }
 
 /**
+ * Siglas das unidades em uso (alocação, divisão do contratado ou permissão de usuário por unidade): essas só se
+ * desativam; as outras podem ser excluídas (RPC unidades_internas_em_uso, migration 108).
+ */
+export async function fetchUnidadesEmUso(): Promise<Set<string>> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('CONFIG_ERROR: Supabase não está configurado.');
+  }
+  const { data, error } = await supabase.rpc('unidades_internas_em_uso');
+  if (error) throw error;
+  return new Set(((data || []) as Array<{ sigla: string; em_uso: boolean }>).filter((r) => r.em_uso).map((r) => r.sigla));
+}
+
+/**
  * @deprecated [LEGACY COMPATIBILITY] Utilize `useSaveDepartment` via React Query / `saveDepartmentRpc`
  */
 export async function addDepartment(sigla: string, nomeCompleto: string): Promise<InternalDepartment> {

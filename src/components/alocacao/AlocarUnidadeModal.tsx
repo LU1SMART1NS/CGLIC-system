@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ActionButton, AlertCard, AppButton, Modal } from '../../design-system';
+import { ActionButton, AlertCard, AppButton, Modal, StatusBadge } from '../../design-system';
 import { useDepartments } from '../../hooks/useDepartments';
 import { useItemAllocations } from '../../hooks/useItemAllocations';
 import { useItemEmpenhoLinks } from '../../hooks/useItemEmpenhoLinks';
@@ -78,10 +78,12 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
     if (carregando) return null;
     const gravadas = estado?.allocations ?? [];
     const exec = summarizeAllocationExecution(gravadas, empenhoDoItem, linksState?.links ?? {}, alocacoesPorContrato(contratado.contratos, gravadas));
-    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades)).map((l) =>
-      l.id === removerId && l.vinculados === 0 && l.contratado === 0 ? { ...l, removida: true } : l
-    );
-  }, [carregando, estado, empenhoDoItem, linksState, removerId, contratado]);
+    const inativas = new Set(departments.filter((d) => !d.ativo).map((d) => normUnidade(d.sigla)));
+    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades)).map((l) => {
+      const linha = inativas.has(normUnidade(l.unitName)) ? { ...l, inativa: true } : l;
+      return linha.id === removerId && linha.vinculados === 0 && linha.contratado === 0 ? { ...linha, removida: true } : linha;
+    });
+  }, [carregando, estado, empenhoDoItem, linksState, removerId, contratado, departments]);
   const [editadas, setEditadas] = React.useState<LinhaAlocacao[] | null>(null);
   const linhas = editadas ?? iniciais;
   const setLinhas = (f: (ls: LinhaAlocacao[]) => LinhaAlocacao[]) => setEditadas((prev) => f(prev ?? iniciais ?? []));
@@ -92,7 +94,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const lista = linhas ?? [];
   const aval = avaliarEdicao(lista, item.quantitativoSenasp);
   const ocupadas = new Set(lista.filter((l) => !l.removida).map((l) => normUnidade(l.unitName)));
-  const livres = departments.filter((d) => !ocupadas.has(normUnidade(d.sigla)));
+  // Unidade desativada não recebe alocação nova (migration 108).
+  const livres = departments.filter((d) => d.ativo && !ocupadas.has(normUnidade(d.sigla)));
   const unidadeEscolhida = livres.some((d) => d.sigla === novaUnidade) ? novaUnidade : (livres[0]?.sigla ?? '');
   const catalogoVazio = !departmentsLoading && departments.length === 0;
   const nomeDe = (sigla: string) => departments.find((d) => normUnidade(d.sigla) === normUnidade(sigla))?.nomeCompleto;
@@ -246,7 +249,14 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                       return (
                         <tr key={l.id} data-testid={`alocar-unidade-linha-${l.unitName}`}>
                           <td style={td}>
-                            <strong style={{ display: 'block', ...riscado }}>{l.unitName}</strong>
+                            <strong style={{ display: 'block', ...riscado }}>
+                              {l.unitName}
+                              {l.inativa && (
+                                <span style={{ marginLeft: '0.4rem', verticalAlign: '1px' }}>
+                                  <StatusBadge label="Inativa" variant="neutral" size="sm" dot={false} />
+                                </span>
+                              )}
+                            </strong>
                             {nomeDe(l.unitName) && <small style={{ color: CINZA, fontSize: '0.75rem' }}>{nomeDe(l.unitName)}</small>}
                           </td>
                           <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.contratado)}</td>
@@ -259,16 +269,18 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                 <input
                                   type="number"
                                   min={a.minimo}
+                                  max={l.inativa ? l.original : undefined}
                                   value={l.qtd}
                                   autoFocus={l.id === focoId}
                                   onChange={(e) => alterar(l.id, { qtd: e.target.value === '' ? '' : Number(e.target.value) })}
                                   disabled={salvando}
                                   aria-label={`Quantidade alocada para ${l.unitName}`}
-                                  aria-invalid={a.abaixoDoMinimo || undefined}
+                                  aria-invalid={a.abaixoDoMinimo || a.acimaDoGravado || undefined}
                                   data-testid={`alocar-unidade-qtd-${l.unitName}`}
-                                  style={{ ...qtdStyle, borderColor: a.abaixoDoMinimo ? 'var(--color-danger-solid)' : '#cbd5e1' }}
+                                  style={{ ...qtdStyle, borderColor: a.abaixoDoMinimo || a.acimaDoGravado ? 'var(--color-danger-solid)' : '#cbd5e1' }}
                                 />
                                 {a.alterada && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-warning-text)', marginTop: '0.15rem' }}>antes {formatNumber(l.original)}</span>}
+                                {a.acimaDoGravado && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>máximo {formatNumber(l.original)} (desativada)</span>}
                                 {a.abaixoDoMinimo && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>mínimo {formatNumber(a.minimo)}{l.contratado > 0 && l.contratado >= l.empenhado ? ' (contratado)' : l.empenhado > 0 ? ' (empenhado)' : ''}</span>}
                               </>
                             )}
