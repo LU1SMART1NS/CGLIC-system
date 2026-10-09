@@ -228,10 +228,12 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     </td>
                     <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '0.5rem', rowGap: '0.15rem' }}>
                       <CarteiraIdLink onClick={abrirAta} label={`Ver detalhes da ata ${numeroAta}`} title={`Ver detalhes · UASG ${arp.codigoUnidadeGerenciadora}`} testId={`ata-360-link-${numeroAta}`}>
                         {numeroAta}
                       </CarteiraIdLink>
                       <SeloPapelSenasp arp={arp} testId={`ata-papel-${numeroAta}-${arp.codigoUnidadeGerenciadora}`} />
+                      </div>
                       {card.fornecedorNome && (
                         <CarteiraCellFilter
                           descricao={`fornecedor ${card.fornecedorNome}`}
