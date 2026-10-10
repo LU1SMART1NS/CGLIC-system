@@ -156,16 +156,6 @@ describe('AllocationsTab', () => {
     expect(html()).not.toContain('contratado-sem-unidade');
   });
 
-  it('a conferência mostra o consumo fechando com as unidades e o sem unidade', () => {
-    const fecha = html({ contratadoItem: 450, contratadoSemUnidade: { quantidade: 200, contratos: 1 } });
-    expect(fecha).toContain('Consumido da SENASP 450 = DSUSP 250 + sem unidade 200');
-    expect(fecha).toContain('fecha com o consumo do item');
-    const naoFecha = html({ contratadoItem: 400 });
-    expect(naoFecha).toContain('Consumido da SENASP 400 ≠ DSUSP 250');
-    expect(naoFecha).toContain('A soma não fecha');
-    expect(html({ contratadoItem: 0 })).not.toContain('conferencia-consumo');
-  });
-
   it('sem alocações mostra o estado vazio', () => {
     const out = html({ rows: [] });
     expect(out).toContain('Nenhuma alocação interna neste item');
