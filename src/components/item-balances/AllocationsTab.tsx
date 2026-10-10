@@ -264,47 +264,11 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
         ) : (
           <DataTable columns={columns} data={rows} keyExtractor={(r) => r.id} testId="allocations-table" />
         )}
-        {contratadoItem > 0 && <ConferenciaDoConsumo contratadoItem={contratadoItem} rows={rows} semUnidade={contratadoSemUnidade.quantidade} />}
       </div>
 
       {canManage && (
         <AlocarUnidadeModal item={janela ? item : null} focoId={janela?.focoId} removerId={janela?.removerId} onFechar={() => setJanela(null)} />
       )}
-    </div>
-  );
-};
-
-/**
- * Conferência do consumo: o contratado do item (consumo da SENASP) é a soma do contratado das unidades mais o que ainda
- * não tem unidade. Diferença = divisão a conferir (soma acima do contrato ou unidade sem alocação).
- */
-const ConferenciaDoConsumo: React.FC<{ contratadoItem: number; rows: AllocationRow[]; semUnidade: number }> = ({ contratadoItem, rows, semUnidade }) => {
-  const partes = rows.filter((r) => r.contratado > 0);
-  const soma = partes.reduce((s, r) => s + r.contratado, 0) + semUnidade;
-  const fecha = Math.abs(soma - contratadoItem) < 0.0001;
-  return (
-    <div
-      data-testid="conferencia-consumo"
-      style={{
-        marginTop: '0.75rem',
-        padding: '0.6rem 0.8rem',
-        borderRadius: '6px',
-        border: '1px solid #e2e8f0',
-        borderLeft: `4px solid ${fecha ? 'var(--color-success-solid)' : 'var(--color-warning)'}`,
-        background: '#f8fafc',
-        fontSize: '0.84rem'
-      }}
-    >
-      <strong>Conferência do consumo</strong>
-      <div style={{ fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', marginTop: '0.2rem' }}>
-        Consumido da SENASP {formatNumber(contratadoItem)} {fecha ? '=' : '≠'}{' '}
-        {[...partes.map((r) => `${r.unitName} ${formatNumber(r.contratado)}`), ...(semUnidade > 0 ? [`sem unidade ${formatNumber(semUnidade)}`] : [])].join(' + ') || '0'}
-      </div>
-      <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.2rem' }}>
-        {fecha
-          ? 'A soma das unidades fecha com o consumo do item. "Sem unidade" é a parte do contratado que ainda espera o gestor.'
-          : 'A soma não fecha: há divisão de contrato a conferir na aba Contratos e empenhos.'}
-      </div>
     </div>
   );
 };
