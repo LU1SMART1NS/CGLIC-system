@@ -305,6 +305,14 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           Instrumentos que exigem sua atenção e as próximas ações recomendadas.
         </p>
 
+        {!saldosOnly && (
+          <GestaoInstrumentosCategoryTabs
+            counts={tabCounts}
+            active={activeTab}
+            onSelect={handleSelectTab}
+          />
+        )}
+
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -322,13 +330,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
             />
           </div>
 
-          {!saldosOnly && (
-            <GestaoInstrumentosCategoryTabs
-              counts={tabCounts}
-              active={activeTab}
-              onSelect={handleSelectTab}
-            />
-          )}
         </div>
       </div>
 

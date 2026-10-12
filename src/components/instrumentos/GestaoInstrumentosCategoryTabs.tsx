@@ -1,5 +1,5 @@
 import React from 'react';
-import { useScrollActiveTab } from '../../design-system/hooks/useScrollActiveTab';
+import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 
 export type GestaoInstrumentosCategoryTab =
   | 'TODAS'
@@ -29,53 +29,17 @@ interface GestaoInstrumentosCategoryTabsProps {
   onSelect: (tab: GestaoInstrumentosCategoryTab) => void;
 }
 
+/** Categorias da Visão Geral no mesmo trilho das carteiras. */
 export const GestaoInstrumentosCategoryTabs: React.FC<GestaoInstrumentosCategoryTabsProps> = ({
   counts,
   active,
   onSelect
-}) => {
-  const listRef = React.useRef<HTMLDivElement>(null);
-  useScrollActiveTab(listRef, active);
-  return (
-    <div
-      ref={listRef}
-      role="tablist"
-      aria-label="Filtrar por categoria de atenção"
-      className="ds-tabs-scroll"
-      style={{
-        display: 'flex',
-        gap: '0.25rem',
-        borderBottom: '1px solid #e2e8f0',
-        ['--scroll-bg' as string]: '#f8fafc'
-      }}
-    >
-      {TABS.map((tab) => {
-        const isActive = active === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onSelect(tab.id)}
-            data-testid={`instrumentos-tab-${tab.id.toLowerCase()}`}
-            style={{
-              padding: '0.5rem 0.9rem',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: `2px solid ${isActive ? 'var(--primary)' : 'transparent'}`,
-              marginBottom: '-1px',
-              color: isActive ? 'var(--primary)' : '#475569',
-              fontSize: '0.82rem',
-              fontWeight: isActive ? 800 : 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {tab.label} ({counts[tab.id] ?? 0})
-          </button>
-        );
-      })}
-    </div>
-  );
-};
+}) => (
+  <CarteiraSegmentTabs
+    segments={TABS.map((tab) => ({ ...tab, count: counts[tab.id] ?? 0 }))}
+    active={active}
+    onSelect={onSelect}
+    testIdPrefix="instrumentos-tab"
+    ariaLabel="Filtrar por categoria de atenção"
+  />
+);

@@ -1556,3 +1556,6 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .segment-pill[aria-pressed='true'] { background: #e8eef8; border-color: var(--primary); color: var(--primary); }
 .segment-pill[aria-pressed='true']:hover { background: #e8eef8; color: var(--primary); }
 .segment-pill[aria-pressed='true'] .segment-pill__count { color: var(--primary); }
+/* Trilho logo abaixo do título da página: encosta no título (a margem do título + o gap da página davam 2rem). */
+.ds-page-header:has(+ .segment-pills) { margin-bottom: 0 !important; }
+.ds-page-header + .segment-pills { margin-top: -0.5rem; }

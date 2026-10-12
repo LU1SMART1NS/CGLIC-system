@@ -268,7 +268,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).toContain('15/2026');
 
     // Tabs somam os itens das duas unidades (1 da 200330 + 5 da 200331 = 6)
-    expect(html).toContain('Todas (6)');
+    expect(html).toContain('Todas<span class="segment-pill__count">6</span>');
   });
 
   it('2. deve renderizar os 4 cards de resumo com dados reais (ARP, Contratos, Valor Global, Alertas) e ser clicáveis', () => {
@@ -311,11 +311,12 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
       />
     );
 
-    expect(html).toContain('Todas (5)');
-    expect(html).toContain('Saldos (1)');
-    expect(html).toContain('Reajustes (1)');
-    expect(html).toContain('Pagamentos (1)');
-    expect(html).toContain('Tarefas (1)');
+    expect(html).toContain('Todas<span class="segment-pill__count">5</span>');
+    expect(html).toContain('Saldos<span class="segment-pill__count">1</span>');
+    expect(html).toContain('Reajustes<span class="segment-pill__count">1</span>');
+    expect(html).toContain('Pagamentos<span class="segment-pill__count">1</span>');
+    expect(html).toContain('Tarefas<span class="segment-pill__count">1</span>');
+    expect(html).toMatch(/aria-pressed="true"[^>]*data-testid="instrumentos-tab-SALDOS"/);
   });
 
   it('4. deve renderizar a tabela com prioridade, instrumento, motivo, prazo, responsável e ação contextual', () => {
