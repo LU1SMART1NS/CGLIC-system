@@ -3,8 +3,8 @@ import { CarteiraFilterButton } from './CarteiraFilterButton';
 import { FILTRO_PAPEL_LABEL, type FiltroPapelSenasp } from '../../utils/ataIdentidade';
 
 /**
- * Filtro "Papel da SENASP" das abas Atas e Itens (mesmo parâmetro ?papel= na URL): gerenciada pela CGLIC ou de
- * outro órgão em que a SENASP é participante ou fez adesão (migration 106).
+ * Filtro "Papel" das abas Atas e Itens (mesmo parâmetro ?papel= na URL): a SENASP é gerenciadora (atas da CGLIC),
+ * participante ou fez adesão em ata de outro órgão (migration 106).
  */
 export const CarteiraPapelSelect: React.FC<{
   value: FiltroPapelSenasp;
@@ -13,7 +13,7 @@ export const CarteiraPapelSelect: React.FC<{
   testId: string;
 }> = ({ value, onChange, counts, testId }) => (
   <CarteiraFilterButton
-    label="Papel da SENASP"
+    label="Papel"
     value={value}
     emptyValue="TODOS"
     options={(Object.keys(FILTRO_PAPEL_LABEL) as Array<Exclude<FiltroPapelSenasp, 'TODOS'>>).map((p) => ({
