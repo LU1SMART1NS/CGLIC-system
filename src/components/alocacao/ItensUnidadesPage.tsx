@@ -145,7 +145,6 @@ export const ItensUnidadesPage: React.FC = () => {
   const abrirItem = (r: CarteiraItemRow) => navigate(`${buildAtaItemPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)}?aba=alocacao`);
   const alocar = (r: CarteiraItemRow) =>
     setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp });
-  const faltaTotal = base.filter((r) => filters.vigencia !== 'VIGENTES' || r.faixa !== 'EXPIRADO').reduce((s, r) => s + Math.max(0, r.quantitativoSenasp - r.alocado), 0);
 
   if (syncError && arps.length === 0) {
     return (
@@ -186,7 +185,6 @@ export const ItensUnidadesPage: React.FC = () => {
               { id: 'SEM', label: 'Sem alocação', count: nivelCounts.SEM, dot: VERMELHO, title: 'Nenhuma unidade recebeu o item' },
               { id: 'TODOS', label: 'Todos', count: nivelCounts.SEM + nivelCounts.PARCIAL + nivelCounts.TOTAL }
             ]}
-            meta={faltaTotal > 0 ? `${formatNumber(faltaTotal)} un ainda sem unidade` : undefined}
           />
 
           <CarteiraFilterBar
