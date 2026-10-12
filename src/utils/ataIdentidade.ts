@@ -62,22 +62,19 @@ export function rotuloChaveGestao(chave: string | null | undefined): string {
   return m ? `${m[1]} (UASG ${m[2]})` : String(chave ?? '').trim();
 }
 
-/** Filtro "Papel da SENASP" da Carteira de Atas. */
-export type FiltroPapelSenasp = 'TODOS' | 'GERENCIADORA' | 'OUTROS' | 'PARTICIPANTE' | 'ADESAO';
-export const FILTRO_PAPEL_VALUES: readonly FiltroPapelSenasp[] = ['TODOS', 'GERENCIADORA', 'OUTROS', 'PARTICIPANTE', 'ADESAO'];
-export const FILTRO_PAPEL_LABEL: Record<Exclude<FiltroPapelSenasp, 'TODOS'>, string> = {
-  GERENCIADORA: 'Gerenciada pela CGLIC',
-  OUTROS: 'Outros órgãos (participante e adesão)',
-  PARTICIPANTE: 'SENASP participante',
-  ADESAO: 'Adesão da SENASP'
+/** Filtro "Papel" das carteiras de Atas e Itens: o papel da SENASP na ata. */
+export type FiltroPapelSenasp = 'TODOS' | PapelSenasp;
+export const FILTRO_PAPEL_VALUES: readonly FiltroPapelSenasp[] = ['TODOS', 'GERENCIADORA', 'PARTICIPANTE', 'ADESAO'];
+export const FILTRO_PAPEL_LABEL: Record<PapelSenasp, string> = {
+  GERENCIADORA: 'Gerenciadora',
+  PARTICIPANTE: 'Participante',
+  ADESAO: 'Adesão'
 };
 
 /** A ata passa no filtro de papel? */
 export function passaFiltroPapel(arp: Pick<ArpRecord, 'codigoUnidadeGerenciadora' | 'papelSenasp'>, filtro: FiltroPapelSenasp): boolean {
   if (filtro === 'TODOS') return true;
-  const papel = papelSenaspDaAta(arp);
-  if (filtro === 'OUTROS') return papel !== 'GERENCIADORA';
-  return papel === filtro;
+  return papelSenaspDaAta(arp) === filtro;
 }
 
 /** Quantas atas (ou itens, pela ata de cada um) cairiam em cada opção do filtro de papel. */
@@ -86,7 +83,7 @@ export function contarPorPapel(
 ): Partial<Record<Exclude<FiltroPapelSenasp, 'TODOS'>, number>> {
   const counts: Partial<Record<Exclude<FiltroPapelSenasp, 'TODOS'>, number>> = {};
   for (const arp of arps) {
-    for (const p of ['GERENCIADORA', 'OUTROS', 'PARTICIPANTE', 'ADESAO'] as const) {
+    for (const p of ['GERENCIADORA', 'PARTICIPANTE', 'ADESAO'] as const) {
       if (passaFiltroPapel(arp, p)) counts[p] = (counts[p] ?? 0) + 1;
     }
   }
