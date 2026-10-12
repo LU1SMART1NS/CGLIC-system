@@ -2,8 +2,8 @@ import React from 'react';
 import { ActionButton, NoticeBar } from '../../../design-system';
 import type { PaymentFollowUpCycle } from '../../../types/paymentFollowUp';
 import type { FaturasDoCicloState } from './cicloPagamentoShared';
+import { formatCurrency } from '../../../utils/format';
 
-const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /** Lista de faturas do contrato para marcar no ciclo, com "Buscar faturas agora" e a conferência do valor. */
 export const FaturasDoCiclo: React.FC<{ cycle: PaymentFollowUpCycle; estado: FaturasDoCicloState; semFaturaTexto: string; testIdPrefix: string }> = ({
@@ -39,7 +39,7 @@ export const FaturasDoCiclo: React.FC<{ cycle: PaymentFollowUpCycle; estado: Fat
                 <input id={`fatura-${f.idFatura}`} type="checkbox" checked={selecionadas.includes(f.idFatura)} disabled={emOutro} onChange={() => alternar(f.idFatura)} style={{ marginTop: '0.2rem' }} />
                 <span style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                   <strong>
-                    {f.numero ? `NF ${f.numero}` : `Fatura ${f.idFatura}`} · {moeda(f.valorLiquido)}
+                    {f.numero ? `NF ${f.numero}` : `Fatura ${f.idFatura}`} · {formatCurrency(f.valorLiquido)}
                   </strong>
                   <span style={{ color: '#64748b' }}>
                     {[
@@ -60,8 +60,8 @@ export const FaturasDoCiclo: React.FC<{ cycle: PaymentFollowUpCycle; estado: Fat
       )}
       {selecionadas.length > 0 && (
         <NoticeBar tone={divergente ? 'warning' : 'success'} testId={`${testIdPrefix}-conferencia-valor`}>
-          Ciclo {moeda(cycle.input.valorAtesto)} {divergente ? '≠' : '='} faturas {moeda(soma)}
-          {divergente ? `: diferença de ${moeda(Math.abs(soma - cycle.input.valorAtesto))}.` : '.'}
+          Ciclo {formatCurrency(cycle.input.valorAtesto)} {divergente ? '≠' : '='} faturas {formatCurrency(soma)}
+          {divergente ? `: diferença de ${formatCurrency(Math.abs(soma - cycle.input.valorAtesto))}.` : '.'}
         </NoticeBar>
       )}
     </>

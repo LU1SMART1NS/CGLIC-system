@@ -40,6 +40,7 @@ import {
   type AcaoAberta
 } from './payment/PaymentCyclePanel';
 import { useLinhasAbertas } from './useLinhasAbertas';
+import { formatCurrency } from '../../utils/format';
 
 interface ContractPagamentosSectionProps {
   contract: ContractDashboardRecord;
@@ -50,7 +51,6 @@ interface ContractPagamentosSectionProps {
   onAbrirEmpenho?: (numero: string) => void;
 }
 
-const moeda = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 const dataHora = (v?: string | null) => {
   if (!v) return '—';
   const d = new Date(v);
@@ -203,7 +203,7 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
         </div>
       )
     },
-    { key: 'valor', header: 'Valor', align: 'right', sortValue: (c) => c.input.valorAtesto, sortFirstDir: 'desc', render: (c) => moeda(c.input.valorAtesto) },
+    { key: 'valor', header: 'Valor', align: 'right', sortValue: (c) => c.input.valorAtesto, sortFirstDir: 'desc', render: (c) => formatCurrency(c.input.valorAtesto) },
     { key: 'chegada', header: 'Chegou em', sortValue: (c) => c.input.dataRecebimento, sortFirstDir: 'desc', render: (c) => isoToBR(c.input.dataRecebimento) },
     { key: 'etapa', header: 'Etapa', render: (c) => <CycleStatusBadge cycle={c} /> },
     { key: 'prazo', header: 'Prazo', sortValue: (c) => c.etapaAtual?.dataAlvo, render: (c) => <PrazoDaEtapa cycle={c} /> },
@@ -232,7 +232,7 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
         </div>
       )
     },
-    { key: 'valor', header: 'Valor', align: 'right', sortValue: (f) => f.valor, sortFirstDir: 'desc', render: (f) => moeda(f.valor) },
+    { key: 'valor', header: 'Valor', align: 'right', sortValue: (f) => f.valor, sortFirstDir: 'desc', render: (f) => formatCurrency(f.valor) },
     {
       key: 'etapa',
       header: 'Situação',
@@ -336,9 +336,9 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
         loading={carregandoFaturas}
         loadingLabel="Carregando faturas..."
         items={[
-          { label: 'Faturado', value: moeda(resumo?.valorFaturado ?? 0), unit: '' },
-          { label: 'Liquidado', value: moeda(resumo?.valorLiquidado ?? 0), unit: '' },
-          { label: 'Pago', value: moeda(resumo?.valorPago ?? 0), unit: '', tone: 'success' },
+          { label: 'Faturado', value: formatCurrency(resumo?.valorFaturado ?? 0), unit: '' },
+          { label: 'Liquidado', value: formatCurrency(resumo?.valorLiquidado ?? 0), unit: '' },
+          { label: 'Pago', value: formatCurrency(resumo?.valorPago ?? 0), unit: '', tone: 'success' },
           {
             label: 'Liquidadas aguardando OB',
             value: String(resumo?.liquidadasSemPagamento ?? 0),

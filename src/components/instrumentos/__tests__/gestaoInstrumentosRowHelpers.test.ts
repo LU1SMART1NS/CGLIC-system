@@ -93,7 +93,7 @@ describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo c
       numeroAta: '00011/2026'
     };
 
-    expect(getAcaoInfo(item)).toEqual({ label: 'Verificar Saldo', targetUrl: '/atas/detalhe/00011%2F2026-200331?aba=acoes' });
+    expect(getAcaoInfo(item)).toEqual({ label: 'Verificar saldo', targetUrl: '/atas/detalhe/00011%2F2026-200331?aba=acoes' });
   });
 
   it('ata de outro órgão: o link usa a UASG da ata (chave do alerta), não a carteira do painel', () => {
@@ -111,7 +111,7 @@ describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo c
 
   it('sem chave nem UASG, vai para a lista de atas', () => {
     const item: DashboardAttentionItem = { id: 'x', category: 'ATA_CRITICA', severity: 'URGENTE', title: 't', numeroAta: '00011/2026' };
-    expect(getAcaoInfo(item)).toEqual({ label: 'Verificar Saldo', targetUrl: '/atas' });
+    expect(getAcaoInfo(item)).toEqual({ label: 'Verificar saldo', targetUrl: '/atas' });
   });
 
   it('direciona para /contratos/:key com o item destacado quando o instrumento é um radar de reajuste de contrato', () => {
@@ -125,7 +125,7 @@ describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo c
     };
 
     expect(getAcaoInfo(item)).toEqual({
-      label: 'Analisar Reajuste',
+      label: 'Analisar reajuste',
       targetUrl: '/contratos/200331-00098-2026?item=ATT-REAJUSTE-CTR-1'
     });
   });
@@ -140,7 +140,7 @@ describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo c
     };
 
     expect(getAcaoInfo(item)).toEqual({
-      label: 'Abrir Tarefa',
+      label: 'Abrir tarefa',
       targetUrl: '/contratos/200331-00098-2026?item=ATT-TASK-OVERDUE-CONTRATO%3A%3AX%3A%3ATAREFA'
     });
   });

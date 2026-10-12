@@ -217,11 +217,11 @@ describe('FASE 5.3 — ContractEventsTimeline Unit Tests', () => {
 
   it('9. Mapeamento de tipos de eventos preserva semântica canônica (Celebração, Prorrogação, Rescisão, Encerramento)', () => {
     expect(getEventTypeDisplay('CELEBRACAO').label).toBe('Celebração inicial');
-    expect(getEventTypeDisplay('PRORROGACAO').label).toBe('Prorrogação de Vigência');
+    expect(getEventTypeDisplay('PRORROGACAO').label).toBe('Prorrogação de vigência');
     expect(getEventTypeDisplay('REAJUSTE').label).toBe('Reajuste contratual');
     expect(getEventTypeDisplay('REPACTUACAO').label).toBe('Repactuação salarial');
-    expect(getEventTypeDisplay('ACRESCIMO').label).toBe('Acréscimo de Valor/Qtd');
-    expect(getEventTypeDisplay('SUPRESSAO').label).toBe('Supressão de Valor/Qtd');
+    expect(getEventTypeDisplay('ACRESCIMO').label).toBe('Acréscimo de valor/qtd');
+    expect(getEventTypeDisplay('SUPRESSAO').label).toBe('Supressão de valor/qtd');
     expect(getEventTypeDisplay('APOSTILAMENTO').label).toBe('Apostilamento');
     expect(getEventTypeDisplay('ENCERRAMENTO').label).toBe('Encerramento contratual');
     expect(getEventTypeDisplay('RESCISAO').label).toBe('Rescisão contratual');

@@ -4,11 +4,11 @@ import { useBuscaEmpenhoPorNumero } from '../../hooks/useVinculoEmpenhosContrato
 import { numeroDeEmpenhoValido, numeroOficialDoEmpenho, type EmpenhoEncontrado, type NovaNotaEmpenho } from '../../services/contratoEmpenhoVinculoService';
 import { credorDiferenteDoFornecedor } from '../../utils/fornecedorMatch';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
+import { formatCurrencyOrDash } from '../../utils/format';
 
 const MOTIVO_MIN = 5;
 const MOTIVO_MAX = 500;
 
-const formatCurrency = (val?: number | null) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 const formatDate = (val?: string | null) => {
   if (!val) return '—';
   const [a, m, d] = val.split('T')[0].split('-');
@@ -224,7 +224,7 @@ export const VincularEmpenhoModal: React.FC<VincularEmpenhoModalProps> = ({
                   <span style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                     <span>
                       <strong>{e.numeroOficial}</strong> · UG emitente {e.uasgEmitente} · emitida em {formatDate(e.dataEmissao)} ·{' '}
-                      {formatCurrency(e.valorEmpenhado)}
+                      {formatCurrencyOrDash(e.valorEmpenhado)}
                     </span>
                     <span style={{ color: 'var(--text-secondary)' }}>{e.credorNome || 'Credor não informado'}</span>
                     <span style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>

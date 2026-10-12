@@ -1,6 +1,7 @@
 import React from 'react';
 import { Package, FileText, Coins, AlertTriangle } from 'lucide-react';
 import { SALDO_RULES, VIGENCIA_RULES } from '../../config/alertRules';
+import { formatCurrency } from '../../utils/format';
 
 export interface GestaoInstrumentosCounts {
   // Card 1 — ARP
@@ -32,10 +33,6 @@ interface GestaoInstrumentosSummaryCardsProps {
   saldosOnly?: boolean;
 }
 
-function formatCurrency(val: number): string {
-  if (typeof val !== 'number' || isNaN(val)) return 'R$ 0,00';
-  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 function formatPercent(part: number, total: number): string {
   if (!total) return '0,0%';

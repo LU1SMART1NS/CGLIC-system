@@ -23,7 +23,7 @@ interface ContractTasksSectionProps {
 }
 
 const CONTRACT_LABELS: TaskPlanLabels = {
-  semPlanoTitulo: 'Nenhum Modelo de Gestão aplicado a este contrato',
+  semPlanoTitulo: 'Nenhum modelo de gestão aplicado a este contrato',
   semPlanoDescricao:
     'Selecione um roteiro operacional pré-configurado (Lei nº 14.133/2021) para acompanhar as etapas de execução, prorrogação e encerramento.',
   gestorLabel: 'gestor do contrato',

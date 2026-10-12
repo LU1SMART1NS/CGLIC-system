@@ -14,7 +14,7 @@ vi.mock('../../../hooks/useContractEvents', () => ({
   })
 }));
 
-describe('ContractEventsTimeline — Integração da Evolução do Valor Contratual (Fase 7.5-C2)', () => {
+describe('ContractEventsTimeline — Integração da Evolução do valor contratual (Fase 7.5-C2)', () => {
   const baseContract: ContractDashboardRecord = {
     id: 'CONTRATO::200331::00010::2026',
     numero: '10/2026',
@@ -53,7 +53,7 @@ describe('ContractEventsTimeline — Integração da Evolução do Valor Contrat
       <ContractEventsTimeline contract={baseContract} eventsOverride={[]} />
     );
 
-    expect(html).not.toContain('Evolução do Valor Contratual');
+    expect(html).not.toContain('Evolução do valor contratual');
     expect(html).toContain('Ainda não há eventos contratuais registrados');
   });
 
@@ -72,7 +72,7 @@ describe('ContractEventsTimeline — Integração da Evolução do Valor Contrat
       <ContractEventsTimeline contract={baseContract} eventsOverride={[reajuste]} />
     );
 
-    expect(html).toContain('Evolução do Valor Contratual');
+    expect(html).toContain('Evolução do valor contratual');
     expect(html).toContain('1 alteração(ões) com impacto monetário');
     expect(html).toContain(formatCurrencyBRL(100000.0)); // Original
     expect(html).toContain(`+ ${formatCurrencyBRL(5500.0)}`); // Variação

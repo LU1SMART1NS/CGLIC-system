@@ -6,8 +6,8 @@ import { listarLimitesArt75II, type LimiteArt75II } from '../../config/limitesLe
 import { salvarLimiteArt75II } from '../../services/alertSettingsService';
 import { formatCurrencyInputBR, parseCurrencyInputBR } from '../contracts/payment/paymentFormUtils';
 import { AdminListShell } from './shared/AdminListShell';
+import { formatCurrency } from '../../utils/format';
 
-const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /**
  * Limite do art. 75, II da Lei 14.133 por ano: até ele, os prazos de liquidação e pagamento caem pela metade
@@ -85,7 +85,7 @@ export const LimitesArt75Card: React.FC = () => {
           keyExtractor={(l) => String(l.ano)}
           columns={[
             { key: 'ano', header: 'Ano', priority: 'primary', render: (l) => <span style={{ fontWeight: 700 }}>{l.ano}</span> },
-            { key: 'valor', header: 'Limite', align: 'right', render: (l) => moeda(l.valor) },
+            { key: 'valor', header: 'Limite', align: 'right', render: (l) => formatCurrency(l.valor) },
             { key: 'decreto', header: 'Fonte', render: (l) => <span style={{ color: '#64748b' }}>{l.decreto}</span> }
           ]}
           rowActions={(l) => <ActionButton action="editar" size="sm" onClick={() => editar(l)} label="Editar" />}

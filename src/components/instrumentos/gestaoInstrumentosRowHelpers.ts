@@ -64,19 +64,19 @@ export interface MotivoInfo {
 }
 
 const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
-  ATA_CRITICA: { label: 'Saldo em Atenção', color: 'var(--color-success)', bg: '#ecfdf5' },
-  UNIDADE_PENDENTE: { label: 'Unidades do Contratado', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
-  FORNECEDOR_PNCP: { label: 'Fornecedor da Ata', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
+  ATA_CRITICA: { label: 'Saldo em atenção', color: 'var(--color-success)', bg: '#ecfdf5' },
+  UNIDADE_PENDENTE: { label: 'Unidades do contratado', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
+  FORNECEDOR_PNCP: { label: 'Fornecedor da ata', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
-  PAGAMENTO_PREVISTO: { label: 'Pagamento Previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  PAGAMENTO_PREVISTO: { label: 'Pagamento previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
-  TAREFA_ATRASADA: { label: 'Tarefa Atrasada', color: 'var(--color-danger-text-strong)', bg: 'var(--color-danger-bg)' },
-  TAREFA_PROXIMA: { label: 'Tarefa Próxima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
-  LEMBRETE: { label: 'Planejamento da Vigência', color: '#475569', bg: '#f1f5f9' }
+  TAREFA_ATRASADA: { label: 'Tarefa atrasada', color: 'var(--color-danger-text-strong)', bg: 'var(--color-danger-bg)' },
+  TAREFA_PROXIMA: { label: 'Tarefa próxima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  LEMBRETE: { label: 'Planejamento da vigência', color: '#475569', bg: '#f1f5f9' }
 };
 
 export function getMotivoInfo(category: DashboardAttentionCategory): MotivoInfo {
-  return MOTIVO_POR_CATEGORIA[category] || { label: 'Situação de Atenção', color: '#475569', bg: '#f1f5f9' };
+  return MOTIVO_POR_CATEGORIA[category] || { label: 'Situação de atenção', color: '#475569', bg: '#f1f5f9' };
 }
 
 /** Situação atual em texto curto, composta apenas de campos reais já calculados (badgeLabel/dataAlvo). */
@@ -132,27 +132,27 @@ function ataItemUrl(item: DashboardAttentionItem & { uasg?: string }): string {
 /** Ação contextual em 1 clique, sempre apontando para um fluxo/rota já existente no sistema. */
 export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo {
   if (item.arpKey && item.numeroAta && (item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA')) {
-    return { label: 'Abrir Tarefa', targetUrl: ataItemUrl(item) };
+    return { label: 'Abrir tarefa', targetUrl: ataItemUrl(item) };
   }
   if (item.category === 'LEMBRETE') {
-    return { label: 'Abrir Planejamento', targetUrl: item.numeroAta ? ataItemUrl(item) : contractItemUrl(item) };
+    return { label: 'Abrir planejamento', targetUrl: item.numeroAta ? ataItemUrl(item) : contractItemUrl(item) };
   }
   switch (item.category) {
     case 'ATA_CRITICA':
-      return { label: 'Verificar Saldo', targetUrl: ataItemUrl(item) };
+      return { label: 'Verificar saldo', targetUrl: ataItemUrl(item) };
     case 'UNIDADE_PENDENTE':
-      return { label: 'Informar Unidades', targetUrl: item.targetUrl || ataItemUrl(item) };
+      return { label: 'Informar unidades', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'FORNECEDOR_PNCP':
       return { label: item.badgeLabel === 'conferir itens' ? 'Conferir Fornecedor' : 'Indicar Fornecedor', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'PAGAMENTO_CRITICO':
-      return { label: 'Abrir Pagamento', targetUrl: '/pagamentos' };
+      return { label: 'Abrir pagamento', targetUrl: '/pagamentos' };
     case 'PAGAMENTO_PREVISTO':
       return { label: item.contractKey ? 'Abrir Pagamentos do Contrato' : 'Abrir Previsão', targetUrl: item.targetUrl || '/pagamentos' };
     case 'REAJUSTE_RADAR':
-      return { label: 'Analisar Reajuste', targetUrl: contractItemUrl(item) };
+      return { label: 'Analisar reajuste', targetUrl: contractItemUrl(item) };
     case 'TAREFA_ATRASADA':
     case 'TAREFA_PROXIMA':
-      return { label: 'Abrir Tarefa', targetUrl: contractItemUrl(item) };
+      return { label: 'Abrir tarefa', targetUrl: contractItemUrl(item) };
     default:
       return { label: 'Visualizar', targetUrl: item.targetUrl || '/contratos' };
   }

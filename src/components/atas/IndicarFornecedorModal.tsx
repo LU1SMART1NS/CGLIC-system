@@ -6,6 +6,7 @@ import { AppTextarea } from '../../design-system/components/FormFields';
 import { formatPncpAtaUrl } from '../../utils/pncpUtils';
 import type { RegistroFornecedorPncp } from '../../services/fornecedorAtaPncpService';
 import type { CandidatoFornecedorPncp } from '../../services/api';
+import { formatCurrency } from '../../utils/format';
 
 interface IndicarFornecedorModalProps {
   isOpen: boolean;
@@ -16,11 +17,10 @@ interface IndicarFornecedorModalProps {
 }
 
 const formatQtd = (n: number) => n.toLocaleString('pt-BR');
-const formatMoeda = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /** Linha "Item 3 · Vestuário Proteção · 16.896 un × R$ 1.416,97 = R$ 23.941.125,12". */
 export function descreverItensDoCandidato(c: CandidatoFornecedorPncp): string[] {
-  return c.itens.map((i) => `Item ${i.numeroItem} · ${i.descricao || 'sem descrição'} · ${formatQtd(i.quantidade)} un × ${formatMoeda(i.valorUnitario)} = ${formatMoeda(i.valorTotal)}`);
+  return c.itens.map((i) => `Item ${i.numeroItem} · ${i.descricao || 'sem descrição'} · ${formatQtd(i.quantidade)} un × ${formatCurrency(i.valorUnitario)} = ${formatCurrency(i.valorTotal)}`);
 }
 
 /** Fornecedor estrangeiro: o PNCP não tem CNPJ, só o código do SICAF ("ESTRANG…"). */

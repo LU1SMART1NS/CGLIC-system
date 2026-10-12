@@ -215,7 +215,7 @@ export const UsersManagement: React.FC = () => {
         actions={
           <ActionButton
             action="novo"
-            label="Novo Servidor"
+            label="Novo servidor"
             onClick={handleOpenCreateModal}
             data-testid="create-user-btn"
           />

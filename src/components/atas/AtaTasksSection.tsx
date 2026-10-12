@@ -22,11 +22,11 @@ interface AtaTasksSectionProps {
 }
 
 const ATA_LABELS: TaskPlanLabels = {
-  semPlanoTitulo: 'Nenhum Modelo de Gestão aplicado a esta Ata',
-  semPlanoDescricao: 'Selecione um roteiro operacional pré-configurado para acompanhar prorrogação, adesões e saldo físico desta Ata.',
+  semPlanoTitulo: 'Nenhum modelo de gestão aplicado a esta ata',
+  semPlanoDescricao: 'Selecione um roteiro operacional pré-configurado para acompanhar prorrogação, adesões e saldo físico desta ata.',
   gestorLabel: 'gestor da Ata',
   herancaMsg: 'Com o gestor da Ata selecionado, a tarefa acompanha automaticamente uma troca de gestor.',
-  semGestorMsg: 'Esta Ata ainda não tem gestor. Defina-o no topo da página (a tarefa passa a segui-lo) ou informe um responsável aqui.'
+  semGestorMsg: 'Esta ata ainda não tem gestor. Defina-o no topo da página (a tarefa passa a segui-lo) ou informe um responsável aqui.'
 };
 
 /** Controlador do plano de gestão de uma Ata: liga os hooks de Ata à tela compartilhada com o Contrato. */

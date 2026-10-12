@@ -19,6 +19,7 @@ import { useContratadoDoContrato } from '../../hooks/useContratadoDoItem';
 import { QuantidadeContratadaCelula, UnidadesDoContratoCelula } from '../item-balances/ContratadoCells';
 import { AjustarQuantidadeModal, type ContratoParaAjustar } from '../item-balances/AjustarQuantidadeModal';
 import type { QuantidadeDoContrato } from '../../services/contratadoUnidadeService';
+import { formatCurrencyOrDash } from '../../utils/format';
 
 interface ContractItemsSectionProps {
   dados: ItensDoContrato | undefined;
@@ -35,8 +36,6 @@ interface ContractItemsSectionProps {
   linkPortal?: string;
 }
 
-const formatMoeda = (v: number | null) =>
-  v === null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatQtd = (v: number | null) => (v === null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 4 }));
 /** Número do item com cinco dígitos, como na ata ("00004"). */
 const formatNumeroItem = (n: number | null) => (n === null ? '—' : String(n).padStart(5, '0'));
@@ -255,8 +254,8 @@ export const ContractItemsSection: React.FC<ContractItemsSectionProps> = ({
                         formatQtd(item.quantidade)
                       )}
                     </td>
-                    <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatMoeda(item.valorUnitario)}</td>
-                    <td data-label="Valor total" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800 }}>{formatMoeda(item.valorTotal)}</td>
+                    <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrencyOrDash(item.valorUnitario)}</td>
+                    <td data-label="Valor total" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800 }}>{formatCurrencyOrDash(item.valorTotal)}</td>
                     <td data-label="Item da ata" style={carteiraTd}>
                       {vinculo ? (
                         <CarteiraIdLink
@@ -281,7 +280,7 @@ export const ContractItemsSection: React.FC<ContractItemsSectionProps> = ({
                   Total de {itens.length} {itens.length === 1 ? 'item' : 'itens'}
                 </th>
                 <th style={{ ...carteiraTh, textAlign: 'right', whiteSpace: 'nowrap' }} data-testid="contract-items-total">
-                  {formatMoeda(valorTotal)}
+                  {formatCurrencyOrDash(valorTotal)}
                 </th>
                 <th style={carteiraTh} />
               </tr>

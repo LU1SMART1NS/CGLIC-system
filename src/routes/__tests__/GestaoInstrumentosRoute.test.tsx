@@ -357,20 +357,20 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).toContain('Aquisição de equipamentos de proteção');
 
     // Motivo da Atenção
-    expect(html).toContain('Saldo em Atenção');
+    expect(html).toContain('Saldo em atenção');
     expect(html).toContain('Execução / Pagamento');
-    expect(html).toContain('Tarefa Atrasada');
+    expect(html).toContain('Tarefa atrasada');
     expect(html).toContain('Reajuste / Repactuação');
-    expect(html).toContain('Tarefa Próxima');
+    expect(html).toContain('Tarefa próxima');
 
     // Responsável
     expect(html).toContain('Ana Costa');
 
     // Ação contextual por motivo (não apenas "Visualizar")
-    expect(html).toContain('Verificar Saldo');
-    expect(html).toContain('Abrir Pagamento');
-    expect(html).toContain('Abrir Tarefa');
-    expect(html).toContain('Analisar Reajuste');
+    expect(html).toContain('Verificar saldo');
+    expect(html).toContain('Abrir pagamento');
+    expect(html).toContain('Abrir tarefa');
+    expect(html).toContain('Analisar reajuste');
   });
 
   it('4b. deve classificar como ARP (não Contrato) um item de saldo crítico cujo numeroContrato traz o texto "ARP ..." (regressão do bug real)', () => {
@@ -400,7 +400,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     expect(html).not.toContain('>CONTRATO<');
     expect(html).toContain('>ARP<');
     // Ação contextual deve levar para /atas (não /contratos), já que não há contrato vinculado
-    expect(html).toContain('Verificar Saldo');
+    expect(html).toContain('Verificar saldo');
   });
 
   it('5. deve exibir estado "Tudo em dia" quando não houver nenhum instrumento em atenção', () => {

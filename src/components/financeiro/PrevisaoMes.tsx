@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ActionButton, NoticeBar, StatusBadge, useToast } from '../../design-system';
+import { ActionButton, EmptyState, NoticeBar, StatusBadge, useToast } from '../../design-system';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { useAuth } from '../../context/AuthContext';
 import { usePrevisaoMensal } from '../../hooks/usePrevisaoMensal';
@@ -227,7 +227,7 @@ export const PrevisaoMes: React.FC = () => {
           </div>
 
           {lista.length === 0 ? (
-            <NoticeBar tone="info" testId="previsao-vazia">Nenhuma linha neste grupo.</NoticeBar>
+            <EmptyState title="Nenhuma linha neste grupo." description="Escolha outro grupo no trilho acima ou outro mês." testId="previsao-vazia" />
           ) : (
             <div data-testid="previsao-mes-table" className="carteira-shell" style={carteiraTableShell}>
               <div style={{ overflowX: 'auto' }}>

@@ -7,8 +7,8 @@ import { rotuloDoItem } from './checklistPagamento';
 import { numeroDoEmpenho, textoDoPagamento } from './cicloPagamentoShared';
 import { TIPOS_DOCUMENTO_RECEBIDO } from './cicloPagamentoShared';
 import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR } from './paymentFormUtils';
+import { formatCurrencyOrDash, formatCurrency } from '../../../utils/format';
 
-const formatCurrency = (v?: number) => (v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 
 /** Documentos ainda podem entrar ou sair enquanto o ciclo está com a CGLIC. */
 const DOCUMENTOS_EDITAVEIS = ['RECEBIDO', 'COM_PENDENCIA', 'DEVOLVIDO', 'CONFERIDO'];
@@ -47,7 +47,7 @@ export const PaymentCycleDocuments: React.FC<{
     { key: 'tipo', header: 'Documento', sortValue: (d) => d.tipo, render: (d) => d.tipo },
     { key: 'numero', header: 'Nº', sortValue: (d) => d.numero, render: (d) => d.numero || '—' },
     { key: 'sei', header: 'Id. SEI', sortValue: (d) => d.sei, render: (d) => <strong>{d.sei}</strong> },
-    { key: 'valor', header: 'Valor', align: 'right', sortValue: (d) => d.valor, sortFirstDir: 'desc', render: (d) => formatCurrency(d.valor) },
+    { key: 'valor', header: 'Valor', align: 'right', sortValue: (d) => d.valor, sortFirstDir: 'desc', render: (d) => formatCurrencyOrDash(d.valor) },
     {
       key: 'acao',
       header: 'Ação',
@@ -151,11 +151,11 @@ export const PaymentCycleItens: React.FC<{ cycle: PaymentFollowUpCycle }> = ({ c
     { key: 'atesto', header: 'Atesto (SEI)', render: (i) => i.atestoSei },
     { key: 'empenho', header: 'Empenho', render: (i) => numeroDoEmpenho(i.empenhoCanonicalKey) },
     { key: 'sub', header: 'Subelemento', render: (i) => i.subelemento || '—' },
-    { key: 'bruto', header: 'Bruto', align: 'right', render: (i) => formatCurrency(i.valorBruto) },
-    { key: 'juros', header: 'Juros/multa', align: 'right', render: (i) => (i.jurosMulta ? <span title={i.justificativaJuros}>{formatCurrency(i.jurosMulta)}</span> : '—') },
-    { key: 'glosa', header: 'Glosa', align: 'right', render: (i) => (i.glosa ? formatCurrency(i.glosa) : '—') },
-    { key: 'desconto', header: 'Desconto', align: 'right', render: (i) => (i.desconto ? formatCurrency(i.desconto) : '—') },
-    { key: 'pagar', header: 'A pagar', align: 'right', render: (i) => <strong>{formatCurrency(i.valorAPagar)}</strong> }
+    { key: 'bruto', header: 'Bruto', align: 'right', render: (i) => formatCurrencyOrDash(i.valorBruto) },
+    { key: 'juros', header: 'Juros/multa', align: 'right', render: (i) => (i.jurosMulta ? <span title={i.justificativaJuros}>{formatCurrencyOrDash(i.jurosMulta)}</span> : '—') },
+    { key: 'glosa', header: 'Glosa', align: 'right', render: (i) => (i.glosa ? formatCurrencyOrDash(i.glosa) : '—') },
+    { key: 'desconto', header: 'Desconto', align: 'right', render: (i) => (i.desconto ? formatCurrencyOrDash(i.desconto) : '—') },
+    { key: 'pagar', header: 'A pagar', align: 'right', render: (i) => <strong>{formatCurrencyOrDash(i.valorAPagar)}</strong> }
   ];
   const copiar = async () => {
     try {
@@ -255,7 +255,7 @@ export const PaymentCyclePrazosLegais: React.FC<{ cycle: PaymentFollowUpCycle; p
       </div>
       <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
         Limite do art. 75, II da Lei 14.133 em {prazos.limite.ano}:{' '}
-        {prazos.limite.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ({prazos.limite.decreto}). Até ele, os prazos de
+        {formatCurrency(prazos.limite.valor)} ({prazos.limite.decreto}). Até ele, os prazos de
         liquidação e pagamento caem pela metade (IN 77, art. 7º, § 2º).
       </div>
       {prazos.limite.desatualizado && (

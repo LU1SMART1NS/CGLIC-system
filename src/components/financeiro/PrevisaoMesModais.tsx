@@ -4,8 +4,8 @@ import type { LinhaPrevisao } from '../../services/previsaoMensalService';
 import { DateField, Field, FooterButtons } from '../contracts/payment/PaymentCycleModals';
 import { errorMessage, useEmpenhosDoContrato } from '../contracts/payment/cicloPagamentoShared';
 import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR, parseDateInputBR, todayISO } from '../contracts/payment/paymentFormUtils';
+import { formatCurrency } from '../../utils/format';
 
-const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const paraCampo = (v: number) => (v > 0 ? formatCurrencyInputBR(String(Math.round(v * 100))) : '');
 
 /** Corrige valor, subitem ou a marca de emenda de uma linha da previsão (ou desfaz o ajuste). */
@@ -68,7 +68,7 @@ export const AjustarLinhaModal: React.FC<{
     >
       <form id="previsao-ajustar-form" onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ fontSize: '0.82rem', color: '#475569' }}>
-          {linha.detalhe}. Valor calculado: <strong>{moeda(linha.valorOriginal)}</strong>.
+          {linha.detalhe}. Valor calculado: <strong>{formatCurrency(linha.valorOriginal)}</strong>.
         </div>
         <Field id="ajuste-valor" label="Valor previsto *">
           <input id="ajuste-valor" className="form-input" type="text" inputMode="numeric" value={valor} onChange={(e) => setValor(formatCurrencyInputBR(e.target.value))} required />
@@ -166,7 +166,7 @@ export const IncluirLinhaModal: React.FC<{
             <option value="">Não informada</option>
             {empenhos.map((e) => (
               <option key={e.canonicalKey} value={e.canonicalKey}>
-                {e.numero} · saldo {moeda(e.saldo)}
+                {e.numero} · saldo {formatCurrency(e.saldo)}
               </option>
             ))}
           </select>
@@ -241,7 +241,7 @@ export const RegistrarEnvioModal: React.FC<{
     >
       <form id="previsao-envio-form" onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <NoticeBar tone="info" testId="previsao-envio-resumo">
-          {quantidade} {quantidade === 1 ? 'linha' : 'linhas'}, total {moeda(total)}. As linhas ficam guardadas como foram enviadas, para comparar com o
+          {quantidade} {quantidade === 1 ? 'linha' : 'linhas'}, total {formatCurrency(total)}. As linhas ficam guardadas como foram enviadas, para comparar com o
           que for pago no mês.{jaEnviada ? ' Já havia um envio registrado: este o substitui.' : ''}
         </NoticeBar>
         <Field id="envio-prev-sei" label="SEI do documento enviado *">

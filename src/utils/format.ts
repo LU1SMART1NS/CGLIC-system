@@ -21,6 +21,11 @@ export function formatCurrency(val?: number | null): string {
   return brl.format(val || 0);
 }
 
+/** R$ 1.528,80; sem valor (null, undefined ou NaN) mostra "—". */
+export function formatCurrencyOrDash(val?: number | null): string {
+  return typeof val === 'number' && !Number.isNaN(val) ? brl.format(val) : '—';
+}
+
 /** R$ 7.434.554 (sem centavos) */
 export function formatCurrencyRounded(val?: number | null): string {
   return brlInteiro.format(val || 0);
