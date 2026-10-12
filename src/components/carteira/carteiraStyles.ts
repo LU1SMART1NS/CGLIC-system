@@ -27,20 +27,6 @@ export const carteiraTableShell: React.CSSProperties = {
   overflow: 'hidden'
 };
 
-export const carteiraSelect: React.CSSProperties = {
-  width: '100%',
-  maxWidth: '190px',
-  flex: '1 1 160px',
-  padding: '0.4rem 0.65rem',
-  borderRadius: '6px',
-  border: '1px solid #cbd5e1',
-  background: '#f8fafc',
-  fontSize: '0.8rem',
-  color: '#0f172a',
-  fontWeight: 600,
-  cursor: 'pointer'
-};
-
 /** Segunda linha da célula de identificação (fornecedor/objeto), limitada a 2 linhas: igual em todas as carteiras. */
 export const carteiraSubtitle: React.CSSProperties = {
   fontSize: '0.78rem',
