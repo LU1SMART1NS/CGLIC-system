@@ -20,7 +20,7 @@ interface CarteiraSituacaoTabsProps {
 }
 
 /**
- * Situação da carteira em segmentos com contagem: Vigentes · Crítico · Atenção · Histórico · Todas.
+ * Situação da carteira em segmentos com contagem: Vigentes · Atenção · Crítico · Histórico · Todas.
  * Substitui os cartões de resumo e o seletor de vigência.
  */
 export const CarteiraSituacaoTabs: React.FC<CarteiraSituacaoTabsProps> = ({
@@ -35,15 +35,15 @@ export const CarteiraSituacaoTabs: React.FC<CarteiraSituacaoTabsProps> = ({
   meta
 }) => {
   const segmentos: Array<CarteiraSegment<CarteiraSituacao>> = [
-    { id: 'VIGENTES', label: 'Vigentes', count: vigentes },
-    { id: 'CRITICO', label: 'Crítico', count: criticos, dot: 'var(--color-danger)', title: `Vencem em até ${VIGENCIA_RULES.faixaCriticoAteDias} dias` },
+    { id: 'VIGENTES', label: 'Vigentes', count: vigentes, dot: 'var(--color-success)' },
     {
       id: 'ATENCAO',
       label: 'Atenção',
       count: atencao,
-      dot: 'var(--color-warning)',
+      dot: 'var(--color-warning-solid)',
       title: `Vencem entre ${VIGENCIA_RULES.faixaCriticoAteDias + 1} e ${VIGENCIA_RULES.faixaAtencaoAteDias} dias`
     },
+    { id: 'CRITICO', label: 'Crítico', count: criticos, dot: 'var(--color-danger)', title: `Vencem em até ${VIGENCIA_RULES.faixaCriticoAteDias} dias` },
     { id: 'HISTORICO', label: 'Histórico', count: historico, title: 'Expirados ou cancelados' },
     { id: 'TODOS', label: 'Todas', count: total }
   ];
