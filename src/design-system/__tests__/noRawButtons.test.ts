@@ -23,6 +23,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/instrument360/Instrument360Hero.tsx': 1, // nome que volta ao resumo (barra encolhida)
   'src/components/instrument360/Instrument360Tabs.tsx': 1, // abas
   'src/components/instrumentos/GestaoInstrumentosCategoryTabs.tsx': 1, // abas
+  'src/components/instrumentos/GestaoInstrumentosDockStrip.tsx': 2, // nome que volta ao topo e números-filtro (faixa encolhida)
   'src/components/instrumentos/GestaoInstrumentosSummaryCards.tsx': 4, // cartões-filtro
   'src/components/modals/ExportExcelModal.tsx': 7, // presets e chips de grupo
   'src/components/plan/TaskPlanSection.tsx': 1, // seletor de status
