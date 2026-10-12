@@ -20,7 +20,8 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
-import { FilterBar } from '../../design-system/components/FilterBar';
+import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
+import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { Modal } from '../../design-system/components/Modal';
 import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
@@ -222,33 +223,27 @@ export const UsersManagement: React.FC = () => {
       />
 
       {/* Filtros */}
-      <div>
-        <FilterBar
-          testId="users-filter-bar"
-          searchValue={searchTerm}
-          onSearchChange={setSearchTerm}
-          searchPlaceholder="Buscar por nome ou e-mail..."
-          selects={[
-            {
-              id: 'users-filter-role-select',
-              label: 'Perfil',
-              value: filterRole,
-              onChange: setFilterRole,
-              options: [{ value: 'todos', label: `Todos os Perfis (${roles.length})` }, ...roles.map((r) => ({ value: r.id, label: r.nome }))]
-            }
-          ]}
-          hasActiveFilters={Boolean(searchTerm) || filterRole !== 'todos'}
-          onClearFilters={() => {
-            setSearchTerm('');
-            setFilterRole('todos');
-          }}
+      <CarteiraFilterBar
+        busca={searchTerm}
+        searchPlaceholder="Buscar por nome ou e-mail..."
+        onChangeBusca={setSearchTerm}
+        hasActiveFilters={Boolean(searchTerm) || filterRole !== 'todos'}
+        onResetFilters={() => {
+          setSearchTerm('');
+          setFilterRole('todos');
+        }}
+        counter={carteiraCounter(filteredUsers.length, users.length, Boolean(searchTerm) || filterRole !== 'todos', 'usuário', 'usuários')}
+        testIdPrefix="users"
+      >
+        <CarteiraFilterButton
+          label="Perfil"
+          value={filterRole}
+          emptyValue="todos"
+          options={roles.map((r) => ({ value: r.id, label: r.nome }))}
+          onChange={setFilterRole}
+          testId="users-filter-role"
         />
-        <div data-testid="users-counter" style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', margin: '0.5rem 0.25rem 0' }}>
-          {filteredUsers.length === users.length
-            ? `${users.length} ${users.length === 1 ? 'usuário' : 'usuários'}`
-            : `${filteredUsers.length} de ${users.length} usuários`}
-        </div>
-      </div>
+      </CarteiraFilterBar>
 
       {/* 3. Tabela de Usuários */}
       <AdminListShell
