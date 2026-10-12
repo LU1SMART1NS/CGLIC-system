@@ -1,5 +1,5 @@
 import React from 'react';
-import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
+import { CarteiraFilterToggle } from '../../carteira/CarteiraFilterButton';
 import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { hasActiveCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { TODOS_GESTORES } from '../../carteira/carteiraGestor';
@@ -72,12 +72,11 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
       counter={carteiraCounter(totalFiltered, totalContracts, hasActiveFilters, 'contrato', 'contratos')}
       testIdPrefix="contracts"
     >
-      <CarteiraFilterButton
-        label="Pendências"
-        value={filters.pendencia}
-        emptyValue="TODOS"
-        options={[{ value: 'COM_PENDENCIA', label: 'Com pendência', count: comPendencia }]}
-        onChange={(value) => onChangeFilter('pendencia', value as ContractsPortfolioFilterState['pendencia'])}
+      <CarteiraFilterToggle
+        label="Com pendência"
+        active={filters.pendencia === 'COM_PENDENCIA'}
+        count={comPendencia}
+        onChange={(on) => onChangeFilter('pendencia', (on ? 'COM_PENDENCIA' : 'TODOS') as ContractsPortfolioFilterState['pendencia'])}
         testId="contracts-filter-pendencia"
       />
 

@@ -178,3 +178,52 @@ export const CarteiraFilterButton: React.FC<CarteiraFilterButtonProps> = ({ labe
     </div>
   );
 };
+
+interface CarteiraFilterToggleProps {
+  /** Rótulo do filtro ("Com pendência"). */
+  label: string;
+  active: boolean;
+  onChange: (active: boolean) => void;
+  /** Quantos registros o filtro traria (aparece desligado). */
+  count?: number;
+  testId: string;
+}
+
+/** Filtro liga/desliga no mesmo visual dos botões: desligado "+ Com pendência 12"; ligado "Com pendência ×". */
+export const CarteiraFilterToggle: React.FC<CarteiraFilterToggleProps> = ({ label, active, onChange, count, testId }) => (
+  <button
+    type="button"
+    aria-pressed={active}
+    onClick={() => onChange(!active)}
+    aria-label={active ? `Remover filtro ${label}` : undefined}
+    className="carteira-filter-btn"
+    data-testid={testId}
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.3rem',
+      padding: '0.38rem 0.65rem',
+      borderRadius: '6px',
+      borderWidth: '1px',
+      borderStyle: active ? 'solid' : 'dashed',
+      borderColor: active ? 'var(--primary)' : '#cbd5e1',
+      background: active ? '#e0e7f5' : '#ffffff',
+      color: active ? 'var(--primary)' : '#334155',
+      fontSize: '0.8rem',
+      fontWeight: 700,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap'
+    }}
+  >
+    {active ? (
+      <>
+        {label} <X size={13} aria-hidden="true" />
+      </>
+    ) : (
+      <>
+        <Plus size={13} aria-hidden="true" /> {label}
+        {count !== undefined && <span style={{ color: '#64748b', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{count}</span>}
+      </>
+    )}
+  </button>
+);

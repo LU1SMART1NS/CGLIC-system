@@ -513,7 +513,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
           label="Gestor da ata"
           value={filters.gestor}
           emptyValue={TODAS}
-          options={[...(temAtaSemGestor ? [{ value: SEM_GESTOR_DA_ATA, label: 'Ata sem gestor' }] : []), ...gestoresDasAtas.map((g) => ({ value: g, label: g }))]}
+          options={[...(temAtaSemGestor ? [{ value: SEM_GESTOR_DA_ATA, label: 'Sem gestor' }] : []), ...gestoresDasAtas.map((g) => ({ value: g, label: g }))]}
           onChange={(v) => setFilter('gestor', v)}
           testId="sem-vinculo-filter-gestor"
         />

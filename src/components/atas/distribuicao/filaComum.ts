@@ -13,10 +13,11 @@ const ROTULO_FAIXA: Record<PrazoFaixa, string> = {
   CRITICO: 'Crítico',
   ATENCAO: 'Atenção',
   REGULAR: 'Em dia',
-  EXPIRADO: 'Encerrada',
+  EXPIRADO: 'Encerradas',
   SEM_DATA: 'Sem data'
 };
-const ORDEM_FAIXA: PrazoFaixa[] = ['CRITICO', 'ATENCAO', 'REGULAR', 'EXPIRADO', 'SEM_DATA'];
+/** Mesma ordem do trilho das carteiras: do em dia ao crítico, depois as encerradas. */
+const ORDEM_FAIXA: PrazoFaixa[] = ['REGULAR', 'ATENCAO', 'CRITICO', 'EXPIRADO', 'SEM_DATA'];
 
 /** Opções do filtro de vigência com a contagem de cada faixa (faixas sem registro ficam de fora). */
 export function vigenciaOptions(faixas: PrazoFaixa[]): CarteiraFilterOption[] {
