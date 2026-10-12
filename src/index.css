@@ -816,16 +816,6 @@ h1, h2, h3, h4 {
   .ds-refresh { width: 100%; justify-content: space-between; }
 }
 
-/* FilterBar */
-.ds-filter-search { min-width: 0 !important; }
-@media (max-width: 480px) {
-  .ds-filter-search { flex: 1 1 100% !important; }
-  .ds-filter-select { flex: 1 1 100% !important; flex-direction: column; align-items: stretch !important; }
-  .ds-filter-select select,
-  .ds-filter-search input { min-height: 44px; font-size: 16px !important; }
-  .ds-filter-chip { min-height: 36px; }
-}
-
 /* Paginação da carteira */
 .carteira-pagination { flex-wrap: wrap; gap: 0.5rem; }
 .carteira-pagination__pages { flex-wrap: wrap; }
@@ -1125,8 +1115,7 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
   button { min-height: 44px; }
   .i360-dock-tab { min-height: 40px; } /* barra fixa mais baixa: 40 px ainda é um alvo confortável */
   button:has(> svg:only-child) { min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
-  .ds-badge, .ds-filter-chip { min-height: 0; }
-  .ds-filter-chip { min-height: 36px; }
+  .ds-badge { min-height: 0; }
 }
 
 /* Campos de formulário: 16px evita o zoom automático do iOS ao focar */
