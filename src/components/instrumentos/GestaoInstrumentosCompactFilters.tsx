@@ -19,7 +19,10 @@ interface GestaoInstrumentosCompactFiltersProps {
   totalItems: number;
 }
 
-/** Filtros da Visão Geral no padrão das carteiras: busca, "+ Prioridade", "Limpar" e contador. */
+/**
+ * Filtros da Visão Geral no padrão das carteiras: busca, "+ Prioridade", "Limpar" e contador.
+ * Prioridade em níveis (Máxima/Alta/Média) para não confundir com "vencida" (vigência) nem com Crítico/Atenção das carteiras.
+ */
 export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompactFiltersProps> = ({
   filters,
   onChangeFilter,
@@ -44,9 +47,9 @@ export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompac
         value={filters.severidade}
         emptyValue="TODAS"
         options={[
-          { value: 'CRITICA', label: 'Vencido' },
-          { value: 'URGENTE', label: 'Urgente' },
-          { value: 'ATENCAO', label: 'Atenção' }
+          { value: 'CRITICA', label: 'Máxima' },
+          { value: 'URGENTE', label: 'Alta' },
+          { value: 'ATENCAO', label: 'Média' }
         ]}
         onChange={(value) => onChangeFilter('severidade', value as GestaoInstrumentosCompactFiltersState['severidade'])}
         testId="instrumentos-filter-severity"
