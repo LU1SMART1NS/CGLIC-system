@@ -224,11 +224,11 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     expect(html).toContain('Não atribuído');
   });
 
-  it('18. enquanto o gestor carrega, mostra "Carregando..." e não "Não atribuído"', () => {
+  it('18. enquanto o gestor carrega, mostra o carregamento e não "Não atribuído"', () => {
     vi.mocked(ataManagersModule.useAtaManager).mockReturnValue({ data: undefined, isLoading: true, isError: false } as any);
     const html = renderToStaticMarkup(<ItemHero {...baseProps} />);
 
-    expect(html).toContain('Carregando...');
+    expect(html).toContain('manager-info-loading');
     expect(html).not.toContain('Não atribuído');
   });
 

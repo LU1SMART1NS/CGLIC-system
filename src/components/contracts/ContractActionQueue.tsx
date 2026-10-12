@@ -6,6 +6,7 @@ import type { ContractTaskPlan } from '../../types';
 import type { SeverityLevel } from '../../design-system/tokens';
 import { severityTokens } from '../../design-system/tokens';
 import { AppButton } from '../../design-system/components/AppButton';
+import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { AvisosResolvidosLista, BotaoResolvido, EspacoResolvido, useResolverAviso, type AlvoResolucao } from '../avisos/ResolverAviso';
@@ -48,8 +49,8 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
 
   if (isLoading) {
     return (
-      <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
-        Carregando ações do contrato...
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem 0' }} aria-busy="true" aria-label="Carregando ações do contrato...">
+        <SkeletonLoader variant="rectangular" height="44px" count={3} />
       </div>
     );
   }

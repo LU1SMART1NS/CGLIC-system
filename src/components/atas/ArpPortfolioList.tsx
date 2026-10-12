@@ -140,7 +140,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   if (totalAtas === 0) {
     return (
       <EmptyState
-        title="Nenhuma Ata de Registro de Preços encontrada."
+        title="Nenhuma ata de registro de preços encontrada."
         description="Não há atas sincronizadas ou cadastradas para a unidade gerenciadora atual."
       />
     );
@@ -149,7 +149,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   if (cards.length === 0) {
     return (
       <CarteiraNoResults
-        title="Nenhuma Ata corresponde aos filtros aplicados."
+        title="Nenhuma ata corresponde aos filtros aplicados."
         description="Altere os critérios selecionados ou limpe os filtros para visualizar a carteira completa de Atas."
         onResetFilters={onResetFilters}
       />

@@ -119,13 +119,13 @@ export function getEventTypeDisplay(tipo: ContractEventType): {
 } {
   switch (tipo) {
     case 'CELEBRACAO':
-      return { label: 'Celebração Inicial', icon: FileSignature, color: 'var(--primary)', dotColor: 'var(--primary)' };
+      return { label: 'Celebração inicial', icon: FileSignature, color: 'var(--primary)', dotColor: 'var(--primary)' };
     case 'PRORROGACAO':
       return { label: 'Prorrogação de Vigência', icon: Clock, color: 'var(--color-info-text)', dotColor: 'var(--color-info-solid)' };
     case 'REAJUSTE':
-      return { label: 'Reajuste Contratual', icon: TrendingUp, color: 'var(--color-success)', dotColor: 'var(--color-success)' };
+      return { label: 'Reajuste contratual', icon: TrendingUp, color: 'var(--color-success)', dotColor: 'var(--color-success)' };
     case 'REPACTUACAO':
-      return { label: 'Repactuação Salarial', icon: Layers, color: '#7c3aed', dotColor: '#7c3aed' };
+      return { label: 'Repactuação salarial', icon: Layers, color: '#7c3aed', dotColor: '#7c3aed' };
     case 'ACRESCIMO':
       return { label: 'Acréscimo de Valor/Qtd', icon: TrendingUp, color: '#0d9488', dotColor: '#0d9488' };
     case 'SUPRESSAO':
@@ -133,11 +133,11 @@ export function getEventTypeDisplay(tipo: ContractEventType): {
     case 'APOSTILAMENTO':
       return { label: 'Apostilamento', icon: FileSpreadsheet, color: '#475569', dotColor: '#475569' };
     case 'ENCERRAMENTO':
-      return { label: 'Encerramento Contratual', icon: FileCheck2, color: 'var(--color-success-solid)', dotColor: 'var(--color-success-solid)' };
+      return { label: 'Encerramento contratual', icon: FileCheck2, color: 'var(--color-success-solid)', dotColor: 'var(--color-success-solid)' };
     case 'RESCISAO':
-      return { label: 'Rescisão Contratual', icon: FileX2, color: 'var(--color-danger)', dotColor: 'var(--color-danger)' };
+      return { label: 'Rescisão contratual', icon: FileX2, color: 'var(--color-danger)', dotColor: 'var(--color-danger)' };
     default:
-      return { label: 'Evento Contratual', icon: FileText, color: '#64748b', dotColor: '#64748b' };
+      return { label: 'Evento contratual', icon: FileText, color: '#64748b', dotColor: '#64748b' };
   }
 }
 
@@ -174,18 +174,18 @@ export function getImpactoDisplay(impacto: ContractEventImpact): {
 } {
   switch (impacto) {
     case 'ALTERA_VIGENCIA':
-      return { label: 'Altera Vigência', bg: 'var(--color-info-bg)', color: 'var(--color-info-text)', border: 'var(--color-info-border)' };
+      return { label: 'Altera vigência', bg: 'var(--color-info-bg)', color: 'var(--color-info-text)', border: 'var(--color-info-border)' };
     case 'ALTERA_VALOR':
-      return { label: 'Altera Valor', bg: 'var(--color-success-bg)', color: 'var(--color-success-text)', border: 'var(--color-success-border)' };
+      return { label: 'Altera valor', bg: 'var(--color-success-bg)', color: 'var(--color-success-text)', border: 'var(--color-success-border)' };
     case 'ALTERA_QUANTITATIVO':
-      return { label: 'Altera Quantitativo', bg: '#fdf4ff', color: '#86198f', border: '#f5d0fe' };
+      return { label: 'Altera quantitativo', bg: '#fdf4ff', color: '#86198f', border: '#f5d0fe' };
     case 'ATUALIZA_DADOS':
-      return { label: 'Atualiza Dados', bg: '#f8fafc', color: '#334155', border: '#cbd5e1' };
+      return { label: 'Atualiza dados', bg: '#f8fafc', color: '#334155', border: '#cbd5e1' };
     case 'EXTINGUE_CONTRATO':
-      return { label: 'Extingue Contrato', bg: 'var(--color-danger-bg)', color: 'var(--color-danger-text-strong)', border: 'var(--color-danger-border)' };
+      return { label: 'Extingue contrato', bg: 'var(--color-danger-bg)', color: 'var(--color-danger-text-strong)', border: 'var(--color-danger-border)' };
     case 'SEM_IMPACTO_FINANCEIRO_TEMPORAL':
     default:
-      return { label: 'Sem Impacto Financeiro/Temporal', bg: '#f1f5f9', color: '#475569', border: '#e2e8f0' };
+      return { label: 'Sem impacto financeiro/temporal', bg: '#f1f5f9', color: '#475569', border: '#e2e8f0' };
   }
 }
 
