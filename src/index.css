@@ -1556,7 +1556,3 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
   .section-header__subtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 .section-header--flush { margin-bottom: 0 !important; }
-
-/* Dois trilhos lado a lado (ex.: vigência + nível): quebram de linha em tela estreita; o último ocupa o resto da linha. */
-.segment-pills-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
-.segment-pills-row > .segment-pills:last-child { flex: 1 1 auto; }
