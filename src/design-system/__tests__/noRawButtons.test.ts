@@ -13,7 +13,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/atas/distribuicao/EscolherAtaModal.tsx': 1, // cartão clicável de cada ata da lista
   'src/components/auth/AuthLayout.tsx': 1, // olho da senha
   'src/components/carteira/CarteiraCellFilter.tsx': 1, // filtro de célula
-  'src/components/carteira/CarteiraFilterButton.tsx': 3, // filtro de coluna
+  'src/components/carteira/CarteiraFilterButton.tsx': 4, // filtro de coluna e filtro liga/desliga
   'src/components/carteira/CarteiraPagination.tsx': 1, // paginação
   'src/components/carteira/CarteiraRowLink.tsx': 1, // link de ID na tabela
   'src/components/carteira/CarteiraSegmentTabs.tsx': 1, // abas

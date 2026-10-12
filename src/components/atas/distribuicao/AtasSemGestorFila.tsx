@@ -142,9 +142,9 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
           value={filters.contratos}
           emptyValue={TODAS}
           options={[
-            { value: 'VINCULADOS', label: 'Com contratos vinculados', count: atas.filter((a) => a.vinculados.length > 0).length },
-            { value: 'PROVAVEIS', label: 'Com prováveis a vincular', count: atas.filter((a) => a.provaveis.length > 0).length },
-            { value: 'NENHUM', label: 'Sem contratos', count: atas.filter((a) => filtroContratos(a, 'NENHUM')).length }
+            { value: 'VINCULADOS', label: 'Vinculados', count: atas.filter((a) => a.vinculados.length > 0).length },
+            { value: 'PROVAVEIS', label: 'Prováveis a vincular', count: atas.filter((a) => a.provaveis.length > 0).length },
+            { value: 'NENHUM', label: 'Nenhum', count: atas.filter((a) => filtroContratos(a, 'NENHUM')).length }
           ]}
           onChange={(v) => setFilter('contratos', v)}
           testId="atas-sem-gestor-filter-contratos"

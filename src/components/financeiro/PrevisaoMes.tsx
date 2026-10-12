@@ -210,8 +210,8 @@ export const PrevisaoMes: React.FC = () => {
               value={filters.emenda}
               emptyValue="TODAS"
               options={[
-                { value: 'SIM', label: 'Só emendas', count: linhas.filter((l) => !l.retirada && l.emenda).length },
-                { value: 'NAO', label: 'Sem emendas', count: linhas.filter((l) => !l.retirada && !l.emenda).length }
+                { value: 'SIM', label: 'Com emenda', count: linhas.filter((l) => !l.retirada && l.emenda).length },
+                { value: 'NAO', label: 'Sem emenda', count: linhas.filter((l) => !l.retirada && !l.emenda).length }
               ]}
               onChange={(v) => setFilter('emenda', v)}
               testId="previsao-filter-emenda"
