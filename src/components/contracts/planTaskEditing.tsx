@@ -9,22 +9,6 @@ import { ActionButton } from '../../design-system/components/ActionButton';
  * O Modelo de Gestão é só um facilitador: o gestor cria, edita e exclui livremente.
  */
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.35rem 0.5rem',
-  fontSize: '0.8rem',
-  borderRadius: '4px',
-  border: '1px solid #cbd5e1'
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: '0.75rem',
-  fontWeight: 600,
-  color: '#475569',
-  display: 'block',
-  marginBottom: '0.2rem'
-};
-
 export const PERSONALIZADA_BADGE_STYLE: React.CSSProperties = {
   fontSize: '0.75rem',
   fontWeight: 700,
@@ -133,7 +117,7 @@ export const AddTaskForm: React.FC<{
       }}
     >
       <div style={{ gridColumn: '1 / -1' }}>
-        <label style={labelStyle} htmlFor="new-task-nome">Nome da tarefa</label>
+        <label className="form-label" htmlFor="new-task-nome">Nome da tarefa</label>
         <input
           id="new-task-nome"
           autoFocus
@@ -141,21 +125,21 @@ export const AddTaskForm: React.FC<{
           value={nome}
           onChange={(e) => setNome(e.target.value)}
           placeholder="Ex.: Solicitar parecer jurídico"
-          style={inputStyle}
+          className="form-input"
         />
       </div>
       <div>
-        <label style={labelStyle} htmlFor="new-task-prazo">Prazo limite (opcional)</label>
-        <input id="new-task-prazo" type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} style={inputStyle} />
+        <label className="form-label" htmlFor="new-task-prazo">Prazo limite (opcional)</label>
+        <input id="new-task-prazo" type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} className="form-input" />
       </div>
       <div>
-        <label style={labelStyle} htmlFor="new-task-obs">Observação (opcional)</label>
+        <label className="form-label" htmlFor="new-task-obs">Observação (opcional)</label>
         <input
           id="new-task-obs"
           type="text"
           value={observacao}
           onChange={(e) => setObservacao(e.target.value)}
-          style={inputStyle}
+          className="form-input"
         />
       </div>
       <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -222,7 +206,7 @@ export const MacrotaskHeader: React.FC<{
             aria-label="Nome da etapa"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            style={{ ...inputStyle, maxWidth: '360px' }}
+            className="form-input" style={{ maxWidth: '360px' }}
           />
           <ActionButton action="salvar" iconOnly label="Salvar nome" type="submit" size="sm" />
           <ActionButton action="cancelar" iconOnly label="Cancelar edição do nome"
@@ -297,7 +281,7 @@ export const AddMacrotaskForm: React.FC<{
         value={nome}
         onChange={(e) => setNome(e.target.value)}
         placeholder="Nome da etapa"
-        style={{ ...inputStyle, maxWidth: '320px' }}
+        className="form-input" style={{ maxWidth: '320px' }}
       />
       <AppButton type="submit" variant="primary" size="sm" disabled={!nome.trim() || isPending} isLoading={isPending}>
         Criar etapa
@@ -328,7 +312,6 @@ export const MutationError: React.FC<{ error: unknown }> = ({ error }) => {
   );
 };
 
-export const planFormStyles = { inputStyle, labelStyle };
 
 /** Cabeçalho de um módulo do plano: modelo de origem, data de aplicação, progresso e exclusão. */
 export const ModuleGroupHeader: React.FC<{
@@ -393,7 +376,7 @@ export const ModuleGroupHeader: React.FC<{
             aria-label="Nome do módulo"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            style={{ ...inputStyle, maxWidth: '360px' }}
+            className="form-input" style={{ maxWidth: '360px' }}
           />
           <ActionButton action="salvar" iconOnly label="Salvar nome do módulo" type="submit" size="sm" />
           <ActionButton action="cancelar" iconOnly label="Cancelar edição do nome do módulo"
