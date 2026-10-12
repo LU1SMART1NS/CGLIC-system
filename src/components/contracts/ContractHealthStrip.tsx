@@ -10,6 +10,7 @@ import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { HealthTile, HealthTileGrid, LifelineRule, PendenciasTile } from '../instrument360/HealthStripParts';
 import { vigenciaTile } from '../atas/Ata360Header';
+import { formatCurrencyRounded } from '../../utils/format';
 
 interface ContractHealthStripProps {
   contract: ContractDashboardRecord;
@@ -19,8 +20,6 @@ interface ContractHealthStripProps {
   onOpenFinanceiro: () => void;
 }
 
-const formatCurrency = (val: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
 
 /** "Sim"/"Não" do Contratos.gov.br (`prorrogavel`); ausente ou diferente disso não vira dica. */
 function prorrogavelHint(raw: unknown): string | null {
@@ -71,7 +70,7 @@ export const ContractHealthStrip: React.FC<ContractHealthStripProps> = ({ contra
   const valorAcumulado = parseValorBR((contract.raw as { valor_acumulado?: unknown } | undefined)?.valor_acumulado);
   const valorTooltip =
     valorAcumulado && valorAcumulado > 0
-      ? [...valorHints, `valor acumulado nas vigências: ${formatCurrency(valorAcumulado)}`].join(' · ')
+      ? [...valorHints, `valor acumulado nas vigências: ${formatCurrencyRounded(valorAcumulado)}`].join(' · ')
       : undefined;
 
   const totalPago = financial.summary?.totalValorPagoGlobal ?? 0;
@@ -82,7 +81,7 @@ export const ContractHealthStrip: React.FC<ContractHealthStripProps> = ({ contra
     ? `${Math.round((totalPago / valorGlobal) * 100)}% pago`
     : '—';
   const financeiroHint: string | string[] = financial.summary && valorGlobal > 0
-    ? [`${formatCurrency(totalPago)} pagos`, `empenhado ${formatCurrencyCompact(totalEmpenhado)}`]
+    ? [`${formatCurrencyRounded(totalPago)} pagos`, `empenhado ${formatCurrencyCompact(totalEmpenhado)}`]
     : financial.isLoading
     ? 'Carregando empenhos'
     : 'Sem empenhos vinculados';

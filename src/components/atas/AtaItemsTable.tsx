@@ -8,6 +8,7 @@ import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteir
 import { saldoBarColor } from './ataSaldoStats';
 import type { ArpItemRecord } from '../../types';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
+import { formatCurrencyOrDash } from '../../utils/format';
 
 interface AtaItemsTableProps {
   itens: ArpItemRecord[];
@@ -27,10 +28,6 @@ interface AtaItemsTableProps {
   emptyAction?: React.ReactNode;
 }
 
-function formatCurrency(val?: number): string {
-  if (typeof val !== 'number' || isNaN(val)) return 'R$ 0,00';
-  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 const formatQtd = (val?: number) => (typeof val === 'number' && !isNaN(val) ? val.toLocaleString('pt-BR') : '0');
 
@@ -71,7 +68,7 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
     return (
       <EmptyState
         title="Nenhum item cadastrado."
-        description={emptyDescription || 'Esta Ata não possui itens sincronizados na base.'}
+        description={emptyDescription || 'Esta ata não possui itens sincronizados na base.'}
         action={emptyAction}
       />
     );
@@ -122,7 +119,7 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
                       </span>
                     </div>
                   </td>
-                  <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.valorUnitario)}</td>
+                  <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrencyOrDash(item.valorUnitario)}</td>
                   <td data-label="Qtd. SENASP" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdHomologada)}</td>
                   <td data-label="Consumido" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdConsumida)}</td>
                   <td data-label="Saldo" style={{ ...carteiraTd, textAlign: 'right', fontWeight: 800 }}>{formatQtd(saldoDisponivel)}</td>

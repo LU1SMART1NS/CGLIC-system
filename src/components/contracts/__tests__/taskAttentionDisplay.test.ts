@@ -101,24 +101,24 @@ describe('Fase 5.2 — Central de Atenção e Tarefas do Contrato 360°', () => 
   });
 
   describe('2. Semântica de Execução (TaskExecutionMode — getExecutionModeDisplay)', () => {
-    it('deve mapear INTERNA para "Providência Interna"', () => {
+    it('deve mapear INTERNA para "Providência interna"', () => {
       const display = getExecutionModeDisplay('INTERNA');
-      expect(display.label).toBe('Providência Interna');
+      expect(display.label).toBe('Providência interna');
     });
 
-    it('deve mapear EXTERNA para "Ação Externa"', () => {
+    it('deve mapear EXTERNA para "Ação externa"', () => {
       const display = getExecutionModeDisplay('EXTERNA');
-      expect(display.label).toBe('Ação Externa');
+      expect(display.label).toBe('Ação externa');
     });
 
-    it('deve mapear AUTOMATICA para "Processamento Automático"', () => {
+    it('deve mapear AUTOMATICA para "Processamento automático"', () => {
       const display = getExecutionModeDisplay('AUTOMATICA');
-      expect(display.label).toBe('Processamento Automático');
+      expect(display.label).toBe('Processamento automático');
     });
 
-    it('deve mapear CONFIRMACAO para "Confirmação Oficial"', () => {
+    it('deve mapear CONFIRMACAO para "Confirmação oficial"', () => {
       const display = getExecutionModeDisplay('CONFIRMACAO');
-      expect(display.label).toBe('Confirmação Oficial');
+      expect(display.label).toBe('Confirmação oficial');
     });
   });
 

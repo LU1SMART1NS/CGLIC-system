@@ -12,8 +12,8 @@ import {
 import { DateField, Field, FooterButtons } from './PaymentCycleModals';
 import { errorMessage, useEmpenhosDoContrato } from './cicloPagamentoShared';
 import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR, parseDateInputBR } from './paymentFormUtils';
+import { formatCurrency } from '../../../utils/format';
 
-const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const AUTOMATICO = '__AUTO__';
 const ROTULO: Record<TipoExpectativa, string> = { MENSAL: 'Mensal', ENTREGA: 'Por entrega', EVENTUAL: 'Eventual' };
 const subtle: React.CSSProperties = { fontSize: '0.78rem', color: '#64748b' };
@@ -89,15 +89,15 @@ export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEd
 
   const textoSugestao =
     sugestao === 'MENSAL'
-      ? `Sugestão do sistema: mensal (pago nos 3 últimos meses, média ${moeda(historico?.media ?? 0)}).`
+      ? `Sugestão do sistema: mensal (pago nos 3 últimos meses, média ${formatCurrency(historico?.media ?? 0)}).`
       : sugestao === 'TALVEZ_MENSAL'
-        ? `Sugestão do sistema: talvez mensal (pago em 2 dos 3 últimos meses, média ${moeda(historico?.media ?? 0)}).`
+        ? `Sugestão do sistema: talvez mensal (pago em 2 dos 3 últimos meses, média ${formatCurrency(historico?.media ?? 0)}).`
         : 'Sem padrão de pagamento nos 3 últimos meses.';
 
   const colunas: Column<EntregaPrevista>[] = [
     { key: 'data', header: 'Data prevista', priority: 'primary', render: (e) => <strong>{isoToBR(e.dataPrevista)}</strong> },
     { key: 'descricao', header: 'O que será entregue', render: (e) => e.descricao },
-    { key: 'valor', header: 'Valor', align: 'right', render: (e) => moeda(e.valor) },
+    { key: 'valor', header: 'Valor', align: 'right', render: (e) => formatCurrency(e.valor) },
     { key: 'empenho', header: 'Empenho', render: (e) => (e.empenhoCanonicalKey ? e.empenhoCanonicalKey.split('-').pop() : '—') }
   ];
 
@@ -134,7 +134,7 @@ export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEd
           </div>
         </div>
       ) : (
-        marca?.valorMensal ? <div style={subtle}>Valor mensal informado: {moeda(marca.valorMensal)}</div> : null
+        marca?.valorMensal ? <div style={subtle}>Valor mensal informado: {formatCurrency(marca.valorMensal)}</div> : null
       )}
       {marca?.atualizadoPorNome && <div style={subtle}>Marcado por {marca.atualizadoPorNome}.</div>}
 
@@ -250,7 +250,7 @@ const EntregaModal: React.FC<{
             <option value="">Não informado</option>
             {empenhos.map((e) => (
               <option key={e.canonicalKey} value={e.canonicalKey}>
-                {e.numero} · saldo {moeda(e.saldo)}
+                {e.numero} · saldo {formatCurrency(e.saldo)}
               </option>
             ))}
           </select>
@@ -298,7 +298,7 @@ const CancelarEntregaModal: React.FC<{ entrega: EntregaPrevista | null; onClose:
     >
       <form id="expectativa-cancelar-form" onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ fontSize: '0.85rem' }}>
-          {entrega.descricao} · {isoToBR(entrega.dataPrevista)} · {moeda(entrega.valor)}
+          {entrega.descricao} · {isoToBR(entrega.dataPrevista)} · {formatCurrency(entrega.valor)}
         </div>
         <Field id="cancelar-motivo" label="Motivo *">
           <input id="cancelar-motivo" className="form-input" type="text" placeholder="Ex.: entrega adiada para 2027" value={motivo} onChange={(e) => setMotivo(e.target.value)} required />

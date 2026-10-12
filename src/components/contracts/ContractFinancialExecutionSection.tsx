@@ -50,6 +50,7 @@ import {
   useToast,
   type Column
 } from '../../design-system';
+import { formatCurrencyOrDash, formatDateBR } from '../../utils/format';
 
 interface ContractFinancialExecutionSectionProps {
   contract: ContractDashboardRecord;
@@ -60,21 +61,8 @@ interface ContractFinancialExecutionSectionProps {
   onAbrirFatura?: (idFatura: number) => void;
 }
 
-const formatCurrency = (val?: number | null) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
-const formatDate = (val?: string | null) => {
-  if (!val) return '—';
-  try {
-    const parts = val.split('T')[0].split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-    return new Date(val).toLocaleDateString('pt-BR');
-  } catch {
-    return val;
-  }
-};
+const formatDate = (val?: string | null) => (val ? formatDateBR(val) : '—');
 
 /** O sistema só repete o vínculo do Contratos.gov.br: a correção é lá. */
 const COMO_CORRIGIR_NA_FONTE =
@@ -140,7 +128,7 @@ const EmpenhosDescartados: React.FC<{
   const columns: Column<DescarteEmpenhoContrato>[] = [
     { key: 'numero', header: 'Empenho', priority: 'primary', render: (d) => <strong>{d.numeroOficial || '—'}</strong> },
     { key: 'credor', header: 'Credor', render: (d) => d.credorNome || '—' },
-    { key: 'valor', header: 'Empenhado', align: 'right', render: (d) => formatCurrency(d.valorEmpenhado) },
+    { key: 'valor', header: 'Empenhado', align: 'right', render: (d) => formatCurrencyOrDash(d.valorEmpenhado) },
     { key: 'motivo', header: 'Motivo', render: (d) => d.motivo },
     {
       key: 'por',
@@ -186,7 +174,7 @@ const EmpenhosDescartados: React.FC<{
   );
 };
 
-const brlCurto = (v: number) => formatCurrency(v);
+const brlCurto = (v: number) => formatCurrencyOrDash(v);
 const qtd = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
 /** Divisão da nota entre os itens do contrato e as faturas que a citam: o que a setinha da linha abre. */
@@ -674,10 +662,10 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
       )
     },
     { key: 'data', header: 'Emissão', sortValue: (e) => e.data_emissao, render: (e) => formatDate(e.data_emissao) },
-    { key: 'empenhado', header: 'Empenhado', sortValue: (e) => e.valor_empenhado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(e.valor_empenhado) },
-    { key: 'liquidado', header: 'Liquidado', sortValue: (e) => e.valor_liquidado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(e.valor_liquidado) },
-    { key: 'pago', header: 'Pago', sortValue: (e) => e.valor_pago, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(e.valor_pago) },
-    { key: 'saldo', header: 'Saldo a executar', sortValue: (e) => Math.max(0, e.valor_empenhado - e.valor_pago), sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrency(Math.max(0, e.valor_empenhado - e.valor_pago)) },
+    { key: 'empenhado', header: 'Empenhado', sortValue: (e) => e.valor_empenhado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(e.valor_empenhado) },
+    { key: 'liquidado', header: 'Liquidado', sortValue: (e) => e.valor_liquidado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(e.valor_liquidado) },
+    { key: 'pago', header: 'Pago', sortValue: (e) => e.valor_pago, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(e.valor_pago) },
+    { key: 'saldo', header: 'Saldo a executar', sortValue: (e) => Math.max(0, e.valor_empenhado - e.valor_pago), sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(Math.max(0, e.valor_empenhado - e.valor_pago)) },
     {
       key: 'itens',
       header: 'Itens do contrato',
@@ -718,15 +706,15 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
       <SummaryBar
         testId="contract-financial-summary"
         items={[
-          { label: 'Empenhado', value: formatCurrency(totalEmpenhado), unit: '' },
-          { label: 'Liquidado', value: `${formatCurrency(totalLiquidado)} (${pctLiquidado.toFixed(1)}%)`, unit: '' },
-          { label: 'Pago', value: `${formatCurrency(totalPago)} (${pctPago.toFixed(1)}%)`, unit: '', tone: 'success' },
-          { label: 'Saldo não executado', value: formatCurrency(summary.saldoNaoExecutadoGlobal), unit: '', tone: 'warning' }
+          { label: 'Empenhado', value: formatCurrencyOrDash(totalEmpenhado), unit: '' },
+          { label: 'Liquidado', value: `${formatCurrencyOrDash(totalLiquidado)} (${pctLiquidado.toFixed(1)}%)`, unit: '' },
+          { label: 'Pago', value: `${formatCurrencyOrDash(totalPago)} (${pctPago.toFixed(1)}%)`, unit: '', tone: 'success' },
+          { label: 'Saldo não executado', value: formatCurrencyOrDash(summary.saldoNaoExecutadoGlobal), unit: '', tone: 'warning' }
         ]}
         progress={{ value: totalPago, max: totalEmpenhado, label: 'Pago do empenhado' }}
       >
         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-          A liquidar <strong>{formatCurrency(summary.saldoALiquidarGlobal)}</strong> · A pagar <strong>{formatCurrency(summary.saldoAPagarGlobal)}</strong>
+          A liquidar <strong>{formatCurrencyOrDash(summary.saldoALiquidarGlobal)}</strong> · A pagar <strong>{formatCurrencyOrDash(summary.saldoAPagarGlobal)}</strong>
         </span>
         <SituacaoSincronizacaoEmpenhos sync={sync} />
         {(aDistribuir.length > 0 || aRever.length > 0) && (
@@ -786,7 +774,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
             <strong>{compartilhadas.length}</strong>{' '}
             {compartilhadas.length === 1 ? 'empenho desta lista também está vinculado' : 'empenhos desta lista também estão vinculados'} a outro
             contrato, porque o Contratos.gov.br os lista nos dois. O valor{' '}
-            {compartilhadas.length === 1 ? 'dele' : 'deles'}, <strong>{formatCurrency(valorCompartilhado)}</strong>, entra inteiro no total de
+            {compartilhadas.length === 1 ? 'dele' : 'deles'}, <strong>{formatCurrencyOrDash(valorCompartilhado)}</strong>, entra inteiro no total de
             cada contrato. Se algum não for deste contrato, retire-o no Contratos.gov.br.
           </NoticeBar>
         )}
@@ -795,7 +783,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
             {divergentes.length === 1 ? 'O empenho' : 'Os empenhos'}{' '}
             <strong>{divergentes.map((e) => e.numero_oficial).join(', ')}</strong>{' '}
             {divergentes.length === 1 ? 'tem credor diferente' : 'têm credor diferente'} do fornecedor do contrato
-            {contract.fornecedorNome ? ` (${contract.fornecedorNome})` : ''}: {formatCurrency(valorDivergente)} que podem estar no contrato
+            {contract.fornecedorNome ? ` (${contract.fornecedorNome})` : ''}: {formatCurrencyOrDash(valorDivergente)} que podem estar no contrato
             errado no Contratos.gov.br. {COMO_CORRIGIR_NA_FONTE}
           </NoticeBar>
         )}

@@ -97,10 +97,10 @@ describe('AtaTasksSection — mesma tela do plano de gestão do Contrato', () =>
   it('sem plano, mostra o estado vazio do design system com o texto da Ata', () => {
     const html = renderToStaticMarkup(<AtaTasksSection ataKey="00011/2026" plan={null} />);
     expect(html).toContain('data-testid="task-plan-empty"');
-    expect(html).toContain('Nenhum Modelo de Gestão aplicado a esta Ata');
+    expect(html).toContain('Nenhum modelo de gestão aplicado a esta ata');
     expect(html).toContain('Começar do zero');
     expect(html).toContain('Aplicar Modelo');
-    expect(html).not.toContain('Nenhum Modelo de Gestão aplicado a este contrato');
+    expect(html).not.toContain('Nenhum modelo de gestão aplicado a este contrato');
   });
 
   it('carregando usa o esqueleto compartilhado, não um texto solto', () => {
