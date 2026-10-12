@@ -244,15 +244,8 @@ const JanelaUnidades: React.FC<Omit<UnidadesDoContratoModalProps, 'contrato'> & 
                               aria-label={`Quantidade do contrato para ${l.unidade}`}
                               aria-invalid={ruim || undefined}
                               data-testid={`unidades-contrato-qtd-${l.unidade}`}
-                              style={{
-                                width: '110px',
-                                textAlign: 'right',
-                                fontVariantNumeric: 'tabular-nums',
-                                fontSize: '0.85rem',
-                                padding: '0.4rem 0.6rem',
-                                border: `1px solid ${ruim ? 'var(--color-danger-solid)' : '#cbd5e1'}`,
-                                borderRadius: '6px'
-                              }}
+                              className="form-input"
+                              style={{ width: '110px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                             />
                             {a.naoCabe && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>não cabe: livre {formatNumber(Math.max(a.livre, 0))}</span>}
                             {a.alterada && !ruim && l.original > 0 && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-warning-text)', marginTop: '0.15rem' }}>antes {formatNumber(l.original)}</span>}

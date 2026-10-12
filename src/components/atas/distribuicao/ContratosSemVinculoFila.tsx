@@ -9,7 +9,7 @@ import { EmptyState } from '../../../design-system/components/EmptyState';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink } from '../../carteira/CarteiraRowLink';
-import { carteiraSelect, carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
@@ -645,7 +645,8 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                                     value={`${ata.numeroAta}|${ata.uasg}`}
                                     onChange={(e) => setAtaEscolhida((prev) => ({ ...prev, [l.contractKey]: e.target.value }))}
                                     aria-label={`Ata para o contrato ${l.numero}`}
-                                    style={{ ...carteiraSelect, maxWidth: '160px' }}
+                                    className="form-input"
+                                    style={{ maxWidth: '160px' }}
                                   >
                                     {l.fortes.map((s) => (
                                       <option key={`${s.numeroAta}|${s.uasg}`} value={`${s.numeroAta}|${s.uasg}`}>
@@ -686,7 +687,8 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
                                 onChange={(e) => setGestorEscolhido((prev) => ({ ...prev, [l.contractKey]: e.target.value }))}
                                 aria-label={`Quem fica com o contrato ${l.numero}`}
                                 data-testid={`sem-vinculo-gestor-${l.contractKey}`}
-                                style={{ ...carteiraSelect, flex: 'none', maxWidth: '200px', fontWeight: 500 }}
+                                className="form-input"
+                                style={{ maxWidth: '200px' }}
                               >
                                 <option value="">Quem fica com o contrato?</option>
                                 {efeito.candidatos.map((g) => (
