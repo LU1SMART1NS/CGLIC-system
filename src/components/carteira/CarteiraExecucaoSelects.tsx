@@ -2,8 +2,6 @@ import React from 'react';
 import { CarteiraFilterButton } from './CarteiraFilterButton';
 import {
   FILTRO_NIVEL_VALUES,
-  NIVEL_ALOCACAO_LABEL,
-  NIVEL_EMPENHO_LABEL,
   type FiltroNivel,
   type NivelAtendimento
 } from '../../utils/itemAtendimento';
@@ -14,6 +12,9 @@ export const TODAS_UNIDADES = 'TODAS';
 export const NIVEL_FILTER_VALUES = FILTRO_NIVEL_VALUES;
 
 const NIVEIS: NivelAtendimento[] = ['TOTAL', 'PARCIAL', 'SEM'];
+/** Rótulos curtos dentro do menu: o nome do filtro ("Alocação", "Empenho") já diz do que se trata. */
+const ALOCACAO_FILTRO_LABEL: Record<NivelAtendimento, string> = { TOTAL: 'Total', PARCIAL: 'Parcial', SEM: 'Nenhuma' };
+const EMPENHO_FILTRO_LABEL: Record<NivelAtendimento, string> = { TOTAL: 'Total', PARCIAL: 'Parcial', SEM: 'Nenhum' };
 
 interface NivelSelectProps {
   value: FiltroNivel;
@@ -29,7 +30,7 @@ export const CarteiraAlocacaoSelect: React.FC<NivelSelectProps> = ({ value, onCh
     label="Alocação"
     value={value}
     emptyValue="TODOS"
-    options={NIVEIS.map((n) => ({ value: n, label: NIVEL_ALOCACAO_LABEL[n], count: counts?.[n] }))}
+    options={NIVEIS.map((n) => ({ value: n, label: ALOCACAO_FILTRO_LABEL[n], count: counts?.[n] }))}
     onChange={(v) => onChange(v as FiltroNivel)}
     testId={testId}
   />
@@ -41,7 +42,7 @@ export const CarteiraEmpenhoSelect: React.FC<NivelSelectProps> = ({ value, onCha
     label="Empenho"
     value={value}
     emptyValue="TODOS"
-    options={NIVEIS.map((n) => ({ value: n, label: NIVEL_EMPENHO_LABEL[n], count: counts?.[n] }))}
+    options={NIVEIS.map((n) => ({ value: n, label: EMPENHO_FILTRO_LABEL[n], count: counts?.[n] }))}
     onChange={(v) => onChange(v as FiltroNivel)}
     testId={testId}
   />

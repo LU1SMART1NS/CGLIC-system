@@ -167,7 +167,7 @@ describe('Alocação → Itens às unidades', () => {
     expect(html).toContain('Placa balística');
     expect(html).not.toContain('Capacete balístico');
     expect(html).toContain('vinc-itens-alocar-a');
-    expect(html).toContain('221 un ainda sem unidade');
+    expect(html).not.toContain('ainda sem unidade');
   });
 
   it('parcialmente alocados mostram o que falta e as unidades', () => {

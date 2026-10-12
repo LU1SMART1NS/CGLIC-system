@@ -193,7 +193,7 @@ describe('filtro em botão', () => {
         totalItens={9}
       />
     );
-    expect(html).toContain('Sem alocação');
+    expect(html).toContain('Nenhuma');
     expect(html).toContain('CGLIC');
     expect(html).toContain('Remover filtro Alocação');
     expect(html).toContain('Remover filtro Unidade');

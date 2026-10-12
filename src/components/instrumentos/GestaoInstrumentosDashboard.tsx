@@ -51,7 +51,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const [searchParams] = useSearchParams();
   const initialSeverity = searchParams.get('severity');
   const isValidSeverity = (value: string | null): value is GestaoInstrumentosCompactFiltersState['severidade'] =>
-    !!value && ['CRITICA', 'URGENTE', 'ATENCAO', 'INFO'].includes(value);
+    // "Info" saiu do filtro: são os lembretes, que já têm a categoria própria no trilho.
+    !!value && ['CRITICA', 'URGENTE', 'ATENCAO'].includes(value);
 
   const [activeTab, setActiveTab] = useState<GestaoInstrumentosCategoryTab>('TODAS');
   const [severidade, setSeveridade] = useState<GestaoInstrumentosCompactFiltersState['severidade']>(
