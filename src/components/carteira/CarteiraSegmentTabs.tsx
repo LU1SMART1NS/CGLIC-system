@@ -14,6 +14,8 @@ interface CarteiraSegmentTabsProps<T extends string> {
   /** Prefixo dos data-testid: `${testIdPrefix}-${id}`. */
   testIdPrefix: string;
   ariaLabel: string;
+  /** Classe extra no contêiner (ex.: posicionamento ao lado de outro trilho). */
+  className?: string;
   /** Resumo curto à direita (ex.: "R$ 184,2 mi em valor vigente"). */
   meta?: string;
 }
@@ -22,9 +24,9 @@ interface CarteiraSegmentTabsProps<T extends string> {
  * Trilho segmentado com contagem (filtros da lista; o selecionado fica destacado enquanto estiver ativo): as situações das carteiras
  * e as filas da Central de Distribuição.
  */
-export function CarteiraSegmentTabs<T extends string>({ segments, active, onSelect, testIdPrefix, ariaLabel, meta }: CarteiraSegmentTabsProps<T>) {
+export function CarteiraSegmentTabs<T extends string>({ segments, active, onSelect, testIdPrefix, ariaLabel, className, meta }: CarteiraSegmentTabsProps<T>) {
   return (
-    <div role="group" aria-label={ariaLabel} className="segment-pills">
+    <div role="group" aria-label={ariaLabel} className={className ? `segment-pills ${className}` : 'segment-pills'}>
       <div className="segment-pills__rail">
         {segments.map((s) => {
           const on = s.id === active;

@@ -77,6 +77,10 @@ export const EmpenhosItensPage: React.FC = () => {
   const base = filters.fila === 'EQUIPE' ? daEquipe : aVincular;
   const gestorDe = (d: DistribuicaoDoEmpenho) => contrato(d.contractKey).gestorNome;
 
+  const vigenciaCounts = useMemo(() => {
+    const encerrados = base.filter((d) => contrato(d.contractKey).expirado).length;
+    return { VIGENTES: base.length - encerrados, ENCERRADOS: encerrados };
+  }, [base, contrato]); // eslint-disable-line react-hooks/exhaustive-deps
   const uasgs = useMemo(() => {
     const m = new Map<string, number>();
     for (const d of base) {
@@ -183,6 +187,18 @@ export const EmpenhosItensPage: React.FC = () => {
         </div>
       ) : (
         <>
+          <div className="segment-pills-row">
+          <CarteiraSegmentTabs
+            testIdPrefix="vinc-empenhos-vigencia"
+            ariaLabel="Vigência do contrato"
+            active={filters.vigencia}
+            onSelect={(v) => setFilter('vigencia', v)}
+            segments={[
+              { id: 'VIGENTES', label: 'Contratos vigentes', count: vigenciaCounts.VIGENTES },
+              { id: TODOS, label: 'Todos', count: base.length },
+              { id: 'ENCERRADOS', label: 'Contratos encerrados', count: vigenciaCounts.ENCERRADOS, title: 'Contratos expirados' }
+            ]}
+          />
           <CarteiraSegmentTabs
             testIdPrefix="vinc-empenhos-fila"
             ariaLabel="Situação do vínculo"
@@ -193,6 +209,7 @@ export const EmpenhosItensPage: React.FC = () => {
               { id: 'EQUIPE', label: 'Vinculadas pela equipe', count: daEquipe.length, title: 'Vinculadas aos itens pela equipe nos últimos 30 dias' }
             ]}
           />
+          </div>
 
           <CarteiraFilterBar
             busca={filters.busca}
@@ -203,17 +220,6 @@ export const EmpenhosItensPage: React.FC = () => {
             counter={carteiraCounter(lista.length, base.length, hasActive, 'nota', 'notas')}
             testIdPrefix="vinc-empenhos"
           >
-            <CarteiraFilterButton
-              label="Vigência"
-              value={filters.vigencia}
-              emptyValue={TODOS}
-              options={[
-                { value: 'VIGENTES', label: 'Contratos vigentes' },
-                { value: 'ENCERRADOS', label: 'Contratos encerrados' }
-              ]}
-              onChange={(v) => setFilter('vigencia', v)}
-              testId="vinc-empenhos-filter-vigencia"
-            />
             {filters.fila === 'A_VINCULAR' && (
               <CarteiraFilterButton
                 label="Sugestão"

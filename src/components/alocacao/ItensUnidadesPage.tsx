@@ -95,6 +95,10 @@ export const ItensUnidadesPage: React.FC = () => {
     for (const r of base) if (filters.vigencia === TODOS || (filters.vigencia === 'HISTORICO' ? r.faixa === 'EXPIRADO' : r.faixa !== 'EXPIRADO')) n[r.nivelAlocacao]++;
     return n;
   }, [base, filters.vigencia]);
+  const vigenciaCounts = useMemo(() => {
+    const encerrados = base.filter((r) => r.faixa === 'EXPIRADO').length;
+    return { VIGENTES: base.length - encerrados, HISTORICO: encerrados };
+  }, [base]);
   const uasgs = useMemo(() => {
     const m = new Map<string, number>();
     // Filtro pela carteira da CGLIC (nas atas de outros órgãos, a UASG da ata é a do outro órgão).
@@ -173,6 +177,18 @@ export const ItensUnidadesPage: React.FC = () => {
         </div>
       ) : (
         <>
+          <div className="segment-pills-row">
+          <CarteiraSegmentTabs
+            testIdPrefix="vinc-itens-vigencia"
+            ariaLabel="Vigência da ata"
+            active={filters.vigencia}
+            onSelect={(v) => setFilter('vigencia', v)}
+            segments={[
+              { id: 'VIGENTES', label: 'Atas vigentes', count: vigenciaCounts.VIGENTES },
+              { id: TODOS, label: 'Todas', count: base.length },
+              { id: 'HISTORICO', label: 'Atas encerradas', count: vigenciaCounts.HISTORICO, title: 'Atas expiradas' }
+            ]}
+          />
           <CarteiraSegmentTabs
             testIdPrefix="vinc-itens-nivel"
             ariaLabel="Alocação do item"
@@ -186,6 +202,7 @@ export const ItensUnidadesPage: React.FC = () => {
             ]}
             meta={faltaTotal > 0 ? `${formatNumber(faltaTotal)} un ainda sem unidade` : undefined}
           />
+          </div>
 
           <CarteiraFilterBar
             busca={filters.busca}
@@ -196,17 +213,6 @@ export const ItensUnidadesPage: React.FC = () => {
             counter={carteiraCounter(lista.length, base.length, hasActive, 'item', 'itens')}
             testIdPrefix="vinc-itens"
           >
-            <CarteiraFilterButton
-              label="Vigência"
-              value={filters.vigencia}
-              emptyValue={TODOS}
-              options={[
-                { value: 'VIGENTES', label: 'Atas vigentes' },
-                { value: 'HISTORICO', label: 'Atas encerradas' }
-              ]}
-              onChange={(v) => setFilter('vigencia', v)}
-              testId="vinc-itens-filter-vigencia"
-            />
             <CarteiraUnidadeSelect value={filters.unidade} unidades={unidades} onChange={(v) => setFilter('unidade', v)} testId="vinc-itens-filter-unidade" />
             <CarteiraFilterButton label="UASG" value={filters.uasg} emptyValue={TODOS} options={[...uasgs.keys()].sort().map((u) => ({ value: u, label: u, count: uasgs.get(u) }))} onChange={(v) => setFilter('uasg', v)} testId="vinc-itens-filter-uasg" />
             {showGestorFilter && <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="vinc-itens-filter-gestor" />}
