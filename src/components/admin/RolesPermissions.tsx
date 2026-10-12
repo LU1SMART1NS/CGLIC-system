@@ -125,14 +125,7 @@ export function resolveProfileLabel(profile: ProfileDefinition, roles: RoleDefin
 export const ProfileDetailContent: React.FC<{ profile: ProfileDefinition }> = ({ profile }) => {
   return (
     <div data-testid={`profile-detail-${profile.id}`} style={{ display: 'flex', flexDirection: 'column', gap: spacing.xl }}>
-      <div>
-        <h2 style={{ margin: 0, fontSize: typography.fontSize.h4, fontWeight: 800, color: colors.text.primary }}>
-          {profile.label}
-        </h2>
-        <p style={{ margin: `${spacing.xs} 0 0 0`, fontSize: typography.fontSize.bodySm, color: colors.text.secondary, lineHeight: 1.5 }}>
-          {profile.description}
-        </p>
-      </div>
+      <SectionHeader title={profile.label} subtitle={profile.description} className="section-header--flush" testId={`profile-detail-header-${profile.id}`} />
 
       <div>
         <SectionHeader title="Acesso por área" testId="profile-detail-areas-header" />

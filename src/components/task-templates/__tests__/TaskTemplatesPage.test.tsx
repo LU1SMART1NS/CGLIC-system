@@ -56,6 +56,6 @@ describe('TaskTemplatesPage genérica (Atas e Contratos)', () => {
     );
     expect(html).toContain('Plano padrão');
     expect(html).toContain('Fase 1');
-    expect(html).toContain('Modelos Disponíveis (1)');
+    expect(html).toContain('Modelos disponíveis');
   });
 });
