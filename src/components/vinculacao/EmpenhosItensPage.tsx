@@ -54,7 +54,7 @@ const VERMELHO = 'var(--color-danger)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
-const SUGESTAO_LABEL: Record<Exclude<FiltroSugestao, 'TODOS'>, string> = { UNICA: 'Sugestão única', VARIAS: 'Mais de uma possibilidade', NENHUMA: 'Sem sugestão' };
+const SUGESTAO_LABEL: Record<Exclude<FiltroSugestao, 'TODOS'>, string> = { UNICA: 'Única', VARIAS: 'Mais de uma', NENHUMA: 'Nenhuma' };
 
 /**
  * Vinculação → Empenhos aos itens: notas de contratos com dois ou mais itens que ainda não foram vinculadas aos
