@@ -1,4 +1,5 @@
 import React from 'react';
+import { InfoHint } from '../../../design-system';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
@@ -44,11 +45,6 @@ export const DivergenciasFila: React.FC<DivergenciasFilaProps> = ({ divergencias
 
   return (
     <section data-testid="distribuicao-divergencias" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-        Pela regra, o contrato vinculado a uma ata tem o mesmo gestor da ata. "Alinhar gestor" atribui o gestor à ata e o leva a todos os
-        contratos vinculados a ela.
-      </p>
-
       <CarteiraFilterBar
         busca={filters.busca}
         searchPlaceholder="Buscar por ata, contrato, gestor..."
@@ -57,7 +53,12 @@ export const DivergenciasFila: React.FC<DivergenciasFilaProps> = ({ divergencias
         onResetFilters={resetFilters}
         counter={carteiraCounter(filtradas.length, divergencias.length, hasActive, 'contrato', 'contratos')}
         testIdPrefix="divergencias"
-      />
+      >
+        <InfoHint
+          testId="divergencias-info"
+          content='Pela regra, o contrato vinculado a uma ata tem o mesmo gestor da ata. "Alinhar gestor" atribui o gestor à ata e o leva a todos os contratos vinculados a ela.'
+        />
+      </CarteiraFilterBar>
 
       {divergencias.length === 0 ? (
         <div style={{ ...carteiraTableShell, padding: '1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
