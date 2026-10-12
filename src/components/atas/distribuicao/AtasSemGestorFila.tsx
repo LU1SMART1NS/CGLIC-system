@@ -1,4 +1,5 @@
 import React from 'react';
+import { InfoHint } from '../../../design-system';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
@@ -94,20 +95,6 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
 
   return (
     <section data-testid={historico ? 'distribuicao-atas-historico' : 'distribuicao-atas-sem-gestor'} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-        {historico ? (
-          <>
-            Atas encerradas, sem gestor e sem contrato vigente. Não há o que acompanhar; atribuir aqui só registra quem responde pelo
-            histórico, e não pesa na carga do gestor.
-          </>
-        ) : (
-          <>
-            Ao atribuir a ata, o servidor recebe também os contratos vinculados a ela. Os prováveis (mesma compra e mesmo fornecedor) ele
-            vincula na Ata 360, e passam a ser dele no momento do vínculo.
-          </>
-        )}
-      </p>
-
       <CarteiraFilterBar
         busca={filters.busca}
         searchPlaceholder="Buscar por ata, fornecedor, objeto, contrato..."
@@ -148,6 +135,14 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
           ]}
           onChange={(v) => setFilter('contratos', v)}
           testId="atas-sem-gestor-filter-contratos"
+        />
+        <InfoHint
+          testId={historico ? 'atas-historico-info' : 'atas-sem-gestor-info'}
+          content={
+            historico
+              ? 'Atas encerradas, sem gestor e sem contrato vigente. Não há o que acompanhar; atribuir aqui só registra quem responde pelo histórico, e não pesa na carga do gestor.'
+              : 'Ao atribuir a ata, o servidor recebe também os contratos vinculados a ela. Os prováveis (mesma compra e mesmo fornecedor) ele vincula na Ata 360, e passam a ser dele no momento do vínculo.'
+          }
         />
       </CarteiraFilterBar>
 
