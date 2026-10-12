@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search } from 'lucide-react';
-import { AppInput, Modal } from '../../../design-system';
+import { AppInput, Modal, StatusBadge } from '../../../design-system';
 import { formatDateBR } from '../../../utils/format';
 import type { FilaAta, ItemFila, MotivoSugestao } from './contratosSemAta';
 import { opcoesDeAta, type OpcaoAta } from './escolherAta';
@@ -14,20 +14,9 @@ const ROTULO_MOTIVO: Record<MotivoSugestao, string> = {
   FORNECEDOR: 'Mesmo fornecedor'
 };
 
-const Selo: React.FC<{ tom: 'ok' | 'aviso' | 'neutro'; children: React.ReactNode }> = ({ tom, children }) => (
-  <span
-    style={{
-      fontSize: '0.7rem',
-      fontWeight: 700,
-      padding: '0.1rem 0.45rem',
-      borderRadius: '999px',
-      whiteSpace: 'nowrap',
-      color: tom === 'ok' ? 'var(--color-success-text)' : tom === 'aviso' ? 'var(--color-warning-text)' : '#64748b',
-      background: tom === 'ok' ? 'var(--color-success-bg, #ecfdf5)' : tom === 'aviso' ? 'var(--color-warning-bg, #fffbeb)' : '#f1f5f9'
-    }}
-  >
-    {children}
-  </span>
+/** Selo padrão (StatusBadge) com o tom da opção: verde (compra e fornecedor), amarelo (pista parcial ou aviso), cinza. */
+const Selo: React.FC<{ tom: 'ok' | 'aviso' | 'neutro'; children: string }> = ({ tom, children }) => (
+  <StatusBadge label={children} variant={tom === 'ok' ? 'success' : tom === 'aviso' ? 'warning' : 'neutral'} size="sm" dot={false} />
 );
 
 const LinhaAta: React.FC<{ opcao: OpcaoAta; onEscolher: () => void }> = ({ opcao, onEscolher }) => {

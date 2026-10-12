@@ -12,10 +12,10 @@ describe('SeloPapelSenasp', () => {
     expect(html).toContain('UASG 200342');
     expect(html).toContain('var(--color-info-bg)');
   });
-  it('adesão: rótulo próprio, borda tracejada e sem UASG quando pedido', () => {
+  it('adesão: rótulo próprio, selo cinza (não azul) e sem UASG quando pedido', () => {
     const html = renderToStaticMarkup(<SeloPapelSenasp arp={{ codigoUnidadeGerenciadora: '200109', papelSenasp: 'ADESAO' }} comUasg={false} />);
     expect(html).toContain('Adesão da SENASP');
-    expect(html).toContain('dashed');
-    expect(html).not.toContain('UASG 200109</span>');
+    expect(html).not.toContain('var(--color-info-bg)');
+    expect(html).not.toContain('· UASG 200109');
   });
 });
