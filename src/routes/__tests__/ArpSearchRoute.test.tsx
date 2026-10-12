@@ -159,7 +159,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
     expect(html).toContain('arp-filter-empenho');
     expect(html).toContain('arp-filter-unidade');
     expect(html).toContain('arp-filter-papel');
-    expect(html).toContain('Papel da SENASP');
+    expect(html).toContain('Papel');
     expect(html).toContain('Alocação');
     expect(html).toContain('Empenho');
     expect(html).toContain('Unidade');

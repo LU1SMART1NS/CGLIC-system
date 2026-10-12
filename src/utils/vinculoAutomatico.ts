@@ -10,9 +10,9 @@ export interface TextoMotivo {
 }
 
 export const ROTULO_TIPO_MOTIVO: Record<TipoMotivo, string> = {
-  GESTOR: 'Decisão de gestor',
-  DADO: 'Dado que não fecha',
-  EQUIPE: 'Decidido pela equipe'
+  GESTOR: 'Falta escolher o gestor',
+  DADO: 'Dado da fonte não bate',
+  EQUIPE: 'Equipe já decidiu'
 };
 
 /**

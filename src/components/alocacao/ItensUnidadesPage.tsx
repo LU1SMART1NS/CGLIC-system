@@ -52,7 +52,9 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   busca: { param: 'busca', default: '' }
 };
-const AMBAR = 'var(--color-warning-solid)';
+const VERDE = 'var(--color-success)';
+const AMARELO = 'var(--color-warning-solid)';
+const VERMELHO = 'var(--color-danger)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 const clamp2: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 /** "00059/2025" → "2025/00059": ordena pelo ano e depois pelo número (igual à Carteira › Itens). */
@@ -143,7 +145,6 @@ export const ItensUnidadesPage: React.FC = () => {
   const abrirItem = (r: CarteiraItemRow) => navigate(`${buildAtaItemPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)}?aba=alocacao`);
   const alocar = (r: CarteiraItemRow) =>
     setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp });
-  const faltaTotal = base.filter((r) => filters.vigencia !== 'VIGENTES' || r.faixa !== 'EXPIRADO').reduce((s, r) => s + Math.max(0, r.quantitativoSenasp - r.alocado), 0);
 
   if (syncError && arps.length === 0) {
     return (
@@ -179,12 +180,11 @@ export const ItensUnidadesPage: React.FC = () => {
             active={nivelAtivo}
             onSelect={(v) => setFilter('nivel', v)}
             segments={[
-              { id: 'SEM', label: 'Sem alocação', count: nivelCounts.SEM, dot: nivelCounts.SEM ? AMBAR : undefined, title: 'Nenhuma unidade recebeu o item' },
-              { id: 'PARCIAL', label: 'Parcialmente alocados', count: nivelCounts.PARCIAL, dot: nivelCounts.PARCIAL ? AMBAR : undefined, title: 'O alocado não alcança o quantitativo SENASP' },
-              { id: 'TOTAL', label: 'Alocados', count: nivelCounts.TOTAL, title: 'O alocado alcança o quantitativo SENASP' },
+              { id: 'TOTAL', label: 'Alocados', count: nivelCounts.TOTAL, dot: VERDE, title: 'O alocado alcança o quantitativo SENASP' },
+              { id: 'PARCIAL', label: 'Parcialmente alocados', count: nivelCounts.PARCIAL, dot: AMARELO, title: 'O alocado não alcança o quantitativo SENASP' },
+              { id: 'SEM', label: 'Sem alocação', count: nivelCounts.SEM, dot: VERMELHO, title: 'Nenhuma unidade recebeu o item' },
               { id: 'TODOS', label: 'Todos', count: nivelCounts.SEM + nivelCounts.PARCIAL + nivelCounts.TOTAL }
             ]}
-            meta={faltaTotal > 0 ? `${formatNumber(faltaTotal)} un ainda sem unidade` : undefined}
           />
 
           <CarteiraFilterBar
@@ -201,8 +201,8 @@ export const ItensUnidadesPage: React.FC = () => {
               value={filters.vigencia}
               emptyValue={TODOS}
               options={[
-                { value: 'VIGENTES', label: 'Atas vigentes' },
-                { value: 'HISTORICO', label: 'Atas encerradas' }
+                { value: 'VIGENTES', label: 'Vigentes' },
+                { value: 'HISTORICO', label: 'Encerradas' }
               ]}
               onChange={(v) => setFilter('vigencia', v)}
               testId="vinc-itens-filter-vigencia"

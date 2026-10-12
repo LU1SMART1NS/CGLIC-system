@@ -3,6 +3,7 @@ import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
+import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
@@ -160,7 +161,8 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
   const confirmDialog = useConfirmDialog();
   const toast = useToast();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
-  const hasActive = hasActiveCarteiraFilters(SCHEMA, filters);
+  // A situação fica no trilho: "Limpar" da barra aparece só pelos demais filtros.
+  const hasActive = hasActiveCarteiraFilters(SCHEMA, { ...filters, situacao: TODAS });
   const lote = useVinculoEmMassa();
   const descartar = useDescartarAta();
   const confirmar = useConfirmarContratoSemAta();
@@ -476,6 +478,20 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
         </div>
       )}
 
+      <CarteiraSegmentTabs
+        testIdPrefix="sem-vinculo-situacao"
+        ariaLabel="Situação do contrato"
+        active={filters.situacao}
+        onSelect={(v) => setFilter('situacao', v)}
+        segments={[
+          { id: 'ATA_PROVAVEL', label: ROTULO_GRUPO.ATA_PROVAVEL, count: contagem('ATA_PROVAVEL'), dot: 'var(--color-success)', title: 'Mesma compra e mesmo fornecedor de uma ata' },
+          { id: 'PARCIAL', label: ROTULO_GRUPO.PARCIAL, count: contagem('PARCIAL'), dot: 'var(--color-warning-solid)', title: 'Só a compra ou só o fornecedor batem' },
+          { id: 'SEM_PISTA', label: ROTULO_GRUPO.SEM_PISTA, count: contagem('SEM_PISTA'), dot: 'var(--color-danger)', title: 'Nenhuma ata parecida' },
+          { id: 'NAO_PERTENCE', label: ROTULO_GRUPO.NAO_PERTENCE, count: contagem('NAO_PERTENCE'), title: 'O coordenador marcou que o contrato não veio de ata' },
+          { id: TODAS, label: 'Todos', count: pendentes.length, title: 'Contratos pendentes (sem os "não pertence" que já têm gestor)' }
+        ]}
+      />
+
       <CarteiraFilterBar
         busca={filters.busca}
         searchPlaceholder="Buscar por contrato, fornecedor, CNPJ, ata, gestor..."
@@ -485,14 +501,6 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
         counter={carteiraCounter(filtradas.length, pendentes.length, hasActive, 'contrato', 'contratos')}
         testIdPrefix="sem-vinculo"
       >
-        <CarteiraFilterButton
-          label="Situação"
-          value={filters.situacao}
-          emptyValue={TODAS}
-          options={(['ATA_PROVAVEL', 'PARCIAL', 'SEM_PISTA', 'NAO_PERTENCE'] as const).map((g) => ({ value: g, label: ROTULO_GRUPO[g], count: contagem(g) }))}
-          onChange={(v) => setFilter('situacao', v)}
-          testId="sem-vinculo-filter-situacao"
-        />
         <CarteiraFilterButton
           label="Motivo"
           value={filters.motivo}

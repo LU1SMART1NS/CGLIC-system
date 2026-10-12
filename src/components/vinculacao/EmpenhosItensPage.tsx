@@ -49,7 +49,8 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   busca: { param: 'busca', default: '' }
 };
-const AMBAR = 'var(--color-warning-solid)';
+const VERDE = 'var(--color-success)';
+const VERMELHO = 'var(--color-danger)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -189,8 +190,8 @@ export const EmpenhosItensPage: React.FC = () => {
             active={filters.fila}
             onSelect={(v) => setFilter('fila', v)}
             segments={[
-              { id: 'A_VINCULAR', label: 'A vincular', count: aVincular.length, dot: aVincular.length ? AMBAR : undefined, title: 'Notas que ainda não entram no empenhado dos itens' },
-              { id: 'EQUIPE', label: 'Vinculadas pela equipe', count: daEquipe.length, title: 'Vinculadas aos itens pela equipe nos últimos 30 dias' }
+              { id: 'EQUIPE', label: 'Vinculadas pela equipe', count: daEquipe.length, dot: VERDE, title: 'Vinculadas aos itens pela equipe nos últimos 30 dias' },
+              { id: 'A_VINCULAR', label: 'A vincular', count: aVincular.length, dot: VERMELHO, title: 'Notas que ainda não entram no empenhado dos itens' }
             ]}
           />
 
@@ -208,8 +209,8 @@ export const EmpenhosItensPage: React.FC = () => {
               value={filters.vigencia}
               emptyValue={TODOS}
               options={[
-                { value: 'VIGENTES', label: 'Contratos vigentes' },
-                { value: 'ENCERRADOS', label: 'Contratos encerrados' }
+                { value: 'VIGENTES', label: 'Vigentes' },
+                { value: 'ENCERRADOS', label: 'Encerrados' }
               ]}
               onChange={(v) => setFilter('vigencia', v)}
               testId="vinc-empenhos-filter-vigencia"
