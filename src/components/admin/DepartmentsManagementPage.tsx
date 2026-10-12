@@ -297,7 +297,6 @@ export const DepartmentsManagementPage: React.FC = () => {
       <AdminListShell
         testId="departments-table-container"
         title="Unidades e departamentos oficiais"
-        countLabel={filtered.length === departments.length ? String(departments.length) : `${filtered.length} de ${departments.length}`}
         isLoading={isDepartmentsLoading}
         isError={isDepartmentsError}
         errorTitle="Não foi possível carregar as unidades internas"

@@ -249,7 +249,6 @@ export const UsersManagement: React.FC = () => {
       <AdminListShell
         testId="users-table-container"
         title="Servidores e usuários"
-        countLabel={filteredUsers.length === users.length ? String(users.length) : `${filteredUsers.length} de ${users.length}`}
         isLoading={isLoading}
         isEmpty={filteredUsers.length === 0}
         emptyTitle="Nenhum usuário encontrado"

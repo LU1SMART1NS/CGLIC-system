@@ -11,6 +11,7 @@ import {
 import { AppCard } from '../../design-system/components/AppCard';
 import { AppButton } from '../../design-system/components/AppButton';
 import { PageHeader } from '../../design-system/components/PageHeader';
+import { SectionHeader } from '../../design-system/components/SectionHeader';
 import { Modal } from '../../design-system/components/Modal';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
@@ -379,7 +380,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
               </h3>
               <StatusBadge
                 variant={template.ativo ? 'success' : 'neutral'}
-                label={template.ativo ? 'ATIVO' : 'INATIVO'}
+                label={template.ativo ? 'Ativo' : 'Inativo'}
               />
             </div>
             {template.descricao && (
@@ -512,15 +513,13 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
 
       {/* Lista de Templates Cadastrados */}
       <div>
-        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Modelos Disponíveis ({templates.length})
-            </h2>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{copy.activeHint}</span>
-          </div>
-          <ActionButton action="novo" label="Novo modelo" onClick={() => setCreating(true)} data-testid="template-new" />
-        </div>
+        <SectionHeader
+          title="Modelos disponíveis"
+          countBadge={templates.length}
+          subtitle={copy.activeHint}
+          actions={<ActionButton action="novo" label="Novo modelo" onClick={() => setCreating(true)} data-testid="template-new" />}
+          testId="templates-header"
+        />
 
         {isLoading ? (
           <SkeletonLoader count={3} height="120px" />
