@@ -29,6 +29,7 @@ export const ContractsPortfolioSummary: React.FC<ContractsPortfolioSummaryProps>
 }) => (
   <CarteiraSituacaoTabs
     testIdPrefix="contracts"
+    genero="m"
     vigentes={vigentes}
     criticos={criticos}
     atencao={atencao}

@@ -138,7 +138,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
     expect(html).toContain('Crítico');
     expect(html).toContain('Vencem em até 30 dias');
     expect(html).toContain('Atenção');
-    expect(html).toContain('Histórico');
+    expect(html).toContain('Encerradas');
     expect(html).toContain('aria-pressed="true"');
   });
 

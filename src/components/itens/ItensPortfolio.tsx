@@ -165,6 +165,7 @@ export const ItensPortfolio: React.FC = () => {
         <>
           <CarteiraSituacaoTabs
             testIdPrefix="itens"
+            genero="m"
             vigentes={resumoVigencia.vigentes}
             criticos={resumoVigencia.criticos}
             atencao={resumoVigencia.atencao}
