@@ -27,7 +27,6 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/modals/ExportExcelModal.tsx': 7, // presets e chips de grupo
   'src/components/plan/TaskPlanSection.tsx': 1, // seletor de status
   'src/design-system/components/AppButton.tsx': 2, // o próprio componente (e a menção no comentário)
-  'src/design-system/components/FilterBar.tsx': 1, // chip de filtro
   'src/design-system/components/Modal.tsx': 1, // fechar
   'src/design-system/components/Tabs.tsx': 1, // abas
   'src/design-system/components/Toast.tsx': 1 // fechar
