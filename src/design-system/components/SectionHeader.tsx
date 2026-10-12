@@ -33,8 +33,8 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
         marginBottom: spacing.xl
       }}
     >
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+      <div className="section-header__title-block">
+        <div className="section-header__title-row" style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
           {icon && (
             <div
               style={{
@@ -80,10 +80,12 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
         </div>
         {subtitle && (
           <p
+            className="section-header__subtitle"
+            title={subtitle}
             style={{
               fontSize: typography.fontSize.bodySm,
               color: colors.text.muted,
-              margin: `${spacing.xxs} 0 0 0`
+              margin: 0
             }}
           >
             {subtitle}

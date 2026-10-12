@@ -10,6 +10,7 @@ import { avisoComoItemDeAtencao, useAvisosPagamentoGerais } from '../../hooks/us
 import { useAuth } from '../../context/AuthContext';
 import { GestaoInstrumentosHeader } from './GestaoInstrumentosHeader';
 import { GestaoInstrumentosSummaryCards, type GestaoInstrumentosCardId } from './GestaoInstrumentosSummaryCards';
+import { SectionHeader } from '../../design-system/components/SectionHeader';
 import { GestaoInstrumentosCategoryTabs, type GestaoInstrumentosCategoryTab } from './GestaoInstrumentosCategoryTabs';
 import { GestaoInstrumentosCompactFilters, type GestaoInstrumentosCompactFiltersState } from './GestaoInstrumentosCompactFilters';
 import { GestaoInstrumentosTable } from './GestaoInstrumentosTable';
@@ -298,12 +299,12 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <div className="section-heading">
-          <h2 className="section-heading__title">Pendências da carteira</h2>
-          <p className="section-heading__subtitle" title="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação.">
-            Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação.
-          </p>
-        </div>
+        <SectionHeader
+          title="Pendências da carteira"
+          subtitle="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação."
+          className="section-header--flush"
+          testId="instrumentos-pendencias-header"
+        />
 
         {!saldosOnly && (
           <GestaoInstrumentosCategoryTabs
