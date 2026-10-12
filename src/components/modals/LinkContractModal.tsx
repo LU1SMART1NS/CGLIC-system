@@ -376,7 +376,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Vincular Contrato"
+      title="Vincular contrato"
       subtitle={`Ata ${numeroAta}${isAtaMode ? '' : ` • Item ${numeroItem}`} • UASG ${uasgDosContratos}`}
       size="lg"
       testId="link-contract-modal"

@@ -158,7 +158,7 @@ describe('ContractEventsTimeline — Integração da Evolução do Valor Contrat
 
     expect(html).not.toContain('data-testid="contract-value-evolution-section"');
     expect(html).not.toContain('Delta:</strong>');
-    expect(html).toContain('Altera Vigência');
+    expect(html).toContain('Altera vigência');
   });
 
   it('6. Renderização responsiva e sem duplicidade de timeline', () => {
