@@ -909,6 +909,28 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
 @media (prefers-reduced-motion: reduce) {
   .i360-head { --i360-t: 0s; }
 }
+/* Visão Geral no mesmo bloco das telas 360: encolhido, os cartões viram a faixa azul com o nome e os números em
+   miniatura (que filtram como os cartões), e o trilho fica numa base clara logo abaixo. */
+.vg-strip { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden;
+  transition: grid-template-rows var(--i360-t) var(--i360-ease), opacity calc(var(--i360-t) * 0.6) var(--i360-ease), visibility 0s var(--i360-t); }
+.i360-head.min .vg-strip { grid-template-rows: 1fr; opacity: 1; visibility: visible;
+  transition: grid-template-rows var(--i360-t) var(--i360-ease), opacity var(--i360-t) var(--i360-ease), visibility 0s; }
+.vg-strip-in { min-height: 0; overflow: hidden; }
+.vg-strip-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 10px 0 8px; color: #ffffff; }
+.vg-strip-title { all: unset; cursor: pointer; font-size: 1.15rem; font-weight: 800; border-radius: 6px; }
+.vg-strip-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.vg-strip-title:focus-visible, .vg-chip:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+.vg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.vg-chip { all: unset; cursor: pointer; display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.24); font-size: 0.78rem; color: rgba(255, 255, 255, 0.85); }
+.vg-chip strong { color: #ffffff; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.vg-chip--danger strong { color: #ffb3b6; }
+.vg-chip:hover { background: rgba(255, 255, 255, 0.18); }
+.vg-chip[aria-pressed='true'] { background: #ffffff; color: var(--primary); }
+.vg-chip[aria-pressed='true'] strong { color: var(--primary); }
+.vg-rail { border-radius: 8px 8px 0 0; transition: background-color var(--i360-t) var(--i360-ease), padding var(--i360-t) var(--i360-ease); }
+.i360-head.min .vg-rail { background-color: #eef3fb; border-bottom: 2px solid #bfcde6; padding: 6px 8px; }
+.i360-head.min .vg-rail .segment-pills__rail { background: #ffffff; }
 .i360-hero-wrap { container-type: inline-size; }
 .i360-identity { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
 .i360-identity-main { display: grid; gap: 4px; flex: 1 1 340px; min-width: 0; }
