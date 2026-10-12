@@ -44,10 +44,9 @@ export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompac
         value={filters.severidade}
         emptyValue="TODAS"
         options={[
-          { value: 'CRITICA', label: 'Crítico' },
+          { value: 'CRITICA', label: 'Vencido' },
           { value: 'URGENTE', label: 'Urgente' },
-          { value: 'ATENCAO', label: 'Atenção' },
-          { value: 'INFO', label: 'Info' }
+          { value: 'ATENCAO', label: 'Atenção' }
         ]}
         onChange={(value) => onChangeFilter('severidade', value as GestaoInstrumentosCompactFiltersState['severidade'])}
         testId="instrumentos-filter-severity"
