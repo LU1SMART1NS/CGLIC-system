@@ -27,7 +27,7 @@ import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
 import { chaveGestaoAta } from '../../../utils/ataIdentidade';
 
-const AMBAR = 'var(--color-warning)';
+const AMBAR = 'var(--color-warning-solid)';
 const VERMELHO = 'var(--color-danger)';
 
 

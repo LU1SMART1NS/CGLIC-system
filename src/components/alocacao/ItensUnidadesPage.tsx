@@ -52,7 +52,7 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   busca: { param: 'busca', default: '' }
 };
-const AMBAR = 'var(--color-warning)';
+const AMBAR = 'var(--color-warning-solid)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 const clamp2: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 /** "00059/2025" → "2025/00059": ordena pelo ano e depois pelo número (igual à Carteira › Itens). */

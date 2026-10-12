@@ -193,7 +193,7 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).toContain('Vigentes');
     expect(html).toContain('Crítico');
     expect(html).toContain('Atenção');
-    expect(html).toContain('Histórico');
+    expect(html).toContain('Encerrados');
     expect(html).toContain('>5<');
     expect(html).toContain('>7<');
     expect((html.match(/em valor vigente/g) || []).length).toBe(1);
