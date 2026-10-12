@@ -449,3 +449,18 @@ export async function reexibirAvisoRpc(chave: string): Promise<{ success: boolea
     p_chave: requireField(chave, 'Aviso não identificado.')
   });
 }
+
+/** Coordenador indica o fornecedor de uma ata que o PNCP publicou sem fornecedor (migration 107). */
+export async function indicarFornecedorDaAtaRpc(input: { numeroControlePncp: string; fornecedorIdentificador: string; comoConfirmou: string }): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('indicar_fornecedor_da_ata', {
+    p_numero_controle_pncp: requireField(input.numeroControlePncp, 'Ata não identificada.'),
+    p_fornecedor_identificador: requireField(input.fornecedorIdentificador, 'Escolha o fornecedor.'),
+    p_como_confirmou: requireField(input.comoConfirmou, 'Escreva como confirmou o fornecedor.')
+  });
+}
+
+export async function desfazerIndicacaoFornecedorDaAtaRpc(numeroControlePncp: string): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('desfazer_indicacao_fornecedor_da_ata', {
+    p_numero_controle_pncp: requireField(numeroControlePncp, 'Ata não identificada.')
+  });
+}

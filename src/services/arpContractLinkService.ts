@@ -17,6 +17,7 @@ import {
   restoreContractSuggestionRpc
 } from '../adapters/arpContractLinkRpcAdapter';
 import { displayContractNumber, formatContractKey } from '../utils/contractNumber';
+import { chaveGestaoAta } from '../utils/ataIdentidade';
 
 /**
  * Consulta os vínculos de um item de ARP com contratos oficiais diretamente da SSOT (PostgreSQL).
@@ -58,6 +59,7 @@ export async function fetchArpItemContractLinks(itemKey: string): Promise<ArpIte
     contractKey: d.contract_key,
     observacoes: d.observacoes || undefined,
     quantidadeContratadaApi: d.quantidade_contratada_api == null ? null : Number(d.quantidade_contratada_api),
+    quantidadeAjustada: d.quantidade_ajustada == null ? null : Number(d.quantidade_ajustada),
     valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
     quantidadeLidaEm: d.quantidade_lida_em || undefined,
     origem: d.origem === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL',
@@ -160,18 +162,22 @@ export async function restoreContractSuggestion(params: DismissContractSuggestio
 }
 
 /**
- * Extrai o número da Ata (ex. "00037/2026") do item_key de um vínculo
+ * Chave de gestão da Ata (gestor, escopo) a partir do item_key de um vínculo
  * (formato "{numeroAta}-{uasg}-{numeroItem}", validado em
- * link_contract_to_item_atomic, migration 20260924000015). Retorna null se o
+ * link_contract_to_item_atomic, migration 20260924000015): o número ("00037/2026") nas atas da CGLIC e
+ * número-UASG ("00005/2025-200342") nas de outros órgãos (migration 106, chaveGestaoAta). Retorna null se o
  * item_key não seguir o formato esperado.
  */
 export function extractAtaKeyFromItemKey(itemKey: string): string | null {
-  const match = /^(\d{5}\/\d{4})-\d{6}-\d{5}$/.exec((itemKey || '').trim());
-  return match ? match[1] : null;
+  const match = /^(\d{5}\/\d{4})-(\d{6})-\d{5}$/.exec((itemKey || '').trim());
+  return match ? chaveGestaoAta(match[1], match[2]) : null;
 }
 
 export interface ArpItemContractLinkPair {
+  /** Chave de gestão da ata (ver extractAtaKeyFromItemKey). */
   ataKey: string;
+  /** Número da ata ("00005/2025"), sem a UASG. */
+  numeroAta?: string;
   contractKey: string;
   /** Chave do item da ata ("00059/2025-200331-00011"). */
   itemKey?: string;
@@ -226,6 +232,7 @@ export async function fetchAllArpItemContractLinks(): Promise<ArpItemContractLin
         const [, uasg, item] = String(row.item_key).trim().split('-');
         pairs.push({
           ataKey,
+          numeroAta: String(row.item_key).trim().split('-')[0],
           contractKey: row.contract_key,
           itemKey: row.item_key,
           uasg,
@@ -268,6 +275,7 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
       contractKey: d.contract_key,
       observacoes: d.observacoes || undefined,
       quantidadeContratadaApi: d.quantidade_contratada_api == null ? null : Number(d.quantidade_contratada_api),
+      quantidadeAjustada: d.quantidade_ajustada == null ? null : Number(d.quantidade_ajustada),
       valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
       quantidadeLidaEm: d.quantidade_lida_em || undefined,
       origem: d.origem === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL',
@@ -278,6 +286,17 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
     console.warn('Erro ao carregar contratos vinculados à Ata', err);
     return [];
   }
+}
+
+/**
+ * Quantidade do item no contrato usada no saldo: a ajustada pelo gestor (migration 103) e, sem ajuste, a lida da
+ * fonte (a leitura ao vivo, quando informada, ou a cópia gravada no vínculo).
+ */
+export function quantidadeUsada(
+  link: Pick<ArpItemContractLink, 'contractKey' | 'quantidadeAjustada' | 'quantidadeContratadaApi'>,
+  quantidades?: ReadonlyMap<string, number>
+): number | undefined {
+  return link.quantidadeAjustada ?? quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined;
 }
 
 /**
@@ -312,7 +331,7 @@ export function enrichContractLinks(
         linkId: link.id,
         itemKey: link.itemKey,
         contractKey: link.contractKey,
-        quantidadeContratada: quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined,
+        quantidadeContratada: quantidadeUsada(link, quantidades),
         quantidadeLidaEm: link.quantidadeLidaEm,
         valorUnitarioContrato: link.valorUnitarioApi ?? undefined,
         observacoes: link.observacoes,
@@ -341,7 +360,7 @@ export function enrichContractLinks(
       linkId: link.id,
       itemKey: link.itemKey,
       contractKey: link.contractKey,
-      quantidadeContratada: quantidades?.get(link.contractKey.toUpperCase()) ?? link.quantidadeContratadaApi ?? undefined,
+      quantidadeContratada: quantidadeUsada(link, quantidades),
         quantidadeLidaEm: link.quantidadeLidaEm,
         valorUnitarioContrato: link.valorUnitarioApi ?? undefined,
       observacoes: link.observacoes,

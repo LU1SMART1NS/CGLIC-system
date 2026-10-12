@@ -15,6 +15,7 @@ import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import type { SeverityLevel } from '../../design-system/tokens';
 import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { ComprasGovReferencia } from './ItemExecutionSummaryStrip';
+import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
 export type ItemTab = 'unidades' | 'contratos' | 'alocacao' | 'adesoes';
 
@@ -83,7 +84,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   onOpenAta
 }) => {
   // O item não tem gestor próprio: vale o da ata. Se a consulta falhar, o bloco some (não vira "Não atribuído").
-  const { data: gestorAta, isLoading: carregandoGestor, isError: erroGestor } = useAtaManager(arp.numeroAtaRegistroPreco);
+  const { data: gestorAta, isLoading: carregandoGestor, isError: erroGestor } = useAtaManager(chaveGestaoDaArp(arp));
 
   const ataUrl = formatPncpAtaUrl(arp.linkAtaPNCP, arp.numeroControlePncpAta, arp.numeroAtaRegistroPreco);
   const compraUrl = formatPncpCompraUrl(arp.linkCompraPNCP, arp.numeroControlePncpCompra, arp.numeroControlePncpAta);

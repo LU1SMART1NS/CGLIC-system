@@ -14,6 +14,7 @@
  */
 
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
+import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
 import type {
   ContractDashboardRecord,
   ArpRecord,
@@ -45,9 +46,16 @@ import { parseDateBRT, differenceInDays, differenceInBusinessDays, getArpVigenci
 import { classifyPrazo } from '../components/carteira/carteiraPrazo';
 import { buildContractEventsFromOfficialData } from './contractEventService';
 import { fetchContratosParaTela } from './contratosOficiaisService';
-import { fetchArpsFromDb } from './dbCacheService';
+import { colunaDaUasgDaAta, fetchArpsFromDb } from './dbCacheService';
+import { chaveGestaoAta, chaveGestaoDaArp, rotuloChaveGestao } from '../utils/ataIdentidade';
+
+/** Chave de gestão da ata de uma linha de saldo (v_arp_item_saldo_detalhado). */
+function chaveDoSaldo(item: any): string {
+  const numero = item?.numero_ata || item?.numeroAta;
+  return numero ? chaveGestaoAta(numero, item?.codigo_uasg || item?.codigoUasg) : '';
+}
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
-import { chaveAvisoLembrete, chaveAvisoReajuste, chaveAvisoSaldo, fetchAvisosResolvidos } from './avisosResolvidosService';
+import { chaveAvisoLembrete, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -218,6 +226,8 @@ export function calculateAttentionSummary(params: {
   eventsMap?: Record<string, ContractEvent[]>;
   paymentCycles?: PaymentFollowUpCycle[];
   arpItems?: Array<{ percentual_consumido?: number }>;
+  /** Atas publicadas no PNCP sem fornecedor (atas_fornecedor_pncp, migration 107). */
+  fornecedoresPncp?: RegistroFornecedorPncp[];
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -230,6 +240,7 @@ export function calculateAttentionSummary(params: {
     eventsMap = {},
     paymentCycles = [],
     arpItems = [],
+    fornecedoresPncp = [],
     currentDate
   } = params;
 
@@ -290,6 +301,33 @@ export function calculateAttentionSummary(params: {
 
   // E) Construção determinística da lista de sinais de atenção
   const items: import('../types/managementDashboard').DashboardAttentionItem[] = [];
+
+  // 0. Fornecedor da ata não informado pelo PNCP: o coordenador indica (atenção); indicação divergente do
+  // Compras.gov.br (urgente). Sem "Resolvido": some ao indicar ou quando a fonte publicar a ata.
+  const arpsPorControle = new Map(arps.filter((a) => a.numeroControlePncpAta).map((a) => [a.numeroControlePncpAta, a]));
+  for (const r of fornecedoresPncp) {
+    if (r.estado !== 'PENDENTE' && r.estado !== 'DIVERGENTE') continue;
+    const arp = arpsPorControle.get(r.numeroControlePncp);
+    if (!arp) continue; // só atas vigentes da carteira em tela
+    const compra = r.numeroCompra && r.anoCompra ? `${r.numeroCompra}/${r.anoCompra}` : arp.numeroCompra && arp.anoCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : 'não informada';
+    const pendente = r.estado === 'PENDENTE';
+    items.push({
+      id: `ATT-FORNECEDOR-${r.numeroControlePncp}`,
+      category: 'FORNECEDOR_PNCP',
+      severity: pendente ? 'ATENCAO' : 'URGENTE',
+      title: pendente ? 'Fornecedor não informado pelo PNCP' : 'Fornecedor indicado diverge do Compras.gov.br',
+      description: pendente
+        ? `Ata ${arp.numeroAtaRegistroPreco} — a compra ${compra} gerou ${r.atasNaCompra ?? 'mais de uma'} ${r.atasNaCompra === 1 ? 'ata' : 'atas'} e o PNCP não diz qual fornecedor é desta; sem itens até a indicação`
+        : `Ata ${arp.numeroAtaRegistroPreco} — indicado ${r.fornecedorNome || r.fornecedorIdentificador}; o Compras.gov.br publicou ${r.fonteFornecedorNome || r.fonteFornecedorIdentificador}`,
+      arpKey: `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`,
+      numeroAta: arp.numeroAtaRegistroPreco,
+      objetoItem: arp.objeto,
+      fornecedorNome: pendente ? undefined : r.fornecedorNome,
+      targetUrl: `/atas/detalhe/${encodeURIComponent(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`)}?aba=acoes`,
+      badgeLabel: pendente ? 'sem itens' : 'conferir itens'
+    });
+  }
+
 
   // 1. Tarefas Atrasadas e Próximas da Central de Prazos
   //
@@ -523,7 +561,7 @@ export function calculateAttentionSummary(params: {
       fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
       contractKey: aItem.contract_key || aItem.contractKey,
       diasRelevantes: 0,
-      targetUrl: numAta ? `/atas/${numAta}` : undefined,
+      targetUrl: numAta ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}` : undefined,
       badgeLabel: `${roundedPerc.toFixed(1)}% consumido`
     });
   }
@@ -557,12 +595,49 @@ export function calculateAttentionSummary(params: {
     });
   }
 
+  // 5b. Contratado por unidade interna (migration 103): no item que já tem unidade alocada, o contratado ainda sem
+  // unidade e a divisão de contrato a conferir. Item sem nenhuma alocação fica de fora: a pendência dele é alocar
+  // (fila Alocação › Itens às unidades), não dividir o contrato.
+  for (const aItem of (arpItems || []) as any[]) {
+    if (!aItem.tem_alocacao) continue;
+    const semUnidade = Number(aItem.quantidade_contratada_sem_unidade) || 0;
+    const aConferir = Number(aItem.total_contratos_a_conferir) || 0;
+    if (semUnidade <= 0 && aConferir <= 0) continue;
+    const numAta = aItem.numero_ata || aItem.numeroAta;
+    const numItem = aItem.numero_item || aItem.numeroItem;
+    const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
+    const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : '');
+    if (!itemKey) continue;
+    const descItem = aItem.descricao_item || aItem.descricaoItem || 'Item de ARP';
+    const conferir = aConferir > 0;
+    const fmt = (n: number) => n.toLocaleString('pt-BR');
+    items.push({
+      id: `ATT-UNIDADE-${itemKey}`,
+      category: 'UNIDADE_PENDENTE',
+      severity: conferir ? 'URGENTE' : 'ATENCAO',
+      avisoChave: numAta && numItem ? chaveAvisoUnidade(numAta, uasgItem, numItem, conferir ? 'CONFERIR' : 'SEM_UNIDADE', conferir ? aConferir : semUnidade) : undefined,
+      title: conferir ? 'Divisão do contratado entre unidades a conferir' : 'Contratado sem unidade interna',
+      description: conferir
+        ? `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${aConferir} ${aConferir === 1 ? 'contrato com divisão' : 'contratos com divisão'} a conferir`
+        : `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${fmt(semUnidade)} contratados ainda sem unidade interna`,
+      arpKey: itemKey,
+      numeroAta: numAta,
+      objetoItem: descItem,
+      fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
+      // Sem prazo: a coluna Prazo mostra "—".
+      targetUrl: numAta && numItem
+        ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}/itens/${encodeURIComponent(String(numItem))}?aba=contratos`
+        : undefined,
+      badgeLabel: conferir ? `${aConferir} a conferir` : `${fmt(semUnidade)} sem unidade`
+    });
+  }
+
   // 6. Tarefas do plano de gestão das Atas — mesma regra das tarefas de contrato
   // (vencida = crítica, vence hoje ou em até 7 dias = urgente). Sem isso, o que a
   // Ata 360 mostra na aba "Ações" nunca chegava à visão global.
   for (const arp of arps) {
     const numAta = arp.numeroAtaRegistroPreco;
-    const plan = numAta ? ataPlans[numAta] : undefined;
+    const plan = numAta ? ataPlans[chaveGestaoDaArp(arp)] : undefined;
     if (!plan) continue;
     for (const macro of plan.macrotarefas) {
       for (const task of macro.tarefas) {
@@ -1042,6 +1117,7 @@ export function buildManagementDashboardReadModel(params: {
   empenhos?: Array<any>;
   itemsSaldo?: Array<any>;
   paymentCycles?: PaymentFollowUpCycle[];
+  fornecedoresPncp?: RegistroFornecedorPncp[];
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1071,26 +1147,28 @@ export function buildManagementDashboardReadModel(params: {
     };
   });
 
+  // Filtro "Ata" pela chave de gestão: atas de outros órgãos repetem números de atas da CGLIC (migration 106).
   const seenAtas = new Set<string>();
   const availableAtas: ManagementDashboardFilterOption[] = [];
   for (const a of rawArps) {
     const num = a.numeroAtaRegistroPreco || (a as any).numeroAta || (a as any).numero || (a as any).id;
-    if (num && !seenAtas.has(num)) {
-      seenAtas.add(num);
+    const chave = num ? chaveGestaoAta(num, a.codigoUnidadeGerenciadora) : '';
+    if (chave && !seenAtas.has(chave)) {
+      seenAtas.add(chave);
       availableAtas.push({
-        key: num,
-        label: `Ata ${num}`,
+        key: chave,
+        label: `Ata ${rotuloChaveGestao(chave)}`,
         sublabel: a.objeto
       });
     }
   }
   for (const item of rawItemsSaldo) {
-    const num = item.numero_ata || item.numeroAta;
-    if (num && !seenAtas.has(num)) {
-      seenAtas.add(num);
+    const chave = chaveDoSaldo(item);
+    if (chave && !seenAtas.has(chave)) {
+      seenAtas.add(chave);
       availableAtas.push({
-        key: num,
-        label: `Ata ${num}`,
+        key: chave,
+        label: `Ata ${rotuloChaveGestao(chave)}`,
         sublabel: item.descricao_item
       });
     }
@@ -1167,14 +1245,14 @@ export function buildManagementDashboardReadModel(params: {
 
     filteredItemsSaldo = filteredItemsSaldo.filter((item) => {
       const itemContract = item.contract_key || item.contractKey;
-      const itemAta = item.numero_ata || item.numeroAta;
+      const itemAta = chaveDoSaldo(item);
       return Boolean(
         (itemContract && scopedContractKeys.has(itemContract)) ||
         (itemAta && assignedAtaSet.has(itemAta))
       );
     });
 
-    filteredArps = filteredArps.filter((arp) => assignedAtaSet.has(arp.numeroAtaRegistroPreco));
+    filteredArps = filteredArps.filter((arp) => assignedAtaSet.has(chaveGestaoDaArp(arp)));
 
     filteredManagers = Object.fromEntries(
       Object.entries(filteredManagers).filter(([k]) => scopedContractKeys.has(k))
@@ -1234,8 +1312,9 @@ export function buildManagementDashboardReadModel(params: {
   }
 
   if (f.numeroAta) {
-    filteredArps = filteredArps.filter((a) => (a.numeroAtaRegistroPreco || (a as any).numeroAta || (a as any).numero || (a as any).id) === f.numeroAta);
-    filteredItemsSaldo = filteredItemsSaldo.filter((item) => (item.numero_ata || item.numeroAta) === f.numeroAta);
+    // f.numeroAta é a chave de gestão (filtro "Ata"): o número nas atas da CGLIC, número-UASG nas de outros órgãos.
+    filteredArps = filteredArps.filter((a) => chaveGestaoAta(a.numeroAtaRegistroPreco || (a as any).numeroAta || (a as any).numero || (a as any).id, a.codigoUnidadeGerenciadora) === f.numeroAta);
+    filteredItemsSaldo = filteredItemsSaldo.filter((item) => chaveDoSaldo(item) === f.numeroAta);
 
     // Empenhos vinculados aos itens desta Ata
     const matchingItemKeys = new Set(filteredItemsSaldo.map((i) => i.item_key || i.itemKey));
@@ -1271,13 +1350,14 @@ export function buildManagementDashboardReadModel(params: {
     const dias = getArpVigenciaStatus(arp.dataVigenciaFinal, currentDate)?.diasRestantes ?? null;
     const faixa = classifyPrazo(dias, Boolean(arp.isCanceladaPncp));
     const vigente = faixa !== 'EXPIRADO' && faixa !== 'SEM_DATA';
-    if (!vigente) encerradasAtaNumbers.add(arp.numeroAtaRegistroPreco);
+    if (!vigente) encerradasAtaNumbers.add(chaveGestaoDaArp(arp));
     return vigente;
   });
-  filteredItemsSaldo = filteredItemsSaldo.filter((item) => !encerradasAtaNumbers.has(item.numero_ata || item.numeroAta));
+  // Pela chave de gestão: uma ata encerrada não esconde os itens de outra de mesmo número (migration 106).
+  filteredItemsSaldo = filteredItemsSaldo.filter((item) => !encerradasAtaNumbers.has(chaveDoSaldo(item)));
 
-  // Planos de Ata só dos instrumentos que sobraram após escopo e filtros.
-  const visibleAtaNumbers = new Set(filteredArps.map((a) => a.numeroAtaRegistroPreco));
+  // Planos de Ata (chave = ata_task_plans.ata_key, a chave de gestão) só dos instrumentos que sobraram.
+  const visibleAtaNumbers = new Set(filteredArps.map((a) => chaveGestaoDaArp(a)));
   const filteredAtaPlans = Object.fromEntries(
     Object.entries(rawAtaPlans).filter(([k]) => visibleAtaNumbers.has(k))
   );
@@ -1294,6 +1374,7 @@ export function buildManagementDashboardReadModel(params: {
     eventsMap: filteredEventsMap,
     paymentCycles: filteredPaymentCycles,
     arpItems: filteredItemsSaldo,
+    fornecedoresPncp: params.fornecedoresPncp,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1340,7 +1421,9 @@ export async function fetchManagementDashboardData(
     ataPlans,
     avisosResolvidos,
     empenhosResumo,
-    arpItemsSaldo
+    arpItemsSaldo,
+    itensComAlocacao,
+    fornecedoresPncp
   ] = await Promise.all([
     fetchContratosParaTela(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar contratos para o dashboard:', err);
@@ -1370,8 +1453,18 @@ export async function fetchManagementDashboardData(
     fetchArpItemSaldosFromDb(cleanUasg).catch((err) => {
       console.error('Erro ao consultar saldos de itens de ARP para o dashboard:', err);
       return [] as any[];
+    }),
+    fetchItensComAlocacao().catch((err) => {
+      console.warn('Erro ao consultar os itens com alocação interna para o dashboard:', err);
+      return new Set<string>();
+    }),
+    fetchRegistrosFornecedorPncp().catch((err) => {
+      console.warn('Erro ao consultar as atas sem fornecedor no PNCP para o dashboard:', err);
+      return [] as RegistroFornecedorPncp[];
     })
   ]);
+  // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
+  const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
 
   const paymentCycles = await fetchAllPaymentCyclesForDashboard(contracts);
 
@@ -1384,8 +1477,9 @@ export async function fetchManagementDashboardData(
     ataPlans,
     avisosResolvidos,
     empenhos: empenhosResumo,
-    itemsSaldo: arpItemsSaldo,
+    itemsSaldo: arpItemsSaldoComAlocacao,
     paymentCycles,
+    fornecedoresPncp,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate
@@ -1499,6 +1593,20 @@ export async function fetchEmpenhosResumoFromDb(_uasg?: string): Promise<any[]> 
   }
 }
 
+/** Chaves dos itens de ata com alguma unidade interna alocada (arp_allocations), em páginas de 1000. */
+export async function fetchItensComAlocacao(): Promise<Set<string>> {
+  const chaves = new Set<string>();
+  if (!isSupabaseConfigured || !supabase) return chaves;
+  const PAGINA = 1000;
+  for (let from = 0; ; from += PAGINA) {
+    const { data, error } = await supabase.from('arp_allocations').select('item_key').order('id', { ascending: true }).range(from, from + PAGINA - 1);
+    if (error) throw error;
+    for (const r of data ?? []) if (r.item_key) chaves.add(r.item_key);
+    if (!data || data.length < PAGINA) break;
+  }
+  return chaves;
+}
+
 /**
  * Consulta segura à view SQL v_arp_item_saldo_detalhado
  */
@@ -1507,7 +1615,8 @@ export async function fetchArpItemSaldosFromDb(uasg?: string): Promise<any[]> {
   try {
     let query = supabase.from('v_arp_item_saldo_detalhado').select('*');
     if (uasg) {
-      query = query.eq('codigo_uasg', uasg);
+      // Carteira da CGLIC inclui as atas de outros órgãos em que a SENASP participa (migration 106).
+      query = query.eq(colunaDaUasgDaAta(uasg), uasg);
     }
     const { data, error } = await query;
     if (error) {

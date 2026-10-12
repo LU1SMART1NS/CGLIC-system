@@ -4,7 +4,7 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
-import { useInstrument360Dock } from './instrument360Dock';
+import { scrollToSummary, useInstrument360Dock } from './instrument360Dock';
 
 /** Identificador do rodapé (processo, categoria, Id PNCP...). Nunca data nem valor. */
 export interface Instrument360MetaItem {
@@ -101,132 +101,136 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
   const texto = toSentenceCaseIfAllCaps(objeto);
   const objetoLongo = Boolean(texto && texto.length > OBJETO_LIMITE);
   const dock = useInstrument360Dock();
-  const setDockSummary = dock?.setSummary;
-  const setHeroEl = dock?.setHeroEl;
-  const alertText = dockAlert ?? (typeof statusAlert === 'string' ? statusAlert : undefined);
-  const statusFaixa = status?.faixa;
-  const statusLabel = status?.label;
-  const statusNeutral = status?.neutral;
-
-  // Entrega à barra fixa o que ela mostra quando este cartão sai da vista.
-  React.useEffect(() => {
-    if (!setDockSummary) return;
-    setDockSummary({
-      title,
-      status: statusFaixa && statusLabel ? { faixa: statusFaixa, label: statusLabel, neutral: statusNeutral } : undefined,
-      alert: alertText,
-      subtitle: dockSubtitle
-    });
-    return () => setDockSummary(null);
-  }, [setDockSummary, title, statusFaixa, statusLabel, statusNeutral, alertText, dockSubtitle]);
+  const min = dock?.min ?? false;
 
   return (
-    <header
-      style={{
-        display: 'grid',
-        gap: '14px',
-        background: '#ffffff',
-        borderRadius: '12px',
-        border: `1px solid ${COLORS.line}`,
-        padding: '20px 24px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-        marginBottom: '1.5rem'
-      }}
-      className="i360-hero-wrap"
-      ref={setHeroEl}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <ActionButton action="voltar"
-          type="button"
-          size="sm"
-          onClick={onBack}
-          data-testid={backTestId}
-        >{backLabel}</ActionButton>
-        {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
-      </div>
+    <header className="i360-hero i360-hero-wrap" data-testid="instrument-360-hero">
+      <Fold>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '14px' }}>
+          <ActionButton action="voltar"
+            type="button"
+            size="sm"
+            onClick={onBack}
+            data-testid={backTestId}
+          >{backLabel}</ActionButton>
+          {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
+        </div>
+      </Fold>
 
-      {notice && <div>{notice}</div>}
+      {notice && <Fold><div style={{ paddingBottom: '14px' }}>{notice}</div></Fold>}
 
       <div className="i360-identity">
         <div className="i360-identity-main">
           {eyebrow && (
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: COLORS.muted }}>
-              {eyebrow}
-            </div>
+            <Fold>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: COLORS.muted, paddingBottom: '4px' }}>
+                {eyebrow}
+              </div>
+            </Fold>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="i360-title-row">
             {icon}
-            <h1 style={{ margin: 0, fontSize: '1.85rem', lineHeight: 1.1, fontWeight: 800, color: COLORS.ink }}>{title}</h1>
-            {status && <InstrumentStatusBadge status={status} testId="instrument-360-status" />}
-            {statusAlert && <InstrumentAlertBadge testId="instrument-360-status-alert">{statusAlert}</InstrumentAlertBadge>}
+            <h1 className="i360-title">
+              {/* Encolhido, o nome leva de volta ao cartão inteiro. */}
+              <button
+                type="button"
+                className="i360-title-btn"
+                onClick={scrollToSummary}
+                tabIndex={min ? 0 : -1}
+                aria-label={min ? `${title}: voltar ao resumo completo` : undefined}
+              >
+                {title}
+              </button>
+            </h1>
+            {status && <InstrumentStatusBadge status={status} testId="instrument-360-status" compact={min} />}
+            {statusAlert && <InstrumentAlertBadge testId="instrument-360-status-alert" compact={min}>{statusAlert}</InstrumentAlertBadge>}
+            {dockAlert && !statusAlert && <span className="i360-min-only"><InstrumentAlertBadge compact>{dockAlert}</InstrumentAlertBadge></span>}
+            {dockSubtitle && <span className="i360-sub-inline" aria-hidden="true">{dockSubtitle}</span>}
           </div>
 
-          {subtitle && <div style={{ fontSize: '0.9rem', color: COLORS.inkSoft }}>{subtitle}</div>}
-
-          {texto && (
-            <p style={{ margin: subtitle ? '2px 0 0 0' : 0, fontSize: '0.92rem', color: COLORS.inkSoft, lineHeight: 1.45, maxWidth: '1200px' }}>
-              {objetoLongo && !objetoAberto ? `${texto.slice(0, OBJETO_LIMITE).trimEnd()}…` : texto}
-              {objetoLongo && (
-                <AppButton
-                  type="button"
-                  variant="link"
-                  size="xs"
-                  onClick={() => setObjetoAberto((v) => !v)}
-                  style={{ marginLeft: '0.4rem' }}
-                >
-                  {objetoAberto ? 'ver menos' : 'ver mais'}
-                </AppButton>
-              )}
-            </p>
+          {(subtitle || texto) && (
+            <Fold>
+              <div style={{ display: 'grid', gap: '2px', paddingTop: '4px' }}>
+                {subtitle && <div style={{ fontSize: '0.9rem', color: COLORS.inkSoft }}>{subtitle}</div>}
+                {texto && (
+                  <p style={{ margin: subtitle ? '2px 0 0 0' : 0, fontSize: '0.92rem', color: COLORS.inkSoft, lineHeight: 1.45, maxWidth: '1200px' }}>
+                    {objetoLongo && !objetoAberto ? `${texto.slice(0, OBJETO_LIMITE).trimEnd()}…` : texto}
+                    {objetoLongo && (
+                      <AppButton
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        onClick={() => setObjetoAberto((v) => !v)}
+                        style={{ marginLeft: '0.4rem' }}
+                      >
+                        {objetoAberto ? 'ver menos' : 'ver mais'}
+                      </AppButton>
+                    )}
+                  </p>
+                )}
+              </div>
+            </Fold>
           )}
-
         </div>
 
         {(manager || origin || (dates && dates.length > 0)) && (
-          <div className="i360-side" data-testid="instrument-360-side">
-            {manager && <div>{manager}</div>}
-            {(origin || (dates && dates.length > 0)) && (
-              <dl className="i360-datalist">
-                {origin && (
-                  <div className="i360-dr" data-testid="instrument-360-origin">
-                    <dt>{origin.label}</dt>
-                    <dd>{origin.value}</dd>
-                  </div>
-                )}
-                {(dates ?? []).map((d) => (
-                  <div key={d.label} className={d.emphasis ? 'i360-dr i360-dr--emphasis' : 'i360-dr'} title={d.title} tabIndex={d.title ? 0 : undefined}>
-                    <dt>{d.label}</dt>
-                    <dd>
-                      {d.value}
-                      {d.risk && <span className="i360-dr-risk">{d.risk}</span>}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
+          <div className="i360-side-fold" data-i360-fold="">
+            <div className="i360-side-clip">
+            <div className="i360-side" data-testid="instrument-360-side">
+              {manager && <div>{manager}</div>}
+              {(origin || (dates && dates.length > 0)) && (
+                <dl className="i360-datalist">
+                  {origin && (
+                    <div className="i360-dr" data-testid="instrument-360-origin">
+                      <dt>{origin.label}</dt>
+                      <dd>{origin.value}</dd>
+                    </div>
+                  )}
+                  {(dates ?? []).map((d) => (
+                    <div key={d.label} className={d.emphasis ? 'i360-dr i360-dr--emphasis' : 'i360-dr'} title={d.title} tabIndex={d.title ? 0 : undefined}>
+                      <dt>{d.label}</dt>
+                      <dd>
+                        {d.value}
+                        {d.risk && <span className="i360-dr-risk">{d.risk}</span>}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </div>
+            </div>
           </div>
         )}
       </div>
 
-      {children}
+      {children && <Fold><div style={{ paddingTop: '14px' }}>{children}</div></Fold>}
 
       {identifiers.length > 0 && (
-        <dl
-          data-testid={identifiersTestId}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 18px', margin: 0, paddingTop: '10px', borderTop: `1px solid ${COLORS.line}`, fontSize: '0.78rem', color: COLORS.muted }}
-        >
-          {identifiers.map(({ label, value }) => (
-            <div key={label} style={{ display: 'flex', gap: '0.3rem' }}>
-              <dt style={{ fontWeight: 600, color: COLORS.inkSoft }}>{label}</dt>
-              <dd style={{ margin: 0, color: value ? COLORS.muted : '#94a3b8', fontStyle: value ? 'normal' : 'italic' }}>{value || 'Não informado'}</dd>
-            </div>
-          ))}
-        </dl>
+        <Fold>
+          <dl
+            data-testid={identifiersTestId}
+            style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 18px', margin: '14px 0 0', paddingTop: '10px', borderTop: `1px solid ${COLORS.line}`, fontSize: '0.78rem', color: COLORS.muted }}
+          >
+            {identifiers.map(({ label, value }) => (
+              <div key={label} style={{ display: 'flex', gap: '0.3rem' }}>
+                <dt style={{ fontWeight: 600, color: COLORS.inkSoft }}>{label}</dt>
+                <dd style={{ margin: 0, color: value ? COLORS.muted : '#94a3b8', fontStyle: value ? 'normal' : 'italic' }}>{value || 'Não informado'}</dd>
+              </div>
+            ))}
+          </dl>
+        </Fold>
       )}
     </header>
   );
 };
+
+/** Bloco do cartão que some quando ele encolhe (a altura vai a zero, sem pular). */
+const Fold: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+  <div className={`i360-fold${className ? ` ${className}` : ''}`} data-i360-fold="">
+    <div className="i360-fold-in">{children}</div>
+  </div>
+);
 
 /** Situação ao lado do título. Os dias restantes ficam só no indicador de vigência. */
 export function instrumentSituationLabel(faixa: PrazoFaixa, cancelada = false): string {

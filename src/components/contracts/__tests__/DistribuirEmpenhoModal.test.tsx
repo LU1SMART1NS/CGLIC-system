@@ -32,7 +32,7 @@ const render = (d = nota(), extra: any = {}) =>
       distribuicao={d}
       numeroContrato="00002/2025"
       itens={itens}
-      empenhadoOutras={new Map([[13, 127400]])}
+      empenhadoOutras={new Map([[13, 26]])}
       isLoading={false}
       onSalvar={vi.fn()}
       onFechar={vi.fn()}
@@ -40,36 +40,62 @@ const render = (d = nota(), extra: any = {}) =>
     />
   );
 
-describe('DistribuirEmpenhoModal', () => {
+describe('DistribuirEmpenhoModal (vínculo por quantidade)', () => {
   it('nula não abre', () => {
     expect(render(null as any)).toBe('');
   });
 
-  it('mostra a nota, a sugestão, um campo por item e o que já veio de outras notas', () => {
+  it('mostra a nota, um campo de quantidade por item e o saldo a empenhar; sem preço nem valor da nota', () => {
     const html = render();
-    expect(html).toContain('Vincular 2024NE000337 aos itens do contrato');
-    expect(html).toContain('Salvar o vínculo');
-    expect(html).not.toContain('Distribu');
+    expect(html).toContain('Vincular 2024NE000337 aos itens');
     expect(html).toContain('Contrato 00002/2025');
-    expect(html).toContain('Igual ao total do item 43');
-    expect(html).toContain('distribuir-valor-13');
-    expect(html).toContain('distribuir-valor-43');
-    expect(html).toMatch(/R\$\s127\.400,00/);
+    expect(html).toContain('distribuir-quantidade-13');
+    expect(html).toContain('distribuir-quantidade-43');
+    expect(html).toContain('Saldo a empenhar');
+    expect(html).toContain('53 un');
+    expect(html).toContain('Contratado 79 · Empenhado 26');
+    expect(html).not.toContain('R$');
+    expect(html).not.toContain('Valor da nota');
+    expect(html).not.toContain('Nesta nota');
+    expect(html).not.toContain('Tudo aqui');
+    expect(html).not.toContain('Distribu');
   });
 
-  it('sem valores, falta a nota inteira e salvar fica desligado', () => {
+  it('sugestão única já vem preenchida, sem o marcador Informada, e permite salvar', () => {
     const html = render();
-    expect(html).toMatch(/falta R\$\s1\.197\.000,00/);
+    expect(html).toContain('Usar sugestão: 342 un do item 43');
+    expect(html).toMatch(/data-testid="distribuir-quantidade-43"[^>]*value="342"/);
+    expect(html).not.toContain('distribuir-informada-43');
+    expect(html).toContain('1 de 2');
+    expect(html).not.toMatch(/aria-disabled="true"[^>]*data-testid="distribuir-salvar"/);
+  });
+
+  it('sem sugestão: nenhum item com quantidade e salvar fica desligado', () => {
+    const html = render(nota({ sugestao_tipo: 'SEM_SUGESTAO', sugestao: [] }));
+    expect(html).toContain('Informe a quantidade em pelo menos um item');
     expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="distribuir-salvar"/);
   });
 
-  it('mais de uma possibilidade: avisa que o gestor escolhe', () => {
+  it('editar o vínculo: abre com as quantidades atuais, marca as informadas e avisa o que passa do saldo', () => {
+    const html = render(
+      nota({ situacao: 'DISTRIBUIDA', origem: 'USUARIO', distribuido_por_nome: 'Maria', parcelas: [{ numero_item: 13, valor: null, quantidade_informada: 60 }, { numero_item: 43, valor: 7000 }] })
+    );
+    expect(html).toMatch(/data-testid="distribuir-quantidade-13"[^>]*value="60"/);
+    expect(html).toMatch(/data-testid="distribuir-quantidade-43"[^>]*value="2"/);
+    expect(html).toContain('distribuir-informada-13');
+    expect(html).toContain('Passa do saldo em 7 un');
+    expect(html).toContain('1 item acima do saldo a empenhar');
+    expect(html).toContain('Vinculada aos itens por Maria');
+  });
+
+  it('mais de uma possibilidade: um botão por opção', () => {
     const html = render(nota({ sugestao_tipo: 'VARIAS_POSSIBILIDADES', sugestao: [{ numero_item: 13, quantidade: 7 }, { numero_item: 43, quantidade: 9 }] }));
     expect(html).toContain('7 un do item 13');
-    expect(html).toContain('Mais de uma possibilidade');
+    expect(html).toContain('9 un do item 43');
+    expect(html).not.toContain('Usar sugestão');
   });
 
   it('erro do banco aparece na janela', () => {
-    expect(render(nota(), { erro: 'O valor do empenho agora é 10.' })).toContain('O valor do empenho agora é 10.');
+    expect(render(nota(), { erro: 'A quantidade do item 13 precisa ser um número inteiro maior que zero.' })).toContain('precisa ser um número inteiro');
   });
 });

@@ -14,6 +14,7 @@ export function useSyncContractItemQuantity() {
       queryClient.invalidateQueries({ queryKey: ['item-contract-links'] });
       queryClient.invalidateQueries({ queryKey: ['ata-linked-contracts'] });
       queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
+      queryClient.invalidateQueries({ queryKey: ['contratado-do-item'] });
     }
   });
 }

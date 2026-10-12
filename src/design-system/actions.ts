@@ -38,6 +38,8 @@ export const ACTIONS = {
   voltar: { label: 'Voltar', icon: ArrowLeft, variant: 'outline' },
   limpar: { label: 'Limpar', icon: X, variant: 'outline' },
   limparFiltros: { label: 'Limpar filtros', icon: X, variant: 'outline' },
+  /** Coordenador indica o fornecedor de uma ata que o PNCP publicou sem fornecedor (migration 107). */
+  indicarFornecedor: { label: 'Indicar fornecedor', icon: UserCheck, variant: 'primary' },
   editar: { label: 'Editar', icon: Pencil, variant: 'outline' },
   renomear: { label: 'Renomear', icon: Pencil, variant: 'outline' },
   conferir: { label: 'Conferir', icon: Search, variant: 'outline' },
@@ -59,6 +61,8 @@ export const ACTIONS = {
   simular: { label: 'Simular', icon: FlaskConical, variant: 'outline' },
   escolherAta: { label: 'Escolher ata', icon: FileSearch, variant: 'outline' },
   reativar: { label: 'Reativar', icon: UserCheck, variant: 'outline' },
+  /** Cadastro desativado (ex.: unidade interna) volta a valer. Usuário usa `reativar`. */
+  reativarCadastro: { label: 'Reativar', icon: RotateCcw, variant: 'outline' },
   atribuir: { label: 'Atribuir', icon: UserPlus, variant: 'outline' },
   alinharGestor: { label: 'Alinhar gestor', icon: UserCheck, variant: 'outline' },
   transferir: { label: 'Transferir', icon: ArrowLeftRight, variant: 'outline' },
@@ -70,6 +74,8 @@ export const ACTIONS = {
   remover: { label: 'Remover', icon: Trash2, variant: 'ghostDanger' },
   desvincular: { label: 'Desvincular', icon: Unlink, variant: 'ghostDanger' },
   desativar: { label: 'Desativar', icon: UserX, variant: 'ghostDanger' },
+  /** Cadastro em uso que não pode ser excluído (ex.: unidade interna com alocação, migration 108). */
+  desativarCadastro: { label: 'Desativar', icon: Ban, variant: 'ghostDanger' },
   cancelarCiclo: { label: 'Cancelar ciclo', icon: Ban, variant: 'ghostDanger' },
   descartar: { label: 'Descartar', icon: XCircle, variant: 'ghostDanger' },
   naoPertence: { label: 'Não pertence a nenhuma ata', icon: FileX, variant: 'ghostDanger' }

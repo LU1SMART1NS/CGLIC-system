@@ -7,8 +7,10 @@ import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import { classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { toSentenceCaseIfAllCaps } from '../utils/textCase';
 import { chaveAvisoLembrete, chaveAvisoSaldo } from './avisosResolvidosService';
+import type { RegistroFornecedorPncp } from './fornecedorAtaPncpService';
 
-export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE';
+/** CADASTRO: a ata veio do PNCP sem fornecedor e precisa da indicação do coordenador (atas_fornecedor_pncp). */
+export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE' | 'CADASTRO';
 
 export interface AtaActionItem {
   id: string;
@@ -24,6 +26,8 @@ export interface AtaActionItem {
   numeroItem?: string;
   /** Chave para marcar como resolvido (saldo e lembrete); tarefa se resolve concluindo. */
   avisoChave?: string;
+  /** Pendência de fornecedor (kind CADASTRO): estado do registro em atas_fornecedor_pncp. */
+  fornecedorEstado?: RegistroFornecedorPncp['estado'];
 }
 
 export interface AtaActionQueue {
@@ -62,6 +66,61 @@ function percentualDoSaldo(s: AtaItemSaldoInput): number {
   return homologada > 0 ? (Number(s.quantidade_consumida || 0) / homologada) * 100 : 0;
 }
 
+/** Texto da compra como as telas mostram ("90039/2025"). */
+function compraDoRegistro(r: RegistroFornecedorPncp, arp: ArpRecord): string {
+  const numero = r.numeroCompra || arp.numeroCompra;
+  const ano = r.anoCompra || arp.anoCompra;
+  return numero && ano ? `${numero}/${ano}` : numero || 'não informada';
+}
+
+/**
+ * Aviso de cadastro da ata publicada no PNCP sem fornecedor. PENDENTE: o coordenador precisa indicar (atenção).
+ * INDICADO sem itens no banco: aguardando a sincronização (informativo); com itens, nada a fazer. DIVERGENTE: o
+ * Compras.gov.br publicou outro fornecedor (urgente). CONFERIDO: nada.
+ */
+export function pendenciaDeFornecedor(arp: ArpRecord, registro: RegistroFornecedorPncp | null | undefined, itensNoBanco: number): AtaActionItem | null {
+  if (!registro) return null;
+  const compra = compraDoRegistro(registro, arp);
+  const id = `ATA-FORNECEDOR-${registro.numeroControlePncp}`;
+  if (registro.estado === 'PENDENTE') {
+    const atas = registro.atasNaCompra ?? 0;
+    return {
+      id,
+      kind: 'CADASTRO',
+      severity: 'ATENCAO',
+      title: 'Fornecedor não informado pelo PNCP',
+      description: atas > 1
+        ? `a compra ${compra} gerou ${atas} atas e o PNCP não diz qual fornecedor é desta`
+        : `a compra ${compra} tem mais de um fornecedor e o PNCP não diz qual é o desta ata`,
+      badgeLabel: 'sem itens',
+      fornecedorEstado: 'PENDENTE'
+    };
+  }
+  if (registro.estado === 'DIVERGENTE') {
+    return {
+      id,
+      kind: 'CADASTRO',
+      severity: 'URGENTE',
+      title: 'Fornecedor indicado diverge do Compras.gov.br',
+      description: `indicado ${registro.fornecedorNome || registro.fornecedorIdentificador}; a fonte publicou ${registro.fonteFornecedorNome || registro.fonteFornecedorIdentificador}`,
+      badgeLabel: 'conferir itens',
+      fornecedorEstado: 'DIVERGENTE'
+    };
+  }
+  if (registro.estado === 'INDICADO' && itensNoBanco === 0) {
+    return {
+      id,
+      kind: 'CADASTRO',
+      severity: 'INFO',
+      title: `Fornecedor indicado: ${registro.fornecedorNome || registro.fornecedorIdentificador}`,
+      description: 'os itens entram na próxima sincronização de atas',
+      badgeLabel: 'aguardando sincronização',
+      fornecedorEstado: 'INDICADO'
+    };
+  }
+  return null;
+}
+
 /**
  * Fila única da Ata 360, no mesmo formato da fila do Contrato 360
  * (contractActionQueueService): saldo de item (>50%), tarefas do plano com prazo
@@ -76,11 +135,20 @@ export function buildAtaActionQueue(params: {
   plan?: AtaTaskPlan | null;
   /** Chaves de avisos_resolvidos. */
   avisosResolvidos?: ReadonlySet<string>;
+  /** Registro da ata em atas_fornecedor_pncp (ata publicada no PNCP sem fornecedor). */
+  fornecedorPncp?: RegistroFornecedorPncp | null;
+  /** Itens da ata já gravados no banco (com itens, a indicação já surtiu efeito). */
+  itensNoBanco?: number;
   currentDate?: Date;
 }): AtaActionQueue {
-  const { arp, saldos = [], plan = null, avisosResolvidos = new Set<string>(), currentDate } = params;
+  const { arp, saldos = [], plan = null, avisosResolvidos = new Set<string>(), fornecedorPncp = null, itensNoBanco = 0, currentDate } = params;
   const items: AtaActionItem[] = [];
   const dispensados: AtaActionItem[] = [];
+
+  // 0. Fornecedor da ata não informado pelo PNCP: sem "Resolvido" (dispensar deixaria a ata sem itens);
+  // some ao indicar o fornecedor ou quando o Compras.gov.br publicar a ata.
+  const cadastro = pendenciaDeFornecedor(arp, fornecedorPncp, itensNoBanco);
+  if (cadastro) items.push(cadastro);
 
   // 1. Saldo físico dos itens
   for (const s of saldos) {

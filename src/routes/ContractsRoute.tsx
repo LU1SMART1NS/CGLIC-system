@@ -1,7 +1,10 @@
 import React, { useMemo, useCallback } from 'react';
 import { PageContainer } from '../design-system/components/PageContainer';
 import { useContractsPortfolio } from '../hooks/useContractsPortfolio';
-import { canAssignManager } from '../components/carteira/ManagerAssign';
+import { canAssignManager, destinoContratoSemGestor } from '../components/carteira/ManagerAssign';
+import { useAllAtaManagers } from '../hooks/useAtaManagers';
+import { useContratosSemAta } from '../hooks/useContratosSemAta';
+import { formatContractNumber } from '../utils/contractNumber';
 import { useAuth } from '../context/AuthContext';
 import { useCarteiraItens } from '../hooks/useCarteiraItens';
 import { TODAS_UNIDADES } from '../components/carteira/CarteiraExecucaoSelects';
@@ -15,7 +18,7 @@ import {
 } from '../components/contracts/portfolio/ContractsPortfolioFilters';
 import { useCarteiraFilters } from '../components/carteira/carteiraFilters';
 import { canFilterByGestor, listGestores, matchesGestorFilter } from '../components/carteira/carteiraGestor';
-import { ContractsPortfolioTable } from '../components/contracts/portfolio/ContractsPortfolioTable';
+import { ContractsPortfolioTable, type ContractPortfolioRow } from '../components/contracts/portfolio/ContractsPortfolioTable';
 import { comparePrazo, matchesStatusFilter } from '../components/carteira/carteiraPrazo';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
@@ -52,6 +55,20 @@ export const ContractsRoute: React.FC = () => {
 
   // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
+
+  // "Sem gestor" leva a quem resolve: o contrato herda o gestor da ata (Central) ou ainda precisa de ata (Vinculação).
+  const { data: ataManagers } = useAllAtaManagers();
+  const { data: confirmacoesSemAta } = useContratosSemAta();
+  const destinoSemGestor = useCallback(
+    (row: ContractPortfolioRow) =>
+      destinoContratoSemGestor({
+        numero: formatContractNumber(row.contract),
+        atas: row.atas ?? [],
+        naoPertenceAAta: Boolean(confirmacoesSemAta?.[row.contractKey]),
+        ataTemGestor: (numeroAta) => Boolean(ataManagers?.[numeroAta]?.gestorNome)
+      }),
+    [ataManagers, confirmacoesSemAta]
+  );
 
   // Contagens dos segmentos de situação e valor vigente, sobre toda a carteira visível (independentes dos filtros).
   const summaryMetrics = useMemo(() => {
@@ -173,6 +190,7 @@ export const ContractsRoute: React.FC = () => {
             totalContracts={allRows.length}
             onResetFilters={handleResetFilters}
             canAssign={canAssign}
+            destinoSemGestor={destinoSemGestor}
             onFilter={handleFilterChange}
           />
         </>

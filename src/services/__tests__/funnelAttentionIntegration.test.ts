@@ -260,7 +260,7 @@ describe('FASE 9-D1 — Integração do Funil Único de Atenção (CGLIC)', () =
     expect(ataAlert?.numeroAta).toBe('00049/2025');
     expect(ataAlert?.arpKey).toBe('00049/2025-200331-1');
     expect(ataAlert?.contractKey).toBe('200331-00015-2026');
-    expect(ataAlert?.targetUrl).toBe('/atas/00049/2025');
+    expect(ataAlert?.targetUrl).toBe('/atas/detalhe/00049%2F2025-200331');
   });
 
   it('9. preservação do Dashboard Gerencial: read model consolida e preserva contratos, prazos e atas', () => {

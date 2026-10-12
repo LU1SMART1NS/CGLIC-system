@@ -20,6 +20,10 @@ import { formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { Instrument360Hero, instrumentSituationLabel } from '../instrument360/Instrument360Hero';
 import { HealthTile, HealthTileGrid, LifelineRule } from '../instrument360/HealthStripParts';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
+import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp, papelSenaspDaAta } from '../../utils/ataIdentidade';
+import { SeloPapelSenasp } from './SeloPapelSenasp';
+import { SeloFornecedorPncp } from './SeloFornecedorPncp';
+import type { RegistroFornecedorPncp } from '../../services/fornecedorAtaPncpService';
 
 interface Ata360HeaderProps {
   arp: ArpRecord;
@@ -33,6 +37,9 @@ interface Ata360HeaderProps {
   onOpenItens: () => void;
   onOpenContratos: () => void;
   onBack?: () => void;
+  /** Ata publicada no PNCP sem fornecedor (atas_fornecedor_pncp): selo no cartão e botão do coordenador. */
+  fornecedorPncp?: RegistroFornecedorPncp | null;
+  onIndicarFornecedor?: () => void;
 }
 
 export const pncpLinkStyle: React.CSSProperties = {
@@ -77,11 +84,16 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   isLoadingSaldos = false,
   onOpenActions,
   onOpenItens,
-  onBack
+  onBack,
+  fornecedorPncp = null,
+  onIndicarFornecedor
 }) => {
   const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
-  const { data: manager, isLoading: loadingManager } = useAtaManager(arp.numeroAtaRegistroPreco);
+  const { data: manager, isLoading: loadingManager } = useAtaManager(chaveGestaoDaArp(arp));
+  // Ata de outro órgão em que a SENASP é participante ou fez adesão (migration 106).
+  const outroOrgao = ataDeOutroOrgao(arp);
+  const papel = papelSenaspDaAta(arp);
   // A divulgação no PNCP só aparece quando o PNCP responde; sem resposta, a linha de datas fica sem ela.
   const { data: pncp, isLoading: loadingPncp } = useAtaPncp(arp);
   // O banco local não guarda a assinatura (só o início da vigência): vem do Compras.gov.br.
@@ -168,6 +180,21 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
           : undefined
       }
       manager={<ManagerInfo label="Gestor da ata" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="ata-manager-info" />}
+      subtitle={
+        outroOrgao ? (
+          <span data-testid="ata-outro-orgao" style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem' }}>
+            <SeloPapelSenasp arp={arp} comUasg={false} />
+            <span>
+              {papel === 'ADESAO'
+                ? 'Ata de outro órgão: a SENASP fez adesão depois da compra, com a quantidade aprovada pela gerenciadora.'
+                : 'Ata de outro órgão: a SENASP participou da compra, com quantidade própria registrada.'}
+            </span>
+          </span>
+        ) : fornecedorPncp ? (
+          <SeloFornecedorPncp registro={fornecedorPncp} itensNoBanco={itens.length} onIndicar={onIndicarFornecedor} />
+        ) : undefined
+      }
+      origin={outroOrgao ? { label: 'Carteira', value: `UASG ${carteiraDaAta(arp)}` } : undefined}
       objeto={arp.objeto}
       dates={[
         // Sem o dado, a linha continua e diz que não foi informado; só espera enquanto a fonte ainda responde.

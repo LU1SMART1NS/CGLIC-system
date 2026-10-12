@@ -863,43 +863,61 @@ h1, h2, h3, h4 {
 
 /* Topo das telas 360: identidade à esquerda e coluna lateral fixa (gestor, origem e datas) à direita.
    A coluna desce para baixo do texto quando o cartão é estreito (container query no cartão). */
-/* Barra de abas das telas 360: gruda abaixo do cabeçalho do sistema (altura em --app-header-h, publicada pelo AppShell). */
-.i360-dock { position: sticky; top: var(--app-header-h, 0px); z-index: 20; margin-bottom: 1.25rem; background: #f8fafc; container-type: inline-size; }
-.i360-dock-row { display: flex; align-items: stretch; gap: 0 16px; }
-/* Grudada, a barra inteira fica no azul-marinho do cabeçalho do sistema (a faixa de abas segue clara). */
-.i360-dock[data-stuck='true'] { background: transparent; padding-top: 6px; }
-/* O azul sangra até as bordas da área de conteúdo (o conteúdo da barra segue alinhado à página): sem cantos soltos nas pontas.
-   O 1px de cima cobre a emenda com o cabeçalho; a sombra de baixo separa a barra do conteúdo que rola. */
-.i360-dock[data-stuck='true']::before {
-  content: ''; position: absolute; top: 0; bottom: 0; left: -100vmax; right: -100vmax; z-index: -1; pointer-events: none;
+/* Bloco do topo das telas 360 (cartão + abas): gruda abaixo do cabeçalho do sistema (altura em --app-header-h, publicada
+   pelo AppShell). Ao rolar, o cartão encolhe até virar a faixa azul com o nome em cima e as abas embaixo (classe .min). */
+.i360-head { --i360-t: 0.65s; --i360-ease: cubic-bezier(0.4, 0, 0.2, 1); position: sticky; top: var(--app-header-h, 0px); z-index: 20; margin-bottom: 1.25rem; }
+/* Faixa azul que sangra até as bordas da área de conteúdo: sem cantos soltos. O 1px de cima cobre a emenda com o
+   cabeçalho; a sombra de baixo separa a barra do conteúdo que rola. */
+.i360-head::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -100vmax; right: -100vmax; z-index: -1; pointer-events: none; opacity: 0;
   background: var(--primary); box-shadow: 0 -1px 0 var(--primary), 0 4px 10px -6px rgba(15, 23, 42, 0.35);
+  transition: opacity var(--i360-t) var(--i360-ease);
 }
-.i360-dock-tabs { flex: 1 1 0; min-width: 0; }
-/* Só a área das abas é tingida: destaca a navegação sem pesar no contexto (número, situação, fornecedor). */
-.i360-dock .i360-dock-tabs { background-color: #eef3fb; border-bottom: 2px solid #bfcde6; padding: 0 0.5rem; border-radius: 8px 8px 0 0; }
-/* Grudada, as abas viram pastas: encostam na base da barra azul e têm os cantos de cima arredondados. */
-.i360-dock[data-stuck='true'] .i360-dock-tabs { border-radius: 8px 8px 0 0; }
-.i360-dock-tab { background: transparent; }
-.i360-dock-tab:hover:not([aria-selected='true']) { color: var(--primary); }
-.i360-dock-mini { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 58%; padding: 0; }
-.i360-dock-id { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; margin-left: -8px; background: none; border: 0; border-radius: 6px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.i360-dock-id { min-height: 0; } /* sobrepõe o alvo de toque de 44 px do celular: a identidade já é larga e clicável */
-.i360-dock-id:hover { background: rgba(255, 255, 255, 0.2); }
-.i360-dock-id:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
-.i360-dock-title { font-weight: 800; font-size: 1rem; color: #ffffff; white-space: nowrap; }
-.i360-dock-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; color: rgba(255, 255, 255, 0.78); }
-@container (max-width: 900px) {
-  .i360-dock-row { flex-wrap: wrap; }
-  .i360-dock-id { flex-wrap: wrap; row-gap: 2px; }
-  .i360-dock-sub { display: none; }
-  .i360-dock-mini { max-width: 100%; flex: 1 1 100%; padding-block: 0 6px; }
-  .i360-dock-id { padding-block: 2px; }
-  .i360-dock-title { font-size: 0.95rem; }
-  .i360-dock-tabs { flex: 1 1 100%; }
+.i360-head.min::before { opacity: 1; }
+html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que está acima: sem ancoragem, a rolagem não é "corrigida" */
+
+/* Cartão: vira transparente e sem moldura quando encolhido. */
+.i360-hero {
+  display: flex; flex-direction: column; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04); margin-bottom: 1.5rem;
+  transition: padding var(--i360-t) var(--i360-ease), margin-bottom var(--i360-t) var(--i360-ease), background-color var(--i360-t) var(--i360-ease),
+    border-color var(--i360-t) var(--i360-ease), border-radius var(--i360-t) var(--i360-ease), box-shadow var(--i360-t) var(--i360-ease);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .i360-dock-mini { animation: i360-dock-in 0.18s ease-out; }
-  @keyframes i360-dock-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.i360-head.min .i360-hero { background: transparent; border-color: transparent; border-radius: 0; box-shadow: none; padding: 10px 0 6px; margin-bottom: 0; }
+/* Blocos que somem: a altura vai a zero pela grade (1fr -> 0fr), junto com a opacidade; depois ficam invisíveis para o teclado. */
+.i360-fold { display: grid; grid-template-rows: 1fr; opacity: 1; visibility: visible;
+  transition: grid-template-rows var(--i360-t) var(--i360-ease), opacity calc(var(--i360-t) * 0.6) var(--i360-ease), visibility 0s; }
+.i360-fold-in { min-height: 0; overflow: hidden; }
+.i360-head.min .i360-fold { grid-template-rows: 0fr; opacity: 0; visibility: hidden; transition: grid-template-rows var(--i360-t) var(--i360-ease), opacity calc(var(--i360-t) * 0.6) var(--i360-ease), visibility 0s var(--i360-t); }
+.i360-identity-main > .i360-fold + .i360-title-row { margin-top: 0; }
+.i360-identity-main > .i360-title-row { padding-block: 2px; }
+.i360-title-row { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+.i360-title { margin: 0; font-size: 1.85rem; line-height: 1.1; font-weight: 800; color: #0f172a; transition: font-size var(--i360-t) var(--i360-ease), color var(--i360-t) var(--i360-ease); }
+.i360-title-btn { all: unset; cursor: default; border-radius: 6px; }
+.i360-title-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.i360-head.min .i360-title { font-size: 1.15rem; color: #ffffff; }
+.i360-head.min .i360-title-btn { cursor: pointer; }
+.i360-head.min .i360-title-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* Fornecedor e aviso só aparecem na faixa encolhida (no cartão inteiro eles têm lugar próprio). */
+.i360-sub-inline, .i360-min-only { min-width: 0; max-width: 0; overflow: hidden; opacity: 0; transition: max-width var(--i360-t) var(--i360-ease), opacity var(--i360-t) var(--i360-ease); }
+.i360-sub-inline { white-space: nowrap; text-overflow: ellipsis; font-size: 0.8rem; color: rgba(255, 255, 255, 0.8); }
+.i360-min-only { display: inline-flex; }
+.i360-head.min .i360-sub-inline { max-width: 340px; opacity: 1; }
+.i360-head.min .i360-min-only { max-width: 260px; opacity: 1; }
+/* Coluna lateral (gestor, origem e datas): encolhe de lado quando o cartão é largo e de altura quando a coluna desce. */
+.i360-side-fold { flex: 0 0 300px; width: 300px; max-height: 600px; display: flex; overflow: hidden; opacity: 1; visibility: visible;
+  transition: flex-basis var(--i360-t) var(--i360-ease), width var(--i360-t) var(--i360-ease), max-height var(--i360-t) var(--i360-ease), opacity calc(var(--i360-t) * 0.6) var(--i360-ease), visibility 0s; }
+.i360-side-fold > .i360-side-clip { flex: 1 1 auto; min-width: 300px; display: flex; }
+.i360-side-clip > .i360-side { flex: 1 1 auto; }
+.i360-head.min .i360-side-fold { flex-basis: 0; width: 0; max-height: 0; opacity: 0; visibility: hidden; transition: flex-basis var(--i360-t) var(--i360-ease), width var(--i360-t) var(--i360-ease), max-height var(--i360-t) var(--i360-ease), opacity calc(var(--i360-t) * 0.6) var(--i360-ease), visibility 0s var(--i360-t); }
+.i360-head.min .i360-identity { column-gap: 0; }
+
+/* Abas: abaixo do cartão; encolhido, viram pastas encostadas na base da faixa azul. */
+.i360-head .i360-tabs { flex: 1 1 0; min-width: 0; background-color: #eef3fb; border-bottom: 2px solid #bfcde6; padding: 0 0.5rem; border-radius: 8px 8px 0 0; }
+.i360-tab { background: transparent; }
+.i360-tab:hover:not([aria-selected='true']) { color: var(--primary); }
+@media (prefers-reduced-motion: reduce) {
+  .i360-head { --i360-t: 0s; }
 }
 .i360-hero-wrap { container-type: inline-size; }
 .i360-identity { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
@@ -913,8 +931,12 @@ h1, h2, h3, h4 {
 .i360-dr-missing { font-weight: 400; font-style: italic; color: #94a3b8; }
 .i360-dr-risk { margin-left: 0.5rem; font-weight: 700; color: var(--color-danger-text); }
 @container (max-width: 700px) {
+  .i360-side-fold { flex: 1 1 100%; width: auto; max-height: none; display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--i360-t) var(--i360-ease), opacity calc(var(--i360-t) * 0.6) var(--i360-ease), visibility 0s; }
+  .i360-side-fold > .i360-side-clip { min-width: 0; min-height: 0; overflow: hidden; display: block; }
+  .i360-head.min .i360-side-fold { flex-basis: 100%; width: auto; max-height: none; grid-template-rows: 0fr; transition: grid-template-rows var(--i360-t) var(--i360-ease), opacity calc(var(--i360-t) * 0.6) var(--i360-ease), visibility 0s var(--i360-t); }
   .i360-side { flex: 1 1 100%; width: auto; padding-left: 0; padding-top: 12px; border-left: 0; border-top: 1px solid #e2e8f0; }
   .i360-dr dd { text-align: left; }
+  .i360-head.min .i360-identity { row-gap: 0; }
 }
 
 /* ==========================================================================
@@ -1517,3 +1539,23 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
   }
   .carteira-filter-menu button { min-height: 44px; }
 }
+
+/* Trilho de situação/fila das carteiras (CarteiraSegmentTabs): o selecionado vem de aria-pressed, não de foco/clique. */
+.segment-pills { display: flex; align-items: center; gap: 0.75rem; }
+.segment-pills__rail { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: #eaeef4; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.segment-pills__rail::-webkit-scrollbar { display: none; }
+.segment-pill {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.8rem; border-radius: 7px;
+  border: 1px solid transparent; background: transparent; color: #556274; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+.segment-pill:hover { background: rgba(255, 255, 255, 0.6); color: #0f172a; }
+.segment-pill:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--primary); }
+.segment-pill__dot { width: 7px; height: 7px; border-radius: 50%; }
+.segment-pill__count { color: #7b8798; font-weight: 700; font-variant-numeric: tabular-nums; }
+.segment-pill[aria-pressed='true'] { background: #e8eef8; border-color: var(--primary); color: var(--primary); }
+.segment-pill[aria-pressed='true']:hover { background: #e8eef8; color: var(--primary); }
+.segment-pill[aria-pressed='true'] .segment-pill__count { color: var(--primary); }
+/* Trilho logo abaixo do título da página: encosta no título (a margem do título + o gap da página davam 2rem). */
+.ds-page-header:has(+ .segment-pills) { margin-bottom: 0 !important; }
+.ds-page-header + .segment-pills { margin-top: -0.5rem; }

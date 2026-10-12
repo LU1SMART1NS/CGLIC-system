@@ -58,13 +58,15 @@ interface AtasSemGestorFilaProps {
   podeAtribuir: boolean;
   /** Abre o "Para quem atribuo?" para as atas (os contratos vinculados vão junto). */
   onAtribuir: (atas: AtaSemGestor[], done?: () => void) => void;
+  /** Fila do histórico: atas encerradas sem contrato vigente (muda só os textos). */
+  historico?: boolean;
 }
 
 /**
  * Atas sem gestor: o trabalho principal do coordenador. Atribuir a ata leva junto os contratos já vinculados; os
  * prováveis (mesma compra e fornecedor) serão vinculados pelo servidor e herdam o gestor no vínculo.
  */
-export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, podeAtribuir, onAtribuir }) => {
+export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, podeAtribuir, onAtribuir, historico = false }) => {
   const navigate = useNavigateWithOrigin();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
   const hasActive = hasActiveCarteiraFilters(SCHEMA, filters);
@@ -91,10 +93,19 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
   const sort = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
 
   return (
-    <section data-testid="distribuicao-atas-sem-gestor" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <section data-testid={historico ? 'distribuicao-atas-historico' : 'distribuicao-atas-sem-gestor'} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-        Ao atribuir a ata, o servidor recebe também os contratos vinculados a ela. Os prováveis (mesma compra e mesmo fornecedor) ele
-        vincula na Ata 360, e passam a ser dele no momento do vínculo.
+        {historico ? (
+          <>
+            Atas encerradas, sem gestor e sem contrato vigente. Não há o que acompanhar; atribuir aqui só registra quem responde pelo
+            histórico, e não pesa na carga do gestor.
+          </>
+        ) : (
+          <>
+            Ao atribuir a ata, o servidor recebe também os contratos vinculados a ela. Os prováveis (mesma compra e mesmo fornecedor) ele
+            vincula na Ata 360, e passam a ser dele no momento do vínculo.
+          </>
+        )}
       </p>
 
       <CarteiraFilterBar
@@ -156,7 +167,7 @@ export const AtasSemGestorFila: React.FC<AtasSemGestorFilaProps> = ({ atas, pode
 
       {atas.length === 0 ? (
         <div style={{ ...carteiraTableShell, padding: '1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
-          Todas as atas com algo a distribuir já têm gestor.
+          {historico ? 'Todas as atas encerradas já têm gestor.' : 'Todas as atas com algo a distribuir já têm gestor.'}
         </div>
       ) : filtradas.length === 0 ? (
         <CarteiraNoResults title="Nenhuma ata encontrada" description="Nenhuma ata sem gestor atende aos filtros." onResetFilters={resetFilters} />

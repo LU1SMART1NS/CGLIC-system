@@ -26,7 +26,7 @@ type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 const UASGS = UASGS_CGLIC;
 
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
-  SALDOS: ['ATA_CRITICA'],
+  SALDOS: ['ATA_CRITICA', 'UNIDADE_PENDENTE', 'FORNECEDOR_PNCP'],
   REAJUSTES: ['REAJUSTE_RADAR'],
   PAGAMENTOS: ['PAGAMENTO_CRITICO', 'PAGAMENTO_PREVISTO'],
   TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA'],
@@ -188,12 +188,13 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       totalEmpenhado: sum((rm) => rm.financial.totalEmpenhado),
       // Só CRITICA: é o que o clique no card filtra. Urgentes aparecem na linha própria do card.
       criticalCount: allItems.filter((i) => i.severity === 'CRITICA').length,
-      totalAlertasAtivos: sum((rm) => rm.attention.totalAlertasAtivos),
+      // Gestor de Saldo: o total do banco soma avisos de todo tipo; conta só os de saldo, como a lista.
+      totalAlertasAtivos: saldosOnly ? allItems.length : sum((rm) => rm.attention.totalAlertasAtivos),
       urgenteCount,
       atencaoCount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, allItems]);
+  }, [dash200330.readModel, dash200331.readModel, allItems, saldosOnly]);
 
   const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
     if (activeTab === 'SALDOS') return 'ARP';
@@ -304,6 +305,14 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           Instrumentos que exigem sua atenção e as próximas ações recomendadas.
         </p>
 
+        {!saldosOnly && (
+          <GestaoInstrumentosCategoryTabs
+            counts={tabCounts}
+            active={activeTab}
+            onSelect={handleSelectTab}
+          />
+        )}
+
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -321,13 +330,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
             />
           </div>
 
-          {!saldosOnly && (
-            <GestaoInstrumentosCategoryTabs
-              counts={tabCounts}
-              active={activeTab}
-              onSelect={handleSelectTab}
-            />
-          )}
         </div>
       </div>
 

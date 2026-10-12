@@ -9,6 +9,7 @@ import { useNumerosDosItensDosContratos } from '../../../hooks/useItensDoContrat
 import { formatContractNumber } from '../../../utils/contractNumber';
 import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParcial, type FilaAta, type FilaContrato } from './contratosSemAta';
 import type { ItemDaAta } from './vinculoEmMassa';
+import { chaveGestaoDaArp } from '../../../utils/ataIdentidade';
 
 /**
  * Atas, contratos e vínculos da carteira, cruzados para dizer quais contratos ainda não têm ata (e qual é a ata
@@ -36,7 +37,7 @@ export function usePendenciasVinculoAta() {
           anoCompra: arp.anoCompra,
           cnpjs: Array.from(new Set(itens.map((i) => (i.niFornecedor || '').replace(/\D/g, '')).filter(Boolean))),
           fornecedorNomes: Array.from(new Set(itens.map((i) => i.nomeRazaoSocialFornecedor).filter(Boolean))),
-          gestorNome: atas.gestorByAta[arp.numeroAtaRegistroPreco],
+          gestorNome: atas.gestorByAta[chaveGestaoDaArp(arp)],
           objeto: arp.objeto,
           fornecedorNome: itens[0]?.nomeRazaoSocialFornecedor,
           faixa: prazo.faixa,
@@ -105,6 +106,8 @@ export function usePendenciasVinculoAta() {
   // Só mostra números com atas, contratos e vínculos carregados: totais parciais enganariam a leitura.
   const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading || semAtaLoading;
   const totalSemVinculo = pendencias.aVincular.length + pendencias.precisamDecisao.length;
+  // Marcados "não pertence a ata" e ainda sem gestor: continuam pendentes na fila da Vinculação.
+  const naoPertencemSemGestor = pendencias.naoPertencem.filter((i) => !i.gestorNome).length;
 
   return {
     atas,
@@ -116,6 +119,7 @@ export function usePendenciasVinculoAta() {
     contratosFila,
     pendencias,
     totalSemVinculo,
+    naoPertencemSemGestor,
     ataDe,
     itensDaAta,
     gestorDoContrato,

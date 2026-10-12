@@ -14,6 +14,7 @@ import { buildAtaKey, getAtaSourceQueryOptions, useAllAtaItemSaldos } from './us
 import { useAllAtaManagers } from './useAtaManagers';
 import { useAssignedManagementScope } from './useAssignedManagementScope';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
+import { carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
 
 const EMPENHOS_SET_KEY = ['atas-with-empenhos-set'] as const;
 const ALLOCATIONS_SET_KEY = ['atas-with-allocations-set'] as const;
@@ -83,9 +84,13 @@ export function useAtasPortfolio() {
       [UASGS_CGLIC[0]]: scope200330.ataKeys,
       [UASGS_CGLIC[1]]: scope200331.ataKeys
     };
+    // Perfil sem escopo (keys indefinidas nas duas carteiras) vê tudo. Gestor: só as atas da carteira atribuídas
+    // a ele, pela chave de gestão (atas de outros órgãos repetem números de atas da CGLIC, migration 106).
+    const escopado = scope200330.ataKeys !== undefined || scope200331.ataKeys !== undefined;
     return arps.filter((a) => {
-      const keys = scopeByUasg[a.codigoUnidadeGerenciadora];
-      return !keys || keys.includes(a.numeroAtaRegistroPreco);
+      if (!escopado) return true;
+      const keys = scopeByUasg[carteiraDaAta(a)];
+      return Boolean(keys?.includes(chaveGestaoDaArp(a)));
     });
   }, [arps, scope200330.ataKeys, scope200331.ataKeys]);
 
@@ -125,7 +130,7 @@ export function useAtasPortfolio() {
   const empenhosDbSet = empenhosQuery.data ?? emptySet;
   const allocationsDbSet = allocationsQuery.data ?? emptySet;
 
-  // Gestor por ata (mesma fonte do detalhe da Ata e da Visão Geral), indexado pelo número da ata.
+  // Gestor por ata (mesma fonte do detalhe da Ata e da Visão Geral), indexado pela chave de gestão (chaveGestaoDaArp).
   const { data: ataManagers } = useAllAtaManagers();
   const gestorByAta = useMemo(() => {
     const map: Record<string, string> = {};

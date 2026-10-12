@@ -21,7 +21,14 @@ import { useArpItemContractLinks } from '../hooks/useAtaManagers';
 import { useContratosSemAta } from '../hooks/useContratosSemAta';
 import { useSyncContractItemQuantity } from '../hooks/useSyncContractItemQuantity';
 import { useEmpenhoDoItem } from '../hooks/useEmpenhoDoItem';
+import { useContratadoDoItem } from '../hooks/useContratadoDoItem';
+import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../utils/contratadoPorUnidade';
+import { AjustarQuantidadeModal, type ContratoParaAjustar } from './item-balances/AjustarQuantidadeModal';
+import { UnidadesDoContratoModal, type ContratoParaDividir } from './item-balances/UnidadesDoContratoModal';
+import { QuantidadeContratadaCelula, UnidadesDoContratoCelula } from './item-balances/ContratadoCells';
 import { VincularAosItensDialog } from './vinculacao/VincularAosItensDialog';
+import { useAcoesDistribuicaoEmpenho } from '../hooks/useDistribuicaoEmpenhos';
+import type { ParcelaDoItem } from '../utils/empenhoDoItem';
 import { ROTAS_VINCULACAO } from './vinculacao/vinculacaoConfig';
 import type { DistribuicaoDoEmpenho } from '../services/distribuicaoEmpenhoService';
 import {
@@ -57,6 +64,7 @@ import { useInstrumentTab } from './instrument360/useInstrumentTab';
 import { AllocationsTab, type AllocationRow } from './item-balances/AllocationsTab';
 import { summarizeAllocationExecution, vinculosSemQuantidade } from '../utils/allocationExecution';
 import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryStrip';
+import { Instrument360Head } from './instrument360/Instrument360Head';
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
@@ -69,6 +77,7 @@ import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from
 import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract, UnidadeItemRecord } from '../types';
 import { STATUS_A_VENCER, formatStatusVigencia } from '../utils/statusVigencia';
+import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -183,6 +192,16 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
   const canonicalItemKey = normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
 
+  // Contratado por unidade (migration 103): quantidade de cada contrato (fonte, ajuste) e a divisão entre as unidades.
+  const { data: contratadoDoItem } = useContratadoDoItem(canonicalItemKey);
+  const quantidadePorContrato = useMemo(
+    () => new Map(contratadoDoItem.contratos.map((c) => [c.contractKey, c])),
+    [contratadoDoItem.contratos]
+  );
+  const unidadesPorContrato = useMemo(() => alocacoesPorContrato(contratadoDoItem.contratos, allocations), [contratadoDoItem.contratos, allocations]);
+  const [contratoAjustando, setContratoAjustando] = useState<ContratoParaAjustar | null>(null);
+  const [contratoDividindo, setContratoDividindo] = useState<ContratoParaDividir | null>(null);
+
   // Vínculos Oficiais com Contratos do CGLIC (Fase 6.2)
   const { data: contractLinks = [] } = useItemContractLinks(
     arp.numeroAtaRegistroPreco,
@@ -190,7 +209,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     item.numeroItem,
     canonicalItemKey
   );
-  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = useContractsDashboard(arp.codigoUnidadeGerenciadora);
+  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = useContractsDashboard(carteiraDaAta(arp));
   const unlinkContractMutation = useUnlinkContractFromItem();
   const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
@@ -281,6 +300,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // ainda faltam vincular. As notas dos contratos chegam pela sincronização do servidor, de hora em hora.
   const { data: empenhoDoItem, isLoading: vinculosLoading, isReady: empenhoDoItemPronto } = useEmpenhoDoItem(canonicalItemKey);
   const [notaParaVincular, setNotaParaVincular] = useState<DistribuicaoDoEmpenho | null>(null);
+  // Quantidade da nota no item (migration 104): gravar, conferir e, se a nova quantidade não cabe na unidade, tirar a
+  // nota de lá e avisar.
+  const acoesQuantidade = useAcoesDistribuicaoEmpenho();
+  const [saidasDaUnidade, setSaidasDaUnidade] = useState<Array<{ numero: string; unidade: string; quantidade: number }>>([]);
 
   // Relê da API, para cada contrato vinculado, a quantidade contratada (que entra no saldo). Só roda pelo botão
   // Atualizar: abrir o item não consulta as APIs. A quantidade contratada também é relida em segundo plano para todos
@@ -341,12 +364,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const { data: todosVinculos = [] } = useArpItemContractLinks();
   const { data: contratosSemAta = {} } = useContratosSemAta();
   const naoSugerir = useMemo(() => {
-    const numeroAta = arp?.numeroAtaRegistroPreco || '';
+    const chaveDaAta = arp ? chaveGestaoDaArp(arp) : '';
     const compra = arp ? buildItemSuggestionCriteria(arp, item).compra : undefined;
     const esteItem = parseInt(String(item?.numeroItem ?? ''), 10);
     const porChave = new Map(officialDashboardContracts.map((c) => [contractKeyOf(c).toUpperCase(), c]));
     const fora: string[] = [];
-    for (const [key, outras] of outrasAtasPorContrato(numeroAta, todosVinculos)) {
+    for (const [key, outras] of outrasAtasPorContrato(chaveDaAta, todosVinculos)) {
       const contrato = porChave.get(key);
       const podeEntrar = Boolean(contrato) && podeEntrarEmMaisUmaAta(contrato!, compra, outras) && !itensEmOutraAta(outras).has(esteItem);
       if (!podeEntrar) fora.push(key);
@@ -512,9 +535,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   // Alocação interna: o empenhado de cada unidade vem das parcelas deste item nas notas ligadas a ela.
   const allocationExecution = React.useMemo(
-    () => summarizeAllocationExecution(allocations, empenhoDoItem, empenhoLinks),
-    [allocations, empenhoDoItem, empenhoLinks]
+    () => summarizeAllocationExecution(allocations, empenhoDoItem, empenhoLinks, unidadesPorContrato),
+    [allocations, empenhoDoItem, empenhoLinks, unidadesPorContrato]
   );
+  const contratadoPorUnidade = useMemo(() => contratadoPorNomeDaUnidade(contratadoDoItem.unidades), [contratadoDoItem.unidades]);
   const allocationRows: AllocationRow[] = React.useMemo(
     () => allocations.map((a) => {
       const exec = allocationExecution.porAlocacao.get(a.id);
@@ -522,12 +546,19 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         id: a.id,
         unitName: a.unitName,
         allocatedQty: a.allocatedQty,
+        contratado: contratadoPorUnidade.get(a.unitName.trim().toLowerCase()) ?? 0,
         empenhado: exec?.empenhado ?? 0,
         vinculados: exec?.vinculados ?? 0
       };
     }),
-    [allocations, allocationExecution]
+    [allocations, allocationExecution, contratadoPorUnidade]
   );
+  const contratadoSemUnidade = useMemo(() => {
+    const comFalta = contratadoDoItem.contratos.filter((c) => c.quantidadeSemUnidade > 0);
+    return { quantidade: comFalta.reduce((s, c) => s + c.quantidadeSemUnidade, 0), contratos: comFalta.length };
+  }, [contratadoDoItem.contratos]);
+  const contratosAConferir = contratadoDoItem.contratos.filter((c) => c.situacao === 'CONFERIR' || c.fonteMudouAposAjuste).length;
+  const tituloItem = `Ata ${arp.numeroAtaRegistroPreco} · item ${item.numeroItem}${item.descricaoItem ? ` · ${item.descricaoItem}` : ''}`;
 
   // Nota sem quantidade neste item (saiu do item, voltou a vincular, item sem preço) não fica em unidade interna:
   // com tudo lido sem erro, quem pode mexer no vínculo desfaz a ligação e a aba avisa quais notas saíram.
@@ -550,14 +581,37 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empenhoDoItemPronto, empenhoLinksCarregados, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
 
+  const handleInformarQuantidade = (p: ParcelaDoItem, quantidade: number | null, sairDaUnidade: string | null) =>
+    acoesQuantidade.informar.mutate(
+      { contratoEmpenhoId: p.contratoEmpenhoId, numeroItem: p.numeroItem, quantidade },
+      {
+        onSuccess: async () => {
+          toast.success(quantidade == null ? `${p.numeroOficial}: quantidade voltou à calculada.` : `${p.numeroOficial}: ${formatNumber(quantidade)} un neste item.`);
+          if (sairDaUnidade && quantidade != null) {
+            const unidade = allocations.find((a) => a.id === sairDaUnidade)?.unitName ?? 'unidade';
+            await handleLinkEmpenho(p.numeroOficial, '');
+            setSaidasDaUnidade((antes) => [...antes.filter((x) => x.numero !== p.numeroOficial), { numero: p.numeroOficial, unidade, quantidade }]);
+          }
+        },
+        onError: (err: any) => toast.error(err?.message || 'Não foi possível gravar a quantidade.')
+      }
+    );
+  const handleConferirQuantidades = (p: ParcelaDoItem) =>
+    acoesQuantidade.conferir.mutate(p.contratoEmpenhoId, {
+      onSuccess: () => toast.success(`${p.numeroOficial}: quantidade conferida.`),
+      onError: (err: any) => toast.error(err?.message || 'Não foi possível registrar a conferência.')
+    });
+
   const totalAllocatedSum = allocations.reduce((acc, curr) => acc + curr.allocatedQty, 0);
   const remainingUGQty = totalUGQty - totalAllocatedSum;
   const percentAllocated = totalUGQty > 0 ? (totalAllocatedSum / totalUGQty) * 100 : 0;
 
-  // Normaliza e ordena unidades considerando UASGs 200331 e 200330 como GERENCIADORA
+  // Normaliza e ordena unidades considerando UASGs 200331 e 200330 como GERENCIADORA (só nas atas da CGLIC: na ata
+  // de outro órgão a SENASP é participante, e a gerenciadora é o outro órgão).
+  const ataDaCglic = !ataDeOutroOrgao(arp);
   const sortedUnidades = [...unidades].map(uni => {
     const cleanUasg = String(uni.codigoUnidade || '').replace(/\D/g, '');
-    const isUG = uni.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(cleanUasg);
+    const isUG = uni.tipoUnidade === 'GERENCIADORA' || (ataDaCglic && isGerenciadoraUasg(cleanUasg));
     return {
       ...uni,
       tipoUnidade: (isUG ? 'GERENCIADORA' : (uni.tipoUnidade || 'PARTICIPANTE')) as 'GERENCIADORA' | 'PARTICIPANTE'
@@ -573,6 +627,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   return (
     <Instrument360Page>
+      <Instrument360Head>
       <ItemHero
         arp={arp}
         item={item}
@@ -614,6 +669,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         idPrefix="item"
         ariaLabel="Seções do item"
       />
+      </Instrument360Head>
 
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'unidades' ? (
@@ -643,6 +699,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                   {vinculosDesfeitos.length === 1 ? 'Esta nota ficou' : 'Estas notas ficaram'} sem quantidade neste item e
                   {vinculosDesfeitos.length === 1 ? ' saiu da unidade interna' : ' saíram da unidade interna'}:{' '}
                   {vinculosDesfeitos.map((v) => `${v.numero} (${v.unidade})`).join(', ')}. Defina a quantidade antes de escolher a unidade de novo.
+                </NoticeBar>
+              )}
+              {saidasDaUnidade.length > 0 && (
+                <NoticeBar tone="warning" testId="nota-saiu-da-unidade">
+                  {saidasDaUnidade.map((x) => `A nota ${x.numero} saiu da unidade ${x.unidade}: a nova quantidade (${formatNumber(x.quantidade)} un) não cabe no saldo dela.`).join(' ')}
                 </NoticeBar>
               )}
               {allocationError && (
@@ -770,6 +831,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                 <th>Número do contrato</th>
                                 <th>Unidade</th>
                                 <th>Fornecedor</th>
+                                <th>Unidades internas</th>
                                 <th>Qtd. contratada</th>
                                 <th>Empenhado</th>
                                 <th>A empenhar</th>
@@ -797,6 +859,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                 const resolvedOrgaoName = isGer
                                   ? (arp.nomeOrgao || arp.nomeUnidadeGerenciadora || c.orgaoNome)
                                   : (matchedUnit?.nomeUnidade || (c.orgaoNome && !c.orgaoNome.includes('SECRETARIA NACIONAL') ? c.orgaoNome : `Órgão Participante`));
+                                const qtdDoContrato = c._isOfficialLink && c.contractKey ? quantidadePorContrato.get(c.contractKey) : undefined;
 
                                 return (
                                   <React.Fragment key={`${c.numeroContrato}-${idx}`}>
@@ -847,8 +910,31 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                           CNPJ: {c.niFornecedor?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") || '-'}
                                         </div>
                                       </td>
+                                      <td data-label="Unidades internas" style={{ fontSize: '0.8rem' }}>
+                                        {qtdDoContrato ? (
+                                          <UnidadesDoContratoCelula
+                                            q={qtdDoContrato}
+                                            onAbrir={
+                                              canLinkEmpenhos
+                                                ? () => setContratoDividindo({ contractKey: qtdDoContrato.contractKey, numeroContrato: displayNumeroContrato, quantidade: qtdDoContrato })
+                                                : undefined
+                                            }
+                                          />
+                                        ) : (
+                                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                                        )}
+                                      </td>
                                       <td data-label="Qtd. contratada" style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 700, color: c.quantidadeContratada != null ? 'var(--success)' : 'var(--text-muted)' }}>
-                                        {c.quantidadeContratada != null ? (
+                                        {qtdDoContrato ? (
+                                          <QuantidadeContratadaCelula
+                                            q={qtdDoContrato}
+                                            onAjustar={
+                                              canEditData
+                                                ? () => setContratoAjustando({ contractKey: qtdDoContrato.contractKey, numeroContrato: displayNumeroContrato, quantidade: qtdDoContrato, linkPortal: contractUrl || undefined })
+                                                : undefined
+                                            }
+                                          />
+                                        ) : c.quantidadeContratada != null ? (
                                           <span>{formatNumber(c.quantidadeContratada)}</span>
                                         ) : (
                                           <span style={{ fontSize: '0.76rem', fontWeight: 500, color: 'var(--text-muted)' }} title="Aguardando sincronização de dados abertos">
@@ -941,7 +1027,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                     
                                     {isExpanded && (
                                       <tr className="carteira-expanded">
-                                        <td colSpan={9} style={{ padding: '0 0 1rem 0', background: '#f8fafc' }}>
+                                        <td colSpan={10} style={{ padding: '0 0 1rem 0', background: '#f8fafc' }}>
                                           <div className="item-expanded-panel" style={{ padding: '1rem', marginLeft: '2.5rem', marginRight: '1rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
                                             <ContractEmpenhosPanel
                                               numeroItem={parseInt(String(item.numeroItem), 10)}
@@ -954,10 +1040,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                                 unitName: a.unitName,
                                                 saldoQty: a.allocatedQty - a.empenhado
                                               }))}
+                                              unidadesDoContrato={(unidadesPorContrato.get(c.contractKey || '') ?? []).map((id) => {
+                                                const unitName = allocations.find((a) => a.id === id)?.unitName ?? '';
+                                                const parte = quantidadePorContrato.get(c.contractKey || '')?.unidades.find((u) => u.unidade.trim().toLowerCase() === unitName.trim().toLowerCase());
+                                                return { id, unitName, contratado: parte?.quantidade ?? 0 };
+                                              })}
                                               linkedAllocationId={(numero) => empenhoLinks[numero] || ''}
                                               onLinkAllocation={handleLinkEmpenho}
                                               onVincularAosItens={canEditData ? setNotaParaVincular : undefined}
-                                              busy={saveEmpenhoLinksMutation.isPending}
+                                              onInformarQuantidade={canEditData ? handleInformarQuantidade : undefined}
+                                              onConferirQuantidades={canEditData ? handleConferirQuantidades : undefined}
+                                              gravandoQuantidade={acoesQuantidade.informar.isPending ? acoesQuantidade.informar.variables?.contratoEmpenhoId : null}
+                                              busy={saveEmpenhoLinksMutation.isPending || acoesQuantidade.conferir.isPending}
                                             />
                                           </div>
                                         </td>
@@ -969,7 +1063,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                             </tbody>
                             <tfoot>
                               <tr style={{ background: '#f8fafc', fontWeight: 700 }} data-testid="vinculados-total">
-                                <td colSpan={4} style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total</td>
+                                <td colSpan={5} style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total</td>
                                 <td style={{ fontFamily: 'monospace' }}>{formatNumber(executionSummary.contratado)}</td>
                                 <td style={{ fontFamily: 'monospace' }}>{formatNumber(executionSummary.empenhado)}</td>
                                 <td style={{ fontFamily: 'monospace', color: executionSummary.aEmpenhar < 0 ? 'var(--danger)' : undefined }}>
@@ -1002,6 +1096,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
             percentAllocated={percentAllocated}
             rows={allocationRows}
             semUnidade={allocationExecution.semUnidade}
+            contratadoItem={executionSummary.contratado}
+            contratadoSemUnidade={contratadoSemUnidade}
+            contratosAConferir={contratosAConferir}
             departments={departments}
             departmentsLoading={departmentsLoading}
             canManage={canManageAllocations}
@@ -1031,9 +1128,30 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         numeroAta={arp.numeroAtaRegistroPreco}
         numeroItem={item.numeroItem}
         uasg={arp.codigoUnidadeGerenciadora}
+        uasgCarteira={carteiraDaAta(arp)}
         itemUnitPrice={item.valorUnitario}
         existingLinkedContractKeys={enrichedOfficialLinks.map(l => l.contractKey)}
         compraDaAta={buildItemSuggestionCriteria(arp, item).compra}
+      />
+
+      {/* Quantidade contratada ajustada e unidades do contrato no item (migration 103). */}
+      <AjustarQuantidadeModal
+        itemKey={canonicalItemKey}
+        tituloItem={tituloItem}
+        contrato={contratoAjustando}
+        cota={totalUGQty}
+        consumoOutros={executionSummary.contratado - (contratoAjustando?.quantidade.quantidadeContratada ?? 0)}
+        onFechar={() => setContratoAjustando(null)}
+      />
+      <UnidadesDoContratoModal
+        itemKey={canonicalItemKey}
+        tituloItem={tituloItem}
+        contrato={contratoDividindo}
+        allocations={allocations}
+        unidades={contratadoDoItem.unidades}
+        nomeDaUnidade={(sigla) => departments.find((d) => d.sigla.trim().toLowerCase() === sigla.trim().toLowerCase())?.nomeCompleto}
+        podeEditar={canLinkEmpenhos}
+        onFechar={() => setContratoDividindo(null)}
       />
 
       {/* "Vincular aos itens" de uma nota do contrato: a mesma janela do Contrato 360 e da Vinculação. */}

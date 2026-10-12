@@ -147,7 +147,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
         <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <CarteiraSortHeader label="Prioridade" sortKey="prioridade" {...sort} />
+              <CarteiraSortHeader label="Prior." hint="Prioridade" align="center" sortKey="prioridade" {...sort} />
               <CarteiraSortHeader label="UASG" sortKey="uasg" {...sort} />
               <CarteiraSortHeader label="Instrumento" sortKey="instrumento" {...sort} />
               <CarteiraSortHeader label="Objeto / Fornecedor" sortKey="objeto" {...sort} />
@@ -165,7 +165,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
 
               return (
                 <tr key={item.id} data-testid={`instrumentos-row-${item.id}`}>
-                  <td data-role="id" style={td}>
+                  <td data-role="id" style={{ ...td, textAlign: 'center' }}>
                     <SeverityBadge severity={item.severity} iconOnly />
                   </td>
                   <td data-label="UASG" style={{ ...td, fontWeight: 700, color: '#475569' }} data-testid={`instrumentos-uasg-${item.id}`}>

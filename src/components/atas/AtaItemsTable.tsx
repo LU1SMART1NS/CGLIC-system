@@ -22,6 +22,9 @@ interface AtaItemsTableProps {
   }>;
   /** Abre o detalhe de saldo do item (clique na linha ou no número do item). */
   onSelectItem?: (item: ArpItemRecord) => void;
+  /** Sem itens: explicação e ação (ex.: ata publicada no PNCP sem fornecedor → "Indicar fornecedor"). */
+  emptyDescription?: string;
+  emptyAction?: React.ReactNode;
 }
 
 function formatCurrency(val?: number): string {
@@ -48,7 +51,7 @@ const SORT_COLUMNS: Record<string, CarteiraSortColumn<ItemRow>> = {
   usado: { value: (r) => r.percentualConsumido, firstDir: 'desc' }
 };
 
-export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onSelectItem }) => {
+export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onSelectItem, emptyDescription, emptyAction }) => {
   const rows = useMemo<ItemRow[]>(() => {
     const saldoByItem = new Map(saldos.map((s) => [String(Number(s.numero_item)), s]));
     return itens.map((item) => {
@@ -68,7 +71,8 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
     return (
       <EmptyState
         title="Nenhum item cadastrado."
-        description="Esta Ata não possui itens sincronizados na base."
+        description={emptyDescription || 'Esta Ata não possui itens sincronizados na base.'}
+        action={emptyAction}
       />
     );
   }

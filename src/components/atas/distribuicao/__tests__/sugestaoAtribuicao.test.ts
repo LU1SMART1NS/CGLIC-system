@@ -41,7 +41,12 @@ const candidatos: CandidatoAtribuicao[] = [
 describe('montarLote', () => {
   it('inclui os contratos que seguem a ata e ignora os encerrados na carga', () => {
     const lote = montarLote([{ tipo: 'ATA', ataKey: '00010/2025' }], links, indexarItens(distribuicao.linhas));
-    expect(lote).toMatchObject({ atas: 1, contratos: 1, vinculados: 1, complexidade: { ALTA: 1, MEDIA: 1, BAIXA: 0 }, equivalente: 5 });
+    expect(lote).toMatchObject({ atas: 1, contratos: 1, vinculados: 1, complexidade: { ALTA: 1, MEDIA: 1, BAIXA: 0 }, equivalente: 5, encerrados: 0 });
+  });
+
+  it('conta à parte a ata encerrada escolhida como alvo (fila do histórico)', () => {
+    const lote = montarLote([{ tipo: 'ATA', ataKey: '00099/2019' }], [], indexarItens(distribuicao.linhas));
+    expect(lote).toMatchObject({ atas: 0, contratos: 0, encerrados: 1, equivalente: 0 });
   });
 });
 

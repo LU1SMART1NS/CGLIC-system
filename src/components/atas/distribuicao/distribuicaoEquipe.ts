@@ -10,10 +10,16 @@ import {
   type Complexidade,
   type NivelComplexidade
 } from './complexidade';
+import { chaveGestaoDaChave } from '../../../utils/ataIdentidade';
 
-/** Ata já com prazo e gestor (chave do gestor = número da ata, como em ata_managers). */
+/** Ata já com prazo e gestor. */
 export interface DistribuicaoAta {
   numeroAta: string;
+  /**
+   * Chave de gestão (a de ata_managers): o número nas atas da CGLIC, número-UASG nas de outros órgãos
+   * (migration 106). Ausente = o número.
+   */
+  chave?: string;
   uasg?: string;
   objeto?: string;
   dias?: number | null;
@@ -40,7 +46,7 @@ export interface DistribuicaoContrato {
 /** Ata ou contrato vigente listado dentro da linha do gestor. */
 export interface DistribuicaoItem {
   tipo: 'ATA' | 'CONTRATO';
-  /** Número da ata (chave do gestor) ou chave do contrato. */
+  /** Chave de gestão da ata (ver DistribuicaoAta.chave) ou chave do contrato. */
   chave: string;
   uasg?: string;
   numero: string;
@@ -91,6 +97,8 @@ export interface Pendencias {
 /** Contrato vigente vinculado a uma ata cujo gestor não é o mesmo (a regra é herdar o gestor da ata). */
 export interface DistribuicaoDivergencia {
   numeroAta: string;
+  /** Chave de gestão da ata (alvo de "alinhar"). */
+  chaveAta: string;
   gestorAta?: string;
   contractKey: string;
   numeroContrato: string;
@@ -126,10 +134,13 @@ function somar(carga: CargaInstrumentos, faixa: PrazoFaixa, valor: number) {
   else if (faixa === 'ATENCAO') carga.atencao++;
 }
 
-/** Número da ata a partir do alerta (`numeroAta` ou a chave `numeroAta-uasg`). */
-function numeroAtaDoAlerta(item: DashboardAttentionItem): string | undefined {
-  return item.numeroAta || item.arpKey?.replace(/-\d{6}$/, '');
+/** Chave de gestão da ata do alerta (pela chave `numeroAta-uasg`; sem ela, o número). */
+function chaveAtaDoAlerta(item: DashboardAttentionItem): string | undefined {
+  if (item.arpKey) return chaveGestaoDaChave(item.arpKey);
+  return item.numeroAta || undefined;
 }
+
+const chaveDaAta = (ata: DistribuicaoAta): string => ata.chave || ata.numeroAta;
 
 /**
  * Distribuição da carteira vigente por gestor: atas e contratos (quantidade, prazo e valor),
@@ -178,13 +189,14 @@ export function buildDistribuicaoEquipe(input: {
 
   for (const ata of input.atas) {
     if (!isVigente(ata.faixa)) continue;
-    ataPorNumero.set(ata.numeroAta, ata);
+    const chave = chaveDaAta(ata);
+    ataPorNumero.set(chave, ata);
     const l = linha(ata.gestorNome);
     somar(l.atas, ata.faixa, ata.valor);
-    l.ataKeys.push(ata.numeroAta);
+    l.ataKeys.push(chave);
     const item: DistribuicaoItem = {
       tipo: 'ATA',
-      chave: ata.numeroAta,
+      chave,
       uasg: ata.uasg,
       numero: ata.numeroAta,
       objeto: ata.objeto || '',
@@ -193,11 +205,11 @@ export function buildDistribuicaoEquipe(input: {
       valor: ata.valor,
       urgentes: 0,
       acompanhar: 0,
-      complexidade: aplicarAjuste(classificarAta(ata.itens ?? 0), input.ajustes?.[`ATA:${ata.numeroAta}`])
+      complexidade: aplicarAjuste(classificarAta(ata.itens ?? 0), input.ajustes?.[`ATA:${chave}`])
     };
     l.itens.push(item);
     contarComplexidade(l, item.complexidade);
-    itemAta.set(ata.numeroAta, item);
+    itemAta.set(chave, item);
     somar(totais.atas, ata.faixa, ata.valor);
   }
   for (const contrato of input.contratos) {
@@ -244,9 +256,9 @@ export function buildDistribuicaoEquipe(input: {
       contar(contrato.gestorNome, itemContrato.get(contrato.contractKey), item);
       continue;
     }
-    const numeroAta = item.contractKey ? undefined : numeroAtaDoAlerta(item);
-    const ata = numeroAta ? ataPorNumero.get(numeroAta) : undefined;
-    if (ata) contar(ata.gestorNome, itemAta.get(ata.numeroAta), item);
+    const chaveAta = item.contractKey ? undefined : chaveAtaDoAlerta(item);
+    const ata = chaveAta ? ataPorNumero.get(chaveAta) : undefined;
+    if (ata) contar(ata.gestorNome, itemAta.get(chaveDaAta(ata)), item);
   }
 
   const divergencias: DistribuicaoDivergencia[] = [];
@@ -276,6 +288,7 @@ export function buildDistribuicaoEquipe(input: {
     if ((ata.gestorNome || '') !== (contrato.gestorNome || '')) {
       divergencias.push({
         numeroAta: ata.numeroAta,
+        chaveAta: chaveDaAta(ata),
         gestorAta: ata.gestorNome,
         contractKey,
         numeroContrato: contrato.numero,

@@ -5,6 +5,9 @@ export interface ArpResponse {
   paginasRestantes: number;
 }
 
+/** Papel da SENASP na ata: gerenciadora (atas da CGLIC), participante ou adesão (atas de outros órgãos). */
+export type PapelSenasp = 'GERENCIADORA' | 'PARTICIPANTE' | 'ADESAO';
+
 export interface ArpRecord {
   numeroAtaRegistroPreco: string;
   codigoUnidadeGerenciadora: string;
@@ -37,6 +40,13 @@ export interface ArpRecord {
   isCanceladaPncp?: boolean;
   prorrogadaPncp?: boolean;
   dataAtualizacaoPncp?: string;
+  /**
+   * Carteira da CGLIC a que a ata pertence (banco, migration 106). Nas gerenciadas é a própria UASG; nas atas
+   * de outros órgãos, a UASG da SENASP (ex.: 200331), enquanto codigoUnidadeGerenciadora é a do outro órgão.
+   */
+  uasgCarteira?: string;
+  /** Papel da SENASP na ata (banco, migration 106). Ausente = ata da CGLIC lida das fontes. */
+  papelSenasp?: PapelSenasp;
 }
 
 export interface ArpItemsResponse {
@@ -44,6 +54,8 @@ export interface ArpItemsResponse {
   totalRegistros: number;
   totalPaginas: number;
   paginasRestantes: number;
+  /** De onde os itens vieram: Compras.gov.br (fonte oficial da ata) ou PNCP (itens da compra atribuídos à ata). */
+  origem?: 'COMPRAS_GOV' | 'PNCP';
 }
 
 export interface ArpItemRecord {

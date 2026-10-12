@@ -52,7 +52,6 @@ describe('summarizeItemExecution', () => {
       empenhado: 29,
       aEmpenhar: 41,
       notasAVincular: 1,
-      valorAVincular: 500,
       contratosSemItens: 1,
       valorSemDivisao: 7500
     });

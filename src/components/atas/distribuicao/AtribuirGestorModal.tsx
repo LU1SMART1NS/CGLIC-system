@@ -104,6 +104,11 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
         >
           <div style={{ fontWeight: 800, color: '#0f172a' }}>
             {plural(lote.atas, 'ata', 'atas')} · {plural(lote.contratos, 'contrato', 'contratos')} vigentes
+            {lote.encerrados > 0 && (
+              <span style={{ fontWeight: 600, color: '#475569' }}>
+                {' '}+ {plural(lote.encerrados, 'encerrado', 'encerrados')} (não {lote.encerrados === 1 ? 'pesa' : 'pesam'} na carga)
+              </span>
+            )}
             {lote.vinculados > 0 && (
               <span style={{ fontWeight: 600, color: 'var(--color-info-text-strong)' }}>
                 {' '}({lote.vinculados} {lote.vinculados === 1 ? 'vem junto' : 'vêm junto'} pelos vínculos com a ata)

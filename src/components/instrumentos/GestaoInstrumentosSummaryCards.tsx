@@ -28,7 +28,7 @@ interface GestaoInstrumentosSummaryCardsProps {
   counts: GestaoInstrumentosCounts;
   activeCard: GestaoInstrumentosCardId | null;
   onSelectCard: (card: GestaoInstrumentosCardId) => void;
-  /** Gestor de Saldo: só o card de Atas (saldo dos itens); contratos, valor e alertas ficam fora. */
+  /** Gestor de Saldo: card de Atas e card de alertas contando só os avisos de saldo; contratos e valor ficam fora. */
   saldosOnly?: boolean;
 }
 
@@ -177,8 +177,9 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
           <strong>{formatCurrency(saldoDisponivel)} ({formatPercent(saldoDisponivel, counts.valorVigenteTotal)})</strong>
         </div>
       </button>
+      </>)}
 
-      {/* Card 4 — Alertas Críticos */}
+      {/* Card 4 — Alertas Críticos (para o Gestor de Saldo: só os avisos de saldo das Atas) */}
       <button
         type="button"
         onClick={() => onSelectCard('ALERTAS')}
@@ -190,29 +191,28 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-            Alertas Críticos
+            {saldosOnly ? 'Alertas de Saldo' : 'Alertas Críticos'}
           </span>
           <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
             <AlertTriangle size={16} />
           </div>
         </div>
         <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--color-danger)', letterSpacing: '-0.02em' }}>
-          {counts.criticalCount} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>itens críticos</span>
+          {counts.criticalCount} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>{saldosOnly ? 'itens esgotados' : 'itens críticos'}</span>
         </div>
         <div style={rowStyle}>
-          <span>Pendências totais</span>
+          <span>{saldosOnly ? 'Pendências de saldo' : 'Pendências totais'}</span>
           <strong>{counts.totalAlertasAtivos}</strong>
         </div>
         <div style={rowStyle}>
-          <span>Urgentes</span>
+          <span>{saldosOnly ? `Urgentes (acima de ${SALDO_RULES.criticoAcimaDePct}%)` : 'Urgentes'}</span>
           <strong style={{ color: counts.urgenteCount > 0 ? 'var(--color-warning)' : '#0f172a' }}>{counts.urgenteCount}</strong>
         </div>
         <div style={rowStyle}>
-          <span>Em atenção</span>
+          <span>{saldosOnly ? `Em atenção (${SALDO_RULES.atencaoAcimaDePct}–${SALDO_RULES.criticoAcimaDePct}%)` : 'Em atenção'}</span>
           <strong>{counts.atencaoCount}</strong>
         </div>
       </button>
-      </>)}
     </div>
   );
 };

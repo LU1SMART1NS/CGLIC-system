@@ -10,6 +10,7 @@ import { InstrumentPageState } from '../instrument360/InstrumentPageState';
 import { Ata360Header } from './Ata360Header';
 import { AtaActionQueue, type Ata360Tab } from './AtaActionQueue';
 import { useAtaActionQueue } from '../../hooks/useAtaActionQueue';
+import { Instrument360Head } from '../instrument360/Instrument360Head';
 import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
 import { AtaItemsTable } from './AtaItemsTable';
 import { AtaLinkedContracts } from './AtaLinkedContracts';
@@ -26,6 +27,9 @@ import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 import { mensagemDesvincular } from '../../utils/vinculoAutomatico';
+import { carteiraDaAta, chaveGestaoDaArp } from '../../utils/ataIdentidade';
+import { useFornecedorAtaPncp } from '../../hooks/useFornecedorAtaPncp';
+import { IndicarFornecedorModal } from './IndicarFornecedorModal';
 
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos'];
 // Gestor de Saldo (domínio de alocações) só precisa chegar aos itens da ata.
@@ -46,16 +50,21 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   const { arp, itens, isLoading, isError, error, refetch } = useAta(ataKey, uasg);
   const { saldos, isLoading: loadingSaldos } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);
-  const { linkedContracts, isLoading: loadingLinks } = useAtaLinkedContracts(arp?.numeroAtaRegistroPreco, uasg);
-  const { data: taskPlan = null, isLoading: loadingTaskPlan } = useAtaTaskPlan(
-    arp?.numeroAtaRegistroPreco || '',
-    Boolean(arp)
-  );
+  // Carteira da CGLIC da ata (nas de outros órgãos, a UASG da SENASP): dela vêm contratos, gestores e escopo.
+  const carteira = arp ? carteiraDaAta(arp) : uasg;
+  const chaveGestao = arp ? chaveGestaoDaArp(arp) : '';
+  const { linkedContracts, isLoading: loadingLinks } = useAtaLinkedContracts(arp?.numeroAtaRegistroPreco, uasg, carteira);
+  const { data: taskPlan = null, isLoading: loadingTaskPlan } = useAtaTaskPlan(chaveGestao, Boolean(arp));
+
+  // Ata publicada no PNCP sem fornecedor (atas_fornecedor_pncp): pendência, indicação do coordenador e conferência.
+  const fornecedorPncp = useFornecedorAtaPncp();
+  const registroFornecedor = arp?.numeroControlePncpAta ? fornecedorPncp.porControle.get(arp.numeroControlePncpAta) ?? null : null;
+  const [indicarAberto, setIndicarAberto] = React.useState(false);
 
   // Escopo ASSIGNED do perfil "gestor" (ata_managers/arp_item_contract_links —
   // ver useAssignedManagementScope.ts), mesma guarda de deep-link já aplicada
   // no Contract360Page para /contratos/:contractKey.
-  const queue = useAtaActionQueue(arp, saldos, taskPlan);
+  const queue = useAtaActionQueue(arp, saldos, taskPlan, { registro: registroFornecedor, itensNoBanco: itens.length });
 
   const { role } = useAuth();
   const saldosOnly = role === 'gestor_saldos';
@@ -63,9 +72,9 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
     tabs: saldosOnly ? SALDOS_TAB_IDS : TAB_IDS,
     defaultTab: saldosOnly ? 'itens' : 'acoes'
   });
-  const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(uasg);
+  const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(carteira);
   const isScopedRole = role === 'gestor';
-  const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(arp.numeroAtaRegistroPreco));
+  const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(chaveGestao));
   // Mesma regra das RPCs link/unlink_contract_to_item_atomic (has_role gestor/admin)
   const canEditLinks = role === 'admin' || role === 'gestor';
   // O quantitativo SENASP dos itens é gravado em segundo plano (pelo servidor, de hora em hora); a tela só lê.
@@ -75,6 +84,31 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const toast = useToast();
   const confirm = useConfirmDialog();
   const [unlinkingId, setUnlinkingId] = React.useState<string | null>(null);
+
+  const podeIndicarFornecedor = fornecedorPncp.podeIndicar && Boolean(registroFornecedor);
+  const abrirIndicar = podeIndicarFornecedor ? () => setIndicarAberto(true) : undefined;
+  const indicarFornecedor = async (input: { fornecedorIdentificador: string; comoConfirmou: string }) => {
+    if (!registroFornecedor) return;
+    await fornecedorPncp.indicar.mutateAsync({ numeroControlePncp: registroFornecedor.numeroControlePncp, ...input });
+    setIndicarAberto(false);
+    toast.success('Fornecedor indicado. Os itens entram na próxima sincronização de atas.');
+  };
+  const desfazerIndicacao = async () => {
+    if (!registroFornecedor) return;
+    const ok = await confirm({
+      title: 'Desfazer indicação do fornecedor',
+      message: `A ata ${registroFornecedor.numeroAta} volta a ficar sem fornecedor e sem itens até nova indicação ou até o Compras.gov.br publicar a ata.`,
+      confirmLabel: 'Desfazer',
+      tone: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await fornecedorPncp.desfazer.mutateAsync(registroFornecedor.numeroControlePncp);
+      toast.success('Indicação desfeita.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível desfazer a indicação.');
+    }
+  };
 
   const handleUnlink = async (link: EnrichedArpItemContract) => {
     const ok = await confirm({
@@ -186,6 +220,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   return (
     <Instrument360Page>
+      <Instrument360Head>
       <Ata360Header
         arp={arp}
         itens={itens}
@@ -196,6 +231,8 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         onOpenActions={() => goToTab('acoes')}
         onOpenItens={() => goToTab('itens')}
         onOpenContratos={() => goToTab('contratos')}
+        fornecedorPncp={registroFornecedor}
+        onIndicarFornecedor={abrirIndicar}
       />
 
       <Instrument360Tabs
@@ -206,6 +243,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         idPrefix="ata"
         ariaLabel="Seções da ata"
       />
+      </Instrument360Head>
 
       <Instrument360TabPanel idPrefix="ata" activeTab={activeTab}>
         {activeTab === 'acoes' && (
@@ -217,10 +255,13 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
           >
             <AtaActionQueue
               queue={queue}
-              ataKey={arp.numeroAtaRegistroPreco}
+              ataKey={chaveGestao}
               plan={taskPlan}
               isLoading={loadingSaldos || loadingTaskPlan}
               onGoTo={(tab) => goToTab(tab)}
+              podeIndicarFornecedor={podeIndicarFornecedor}
+              onIndicarFornecedor={abrirIndicar}
+              onDesfazerIndicacao={desfazerIndicacao}
             />
           </InstrumentSection>
         )}
@@ -232,7 +273,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
             subtitle="Todas as tarefas do modelo de gestão aplicado, com responsável, prazo e situação"
             icon={ListTodo}
           >
-            <AtaTasksSection ataKey={arp.numeroAtaRegistroPreco} plan={taskPlan} isLoading={loadingTaskPlan} />
+            <AtaTasksSection ataKey={chaveGestao} plan={taskPlan} isLoading={loadingTaskPlan} />
           </InstrumentSection>
         )}
 
@@ -248,6 +289,18 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
               saldos={saldos}
               onSelectItem={(item) =>
                 navigate(buildAtaItemPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem))
+              }
+              emptyDescription={
+                registroFornecedor?.estado === 'PENDENTE'
+                  ? 'O PNCP publicou esta ata sem dizer o fornecedor, e a compra tem mais de uma ata. Indique o fornecedor para a sincronização trazer os itens.'
+                  : registroFornecedor?.estado === 'INDICADO'
+                    ? `Fornecedor indicado: ${registroFornecedor.fornecedorNome || registroFornecedor.fornecedorIdentificador}. Os itens entram na próxima sincronização de atas.`
+                    : undefined
+              }
+              emptyAction={
+                registroFornecedor?.estado === 'PENDENTE' && abrirIndicar ? (
+                  <ActionButton action="indicarFornecedor" type="button" size="sm" onClick={abrirIndicar} />
+                ) : undefined
               }
             />
           </InstrumentSection>
@@ -272,12 +325,22 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         )}
       </Instrument360TabPanel>
 
+      <IndicarFornecedorModal
+        key={indicarAberto ? 'indicar-aberto' : 'indicar-fechado'}
+        isOpen={indicarAberto}
+        registro={registroFornecedor}
+        onClose={() => setIndicarAberto(false)}
+        onConfirm={indicarFornecedor}
+        isSaving={fornecedorPncp.indicar.isPending}
+      />
+
       {canEditLinks && (
         <LinkContractModal
           isOpen={isLinkModalOpen}
           onClose={() => setIsLinkModalOpen(false)}
           numeroAta={arp.numeroAtaRegistroPreco}
           uasg={arp.codigoUnidadeGerenciadora}
+          uasgCarteira={carteira}
           itemOptions={linkItemOptions}
           suggestionCriteria={linkSuggestionCriteria}
         />

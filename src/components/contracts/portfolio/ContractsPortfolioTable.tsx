@@ -18,7 +18,7 @@ import { CarteiraCellFilter } from '../../carteira/CarteiraCellFilter';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../../carteira/CarteiraRowLink';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
 import type { ContractsPortfolioFilterState } from './ContractsPortfolioFilters';
-import { ManagerCell } from '../../carteira/ManagerAssign';
+import { ManagerCell, type DestinoSemGestor } from '../../carteira/ManagerAssign';
 import { getAcaoInfo, getMotivoInfo } from '../../instrumentos/gestaoInstrumentosRowHelpers';
 import type { DashboardAttentionItem } from '../../../types/managementDashboard';
 import type { ContractDashboardRecord } from '../../../types';
@@ -40,8 +40,10 @@ interface ContractsPortfolioTableProps {
   totalContracts: number;
   onResetFilters: () => void;
   pageSize?: number;
-  /** Coordenador: "Sem gestor" vira atalho para a Central de Distribuição (a atribuição é feita só lá). */
+  /** Coordenador: "Sem gestor" vira atalho para onde o gestor do contrato se resolve. */
   canAssign?: boolean;
+  /** Para onde o "Sem gestor" de cada contrato leva (Vinculação ou Central, conforme o caso). */
+  destinoSemGestor?: (row: ContractPortfolioRow) => DestinoSemGestor;
   /** Clique num valor da célula aplica o filtro correspondente (prazo → situação, pendências, fornecedor → busca). */
   onFilter?: <K extends keyof ContractsPortfolioFilterState>(key: K, value: ContractsPortfolioFilterState[K]) => void;
 }
@@ -96,6 +98,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   onResetFilters,
   pageSize = 15,
   canAssign = false,
+  destinoSemGestor,
   onFilter
 }) => {
   const navigate = useNavigateWithOrigin();
@@ -238,7 +241,12 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                       )}
                     </td>
                     <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <ManagerCell gestorNome={gestorNome} canAssign={canAssign} testId={`contracts-manager-${contractKey}`} />
+                      <ManagerCell
+                        gestorNome={gestorNome}
+                        canAssign={canAssign}
+                        destino={!gestorNome && canAssign ? destinoSemGestor?.(row) : undefined}
+                        testId={`contracts-manager-${contractKey}`}
+                      />
                     </td>
                   </tr>
 

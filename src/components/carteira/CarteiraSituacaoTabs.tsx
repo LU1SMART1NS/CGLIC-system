@@ -8,6 +8,8 @@ export type CarteiraSituacao = CarteiraStatusFilter | 'TODOS';
 interface CarteiraSituacaoTabsProps {
   /** Prefixo dos data-testid (ex.: "arp" → "arp-situacao-CRITICO"). */
   testIdPrefix: string;
+  /** Concordância dos rótulos: atas são femininas ("Encerradas"), contratos e itens masculinos ("Encerrados"). */
+  genero?: 'f' | 'm';
   vigentes: number;
   criticos: number;
   atencao: number;
@@ -20,11 +22,12 @@ interface CarteiraSituacaoTabsProps {
 }
 
 /**
- * Situação da carteira em segmentos com contagem: Vigentes · Crítico · Atenção · Histórico · Todas.
+ * Situação da carteira em segmentos com contagem: Vigentes · Atenção · Crítico · Todas · Encerradas.
  * Substitui os cartões de resumo e o seletor de vigência.
  */
 export const CarteiraSituacaoTabs: React.FC<CarteiraSituacaoTabsProps> = ({
   testIdPrefix,
+  genero = 'f',
   vigentes,
   criticos,
   atencao,
@@ -35,17 +38,17 @@ export const CarteiraSituacaoTabs: React.FC<CarteiraSituacaoTabsProps> = ({
   meta
 }) => {
   const segmentos: Array<CarteiraSegment<CarteiraSituacao>> = [
-    { id: 'VIGENTES', label: 'Vigentes', count: vigentes },
-    { id: 'CRITICO', label: 'Crítico', count: criticos, dot: 'var(--color-danger)', title: `Vencem em até ${VIGENCIA_RULES.faixaCriticoAteDias} dias` },
+    { id: 'VIGENTES', label: 'Vigentes', count: vigentes, dot: 'var(--color-success)' },
     {
       id: 'ATENCAO',
       label: 'Atenção',
       count: atencao,
-      dot: 'var(--color-warning)',
+      dot: 'var(--color-warning-solid)',
       title: `Vencem entre ${VIGENCIA_RULES.faixaCriticoAteDias + 1} e ${VIGENCIA_RULES.faixaAtencaoAteDias} dias`
     },
-    { id: 'HISTORICO', label: 'Histórico', count: historico, title: 'Expirados ou cancelados' },
-    { id: 'TODOS', label: 'Todas', count: total }
+    { id: 'CRITICO', label: 'Crítico', count: criticos, dot: 'var(--color-danger)', title: `Vencem em até ${VIGENCIA_RULES.faixaCriticoAteDias} dias` },
+    { id: 'TODOS', label: genero === 'm' ? 'Todos' : 'Todas', count: total },
+    { id: 'HISTORICO', label: genero === 'm' ? 'Encerrados' : 'Encerradas', count: historico, title: 'Expirados ou cancelados' }
   ];
 
   return (

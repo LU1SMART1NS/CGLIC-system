@@ -18,6 +18,7 @@ import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { SincronizacaoFalhaNotice } from './carteira/SincronizacaoFalhaNotice';
 import type { ArpRecord, ArpItemRecord } from '../types';
+import { chaveGestaoDaArp, contarPorPapel, passaFiltroPapel } from '../utils/ataIdentidade';
 
 interface ArpSearchProps {
   onSelectArp: (arp: ArpRecord) => void;
@@ -100,8 +101,14 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     return { alocacao, empenho };
   }, [scopedArps, resumoPorAta, filterState.statusVigencia]);
 
+  // Quantas atas da situação escolhida cairiam em cada papel da SENASP (contagem no menu do filtro).
+  const papelCounts = useMemo(
+    () => contarPorPapel(scopedArps.filter((arp) => matchesStatusFilter(getArpPrazo(arp).faixa, filterState.statusVigencia))),
+    [scopedArps, filterState.statusVigencia]
+  );
+
   const gestoresDisponiveis = useMemo(
-    () => listGestores(scopedArps.map((arp) => gestorByAta[arp.numeroAtaRegistroPreco])),
+    () => listGestores(scopedArps.map((arp) => gestorByAta[chaveGestaoDaArp(arp)])),
     [scopedArps, gestorByAta]
   );
   // O perfil "gestor" já vê só as próprias atas: sem seletor, e um ?gestor= na URL é ignorado.
@@ -122,8 +129,11 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       if (!passaFiltroNivel(execucao?.nivelEmpenho ?? null, filterState.filtroEmpenho)) return false;
       if (filterState.unidade !== TODAS_UNIDADES && !execucao?.unidades.has(filterState.unidade)) return false;
 
-      // 4. Filtro de Gestor
-      if (showGestorFilter && !matchesGestorFilter(gestorByAta[arp.numeroAtaRegistroPreco], filterState.gestor)) return false;
+      // 4. Papel da SENASP (gerenciada pela CGLIC ou de outro órgão)
+      if (!passaFiltroPapel(arp, filterState.papel)) return false;
+
+      // 5. Filtro de Gestor
+      if (showGestorFilter && !matchesGestorFilter(gestorByAta[chaveGestaoDaArp(arp)], filterState.gestor)) return false;
 
       // 5. Busca Textual
       if (filterState.busca.trim().length > 0) {
@@ -227,6 +237,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         unidades={unidades}
         alocacaoCounts={nivelCounts.alocacao}
         empenhoCounts={nivelCounts.empenho}
+        papelCounts={papelCounts}
         showGestorFilter={showGestorFilter}
         onChangeFilter={handleFilterChange}
         onResetFilters={handleResetFilters}

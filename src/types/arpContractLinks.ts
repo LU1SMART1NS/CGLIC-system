@@ -11,6 +11,8 @@ export interface ArpItemContractLink {
   observacoes?: string;
   /** Cópia da quantidade do item no contrato lida da API (nunca digitada); nulo = a API não listou o item. */
   quantidadeContratadaApi?: number | null;
+  /** Quantidade informada pelo gestor (migration 103); quando existe, é a usada no saldo. */
+  quantidadeAjustada?: number | null;
   valorUnitarioApi?: number | null;
   /** Quando a quantidade foi lida da API; ausente = ainda não sincronizada. */
   quantidadeLidaEm?: string;
@@ -39,7 +41,7 @@ export interface EnrichedArpItemContract {
   linkId: string;
   itemKey: string;
   contractKey: string;
-  /** Quantidade do item no contrato, lida da API oficial (não é gravada no vínculo). */
+  /** Quantidade do item no contrato usada no saldo: a ajustada pelo gestor ou, sem ajuste, a lida da fonte. */
   quantidadeContratada?: number;
   /** Quando a quantidade foi lida da API pela última vez; ausente = ainda não sincronizada. */
   quantidadeLidaEm?: string;

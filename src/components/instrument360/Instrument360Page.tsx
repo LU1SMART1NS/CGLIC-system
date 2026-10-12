@@ -8,7 +8,7 @@ import { Instrument360DockProvider } from './Instrument360DockProvider';
  * O gutter horizontal vem do <main> (--page-gutter); aqui só o respiro vertical.
  */
 export const Instrument360Page: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <PageContainer data-testid="instrument-page" maxWidth={1400} style={{ padding: '1.5rem 0' }}>
+  <PageContainer data-testid="instrument-page" maxWidth={1400} style={{ padding: '1.5rem 0', paddingBottom: 'calc(1.5rem + var(--i360-lost, 0px))' }}>
     <Instrument360DockProvider>{children}</Instrument360DockProvider>
   </PageContainer>
 );

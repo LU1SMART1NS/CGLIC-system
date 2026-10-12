@@ -10,6 +10,7 @@ import type { PrazoFaixa } from '../components/carteira/carteiraPrazo';
 import type { CarteiraItemEmpenho, CarteiraItemLink } from '../services/carteiraItensService';
 import type { GlobalAllocationRecord } from '../services/allocationService';
 import type { ArpItemRecord, ArpRecord } from '../types';
+import { chaveGestaoAta } from './ataIdentidade';
 
 /** Uma linha da aba Itens: o item da ata com prazo da ata, alocação por unidade e empenho. */
 export interface CarteiraItemRow {
@@ -31,6 +32,8 @@ export interface CarteiraItemRow {
   nivelAlocacao: NivelAtendimento;
   /** Soma da quantidade do item nos contratos vinculados; nula quando nenhum vínculo tem a quantidade lida. */
   contratada: number | null;
+  /** Parte do contratado ainda sem unidade interna (migration 103; 0 sem o dado). */
+  contratadoSemUnidade: number;
   /** Soma das parcelas deste item nas notas vinculadas aos itens dos contratos (em unidades). */
   empenhado: number;
   nivelEmpenho: NivelAtendimento;
@@ -148,7 +151,7 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
         ataKey,
         arp,
         item,
-        gestorNome: gestorByAta[numeroAta],
+        gestorNome: gestorByAta[chaveGestaoAta(numeroAta, uasg)],
         diasRestantes: dias,
         faixa,
         quantitativoSenasp: senasp,
@@ -157,6 +160,7 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
         alocadoPorUnidade,
         nivelAlocacao: nivelAlocacao(alocado, senasp),
         contratada,
+        contratadoSemUnidade: saldo ? Number(saldo.quantidade_contratada_sem_unidade) || 0 : 0,
         empenhado,
         nivelEmpenho: nivelEmpenho(empenhado, contratada)
       });

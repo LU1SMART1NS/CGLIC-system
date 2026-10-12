@@ -25,14 +25,15 @@ import { useAuth } from '../../../context/AuthContext';
 import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
 import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
+import { chaveGestaoAta } from '../../../utils/ataIdentidade';
 
-const AMBAR = 'var(--color-warning)';
+const AMBAR = 'var(--color-warning-solid)';
 const VERMELHO = 'var(--color-danger)';
 
 
 /**
  * Central de Distribuição, no padrão das carteiras: atas e contratos para gestores. Filas em abas com contagem
- * (Atas sem gestor, Gestor diferente da ata) e a carga de cada gestor (Equipe). A aba fica na URL. O vínculo de
+ * (Atas sem gestor, Histórico sem gestor, Gestor diferente da ata) e a carga de cada gestor (Equipe). A aba fica na URL. O vínculo de
  * contrato à ata saiu daqui para o menu Vinculação.
  */
 export const DistribuicaoEquipePage: React.FC = () => {
@@ -76,7 +77,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
 
   const { divergencias, totais } = distribuicao;
   // "Gestor diferente da ata" só aparece quando há caso: o vínculo automático não cria divergência (migration 95).
-  const aba: Fila = abaDaUrl === 'DIVERGENCIAS' && divergencias.length === 0 ? FILA_INICIAL : abaDaUrl;
+  // "Histórico sem gestor" também some quando está vazia.
+  const historico = pendencias.atasHistoricoSemGestor;
+  const filaVazia = (abaDaUrl === 'DIVERGENCIAS' && divergencias.length === 0) || (abaDaUrl === 'HISTORICO' && historico.length === 0);
+  const aba: Fila = filaVazia ? FILA_INICIAL : abaDaUrl;
   const totalInstrumentos = totais.atas.vigentes + totais.contratos.vigentes;
   // A carteira sem gestor fica nas filas; a Equipe mostra só quem tem carteira.
   const linhasEquipe = distribuicao.linhas.filter((l) => l.gestorNome !== null);
@@ -90,6 +94,16 @@ export const DistribuicaoEquipePage: React.FC = () => {
       dot: pendencias.atasSemGestor.length ? AMBAR : undefined,
       title: 'Vigentes e encerradas que ainda têm contratos'
     },
+    ...(historico.length > 0
+      ? [
+          {
+            id: 'HISTORICO' as const,
+            label: 'Histórico sem gestor',
+            count: historico.length,
+            title: 'Encerradas sem contrato vigente: não pesam na carga'
+          }
+        ]
+      : []),
     ...(divergencias.length > 0
       ? [
           {
@@ -177,7 +191,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
               podeAtribuir={canAssign}
               onAtribuir={(lista, done) =>
                 setTransferencia({
-                  targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: ata.numeroAta })),
+                  targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: chaveGestaoAta(ata.numeroAta, ata.uasg) })),
                   origem: null,
                   done,
                   provaveis: lista.reduce((n, ata) => n + ata.provaveis.length, 0)
@@ -186,11 +200,22 @@ export const DistribuicaoEquipePage: React.FC = () => {
             />
           )}
 
+          {aba === 'HISTORICO' && (
+            <AtasSemGestorFila
+              historico
+              atas={historico}
+              podeAtribuir={canAssign}
+              onAtribuir={(lista, done) =>
+                setTransferencia({ targets: lista.map((ata) => ({ tipo: 'ATA' as const, ataKey: chaveGestaoAta(ata.numeroAta, ata.uasg) })), origem: null, done })
+              }
+            />
+          )}
+
           {aba === 'DIVERGENCIAS' && (
             <DivergenciasFila
               divergencias={divergencias}
               podeAlinhar={canAssign}
-              onAlinhar={(d) => setTransferencia({ targets: [{ tipo: 'ATA', ataKey: d.numeroAta }], origem: d.gestorAta ?? null })}
+              onAlinhar={(d) => setTransferencia({ targets: [{ tipo: 'ATA', ataKey: d.chaveAta }], origem: d.gestorAta ?? null })}
             />
           )}
 

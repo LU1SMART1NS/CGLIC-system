@@ -97,6 +97,17 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       .sort((a, b) => a.numeroAta.localeCompare(b.numeroAta));
   }, [itensDoContrato]);
 
+  // O PNCP pode trazer o número sem os zeros à esquerda ("5/2025"); o banco guarda "00005/2025".
+  const numeroAtaPadrao = (n: string) => n.replace(/^(\d+)\//, (_, d: string) => `${d.padStart(5, '0')}/`);
+  // Uma ata só: a do PNCP ou, sem ela, a do único vínculo. Tem link quando está no sistema: UASG da CGLIC ou ata de
+  // outro órgão com vínculo (as de participação e adesão da SENASP entram na carteira pela migration 106).
+  const origemUnica: { numeroAta: string; uasg?: string } | undefined = ataOrigem ?? (atasVinculadas.length === 1 ? atasVinculadas[0] : undefined);
+  const origemNoSistema = Boolean(
+    origemUnica?.uasg &&
+      (isUasgCglic(origemUnica.uasg) ||
+        atasVinculadas.some((a) => numeroAtaPadrao(a.numeroAta) === numeroAtaPadrao(origemUnica.numeroAta) && a.uasg === origemUnica.uasg))
+  );
+
   // RBAC: gestor, coordenador e admin possuem permissão
   const isAuthorized =
     userRole !== undefined
@@ -264,13 +275,11 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
                 <span data-testid="contract-atas-de-origem" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.1rem' }}>
                   {atasVinculadas.map((a) => (
                     <span key={`${a.numeroAta}-${a.uasg}`}>
-                      {isUasgCglic(a.uasg) ? (
-                        <AppButton type="button" variant="link" size="sm" onClick={() => navigate(buildAtaPath(a.numeroAta, a.uasg))}>
-                          nº {a.numeroAta}
-                        </AppButton>
-                      ) : (
-                        <span>nº {a.numeroAta}</span>
-                      )}
+                      {/* Ata com vínculo está no sistema, da CGLIC ou de outro órgão (migration 106): sempre abre. */}
+                      <AppButton type="button" variant="link" size="sm" onClick={() => navigate(buildAtaPath(a.numeroAta, a.uasg))}>
+                        nº {a.numeroAta}
+                      </AppButton>
+                      {!isUasgCglic(a.uasg) && <span style={{ color: '#64748b', fontWeight: 500 }}> · UASG {a.uasg}</span>}
                       <span style={{ color: '#64748b', fontWeight: 500 }}>
                         {' '}
                         · {a.itens.length === 1 ? 'item' : 'itens'} {a.itens.join(', ')}
@@ -280,21 +289,24 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
                 </span>
               )
             }
-          : ataOrigem
+          : origemUnica
           ? {
               label: 'Ata de origem',
               value:
-                ataOrigem.uasg && isUasgCglic(ataOrigem.uasg) ? (
-                  <AppButton
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    onClick={() => navigate(buildAtaPath(ataOrigem.numeroAta, ataOrigem.uasg as string))}
-                  >
-                    nº {ataOrigem.numeroAta}
-                  </AppButton>
+                origemUnica.uasg && origemNoSistema ? (
+                  <span>
+                    <AppButton
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      onClick={() => navigate(buildAtaPath(origemUnica.numeroAta, origemUnica.uasg as string))}
+                    >
+                      nº {origemUnica.numeroAta}
+                    </AppButton>
+                    {!isUasgCglic(origemUnica.uasg) && <span style={{ color: '#64748b', fontWeight: 500 }}> · UASG {origemUnica.uasg}</span>}
+                  </span>
                 ) : (
-                  <span>nº {ataOrigem.numeroAta}</span>
+                  <span>nº {origemUnica.numeroAta}</span>
                 )
             }
           : undefined

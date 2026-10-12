@@ -7,6 +7,7 @@ import { useSaveContractManager } from '../../../hooks/useSaveContractManager';
 import { useToast } from '../../../design-system/components/Toast';
 import type { DistribuicaoAviso } from '../../../services/distribuicaoAvisosService';
 import { formatDateBR } from '../../../utils/format';
+import { rotuloChaveGestao } from '../../../utils/ataIdentidade';
 
 const MOSTRAR = 5;
 
@@ -19,13 +20,13 @@ const numeroDoContrato = (key?: string) => {
 /** Uma frase por aviso, em linguagem do coordenador. */
 export function textoAviso(a: DistribuicaoAviso): string {
   if (a.tipo === 'GESTORES_DIFERENTES') {
-    return `O contrato ${numeroDoContrato(a.contractKey)} está em atas de gestores diferentes: a ata ${a.ataKey} é de ${a.gestorNovo} e o contrato está com ${a.gestorAnterior ?? 'ninguém'}${a.feitoPorNome ? ` (vínculo ou troca feita por ${a.feitoPorNome})` : ''}.`;
+    return `O contrato ${numeroDoContrato(a.contractKey)} está em atas de gestores diferentes: a ata ${rotuloChaveGestao(a.ataKey)} é de ${a.gestorNovo} e o contrato está com ${a.gestorAnterior ?? 'ninguém'}${a.feitoPorNome ? ` (vínculo ou troca feita por ${a.feitoPorNome})` : ''}.`;
   }
   const quem = a.feitoPorNome ? `${a.feitoPorNome} vinculou` : 'Foi vinculado';
   if (a.tipo === 'ATA_ASSUMIU_GESTOR') {
-    return `${quem} o contrato ${numeroDoContrato(a.contractKey)} à ata ${a.ataKey}, que estava sem gestor: a ata passou a ser de ${a.gestorNovo}, gestor do contrato.`;
+    return `${quem} o contrato ${numeroDoContrato(a.contractKey)} à ata ${rotuloChaveGestao(a.ataKey)}, que estava sem gestor: a ata passou a ser de ${a.gestorNovo}, gestor do contrato.`;
   }
-  return `${quem} o contrato ${numeroDoContrato(a.contractKey)} à ata ${a.ataKey}: o contrato passou de ${a.gestorAnterior ?? 'sem gestor'} para ${a.gestorNovo}, gestor da ata.`;
+  return `${quem} o contrato ${numeroDoContrato(a.contractKey)} à ata ${rotuloChaveGestao(a.ataKey)}: o contrato passou de ${a.gestorAnterior ?? 'sem gestor'} para ${a.gestorNovo}, gestor da ata.`;
 }
 
 /**
@@ -92,7 +93,7 @@ const ConflitoGestores: React.FC<{ aviso: DistribuicaoAviso; gestorContrato?: st
     if (!gestorContrato) return;
     void executar(
       () => salvarAta.mutateAsync({ ataKey: aviso.ataKey, gestorNome: gestorContrato, gestorUserId: userId(gestorContrato) }),
-      `A ata ${aviso.ataKey} passou para ${gestorContrato}.`
+      `A ata ${rotuloChaveGestao(aviso.ataKey)} passou para ${gestorContrato}.`
     );
   };
 
@@ -113,7 +114,7 @@ const ConflitoGestores: React.FC<{ aviso: DistribuicaoAviso; gestorContrato?: st
         </AppButton>
         {gestorContrato && (
           <AppButton type="button" variant="outline" size="sm" disabled={ocupado} onClick={passarAta} data-testid="aviso-conflito-ata">
-            Passar ata {aviso.ataKey} a {gestorContrato}
+            Passar ata {rotuloChaveGestao(aviso.ataKey)} a {gestorContrato}
           </AppButton>
         )}
       </span>

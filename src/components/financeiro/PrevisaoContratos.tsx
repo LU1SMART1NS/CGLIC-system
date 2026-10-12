@@ -136,7 +136,7 @@ export const PrevisaoContratos: React.FC = () => {
             active={filters.classe}
             onSelect={(v) => setFilter('classe', v)}
             segments={[
-              { id: 'SUGERIDO_MENSAL', label: 'Sugeridos mensais', count: n('SUGERIDO_MENSAL'), dot: 'var(--color-warning)', title: 'Sem marca; pagos nos 3 últimos meses' },
+              { id: 'SUGERIDO_MENSAL', label: 'Sugeridos mensais', count: n('SUGERIDO_MENSAL'), dot: 'var(--color-warning-solid)', title: 'Sem marca; pagos nos 3 últimos meses' },
               { id: 'TALVEZ_MENSAL', label: 'Talvez mensais', count: n('TALVEZ_MENSAL'), title: 'Sem marca; pagos em 2 dos 3 últimos meses' },
               { id: 'MENSAL', label: 'Mensais', count: n('MENSAL') },
               { id: 'ENTREGA', label: 'Por entrega', count: n('ENTREGA') },

@@ -11,6 +11,8 @@ import {
   TODAS_UNIDADES
 } from '../carteira/CarteiraExecucaoSelects';
 import type { FiltroNivel, NivelAtendimento } from '../../utils/itemAtendimento';
+import { CarteiraPapelSelect } from '../carteira/CarteiraPapelSelect';
+import { FILTRO_PAPEL_VALUES, type FiltroPapelSenasp } from '../../utils/ataIdentidade';
 
 export interface ArpPortfolioFilterState {
   statusVigencia: ArpVigenciaFilterOption;
@@ -22,6 +24,8 @@ export interface ArpPortfolioFilterState {
   unidade: string;
   /** Nome do gestor ('TODOS' = sem filtro; '__SEM_GESTOR__' = atas sem gestor atribuído). */
   gestor: string;
+  /** Papel da SENASP na ata: gerenciada pela CGLIC ou de outro órgão (participante ou adesão, migration 106). */
+  papel: FiltroPapelSenasp;
   busca: string;
 }
 
@@ -31,6 +35,7 @@ export const ARP_FILTER_SCHEMA: CarteiraFilterSchema<ArpPortfolioFilterState> = 
   filtroEmpenho: { param: 'empenho', default: 'TODOS', values: NIVEL_FILTER_VALUES },
   unidade: { param: 'unidade', default: TODAS_UNIDADES },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
+  papel: { param: 'papel', default: 'TODOS', values: FILTRO_PAPEL_VALUES },
   busca: { param: 'busca', default: '' }
 };
 
@@ -40,6 +45,7 @@ export const DEFAULT_ARP_FILTERS: ArpPortfolioFilterState = {
   filtroEmpenho: 'TODOS',
   unidade: TODAS_UNIDADES,
   gestor: TODOS_GESTORES,
+  papel: 'TODOS',
   busca: ''
 };
 
@@ -51,6 +57,8 @@ interface ArpPortfolioFiltersProps {
   /** Quantas atas cada nível de alocação / empenho traria (aparece no menu do filtro). */
   alocacaoCounts?: Partial<Record<NivelAtendimento, number>>;
   empenhoCounts?: Partial<Record<NivelAtendimento, number>>;
+  /** Quantas atas cada papel da SENASP traria (aparece no menu do filtro). */
+  papelCounts?: Partial<Record<Exclude<FiltroPapelSenasp, 'TODOS'>, number>>;
   /** Esconde o seletor de gestor (perfil "gestor", que já vê só as próprias atas). */
   showGestorFilter?: boolean;
   onChangeFilter: <K extends keyof ArpPortfolioFilterState>(key: K, value: ArpPortfolioFilterState[K]) => void;
@@ -65,6 +73,7 @@ export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
   unidades = [],
   alocacaoCounts,
   empenhoCounts,
+  papelCounts,
   showGestorFilter = true,
   onChangeFilter,
   onResetFilters,
@@ -102,6 +111,13 @@ export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
         unidades={unidades}
         onChange={(value) => onChangeFilter('unidade', value)}
         testId="arp-filter-unidade"
+      />
+
+      <CarteiraPapelSelect
+        value={filters.papel}
+        onChange={(value) => onChangeFilter('papel', value)}
+        counts={papelCounts}
+        testId="arp-filter-papel"
       />
 
       {showGestorFilter && (

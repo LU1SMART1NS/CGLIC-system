@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
 import { buildAtaPath, uasgFromAtaKey, useAta } from '../hooks/useAta';
 import { UASG_LINK_LEGADO } from '../config/unidadesGestoras';
+import { carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
 
 /**
  * Detalhe (saldo) de um item da Ata em /atas/detalhe/:ataKey/itens/:numeroItem.
@@ -32,7 +33,7 @@ export const ItemBalancesRoute: React.FC = () => {
 
   // Mesmo escopo da Ata 360: o perfil "gestor" só abre itens das Atas atribuídas a ele.
   const { role } = useAuth();
-  const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(uasg);
+  const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(arp ? carteiraDaAta(arp) : uasg);
   const isScopedRole = role === 'gestor';
 
   // O gestor de saldos chega ao item pela carteira de Itens e volta para lá.
@@ -51,7 +52,7 @@ export const ItemBalancesRoute: React.FC = () => {
     return <InstrumentPageState kind="loading" title="Carregando item da ata..." />;
   }
 
-  if (arp && isScopedRole && !assignedAtaKeys?.includes(arp.numeroAtaRegistroPreco)) {
+  if (arp && isScopedRole && !assignedAtaKeys?.includes(chaveGestaoDaArp(arp))) {
     return (
       <InstrumentPageState
         kind="forbidden"

@@ -31,6 +31,14 @@ export function chaveAvisoSaldo(numeroAta: string, uasg: string, numeroItem: str
   return `SALDO::${numeroAta}-${uasg}::${numeroItemCanonico(numeroItem)}::${nivel}`;
 }
 
+/**
+ * Contratado sem unidade interna ou divisão a conferir (migration 103). Usa o tipo SALDO; o motivo e a quantidade
+ * entram na chave, então o aviso volta se mudar (mais contratado sem unidade, outra divisão a conferir).
+ */
+export function chaveAvisoUnidade(numeroAta: string, uasg: string, numeroItem: string | number, motivo: 'SEM_UNIDADE' | 'CONFERIR', quantidade: number): string {
+  return `SALDO::${numeroAta}-${uasg}::${numeroItemCanonico(numeroItem)}::UNIDADE-${motivo}-${quantidade}`;
+}
+
 /** Reajuste: vale para o ciclo; o próximo ciclo avisa de novo. */
 export function chaveAvisoReajuste(contractKey: string, ciclo: string | number): string {
   return `REAJUSTE::${contractKey}::${ciclo}`;

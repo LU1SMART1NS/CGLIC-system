@@ -30,7 +30,9 @@ import { useFaturasDoContrato } from '../../hooks/useFaturasDoContrato';
 import { ContractTasksSection } from './ContractTasksSection';
 import { ContractEventsTimeline } from './ContractEventsTimeline';
 import { ContractItemsSection } from './ContractItemsSection';
+import { displayContractNumber } from '../../utils/contractNumber';
 import { useItensDoContrato } from '../../hooks/useItensDoContrato';
+import { Instrument360Head } from '../instrument360/Instrument360Head';
 import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 
@@ -157,6 +159,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
 
   return (
     <Instrument360Page>
+      <Instrument360Head>
       <Contract360Header contract={contract} loadingOfficial={enriching}>
         <ContractHealthStrip
           contract={contract}
@@ -175,6 +178,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
         idPrefix="contract"
         ariaLabel="Seções do contrato"
       />
+      </Instrument360Head>
 
       <Instrument360TabPanel idPrefix="contract" activeTab={activeTab}>
         {activeTab === 'acoes' && (
@@ -217,6 +221,10 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
               isLoading={itensDoContrato.isLoading}
               error={itensDoContrato.error}
               onRetry={() => void itensDoContrato.refetch()}
+              contractKey={resolvedContractKey}
+              numeroContrato={displayContractNumber(contract) || `${contract.numero}/${contract.ano}`}
+              podeAjustar={role === 'admin' || role === 'gestor'}
+              linkPortal={contract.linkPncp || undefined}
             />
           </InstrumentSection>
         )}

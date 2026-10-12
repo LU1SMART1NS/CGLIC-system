@@ -4,11 +4,20 @@ import { formatCurrency, formatNumber } from './itemBalanceUtils';
 import type { ExecucaoNoContrato, ParcelaDoItem } from '../../utils/empenhoDoItem';
 import type { DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
 import { textoDaSugestao } from '../../utils/distribuicaoEmpenho';
+import { AvisoQuantidade, CampoQuantidadeNota } from './CampoQuantidadeNota';
 
 export interface AllocationOption {
   id: string;
   unitName: string;
   saldoQty: number;
+}
+
+/** Unidade que recebeu parte deste contrato no item (migration 103). */
+export interface UnidadeDoContrato {
+  id: string;
+  unitName: string;
+  /** Quanto do contrato, neste item, é da unidade. */
+  contratado: number;
 }
 
 interface ContractEmpenhosPanelProps {
@@ -21,11 +30,25 @@ interface ContractEmpenhosPanelProps {
   loading: boolean;
   canLinkEmpenhos: boolean;
   allocationOptions: AllocationOption[];
+  /**
+   * Unidades deste contrato no item. Uma só: a nota herda a unidade, sem escolha. Várias: a escolha fica entre elas,
+   * até o contratado de cada uma neste contrato. Nenhuma (contrato sem divisão): escolhe entre todas as alocadas.
+   */
+  unidadesDoContrato?: UnidadeDoContrato[];
   /** Id da unidade interna a que a nota (pelo número) está ligada. */
   linkedAllocationId: (numeroEmpenho: string) => string;
   onLinkAllocation: (numeroEmpenho: string, allocationId: string) => void;
   /** Gestor e coordenador: abre a janela "Vincular aos itens" da nota. */
   onVincularAosItens?: (nota: DistribuicaoDoEmpenho) => void;
+  /**
+   * Gestor e coordenador: grava a quantidade da nota neste item (nula = volta à calculada pelo valor). `sairDaUnidade`
+   * = id da unidade ligada à mão em que a nova quantidade não cabe (a tela tira a nota de lá depois de gravar).
+   */
+  onInformarQuantidade?: (p: ParcelaDoItem, quantidade: number | null, sairDaUnidade: string | null) => void;
+  /** Gestor e coordenador: confirma as quantidades depois que o valor da nota mudou. */
+  onConferirQuantidades?: (p: ParcelaDoItem) => void;
+  /** Nota cuja quantidade está sendo gravada. */
+  gravandoQuantidade?: string | null;
   busy: boolean;
 }
 
@@ -42,8 +65,8 @@ function sugestaoParaEsteItem(d: DistribuicaoDoEmpenho, numeroItem: number): str
 
 /**
  * Notas de UM contrato para este item: as que já foram vinculadas a ele (parcela, quantidade e unidade interna) e as
- * do contrato que ainda faltam vincular aos itens. A quantidade vem da parcela ÷ preço do item no contrato; não há
- * mais confirmação de quantidade por item.
+ * do contrato que ainda faltam vincular aos itens. A quantidade é a informada pelo gestor
+ * (inteira, editável aqui), senão a parcela ÷ preço do item no contrato (migration 104).
  */
 export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
   numeroItem,
@@ -52,9 +75,13 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
   loading,
   canLinkEmpenhos,
   allocationOptions,
+  unidadesDoContrato = [],
   linkedAllocationId,
   onLinkAllocation,
   onVincularAosItens,
+  onInformarQuantidade,
+  onConferirQuantidades,
+  gravandoQuantidade,
   busy
 }) => {
   const parcelas = execucao?.parcelas ?? [];
@@ -62,6 +89,33 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
   const deOutro = new Set((execucao?.deOutroItem ?? []).map((d) => d.contratoEmpenhoId));
   const empenhado = execucao?.empenhado ?? 0;
   const aEmpenhar = contratado != null ? contratado - empenhado : null;
+
+  // Unidade de cada nota: a ligada à mão ou, sem ela, a herdada do contrato de uma unidade só.
+  const herdadaId = unidadesDoContrato.length === 1 ? unidadesDoContrato[0].id : '';
+  const unidadeEfetiva = (numero: string) => linkedAllocationId(numero) || herdadaId;
+  // Empenhado de cada unidade neste contrato (para o saldo das opções quando o contrato foi dividido).
+  const empenhadoNoContrato = new Map<string, number>();
+  for (const p of parcelas) {
+    const id = unidadeEfetiva(p.numeroOficial);
+    if (id && p.quantidade != null) empenhadoNoContrato.set(id, (empenhadoNoContrato.get(id) ?? 0) + p.quantidade);
+  }
+  const idsDoContrato = new Set(unidadesDoContrato.map((u) => u.id));
+  const comValorMudou = parcelas.filter((p) => p.valorMudou);
+
+  // Unidade ligada à mão em que a nova quantidade não cabe (a nota sai dela depois de gravar).
+  const unidadeQueNaoCabe = (p: ParcelaDoItem, nova: number): string | null => {
+    const atual = linkedAllocationId(p.numeroOficial);
+    if (!atual) return null;
+    const antiga = p.quantidade ?? 0;
+    if (unidadesDoContrato.length > 1 && idsDoContrato.has(atual)) {
+      const u = unidadesDoContrato.find((x) => x.id === atual)!;
+      const saldo = u.contratado - (empenhadoNoContrato.get(atual) ?? 0) + antiga;
+      return saldo >= nova ? null : atual;
+    }
+    const a = allocationOptions.find((x) => x.id === atual);
+    if (!a) return null;
+    return a.saldoQty + antiga >= nova ? null : atual;
+  };
 
   const colunasParcelas: Column<ParcelaDoItem>[] = [
     {
@@ -78,19 +132,37 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
         </>
       )
     },
-    { key: 'parcela', header: 'Parcela deste item', align: 'right', sortValue: (p) => p.valor, sortFirstDir: 'desc', render: (p) => <strong>{formatCurrency(p.valor)}</strong> },
     {
       key: 'qtd',
       header: 'Quantidade',
       align: 'right',
       sortValue: (p) => p.quantidade,
       sortFirstDir: 'desc',
-      render: (p) =>
-        p.quantidade != null ? (
-          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatNumber(p.quantidade)} un</span>
-        ) : (
-          <span style={subtle} title="O item não tem preço unitário no contrato (ex.: serviço)">sem preço</span>
-        )
+      render: (p) => (
+        <>
+          {onInformarQuantidade ? (
+            <CampoQuantidadeNota
+              quantidade={p.quantidade}
+              calculada={p.quantidadeCalculada}
+              informada={p.informada}
+              podeVoltarACalculada={p.valor != null}
+              disabled={busy || gravandoQuantidade === p.contratoEmpenhoId}
+              ariaLabel={`Quantidade da nota ${p.numeroOficial} neste item`}
+              testId={`quantidade-nota-${p.numeroOficial}`}
+              onGravar={(q) => onInformarQuantidade(p, q, q == null ? null : unidadeQueNaoCabe(p, q))}
+            />
+          ) : p.quantidade != null ? (
+            <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+              {p.informada && <StatusBadge label="Informada" variant="info" size="sm" dot={false} />} {formatNumber(p.quantidade)} un
+            </span>
+          ) : (
+            <span style={subtle} title="O item não tem preço unitário no contrato (ex.: serviço) e a quantidade não foi informada">
+              a definir
+            </span>
+          )}
+          <AvisoQuantidade quantidade={p.quantidade} testId={`quantidade-a-definir-${p.numeroOficial}`} />
+        </>
+      )
     },
     {
       key: 'vinculo',
@@ -113,6 +185,16 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
       render: (p) => {
         if (allocationOptions.length === 0) return <span style={subtle}>Sem unidades alocadas</span>;
         const current = linkedAllocationId(p.numeroOficial);
+        // Contrato de uma unidade só: a nota herda a unidade, sem escolha (a menos que esteja ligada à mão a outra).
+        if (unidadesDoContrato.length === 1 && p.quantidade != null && (!current || current === herdadaId)) {
+          return (
+            <span data-testid={`unidade-herdada-${p.numeroOficial}`}>
+              <strong>{unidadesDoContrato[0].unitName}</strong>{' '}
+              {!current && <StatusBadge label="do contrato" variant="info" size="sm" dot={false} />}
+              {!current && <div style={subtle}>herdada: o contrato é só da {unidadesDoContrato[0].unitName}</div>}
+            </span>
+          );
+        }
         const semQuantidade = p.quantidade == null;
         const estilo: React.CSSProperties = {
           padding: '0.2rem 0.4rem',
@@ -138,6 +220,37 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
           );
         }
         const quantidade = p.quantidade ?? 0;
+        // Contrato dividido entre várias unidades: só elas, até o contratado de cada uma neste contrato.
+        if (unidadesDoContrato.length > 1) {
+          const fora = current && !idsDoContrato.has(current);
+          return (
+            <>
+              <select
+                value={current}
+                onChange={(e) => onLinkAllocation(p.numeroOficial, e.target.value)}
+                disabled={busy || !canLinkEmpenhos}
+                className="form-input"
+                aria-label={`Unidade interna da nota ${p.numeroOficial}`}
+                title={canLinkEmpenhos ? undefined : 'Só o gestor e o coordenador escolhem a unidade interna da nota.'}
+                style={{ ...estilo, borderColor: fora ? 'var(--danger)' : estilo.borderColor }}
+              >
+                <option value="">Sem unidade</option>
+                {unidadesDoContrato.map((u) => {
+                  // Saldo da unidade neste contrato: o contratado dela menos o já empenhado por ela (sem esta nota).
+                  const saldoNoContrato = u.contratado - (empenhadoNoContrato.get(u.id) ?? 0);
+                  const cabe = saldoNoContrato + (u.id === current ? quantidade : 0) >= quantidade;
+                  return (
+                    <option key={u.id} value={u.id} disabled={!cabe && u.id !== current} title={`Contratado ${formatNumber(u.contratado)} un neste contrato`}>
+                      {u.unitName} (saldo {formatNumber(saldoNoContrato)} un{cabe ? '' : ' · não cabe'})
+                    </option>
+                  );
+                })}
+                {fora && <option value={current}>{allocationOptions.find((a) => a.id === current)?.unitName ?? 'unidade'} (fora do contrato)</option>}
+              </select>
+              {fora && <div style={{ ...subtle, color: 'var(--danger)' }}>a unidade escolhida não está no contrato: confira</div>}
+            </>
+          );
+        }
         return (
           <select
             value={current}
@@ -176,7 +289,6 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
         </>
       )
     },
-    { key: 'valor', header: 'Valor da nota', align: 'right', sortValue: (d) => d.valorNota, sortFirstDir: 'desc', render: (d) => formatCurrency(d.valorNota) },
     {
       key: 'sugestao',
       header: 'Sugestão',
@@ -207,6 +319,31 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
           <strong style={{ color: aEmpenhar != null && aEmpenhar < 0 ? 'var(--danger)' : undefined }}>{aEmpenhar != null ? formatNumber(aEmpenhar) : 'N/D'}</strong>
         </span>
       </div>
+
+      {contratado != null && empenhado > contratado + 1e-6 && (
+        <NoticeBar tone="warning" testId="contract-empenhos-acima-do-contratado">
+          As quantidades das notas somam {formatNumber(empenhado)} un e passam do contratado ({formatNumber(contratado)} un). Confira a base do contrato
+          antes de seguir.
+        </NoticeBar>
+      )}
+
+      {comValorMudou.length > 0 && (
+        <NoticeBar tone="warning" testId="contract-empenhos-valor-mudou">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            {comValorMudou.map((p) => (
+              <span key={p.contratoEmpenhoId}>
+                O valor da nota <strong>{p.numeroOficial}</strong> mudou de {formatCurrency(p.valorMudou!.antes)} para {formatCurrency(p.valorMudou!.agora)}{' '}
+                depois do vínculo. A quantidade continua contando; confira se ainda está certa.{' '}
+                {onConferirQuantidades && (
+                  <AppButton variant="link" size="xs" type="button" onClick={() => onConferirQuantidades(p)} disabled={busy} data-testid={`conferir-${p.numeroOficial}`}>
+                    Quantidade conferida
+                  </AppButton>
+                )}
+              </span>
+            ))}
+          </div>
+        </NoticeBar>
+      )}
 
       {execucao?.semItens && (
         <NoticeBar tone="info" testId="contract-empenhos-sem-itens">

@@ -2,7 +2,7 @@ import type { CarteiraFilterOption } from '../../carteira/CarteiraFilterButton';
 import type { PrazoFaixa } from '../../carteira/carteiraPrazo';
 
 /** Filas da Central de Distribuição (?aba=); a ordem é fixa e a inicial é a de atas sem gestor. */
-export const FILAS = ['EQUIPE', 'ATAS', 'DIVERGENCIAS'] as const;
+export const FILAS = ['EQUIPE', 'ATAS', 'HISTORICO', 'DIVERGENCIAS'] as const;
 export type Fila = (typeof FILAS)[number];
 export const FILA_INICIAL: Fila = 'ATAS';
 

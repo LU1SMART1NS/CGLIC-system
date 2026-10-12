@@ -32,6 +32,7 @@ import { formatNumber } from '../item-balances/itemBalanceUtils';
 import { Boxes } from 'lucide-react';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AlocarUnidadeModal, type ItemParaAlocar } from './AlocarUnidadeModal';
+import { carteiraDaAta } from '../../utils/ataIdentidade';
 
 interface Filtros {
   nivel: string;
@@ -51,7 +52,7 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   busca: { param: 'busca', default: '' }
 };
-const AMBAR = 'var(--color-warning)';
+const AMBAR = 'var(--color-warning-solid)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 const clamp2: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 /** "00059/2025" → "2025/00059": ordena pelo ano e depois pelo número (igual à Carteira › Itens). */
@@ -96,7 +97,8 @@ export const ItensUnidadesPage: React.FC = () => {
   }, [base, filters.vigencia]);
   const uasgs = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of base) m.set(r.arp.codigoUnidadeGerenciadora, (m.get(r.arp.codigoUnidadeGerenciadora) ?? 0) + 1);
+    // Filtro pela carteira da CGLIC (nas atas de outros órgãos, a UASG da ata é a do outro órgão).
+    for (const r of base) m.set(carteiraDaAta(r.arp), (m.get(carteiraDaAta(r.arp)) ?? 0) + 1);
     return m;
   }, [base]);
   const gestores = useMemo(() => listGestores(base.map((r) => r.gestorNome)), [base]);
@@ -109,7 +111,7 @@ export const ItensUnidadesPage: React.FC = () => {
         if (filters.vigencia === 'VIGENTES' && r.faixa === 'EXPIRADO') return false;
         if (filters.vigencia === 'HISTORICO' && r.faixa !== 'EXPIRADO') return false;
         if (filters.unidade !== TODAS_UNIDADES && !(r.alocadoPorUnidade[filters.unidade] > 0)) return false;
-        if (filters.uasg !== TODOS && r.arp.codigoUnidadeGerenciadora !== filters.uasg) return false;
+        if (filters.uasg !== TODOS && carteiraDaAta(r.arp) !== filters.uasg) return false;
         if (showGestorFilter && !matchesGestorFilter(r.gestorNome, filters.gestor)) return false;
         if (q) {
           const casa =
@@ -224,6 +226,7 @@ export const ItensUnidadesPage: React.FC = () => {
                       <CarteiraSortHeader label="Quantitativo SENASP" sortKey="senasp" align="right" {...sort} />
                       <CarteiraSortHeader label="Alocado" sortKey="alocado" {...sort} />
                       <th style={carteiraTh}>Unidades</th>
+                      <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
                       <CarteiraSortHeader label="Falta alocar" sortKey="falta" align="right" {...sort} />
                       <th style={carteiraTh}>Situação</th>
                       {showGestorFilter && <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sort} />}
@@ -259,6 +262,20 @@ export const ItensUnidadesPage: React.FC = () => {
                           </td>
                           <td data-label="Unidades" style={{ ...carteiraTd, fontSize: '0.8rem' }}>
                             {unidadesDoItem.length > 0 ? unidadesDoItem.map(([u, q]) => `${unidades.find((x) => x.chave === u)?.nome ?? u} ${formatNumber(q)}`).join(' · ') : <span style={{ color: '#94a3b8' }}>—</span>}
+                          </td>
+                          <td data-label="Contratado" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                            {r.contratada != null && r.contratada > 0 ? (
+                              <>
+                                {formatNumber(r.contratada)} un
+                                {r.contratadoSemUnidade > 0 && (
+                                  <div style={{ ...subtle, color: 'var(--color-warning-text)' }} title="Contratado que ainda não foi dividido entre as unidades internas">
+                                    {formatNumber(r.contratadoSemUnidade)} sem unidade
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <span style={{ color: '#94a3b8' }}>—</span>
+                            )}
                           </td>
                           <td data-label="Falta alocar" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: falta > 0 ? 'var(--color-warning-text)' : undefined }}>
                             {falta > 0 ? `${formatNumber(falta)} un` : '—'}

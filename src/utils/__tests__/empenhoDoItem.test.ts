@@ -11,7 +11,7 @@ const notas = [
   nota({ ne: '2024NE000301', valor_nota: 127400, situacao: 'DISTRIBUIDA', origem: 'USUARIO', parcelas: [{ numero_item: 13, valor: 127400 }] }),
   nota({ ne: '2024NE000330', valor_nota: 147000, sugestao_tipo: 'VARIAS_POSSIBILIDADES', sugestao: [{ numero_item: 13, quantidade: 30 }, { numero_item: 43, quantidade: 42 }] }),
   nota({ ne: '2024NE000328', valor_nota: 14700, sugestao_tipo: 'MULTIPLO_DO_PRECO', sugestao: [{ numero_item: 13, quantidade: 3 }] }),
-  nota({ ne: '2025NE000010', valor_nota: 7000, situacao: 'REVISAR', motivo_revisao: 'VALOR_MUDOU', origem: 'USUARIO', parcelas: [{ numero_item: 43, valor: 3500 }] })
+  nota({ ne: '2025NE000010', valor_nota: 7000, situacao: 'REVISAR', motivo_revisao: 'ITEM_FORA_DO_CONTRATO', origem: 'USUARIO', parcelas: [{ numero_item: 43, valor: 3500 }] })
 ];
 
 describe('montarEmpenhoDoItem', () => {
@@ -46,6 +46,31 @@ describe('montarEmpenhoDoItem', () => {
     expect(r.empenhado).toBe(0);
     expect(r.contratosSemItens).toBe(1);
     expect(r.aVincular).toHaveLength(0);
+  });
+
+  it('quantidade informada vale no lugar da calculada e ganha o marcador; valor mudou vira aviso e continua contando', () => {
+    const r = montarEmpenhoDoItem({
+      numeroItem: 1,
+      contratos: [
+        {
+          contractKey: 'A',
+          valorUnitario: 2458.16,
+          distribuicoes: [
+            nota({ ne: 'N1', valor_nota: 14750, valor_na_distribuicao: 11750, motivo_revisao: 'VALOR_MUDOU', situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numero_item: 1, valor: 14750, quantidade_informada: 5 }] }),
+            nota({ ne: 'N2', valor_nota: 11750, situacao: 'DISTRIBUIDA', origem: 'AUTO', parcelas: [{ numero_item: 1, valor: 11750 }] })
+          ]
+        },
+        { contractKey: 'B', valorUnitario: 100, distribuicoes: [nota({ ne: 'N3', valor_nota: 900, situacao: 'DISTRIBUIDA', origem: 'USUARIO', parcelas: [{ numero_item: 1, valor: null, quantidade_informada: 4 }, { numero_item: 2, valor: null, quantidade_informada: 9 }] })] }
+      ]
+    });
+    const [n1, n2] = r.porContrato.get('A')!.parcelas.sort((a, b) => a.numeroOficial.localeCompare(b.numeroOficial));
+    expect(n1).toMatchObject({ quantidade: 5, informada: true, valorMudou: { antes: 11750, agora: 14750 } });
+    expect(n1.quantidadeCalculada).toBeCloseTo(6, 0);
+    expect(n2).toMatchObject({ informada: false, valorMudou: null });
+    expect(n2.quantidade).toBeCloseTo(4.78, 2);
+    const n3 = r.porContrato.get('B')!.parcelas[0];
+    expect(n3).toMatchObject({ valor: null, quantidade: 4, quantidadeCalculada: null, informada: true });
+    expect(r.empenhado).toBeCloseTo(5 + 4.78 + 4, 1);
   });
 
   it('soma vários contratos', () => {

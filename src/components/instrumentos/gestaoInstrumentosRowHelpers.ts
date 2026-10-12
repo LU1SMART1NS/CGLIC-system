@@ -65,6 +65,8 @@ export interface MotivoInfo {
 
 const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   ATA_CRITICA: { label: 'Saldo em Atenção', color: 'var(--color-success)', bg: '#ecfdf5' },
+  UNIDADE_PENDENTE: { label: 'Unidades do Contratado', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
+  FORNECEDOR_PNCP: { label: 'Fornecedor da Ata', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
   PAGAMENTO_PREVISTO: { label: 'Pagamento Previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
@@ -115,10 +117,16 @@ function contractItemUrl(item: DashboardAttentionItem): string {
   return `/contratos/${encodeURIComponent(item.contractKey)}?item=${encodeURIComponent(item.id)}`;
 }
 
-/** Detalhe da Ata (Ata 360, aba Ações) quando o alerta é de Ata e a UASG é conhecida. */
+/**
+ * Detalhe da Ata (Ata 360, aba Ações) quando o alerta é de Ata e a UASG é conhecida. A UASG da ata vem da chave do
+ * alerta ("NÚMERO-UASG[-ITEM]"); `item.uasg` é a carteira do painel, que nas atas de outros órgãos não é a UASG da
+ * ata (migration 106) e só vale quando o alerta não traz a chave.
+ */
 function ataItemUrl(item: DashboardAttentionItem & { uasg?: string }): string {
-  if (!item.numeroAta || !item.uasg) return '/atas';
-  return buildAtaPath(item.numeroAta, item.uasg, 'acoes');
+  const uasgDaChave = /^\d{5}\/\d{4}-(\d{6})/.exec(String(item.arpKey ?? ''))?.[1];
+  const uasg = uasgDaChave || item.uasg;
+  if (!item.numeroAta || !uasg) return '/atas';
+  return buildAtaPath(item.numeroAta, uasg, 'acoes');
 }
 
 /** Ação contextual em 1 clique, sempre apontando para um fluxo/rota já existente no sistema. */
@@ -132,6 +140,10 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
   switch (item.category) {
     case 'ATA_CRITICA':
       return { label: 'Verificar Saldo', targetUrl: ataItemUrl(item) };
+    case 'UNIDADE_PENDENTE':
+      return { label: 'Informar Unidades', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'FORNECEDOR_PNCP':
+      return { label: item.badgeLabel === 'conferir itens' ? 'Conferir Fornecedor' : 'Indicar Fornecedor', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'PAGAMENTO_CRITICO':
       return { label: 'Abrir Pagamento', targetUrl: '/pagamentos' };
     case 'PAGAMENTO_PREVISTO':

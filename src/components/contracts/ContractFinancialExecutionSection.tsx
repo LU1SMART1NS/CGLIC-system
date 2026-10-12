@@ -6,18 +6,23 @@ import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 import { useFaturasDoContrato, empenhosDaFatura } from '../../hooks/useFaturasDoContrato';
 import { useAcoesDistribuicaoEmpenho, useDistribuicoesEmpenhoContrato } from '../../hooks/useDistribuicaoEmpenhos';
-import type { DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
+import type { DistribuicaoDoEmpenho, QuantidadeNoItem } from '../../services/distribuicaoEmpenhoService';
 import type { FaturaDoContrato } from '../../services/faturasService';
 import type { VinculoDoContrato } from '../../services/itensContratoService';
 import {
   empenhadoPorItem,
   itensNumerados,
   motivoDaRevisao,
+  quantidadeCalculada,
+  quantidadeDaParcela,
+  quantidadeFoiInformada,
+  quantidadeQuebrada,
   rotuloDaSituacao,
   sugestaoCurta,
   textoDaSugestao,
   type ItemNumerado
 } from '../../utils/distribuicaoEmpenho';
+import { AvisoQuantidade, CampoQuantidadeNota } from '../item-balances/CampoQuantidadeNota';
 import { DistribuirEmpenhoModal } from './DistribuirEmpenhoModal';
 import { useLinhasAbertas } from './useLinhasAbertas';
 import type { ContractDashboardRecord } from '../../types';
@@ -193,12 +198,33 @@ export const EmpenhoDetalhe: React.FC<{
   faturas: FaturaDoContrato[];
   podeEditar: boolean;
   desfazendo: boolean;
+  /** A quantidade desta nota está sendo gravada ou conferida. */
+  gravando?: boolean;
   onDistribuir: (d: DistribuicaoDoEmpenho) => void;
   onDesfazer: (d: DistribuicaoDoEmpenho) => void;
+  /** Grava a quantidade da nota em um item (nula = volta à calculada). */
+  onInformarQuantidade?: (d: DistribuicaoDoEmpenho, numeroItem: number, quantidade: number | null) => void;
+  /** Confirma as quantidades depois que o valor da nota mudou. */
+  onConferir?: (d: DistribuicaoDoEmpenho) => void;
   onAbrirItem: (v: VinculoDoContrato) => void;
   onAbrirFatura?: (idFatura: number) => void;
-}> = ({ empenho, distribuicao: d, itens, vinculoPorItem, faturas, podeEditar, desfazendo, onDistribuir, onDesfazer, onAbrirItem, onAbrirFatura }) => {
-  const parcelaDe = new Map((d?.parcelas ?? []).map((p) => [p.numeroItem, p.valor]));
+}> = ({
+  empenho,
+  distribuicao: d,
+  itens,
+  vinculoPorItem,
+  faturas,
+  podeEditar,
+  desfazendo,
+  gravando = false,
+  onDistribuir,
+  onDesfazer,
+  onInformarQuantidade,
+  onConferir,
+  onAbrirItem,
+  onAbrirFatura
+}) => {
+  const parcelaDe = new Map((d?.parcelas ?? []).map((p) => [p.numeroItem, p]));
   const fechada = d?.situacao === 'DISTRIBUIDA';
   const podeDistribuir = podeEditar && d && (d.situacao === 'A_DISTRIBUIR' || d.situacao === 'REVISAR' || (d.situacao === 'DISTRIBUIDA' && d.origem === 'USUARIO'));
   const sugestao = d && !fechada ? textoDaSugestao(d.sugestaoTipo, d.sugestao) : null;
@@ -219,21 +245,15 @@ export const EmpenhoDetalhe: React.FC<{
       ) : (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem 1.25rem', fontSize: '0.82rem' }}>
-            <span>
-              Valor da nota <strong>{brlCurto(d.valorNota)}</strong>
-            </span>
-            <span>
-              Vinculado aos itens <strong>{brlCurto(fechada ? d.valorDistribuido : d.situacao === 'REVISAR' ? d.valorDistribuido : 0)}</strong>
-            </span>
             {fechada ? (
               <StatusBadge
-                label={d.origem === 'AUTO' ? 'Vinculada automaticamente: contrato de um item' : `por ${d.distribuidoPorNome || 'usuário'}${d.distribuidoEm ? ` em ${formatDate(d.distribuidoEm)}` : ''}`}
+                label={d.origem === 'AUTO' ? 'Vinculada automaticamente: contrato de um item' : `Vinculada por ${d.distribuidoPorNome || 'usuário'}${d.distribuidoEm ? ` em ${formatDate(d.distribuidoEm)}` : ''}`}
                 variant="info"
                 size="sm"
                 dot={false}
               />
             ) : (
-              <StatusBadge label={`falta ${brlCurto(d.valorNota - (d.situacao === 'REVISAR' ? 0 : d.valorDistribuido))}`} variant="warning" size="sm" dot={false} />
+              <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar o vínculo aos itens' : 'A vincular aos itens'} variant="warning" size="sm" dot={false} />
             )}
             {sugestao && <span style={{ color: 'var(--text-muted)' }}>sugestão: {sugestao}</span>}
             <span style={{ flex: 1 }} />
@@ -253,7 +273,21 @@ export const EmpenhoDetalhe: React.FC<{
               </ActionButton>
             )}
           </div>
-          {revisao && <NoticeBar tone="warning">{revisao}</NoticeBar>}
+          {revisao && (
+            <NoticeBar
+              tone="warning"
+              testId={`empenho-revisao-${empenho.numero_oficial}`}
+              action={
+                podeEditar && onConferir && fechada && d.motivoRevisao === 'VALOR_MUDOU' ? (
+                  <AppButton variant="outline" size="sm" onClick={() => onConferir(d)} disabled={gravando} data-testid={`empenho-conferir-${empenho.numero_oficial}`}>
+                    Quantidades conferidas
+                  </AppButton>
+                ) : undefined
+              }
+            >
+              {revisao}
+            </NoticeBar>
+          )}
           {d.observacao && fechada && (
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Observação: {d.observacao}</span>
           )}
@@ -263,24 +297,42 @@ export const EmpenhoDetalhe: React.FC<{
                 <tr>
                   <th>Item</th>
                   <th>Descrição</th>
-                  <th style={{ textAlign: 'right' }}>Parcela</th>
                   <th style={{ textAlign: 'right' }}>Quantidade</th>
                   <th>Na ata</th>
                 </tr>
               </thead>
               <tbody>
                 {itens.map((i) => {
-                  const v = fechada ? parcelaDe.get(i.numeroItem) ?? 0 : 0;
+                  const p = fechada ? parcelaDe.get(i.numeroItem) : undefined;
+                  const q = p ? quantidadeDaParcela(p, i.valorUnitario) : null;
+                  const informada = p ? quantidadeFoiInformada(p, i.valorUnitario) : false;
                   const vinculo = vinculoPorItem.get(i.numeroItem);
                   return (
                     <tr key={i.numeroItem}>
                       <td style={{ fontWeight: 700 }}>{i.numeroItem}</td>
                       <td style={{ minWidth: '180px', maxWidth: '340px' }}>{i.descricao || '—'}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                        {v > 0 ? brlCurto(v) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                      </td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                        {v > 0 && i.valorUnitario ? <strong>{qtd(v / i.valorUnitario)} un</strong> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        {!p ? (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        ) : podeEditar && onInformarQuantidade ? (
+                          <CampoQuantidadeNota
+                            quantidade={q}
+                            calculada={quantidadeCalculada(p, i.valorUnitario)}
+                            informada={informada}
+                            podeVoltarACalculada={p.valor != null}
+                            disabled={gravando}
+                            ariaLabel={`Quantidade da nota ${empenho.numero_oficial} no item ${i.numeroItem}`}
+                            testId={`empenho-quantidade-${empenho.numero_oficial}-${i.numeroItem}`}
+                            onGravar={(nova) => onInformarQuantidade(d, i.numeroItem, nova)}
+                          />
+                        ) : q != null ? (
+                          <strong>
+                            {informada && <StatusBadge label="Informada" variant="info" size="sm" dot={false} />} {qtd(q)} un
+                          </strong>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>a definir</span>
+                        )}
+                        {p && <AvisoQuantidade quantidade={q} />}
                         {i.quantidade != null && (
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>de {qtd(i.quantidade)} contratadas</div>
                         )}
@@ -362,6 +414,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
 
   const itens = React.useMemo(() => itensNumerados(itensDoContrato?.itens ?? []), [itensDoContrato]);
   const vinculoPorItem = React.useMemo(() => new Map((itensDoContrato?.vinculos ?? []).map((v) => [v.numeroItem, v])), [itensDoContrato]);
+  const precoDoItem = React.useMemo(() => new Map(itens.map((i) => [i.numeroItem, i.valorUnitario])), [itens]);
   const distribuicaoPorEmpenho = React.useMemo(() => new Map(distribuicoes.map((d) => [d.empenhoId, d])), [distribuicoes]);
   const faturas = faturasData?.faturas ?? [];
   const faturasDaNota = (numero: string) => faturas.filter((f) => empenhosDaFatura(f.empenhos).includes(numero));
@@ -403,22 +456,36 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
       }
     });
   const abrirDistribuicao = (d: DistribuicaoDoEmpenho) => {
-    acoesDistribuicao.distribuir.reset();
+    acoesDistribuicao.vincular.reset();
     setDistribuindo(d);
   };
-  const salvarDistribuicao = (parcelas: { numeroItem: number; valor: number }[], observacao: string) => {
+  const salvarDistribuicao = (quantidades: QuantidadeNoItem[], observacao: string) => {
     if (!distribuindo) return;
     const alvo = distribuindo;
-    acoesDistribuicao.distribuir.mutate(
-      { contratoEmpenhoId: alvo.contratoEmpenhoId, parcelas, valorNota: alvo.valorNota, observacao },
+    acoesDistribuicao.vincular.mutate(
+      { contratoEmpenhoId: alvo.contratoEmpenhoId, itens: quantidades, observacao },
       {
         onSuccess: () => {
           setDistribuindo(null);
-          toast.success(`${alvo.numeroOficial} vinculada a ${parcelas.length === 1 ? '1 item' : `${parcelas.length} itens`} do contrato.`);
+          toast.success(`${alvo.numeroOficial} vinculada a ${quantidades.length === 1 ? '1 item' : `${quantidades.length} itens`} do contrato.`);
         }
       }
     );
   };
+  const informarQuantidade = (d: DistribuicaoDoEmpenho, numeroItem: number, quantidade: number | null) =>
+    acoesDistribuicao.informar.mutate(
+      { contratoEmpenhoId: d.contratoEmpenhoId, numeroItem, quantidade },
+      {
+        onSuccess: () =>
+          toast.success(quantidade == null ? `${d.numeroOficial}: quantidade do item ${numeroItem} voltou à calculada.` : `${d.numeroOficial}: ${quantidade} un no item ${numeroItem}.`),
+        onError: (err: any) => toast.error(err?.message || 'Não foi possível gravar a quantidade.')
+      }
+    );
+  const conferirQuantidades = (d: DistribuicaoDoEmpenho) =>
+    acoesDistribuicao.conferir.mutate(d.contratoEmpenhoId, {
+      onSuccess: () => toast.success(`${d.numeroOficial}: quantidades conferidas.`),
+      onError: (err: any) => toast.error(err?.message || 'Não foi possível registrar a conferência.')
+    });
   const desfazerDistribuicao = async (d: DistribuicaoDoEmpenho) => {
     const ok = await confirm({
       title: 'Desfazer o vínculo aos itens',
@@ -463,9 +530,9 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
         distribuicao={distribuindo}
         numeroContrato={numeroContrato}
         itens={itens}
-        empenhadoOutras={empenhadoPorItem(distribuicoes, distribuindo?.contratoEmpenhoId)}
-        isLoading={acoesDistribuicao.distribuir.isPending}
-        erro={acoesDistribuicao.distribuir.error?.message}
+        empenhadoOutras={empenhadoPorItem(distribuicoes, itens, distribuindo?.contratoEmpenhoId)}
+        isLoading={acoesDistribuicao.vincular.isPending}
+        erro={acoesDistribuicao.vincular.error?.message}
         onSalvar={salvarDistribuicao}
         onFechar={() => setDistribuindo(null)}
       />
@@ -620,19 +687,26 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
         if (!d) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
         const r = rotuloDaSituacao(d);
         const fechada = d.situacao === 'DISTRIBUIDA';
+        // Vinculada: cada item com a quantidade (informada ou calculada); avisos de quantidade a definir e valor mudou.
+        const quantidades = fechada ? d.parcelas.map((p) => ({ p, q: quantidadeDaParcela(p, precoDoItem.get(p.numeroItem)) })) : [];
         const detalhe = fechada
-          ? d.parcelas.length === 1
-            ? `item ${d.parcelas[0].numeroItem}`
-            : `itens ${d.parcelas.map((p) => p.numeroItem).join(', ')}`
+          ? quantidades.map(({ p, q }) => `item ${p.numeroItem}${q != null ? ` · ${qtd(q)} un` : ''}`).join(', ')
           : d.situacao === 'A_DISTRIBUIR'
             ? sugestaoCurta(d.sugestaoTipo, d.sugestao)
             : d.situacao === 'REVISAR'
-              ? d.motivoRevisao === 'VALOR_MUDOU' ? 'o valor da nota mudou' : 'item fora do contrato'
+              ? 'item fora do contrato'
               : null;
+        const algumaInformada = fechada && d.parcelas.some((p) => quantidadeFoiInformada(p, precoDoItem.get(p.numeroItem)));
+        const aDefinir = quantidades.some(({ q }) => q == null || quantidadeQuebrada(q));
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start' }} data-testid="contract-financial-situacao-itens">
-            <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
+            <span style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+              <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
+              {algumaInformada && <StatusBadge label="Informada" variant="info" size="sm" dot={false} />}
+            </span>
             {detalhe && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{detalhe}</span>}
+            {aDefinir && <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>Quantidade a definir</span>}
+            {fechada && d.motivoRevisao === 'VALOR_MUDOU' && <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>Valor da nota mudou</span>}
           </div>
         );
       }
@@ -669,8 +743,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
             {aDistribuir.length > 0 && (
               <>
                 <strong>{aDistribuir.length}</strong>{' '}
-                {aDistribuir.length === 1 ? 'nota ainda não foi vinculada' : 'notas ainda não foram vinculadas'} aos itens do contrato (
-                {formatCurrency(aDistribuir.reduce((s, d) => s + d.valorNota, 0))}).{' '}
+                {aDistribuir.length === 1 ? 'nota ainda não foi vinculada' : 'notas ainda não foram vinculadas'} aos itens do contrato.{' '}
               </>
             )}
             {aRever.length > 0 && (
@@ -757,8 +830,14 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
               faturas={faturasDaNota(e.numero_oficial)}
               podeEditar={podeEditar}
               desfazendo={acoesDistribuicao.desfazer.isPending && acoesDistribuicao.desfazer.variables === distribuicaoDe(e)?.contratoEmpenhoId}
+              gravando={
+                (acoesDistribuicao.informar.isPending && acoesDistribuicao.informar.variables?.contratoEmpenhoId === distribuicaoDe(e)?.contratoEmpenhoId) ||
+                (acoesDistribuicao.conferir.isPending && acoesDistribuicao.conferir.variables === distribuicaoDe(e)?.contratoEmpenhoId)
+              }
               onDistribuir={abrirDistribuicao}
               onDesfazer={(d) => void desfazerDistribuicao(d)}
+              onInformarQuantidade={informarQuantidade}
+              onConferir={conferirQuantidades}
               onAbrirItem={(v) => navigate(`${buildAtaItemPath(v.numeroAta, v.uasgAta, v.numeroItem)}?aba=contratos`)}
               onAbrirFatura={onAbrirFatura}
             />

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { ErrorState } from '../../design-system/components/ErrorState';
@@ -15,12 +15,24 @@ import {
   type ItensDoContrato,
   type VinculoDoContrato
 } from '../../services/itensContratoService';
+import { useContratadoDoContrato } from '../../hooks/useContratadoDoItem';
+import { QuantidadeContratadaCelula, UnidadesDoContratoCelula } from '../item-balances/ContratadoCells';
+import { AjustarQuantidadeModal, type ContratoParaAjustar } from '../item-balances/AjustarQuantidadeModal';
+import type { QuantidadeDoContrato } from '../../services/contratadoUnidadeService';
 
 interface ContractItemsSectionProps {
   dados: ItensDoContrato | undefined;
   isLoading: boolean;
   error?: Error | null;
   onRetry?: () => void;
+  /** Chave do contrato: lê a quantidade usada no saldo de cada item da ata (migration 103). */
+  contractKey?: string;
+  /** Número do contrato para os textos da janela de ajuste ("00012/2025"). */
+  numeroContrato?: string;
+  /** Gestor e coordenador ajustam a quantidade contratada. */
+  podeAjustar?: boolean;
+  /** Página do contrato no portal oficial, para a janela de ajuste. */
+  linkPortal?: string;
 }
 
 const formatMoeda = (v: number | null) =>
@@ -29,6 +41,13 @@ const formatQtd = (v: number | null) => (v === null ? '—' : v.toLocaleString('
 /** Número do item com cinco dígitos, como na ata ("00004"). */
 const formatNumeroItem = (n: number | null) => (n === null ? '—' : String(n).padStart(5, '0'));
 const rotuloDoVinculo = (v: VinculoDoContrato) => `Ata ${v.numeroAta} · Item ${formatNumeroItem(v.numeroItem)}`;
+
+/** "Ata 00059/2025 · item 1 · descrição" a partir da chave do item da ata. */
+function tituloDoItem(itemKey: string, descricao?: string | null): string {
+  const m = /^(.+)-\d{6}-(\d+)$/.exec(itemKey);
+  const base = m ? `Ata ${m[1]} · item ${Number(m[2])}` : itemKey;
+  return descricao ? `${base} · ${descricao}` : base;
+}
 
 interface Linha {
   item: ItemDoContrato;
@@ -48,8 +67,34 @@ const SORT_COLUMNS: Record<string, CarteiraSortColumn<Linha>> = {
  * Cada item mostra o item da ata a que está vinculado, e a tela avisa o vínculo que aponta para um item que o
  * contrato não tem.
  */
-export const ContractItemsSection: React.FC<ContractItemsSectionProps> = ({ dados, isLoading, error, onRetry }) => {
+export const ContractItemsSection: React.FC<ContractItemsSectionProps> = ({
+  dados,
+  isLoading,
+  error,
+  onRetry,
+  contractKey,
+  numeroContrato,
+  podeAjustar = false,
+  linkPortal
+}) => {
   const navigate = useNavigate();
+  // Quantidade usada no saldo de cada item da ata (ajustada ou da fonte) e o saldo do item, para a janela de ajuste.
+  const { data: contratado } = useContratadoDoContrato(contractKey);
+  const quantidadePorItem = useMemo(() => new Map(contratado.porItem.map((q) => [q.itemKey, q])), [contratado.porItem]);
+  const [ajustando, setAjustando] = useState<{ itemKey: string; contrato: ContratoParaAjustar } | null>(null);
+  const abrirAjuste = (q: QuantidadeDoContrato) =>
+    setAjustando({ itemKey: q.itemKey, contrato: { contractKey: q.contractKey, numeroContrato: numeroContrato || q.contractKey, quantidade: q, linkPortal } });
+  const saldoDoAjuste = ajustando ? contratado.saldoPorItem.get(ajustando.itemKey) : undefined;
+  const janelaDeAjuste = (
+    <AjustarQuantidadeModal
+      itemKey={ajustando?.itemKey ?? ''}
+      tituloItem={ajustando ? tituloDoItem(ajustando.itemKey, saldoDoAjuste?.descricao) : ''}
+      contrato={ajustando?.contrato ?? null}
+      cota={saldoDoAjuste?.cota ?? 0}
+      consumoOutros={(saldoDoAjuste?.consumo ?? 0) - (ajustando?.contrato.quantidade.quantidadeContratada ?? 0)}
+      onFechar={() => setAjustando(null)}
+    />
+  );
   const abrirItemDaAta = (v: VinculoDoContrato) => navigate(buildAtaItemPath(v.numeroAta, v.uasgAta, v.numeroItem));
   const itens = dados?.itens ?? [];
   const vinculos = dados?.vinculos ?? [];
@@ -86,12 +131,65 @@ export const ContractItemsSection: React.FC<ContractItemsSectionProps> = ({ dado
     );
   }
   if (itens.length === 0) {
+    if (contratado.porItem.length === 0) {
+      return (
+        <EmptyState
+          testId="contract-items-empty"
+          title="As fontes oficiais não informam itens para este contrato."
+          description="O Contratos.gov.br e o Compras.gov.br não devolveram itens. Isso acontece com contratos manuais ou ainda não publicados."
+        />
+      );
+    }
+    // Contrato sem itens na fonte, mas vinculado a itens de ata: a quantidade de cada item só entra no saldo se o
+    // gestor informar (Ajustar).
     return (
-      <EmptyState
-        testId="contract-items-empty"
-        title="As fontes oficiais não informam itens para este contrato."
-        description="O Contratos.gov.br e o Compras.gov.br não devolveram itens. Isso acontece com contratos manuais ou ainda não publicados."
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <NoticeBar tone="info" testId="contract-items-empty-with-links">
+          O Contratos.gov.br e o Compras.gov.br não informam itens para este contrato. Nos itens de ata vinculados abaixo, a quantidade só entra
+          no saldo quando o gestor a informa em Ajustar.
+        </NoticeBar>
+        <div data-testid="contract-items-links-table" style={carteiraTableShell}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={carteiraTh}>Item da ata</th>
+                  <th style={{ ...carteiraTh, textAlign: 'right' }}>Quantidade no saldo</th>
+                  <th style={carteiraTh}>Unidades internas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contratado.porItem.map((q) => {
+                  const v = vinculos.find((x) => x.itemKey === q.itemKey);
+                  return (
+                    <tr key={q.itemKey} data-testid={`contract-item-link-row-${q.itemKey}`}>
+                      <td style={carteiraTd}>
+                        {v ? (
+                          <CarteiraIdLink onClick={() => abrirItemDaAta(v)} label={`Abrir o item ${formatNumeroItem(v.numeroItem)} na ata ${v.numeroAta}`} title="Abrir o item na ata">
+                            {rotuloDoVinculo(v)}
+                          </CarteiraIdLink>
+                        ) : (
+                          tituloDoItem(q.itemKey)
+                        )}
+                        {contratado.saldoPorItem.get(q.itemKey)?.descricao && (
+                          <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{contratado.saldoPorItem.get(q.itemKey)?.descricao}</div>
+                        )}
+                      </td>
+                      <td data-label="Quantidade no saldo" style={{ ...carteiraTd, textAlign: 'right' }}>
+                        <QuantidadeContratadaCelula q={q} onAjustar={podeAjustar ? () => abrirAjuste(q) : undefined} />
+                      </td>
+                      <td data-label="Unidades internas" style={{ ...carteiraTd, fontSize: '0.8rem' }}>
+                        <UnidadesDoContratoCelula q={q} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {janelaDeAjuste}
+      </div>
     );
   }
 
@@ -146,7 +244,17 @@ export const ContractItemsSection: React.FC<ContractItemsSectionProps> = ({ dado
                         </span>
                       </div>
                     </td>
-                    <td data-label="Quantidade" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(item.quantidade)}</td>
+                    <td data-label="Quantidade" style={{ ...carteiraTd, textAlign: 'right' }}>
+                      {vinculo && quantidadePorItem.get(vinculo.itemKey) ? (
+                        <QuantidadeContratadaCelula
+                          q={quantidadePorItem.get(vinculo.itemKey)!}
+                          compacta
+                          onAjustar={podeAjustar ? () => abrirAjuste(quantidadePorItem.get(vinculo.itemKey)!) : undefined}
+                        />
+                      ) : (
+                        formatQtd(item.quantidade)
+                      )}
+                    </td>
                     <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatMoeda(item.valorUnitario)}</td>
                     <td data-label="Valor total" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800 }}>{formatMoeda(item.valorTotal)}</td>
                     <td data-label="Item da ata" style={carteiraTd}>
@@ -181,7 +289,7 @@ export const ContractItemsSection: React.FC<ContractItemsSectionProps> = ({ dado
           </table>
         </div>
       </div>
-
+      {janelaDeAjuste}
     </div>
   );
 };

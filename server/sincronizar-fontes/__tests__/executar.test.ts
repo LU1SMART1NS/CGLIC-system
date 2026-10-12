@@ -14,6 +14,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarItensContratosPendentes: vi.fn(async () => ({ contratos: 40, pendentes: 12 })),
     sincronizarUnidadesItens: vi.fn(async () => sucesso(17)),
     contarUnidadesItensPendentes: vi.fn(async () => ({ itens: 657, pendentes: 200 })),
+    sincronizarAtasParticipacao: vi.fn(async () => sucesso(19)),
+    testarAtasParticipacao: vi.fn(async () => ({ compras: 18, antigas: 0, pendentes: 18, lidas: 18, adiadas: 0, atasDaCompra: 26, participante: 14, adesao: 5, semSenasp: 7, itensSemResposta: 0, falhas: 0, atas: [] })),
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
     sincronizarFaturasDaCarteira: vi.fn(async () => sucesso(13)),
@@ -144,6 +146,21 @@ describe('executarPedido', () => {
     expect(d.contarUnidadesItensPendentes).toHaveBeenCalledWith('200331');
     expect(r).toMatchObject({ dry: true, consulta: { itens: 657, pendentes: 200 } });
     expect(d.sincronizarUnidadesItens).not.toHaveBeenCalled();
+  });
+
+  it('atas em que a SENASP participa: chama a sincronização da UASG com orçamento de tempo', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'atas_participacao', uasg: '200331' }, d);
+    expect(d.sincronizarAtasParticipacao).toHaveBeenCalledWith('200331', { forcar: undefined, orcamentoMs: 75_000 });
+    expect(r).toMatchObject({ dry: false, recurso: 'atas_participacao', resultado: { status: 'SUCESSO', total: 19 } });
+  });
+
+  it('dry das atas em que a SENASP participa: faz a descoberta sem gravar; não sincroniza', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'atas_participacao', uasg: '200331', dry: true }, d);
+    expect(d.testarAtasParticipacao).toHaveBeenCalledWith('200331', { orcamentoMs: 75_000 });
+    expect(r).toMatchObject({ dry: true, consulta: { participante: 14, adesao: 5 } });
+    expect(d.sincronizarAtasParticipacao).not.toHaveBeenCalled();
   });
 
   it('dry de contratos: só consulta as fontes e conta; não grava nem usa a trava', async () => {

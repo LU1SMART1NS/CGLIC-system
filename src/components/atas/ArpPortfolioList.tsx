@@ -27,6 +27,8 @@ import type { CarteiraAtaExecucao } from '../../utils/carteiraItens';
 import type { ArpPortfolioFilterState } from './ArpPortfolioFilters';
 import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
+import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
+import { SeloPapelSenasp } from './SeloPapelSenasp';
 
 interface ArpPortfolioListProps {
   cards: AtaGroupedCard[];
@@ -102,8 +104,8 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
       numero: { value: (c) => c.arp.numeroAtaRegistroPreco.split('/').reverse().join('/') },
       vigencia: { value: (c) => getArpVigenciaStatus(c.arp.dataVigenciaFinal)?.diasRestantes ?? null },
       itens: { value: (c) => c.itens.length || c.arp.quantidadeItens || 0, firstDir: 'desc' },
-      consumo: { value: (c) => saldoStatsByAta[c.arp.numeroAtaRegistroPreco]?.maxPct ?? null, firstDir: 'desc' },
-      gestor: { value: (c) => gestorByAta[c.arp.numeroAtaRegistroPreco] }
+      consumo: { value: (c) => saldoStatsByAta[chaveGestaoDaArp(c.arp)]?.maxPct ?? null, firstDir: 'desc' },
+      gestor: { value: (c) => gestorByAta[chaveGestaoDaArp(c.arp)] }
     }),
     [saldoStatsByAta, gestorByAta]
   );
@@ -179,8 +181,9 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               const vigencia = getArpVigenciaStatus(arp.dataVigenciaFinal);
               const dias = vigencia ? vigencia.diasRestantes : null;
               const faixa = classifyPrazo(dias, Boolean(arp.isCanceladaPncp));
-              const stats = saldoStatsByAta[numeroAta];
-              const gestor = gestorByAta[numeroAta];
+              const chaveGestao = chaveGestaoDaArp(arp);
+              const stats = saldoStatsByAta[chaveGestao];
+              const gestor = gestorByAta[chaveGestao];
               const totalItens = card.itens.length || arp.quantidadeItens || 0;
               const isItemsLoading = Boolean(itemsLoadingByAta[ataKey]);
               const abrirAta = () => navigate(`/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, arp.codigoUnidadeGerenciadora))}`);
@@ -225,9 +228,12 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     </td>
                     <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '0.5rem', rowGap: '0.15rem' }}>
                       <CarteiraIdLink onClick={abrirAta} label={`Ver detalhes da ata ${numeroAta}`} title={`Ver detalhes · UASG ${arp.codigoUnidadeGerenciadora}`} testId={`ata-360-link-${numeroAta}`}>
                         {numeroAta}
                       </CarteiraIdLink>
+                      <SeloPapelSenasp arp={arp} testId={`ata-papel-${numeroAta}-${arp.codigoUnidadeGerenciadora}`} />
+                      </div>
                       {card.fornecedorNome && (
                         <CarteiraCellFilter
                           descricao={`fornecedor ${card.fornecedorNome}`}

@@ -23,6 +23,7 @@ import {
 import { formatStatusVigencia } from '../../utils/statusVigencia';
 import { chaveDoContrato } from '../../utils/contractKeyUtils';
 import { itensEmOutraAta, outrasAtasPorContrato, podeEntrarEmMaisUmaAta, textoOutrasAtas } from '../../utils/contratoVariasAtas';
+import { chaveGestaoAta } from '../../utils/ataIdentidade';
 import { useAuth } from '../../context/AuthContext';
 import { useSaveContractManager } from '../../hooks/useSaveContractManager';
 
@@ -47,7 +48,13 @@ interface LinkContractModalProps {
   itemKey?: string;
   numeroAta: string;
   numeroItem?: number | string;
+  /** UASG da ata (gerenciadora): compõe a chave do item. */
   uasg?: string;
+  /**
+   * Carteira da CGLIC da ata (de onde vêm os contratos e os gestores). Nas atas da CGLIC é a própria UASG; nas de
+   * outros órgãos, a UASG da SENASP (migration 106). Sem ela, usa `uasg`.
+   */
+  uasgCarteira?: string;
   existingLinkedContractKeys?: string[];
   /** Preço unitário do item no modo Item. */
   itemUnitPrice?: number;
@@ -91,6 +98,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   numeroAta,
   numeroItem,
   uasg,
+  uasgCarteira,
   existingLinkedContractKeys = [],
   itemUnitPrice,
   itemOptions,
@@ -100,9 +108,11 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 }) => {
   const isAtaMode = Boolean(itemOptions && itemOptions.length > 0);
   const cleanUasg = (uasg || '').trim();
+  const uasgDosContratos = (uasgCarteira || uasg || '').trim();
+  const chaveGestao = chaveGestaoAta(numeroAta, cleanUasg);
 
   // 1. Reúso do catálogo oficial via React Query (Zero chamadas de rede se em cache)
-  const { data: officialContracts = [], isLoading: loadingContracts } = useContractsDashboard(cleanUasg);
+  const { data: officialContracts = [], isLoading: loadingContracts } = useContractsDashboard(uasgDosContratos);
   const linkMutation = useLinkContractToItem();
   const linkItemsMutation = useLinkContractToItems();
   const syncQuantityMutation = useSyncContractItemQuantity();
@@ -129,8 +139,8 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   const { data: todosVinculos = [] } = useArpItemContractLinks(isOpen);
   const { data: semAta = {} } = useContratosSemAta();
   const { data: ataManagers } = useAllAtaManagers();
-  const { data: contractManagers } = useAllContractManagers(cleanUasg);
-  const outrasAtas = useMemo(() => outrasAtasPorContrato(numeroAta, todosVinculos), [todosVinculos, numeroAta]);
+  const { data: contractManagers } = useAllContractManagers(uasgDosContratos);
+  const outrasAtas = useMemo(() => outrasAtasPorContrato(chaveGestaoAta(numeroAta, cleanUasg), todosVinculos), [todosVinculos, numeroAta, cleanUasg]);
   // Já em ata de outra compra: bloqueado. Já em outra ata da mesma compra: pode entrar nesta com outros itens.
   const { ataDeOutroVinculo, tambemEmOutrasAtas } = useMemo(() => {
     const bloqueio = new Map<string, string>();
@@ -219,7 +229,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   const itensJaEmOutraAta = itensEmOutraAta(outrasDoSelecionado);
   // Modo Item: o item fixo já está em outra ata para este contrato.
   const ataDoItemFixo = !isAtaMode && numeroItem != null ? itensJaEmOutraAta.get(parseInt(String(numeroItem), 10)) : undefined;
-  const gestorDaAta = ataManagers?.[numeroAta]?.gestorNome;
+  const gestorDaAta = ataManagers?.[chaveGestao]?.gestorNome;
   const gestorAtualDoContrato = selectedContract ? contractManagers?.[contractKeyOf(selectedContract)]?.gestorNome : undefined;
   // Contrato já em outra ata e com gestor diferente do desta: o contrato fica como está; o coordenador decide.
   const gestoresDiferentes =
@@ -235,7 +245,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
         numero: contract.numero,
         ano: Number(contract.ano),
         gestorNome: gestorDaAta,
-        gestorUserId: ataManagers?.[numeroAta]?.gestorUserId ?? null
+        gestorUserId: ataManagers?.[chaveGestao]?.gestorUserId ?? null
       });
     } catch (err: any) {
       toast.error(`Contrato vinculado, mas o gestor não foi trocado: ${err?.message || 'erro desconhecido'}. Troque na Central de Distribuição.`);
@@ -367,7 +377,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       title="Vincular Contrato"
-      subtitle={`Ata ${numeroAta}${isAtaMode ? '' : ` • Item ${numeroItem}`} • UASG ${cleanUasg}`}
+      subtitle={`Ata ${numeroAta}${isAtaMode ? '' : ` • Item ${numeroItem}`} • UASG ${uasgDosContratos}`}
       size="lg"
       testId="link-contract-modal"
     >
@@ -382,7 +392,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
           {!selectedContract ? (
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.5rem' }}>
-                1. Selecione o Contrato Oficial vigente da UASG {cleanUasg}:
+                1. Selecione o Contrato Oficial vigente da UASG {uasgDosContratos}:
               </label>
 
               {/* Barra de Pesquisa */}
