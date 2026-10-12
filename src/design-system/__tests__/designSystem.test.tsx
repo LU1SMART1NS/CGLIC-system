@@ -13,7 +13,6 @@ import {
   SeverityBadge,
   AlertCard,
   SectionHeader,
-  FilterBar,
   DataTable,
   EmptyState,
   ErrorState,
@@ -164,7 +163,7 @@ describe('SaldoARP 3.0 — Design System Foundation (Fase 9-C1)', () => {
     });
   });
 
-  describe('6. Componente SectionHeader e FilterBar', () => {
+  describe('6. Componente SectionHeader', () => {
     it('deve renderizar SectionHeader com título, subtítulo e contadores', () => {
       const html = renderToStaticMarkup(
         <SectionHeader
@@ -176,37 +175,6 @@ describe('SaldoARP 3.0 — Design System Foundation (Fase 9-C1)', () => {
       expect(html).toContain('Central de Atenção');
       expect(html).toContain('Itens que demandam ação tempestiva');
       expect(html).toContain('4 alertas');
-    });
-
-    it('deve renderizar FilterBar com busca, selects e chips', () => {
-      const html = renderToStaticMarkup(
-        <FilterBar
-          searchValue="Alfa"
-          onSearchChange={vi.fn()}
-          searchPlaceholder="Buscar contratos..."
-          selects={[
-            {
-              id: 'uasg',
-              label: 'UASG',
-              value: '200331',
-              options: [{ value: '200331', label: '200331 - DTI' }],
-              onChange: vi.fn()
-            }
-          ]}
-          chips={[
-            { id: 'criticos', label: 'Críticos', active: true, count: 3, onClick: vi.fn() }
-          ]}
-          hasActiveFilters={true}
-          onClearFilters={vi.fn()}
-        />
-      );
-
-      expect(html).toContain('filter-bar');
-      expect(html).toContain('value="Alfa"');
-      expect(html).toContain('200331 - DTI');
-      expect(html).toContain('Críticos');
-      expect(html).toContain('3');
-      expect(html).toContain('Limpar filtros');
     });
   });
 

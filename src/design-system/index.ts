@@ -13,7 +13,6 @@ export * from './components/StatusBadge';
 export * from './components/SeverityBadge';
 export * from './components/AlertCard';
 export * from './components/SectionHeader';
-export * from './components/FilterBar';
 export * from './components/DataTable';
 export * from './components/EmptyState';
 export * from './components/ErrorState';
