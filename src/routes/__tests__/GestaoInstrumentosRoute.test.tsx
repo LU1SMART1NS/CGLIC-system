@@ -214,8 +214,8 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
 
     expect(html).toContain('Visão Geral');
-    expect(html).toContain('Painel unificado de gestão e monitoramento — Lei 14.133');
-    expect(html).toContain('Ações Imediatas / Pendências da Carteira');
+    expect(html).toContain('Resumo da carteira de atas e contratos e o que exige sua atenção');
+    expect(html).toContain('Pendências da carteira');
   });
 
   it('1b. deve consolidar instrumentos das duas UASGs (200330 e 200331) e identificar a origem de cada linha na coluna UASG', () => {
