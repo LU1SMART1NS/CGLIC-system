@@ -19,8 +19,7 @@ import {
   ConfirmDeleteButton,
   MutationError,
   PERSONALIZADA_BADGE_STYLE,
-  describeResponsavel,
-  planFormStyles
+  describeResponsavel
 } from '../contracts/planTaskEditing';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { classifyTaskAttention } from '../contracts/taskAttentionDisplay';
@@ -269,25 +268,19 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           }}
         >
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label className="form-label">
               Nome da tarefa
             </label>
             <input
               type="text"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.35rem 0.5rem',
-                fontSize: '0.8rem',
-                borderRadius: '4px',
-                border: '1px solid #cbd5e1'
-              }}
+              className="form-input"
             />
           </div>
 
           <div>
-            <label htmlFor={`responsavel-${task.id}`} style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label htmlFor={`responsavel-${task.id}`} className="form-label">
               Responsável
             </label>
             <ResponsavelField
@@ -300,20 +293,14 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           </div>
 
           <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label className="form-label">
               Prazo limite
             </label>
             <input
               type="date"
               value={prazo}
               onChange={(e) => setPrazo(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.35rem 0.5rem',
-                fontSize: '0.8rem',
-                borderRadius: '4px',
-                border: '1px solid #cbd5e1'
-              }}
+              className="form-input"
             />
           </div>
 
@@ -322,7 +309,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
+            <label className="form-label">
               Observação / Justificativa
             </label>
             <input
@@ -330,13 +317,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
               placeholder="Anotações de instrução ou despacho"
-              style={{
-                width: '100%',
-                padding: '0.35rem 0.5rem',
-                fontSize: '0.8rem',
-                borderRadius: '4px',
-                border: '1px solid #cbd5e1'
-              }}
+              className="form-input"
             />
           </div>
 
@@ -520,7 +501,7 @@ export const TaskPlanSection: React.FC<{
           </>
         }
       >
-        <label style={planFormStyles.labelStyle} htmlFor="nome-novo-modulo">Nome do novo módulo</label>
+        <label className="form-label" htmlFor="nome-novo-modulo">Nome do novo módulo</label>
         <input
           id="nome-novo-modulo"
           className="form-input"
