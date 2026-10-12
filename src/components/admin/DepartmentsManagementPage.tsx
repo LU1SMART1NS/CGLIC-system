@@ -3,7 +3,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { FilterBar } from '../../design-system/components/FilterBar';
+import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { Modal } from '../../design-system/components/Modal';
 import { AppInput, AppSelect } from '../../design-system/components/FormFields';
@@ -281,16 +281,17 @@ export const DepartmentsManagementPage: React.FC = () => {
         ]}
       />
 
-      <FilterBar
-        testId="departments-filter-bar"
-        searchValue={search}
-        onSearchChange={setSearch}
+      <CarteiraFilterBar
+        busca={search}
         searchPlaceholder="Buscar por sigla ou nome..."
+        onChangeBusca={setSearch}
         hasActiveFilters={hasActiveFilters}
-        onClearFilters={() => {
+        onResetFilters={() => {
           setSearch('');
           setStatusFilter('todas');
         }}
+        counter={carteiraCounter(filtered.length, departments.length, hasActiveFilters, 'unidade', 'unidades')}
+        testIdPrefix="departments"
       />
 
       <AdminListShell
