@@ -92,7 +92,7 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
             value={motivoOpcao}
             onChange={(e) => setMotivoOpcao(e.target.value)}
             data-testid="ajuste-motivo"
-            style={{ fontSize: '0.82rem', padding: '0.45rem 0.5rem', border: '1px solid var(--primary)', borderRadius: '6px', background: '#ffffff' }}
+            className="form-input"
           >
             <option value="">Selecione o motivo...</option>
             {MOTIVOS_AJUSTE.map((m) => (
@@ -109,7 +109,7 @@ export const AjusteComplexidadePanel: React.FC<AjusteComplexidadePanelProps> = (
               onChange={(e) => setMotivoTexto(e.target.value)}
               placeholder="Descreva o motivo"
               data-testid="ajuste-motivo-texto"
-              style={{ fontSize: '16px', padding: '0.45rem 0.5rem', border: '1px solid var(--primary)', borderRadius: '6px' }}
+              className="form-input"
             />
           )}
         </div>

@@ -12,15 +12,6 @@ const OUTRO = '__outro__';
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-const fieldStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.35rem 0.5rem',
-  fontSize: '0.8rem',
-  borderRadius: '4px',
-  border: '1px solid #cbd5e1',
-  backgroundColor: '#fff'
-};
-
 export const ResponsavelField: React.FC<{
   id: string;
   value: ResponsavelValue;
@@ -54,7 +45,7 @@ export const ResponsavelField: React.FC<{
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-      <select id={id} value={selected} onChange={(e) => handleSelect(e.target.value)} style={fieldStyle}>
+      <select id={id} value={selected} onChange={(e) => handleSelect(e.target.value)} className="form-input">
         <option value={HERDAR}>
           {gestorNome ? `${capitalize(gestorLabel)}: ${gestorNome}` : `Sem responsável (${gestorLabel} não definido)`}
         </option>
@@ -73,7 +64,7 @@ export const ResponsavelField: React.FC<{
           onChange={(e) => onChange({ nome: e.target.value })}
           placeholder="Nome do servidor"
           autoFocus
-          style={fieldStyle}
+          className="form-input"
         />
       )}
     </div>
