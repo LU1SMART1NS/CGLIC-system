@@ -1542,14 +1542,14 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 
 /* Trilho de situação/fila das carteiras (CarteiraSegmentTabs): o selecionado vem de aria-pressed, não de foco/clique. */
 .segment-pills { display: flex; align-items: center; gap: 0.75rem; }
-.segment-pills__rail { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: #eaeef4; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.segment-pills__rail { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: transparent; border: 1px solid #e2e8f0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .segment-pills__rail::-webkit-scrollbar { display: none; }
 .segment-pill {
   display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.8rem; border-radius: 7px;
   border: 1px solid transparent; background: transparent; color: #556274; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;
   transition: background-color 0.12s, color 0.12s, border-color 0.12s;
 }
-.segment-pill:hover { background: rgba(255, 255, 255, 0.6); color: #0f172a; }
+.segment-pill:hover { background: rgba(15, 23, 42, 0.05); color: #0f172a; }
 .segment-pill:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--primary); }
 .segment-pill__dot { width: 7px; height: 7px; border-radius: 50%; }
 .segment-pill__count { color: #7b8798; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -1559,3 +1559,13 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 /* Trilho logo abaixo do título da página: encosta no título (a margem do título + o gap da página davam 2rem). */
 .ds-page-header:has(+ .segment-pills) { margin-bottom: 0 !important; }
 .ds-page-header + .segment-pills { margin-top: -0.5rem; }
+
+/* Título de seção dentro da página: título e descrição lado a lado, como no PageHeader. */
+.section-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.75rem; min-width: 0; }
+.section-heading__title { margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f172a; }
+.section-heading__subtitle { margin: 0; font-size: 0.8125rem; color: #64748b; }
+@media (min-width: 768px) {
+  .section-heading { flex-wrap: nowrap; }
+  .section-heading__title { flex: none; }
+  .section-heading__subtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

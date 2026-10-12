@@ -298,12 +298,12 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-          Ações Imediatas / Pendências da Carteira
-        </h2>
-        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-          Instrumentos que exigem sua atenção e as próximas ações recomendadas.
-        </p>
+        <div className="section-heading">
+          <h2 className="section-heading__title">Pendências da carteira</h2>
+          <p className="section-heading__subtitle" title="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação.">
+            Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação.
+          </p>
+        </div>
 
         {!saldosOnly && (
           <GestaoInstrumentosCategoryTabs
