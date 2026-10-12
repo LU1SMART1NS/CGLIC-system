@@ -7,6 +7,7 @@ import { EmptyState } from '../../design-system/components/EmptyState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { CarteiraIdLink, propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
+import { formatCurrencyOrDash } from '../../utils/format';
 
 interface AtaLinkedContractsProps {
   linkedContracts: EnrichedArpItemContract[];
@@ -19,10 +20,6 @@ interface AtaLinkedContractsProps {
   unlinkingId?: string | null;
 }
 
-function formatCurrency(val?: number): string {
-  if (typeof val !== 'number' || isNaN(val)) return 'R$ 0,00';
-  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 /** Número do item a partir do item_key ("00050/2024-200331-00002" → "00002"). */
 function itemNumberFromKey(itemKey: string): string {
@@ -52,8 +49,8 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
         title="Nenhum contrato vinculado."
         description={
           emptyAction
-            ? 'Ainda não há contratos oficiais vinculados a itens desta Ata. Vincule um contrato indicando os itens que ele cobre.'
-            : 'Ainda não há contratos oficiais vinculados a itens desta Ata.'
+            ? 'Ainda não há contratos oficiais vinculados a itens desta ata. Vincule um contrato indicando os itens que ele cobre.'
+            : 'Ainda não há contratos oficiais vinculados a itens desta ata.'
         }
         action={emptyAction}
       />
@@ -95,7 +92,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
                 <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{link.numeroContratoFormatado}</strong>
               )}
               <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
-                {link.fornecedorNome?.toUpperCase()} {link.valorGlobal ? `• ${formatCurrency(link.valorGlobal)}` : ''}
+                {link.fornecedorNome?.toUpperCase()} {link.valorGlobal ? `• ${formatCurrencyOrDash(link.valorGlobal)}` : ''}
               </p>
               <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.15rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                 Item {itemNumberFromKey(link.itemKey)}

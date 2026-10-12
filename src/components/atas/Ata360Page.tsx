@@ -170,7 +170,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
       <InstrumentPageState
         kind="forbidden"
         title="Acesso não autorizado"
-        message="Esta Ata não está atribuída a você. Seu perfil de gestor só permite visualizar a Visão 360° das Atas onde você é o gestor titular."
+        message="Esta ata não está atribuída a você. Seu perfil de gestor só permite ver a Visão 360° das atas em que você é o gestor titular."
         backLabel={back.label}
         onBack={back.back}
       />

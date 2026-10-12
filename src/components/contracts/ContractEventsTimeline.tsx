@@ -121,15 +121,15 @@ export function getEventTypeDisplay(tipo: ContractEventType): {
     case 'CELEBRACAO':
       return { label: 'Celebração inicial', icon: FileSignature, color: 'var(--primary)', dotColor: 'var(--primary)' };
     case 'PRORROGACAO':
-      return { label: 'Prorrogação de Vigência', icon: Clock, color: 'var(--color-info-text)', dotColor: 'var(--color-info-solid)' };
+      return { label: 'Prorrogação de vigência', icon: Clock, color: 'var(--color-info-text)', dotColor: 'var(--color-info-solid)' };
     case 'REAJUSTE':
       return { label: 'Reajuste contratual', icon: TrendingUp, color: 'var(--color-success)', dotColor: 'var(--color-success)' };
     case 'REPACTUACAO':
       return { label: 'Repactuação salarial', icon: Layers, color: '#7c3aed', dotColor: '#7c3aed' };
     case 'ACRESCIMO':
-      return { label: 'Acréscimo de Valor/Qtd', icon: TrendingUp, color: '#0d9488', dotColor: '#0d9488' };
+      return { label: 'Acréscimo de valor/qtd', icon: TrendingUp, color: '#0d9488', dotColor: '#0d9488' };
     case 'SUPRESSAO':
-      return { label: 'Supressão de Valor/Qtd', icon: TrendingDown, color: 'var(--color-warning)', dotColor: 'var(--color-warning)' };
+      return { label: 'Supressão de valor/qtd', icon: TrendingDown, color: 'var(--color-warning)', dotColor: 'var(--color-warning)' };
     case 'APOSTILAMENTO':
       return { label: 'Apostilamento', icon: FileSpreadsheet, color: '#475569', dotColor: '#475569' };
     case 'ENCERRAMENTO':
@@ -314,7 +314,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
           style={{ background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '1rem 1.25rem', marginBottom: '1.5rem' }}
         >
           <SectionHeader
-            title="Evolução do Valor Contratual"
+            title="Evolução do valor contratual"
             subtitle="Projeção jurídica determinística (Lei nº 14.133/2021) • Não substitui a execução financeira oficial"
             icon={<TrendingUp size={16} />}
             actions={
@@ -404,7 +404,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                   { key: 'TODOS', label: `Todos (${sortedEvents.length})` },
                   {
                     key: 'OFICIAIS',
-                    label: `Fatos Oficiais (${sortedEvents.filter((e) => getOficialidadeInfo(e).level === 'FATO_OFICIAL').length})`
+                    label: `Fatos oficiais (${sortedEvents.filter((e) => getOficialidadeInfo(e).level === 'FATO_OFICIAL').length})`
                   },
                   {
                     key: 'INTERNOS',

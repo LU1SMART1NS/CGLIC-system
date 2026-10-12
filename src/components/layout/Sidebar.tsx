@@ -108,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
   const bottom = areas.filter((area) => area.placement === 'bottom');
 
   return (
-    <nav aria-label="Navegação Principal" className={mode === 'rail' ? 'app-rail' : 'app-bottom-nav'}>
+    <nav aria-label="Navegação principal" className={mode === 'rail' ? 'app-rail' : 'app-bottom-nav'}>
       {mode === 'rail' && (
         <Link to="/" className="app-rail-brand" aria-label="ComprasSUSP, página inicial">
           <span>Compras</span>SUSP

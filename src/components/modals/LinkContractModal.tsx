@@ -9,7 +9,7 @@ import { useLinkContractToItems } from '../../hooks/useLinkContractToItems';
 import { useContractItemQuantities } from '../../hooks/useContractItemQuantities';
 import { useSyncContractItemQuantity } from '../../hooks/useSyncContractItemQuantity';
 import type { ContractDashboardRecord } from '../../types';
-import { formatCnpj } from '../../utils/format';
+import { formatCnpj, formatCurrencyOrDash } from '../../utils/format';
 import { displayContractNumber } from '../../utils/contractNumber';
 import { useDescartesAtaContrato } from '../../hooks/useDescartesAtaContrato';
 import { Modal, AlertCard, useToast, ActionButton, AppButton } from '../../design-system';
@@ -86,10 +86,6 @@ function formatDateBR(dateStr?: string): string {
   return dateStr;
 }
 
-function formatCurrency(val?: number): string {
-  if (typeof val !== 'number' || isNaN(val)) return 'R$ 0,00';
-  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   isOpen,
@@ -543,7 +539,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                       <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Valor Global</span>
                         <strong style={{ fontSize: '0.88rem', color: 'var(--primary)' }}>
-                          {formatCurrency(c.valorGlobal || c.valorInicial)}
+                          {formatCurrencyOrDash(c.valorGlobal || c.valorInicial)}
                         </strong>
                       </div>
                     </div>
@@ -581,7 +577,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                     <strong>Vigência até:</strong> {formatDateBR(selectedContract.dataVigenciaFim)}
                   </div>
                   <div>
-                    <strong>Valor Global:</strong> {formatCurrency(selectedContract.valorGlobal || selectedContract.valorInicial)}
+                    <strong>Valor Global:</strong> {formatCurrencyOrDash(selectedContract.valorGlobal || selectedContract.valorInicial)}
                   </div>
                 </div>
               </div>

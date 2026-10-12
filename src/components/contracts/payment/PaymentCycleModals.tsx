@@ -21,8 +21,8 @@ import {
   prazoPadraoISO,
   todayISO
 } from './paymentFormUtils';
+import { formatCurrency } from '../../../utils/format';
 
-const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export const Field: React.FC<{ id: string; label: string; children: React.ReactNode; hint?: React.ReactNode }> = ({ id, label, children, hint }) => (
   <div className="form-group">
@@ -301,7 +301,7 @@ export const CreateCycleModal: React.FC<{
                       <option value="">{carregandoEmpenhos ? 'Carregando...' : 'Escolha'}</option>
                       {empenhos.map((e) => (
                         <option key={e.canonicalKey} value={e.canonicalKey}>
-                          {e.numero} · saldo {moeda(e.saldo)}{e.naturezaDespesa ? ` · ND ${e.naturezaDespesa}` : ''}
+                          {e.numero} · saldo {formatCurrency(e.saldo)}{e.naturezaDespesa ? ` · ND ${e.naturezaDespesa}` : ''}
                         </option>
                       ))}
                     </select>
@@ -325,7 +325,7 @@ export const CreateCycleModal: React.FC<{
                   </Field>
                   <div className="form-group">
                     <span className="form-label">A pagar</span>
-                    <strong style={{ fontSize: '0.95rem', padding: '0.45rem 0' }}>{moeda(aPagar(item))}</strong>
+                    <strong style={{ fontSize: '0.95rem', padding: '0.45rem 0' }}>{formatCurrency(aPagar(item))}</strong>
                   </div>
                 </div>
                 {juros > 0 && (
@@ -353,7 +353,7 @@ export const CreateCycleModal: React.FC<{
               Adicionar nota fiscal
             </ActionButton>
             <span style={{ fontSize: '0.85rem', color: '#334155' }}>
-              Total a pagar: <strong>{moeda(total)}</strong>
+              Total a pagar: <strong>{formatCurrency(total)}</strong>
             </span>
           </div>
           {semSaldo.length > 0 && (

@@ -40,13 +40,13 @@ export function getExecutionModeDisplay(mode?: TaskExecutionMode): {
 } {
   switch (mode) {
     case 'CONFIRMACAO':
-      return { label: 'Confirmação Oficial', bg: 'var(--color-info-bg)', color: 'var(--color-info-text)', border: 'var(--color-info-border)' };
+      return { label: 'Confirmação oficial', bg: 'var(--color-info-bg)', color: 'var(--color-info-text)', border: 'var(--color-info-border)' };
     case 'EXTERNA':
-      return { label: 'Ação Externa', bg: '#fdf4ff', color: '#86198f', border: '#f5d0fe' };
+      return { label: 'Ação externa', bg: '#fdf4ff', color: '#86198f', border: '#f5d0fe' };
     case 'AUTOMATICA':
-      return { label: 'Processamento Automático', bg: 'var(--color-success-bg)', color: 'var(--color-success-text)', border: 'var(--color-success-border)' };
+      return { label: 'Processamento automático', bg: 'var(--color-success-bg)', color: 'var(--color-success-text)', border: 'var(--color-success-border)' };
     case 'INTERNA':
     default:
-      return { label: 'Providência Interna', bg: '#f8fafc', color: '#334155', border: '#cbd5e1' };
+      return { label: 'Providência interna', bg: '#f8fafc', color: '#334155', border: '#cbd5e1' };
   }
 }

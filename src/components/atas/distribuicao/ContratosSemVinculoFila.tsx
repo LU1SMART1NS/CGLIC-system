@@ -5,6 +5,7 @@ import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilte
 import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { CarteiraNoResults } from '../../carteira/CarteiraNoResults';
+import { EmptyState } from '../../../design-system/components/EmptyState';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../../carteira/CarteiraSortHeader';
 import { CarteiraIdLink } from '../../carteira/CarteiraRowLink';
@@ -550,7 +551,7 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
       )}
 
       {universo.length === 0 ? (
-        <div style={{ ...carteiraTableShell, padding: '1.25rem', fontSize: '0.85rem', color: '#64748b' }}>Nenhum contrato nesta situação.</div>
+        <EmptyState title="Nenhum contrato nesta situação." description="Escolha outra situação no trilho acima." testId="sem-vinculo-vazio" />
       ) : filtradas.length === 0 ? (
         <CarteiraNoResults title="Nenhum contrato encontrado" description="Nenhum contrato sem vínculo atende aos filtros." onResetFilters={resetFilters} />
       ) : (

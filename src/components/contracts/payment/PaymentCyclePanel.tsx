@@ -10,6 +10,7 @@ import { calcularPrazosLegais } from '../../../services/prazosLegaisPagamento';
 import { isoToBR } from './paymentFormUtils';
 import { isPaymentCycleEncerrado } from '../../../services/paymentFollowUpService';
 import type { useContractPaymentFollowUp } from '../../../hooks/useContractPaymentFollowUp';
+import { formatCurrency } from '../../../utils/format';
 
 /** Marcos do ciclo. Liquidado e Pago entram sozinhos (conciliação com a fatura e a ordem bancária). */
 export const MARCOS: Array<{ id: string; title: string }> = [
@@ -198,7 +199,7 @@ export const PaymentCyclePanel: React.FC<PaymentCyclePanelProps> = ({
         )}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#0f172a' }}>
           <DollarSign size={13} color="var(--color-success)" /> A pagar:{' '}
-          <strong>{cycle.input.valorAtesto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+          <strong>{formatCurrency(cycle.input.valorAtesto)}</strong>
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
           <Calendar size={13} /> Vencimento da fatura: <strong>{isoToBR(cycle.input.dataVencimentoFatura)}</strong>
