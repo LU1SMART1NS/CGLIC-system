@@ -388,7 +388,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
           {!selectedContract ? (
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.5rem' }}>
-                1. Selecione o Contrato Oficial vigente da UASG {uasgDosContratos}:
+                1. Selecione o contrato oficial vigente da UASG {uasgDosContratos}:
               </label>
 
               {/* Barra de Pesquisa */}
@@ -399,14 +399,8 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   placeholder="Pesquisar por número, fornecedor ou CNPJ..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.55rem 0.75rem 0.55rem 2.25rem',
-                    fontSize: '0.88rem',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    outline: 'none'
-                  }}
+                  className="form-input"
+                  style={{ paddingLeft: '2.25rem' }}
                   autoFocus
                 />
               </div>
@@ -751,7 +745,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
 
               {/* Campo Observações */}
               <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '0.35rem' }}>
+                <label className="form-label">
                   Observações / Justificativa Interna
                 </label>
                 <input
@@ -759,13 +753,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
                   placeholder="Ex: Aquisição emergencial para reforço operacional..."
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.45rem 0.65rem',
-                    fontSize: '0.82rem',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1'
-                  }}
+                  className="form-input"
                 />
               </div>
 

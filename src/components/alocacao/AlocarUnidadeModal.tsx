@@ -40,7 +40,8 @@ const CINZA = '#64748b';
 const secaoStyle: React.CSSProperties = { margin: '0 0 0.4rem', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: CINZA };
 const thStyle: React.CSSProperties = { textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: CINZA, padding: '0.4rem 0.5rem', borderBottom: '1px solid #e2e8f0' };
 const tdStyle: React.CSSProperties = { padding: '0.5rem', borderBottom: '1px solid #e2e8f0', verticalAlign: 'middle' };
-const qtdStyle: React.CSSProperties = { width: '120px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '0.85rem', padding: '0.4rem 0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px' };
+/** Campo de quantidade: visual do campo padrão (.form-input), estreito e alinhado à direita. */
+const qtdStyle: React.CSSProperties = { width: '120px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 const FUNDO_LINHA = { alterada: 'var(--color-warning-bg)', removida: 'var(--color-danger-bg)', adicionada: 'var(--color-success-bg)' };
 
 /** Catálogo de Unidades Internas vazio: não há a quem alocar. */
@@ -277,7 +278,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                   aria-label={`Quantidade alocada para ${l.unitName}`}
                                   aria-invalid={a.abaixoDoMinimo || a.acimaDoGravado || undefined}
                                   data-testid={`alocar-unidade-qtd-${l.unitName}`}
-                                  style={{ ...qtdStyle, borderColor: a.abaixoDoMinimo || a.acimaDoGravado ? 'var(--color-danger-solid)' : '#cbd5e1' }}
+                                  className="form-input"
+                                  style={qtdStyle}
                                 />
                                 {a.alterada && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-warning-text)', marginTop: '0.15rem' }}>antes {formatNumber(l.original)}</span>}
                                 {a.acimaDoGravado && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>máximo {formatNumber(l.original)} (desativada)</span>}
@@ -331,7 +333,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                     disabled={salvando}
                     aria-label="Unidade interna"
                     data-testid="alocar-unidade-select"
-                    style={{ flex: '1 1 240px', minWidth: 0, fontWeight: 700, color: 'var(--primary)', fontSize: '0.85rem', padding: '0.45rem 0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ flex: '1 1 240px', minWidth: 0, width: 'auto' }}
                   >
                     {livres.map((d) => (
                       <option key={d.id} value={d.sigla}>
@@ -349,6 +351,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                     disabled={salvando}
                     aria-label="Quantidade da nova unidade"
                     data-testid="alocar-unidade-qtd"
+                    className="form-input"
                     style={qtdStyle}
                   />
                   <ActionButton action="adicionar" size="sm" onClick={adicionar} disabled={salvando} data-testid="alocar-unidade-adicionar" />
