@@ -15,12 +15,12 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'TODAS', label: 'Todas' },
   { id: 'SALDOS', label: 'Saldos' },
   { id: 'REAJUSTES', label: 'Reajustes' },
   { id: 'PAGAMENTOS', label: 'Pagamentos' },
   { id: 'TAREFAS', label: 'Tarefas' },
-  { id: 'LEMBRETES', label: 'Lembretes' }
+  { id: 'LEMBRETES', label: 'Lembretes' },
+  { id: 'TODAS', label: 'Todas' }
 ];
 
 interface GestaoInstrumentosCategoryTabsProps {

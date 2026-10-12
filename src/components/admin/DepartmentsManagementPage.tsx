@@ -4,6 +4,7 @@ import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { FilterBar } from '../../design-system/components/FilterBar';
+import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { Modal } from '../../design-system/components/Modal';
 import { AppInput, AppSelect } from '../../design-system/components/FormFields';
 import { AdminListShell } from './shared/AdminListShell';
@@ -213,6 +214,7 @@ export const DepartmentsManagementPage: React.FC = () => {
     });
   }, [departments, search, statusFilter]);
   const hasActiveFilters = Boolean(search) || statusFilter !== 'todas';
+  const totalAtivas = departments.filter((d) => d.ativo).length;
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -267,16 +269,23 @@ export const DepartmentsManagementPage: React.FC = () => {
         </div>
       )}
 
+      <CarteiraSegmentTabs
+        testIdPrefix="departments-status"
+        ariaLabel="Situação das unidades"
+        active={statusFilter}
+        onSelect={setStatusFilter}
+        segments={[
+          { id: 'ativas', label: 'Ativas', count: totalAtivas },
+          { id: 'inativas', label: 'Inativas', count: departments.length - totalAtivas },
+          { id: 'todas', label: 'Todas', count: departments.length }
+        ]}
+      />
+
       <FilterBar
         testId="departments-filter-bar"
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Buscar por sigla ou nome..."
-        chips={[
-          { id: 'todas', label: 'Todas', active: statusFilter === 'todas', onClick: () => setStatusFilter('todas') },
-          { id: 'ativas', label: 'Ativas', active: statusFilter === 'ativas', onClick: () => setStatusFilter('ativas') },
-          { id: 'inativas', label: 'Inativas', active: statusFilter === 'inativas', onClick: () => setStatusFilter('inativas') }
-        ]}
         hasActiveFilters={hasActiveFilters}
         onClearFilters={() => {
           setSearch('');
