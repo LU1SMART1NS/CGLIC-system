@@ -10,6 +10,7 @@ import { InstrumentPageState } from '../instrument360/InstrumentPageState';
 import { Ata360Header } from './Ata360Header';
 import { AtaActionQueue, type Ata360Tab } from './AtaActionQueue';
 import { useAtaActionQueue } from '../../hooks/useAtaActionQueue';
+import { Instrument360Head } from '../instrument360/Instrument360Head';
 import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
 import { AtaItemsTable } from './AtaItemsTable';
 import { AtaLinkedContracts } from './AtaLinkedContracts';
@@ -219,6 +220,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   return (
     <Instrument360Page>
+      <Instrument360Head>
       <Ata360Header
         arp={arp}
         itens={itens}
@@ -241,6 +243,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         idPrefix="ata"
         ariaLabel="Seções da ata"
       />
+      </Instrument360Head>
 
       <Instrument360TabPanel idPrefix="ata" activeTab={activeTab}>
         {activeTab === 'acoes' && (

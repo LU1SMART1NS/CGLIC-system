@@ -64,6 +64,7 @@ import { useInstrumentTab } from './instrument360/useInstrumentTab';
 import { AllocationsTab, type AllocationRow } from './item-balances/AllocationsTab';
 import { summarizeAllocationExecution, vinculosSemQuantidade } from '../utils/allocationExecution';
 import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryStrip';
+import { Instrument360Head } from './instrument360/Instrument360Head';
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
@@ -626,6 +627,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   return (
     <Instrument360Page>
+      <Instrument360Head>
       <ItemHero
         arp={arp}
         item={item}
@@ -667,6 +669,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         idPrefix="item"
         ariaLabel="Seções do item"
       />
+      </Instrument360Head>
 
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'unidades' ? (
