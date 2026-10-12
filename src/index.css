@@ -271,13 +271,13 @@ h1, h2, h3, h4 {
 }
 
 .custom-table th {
-  background: #f8fafc;
-  color: #475569;
-  font-weight: 700;
-  padding: 0.75rem 1rem;
+  color: #64748b;
+  font-weight: 800;
+  padding: 0.65rem 1rem;
   border-bottom: 1px solid #e2e8f0;
-  font-size: 0.78rem;
-  text-transform: none;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .custom-table td {
@@ -933,8 +933,9 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
    DataTable (Fase 2 / P2) — tabela rolável e modo cartões no mobile
    ========================================================================== */
 .ds-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; }
-.ds-table thead tr { background: #f8fafc; color: #475569; border-bottom: 1px solid #e2e8f0; }
-.ds-table th { padding: 0.55rem 0.875rem; font-size: 0.78rem; font-weight: 700; }
+.ds-table thead tr { border-bottom: 1px solid #e2e8f0; }
+/* Cabeçalho igual ao das carteiras (carteiraTh): maiúsculas pequenas, cinza, sem fundo. */
+.ds-table th { padding: 0.65rem 0.875rem; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: #64748b; }
 .ds-table td { padding: 0.55rem 0.875rem; vertical-align: middle; color: #0f172a; border-bottom: 1px solid #f1f5f9; }
 .ds-table__empty { padding: 3rem 1rem !important; text-align: center !important; font-style: italic; }
 /* Linha com detalhes abertos logo abaixo (renderExpanded). */

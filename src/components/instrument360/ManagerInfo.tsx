@@ -1,4 +1,5 @@
 import React from 'react';
+import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { UserCheck, UserCircle2 } from 'lucide-react';
 
 /**
@@ -33,7 +34,7 @@ export const ManagerInfo: React.FC<{ label: string; gestorNome?: string; isLoadi
       <div>
         <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>{label}</div>
         <div style={{ fontSize: '0.85rem', fontWeight: assigned ? 700 : 400, color: assigned ? '#0f172a' : '#94a3b8', fontStyle: assigned ? 'normal' : 'italic' }}>
-          {isLoading ? 'Carregando...' : gestorNome || 'Não atribuído'}
+          {isLoading ? <SkeletonLoader variant="text" width="120px" testId="manager-info-loading" /> : gestorNome || 'Não atribuído'}
         </div>
       </div>
     </div>

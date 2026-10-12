@@ -4,6 +4,7 @@ import { FileText } from 'lucide-react';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { OrigemVinculoBadge } from '../vinculos/OrigemVinculoBadge';
 import { EmptyState } from '../../design-system/components/EmptyState';
+import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { CarteiraIdLink, propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 
@@ -39,8 +40,8 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
 
   if (isLoading) {
     return (
-      <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
-        Carregando contratos vinculados...
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem 0' }} aria-busy="true" aria-label="Carregando contratos vinculados...">
+        <SkeletonLoader variant="rectangular" height="44px" count={3} />
       </div>
     );
   }

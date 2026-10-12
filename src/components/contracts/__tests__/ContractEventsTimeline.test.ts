@@ -167,12 +167,12 @@ describe('FASE 5.3 — ContractEventsTimeline Unit Tests', () => {
   });
 
   it('7. Impacto formal é traduzido com rótulos e estilos visuais adequados', () => {
-    expect(getImpactoDisplay('ALTERA_VIGENCIA').label).toBe('Altera Vigência');
-    expect(getImpactoDisplay('ALTERA_VALOR').label).toBe('Altera Valor');
-    expect(getImpactoDisplay('ALTERA_QUANTITATIVO').label).toBe('Altera Quantitativo');
-    expect(getImpactoDisplay('ATUALIZA_DADOS').label).toBe('Atualiza Dados');
-    expect(getImpactoDisplay('EXTINGUE_CONTRATO').label).toBe('Extingue Contrato');
-    expect(getImpactoDisplay('SEM_IMPACTO_FINANCEIRO_TEMPORAL').label).toBe('Sem Impacto Financeiro/Temporal');
+    expect(getImpactoDisplay('ALTERA_VIGENCIA').label).toBe('Altera vigência');
+    expect(getImpactoDisplay('ALTERA_VALOR').label).toBe('Altera valor');
+    expect(getImpactoDisplay('ALTERA_QUANTITATIVO').label).toBe('Altera quantitativo');
+    expect(getImpactoDisplay('ATUALIZA_DADOS').label).toBe('Atualiza dados');
+    expect(getImpactoDisplay('EXTINGUE_CONTRATO').label).toBe('Extingue contrato');
+    expect(getImpactoDisplay('SEM_IMPACTO_FINANCEIRO_TEMPORAL').label).toBe('Sem impacto financeiro/temporal');
   });
 
   it('8. Múltiplos eventos na mesma data realizam desempate determinístico por sequencial', () => {
@@ -216,15 +216,15 @@ describe('FASE 5.3 — ContractEventsTimeline Unit Tests', () => {
   });
 
   it('9. Mapeamento de tipos de eventos preserva semântica canônica (Celebração, Prorrogação, Rescisão, Encerramento)', () => {
-    expect(getEventTypeDisplay('CELEBRACAO').label).toBe('Celebração Inicial');
+    expect(getEventTypeDisplay('CELEBRACAO').label).toBe('Celebração inicial');
     expect(getEventTypeDisplay('PRORROGACAO').label).toBe('Prorrogação de Vigência');
-    expect(getEventTypeDisplay('REAJUSTE').label).toBe('Reajuste Contratual');
-    expect(getEventTypeDisplay('REPACTUACAO').label).toBe('Repactuação Salarial');
+    expect(getEventTypeDisplay('REAJUSTE').label).toBe('Reajuste contratual');
+    expect(getEventTypeDisplay('REPACTUACAO').label).toBe('Repactuação salarial');
     expect(getEventTypeDisplay('ACRESCIMO').label).toBe('Acréscimo de Valor/Qtd');
     expect(getEventTypeDisplay('SUPRESSAO').label).toBe('Supressão de Valor/Qtd');
     expect(getEventTypeDisplay('APOSTILAMENTO').label).toBe('Apostilamento');
-    expect(getEventTypeDisplay('ENCERRAMENTO').label).toBe('Encerramento Contratual');
-    expect(getEventTypeDisplay('RESCISAO').label).toBe('Rescisão Contratual');
+    expect(getEventTypeDisplay('ENCERRAMENTO').label).toBe('Encerramento contratual');
+    expect(getEventTypeDisplay('RESCISAO').label).toBe('Rescisão contratual');
   });
 
   it('10. Evento não possui data inventada quando não informada', () => {

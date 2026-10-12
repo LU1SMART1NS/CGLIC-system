@@ -212,7 +212,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
       />
     );
 
-    expect(html).toContain('Nenhuma Ata de Registro de Preços encontrada.');
+    expect(html).toContain('Nenhuma ata de registro de preços encontrada.');
   });
 
   it('6. deve exibir estado de filtro sem resultados com botão Limpar Filtros', () => {
@@ -226,7 +226,7 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
       />
     );
 
-    expect(html).toContain('Nenhuma Ata corresponde aos filtros aplicados.');
+    expect(html).toContain('Nenhuma ata corresponde aos filtros aplicados.');
     expect(html).toContain('Limpar filtros');
   });
 });
