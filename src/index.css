@@ -1530,7 +1530,7 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 }
 
 /* Trilho de situação/fila das carteiras (CarteiraSegmentTabs): o selecionado vem de aria-pressed, não de foco/clique. */
-.segment-pills { display: flex; align-items: center; gap: 0.75rem; }
+.segment-pills { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.75rem; }
 .segment-pills__rail { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: transparent; border: 1px solid #e2e8f0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .segment-pills__rail::-webkit-scrollbar { display: none; }
 .segment-pill {
