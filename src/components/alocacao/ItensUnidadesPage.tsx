@@ -22,7 +22,8 @@ import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/CarteiraDetailLabel';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { SeloPapelSenasp } from '../atas/SeloPapelSenasp';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, canFilterByGestor, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
 import { comparePrazo } from '../carteira/carteiraPrazo';
@@ -63,7 +64,6 @@ const AMARELO = 'var(--color-warning-solid)';
 const VERMELHO = 'var(--color-danger)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 const clamp2: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
-const fornecedorStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#64748b', marginTop: '0.15rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 /** "00059/2025" → "2025/00059": ordena pelo ano e depois pelo número (igual à Carteira › Itens). */
 const ataOrdem = (numero: string) => numero.split('/').reverse().join('/');
 const NIVEL_ATA_LABEL: Record<NivelAtendimento, string> = { SEM: 'Sem alocação', PARCIAL: 'Parcialmente alocada', TOTAL: 'Alocada' };
@@ -392,7 +392,6 @@ export const ItensUnidadesPage: React.FC = () => {
                     className="carteira-row-link"
                     aria-expanded={aberta}
                     onClick={abrirAoClicarNaLinha(alternar)}
-                    style={aberta ? { background: '#f1f5fb' } : undefined}
                   >
                     <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
                       <ActionButton
@@ -407,16 +406,21 @@ export const ItensUnidadesPage: React.FC = () => {
                       />
                     </td>
                     <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
-                      <CarteiraIdLink onClick={() => abrirAta(g.primeiro)} label={`Abrir a ata ${numero}`} title={`Abrir a Ata 360 · UASG ${arp.codigoUnidadeGerenciadora}`}>
-                        {numero}
-                      </CarteiraIdLink>
-                      {g.fornecedor && (
-                        <CarteiraCellFilter descricao={`fornecedor ${g.fornecedor}`} onFilter={() => setFilter('busca', g.fornecedor!)}>
-                          <div title={g.fornecedor} style={fornecedorStyle}>
-                            {g.fornecedor}
-                          </div>
-                        </CarteiraCellFilter>
-                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '0.5rem', rowGap: '0.15rem' }}>
+                          <CarteiraIdLink onClick={() => abrirAta(g.primeiro)} label={`Abrir a ata ${numero}`} title={`Abrir a Ata 360 · UASG ${arp.codigoUnidadeGerenciadora}`}>
+                            {numero}
+                          </CarteiraIdLink>
+                          <SeloPapelSenasp arp={arp} testId={`vinc-atas-papel-${g.ataKey}`} />
+                        </div>
+                        {g.fornecedor && (
+                          <CarteiraCellFilter descricao={`fornecedor ${g.fornecedor}`} onFilter={() => setFilter('busca', g.fornecedor!)}>
+                            <div title={g.fornecedor} style={carteiraFornecedor}>
+                              {g.fornecedor}
+                            </div>
+                          </CarteiraCellFilter>
+                        )}
+                      </div>
                     </td>
                     <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                       <CarteiraPrazoPill faixa={g.primeiro.faixa} diasRestantes={g.primeiro.diasRestantes} />
