@@ -719,6 +719,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                 departments={departments}
                 departmentsLoading={departmentsLoading}
                 canManage={canManageAllocations}
+                canInformUnits={canEditData}
                 error={allocationError}
                 onGoToContracts={() => setActiveTab('contratos')}
               />

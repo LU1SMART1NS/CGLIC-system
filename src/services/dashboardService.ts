@@ -640,7 +640,7 @@ export function calculateAttentionSummary(params: {
       title: conferir ? 'Divisão do contratado entre unidades a conferir' : 'Contratado sem unidade interna',
       description: conferir
         ? `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${aConferir} ${aConferir === 1 ? 'contrato com divisão' : 'contratos com divisão'} a conferir`
-        : `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${fmt(semUnidade)} contratados ainda sem unidade interna`,
+        : `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${fmt(semUnidade)} un contratados ainda sem unidade interna`,
       arpKey: itemKey,
       numeroAta: numAta,
       objetoItem: descItem,
