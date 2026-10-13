@@ -31,7 +31,7 @@ type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 const UASGS = UASGS_CGLIC;
 
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
-  SALDOS: ['ATA_CRITICA', 'UNIDADE_PENDENTE', 'FORNECEDOR_PNCP'],
+  SALDOS: ['ATA_CRITICA', 'QUANTITATIVOS', 'UNIDADE_PENDENTE', 'FORNECEDOR_PNCP'],
   REAJUSTES: ['REAJUSTE_RADAR'],
   PAGAMENTOS: ['PAGAMENTO_CRITICO', 'PAGAMENTO_PREVISTO'],
   TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA'],
@@ -110,9 +110,12 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sincronizacao.atualizar]);
 
-  // Gestor de Saldo (domínio de alocações, sem contratos): enxerga só os alertas de saldo das Atas.
+  // Gestor de Saldo (domínio de alocações, sem contratos): enxerga os alertas de saldo das Atas e os quantitativos a
+  // conferir (cota própria, migration 109), que são pendência dele. O gestor da ata vê o saldo crítico, mas não os
+  // quantitativos: quem os resolve é o gestor de saldo (o coordenador vê tudo).
   const { role } = useAuth();
   const saldosOnly = role === 'gestor_saldos';
+  const semQuantitativos = role === 'gestor';
   // Expectativa de pagamento (Portaria 50): avisos calculados na tela a partir das marcas dos contratos.
   const { avisos: avisosPagamento } = useAvisosPagamentoGerais({ enabled: !saldosOnly });
 
@@ -128,7 +131,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       const dash = uasg === UASGS[0] ? dash200330 : dash200331;
       const attention = dash.readModel?.attention;
       for (const item of [...(attention?.items || []), ...(attention?.resolvidos || [])]) {
-        if (saldosOnly && item.category !== 'ATA_CRITICA') continue;
+        if (saldosOnly && item.category !== 'ATA_CRITICA' && item.category !== 'QUANTITATIVOS') continue;
+        if (semQuantitativos && item.category === 'QUANTITATIVOS') continue;
         if (item.taskId && tarefasConcluidas.has(item.taskId)) continue;
         (item.avisoChave && avisosResolvidos.has(item.avisoChave) ? resolvidos : ativos).push({ ...item, uasg });
       }
@@ -136,7 +140,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     for (const a of avisosPagamento) ativos.push(avisoComoItemDeAtencao(a, UASGS[0]));
     return { allItems: ativos, itensResolvidos: resolvidos };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, saldosOnly, avisosPagamento, avisosResolvidos, tarefasConcluidas]);
+  }, [dash200330.readModel, dash200331.readModel, saldosOnly, semQuantitativos, avisosPagamento, avisosResolvidos, tarefasConcluidas]);
 
   const tabCounts = useMemo(() => {
     return {
