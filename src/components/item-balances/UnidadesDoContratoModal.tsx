@@ -123,7 +123,7 @@ const JanelaUnidades: React.FC<Omit<UnidadesDoContratoModalProps, 'contrato'> & 
                 action="desfazer"
                 size="sm"
                 label="Desfazer divisão"
-                title="Volta o contrato para sem unidade (ou para a divisão automática, se o item tiver uma unidade só)."
+                title="Volta o contrato para sem unidade (ou para a divisão automática, se o item tiver uma unidade só e os contratos couberem nela)."
                 onClick={() => void desfazer()}
                 disabled={salvando}
                 data-testid="unidades-contrato-desfazer"
@@ -175,8 +175,8 @@ const JanelaUnidades: React.FC<Omit<UnidadesDoContratoModalProps, 'contrato'> & 
 
           {q.divisaoOrigem === 'AUTO' && (
             <NoticeBar tone="info" testId="unidades-contrato-auto">
-              Dividido automaticamente: o item tinha uma unidade alocada quando o contrato foi vinculado. Ao salvar aqui, a divisão passa a ser sua e a
-              automação não mexe mais nela.
+              Dividido automaticamente: o item tem uma unidade alocada só e todos os contratos cabem no alocado dela. Se outra unidade for alocada ou
+              o alocado não comportar os contratos, a divisão automática sai. Ao salvar aqui, a divisão passa a ser sua e a automação não mexe mais nela.
             </NoticeBar>
           )}
           {q.situacao === 'CONFERIR' && (

@@ -39,7 +39,7 @@ export function useSaveAllocations() {
       });
       // A carteira (aba Itens e filtros de alocação) soma as alocações de todos os itens.
       queryClient.invalidateQueries({ queryKey: ['carteira-alocacoes'] });
-      // Alocação muda a divisão automática do contratado entre as unidades (migration 103).
+      // Alocação muda a divisão automática do contratado entre as unidades (migrations 103 e 110).
       queryClient.invalidateQueries({ queryKey: ['contratado-do-item', canonicalKey] });
     }
   });
