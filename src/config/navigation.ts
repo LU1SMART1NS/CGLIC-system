@@ -197,7 +197,8 @@ export const navigationConfig: NavItem[] = [
         route: '/empenhos',
         status: 'active',
         matchPrefixes: ['/empenhos'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        // Gestor de saldo fica fora do Financeiro: o empenhado que ele usa já aparece no Item e na Alocação.
+        allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
         id: 'execucao-pagamentos',

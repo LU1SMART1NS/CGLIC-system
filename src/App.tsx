@@ -328,7 +328,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/empenhos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                   <FinancialExecutionRoute />
                 </RequireRole>
               }

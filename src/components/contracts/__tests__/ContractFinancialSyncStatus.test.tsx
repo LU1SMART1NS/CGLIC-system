@@ -223,6 +223,16 @@ describe('ContractFinancialExecutionSection: vínculo híbrido', () => {
     expect(html).toContain('contract-financial-empty');
     expect(html).toContain('contract-financial-vincular');
     expect(html).toContain('contract-financial-descartados');
+    expect(html).toContain('Consultar em Empenhos');
+  });
+
+  it('contrato sem empenho: gestor de saldo não recebe atalho para o Financeiro', () => {
+    vi.mocked(useContractFinancialSummary).mockReturnValue(vazio as any);
+    vi.mocked(useDescartesEmpenhoContrato).mockReturnValue({ data: [] } as any);
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
+    const html = renderEq();
+    expect(html).toContain('contract-financial-empty');
+    expect(html).not.toContain('Consultar em Empenhos');
   });
 });
 
