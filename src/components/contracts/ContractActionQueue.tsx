@@ -54,7 +54,13 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
   React.useEffect(() => {
     if (!highlightedId) return;
     const el = document.querySelector(`[data-action-id="${CSS.escape(highlightedId)}"]`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (!el) return;
+    // Só rola quando a ação está fora da área visível abaixo da barra grudada. Rolar sempre brigava com a ancoragem das
+    // telas 360 (useInstrumentTab): as duas rolagens se alternavam e o cartão encolhia e reabria, ou ficava um vão em branco.
+    const barraAte = document.querySelector('[data-i360-head]')?.getBoundingClientRect().bottom ?? 0;
+    const caixa = el.getBoundingClientRect();
+    if (caixa.top >= barraAte && caixa.bottom <= window.innerHeight) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [highlightedId, queue.items]);
 
   if (isLoading) {
