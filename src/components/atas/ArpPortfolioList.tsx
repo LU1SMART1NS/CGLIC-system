@@ -314,7 +314,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                               <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                   <tr>
-                                    <th style={carteiraTh}>Item</th>
+                                    <th style={carteiraTh}>Descrição</th>
                                     <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor unitário</th>
                                     <th style={carteiraTh}>Consumo</th>
                                   </tr>
