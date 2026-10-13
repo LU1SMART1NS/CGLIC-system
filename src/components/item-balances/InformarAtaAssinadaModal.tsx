@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActionButton, AppButton, AppInput, AppTextarea, Modal, NoticeBar, StatusBadge, useToast } from '../../design-system';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
+import { fetchNomeUasg } from '../../services/api';
 import { documentoSeiValido } from '../../utils/quantitativos';
 import { formatNumber } from './itemBalanceUtils';
 
@@ -19,6 +20,8 @@ interface NovoOrgao {
   uasg: string;
   nome: string;
   quantidade: string;
+  /** Busca do nome no Compras.gov.br; só quando a fonte não acha (ou falha) o nome é digitado. */
+  busca: 'vazia' | 'buscando' | 'achou' | 'nao-encontrada' | 'falhou';
 }
 
 interface Props {
@@ -60,6 +63,19 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
 
   const soma = orgaos.reduce((s, o) => s + (inteiro(valores[o.uasg] ?? '') ? Number(valores[o.uasg]) : 0), 0)
     + novos.reduce((s, n) => s + (inteiro(n.quantidade) ? Number(n.quantidade) : 0), 0);
+  const alterarNovo = (id: number, mudanca: Partial<NovoOrgao>) => setNovos((l) => l.map((x) => (x.id === id ? { ...x, ...mudanca } : x)));
+
+  /** Com os 6 dígitos da UASG, traz o nome do órgão do cadastro do Compras.gov.br. */
+  const mudarUasgNovo = (id: number, digitado: string) => {
+    const uasg = digitado.replace(/\D/g, '').slice(0, 6);
+    alterarNovo(id, { uasg, nome: '', busca: uasg.length === 6 ? 'buscando' : 'vazia' });
+    if (uasg.length !== 6) return;
+    void fetchNomeUasg(uasg).then((r) => setNovos((l) => l.map((x) => {
+      if (x.id !== id || x.uasg !== uasg) return x; // a UASG mudou enquanto buscava
+      return r.situacao === 'achou' ? { ...x, nome: r.nome, busca: 'achou' } : { ...x, busca: r.situacao };
+    })));
+  };
+
   const copiarRegistrado = () => setValores(Object.fromEntries(orgaos.map((o) => [o.uasg, valores[o.uasg]?.trim() ? valores[o.uasg] : String(o.registrado ?? 0)])));
 
   const gravar = async () => {
@@ -72,7 +88,8 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
       if (!n.uasg.trim() && !n.nome.trim() && !n.quantidade.trim()) continue;
       if (!/^\d{6}$/.test(n.uasg.trim())) return setErro('A UASG do órgão novo tem 6 dígitos.');
       if (orgaos.some((o) => o.uasg === n.uasg.trim()) || novos.filter((x) => x.uasg.trim() === n.uasg.trim()).length > 1) return setErro(`A UASG ${n.uasg.trim()} já está na lista.`);
-      if (!n.nome.trim()) return setErro('Escreva o nome do órgão novo.');
+      if (n.busca === 'buscando') return setErro(`Aguarde: buscando o nome da UASG ${n.uasg.trim()}.`);
+      if (!n.nome.trim()) return setErro(`Escreva o nome do órgão da UASG ${n.uasg.trim()} (não veio do Compras.gov.br).`);
       if (!inteiro(n.quantidade)) return setErro(`Informe a quantidade da UASG ${n.uasg.trim()} (número inteiro).`);
     }
     if (!documentoSeiValido(documento)) return setErro('O número do documento SEI tem 8 dígitos (ex.: 12345678).');
@@ -148,16 +165,30 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
               ))}
               {novos.map((n) => (
                 <tr key={n.id} style={{ borderTop: '1px solid var(--border)' }}>
-                  <td style={{ padding: '0.4rem 0.6rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    <AppInput aria-label="UASG do órgão novo" inputMode="numeric" maxLength={6} placeholder="UASG" value={n.uasg} style={{ width: 100 }}
-                      onChange={(e) => setNovos((l) => l.map((x) => (x.id === n.id ? { ...x, uasg: e.target.value.replace(/\D/g, '') } : x)))} />
-                    <AppInput aria-label="Nome do órgão novo" placeholder="Nome do órgão" value={n.nome} style={{ flex: '1 1 180px' }}
-                      onChange={(e) => setNovos((l) => l.map((x) => (x.id === n.id ? { ...x, nome: e.target.value } : x)))} />
+                  <td style={{ padding: '0.4rem 0.6rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <AppInput aria-label="UASG do órgão novo" inputMode="numeric" maxLength={6} placeholder="UASG" value={n.uasg} style={{ width: 100 }}
+                        onChange={(e) => mudarUasgNovo(n.id, e.target.value)} data-testid={`informar-novo-uasg-${n.id}`} />
+                      {n.busca === 'achou' && <div style={{ fontWeight: 700 }} data-testid={`informar-novo-nome-${n.id}`}>{n.nome}</div>}
+                      {n.busca === 'buscando' && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Buscando o nome no Compras.gov.br…</span>}
+                      {n.busca === 'vazia' && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Digite os 6 dígitos: o nome vem sozinho</span>}
+                    </div>
+                    {(n.busca === 'nao-encontrada' || n.busca === 'falhou') && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.35rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--warning-text)' }}>
+                          {n.busca === 'nao-encontrada'
+                            ? 'UASG não encontrada no Compras.gov.br. Confira o número ou escreva o nome do órgão.'
+                            : 'O Compras.gov.br não respondeu. Escreva o nome do órgão.'}
+                        </span>
+                        <AppInput aria-label="Nome do órgão novo" placeholder="Nome do órgão" value={n.nome}
+                          onChange={(e) => alterarNovo(n.id, { nome: e.target.value })} />
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)' }}>sem registro</td>
                   <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>
                     <AppInput aria-label="Quantidade do órgão novo" inputMode="numeric" value={n.quantidade} style={{ width: 110, textAlign: 'right' }}
-                      onChange={(e) => setNovos((l) => l.map((x) => (x.id === n.id ? { ...x, quantidade: e.target.value.replace(/\D/g, '') } : x)))} />
+                      onChange={(e) => alterarNovo(n.id, { quantidade: e.target.value.replace(/\D/g, '') })} />
                   </td>
                 </tr>
               ))}
@@ -165,7 +196,7 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
           </table>
         </div>
         <div>
-          <AppButton variant="outline" size="sm" onClick={() => setNovos((l) => [...l, { id: Date.now(), uasg: '', nome: '', quantidade: '' }])} data-testid="informar-novo-orgao">
+          <AppButton variant="outline" size="sm" onClick={() => setNovos((l) => [...l, { id: Date.now(), uasg: '', nome: '', quantidade: '', busca: 'vazia' }])} data-testid="informar-novo-orgao">
             + Órgão que está na ata assinada e não aparece aqui
           </AppButton>
         </div>
