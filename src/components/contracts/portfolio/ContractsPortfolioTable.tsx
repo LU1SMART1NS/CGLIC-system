@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { EmptyState } from '../../../design-system/components/EmptyState';
 import { ActionButton } from '../../../design-system/components/ActionButton';
@@ -315,16 +316,18 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                                         <td data-label="Prioridade" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                                           <SeverityBadge severity={p.severity} />
                                         </td>
-                                        <td data-role="id" style={{ ...carteiraTd, fontWeight: 700, color: motivo.color }}>
-                                          {motivo.label}
+                                        <td data-role="id" style={carteiraTd}>
+                                          <CarteiraIdLink onClick={abrirPendencia} label={`${acao.label}: ${motivo.label}`} title={acao.label}>
+                                            <span style={{ color: motivo.color }}>{motivo.label}</span>
+                                          </CarteiraIdLink>
                                         </td>
                                         <td data-label="Detalhe" style={{ ...carteiraTd, color: '#64748b' }}>
                                           {p.badgeLabel || p.description || p.title || '—'}
                                         </td>
                                         <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                          <ActionButton action="abrir" type="button" size="sm" onClick={abrirPendencia}>
-                                            {acao.label}
-                                          </ActionButton>
+                                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                            {acao.label} <ArrowRight size={14} aria-hidden="true" />
+                                          </span>
                                         </td>
                                       </tr>
                                     );
