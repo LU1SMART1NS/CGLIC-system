@@ -21,6 +21,7 @@ import { passaFiltroNivel, type NivelAtendimento } from '../../utils/itemAtendim
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import { ItensPortfolioFilters, ITENS_FILTER_SCHEMA } from './ItensPortfolioFilters';
 import { ItensPortfolioTable } from './ItensPortfolioTable';
+import { AvisoCarregando } from '../../design-system';
 import { contarPorPapel, passaFiltroPapel } from '../../utils/ataIdentidade';
 
 /**
@@ -157,6 +158,7 @@ export const ItensPortfolio: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando itens...">
+          <AvisoCarregando label="Carregando itens" />
           <SkeletonLoader variant="card" height="96px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />

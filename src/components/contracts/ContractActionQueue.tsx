@@ -11,6 +11,7 @@ import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { AvisosResolvidosLista, BotaoResolvido, EspacoResolvido, useResolverAviso, type AlvoResolucao } from '../avisos/ResolverAviso';
+import { AvisoCarregando } from '../../design-system';
 import type { ContractActionItem, ContractActionQueue as ActionQueueData } from '../../services/contractActionQueueService';
 
 export type Contract360Tab = 'acoes' | 'plano' | 'itens' | 'financeiro' | 'pagamentos' | 'historico';
@@ -53,6 +54,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
   if (isLoading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem 0' }} aria-busy="true" aria-label="Carregando ações do contrato...">
+        <AvisoCarregando label="Carregando ações do contrato" />
         <SkeletonLoader variant="rectangular" height="44px" count={3} />
       </div>
     );

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { META_SEM_BARRA_DE_CARREGAMENTO } from '../design-system/components/Carregamento';
 import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import {
   assinarSincronizacaoLocal,
@@ -82,6 +83,8 @@ export function useSituacaoSincronizacao(
     queryFn: () => fetchSincronizacaoStatus(recurso),
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
+    // A conferência periódica roda em segundo plano: não acende a barra de carregamento do topo.
+    meta: META_SEM_BARRA_DE_CARREGAMENTO,
     refetchInterval: (query: { state: { data?: SincronizacaoFonteStatus[] } }) =>
       resumirSincronizacao(query.state.data ?? []).emAndamentoNoBanco ? INTERVALO_DURANTE_SINCRONIZACAO_MS : INTERVALO_CONFERENCIA_STATUS_MS
   });

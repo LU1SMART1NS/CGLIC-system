@@ -4,7 +4,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import { ActionButton, AppButton, AppTextarea, Modal, StatusBadge, useToast } from '../../design-system';
+import { ActionButton, AppButton, AppTextarea, Modal, StatusBadge, useToast, AvisoCarregando } from '../../design-system';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../hooks/useVinculacaoEmpenhos';
@@ -178,6 +178,7 @@ export const EmpenhosItensPage: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando empenhos...">
+          <AvisoCarregando label="Carregando empenhos" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />

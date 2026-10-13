@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertCircle, Loader2, Search } from 'lucide-react';
-import { ActionButton, AppButton } from '../../design-system';
+import { ActionButton, AppButton, MENSAGEM_CARREGAMENTO_LENTO, useFaseDaEspera } from '../../design-system';
 import { colors, shapes, typography } from '../../design-system/tokens';
 import { Instrument360Page } from './Instrument360Page';
 
@@ -35,6 +35,8 @@ export const InstrumentPageState: React.FC<InstrumentPageStateProps> = ({
   onBack
 }) => {
   const isDanger = kind === 'error' || kind === 'forbidden';
+  // Espera longa: depois de 8 s, explica a demora para o usuário não recarregar a página.
+  const demorando = useFaseDaEspera() === 2 && kind === 'loading';
   return (
     <Instrument360Page>
       <div
@@ -80,6 +82,11 @@ export const InstrumentPageState: React.FC<InstrumentPageStateProps> = ({
         {message && (
           <p style={{ fontSize: typography.fontSize.body, color: colors.text.muted, maxWidth: 550, margin: '0 auto 1.5rem auto' }}>
             {message}
+          </p>
+        )}
+        {demorando && (
+          <p className="aviso-carregando aviso-carregando--lento" style={{ maxWidth: 550, margin: '0 auto', justifyContent: 'center' }}>
+            {MENSAGEM_CARREGAMENTO_LENTO}
           </p>
         )}
         {(onRetry || onBack) && (

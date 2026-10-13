@@ -8,7 +8,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { useToast } from '../../design-system';
+import { useToast, AvisoCarregando } from '../../design-system';
 import { useAuth } from '../../context/AuthContext';
 import { createPaymentCycleRpc, type CreatePaymentCycleInput } from '../../adapters/paymentCycleRpcAdapter';
 import { CreateCycleModal } from '../contracts/payment/PaymentCycleModals';
@@ -199,6 +199,7 @@ export const PagamentosCarteira: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando pagamentos...">
+          <AvisoCarregando label="Carregando pagamentos" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />

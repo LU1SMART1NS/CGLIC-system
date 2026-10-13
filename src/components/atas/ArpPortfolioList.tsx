@@ -28,6 +28,7 @@ import type { ArpPortfolioFilterState } from './ArpPortfolioFilters';
 import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
+import { AvisoCarregando } from '../../design-system';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
 
 interface ArpPortfolioListProps {
@@ -130,6 +131,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   if (isLoading && totalAtas === 0) {
     return (
       <div className="ata-cards-container" aria-busy="true" aria-label="Carregando atas...">
+        <AvisoCarregando label="Carregando atas" />
         <AtaCardSkeleton />
         <AtaCardSkeleton />
         <AtaCardSkeleton />

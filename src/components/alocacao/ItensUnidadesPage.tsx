@@ -3,7 +3,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import { ActionButton } from '../../design-system';
+import { ActionButton, AvisoCarregando } from '../../design-system';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
@@ -168,6 +168,7 @@ export const ItensUnidadesPage: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando itens...">
+          <AvisoCarregando label="Carregando itens" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
