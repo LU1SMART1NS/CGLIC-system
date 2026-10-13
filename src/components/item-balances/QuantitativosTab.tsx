@@ -32,6 +32,8 @@ import { isUasgCglic } from '../../config/unidadesGestoras';
 import type { UnidadeItemRecord } from '../../types';
 import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
 import { InformarAtaAssinadaModal } from './InformarAtaAssinadaModal';
+import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
+import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { ConfirmarRemanejamentoModal, ContinuaDoOrgaoModal } from './RemanejamentoModals';
 
 export interface QuantitativosTabProps {
@@ -62,7 +64,12 @@ export interface QuantitativosTabProps {
 
 interface Linha {
   uasg: string;
+  /** Nome do cadastro de UASGs; sem cadastro, o nome que veio com a ata. */
   nome: string;
+  /** Nome que veio com a ata (a fonte corta em 45 letras). */
+  nomeNaAta: string;
+  /** "Boa Vista/RR", do cadastro de UASGs. */
+  local: string | null;
   ehSenasp: boolean;
   gerenciadora: boolean;
   registrado: number | null;
@@ -89,11 +96,16 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
   const [continuando, setContinuando] = React.useState<OrgaoQuantitativo | null>(null);
 
   const nomesVivos = React.useMemo(() => new Map(p.unidades.map((u) => [digitos(u.codigoUnidade), u.nomeUnidade])), [p.unidades]);
+  const cadastro = useCadastroUasgs([...q.orgaos.map((o) => o.uasg), ...p.unidades.map((u) => digitos(u.codigoUnidade))]);
   const linhas: Linha[] = React.useMemo(() => {
+    const identidade = (uasg: string, nomeNaAta: string) => {
+      const c = cadastro.get(uasg);
+      return { nome: c?.nome ?? nomeNaAta, nomeNaAta, local: c ? localDaUasg(c) : null };
+    };
     const base: Linha[] = q.informado
       ? q.orgaos.map((o) => ({
           uasg: o.uasg,
-          nome: nomesVivos.get(o.uasg) ?? o.nomeOrgao ?? `UASG ${o.uasg}`,
+          ...identidade(o.uasg, nomesVivos.get(o.uasg) ?? o.nomeOrgao ?? `UASG ${o.uasg}`),
           ehSenasp: o.ehSenasp,
           gerenciadora: o.ehSenasp && p.ataDaCglic,
           registrado: o.quantidadeRegistrada,
@@ -101,14 +113,14 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         }))
       : p.unidades.map((u) => {
           const uasg = digitos(u.codigoUnidade);
-          return { uasg, nome: u.nomeUnidade, ehSenasp: isUasgCglic(uasg), gerenciadora: u.tipoUnidade === 'GERENCIADORA', registrado: Number(u.quantidadeRegistrada) || 0, orgao: null };
+          return { uasg, ...identidade(uasg, u.nomeUnidade), ehSenasp: isUasgCglic(uasg), gerenciadora: u.tipoUnidade === 'GERENCIADORA', registrado: Number(u.quantidadeRegistrada) || 0, orgao: null };
         });
     return base.sort((a, b) =>
       Number(b.ehSenasp) - Number(a.ehSenasp)
       || Number(b.gerenciadora) - Number(a.gerenciadora)
       || (a.orgao && b.orgao ? ORDEM[a.orgao.situacao] - ORDEM[b.orgao.situacao] : 0)
       || (b.registrado ?? -1) - (a.registrado ?? -1));
-  }, [q.informado, q.orgaos, p.unidades, p.ataDaCglic, nomesVivos]);
+  }, [q.informado, q.orgaos, p.unidades, p.ataDaCglic, nomesVivos, cadastro]);
   const nomeDe = React.useCallback((uasg: string) => linhas.find((l) => l.uasg === uasg)?.nome ?? (isUasgCglic(uasg) ? 'SENASP' : `UASG ${uasg}`), [linhas]);
   const linhaSenasp = linhas.find((l) => l.ehSenasp);
 
@@ -213,9 +225,9 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       minWidth: '260px',
       render: (l) => (
         <>
-          <div style={{ fontWeight: 700 }}>{l.nome}</div>
+          <div style={{ fontWeight: 700 }} title={l.nome !== l.nomeNaAta ? `Nome na ata: ${l.nomeNaAta}` : undefined}>{l.nome}</div>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.15rem', flexWrap: 'wrap' }}>
-            <span style={pequeno}>UASG {l.uasg}</span>
+            <span style={pequeno}>UASG {l.uasg}{l.local ? ` · ${l.local}` : ''}</span>
             <StatusBadge label={l.gerenciadora ? 'Gerenciadora' : 'Participante'} variant={l.gerenciadora ? 'info' : 'neutral'} size="sm" dot={false} />
             {l.ehSenasp && <span style={pequeno}>{p.totalUnidadesInternas} {p.totalUnidadesInternas === 1 ? 'unidade interna' : 'unidades internas'}</span>}
           </div>
@@ -436,7 +448,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         homologado={p.homologado}
         corrigir={q.informado}
         documentoSeiAtual={q.documentoSei}
-        orgaos={linhas.map((l) => ({ uasg: l.uasg, nome: l.nome, registrado: l.registrado, assinada: l.orgao ? l.orgao.quantidadeAssinada : null, ehSenasp: l.ehSenasp }))}
+        orgaos={linhas.map((l) => ({ uasg: l.uasg, nome: l.nome, nomeNaAta: l.nomeNaAta, local: l.local, registrado: l.registrado, assinada: l.orgao ? l.orgao.quantidadeAssinada : null, ehSenasp: l.ehSenasp }))}
         onFechar={() => setInformando(false)}
       />
       <ConfirmarRemanejamentoModal itemKey={p.itemKey} orgao={confirmando} quantitativos={q} nomeDe={nomeDe} onFechar={() => setConfirmando(null)} />
