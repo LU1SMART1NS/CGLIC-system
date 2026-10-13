@@ -571,9 +571,11 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           description={vazio.description}
           action={
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <AppButton variant="outline" size="sm" icon={<ArrowRight size={14} />} onClick={() => navigate(empenhosUrl)}>
-                Consultar em Empenhos
-              </AppButton>
+              {role !== 'gestor_saldos' && (
+                <AppButton variant="outline" size="sm" icon={<ArrowRight size={14} />} onClick={() => navigate(empenhosUrl)}>
+                  Consultar em Empenhos
+                </AppButton>
+              )}
               {botaoVincular}
             </div>
           }
