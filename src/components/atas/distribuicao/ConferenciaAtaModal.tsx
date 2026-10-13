@@ -1,10 +1,9 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ExternalLink, Loader2, MinusCircle } from 'lucide-react';
-import { ActionButton, AppButton, Modal, NoticeBar } from '../../../design-system';
+import { CheckCircle2, Loader2, MinusCircle } from 'lucide-react';
+import { ActionButton, Modal, NoticeBar } from '../../../design-system';
 import { useToast } from '../../../design-system/components/Toast';
 import { useDescartarAta } from '../../../hooks/useDescartesAtaContrato';
-import { buildAtaPath } from '../../../hooks/useAta';
 import { useVinculoEmMassa } from '../../../hooks/useVinculoEmMassa';
 import { fetchContractItemQuantities } from '../../../services/contractItemsService';
 import type { PlanoVinculo } from '../../../services/vinculoEmMassaService';
@@ -161,8 +160,6 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
     }
   };
 
-  const verAtaCompleta = () => window.open(buildAtaPath(ata.numeroAta, ata.uasg), '_blank', 'noopener');
-
   return (
     <Modal
       isOpen
@@ -173,9 +170,6 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
       subtitle="Confira se o contrato pertence a esta ata"
       footer={
         <>
-          <AppButton variant="outline" size="sm" icon={<ExternalLink size={13} />} onClick={verAtaCompleta} title="Abrir a Ata 360 em outra aba, só para consulta">
-            Ver ata completa
-          </AppButton>
           {podeAgir && (
             <>
               <ActionButton
