@@ -18,6 +18,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     testarAtasParticipacao: vi.fn(async () => ({ compras: 18, antigas: 0, pendentes: 18, lidas: 18, adiadas: 0, atasDaCompra: 26, participante: 14, adesao: 5, semSenasp: 7, itensSemResposta: 0, falhas: 0, atas: [] })),
     sincronizarContratosParticipantes: vi.fn(async () => sucesso(21)),
     contarContratosParticipantesPendentes: vi.fn(async () => ({ orgaos: 184, pendentes: 184 })),
+    sincronizarCadastroUasgs: vi.fn(async () => sucesso(23)),
+    contarCadastroUasgsPendentes: vi.fn(async () => ({ pendentes: 260, amostra: null })),
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
     sincronizarFaturasDaCarteira: vi.fn(async () => sucesso(13)),
@@ -200,5 +202,16 @@ describe('executarPedido', () => {
     const r = await executarPedido({ recurso: 'saldos_itens', dry: true }, d);
     expect(r.dry).toBe(true);
     expect(d.sincronizarSaldosItens).not.toHaveBeenCalled();
+  });
+
+  it('cadastro_uasgs: vale para todas as carteiras, sem UASG', async () => {
+    expect(validarPedido({ recurso: 'cadastro_uasgs' })).toMatchObject({ ok: true, pedido: { recurso: 'cadastro_uasgs' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'cadastro_uasgs', forcar: true }, d);
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 23 } });
+    expect(vi.mocked(d.sincronizarCadastroUasgs).mock.calls[0][0]).toMatchObject({ forcar: true });
+    const dry = await executarPedido({ recurso: 'cadastro_uasgs', dry: true }, d);
+    expect(dry).toMatchObject({ dry: true, consulta: { pendentes: 260 } });
+    expect(d.sincronizarCadastroUasgs).toHaveBeenCalledTimes(1);
   });
 });

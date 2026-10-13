@@ -8,7 +8,12 @@ import { formatNumber } from './itemBalanceUtils';
 /** Órgão na janela: o registrado do Compras.gov.br aparece ao lado, só para comparar. */
 export interface OrgaoParaInformar {
   uasg: string;
+  /** Nome do cadastro de UASGs; sem cadastro, o nome que veio com a ata. */
   nome: string;
+  /** Nome que veio com a ata: aparece ao parar o mouse quando é diferente. */
+  nomeNaAta?: string;
+  /** "Boa Vista/RR", do cadastro de UASGs. */
+  local?: string | null;
   registrado: number | null;
   /** Quantidade já informada (correção); nula na primeira vez. */
   assinada: number | null;
@@ -146,8 +151,8 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
               {orgaos.map((o) => (
                 <tr key={o.uasg} style={{ borderTop: '1px solid var(--border)' }}>
                   <td style={{ padding: '0.4rem 0.6rem' }}>
-                    <div style={{ fontWeight: 700 }}>{o.nome}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>UASG {o.uasg}{o.ehSenasp ? ' · SENASP' : ''}</div>
+                    <div style={{ fontWeight: 700 }} title={o.nomeNaAta && o.nomeNaAta !== o.nome ? `Nome na ata: ${o.nomeNaAta}` : undefined}>{o.nome}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>UASG {o.uasg}{o.local ? ` · ${o.local}` : ''}{o.ehSenasp ? ' · SENASP' : ''}</div>
                   </td>
                   <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontFamily: 'monospace' }}>{o.registrado == null ? '—' : formatNumber(o.registrado)}</td>
                   <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>

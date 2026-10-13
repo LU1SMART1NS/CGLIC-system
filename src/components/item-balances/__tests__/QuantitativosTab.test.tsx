@@ -123,4 +123,24 @@ describe('QuantitativosTab', () => {
     expect(h).toContain('data-testid="soma-assinada-nao-fecha"');
     expect(h).toContain('data-testid="soma-registrado-nao-fecha"');
   });
+
+  it('nome, cidade e UF do cadastro de UASGs; o nome da ata fica no título', () => {
+    const client = new QueryClient();
+    const codigos = ['200331', '200109', '453079', '450955', '926016'].sort().join(',');
+    client.setQueryData(['cadastro-uasgs', codigos], new Map([
+      ['453079', { uasg: '453079', nome: 'SECRETARIA DE ESTADO DE SEGURANÇA PÚBLICA-PR', municipio: 'CURITIBA', siglaUf: 'PR' }]
+    ]));
+    const h = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><QuantitativosTab {...base} /></MemoryRouter>
+      </QueryClientProvider>
+    );
+    expect(h).toContain('SECRETARIA DE ESTADO DE SEGURANÇA PÚBLICA-PR');
+    expect(h).toContain('UASG 453079 · Curitiba/PR');
+    expect(h).toContain('title="Nome na ata: SECRETARIA DE ESTADO DA SEGURANCA PUBLICA"');
+    // Sem cadastro: segue o nome da ata, sem cidade.
+    expect(h).toContain('POLICIA RODOVIARIA FEDERAL');
+    expect(h).toContain('UASG 200109<');
+  });
 });
+
