@@ -31,7 +31,7 @@ describe('lerItensDoContrato', () => {
   it('com o id do Contratos.gov.br, lê os itens direto, sem a consulta que descobre o id', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => [itemGov] });
     const r = await lerItensDoContrato({ uasg: '200331', numero: '00173', ano: '2026', contratoId: 924668 } as any);
-    expect(fetchMock).toHaveBeenCalledWith('/api-contratos-gov/api/contrato/924668/itens');
+    expect(fetchMock).toHaveBeenCalledWith('/api-contratos-gov/api/contrato/924668/itens', expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(fetchContratosGovData).not.toHaveBeenCalled();
     expect(r).toEqual({
       fonte: 'CONTRATOS_GOV',

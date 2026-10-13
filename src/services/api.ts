@@ -1,4 +1,5 @@
 import type { ArpResponse, ArpItemsResponse, ArpItemRecord, UnidadesItemResponse, FilterParams, ArpRecord, EmpenhosSaldoItemResponse, EmpenhoSaldoItemRecord, PncpContractEmpenho, AdesoesItemResponse, AdesaoItemRecord, ComprasGovContratoItemRecord, ComprasGovContratosItemResponse, ContratosGovEmpenhoRecord } from '../types';
+import { fetchComTempoLimite, TEMPO_LIMITE_EMPENHOS_MS, TEMPO_LIMITE_DETALHE_EMPENHO_MS, TEMPO_LIMITE_ITENS_MS } from './fetchComTempoLimite';
 import { cacheArpsInDb, cacheArpItemsInDb, fetchArpsFromDb } from './dbCacheService';
 import type { ContratosGovHistoricoRecord } from '../types/contractHistorico';
 import type { ContratosGovResponsavelRecord, ContratosGovGarantiaRecord } from '../types/contractResponsaveis';
@@ -1467,7 +1468,7 @@ export async function fetchContratosGovData(
 
   for (const ug of candidateUgs) {
     try {
-      const listRes = await fetch(`/api-contratos-gov/api/contrato/ugorigem/${ug}/numeroano/${numeroAno}`);
+      const listRes = await fetchComTempoLimite(`/api-contratos-gov/api/contrato/ugorigem/${ug}/numeroano/${numeroAno}`, TEMPO_LIMITE_ITENS_MS, 'Contratos.gov.br');
       if (listRes.ok) {
         const data = await listRes.json();
         const cObj = Array.isArray(data) ? data[0] : data;
@@ -1475,7 +1476,7 @@ export async function fetchContratosGovData(
         const orgaoNome = cObj?.contratante?.orgao?.nome || cObj?.contratante?.orgao_origem?.nome;
 
         if (contratoId) {
-          const itemsRes = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/itens`);
+          const itemsRes = await fetchComTempoLimite(`/api-contratos-gov/api/contrato/${contratoId}/itens`, TEMPO_LIMITE_ITENS_MS, 'Contratos.gov.br');
           const itemsData = itemsRes.ok ? await itemsRes.json() : [];
           return {
             contratoId,
@@ -1492,32 +1493,7 @@ export async function fetchContratosGovData(
   return { items: [] };
 }
 
-/** Tempo máximo de espera pela lista de empenhos de um contrato (Contratos.gov.br e PNCP). */
-export const TEMPO_LIMITE_EMPENHOS_MS = 30_000;
-/** Tempo máximo de espera pela minuta de um empenho. */
-const TEMPO_LIMITE_DETALHE_EMPENHO_MS = 15_000;
-
-/** Erro de uma consulta que não terminou no tempo limite. Quem chama pode tentar de novo. */
-export class TempoEsgotadoError extends Error {
-  constructor(fonte: string, ms: number) {
-    super(`${fonte} não respondeu em ${Math.round(ms / 1000)} s.`);
-    this.name = 'TempoEsgotadoError';
-  }
-}
-
-/** fetch que desiste depois de `ms` milissegundos, com mensagem legível em falha de rede ou de tempo. */
-async function fetchComTempoLimite(url: string, ms: number, fonte: string): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } catch (err: any) {
-    if (controller.signal.aborted) throw new TempoEsgotadoError(fonte, ms);
-    throw new Error(`Falha de rede ao consultar o ${fonte}: ${err?.message || err}`);
-  } finally {
-    clearTimeout(timer);
-  }
-}
+export { TempoEsgotadoError, TEMPO_LIMITE_EMPENHOS_MS } from './fetchComTempoLimite';
 
 /**
  * Consulta empenhos do contrato no Contratos.gov.br (comprasnet)
@@ -1676,7 +1652,7 @@ export async function fetchContratoItensComprasGov(
 
   try {
     const url = `${BASE_URL.replace('/modulo-arp', '/modulo-contratos')}/2.1_consultarContratosItem_Id?tipo=numeroControlePncpContrato&codigo=${encodeURIComponent(numeroControlePncp)}`;
-    const response = await fetch(url);
+    const response = await fetchComTempoLimite(url, TEMPO_LIMITE_ITENS_MS, 'Compras.gov.br');
     if (response.ok) {
       const data = await response.json() as ComprasGovContratosItemResponse;
       if (data.resultado && data.resultado.length > 0) {

@@ -10,6 +10,7 @@ import { formatContractNumber } from '../../../utils/contractNumber';
 import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParcial, type FilaAta, type FilaContrato } from './contratosSemAta';
 import type { ItemDaAta } from './vinculoEmMassa';
 import { chaveGestaoDaArp } from '../../../utils/ataIdentidade';
+import type { EstadoMotivos } from '../../../utils/vinculoAutomatico';
 
 /**
  * Atas, contratos e vínculos da carteira, cruzados para dizer quais contratos ainda não têm ata (e qual é a ata
@@ -22,7 +23,11 @@ export function usePendenciasVinculoAta() {
   const { data: links = [], isLoading: linksLoading } = useArpItemContractLinks();
   const { data: confirmacoesSemAta = {}, isLoading: semAtaLoading } = useContratosSemAta();
   const { data: descartesAta = {} } = useDescartesAtaContrato();
-  const { data: motivosManual } = useMotivosVinculoManual();
+  const motivosQuery = useMotivosVinculoManual();
+  const motivosManual = motivosQuery.data;
+  /** Leitura dos motivos (RPC prever_vinculos_automaticos): a fila não promete vínculo automático enquanto carrega ou se falhou. */
+  const motivosEstado: EstadoMotivos = motivosQuery.isError ? 'FALHOU' : motivosQuery.data ? 'OK' : 'CARREGANDO';
+  const relerMotivos = () => void motivosQuery.refetch();
 
   const atasFila = useMemo<FilaAta[]>(
     () =>
@@ -115,6 +120,8 @@ export function usePendenciasVinculoAta() {
     links,
     confirmacoesSemAta,
     motivosManual,
+    motivosEstado,
+    relerMotivos,
     atasFila,
     contratosFila,
     pendencias,

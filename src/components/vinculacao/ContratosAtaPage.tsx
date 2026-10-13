@@ -31,7 +31,7 @@ export const ContratosAtaPage: React.FC = () => {
   const { role } = useAuth();
   const podeVincular = role === 'admin' || role === 'gestor';
   const podeDecidir = canAssignManager(role);
-  const { atas, contratos, links, confirmacoesSemAta, motivosManual, pendencias, totalSemVinculo, ataDe, itensDaAta, atasFila, isBusy, refresh } =
+  const { atas, contratos, links, confirmacoesSemAta, motivosManual, motivosEstado, relerMotivos, pendencias, totalSemVinculo, ataDe, itensDaAta, atasFila, isBusy, refresh } =
     usePendenciasVinculoAta();
   const { data: ajustes } = useComplexidadeAjustes();
 
@@ -122,6 +122,8 @@ export const ContratosAtaPage: React.FC = () => {
           ) : (
             <ContratosSemVinculoFila
               motivos={motivosManual}
+              motivosEstado={motivosEstado}
+              onRelerMotivos={relerMotivos}
               pendencias={pendencias}
               confirmacoes={confirmacoesSemAta}
               podeAgir={podeVincular}

@@ -72,7 +72,9 @@ export async function fetchMotivosVinculoManual(): Promise<Map<string, MotivoVin
       if (r.contract_key && r.motivo) mapa.set(r.contract_key, r.motivo);
     }
   } catch (err) {
-    console.warn('Motivos do vínculo automático indisponíveis (migration 95 aplicada?)', err);
+    // A tela mostra "motivo não lido" em vez de fingir que o sistema ainda vai conferir o contrato.
+    console.warn('Motivos do vínculo automático indisponíveis', err);
+    throw err instanceof Error ? err : new Error(String(err));
   }
   return mapa;
 }
