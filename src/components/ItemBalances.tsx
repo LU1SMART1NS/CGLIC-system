@@ -71,7 +71,8 @@ import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
-import { UnidadesTab } from './item-balances/UnidadesTab';
+import { QuantitativosTab } from './item-balances/QuantitativosTab';
+import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
@@ -89,7 +90,7 @@ interface ItemBalancesProps {
   onOpenAta?: () => void;
 }
 
-const ITEM_TABS: ItemTab[] = ['unidades', 'alocacao', 'contratos', 'adesoes'];
+const ITEM_TABS: ItemTab[] = ['quantitativos', 'contratos', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 const EMPTY_UNIDADES: UnidadeItemRecord[] = [];
@@ -131,8 +132,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const navigate = useNavigateWithOrigin();
   const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
     tabs: ITEM_TABS,
-    defaultTab: 'unidades',
-    aliases: { empenhos: 'contratos' }
+    defaultTab: 'quantitativos',
+    // Órgãos participantes e Alocação interna viraram a aba Órgãos e quantitativos (migration 109).
+    aliases: { empenhos: 'contratos', unidades: 'quantitativos', alocacao: 'quantitativos' }
   });
 
   // Mesmas regras do backend: alocações exigem allocations.manage (admin e gestor de saldos); escolher a unidade
@@ -451,6 +453,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     arp.codigoUnidadeGerenciadora,
     saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) : Number(item.quantidadeHomologadaItem) || 0
   );
+  // Com a ata assinada informada (migration 109), a base do saldo e o limite da alocação são a cota própria:
+  // o registrado da SENASP menos o que ela gerencia para os órgãos participantes.
+  const { data: quantitativos, isLoading: quantitativosLoading } = useQuantitativosDoItem(canonicalItemKey);
+  const baseSaldo = quantitativos.informado ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty;
 
   const handleLinkEmpenho = async (empenhoUnidade: string, departmentId: string) => {
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
@@ -493,11 +499,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // o empenho é a execução desse contratado. O Compras.gov é só referência.
   const executionSummary = React.useMemo(
     () => summarizeItemExecution({
-      homologado: totalUGQty,
+      homologado: baseSaldo,
       contratados: enrichedOfficialLinks.map((l) => l.quantidadeContratada ?? null),
       empenho: empenhoDoItem
     }),
-    [totalUGQty, enrichedOfficialLinks, empenhoDoItem]
+    [baseSaldo, enrichedOfficialLinks, empenhoDoItem]
   );
   // Abre a fila Vinculação › Empenhos aos itens; com um contrato só, já filtrada por ele.
   const abrirVinculacaoDoItem = () => {
@@ -512,7 +518,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   // Cálculo seguro e sem duplicidade das métricas dos cards de resumo
   const cardMetrics = calculateItemCardMetrics({
-    quantidadeHomologada: totalUGQty,
+    quantidadeHomologada: baseSaldo,
     quantidadeTotalAta: item.quantidadeHomologadaItem || totalRegistrado,
     totalEmpenhado: executionSummary.contratado,
     maximoAdesaoItem: item.maximoAdesao,
@@ -603,8 +609,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     });
 
   const totalAllocatedSum = allocations.reduce((acc, curr) => acc + curr.allocatedQty, 0);
-  const remainingUGQty = totalUGQty - totalAllocatedSum;
-  const percentAllocated = totalUGQty > 0 ? (totalAllocatedSum / totalUGQty) * 100 : 0;
+  const remainingUGQty = baseSaldo - totalAllocatedSum;
+  const percentAllocated = baseSaldo > 0 ? (totalAllocatedSum / baseSaldo) * 100 : 0;
 
   // Normaliza e ordena unidades considerando UASGs 200331 e 200330 como GERENCIADORA (só nas atas da CGLIC: na ata
   // de outro órgão a SENASP é participante, e a gerenciadora é o outro órgão).
@@ -659,8 +665,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       <Instrument360Tabs
         ref={tabsRef}
         tabs={[
-          { id: 'unidades', label: unidadesDoItem?.origem === 'SEM_DADOS' ? 'Órgãos participantes' : `Órgãos participantes (${sortedUnidades.length})` },
-          { id: 'alocacao', label: `Alocação interna (${allocations.length})` },
+          { id: 'quantitativos', label: 'Órgãos e quantitativos' },
           { id: 'contratos', label: `Contratos e empenhos (${contractsCount})` },
           { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` }
         ]}
@@ -672,16 +677,52 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       </Instrument360Head>
 
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
-        {activeTab === 'unidades' ? (
-          <UnidadesTab
-            loading={loading}
+        {activeTab === 'quantitativos' ? (
+          <QuantitativosTab
+            itemKey={canonicalItemKey}
+            tituloItem={tituloItem}
+            ataDaCglic={ataDaCglic}
+            homologado={Number(item.quantidadeHomologadaItem) || 0}
+            unidades={sortedUnidades}
+            loading={loading || quantitativosLoading}
             error={error}
-            sortedUnidades={sortedUnidades}
-            ugUasg={arp.codigoUnidadeGerenciadora}
-            contratadoUG={executionSummary.contratado}
             origem={unidadesDoItem?.origem ?? 'API'}
             copiadoEm={unidadesDoItem?.copiadoEm ?? null}
-            baseSemOrgaos={totalUGQty}
+            registradoSenasp={totalUGQty}
+            baseSaldo={baseSaldo}
+            contratadoSenasp={executionSummary.contratado}
+            quantitativos={quantitativos}
+            podeInformar={canEditData}
+            podeRemanejar={canManageAllocations}
+            alocado={totalAllocatedSum}
+            totalUnidadesInternas={allocations.length}
+            unidadesInternas={
+              <AllocationsTab
+                ugUasg={arp.codigoUnidadeGerenciadora}
+                item={{
+                  numeroAta: arp.numeroAtaRegistroPreco,
+                  uasg: arp.codigoUnidadeGerenciadora,
+                  numeroItem: String(item.numeroItem),
+                  descricao: item.descricaoItem,
+                  quantitativoSenasp: baseSaldo,
+                  rotuloLimite: quantitativos.informado ? 'Cota própria da SENASP' : undefined
+                }}
+                totalUG={baseSaldo}
+                totalAllocated={totalAllocatedSum}
+                remaining={remainingUGQty}
+                percentAllocated={percentAllocated}
+                rows={allocationRows}
+                semUnidade={allocationExecution.semUnidade}
+                contratadoItem={executionSummary.contratado}
+                contratadoSemUnidade={contratadoSemUnidade}
+                contratosAConferir={contratosAConferir}
+                departments={departments}
+                departmentsLoading={departmentsLoading}
+                canManage={canManageAllocations}
+                error={allocationError}
+                onGoToContracts={() => setActiveTab('contratos')}
+              />
+            }
           />
         ) : activeTab === 'contratos' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="contratos-tab">
@@ -1080,31 +1121,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                 </div>
               )}
           </div>
-        ) : activeTab === 'alocacao' ? (
-          <AllocationsTab
-            ugUasg={arp.codigoUnidadeGerenciadora}
-            item={{
-              numeroAta: arp.numeroAtaRegistroPreco,
-              uasg: arp.codigoUnidadeGerenciadora,
-              numeroItem: String(item.numeroItem),
-              descricao: item.descricaoItem,
-              quantitativoSenasp: totalUGQty
-            }}
-            totalUG={totalUGQty}
-            totalAllocated={totalAllocatedSum}
-            remaining={remainingUGQty}
-            percentAllocated={percentAllocated}
-            rows={allocationRows}
-            semUnidade={allocationExecution.semUnidade}
-            contratadoItem={executionSummary.contratado}
-            contratadoSemUnidade={contratadoSemUnidade}
-            contratosAConferir={contratosAConferir}
-            departments={departments}
-            departmentsLoading={departmentsLoading}
-            canManage={canManageAllocations}
-            error={allocationError}
-            onGoToContracts={() => setActiveTab('contratos')}
-          />
         ) : (
           <AdesoesTab
             adesoesLoading={adesoesLoading || loading}
@@ -1139,7 +1155,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         itemKey={canonicalItemKey}
         tituloItem={tituloItem}
         contrato={contratoAjustando}
-        cota={totalUGQty}
+        cota={baseSaldo}
         consumoOutros={executionSummary.contratado - (contratoAjustando?.quantidade.quantidadeContratada ?? 0)}
         onFechar={() => setContratoAjustando(null)}
       />

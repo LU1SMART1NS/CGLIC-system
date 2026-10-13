@@ -27,6 +27,11 @@ import {
   sincronizarAtasParticipacao,
   testarAtasParticipacao
 } from '../../src/services/atasParticipacaoSyncService';
+import {
+  contarContratosParticipantesPendentes,
+  ORCAMENTO_CONTRATOS_PARTICIPANTES_MS,
+  sincronizarContratosParticipantes
+} from '../../src/services/contratosParticipantesSyncService';
 import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFontesService';
 
 /**
@@ -35,7 +40,7 @@ import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFon
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'empenhos', 'faturas', 'ordens_bancarias'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
@@ -70,6 +75,8 @@ export interface DependenciasDeExecucao {
   sincronizarAtasParticipacao: typeof sincronizarAtasParticipacao;
   /** Teste sem gravar das atas em que a SENASP participa: faz a descoberta inteira dentro do orçamento. */
   testarAtasParticipacao: typeof testarAtasParticipacao;
+  sincronizarContratosParticipantes: typeof sincronizarContratosParticipantes;
+  contarContratosParticipantesPendentes: typeof contarContratosParticipantesPendentes;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
   fetchArpsDasFontes: typeof fetchArpsDasFontes;
   agora: () => number;
@@ -120,6 +127,8 @@ const PADRAO: DependenciasDeExecucao = {
   contarUnidadesItensPendentes,
   sincronizarAtasParticipacao,
   testarAtasParticipacao,
+  sincronizarContratosParticipantes,
+  contarContratosParticipantesPendentes,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
   agora: () => Date.now()
@@ -174,6 +183,8 @@ export async function executarPedido(
       consulta = { ...(await deps.contarUnidadesItensPendentes(uasg as string)) };
     } else if (pedido.recurso === 'atas_participacao') {
       consulta = { ...(await deps.testarAtasParticipacao(uasg as string, { orcamentoMs: ORCAMENTO_ATAS_PARTICIPACAO_MS })) };
+    } else if (pedido.recurso === 'contratos_participantes') {
+      consulta = { ...(await deps.contarContratosParticipantesPendentes(uasg as string)) };
     } else if (pedido.recurso === 'empenhos') {
       consulta = await deps.consultarEmpenhosDeTeste(uasg as string);
     } else if (pedido.recurso === 'faturas' || pedido.recurso === 'ordens_bancarias') {
@@ -193,6 +204,8 @@ export async function executarPedido(
     resultado = await deps.sincronizarUnidadesItens(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_UNIDADES_ITENS_MS });
   } else if (pedido.recurso === 'atas_participacao') {
     resultado = await deps.sincronizarAtasParticipacao(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_ATAS_PARTICIPACAO_MS });
+  } else if (pedido.recurso === 'contratos_participantes') {
+    resultado = await deps.sincronizarContratosParticipantes(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_CONTRATOS_PARTICIPANTES_MS });
   } else if (pedido.recurso === 'empenhos') {
     resultado = await deps.sincronizarEmpenhosDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
   } else if (pedido.recurso === 'faturas') {

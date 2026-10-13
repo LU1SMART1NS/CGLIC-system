@@ -17,7 +17,7 @@ import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { ComprasGovReferencia } from './ItemExecutionSummaryStrip';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
-export type ItemTab = 'unidades' | 'contratos' | 'alocacao' | 'adesoes';
+export type ItemTab = 'quantitativos' | 'contratos' | 'adesoes';
 
 export interface ItemHeroMetrics {
   officialSaldo: number;
@@ -225,9 +225,9 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           <HealthTile
             label="Alocação interna"
             value={`${formatNumber(alocada)} un`}
-            hint={alocadaAcima ? `acima do SENASP em ${formatNumber(-aAlocar)} un` : `a alocar ${formatNumber(aAlocar)} un`}
+            hint={alocadaAcima ? `acima do limite em ${formatNumber(-aAlocar)} un` : `a alocar ${formatNumber(aAlocar)} un`}
             tone={alocadaAcima ? 'ATENCAO' : undefined}
-            onClick={() => onGoTo('alocacao')}
+            onClick={() => onGoTo('quantitativos')}
             testId="item-health-alocacao"
           />
           <HealthTile

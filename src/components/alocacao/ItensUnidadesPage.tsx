@@ -142,7 +142,7 @@ export const ItensUnidadesPage: React.FC = () => {
   const sort = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, React.useCallback((r: CarteiraItemRow) => r.key, []), PAGE_SIZE);
 
-  const abrirItem = (r: CarteiraItemRow) => navigate(`${buildAtaItemPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)}?aba=alocacao`);
+  const abrirItem = (r: CarteiraItemRow) => navigate(`${buildAtaItemPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)}?aba=quantitativos`);
   const alocar = (r: CarteiraItemRow) =>
     setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp });
 
