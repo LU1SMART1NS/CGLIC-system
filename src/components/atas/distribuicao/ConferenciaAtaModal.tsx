@@ -203,14 +203,14 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '1rem' }}>
           <section aria-label="Contrato" style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
             <strong style={{ fontSize: '0.9rem' }}>Contrato {contrato.numero}</strong>
-            <Campo rotulo="Fornecedor">{contrato.fornecedorNome}</Campo>
+            <Campo rotulo="Fornecedor">{contrato.fornecedorNome?.toUpperCase()}</Campo>
             <Campo rotulo="Vigência">{contrato.contract.dataVigenciaFim ? `até ${formatDateBR(contrato.contract.dataVigenciaFim)}` : undefined}</Campo>
             <Campo rotulo="Objeto" limitar>{contrato.objeto}</Campo>
             <Campo rotulo="Gestor">{contrato.gestorNome || 'sem gestor'}</Campo>
           </section>
           <section aria-label="Ata" style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
             <strong style={{ fontSize: '0.9rem' }}>Ata {ata.numeroAta}</strong>
-            <Campo rotulo="Fornecedor">{ata.fornecedorNome}</Campo>
+            <Campo rotulo="Fornecedor">{ata.fornecedorNome?.toUpperCase()}</Campo>
             <Campo rotulo="Vigência">{ata.vigenciaFim ? `até ${formatDateBR(ata.vigenciaFim)}` : undefined}</Campo>
             <Campo rotulo="Objeto" limitar>{ata.objeto}</Campo>
             <Campo rotulo="Gestor">{ata.gestorNome || 'sem gestor'}</Campo>
