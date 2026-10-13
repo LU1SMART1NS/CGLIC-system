@@ -24,6 +24,8 @@
 --    passa a ser a cota própria. Colunas novas no fim.
 -- 6) save_allocations_atomic: a soma alocada às unidades internas não pode passar da base do saldo
 --    (cota própria, ou o registrado da SENASP sem ata assinada). Reduzir continua permitido.
+-- 7) participantes_contratos_itens e participantes_contratos_leituras: contratos dos órgãos participantes no
+--    Contratos.gov.br (ativos e encerrados), gravados pelo servidor (recurso 'contratos_participantes').
 --
 -- Regra aprovada (13/10/2026): registrado do participante reduzido depois do registro da ata é
 -- remanejamento definitivo, salvo "continua do órgão". Antes do histórico, "mudou" vem da data da última
@@ -1146,3 +1148,118 @@ BEGIN
   );
 END;
 $function$;
+
+-- ------------------------------------------------------------------------------
+-- 11) Contratos dos órgãos participantes (Contratos.gov.br, contratos ativos e encerrados)
+--     Gravados pelo servidor (recurso 'contratos_participantes', por UASG gerenciadora). O contrato entra no
+--     item quando a compra, o fornecedor e o número do item batem com a ata. Nunca apagados: um contrato que
+--     some das listas continua contando como consumido, com a data em que foi visto pela última vez.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.participantes_contratos_itens (
+  item_key        VARCHAR(100) NOT NULL,
+  uasg            VARCHAR(6)   NOT NULL CHECK (uasg ~ '^[0-9]{6}$'),
+  contrato_id     VARCHAR(30)  NOT NULL,
+  numero          VARCHAR(40),
+  tipo            VARCHAR(40),
+  situacao        VARCHAR(40),
+  quantidade      NUMERIC(18, 4) CHECK (quantidade IS NULL OR quantidade >= 0),
+  valor_unitario  NUMERIC(18, 4),
+  valor_global    NUMERIC(18, 2),
+  vigencia_fim    DATE,
+  visto_em        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (item_key, uasg, contrato_id)
+);
+COMMENT ON TABLE public.participantes_contratos_itens IS
+  'Quantidade do item nos contratos (ou notas de empenho) dos órgãos participantes, lida do Contratos.gov.br. Nunca apagada pela sincronização.';
+
+CREATE TABLE IF NOT EXISTS public.participantes_contratos_leituras (
+  uasg_gerenciadora   VARCHAR(6) NOT NULL CHECK (uasg_gerenciadora ~ '^[0-9]{6}$'),
+  uasg                VARCHAR(6) NOT NULL CHECK (uasg ~ '^[0-9]{6}$'),
+  lido_em             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  contratos_na_ug     INTEGER NOT NULL CHECK (contratos_na_ug >= 0),
+  contratos_nos_itens INTEGER NOT NULL CHECK (contratos_nos_itens >= 0),
+  PRIMARY KEY (uasg_gerenciadora, uasg)
+);
+COMMENT ON TABLE public.participantes_contratos_leituras IS
+  'Última leitura da lista de contratos de cada UASG participante no Contratos.gov.br. contratos_na_ug = 0: o órgão não publica contratos lá (sem dado); > 0 sem contrato no item: nenhum contrato (zero real).';
+
+ALTER TABLE public.participantes_contratos_itens    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.participantes_contratos_leituras ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Authenticated Read: participantes_contratos_itens" ON public.participantes_contratos_itens;
+CREATE POLICY "Authenticated Read: participantes_contratos_itens" ON public.participantes_contratos_itens FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated Read: participantes_contratos_leituras" ON public.participantes_contratos_leituras;
+CREATE POLICY "Authenticated Read: participantes_contratos_leituras" ON public.participantes_contratos_leituras FOR SELECT TO authenticated USING (true);
+REVOKE ALL ON public.participantes_contratos_itens, public.participantes_contratos_leituras FROM PUBLIC, anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.participantes_contratos_itens, public.participantes_contratos_leituras FROM authenticated;
+GRANT SELECT ON public.participantes_contratos_itens, public.participantes_contratos_leituras TO authenticated;
+GRANT ALL ON public.participantes_contratos_itens, public.participantes_contratos_leituras TO service_role;
+
+-- p_leituras: [{"uasg": "200109", "contratos_na_ug": 686, "linhas": [{"item_key": "...", "contrato_id": "123",
+--   "numero": "00059/2026", "tipo": "Contrato", "situacao": "Ativo", "quantidade": 60, "valor_unitario": 103908.66,
+--   "valor_global": 6234519.6, "vigencia_fim": "2027-01-10"}]}]
+CREATE OR REPLACE FUNCTION public.gravar_contratos_participantes(p_uasg VARCHAR, p_leituras JSONB)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_leitura JSONB;
+  v_linha   JSONB;
+  v_part    VARCHAR(6);
+  v_total   INTEGER := 0;
+  v_itens   INTEGER;
+BEGIN
+  IF NOT public.eh_service_role() THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Só o servidor grava os contratos dos participantes.' USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.sincronizacao_fontes
+     WHERE recurso = 'contratos_participantes' AND uasg = p_uasg
+       AND em_andamento_por IS NOT DISTINCT FROM auth.uid()
+       AND em_andamento_desde >= NOW() - INTERVAL '10 minutes'
+  ) THEN
+    RAISE EXCEPTION 'SYNC_NOT_RESERVED: Sincronização dos contratos dos participantes da UASG % não reservada.', p_uasg USING ERRCODE = '55000';
+  END IF;
+  IF p_leituras IS NULL OR jsonb_typeof(p_leituras) <> 'array' OR jsonb_array_length(p_leituras) > 100 THEN
+    RAISE EXCEPTION 'INVALID_PAYLOAD: p_leituras deve ser um array com até 100 órgãos.' USING ERRCODE = '22023';
+  END IF;
+
+  FOR v_leitura IN SELECT e FROM jsonb_array_elements(p_leituras) e LOOP
+    v_part := regexp_replace(COALESCE(v_leitura->>'uasg', ''), '\D', '', 'g');
+    IF v_part !~ '^[0-9]{6}$' THEN CONTINUE; END IF;
+    v_itens := 0;
+    FOR v_linha IN SELECT e FROM jsonb_array_elements(CASE WHEN jsonb_typeof(v_leitura->'linhas') = 'array' THEN v_leitura->'linhas' ELSE '[]'::JSONB END) e LOOP
+      IF COALESCE(v_linha->>'item_key', '') = '' OR COALESCE(v_linha->>'contrato_id', '') = '' THEN CONTINUE; END IF;
+      INSERT INTO public.participantes_contratos_itens AS p
+        (item_key, uasg, contrato_id, numero, tipo, situacao, quantidade, valor_unitario, valor_global, vigencia_fim, visto_em)
+      VALUES (
+        left(v_linha->>'item_key', 100), v_part, left(v_linha->>'contrato_id', 30),
+        left(v_linha->>'numero', 40), left(v_linha->>'tipo', 40), left(v_linha->>'situacao', 40),
+        CASE WHEN v_linha->>'quantidade' ~ '^[0-9]+(\.[0-9]+)?$' THEN (v_linha->>'quantidade')::NUMERIC END,
+        CASE WHEN v_linha->>'valor_unitario' ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (v_linha->>'valor_unitario')::NUMERIC END,
+        CASE WHEN v_linha->>'valor_global' ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (v_linha->>'valor_global')::NUMERIC END,
+        CASE WHEN v_linha->>'vigencia_fim' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN left(v_linha->>'vigencia_fim', 10)::DATE END,
+        NOW())
+      ON CONFLICT (item_key, uasg, contrato_id) DO UPDATE
+        SET numero = EXCLUDED.numero, tipo = EXCLUDED.tipo, situacao = EXCLUDED.situacao, quantidade = EXCLUDED.quantidade,
+            valor_unitario = EXCLUDED.valor_unitario, valor_global = EXCLUDED.valor_global, vigencia_fim = EXCLUDED.vigencia_fim,
+            visto_em = NOW();
+      v_itens := v_itens + 1;
+    END LOOP;
+    INSERT INTO public.participantes_contratos_leituras (uasg_gerenciadora, uasg, lido_em, contratos_na_ug, contratos_nos_itens)
+    VALUES (p_uasg, v_part, NOW(), GREATEST(COALESCE((v_leitura->>'contratos_na_ug')::INTEGER, 0), 0), v_itens)
+    ON CONFLICT (uasg_gerenciadora, uasg) DO UPDATE
+      SET lido_em = NOW(), contratos_na_ug = EXCLUDED.contratos_na_ug, contratos_nos_itens = EXCLUDED.contratos_nos_itens;
+    v_total := v_total + 1;
+  END LOOP;
+  RETURN v_total;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.gravar_contratos_participantes(VARCHAR, JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.gravar_contratos_participantes(VARCHAR, JSONB) TO service_role;
+
+-- Agendamento (mesmo padrão das migrations 77 e 105): de hora em hora, cada execução lê os órgãos que
+-- estão há mais de 24 h sem leitura, dentro do orçamento de tempo da função.
+SELECT cron.schedule('sincronizar-contratos-participantes-200330', '32 * * * *', $$SELECT public.disparar_sincronizacao('contratos_participantes', '200330')$$);
+SELECT cron.schedule('sincronizar-contratos-participantes-200331', '34 * * * *', $$SELECT public.disparar_sincronizacao('contratos_participantes', '200331')$$);
