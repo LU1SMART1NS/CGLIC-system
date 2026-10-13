@@ -26,6 +26,37 @@ export const ORCAMENTO_CADASTRO_UASGS_MS = 100_000;
 const URL_CADASTRO = '/api-arp/modulo-uasg/1_consultarUasg';
 const LOTE_GRAVACAO = 50;
 
+/**
+ * Ritmo das consultas. Na primeira execução no servidor (13/10/2026), 177 de 365 UASGs falharam lidas
+ * em sequência sem pausa; o Compras.gov.br limita consultas seguidas (429, como no módulo ARP).
+ */
+const PAUSA_ENTRE_UASGS_MS = 400;
+const TENTATIVAS = 3;
+const ESPERA_POR_TENTATIVA_MS = 3_000;
+/** Falhas seguidas (já com as novas tentativas) que encerram a execução: a fonte está fora ou bloqueando. */
+const FALHAS_SEGUIDAS_PARA_PARAR = 5;
+
+const dormir = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Consulta com novas tentativas em 429, erro 5xx ou falha de rede; outro erro da fonte lança na hora. */
+async function consultar(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>): Promise<Response> {
+  let ultimoErro: unknown = null;
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+    if (tentativa > 1) await esperar(ESPERA_POR_TENTATIVA_MS * (tentativa - 1));
+    let resposta: Response;
+    try {
+      resposta = await fetcher(url);
+    } catch (err) {
+      ultimoErro = err;
+      continue;
+    }
+    if (resposta.ok) return resposta;
+    ultimoErro = new Error(`Cadastro de UASGs respondeu ${resposta.status}.`);
+    if (resposta.status !== 429 && resposta.status < 500) break;
+  }
+  throw ultimoErro;
+}
+
 export interface UasgDoCadastro {
   codigo_uasg: string;
   /** Ausente = o cadastro não achou a UASG. */
@@ -44,10 +75,13 @@ export function normalizarNomeDoCadastro(nome: string): string {
 }
 
 /** Lê uma UASG no cadastro: ativa primeiro, depois inativa. Lança em falha de rede ou resposta com erro. */
-export async function lerUasgNoCadastro(codigo: string, fetcher: typeof fetch = fetch): Promise<UasgDoCadastro> {
+export async function lerUasgNoCadastro(
+  codigo: string,
+  fetcher: typeof fetch = fetch,
+  esperar: (ms: number) => Promise<void> = dormir
+): Promise<UasgDoCadastro> {
   for (const status of ['true', 'false']) {
-    const resposta = await fetcher(`${URL_CADASTRO}?pagina=1&codigoUasg=${codigo}&statusUasg=${status}`);
-    if (!resposta.ok) throw new Error(`Cadastro de UASGs respondeu ${resposta.status} para a UASG ${codigo}.`);
+    const resposta = await consultar(`${URL_CADASTRO}?pagina=1&codigoUasg=${codigo}&statusUasg=${status}`, fetcher, esperar);
     const dados = (await resposta.json()) as { resultado?: Array<Record<string, unknown>> };
     const r = (dados.resultado ?? []).find((x) => String(x.codigoUasg ?? '') === codigo);
     const nome = typeof r?.nomeUasg === 'string' ? normalizarNomeDoCadastro(r.nomeUasg) : '';
@@ -85,9 +119,10 @@ export async function contarCadastroUasgsPendentes(): Promise<{ pendentes: numbe
 }
 
 export async function sincronizarCadastroUasgs(
-  opts: { forcar?: boolean; orcamentoMs?: number; agora?: () => number } = {}
+  opts: { forcar?: boolean; orcamentoMs?: number; agora?: () => number; esperar?: (ms: number) => Promise<void> } = {}
 ): Promise<ResultadoSincronizacao> {
   const agora = opts.agora ?? (() => Date.now());
+  const esperar = opts.esperar ?? dormir;
   const orcamento = opts.orcamentoMs ?? ORCAMENTO_CADASTRO_UASGS_MS;
 
   return executarComReserva(
@@ -102,6 +137,8 @@ export async function sincronizarCadastroUasgs(
       let naoAchadas = 0;
       let falhas = 0;
       let pendentes = 0;
+      let seguidas = 0;
+      let primeiroErro: string | null = null;
       let lote: UasgDoCadastro[] = [];
 
       for (let i = 0; i < fila.length; i++) {
@@ -109,13 +146,21 @@ export async function sincronizarCadastroUasgs(
           pendentes = fila.length - i;
           break;
         }
+        if (i > 0) await esperar(PAUSA_ENTRE_UASGS_MS);
         try {
-          const uasg = await lerUasgNoCadastro(fila[i]);
+          const uasg = await lerUasgNoCadastro(fila[i], fetch, esperar);
           if (!uasg.nome) naoAchadas++;
           lote.push(uasg);
+          seguidas = 0;
         } catch (err) {
           falhas++;
+          seguidas++;
+          primeiroErro ??= mensagemDeErro(err);
           console.warn(`[cadastroUasgs] UASG ${fila[i]} não pôde ser lida:`, mensagemDeErro(err));
+          if (seguidas >= FALHAS_SEGUIDAS_PARA_PARAR) {
+            pendentes = fila.length - i - 1;
+            break;
+          }
         }
         if (lote.length >= LOTE_GRAVACAO) {
           gravadas += await gravar(lote);
@@ -125,7 +170,7 @@ export async function sincronizarCadastroUasgs(
       gravadas += await gravar(lote);
 
       const problemas: string[] = [];
-      if (falhas > 0) problemas.push(`${falhas} ${falhas === 1 ? 'UASG não pôde ser lida' : 'UASGs não puderam ser lidas'}`);
+      if (falhas > 0) problemas.push(`${falhas} ${falhas === 1 ? 'UASG não pôde ser lida' : 'UASGs não puderam ser lidas'} (${primeiroErro})`);
       if (naoAchadas > 0) problemas.push(`o cadastro não achou ${naoAchadas} ${naoAchadas === 1 ? 'UASG' : 'UASGs'}`);
       if (pendentes > 0) problemas.push(`${pendentes} ${pendentes === 1 ? 'UASG ficou' : 'UASGs ficaram'} para a próxima execução`);
       return problemas.length > 0
