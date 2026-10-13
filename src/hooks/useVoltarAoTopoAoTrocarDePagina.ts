@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
 
 /**
@@ -12,7 +12,9 @@ export function useVoltarAoTopoAoTrocarDePagina(): void {
   const tipo = useNavigationType();
   const anterior = useRef(pathname);
 
-  useEffect(() => {
+  // Layout effect: sobe antes dos efeitos da página nova. O cartão das telas 360 lê a rolagem ao montar; com a rolagem
+  // antiga ele abria já encolhido e reabria logo depois, ao subir.
+  useLayoutEffect(() => {
     if (anterior.current === pathname) return;
     anterior.current = pathname;
     if (tipo === 'POP') return;
