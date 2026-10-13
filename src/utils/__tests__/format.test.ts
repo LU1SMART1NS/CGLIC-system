@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatCurrencyRounded, formatNumber, formatPercent, formatCnpj, formatDateBR, formatProcessoSei } from '../format';
+import { formatCurrency, formatCurrencyRounded, formatNumber, formatPercent, formatCnpj, formatDateBR, formatProcessoSei, primeiraMaiuscula } from '../format';
 
 const nbsp = (s: string) => s.replace(/ /g, ' ');
 
@@ -30,5 +30,24 @@ describe('format', () => {
   it('reexporta a data canônica', () => {
     expect(formatDateBR('2026-10-01T10:00:00')).toBe('01/10/2026');
     expect(formatDateBR(null)).toBe('-');
+  });
+});
+
+describe('primeiraMaiuscula', () => {
+  it('texto todo em maiúsculas vira minúsculas com a primeira maiúscula', () => {
+    expect(primeiraMaiuscula('O OBJETO DO PRESENTE INSTRUMENTO É A AQUISIÇÃO DE MIRA OPTRÔNICA')).toBe('O objeto do presente instrumento é a aquisição de mira optrônica');
+  });
+  it('texto que mistura os dois só ganha a primeira maiúscula e preserva o resto', () => {
+    expect(primeiraMaiuscula('registro de preços para a Secretaria Nacional de Segurança Pública')).toBe('Registro de preços para a Secretaria Nacional de Segurança Pública');
+    expect(primeiraMaiuscula('Aquisição para a SENASP')).toBe('Aquisição para a SENASP');
+  });
+  it('começa pela primeira letra, mesmo depois de aspas ou número', () => {
+    expect(primeiraMaiuscula('"aquisição" de mira')).toBe('"Aquisição" de mira');
+    expect(primeiraMaiuscula('ÁGUA MINERAL')).toBe('Água mineral');
+  });
+  it('vazio, nulo e sem letras voltam sem erro', () => {
+    expect(primeiraMaiuscula(undefined)).toBe('');
+    expect(primeiraMaiuscula('  ')).toBe('');
+    expect(primeiraMaiuscula('123/2026')).toBe('123/2026');
   });
 });
