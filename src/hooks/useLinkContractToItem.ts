@@ -26,7 +26,7 @@ export function useLinkContractToItem() {
       });
       // Lista geral de vínculos: Central de Distribuição, propagação do gestor e escopo do perfil gestor
       queryClient.invalidateQueries({ queryKey: ['all-arp-item-contract-links'] });
-      // Vínculo novo pode receber a divisão automática entre as unidades (migration 103).
+      // Vínculo novo pode receber a divisão automática entre as unidades (migrations 103 e 110).
       queryClient.invalidateQueries({ queryKey: ['contratado-do-item'] });
     }
   });
