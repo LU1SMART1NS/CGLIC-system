@@ -58,6 +58,8 @@ export type DashboardAttentionCategory =
   | 'UNIDADE_PENDENTE'
   /** Ata publicada no PNCP sem fornecedor: o coordenador indica, ou a indicação diverge do Compras.gov.br (migration 107). */
   | 'FORNECEDOR_PNCP'
+  /** Nota ou fatura que a fonte deixou de listar e que tem trabalho da equipe: a sincronização não a apaga e o coordenador decide (migration 113). */
+  | 'FONTE_A_CONFERIR'
   /** Vínculo automático que a fonte desmentiu mas que tem trabalho do gestor: o cron não o apaga e o coordenador decide (migration 112). */
   | 'VINCULO_A_CONFERIR'
   /** Quantitativos do item a conferir: cota própria negativa, órgão fora da ata assinada, soma que não fecha ou
@@ -88,6 +90,8 @@ export interface DashboardAttentionItem {
    * Tarefa se resolve concluindo-a; pagamento, registrando a etapa (sem chave).
    */
   avisoChave?: string;
+  /** FONTE_A_CONFERIR: qual nota ou fatura (v_ausentes_da_fonte), para a decisão do coordenador. */
+  ausenteDaFonte?: { tipo: 'NOTA' | 'FATURA'; chave: string };
   /** Alertas de saldo: descrição do item da Ata e seu fornecedor (a coluna Objeto/Fornecedor prefere estes). */
   objetoItem?: string;
   fornecedorNome?: string;

@@ -7,6 +7,7 @@ import { getContractManagementKey } from '../services/contractManagementService'
 import { parseDateBRT } from '../services/temporalEngineService';
 import { useAvisosPagamentoDoContrato } from './useAvisosPagamento';
 import { useVinculosAConferir } from './useVinculosAConferir';
+import { useAusentesDaFonte } from './useAusentesDaFonte';
 
 const EMPTY_QUEUE: ContractActionQueue = {
   items: [],
@@ -23,14 +24,15 @@ export function useContractActionQueue(
   const { cycles, isLoading } = useContractPaymentFollowUp(contractKey);
   const { porChave } = useAvisosResolvidos();
   const { vinculos } = useVinculosAConferir();
+  const { ausentes } = useAusentesDaFonte();
   const resolvidos = useMemo(() => new Set(porChave.keys()), [porChave]);
   const fimVigencia = parseDateBRT(contract?.dataVigenciaFim);
   const vigente = Boolean(contract) && !(fimVigencia && fimVigencia.getTime() < new Date().setHours(0, 0, 0, 0));
   const avisosPagamento = useAvisosPagamentoDoContrato(contractKey, cycles, vigente);
 
   const queue = useMemo(
-    () => (contract ? buildContractActionQueue({ contract, contractKey, plan, paymentCycles: cycles, avisosPagamento, avisosResolvidos: resolvidos, vinculosAConferir: vinculos }) : EMPTY_QUEUE),
-    [contract, contractKey, plan, cycles, avisosPagamento, resolvidos, vinculos]
+    () => (contract ? buildContractActionQueue({ contract, contractKey, plan, paymentCycles: cycles, avisosPagamento, avisosResolvidos: resolvidos, vinculosAConferir: vinculos, ausentesDaFonte: ausentes }) : EMPTY_QUEUE),
+    [contract, contractKey, plan, cycles, avisosPagamento, resolvidos, vinculos, ausentes]
   );
 
   return { queue, contractKey, isLoading };
