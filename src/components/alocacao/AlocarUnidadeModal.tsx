@@ -19,8 +19,10 @@ export interface ItemParaAlocar {
   uasg: string;
   numeroItem: string;
   descricao?: string;
-  /** Quantitativo SENASP do item: o teto da soma das alocações. */
+  /** Teto da soma das alocações: a cota própria da SENASP com a ata assinada informada, senão o quantitativo SENASP. */
   quantitativoSenasp: number;
+  /** Nome do teto na régua (padrão "Quantitativo SENASP"). */
+  rotuloLimite?: string;
 }
 
 interface AlocarUnidadeModalProps {
@@ -128,7 +130,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
       } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
         setErro('Só o coordenador e o gestor de saldos alocam quantitativo.');
       } else {
-        setErro(err?.message || 'Não foi possível gravar as alocações.');
+        setErro(String(err?.message || 'Não foi possível gravar as alocações.').replace(/^ACIMA_DA_COTA:\s*/, ''));
       }
       return;
     }
@@ -190,7 +192,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
           {/* Régua: quantitativo SENASP, fatia de cada unidade e o que falta alocar */}
           <div data-testid="alocar-unidade-regua">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1.25rem', fontSize: '0.82rem', color: '#334155', marginBottom: '0.45rem', fontVariantNumeric: 'tabular-nums' }}>
-              <span>Quantitativo SENASP <strong>{formatNumber(item.quantitativoSenasp)}</strong></span>
+              <span>{item.rotuloLimite ?? 'Quantitativo SENASP'} <strong>{formatNumber(item.quantitativoSenasp)}</strong></span>
               <span>Alocado <strong>{formatNumber(aval.totalAlocado)}</strong></span>
               <span>
                 A alocar <strong style={{ color: aval.aAlocar < 0 ? 'var(--color-danger-text)' : undefined }}>{formatNumber(aval.aAlocar)}</strong>

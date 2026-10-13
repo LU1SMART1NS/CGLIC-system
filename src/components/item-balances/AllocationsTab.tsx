@@ -49,6 +49,8 @@ interface AllocationsTabProps {
   departments: InternalDepartment[];
   departmentsLoading: boolean;
   canManage: boolean;
+  /** Gestor da ata ou coordenador: pode informar a unidade dos contratos e das notas em "Contratos e empenhos". */
+  canInformUnits: boolean;
   /** Erro de gravação vindo da página (ex.: vínculo de empenho). */
   error: string | null;
 
@@ -70,6 +72,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
   departments,
   departmentsLoading,
   canManage,
+  canInformUnits,
   error,
   onGoToContracts
 }) => {
@@ -193,14 +196,17 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
           <NoticeBar
             testId="contratado-sem-unidade"
             action={
-              <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
-                Informar unidades em Contratos e empenhos
-              </AppButton>
+              canInformUnits ? (
+                <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
+                  Informar unidades em Contratos e empenhos
+                </AppButton>
+              ) : undefined
             }
           >
-            <strong>{formatNumber(contratadoSemUnidade.quantidade)}</strong> contratados ainda sem unidade interna
-            {contratadoSemUnidade.contratos > 0 ? ` (${contratadoSemUnidade.contratos} ${contratadoSemUnidade.contratos === 1 ? 'contrato' : 'contratos'})` : ''}.
-            Não entram no contratado das unidades até a unidade ser informada.
+            <strong>{formatNumber(contratadoSemUnidade.quantidade)} un</strong> contratados
+            {contratadoSemUnidade.contratos > 0 ? ` em ${contratadoSemUnidade.contratos} ${contratadoSemUnidade.contratos === 1 ? 'contrato' : 'contratos'}` : ''} ainda
+            {contratadoSemUnidade.quantidade === 1 ? ' está' : ' estão'} sem unidade interna. Só {contratadoSemUnidade.quantidade === 1 ? 'entra' : 'entram'} no contratado das unidades depois que a
+            unidade for informada{canInformUnits ? '.' : ' pelo gestor da ata em Contratos e empenhos.'}
           </NoticeBar>
         )}
         {contratosAConferir > 0 && (
@@ -213,13 +219,16 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
           <NoticeBar
             testId="empenhos-sem-unidade"
             action={
-              <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
-                Escolher a unidade em Contratos e empenhos
-              </AppButton>
+              canInformUnits ? (
+                <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
+                  Escolher a unidade em Contratos e empenhos
+                </AppButton>
+              ) : undefined
             }
           >
             <strong>{semUnidade.count}</strong> {semUnidade.count === 1 ? 'nota vinculada a este item está' : 'notas vinculadas a este item estão'} ({formatNumber(semUnidade.empenhado)} un)
-            sem unidade interna. Não entram no empenhado das unidades até a unidade ser escolhida.
+            sem unidade interna. {semUnidade.count === 1 ? 'Só entra' : 'Só entram'} no empenhado das unidades depois que a unidade for
+            escolhida{canInformUnits ? '.' : ' pelo gestor da ata em Contratos e empenhos.'}
           </NoticeBar>
         )}
       </SummaryBar>
@@ -238,7 +247,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
       <div>
         <SectionHeader
           title="Alocações"
-          subtitle={`Quantitativo da UG ${ugUasg} alocado às unidades internas.`}
+          subtitle={item.rotuloLimite ? `${item.rotuloLimite} alocada às unidades internas.` : `Quantitativo da UG ${ugUasg} alocado às unidades internas.`}
           icon={<Building2 size={16} />}
           countBadge={rows.length}
           actions={

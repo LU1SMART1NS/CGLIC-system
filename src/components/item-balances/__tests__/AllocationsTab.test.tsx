@@ -27,6 +27,7 @@ const base: React.ComponentProps<typeof AllocationsTab> = {
   departments,
   departmentsLoading: false,
   canManage: true,
+  canInformUnits: true,
   error: null,
   onGoToContracts: vi.fn()
 };
@@ -149,11 +150,20 @@ describe('AllocationsTab', () => {
   it('avisa do contratado ainda sem unidade e dos contratos a conferir', () => {
     const out = html({ contratadoItem: 450, contratadoSemUnidade: { quantidade: 200, contratos: 1 }, contratosAConferir: 2 });
     expect(out).toContain('contratado-sem-unidade');
-    expect(out).toContain('<strong>200</strong> contratados ainda sem unidade interna');
-    expect(out).toContain('(1 contrato)');
+    expect(out).toContain('<strong>200 un</strong> contratados em 1 contrato ainda estão sem unidade interna');
+    expect(out).toContain('Só entram no contratado das unidades depois que a unidade for informada.');
     expect(out).toContain('Informar unidades em Contratos e empenhos');
     expect(out).toContain('2 contratos têm');
     expect(html()).not.toContain('contratado-sem-unidade');
+  });
+
+  it('quem não informa unidades (gestor de saldo) vê o aviso sem botão, pedindo ao gestor da ata', () => {
+    const out = html({ canInformUnits: false, contratadoSemUnidade: { quantidade: 4, contratos: 2 }, semUnidade: { empenhado: 34, count: 3 } });
+    expect(out).toContain('<strong>4 un</strong> contratados em 2 contratos ainda estão sem unidade interna');
+    expect(out).toContain('unidade for informada pelo gestor da ata em Contratos e empenhos.');
+    expect(out).not.toContain('Informar unidades em Contratos e empenhos');
+    expect(out).toContain('unidade for escolhida pelo gestor da ata em Contratos e empenhos.');
+    expect(out).not.toContain('Escolher a unidade em Contratos e empenhos');
   });
 
   it('sem alocações mostra o estado vazio', () => {

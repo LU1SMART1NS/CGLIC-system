@@ -55,7 +55,7 @@ function chaveDoSaldo(item: any): string {
   return numero ? chaveGestaoAta(numero, item?.codigo_uasg || item?.codigoUasg) : '';
 }
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
-import { chaveAvisoLembrete, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, fetchAvisosResolvidos } from './avisosResolvidosService';
+import { chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -214,6 +214,27 @@ export function calculateDeadlinesSummary(
 /**
  * 3. Cálculo puro do Bloco "Atenção Agora"
  */
+/** Motivos do aviso de quantitativos de um item (linha de v_arp_item_saldo_detalhado com a ata assinada informada). */
+export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; texto: string; selo: string; critico: boolean }> {
+  const n = (v: unknown) => Number(v) || 0;
+  const fmt = (v: number) => v.toLocaleString('pt-BR');
+  const motivos: Array<{ chave: string; texto: string; selo: string; critico: boolean }> = [];
+  const cota = n(aItem.quantidade_base_senasp);
+  if (cota < 0) motivos.push({ chave: `COTA${cota}`, texto: `cota própria negativa (${fmt(cota)}): a SENASP remanejou quantidade de órgãos que não abriram mão`, selo: 'cota negativa', critico: true });
+  const fora = n(aItem.orgaos_fora_da_ata);
+  if (fora > 0) motivos.push({ chave: `FORA${fora}`, texto: `${fora} ${fora === 1 ? 'órgão registrado' : 'órgãos registrados'} sem quantidade na ata assinada`, selo: 'fora da ata', critico: false });
+  const homologado = n(aItem.quantidade_homologada);
+  if (aItem.total_assinada != null && n(aItem.total_assinada) !== homologado) {
+    motivos.push({ chave: `ASS${n(aItem.total_assinada)}`, texto: `soma da ata assinada (${fmt(n(aItem.total_assinada))}) diferente do homologado (${fmt(homologado)})`, selo: 'soma não fecha', critico: false });
+  }
+  if (aItem.total_registrado != null && n(aItem.total_registrado) !== homologado) {
+    motivos.push({ chave: `REG${n(aItem.total_registrado)}`, texto: `soma do registrado (${fmt(n(aItem.total_registrado))}) diferente do homologado (${fmt(homologado)})`, selo: 'soma não fecha', critico: false });
+  }
+  const acima = n(aItem.orgaos_contratado_acima);
+  if (acima > 0) motivos.push({ chave: `ACIMA${acima}`, texto: `${acima} ${acima === 1 ? 'órgão contratou' : 'órgãos contrataram'} acima do registrado`, selo: 'contratado acima', critico: false });
+  return motivos;
+}
+
 export function calculateAttentionSummary(params: {
   contracts?: ContractDashboardRecord[];
   arps?: ArpRecord[];
@@ -619,7 +640,7 @@ export function calculateAttentionSummary(params: {
       title: conferir ? 'Divisão do contratado entre unidades a conferir' : 'Contratado sem unidade interna',
       description: conferir
         ? `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${aConferir} ${aConferir === 1 ? 'contrato com divisão' : 'contratos com divisão'} a conferir`
-        : `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${fmt(semUnidade)} contratados ainda sem unidade interna`,
+        : `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${fmt(semUnidade)} un contratados ainda sem unidade interna`,
       arpKey: itemKey,
       numeroAta: numAta,
       objetoItem: descItem,
@@ -629,6 +650,36 @@ export function calculateAttentionSummary(params: {
         ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}/itens/${encodeURIComponent(String(numItem))}?aba=contratos`
         : undefined,
       badgeLabel: conferir ? `${aConferir} a conferir` : `${fmt(semUnidade)} sem unidade`
+    });
+  }
+
+  // 5c. Quantitativos do item a conferir (migration 109): só nos itens com a ata assinada informada. Pendência do
+  // gestor de saldo; cota própria negativa é crítica (a SENASP repassou quantidade de órgão que não abriu mão).
+  for (const aItem of (arpItems || []) as any[]) {
+    if (!aItem.ata_assinada_informada) continue;
+    const motivos = motivosDosQuantitativos(aItem);
+    if (motivos.length === 0) continue;
+    const numAta = aItem.numero_ata || aItem.numeroAta;
+    const numItem = aItem.numero_item || aItem.numeroItem;
+    const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
+    const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : '');
+    if (!itemKey) continue;
+    const critico = motivos.some((m) => m.critico);
+    items.push({
+      id: `ATT-QUANTITATIVOS-${itemKey}`,
+      category: 'QUANTITATIVOS',
+      severity: critico ? 'CRITICA' : 'ATENCAO',
+      avisoChave: numAta && numItem ? chaveAvisoQuantitativos(numAta, uasgItem, numItem, motivos.map((m) => m.chave).join('|')) : undefined,
+      title: critico ? 'Cota própria da SENASP negativa' : 'Quantitativos do item a conferir',
+      description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${motivos.map((m) => m.texto).join('; ')}`,
+      arpKey: itemKey,
+      numeroAta: numAta,
+      objetoItem: aItem.descricao_item || aItem.descricaoItem || 'Item de ARP',
+      fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
+      targetUrl: numAta && numItem
+        ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}/itens/${encodeURIComponent(String(numItem))}`
+        : undefined,
+      badgeLabel: motivos.length === 1 ? motivos[0].selo : `${motivos.length} pontos a conferir`
     });
   }
 

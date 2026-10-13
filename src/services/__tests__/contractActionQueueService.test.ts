@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import type { ContractDashboardRecord, ContractTask, ContractTaskPlan } from '../../types';
 import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 import { buildContractActionQueue } from '../contractActionQueueService';
@@ -6,6 +6,15 @@ import { calculateAttentionSummary } from '../dashboardService';
 import { addDays, formatDateISO } from '../temporalEngineService';
 
 const KEY = '200331-00010-2026';
+// Relógio fixo numa sexta sem feriado por perto (23/10/2026): "3 dias atrás" cai na terça
+// e vale -3 dias úteis. Com o relógio real, um fim de semana ou feriado no meio
+// (ex.: 10/10 sábado e 12/10 feriado) transformava a tarefa vencida em "Vence Hoje".
+vi.useFakeTimers({ toFake: ['Date'] });
+vi.setSystemTime(new Date('2026-10-23T12:00:00-03:00'));
+afterAll(() => {
+  vi.useRealTimers();
+});
+
 const inDays = (n: number) => formatDateISO(addDays(new Date(), n));
 
 const contract: ContractDashboardRecord = {

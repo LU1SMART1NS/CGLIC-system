@@ -1287,6 +1287,31 @@ export async function fetchUnidadesItem(
   return { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 };
 }
 
+/** Resultado da busca do nome de uma UASG no Compras.gov.br. */
+export type NomeUasgResultado =
+  | { situacao: 'achou'; nome: string; uf: string | null }
+  | { situacao: 'nao-encontrada' }
+  | { situacao: 'falhou' };
+
+/**
+ * Nome da UASG no cadastro do Compras.gov.br (/modulo-uasg/1_consultarUasg).
+ * A API exige statusUasg: procura primeiro entre as ativas e depois entre as inativas.
+ */
+export async function fetchNomeUasg(codigoUasg: string): Promise<NomeUasgResultado> {
+  try {
+    for (const statusUasg of [true, false]) {
+      const response = await fetch(`/api-arp/modulo-uasg/1_consultarUasg${buildQueryString({ codigoUasg, statusUasg: String(statusUasg) })}`);
+      if (!response.ok) return { situacao: 'falhou' };
+      const data = await response.json() as { resultado?: Array<{ nomeUasg?: string; siglaUf?: string | null }> };
+      const achada = data.resultado?.find((u) => u.nomeUasg?.trim());
+      if (achada) return { situacao: 'achou', nome: achada.nomeUasg!.trim(), uf: achada.siglaUf ?? null };
+    }
+    return { situacao: 'nao-encontrada' };
+  } catch {
+    return { situacao: 'falhou' };
+  }
+}
+
 /**
  * 4. Consultar Empenhos Saldo Item
  * Endereço: /modulo-arp/4_consultarEmpenhosSaldoItem

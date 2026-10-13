@@ -258,7 +258,7 @@ describe('ItemHero — alocação interna, participação da SENASP e valor unit
 
   it('alocação acima do quantitativo SENASP ganha o selo de atenção', () => {
     const html = render({ quantidadeAlocada: 120 });
-    expect(html).toContain('acima do SENASP em 20 un');
+    expect(html).toContain('acima do limite em 20 un');
     expect(html).toContain('Atenção');
   });
 
