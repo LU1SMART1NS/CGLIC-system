@@ -1263,3 +1263,19 @@ GRANT EXECUTE ON FUNCTION public.gravar_contratos_participantes(VARCHAR, JSONB) 
 -- estão há mais de 24 h sem leitura, dentro do orçamento de tempo da função.
 SELECT cron.schedule('sincronizar-contratos-participantes-200330', '32 * * * *', $$SELECT public.disparar_sincronizacao('contratos_participantes', '200330')$$);
 SELECT cron.schedule('sincronizar-contratos-participantes-200331', '34 * * * *', $$SELECT public.disparar_sincronizacao('contratos_participantes', '200331')$$);
+
+-- Fila de leitura do servidor: cada UASG participante das atas da SENASP e quando foi lida pela última vez.
+CREATE OR REPLACE VIEW public.v_participantes_contratos_fila
+WITH (security_invoker = true)
+AS
+SELECT p.uasg_gerenciadora, p.uasg, l.lido_em, l.contratos_na_ug, l.contratos_nos_itens
+  FROM (
+    SELECT DISTINCT split_part(c.item_key, '-', 2)::VARCHAR(6) AS uasg_gerenciadora, x.uasg
+      FROM public.itens_ata_unidades_copia c
+      CROSS JOIN LATERAL public.registrado_por_uasg(c.unidades) x
+     WHERE split_part(c.item_key, '-', 2) IN ('200330', '200331')
+       AND x.uasg NOT IN ('200330', '200331')
+  ) p
+  LEFT JOIN public.participantes_contratos_leituras l ON l.uasg_gerenciadora = p.uasg_gerenciadora AND l.uasg = p.uasg;
+REVOKE ALL ON public.v_participantes_contratos_fila FROM PUBLIC, anon;
+GRANT SELECT ON public.v_participantes_contratos_fila TO authenticated, service_role;
