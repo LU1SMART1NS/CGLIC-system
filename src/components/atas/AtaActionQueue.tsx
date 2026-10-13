@@ -36,7 +36,8 @@ const KIND_LABELS: Record<AtaActionItem['kind'], string> = {
   SALDO: 'Saldo do item',
   TAREFA: 'Tarefa',
   LEMBRETE: 'Planejamento da vigência',
-  CADASTRO: 'Cadastro'
+  CADASTRO: 'Cadastro',
+  VINCULO: 'Vínculo com contrato'
 };
 
 /** Fila única da Ata 360 — mesmo layout da ContractActionQueue do Contrato 360. */
@@ -64,6 +65,7 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
     const check = alvo && podeResolverAlvo(alvo) ? <BotaoResolvido onClick={() => abrir(alvo)} testId={`resolver-${item.id}`} /> : <EspacoResolvido />;
     switch (item.kind) {
       case 'SALDO':
+      case 'VINCULO':
         return (
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
             {check}
@@ -147,12 +149,12 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
 
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
             {queue.items.map((item, idx) => {
-              const go = item.kind === 'SALDO' ? () => onGoTo('itens') : null;
+              const go = item.kind === 'SALDO' ? () => onGoTo('itens') : item.kind === 'VINCULO' ? () => onGoTo('contratos') : null;
               return (
               <div
                 key={item.id}
                 data-action-id={item.id}
-                {...propsDeLinhaClicavel(go, 'Ver itens', { rotulo: `Ver itens: ${item.title}` })}
+                {...propsDeLinhaClicavel(go, item.kind === 'VINCULO' ? 'Ver contratos vinculados' : 'Ver itens', { rotulo: `${item.kind === 'VINCULO' ? 'Ver contratos vinculados' : 'Ver itens'}: ${item.title}` })}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

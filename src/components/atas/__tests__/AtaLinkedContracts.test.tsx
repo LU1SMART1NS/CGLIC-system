@@ -3,6 +3,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { AtaLinkedContracts } from '../AtaLinkedContracts';
 
 vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => vi.fn() }));
+// O aviso de vínculo a conferir consulta o banco; aqui não há marcas.
+vi.mock('../../../hooks/useVinculosAConferir', () => ({
+  useVinculosAConferir: () => ({ vinculos: [], porPar: new Map(), isLoading: false, podeDecidir: false, manter: { isPending: false }, retirar: { isPending: false } })
+}));
 
 const link = (over: Record<string, unknown> = {}) => ({
   linkId: 'l1',

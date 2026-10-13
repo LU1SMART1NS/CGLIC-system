@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { mensagemDesvincular } from '../utils/vinculoAutomatico';
 import { OrigemVinculoBadge } from './vinculos/OrigemVinculoBadge';
+import { VinculoAConferirAviso } from './vinculos/VinculoAConferirAviso';
 import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Building2, ExternalLink } from 'lucide-react';
 import { getCanonicalContractKey } from '../services/api';
@@ -1027,6 +1028,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                             <StatusBadge label="Manual" variant="warning" size="sm" dot={false} />
                                           )}
                                           {c._isOfficialLink && <OrigemVinculoBadge origem={c._origem} />}
+                                          {c._isOfficialLink && <VinculoAConferirAviso itemKey={canonicalItemKey} contractKey={c.contractKey} formato="selo" />}
                                         </div>
                                       </td>
                                       <td data-role="action" style={{ textAlign: 'center' }}>

@@ -464,3 +464,21 @@ export async function desfazerIndicacaoFornecedorDaAtaRpc(numeroControlePncp: st
     p_numero_controle_pncp: requireField(numeroControlePncp, 'Ata não identificada.')
   });
 }
+
+/** Coordenador mantém o vínculo automático que a fonte desmentiu: ele passa a MANUAL (migration 112). */
+export async function manterVinculoAConferirRpc(input: { itemKey: string; contractKey: string; justificativa: string }): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('manter_vinculo_a_conferir', {
+    p_item_key: requireField(input.itemKey, 'Item não identificado.'),
+    p_contract_key: requireField(input.contractKey, 'Contrato não identificado.'),
+    p_justificativa: requireField(input.justificativa, 'Escreva a justificativa.')
+  });
+}
+
+/** Coordenador retira o vínculo automático que a fonte desmentiu; a quantidade ajustada e a divisão saem junto (migration 112). */
+export async function retirarVinculoAConferirRpc(input: { itemKey: string; contractKey: string; justificativa: string }): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('retirar_vinculo_a_conferir', {
+    p_item_key: requireField(input.itemKey, 'Item não identificado.'),
+    p_contract_key: requireField(input.contractKey, 'Contrato não identificado.'),
+    p_justificativa: requireField(input.justificativa, 'Escreva a justificativa.')
+  });
+}
