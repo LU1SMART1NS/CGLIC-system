@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { scrollToDock } from './instrument360Dock';
 
 /** Resolve a aba ativa a partir do `?aba=`; valor desconhecido cai na aba padrão e `aliases` cobre nomes antigos. */
@@ -28,8 +28,20 @@ export function useInstrumentTab<T extends string>(options: { tabs: readonly T[]
   const { tabs, defaultTab, aliases } = options;
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const tabsRef = React.useRef<HTMLDivElement>(null);
   const activeTab = resolveInstrumentTab(searchParams.get('aba'), tabs, defaultTab, aliases);
+
+  // Quem abre a tela com `state.ancorar` (pendência da carteira) chega como se tivesse clicado na aba: cartão encolhido
+  // e conteúdo logo abaixo da barra. Espera a barra existir (a tela pode carregar antes) e só vale uma vez: o aviso sai
+  // do state, para recarregar a página não repetir.
+  const ancorar = Boolean((location.state as { ancorar?: boolean } | null)?.ancorar);
+  React.useEffect(() => {
+    if (!ancorar || !tabsRef.current) return;
+    const { ancorar: _usado, ...resto } = (location.state ?? {}) as Record<string, unknown>;
+    navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: resto });
+    scrollToDock(tabsRef.current);
+  });
 
   /** `extra` vai junto no endereço (ex.: `{ abrir: '2024NE000337' }` para a aba abrir aquela linha). */
   const goToTab = (tab: T, extra?: Record<string, string>) => {

@@ -310,7 +310,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                                   {pendencias.map((p) => {
                                     const motivo = getMotivoInfo(p.category);
                                     const acao = getAcaoInfo(p);
-                                    const abrirPendencia = () => navigate(acao.targetUrl);
+                                    const abrirPendencia = () => navigate(acao.targetUrl, { state: { ancorar: true } });
                                     return (
                                       <tr key={p.id} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirPendencia)}>
                                         <td data-label="Prioridade" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
