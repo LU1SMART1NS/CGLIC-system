@@ -31,8 +31,6 @@ export interface ResultadoVinculo {
   avisos: string[];
 }
 
-const OBSERVACAO = 'Vínculo atribuído pela Coordenação';
-
 /**
  * Vincula um contrato aos itens da ata e lê uma vez os itens do contrato na API oficial para gravar a quantidade
  * contratada de cada item (que entra no saldo). A falha do vínculo é do contrato; a falha da leitura da API vira aviso
@@ -43,8 +41,8 @@ export async function vincularContrato(plano: PlanoVinculo): Promise<ResultadoVi
   try {
     await saveArpContractItemLinks({
       contractKey: plano.contractKey,
-      itemKeys: plano.itens.map((i) => i.itemKey),
-      observacoes: OBSERVACAO
+      // Quem vinculou e quando o banco grava sozinho (migration 115); não há observação fixa.
+      itemKeys: plano.itens.map((i) => i.itemKey)
     });
   } catch (err: any) {
     return { ...base, ok: false, itens: 0, erro: err?.message || 'Falha ao vincular o contrato.', avisos: [] };

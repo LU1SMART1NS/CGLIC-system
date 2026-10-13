@@ -1,4 +1,5 @@
 import type { MotivoVinculoManual } from '../services/vinculoAutomaticoService';
+import type { OrigemVinculo } from '../types/arpContractLinks';
 
 /** GESTOR: falta uma decisão de quem cuida; DADO: algum dado da fonte não fecha; EQUIPE: a equipe já decidiu. */
 export type TipoMotivo = 'GESTOR' | 'DADO' | 'EQUIPE';
@@ -134,4 +135,17 @@ export function mensagemDesvincular(numeroContrato: string, numeroItem: string, 
   const item = numeroItem ? `do item ${numeroItem.replace(/^0+(?=\d)/, '')}` : 'deste item';
   const quem = origem === 'AUTOMATICO' ? 'Este vínculo foi feito pelo sistema. ' : '';
   return `Desvincular o contrato ${numeroContrato} ${item}? ${quem}O sistema não vai refazer este vínculo. Para devolvê-lo, use "Restaurar" nas sugestões descartadas do item.`;
+}
+
+/**
+ * Quem vinculou o contrato ao item, para a linha do vínculo: "Vinculado por Fulano em 13/10/2026". Só o vínculo feito
+ * à mão e com nome gravado (migration 115); o automático tem selo próprio e os anteriores à migration não têm nome.
+ */
+export function textoQuemVinculou(origem: OrigemVinculo | undefined, nome?: string | null, quando?: string | null): string | undefined {
+  const quem = (nome ?? '').trim();
+  if (origem !== 'MANUAL' || !quem) return undefined;
+  // O carimbo do banco vem em UTC: o dia é o de Brasília (vincular às 22h não pode sair como o dia seguinte).
+  const d = quando ? new Date(quando) : null;
+  const dia = d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '';
+  return `Vinculado por ${quem}${dia ? ` em ${dia}` : ''}`;
 }

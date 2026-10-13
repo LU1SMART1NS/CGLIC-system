@@ -4,7 +4,8 @@ import {
   frasesHerancaGestor,
   mensagemDesvincular,
   textoMotivoDaFila,
-  textoMotivoManual
+  textoMotivoManual,
+  textoQuemVinculou
 } from '../vinculoAutomatico';
 import { lerResumo } from '../../services/vinculoAutomaticoService';
 
@@ -101,5 +102,23 @@ describe('lerResumo', () => {
   });
   it('resposta vazia vira zeros', () => {
     expect(lerResumo(null).novos).toBe(0);
+  });
+});
+
+describe('textoQuemVinculou', () => {
+  it('vínculo à mão com nome e data', () => {
+    expect(textoQuemVinculou('MANUAL', 'Luís Martins', '2026-10-13T22:10:00Z')).toBe('Vinculado por Luís Martins em 13/10/2026');
+  });
+  it('o dia é o de Brasília: 02:00 UTC ainda é o dia anterior', () => {
+    expect(textoQuemVinculou('MANUAL', 'Luís Martins', '2026-10-14T02:00:00Z')).toBe('Vinculado por Luís Martins em 13/10/2026');
+  });
+  it('sem data, só o nome', () => {
+    expect(textoQuemVinculou('MANUAL', 'Luís Martins')).toBe('Vinculado por Luís Martins');
+  });
+  it('automático, sem nome gravado ou sem origem: nada (o selo já diz)', () => {
+    expect(textoQuemVinculou('AUTOMATICO', 'Luís Martins', '2026-10-13')).toBeUndefined();
+    expect(textoQuemVinculou('MANUAL', null, '2026-10-13')).toBeUndefined();
+    expect(textoQuemVinculou('MANUAL', '  ')).toBeUndefined();
+    expect(textoQuemVinculou(undefined, 'Luís Martins')).toBeUndefined();
   });
 });
