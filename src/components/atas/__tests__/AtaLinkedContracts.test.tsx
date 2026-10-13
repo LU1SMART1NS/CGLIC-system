@@ -43,6 +43,14 @@ describe('AtaLinkedContracts', () => {
     expect(auto).toContain('Vinculado pelo sistema');
     const manual = renderToStaticMarkup(<AtaLinkedContracts linkedContracts={[link({ origem: 'MANUAL' })]} />);
     expect(manual).toContain('Vinculado à mão');
+    const porNome = renderToStaticMarkup(<AtaLinkedContracts linkedContracts={[link({ origem: 'MANUAL', criadoPorNome: 'Luís Martins', criadoEm: '2026-10-13T22:10:00Z' })]} />);
+    expect(porNome).toContain('Vinculado por Luís Martins em 13/10/2026');
+    expect(porNome).not.toContain('Obs.');
+    // Observação digitada continua aparecendo, depois do nome.
+    const comObs = renderToStaticMarkup(<AtaLinkedContracts linkedContracts={[link({ origem: 'MANUAL', criadoPorNome: 'Luís Martins', observacoes: 'Aditivo de 2025' })]} />);
+    expect(comObs).toContain('Obs. Aditivo de 2025');
+    const auto2 = renderToStaticMarkup(<AtaLinkedContracts linkedContracts={[link({ origem: 'AUTOMATICO', criadoPorNome: 'Luís Martins' })]} />);
+    expect(auto2).not.toContain('Vinculado por');
     const semMigration = renderToStaticMarkup(<AtaLinkedContracts linkedContracts={[link()]} />);
     expect(semMigration).not.toContain('Vinculado');
   });

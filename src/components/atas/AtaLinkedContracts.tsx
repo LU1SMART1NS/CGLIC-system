@@ -10,6 +10,7 @@ import { CarteiraIdLink, propsDeLinhaClicavel, SetaDaLinha } from '../carteira/C
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 import { AvisoCarregando } from '../../design-system';
 import { formatCurrencyOrDash } from '../../utils/format';
+import { textoQuemVinculou } from '../../utils/vinculoAutomatico';
 
 interface AtaLinkedContractsProps {
   linkedContracts: EnrichedArpItemContract[];
@@ -64,6 +65,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
       {linkedContracts.map((link) => {
         const abrir = link.isOficial ? () => navigate(`/contratos/${encodeURIComponent(link.contractKey)}`) : null;
+        const quemVinculou = textoQuemVinculou(link.origem, link.criadoPorNome, link.criadoEm);
         return (
         <div
           key={link.linkId}
@@ -102,6 +104,9 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
                 <OrigemVinculoBadge origem={link.origem} mostrarManual />
               </p>
               <VinculoAConferirAviso itemKey={link.itemKey} contractKey={link.contractKey} />
+              {quemVinculou && (
+                <p data-testid="ata-linked-contract-quem" style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.1rem 0 0 0' }}>{quemVinculou}</p>
+              )}
               {link.observacoes && (
                 <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.1rem 0 0 0' }}>Obs. {link.observacoes}</p>
               )}

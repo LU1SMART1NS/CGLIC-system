@@ -18,6 +18,8 @@ export interface ArpItemContractLink {
   quantidadeLidaEm?: string;
   /** AUTOMATICO = feito pelo sistema (regra de compra, fornecedor e item; migration 95); MANUAL = feito pela equipe. */
   origem?: OrigemVinculo;
+  /** Nome de quem fez o vínculo, gravado na hora (migration 115); ausente no automático e nos anteriores à migration. */
+  criadoPorNome?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -50,6 +52,9 @@ export interface EnrichedArpItemContract {
   observacoes?: string;
   /** Quem fez o vínculo: o sistema ou a equipe. */
   origem?: OrigemVinculo;
+  /** Nome de quem fez o vínculo à mão (migration 115) e quando. */
+  criadoPorNome?: string;
+  criadoEm?: string;
   // Dados oficiais derivados diretamente do catálogo governamental
   contract?: ContractDashboardRecord;
   numeroContratoFormatado: string;
