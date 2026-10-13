@@ -157,6 +157,47 @@ DROP TRIGGER IF EXISTS trg_audit_ata_item_continua_orgao ON public.ata_item_cont
 CREATE TRIGGER trg_audit_ata_item_continua_orgao AFTER INSERT OR UPDATE OR DELETE ON public.ata_item_continua_orgao
   FOR EACH ROW EXECUTE FUNCTION public.trg_audit_log_capture();
 
+-- Contratos dos órgãos participantes (tabelas; a gravação pelo servidor está na seção 11)
+CREATE TABLE IF NOT EXISTS public.participantes_contratos_itens (
+  item_key        VARCHAR(100) NOT NULL,
+  uasg            VARCHAR(6)   NOT NULL CHECK (uasg ~ '^[0-9]{6}$'),
+  contrato_id     VARCHAR(30)  NOT NULL,
+  numero          VARCHAR(40),
+  tipo            VARCHAR(40),
+  situacao        VARCHAR(40),
+  quantidade      NUMERIC(18, 4) CHECK (quantidade IS NULL OR quantidade >= 0),
+  valor_unitario  NUMERIC(18, 4),
+  valor_global    NUMERIC(18, 2),
+  vigencia_fim    DATE,
+  visto_em        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (item_key, uasg, contrato_id)
+);
+COMMENT ON TABLE public.participantes_contratos_itens IS
+  'Quantidade do item nos contratos (ou notas de empenho) dos órgãos participantes, lida do Contratos.gov.br. Nunca apagada pela sincronização.';
+
+CREATE TABLE IF NOT EXISTS public.participantes_contratos_leituras (
+  uasg_gerenciadora   VARCHAR(6) NOT NULL CHECK (uasg_gerenciadora ~ '^[0-9]{6}$'),
+  uasg                VARCHAR(6) NOT NULL CHECK (uasg ~ '^[0-9]{6}$'),
+  lido_em             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  contratos_na_ug     INTEGER NOT NULL CHECK (contratos_na_ug >= 0),
+  contratos_nos_itens INTEGER NOT NULL CHECK (contratos_nos_itens >= 0),
+  PRIMARY KEY (uasg_gerenciadora, uasg)
+);
+COMMENT ON TABLE public.participantes_contratos_leituras IS
+  'Última leitura da lista de contratos de cada UASG participante no Contratos.gov.br. contratos_na_ug = 0: o órgão não publica contratos lá (sem dado); > 0 sem contrato no item: nenhum contrato (zero real).';
+
+ALTER TABLE public.participantes_contratos_itens    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.participantes_contratos_leituras ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Authenticated Read: participantes_contratos_itens" ON public.participantes_contratos_itens;
+CREATE POLICY "Authenticated Read: participantes_contratos_itens" ON public.participantes_contratos_itens FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated Read: participantes_contratos_leituras" ON public.participantes_contratos_leituras;
+CREATE POLICY "Authenticated Read: participantes_contratos_leituras" ON public.participantes_contratos_leituras FOR SELECT TO authenticated USING (true);
+REVOKE ALL ON public.participantes_contratos_itens, public.participantes_contratos_leituras FROM PUBLIC, anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.participantes_contratos_itens, public.participantes_contratos_leituras FROM authenticated;
+GRANT SELECT ON public.participantes_contratos_itens, public.participantes_contratos_leituras TO authenticated;
+GRANT ALL ON public.participantes_contratos_itens, public.participantes_contratos_leituras TO service_role;
+
+
 -- ------------------------------------------------------------------------------
 -- 2b) Registrado por órgão a partir da lista copiada do Compras.gov.br
 --     (soma as linhas repetidas de um mesmo órgão; ignora linhas excluídas na fonte)
@@ -455,6 +496,16 @@ WITH ultimo AS (
   SELECT al.item_key, sum(al.allocated_qty) AS alocado
     FROM public.arp_allocations al
    GROUP BY al.item_key
+), contratado AS (
+  SELECT c.item_key, c.uasg, sum(COALESCE(c.quantidade, 0)) AS quantidade
+    FROM public.participantes_contratos_itens c
+   GROUP BY c.item_key, c.uasg
+), acima_do_registrado AS (
+  SELECT o.item_key, count(*) AS n
+    FROM public.v_item_quantitativos_orgaos o
+    JOIN contratado c ON c.item_key = o.item_key AND c.uasg = o.uasg
+   WHERE NOT o.eh_senasp AND c.quantidade > COALESCE(o.quantidade_registrada, 0)
+   GROUP BY o.item_key
 )
 SELECT u.item_key,
        u.documento_sei,
@@ -470,11 +521,13 @@ SELECT u.item_key,
        COALESCE(al.alocado, 0) AS alocado,
        COALESCE(p.orgaos_fora_da_ata, 0) AS orgaos_fora_da_ata,
        COALESCE(p.orgaos_remanejados_a_menos, 0) AS orgaos_remanejados_a_menos,
-       COALESCE(p.orgaos_gerenciados, 0) AS orgaos_gerenciados
+       COALESCE(p.orgaos_gerenciados, 0) AS orgaos_gerenciados,
+       COALESCE(ar.n, 0) AS orgaos_contratado_acima
   FROM ultimo u
   JOIN itens it ON it.item_key = u.item_key
   LEFT JOIN por_item p ON p.item_key = u.item_key
-  LEFT JOIN aloc al ON al.item_key = u.item_key;
+  LEFT JOIN aloc al ON al.item_key = u.item_key
+  LEFT JOIN acima_do_registrado ar ON ar.item_key = u.item_key;
 
 COMMENT ON VIEW public.v_item_quantitativos IS
   'Um item por linha, só itens de atas da SENASP com a ata assinada informada: registrado da SENASP, gerenciado para participantes e cota própria (registrado − gerenciado).';
@@ -544,6 +597,10 @@ AS
             COALESCE(ic.quantidade_senasp, ic.quantidade_homologada, 0::numeric) AS quantidade_registrada_senasp,
             COALESCE(vq.gerenciado_participantes, 0::numeric) AS gerenciado_participantes,
             vq.item_key IS NOT NULL AS ata_assinada_informada,
+            vq.total_assinada,
+            vq.total_registrado,
+            COALESCE(vq.orgaos_fora_da_ata, 0::bigint) AS orgaos_fora_da_ata,
+            COALESCE(vq.orgaos_contratado_acima, 0::bigint) AS orgaos_contratado_acima,
             COALESCE(ca.total_contratado, 0::numeric) AS quantidade_consumida,
             COALESCE(ca.total_contratos_vinculados, 0::bigint) AS total_contratos_vinculados,
             COALESCE(ca.total_contratos_sem_quantidade, 0::bigint) AS total_contratos_sem_quantidade,
@@ -583,7 +640,11 @@ AS
     b.papel_senasp,
     b.quantidade_registrada_senasp,
     b.gerenciado_participantes,
-    b.ata_assinada_informada
+    b.ata_assinada_informada,
+    b.total_assinada,
+    b.total_registrado,
+    b.orgaos_fora_da_ata,
+    b.orgaos_contratado_acima
    FROM base b
      LEFT JOIN empenhado_agg e ON e.item_key::text = b.item_key;
 
@@ -1155,45 +1216,6 @@ $function$;
 --     item quando a compra, o fornecedor e o número do item batem com a ata. Nunca apagados: um contrato que
 --     some das listas continua contando como consumido, com a data em que foi visto pela última vez.
 -- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.participantes_contratos_itens (
-  item_key        VARCHAR(100) NOT NULL,
-  uasg            VARCHAR(6)   NOT NULL CHECK (uasg ~ '^[0-9]{6}$'),
-  contrato_id     VARCHAR(30)  NOT NULL,
-  numero          VARCHAR(40),
-  tipo            VARCHAR(40),
-  situacao        VARCHAR(40),
-  quantidade      NUMERIC(18, 4) CHECK (quantidade IS NULL OR quantidade >= 0),
-  valor_unitario  NUMERIC(18, 4),
-  valor_global    NUMERIC(18, 2),
-  vigencia_fim    DATE,
-  visto_em        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (item_key, uasg, contrato_id)
-);
-COMMENT ON TABLE public.participantes_contratos_itens IS
-  'Quantidade do item nos contratos (ou notas de empenho) dos órgãos participantes, lida do Contratos.gov.br. Nunca apagada pela sincronização.';
-
-CREATE TABLE IF NOT EXISTS public.participantes_contratos_leituras (
-  uasg_gerenciadora   VARCHAR(6) NOT NULL CHECK (uasg_gerenciadora ~ '^[0-9]{6}$'),
-  uasg                VARCHAR(6) NOT NULL CHECK (uasg ~ '^[0-9]{6}$'),
-  lido_em             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  contratos_na_ug     INTEGER NOT NULL CHECK (contratos_na_ug >= 0),
-  contratos_nos_itens INTEGER NOT NULL CHECK (contratos_nos_itens >= 0),
-  PRIMARY KEY (uasg_gerenciadora, uasg)
-);
-COMMENT ON TABLE public.participantes_contratos_leituras IS
-  'Última leitura da lista de contratos de cada UASG participante no Contratos.gov.br. contratos_na_ug = 0: o órgão não publica contratos lá (sem dado); > 0 sem contrato no item: nenhum contrato (zero real).';
-
-ALTER TABLE public.participantes_contratos_itens    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.participantes_contratos_leituras ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Authenticated Read: participantes_contratos_itens" ON public.participantes_contratos_itens;
-CREATE POLICY "Authenticated Read: participantes_contratos_itens" ON public.participantes_contratos_itens FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Authenticated Read: participantes_contratos_leituras" ON public.participantes_contratos_leituras;
-CREATE POLICY "Authenticated Read: participantes_contratos_leituras" ON public.participantes_contratos_leituras FOR SELECT TO authenticated USING (true);
-REVOKE ALL ON public.participantes_contratos_itens, public.participantes_contratos_leituras FROM PUBLIC, anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.participantes_contratos_itens, public.participantes_contratos_leituras FROM authenticated;
-GRANT SELECT ON public.participantes_contratos_itens, public.participantes_contratos_leituras TO authenticated;
-GRANT ALL ON public.participantes_contratos_itens, public.participantes_contratos_leituras TO service_role;
-
 -- p_leituras: [{"uasg": "200109", "contratos_na_ug": 686, "linhas": [{"item_key": "...", "contrato_id": "123",
 --   "numero": "00059/2026", "tipo": "Contrato", "situacao": "Ativo", "quantidade": 60, "valor_unitario": 103908.66,
 --   "valor_global": 6234519.6, "vigencia_fim": "2027-01-10"}]}]
