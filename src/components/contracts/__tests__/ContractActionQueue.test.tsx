@@ -8,6 +8,11 @@ import { addDays, formatDateISO } from '../../../services/temporalEngineService'
 import { buildContractActionQueue } from '../../../services/contractActionQueueService';
 
 let mockCycles: PaymentFollowUpCycle[] = [];
+const mockFonte = { podeDecidir: false };
+// A fila consulta as notas e faturas a conferir (migration 113); aqui a consulta é simulada.
+vi.mock('../../../hooks/useAusentesDaFonte', () => ({
+  useAusentesDaFonte: () => ({ ausentes: [], porChave: new Map(), isLoading: false, podeDecidir: mockFonte.podeDecidir, decidir: { isPending: false, mutateAsync: vi.fn() } })
+}));
 
 vi.mock('../../avisos/ResolverAviso', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../avisos/ResolverAviso')>()),
@@ -84,8 +89,8 @@ function planWith(prazo: string | undefined, executionMode?: 'CONFIRMACAO'): Con
   } as ContractTaskPlan;
 }
 
-function render(contract: ContractDashboardRecord, plan: ContractTaskPlan | null, url = '/') {
-  const queue = buildContractActionQueue({ contract, contractKey: contract.id, plan, paymentCycles: mockCycles });
+function render(contract: ContractDashboardRecord, plan: ContractTaskPlan | null, url = '/', extra: Partial<Parameters<typeof buildContractActionQueue>[0]> = {}) {
+  const queue = buildContractActionQueue({ contract, contractKey: contract.id, plan, paymentCycles: mockCycles, ...extra });
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[url]}>
       <ContractActionQueue queue={queue} contractKey={contract.id} plan={plan} onGoTo={() => {}} />
@@ -171,5 +176,28 @@ describe('ContractActionQueue', () => {
     const html = render(baseContract, null);
     expect(html).not.toContain('Confirmar a quantidade');
     expect(html).not.toContain('Execução do contrato');
+  });
+
+  it('nota que a fonte deixou de listar: urgente, ✓ para todos e Conferir só para o coordenador', () => {
+    mockCycles = [];
+    const ausente = {
+      tipo: 'NOTA' as const,
+      chave: 'ce-1',
+      contractKey: baseContract.id,
+      numero: '2025NE000123',
+      valor: 1000,
+      detectadoEm: '2026-10-20T10:00:00Z',
+      distribuidoPorNome: 'Daniel Espíndola',
+      quantidadesInformadas: 0
+    };
+    mockFonte.podeDecidir = false;
+    const gestor = render(baseContract, null, '/', { ausentesDaFonte: [ausente] });
+    expect(gestor).toContain('Nota 2025NE000123 saiu do contrato na fonte');
+    expect(gestor).toContain('distribuição entre os itens feita por Daniel Espíndola');
+    expect(gestor).toContain('resolver-ATT-FONTE-NOTA-ce-1');
+    expect(gestor).not.toContain('decidir-ATT-FONTE-NOTA-ce-1');
+    mockFonte.podeDecidir = true;
+    expect(render(baseContract, null, '/', { ausentesDaFonte: [ausente] })).toContain('decidir-ATT-FONTE-NOTA-ce-1');
+    mockFonte.podeDecidir = false;
   });
 });

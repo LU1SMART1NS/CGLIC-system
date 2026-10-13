@@ -15,6 +15,7 @@
 
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
+import { fetchAusentesDaFonte, rotuloAusente, trabalhoNaFonte, type AusenteDaFonte } from './ausentesDaFonteService';
 import { fetchVinculosAConferir, numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
 import type {
   ContractDashboardRecord,
@@ -56,7 +57,7 @@ function chaveDoSaldo(item: any): string {
   return numero ? chaveGestaoAta(numero, item?.codigo_uasg || item?.codigoUasg) : '';
 }
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
-import { chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, fetchAvisosResolvidos } from './avisosResolvidosService';
+import { chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, chaveAvisoFonte, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -215,7 +216,10 @@ export function calculateDeadlinesSummary(
 /**
  * 3. Cálculo puro do Bloco "Atenção Agora"
  */
-/** Motivos do aviso de quantitativos de um item (linha de v_arp_item_saldo_detalhado com a ata assinada informada). */
+/**
+ * Motivos do aviso de quantitativos de um item (linha de v_arp_item_saldo_detalhado com a ata assinada informada).
+ * Na ata de outro órgão (migration 114), o motivo é o saldo crítico com quantidade da SENASP ainda na gerenciadora.
+ */
 export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; texto: string; selo: string; critico: boolean }> {
   const n = (v: unknown) => Number(v) || 0;
   const fmt = (v: number) => v.toLocaleString('pt-BR');
@@ -233,7 +237,23 @@ export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; text
   }
   const acima = n(aItem.orgaos_contratado_acima);
   if (acima > 0) motivos.push({ chave: `ACIMA${acima}`, texto: `${acima} ${acima === 1 ? 'órgão contratou' : 'órgãos contrataram'} acima do registrado`, selo: 'contratado acima', critico: false });
+  const naGerenciadora = n(aItem.gerenciado_pela_gerenciadora);
+  if (naGerenciadora > 0 && classifyArpItemSaldo(n(aItem.percentual_consumido)).isCritico) {
+    const ger = aItem.codigo_uasg || aItem.codigoUasg || '';
+    motivos.push({
+      chave: `GER${naGerenciadora}`,
+      texto: `saldo crítico com ${fmt(naGerenciadora)} da SENASP na gerenciadora${ger ? ` (UASG ${ger})` : ''}: peça o remanejamento`,
+      selo: 'pedir à gerenciadora',
+      critico: false
+    });
+  }
   return motivos;
+}
+
+/** Ata de outro órgão (migration 114): " · há N na gerenciadora para pedir", quando a ata assinada dá mais à SENASP. */
+function naGerenciadoraTexto(aItem: any): string {
+  const n = Number(aItem.gerenciado_pela_gerenciadora) || 0;
+  return n > 0 ? ` · há ${n.toLocaleString('pt-BR')} na gerenciadora para pedir` : '';
 }
 
 export function calculateAttentionSummary(params: {
@@ -252,6 +272,8 @@ export function calculateAttentionSummary(params: {
   fornecedoresPncp?: RegistroFornecedorPncp[];
   /** Vínculos automáticos desmentidos pela fonte com trabalho do gestor (vinculo_automatico_a_conferir, migration 112). */
   vinculosAConferir?: VinculoAConferir[];
+  /** Notas e faturas que a fonte deixou de listar e têm trabalho da equipe (migration 113). */
+  ausentesDaFonte?: AusenteDaFonte[];
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -266,6 +288,7 @@ export function calculateAttentionSummary(params: {
     arpItems = [],
     fornecedoresPncp = [],
     vinculosAConferir = [],
+    ausentesDaFonte = [],
     currentDate
   } = params;
 
@@ -374,6 +397,29 @@ export function calculateAttentionSummary(params: {
       contractKey: v.contractKey,
       numeroContrato,
       targetUrl: `/atas/detalhe/${encodeURIComponent(`${v.numeroAta}-${v.uasg}`)}/itens/${encodeURIComponent(String(Number(v.numeroItem) || v.numeroItem))}?aba=contratos`,
+      badgeLabel: 'a conferir'
+    });
+  }
+
+  // 0c. Nota ou fatura que o Contratos.gov.br deixou de listar e que tem trabalho da equipe (migration 113): a
+  // sincronização não a apaga. O coordenador decide manter ou retirar; o ✓ só esconde o aviso.
+  const contratosDoPainel = new Map(contracts.map((c) => [c.id, c]));
+  for (const a of ausentesDaFonte) {
+    const contrato = contratosDoPainel.get(a.contractKey);
+    if (!contrato) continue; // só contratos da carteira em tela
+    const numeroContrato = contrato.numeroFormatado || `${contrato.numero}/${contrato.ano}`;
+    const rotulo = rotuloAusente(a);
+    items.push({
+      id: `ATT-FONTE-${a.tipo}-${a.chave}`,
+      category: 'FONTE_A_CONFERIR',
+      severity: 'URGENTE',
+      avisoChave: chaveAvisoFonte(a.contractKey, a.tipo, a.chave, a.detectadoEm),
+      ausenteDaFonte: { tipo: a.tipo, chave: a.chave },
+      title: `${rotulo.charAt(0).toUpperCase()}${rotulo.slice(1)} saiu do contrato na fonte`,
+      description: `Contrato ${numeroContrato}: o Contratos.gov.br deixou de listar a ${a.tipo === 'NOTA' ? 'nota' : 'fatura'}. Mantida porque ${a.tipo === 'NOTA' ? `tem ${trabalhoNaFonte(a)}` : trabalhoNaFonte(a)}; o coordenador decide`,
+      contractKey: a.contractKey,
+      numeroContrato,
+      fornecedorNome: contrato.fornecedorNome,
       badgeLabel: 'a conferir'
     });
   }
@@ -603,7 +649,7 @@ export function calculateAttentionSummary(params: {
       severity,
       avisoChave: numAta && numItem ? chaveAvisoSaldo(numAta, uasgItem, numItem, severity) : undefined,
       title: `Consumo Crítico em Ata (${roundedPerc.toFixed(1)}%)`,
-      description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}`,
+      description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}${naGerenciadoraTexto(aItem)}`,
       arpKey: itemKey,
       numeroAta: numAta,
       objetoItem: descItem,
@@ -684,7 +730,7 @@ export function calculateAttentionSummary(params: {
   // 5c. Quantitativos do item a conferir (migration 109): só nos itens com a ata assinada informada. Pendência do
   // gestor de saldo; cota própria negativa é crítica (a SENASP repassou quantidade de órgão que não abriu mão).
   for (const aItem of (arpItems || []) as any[]) {
-    if (!aItem.ata_assinada_informada) continue;
+    if (!aItem.ata_assinada_informada && !((Number(aItem.gerenciado_pela_gerenciadora) || 0) > 0)) continue;
     const motivos = motivosDosQuantitativos(aItem);
     if (motivos.length === 0) continue;
     const numAta = aItem.numero_ata || aItem.numeroAta;
@@ -698,7 +744,9 @@ export function calculateAttentionSummary(params: {
       category: 'QUANTITATIVOS',
       severity: critico ? 'CRITICA' : 'ATENCAO',
       avisoChave: numAta && numItem ? chaveAvisoQuantitativos(numAta, uasgItem, numItem, motivos.map((m) => m.chave).join('|')) : undefined,
-      title: critico ? 'Cota própria da SENASP negativa' : 'Quantitativos do item a conferir',
+      title: critico
+        ? 'Cota própria da SENASP negativa'
+        : motivos.every((m) => m.chave.startsWith('GER')) ? 'Pedir remanejamento à gerenciadora' : 'Quantitativos do item a conferir',
       description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${motivos.map((m) => m.texto).join('; ')}`,
       arpKey: itemKey,
       numeroAta: numAta,
@@ -1198,6 +1246,7 @@ export function buildManagementDashboardReadModel(params: {
   paymentCycles?: PaymentFollowUpCycle[];
   fornecedoresPncp?: RegistroFornecedorPncp[];
   vinculosAConferir?: VinculoAConferir[];
+  ausentesDaFonte?: AusenteDaFonte[];
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1456,6 +1505,7 @@ export function buildManagementDashboardReadModel(params: {
     arpItems: filteredItemsSaldo,
     fornecedoresPncp: params.fornecedoresPncp,
     vinculosAConferir: params.vinculosAConferir,
+    ausentesDaFonte: params.ausentesDaFonte,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1505,7 +1555,8 @@ export async function fetchManagementDashboardData(
     arpItemsSaldo,
     itensComAlocacao,
     fornecedoresPncp,
-    vinculosAConferir
+    vinculosAConferir,
+    ausentesDaFonte
   ] = await Promise.all([
     fetchContratosParaTela(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar contratos para o dashboard:', err);
@@ -1547,6 +1598,10 @@ export async function fetchManagementDashboardData(
     fetchVinculosAConferir().catch((err) => {
       console.warn('Erro ao consultar os vínculos a conferir para o dashboard:', err);
       return [] as VinculoAConferir[];
+    }),
+    fetchAusentesDaFonte().catch((err) => {
+      console.warn('Erro ao consultar as notas e faturas a conferir para o dashboard:', err);
+      return [] as AusenteDaFonte[];
     })
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
@@ -1567,6 +1622,7 @@ export async function fetchManagementDashboardData(
     paymentCycles,
     fornecedoresPncp,
     vinculosAConferir,
+    ausentesDaFonte,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate

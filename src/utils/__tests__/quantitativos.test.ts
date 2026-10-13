@@ -6,7 +6,7 @@ import { vazioDoItem, type OrgaoQuantitativo, type QuantitativosDoItem } from '.
 const org = (p: Partial<OrgaoQuantitativo> & { uasg: string }): OrgaoQuantitativo => ({
   nomeOrgao: p.uasg, tipoUnidade: 'PARTICIPANTE', ehSenasp: false, quantidadeAssinada: 0, quantidadeRegistrada: 0, semRegistro: false,
   situacao: 'IGUAL', falta: 0, acima: 0, remanejadoConfirmado: 0, resto: 0, continuaDoOrgao: null, gerenciado: 0, mudou: false,
-  mudouEm: null, atualizadoEm: null, ...p
+  mudouEm: null, atualizadoEm: null, ataDaSenasp: true, ...p
 });
 const ORGAOS: OrgaoQuantitativo[] = [
   org({ uasg: '200331', ehSenasp: true, situacao: 'SENASP', quantidadeAssinada: 755, quantidadeRegistrada: 801 }),

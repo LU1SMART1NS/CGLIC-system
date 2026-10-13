@@ -152,6 +152,8 @@ export interface ResultadoFaturasContrato {
   gravadas: number;
   removidas: number;
   remocao_bloqueada: number;
+  /** Faturas que a fonte deixou de listar mas estão num ciclo de pagamento: ficam a conferir (migration 113). */
+  a_conferir: number;
 }
 
 export async function gravarFaturasDoContrato(contractKey: string, faturas: FaturaParaGravar[]): Promise<ResultadoFaturasContrato | null> {
@@ -162,7 +164,7 @@ export async function gravarFaturasDoContrato(contractKey: string, faturas: Fatu
     p_remover_ausentes: true
   });
   if (error) throw mapPostgresErrorToAppError(error);
-  return { gravadas: Number(r?.gravadas ?? 0), removidas: Number(r?.removidas ?? 0), remocao_bloqueada: Number(r?.remocao_bloqueada ?? 0) };
+  return { gravadas: Number(r?.gravadas ?? 0), removidas: Number(r?.removidas ?? 0), remocao_bloqueada: Number(r?.remocao_bloqueada ?? 0), a_conferir: Number(r?.a_conferir ?? 0) };
 }
 
 export async function gravarOrdensBancarias(ug: string, np: string, ordens: OrdemBancariaParaGravar[]): Promise<number | null> {

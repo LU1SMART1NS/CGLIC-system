@@ -221,6 +221,9 @@ export interface SyncContractEmpenhosRpcResult {
   ignorados_numeros?: string[];
   /** Vínculos feitos à mão que a fonte passou a listar (viraram FONTE). */
   promovidos?: number;
+  /** Notas que a fonte deixou de listar mas têm trabalho da equipe: ficam a conferir (migration 113). */
+  a_conferir?: number;
+  a_conferir_numeros?: string[];
 }
 
 /** A RPC não existe no banco (migration ainda não aplicada): PostgREST responde PGRST202. */
@@ -295,7 +298,9 @@ export async function syncContractEmpenhosM17(
     remocao_bloqueada: Number(data?.remocao_bloqueada ?? 0),
     ignorados_descartados: Number(data?.ignorados_descartados ?? 0),
     ignorados_numeros: Array.isArray(data?.ignorados_numeros) ? data.ignorados_numeros.map(String) : [],
-    promovidos: Number(data?.promovidos ?? 0)
+    promovidos: Number(data?.promovidos ?? 0),
+    a_conferir: Number(data?.a_conferir ?? 0),
+    a_conferir_numeros: Array.isArray(data?.a_conferir_numeros) ? data.a_conferir_numeros.map(String) : []
   };
 }
 

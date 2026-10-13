@@ -432,7 +432,7 @@ export async function deleteContractTaskRpc(id: string): Promise<RpcGenericDelet
 // -------------------------------------------------------------
 export interface ResolverAvisoInput {
   chave: string;
-  tipo: 'SALDO' | 'REAJUSTE' | 'LEMBRETE';
+  tipo: 'SALDO' | 'REAJUSTE' | 'LEMBRETE' | 'FONTE';
   justificativa: string;
 }
 
@@ -470,6 +470,16 @@ export async function manterVinculoAConferirRpc(input: { itemKey: string; contra
   return callPlanRpc<{ success: boolean }>('manter_vinculo_a_conferir', {
     p_item_key: requireField(input.itemKey, 'Item não identificado.'),
     p_contract_key: requireField(input.contractKey, 'Contrato não identificado.'),
+    p_justificativa: requireField(input.justificativa, 'Escreva a justificativa.')
+  });
+}
+
+/** Coordenador decide sobre nota ou fatura que a fonte deixou de listar e tem trabalho da equipe (migration 113). */
+export async function decidirAusenteDaFonteRpc(input: { tipo: 'NOTA' | 'FATURA'; chave: string; decisao: 'MANTER' | 'RETIRAR'; justificativa: string }): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('decidir_ausente_da_fonte', {
+    p_tipo: input.tipo,
+    p_chave: requireField(input.chave, 'Nota ou fatura não identificada.'),
+    p_decisao: input.decisao,
     p_justificativa: requireField(input.justificativa, 'Escreva a justificativa.')
   });
 }

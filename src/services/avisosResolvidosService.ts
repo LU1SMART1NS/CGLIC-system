@@ -6,7 +6,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
  * embute o que faz o aviso voltar: o nível do saldo, o ciclo do reajuste ou a vigência
  * do lembrete. Tarefa se resolve concluindo-a no plano; pagamento, registrando a etapa.
  */
-export type AvisoResolvivelTipo = 'SALDO' | 'REAJUSTE' | 'LEMBRETE';
+export type AvisoResolvivelTipo = 'SALDO' | 'REAJUSTE' | 'LEMBRETE' | 'FONTE';
 
 export interface AvisoResolvido {
   chave: string;
@@ -55,6 +55,15 @@ export function chaveAvisoQuantitativos(numeroAta: string, uasg: string, numeroI
 export function chaveAvisoVinculo(numeroAta: string, uasg: string, numeroItem: string | number, contractKey: string, motivo: string, detectadoEm: string): string {
   const epoch = Math.floor(new Date(detectadoEm).getTime() / 1000) || 0;
   return `SALDO::${numeroAta}-${uasg}::${numeroItemCanonico(numeroItem)}::VINCULO-${contractKey}-${motivo}-${epoch}`;
+}
+
+/**
+ * Nota ou fatura que a fonte deixou de listar e que tem trabalho da equipe (migration 113). O momento em que a marca
+ * foi criada entra na chave: se a fonte voltar a listar e depois tirar de novo, o aviso volta.
+ */
+export function chaveAvisoFonte(contractKey: string, tipo: 'NOTA' | 'FATURA', chave: string, detectadoEm: string): string {
+  const epoch = Math.floor(new Date(detectadoEm).getTime() / 1000) || 0;
+  return `FONTE::${contractKey}::${tipo}-${chave}-${epoch}`;
 }
 
 /** Reajuste: vale para o ciclo; o próximo ciclo avisa de novo. */
