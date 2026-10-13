@@ -18,6 +18,7 @@ import { ArpPortfolioList } from './atas/ArpPortfolioList';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { SincronizacaoFalhaNotice } from './carteira/SincronizacaoFalhaNotice';
 import type { ArpRecord, ArpItemRecord } from '../types';
+import { AvisoCarregando } from '../design-system';
 import { chaveGestaoDaArp, contarPorPapel, passaFiltroPapel } from '../utils/ataIdentidade';
 
 interface ArpSearchProps {
@@ -203,6 +204,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando atas...">
+          <AvisoCarregando label="Carregando atas" />
           <SkeletonLoader variant="card" height="96px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />

@@ -18,6 +18,7 @@ import { situacaoDoSaldo, type EmpenhoCarteiraRow } from '../../services/finance
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
 import { normalizarBusca } from './financeiroFormat';
 import { EmpenhosCarteiraTable } from './EmpenhosCarteiraTable';
+import { AvisoCarregando } from '../../design-system';
 import { useSituacaoDistribuicaoPorEmpenho } from '../../hooks/useVinculacaoEmpenhos';
 
 export interface EmpenhosFilterState {
@@ -147,6 +148,7 @@ export const EmpenhosCarteira: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando empenhos...">
+          <AvisoCarregando label="Carregando empenhos" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />

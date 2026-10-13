@@ -19,6 +19,7 @@ import { getArpPrazo } from '../../hooks/useAtasPortfolio';
 import { useComplexidadeAjustes } from '../../hooks/useComplexidadeAjustes';
 import { formatContractNumber } from '../../utils/contractNumber';
 import type { ManagerTarget } from '../../services/managerAssignmentService';
+import { AvisoCarregando } from '../../design-system';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
 /**
@@ -97,6 +98,7 @@ export const ContratosAtaPage: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando contratos...">
+          <AvisoCarregando label="Carregando contratos" />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
         </div>

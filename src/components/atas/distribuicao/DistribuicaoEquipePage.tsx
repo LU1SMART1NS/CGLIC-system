@@ -9,7 +9,7 @@ import { HeaderRefreshAction } from '../../../design-system/components/HeaderRef
 import { SkeletonLoader } from '../../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../../design-system/components/ErrorState';
 import { EmptyState } from '../../../design-system/components/EmptyState';
-import { AppButton, NoticeBar } from '../../../design-system';
+import { AppButton, NoticeBar, AvisoCarregando } from '../../../design-system';
 import { useNavigate } from 'react-router-dom';
 import { canAssignManager } from '../../carteira/ManagerAssign';
 import { AtribuirGestorModal } from './AtribuirGestorModal';
@@ -136,6 +136,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando distribuição...">
+          <AvisoCarregando label="Carregando distribuição" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />

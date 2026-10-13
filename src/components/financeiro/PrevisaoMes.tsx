@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ActionButton, EmptyState, NoticeBar, StatusBadge, useToast } from '../../design-system';
+import { ActionButton, EmptyState, NoticeBar, StatusBadge, useToast, AvisoCarregando } from '../../design-system';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { useAuth } from '../../context/AuthContext';
 import { usePrevisaoMensal } from '../../hooks/usePrevisaoMensal';
@@ -174,6 +174,7 @@ export const PrevisaoMes: React.FC = () => {
 
       {isLoading || carregandoContratos ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} aria-busy="true" aria-label="Montando a previsão...">
+          <AvisoCarregando label="Montando a previsão" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
         </div>

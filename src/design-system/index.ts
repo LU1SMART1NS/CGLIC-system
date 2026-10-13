@@ -40,6 +40,7 @@ export * from './components/HeaderRefreshAction';
 export * from './components/Modal';
 export * from './components/ConfirmDialog';
 export * from './components/Toast';
+export * from './components/Carregamento';
 
 // Hooks
 export * from './hooks/useMediaQuery';

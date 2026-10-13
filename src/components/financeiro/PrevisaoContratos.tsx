@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
-import { InfoHint, useToast } from '../../design-system';
+import { InfoHint, useToast, AvisoCarregando } from '../../design-system';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useFaturasCarteira } from '../../hooks/useFinanceiroCarteira';
@@ -125,6 +125,7 @@ export const PrevisaoContratos: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando contratos...">
+          <AvisoCarregando label="Carregando contratos" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
         </div>
