@@ -68,6 +68,7 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   UNIDADE_PENDENTE: { label: 'Unidades do contratado', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   FORNECEDOR_PNCP: { label: 'Fornecedor da ata', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   VINCULO_A_CONFERIR: { label: 'Vínculo a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  FONTE_A_CONFERIR: { label: 'Fonte a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   QUANTITATIVOS: { label: 'Quantitativos a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
   PAGAMENTO_PREVISTO: { label: 'Pagamento previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
@@ -148,6 +149,8 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
       return { label: 'Conferir quantitativos', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'FORNECEDOR_PNCP':
       return { label: item.badgeLabel === 'conferir itens' ? 'Conferir Fornecedor' : 'Indicar Fornecedor', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'FONTE_A_CONFERIR':
+      return { label: 'Conferir no contrato', targetUrl: contractItemUrl(item) };
     case 'VINCULO_A_CONFERIR':
       return { label: 'Conferir vínculo', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'PAGAMENTO_CRITICO':

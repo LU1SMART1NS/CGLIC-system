@@ -9,9 +9,11 @@ import { isLembreteNaJanela } from '../config/alertRules';
 import type { AvisoPagamento } from './avisosPagamentoService';
 import { chaveAvisoLembrete, chaveAvisoVinculo } from './avisosResolvidosService';
 import { textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
+import type { AusenteDaFonte } from './ausentesDaFonteService';
 
 /** VINCULO: vínculo automático com a ata desmentido pela fonte, com trabalho do gestor, a conferir (migration 112). */
-export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE' | 'VINCULO';
+/** FONTE: nota ou fatura que a fonte deixou de listar e tem trabalho da equipe, a conferir (migration 113). */
+export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE' | 'VINCULO' | 'FONTE';
 
 export interface ContractActionItem {
   id: string;
@@ -30,6 +32,8 @@ export interface ContractActionItem {
   avisoChave?: string;
   /** Tela onde o aviso se resolve (kind VINCULO: Contratos vinculados do item). */
   targetUrl?: string;
+  /** kind FONTE: qual nota ou fatura, para a decisão do coordenador. */
+  ausenteDaFonte?: { tipo: 'NOTA' | 'FATURA'; chave: string };
 }
 
 export interface ContractActionQueue {
@@ -46,7 +50,8 @@ const KIND_BY_CATEGORY: Partial<Record<DashboardAttentionItem['category'], Contr
   TAREFA_ATRASADA: 'TAREFA',
   TAREFA_PROXIMA: 'TAREFA',
   PAGAMENTO_CRITICO: 'PAGAMENTO',
-  REAJUSTE_RADAR: 'REAJUSTE'
+  REAJUSTE_RADAR: 'REAJUSTE',
+  FONTE_A_CONFERIR: 'FONTE'
 };
 
 function isTaskOpen(status?: string): boolean {
@@ -76,9 +81,11 @@ export function buildContractActionQueue(params: {
   avisosResolvidos?: ReadonlySet<string>;
   /** Vínculos automáticos desmentidos pela fonte com trabalho do gestor (qualquer contrato; a fila pega os deste). */
   vinculosAConferir?: VinculoAConferir[];
+  /** Notas e faturas a conferir (qualquer contrato; o funil pega as deste). */
+  ausentesDaFonte?: AusenteDaFonte[];
   currentDate?: Date;
 }): ContractActionQueue {
-  const { contractKey, plan, paymentCycles = [], avisosPagamento = [], avisosResolvidos = new Set<string>(), vinculosAConferir = [], currentDate } = params;
+  const { contractKey, plan, paymentCycles = [], avisosPagamento = [], avisosResolvidos = new Set<string>(), vinculosAConferir = [], ausentesDaFonte = [], currentDate } = params;
   const dispensados: ContractActionItem[] = [];
   // Vigência encerrada: os lembretes de prorrogação (D-180/D-60) perdem o sentido.
   const fimVigencia = parseDateBRT(params.contract.dataVigenciaFim);
@@ -113,6 +120,7 @@ export function buildContractActionQueue(params: {
     plans,
     paymentCycles,
     avisosResolvidos,
+    ausentesDaFonte,
     currentDate
   });
   for (const f of [...funnelItems, ...resolvidos]) {
@@ -129,7 +137,8 @@ export function buildContractActionQueue(params: {
         diasRelevantes: f.diasRelevantes,
         dataAlvo: f.dataAlvo,
         taskId: f.taskId,
-        avisoChave: f.avisoChave
+        avisoChave: f.avisoChave,
+        ausenteDaFonte: f.ausenteDaFonte
       })
     );
   }

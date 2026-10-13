@@ -1,6 +1,9 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
+import { useAusentesDaFonte } from '../../hooks/useAusentesDaFonte';
+import { ActionButton } from '../../design-system/components/ActionButton';
+import { AusenteDaFonteDecisao } from '../fonte/AusenteDaFonteDecisao';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { ContractTaskPlan } from '../../types';
@@ -35,13 +38,16 @@ const KIND_LABELS: Record<ContractActionItem['kind'], string> = {
   PAGAMENTO: 'Pagamento',
   REAJUSTE: 'Reajuste / repactuação',
   LEMBRETE: 'Prazo legal',
-  VINCULO: 'Vínculo com a ata'
+  VINCULO: 'Vínculo com a ata',
+  FONTE: 'Fonte a conferir'
 };
 
 export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue, plan, isLoading = false, onGoTo }) => {
   const { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo } = useResolverAviso();
   const [searchParams] = useSearchParams();
   const navigate = useNavigateWithOrigin();
+  const { podeDecidir } = useAusentesDaFonte();
+  const [decidindo, setDecidindo] = React.useState<{ tipo: 'NOTA' | 'FATURA'; chave: string } | null>(null);
   const highlightedId = searchParams.get('item');
 
   React.useEffect(() => {
@@ -88,6 +94,15 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
             {check}
             {rowGo(item) ? <SetaDaLinha /> : null}
+          </div>
+        );
+      case 'FONTE':
+        return (
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            {check}
+            {podeDecidir && item.ausenteDaFonte ? (
+              <ActionButton action="conferir" size="sm" onClick={() => setDecidindo(item.ausenteDaFonte!)} data-testid={`decidir-${item.id}`} />
+            ) : null}
           </div>
         );
       case 'LEMBRETE':
@@ -218,6 +233,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
         </AppButton>
       )}
       {dialog}
+      {decidindo && <AusenteDaFonteDecisao tipo={decidindo.tipo} chave={decidindo.chave} onClose={() => setDecidindo(null)} />}
     </div>
   );
 };
