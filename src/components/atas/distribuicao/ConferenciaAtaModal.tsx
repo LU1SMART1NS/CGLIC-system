@@ -1,10 +1,9 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ExternalLink, Loader2, MinusCircle } from 'lucide-react';
-import { ActionButton, AppButton, Modal, NoticeBar } from '../../../design-system';
+import { CheckCircle2, Loader2, MinusCircle } from 'lucide-react';
+import { ActionButton, Modal, NoticeBar } from '../../../design-system';
 import { useToast } from '../../../design-system/components/Toast';
 import { useDescartarAta } from '../../../hooks/useDescartesAtaContrato';
-import { buildAtaPath } from '../../../hooks/useAta';
 import { useVinculoEmMassa } from '../../../hooks/useVinculoEmMassa';
 import { fetchContractItemQuantities } from '../../../services/contractItemsService';
 import type { PlanoVinculo } from '../../../services/vinculoEmMassaService';
@@ -161,8 +160,6 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
     }
   };
 
-  const verAtaCompleta = () => window.open(buildAtaPath(ata.numeroAta, ata.uasg), '_blank', 'noopener');
-
   return (
     <Modal
       isOpen
@@ -173,9 +170,6 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
       subtitle="Confira se o contrato pertence a esta ata"
       footer={
         <>
-          <AppButton variant="outline" size="sm" icon={<ExternalLink size={13} />} onClick={verAtaCompleta} title="Abrir a Ata 360 em outra aba, só para consulta">
-            Ver ata completa
-          </AppButton>
           {podeAgir && (
             <>
               <ActionButton
@@ -209,16 +203,16 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '1rem' }}>
           <section aria-label="Contrato" style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
             <strong style={{ fontSize: '0.9rem' }}>Contrato {contrato.numero}</strong>
-            <Campo rotulo="Fornecedor">{contrato.fornecedorNome}</Campo>
+            <Campo rotulo="Fornecedor">{contrato.fornecedorNome?.toUpperCase()}</Campo>
             <Campo rotulo="Vigência">{contrato.contract.dataVigenciaFim ? `até ${formatDateBR(contrato.contract.dataVigenciaFim)}` : undefined}</Campo>
-            <Campo rotulo="Objeto" limitar>{contrato.objeto}</Campo>
+            <Campo rotulo="Objeto" limitar>{contrato.objeto?.toUpperCase()}</Campo>
             <Campo rotulo="Gestor">{contrato.gestorNome || 'sem gestor'}</Campo>
           </section>
           <section aria-label="Ata" style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
             <strong style={{ fontSize: '0.9rem' }}>Ata {ata.numeroAta}</strong>
-            <Campo rotulo="Fornecedor">{ata.fornecedorNome}</Campo>
+            <Campo rotulo="Fornecedor">{ata.fornecedorNome?.toUpperCase()}</Campo>
             <Campo rotulo="Vigência">{ata.vigenciaFim ? `até ${formatDateBR(ata.vigenciaFim)}` : undefined}</Campo>
-            <Campo rotulo="Objeto" limitar>{ata.objeto}</Campo>
+            <Campo rotulo="Objeto" limitar>{ata.objeto?.toUpperCase()}</Campo>
             <Campo rotulo="Gestor">{ata.gestorNome || 'sem gestor'}</Campo>
           </section>
         </div>
