@@ -73,13 +73,15 @@ import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
 import { QuantitativosTab } from './item-balances/QuantitativosTab';
+import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOrgaoTab';
+import { adesoesDaSenasp, papelDoItem } from '../utils/quantitativosOutroOrgao';
 import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract, UnidadeItemRecord } from '../types';
 import { STATUS_A_VENCER, formatStatusVigencia } from '../utils/statusVigencia';
-import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
+import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp, papelSenaspDaAta } from '../utils/ataIdentidade';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -457,7 +459,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Com a ata assinada informada (migration 109), a base do saldo e o limite da alocação são a cota própria:
   // o registrado da SENASP menos o que ela gerencia para os órgãos participantes.
   const { data: quantitativos, isLoading: quantitativosLoading } = useQuantitativosDoItem(canonicalItemKey);
-  const baseSaldo = quantitativos.informado ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty;
+  // Só na ata da SENASP: na ata de outro órgão (migration 114) a base continua o registrado (ou o aprovado na adesão).
+  const cotaPropriaInformada = !ataDeOutroOrgao(arp) && quantitativos.informado;
+  const baseSaldo = cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty;
 
   const handleLinkEmpenho = async (empenhoUnidade: string, departmentId: string) => {
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
@@ -629,6 +633,37 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     return (a.codigoUnidade || '').localeCompare(b.codigoUnidade || '');
   });
 
+  // Papel da SENASP neste item (ata de outro órgão: participante ou adesão, migration 114).
+  const papelDoAItem = papelDoItem(papelSenaspDaAta(arp), unidades, adesoesDaSenasp(adesoes));
+  const unidadesInternasDoItem = (
+    <AllocationsTab
+      ugUasg={arp.codigoUnidadeGerenciadora}
+      item={{
+        numeroAta: arp.numeroAtaRegistroPreco,
+        uasg: arp.codigoUnidadeGerenciadora,
+        numeroItem: String(item.numeroItem),
+        descricao: item.descricaoItem,
+        quantitativoSenasp: baseSaldo,
+        rotuloLimite: cotaPropriaInformada ? 'Cota própria da SENASP' : papelDoAItem === 'ADESAO' ? 'Quantidade aprovada da SENASP' : papelDoAItem === 'PARTICIPANTE' ? 'Quantidade registrada da SENASP' : undefined
+      }}
+      totalUG={baseSaldo}
+      totalAllocated={totalAllocatedSum}
+      remaining={remainingUGQty}
+      percentAllocated={percentAllocated}
+      rows={allocationRows}
+      semUnidade={allocationExecution.semUnidade}
+      contratadoItem={executionSummary.contratado}
+      contratadoSemUnidade={contratadoSemUnidade}
+      contratosAConferir={contratosAConferir}
+      departments={departments}
+      departmentsLoading={departmentsLoading}
+      canManage={canManageAllocations}
+      canInformUnits={canEditData}
+      error={allocationError}
+      onGoToContracts={() => setActiveTab('contratos')}
+    />
+  );
+
   const linkedContractsCount = manualContratos.length + enrichedOfficialLinks.length;
   const contractsCount = linkedContractsCount;
 
@@ -679,53 +714,50 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'quantitativos' ? (
-          <QuantitativosTab
-            itemKey={canonicalItemKey}
-            tituloItem={tituloItem}
-            ataDaCglic={ataDaCglic}
-            homologado={Number(item.quantidadeHomologadaItem) || 0}
-            unidades={sortedUnidades}
-            loading={loading || quantitativosLoading}
-            error={error}
-            origem={unidadesDoItem?.origem ?? 'API'}
-            copiadoEm={unidadesDoItem?.copiadoEm ?? null}
-            registradoSenasp={totalUGQty}
-            baseSaldo={baseSaldo}
-            contratadoSenasp={executionSummary.contratado}
-            quantitativos={quantitativos}
-            podeInformar={canEditData}
-            podeRemanejar={canManageAllocations}
-            alocado={totalAllocatedSum}
-            totalUnidadesInternas={allocations.length}
-            unidadesInternas={
-              <AllocationsTab
-                ugUasg={arp.codigoUnidadeGerenciadora}
-                item={{
-                  numeroAta: arp.numeroAtaRegistroPreco,
-                  uasg: arp.codigoUnidadeGerenciadora,
-                  numeroItem: String(item.numeroItem),
-                  descricao: item.descricaoItem,
-                  quantitativoSenasp: baseSaldo,
-                  rotuloLimite: quantitativos.informado ? 'Cota própria da SENASP' : undefined
-                }}
-                totalUG={baseSaldo}
-                totalAllocated={totalAllocatedSum}
-                remaining={remainingUGQty}
-                percentAllocated={percentAllocated}
-                rows={allocationRows}
-                semUnidade={allocationExecution.semUnidade}
-                contratadoItem={executionSummary.contratado}
-                contratadoSemUnidade={contratadoSemUnidade}
-                contratosAConferir={contratosAConferir}
-                departments={departments}
-                departmentsLoading={departmentsLoading}
-                canManage={canManageAllocations}
-                canInformUnits={canEditData}
-                error={allocationError}
-                onGoToContracts={() => setActiveTab('contratos')}
-              />
-            }
-          />
+          ataDaCglic ? (
+            <QuantitativosTab
+              itemKey={canonicalItemKey}
+              tituloItem={tituloItem}
+              ataDaCglic={ataDaCglic}
+              homologado={Number(item.quantidadeHomologadaItem) || 0}
+              unidades={sortedUnidades}
+              loading={loading || quantitativosLoading}
+              error={error}
+              origem={unidadesDoItem?.origem ?? 'API'}
+              copiadoEm={unidadesDoItem?.copiadoEm ?? null}
+              registradoSenasp={totalUGQty}
+              baseSaldo={baseSaldo}
+              contratadoSenasp={executionSummary.contratado}
+              quantitativos={quantitativos}
+              podeInformar={canEditData}
+              podeRemanejar={canManageAllocations}
+              alocado={totalAllocatedSum}
+              totalUnidadesInternas={allocations.length}
+              unidadesInternas={unidadesInternasDoItem}
+            />
+          ) : (
+            <QuantitativosOutroOrgaoTab
+              itemKey={canonicalItemKey}
+              tituloItem={tituloItem}
+              papel={papelDoAItem === 'ADESAO' ? 'ADESAO' : 'PARTICIPANTE'}
+              uasgGerenciadora={arp.codigoUnidadeGerenciadora}
+              uasgSenasp={carteiraDaAta(arp)}
+              unidades={sortedUnidades}
+              loading={loading || quantitativosLoading || adesoesLoading}
+              error={error}
+              origem={unidadesDoItem?.origem ?? 'API'}
+              copiadoEm={unidadesDoItem?.copiadoEm ?? null}
+              quantidadeSenasp={totalUGQty}
+              contratadoSenasp={executionSummary.contratado}
+              quantitativos={quantitativos}
+              adesoes={adesoes}
+              podeInformar={canEditData}
+              podeRemanejar={canManageAllocations}
+              alocado={totalAllocatedSum}
+              totalUnidadesInternas={allocations.length}
+              unidadesInternas={unidadesInternasDoItem}
+            />
+          )
         ) : activeTab === 'contratos' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="contratos-tab">
               <div>

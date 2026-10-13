@@ -11,7 +11,7 @@ import type { UnidadeItemRecord } from '../../../types';
 const org = (p: Partial<OrgaoQuantitativo> & { uasg: string }): OrgaoQuantitativo => ({
   nomeOrgao: null, tipoUnidade: 'PARTICIPANTE', ehSenasp: false, quantidadeAssinada: 0, quantidadeRegistrada: 0, semRegistro: false,
   situacao: 'IGUAL', falta: 0, acima: 0, remanejadoConfirmado: 0, resto: 0, continuaDoOrgao: null, gerenciado: 0, mudou: false,
-  mudouEm: null, atualizadoEm: null, ...p
+  mudouEm: null, atualizadoEm: null, ataDaSenasp: true, ...p
 });
 const unidade = (codigoUnidade: string, nomeUnidade: string, quantidadeRegistrada: number, tipoUnidade = 'PARTICIPANTE') =>
   ({ codigoUnidade, nomeUnidade, quantidadeRegistrada, tipoUnidade } as UnidadeItemRecord);
