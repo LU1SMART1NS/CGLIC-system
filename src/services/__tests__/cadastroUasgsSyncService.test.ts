@@ -31,8 +31,27 @@ describe('cadastro de UASGs', () => {
     expect(fetcher).toHaveBeenLastCalledWith('/api-arp/modulo-uasg/1_consultarUasg?pagina=1&codigoUasg=123456&statusUasg=false');
   });
 
-  it('erro da fonte lança: não grava "não achada" por engano', async () => {
+  it('erro da fonte lança depois de 3 tentativas: não grava "não achada" por engano', async () => {
     const fetcher = vi.fn(async () => resposta([], false, 503));
-    await expect(lerUasgNoCadastro('462492', fetcher as unknown as typeof fetch)).rejects.toThrow('503');
+    const esperar = vi.fn(async () => {});
+    await expect(lerUasgNoCadastro('462492', fetcher as unknown as typeof fetch, esperar)).rejects.toThrow('503');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(esperar.mock.calls).toEqual([[3000], [6000]]);
+  });
+
+  it('429 e falha de rede: espera e tenta de novo', async () => {
+    const ok = resposta([{ codigoUasg: '462492', nomeUasg: 'CBM RR', siglaUf: 'RR' }]);
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(resposta([], false, 429))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(ok);
+    const r = await lerUasgNoCadastro('462492', fetcher as unknown as typeof fetch, async () => {});
+    expect(r.nome).toBe('CBM RR');
+  });
+
+  it('404 ou 400 não insiste', async () => {
+    const fetcher = vi.fn(async () => resposta([], false, 400));
+    await expect(lerUasgNoCadastro('462492', fetcher as unknown as typeof fetch, async () => {})).rejects.toThrow('400');
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
