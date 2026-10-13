@@ -7,7 +7,7 @@ import { useDescartarAta } from '../../../hooks/useDescartesAtaContrato';
 import { useVinculoEmMassa } from '../../../hooks/useVinculoEmMassa';
 import { fetchContractItemQuantities } from '../../../services/contractItemsService';
 import type { PlanoVinculo } from '../../../services/vinculoEmMassaService';
-import { formatDateBR, primeiraMaiuscula } from '../../../utils/format';
+import { formatDateBR } from '../../../utils/format';
 import { normalizeItemKey } from '../../../utils/itemKeyUtils';
 import { sugerirAtas, type FilaAta, type ItemFila } from './contratosSemAta';
 import { efeitoGestorVariasAtas, preverVinculo, type ItemDaAta } from './vinculoEmMassa';
@@ -205,14 +205,14 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
             <strong style={{ fontSize: '0.9rem' }}>Contrato {contrato.numero}</strong>
             <Campo rotulo="Fornecedor">{contrato.fornecedorNome?.toUpperCase()}</Campo>
             <Campo rotulo="Vigência">{contrato.contract.dataVigenciaFim ? `até ${formatDateBR(contrato.contract.dataVigenciaFim)}` : undefined}</Campo>
-            <Campo rotulo="Objeto" limitar>{primeiraMaiuscula(contrato.objeto)}</Campo>
+            <Campo rotulo="Objeto" limitar>{contrato.objeto?.toUpperCase()}</Campo>
             <Campo rotulo="Gestor">{contrato.gestorNome || 'sem gestor'}</Campo>
           </section>
           <section aria-label="Ata" style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
             <strong style={{ fontSize: '0.9rem' }}>Ata {ata.numeroAta}</strong>
             <Campo rotulo="Fornecedor">{ata.fornecedorNome?.toUpperCase()}</Campo>
             <Campo rotulo="Vigência">{ata.vigenciaFim ? `até ${formatDateBR(ata.vigenciaFim)}` : undefined}</Campo>
-            <Campo rotulo="Objeto" limitar>{primeiraMaiuscula(ata.objeto)}</Campo>
+            <Campo rotulo="Objeto" limitar>{ata.objeto?.toUpperCase()}</Campo>
             <Campo rotulo="Gestor">{ata.gestorNome || 'sem gestor'}</Campo>
           </section>
         </div>

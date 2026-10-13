@@ -77,17 +77,3 @@ export function formatProcessoSei(valor?: string | null): string {
   }
   return texto;
 }
-
-/**
- * Texto com a primeira letra maiúscula, só para exibição. Texto todo em maiúsculas (como o Contratos.gov.br entrega
- * o objeto) vira minúsculas com a primeira maiúscula; texto que já mistura os dois só ganha a primeira maiúscula e o
- * resto fica como veio (preserva siglas e nomes próprios). Siglas de um texto todo em maiúsculas não são recuperáveis.
- */
-export function primeiraMaiuscula(texto?: string | null): string {
-  const t = (texto ?? '').trim();
-  if (!t) return '';
-  const base = t === t.toUpperCase() && t !== t.toLowerCase() ? t.toLowerCase() : t;
-  const i = base.search(/\p{L}/u);
-  if (i < 0) return base;
-  return base.slice(0, i) + base.charAt(i).toLocaleUpperCase('pt-BR') + base.slice(i + 1);
-}
