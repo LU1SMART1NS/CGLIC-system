@@ -39,6 +39,14 @@ export function chaveAvisoUnidade(numeroAta: string, uasg: string, numeroItem: s
   return `SALDO::${numeroAta}-${uasg}::${numeroItemCanonico(numeroItem)}::UNIDADE-${motivo}-${quantidade}`;
 }
 
+/**
+ * Quantitativos do item a conferir (migration 109). Usa o tipo SALDO; os motivos e os números entram na chave, então o
+ * aviso volta se a situação mudar (outro órgão fora da ata, cota própria diferente).
+ */
+export function chaveAvisoQuantitativos(numeroAta: string, uasg: string, numeroItem: string | number, assinatura: string): string {
+  return `SALDO::${numeroAta}-${uasg}::${numeroItemCanonico(numeroItem)}::QUANTITATIVOS-${assinatura}`;
+}
+
 /** Reajuste: vale para o ciclo; o próximo ciclo avisa de novo. */
 export function chaveAvisoReajuste(contractKey: string, ciclo: string | number): string {
   return `REAJUSTE::${contractKey}::${ciclo}`;
