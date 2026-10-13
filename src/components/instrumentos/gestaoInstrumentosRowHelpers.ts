@@ -154,7 +154,10 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
     case 'VINCULO_A_CONFERIR':
       return { label: 'Conferir vínculo', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'PAGAMENTO_CRITICO':
-      return { label: 'Abrir pagamento', targetUrl: '/pagamentos' };
+      return {
+        label: 'Abrir pagamento',
+        targetUrl: item.contractKey ? `/contratos/${encodeURIComponent(item.contractKey)}?aba=pagamentos` : '/pagamentos'
+      };
     case 'PAGAMENTO_PREVISTO':
       return { label: item.contractKey ? 'Abrir Pagamentos do Contrato' : 'Abrir Previsão', targetUrl: item.targetUrl || '/pagamentos' };
     case 'REAJUSTE_RADAR':
