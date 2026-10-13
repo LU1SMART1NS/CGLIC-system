@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { ContractTaskPlan } from '../../types';
@@ -33,12 +34,14 @@ const KIND_LABELS: Record<ContractActionItem['kind'], string> = {
   TAREFA: 'Tarefa',
   PAGAMENTO: 'Pagamento',
   REAJUSTE: 'Reajuste / repactuação',
-  LEMBRETE: 'Prazo legal'
+  LEMBRETE: 'Prazo legal',
+  VINCULO: 'Vínculo com a ata'
 };
 
 export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue, plan, isLoading = false, onGoTo }) => {
   const { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo } = useResolverAviso();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigateWithOrigin();
   const highlightedId = searchParams.get('item');
 
   React.useEffect(() => {
@@ -60,6 +63,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
     switch (item.kind) {
       case 'PAGAMENTO': return { label: item.id.startsWith('AVISO-') ? 'Ver pagamentos do contrato' : 'Abrir ciclo', go: () => onGoTo('pagamentos') };
       case 'REAJUSTE': return { label: 'Ver histórico', go: () => onGoTo('historico') };
+      case 'VINCULO': return item.targetUrl ? { label: 'Conferir o vínculo no item', go: () => navigate(item.targetUrl!) } : null;
       default: return null;
     }
   };
@@ -79,6 +83,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
         return check;
       case 'PAGAMENTO':
       case 'REAJUSTE':
+      case 'VINCULO':
         return (
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
             {check}

@@ -58,6 +58,8 @@ export type DashboardAttentionCategory =
   | 'UNIDADE_PENDENTE'
   /** Ata publicada no PNCP sem fornecedor: o coordenador indica, ou a indicação diverge do Compras.gov.br (migration 107). */
   | 'FORNECEDOR_PNCP'
+  /** Vínculo automático que a fonte desmentiu mas que tem trabalho do gestor: o cron não o apaga e o coordenador decide (migration 112). */
+  | 'VINCULO_A_CONFERIR'
   /** Quantitativos do item a conferir: cota própria negativa, órgão fora da ata assinada, soma que não fecha ou
    *  participante com contratado acima do registrado (migration 109). Pendência do gestor de saldo. */
   | 'QUANTITATIVOS'

@@ -47,6 +47,16 @@ export function chaveAvisoQuantitativos(numeroAta: string, uasg: string, numeroI
   return `SALDO::${numeroAta}-${uasg}::${numeroItemCanonico(numeroItem)}::QUANTITATIVOS-${assinatura}`;
 }
 
+/**
+ * Vínculo automático desmentido pela fonte que tem trabalho do gestor (migration 112). Usa o tipo SALDO; o contrato, o
+ * motivo e o momento em que a marca foi criada entram na chave, então o aviso volta se mudar o motivo ou se a marca
+ * for refeita depois de a fonte confirmar o par.
+ */
+export function chaveAvisoVinculo(numeroAta: string, uasg: string, numeroItem: string | number, contractKey: string, motivo: string, detectadoEm: string): string {
+  const epoch = Math.floor(new Date(detectadoEm).getTime() / 1000) || 0;
+  return `SALDO::${numeroAta}-${uasg}::${numeroItemCanonico(numeroItem)}::VINCULO-${contractKey}-${motivo}-${epoch}`;
+}
+
 /** Reajuste: vale para o ciclo; o próximo ciclo avisa de novo. */
 export function chaveAvisoReajuste(contractKey: string, ciclo: string | number): string {
   return `REAJUSTE::${contractKey}::${ciclo}`;

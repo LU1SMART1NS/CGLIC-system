@@ -3,6 +3,7 @@ import type { ArpRecord, AtaTaskPlan } from '../types';
 import { buildAtaActionQueue, type AtaActionQueue, type AtaItemSaldoInput } from '../services/ataActionQueueService';
 import type { RegistroFornecedorPncp } from '../services/fornecedorAtaPncpService';
 import { useAvisosResolvidos } from './useAvisosResolvidos';
+import { useVinculosAConferir } from './useVinculosAConferir';
 
 const EMPTY_QUEUE: AtaActionQueue = {
   items: [],
@@ -20,9 +21,10 @@ export function useAtaActionQueue(
   const { porChave } = useAvisosResolvidos();
   const resolvidos = useMemo(() => new Set(porChave.keys()), [porChave]);
   const { registro = null, itensNoBanco = 0 } = fornecedor;
+  const { vinculos } = useVinculosAConferir();
 
   return useMemo(
-    () => (arp ? buildAtaActionQueue({ arp, saldos, plan, avisosResolvidos: resolvidos, fornecedorPncp: registro, itensNoBanco }) : EMPTY_QUEUE),
-    [arp, saldos, plan, resolvidos, registro, itensNoBanco]
+    () => (arp ? buildAtaActionQueue({ arp, saldos, plan, avisosResolvidos: resolvidos, fornecedorPncp: registro, itensNoBanco, vinculosAConferir: vinculos }) : EMPTY_QUEUE),
+    [arp, saldos, plan, resolvidos, registro, itensNoBanco, vinculos]
   );
 }

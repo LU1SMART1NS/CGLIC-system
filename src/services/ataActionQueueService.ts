@@ -6,11 +6,13 @@ import { differenceInBusinessDays, parseDateBRT } from './temporalEngineService'
 import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import { classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { toSentenceCaseIfAllCaps } from '../utils/textCase';
-import { chaveAvisoLembrete, chaveAvisoSaldo } from './avisosResolvidosService';
+import { chaveAvisoLembrete, chaveAvisoSaldo, chaveAvisoVinculo } from './avisosResolvidosService';
+import { numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
 import type { RegistroFornecedorPncp } from './fornecedorAtaPncpService';
 
-/** CADASTRO: a ata veio do PNCP sem fornecedor e precisa da indicação do coordenador (atas_fornecedor_pncp). */
-export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE' | 'CADASTRO';
+/** CADASTRO: a ata veio do PNCP sem fornecedor e precisa da indicação do coordenador (atas_fornecedor_pncp).
+ *  VINCULO: vínculo automático desmentido pela fonte, com trabalho do gestor, a conferir (migration 112). */
+export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE' | 'CADASTRO' | 'VINCULO';
 
 export interface AtaActionItem {
   id: string;
@@ -139,9 +141,11 @@ export function buildAtaActionQueue(params: {
   fornecedorPncp?: RegistroFornecedorPncp | null;
   /** Itens da ata já gravados no banco (com itens, a indicação já surtiu efeito). */
   itensNoBanco?: number;
+  /** Vínculos automáticos desmentidos pela fonte com trabalho do gestor (qualquer ata; a fila pega os desta). */
+  vinculosAConferir?: VinculoAConferir[];
   currentDate?: Date;
 }): AtaActionQueue {
-  const { arp, saldos = [], plan = null, avisosResolvidos = new Set<string>(), fornecedorPncp = null, itensNoBanco = 0, currentDate } = params;
+  const { arp, saldos = [], plan = null, avisosResolvidos = new Set<string>(), fornecedorPncp = null, itensNoBanco = 0, vinculosAConferir = [], currentDate } = params;
   const items: AtaActionItem[] = [];
   const dispensados: AtaActionItem[] = [];
 
@@ -149,6 +153,25 @@ export function buildAtaActionQueue(params: {
   // some ao indicar o fornecedor ou quando o Compras.gov.br publicar a ata.
   const cadastro = pendenciaDeFornecedor(arp, fornecedorPncp, itensNoBanco);
   if (cadastro) items.push(cadastro);
+
+  // 0b. Vínculo automático desmentido pela fonte que tem trabalho do gestor: o cron não o apaga; o coordenador
+  // decide manter ou retirar (Contratos vinculados). O ✓ só esconde o aviso.
+  for (const v of vinculosAConferir) {
+    if (v.numeroAta !== arp.numeroAtaRegistroPreco || v.uasg !== arp.codigoUnidadeGerenciadora) continue;
+    const numeroItem = String(Number(v.numeroItem) || v.numeroItem);
+    const trabalho = trabalhoDoGestor(v);
+    const aviso: AtaActionItem = {
+      id: `ATA-VINCULO-${v.itemKey}-${v.contractKey}`,
+      kind: 'VINCULO',
+      severity: 'URGENTE',
+      title: `Item ${numeroItem} · contrato ${numeroDoContrato(v.contractKey)}: vínculo desmentido pela fonte`,
+      description: `${textoDoMotivoVinculo(v.motivo)}; mantido porque tem ${trabalho || 'trabalho do gestor'}`,
+      badgeLabel: 'a conferir',
+      numeroItem,
+      avisoChave: chaveAvisoVinculo(v.numeroAta, v.uasg, v.numeroItem, v.contractKey, v.motivo, v.detectadoEm)
+    };
+    (avisosResolvidos.has(aviso.avisoChave!) ? dispensados : items).push(aviso);
+  }
 
   // 1. Saldo físico dos itens
   for (const s of saldos) {

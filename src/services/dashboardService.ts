@@ -15,6 +15,7 @@
 
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
+import { fetchVinculosAConferir, numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
 import type {
   ContractDashboardRecord,
   ArpRecord,
@@ -55,7 +56,7 @@ function chaveDoSaldo(item: any): string {
   return numero ? chaveGestaoAta(numero, item?.codigo_uasg || item?.codigoUasg) : '';
 }
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
-import { chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, fetchAvisosResolvidos } from './avisosResolvidosService';
+import { chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -249,6 +250,8 @@ export function calculateAttentionSummary(params: {
   arpItems?: Array<{ percentual_consumido?: number }>;
   /** Atas publicadas no PNCP sem fornecedor (atas_fornecedor_pncp, migration 107). */
   fornecedoresPncp?: RegistroFornecedorPncp[];
+  /** Vínculos automáticos desmentidos pela fonte com trabalho do gestor (vinculo_automatico_a_conferir, migration 112). */
+  vinculosAConferir?: VinculoAConferir[];
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -262,6 +265,7 @@ export function calculateAttentionSummary(params: {
     paymentCycles = [],
     arpItems = [],
     fornecedoresPncp = [],
+    vinculosAConferir = [],
     currentDate
   } = params;
 
@@ -349,6 +353,30 @@ export function calculateAttentionSummary(params: {
     });
   }
 
+
+  // 0b. Vínculo automático desmentido pela fonte com trabalho do gestor (migration 112): o cron não o apaga, e o
+  // gestor da ata e do contrato precisa saber. O coordenador decide manter ou retirar; o gestor pode marcar o aviso
+  // como resolvido (só esconde, não decide).
+  const arpsDoPainel = new Set(arps.map((a) => `${a.numeroAtaRegistroPreco}|${a.codigoUnidadeGerenciadora}`));
+  for (const v of vinculosAConferir) {
+    if (!v.numeroAta || !arpsDoPainel.has(`${v.numeroAta}|${v.uasg}`)) continue; // só atas da carteira em tela
+    const trabalho = trabalhoDoGestor(v);
+    const numeroContrato = numeroDoContrato(v.contractKey);
+    items.push({
+      id: `ATT-VINCULO-${v.itemKey}-${v.contractKey}`,
+      category: 'VINCULO_A_CONFERIR',
+      severity: 'URGENTE',
+      avisoChave: chaveAvisoVinculo(v.numeroAta, v.uasg, v.numeroItem, v.contractKey, v.motivo, v.detectadoEm),
+      title: 'Vínculo automático desmentido pela fonte',
+      description: `Ata ${v.numeroAta} — Item ${Number(v.numeroItem) || v.numeroItem}, contrato ${numeroContrato}: ${textoDoMotivoVinculo(v.motivo)}. Mantido porque tem ${trabalho || 'trabalho do gestor'}; o coordenador decide`,
+      arpKey: `${v.numeroAta}-${v.uasg}`,
+      numeroAta: v.numeroAta,
+      contractKey: v.contractKey,
+      numeroContrato,
+      targetUrl: `/atas/detalhe/${encodeURIComponent(`${v.numeroAta}-${v.uasg}`)}/itens/${encodeURIComponent(String(Number(v.numeroItem) || v.numeroItem))}?aba=contratos`,
+      badgeLabel: 'a conferir'
+    });
+  }
 
   // 1. Tarefas Atrasadas e Próximas da Central de Prazos
   //
@@ -1169,6 +1197,7 @@ export function buildManagementDashboardReadModel(params: {
   itemsSaldo?: Array<any>;
   paymentCycles?: PaymentFollowUpCycle[];
   fornecedoresPncp?: RegistroFornecedorPncp[];
+  vinculosAConferir?: VinculoAConferir[];
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1426,6 +1455,7 @@ export function buildManagementDashboardReadModel(params: {
     paymentCycles: filteredPaymentCycles,
     arpItems: filteredItemsSaldo,
     fornecedoresPncp: params.fornecedoresPncp,
+    vinculosAConferir: params.vinculosAConferir,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1474,7 +1504,8 @@ export async function fetchManagementDashboardData(
     empenhosResumo,
     arpItemsSaldo,
     itensComAlocacao,
-    fornecedoresPncp
+    fornecedoresPncp,
+    vinculosAConferir
   ] = await Promise.all([
     fetchContratosParaTela(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar contratos para o dashboard:', err);
@@ -1512,6 +1543,10 @@ export async function fetchManagementDashboardData(
     fetchRegistrosFornecedorPncp().catch((err) => {
       console.warn('Erro ao consultar as atas sem fornecedor no PNCP para o dashboard:', err);
       return [] as RegistroFornecedorPncp[];
+    }),
+    fetchVinculosAConferir().catch((err) => {
+      console.warn('Erro ao consultar os vínculos a conferir para o dashboard:', err);
+      return [] as VinculoAConferir[];
     })
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
@@ -1531,6 +1566,7 @@ export async function fetchManagementDashboardData(
     itemsSaldo: arpItemsSaldoComAlocacao,
     paymentCycles,
     fornecedoresPncp,
+    vinculosAConferir,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate

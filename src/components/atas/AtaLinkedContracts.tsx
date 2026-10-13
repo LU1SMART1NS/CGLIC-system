@@ -3,6 +3,7 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { FileText } from 'lucide-react';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { OrigemVinculoBadge } from '../vinculos/OrigemVinculoBadge';
+import { VinculoAConferirAviso } from '../vinculos/VinculoAConferirAviso';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { CarteiraIdLink, propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
@@ -98,6 +99,7 @@ export const AtaLinkedContracts: React.FC<AtaLinkedContractsProps> = ({
                 Item {itemNumberFromKey(link.itemKey)}
                 <OrigemVinculoBadge origem={link.origem} mostrarManual />
               </p>
+              <VinculoAConferirAviso itemKey={link.itemKey} contractKey={link.contractKey} />
               {link.observacoes && (
                 <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.1rem 0 0 0' }}>Obs. {link.observacoes}</p>
               )}

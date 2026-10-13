@@ -26,6 +26,8 @@ const REGRA: Record<AvisoResolvivelTipo, string> = {
   REAJUSTE: 'O aviso não aparece mais neste ciclo de reajuste.',
   LEMBRETE: 'O lembrete não aparece mais nesta vigência.'
 };
+/** Aviso de vínculo a conferir (migration 112): resolver só esconde, não decide o vínculo. */
+const REGRA_VINCULO = 'Só esconde o aviso: o vínculo continua como está até o coordenador decidir. O aviso volta se o motivo mudar.';
 const REGRA_TAREFA = 'A tarefa será marcada como concluída no plano, com a justificativa na observação.';
 
 /** Junta a justificativa à observação que a tarefa já tinha (o RPC substitui a observação). */
@@ -100,7 +102,7 @@ export function useResolverAviso() {
     }
   };
 
-  const regra = alvo ? (alvo.tipo === 'AVISO' ? REGRA[tipoDaChave(alvo.chave)] : REGRA_TAREFA) : '';
+  const regra = alvo ? (alvo.tipo === 'AVISO' ? (alvo.chave.includes('::VINCULO-') ? REGRA_VINCULO : REGRA[tipoDaChave(alvo.chave)]) : REGRA_TAREFA) : '';
 
   const dialog = (
     <Modal
