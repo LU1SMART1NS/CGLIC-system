@@ -9,7 +9,7 @@ const COLORS: Record<NivelAtendimento, { color: string; bg: string }> = {
 
 interface CarteiraNivelPillProps {
   nivel: NivelAtendimento | null;
-  /** Texto de cada nível (ex.: "Totalmente alocado"). */
+  /** Texto de cada nível (ex.: "Alocado"). */
   labels: Record<NivelAtendimento, string>;
 }
 

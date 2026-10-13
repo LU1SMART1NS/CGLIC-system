@@ -29,7 +29,7 @@ import { TODOS_GESTORES, canFilterByGestor, listGestores, matchesGestorFilter } 
 import { comparePrazo } from '../carteira/carteiraPrazo';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
-import { NIVEL_ALOCACAO_LABEL, agregarNivel, type NivelAtendimento } from '../../utils/itemAtendimento';
+import { NIVEL_ALOCACAO_ATA_LABEL, NIVEL_ALOCACAO_LABEL, agregarNivel, type NivelAtendimento } from '../../utils/itemAtendimento';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import { formatNumber } from '../item-balances/itemBalanceUtils';
 import { Boxes } from 'lucide-react';
@@ -66,7 +66,6 @@ const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fon
 const clamp2: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 /** "00059/2025" → "2025/00059": ordena pelo ano e depois pelo número (igual à Carteira › Itens). */
 const ataOrdem = (numero: string) => numero.split('/').reverse().join('/');
-const NIVEL_ATA_LABEL: Record<NivelAtendimento, string> = { SEM: 'Sem alocação', PARCIAL: 'Parcialmente alocada', TOTAL: 'Alocada' };
 const CHIP: Record<NivelAtendimento, { color: string; bg: string; label: (n: number) => string }> = {
   SEM: { color: 'var(--color-danger-text)', bg: 'var(--color-danger-bg)', label: () => 'sem' },
   PARCIAL: { color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)', label: () => 'parcial' },
@@ -449,7 +448,7 @@ export const ItensUnidadesPage: React.FC = () => {
                       {g.falta > 0 ? `${formatNumber(g.falta)} un` : '—'}
                     </td>
                     <td data-label="Situação" style={carteiraTd}>
-                      <CarteiraNivelPill nivel={g.nivel} labels={NIVEL_ATA_LABEL} />
+                      <CarteiraNivelPill nivel={g.nivel} labels={NIVEL_ALOCACAO_ATA_LABEL} />
                     </td>
                     {showGestorFilter && (
                       <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>

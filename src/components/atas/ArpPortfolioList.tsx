@@ -22,7 +22,7 @@ import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteir
 import { ManagerCell } from '../carteira/ManagerAssign';
 import { CarteiraNivelPill } from '../carteira/CarteiraNivelPill';
 import { TODAS_UNIDADES } from '../carteira/CarteiraExecucaoSelects';
-import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
+import { NIVEL_ALOCACAO_ATA_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
 import type { CarteiraAtaExecucao } from '../../utils/carteiraItens';
 import type { ArpPortfolioFilterState } from './ArpPortfolioFilters';
 import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
@@ -277,7 +277,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                           descricao="este nível de alocação"
                           onFilter={onFilter && execucaoPorAta?.get(ataKey)?.nivelAlocacao ? () => onFilter('filtroAlocacao', execucaoPorAta.get(ataKey)!.nivelAlocacao!) : undefined}
                         >
-                          <CarteiraNivelPill nivel={execucaoPorAta?.get(ataKey)?.nivelAlocacao ?? null} labels={NIVEL_ALOCACAO_LABEL} />
+                          <CarteiraNivelPill nivel={execucaoPorAta?.get(ataKey)?.nivelAlocacao ?? null} labels={NIVEL_ALOCACAO_ATA_LABEL} />
                         </CarteiraCellFilter>
                       </td>
                     )}
