@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
-import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { carteiraFornecedor, carteiraTh as th, carteiraTd as td } from '../carteira/carteiraStyles';
+import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import {
   getInstrumentoInfo,
@@ -162,9 +162,11 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
             {pageRows.map(({ item, instrumento, motivo, situacao, fornecedor, responsavel }) => {
               const prazo = getPrazoLabel(item);
               const acao = getAcaoInfo(item);
+              // Como nas carteiras: a linha toda leva ao destino, já com o cartão encolhido e as ações à vista.
+              const abrir = () => navigate(acao.targetUrl, { state: { ancorar: true } });
 
               return (
-                <tr key={item.id} data-testid={`instrumentos-row-${item.id}`}>
+                <tr key={item.id} data-testid={`instrumentos-row-${item.id}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrir)}>
                   <td data-role="id" style={{ ...td, textAlign: 'center' }}>
                     <SeverityBadge severity={item.severity} iconOnly />
                   </td>
@@ -172,7 +174,14 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                     {item.uasg}
                   </td>
                   <td data-role="id" style={td}>
-                    <div style={{ fontWeight: 800 }}>{instrumento.label}</div>
+                    <CarteiraIdLink
+                      onClick={abrir}
+                      label={`${acao.label}: ${instrumento.label}`}
+                      title={item.category === 'PAGAMENTO_CRITICO' || item.category === 'PAGAMENTO_PREVISTO' ? 'O aviso some sozinho quando a etapa do pagamento é registrada' : acao.label}
+                      testId={`instrumentos-action-${item.id}`}
+                    >
+                      {instrumento.label}
+                    </CarteiraIdLink>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                       {instrumento.tipo}
                     </div>
@@ -214,17 +223,9 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
                   </td>
                   <td data-role="action" style={td}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'nowrap' }}>
-                      <AppButton
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(acao.targetUrl)}
-                        data-testid={`instrumentos-action-${item.id}`}
-                        title={item.category === 'PAGAMENTO_CRITICO' || item.category === 'PAGAMENTO_PREVISTO' ? 'O aviso some sozinho quando a etapa do pagamento é registrada' : undefined}
-                      >
-                        {acao.label}
-                        <ChevronRight size={13} />
-                      </AppButton>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                        {acao.label} <ArrowRight size={14} aria-hidden="true" />
+                      </span>
                       {(() => {
                         const alvo = onResolver ? getAlvoResolucao(item) : null;
                         return alvo && (podeResolverAlvo?.(alvo) ?? true)
