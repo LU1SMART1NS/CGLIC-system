@@ -238,7 +238,7 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
       <div>
         <SectionHeader
           title="Alocações"
-          subtitle={`Quantitativo da UG ${ugUasg} alocado às unidades internas.`}
+          subtitle={item.rotuloLimite ? `${item.rotuloLimite} alocada às unidades internas.` : `Quantitativo da UG ${ugUasg} alocado às unidades internas.`}
           icon={<Building2 size={16} />}
           countBadge={rows.length}
           actions={

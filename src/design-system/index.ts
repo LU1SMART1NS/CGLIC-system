@@ -20,6 +20,8 @@ export * from './components/SkeletonLoader';
 export * from './components/Tabs';
 export * from './components/ProgressBar';
 export * from './components/SummaryBar';
+export * from './components/MetricStrip';
+export * from './components/RowActionsMenu';
 export * from './components/InfoHint';
 export * from './components/NoticeBar';
 export * from './components/Timeline';
