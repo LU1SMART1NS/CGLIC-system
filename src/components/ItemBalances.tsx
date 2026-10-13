@@ -133,7 +133,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
     tabs: ITEM_TABS,
     defaultTab: 'quantitativos',
-    // Órgãos participantes e Alocação interna viraram a aba Quantitativos (migration 109).
+    // Órgãos participantes e Alocação interna viraram a aba Órgãos e quantitativos (migration 109).
     aliases: { empenhos: 'contratos', unidades: 'quantitativos', alocacao: 'quantitativos' }
   });
 
@@ -665,7 +665,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       <Instrument360Tabs
         ref={tabsRef}
         tabs={[
-          { id: 'quantitativos', label: 'Quantitativos' },
+          { id: 'quantitativos', label: 'Órgãos e quantitativos' },
           { id: 'contratos', label: `Contratos e empenhos (${contractsCount})` },
           { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` }
         ]}
