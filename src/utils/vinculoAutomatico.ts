@@ -101,10 +101,13 @@ export type GrupoFila = 'ATA_PROVAVEL' | 'PARCIAL' | 'SEM_PISTA' | 'NAO_PERTENCE
  * Frase da coluna "Por que ficou para a equipe". Com o motivo do banco, usa ele; sem (contrato sem ata da mesma compra,
  * vínculo parcial, ou antes da primeira execução), explica pela situação da linha.
  */
+/** Situação da leitura dos motivos no banco: enquanto carrega ou quando falha, a fila não promete nada. */
+export type EstadoMotivos = 'CARREGANDO' | 'FALHOU' | 'OK';
+
 export function textoMotivoDaFila(
   motivo: MotivoVinculoManual | undefined,
   grupo: GrupoFila,
-  ctx: { numeroAta?: string; gestorContrato?: string; gestorAta?: string; vinculoParcial?: boolean } = {}
+  ctx: { numeroAta?: string; gestorContrato?: string; gestorAta?: string; vinculoParcial?: boolean; motivos?: EstadoMotivos } = {}
 ): TextoMotivo {
   if (grupo === 'NAO_PERTENCE') return textoMotivoManual('NAO_PERTENCE_A_ATA');
   if (motivo) return textoMotivoManual(motivo, ctx);
@@ -116,6 +119,12 @@ export function textoMotivoDaFila(
   }
   if (grupo === 'PARCIAL') {
     return { titulo: 'Só uma pista parcial', detalhe: 'Alguma ata é da mesma compra ou do mesmo fornecedor, mas não das duas coisas.', tipo: 'DADO' };
+  }
+  if (ctx.motivos === 'CARREGANDO') {
+    return { titulo: 'Lendo o motivo…', detalhe: 'O sistema está conferindo por que este contrato ficou para a equipe.', tipo: 'DADO' };
+  }
+  if (ctx.motivos === 'FALHOU') {
+    return { titulo: 'Motivo não lido', detalhe: 'Não foi possível ler a regra do sistema. Recarregue a página; se continuar, avise o coordenador.', tipo: 'DADO' };
   }
   return { titulo: 'Aguardando o sistema', detalhe: 'O vínculo automático confere este contrato na próxima execução.', tipo: 'DADO' };
 }

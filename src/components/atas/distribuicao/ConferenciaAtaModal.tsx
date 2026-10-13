@@ -178,11 +178,6 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
           </AppButton>
           {podeAgir && (
             <>
-              {podeDecidir && (
-                <ActionButton action="descartar" size="sm" onClick={naoEhEstaAta} disabled={ocupado} title="Este contrato não pertence a esta ata: ela deixa de ser sugerida" data-testid="conferencia-descartar">
-                  Esta não é a ata
-                </ActionButton>
-              )}
               <ActionButton
                 action="vincular"
                 size="sm"
@@ -200,6 +195,11 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
               >
                 {itensMarcados.length > 0 && !algumConfirmado ? 'Vincular mesmo assim' : 'Vincular'}
               </ActionButton>
+              {podeDecidir && (
+                <ActionButton action="descartar" size="sm" onClick={naoEhEstaAta} disabled={ocupado} title="Este contrato não pertence a esta ata: ela deixa de ser sugerida" data-testid="conferencia-descartar">
+                  Esta não é a ata
+                </ActionButton>
+              )}
             </>
           )}
         </>

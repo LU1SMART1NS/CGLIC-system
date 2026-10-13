@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../arpContractLinkService', () => ({ saveArpContractItemLinks: vi.fn() }));
 vi.mock('../contractItemQuantitySyncService', () => ({ syncContractItemQuantity: vi.fn() }));
+vi.mock('../contractItemsService', () => ({ fetchContractItemDetails: vi.fn() }));
 
 import { saveArpContractItemLinks } from '../arpContractLinkService';
 import { syncContractItemQuantity } from '../contractItemQuantitySyncService';
+import { fetchContractItemDetails } from '../contractItemsService';
 import { executarVinculos, vincularContrato, type PlanoVinculo } from '../vinculoEmMassaService';
 
 const plano = (contractKey: string, itens = ['00001', '00004']): PlanoVinculo => ({
@@ -21,13 +23,24 @@ describe('vinculoEmMassaService', () => {
     vi.resetAllMocks();
     vi.mocked(saveArpContractItemLinks).mockResolvedValue(2);
     vi.mocked(syncContractItemQuantity).mockResolvedValue({ quantidade: 5, valorUnitario: 12, listado: true });
+    vi.mocked(fetchContractItemDetails).mockResolvedValue(new Map([[1, { quantidade: 5, valorUnitario: 12 }]]));
   });
 
-  it('vincula todos os itens de uma vez e lê a quantidade de cada item', async () => {
+  it('vincula todos os itens de uma vez, lê a API uma só vez e grava a quantidade de cada item', async () => {
     const r = await vincularContrato(plano('c1'));
     expect(r).toMatchObject({ ok: true, itens: 2, avisos: [] });
     expect(saveArpContractItemLinks).toHaveBeenCalledWith(expect.objectContaining({ contractKey: 'c1', itemKeys: ['00059/2025-200331-00001', '00059/2025-200331-00004'] }));
+    expect(fetchContractItemDetails).toHaveBeenCalledTimes(1);
     expect(syncContractItemQuantity).toHaveBeenCalledTimes(2);
+    expect(syncContractItemQuantity).toHaveBeenCalledWith(expect.objectContaining({ numeroItem: '00004', detalhes: expect.any(Map) }));
+  });
+
+  it('API sem itens (fora do ar ou tempo esgotado): o vínculo vale e todos os itens viram aviso, sem gravar quantidade', async () => {
+    vi.mocked(fetchContractItemDetails).mockRejectedValueOnce(new Error('Contratos.gov.br não respondeu em 20 s.'));
+    const r = await vincularContrato(plano('c1'));
+    expect(r.ok).toBe(true);
+    expect(r.avisos).toEqual(['quantidade do item 00001', 'quantidade do item 00004']);
+    expect(syncContractItemQuantity).not.toHaveBeenCalled();
   });
 
   it('falha no vínculo (ex.: contrato de outra ata) não lê a API e vira erro do contrato', async () => {

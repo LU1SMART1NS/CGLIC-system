@@ -3,7 +3,7 @@
  * Esta rotina lê a API e grava uma CÓPIA no vínculo (nunca digitada), para a view de saldo
  * (Ata, busca de atas, dashboards) enxergar o consumo do item sem consultar a API.
  */
-import { fetchContractItemDetails } from './contractItemsService';
+import { fetchContractItemDetails, type ContractItemDetails } from './contractItemsService';
 import { syncContractItemQuantityRpc } from '../adapters/arpContractLinkRpcAdapter';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
 import type { ContractDashboardRecord } from '../types';
@@ -15,6 +15,8 @@ export interface SyncContractItemQuantityParams {
   numeroItem: string;
   contractKey: string;
   contract: Pick<ContractDashboardRecord, 'uasg' | 'numero' | 'ano' | 'numeroControlePncp'>;
+  /** Itens do contrato já lidos da API (uma leitura para vários itens do mesmo contrato); sem eles, lê aqui. */
+  detalhes?: ContractItemDetails;
 }
 
 export interface SyncContractItemQuantityResult {
@@ -28,7 +30,7 @@ export async function syncContractItemQuantity(params: SyncContractItemQuantityP
   const { numeroAta, uasg, numeroItem, contractKey, contract } = params;
   const itemKey = normalizeItemKey(numeroAta, uasg, numeroItem);
 
-  const details = await fetchContractItemDetails(contract);
+  const details = params.detalhes ?? (await fetchContractItemDetails(contract));
   if (details.size === 0) {
     // API fora do ar ou contrato ainda não publicado: não marca como lido, para tentar de novo depois.
     throw new Error('A API oficial não retornou os itens do contrato.');

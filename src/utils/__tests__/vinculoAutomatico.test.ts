@@ -39,6 +39,15 @@ describe('textoMotivoDaFila', () => {
     expect(textoMotivoDaFila(undefined, 'ATA_PROVAVEL').titulo).toBe('Aguardando o sistema');
     expect(textoMotivoDaFila(undefined, 'ATA_PROVAVEL', { vinculoParcial: true }).titulo).toBe('Vínculo parcial');
   });
+  it('enquanto os motivos carregam ou quando a leitura falha, não promete que o sistema vai vincular', () => {
+    expect(textoMotivoDaFila(undefined, 'ATA_PROVAVEL', { motivos: 'CARREGANDO' }).titulo).toBe('Lendo o motivo…');
+    expect(textoMotivoDaFila(undefined, 'ATA_PROVAVEL', { motivos: 'FALHOU' }).titulo).toBe('Motivo não lido');
+    expect(textoMotivoDaFila(undefined, 'ATA_PROVAVEL', { motivos: 'OK' }).titulo).toBe('Aguardando o sistema');
+    // Com motivo do banco, o estado da leitura não importa.
+    expect(textoMotivoDaFila('OUTRO_FORNECEDOR', 'ATA_PROVAVEL', { motivos: 'FALHOU' }).titulo).toBe('Fornecedor não confirmado');
+    // Sem pista e pista parcial se explicam pela própria linha.
+    expect(textoMotivoDaFila(undefined, 'SEM_PISTA', { motivos: 'CARREGANDO' }).titulo).toBe('Sem ata da mesma compra');
+  });
   it('não pertence a ata vale mesmo com outro motivo', () => {
     expect(textoMotivoDaFila('OUTRO_FORNECEDOR', 'NAO_PERTENCE').titulo).toBe('Não pertence a ata');
   });
