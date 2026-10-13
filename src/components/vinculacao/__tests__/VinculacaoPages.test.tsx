@@ -160,9 +160,32 @@ describe('Alocação → Itens às unidades', () => {
     } as any);
   });
 
-  it('gestor de saldos abre em "Sem alocação" e aloca da linha', () => {
+  it('abre agrupado por ata, com a ata fechada e o resumo de todos os itens', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
     const html = render(<ItensUnidadesPage />);
+    expect(html).toContain('vinc-atas-row-00021/2024-200331');
+    expect(html).toContain('1 item em 1 ata');
+    expect(html).toContain('3 itens');
+    expect(html).toContain('Parcialmente alocada');
+    // Soma limitada ao quantitativo de cada item: 0 + 200 + 35 de 79 + 342 + 35.
+    expect(html).toContain('235');
+    expect(html).toContain('221 un');
+    expect(html).not.toContain('Placa balística');
+  });
+
+  it('a busca por item já abre a ata mostrando o item e o link para os outros', () => {
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
+    const html = render(<ItensUnidadesPage />, '/?busca=placa');
+    expect(html).toContain('vinc-atas-itens-00021/2024-200331');
+    expect(html).toContain('Placa balística');
+    expect(html).not.toContain('Capacete balístico');
+    expect(html).toContain('Mostrar os outros 2 itens da ata');
+    expect(html).toContain('vinc-itens-alocar-a');
+  });
+
+  it('gestor de saldos abre em "Sem alocação" e aloca da linha', () => {
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
+    const html = render(<ItensUnidadesPage />, '/?ver=ITEM');
     expect(html).toContain('Itens a alocar às unidades internas');
     expect(html).toContain('Placa balística');
     expect(html).not.toContain('Capacete balístico');
@@ -172,7 +195,7 @@ describe('Alocação → Itens às unidades', () => {
 
   it('parcialmente alocados mostram o que falta e as unidades', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
-    const html = render(<ItensUnidadesPage />, '/?alocacao=PARCIAL');
+    const html = render(<ItensUnidadesPage />, '/?alocacao=PARCIAL&ver=ITEM');
     expect(html).toContain('Capacete balístico');
     expect(html).toContain('142 un');
     expect(html).toContain('DFNSP 200');
@@ -180,6 +203,7 @@ describe('Alocação → Itens às unidades', () => {
 
   it('gestor e consulta só acompanham: sem botão Alocar', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
-    expect(render(<ItensUnidadesPage />)).not.toContain('vinc-itens-alocar-');
+    expect(render(<ItensUnidadesPage />, '/?ver=ITEM')).not.toContain('vinc-itens-alocar-');
+    expect(render(<ItensUnidadesPage />, '/?busca=placa')).not.toContain('vinc-itens-alocar-');
   });
 });
