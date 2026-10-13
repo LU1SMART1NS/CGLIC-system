@@ -49,9 +49,16 @@ describe('cadastro de UASGs', () => {
     expect(r.nome).toBe('CBM RR');
   });
 
-  it('404 ou 400 não insiste', async () => {
-    const fetcher = vi.fn(async () => resposta([], false, 400));
-    await expect(lerUasgNoCadastro('462492', fetcher as unknown as typeof fetch, async () => {})).rejects.toThrow('400');
+  it('400 passageiro: tenta de novo (a consulta é sempre a mesma)', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(resposta([], false, 400))
+      .mockResolvedValueOnce(resposta([{ codigoUasg: '200366', nomeUasg: 'DPF FOZ', siglaUf: 'PR' }]));
+    expect((await lerUasgNoCadastro('200366', fetcher as unknown as typeof fetch, async () => {})).nome).toBe('DPF FOZ');
+  });
+
+  it('404 não insiste', async () => {
+    const fetcher = vi.fn(async () => resposta([], false, 404));
+    await expect(lerUasgNoCadastro('462492', fetcher as unknown as typeof fetch, async () => {})).rejects.toThrow('404');
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
