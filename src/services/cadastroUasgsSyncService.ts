@@ -38,7 +38,11 @@ const FALHAS_SEGUIDAS_PARA_PARAR = 5;
 
 const dormir = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** Consulta com novas tentativas em 429, erro 5xx ou falha de rede; outro erro da fonte lança na hora. */
+/**
+ * Consulta com novas tentativas em 400, 429, erro 5xx ou falha de rede; outro erro da fonte lança na hora.
+ * O 400 entra porque a consulta é sempre a mesma: em 13/10/2026 o cadastro devolveu 400 ao acaso sob carga
+ * (UASG 200366: 400 e, em seguida, 200 seis vezes).
+ */
 async function consultar(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>): Promise<Response> {
   let ultimoErro: unknown = null;
   for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
@@ -52,7 +56,7 @@ async function consultar(url: string, fetcher: typeof fetch, esperar: (ms: numbe
     }
     if (resposta.ok) return resposta;
     ultimoErro = new Error(`Cadastro de UASGs respondeu ${resposta.status}.`);
-    if (resposta.status !== 429 && resposta.status < 500) break;
+    if (resposta.status !== 400 && resposta.status !== 429 && resposta.status < 500) break;
   }
   throw ultimoErro;
 }
