@@ -1300,10 +1300,6 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 }
 
 @media (max-width: 767px) {
-  .carteira-pend-row { flex-direction: column; align-items: stretch !important; gap: 0.5rem !important; }
-  .carteira-pend-main { flex-wrap: wrap; }
-  .carteira-pend-main > span { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
-  .carteira-pend-row > button { width: 100%; justify-content: center; min-height: 44px; }
 }
 @media (max-width: 767px) {
   /* Célula de ação sem botão (ex.: empenho sem contrato) não ocupa linha no cartão. */

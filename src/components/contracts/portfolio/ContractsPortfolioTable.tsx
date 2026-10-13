@@ -295,28 +295,43 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                           {pendencias.length === 0 ? (
                             <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Nenhuma pendência em aberto.</div>
                           ) : (
-                            pendencias.map((p) => {
-                              const motivo = getMotivoInfo(p.category);
-                              const acao = getAcaoInfo(p);
-                              return (
-                                <div
-                                  key={p.id}
-                                  className="carteira-pend-row"
-                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.45rem 0', borderTop: '1px solid #e2e8f0' }}
-                                >
-                                  <div className="carteira-pend-main" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-                                    <SeverityBadge severity={p.severity} />
-                                    <span style={{ fontWeight: 700, color: motivo.color }}>{motivo.label}</span>
-                                    <span style={{ color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {p.badgeLabel || p.description || p.title}
-                                    </span>
-                                  </div>
-                                  <ActionButton action="abrir" type="button" size="sm" onClick={() => navigate(acao.targetUrl)}>
-                                    {acao.label}
-                                  </ActionButton>
-                                </div>
-                              );
-                            })
+                            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+                              <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr>
+                                    <th style={carteiraTh}>Prioridade</th>
+                                    <th style={carteiraTh}>Descrição</th>
+                                    <th style={carteiraTh}>Detalhe</th>
+                                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pendencias.map((p) => {
+                                    const motivo = getMotivoInfo(p.category);
+                                    const acao = getAcaoInfo(p);
+                                    const abrirPendencia = () => navigate(acao.targetUrl);
+                                    return (
+                                      <tr key={p.id} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirPendencia)}>
+                                        <td data-label="Prioridade" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                                          <SeverityBadge severity={p.severity} />
+                                        </td>
+                                        <td data-role="id" style={{ ...carteiraTd, fontWeight: 700, color: motivo.color }}>
+                                          {motivo.label}
+                                        </td>
+                                        <td data-label="Detalhe" style={{ ...carteiraTd, color: '#64748b' }}>
+                                          {p.badgeLabel || p.description || p.title || '—'}
+                                        </td>
+                                        <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                          <ActionButton action="abrir" type="button" size="sm" onClick={abrirPendencia}>
+                                            {acao.label}
+                                          </ActionButton>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
                           )}
                         </div>
                       </td>
