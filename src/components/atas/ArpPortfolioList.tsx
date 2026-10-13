@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight } from 'lucide-react';
 import { AtaCardSkeleton } from '../cards/AtaCardSkeleton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { buildAtaKey } from '../../hooks/useAta';
@@ -11,7 +10,6 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
-import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
@@ -27,6 +25,7 @@ import type { CarteiraAtaExecucao } from '../../utils/carteiraItens';
 import type { ArpPortfolioFilterState } from './ArpPortfolioFilters';
 import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
+import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { AvisoCarregando } from '../../design-system';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
@@ -311,29 +310,44 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         ) : (
                           <>
                             <CarteiraDetailLabel>Itens da ata</CarteiraDetailLabel>
-                            {visibleItems.map((item, idx) => (
-                              <div
-                                key={`${item.numeroItem}-${item.codigoItem}-${idx}`}
-                                className="arp-item-row"
-                                style={{ display: 'grid', gridTemplateColumns: '56px minmax(0, 1fr) 120px 110px auto', gap: '0.75rem', alignItems: 'center', fontSize: '0.82rem', padding: '0.45rem 0', borderTop: '1px solid #e2e8f0' }}
-                              >
-                                <span style={{ fontWeight: 700 }}>{item.numeroItem}</span>
-                                <span title={item.descricaoItem} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.descricaoItem}</span>
-                                <span>{formatCurrencyOrDash(item.valorUnitario)}</span>
-                                <SaldoBar pct={pctOf(item)} />
-                                <AppButton
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => onSelectItem(arp, item)}
-                                  data-testid={`arp-item-${numeroAta}-${item.numeroItem}`}
-                                >
-                                  Ver saldo <ArrowRight size={13} />
-                                </AppButton>
-                              </div>
-                            ))}
+                            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+                              <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr>
+                                    <th style={carteiraTh}>Item</th>
+                                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor unitário</th>
+                                    <th style={carteiraTh}>Consumo</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {visibleItems.map((item, idx) => (
+                                    <tr
+                                      key={`${item.numeroItem}-${item.codigoItem}-${idx}`}
+                                      data-testid={`arp-item-${numeroAta}-${item.numeroItem}`}
+                                      className="carteira-row-link"
+                                      onClick={abrirAoClicarNaLinha(() => onSelectItem(arp, item))}
+                                    >
+                                      <td data-role="id" style={{ ...carteiraTd, minWidth: '240px', maxWidth: '520px' }}>
+                                        <CarteiraIdLink onClick={() => onSelectItem(arp, item)} label={`Ver saldo do item ${item.numeroItem} da ata ${numeroAta}`} title="Ver o saldo do item">
+                                          {item.numeroItem}
+                                        </CarteiraIdLink>
+                                        <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                          {toSentenceCaseIfAllCaps(item.descricaoItem) || '—'}
+                                        </div>
+                                      </td>
+                                      <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                        {formatCurrencyOrDash(item.valorUnitario)}
+                                      </td>
+                                      <td data-label="Consumo" style={carteiraTd}>
+                                        <SaldoBar pct={pctOf(item)} />
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                             {hiddenCount > 0 && (
-                              <div style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700, paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+                              <div style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700, paddingTop: '0.5rem' }}>
                                 + {hiddenCount} {hiddenCount === 1 ? 'item' : 'itens'} · veja todos nos detalhes da ata
                               </div>
                             )}
