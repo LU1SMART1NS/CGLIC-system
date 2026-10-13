@@ -216,7 +216,10 @@ export function calculateDeadlinesSummary(
 /**
  * 3. Cálculo puro do Bloco "Atenção Agora"
  */
-/** Motivos do aviso de quantitativos de um item (linha de v_arp_item_saldo_detalhado com a ata assinada informada). */
+/**
+ * Motivos do aviso de quantitativos de um item (linha de v_arp_item_saldo_detalhado com a ata assinada informada).
+ * Na ata de outro órgão (migration 114), o motivo é o saldo crítico com quantidade da SENASP ainda na gerenciadora.
+ */
 export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; texto: string; selo: string; critico: boolean }> {
   const n = (v: unknown) => Number(v) || 0;
   const fmt = (v: number) => v.toLocaleString('pt-BR');
@@ -234,7 +237,23 @@ export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; text
   }
   const acima = n(aItem.orgaos_contratado_acima);
   if (acima > 0) motivos.push({ chave: `ACIMA${acima}`, texto: `${acima} ${acima === 1 ? 'órgão contratou' : 'órgãos contrataram'} acima do registrado`, selo: 'contratado acima', critico: false });
+  const naGerenciadora = n(aItem.gerenciado_pela_gerenciadora);
+  if (naGerenciadora > 0 && classifyArpItemSaldo(n(aItem.percentual_consumido)).isCritico) {
+    const ger = aItem.codigo_uasg || aItem.codigoUasg || '';
+    motivos.push({
+      chave: `GER${naGerenciadora}`,
+      texto: `saldo crítico com ${fmt(naGerenciadora)} da SENASP na gerenciadora${ger ? ` (UASG ${ger})` : ''}: peça o remanejamento`,
+      selo: 'pedir à gerenciadora',
+      critico: false
+    });
+  }
   return motivos;
+}
+
+/** Ata de outro órgão (migration 114): " · há N na gerenciadora para pedir", quando a ata assinada dá mais à SENASP. */
+function naGerenciadoraTexto(aItem: any): string {
+  const n = Number(aItem.gerenciado_pela_gerenciadora) || 0;
+  return n > 0 ? ` · há ${n.toLocaleString('pt-BR')} na gerenciadora para pedir` : '';
 }
 
 export function calculateAttentionSummary(params: {
@@ -630,7 +649,7 @@ export function calculateAttentionSummary(params: {
       severity,
       avisoChave: numAta && numItem ? chaveAvisoSaldo(numAta, uasgItem, numItem, severity) : undefined,
       title: `Consumo Crítico em Ata (${roundedPerc.toFixed(1)}%)`,
-      description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}`,
+      description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}${naGerenciadoraTexto(aItem)}`,
       arpKey: itemKey,
       numeroAta: numAta,
       objetoItem: descItem,
@@ -711,7 +730,7 @@ export function calculateAttentionSummary(params: {
   // 5c. Quantitativos do item a conferir (migration 109): só nos itens com a ata assinada informada. Pendência do
   // gestor de saldo; cota própria negativa é crítica (a SENASP repassou quantidade de órgão que não abriu mão).
   for (const aItem of (arpItems || []) as any[]) {
-    if (!aItem.ata_assinada_informada) continue;
+    if (!aItem.ata_assinada_informada && !((Number(aItem.gerenciado_pela_gerenciadora) || 0) > 0)) continue;
     const motivos = motivosDosQuantitativos(aItem);
     if (motivos.length === 0) continue;
     const numAta = aItem.numero_ata || aItem.numeroAta;
@@ -725,7 +744,9 @@ export function calculateAttentionSummary(params: {
       category: 'QUANTITATIVOS',
       severity: critico ? 'CRITICA' : 'ATENCAO',
       avisoChave: numAta && numItem ? chaveAvisoQuantitativos(numAta, uasgItem, numItem, motivos.map((m) => m.chave).join('|')) : undefined,
-      title: critico ? 'Cota própria da SENASP negativa' : 'Quantitativos do item a conferir',
+      title: critico
+        ? 'Cota própria da SENASP negativa'
+        : motivos.every((m) => m.chave.startsWith('GER')) ? 'Pedir remanejamento à gerenciadora' : 'Quantitativos do item a conferir',
       description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${motivos.map((m) => m.texto).join('; ')}`,
       arpKey: itemKey,
       numeroAta: numAta,

@@ -54,3 +54,30 @@ describe('Visão Geral — quantitativos a conferir', () => {
     expect(lista[0].badgeLabel).toBe('2 pontos a conferir');
   });
 });
+
+describe('Ata de outro órgão — quantidade da SENASP na gerenciadora (migration 114)', () => {
+  // 00010/2025 da UASG 200342, item 7: a ata assinada dá 397 a mais à SENASP, ainda no registrado da gerenciadora.
+  const part = (over: Record<string, unknown> = {}) => linha({
+    item_key: '00010/2025-200342-00007', numero_ata: '00010/2025', numero_item: '00007', codigo_uasg: '200342', descricao_item: 'Monitor',
+    quantidade_homologada: 19389, quantidade_base_senasp: 2003, quantidade_consumida: 1800, percentual_consumido: 89.87,
+    ata_assinada_informada: false, total_assinada: null, total_registrado: null, gerenciado_pela_gerenciadora: 397, ...over
+  });
+  const avisos = (arpItems: any[]) =>
+    calculateAttentionSummary({ arpItems, currentDate: new Date('2026-10-13T12:00:00') } as any).items;
+
+  it('saldo crítico com quantidade na gerenciadora vira pendência do gestor de saldo', () => {
+    const [a] = avisos([part()]).filter((i) => i.category === 'QUANTITATIVOS');
+    expect(a).toMatchObject({ title: 'Pedir remanejamento à gerenciadora', badgeLabel: 'pedir à gerenciadora', severity: 'ATENCAO' });
+    expect(a.description).toContain('saldo crítico com 397 da SENASP na gerenciadora (UASG 200342)');
+  });
+
+  it('sem saldo crítico, ou nada na gerenciadora, não há pendência', () => {
+    expect(avisos([part({ quantidade_consumida: 100, percentual_consumido: 5 })]).filter((i) => i.category === 'QUANTITATIVOS')).toEqual([]);
+    expect(avisos([part({ gerenciado_pela_gerenciadora: 0 })]).filter((i) => i.category === 'QUANTITATIVOS')).toEqual([]);
+  });
+
+  it('o aviso de consumo crítico diz quanto há na gerenciadora para pedir', () => {
+    const [c] = avisos([part()]).filter((i) => i.category === 'ATA_CRITICA');
+    expect(c.description).toContain('há 397 na gerenciadora para pedir');
+  });
+});

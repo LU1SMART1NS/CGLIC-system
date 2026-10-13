@@ -68,6 +68,8 @@ export interface DataTableProps<T> {
   onToggleExpand?: (key: string) => void;
   /** Nome da linha para o leitor de tela ("Abrir detalhes de ..."). */
   expandLabel?: (item: T, index: number) => string;
+  /** Só as linhas em que devolve true abrem detalhes (sem ele, todas abrem). */
+  canExpand?: (item: T, index: number) => boolean;
 }
 
 const hideClass = (col: { hideBelow?: 'sm' | 'md' }) =>
@@ -92,7 +94,8 @@ export function DataTable<T>({
   renderExpanded,
   expandedKeys,
   onToggleExpand,
-  expandLabel
+  expandLabel,
+  canExpand
 }: DataTableProps<T>) {
   const isMobile = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
   const [internalExpanded, setInternalExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -108,13 +111,15 @@ export function DataTable<T>({
       });
     }
   };
+  const abre = (item: T, idx: number) => Boolean(renderExpanded) && (canExpand ? canExpand(item, idx) : true);
   const openOf = (item: T, idx: number): (() => void) | null | undefined =>
-    rowOpen ? rowOpen(item, idx) : renderExpanded ? () => toggleExpand(keyExtractor(item, idx)) : undefined;
+    rowOpen ? rowOpen(item, idx) : abre(item, idx) ? () => toggleExpand(keyExtractor(item, idx)) : undefined;
   const clickOf = (item: T, idx: number) => {
     const abrir = openOf(item, idx);
     return abrir ? abrirAoClicarNaLinha(abrir) : undefined;
   };
   const expandButton = (item: T, idx: number) => {
+    if (!abre(item, idx)) return null;
     const key = keyExtractor(item, idx);
     const aberto = expanded.has(key);
     const nome = expandLabel?.(item, idx);
@@ -214,9 +219,9 @@ export function DataTable<T>({
                       {renderExpanded && expandButton(item, idx)}
                     </div>
                   )}
-                  {renderExpanded && expanded.has(key) && (
+                  {abre(item, idx) && expanded.has(key) && (
                     <div className="ds-table__detail" data-testid={`${testId}-detail-${key}`}>
-                      {renderExpanded(item, idx)}
+                      {renderExpanded!(item, idx)}
                     </div>
                   )}
                 </li>
@@ -281,7 +286,7 @@ export function DataTable<T>({
           ) : (
             rows.map((item, idx) => {
               const key = keyExtractor(item, idx);
-              const aberto = Boolean(renderExpanded && expanded.has(key));
+              const aberto = abre(item, idx) && expanded.has(key);
               return (
                 <React.Fragment key={key}>
                   <tr

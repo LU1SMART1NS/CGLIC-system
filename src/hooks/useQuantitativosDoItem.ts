@@ -4,6 +4,7 @@ import {
   desfazerContinuaDoOrgao,
   desfazerRemanejamentos,
   fetchQuantitativosDoItem,
+  informarQuantidadeAdesao,
   informarQuantidadesAtaAssinada,
   marcarContinuaDoOrgao,
   vazioDoItem,
@@ -65,5 +66,10 @@ export function useAcoesQuantitativos(itemKey: string) {
     retry: 0,
     onSettled: aoTerminar
   });
-  return { informar, confirmar, desfazerRemanejamento, marcarContinua, desfazerContinua };
+  const informarAdesao = useMutation({
+    mutationFn: (p: Omit<Parameters<typeof informarQuantidadeAdesao>[0], 'itemKey'>) => informarQuantidadeAdesao({ ...p, itemKey }),
+    retry: 0,
+    onSettled: aoTerminar
+  });
+  return { informar, confirmar, desfazerRemanejamento, marcarContinua, desfazerContinua, informarAdesao };
 }
