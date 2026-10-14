@@ -5,11 +5,11 @@ import { mapDistribuicao } from '../../../services/distribuicaoEmpenhoService';
 
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'gestor' })) }));
 vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => vi.fn() }));
-vi.mock('../../../hooks/useVinculacaoEmpenhos', () => ({
-  useEmpenhosParaVincularAosItens: vi.fn(),
-  useContratosComEmpenhosConsultados: vi.fn(() => ({ data: new Set(['K1']), isLoading: false }))
+vi.mock('../../../hooks/useVinculacaoEmpenhos', () => ({ useEmpenhosParaVincularAosItens: vi.fn() }));
+vi.mock('../../../hooks/useEmpenhosForaDoContrato', () => ({
+  useEmpenhosForaDoContrato: vi.fn(),
+  useAcoesCorrecaoNaFonte: () => ({ marcar: { mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null }, desfazer: { mutate: vi.fn(), isPending: false } })
 }));
-vi.mock('../../../hooks/useFinanceiroCarteira', () => ({ useFaturasCarteira: vi.fn() }));
 vi.mock('../../financeiro/useContratosDoFinanceiro', async (orig) => ({
   ...(await orig<typeof import('../../financeiro/useContratosDoFinanceiro')>()),
   useContratosDoFinanceiro: vi.fn()
@@ -20,11 +20,12 @@ vi.mock('../../../hooks/useCarteiraItens', () => ({ useCarteiraItens: vi.fn() })
 vi.mock('../VincularAosItensDialog', () => ({ VincularAosItensDialog: () => null }));
 vi.mock('../../alocacao/AlocarUnidadeModal', () => ({ AlocarUnidadeModal: () => null }));
 vi.mock('@tanstack/react-query', async (orig) => ({ ...(await orig<typeof import('@tanstack/react-query')>()), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
-vi.mock('../../../hooks/useVinculoEmpenhosContrato', () => ({ useAcoesVinculoEmpenho: () => ({ vincular: { mutate: vi.fn(), isPending: false, error: null } }) }));
 
 import { useAuth } from '../../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../../hooks/useVinculacaoEmpenhos';
-import { useFaturasCarteira } from '../../../hooks/useFinanceiroCarteira';
+import { useEmpenhosForaDoContrato } from '../../../hooks/useEmpenhosForaDoContrato';
+import { linhaForaDoContrato } from '../../../services/empenhosForaDoContratoService';
+import { PainelDaConferencia } from '../ConferenciaForaDoContrato';
 import { useContratosDoFinanceiro } from '../../financeiro/useContratosDoFinanceiro';
 import { useAtasPortfolio } from '../../../hooks/useAtasPortfolio';
 import { useCarteiraItens } from '../../../hooks/useCarteiraItens';
@@ -93,14 +94,22 @@ describe('Vinculação → Empenhos aos itens', () => {
   });
 });
 
+const fora = (over: any) =>
+  linhaForaDoContrato({
+    id_fatura: 1490, contract_key: 'K1', fatura_numero: '1490', fatura_emissao: '2026-07-10', fatura_referencia: '07/2026', fatura_valor_liquido: 24500,
+    id_empenho_gov: 'g412', numero_empenho: '2024NE000412', empenho_id: null, outros_contratos: [], homonimas: [], outras_notas_da_fatura: [],
+    veredito: 'FORA_DOS_CONTRATOS', situacao: 'A_CONFERIR', ...over
+  });
+
 describe('Vinculação → Empenhos ao contrato', () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     contratos(new Set(['K1']));
-    vi.mocked(useFaturasCarteira).mockReturnValue({
+    vi.mocked(useEmpenhosForaDoContrato).mockReturnValue({
       data: [
-        { idFatura: 1490, contractKey: 'K1', numero: '1490', referencia: '07/2026', emissao: '2026-07-10', valorLiquido: 24500, cancelada: false, empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2024NE000412' },
-        { idFatura: 2231, contractKey: 'K2', numero: '2231', emissao: '2026-09-01', valorLiquido: 11800, cancelada: false, empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2025NE000603' }
+        fora({}),
+        fora({ id_fatura: 2231, contract_key: 'K2', fatura_numero: '2231', id_empenho_gov: 'g603', numero_empenho: '2025NE000603' }),
+        fora({ id_fatura: 1500, id_empenho_gov: 'g700', numero_empenho: '2024NE000700', veredito: 'EM_OUTRO_CONTRATO', outros_contratos: ['200331-00004-2017'], situacao: 'CORRIGINDO', correcao_tipo: 'MUDAR_FATURA_DE_CONTRATO', correcao_por_nome: 'Maria', correcao_em: '2026-10-13T12:00:00Z' })
       ],
       isLoading: false,
       error: null,
@@ -108,23 +117,50 @@ describe('Vinculação → Empenhos ao contrato', () => {
     } as any);
   });
 
-  it('lista a NE citada pela fatura, com vincular ao contrato e o portal oficial', () => {
+  it('lista as notas a conferir do escopo do gestor, com o veredito e o botão Conferir, sem vincular à mão', () => {
     const html = render(<EmpenhosContratoPage />);
-    expect(html).toContain('Empenhos a vincular ao contrato');
+    expect(html).toContain('Empenhos citados fora do contrato');
     expect(html).toContain('2024NE000412');
-    expect(html).toContain('1490');
-    expect(html).toContain('Vincular ao contrato');
-    expect(html).toContain('Contratos.gov.br');
-    // Contrato fora do escopo do gestor e contrato sem empenhos consultados não entram.
+    expect(html).toContain('Fora dos contratos');
+    expect(html).toContain('vinc-ne-contrato-conferir-1490|g412');
+    expect(html).not.toContain('Vincular ao contrato');
+    // Fora do escopo do gestor não entra; a marcada fica no segmento "Corrigindo na fonte".
     expect(html).not.toContain('2025NE000603');
+    expect(html).not.toContain('2024NE000700');
+    expect(html).toMatch(/A conferir<span class="segment-pill__count">1</);
+    expect(html).toMatch(/Corrigindo na fonte<span class="segment-pill__count">1</);
   });
 
-  it('consulta vê a lista sem o botão de vincular', () => {
+  it('segmento "Corrigindo na fonte": quem marcou e o botão de desfazer para o gestor', () => {
+    let html = render(<EmpenhosContratoPage />, '/?situacao=CORRIGINDO');
+    expect(html).toContain('2024NE000700');
+    expect(html).toContain('Corrigindo na fonte · Maria, 13/10/2026');
+    expect(html).toContain('vinc-ne-contrato-desfazer-1500|g700');
     vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
     contratos(null);
-    const html = render(<EmpenhosContratoPage />);
-    expect(html).toContain('2024NE000412');
-    expect(html).not.toContain('Vincular ao contrato');
+    html = render(<EmpenhosContratoPage />, '/?situacao=CORRIGINDO');
+    expect(html).toContain('2024NE000700');
+    expect(html).not.toContain('vinc-ne-contrato-desfazer');
+  });
+
+  it('a conferência tem as três partes; "Vou corrigir" só para quem pode marcar', () => {
+    const l = fora({ veredito: 'EM_OUTRO_CONTRATO', outros_contratos: ['200331-00004-2017'] });
+    let html = renderToStaticMarkup(<PainelDaConferencia linha={l} contrato={{ numero: '00088/2013' }} podeMarcar onVouCorrigir={vi.fn()} />);
+    expect(html).toContain('O que aconteceu');
+    expect(html).toContain('Esta nota está no contrato 00004/2017 e não neste.');
+    expect(html).toContain('O que fazer no Contratos.gov.br');
+    expect(html).toContain('inclua a nota também no 00088/2013.');
+    expect(html).toContain('Vou corrigir no Contratos.gov.br');
+    html = renderToStaticMarkup(<PainelDaConferencia linha={l} contrato={{ numero: '00088/2013' }} podeMarcar={false} onVouCorrigir={vi.fn()} />);
+    expect(html).not.toContain('Vou corrigir no Contratos.gov.br');
+    expect(html).toContain('Abrir o Contratos.gov.br');
+  });
+
+  it('marca vencida volta para "A conferir" com o aviso de que a correção não chegou', () => {
+    const l = fora({ situacao: 'CORRECAO_NAO_CHEGOU', correcao_tipo: 'OUTRO', correcao_por_nome: 'Maria', correcao_em: '2026-10-01T12:00:00Z' });
+    const html = renderToStaticMarkup(<PainelDaConferencia linha={l} contrato={{ numero: '00002/2025' }} podeMarcar onVouCorrigir={vi.fn()} />);
+    expect(html).toContain('a correção ainda não chegou');
+    expect(html).toContain('Vou corrigir no Contratos.gov.br');
   });
 });
 

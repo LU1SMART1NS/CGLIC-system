@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight, Ban, Layers, Receipt } from 'lucide-react';
+import { ArrowRight, Layers, Receipt } from 'lucide-react';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { useItensDoContrato } from '../../hooks/useItensDoContrato';
@@ -31,10 +31,7 @@ import { useSincronizacaoEmpenhosContrato } from '../../hooks/useSincronizacaoEm
 import type { SincronizacaoEmpenhosContrato } from '../../services/contratoEmpenhosSincronizacaoService';
 import { CarteiraIdLink } from '../carteira/CarteiraRowLink';
 import { useAuth } from '../../context/AuthContext';
-import { useAcoesVinculoEmpenho, useDescartesEmpenhoContrato } from '../../hooks/useVinculoEmpenhosContrato';
-import type { DescarteEmpenhoContrato } from '../../services/contratoEmpenhoVinculoService';
 import { credorDiferenteDoFornecedor } from '../../utils/fornecedorMatch';
-import { VincularEmpenhoModal, type PedidoDeVinculo } from './EmpenhoVinculoModals';
 import {
   ActionButton,
   AppButton,
@@ -66,7 +63,7 @@ const formatDate = (val?: string | null) => (val ? formatDateBR(val) : '—');
 
 /** O sistema só repete o vínculo do Contratos.gov.br: a correção é lá. */
 const COMO_CORRIGIR_NA_FONTE =
-  'Se não for deste contrato, peça ao setor responsável que retire a nota do contrato no Contratos.gov.br. A correção aparece aqui na próxima sincronização.';
+  'Se não for deste contrato, retire a nota do contrato no Contratos.gov.br. A correção aparece aqui na próxima sincronização.';
 
 type EmpenhoRow = ReturnType<typeof useContractFinancialSummary>['empenhosList'][number];
 
@@ -111,66 +108,6 @@ const SituacaoSincronizacaoEmpenhos: React.FC<{ sync?: SincronizacaoEmpenhosCont
         {sync.mensagem}
       </NoticeBar>
     </>
-  );
-};
-
-/**
- * Descartes feitos antes de o sistema passar a seguir só o Contratos.gov.br. Não há como descartar
- * novos; restaurar devolve o empenho ao contrato e às somas até a fonte ser corrigida.
- */
-const EmpenhosDescartados: React.FC<{
-  descartes: DescarteEmpenhoContrato[];
-  podeEditar: boolean;
-  restaurando?: string;
-  onRestaurar: (d: DescarteEmpenhoContrato) => void;
-}> = ({ descartes, podeEditar, restaurando, onRestaurar }) => {
-  if (descartes.length === 0) return null;
-  const columns: Column<DescarteEmpenhoContrato>[] = [
-    { key: 'numero', header: 'Empenho', priority: 'primary', render: (d) => <strong>{d.numeroOficial || '—'}</strong> },
-    { key: 'credor', header: 'Credor', render: (d) => d.credorNome || '—' },
-    { key: 'valor', header: 'Empenhado', align: 'right', render: (d) => formatCurrencyOrDash(d.valorEmpenhado) },
-    { key: 'motivo', header: 'Motivo', render: (d) => d.motivo },
-    {
-      key: 'por',
-      header: 'Descartado por',
-      render: (d) => (
-        <span>
-          {d.descartadoPorNome || '—'}
-          <br />
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatDataHora(d.descartadoEm)}</span>
-        </span>
-      )
-    }
-  ];
-  return (
-    <div data-testid="contract-financial-descartados">
-      <SectionHeader
-        title="Empenhos descartados"
-        subtitle="Tirados do contrato pela equipe antes de o sistema passar a seguir só o Contratos.gov.br. Ficam fora das somas até serem restaurados. Restaure e, se o vínculo estiver errado, retire a nota do contrato no Contratos.gov.br."
-        icon={<Ban size={16} />}
-        countBadge={descartes.length}
-      />
-      <DataTable
-        columns={columns}
-        data={descartes}
-        keyExtractor={(d) => d.empenhoId}
-        testId="contract-financial-descartados-table"
-        rowActions={
-          podeEditar
-            ? (d) => (
-                <ActionButton
-                  action="restaurar"
-                  size="sm"
-                  onClick={() => onRestaurar(d)}
-                  isLoading={restaurando === d.empenhoId}
-                  disabled={Boolean(restaurando)}
-                  data-testid="contract-financial-restaurar"
-                />
-              )
-            : undefined
-        }
-      />
-    </div>
   );
 };
 
@@ -385,16 +322,13 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const { data: itensDoContrato } = useItensDoContrato(contractKey);
   const { data: faturasData } = useFaturasDoContrato(contractKey);
 
-  // Vínculo híbrido (migration 85): a fonte vincula e a equipe vincula à mão o que falta. Vínculo errado
-  // vindo da fonte se corrige no Contratos.gov.br; a sincronização traz a correção.
+  // Os empenhos do contrato vêm só do Contratos.gov.br (migration 117 tirou o vínculo à mão): vínculo errado ou
+  // nota que falta se corrigem lá, pelo próprio gestor, e a sincronização traz a correção.
   const { role } = useAuth();
   const podeEditar = role === 'admin' || role === 'gestor';
   const toast = useToast();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const { data: descartes = [] } = useDescartesEmpenhoContrato(contractKey);
-  const acoes = useAcoesVinculoEmpenho(contractKey);
   const acoesDistribuicao = useAcoesDistribuicaoEmpenho(contractKey);
-  const [vinculando, setVinculando] = React.useState(false);
   const [distribuindo, setDistribuindo] = React.useState<DistribuicaoDoEmpenho | null>(null);
   const numeroContrato = contract.numero || numeroDaChave(contractKey);
   const fornecedor = { cnpj: contract.fornecedorCnpjCpf, nome: contract.fornecedorNome };
@@ -408,41 +342,6 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const faturasDaNota = (numero: string) => faturas.filter((f) => empenhosDaFatura(f.empenhos).includes(numero));
   const linhas = useLinhasAbertas(abrirEmpenho, 'contract-financial-table', empenhosList.length > 0);
 
-  const restaurar = (d: DescarteEmpenhoContrato) =>
-    acoes.restaurar.mutate(d.empenhoId, {
-      onSuccess: () => toast.success(`${d.numeroOficial || 'Empenho'} voltou para o contrato ${numeroContrato}.`),
-      onError: (err: any) => toast.error(err?.message || 'Não foi possível restaurar o empenho.')
-    });
-  const desvincular = async (e: EmpenhoRow) => {
-    if (!e.empenho_id) return;
-    const ok = await confirm({
-      title: 'Desvincular empenho',
-      message: (
-        <>
-          O empenho <strong>{e.numero_oficial}</strong> foi vinculado à mão
-          {e.vinculado_por_nome ? ` por ${e.vinculado_por_nome}` : ''} e sai deste contrato e das somas dele.
-        </>
-      ),
-      confirmLabel: 'Desvincular',
-      tone: 'danger'
-    });
-    if (!ok) return;
-    acoes.desvincular.mutate(e.empenho_id, {
-      onSuccess: () => toast.success(`${e.numero_oficial} desvinculado do contrato ${numeroContrato}.`),
-      onError: (err: any) => toast.error(err?.message || 'Não foi possível desvincular o empenho.')
-    });
-  };
-  const abrirVinculo = () => {
-    acoes.vincular.reset();
-    setVinculando(true);
-  };
-  const confirmarVinculo = (pedido: PedidoDeVinculo) =>
-    acoes.vincular.mutate(pedido, {
-      onSuccess: (r) => {
-        setVinculando(false);
-        toast.success(`${r.numeroOficial || 'Empenho'} vinculado ao contrato ${numeroContrato}${r.empenhoCriado ? ' (nota informada à mão)' : ''}.`);
-      }
-    });
   const abrirDistribuicao = (d: DistribuicaoDoEmpenho) => {
     acoesDistribuicao.vincular.reset();
     setDistribuindo(d);
@@ -492,28 +391,9 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
     });
   };
 
-  const botaoVincular = podeEditar ? (
-    <ActionButton action="vincular" label="Vincular empenho" size="sm" onClick={abrirVinculo} data-testid="contract-financial-vincular" />
-  ) : null;
-
-  // Modais e lista de descartados valem para a aba com ou sem empenhos vinculados.
+  // Modais valem para a aba com ou sem empenhos vinculados.
   const extras = (
     <>
-      <EmpenhosDescartados
-        descartes={descartes}
-        podeEditar={podeEditar}
-        restaurando={acoes.restaurar.isPending ? acoes.restaurar.variables : undefined}
-        onRestaurar={restaurar}
-      />
-      <VincularEmpenhoModal
-        isOpen={vinculando}
-        contrato={{ numero: numeroContrato, uasg: contract.uasg, fornecedorNome: contract.fornecedorNome, fornecedorCnpjCpf: contract.fornecedorCnpjCpf }}
-        idsVinculados={new Set(empenhosList.map((e) => e.empenho_id).filter(Boolean) as string[])}
-        isLoading={acoes.vincular.isPending}
-        erro={acoes.vincular.error?.message}
-        onVincular={confirmarVinculo}
-        onFechar={() => setVinculando(false)}
-      />
       <DistribuirEmpenhoModal
         distribuicao={distribuindo}
         numeroContrato={numeroContrato}
@@ -576,7 +456,6 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
                   Consultar em Empenhos
                 </AppButton>
               )}
-              {botaoVincular}
             </div>
           }
           testId="contract-financial-empty"
@@ -750,11 +629,14 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
             tone="info"
             testId="contract-financial-fatura-ne-fora"
             action={
-              onAbrirFatura ? (
-                <AppButton variant="outline" size="sm" onClick={() => onAbrirFatura(faturasComNeFora[0].idFatura)}>
-                  Ver a fatura
-                </AppButton>
-              ) : undefined
+              <AppButton
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/vinculacao/empenhos-contrato?situacao=TODAS&busca=${encodeURIComponent(numeroContrato)}`)}
+                data-testid="contract-financial-fatura-ne-fora-conferir"
+              >
+                Ver a conferência
+              </AppButton>
             }
           >
             {faturasComNeFora.length === 1 ? (
@@ -766,9 +648,9 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
                 <strong>{faturasComNeFora.length}</strong> faturas citam
               </>
             )}{' '}
-            empenho que não está vinculado a este contrato:{' '}
-            <strong>{[...new Set(faturasComNeFora.flatMap((f) => empenhosDaFatura(f.empenhosSemVinculoNumeros)))].join(', ')}</strong>. Confira o
-            contrato no Contratos.gov.br.
+            empenho que o Contratos.gov.br não lista neste contrato:{' '}
+            <strong>{[...new Set(faturasComNeFora.flatMap((f) => empenhosDaFatura(f.empenhosSemVinculoNumeros)))].join(', ')}</strong>. A conferência mostra
+            o que corrigir no Contratos.gov.br.
           </NoticeBar>
         )}
         {compartilhadas.length > 0 && (
@@ -803,7 +685,6 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           title="Notas de empenho do contrato"
           icon={<Layers size={16} />}
           countBadge={empenhosList.length}
-          actions={botaoVincular}
         />
         <DataTable
           columns={columns}
@@ -835,23 +716,6 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           expandedKeys={linhas.abertas}
           onToggleExpand={linhas.alternar}
           expandLabel={(e) => e.numero_oficial}
-          rowActions={
-            podeEditar
-              ? (e) =>
-                  // Só o vínculo feito à mão se desfaz aqui; o da fonte se corrige no Contratos.gov.br.
-                  e.empenho_id && e.origem_vinculo === 'MANUAL' ? (
-                    <ActionButton
-                      action="desvincular"
-                      iconOnly
-                      size="sm"
-                      label={`Desvincular ${e.numero_oficial}`}
-                      onClick={() => desvincular(e)}
-                      disabled={acoes.desvincular.isPending}
-                      data-testid="contract-financial-desvincular"
-                    />
-                  ) : null
-              : undefined
-          }
         />
       </div>
       {extras}

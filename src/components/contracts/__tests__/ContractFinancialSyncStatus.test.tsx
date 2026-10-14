@@ -17,19 +17,10 @@ vi.mock('../../../hooks/useFaturasDoContrato', async (orig) => ({
 }));
 vi.mock('../../../hooks/useContractFinancialSummary', () => ({ useContractFinancialSummary: vi.fn() }));
 vi.mock('../../../hooks/useSincronizacaoEmpenhosContrato', () => ({ useSincronizacaoEmpenhosContrato: vi.fn() }));
-vi.mock('../../../hooks/useVinculoEmpenhosContrato', () => {
-  const mut = () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, variables: undefined });
-  return {
-    useDescartesEmpenhoContrato: vi.fn(() => ({ data: [] })),
-    useAcoesVinculoEmpenho: () => ({ descartar: mut(), restaurar: mut(), vincular: mut(), desvincular: mut() }),
-    useBuscaEmpenhoPorNumero: () => ({ data: [], isLoading: false, isError: false })
-  };
-});
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'leitor' })) }));
 
 import { useContractFinancialSummary } from '../../../hooks/useContractFinancialSummary';
 import { useSincronizacaoEmpenhosContrato } from '../../../hooks/useSincronizacaoEmpenhosContrato';
-import { useDescartesEmpenhoContrato } from '../../../hooks/useVinculoEmpenhosContrato';
 import { useAuth } from '../../../context/AuthContext';
 import { useDistribuicoesEmpenhoContrato } from '../../../hooks/useDistribuicaoEmpenhos';
 import { useItensDoContrato } from '../../../hooks/useItensDoContrato';
@@ -183,52 +174,30 @@ describe('ContractFinancialExecutionSection: vínculo híbrido', () => {
     expect(html).toContain('contract-financial-manuais');
   });
 
-  it('leitor não vê as ações; gestor só desvincula o manual e não descarta o que veio da fonte', () => {
-    vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
-    let html = renderEq();
-    expect(html).not.toContain('contract-financial-desvincular');
-    expect(html).not.toContain('contract-financial-vincular');
-
-    vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
-    html = renderEq();
-    expect(html).not.toContain('contract-financial-descartar');
-    expect(html).not.toContain('descartar-empenho-modal');
-    expect(html.match(/data-testid="contract-financial-desvincular"/g)).toHaveLength(1);
-    expect(html).toContain('contract-financial-vincular');
-    expect(html).toContain('retire a nota do contrato no Contratos.gov.br');
+  it('vínculo à mão saiu: ninguém vê vincular, desvincular, descartar nem restaurar; a correção é no Contratos.gov.br', () => {
+    for (const role of ['leitor', 'gestor', 'admin']) {
+      vi.mocked(useAuth).mockReturnValue({ role } as any);
+      const html = renderEq();
+      expect(html).not.toContain('contract-financial-desvincular');
+      expect(html).not.toContain('contract-financial-vincular"');
+      expect(html).not.toContain('contract-financial-descartados');
+      expect(html).not.toContain('contract-financial-restaurar');
+      expect(html).not.toContain('vincular-empenho-modal');
+      expect(html).toContain('retire a nota do contrato no Contratos.gov.br');
+    }
   });
 
-  it('lista os descartados com motivo e autor; restaurar só para gestor', () => {
-    vi.mocked(useDescartesEmpenhoContrato).mockReturnValue({
-      data: [{ contractKey: equilibrio.id, empenhoId: 'x', motivo: 'Credor é a HPE', descartadoPorNome: 'Maria', descartadoEm: '2026-10-06T20:00:00Z', numeroOficial: '2024NE000765', credorNome: 'HPE AUTOMOTORES', valorEmpenhado: 567513.93 }]
-    } as any);
-    vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
-    let html = renderEq();
-    expect(html).toContain('Empenhos descartados');
-    expect(html).toContain('Credor é a HPE');
-    expect(html).toContain('contract-financial-restaurar');
-    vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
-    html = renderEq();
-    expect(html).toContain('Empenhos descartados');
-    expect(html).not.toContain('contract-financial-restaurar');
-  });
-
-  it('contrato sem empenho: gestor pode vincular à mão e vê os descartados', () => {
+  it('contrato sem empenho: sem botão de vincular à mão', () => {
     vi.mocked(useContractFinancialSummary).mockReturnValue(vazio as any);
-    vi.mocked(useDescartesEmpenhoContrato).mockReturnValue({
-      data: [{ contractKey: equilibrio.id, empenhoId: 'x', motivo: 'Credor é a HPE', numeroOficial: '2024NE000765' }]
-    } as any);
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     const html = renderEq();
     expect(html).toContain('contract-financial-empty');
-    expect(html).toContain('contract-financial-vincular');
-    expect(html).toContain('contract-financial-descartados');
+    expect(html).not.toContain('contract-financial-vincular"');
     expect(html).toContain('Consultar em Empenhos');
   });
 
   it('contrato sem empenho: gestor de saldo não recebe atalho para o Financeiro', () => {
     vi.mocked(useContractFinancialSummary).mockReturnValue(vazio as any);
-    vi.mocked(useDescartesEmpenhoContrato).mockReturnValue({ data: [] } as any);
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
     const html = renderEq();
     expect(html).toContain('contract-financial-empty');
@@ -306,7 +275,7 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).not.toContain('contract-financial-a-distribuir');
   });
 
-  it('fatura que cita NE fora do contrato aparece no resumo e leva à aba Pagamentos', () => {
+  it('fatura que cita NE fora do contrato aparece no resumo e leva à conferência no menu Vinculação', () => {
     vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({ data: [] } as any);
     vi.mocked(useFaturasDoContrato).mockReturnValue({
       data: { faturas: [{ idFatura: 7, numero: '1490', empenhos: '2024NE000412', empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2024NE000412', valor: 10 }], resumo: null, sincronizadoEm: null }
@@ -314,7 +283,8 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     const html = renderToStaticMarkup(<ContractFinancialExecutionSection contract={contract} contractKey={contract.id} onAbrirFatura={vi.fn()} />);
     expect(html).toContain('contract-financial-fatura-ne-fora');
     expect(html).toContain('2024NE000412');
-    expect(html).toContain('Ver a fatura');
+    expect(html).toContain('Ver a conferência');
+    expect(html).toContain('contract-financial-fatura-ne-fora-conferir');
   });
 
   const detalhe = (d: DistribuicaoDoEmpenho | undefined, podeEditar = true, faturas: any[] = [], extra: Record<string, unknown> = {}) =>

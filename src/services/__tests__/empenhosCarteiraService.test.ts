@@ -4,6 +4,7 @@ import {
   entraNoLote,
   selecionarContratos,
   ordenarParaSincronizar,
+  escolherReleituras,
   processarFila,
   mensagemDaCarteira,
   RECONSULTA_HORAS
@@ -58,6 +59,40 @@ describe('ordem da execução', () => {
   it('forçar inclui os consultados há pouco', () => {
     const lista = [c('200331-00002-2026')];
     expect(ordenarParaSincronizar(lista, new Map([['200331-00002-2026', horasAtras(1)]]), { agora, forcar: true })).toHaveLength(1);
+  });
+});
+
+describe('releitura pedida por fatura', () => {
+  const agora = Date.parse('2026-10-14T01:00:00Z');
+  const ha = (h: number) => new Date(agora - h * 3600_000).toISOString();
+
+  it('contrato com nota citada fora dele vai à frente, mesmo lido há pouco', () => {
+    const tentativas = new Map([
+      ['200331-00223-2026', ha(1)],
+      ['200331-00001-2026', ha(30)]
+    ]);
+    const fila = ordenarParaSincronizar([c('200331-00001-2026'), c('200331-00223-2026'), c('200331-00002-2026', undefined)], tentativas, {
+      agora,
+      prioritarios: new Set(['200331-00223-2026'])
+    });
+    expect(fila.map((x) => x.id)).toEqual(['200331-00223-2026', '200331-00002-2026', '200331-00001-2026']);
+  });
+
+  it('relê só quando as notas foram lidas antes da última leitura das faturas', () => {
+    const faturas = new Map([
+      ['200331-00223-2026', '2026-10-14T00:22:10Z'],
+      ['200331-00009-2013', '2026-10-13T09:00:00Z']
+    ]);
+    const empenhos = new Map([
+      ['200331-00223-2026', '2026-10-13T11:50:12Z'],
+      ['200331-00009-2013', '2026-10-13T10:51:18Z']
+    ]);
+    // 00223/2026: faturas lidas depois das notas → reler. 00009/2013: notas já relidas depois das faturas → esperar.
+    // Sem registro de leitura: reler.
+    expect([...escolherReleituras(['200331-00223-2026', '200331-00009-2013', '200331-00999-2025'], faturas, empenhos)]).toEqual([
+      '200331-00223-2026',
+      '200331-00999-2025'
+    ]);
   });
 });
 
