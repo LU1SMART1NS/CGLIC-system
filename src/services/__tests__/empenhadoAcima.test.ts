@@ -72,4 +72,26 @@ describe('empenhado acima do contratado', () => {
     expect(chaveAvisoEmpenhoAcima(K, 8, 913)).toBe(`FONTE::${K}::ACIMA-8-913`);
     expect(chaveAvisoEmpenhoAcima(K, 8, 920)).not.toBe(chaveAvisoEmpenhoAcima(K, 8, 913));
   });
+
+  it('item de serviço diz o período de 12 meses do excesso (migration 137)', () => {
+    const servico = empenhadoAcimaDaLinha({
+      contract_key: K,
+      numero_item: 1,
+      descricao: 'Transporte fluvial',
+      quantidade_contratada: '23.0000',
+      quantidade_empenhada: '25.0000',
+      quantidade_acima: '2.0000',
+      notas: 2,
+      ultima_nota: '2026NE000323',
+      ultima_origem: 'SIAFI',
+      periodo_inicio: '2025-10-01',
+      periodo_fim: '2026-09-30'
+    });
+    expect(servico).toMatchObject({ periodoInicio: '2025-10-01', periodoFim: '2026-09-30' });
+    expect(linha).toMatchObject({ periodoInicio: null, periodoFim: null });
+    const { items } = calculateAttentionSummary({ contracts: [contrato], empenhadoAcima: [servico] });
+    expect(items.find((i) => i.category === 'EMPENHO_ACIMA')?.description).toBe(
+      'Item 1: 25 empenhados de 01/10/2025 a 30/09/2026 para 23 contratados (2 acima) · última nota: 2026NE000323, vinculada pela nota no SIAFI'
+    );
+  });
 });
