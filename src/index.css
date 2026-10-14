@@ -1634,3 +1634,55 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 /* Menu ⋯ das ações de uma linha (RowActionsMenu) */
 .ds-row-menu { display: flex; flex-direction: column; gap: 2px; }
 .ds-row-menu .ds-row-menu__item { justify-content: flex-start; text-align: left; }
+
+/* ==========================================================================
+   Revisão no celular (14/10/2026)
+   ========================================================================== */
+/* Botão de um aviso (NoticeBar): quebra o texto em vez de sair da tela. */
+.ds-notice-bar__acao .ds-btn { white-space: normal; text-align: center; max-width: 100%; }
+
+/* Selos nos cartões das tabelas: quebram a linha em vez de passar da borda do cartão. */
+.ds-table-cards__field dd > * { max-width: 100%; }
+.ds-table-cards__field .ds-badge { white-space: normal; line-height: 1.25; letter-spacing: 0; }
+/* Em 320 px o rótulo do campo ocupava 45% e a palavra longa do selo ("automaticamente") quebrava no meio. */
+@media (max-width: 360px) { .ds-table-cards__field dt { max-width: 40%; } }
+.ds-table-cards__field .ds-badge__label { white-space: normal; overflow: visible; }
+
+/* Topo das telas 360: "Voltar" curto só no celular. */
+.i360-voltar-curto { display: none; }
+@media (max-width: 480px) {
+  .i360-voltar-longo { display: none; }
+  .i360-voltar-curto { display: inline; }
+  /* Voltar e as ações correm na mesma linha e só quebram quando não cabem (antes: uma por linha). */
+  .i360-topo { gap: 0.5rem !important; justify-content: flex-start !important; }
+  .i360-topo-acoes { display: contents !important; }
+}
+
+@media (max-width: 480px) {
+  /* Descrição longa do item no subtítulo da janela: duas linhas. */
+  .ds-modal__subtitle {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  /* Botões do rodapé das janelas com altura de toque. */
+  .ds-modal__footer .ds-btn { min-height: 44px; }
+
+  /* Janela "Alocação do item": cada unidade vira um cartão (unidade; contratado e empenhado; quantidade e ação). */
+  .alocar-tabela thead { display: none; }
+  .alocar-tabela, .alocar-tabela tbody { display: block; }
+  .alocar-tabela tr {
+    display: grid; grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'unidade unidade' 'contratado empenhado' 'alocado acao';
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .alocar-tabela td { border-bottom: 0 !important; text-align: left !important; }
+  .alocar-tabela td:nth-child(1) { grid-area: unidade; padding-bottom: 0.15rem !important; }
+  .alocar-tabela td:nth-child(2) { grid-area: contratado; }
+  .alocar-tabela td:nth-child(3) { grid-area: empenhado; }
+  .alocar-tabela td:nth-child(4) { grid-area: alocado; }
+  .alocar-tabela td:nth-child(5) { grid-area: acao; display: flex; align-items: flex-end; justify-content: flex-end; }
+  .alocar-tabela td[data-rotulo]::before {
+    content: attr(data-rotulo); display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 0.15rem;
+  }
+  .alocar-tabela input { width: 100% !important; max-width: 160px; }
+  .alocar-tabela-wrap { overflow-x: visible !important; }
+}

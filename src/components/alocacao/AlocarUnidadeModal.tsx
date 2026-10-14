@@ -244,8 +244,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
             {lista.length === 0 ? (
               <p style={{ margin: 0, fontSize: '0.85rem', color: CINZA }}>Nenhuma unidade alocada neste item ainda.</p>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table data-testid="alocar-unidade-lista" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <div className="alocar-tabela-wrap" style={{ overflowX: 'auto' }}>
+                <table className="alocar-tabela" data-testid="alocar-unidade-lista" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr>
                       <th style={thStyle}>Unidade interna</th>
@@ -274,9 +274,9 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                             </strong>
                             {nomeDe(l.unitName) && <small style={{ color: CINZA, fontSize: '0.75rem' }}>{nomeDe(l.unitName)}</small>}
                           </td>
-                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.contratado)}</td>
-                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.empenhado)}</td>
-                          <td style={{ ...td, textAlign: 'right' }}>
+                          <td data-rotulo="Contratado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.contratado)}</td>
+                          <td data-rotulo="Empenhado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.empenhado)}</td>
+                          <td data-rotulo="Alocado" style={{ ...td, textAlign: 'right' }}>
                             {l.removida ? (
                               <span style={{ fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.original)}</span>
                             ) : (
