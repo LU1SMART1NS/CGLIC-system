@@ -215,18 +215,22 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
 // Pagamentos
 // -----------------------------------------------------------------------------------------------------
 
-/** Etapa do pagamento: as duas primeiras vêm do ciclo da CGLIC; as demais, da fatura no SIAFI e no Tesouro. */
+/**
+ * Etapa do pagamento: as duas primeiras vêm do ciclo da CGLIC; as demais, da fatura no SIAFI e no Tesouro.
+ * SEM_CONFIRMACAO: fatura liquidada sem NP na fonte (faturas antigas ou pagas por outro documento, como DD). Sem NP
+ * não há como achar a OB no Tesouro, então ela não é "aguardando OB": o pagamento só se confere no SIAFI.
+ */
 export type EtapaPagamento =
-  | 'NA_CGLIC' | 'DEVOLVIDO_CORRECAO' | 'NA_CGOFI' | 'EM_ANDAMENTO' | 'AGUARDANDO_OB' | 'ERRO_SIAFI' | 'PAGA' | 'CANCELADA';
+  | 'NA_CGLIC' | 'DEVOLVIDO_CORRECAO' | 'NA_CGOFI' | 'EM_ANDAMENTO' | 'AGUARDANDO_OB' | 'SEM_CONFIRMACAO' | 'ERRO_SIAFI' | 'PAGA' | 'CANCELADA';
 
 export type PagamentoCarteiraRow =
   | { tipo: 'CICLO'; chave: string; contractKey: string; etapa: EtapaPagamento; ciclo: PaymentFollowUpCycle; faturas: FaturaCarteira[] }
   | { tipo: 'FATURA'; chave: string; contractKey: string; etapa: EtapaPagamento; fatura: FaturaCarteira };
 
-export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'dataLiquidacao' | 'situacao'>): EtapaPagamento {
+export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'dataLiquidacao' | 'situacao' | 'np'>): EtapaPagamento {
   if (f.cancelada) return 'CANCELADA';
   if (f.paga) return 'PAGA';
-  if (f.dataLiquidacao) return 'AGUARDANDO_OB';
+  if (f.dataLiquidacao) return f.np ? 'AGUARDANDO_OB' : 'SEM_CONFIRMACAO';
   if (f.situacao === 'Siafi Erro') return 'ERRO_SIAFI';
   return 'EM_ANDAMENTO';
 }
@@ -244,6 +248,8 @@ export const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
   NA_CGOFI: 'TRAMITACAO',
   EM_ANDAMENTO: 'TRAMITACAO',
   AGUARDANDO_OB: 'TRAMITACAO',
+  // Fica à vista em "Em tramitação" (não está confirmada como paga), mas fora do valor "aguardando OB".
+  SEM_CONFIRMACAO: 'TRAMITACAO',
   PAGA: 'PAGA',
   CANCELADA: null
 };
