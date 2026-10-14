@@ -94,8 +94,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Resolve a role sempre que o usuário autenticado mudar (login, refresh
   // com sessão restaurada, ou troca de conta). Reage a logout limpando o
   // estado imediatamente, sem esperar nenhuma requisição.
+  // Depende só do id: a renovação automática da sessão (TOKEN_REFRESHED, ou
+  // SIGNED_IN ao voltar para a aba) traz um objeto `user` novo do mesmo
+  // usuário. Reagir ao objeto voltava a role para 'loading', o RequireRole
+  // desmontava a tela inteira ("Verificando permissões...") e o usuário
+  // perdia rolagem, janelas abertas e o que tinha digitado.
+  const userId = user?.id ?? null;
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       // Sem usuário autenticado (ainda não resolvido, ou deslogado) — não há
       // role para resolver. Consumidores devem checar `loading` (autenticação)
       // antes de `roleStatus`; este estado nunca fica "preso" em 'loading'.
@@ -107,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let cancelled = false;
     setRoleStatus('loading');
 
-    resolveOwnAppRole(user.id)
+    resolveOwnAppRole(userId)
       .then((resolved) => {
         if (cancelled) return;
         setRole(resolved);
@@ -122,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [userId]);
 
   const signOut = async () => {
     if (supabase) {
