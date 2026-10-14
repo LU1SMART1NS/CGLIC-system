@@ -13,6 +13,7 @@ function consulta(tabela: string) {
     select: () => q,
     eq: () => q,
     not: () => q,
+    order: () => q,
     range: async () => ({ data: tabelas[tabela] ?? [], error: null })
   };
   return q;

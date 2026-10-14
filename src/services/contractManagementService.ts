@@ -1,4 +1,5 @@
 import { moduleFromRow } from '../utils/taskPlanModules';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { resolveContractKey } from '../utils/contractKeyUtils';
 import type {
@@ -120,13 +121,13 @@ export async function fetchAllContractManagers(uasg?: string): Promise<Record<st
   if (!isSupabaseConfigured || !supabase) return {};
 
   try {
-    let query = supabase.from('contract_managers').select('*');
-    if (uasg && uasg.trim()) {
-      query = query.eq('uasg', uasg.trim());
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
+    // 518 gestores na 200331 em 14/10/2026: todas as páginas, em ordem fixa (o PostgREST corta em mil).
+    const db = supabase;
+    const data = await lerTodasAsPaginas<any>((de, ate) => {
+      let query = db.from('contract_managers').select('*');
+      if (uasg && uasg.trim()) query = query.eq('uasg', uasg.trim());
+      return query.order('contract_key').range(de, ate);
+    });
     if (!data || !Array.isArray(data)) return {};
 
     const map: Record<string, ContractManager> = {};
@@ -290,13 +291,12 @@ export async function fetchAllContractTaskPlans(uasg?: string): Promise<Record<s
   if (!isSupabaseConfigured || !supabase) return {};
 
   try {
-    let plansQuery = supabase.from('contract_task_plans').select('*');
-    if (uasg && uasg.trim()) {
-      plansQuery = plansQuery.eq('uasg', uasg.trim());
-    }
-
-    const { data: plansData, error: plansError } = await plansQuery;
-    if (plansError) throw plansError;
+    const db = supabase;
+    const plansData = await lerTodasAsPaginas<any>((de, ate) => {
+      let plansQuery = db.from('contract_task_plans').select('*');
+      if (uasg && uasg.trim()) plansQuery = plansQuery.eq('uasg', uasg.trim());
+      return plansQuery.order('id').range(de, ate);
+    });
     if (!plansData || !Array.isArray(plansData) || plansData.length === 0) return {};
 
     const planIds = plansData.map((p: any) => p.id);

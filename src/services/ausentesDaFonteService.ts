@@ -5,6 +5,7 @@
  *   FATURA ligada a um ciclo de pagamento.
  */
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 
 export type TipoAusenteDaFonte = 'NOTA' | 'FATURA';
 
@@ -73,7 +74,9 @@ export function rotuloAusente(a: Pick<AusenteDaFonte, 'tipo' | 'numero' | 'chave
 
 export async function fetchAusentesDaFonte(): Promise<AusenteDaFonte[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase.from('v_ausentes_da_fonte').select(COLUNAS);
-  if (error) throw error;
-  return ((data || []) as unknown as LinhaAusente[]).map(ausenteDaLinha);
+  const db = supabase;
+  const data = await lerTodasAsPaginas<LinhaAusente>((de, ate) =>
+    db.from('v_ausentes_da_fonte').select(COLUNAS).order('tipo').order('chave').range(de, ate)
+  );
+  return data.map(ausenteDaLinha);
 }

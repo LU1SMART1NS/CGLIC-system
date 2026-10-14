@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 
 export type TipoInstrumentoAjuste = 'ATA' | 'CONTRATO';
@@ -25,8 +26,10 @@ export const chaveAjuste = (tipo: TipoInstrumentoAjuste, chave: string) => `${ti
 export async function fetchComplexidadeAjustes(): Promise<Record<string, ComplexidadeAjuste>> {
   if (!isSupabaseConfigured || !supabase) return {};
   try {
-    const { data, error } = await supabase.from('instrument_complexity_overrides').select('*');
-    if (error) throw error;
+    const db = supabase;
+    const data = await lerTodasAsPaginas<any>((de, ate) =>
+      db.from('instrument_complexity_overrides').select('*').order('tipo').order('chave').range(de, ate)
+    );
     const map: Record<string, ComplexidadeAjuste> = {};
     for (const row of data || []) {
       map[chaveAjuste(row.tipo, row.chave)] = {

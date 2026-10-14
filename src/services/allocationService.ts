@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type { InternalAllocation } from '../types';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import type { RpcAllocationResult, RpcEmpenhoLinkResult } from '../types/rpc';
 import { executeSaveAllocationsRpc } from '../adapters/allocationRpcAdapter';
 import { executeSaveEmpenhoLinksRpc } from '../adapters/empenhoLinkRpcAdapter';
@@ -27,9 +28,15 @@ export async function fetchAllAllocationsGlobal(): Promise<GlobalAllocationRecor
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
-        .from('arp_allocations')
-        .select('*');
+      // Todas as páginas (o PostgREST corta em mil), em ordem fixa.
+      const db = supabase;
+      let data: any[] | null = null;
+      let error: unknown = null;
+      try {
+        data = await lerTodasAsPaginas<any>((de, ate) => db.from('arp_allocations').select('*').order('id').range(de, ate));
+      } catch (e) {
+        error = e;
+      }
 
       if (!error && data && data.length > 0) {
         return data.map((d: any) => ({

@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 
 /**
@@ -18,8 +19,10 @@ export const chaveDescarte = (contractKey: string, ataKey: string) => `${contrac
 export async function fetchDescartesAtaContrato(): Promise<Record<string, DescarteAtaContrato>> {
   if (!isSupabaseConfigured || !supabase) return {};
   try {
-    const { data, error } = await supabase.from('contract_ata_descartes').select('*');
-    if (error) throw error;
+    const db = supabase;
+    const data = await lerTodasAsPaginas<any>((de, ate) =>
+      db.from('contract_ata_descartes').select('*').order('contract_key').order('ata_key').range(de, ate)
+    );
     const map: Record<string, DescarteAtaContrato> = {};
     for (const row of data || []) {
       map[chaveDescarte(row.contract_key, row.ata_key)] = {
