@@ -22,6 +22,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarCadastroUasgsPendentes: vi.fn(async () => ({ pendentes: 260, amostra: null })),
     sincronizarItensNotasSiafi: vi.fn(async () => sucesso(25)),
     contarItensNotasSiafiPendentes: vi.fn(async () => ({ pendentes: 416, amostra: null })),
+    sincronizarSaldoContabil: vi.fn(async (): Promise<ResultadoSincronizacao> => ({ status: 'SUCESSO', total: 10, fontesComFalha: [], mensagem: '10 de 10 conta(s) lida(s)' })),
+    contarSaldoContabilPendentes: vi.fn(async () => ({ leituras: 10, anosFechados: 0, amostraPagoNoAno: 22 })),
     chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
@@ -217,6 +219,18 @@ describe('executarPedido', () => {
     const dry = await executarPedido({ recurso: 'itens_notas_siafi', uasg: '200331', dry: true }, d);
     expect(dry).toMatchObject({ dry: true, consulta: { pendentes: 416 } });
     expect(vi.mocked(d.contarItensNotasSiafiPendentes).mock.calls[0]).toEqual(['200331', 'chave-de-teste']);
+  });
+
+  it('saldo_contabil: por UG, com orçamento de tempo; teste sem gravar conta as leituras', async () => {
+    expect(validarPedido({ recurso: 'saldo_contabil' })).toMatchObject({ ok: false });
+    expect(validarPedido({ recurso: 'saldo_contabil', uasg: '200331' })).toMatchObject({ ok: true });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'saldo_contabil', uasg: '200331', forcar: true }, d);
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 10 } });
+    expect(vi.mocked(d.sincronizarSaldoContabil).mock.calls[0]).toEqual(['200331', expect.objectContaining({ forcar: true, orcamentoMs: expect.any(Number) })]);
+    const dry = await executarPedido({ recurso: 'saldo_contabil', uasg: '200330', dry: true }, d);
+    expect(dry).toMatchObject({ dry: true, consulta: { leituras: 10, amostraPagoNoAno: 22 } });
+    expect(d.sincronizarSaldoContabil).toHaveBeenCalledTimes(1);
   });
 
   it('cadastro_uasgs: vale para todas as carteiras, sem UASG', async () => {
