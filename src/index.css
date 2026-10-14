@@ -1696,8 +1696,8 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 }
 @media (pointer: coarse) {
   /* Área clicável de 44 px sem mudar o visual compacto (mesma técnica do .ds-btn). */
-  .carteira-filter-btn, .carteira-cell-filter, .vg-chip, .vg-strip-title, .i360-head.min .i360-title-btn { position: relative; }
-  .carteira-filter-btn::after, .carteira-cell-filter::after, .vg-chip::after, .vg-strip-title::after, .i360-head.min .i360-title-btn::after {
+  .carteira-filter-btn, .carteira-cell-filter, .vg-chip, .vg-strip-title, .i360-title-btn { position: relative; }
+  .carteira-filter-btn::after, .carteira-cell-filter::after, .vg-chip::after, .vg-strip-title::after, .i360-title-btn::after {
     content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: max(100%, 44px); height: max(100%, 44px);
   }
