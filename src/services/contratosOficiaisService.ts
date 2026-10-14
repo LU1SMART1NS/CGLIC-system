@@ -7,7 +7,7 @@
  * por vez e só quando os dados passaram da validade. O coordenador força a atualização pelo botão.
  *
  * Provisório: a sincronização roda no navegador de quem tem perfil de gravação (gestor/coordenador).
- * Ela vai para uma Edge Function agendada no item 2 do PLANO_PERSISTENCIA_CONTRATOS_E_CACHE.md.
+ * Ela vai para uma Edge Function agendada no item 2 do docs/historico/PLANO_PERSISTENCIA_CONTRATOS_E_CACHE.md.
  */
 
 import type { ContractDashboardRecord } from '../types';
