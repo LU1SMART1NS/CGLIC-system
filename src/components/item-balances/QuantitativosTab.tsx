@@ -35,6 +35,7 @@ import { InformarAtaAssinadaModal } from './InformarAtaAssinadaModal';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { ConfirmarRemanejamentoModal, ContinuaDoOrgaoModal } from './RemanejamentoModals';
+import { useOrgaosRecolhidos } from './useOrgaosRecolhidos';
 
 export interface QuantitativosTabProps {
   itemKey: string;
@@ -135,6 +136,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
     if (n.has(uasg)) n.delete(uasg); else n.add(uasg);
     return n;
   });
+
+  const recolhidos = useOrgaosRecolhidos(linhas, p.itemKey);
 
   const estado = (l: Linha): EstadoContratado => contratadoDoOrgao(l.uasg, l.ehSenasp, q, p.contratadoSenasp);
   const extrato = q.informado ? extratoDaCotaPropria(q) : null;
@@ -426,9 +429,10 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
             <div style={{ marginTop: '0.75rem' }}>{p.unidadesInternas}</div>
           </>
         ) : (
+          <>
           <DataTable
             columns={columns}
-            data={linhas}
+            data={recolhidos.visiveis}
             keyExtractor={(l) => l.uasg}
             isLoading={p.loading}
             testId="quantitativos-tabela"
@@ -438,6 +442,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
             expandLabel={(l) => l.nome}
             rowActions={q.informado && p.podeRemanejar ? (l) => <RowActionsMenu label={`Ações de ${l.nome}`} actions={acoesDaLinha(l)} testId={`acoes-${l.uasg}`} /> : undefined}
           />
+          {recolhidos.botao}
+          </>
         )}
       </div>
 

@@ -19,6 +19,7 @@ import {
   type MetricStripItem
 } from '../../design-system';
 import { formatNumber } from './itemBalanceUtils';
+import { useOrgaosRecolhidos } from './useOrgaosRecolhidos';
 import { formatDataHoraBR } from '../../utils/format';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import type { OrgaoQuantitativo, QuantitativosDoItem } from '../../services/quantitativosService';
@@ -131,6 +132,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
   // A linha da SENASP vem aberta ao entrar na aba e ao trocar de item.
   const [abertas, setAbertas] = React.useState<Set<string>>(() => new Set([uasgSenasp]));
   React.useEffect(() => { setAbertas(new Set([uasgSenasp])); }, [p.itemKey, uasgSenasp]);
+  const recolhidos = useOrgaosRecolhidos(linhas, p.itemKey);
   const alternar = (uasg: string) => setAbertas((s) => {
     const n = new Set(s);
     if (n.has(uasg)) n.delete(uasg); else n.add(uasg);
@@ -454,7 +456,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
         )}
         <DataTable
           columns={columns}
-          data={linhas}
+          data={recolhidos.visiveis}
           keyExtractor={(l) => l.uasg}
           isLoading={p.loading}
           testId="quantitativos-tabela"
@@ -464,6 +466,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
           onToggleExpand={alternar}
           expandLabel={(l) => l.nome}
         />
+        {recolhidos.botao}
       </div>
 
       {participante && (
