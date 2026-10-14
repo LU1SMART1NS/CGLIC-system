@@ -224,11 +224,22 @@ BEGIN
     EXECUTE format('DROP FUNCTION %s', v_oid::regprocedure);
     EXECUTE v_novo;
 
-    -- Mesmas permissões de antes.
+    -- Mesmas permissões de antes. A função nova nasce com as permissões padrão do Supabase (inclusive anon):
+    -- tira todas e devolve só as que a antiga tinha.
     SELECT format('public.%I(%s)', p.proname, pg_get_function_identity_arguments(p.oid)) INTO v_ass
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public' AND p.proname = v_alvos[i][1];
     IF v_acl IS NOT NULL THEN
+      FOR g IN SELECT DISTINCT a.grantee FROM pg_proc p, aclexplode(p.proacl) a
+                WHERE p.oid = (SELECT p2.oid FROM pg_proc p2 JOIN pg_namespace n2 ON n2.oid = p2.pronamespace
+                                WHERE n2.nspname = 'public' AND p2.proname = v_alvos[i][1])
+                  AND a.grantee <> p.proowner LOOP
+        IF g.grantee = 0 THEN
+          EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', v_ass);
+        ELSE
+          EXECUTE format('REVOKE ALL ON FUNCTION %s FROM %I', v_ass, g.grantee::regrole::TEXT);
+        END IF;
+      END LOOP;
       EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', v_ass);
       FOR g IN SELECT a.grantee FROM aclexplode(v_acl) a WHERE a.privilege_type = 'EXECUTE' LOOP
         IF g.grantee = 0 THEN
