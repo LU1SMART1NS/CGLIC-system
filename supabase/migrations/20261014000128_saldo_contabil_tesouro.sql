@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- MIGRATION 126: SALDO CONTÁBIL DO TESOURO POR EMPENHO (FASE 1 DO ESTUDO)
--- Versão: 20261014000126_saldo_contabil_tesouro.sql
+-- Versão: 20261014000128_saldo_contabil_tesouro.sql
 --
 -- Contexto: estudo docs/estudos/saldo-contabil-tesouro.md (14/10/2026). A API aberta do Tesouro (STA) publica,
 -- uma vez por dia, o saldo contábil do SIAFI por conta corrente (nota de empenho + subitem). Com ele dá para saber,
