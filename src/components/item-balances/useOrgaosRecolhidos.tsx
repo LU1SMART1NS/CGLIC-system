@@ -10,8 +10,9 @@ import { breakpoints } from '../../design-system/tokens';
  */
 export function useOrgaosRecolhidos<T extends { ehSenasp: boolean }>(linhas: T[], itemKey: string) {
   const celular = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
-  const [verTodos, setVerTodos] = React.useState(false);
-  React.useEffect(() => setVerTodos(false), [itemKey]);
+  // Guarda o item em que a lista foi aberta: ao trocar de item, volta recolhida sem precisar de efeito.
+  const [abertoNoItem, setAbertoNoItem] = React.useState<string | null>(null);
+  const verTodos = abertoNoItem === itemKey;
 
   const participantes = linhas.filter((l) => !l.ehSenasp).length;
   const temSenasp = linhas.length > participantes;
@@ -25,7 +26,7 @@ export function useOrgaosRecolhidos<T extends { ehSenasp: boolean }>(linhas: T[]
         size="sm"
         fullWidth
         icon={verTodos ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        onClick={() => setVerTodos((v) => !v)}
+        onClick={() => setAbertoNoItem(verTodos ? null : itemKey)}
         aria-expanded={verTodos}
         data-testid="ver-orgaos-participantes"
       >
