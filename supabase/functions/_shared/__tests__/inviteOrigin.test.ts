@@ -2,14 +2,19 @@ import { describe, it, expect } from 'vitest';
 import { resolveInviteRedirect, ALLOWED_INVITE_ORIGINS } from '../inviteOrigin';
 
 describe('resolveInviteRedirect — allow-list de origem do redirectTo do convite', () => {
-  it('origin permitido (Vercel produção — domínio canônico) -> redirectTo correto', () => {
+  it('origin permitido (produção — domínio canônico) -> redirectTo correto', () => {
+    const result = resolveInviteRedirect('https://comprassusp.app');
+    expect(result).toEqual({ ok: true, redirectTo: 'https://comprassusp.app/definir-senha' });
+  });
+
+  it('domínio anterior da Vercel -> redirectTo aponta ao domínio canônico', () => {
     const result = resolveInviteRedirect('https://cglic.vercel.app');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
+    expect(result).toEqual({ ok: true, redirectTo: 'https://comprassusp.app/definir-senha' });
   });
 
   it('domínio anterior (protegido por SSO da Vercel) -> redirectTo aponta ao domínio canônico', () => {
     const result = resolveInviteRedirect('https://cglic-lu1smart1ns-projects.vercel.app');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
+    expect(result).toEqual({ ok: true, redirectTo: 'https://comprassusp.app/definir-senha' });
   });
 
   it('origin permitido (localhost de desenvolvimento) -> redirectTo correto', () => {
@@ -18,8 +23,8 @@ describe('resolveInviteRedirect — allow-list de origem do redirectTo do convit
   });
 
   it('tolera barra final na origem recebida', () => {
-    const result = resolveInviteRedirect('https://cglic.vercel.app/');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
+    const result = resolveInviteRedirect('https://comprassusp.app/');
+    expect(result).toEqual({ ok: true, redirectTo: 'https://comprassusp.app/definir-senha' });
   });
 
   it('origin não permitido (domínio arbitrário) -> convite rejeitado, sem redirectTo', () => {
@@ -40,6 +45,7 @@ describe('resolveInviteRedirect — allow-list de origem do redirectTo do convit
   });
 
   it('a allow-list contém exatamente as origens de produção (atual e anterior) e desenvolvimento local esperadas', () => {
+    expect(ALLOWED_INVITE_ORIGINS).toContain('https://comprassusp.app');
     expect(ALLOWED_INVITE_ORIGINS).toContain('https://cglic.vercel.app');
     expect(ALLOWED_INVITE_ORIGINS).toContain('https://cglic-lu1smart1ns-projects.vercel.app');
     expect(ALLOWED_INVITE_ORIGINS).toContain('http://localhost:5173');
