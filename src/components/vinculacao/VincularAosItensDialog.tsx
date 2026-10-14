@@ -33,10 +33,12 @@ export const VincularAosItensDialog: React.FC<VincularAosItensDialogProps> = ({ 
   }, [nota?.contratoEmpenhoId]);
 
   if (!nota) return null;
+  // A nota como está agora no contrato (depois de um conflito de edição, a lista relida traz a versão nova).
+  const atual = distribuicoes.find((d) => d.contratoEmpenhoId === nota.contratoEmpenhoId) ?? nota;
 
   const salvar = (quantidades: QuantidadeNoItem[], observacao: string) =>
     acoes.vincular.mutate(
-      { contratoEmpenhoId: nota.contratoEmpenhoId, itens: quantidades, observacao },
+      { contratoEmpenhoId: atual.contratoEmpenhoId, itens: quantidades, observacao, versao: atual.versao },
       {
         onSuccess: () => {
           toast.success(`${nota.numeroOficial} vinculada a ${quantidades.length === 1 ? '1 item' : `${quantidades.length} itens`} do contrato ${numeroContrato}.`);
@@ -48,7 +50,7 @@ export const VincularAosItensDialog: React.FC<VincularAosItensDialogProps> = ({ 
 
   return (
     <DistribuirEmpenhoModal
-      distribuicao={nota}
+      distribuicao={atual}
       numeroContrato={numeroContrato}
       itens={itens}
       empenhadoOutras={empenhadoPorItem(distribuicoes, itens, nota.contratoEmpenhoId)}

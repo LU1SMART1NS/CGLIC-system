@@ -454,6 +454,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         homologado={p.homologado}
         corrigir={q.informado}
         documentoSeiAtual={q.documentoSei}
+        versao={q.versaoAssinada}
         orgaos={linhas.map((l) => ({ uasg: l.uasg, nome: l.nome, nomeNaAta: l.nomeNaAta, local: l.local, registrado: l.registrado, assinada: l.orgao ? l.orgao.quantidadeAssinada : null, ehSenasp: l.ehSenasp }))}
         onFechar={() => setInformando(false)}
       />

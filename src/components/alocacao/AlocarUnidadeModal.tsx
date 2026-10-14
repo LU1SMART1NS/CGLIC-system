@@ -12,6 +12,7 @@ import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../../utils/co
 import { summarizeAllocationExecution } from '../../utils/allocationExecution';
 import { avaliarEdicao, linhasIniciais, listaParaGravar, normUnidade, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
+import { MENSAGEM_CONFLITO_EDICAO } from '../../utils/conflitoEdicao';
 import { formatNumber } from '../item-balances/itemBalanceUtils';
 
 export interface ItemParaAlocar {
@@ -131,7 +132,9 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
       await salvarAlocacoes.mutateAsync({ itemKey, allocations: listaParaGravar(linhas, estado?.allocations ?? []), expectedVersion: estado?.version });
     } catch (err: any) {
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        setErro('As alocações deste item mudaram por outro usuário. Feche e abra de novo antes de salvar.');
+        // A janela volta ao que está gravado agora (a mutação relê as alocações).
+        setEditadas(null);
+        setErro(MENSAGEM_CONFLITO_EDICAO);
       } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
         setErro('Só o coordenador e o gestor de saldos alocam quantitativo.');
       } else {

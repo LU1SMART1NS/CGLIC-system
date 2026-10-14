@@ -39,7 +39,9 @@ export function useAcoesDistribuicaoEmpenho(contractKey?: string) {
     onSettled: aoTerminar
   });
   const desfazer = useMutation({
-    mutationFn: (contratoEmpenhoId: string) => desfazerDistribuicaoEmpenho(contratoEmpenhoId),
+    // A tela passa a versão que leu (migration 129); só o id desfaz sem conferir.
+    mutationFn: (p: string | { contratoEmpenhoId: string; versao?: string | null }) =>
+      typeof p === 'string' ? desfazerDistribuicaoEmpenho(p) : desfazerDistribuicaoEmpenho(p.contratoEmpenhoId, p.versao),
     retry: 0,
     onSettled: aoTerminar
   });

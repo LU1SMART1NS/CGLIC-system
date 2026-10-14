@@ -29,7 +29,8 @@ export function useSaveAllocations() {
       return saveAllocations(itemKey, allocations, expectedVersion);
     },
     retry: 0,
-    onSuccess: (_data, variables) => {
+    // Também no erro: depois de um conflito (40001), a tela relê as alocações e a versão atuais.
+    onSettled: (_data, _error, variables) => {
       const parsed = parseItemKey(variables.itemKey);
       const canonicalKey = normalizeItemKey(parsed.numeroAta, parsed.uasg, parsed.itemNum);
 

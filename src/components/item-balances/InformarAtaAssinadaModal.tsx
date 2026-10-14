@@ -4,6 +4,7 @@ import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import { fetchNomeUasg } from '../../services/api';
 import { fetchQuantitativosDoItem } from '../../services/quantitativosService';
 import { documentoSeiValido } from '../../utils/quantitativos';
+import { MENSAGEM_CONFLITO_EDICAO, ehConflitoEdicao } from '../../utils/conflitoEdicao';
 import { formatNumber } from './itemBalanceUtils';
 
 /** Órgão na janela: o registrado do Compras.gov.br aparece ao lado, só para comparar. */
@@ -39,6 +40,8 @@ interface Props {
   /** Já informada: a janela é de correção e pede justificativa. */
   corrigir: boolean;
   documentoSeiAtual: string | null;
+  /** Versão lida com o item (migration 129); o banco recusa se outra pessoa informou nesse meio-tempo. */
+  versao?: string | null;
   onFechar: () => void;
 }
 
@@ -48,7 +51,7 @@ const inteiro = (v: string) => /^\d+$/.test(v.trim());
  * Informar (ou corrigir) a quantidade de cada órgão na ata assinada — gestor da ata ou coordenador.
  * Grava a lista inteira de uma vez (informar_quantidades_ata_assinada, migration 109).
  */
-export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tituloItem, homologado, orgaos, corrigir, documentoSeiAtual, onFechar }) => {
+export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tituloItem, homologado, orgaos, corrigir, documentoSeiAtual, versao, onFechar }) => {
   const toast = useToast();
   const { informar } = useAcoesQuantitativos(itemKey);
   const [valores, setValores] = React.useState<Record<string, string>>({});
@@ -56,16 +59,19 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
   const [documento, setDocumento] = React.useState('');
   const [justificativa, setJustificativa] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
+  const houveConflito = React.useRef(false);
 
+  // Ao abrir e quando a versão muda (depois de um conflito de edição, o item relido traz o que está gravado agora).
   React.useEffect(() => {
     if (!aberto) return;
     setValores(Object.fromEntries(orgaos.map((o) => [o.uasg, o.assinada != null ? String(o.assinada) : ''])));
     setNovos([]);
     setDocumento(documentoSeiAtual ?? '');
     setJustificativa('');
-    setErro(null);
+    setErro(houveConflito.current ? MENSAGEM_CONFLITO_EDICAO : null);
+    houveConflito.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aberto]);
+  }, [aberto, versao]);
 
   const soma = orgaos.reduce((s, o) => s + (inteiro(valores[o.uasg] ?? '') ? Number(valores[o.uasg]) : 0), 0)
     + novos.reduce((s, n) => s + (inteiro(n.quantidade) ? Number(n.quantidade) : 0), 0);
@@ -107,7 +113,8 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
           ...novos.filter((n) => n.uasg.trim()).map((n) => ({ uasg: n.uasg.trim(), quantidade: Number(n.quantidade), nome: n.nome.trim() }))
         ],
         documentoSei: documento,
-        justificativa: corrigir ? justificativa : null
+        justificativa: corrigir ? justificativa : null,
+        versao
       });
       toast.success(corrigir ? 'Quantidades da ata assinada corrigidas.' : 'Quantidades da ata assinada informadas.');
       onFechar();
@@ -122,6 +129,7 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
         }
       }).catch(() => undefined);
     } catch (err: any) {
+      if (ehConflitoEdicao(err)) houveConflito.current = true;
       setErro(err?.message || 'Não foi possível gravar as quantidades.');
     }
   };

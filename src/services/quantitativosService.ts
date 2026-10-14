@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { rpcInexistente } from './empenhoSyncService';
+import { ConflitoEdicaoError, comVersao, erroDeConflito } from '../utils/conflitoEdicao';
 
 /**
  * Quantitativos do item (migration 109): ata assinada × registrado no Compras.gov.br, remanejamentos,
@@ -127,6 +128,9 @@ export interface QuantitativosDoItem {
   contratos: ContratoDoParticipante[];
   leituras: Map<string, LeituraDoParticipante>;
   adesoesInformadas: AdesaoInformada[];
+  /** Versões lidas antes dos dados (migration 129); voltam ao salvar para o banco recusar se outra pessoa mexeu. */
+  versaoAssinada?: string | null;
+  versaoAdesoes?: string | null;
 }
 
 export const MIGRATION_109_AUSENTE = 'Os quantitativos da ata assinada ainda não estão disponíveis no banco (migration 109).';
@@ -167,7 +171,9 @@ export function vazioDoItem(): QuantitativosDoItem {
     registros: [],
     contratos: [],
     leituras: new Map(),
-    adesoesInformadas: []
+    adesoesInformadas: [],
+    versaoAssinada: null,
+    versaoAdesoes: null
   };
 }
 
@@ -200,6 +206,11 @@ export async function fetchQuantitativosDoItem(itemKey: string): Promise<Quantit
   const vazio = vazioDoItem();
   if (!key || !isSupabaseConfigured || !supabase) return vazio;
   const uasgGerenciadora = key.split('-')[1] ?? '';
+
+  // A versão vem ANTES dos dados: se alguém gravar entre as leituras, a versão fica velha e o banco recusa (seguro);
+  // o contrário deixaria a tela com dados velhos e versão nova. Sem a migration 129, segue sem versão.
+  const versoes = await supabase.rpc('versao_quantitativos_item', { p_item_key: key });
+  const versao = versoes.error ? null : ((versoes.data ?? null) as { assinada?: string; adesoes?: string } | null);
 
   const [item, orgaos, remanejamentos, continua, registros, contratos, leituras, adesoesInformadas] = await Promise.all([
     supabase.from('v_item_quantitativos').select('*').eq('item_key', key).maybeSingle(),
@@ -282,8 +293,15 @@ export async function fetchQuantitativosDoItem(itemKey: string): Promise<Quantit
       justificativa: r.justificativa ?? null,
       informadoPorNome: r.informado_por_nome ?? '',
       informadoEm: r.informado_em
-    }))
+    })),
+    versaoAssinada: versao?.assinada ?? null,
+    versaoAdesoes: versao?.adesoes ?? null
   };
+}
+
+/** Erro das RPCs de quantitativos: o conflito de edição vira ConflitoEdicaoError; o resto, mensagem legível. */
+function erroDosQuantitativos(error: any): Error {
+  return erroDeConflito(error) ? new ConflitoEdicaoError() : new Error(mensagemDoErroQuantitativos(error));
 }
 
 export interface QuantidadeInformada {
@@ -298,14 +316,17 @@ export async function informarQuantidadesAtaAssinada(p: {
   quantidades: QuantidadeInformada[];
   documentoSei: string;
   justificativa?: string | null;
+  /** versaoAssinada lida com o item; o banco recusa se outra pessoa informou nesse meio-tempo. */
+  versao?: string | null;
 }): Promise<void> {
   const { error } = await requireSupabase().rpc('informar_quantidades_ata_assinada', {
     p_item_key: p.itemKey,
     p_quantidades: p.quantidades.map((q) => ({ uasg: q.uasg, quantidade: q.quantidade, nome: q.nome?.trim() || null })),
     p_documento_sei: p.documentoSei.trim(),
-    p_justificativa: p.justificativa?.trim() || null
+    p_justificativa: p.justificativa?.trim() || null,
+    ...comVersao(p.versao)
   });
-  if (error) throw new Error(mensagemDoErroQuantitativos(error));
+  if (error) throw erroDosQuantitativos(error);
 }
 
 export async function confirmarRemanejamento(p: {
@@ -354,6 +375,8 @@ export async function informarQuantidadeAdesao(p: {
   quantidade: number;
   documentoSei: string;
   justificativa?: string | null;
+  /** versaoAdesoes lida com o item. */
+  versao?: string | null;
 }): Promise<void> {
   const { error } = await requireSupabase().rpc('informar_quantidade_adesao', {
     p_item_key: p.itemKey,
@@ -361,7 +384,11 @@ export async function informarQuantidadeAdesao(p: {
     p_aprovada_em: p.aprovadaEm,
     p_quantidade: p.quantidade,
     p_documento_sei: p.documentoSei.trim(),
-    p_justificativa: p.justificativa?.trim() || null
+    p_justificativa: p.justificativa?.trim() || null,
+    ...comVersao(p.versao)
   });
-  if (error) throw new Error(rpcInexistente(error) ? 'A quantidade da adesão ainda não pode ser informada no banco (migration 114).' : mensagemDoErroQuantitativos(error));
+  if (error) {
+    if (rpcInexistente(error)) throw new Error('A quantidade da adesão ainda não pode ser informada no banco (migration 114).');
+    throw erroDosQuantitativos(error);
+  }
 }

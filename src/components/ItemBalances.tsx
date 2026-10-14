@@ -43,6 +43,7 @@ import { useContractsDashboard } from '../hooks/useContractsDashboard';
 import { useItemNosContratos } from '../hooks/useItensDoContrato';
 import { enrichContractLinks } from '../services/arpContractLinkService';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
+import { MENSAGEM_CONFLITO_EDICAO } from '../utils/conflitoEdicao';
 import {
   buildItemContractSuggestions,
   buildItemSuggestionCriteria,
@@ -442,7 +443,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       });
     } catch (err: any) {
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        setAllocationError('Conflito de concorrência: os vínculos de empenhos foram modificados por outro usuário. Recarregue a página antes de salvar novamente.');
+        setAllocationError(MENSAGEM_CONFLITO_EDICAO);
       } else {
         setAllocationError(err?.message || 'Erro ao salvar vínculo de empenho.');
       }
@@ -549,13 +550,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     saveEmpenhoLinksMutation
       .mutateAsync({ itemKey, links: limpeza.restantes, expectedVersion: empenhoLinkVersion })
       .then(() => setVinculosDesfeitos((antes) => [...antes, ...limpeza.removidos.map((r) => ({ numero: r.numero, unidade: nomes.get(r.allocationId) ?? 'unidade removida' }))]))
+      // Conflito (outra pessoa mexeu nos vínculos): a mutação relê os vínculos; com a versão nova, a limpeza tenta de
+      // novo com o que está gravado agora.
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empenhoDoItemPronto, empenhoLinksCarregados, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
 
   const handleInformarQuantidade = (p: ParcelaDoItem, quantidade: number | null, sairDaUnidade: string | null) =>
     acoesQuantidade.informar.mutate(
-      { contratoEmpenhoId: p.contratoEmpenhoId, numeroItem: p.numeroItem, quantidade },
+      { contratoEmpenhoId: p.contratoEmpenhoId, numeroItem: p.numeroItem, quantidade, versao: p.versao },
       {
         onSuccess: async () => {
           toast.success(quantidade == null ? `${p.numeroOficial}: quantidade voltou à calculada.` : `${p.numeroOficial}: ${formatNumber(quantidade)} un neste item.`);
@@ -1138,7 +1141,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       <UnidadesDoContratoModal
         itemKey={canonicalItemKey}
         tituloItem={tituloItem}
-        contrato={contratoDividindo}
+        // O contrato como está agora (depois de um conflito de edição, a leitura nova traz a divisão gravada).
+        contrato={
+          contratoDividindo
+            ? {
+                ...contratoDividindo,
+                quantidade: contratadoDoItem?.contratos.find((c) => c.contractKey === contratoDividindo.contractKey) ?? contratoDividindo.quantidade
+              }
+            : null
+        }
         allocations={allocations}
         unidades={contratadoDoItem.unidades}
         nomeDaUnidade={(sigla) => departments.find((d) => d.sigla.trim().toLowerCase() === sigla.trim().toLowerCase())?.nomeCompleto}

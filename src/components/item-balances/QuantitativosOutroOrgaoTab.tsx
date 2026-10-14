@@ -24,6 +24,7 @@ import { formatDataHoraBR } from '../../utils/format';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import type { OrgaoQuantitativo, QuantitativosDoItem } from '../../services/quantitativosService';
 import { documentoSeiValido } from '../../utils/quantitativos';
+import { MENSAGEM_CONFLITO_EDICAO, ehConflitoEdicao } from '../../utils/conflitoEdicao';
 import { adesoesComInformadas, mudaramComASenasp, textoDaSituacaoSenasp, type AdesaoDaSenasp } from '../../utils/quantitativosOutroOrgao';
 import { isUasgCglic } from '../../config/unidadesGestoras';
 import type { AdesaoItemRecord, UnidadeItemRecord } from '../../types';
@@ -480,6 +481,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
           atual={orgaoSenasp?.quantidadeAssinada ?? null}
           corrigir={q.informado}
           documentoSeiAtual={q.documentoSei}
+          versao={q.versaoAssinada}
           onFechar={() => setInformando(false)}
         />
       )}
@@ -487,7 +489,13 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
         <ContinuaDaSenaspModal aberto={continuando} itemKey={p.itemKey} uasgSenasp={uasgSenasp} maximo={orgaoSenasp.resto} onFechar={() => setContinuando(false)} />
       )}
       {!participante && (
-        <InformarAdesaoModal itemKey={p.itemKey} adesao={adesaoAInformar} onFechar={() => setAdesaoAInformar(null)} />
+        <InformarAdesaoModal
+          itemKey={p.itemKey}
+          // A adesão como está agora (depois de um conflito de edição, o item relido traz o que está gravado).
+          adesao={adesaoAInformar ? adesoes.find((a) => a.uasg === adesaoAInformar.uasg && a.aprovadaEm === adesaoAInformar.aprovadaEm) ?? adesaoAInformar : null}
+          versao={q.versaoAdesoes}
+          onFechar={() => setAdesaoAInformar(null)}
+        />
       )}
     </div>
   );
@@ -509,23 +517,28 @@ const InformarQtdSenaspModal: React.FC<{
   atual: number | null;
   corrigir: boolean;
   documentoSeiAtual: string | null;
+  /** Versão lida com o item (migration 129). */
+  versao?: string | null;
   onFechar: () => void;
-}> = ({ aberto, itemKey, tituloItem, uasgSenasp, nomeSenasp, registrado, atual, corrigir, documentoSeiAtual, onFechar }) => {
+}> = ({ aberto, itemKey, tituloItem, uasgSenasp, nomeSenasp, registrado, atual, corrigir, documentoSeiAtual, versao, onFechar }) => {
   const toast = useToast();
   const { informar } = useAcoesQuantitativos(itemKey);
   const [quantidade, setQuantidade] = React.useState('');
   const [documento, setDocumento] = React.useState('');
   const [justificativa, setJustificativa] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
+  const houveConflito = React.useRef(false);
 
+  // Ao abrir e quando a versão muda (depois de um conflito de edição, recomeça com o que está gravado agora).
   React.useEffect(() => {
     if (!aberto) return;
     setQuantidade(atual != null ? String(atual) : '');
     setDocumento(documentoSeiAtual ?? '');
     setJustificativa('');
-    setErro(null);
+    setErro(houveConflito.current ? MENSAGEM_CONFLITO_EDICAO : null);
+    houveConflito.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aberto]);
+  }, [aberto, versao]);
 
   const gravar = async () => {
     setErro(null);
@@ -533,10 +546,11 @@ const InformarQtdSenaspModal: React.FC<{
     if (!documentoSeiValido(documento)) return setErro('O número do documento SEI tem 8 dígitos (ex.: 12345678).');
     if (corrigir && justificativa.trim().length < 15) return setErro('Escreva a justificativa da correção (mínimo de 15 caracteres).');
     try {
-      await informar.mutateAsync({ quantidades: [{ uasg: uasgSenasp, quantidade: Number(quantidade), nome: nomeSenasp }], documentoSei: documento, justificativa: corrigir ? justificativa : null });
+      await informar.mutateAsync({ quantidades: [{ uasg: uasgSenasp, quantidade: Number(quantidade), nome: nomeSenasp }], documentoSei: documento, justificativa: corrigir ? justificativa : null, versao });
       toast.success(corrigir ? 'Quantidade da ata assinada corrigida.' : 'Quantidade da ata assinada informada.');
       onFechar();
     } catch (err: any) {
+      if (ehConflitoEdicao(err)) houveConflito.current = true;
       setErro(err?.message || 'Não foi possível gravar a quantidade.');
     }
   };
@@ -647,7 +661,12 @@ const ContinuaDaSenaspModal: React.FC<{ aberto: boolean; itemKey: string; uasgSe
 };
 
 /** Quantidade aprovada de uma adesão da SENASP sem quantidade no Compras.gov.br — gestor da ata ou coordenador. */
-const InformarAdesaoModal: React.FC<{ itemKey: string; adesao: AdesaoDaSenasp | null; onFechar: () => void }> = ({ itemKey, adesao, onFechar }) => {
+const InformarAdesaoModal: React.FC<{ itemKey: string; adesao: AdesaoDaSenasp | null; versao?: string | null; onFechar: () => void }> = ({
+  itemKey,
+  adesao,
+  versao,
+  onFechar
+}) => {
   const toast = useToast();
   const { informarAdesao } = useAcoesQuantitativos(itemKey);
   const [quantidade, setQuantidade] = React.useState('');
@@ -655,14 +674,17 @@ const InformarAdesaoModal: React.FC<{ itemKey: string; adesao: AdesaoDaSenasp | 
   const [justificativa, setJustificativa] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
   const corrigir = Boolean(adesao?.informada);
+  const houveConflito = React.useRef(false);
 
+  // Ao abrir e quando a versão muda (depois de um conflito de edição, recomeça com o que está gravado agora).
   React.useEffect(() => {
     if (!adesao) return;
     setQuantidade(adesao.informada ? String(adesao.informada.quantidade) : '');
     setDocumento(adesao.informada?.documentoSei ?? '');
     setJustificativa('');
-    setErro(null);
-  }, [adesao?.uasg, adesao?.aprovadaEm]); // eslint-disable-line react-hooks/exhaustive-deps
+    setErro(houveConflito.current ? MENSAGEM_CONFLITO_EDICAO : null);
+    houveConflito.current = false;
+  }, [adesao?.uasg, adesao?.aprovadaEm, versao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gravar = async () => {
     if (!adesao) return;
@@ -671,10 +693,11 @@ const InformarAdesaoModal: React.FC<{ itemKey: string; adesao: AdesaoDaSenasp | 
     if (!documentoSeiValido(documento)) return setErro('O número do documento SEI tem 8 dígitos (ex.: 12345678).');
     if (corrigir && justificativa.trim().length < 15) return setErro('Escreva a justificativa da correção (mínimo de 15 caracteres).');
     try {
-      await informarAdesao.mutateAsync({ uasg: adesao.uasg, aprovadaEm: adesao.aprovadaEm, quantidade: Number(quantidade), documentoSei: documento, justificativa: corrigir ? justificativa : null });
+      await informarAdesao.mutateAsync({ uasg: adesao.uasg, aprovadaEm: adesao.aprovadaEm, quantidade: Number(quantidade), documentoSei: documento, justificativa: corrigir ? justificativa : null, versao });
       toast.success('Quantidade aprovada da adesão gravada.');
       onFechar();
     } catch (err: any) {
+      if (ehConflitoEdicao(err)) houveConflito.current = true;
       setErro(err?.message || 'Não foi possível gravar a quantidade.');
     }
   };

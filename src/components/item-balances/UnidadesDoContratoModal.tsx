@@ -5,6 +5,7 @@ import { avaliarDivisao, linhasDaDivisao, type LinhaDivisao } from '../../utils/
 import type { ContratadoDaUnidade, QuantidadeDoContrato } from '../../services/contratadoUnidadeService';
 import type { InternalAllocation } from '../../types';
 import { formatNumber } from './itemBalanceUtils';
+import { MENSAGEM_CONFLITO_EDICAO, ehConflitoEdicao } from '../../utils/conflitoEdicao';
 
 export interface ContratoParaDividir {
   contractKey: string;
@@ -39,10 +40,29 @@ const nums: React.CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tab
  * unidade interna. Só unidades alocadas no item recebem; cada uma até o livre dela (alocado − contratado nos outros
  * contratos). A soma não passa do contrato; o que faltar fica "sem unidade".
  */
-export const UnidadesDoContratoModal: React.FC<UnidadesDoContratoModalProps> = ({ contrato, ...rest }) =>
-  contrato ? <JanelaUnidades key={contrato.contractKey} contrato={contrato} {...rest} /> : null;
+export const UnidadesDoContratoModal: React.FC<UnidadesDoContratoModalProps> = ({ contrato, ...rest }) => {
+  // Depois de um conflito de edição, a janela recomeça com a divisão gravada agora (a chave inclui a versão) e
+  // continua mostrando o aviso.
+  // Guarda o contrato em que houve o conflito: ao abrir outro, o aviso não aparece.
+  const [conflitoNo, setConflitoNo] = React.useState<string | null>(null);
+  return contrato ? (
+    <JanelaUnidades
+      key={`${contrato.contractKey}:${contrato.quantidade.versao ?? ''}`}
+      contrato={contrato}
+      erroInicial={conflitoNo === contrato.contractKey ? MENSAGEM_CONFLITO_EDICAO : null}
+      onConflito={() => setConflitoNo(contrato.contractKey)}
+      {...rest}
+      onFechar={() => {
+        setConflitoNo(null);
+        rest.onFechar();
+      }}
+    />
+  ) : null;
+};
 
-const JanelaUnidades: React.FC<Omit<UnidadesDoContratoModalProps, 'contrato'> & { contrato: ContratoParaDividir }> = ({
+const JanelaUnidades: React.FC<
+  Omit<UnidadesDoContratoModalProps, 'contrato'> & { contrato: ContratoParaDividir; erroInicial: string | null; onConflito: () => void }
+> = ({
   itemKey,
   tituloItem,
   contrato,
@@ -50,6 +70,8 @@ const JanelaUnidades: React.FC<Omit<UnidadesDoContratoModalProps, 'contrato'> & 
   unidades,
   nomeDaUnidade,
   podeEditar,
+  erroInicial,
+  onConflito,
   onFechar
 }) => {
   const q = contrato.quantidade;
@@ -57,7 +79,7 @@ const JanelaUnidades: React.FC<Omit<UnidadesDoContratoModalProps, 'contrato'> & 
   const toast = useToast();
   const { dividir, desfazerDivisao } = useAcoesContratado(itemKey);
   const [linhas, setLinhas] = React.useState<LinhaDivisao[]>(() => linhasDaDivisao(q, allocations, unidades));
-  const [erro, setErro] = React.useState<string | null>(null);
+  const [erro, setErro] = React.useState<string | null>(erroInicial);
   const salvando = dividir.isPending || desfazerDivisao.isPending;
   const aval = avaliarDivisao(linhas, total);
   const semQuantidade = q.quantidadeContratada == null || q.quantidadeContratada <= 0;
@@ -74,11 +96,13 @@ const JanelaUnidades: React.FC<Omit<UnidadesDoContratoModalProps, 'contrato'> & 
         unidades: linhas
           .map((l) => ({ unidade: l.unidade, quantidade: aval.porLinha.get(l.unidade)?.quantidade ?? 0 }))
           .filter((u) => u.quantidade > 0),
-        quantidadeVista: total
+        quantidadeVista: total,
+        versao: q.versao
       });
       toast.success(`Unidades do contrato ${contrato.numeroContrato} gravadas.`);
       onFechar();
     } catch (e: any) {
+      if (ehConflitoEdicao(e)) onConflito();
       setErro(e?.message || 'Não foi possível gravar a divisão.');
     }
   };
@@ -86,10 +110,11 @@ const JanelaUnidades: React.FC<Omit<UnidadesDoContratoModalProps, 'contrato'> & 
   const desfazer = async () => {
     setErro(null);
     try {
-      await desfazerDivisao.mutateAsync(contrato.contractKey);
+      await desfazerDivisao.mutateAsync({ contractKey: contrato.contractKey, versao: q.versao });
       toast.success(`A divisão do contrato ${contrato.numeroContrato} foi desfeita.`);
       onFechar();
     } catch (e: any) {
+      if (ehConflitoEdicao(e)) onConflito();
       setErro(e?.message || 'Não foi possível desfazer a divisão.');
     }
   };
