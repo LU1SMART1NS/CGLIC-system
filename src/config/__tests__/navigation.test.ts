@@ -290,7 +290,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(config?.children?.map((c) => c.label)).toEqual(['Modelos de Gestão', 'Unidades Internas']);
     });
 
-    it('Gestor de Saldo (gestor_saldos) vê Visão Geral (restrita a saldos), Atas, Itens e Contratos — sem Financeiro, Usuários ou Perfis', () => {
+    it('Gestor de Saldo (gestor_saldos) vê Visão Geral (restrita a saldos), Atas e Itens — sem Contratos, Financeiro, Usuários ou Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor_saldos');
       const labels = flatLabels(visible);
 
@@ -299,7 +299,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
       expect(labels).toContain('Visão Geral');
       expect(labels).toContain('Atas');
-      expect(labels).toContain('Contratos');
+      // Carteira dele é Atas · Itens: contratos são do gestor da ata (o empenhado por unidade fica na Alocação e no Item)
+      expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
+      expect(labels).not.toContain('Contratos');
       expect(labels).not.toContain('Modelos de Gestão');
       // Configurações aparece só com o cadastro de unidades internas, que ele mantém
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);

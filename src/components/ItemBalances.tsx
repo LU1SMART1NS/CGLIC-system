@@ -96,6 +96,8 @@ interface ItemBalancesProps {
 }
 
 const ITEM_TABS: ItemTab[] = ['quantitativos', 'contratos', 'adesoes'];
+// Gestor de saldo não vê contratos: fica com os quantitativos (empenhado por unidade incluído) e as adesões.
+const SALDOS_ITEM_TABS: ItemTab[] = ['quantitativos', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 const EMPTY_UNIDADES: UnidadeItemRecord[] = [];
@@ -137,8 +139,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Aba no endereço (?aba=), com o mesmo comportamento das telas de Ata e Contrato.
   // 'empenhos' era uma aba própria; os empenhos agora ficam dentro de cada contrato.
   const navigate = useNavigateWithOrigin();
+  const { role } = useAuth();
+  const verContratos = role !== 'gestor_saldos';
   const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
-    tabs: ITEM_TABS,
+    tabs: verContratos ? ITEM_TABS : SALDOS_ITEM_TABS,
     defaultTab: 'quantitativos',
     // Órgãos participantes e Alocação interna viraram a aba Órgãos e quantitativos (migration 109).
     aliases: { empenhos: 'contratos', unidades: 'quantitativos', alocacao: 'quantitativos' }
@@ -147,7 +151,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Mesmas regras do backend: alocações exigem allocations.manage (admin e gestor de saldos); escolher a unidade
   // interna da nota é do gestor e do coordenador (allocations.link_empenho, migration 98); contratos e empenhos
   // manuais, admin e gestor.
-  const { role } = useAuth();
   const toast = useToast();
   const confirm = useConfirmDialog();
   const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
@@ -704,6 +707,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         }}
         referencia={comprasGovReferencia}
         onGoTo={(tab) => setActiveTab(tab)}
+        verContratos={verContratos}
         onOpenAta={onOpenAta}
       />
 
@@ -711,7 +715,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         ref={tabsRef}
         tabs={[
           { id: 'quantitativos', label: 'Órgãos e quantitativos' },
-          { id: 'contratos', label: `Contratos e empenhos (${contractsCount})` },
+          ...(verContratos ? [{ id: 'contratos' as const, label: `Contratos e empenhos (${contractsCount})` }] : []),
           { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` }
         ]}
         active={activeTab}
