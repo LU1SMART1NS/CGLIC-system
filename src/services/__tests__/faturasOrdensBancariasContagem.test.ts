@@ -4,8 +4,7 @@ const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const NPS = Array.from({ length: 12 }, (_, i) => `2026NP${String(i + 1).padStart(6, '0')}`);
 
 const tabelas: Record<string, any[]> = {
-  contrato_faturas: NPS.map((np) => ({ np, data_liquidacao: '2026-09-01', cancelada: false })),
-  ordens_bancarias: [],
+  v_contrato_faturas: NPS.map((np, i) => ({ np, numero: `NF${i + 1}`, data_liquidacao: '2026-09-01', cancelada: false, ordens_bancarias: null })),
   np_consultas: []
 };
 
@@ -25,7 +24,8 @@ vi.mock('../supabaseClient', () => ({
   supabase: {
     from: (tabela: string) => consulta(tabela),
     // Cada gravação demora um tempo diferente: as respostas voltam fora de ordem, como no servidor.
-    rpc: vi.fn(async (_nome: string, args: any) => {
+    rpc: vi.fn(async (nome: string, args: any) => {
+      if (nome === 'recalcular_pagamento_faturas') return { data: { alteradas: 0, removidas: 0 }, error: null };
       await esperar(5 + (gravacoes++ % 5) * 4);
       return { data: (args.p_ordens as any[]).length, error: null };
     })

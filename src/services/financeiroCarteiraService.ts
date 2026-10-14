@@ -59,12 +59,18 @@ export interface FaturaCarteira {
   /** NEs citadas pela fatura que não estão vinculadas ao contrato no sistema (quantidade e números). */
   empenhosSemVinculo: number;
   empenhosSemVinculoNumeros: string | null;
+  /**
+   * Há OB da NP na UG da fatura, mas ela não confirma o pagamento (favorecido de outra despesa, migration 123): a
+   * fatura não está paga e fica "a conferir". obsAConferir traz as OBs e os favorecidos.
+   */
+  pagamentoAConferir?: boolean;
+  obsAConferir?: string | null;
 }
 
 export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
   const linhas = await lerTudo<any>(
     'v_contrato_faturas',
-    'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros',
+    'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros, pagamento_a_conferir, obs_a_conferir',
     'id_fatura'
   );
   return linhas.map((f) => ({
@@ -86,7 +92,9 @@ export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
     npContratos: Number(f.np_contratos ?? 0),
     empenhos: f.empenhos ?? null,
     empenhosSemVinculo: Number(f.empenhos_sem_vinculo ?? 0),
-    empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null
+    empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null,
+    pagamentoAConferir: Boolean(f.pagamento_a_conferir),
+    obsAConferir: f.obs_a_conferir ?? null
   }));
 }
 
@@ -217,8 +225,9 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
 
 /**
  * Etapa do pagamento: as duas primeiras vêm do ciclo da CGLIC; as demais, da fatura no SIAFI e no Tesouro.
- * SEM_CONFIRMACAO: fatura liquidada sem NP na fonte (faturas antigas ou pagas por outro documento, como DD). Sem NP
- * não há como achar a OB no Tesouro, então ela não é "aguardando OB": o pagamento só se confere no SIAFI.
+ * SEM_CONFIRMACAO: não há como confirmar o pagamento pelas fontes abertas, e ele se confere no SIAFI. Ou a fatura
+ * está liquidada sem NP na fonte (antigas ou pagas por outro documento, como DD), ou a OB da NP é de outra despesa
+ * (pagamento a conferir, migration 123). Não é "aguardando OB" nem "paga".
  */
 export type EtapaPagamento =
   | 'NA_CGLIC' | 'DEVOLVIDO_CORRECAO' | 'NA_CGOFI' | 'EM_ANDAMENTO' | 'AGUARDANDO_OB' | 'SEM_CONFIRMACAO' | 'ERRO_SIAFI' | 'PAGA' | 'CANCELADA';
@@ -227,9 +236,12 @@ export type PagamentoCarteiraRow =
   | { tipo: 'CICLO'; chave: string; contractKey: string; etapa: EtapaPagamento; ciclo: PaymentFollowUpCycle; faturas: FaturaCarteira[] }
   | { tipo: 'FATURA'; chave: string; contractKey: string; etapa: EtapaPagamento; fatura: FaturaCarteira };
 
-export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'dataLiquidacao' | 'situacao' | 'np'>): EtapaPagamento {
+export function etapaDaFatura(
+  f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'dataLiquidacao' | 'situacao' | 'np' | 'pagamentoAConferir'>
+): EtapaPagamento {
   if (f.cancelada) return 'CANCELADA';
   if (f.paga) return 'PAGA';
+  if (f.pagamentoAConferir) return 'SEM_CONFIRMACAO';
   if (f.dataLiquidacao) return f.np ? 'AGUARDANDO_OB' : 'SEM_CONFIRMACAO';
   if (f.situacao === 'Siafi Erro') return 'ERRO_SIAFI';
   return 'EM_ANDAMENTO';
@@ -238,9 +250,10 @@ export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'da
 /** Etapa do ciclo em aberto; ciclo pago ou cancelado não entra na lista (a fatura dele já aparece). */
 /**
  * Segmentos de Pagamentos: o que precisa de ação da equipe (ciclo na CGLIC, erro no SIAFI), o que anda sem a CGLIC (na
- * CGOFI, fatura ainda não liquidada, liquidada esperando OB) e o que já foi pago. Cancelada só aparece em Todas.
+ * CGOFI, fatura ainda não liquidada, liquidada esperando OB), o que não dá para confirmar pelas fontes abertas (sem NP
+ * ou com a OB da NP de outra despesa) e o que já foi pago. Cancelada só aparece em Todas.
  */
-export type GrupoPagamento = 'ACAO' | 'TRAMITACAO' | 'PAGA';
+export type GrupoPagamento = 'ACAO' | 'TRAMITACAO' | 'CONFERIR' | 'PAGA';
 export const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
   NA_CGLIC: 'ACAO',
   ERRO_SIAFI: 'ACAO',
@@ -248,8 +261,8 @@ export const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
   NA_CGOFI: 'TRAMITACAO',
   EM_ANDAMENTO: 'TRAMITACAO',
   AGUARDANDO_OB: 'TRAMITACAO',
-  // Fica à vista em "Em tramitação" (não está confirmada como paga), mas fora do valor "aguardando OB".
-  SEM_CONFIRMACAO: 'TRAMITACAO',
+  // Segmento próprio "A conferir": não está confirmada como paga nem anda sozinha; fora do valor "aguardando OB".
+  SEM_CONFIRMACAO: 'CONFERIR',
   PAGA: 'PAGA',
   CANCELADA: null
 };

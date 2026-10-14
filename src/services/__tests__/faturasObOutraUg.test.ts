@@ -12,7 +12,9 @@ function consulta(tabela: string) {
   const q: any = { select: () => q, eq: () => q, not: () => q, range: async () => ({ data: tabelas[tabela] ?? [], error: null }) };
   return q;
 }
-const rpc = vi.fn(async (_nome: string, args: any) => ({ data: (args.p_ordens as any[]).length, error: null }));
+const rpc = vi.fn(async (nome: string, args: any): Promise<any> =>
+  nome === 'recalcular_pagamento_faturas' ? { data: { alteradas: 3, removidas: 0 }, error: null } : { data: (args.p_ordens as any[]).length, error: null }
+);
 vi.mock('../supabaseClient', () => ({ isSupabaseConfigured: true, supabase: { from: (t: string) => consulta(t), rpc: (n: string, a: any) => rpc(n, a) } }));
 vi.mock('../sincronizacaoFontesService', async (orig) => ({
   ...(await orig<typeof import('../sincronizacaoFontesService')>()),
@@ -27,7 +29,7 @@ vi.mock('../empenhosCarteiraService', async (orig) => ({
   contratosComEmpenhoAPagar: vi.fn(async () => new Set())
 }));
 
-import { obCitaFatura, npsComPagamento, sincronizarOrdensBancariasDaCarteira } from '../faturasService';
+import { obCitaFatura, npsConfirmadas, sincronizarOrdensBancariasDaCarteira } from '../faturasService';
 
 describe('obCitaFatura', () => {
   it('acha o número da fatura como palavra inteira nas observações reais', () => {
@@ -71,27 +73,19 @@ describe('obCitaFatura', () => {
   });
 });
 
-describe('npsComPagamento', () => {
-  const f = (np: string, numero: string, cancelada = false) => ({ np, numero, cancelada });
+describe('npsConfirmadas', () => {
+  const f = (np: string, ordens_bancarias: string | null, cancelada = false) => ({ np, ordens_bancarias, cancelada });
 
-  it('conta a OB da própria UG e a da outra UG que cita todas as faturas da NP', () => {
-    const faturas = [f('2024NP000001', 'A1'), f('2024NP000304', '50.961-0'), f('2026NP000231', '795823'), f('2026NP000231', '886222'), f('2024NP000009', '9999')];
-    const obs = [
-      { ug: '200330', np: '2024NP000001', observacao: null },
-      { ug: '200331', np: '2024NP000304', observacao: OBS_EMBRATEL },
-      // cita só uma das duas faturas da NP: a outra pode ser NP distinta de mesmo número na própria UG
-      { ug: '200331', np: '2026NP000231', observacao: 'PGTO NUM.(S): 795823, CONTRATO Nº: 00216/2025' },
-      // OB da outra UG que não cita a fatura
-      { ug: '200331', np: '2024NP000009', observacao: 'PGTO NUM.(S): 1234, CONTRATO Nº: 1/2024' }
+  it('NP sai da fila só quando todas as faturas não canceladas têm OB que confirma', () => {
+    const faturas = [
+      f('2024NP000001', '2024OB000001'),
+      f('2026NP000231', '2026OB002534'),
+      f('2026NP000231', null), // mesma NP, fatura de outro contrato sem pagamento confirmado
+      f('2026NP000204', null), // OB da NP é de outra despesa: "a conferir"
+      f('2024NP000304', '2024OB040837'),
+      f('2024NP000304', null, true) // cancelada não conta
     ];
-    expect([...npsComPagamento(faturas, obs, '200330')].sort()).toEqual(['2024NP000001', '2024NP000304']);
-  });
-
-  it('fatura cancelada não precisa estar citada; UG fora da CGLIC só olha a própria', () => {
-    const faturas = [f('2024NP000304', '50.961-0'), f('2024NP000304', '7777', true)];
-    const obs = [{ ug: '200331', np: '2024NP000304', observacao: OBS_EMBRATEL }];
-    expect([...npsComPagamento(faturas, obs, '200330')]).toEqual(['2024NP000304']);
-    expect([...npsComPagamento(faturas, obs, '999999')]).toEqual([]);
+    expect([...npsConfirmadas(faturas)].sort()).toEqual(['2024NP000001', '2024NP000304']);
   });
 });
 
@@ -100,21 +94,20 @@ describe('sincronizarOrdensBancariasDaCarteira: OB paga pela outra UG', () => {
     rpc.mockClear();
     fetchOb.mockClear();
     for (const k of Object.keys(sta)) delete sta[k];
-    tabelas.contrato_faturas = [
-      { np: '2024NP000304', numero: '50.961-0', data_liquidacao: null, cancelada: false },
-      { np: '2024NP000500', numero: '51000', data_liquidacao: '2024-05-01', cancelada: false },
-      { np: '2024NP000600', numero: '52000', data_liquidacao: '2024-05-01', cancelada: false }
+    tabelas.v_contrato_faturas = [
+      { np: '2024NP000304', numero: '50.961-0', data_liquidacao: null, cancelada: false, ordens_bancarias: null },
+      { np: '2024NP000500', numero: '51000', data_liquidacao: '2024-05-01', cancelada: false, ordens_bancarias: null },
+      { np: '2024NP000600', numero: '52000', data_liquidacao: '2024-05-01', cancelada: false, ordens_bancarias: null }
     ];
-    tabelas.ordens_bancarias = [];
     tabelas.np_consultas = [];
   });
 
-  it('sem OB na própria UG, grava só a OB da outra UG que cita a fatura, sem registrar a consulta lá', async () => {
+  it('consulta as duas UGs; da outra grava só a OB que cita a fatura, sem registrar a consulta lá; recalcula no fim', async () => {
     sta['200331/2024NP000304'] = [
       { numero: '2024OB040837', emissao: '2024-05-22', valor: '223.70', cancelamentoob: '0', observacao: OBS_EMBRATEL },
       { numero: '2024OB040900', emissao: '2024-05-23', valor: '10.00', cancelamentoob: '0', observacao: 'PGTO NUM.(S): 1234' }
     ];
-    // a própria UG paga a 500; a 600 tem OB na outra UG, mas de outra fatura
+    // a 500 tem OB na própria UG (ainda não confirmada); a 600 tem OB na outra UG, mas de outra fatura
     sta['200330/2024NP000500'] = [{ numero: '2024OB000500', emissao: '2024-05-02', valor: '1.00', cancelamentoob: '0' }];
     sta['200331/2024NP000600'] = [{ numero: '2024OB000600', emissao: '2024-05-02', valor: '1.00', cancelamentoob: '0', observacao: 'PGTO NUM.(S): 99999' }];
 
@@ -122,30 +115,44 @@ describe('sincronizarOrdensBancariasDaCarteira: OB paga pela outra UG', () => {
     expect(r.status).toBe('SUCESSO');
     expect(r.mensagem).toContain('3 de 3 NP(s) consultada(s)');
     expect(r.mensagem).toContain('2 com ordem bancária');
-    expect(r.mensagem).toContain('1 paga(s) pela UG 200331');
+    expect(r.mensagem).toContain('1 com OB na UG 200331');
+    expect(r.mensagem).toContain('pagamento recalculado em 3 fatura(s)');
 
-    // a NP paga na própria UG não consulta a outra
+    // a OB da própria UG pode ser de outra despesa: a outra UG é consultada para todas as NPs da fila
     expect(fetchOb.mock.calls.map((c) => c.join('/')).sort()).toEqual([
       '200330/2024NP000304',
       '200330/2024NP000500',
       '200330/2024NP000600',
       '200331/2024NP000304',
+      '200331/2024NP000500',
       '200331/2024NP000600'
     ]);
-    const daOutra = rpc.mock.calls.map((c) => c[1]).filter((a: any) => a.p_ug === '200331');
+    expect(rpc.mock.calls.filter((c) => c[0] === 'recalcular_pagamento_faturas')).toHaveLength(1);
+    const daOutra = rpc.mock.calls.map((c) => c[1]).filter((a: any) => a?.p_ug === '200331');
     expect(daOutra).toHaveLength(1);
     expect(daOutra[0]).toMatchObject({ p_np: '2024NP000304', p_registrar_consulta: false });
     expect(daOutra[0].p_ordens.map((o: any) => o.numero)).toEqual(['2024OB040837']);
     // as gravações da própria UG seguem registrando a consulta (sem o parâmetro novo)
-    const daPropria = rpc.mock.calls.map((c) => c[1]).filter((a: any) => a.p_ug === '200330');
+    const daPropria = rpc.mock.calls.map((c) => c[1]).filter((a: any) => a?.p_ug === '200330');
     expect(daPropria).toHaveLength(3);
     expect(daPropria.every((a: any) => !('p_registrar_consulta' in a))).toBe(true);
   });
 
-  it('NP já paga pela outra UG sai da fila', async () => {
-    tabelas.ordens_bancarias = [{ ug: '200331', np: '2024NP000304', observacao: OBS_EMBRATEL }];
+  it('NP com o pagamento confirmado sai da fila; NP "a conferir" continua', async () => {
+    tabelas.v_contrato_faturas[0].ordens_bancarias = '2024OB040837';
     const r: any = await sincronizarOrdensBancariasDaCarteira('200330');
     expect(r.mensagem).toContain('2 de 2 NP(s) consultada(s)');
     expect(fetchOb.mock.calls.some((c) => c[1] === '2024NP000304')).toBe(false);
+  });
+
+  it('falha no recálculo vira aviso e deixa a execução parcial, sem perder as OBs gravadas', async () => {
+    const original = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (nome: string, args: any) =>
+      nome === 'recalcular_pagamento_faturas' ? { data: null, error: { message: 'tempo esgotado', code: '57014' } as any } : original(nome, args)
+    );
+    const r: any = await sincronizarOrdensBancariasDaCarteira('200330');
+    rpc.mockImplementation(original);
+    expect(r.status).toBe('PARCIAL');
+    expect(r.mensagem).toContain('recálculo do pagamento');
   });
 });

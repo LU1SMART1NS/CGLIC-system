@@ -94,7 +94,7 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
     empenho: f.empenhos,
     valor: f.valorLiquido,
     ano: f.emissao?.slice(0, 4) ?? null,
-    busca: [f.numero, f.np, f.ordensBancarias, f.empenhos, f.referencia].filter(Boolean).join(' ')
+    busca: [f.numero, f.np, f.ordensBancarias, f.obsAConferir, f.empenhos, f.referencia].filter(Boolean).join(' ')
   };
   const npCompartilhada = f.npContratos > 1 ? ` · paga também ${f.npContratos - 1} outro(s) contrato(s)` : '';
   const vencimento = f.vencimento
@@ -119,7 +119,11 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
     case 'SEM_CONFIRMACAO':
       return {
         ...base,
-        etapa: { label: 'Sem como confirmar', variant: 'neutral', detalhe: 'a fonte não informa a NP' },
+        etapa: {
+          label: 'Sem como confirmar',
+          variant: 'neutral',
+          detalhe: f.pagamentoAConferir ? `a OB da ${f.np} é de outra despesa: ${f.obsAConferir}` : 'a fonte não informa a NP'
+        },
         prazo: { texto: `Liquidada em ${dataBR(f.dataLiquidacao)}`, detalhe: 'confira o pagamento no SIAFI', atrasado: false, ordem: f.dataLiquidacao }
       };
     case 'ERRO_SIAFI':

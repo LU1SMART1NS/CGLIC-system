@@ -247,6 +247,22 @@ describe('ContractPagamentosSection', () => {
     expect(html).not.toContain('>aguardando<');
   });
 
+  it('OB da NP de outra despesa: "sem como confirmar", coluna de OB indica a OB e não conta como aguardando', () => {
+    faturas({
+      faturas: [
+        fatura(),
+        fatura({ idFatura: 2, numero: '794375', valor: 1000, paga: false, ordensBancarias: null, obEmissao: null, np: '2026NP000204',
+          dataLiquidacao: '2026-07-17', pagamentoAConferir: true, obsAConferir: '2026OB033585 (BANCO DO BRASIL SA)' })
+      ],
+      resumo,
+      sincronizadoEm: '2026-10-06T20:22:00Z'
+    });
+    const html = renderSection();
+    expect(html).toContain('Sem como confirmar');
+    expect(html).toContain('de outra despesa: 2026OB033585 (BANCO DO BRASIL SA)');
+    expect(html).toMatch(/Liquidadas aguardando OB[\s\S]{0,400}?>0</);
+  });
+
   it('NP que paga outros contratos e NE citada sem vínculo são avisadas', () => {
     faturas({ faturas: [fatura({ npContratos: 3, empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2023NE000280', empenhos: '2023NE000280' })], resumo, sincronizadoEm: '2026-10-06T20:22:00Z' });
     const html = renderSection();

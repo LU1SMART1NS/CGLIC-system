@@ -60,12 +60,13 @@ const dataHora = (v?: string | null) => {
 };
 
 /**
- * Etapa da fatura: cancelada, paga (OB válida ou "Pago"), liquidada aguardando OB, liquidada sem NP (sem como
- * confirmar o pagamento: sem NP não há como achar a OB) ou em andamento.
+ * Etapa da fatura: cancelada, paga (OB que confirma ou "Pago"), sem como confirmar (OB da NP de outra despesa, ou
+ * liquidada sem NP), liquidada aguardando OB ou em andamento.
  */
 export function etapaDaFatura(f: FaturaDoContrato): { label: string; variant: 'success' | 'info' | 'warning' | 'neutral' | 'danger' } {
   if (f.cancelada) return { label: 'Cancelada', variant: 'neutral' };
   if (f.paga) return { label: 'Paga', variant: 'success' };
+  if (f.pagamentoAConferir) return { label: 'Sem como confirmar', variant: 'neutral' };
   if (f.dataLiquidacao) return f.np ? { label: 'Liquidada', variant: 'info' } : { label: 'Sem como confirmar', variant: 'neutral' };
   if (f.situacao === 'Siafi Erro') return { label: 'Erro no SIAFI', variant: 'danger' };
   return { label: f.situacao || 'Em andamento', variant: 'warning' };
@@ -145,7 +146,7 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
   const nesSemVinculo = [...new Set(comNeSemVinculo.flatMap((f) => empenhosDaFatura(f.empenhosSemVinculoNumeros)))];
   const npCompartilhada = faturas.filter((f) => !f.cancelada && f.npContratos > 1).length;
   // Liquidada sem NP não conta como "aguardando OB": sem NP não há como achar a OB no Tesouro.
-  const aguardandoOb = faturas.filter((f) => !f.cancelada && !f.paga && f.dataLiquidacao && f.np).length;
+  const aguardandoOb = faturas.filter((f) => !f.cancelada && !f.paga && f.dataLiquidacao && f.np && !f.pagamentoAConferir).length;
 
   const linhasFatura = useLinhasAbertas(abrirFatura, 'contract-faturas-table', faturas.length > 0);
   const linhasAtesto = useLinhasAbertas(null, 'payment-atesto-table', true);
@@ -261,7 +262,9 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isoToBR(f.obEmissao)}</span>
             </>
           ) : (
-            <span style={{ color: 'var(--text-muted)' }}>{f.dataLiquidacao && !f.cancelada ? (f.np ? 'aguardando' : 'sem NP') : '—'}</span>
+            <span style={{ color: 'var(--text-muted)' }}>
+              {f.pagamentoAConferir ? `de outra despesa: ${f.obsAConferir}` : f.dataLiquidacao && !f.cancelada ? (f.np ? 'aguardando' : 'sem NP') : '—'}
+            </span>
           )}
           {f.np && (
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>

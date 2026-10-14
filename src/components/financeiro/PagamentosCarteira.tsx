@@ -53,7 +53,7 @@ const ROTULO_ETAPA: Record<EtapaPagamento, string> = {
 };
 
 const PAGAMENTOS_FILTER_SCHEMA: CarteiraFilterSchema<PagamentosFilterState> = {
-  grupo: { param: 'situacao', default: 'ACAO', values: ['ACAO', 'TRAMITACAO', 'PAGA', TODOS] },
+  grupo: { param: 'situacao', default: 'ACAO', values: ['ACAO', 'TRAMITACAO', 'CONFERIR', 'PAGA', TODOS] },
   etapa: { param: 'etapa', default: TODOS, values: [...ETAPAS, TODOS] },
   ano: { param: 'ano', default: TODOS },
   uasg: { param: 'uasg', default: TODOS },
@@ -221,7 +221,13 @@ export const PagamentosCarteira: React.FC = () => {
                 title: 'Ciclos com a CGLIC (conferência, pendência, envio) e faturas com erro no SIAFI'
               },
               { id: 'TRAMITACAO', label: 'Em tramitação', count: nGrupo('TRAMITACAO'), title: 'Devolvidos para correção, na CGOFI, faturas ainda não liquidadas e liquidadas aguardando a ordem bancária' },
-              { id: 'PAGA', label: 'Pagas', count: nGrupo('PAGA'), title: 'Faturas cuja nota de pagamento tem ordem bancária válida' },
+              {
+                id: 'CONFERIR',
+                label: 'A conferir',
+                count: nGrupo('CONFERIR'),
+                title: 'Faturas cujo pagamento não dá para confirmar pelas fontes abertas: sem NP no Contratos.gov.br ou com a OB da NP de outra despesa. Confira no SIAFI.'
+              },
+              { id: 'PAGA', label: 'Pagas', count: nGrupo('PAGA'), title: 'Faturas com ordem bancária que confirma o pagamento' },
               { id: TODOS, label: 'Todas', count: itens.length }
             ]}
             meta={`${formatCurrencyCompact(resumo.aguardandoOb)} aguardando OB`}

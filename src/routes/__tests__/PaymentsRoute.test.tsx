@@ -76,7 +76,11 @@ describe('Financeiro → Pagamentos', () => {
           fatura({}),
           fatura({ idFatura: 2, numero: 'NF-LIQ', dataLiquidacao: '2026-10-01', np: '2026NP000811', situacao: 'Siafi Apropriado' }),
           fatura({ idFatura: 3, numero: 'NF-PAGA', dataLiquidacao: '2026-09-01', paga: true, ordensBancarias: '2026OB018840', obEmissao: '2026-09-03' }),
-          fatura({ idFatura: 4, numero: 'NF-SEM-NP', dataLiquidacao: '2024-01-31', np: null, situacao: 'Siafi Apropriado', valorLiquido: 9000000 })
+          fatura({ idFatura: 4, numero: 'NF-SEM-NP', dataLiquidacao: '2024-01-31', np: null, situacao: 'Siafi Apropriado', valorLiquido: 9000000 }),
+          fatura({
+            idFatura: 5, numero: 'NF-OUTRA-DESPESA', dataLiquidacao: '2026-07-17', np: '2026NP000204', situacao: 'Siafi Apropriado',
+            valorLiquido: 283968.84, pagamentoAConferir: true, obsAConferir: '2026OB033585 (BANCO DO BRASIL SA)'
+          })
         ]
       ),
       isLoading: false,
@@ -90,8 +94,9 @@ describe('Financeiro → Pagamentos', () => {
     const html = render();
     expect(html).toContain('data-testid="pagamentos-situacao-ACAO"');
     expect(html).toMatch(/Precisa de ação<span[^>]*>1</);
-    // Em tramitação: a fatura não liquidada, a liquidada aguardando OB e a liquidada sem NP.
-    expect(html).toMatch(/Em tramitação<span[^>]*>3</);
+    // Em tramitação: a fatura não liquidada e a liquidada aguardando OB. A conferir: sem NP e OB de outra despesa.
+    expect(html).toMatch(/Em tramitação<span[^>]*>2</);
+    expect(html).toMatch(/A conferir<span[^>]*>2</);
     expect(html).toMatch(/Pagas<span[^>]*>1</);
     expect(html).toContain('data-testid="pagamentos-filter-etapa"');
     expect(html).toContain('Atesto 4512345');
@@ -109,7 +114,7 @@ describe('Financeiro → Pagamentos', () => {
   });
 
   it('liquidada sem NP aparece "sem como confirmar" e fica fora do valor aguardando OB', () => {
-    const html = render('/pagamentos?situacao=TRAMITACAO&etapa=SEM_CONFIRMACAO');
+    const html = render('/pagamentos?situacao=CONFERIR&etapa=SEM_CONFIRMACAO');
     expect(html).toContain('NF-SEM-NP');
     expect(html).toContain('Sem como confirmar');
     expect(html).toContain('a fonte não informa a NP');
@@ -120,6 +125,15 @@ describe('Financeiro → Pagamentos', () => {
     expect(html).not.toMatch(/9,1\s?mi[^<]*aguardando OB/);
     const aguardando = render('/pagamentos?situacao=TRAMITACAO&etapa=AGUARDANDO_OB');
     expect(aguardando).not.toContain('NF-SEM-NP');
+  });
+
+  it('OB da NP de outra despesa: "sem como confirmar" em A conferir, com a OB e o favorecido; fora de Pagas', () => {
+    const html = render('/pagamentos?situacao=CONFERIR');
+    expect(html).toContain('NF-OUTRA-DESPESA');
+    expect(html).toContain('a OB da 2026NP000204 é de outra despesa: 2026OB033585 (BANCO DO BRASIL SA)');
+    expect(html).toContain('NF-SEM-NP');
+    expect(render('/pagamentos?situacao=PAGA')).not.toContain('NF-OUTRA-DESPESA');
+    expect(render('/pagamentos?situacao=TRAMITACAO')).not.toContain('NF-OUTRA-DESPESA');
   });
 
   it('não mostra os quadros antigos de CGOFI nem o fluxo de tramitação', () => {

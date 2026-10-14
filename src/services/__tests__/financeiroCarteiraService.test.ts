@@ -81,9 +81,14 @@ describe('etapas do pagamento', () => {
     expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Pendente', np: null })).toBe('EM_ANDAMENTO');
   });
 
-  it('liquidada sem NP fica "sem como confirmar", em tramitação, e não "aguardando OB"', () => {
+  it('liquidada sem NP ou com OB de outra despesa fica "sem como confirmar", no segmento A conferir', () => {
     expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2024-01-31', situacao: 'Siafi Apropriado', np: null })).toBe('SEM_CONFIRMACAO');
-    expect(GRUPO_DA_ETAPA.SEM_CONFIRMACAO).toBe('TRAMITACAO');
+    expect(
+      etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2026-07-17', situacao: 'Siafi Apropriado', np: '2026NP000204', pagamentoAConferir: true })
+    ).toBe('SEM_CONFIRMACAO');
+    // a conferir sem liquidação também não é "não liquidada"
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Pendente', np: '2026NP000204', pagamentoAConferir: true })).toBe('SEM_CONFIRMACAO');
+    expect(GRUPO_DA_ETAPA.SEM_CONFIRMACAO).toBe('CONFERIR');
     // paga continua paga, com ou sem NP
     expect(etapaDaFatura({ cancelada: false, paga: true, dataLiquidacao: '2024-01-31', situacao: 'Pago', np: null })).toBe('PAGA');
   });
