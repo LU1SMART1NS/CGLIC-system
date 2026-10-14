@@ -359,7 +359,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       action={p.podeInformar ? <AppButton variant="primary" size="sm" onClick={() => setInformando(true)} data-testid="informar-ata-assinada">Informar qtd. da ata assinada</AppButton> : undefined}
     >
       <StatusBadge label="Não informado" variant="neutral" size="sm" dot={false} />{' '}
-      As quantidades da ata assinada ainda não foram informadas. Sem elas, a SENASP usa todo o registrado no Compras.gov.br, sem separar o que é dos participantes, e esse é o limite da alocação.
+      Sem a ata assinada, o limite da alocação é todo o registrado da SENASP, sem separar o que é dos participantes.
       {p.podeInformar ? '' : ' Quem informa é o gestor da ata.'}
     </NoticeBar>
   ) : null;
