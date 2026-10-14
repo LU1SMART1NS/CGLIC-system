@@ -42,6 +42,11 @@ import {
   ORCAMENTO_ITENS_NOTAS_SIAFI_MS,
   sincronizarItensNotasSiafi
 } from '../../src/services/itensNotasSiafiSyncService';
+import {
+  contarSaldoContabilPendentes,
+  ORCAMENTO_SALDO_CONTABIL_MS,
+  sincronizarSaldoContabil
+} from '../../src/services/saldoContabilSyncService';
 import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFontesService';
 import { lerAmbiente } from './ambiente';
 
@@ -51,7 +56,7 @@ import { lerAmbiente } from './ambiente';
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
@@ -92,6 +97,8 @@ export interface DependenciasDeExecucao {
   contarCadastroUasgsPendentes: typeof contarCadastroUasgsPendentes;
   sincronizarItensNotasSiafi: typeof sincronizarItensNotasSiafi;
   contarItensNotasSiafiPendentes: typeof contarItensNotasSiafiPendentes;
+  sincronizarSaldoContabil: typeof sincronizarSaldoContabil;
+  contarSaldoContabilPendentes: typeof contarSaldoContabilPendentes;
   /** Chave da API do Portal da Transparência (segredo PORTAL_TRANSPARENCIA_CHAVE da Edge Function). */
   chaveDoPortal: () => string | undefined;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
@@ -150,6 +157,8 @@ const PADRAO: DependenciasDeExecucao = {
   contarCadastroUasgsPendentes,
   sincronizarItensNotasSiafi,
   contarItensNotasSiafiPendentes,
+  sincronizarSaldoContabil,
+  contarSaldoContabilPendentes,
   chaveDoPortal: () => lerAmbiente('PORTAL_TRANSPARENCIA_CHAVE')?.trim() || undefined,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
@@ -211,6 +220,8 @@ export async function executarPedido(
       consulta = { ...(await deps.contarCadastroUasgsPendentes()) };
     } else if (pedido.recurso === 'itens_notas_siafi') {
       consulta = { ...(await deps.contarItensNotasSiafiPendentes(uasg as string, deps.chaveDoPortal())) };
+    } else if (pedido.recurso === 'saldo_contabil') {
+      consulta = await deps.contarSaldoContabilPendentes(uasg as string);
     } else if (pedido.recurso === 'empenhos') {
       consulta = await deps.consultarEmpenhosDeTeste(uasg as string);
     } else if (pedido.recurso === 'faturas' || pedido.recurso === 'ordens_bancarias') {
@@ -240,6 +251,8 @@ export async function executarPedido(
       forcar: pedido.forcar,
       orcamentoMs: ORCAMENTO_ITENS_NOTAS_SIAFI_MS
     });
+  } else if (pedido.recurso === 'saldo_contabil') {
+    resultado = await deps.sincronizarSaldoContabil(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_SALDO_CONTABIL_MS });
   } else if (pedido.recurso === 'empenhos') {
     resultado = await deps.sincronizarEmpenhosDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
   } else if (pedido.recurso === 'faturas') {
