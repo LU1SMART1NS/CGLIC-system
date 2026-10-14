@@ -1,6 +1,6 @@
 /**
  * Saldo contábil do SIAFI por empenho, lido da API aberta do Tesouro (STA) e gravado em empenho_saldo_contabil
- * (migration 126). Roda no servidor, sob a trava do banco (recurso 'saldo_contabil', uma execução por UG).
+ * (migration 128). Roda no servidor, sob a trava do banco (recurso 'saldo_contabil', uma execução por UG).
  *
  * O ano corrente é lido em toda execução (o Tesouro atualiza uma vez por dia). Os anos fechados são lidos uma vez:
  * de novo só se a última leitura foi antes de fevereiro do ano seguinte, quando o ano fecha de vez no SIAFI.

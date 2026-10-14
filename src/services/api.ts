@@ -1567,7 +1567,7 @@ export async function fetchOrdensBancariasDaNp(ug: string, np: string, gestao = 
 /**
  * Saldo contábil do SIAFI de uma conta, numa UG e ano, pela API aberta do Tesouro (STA):
  * GET https://sta.api.gov.br/api/saldocontabil/ano/{ano}/ug/{ug}/gestao/{gestão}/contacontabil/{conta}.
- * Uma linha por conta corrente (empenho + subitem). Atualizado uma vez por dia (migration 126).
+ * Uma linha por conta corrente (empenho + subitem). Atualizado uma vez por dia (migration 128).
  */
 export async function fetchSaldoContabil(ano: number, ug: string, conta: string, gestao = '00001'): Promise<any[]> {
   const res = await fetchComTempoLimite(

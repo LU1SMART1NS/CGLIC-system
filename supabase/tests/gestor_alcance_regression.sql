@@ -7,6 +7,9 @@
 --   PERFORM public.exigir_alcance_do_gestor(<chave do contrato>, <chave da ata>);
 -- logo no início do corpo e acrescentar o nome à lista abaixo.
 --
+-- As 4 RPCs de cadastro manual (save_manual_contrato_atomic, delete_manual_contrato_atomic,
+-- save_manual_empenhos_atomic, save_empenho_manual_quantities_atomic) saíram na migration 127.
+--
 -- Uso (Postgres local do `supabase start`, nunca contra o projeto remoto):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/gestor_alcance_regression.sql
 -- ==============================================================================
@@ -29,8 +32,7 @@ DECLARE
     'unlink_contract_from_item_atomic', 'dismiss_contract_suggestion_atomic', 'restore_contract_suggestion_atomic',
     'ajustar_quantidade_contratada', 'desfazer_ajuste_quantidade_contratada', 'dividir_contrato_nas_unidades',
     'desfazer_divisao_contrato_unidades', 'sync_contract_item_quantity_atomic', 'save_empenho_links_atomic',
-    'informar_quantidades_ata_assinada', 'informar_quantidade_adesao', 'save_manual_empenhos_atomic',
-    'save_empenho_manual_quantities_atomic', 'save_manual_contrato_atomic', 'delete_manual_contrato_atomic',
+    'informar_quantidades_ata_assinada', 'informar_quantidade_adesao',
     'sync_item_senasp_quantity_atomic', 'start_contract_task_plan_atomic', 'apply_contract_task_template_atomic',
     'apply_contract_task_template_to_key_atomic', 'save_contract_task_macrotask_atomic',
     'delete_contract_task_macrotask_atomic', 'create_contract_task_atomic', 'update_contract_task_atomic',
