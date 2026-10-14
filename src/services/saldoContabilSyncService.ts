@@ -93,10 +93,26 @@ async function lerCargas(ug: string): Promise<Array<{ ano: number; conta: string
   return (data ?? []) as any;
 }
 
-async function gravar(ug: string, ano: number, conta: string, linhas: LinhaSaldoContabil[]): Promise<{ gravadas: number; bloqueada: boolean }> {
-  const { data, error } = await supabase!.rpc('gravar_saldo_contabil', { p_ug: ug, p_ano: ano, p_conta: conta, p_linhas: linhas });
-  if (error) throw mapPostgresErrorToAppError(error);
-  return { gravadas: Number((data as any)?.gravadas ?? 0), bloqueada: Boolean((data as any)?.bloqueada) };
+/** Espera entre a gravação que estourou o limite de tempo do banco e a nova tentativa. */
+export const ESPERA_NOVA_TENTATIVA_MS = 3_000;
+
+async function gravar(
+  ug: string,
+  ano: number,
+  conta: string,
+  linhas: LinhaSaldoContabil[],
+  esperar: (ms: number) => Promise<void>
+): Promise<{ gravadas: number; bloqueada: boolean }> {
+  for (let tentativa = 1; ; tentativa++) {
+    const { data, error } = await supabase!.rpc('gravar_saldo_contabil', { p_ug: ug, p_ano: ano, p_conta: conta, p_linhas: linhas });
+    if (!error) return { gravadas: Number((data as any)?.gravadas ?? 0), bloqueada: Boolean((data as any)?.bloqueada) };
+    // O limite da API do banco é de 8 s; com o banco carregado, uma conta grande pode passar dele (14/10/2026).
+    if (tentativa === 1 && /statement timeout/i.test(String(error.message ?? ''))) {
+      await esperar(ESPERA_NOVA_TENTATIVA_MS);
+      continue;
+    }
+    throw mapPostgresErrorToAppError(error);
+  }
 }
 
 /** Teste sem gravar: o que seria lido e uma consulta de amostra (conta de pago do ano corrente). */
@@ -109,10 +125,11 @@ export async function contarSaldoContabilPendentes(ug: string, agora: () => numb
 
 export async function sincronizarSaldoContabil(
   ug: string,
-  opts: { forcar?: boolean; orcamentoMs?: number; agora?: () => number; concorrencia?: number } = {}
+  opts: { forcar?: boolean; orcamentoMs?: number; agora?: () => number; concorrencia?: number; esperar?: (ms: number) => Promise<void> } = {}
 ): Promise<ResultadoSincronizacao> {
   const agora = opts.agora ?? (() => Date.now());
   const orcamento = opts.orcamentoMs ?? ORCAMENTO_SALDO_CONTABIL_MS;
+  const esperar = opts.esperar ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   return executarComReserva(RECURSO_SALDO_CONTABIL, ug, { forcar: opts.forcar, validade: VALIDADE_SALDO_CONTABIL }, async () => {
     const inicio = agora();
     const anoAtual = new Date(inicio).getUTCFullYear();
@@ -123,6 +140,13 @@ export async function sincronizarSaldoContabil(
     let bloqueadas = 0;
     let proxima = 0;
     const erros: string[] = [];
+    // As consultas ao Tesouro correm em paralelo; as gravações, uma por vez, para não sobrecarregar o banco.
+    let filaDeGravacao: Promise<unknown> = Promise.resolve();
+    const gravarNaVez = (ano: number, conta: string, lista: LinhaSaldoContabil[]) => {
+      const vez = filaDeGravacao.then(() => gravar(ug, ano, conta, lista, esperar));
+      filaDeGravacao = vez.catch(() => undefined);
+      return vez;
+    };
     // Vários trabalhadores pegam a próxima conta da fila; cada um para quando o orçamento de tempo acaba.
     // Não somar na mesma linha do await (`x += await f()`): com trabalhadores em paralelo, perde somas.
     const trabalhador = async () => {
@@ -131,7 +155,7 @@ export async function sincronizarSaldoContabil(
         const { ano, conta } = plano[proxima++];
         try {
           const lista = (await fetchSaldoContabil(ano, ug, conta)).map(normalizarLinhaSaldo).filter((l): l is LinhaSaldoContabil => l !== null);
-          const r = await gravar(ug, ano, conta, lista);
+          const r = await gravarNaVez(ano, conta, lista);
           lidas++;
           linhas += r.gravadas;
           if (r.bloqueada) bloqueadas++;
@@ -144,7 +168,7 @@ export async function sincronizarSaldoContabil(
     const pendentes = plano.length - proxima;
 
     const partes = [`${lidas} de ${plano.length} conta(s) lida(s)`, `${linhas} linha(s) gravada(s)`];
-    if (bloqueadas) partes.push(`${bloqueadas} conta(s) vieram vazias e o saldo anterior foi mantido`);
+    if (bloqueadas) partes.push(`${bloqueadas} conta(s) vieram vazias ou incompletas e o saldo anterior foi mantido`);
     if (erros.length) partes.push(`${erros.length} com falha (ex.: ${erros[0]})`);
     if (pendentes) partes.push(`o tempo da execução acabou e ${pendentes} conta(s) ficam para a próxima`);
     const mensagem = `${partes.join(', ')}.`;

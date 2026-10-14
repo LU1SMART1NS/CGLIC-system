@@ -94,15 +94,50 @@ describe('sincronizarSaldoContabil', () => {
     expect(r.status).toBe('PARCIAL');
     expect(r.mensagem).toContain('9 de 10 conta(s) lida(s)');
     expect(r.mensagem).toContain('1 com falha');
-    expect(r.mensagem).toContain('1 conta(s) vieram vazias e o saldo anterior foi mantido');
+    expect(r.mensagem).toContain('1 conta(s) vieram vazias ou incompletas e o saldo anterior foi mantido');
   });
 
   it('erro da gravação (objeto do banco) aparece com o texto, não "[object Object]"', async () => {
-    rpc.mockImplementationOnce(async () => ({ data: null, error: { message: 'canceling statement due to statement timeout', code: '57014' } }));
+    rpc.mockImplementationOnce(async () => ({ data: null, error: { message: 'new row violates check constraint', code: '23514' } }));
     const r: any = await sincronizarSaldoContabil('200330', { agora: () => AGORA });
     expect(r.status).toBe('PARCIAL');
     expect(r.mensagem).not.toContain('[object Object]');
     expect(r.mensagem).toMatch(/1 com falha \(ex\.: \d{9}\/2026: .+\)/);
+  });
+
+  it('gravação que estoura o limite de tempo do banco é tentada de novo, uma vez', async () => {
+    const esperas: number[] = [];
+    rpc.mockImplementationOnce(async () => ({ data: null, error: { message: 'canceling statement due to statement timeout', code: '57014' } }));
+    const r: any = await sincronizarSaldoContabil('200330', { agora: () => AGORA, esperar: async (ms) => void esperas.push(ms) });
+    expect(r).toMatchObject({ status: 'SUCESSO', total: 10 });
+    expect(esperas).toEqual([3000]);
+    expect(rpc).toHaveBeenCalledTimes(11);
+  });
+
+  it('segundo estouro de tempo vira falha da conta, com o texto do banco', async () => {
+    const timeout = async () => ({ data: null, error: { message: 'canceling statement due to statement timeout', code: '57014' } });
+    rpc.mockImplementationOnce(timeout).mockImplementationOnce(timeout);
+    const r: any = await sincronizarSaldoContabil('200330', { agora: () => AGORA, esperar: async () => {} });
+    expect(r.status).toBe('PARCIAL');
+    expect(r.mensagem).toContain('9 de 10 conta(s) lida(s)');
+    expect(r.mensagem).toContain('statement timeout');
+  });
+
+  it('grava uma conta por vez, mesmo lendo várias ao mesmo tempo', async () => {
+    let gravando = 0;
+    let maximo = 0;
+    const padrao = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (nome: string, args: any) => {
+      gravando++;
+      maximo = Math.max(maximo, gravando);
+      await new Promise((r) => setTimeout(r, 3));
+      gravando--;
+      return padrao(nome, args);
+    });
+    const r: any = await sincronizarSaldoContabil('200330', { agora: () => AGORA, concorrencia: 4 });
+    rpc.mockImplementation(padrao);
+    expect(r).toMatchObject({ status: 'SUCESSO', total: 10 });
+    expect(maximo).toBe(1);
   });
 
   it('lê várias contas ao mesmo tempo e conta todas certo', async () => {
