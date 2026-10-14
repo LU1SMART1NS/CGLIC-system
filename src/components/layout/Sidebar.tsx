@@ -54,7 +54,7 @@ export function rememberAreaVisit(areas: NavItem[], pathname: string, search: st
   }
 }
 
-const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: PendenciaDaArea }> = ({ area, pathname, pendencia }) => {
+const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: PendenciaDaArea; curto?: boolean }> = ({ area, pathname, pendencia, curto }) => {
   const active = isItemActive(area, pathname);
   const Icon = area.icon;
   // Com pendência, a área abre direto nela; sem pendência, na última página usada.
@@ -68,13 +68,14 @@ const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: Pendenci
         className="app-rail-link"
         data-active={active ? 'true' : undefined}
         aria-current={active ? 'page' : undefined}
+        title={curto && area.shortLabel ? area.label : undefined}
       >
         {Icon && (
           <span className="app-rail-icon">
             <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
           </span>
         )}
-        <span className="app-rail-label">{area.label}</span>
+        <span className="app-rail-label">{curto ? (area.shortLabel ?? area.label) : area.label}</span>
         {contagem ? (
           <span
             className={`app-rail-count${pendencia?.vermelho ? ' app-rail-count--urgente' : ''}`}
@@ -115,11 +116,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
         </Link>
       )}
       {top.map((area) => (
-        <AreaItem key={area.id} area={area} pathname={pathname} pendencia={pendencias[area.id]} />
+        <AreaItem key={area.id} area={area} pathname={pathname} pendencia={pendencias[area.id]} curto={mode !== 'rail'} />
       ))}
       <ContagensDaCarteira />
       {mode === 'rail' && <div className="app-rail-spacer" />}
-      {bottom.map((area) => <AreaItem key={area.id} area={area} pathname={pathname} />)}
+      {bottom.map((area) => <AreaItem key={area.id} area={area} pathname={pathname} curto={mode !== 'rail'} />)}
     </nav>
   );
 };

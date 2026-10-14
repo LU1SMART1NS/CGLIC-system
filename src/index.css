@@ -1686,3 +1686,19 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
   .alocar-tabela input { width: 100% !important; max-width: 160px; }
   .alocar-tabela-wrap { overflow-x: visible !important; }
 }
+
+/* Alvos de toque que não são AppButton (revisão de 14/10/2026). Os AppButton já têm 44 px pelo ::after. */
+@media (max-width: 767px) {
+  .area-tab, .area-subtab { min-height: 44px; display: inline-flex; align-items: center; }
+  .ds-metric-strip__title, .ds-metric__label { font-size: 0.75rem; }
+  /* Caixa de seleção das filas (SelecaoCell tem 15 px no estilo da linha): maior para o dedo. */
+  td[data-role='select'] input[type='checkbox'] { width: 24px !important; height: 24px !important; }
+}
+@media (pointer: coarse) {
+  /* Área clicável de 44 px sem mudar o visual compacto (mesma técnica do .ds-btn). */
+  .carteira-filter-btn, .carteira-cell-filter, .vg-chip, .vg-strip-title, .i360-head.min .i360-title-btn { position: relative; }
+  .carteira-filter-btn::after, .carteira-cell-filter::after, .vg-chip::after, .vg-strip-title::after, .i360-head.min .i360-title-btn::after {
+    content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: max(100%, 44px); height: max(100%, 44px);
+  }
+}
