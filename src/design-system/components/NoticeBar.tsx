@@ -45,7 +45,7 @@ export const NoticeBar: React.FC<NoticeBarProps> = ({ tone = 'warning', children
       }}
     >
       <span style={{ color: t.color }}>{children}</span>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+      <span className="ds-notice-bar__acao" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', maxWidth: '100%' }}>
         {action}
         {onDismiss && (
           <ActionButton action="fechar" iconOnly label="Fechar aviso" onClick={onDismiss} />

@@ -106,14 +106,19 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
   return (
     <header className="i360-hero i360-hero-wrap" data-testid="instrument-360-hero">
       <Fold>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '14px' }}>
+        <div className="i360-topo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '14px' }}>
           <ActionButton action="voltar"
             type="button"
             size="sm"
             onClick={onBack}
+            aria-label={backLabel}
             data-testid={backTestId}
-          >{backLabel}</ActionButton>
-          {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
+          >
+            {/* No celular só "Voltar": o rótulo inteiro empurrava as ações para linhas de baixo. */}
+            <span className="i360-voltar-longo">{backLabel}</span>
+            <span className="i360-voltar-curto" aria-hidden="true">Voltar</span>
+          </ActionButton>
+          {actions && <div className="i360-topo-acoes" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
         </div>
       </Fold>
 

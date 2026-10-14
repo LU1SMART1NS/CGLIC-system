@@ -646,8 +646,8 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
         const algumaInformada = fechada && d.parcelas.some((p) => quantidadeFoiInformada(p, precoDoItem.get(p.numeroItem)));
         const aDefinir = quantidades.some(({ q }) => q == null || quantidadeQuebrada(q));
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start' }} data-testid="contract-financial-situacao-itens">
-            <span style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start', minWidth: 0, maxWidth: '100%' }} data-testid="contract-financial-situacao-itens">
+            <span style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap', maxWidth: '100%' }}>
               <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
               {algumaInformada && <StatusBadge label="Informada" variant="info" size="sm" dot={false} />}
             </span>
