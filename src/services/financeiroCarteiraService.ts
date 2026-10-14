@@ -150,6 +150,8 @@ export interface EmpenhoCarteiraRow {
   liquidadoAPagar?: number | null;
   /** Quando o Tesouro publicou o saldo usado (horário de Brasília). */
   tesouroAtualizadoEm?: string | null;
+  /** Restos a pagar do empenho no ano corrente, pelo Tesouro (migration 135); null sem Tesouro ou sem resto a pagar. */
+  restosAPagar?: RestosAPagarEmpenho | null;
   /** Contratos a que o empenho está vinculado (quase sempre um). */
   contractKeys: string[];
   /** Plano interno e natureza de despesa (migration 87; vazios até a sincronização reler o contrato). */
@@ -183,13 +185,46 @@ export interface FaturaEmpenhoDb {
   valor: number | null;
 }
 
-/** Saldo contábil do Tesouro de um empenho do sistema (v_empenho_saldo_contabil, migration 128). */
+/**
+ * Restos a pagar de um empenho no ano corrente (Tesouro). Não processados: ainda a liquidar ou já liquidados a pagar;
+ * processados: liquidados no ano do empenho, a pagar.
+ */
+export interface RestosAPagarEmpenho {
+  naoProcessadoALiquidar: number;
+  naoProcessadoLiquidadoAPagar: number;
+  processadoAPagar: number;
+  pagoNoAno: number;
+}
+
+/** Saldo contábil do Tesouro de um empenho do sistema (v_empenho_saldo_contabil, migrations 128 e 135). */
 export interface SaldoTesouroEmpenho {
   pagoTotal: number;
   aLiquidar: number;
   liquidadoAPagar: number;
   atualizadoEm: string | null;
+  restosAPagar?: RestosAPagarEmpenho | null;
 }
+
+export type SituacaoRestosAPagar = 'NAO_PROCESSADO' | 'PROCESSADO' | 'OS_DOIS';
+
+/** Saldo em restos a pagar (não processados + processados). */
+export function saldoRestosAPagar(rp: RestosAPagarEmpenho | null | undefined): number {
+  if (!rp) return 0;
+  return centavosRp(rp.naoProcessadoALiquidar + rp.naoProcessadoLiquidadoAPagar + rp.processadoAPagar);
+}
+
+/** Tipo do resto a pagar com saldo; null quando o empenho não tem saldo em restos a pagar. */
+export function situacaoRestosAPagar(rp: RestosAPagarEmpenho | null | undefined): SituacaoRestosAPagar | null {
+  if (!rp) return null;
+  const naoProcessado = rp.naoProcessadoALiquidar + rp.naoProcessadoLiquidadoAPagar > 0.005;
+  const processado = rp.processadoAPagar > 0.005;
+  if (naoProcessado && processado) return 'OS_DOIS';
+  if (naoProcessado) return 'NAO_PROCESSADO';
+  if (processado) return 'PROCESSADO';
+  return null;
+}
+
+const centavosRp = (v: number) => Math.round(v * 100) / 100;
 
 const centavos = (v: number) => Math.round(v * 100) / 100;
 
@@ -263,30 +298,52 @@ export function montarEmpenhosCarteira(
       saldo,
       liquidadoAPagar: tesouro ? centavos(tesouro.liquidadoAPagar) : null,
       tesouroAtualizadoEm: tesouro?.atualizadoEm ?? null,
+      restosAPagar: tesouro?.restosAPagar ?? null,
       contractKeys: [...contractKeys].sort()
     });
   }
   return rows;
 }
 
-/** Saldo do Tesouro dos empenhos do sistema, por id do empenho. */
+const COLUNAS_TESOURO = 'empenho_id, pago_total, exercicio_a_liquidar, exercicio_liquidado_a_pagar, rp_a_liquidar, rp_liquidado_a_pagar, atualizado_tesouro';
+const COLUNAS_RESTOS_A_PAGAR = 'rpnp_liquidado_a_pagar, rpp_a_pagar, rp_pago_no_ano';
+
+/**
+ * Saldo do Tesouro dos empenhos do sistema, por id do empenho. Lê também os restos a pagar (migration 135); se o
+ * banco ainda não tiver essas colunas (tela publicada antes da migration), lê o resto sem elas.
+ */
 async function lerSaldosTesouro(): Promise<Map<string, SaldoTesouroEmpenho>> {
   const mapa = new Map<string, SaldoTesouroEmpenho>();
   if (!isSupabaseConfigured || !supabase) return mapa;
+  let comRestos = true;
   for (let de = 0; ; de += PAGINA) {
     const { data, error } = await supabase
       .from('v_empenho_saldo_contabil')
-      .select('empenho_id, pago_total, exercicio_a_liquidar, exercicio_liquidado_a_pagar, rp_a_liquidar, rp_liquidado_a_pagar, atualizado_tesouro')
+      .select(comRestos ? `${COLUNAS_TESOURO}, ${COLUNAS_RESTOS_A_PAGAR}` : COLUNAS_TESOURO)
       .not('empenho_id', 'is', null)
       .order('empenho_id', { ascending: true })
       .range(de, de + PAGINA - 1);
+    if (error && comRestos && (error.code === '42703' || /rpnp_|rpp_|rp_pago/.test(String(error.message ?? '')))) {
+      comRestos = false;
+      de -= PAGINA;
+      continue;
+    }
     if (error) throw mapPostgresErrorToAppError(error);
     for (const r of (data ?? []) as any[]) {
+      const rpnpALiquidar = Number(r.rp_a_liquidar ?? 0);
       mapa.set(String(r.empenho_id), {
         pagoTotal: Number(r.pago_total ?? 0),
-        aLiquidar: Number(r.exercicio_a_liquidar ?? 0) + Number(r.rp_a_liquidar ?? 0),
+        aLiquidar: Number(r.exercicio_a_liquidar ?? 0) + rpnpALiquidar,
         liquidadoAPagar: Number(r.exercicio_liquidado_a_pagar ?? 0) + Number(r.rp_liquidado_a_pagar ?? 0),
-        atualizadoEm: r.atualizado_tesouro ?? null
+        atualizadoEm: r.atualizado_tesouro ?? null,
+        restosAPagar: comRestos
+          ? {
+              naoProcessadoALiquidar: rpnpALiquidar,
+              naoProcessadoLiquidadoAPagar: Number(r.rpnp_liquidado_a_pagar ?? 0),
+              processadoAPagar: Number(r.rpp_a_pagar ?? 0),
+              pagoNoAno: Number(r.rp_pago_no_ano ?? 0)
+            }
+          : null
       });
     }
     if (!data || data.length < PAGINA) break;

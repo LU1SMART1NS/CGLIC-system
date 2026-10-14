@@ -5,7 +5,9 @@ import {
   etapaDoCiclo,
   montarEmpenhosCarteira,
   montarPagamentosCarteira,
+  saldoRestosAPagar,
   situacaoDoSaldo,
+  situacaoRestosAPagar,
   type EmpenhoResumoDb
 } from '../financeiroCarteiraService';
 import { descreverLinha } from '../../components/financeiro/pagamentoLinha';
@@ -109,6 +111,20 @@ describe('montarEmpenhosCarteira', () => {
       new Set(['K'])
     );
     expect(rows.map((r) => r.valorPagoFaturas)).toEqual([60, 40]);
+  });
+
+  it('restos a pagar do Tesouro vão para a linha; tipo e saldo pelo que ainda está em aberto', () => {
+    const rp = { naoProcessadoALiquidar: 70, naoProcessadoLiquidadoAPagar: 30, processadoAPagar: 0, pagoNoAno: 500 };
+    const tesouro = new Map([['e1', { pagoTotal: 900, aLiquidar: 70, liquidadoAPagar: 30, atualizadoEm: null, restosAPagar: rp }]]);
+    const [row] = montarEmpenhosCarteira([emp({})], [{ empenho_id: 'e1', contract_key: 'K' }], fe, faturas, new Set(['K']), tesouro);
+    expect(row.restosAPagar).toEqual(rp);
+    expect(situacaoRestosAPagar(row.restosAPagar)).toBe('NAO_PROCESSADO');
+    expect(saldoRestosAPagar(row.restosAPagar)).toBe(100);
+    expect(situacaoRestosAPagar({ ...rp, naoProcessadoALiquidar: 0, naoProcessadoLiquidadoAPagar: 0, processadoAPagar: 10 })).toBe('PROCESSADO');
+    expect(situacaoRestosAPagar({ ...rp, processadoAPagar: 10 })).toBe('OS_DOIS');
+    // resto a pagar todo pago no ano: sem saldo, não conta como resto a pagar em aberto
+    expect(situacaoRestosAPagar({ naoProcessadoALiquidar: 0, naoProcessadoLiquidadoAPagar: 0, processadoAPagar: 0, pagoNoAno: 500 })).toBeNull();
+    expect(situacaoRestosAPagar(null)).toBeNull();
   });
 
   it('empenho sem contrato não entra; vínculos repetidos não duplicam', () => {
