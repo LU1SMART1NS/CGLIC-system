@@ -2,7 +2,7 @@
 
 Percorrem as rotas e abas do sistema em 375px (e conferem estouro de página também em 320px e 768px) com os
 critérios da auditoria mobile: sem rolagem horizontal da página, nenhum controle inalcançável, ações visíveis,
-alvos de toque ≥ 44px, inputs ≥ 16px e texto ≥ 12px (ver `AUDITORIA_MOBILE_FECHAMENTO.md`).
+alvos de toque ≥ 44px, inputs ≥ 16px e texto ≥ 12px (ver `docs/historico/AUDITORIA_MOBILE_FECHAMENTO.md`). Lista de telas revisada em 14/10/2026.
 
 Usam o **Chrome instalado na máquina** (nenhum navegador é baixado).
 

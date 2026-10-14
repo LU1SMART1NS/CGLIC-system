@@ -45,7 +45,16 @@ export function measureLayout(page: Page): Promise<LayoutMetrics> {
       scrollWidth: document.documentElement.scrollWidth,
       unreachable: controls.filter((b) => outside(b) && !inScroller(b)).map(label),
       offscreenInScroller: controls.filter((b) => outside(b) && inScroller(b) && !b.closest('[role=tablist]')).map(label),
-      smallTargets: controls.filter((b) => b.getBoundingClientRect().height < 43.5).map(label),
+      // Conta a área clicável, não só o desenho: .ds-btn e outros controles compactos ganham 44 px por um ::after
+      // invisível em telas de toque. O número da carteira (.carteira-id-link) fica de fora: o cartão inteiro abre o mesmo detalhe.
+      smallTargets: controls
+        .filter((b) => !b.classList.contains('carteira-id-link'))
+        .filter((b) => {
+          const after = getComputedStyle(b, '::after');
+          const extra = after.position === 'absolute' && after.content !== 'none' ? parseFloat(after.height) || 0 : 0;
+          return Math.max(b.getBoundingClientRect().height, extra) < 43.5;
+        })
+        .map(label),
       inputsBelow16: fields.filter((e) => parseFloat(getComputedStyle(e).fontSize) < 16).length,
       textBelow12: Array.from(main.querySelectorAll('*')).filter(
         (e) => e.children.length === 0 && ((e as HTMLElement).innerText || '').trim() && parseFloat(getComputedStyle(e).fontSize) < 12

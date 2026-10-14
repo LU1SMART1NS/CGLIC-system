@@ -51,6 +51,8 @@ export interface NavItem {
   group?: string;
   /** 'bottom' = área fica no pé do menu chave (ex.: Configurações). */
   placement?: 'bottom';
+  /** Nome curto da área na barra inferior do celular, onde o nome inteiro era cortado ("Visão Ge…"). */
+  shortLabel?: string;
 }
 
 /**
@@ -70,6 +72,7 @@ export const navigationConfig: NavItem[] = [
   {
     id: 'visao-geral',
     label: 'Visão Geral',
+    shortLabel: 'Início',
     icon: LayoutDashboard,
     status: 'active',
     children: [
@@ -152,6 +155,7 @@ export const navigationConfig: NavItem[] = [
     // Filas de vínculo: ligar uma coisa à outra. "Distribuição" (Visão Geral) fica só com atas e contratos para gestores.
     id: 'vinculacao',
     label: 'Vinculação',
+    shortLabel: 'Vínculos',
     icon: Link2,
     status: 'active',
     children: [
@@ -214,6 +218,7 @@ export const navigationConfig: NavItem[] = [
   {
     id: 'configuracoes',
     label: 'Configurações',
+    shortLabel: 'Ajustes',
     icon: Settings,
     status: 'active',
     placement: 'bottom',

@@ -434,7 +434,7 @@ export const ItensUnidadesPage: React.FC = () => {
                           {(['SEM', 'PARCIAL', 'TOTAL'] as const)
                             .filter((n) => g.contagem[n] > 0)
                             .map((n) => (
-                              <span key={n} style={{ fontSize: '0.7rem', fontWeight: 700, borderRadius: '4px', padding: '0.05rem 0.4rem', color: CHIP[n].color, background: CHIP[n].bg }}>
+                              <span key={n} style={{ fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', padding: '0.05rem 0.4rem', color: CHIP[n].color, background: CHIP[n].bg }}>
                                 {g.contagem[n]} {CHIP[n].label(g.contagem[n])}
                               </span>
                             ))}

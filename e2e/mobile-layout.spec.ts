@@ -4,7 +4,7 @@ import { measureLayout, waitForSettled, type LayoutMetrics } from './layoutProbe
 
 /**
  * Regressão de layout mobile: percorre as rotas e abas do sistema e confere os critérios da
- * auditoria (AUDITORIA_MOBILE_FECHAMENTO.md). Veja e2e/README.md para a sessão e as chaves de teste.
+ * auditoria (docs/historico/AUDITORIA_MOBILE_FECHAMENTO.md), revisada em 14/10/2026. Veja e2e/README.md para a sessão e as chaves de teste.
  */
 const ATA_KEY = process.env.E2E_ATA_KEY ?? '00059/2025-200331';
 const CONTRACT_KEY = process.env.E2E_CONTRACT_KEY ?? '200331-00141-2025';
@@ -16,21 +16,27 @@ const ROUTES: Array<{ name: string; url: string }> = [
   { name: 'Carteira de Atas', url: '/atas' },
   { name: 'Itens da carteira', url: '/itens' },
   { name: 'Carteira de Contratos', url: '/contratos' },
+  { name: 'Distribuição', url: '/atas/distribuicao' },
+  { name: 'Alocação', url: '/alocacao' },
+  { name: 'Vínculos · Contratos à ata', url: '/vinculacao/contratos' },
+  { name: 'Vínculos · Empenhos ao contrato', url: '/vinculacao/empenhos-contrato' },
+  { name: 'Vínculos · Empenhos aos itens', url: '/vinculacao/empenhos-itens' },
   { name: 'Pagamentos', url: '/pagamentos' },
+  { name: 'Previsão de pagamentos', url: '/pagamentos/previsao' },
   { name: 'Empenhos', url: '/empenhos' },
-  { name: 'Modelos de Ata', url: '/atas/modelos' },
-  { name: 'Modelos de Contrato', url: '/contratos/modelos' },
+  { name: 'Modelos de Ata', url: '/configuracoes/modelos?tipo=atas' },
+  { name: 'Modelos de Contrato', url: '/configuracoes/modelos?tipo=contratos' },
   { name: 'Unidades internas', url: '/admin/departamentos' },
   { name: 'Usuários', url: '/admin/usuarios' },
   { name: 'Perfis', url: '/admin/perfis' },
   { name: 'Regras de alertas', url: '/admin/regras-alertas' },
   { name: 'Feriados', url: '/admin/feriados' },
   ...['acoes', 'plano', 'itens', 'contratos'].map((aba) => ({ name: `Ata 360 · ${aba}`, url: `/atas/detalhe/${ata}?aba=${aba}` })),
-  ...['acoes', 'plano', 'pagamentos', 'financeiro', 'historico'].map((aba) => ({
+  ...['acoes', 'plano', 'itens', 'pagamentos', 'financeiro', 'historico'].map((aba) => ({
     name: `Contrato 360 · ${aba}`,
     url: `/contratos/${encodeURIComponent(CONTRACT_KEY)}?aba=${aba}`
   })),
-  ...['unidades', 'alocacao', 'contratos', 'adesoes'].map((aba) => ({
+  ...['quantitativos', 'contratos', 'adesoes'].map((aba) => ({
     name: `Item · ${aba}`,
     url: `/atas/detalhe/${ata}/itens/${ITEM}?aba=${aba}`
   }))
