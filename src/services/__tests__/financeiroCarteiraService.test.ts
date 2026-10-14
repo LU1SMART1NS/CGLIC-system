@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   etapaDaFatura,
+  GRUPO_DA_ETAPA,
   etapaDoCiclo,
   montarEmpenhosCarteira,
   montarPagamentosCarteira,
@@ -73,11 +74,18 @@ describe('montarEmpenhosCarteira', () => {
 
 describe('etapas do pagamento', () => {
   it('fatura: cancelada > paga > liquidada > erro > em andamento', () => {
-    expect(etapaDaFatura({ cancelada: true, paga: true, dataLiquidacao: 'x', situacao: null })).toBe('CANCELADA');
-    expect(etapaDaFatura({ cancelada: false, paga: true, dataLiquidacao: 'x', situacao: null })).toBe('PAGA');
-    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2026-10-01', situacao: 'Siafi Apropriado' })).toBe('AGUARDANDO_OB');
-    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Siafi Erro' })).toBe('ERRO_SIAFI');
-    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Pendente' })).toBe('EM_ANDAMENTO');
+    expect(etapaDaFatura({ cancelada: true, paga: true, dataLiquidacao: 'x', situacao: null, np: null })).toBe('CANCELADA');
+    expect(etapaDaFatura({ cancelada: false, paga: true, dataLiquidacao: 'x', situacao: null, np: null })).toBe('PAGA');
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2026-10-01', situacao: 'Siafi Apropriado', np: '2026NP000001' })).toBe('AGUARDANDO_OB');
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Siafi Erro', np: null })).toBe('ERRO_SIAFI');
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Pendente', np: null })).toBe('EM_ANDAMENTO');
+  });
+
+  it('liquidada sem NP fica "sem como confirmar", em tramitação, e não "aguardando OB"', () => {
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2024-01-31', situacao: 'Siafi Apropriado', np: null })).toBe('SEM_CONFIRMACAO');
+    expect(GRUPO_DA_ETAPA.SEM_CONFIRMACAO).toBe('TRAMITACAO');
+    // paga continua paga, com ou sem NP
+    expect(etapaDaFatura({ cancelada: false, paga: true, dataLiquidacao: '2024-01-31', situacao: 'Pago', np: null })).toBe('PAGA');
   });
 
   it('ciclo: conferência na CGLIC, devolvido em correção, enviado na CGOFI, liquidado aguardando OB; pago e cancelado saem', () => {

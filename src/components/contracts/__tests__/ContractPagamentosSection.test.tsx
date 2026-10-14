@@ -230,6 +230,23 @@ describe('ContractPagamentosSection', () => {
     expect(html).toContain('não o valor da OB');
   });
 
+  it('liquidada sem NP aparece "sem como confirmar" e não conta como aguardando OB', () => {
+    faturas({
+      faturas: [
+        fatura(),
+        fatura({ idFatura: 2, numero: '220104', valor: 1000, paga: false, ordensBancarias: null, obEmissao: null, np: null, dataLiquidacao: '2024-01-31' })
+      ],
+      // a view ainda conta a liquidada sem NP; a tela não usa mais esse número
+      resumo: { ...resumo, liquidadasSemPagamento: 1 },
+      sincronizadoEm: '2026-10-06T20:22:00Z'
+    });
+    const html = renderSection();
+    expect(html).toContain('Sem como confirmar');
+    expect(html).toMatch(/Liquidadas aguardando OB[\s\S]{0,400}?>0</);
+    expect(html).toContain('sem NP');
+    expect(html).not.toContain('>aguardando<');
+  });
+
   it('NP que paga outros contratos e NE citada sem vínculo são avisadas', () => {
     faturas({ faturas: [fatura({ npContratos: 3, empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2023NE000280', empenhos: '2023NE000280' })], resumo, sincronizadoEm: '2026-10-06T20:22:00Z' });
     const html = renderSection();

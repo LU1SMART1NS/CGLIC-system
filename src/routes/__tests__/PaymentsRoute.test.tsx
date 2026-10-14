@@ -75,7 +75,8 @@ describe('Financeiro → Pagamentos', () => {
         [
           fatura({}),
           fatura({ idFatura: 2, numero: 'NF-LIQ', dataLiquidacao: '2026-10-01', np: '2026NP000811', situacao: 'Siafi Apropriado' }),
-          fatura({ idFatura: 3, numero: 'NF-PAGA', dataLiquidacao: '2026-09-01', paga: true, ordensBancarias: '2026OB018840', obEmissao: '2026-09-03' })
+          fatura({ idFatura: 3, numero: 'NF-PAGA', dataLiquidacao: '2026-09-01', paga: true, ordensBancarias: '2026OB018840', obEmissao: '2026-09-03' }),
+          fatura({ idFatura: 4, numero: 'NF-SEM-NP', dataLiquidacao: '2024-01-31', np: null, situacao: 'Siafi Apropriado', valorLiquido: 9000000 })
         ]
       ),
       isLoading: false,
@@ -89,8 +90,8 @@ describe('Financeiro → Pagamentos', () => {
     const html = render();
     expect(html).toContain('data-testid="pagamentos-situacao-ACAO"');
     expect(html).toMatch(/Precisa de ação<span[^>]*>1</);
-    // Em tramitação: a fatura não liquidada e a liquidada aguardando OB.
-    expect(html).toMatch(/Em tramitação<span[^>]*>2</);
+    // Em tramitação: a fatura não liquidada, a liquidada aguardando OB e a liquidada sem NP.
+    expect(html).toMatch(/Em tramitação<span[^>]*>3</);
     expect(html).toMatch(/Pagas<span[^>]*>1</);
     expect(html).toContain('data-testid="pagamentos-filter-etapa"');
     expect(html).toContain('Atesto 4512345');
@@ -105,6 +106,20 @@ describe('Financeiro → Pagamentos', () => {
     const pagas = render('/pagamentos?situacao=PAGA');
     expect(pagas).toContain('2026OB018840');
     expect(pagas).toContain('OB em 03/09/2026');
+  });
+
+  it('liquidada sem NP aparece "sem como confirmar" e fica fora do valor aguardando OB', () => {
+    const html = render('/pagamentos?situacao=TRAMITACAO&etapa=SEM_CONFIRMACAO');
+    expect(html).toContain('NF-SEM-NP');
+    expect(html).toContain('Sem como confirmar');
+    expect(html).toContain('a fonte não informa a NP');
+    expect(html).toContain('confira o pagamento no SIAFI');
+    expect(html).not.toContain('NF-LIQ');
+    // Só a NF-LIQ (R$ 112 mil) conta como aguardando OB; os R$ 9 mi da NF-SEM-NP ficam fora.
+    expect(html).toMatch(/R\$\s?112[^<]*aguardando OB/);
+    expect(html).not.toMatch(/9,1\s?mi[^<]*aguardando OB/);
+    const aguardando = render('/pagamentos?situacao=TRAMITACAO&etapa=AGUARDANDO_OB');
+    expect(aguardando).not.toContain('NF-SEM-NP');
   });
 
   it('não mostra os quadros antigos de CGOFI nem o fluxo de tramitação', () => {

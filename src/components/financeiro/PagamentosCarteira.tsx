@@ -38,7 +38,7 @@ export interface PagamentosFilterState {
 }
 
 const TODOS = 'TODOS';
-const ETAPAS: EtapaPagamento[] = ['NA_CGLIC', 'ERRO_SIAFI', 'DEVOLVIDO_CORRECAO', 'NA_CGOFI', 'EM_ANDAMENTO', 'AGUARDANDO_OB', 'PAGA', 'CANCELADA'];
+const ETAPAS: EtapaPagamento[] = ['NA_CGLIC', 'ERRO_SIAFI', 'DEVOLVIDO_CORRECAO', 'NA_CGOFI', 'EM_ANDAMENTO', 'AGUARDANDO_OB', 'SEM_CONFIRMACAO', 'PAGA', 'CANCELADA'];
 
 const ROTULO_ETAPA: Record<EtapaPagamento, string> = {
   NA_CGLIC: 'Na CGLIC',
@@ -47,6 +47,7 @@ const ROTULO_ETAPA: Record<EtapaPagamento, string> = {
   NA_CGOFI: 'Na CGOFI',
   EM_ANDAMENTO: 'Não liquidada',
   AGUARDANDO_OB: 'Aguardando OB',
+  SEM_CONFIRMACAO: 'Sem como confirmar',
   PAGA: 'Paga',
   CANCELADA: 'Cancelada'
 };

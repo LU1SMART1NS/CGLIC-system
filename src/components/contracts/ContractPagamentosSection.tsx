@@ -59,11 +59,14 @@ const dataHora = (v?: string | null) => {
     : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-/** Etapa da fatura: cancelada, paga (OB válida ou "Pago"), liquidada aguardando OB ou em andamento. */
+/**
+ * Etapa da fatura: cancelada, paga (OB válida ou "Pago"), liquidada aguardando OB, liquidada sem NP (sem como
+ * confirmar o pagamento: sem NP não há como achar a OB) ou em andamento.
+ */
 export function etapaDaFatura(f: FaturaDoContrato): { label: string; variant: 'success' | 'info' | 'warning' | 'neutral' | 'danger' } {
   if (f.cancelada) return { label: 'Cancelada', variant: 'neutral' };
   if (f.paga) return { label: 'Paga', variant: 'success' };
-  if (f.dataLiquidacao) return { label: 'Liquidada', variant: 'info' };
+  if (f.dataLiquidacao) return f.np ? { label: 'Liquidada', variant: 'info' } : { label: 'Sem como confirmar', variant: 'neutral' };
   if (f.situacao === 'Siafi Erro') return { label: 'Erro no SIAFI', variant: 'danger' };
   return { label: f.situacao || 'Em andamento', variant: 'warning' };
 }
@@ -141,6 +144,8 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
   const comNeSemVinculo = faturas.filter((f) => f.empenhosSemVinculo > 0);
   const nesSemVinculo = [...new Set(comNeSemVinculo.flatMap((f) => empenhosDaFatura(f.empenhosSemVinculoNumeros)))];
   const npCompartilhada = faturas.filter((f) => !f.cancelada && f.npContratos > 1).length;
+  // Liquidada sem NP não conta como "aguardando OB": sem NP não há como achar a OB no Tesouro.
+  const aguardandoOb = faturas.filter((f) => !f.cancelada && !f.paga && f.dataLiquidacao && f.np).length;
 
   const linhasFatura = useLinhasAbertas(abrirFatura, 'contract-faturas-table', faturas.length > 0);
   const linhasAtesto = useLinhasAbertas(null, 'payment-atesto-table', true);
@@ -256,7 +261,7 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isoToBR(f.obEmissao)}</span>
             </>
           ) : (
-            <span style={{ color: 'var(--text-muted)' }}>{f.dataLiquidacao && !f.cancelada ? 'aguardando' : '—'}</span>
+            <span style={{ color: 'var(--text-muted)' }}>{f.dataLiquidacao && !f.cancelada ? (f.np ? 'aguardando' : 'sem NP') : '—'}</span>
           )}
           {f.np && (
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -341,9 +346,9 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
           { label: 'Pago', value: formatCurrency(resumo?.valorPago ?? 0), unit: '', tone: 'success' },
           {
             label: 'Liquidadas aguardando OB',
-            value: String(resumo?.liquidadasSemPagamento ?? 0),
+            value: String(aguardandoOb),
             unit: '',
-            tone: (resumo?.liquidadasSemPagamento ?? 0) > 0 ? 'warning' : 'default'
+            tone: aguardandoOb > 0 ? 'warning' : 'default'
           },
           { label: 'Ciclos ativos', value: String(ativos), unit: '' }
         ]}

@@ -11,8 +11,9 @@ export const ORDEM_ETAPA: Record<EtapaPagamento, number> = {
   EM_ANDAMENTO: 2,
   ERRO_SIAFI: 3,
   AGUARDANDO_OB: 4,
-  PAGA: 5,
-  CANCELADA: 6
+  SEM_CONFIRMACAO: 5,
+  PAGA: 6,
+  CANCELADA: 7
 };
 
 export interface LinhaPagamento {
@@ -115,6 +116,12 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
         prazo: { texto: `Liquidada em ${dataBR(f.dataLiquidacao)}`, detalhe: `aguardando OB há ${dias(n)}`, atrasado: n > 5, ordem: f.dataLiquidacao }
       };
     }
+    case 'SEM_CONFIRMACAO':
+      return {
+        ...base,
+        etapa: { label: 'Sem como confirmar', variant: 'neutral', detalhe: 'a fonte não informa a NP' },
+        prazo: { texto: `Liquidada em ${dataBR(f.dataLiquidacao)}`, detalhe: 'confira o pagamento no SIAFI', atrasado: false, ordem: f.dataLiquidacao }
+      };
     case 'ERRO_SIAFI':
       return { ...base, etapa: { label: 'Erro no SIAFI', variant: 'danger', detalhe: null }, prazo: vencimento };
     case 'CANCELADA':
