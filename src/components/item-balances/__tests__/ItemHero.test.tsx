@@ -6,6 +6,7 @@ import type { ArpRecord, ArpItemRecord } from '../../../types';
 import { addDays, formatDateISO } from '../../../services/temporalEngineService';
 
 vi.mock('../../../hooks/useAtaManagers', () => ({ useAtaManager: vi.fn() }));
+vi.mock('../../../hooks/useCadastroUasgs', () => ({ useEyebrowDaGerenciadora: (uasg: string, nome?: string) => [`UASG ${uasg}`, nome].filter(Boolean).join(' · ') }));
 
 const mockArp: ArpRecord = {
   numeroAtaRegistroPreco: '90001/2026',

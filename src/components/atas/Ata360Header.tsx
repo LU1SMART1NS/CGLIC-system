@@ -10,6 +10,7 @@ import type { AtaActionItem, AtaItemSaldoInput } from '../../services/ataActionQ
 import { SALDO_RULES } from '../../config/alertRules';
 import { useAtaManager } from '../../hooks/useAtaManagers';
 import { useAtaPncp } from '../../hooks/useAtaPncp';
+import { useEyebrowDaGerenciadora } from '../../hooks/useCadastroUasgs';
 import { useAtaAssinatura } from '../../hooks/useAtaAssinatura';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
 import { MissingValue } from '../instrument360/MissingValue';
@@ -93,6 +94,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   const { data: manager, isLoading: loadingManager } = useAtaManager(chaveGestaoDaArp(arp));
   // Ata de outro órgão em que a SENASP é participante ou fez adesão (migration 106).
   const outroOrgao = ataDeOutroOrgao(arp);
+  const eyebrow = useEyebrowDaGerenciadora(String(arp.codigoUnidadeGerenciadora ?? ''), arp.nomeUnidadeGerenciadora, outroOrgao);
   const papel = papelSenaspDaAta(arp);
   // A divulgação no PNCP só aparece quando o PNCP responde; sem resposta, a linha de datas fica sem ela.
   const { data: pncp, isLoading: loadingPncp } = useAtaPncp(arp);
@@ -171,7 +173,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
           )}
         </>
       }
-      eyebrow={[`UASG ${arp.codigoUnidadeGerenciadora}`, arp.nomeUnidadeGerenciadora].filter(Boolean).join(' · ')}
+      eyebrow={eyebrow}
       title={`Ata nº ${arp.numeroAtaRegistroPreco}`}
       status={{ faixa: encerrada ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, cancelada), neutral: !encerrada }}
       dockAlert={

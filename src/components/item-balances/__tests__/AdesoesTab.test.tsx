@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+const cadastro = new Map<string, { uasg: string; nome: string; municipio: string | null; siglaUf: string | null }>();
+vi.mock('../../../hooks/useCadastroUasgs', () => ({ useCadastroUasgs: () => cadastro }));
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AdesoesTab, splitUnidade } from '../AdesoesTab';
 import type { AdesaoItemRecord } from '../../../types';
@@ -39,7 +42,7 @@ describe('AdesoesTab', () => {
   it('lista os órgãos aderentes na tabela', () => {
     const out = html();
     expect(out).toContain('INCRA-SEDE/DF');
-    expect(out).toContain('UASG: 373083');
+    expect(out).toContain('UASG 373083');
     expect(out).toContain('2,06%'); // 100 de 4.863 homologadas
   });
 
@@ -91,4 +94,17 @@ describe('AdesoesTab', () => {
   it('mostra o carregamento no resumo', () => {
     expect(html({ adesoesLoading: true })).toContain('Consultando adesões de carona');
   });
+
+  it('nome, cidade e UF do cadastro de UASGs; o nome da adesão fica no título', () => {
+    cadastro.set('373083', { uasg: '373083', nome: 'INCRA - SEDE', municipio: 'BRASÍLIA', siglaUf: 'DF' });
+    try {
+      const out = html();
+      expect(out).toContain('INCRA - SEDE');
+      expect(out).toContain('UASG 373083 · Brasília/DF');
+      expect(out).toContain('title="Nome na adesão: INCRA-SEDE/DF"');
+    } finally {
+      cadastro.clear();
+    }
+  });
 });
+
