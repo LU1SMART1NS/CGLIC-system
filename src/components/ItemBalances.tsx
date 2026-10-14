@@ -7,6 +7,8 @@ import { Building2, ExternalLink } from 'lucide-react';
 import { getCanonicalContractKey } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
+import { useCadastroUasgs } from '../hooks/useCadastroUasgs';
+import { localDaUasg } from '../services/cadastroUasgsSyncService';
 import { escolherAdesoes, useItemAdesoes } from '../hooks/useItemAdesoes';
 import { useDepartments } from '../hooks/useDepartments';
 import { useItemAllocations } from '../hooks/useItemAllocations';
@@ -110,6 +112,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     item.numeroItem
   );
   const unidades = unidadesDoItem?.unidades ?? EMPTY_UNIDADES;
+  // Nome, cidade e UF dos órgãos no cadastro de UASGs (o nome da ata vem cortado em 45 letras).
+  const cadastroUasgs = useCadastroUasgs(unidades.map((u) => String(u.codigoUnidade ?? '').replace(/\D/g, '')));
   const { saldos: saldosDaAta } = useAtaItemSaldos(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
   const error = unidadesQueryError ? (unidadesQueryError.message || 'Erro ao buscar saldos por unidade.') : null;
 
@@ -931,9 +935,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                 const isGer = isGerenciadoraUasg(c.uasg, arp.codigoUnidadeGerenciadora) || c.tipoUnidade === 'GERENCIADORA';
                                 const contractUasg = c.uasg || (isGer ? (arp.codigoUnidadeGerenciadora || '200331') : '');
                                 const matchedUnit = unidades.find(u => String(u.codigoUnidade).trim() === String(contractUasg).trim());
+                                const cadastroDoOrgao = isGer ? undefined : cadastroUasgs.get(String(contractUasg).trim());
                                 const resolvedOrgaoName = isGer
                                   ? (arp.nomeOrgao || arp.nomeUnidadeGerenciadora || c.orgaoNome)
-                                  : (matchedUnit?.nomeUnidade || (c.orgaoNome && !c.orgaoNome.includes('SECRETARIA NACIONAL') ? c.orgaoNome : `Órgão Participante`));
+                                  : (cadastroDoOrgao?.nome || matchedUnit?.nomeUnidade || (c.orgaoNome && !c.orgaoNome.includes('SECRETARIA NACIONAL') ? c.orgaoNome : `Órgão Participante`));
+                                const localDoOrgao = cadastroDoOrgao ? localDaUasg(cadastroDoOrgao) : null;
                                 const qtdDoContrato = c._isOfficialLink && c.contractKey ? quantidadePorContrato.get(c.contractKey) : undefined;
 
                                 return (
@@ -966,13 +972,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                       </td>
                                       <td data-label="Unidade" style={{ fontSize: '0.85rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                          {contractUasg ? null : resolvedOrgaoName}
-                                          {contractUasg ? (
+                                          {contractUasg && !cadastroDoOrgao ? null : resolvedOrgaoName}
+                                          {contractUasg && !cadastroDoOrgao ? (
                                             <span style={{ fontSize: '0.75rem', color: 'var(--color-info-text)', fontWeight: 600, background: 'var(--color-info-bg)', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid var(--color-info-border)' }}>
                                               UASG: {contractUasg}
                                             </span>
                                           ) : null}
                                         </div>
+                                        {cadastroDoOrgao && (
+                                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }} data-testid={`vinculado-orgao-local-${idx}`}>
+                                            UASG {contractUasg}{localDoOrgao ? ` · ${localDoOrgao}` : ''}
+                                          </div>
+                                        )}
                                         {!isGer && (
                                           <div style={{ marginTop: '0.25rem' }}>
                                             <StatusBadge label="Participante" variant="neutral" size="sm" dot={false} />

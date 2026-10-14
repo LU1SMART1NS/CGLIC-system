@@ -4,6 +4,8 @@ import { formatNumber, formatCurrency, formatDate } from './itemBalanceUtils';
 import { formatDataHoraBR } from '../../utils/format';
 import type { AdesaoItemRecord, ArpItemRecord } from '../../types';
 import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
+import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
+import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { DataTable, EmptyState, ErrorState, NoticeBar, ProgressBar, SectionHeader, StatusBadge, SummaryBar, type Column } from '../../design-system';
 
 export interface AdesoesTabProps {
@@ -46,17 +48,25 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
     (b.dataAprovacaoAnalise || '').localeCompare(a.dataAprovacaoAnalise || '')
   );
 
+  // Nome, cidade e UF do cadastro de UASGs (o nome da adesão vem cortado da fonte); sem cadastro, o nome da adesão.
+  const cadastro = useCadastroUasgs(adesoes.map((a) => splitUnidade(a.unidadeNaoParticipante).codigo));
+  const orgaoDa = (ade: AdesaoItemRecord) => {
+    const { codigo, nome } = splitUnidade(ade.unidadeNaoParticipante);
+    const c = cadastro.get(codigo);
+    return { codigo, nome: c?.nome ?? nome, nomeNaAdesao: nome, local: c ? localDaUasg(c) : null };
+  };
+
   const columns: Column<AdesaoItemRecord>[] = [
     {
       key: 'orgao',
       header: 'Órgão não participante',
-      sortValue: (ade) => splitUnidade(ade.unidadeNaoParticipante).nome,
+      sortValue: (ade) => orgaoDa(ade).nome,
       render: (ade) => {
-        const { codigo, nome } = splitUnidade(ade.unidadeNaoParticipante);
+        const { codigo, nome, nomeNaAdesao, local } = orgaoDa(ade);
         return (
           <>
-            <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{nome || 'Órgão não informado'}</div>
-            {codigo && <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>UASG: {codigo}</div>}
+            <div style={{ fontWeight: 700, color: 'var(--primary)' }} title={nome !== nomeNaAdesao && nomeNaAdesao ? `Nome na adesão: ${nomeNaAdesao}` : undefined}>{nome || 'Órgão não informado'}</div>
+            {codigo && <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>UASG {codigo}{local ? ` · ${local}` : ''}</div>}
           </>
         );
       }
