@@ -118,15 +118,18 @@ const UG_PAR: Record<string, string> = { '200330': '200331', '200331': '200330' 
 /**
  * A observação da OB cita o número da fatura como palavra inteira ("NUM.(S): 72834, 73469, CONTRATO..."), separada
  * por espaço, vírgula, ponto e vírgula, dois-pontos ou ponto final. Entre parênteses costuma vir outro documento
- * ("CONTRATO Nº 99/2024 (32554104)"), por isso não conta. Números com menos de 4 caracteres também não contam:
- * confundiriam com o número do contrato ou do ano. Mesma regra da
- * função ob_cita_fatura do banco (migration 119), usada pela view para ligar a OB da outra UG à fatura.
+ * ("CONTRATO Nº 99/2024 (32554104)"), por isso não conta. Número só de dígitos vale com ou sem zeros à esquerda,
+ * dos dois lados: a fatura "000003007" é a "INVOICE 3007" da OB. Números com menos de 4 caracteres (sem contar
+ * esses zeros) não contam: confundiriam com o número do contrato ou do ano. Mesma regra da função ob_cita_fatura
+ * do banco (migrations 119 e 120), usada pela view para ligar a OB da outra UG à fatura.
  */
 export function obCitaFatura(observacao: string | null | undefined, numero: string | null | undefined): boolean {
-  const n = String(numero ?? '').trim().toUpperCase();
+  const bruto = String(numero ?? '').trim().toUpperCase();
   const obs = String(observacao ?? '').toUpperCase();
+  const soDigitos = /^\d+$/.test(bruto);
+  const n = soDigitos ? bruto.replace(/^0+/, '') : bruto;
   if (n.length < 4 || !obs) return false;
-  const escapado = n.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
+  const escapado = (soDigitos ? '0*' : '') + n.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
   return new RegExp(`(^|[\\s,;:])${escapado}($|[\\s,;:]|\\.(\\s|$))`).test(obs);
 }
 
