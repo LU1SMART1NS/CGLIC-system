@@ -91,7 +91,7 @@ Os nomes exibidos dos perfis são editáveis pelo coordenador (migration 68). As
 | `supabase/limpezas/` | Limpezas únicas feitas à mão; rodam como ensaio por padrão (só gravam com `SET limpeza.aplicar = 'sim'`) |
 | `e2e/` | Testes de layout no celular (Playwright) |
 | `docs/` | Regras de dados, índice das migrations e `historico/` (relatórios das fases anteriores) |
-| `db/`, `scratch/` | Sobras de fases antigas, fora do build |
+| `db/` | Sobras de fases antigas, fora do build |
 
 ## 5. Convenções de tela
 
