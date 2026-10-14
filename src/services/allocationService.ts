@@ -87,18 +87,20 @@ export async function fetchAllocationsWithState(itemKey: string): Promise<ItemAl
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data: allocData, error: allocError } = await supabase
-        .from('arp_allocations')
-        .select('*')
-        .eq('item_key', canonicalKey);
-
-      const { data: stateData } = await supabase
+      // A versão vem ANTES dos dados: se alguém salvar entre as duas leituras, a versão fica velha e o banco recusa
+      // (seguro). Lida depois, a tela ficaria com dados velhos e versão nova, e o próximo salvar apagaria o do outro.
+      // Sem conseguir ler a versão, 0 faz o banco recusar em vez de gravar às cegas.
+      const { data: stateData, error: stateError } = await supabase
         .from('item_allocation_state')
         .select('version')
         .eq('item_key', canonicalKey)
         .maybeSingle();
+      const version = stateError ? 0 : stateData?.version ?? 1;
 
-      const version = stateData?.version ?? 1;
+      const { data: allocData, error: allocError } = await supabase
+        .from('arp_allocations')
+        .select('*')
+        .eq('item_key', canonicalKey);
 
       if (!allocError && allocData) {
         const mapped: InternalAllocation[] = allocData.map((d: any) => ({
@@ -210,18 +212,18 @@ export async function fetchEmpenhoLinksWithState(itemKey: string): Promise<ItemE
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data: linkData, error: linkError } = await supabase
-        .from('empenho_links')
-        .select('*')
-        .eq('item_key', canonicalKey);
-
-      const { data: stateData } = await supabase
+      // Versão antes dos dados (ver fetchAllocationsWithState).
+      const { data: stateData, error: stateError } = await supabase
         .from('item_empenho_link_state')
         .select('version')
         .eq('item_key', canonicalKey)
         .maybeSingle();
+      const version = stateError ? 0 : stateData?.version ?? 1;
 
-      const version = stateData?.version ?? 1;
+      const { data: linkData, error: linkError } = await supabase
+        .from('empenho_links')
+        .select('*')
+        .eq('item_key', canonicalKey);
 
       if (!linkError && linkData) {
         const map: Record<string, string> = {};

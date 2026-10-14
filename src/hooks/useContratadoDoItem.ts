@@ -85,7 +85,9 @@ export function useAcoesContratado(itemKey: string) {
     onSettled: aoTerminar
   });
   const desfazerDivisao = useMutation({
-    mutationFn: (contractKey: string) => desfazerDivisaoContrato({ itemKey, contractKey }),
+    // A tela passa a versão que leu (migration 129); só a chave desfaz sem conferir.
+    mutationFn: (p: string | { contractKey: string; versao?: string | null }) =>
+      typeof p === 'string' ? desfazerDivisaoContrato({ itemKey, contractKey: p }) : desfazerDivisaoContrato({ itemKey, ...p }),
     retry: 0,
     onSettled: aoTerminar
   });

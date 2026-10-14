@@ -423,11 +423,15 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
     acoesDistribuicao.vincular.reset();
     setDistribuindo(d);
   };
+  // A janela mostra a nota como está agora (depois de um conflito, a lista relida traz a versão nova).
+  const distribuindoAtual = distribuindo
+    ? distribuicoes.find((d) => d.contratoEmpenhoId === distribuindo.contratoEmpenhoId) ?? distribuindo
+    : null;
   const salvarDistribuicao = (quantidades: QuantidadeNoItem[], observacao: string) => {
-    if (!distribuindo) return;
-    const alvo = distribuindo;
+    if (!distribuindoAtual) return;
+    const alvo = distribuindoAtual;
     acoesDistribuicao.vincular.mutate(
-      { contratoEmpenhoId: alvo.contratoEmpenhoId, itens: quantidades, observacao },
+      { contratoEmpenhoId: alvo.contratoEmpenhoId, itens: quantidades, observacao, versao: alvo.versao },
       {
         onSuccess: () => {
           setDistribuindo(null);
@@ -438,7 +442,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   };
   const informarQuantidade = (d: DistribuicaoDoEmpenho, numeroItem: number, quantidade: number | null) =>
     acoesDistribuicao.informar.mutate(
-      { contratoEmpenhoId: d.contratoEmpenhoId, numeroItem, quantidade },
+      { contratoEmpenhoId: d.contratoEmpenhoId, numeroItem, quantidade, versao: d.versao },
       {
         onSuccess: () =>
           toast.success(quantidade == null ? `${d.numeroOficial}: quantidade do item ${numeroItem} voltou à calculada.` : `${d.numeroOficial}: ${quantidade} un no item ${numeroItem}.`),
@@ -463,7 +467,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
       tone: 'danger'
     });
     if (!ok) return;
-    acoesDistribuicao.desfazer.mutate(d.contratoEmpenhoId, {
+    acoesDistribuicao.desfazer.mutate({ contratoEmpenhoId: d.contratoEmpenhoId, versao: d.versao }, {
       onSuccess: () => toast.success(`Vínculo de ${d.numeroOficial} aos itens desfeito.`),
       onError: (err: any) => toast.error(err?.message || 'Não foi possível desfazer o vínculo aos itens.')
     });
@@ -473,10 +477,10 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const extras = (
     <>
       <DistribuirEmpenhoModal
-        distribuicao={distribuindo}
+        distribuicao={distribuindoAtual}
         numeroContrato={numeroContrato}
         itens={itens}
-        empenhadoOutras={empenhadoPorItem(distribuicoes, itens, distribuindo?.contratoEmpenhoId)}
+        empenhadoOutras={empenhadoPorItem(distribuicoes, itens, distribuindoAtual?.contratoEmpenhoId)}
         isLoading={acoesDistribuicao.vincular.isPending}
         erro={acoesDistribuicao.vincular.error?.message}
         onSalvar={salvarDistribuicao}

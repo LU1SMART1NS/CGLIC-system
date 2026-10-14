@@ -9,6 +9,7 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../hooks/useVinculacaoEmpenhos';
 import { desfazerDistribuicaoEmpenho, vincularEmpenhoAosItens, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
+import { ehConflitoEdicao } from '../../utils/conflitoEdicao';
 import { motivoDaNota, motivoDaRevisao, rotuloDaSituacao, sugestaoCurta, textoDaSugestao } from '../../utils/distribuicaoEmpenho';
 import { useConferenciasDaNota } from '../../hooks/useConferenciaNota';
 import { ConferirNoContratosGov } from './ConferirNoContratosGov';
@@ -139,17 +140,21 @@ export const EmpenhosItensPage: React.FC = () => {
   const vincularLote = async () => {
     setGravandoLote(true);
     let feitas = 0;
+    let puladas = 0;
     const erros: string[] = [];
     for (const d of selecionadas) {
       try {
+        // A versão lida na fila: se alguém vinculou a nota nesse meio-tempo, o banco recusa e a nota é pulada.
         await vincularEmpenhoAosItens({
           contratoEmpenhoId: d.contratoEmpenhoId,
           itens: [{ numeroItem: d.sugestao[0].numeroItem, quantidade: d.sugestao[0].quantidade }],
-          observacao: obsLote
+          observacao: obsLote,
+          versao: d.versao
         });
         feitas++;
       } catch (err: any) {
-        erros.push(`${d.numeroOficial}: ${err?.message || 'erro desconhecido'}`);
+        if (ehConflitoEdicao(err)) puladas++;
+        else erros.push(`${d.numeroOficial}: ${err?.message || 'erro desconhecido'}`);
       }
     }
     setGravandoLote(false);
@@ -158,6 +163,11 @@ export const EmpenhosItensPage: React.FC = () => {
     selecao.limpar();
     await queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao'] });
     if (feitas > 0) toast.success(`${plural(feitas, 'nota vinculada', 'notas vinculadas')} aos itens pela sugestão.`);
+    if (puladas > 0) {
+      toast.error(
+        `${plural(puladas, 'nota foi pulada', 'notas foram puladas')} porque outra pessoa as alterou enquanto você editava. A lista foi atualizada; confira antes de vincular de novo.`
+      );
+    }
     if (erros.length > 0) toast.error(`${plural(erros.length, 'nota não foi vinculada', 'notas não foram vinculadas')}: ${erros.join('; ')}`);
   };
 
@@ -178,10 +188,11 @@ export const EmpenhosItensPage: React.FC = () => {
     if (!ok) return;
     setDesfazendo(d.contratoEmpenhoId);
     try {
-      await desfazerDistribuicaoEmpenho(d.contratoEmpenhoId);
+      await desfazerDistribuicaoEmpenho(d.contratoEmpenhoId, d.versao);
       await queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao'] });
       toast.success(`${d.numeroOficial} voltou para "A vincular".`);
     } catch (err: any) {
+      if (ehConflitoEdicao(err)) await queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao'] });
       toast.error(err?.message || 'Não foi possível desfazer o vínculo.');
     } finally {
       setDesfazendo(null);

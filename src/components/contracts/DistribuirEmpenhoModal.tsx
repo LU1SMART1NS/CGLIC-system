@@ -34,7 +34,10 @@ function lerQuantidade(texto: string): number | null {
  */
 export const DistribuirEmpenhoModal: React.FC<DistribuirEmpenhoModalProps> = (props) =>
   // Uma janela por nota: abre já com o vínculo atual (editar) ou com a sugestão.
-  props.distribuicao ? <JanelaVincular key={props.distribuicao.contratoEmpenhoId} {...props} d={props.distribuicao} /> : null;
+  // A chave inclui a versão: depois de um conflito de edição, a janela recomeça com o que está gravado agora.
+  props.distribuicao ? (
+    <JanelaVincular key={`${props.distribuicao.contratoEmpenhoId}:${props.distribuicao.versao ?? ''}`} {...props} d={props.distribuicao} />
+  ) : null;
 
 const JanelaVincular: React.FC<DistribuirEmpenhoModalProps & { d: DistribuicaoDoEmpenho }> = ({
   d,

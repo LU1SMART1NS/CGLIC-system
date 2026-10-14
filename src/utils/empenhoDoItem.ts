@@ -30,6 +30,8 @@ export interface ParcelaDoItem {
   origem: OrigemDoVinculo | null;
   vinculadaPorNome: string | null;
   vinculadaEm: string | null;
+  /** Versão do vínculo da nota quando a tela leu (migration 129). */
+  versao?: string | null;
 }
 
 /** Execução do item em UM contrato. */
@@ -120,7 +122,8 @@ export function montarEmpenhoDoItem(input: {
           valorMudou: d.motivoRevisao === 'VALOR_MUDOU' ? { antes: d.valorNaDistribuicao ?? d.valorDistribuido, agora: d.valorNota } : null,
           origem: d.origem,
           vinculadaPorNome: d.distribuidoPorNome,
-          vinculadaEm: d.distribuidoEm
+          vinculadaEm: d.distribuidoEm,
+          versao: d.versao ?? null
         });
         e.valorEmpenhado += parcela.valor ?? 0;
         if (quantidade != null) e.empenhado += quantidade;

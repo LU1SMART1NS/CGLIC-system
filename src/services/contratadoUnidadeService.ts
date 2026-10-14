@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { rpcInexistente } from './empenhoSyncService';
+import { ConflitoEdicaoError, comVersao, erroDeConflito, semColunaDeVersao } from '../utils/conflitoEdicao';
 
 /**
  * Contratado por unidade interna e quantidade contratada ajustada (migration 103).
@@ -48,6 +49,8 @@ export interface QuantidadeDoContrato {
   quantidadeSemUnidade: number;
   unidades: ParteDaUnidade[];
   situacao: SituacaoDivisao;
+  /** Versão da divisão quando a tela leu (migration 129). */
+  versao?: string | null;
 }
 
 /** Unidade do item: alocado, contratado (divisões dos contratos) e livre para contratar. */
@@ -127,7 +130,8 @@ export function mapQuantidadeDoContrato(r: any): QuantidadeDoContrato {
     quantidadeDividida: num(r.quantidade_dividida),
     quantidadeSemUnidade: num(r.quantidade_sem_unidade),
     unidades,
-    situacao: (r.situacao_divisao as SituacaoDivisao) ?? 'SEM_DIVISAO'
+    situacao: (r.situacao_divisao as SituacaoDivisao) ?? 'SEM_DIVISAO',
+    versao: r.versao_edicao ?? null
   };
 }
 
@@ -148,10 +152,14 @@ export function mapContratadoDaUnidade(r: any): ContratadoDaUnidade {
 export async function fetchContratadoDoItem(itemKey: string): Promise<ContratadoDoItem> {
   const key = (itemKey || '').trim();
   if (!key || !isSupabaseConfigured || !supabase) return { contratos: [], unidades: [] };
-  const [contratos, unidades] = await Promise.all([
-    supabase.from('v_arp_item_contrato_quantidade').select('*').eq('item_key', key),
+  let [contratos, unidades] = await Promise.all([
+    supabase.from('v_arp_item_contrato_quantidade').select('*, versao_edicao').eq('item_key', key),
     supabase.from('v_arp_item_unidade_contratado').select('*').eq('item_key', key)
   ]);
+  // Banco sem a migration 129: lê sem a versão (grava como antes).
+  if (contratos.error && semColunaDeVersao(contratos.error)) {
+    contratos = await supabase.from('v_arp_item_contrato_quantidade').select('*').eq('item_key', key);
+  }
   if (contratos.error) {
     if (tabelaAusente(contratos.error)) return { contratos: [], unidades: [] };
     throw new Error(contratos.error.message);
@@ -216,29 +224,38 @@ export async function desfazerAjusteQuantidade(p: { itemKey: string; contractKey
   if (error) throw new Error(mensagemDoErroContratado(error));
 }
 
+/** Erro da divisão: o conflito de edição vira ConflitoEdicaoError; o resto, mensagem legível. */
+function erroDaDivisao(error: any): Error {
+  return erroDeConflito(error) ? new ConflitoEdicaoError() : new Error(mensagemDoErroContratado(error));
+}
+
 export async function dividirContratoNasUnidades(p: {
   itemKey: string;
   contractKey: string;
   unidades: Array<{ unidade: string; quantidade: number }>;
   quantidadeVista: number;
   observacao?: string;
+  /** Versão da divisão quando a tela leu (migration 129); o banco recusa se outra pessoa mexeu. */
+  versao?: string | null;
 }): Promise<void> {
   const { error } = await requireSupabase().rpc('dividir_contrato_nas_unidades', {
     p_item_key: p.itemKey,
     p_contract_key: p.contractKey,
     p_unidades: p.unidades,
     p_quantidade_vista: p.quantidadeVista,
-    p_observacao: p.observacao?.trim() || null
+    p_observacao: p.observacao?.trim() || null,
+    ...comVersao(p.versao)
   });
-  if (error) throw new Error(mensagemDoErroContratado(error));
+  if (error) throw erroDaDivisao(error);
 }
 
-export async function desfazerDivisaoContrato(p: { itemKey: string; contractKey: string }): Promise<void> {
+export async function desfazerDivisaoContrato(p: { itemKey: string; contractKey: string; versao?: string | null }): Promise<void> {
   const { error } = await requireSupabase().rpc('desfazer_divisao_contrato_unidades', {
     p_item_key: p.itemKey,
-    p_contract_key: p.contractKey
+    p_contract_key: p.contractKey,
+    ...comVersao(p.versao)
   });
-  if (error) throw new Error(mensagemDoErroContratado(error));
+  if (error) throw erroDaDivisao(error);
 }
 
 /** Saldo do item da ata, o bastante para a janela de ajuste avisar quando o consumo passa da cota. */
@@ -262,7 +279,8 @@ export async function fetchContratadoDoContrato(contractKey: string): Promise<Co
   const key = (contractKey || '').trim();
   const vazio: ContratadoDoContrato = { porItem: [], saldoPorItem: new Map() };
   if (!key || !isSupabaseConfigured || !supabase) return vazio;
-  const { data, error } = await supabase.from('v_arp_item_contrato_quantidade').select('*').eq('contract_key', key);
+  let { data, error } = await supabase.from('v_arp_item_contrato_quantidade').select('*, versao_edicao').eq('contract_key', key);
+  if (error && semColunaDeVersao(error)) ({ data, error } = await supabase.from('v_arp_item_contrato_quantidade').select('*').eq('contract_key', key));
   if (error) {
     if (tabelaAusente(error)) return vazio;
     throw new Error(error.message);
