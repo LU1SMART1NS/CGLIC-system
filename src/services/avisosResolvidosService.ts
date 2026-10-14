@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 
 /**
  * Avisos marcados como resolvidos (✓) na Visão Geral e nas Ações da ata e do contrato
@@ -100,10 +101,11 @@ export async function fetchAvisosResolvidos(): Promise<AvisoResolvido[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
   try {
-    const { data, error } = await supabase
-      .from('avisos_resolvidos')
-      .select('chave, tipo, justificativa, resolvido_por_nome, resolvido_em');
-    if (error) throw error;
+    // Cresce sem parar (cada ✓ Resolvido é uma linha): todas as páginas, em ordem fixa.
+    const db = supabase;
+    const data = await lerTodasAsPaginas<any>((de, ate) =>
+      db.from('avisos_resolvidos').select('chave, tipo, justificativa, resolvido_por_nome, resolvido_em').order('chave').range(de, ate)
+    );
     return (data || []).map((row: { chave: string; tipo: AvisoResolvivelTipo; justificativa: string; resolvido_por_nome: string | null; resolvido_em: string }) => ({
       chave: row.chave,
       tipo: row.tipo,

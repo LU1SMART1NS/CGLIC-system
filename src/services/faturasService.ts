@@ -11,6 +11,7 @@
  *   empenhos.identificador_fonte), que já traz a UASG emitente certa.
  */
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { fetchContratosGovFaturas, fetchOrdensBancariasDaNp } from './api';
 import { parseMoneyValue } from './balanceService';
 import { fetchContratosOficiaisDoBanco } from './contratosOficiaisService';
@@ -25,7 +26,6 @@ export const RECURSO_ORDENS_BANCARIAS = 'ordens_bancarias' as const;
 export const FONTE_FATURAS = 'Faturas dos contratos (Contratos.gov.br)';
 export const FONTE_ORDENS_BANCARIAS = 'Ordens bancárias (Tesouro, STA)';
 export const VALIDADE_FATURAS = '6 hours';
-const PAGINA = 1000;
 const NP_FORMATO = /^\d{4}NP\d{6}$/;
 
 /**
@@ -259,17 +259,13 @@ async function recalcularAoFim(partes: string[], erros: string[]): Promise<void>
 // Sincronização por carteira
 // -----------------------------------------------------------------------------------------------------
 
-async function lerPaginado<T>(tabela: string, colunas: string, filtro?: (q: any) => any): Promise<T[]> {
-  const linhas: T[] = [];
-  for (let from = 0; ; from += PAGINA) {
+/** Lê a tabela inteira de mil em mil, na ordem de `ordem` (coluna única: sem ordem fixa as páginas repetem ou pulam linhas). */
+async function lerPaginado<T>(tabela: string, colunas: string, ordem: string, filtro?: (q: any) => any): Promise<T[]> {
+  return lerTodasAsPaginas<T>((de, ate) => {
     let q = supabase!.from(tabela).select(colunas);
     if (filtro) q = filtro(q);
-    const { data: d, error } = await q.range(from, from + PAGINA - 1);
-    if (error) throw error;
-    linhas.push(...((d ?? []) as T[]));
-    if (!d || d.length < PAGINA) break;
-  }
-  return linhas;
+    return q.order(ordem, { ascending: true }).range(de, ate);
+  });
 }
 
 export interface OpcoesSincronizacao {
@@ -325,7 +321,7 @@ export async function sincronizarFaturasDaCarteira(uasg: string, opts: OpcoesSin
     const [carteira, comEmpenhoAPagar, sinc] = await Promise.all([
       fetchContratosOficiaisDoBanco(uasg),
       contratosComEmpenhoAPagar(),
-      lerPaginado<{ contract_key: string; sincronizado_em: string }>('contrato_faturas_sincronizacao', 'contract_key, sincronizado_em')
+      lerPaginado<{ contract_key: string; sincronizado_em: string }>('contrato_faturas_sincronizacao', 'contract_key, sincronizado_em', 'contract_key')
     ]);
     if (carteira.length === 0) {
       return { status: 'ERRO', erro: 'A carteira de contratos da UASG está vazia no banco: sincronize os contratos antes.' };
@@ -405,10 +401,11 @@ export async function sincronizarOrdensBancariasDaCarteira(uasg: string, opts: O
       // ordens_bancarias da view = só as OBs que confirmam a fatura
       lerPaginado<{ np: string | null; numero: string | null; data_liquidacao: string | null; cancelada: boolean; ordens_bancarias: string | null }>(
         'v_contrato_faturas',
-        'np, numero, data_liquidacao, cancelada, ordens_bancarias',
+        'np, numero, data_liquidacao, cancelada, ordens_bancarias, id_fatura',
+        'id_fatura',
         (q) => q.eq('ug_np', uasg).not('np', 'is', null)
       ),
-      lerPaginado<{ np: string; consultado_em: string }>('np_consultas', 'np, consultado_em', (q) => q.eq('ug', uasg))
+      lerPaginado<{ np: string; consultado_em: string }>('np_consultas', 'np, consultado_em', 'np', (q) => q.eq('ug', uasg))
     ]);
     const fila = filaDeNps(faturas, npsConfirmadas(faturas), new Map(consultas.map((c) => [c.np, c.consultado_em])), {
       agora: agora(),

@@ -9,7 +9,7 @@ const OBS_NF = 'PAGAMENTO DAS NF 40239 40251 40223. CONTRATO Nº 99/2024 (325541
 
 const tabelas: Record<string, any[]> = {};
 function consulta(tabela: string) {
-  const q: any = { select: () => q, eq: () => q, not: () => q, range: async () => ({ data: tabelas[tabela] ?? [], error: null }) };
+  const q: any = { select: () => q, eq: () => q, not: () => q, order: () => q, range: async () => ({ data: tabelas[tabela] ?? [], error: null }) };
   return q;
 }
 const rpc = vi.fn(async (nome: string, args: any): Promise<any> =>

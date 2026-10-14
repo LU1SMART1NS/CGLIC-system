@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured, ehServidor } from './supabaseClient';
 import type { DbAta } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../utils/pncpUtils';
@@ -87,16 +88,20 @@ export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): 
   }
 
   try {
-    let query = supabase.from('atas_registro_preco').select('*');
-
-    if (codigoUasg) {
-      query = query.eq(colunaDaUasgDaAta(codigoUasg), codigoUasg);
+    // Todas as páginas, em ordem fixa (o PostgREST corta em mil).
+    const db = supabase;
+    let data: any[] | null = null;
+    let error: unknown = null;
+    try {
+      data = await lerTodasAsPaginas<any>((de, ate) => {
+        let query = db.from('atas_registro_preco').select('*');
+        if (codigoUasg) query = query.eq(colunaDaUasgDaAta(codigoUasg), codigoUasg);
+        if (numeroAta) query = query.ilike('numero_ata', `%${numeroAta}%`);
+        return query.order('id').range(de, ate);
+      });
+    } catch (e) {
+      error = e;
     }
-    if (numeroAta) {
-      query = query.ilike('numero_ata', `%${numeroAta}%`);
-    }
-
-    const { data, error } = await query;
 
     if (!error && data && data.length > 0) {
       const arps: ArpRecord[] = data.map((d: DbAta) => ({
@@ -161,13 +166,19 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
   }
 
   try {
-    let query = supabase.from('atas_registro_preco').select('*, itens_ata(*)');
-
-    if (uasg) {
-      query = query.eq(colunaDaUasgDaAta(uasg), uasg);
+    // Todas as páginas, em ordem fixa (o PostgREST corta em mil atas; os itens vêm dentro de cada ata).
+    const db = supabase;
+    let data: any[] | null = null;
+    let error: unknown = null;
+    try {
+      data = await lerTodasAsPaginas<any>((de, ate) => {
+        let query = db.from('atas_registro_preco').select('*, itens_ata(*)');
+        if (uasg) query = query.eq(colunaDaUasgDaAta(uasg), uasg);
+        return query.order('id').range(de, ate);
+      });
+    } catch (e) {
+      error = e;
     }
-
-    const { data, error } = await query;
 
     if (!error && data && data.length > 0) {
       const itemsByAta: Record<string, ArpItemRecord[]> = {};
@@ -296,11 +307,10 @@ export async function fetchEstadoAtasNoBanco(uasg: string): Promise<Map<string, 
   const estado = new Map<string, EstadoAtaNoBanco>();
   if (!isSupabaseConfigured || !supabase) return estado;
   try {
-    const { data, error } = await supabase
-      .from('atas_registro_preco')
-      .select('numero_ata, processo_compra, itens_ata(ultimo_sync_em)')
-      .eq('codigo_uasg', uasg);
-    if (error) throw error;
+    const db = supabase;
+    const data = await lerTodasAsPaginas<any>((de, ate) =>
+      db.from('atas_registro_preco').select('numero_ata, processo_compra, itens_ata(ultimo_sync_em)').eq('codigo_uasg', uasg).order('id').range(de, ate)
+    );
     for (const linha of (data ?? []) as Array<{ numero_ata: string; processo_compra: string | null; itens_ata: Array<{ ultimo_sync_em: string | null }> | null }>) {
       const lidos = (linha.itens_ata ?? []).map((i) => i.ultimo_sync_em).filter((t): t is string => Boolean(t)).sort();
       estado.set(linha.numero_ata, { itens: linha.itens_ata?.length ?? 0, itensLidosEmMaisAntigo: lidos[0] ?? null, processoCompra: linha.processo_compra ?? null });
@@ -377,62 +387,6 @@ export interface EmpenhoDetail {
 }
 
 /**
- * Consulta detalhes de Empenhos e Contratos associados a uma Ata no Supabase
- */
-export async function fetchEmpenhoDetailsFromDb(numeroAta: string, uasg: string): Promise<EmpenhoDetail[]> {
-  if (!isSupabaseConfigured || !supabase) return [];
-
-  try {
-    const { data: ataData } = await supabase
-      .from('atas_registro_preco')
-      .select('id')
-      .eq('numero_ata', numeroAta)
-      .eq('codigo_uasg', uasg)
-      .maybeSingle();
-
-    if (!ataData) return [];
-
-    const { data: itensData } = await supabase
-      .from('itens_ata')
-      .select('id')
-      .eq('ata_id', ataData.id);
-
-    if (!itensData || itensData.length === 0) return [];
-
-    const itemIds = itensData.map(i => i.id);
-
-    const { data: alocacoes } = await supabase
-      .from('alocacoes_internas')
-      .select(`
-        id,
-        unidade_nome,
-        quantidade_empenhada,
-        numero_empenho,
-        data_empenho,
-        processo_sei_id,
-        processos_sei ( numero_processo_sei )
-      `)
-      .in('item_id', itemIds);
-
-    if (alocacoes && alocacoes.length > 0) {
-      return alocacoes
-        .filter((a: any) => a.numero_empenho || a.quantidade_empenhada > 0)
-        .map((a: any) => ({
-          numeroEmpenho: a.numero_empenho || '',
-          dataEmpenho: a.data_empenho || '',
-          numeroProcessoSei: a.processos_sei?.numero_processo_sei || '',
-          unidadeNome: a.unidade_nome || '',
-          quantidadeEmpenhada: Number(a.quantidade_empenhada) || 0
-        }));
-    }
-  } catch (error) {
-    console.warn('Erro ao consultar empenhos do Supabase', error);
-  }
-
-  return [];
-}
-
-/**
  * Retorna o conjunto de chaves de Atas (numeroAta-uasg) que possuem empenhos vinculados no Supabase e localStorage
  */
 export async function fetchAtasWithEmpenhosSet(): Promise<Set<string>> {
@@ -440,37 +394,11 @@ export async function fetchAtasWithEmpenhosSet(): Promise<Set<string>> {
 
   if (isSupabaseConfigured && supabase) {
     try {
-      // 1. Consulta alocacoes_internas no Supabase
-      const { data: alocacoes } = await supabase
-        .from('alocacoes_internas')
-        .select(`
-          numero_empenho,
-          quantidade_empenhada,
-          itens_ata (
-            numero_item,
-            atas_registro_preco (
-              numero_ata,
-              codigo_uasg
-            )
-          )
-        `);
-
-      if (alocacoes && alocacoes.length > 0) {
-        alocacoes.forEach((al: any) => {
-          if (al.numero_empenho || Number(al.quantidade_empenhada) > 0) {
-            const ata = al.itens_ata?.atas_registro_preco;
-            if (ata && ata.numero_ata && ata.codigo_uasg) {
-              set.add(`${ata.numero_ata}-${ata.codigo_uasg}`);
-              set.add(`${ata.numero_ata.replace(/^0+/, '')}-${ata.codigo_uasg}`);
-            }
-          }
-        });
-      }
-
-      // 2. Consulta tabela empenho_links no Supabase
-      const { data: empenhoLinks } = await supabase
-        .from('empenho_links')
-        .select('item_key');
+      // Vínculos nota → unidade (empenho_links), todas as páginas em ordem fixa.
+      const db = supabase;
+      const empenhoLinks = await lerTodasAsPaginas<{ item_key: string }>((de, ate) =>
+        db.from('empenho_links').select('item_key').order('id').range(de, ate)
+      );
 
       if (empenhoLinks && empenhoLinks.length > 0) {
         empenhoLinks.forEach((link: any) => {
@@ -521,10 +449,11 @@ export async function fetchAtasWithAllocationsSet(): Promise<Set<string>> {
 
   if (isSupabaseConfigured && supabase) {
     try {
-      // 1. Consulta arp_allocations (tabela de alocações internas por item_key)
-      const { data: arpAllocations } = await supabase
-        .from('arp_allocations')
-        .select('item_key');
+      // Alocações às unidades (arp_allocations), todas as páginas em ordem fixa.
+      const db = supabase;
+      const arpAllocations = await lerTodasAsPaginas<{ item_key: string }>((de, ate) =>
+        db.from('arp_allocations').select('item_key').order('id').range(de, ate)
+      );
 
       if (arpAllocations && arpAllocations.length > 0) {
         arpAllocations.forEach((alloc: any) => {
@@ -536,32 +465,6 @@ export async function fetchAtasWithAllocationsSet(): Promise<Set<string>> {
             if (numAta && uasg) {
               set.add(`${numAta}-${uasg}`);
               set.add(`${numAta.replace(/^0+/, '')}-${uasg}`);
-            }
-          }
-        });
-      }
-
-      // 2. Consulta alocacoes_internas via join com itens_ata
-      const { data: alocacoes } = await supabase
-        .from('alocacoes_internas')
-        .select(`
-          quantidade_alocada,
-          itens_ata (
-            numero_item,
-            atas_registro_preco (
-              numero_ata,
-              codigo_uasg
-            )
-          )
-        `);
-
-      if (alocacoes && alocacoes.length > 0) {
-        alocacoes.forEach((al: any) => {
-          if (Number(al.quantidade_alocada) > 0) {
-            const ata = al.itens_ata?.atas_registro_preco;
-            if (ata && ata.numero_ata && ata.codigo_uasg) {
-              set.add(`${ata.numero_ata}-${ata.codigo_uasg}`);
-              set.add(`${ata.numero_ata.replace(/^0+/, '')}-${ata.codigo_uasg}`);
             }
           }
         });

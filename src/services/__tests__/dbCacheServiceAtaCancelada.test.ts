@@ -7,7 +7,7 @@ const linhas = vi.hoisted(() => [
 ]);
 
 vi.mock('../supabaseClient', () => {
-  const consulta = { eq: () => consulta, ilike: () => consulta, then: (ok: (r: unknown) => unknown) => ok({ data: linhas, error: null }) };
+  const consulta: any = { eq: () => consulta, ilike: () => consulta, order: () => consulta, range: () => consulta, then: (ok: (r: unknown) => unknown) => ok({ data: linhas, error: null }) };
   return {
     isSupabaseConfigured: true,
     ehServidor: false,

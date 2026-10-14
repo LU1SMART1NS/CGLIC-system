@@ -104,7 +104,8 @@ export async function fetchConferenciasDaNota(): Promise<ConferenciaDaNota[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const linhas: any[] = [];
   for (let de = 0; ; de += 1000) {
-    const { data, error } = await supabase.from('v_empenho_conferencia_nota').select('*').range(de, de + 999);
+    // Ordem fixa por nota: sem ela as páginas podem repetir ou pular linhas.
+    const { data, error } = await supabase.from('v_empenho_conferencia_nota').select('*').order('contrato_empenho_id').range(de, de + 999);
     if (error) {
       // Banco sem a migration 121: a fila segue sem a conferência.
       if (rpcInexistente(error) || error.code === '42P01' || error.code === 'PGRST205') return [];
