@@ -48,6 +48,14 @@ export function chaveAvisoQuantitativos(numeroAta: string, uasg: string, numeroI
 }
 
 /**
+ * Ata da CGLIC com alocação feita sem a qtd. da ata assinada (migration 116). Usa o tipo SALDO, por ata; o número de
+ * itens nessa situação entra na chave, então o aviso volta se mais itens forem alocados antes de informar.
+ */
+export function chaveAvisoAtaAssinada(numeroAta: string, uasg: string, itensAlocados: number): string {
+  return `SALDO::${numeroAta}-${uasg}::ATA-ASSINADA-${itensAlocados}`;
+}
+
+/**
  * Vínculo automático desmentido pela fonte que tem trabalho do gestor (migration 112). Usa o tipo SALDO; o contrato, o
  * motivo e o momento em que a marca foi criada entram na chave, então o aviso volta se mudar o motivo ou se a marca
  * for refeita depois de a fonte confirmar o par.

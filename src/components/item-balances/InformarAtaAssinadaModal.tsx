@@ -2,6 +2,7 @@ import React from 'react';
 import { ActionButton, AppButton, AppInput, AppTextarea, Modal, NoticeBar, StatusBadge, useToast } from '../../design-system';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import { fetchNomeUasg } from '../../services/api';
+import { fetchQuantitativosDoItem } from '../../services/quantitativosService';
 import { documentoSeiValido } from '../../utils/quantitativos';
 import { formatNumber } from './itemBalanceUtils';
 
@@ -110,6 +111,16 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
       });
       toast.success(corrigir ? 'Quantidades da ata assinada corrigidas.' : 'Quantidades da ata assinada informadas.');
       onFechar();
+      // A cota própria sai das regras do banco (remanejamentos, "continua do órgão"): só depois de gravar dá para
+      // saber se ficou abaixo do que já estava alocado. A gravação vale; o gestor de saldo recebe o aviso (migration 116).
+      void fetchQuantitativosDoItem(itemKey).then((q) => {
+        if (q.informado && q.alocado > q.cotaPropria) {
+          toast.show(
+            `A cota própria da SENASP ficou em ${formatNumber(q.cotaPropria)}, abaixo dos ${formatNumber(q.alocado)} já alocados às unidades internas. O gestor de saldo recebe o aviso para diminuir ${formatNumber(q.alocado - Math.max(q.cotaPropria, 0))} na alocação.`,
+            'warning'
+          );
+        }
+      }).catch(() => undefined);
     } catch (err: any) {
       setErro(err?.message || 'Não foi possível gravar as quantidades.');
     }

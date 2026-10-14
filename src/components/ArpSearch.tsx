@@ -93,13 +93,15 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   const nivelCounts = useMemo(() => {
     const alocacao: Partial<Record<NivelAtendimento, number>> = {};
     const empenho: Partial<Record<NivelAtendimento, number>> = {};
+    const ataAssinada: Partial<Record<'A_INFORMAR' | 'INFORMADA', number>> = {};
     for (const arp of scopedArps) {
       if (!matchesStatusFilter(getArpPrazo(arp).faixa, filterState.statusVigencia)) continue;
       const execucao = resumoPorAta.get(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`);
       if (execucao?.nivelAlocacao) alocacao[execucao.nivelAlocacao] = (alocacao[execucao.nivelAlocacao] ?? 0) + 1;
       if (execucao?.nivelEmpenho) empenho[execucao.nivelEmpenho] = (empenho[execucao.nivelEmpenho] ?? 0) + 1;
+      if (execucao?.ataAssinada) ataAssinada[execucao.ataAssinada.situacao] = (ataAssinada[execucao.ataAssinada.situacao] ?? 0) + 1;
     }
-    return { alocacao, empenho };
+    return { alocacao, empenho, ataAssinada };
   }, [scopedArps, resumoPorAta, filterState.statusVigencia]);
 
   // Quantas atas da situação escolhida cairiam em cada papel da SENASP (contagem no menu do filtro).
@@ -129,6 +131,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       // 3. Empenho
       if (!passaFiltroNivel(execucao?.nivelEmpenho ?? null, filterState.filtroEmpenho)) return false;
       if (filterState.unidade !== TODAS_UNIDADES && !execucao?.unidades.has(filterState.unidade)) return false;
+      // Qtd. da ata assinada (migration 116): ata em que informar não muda nada (adesão, só a SENASP) fica de fora.
+      if (filterState.ataAssinada !== 'TODOS' && execucao?.ataAssinada?.situacao !== filterState.ataAssinada) return false;
 
       // 4. Papel da SENASP (gerenciada pela CGLIC ou de outro órgão)
       if (!passaFiltroPapel(arp, filterState.papel)) return false;
@@ -239,6 +243,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         unidades={unidades}
         alocacaoCounts={nivelCounts.alocacao}
         empenhoCounts={nivelCounts.empenho}
+        ataAssinadaCounts={nivelCounts.ataAssinada}
         papelCounts={papelCounts}
         showGestorFilter={showGestorFilter}
         onChangeFilter={handleFilterChange}

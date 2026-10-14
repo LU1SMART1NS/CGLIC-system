@@ -65,6 +65,9 @@ export type DashboardAttentionCategory =
   /** Quantitativos do item a conferir: cota própria negativa, órgão fora da ata assinada, soma que não fecha ou
    *  participante com contratado acima do registrado (migration 109). Pendência do gestor de saldo. */
   | 'QUANTITATIVOS'
+  /** Ata da CGLIC com item alocado antes de informar a qtd. da ata assinada, com outros órgãos registrados: o limite
+   *  é provisório (migration 116). Pendência do gestor da ata e do coordenador. */
+  | 'ATA_ASSINADA'
   | 'LEMBRETE';
 
 export type DashboardAttentionSeverity = 'CRITICA' | 'URGENTE' | 'ATENCAO' | 'INFO';

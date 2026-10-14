@@ -66,3 +66,28 @@ export const CarteiraUnidadeSelect: React.FC<UnidadeSelectProps> = ({ value, uni
     <CarteiraFilterButton label="Unidade" value={value} emptyValue={TODAS_UNIDADES} options={options} onChange={onChange} testId={testId} />
   );
 };
+
+/** Filtro "Qtd. assinada" (migration 116): atas com a quantidade da ata assinada a informar ou já informada. */
+export type FiltroAtaAssinada = 'TODOS' | 'A_INFORMAR' | 'INFORMADA';
+export const FILTRO_ATA_ASSINADA_VALUES: readonly FiltroAtaAssinada[] = ['TODOS', 'A_INFORMAR', 'INFORMADA'];
+
+interface AtaAssinadaSelectProps {
+  value: FiltroAtaAssinada;
+  onChange: (value: FiltroAtaAssinada) => void;
+  testId: string;
+  counts?: Partial<Record<Exclude<FiltroAtaAssinada, 'TODOS'>, number>>;
+}
+
+export const CarteiraAtaAssinadaSelect: React.FC<AtaAssinadaSelectProps> = ({ value, onChange, testId, counts }) => (
+  <CarteiraFilterButton
+    label="Qtd. assinada"
+    value={value}
+    emptyValue="TODOS"
+    options={[
+      { value: 'A_INFORMAR', label: 'A informar', count: counts?.A_INFORMAR },
+      { value: 'INFORMADA', label: 'Informada', count: counts?.INFORMADA }
+    ]}
+    onChange={(v) => onChange(v as FiltroAtaAssinada)}
+    testId={testId}
+  />
+);

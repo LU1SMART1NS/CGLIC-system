@@ -228,7 +228,7 @@ export const ItensUnidadesPage: React.FC = () => {
   const abrirItem = (r: CarteiraItemRow) => navigate(`${buildAtaItemPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)}?aba=quantitativos`);
   const abrirAta = (r: CarteiraItemRow) => navigate(buildAtaPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora));
   const alocar = (r: CarteiraItemRow) =>
-    setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp });
+    setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp, limiteProvisorioOutrosOrgaos: r.limiteProvisorioOutrosOrgaos });
   const estaAberta = (g: GrupoAta) => abertas[g.ataKey] ?? g.achouItem;
   const todasAbertas = paginaAtas.pageItems.length > 0 && paginaAtas.pageItems.every(estaAberta);
   const abrirOuFecharTodas = () =>
