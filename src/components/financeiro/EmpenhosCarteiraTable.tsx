@@ -8,7 +8,7 @@ import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
-import type { EmpenhoCarteiraRow } from '../../services/financeiroCarteiraService';
+import { situacaoRestosAPagar, type EmpenhoCarteiraRow } from '../../services/financeiroCarteiraService';
 import type { ContratoDoFinanceiro } from './useContratosDoFinanceiro';
 import { dataBR } from './financeiroFormat';
 import type { EmpenhosFilterState } from './EmpenhosCarteira';
@@ -30,6 +30,12 @@ interface EmpenhosCarteiraTableProps {
 }
 
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
+
+const ROTULO_RP = {
+  NAO_PROCESSADO: 'resto a pagar não processado',
+  PROCESSADO: 'resto a pagar processado',
+  OS_DOIS: 'restos a pagar processados e não processados'
+} as const;
 
 /** Diferença que vale mostrar entre o pago do Tesouro e a soma das faturas (1% ou R$ 1). */
 const difere = (a: number, b: number) => Math.abs(a - b) > Math.max(1, 0.01 * Math.max(a, b));
@@ -189,6 +195,14 @@ export const EmpenhosCarteiraTable: React.FC<EmpenhosCarteiraTableProps> = ({
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
                         <span>{formatCurrency(row.saldo)}</span>
+                        {(() => {
+                          const rp = situacaoRestosAPagar(row.restosAPagar);
+                          return rp ? (
+                            <span style={{ ...subtle, fontWeight: 600 }} data-testid={`empenhos-rp-${row.numero}`} title="Saldo inscrito em restos a pagar no Tesouro (ano corrente)">
+                              {ROTULO_RP[rp]}
+                            </span>
+                          ) : null;
+                        })()}
                         {(row.liquidadoAPagar ?? 0) > 0.005 && (
                           <span style={{ ...subtle, fontWeight: 600 }} title="Parte do saldo já liquidada no SIAFI, esperando a ordem bancária">
                             {formatCurrency(row.liquidadoAPagar!)} liquidado a pagar
