@@ -1,5 +1,5 @@
 import type { ItemDoContrato } from '../services/itensContratoService';
-import type { DistribuicaoDoEmpenho, ParcelaDoItem, SugestaoDeItem, TipoSugestao } from '../services/distribuicaoEmpenhoService';
+import type { DistribuicaoDoEmpenho, NotaNoSiafi, ParcelaDoItem, SugestaoDeItem, TipoSugestao } from '../services/distribuicaoEmpenhoService';
 
 /** Item do contrato pelo número da compra, como a view v_contrato_itens_numerados agrupa. */
 export interface ItemNumerado {
@@ -41,9 +41,15 @@ export function quantidadeCalculada(p: Pick<ParcelaDoItem, 'valor'>, valorUnitar
   return p.valor != null && p.valor > 0 && valorUnitario && valorUnitario > 0 ? p.valor / valorUnitario : null;
 }
 
-/** Quantidade usada da parcela (como v_contrato_itens_execucao): a informada pelo gestor, senão a calculada. */
-export function quantidadeDaParcela(p: Pick<ParcelaDoItem, 'valor' | 'quantidadeInformada'>, valorUnitario: number | null | undefined): number | null {
-  return p.quantidadeInformada ?? quantidadeCalculada(p, valorUnitario);
+/**
+ * Quantidade usada da parcela (como v_contrato_itens_execucao): a informada pelo gestor, senão a da nota no SIAFI,
+ * senão a calculada pelo valor.
+ */
+export function quantidadeDaParcela(
+  p: Pick<ParcelaDoItem, 'valor' | 'quantidadeInformada'> & { quantidadeNota?: number | null },
+  valorUnitario: number | null | undefined
+): number | null {
+  return p.quantidadeInformada ?? p.quantidadeNota ?? quantidadeCalculada(p, valorUnitario);
 }
 
 /** A quantidade foi digitada por alguém (e não é igual à calculada pelo valor). */
@@ -91,7 +97,10 @@ export function sugestaoCurta(tipo: TipoSugestao | null, sugestao: SugestaoDeIte
 export function rotuloDaSituacao(d: Pick<DistribuicaoDoEmpenho, 'situacao' | 'origem'>): { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' } {
   switch (d.situacao) {
     case 'DISTRIBUIDA':
-      return { label: d.origem === 'AUTO' ? 'Vinculada automaticamente' : d.origem === 'VALOR' ? 'Vinculada pelo valor' : 'Vinculada', variant: 'success' };
+      return {
+        label: d.origem === 'AUTO' ? 'Vinculada automaticamente' : d.origem === 'SIAFI' ? 'Vinculada pela nota' : d.origem === 'VALOR' ? 'Vinculada pelo valor' : 'Vinculada',
+        variant: 'success'
+      };
     case 'A_DISTRIBUIR':
       return { label: 'A vincular', variant: 'warning' };
     case 'REVISAR':
@@ -106,12 +115,45 @@ export function rotuloDaSituacao(d: Pick<DistribuicaoDoEmpenho, 'situacao' | 'or
 /** Quem vinculou a nota aos itens, numa frase curta (Contrato 360). */
 export function textoDaOrigem(d: Pick<DistribuicaoDoEmpenho, 'origem' | 'distribuidoPorNome' | 'distribuidoEm'>, formatarData: (iso: string) => string): string {
   if (d.origem === 'AUTO') return 'Vinculada automaticamente: contrato de um item';
+  if (d.origem === 'SIAFI') return 'Vinculada pela nota no SIAFI';
   if (d.origem === 'VALOR') return 'Vinculada pelo valor da nota';
   return `Vinculada por ${d.distribuidoPorNome || 'usuário'}${d.distribuidoEm ? ` em ${formatarData(d.distribuidoEm)}` : ''}`;
 }
 
-/** Vínculo que o gestor pode editar ou desfazer: o dele e o feito pelo valor (o de contrato de um item, não). */
-export const vinculoEditavel = (d: Pick<DistribuicaoDoEmpenho, 'origem'>) => d.origem === 'USUARIO' || d.origem === 'VALOR';
+/** Vínculo que o gestor pode editar: o dele, o feito pela nota no SIAFI e o feito pelo valor (o de contrato de um item, não). */
+export const vinculoEditavel = (d: Pick<DistribuicaoDoEmpenho, 'origem'>) => d.origem === 'USUARIO' || d.origem === 'VALOR' || d.origem === 'SIAFI';
+
+/** Vínculo que o gestor pode desfazer: o dele e o feito pelo valor. O da nota no SIAFI e o automático se editam. */
+export const vinculoDesfazivel = (d: Pick<DistribuicaoDoEmpenho, 'origem'>) => d.origem === 'USUARIO' || d.origem === 'VALOR';
+
+/** Por que a nota não foi vinculada pelo SIAFI, numa frase curta (fila "A vincular"). */
+export function motivoDaNota(nota: NotaNoSiafi | null | undefined): string | null {
+  if (nota === undefined) return null;
+  if (nota === null) return 'nota ainda não lida no SIAFI';
+  switch (nota.motivo) {
+    case 'QUANTIDADE_QUEBRADA': {
+      const q = nota.itens.find((i) => quantidadeQuebrada(i.quantidade));
+      return q ? `a nota diz ${q.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 4 })} un do item ${q.numeroItem}` : 'a nota tem quantidade quebrada';
+    }
+    case 'SOMA_NAO_FECHA':
+      return 'a soma dos itens da nota não fecha com o valor';
+    case 'LINHA_SEM_ITEM':
+      return 'uma linha da nota não diz o item';
+    case 'NOTA_SEM_ITENS':
+      return 'a nota não tem itens no SIAFI';
+    default:
+      return null;
+  }
+}
+
+/** Quantidades inteiras que a nota diz nos itens do contrato (para começar a janela "Vincular aos itens"). */
+export function quantidadesDaNota(nota: NotaNoSiafi | null | undefined): Map<number, number> {
+  const m = new Map<number, number>();
+  for (const i of nota?.itens ?? []) {
+    if (i.noContrato && i.quantidade > 0 && !quantidadeQuebrada(i.quantidade)) m.set(i.numeroItem, Math.round(i.quantidade));
+  }
+  return m;
+}
 
 /** Por que o vínculo aos itens precisa de atenção, em uma frase. */
 export function motivoDaRevisao(d: DistribuicaoDoEmpenho): string | null {

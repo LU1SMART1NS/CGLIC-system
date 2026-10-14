@@ -6,7 +6,7 @@ import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 import { useFaturasDoContrato, empenhosDaFatura } from '../../hooks/useFaturasDoContrato';
 import { useAcoesDistribuicaoEmpenho, useDistribuicoesEmpenhoContrato } from '../../hooks/useDistribuicaoEmpenhos';
-import type { DistribuicaoDoEmpenho, QuantidadeNoItem } from '../../services/distribuicaoEmpenhoService';
+import type { DistribuicaoDoEmpenho, NotaNoSiafi, QuantidadeNoItem } from '../../services/distribuicaoEmpenhoService';
 import type { FaturaDoContrato } from '../../services/faturasService';
 import type { VinculoDoContrato } from '../../services/itensContratoService';
 import {
@@ -21,6 +21,7 @@ import {
   sugestaoCurta,
   textoDaOrigem,
   textoDaSugestao,
+  vinculoDesfazivel,
   vinculoEditavel,
   type ItemNumerado
 } from '../../utils/distribuicaoEmpenho';
@@ -116,6 +117,74 @@ const SituacaoSincronizacaoEmpenhos: React.FC<{ sync?: SincronizacaoEmpenhosCont
 const brlCurto = (v: number) => formatCurrencyOrDash(v);
 const qtd = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
+/** O que a nota diz no SIAFI (Portal da Transparência): itens, quantidade e preço, comparados com o contrato. */
+export const NotaNoSiafiDaLinha: React.FC<{ nota: NotaNoSiafi; itens: ItemNumerado[]; valorNota: number; numero: string }> = ({ nota, itens, valorNota, numero }) => {
+  const precoDoContrato = new Map(itens.map((i) => [i.numeroItem, i.valorUnitario]));
+  const difere = (n: number, pu: number | null) => {
+    const pc = precoDoContrato.get(n);
+    return pu != null && pc != null && Math.abs(pu - pc) > 0.011;
+  };
+  return (
+    <div data-testid={`empenho-nota-siafi-${numero}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem 0.75rem', fontSize: '0.78rem' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Itens da nota no SIAFI</span>
+        {nota.lidoEm && <span style={{ color: 'var(--text-muted)' }}>lida no Portal da Transparência em {formatDate(nota.lidoEm)}</span>}
+        {nota.precoDiferente && <StatusBadge label="Preço da nota diferente do contrato" variant="neutral" size="sm" dot={false} />}
+      </div>
+      {nota.itens.length === 0 ? (
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>A nota não tem itens no SIAFI.</span>
+      ) : (
+        <div className="table-scroll" style={{ border: '1px solid #e2e8f0', borderRadius: '6px', background: '#ffffff' }}>
+          <table className="ds-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Descrição na nota</th>
+                <th style={{ textAlign: 'right' }}>Quantidade</th>
+                <th style={{ textAlign: 'right' }}>Preço na nota</th>
+                <th style={{ textAlign: 'right' }}>Preço no contrato</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nota.itens.map((i) => (
+                <tr key={i.numeroItem}>
+                  <td style={{ fontWeight: 700 }}>
+                    {i.numeroItem}
+                    {!i.noContrato && <div style={{ fontSize: '0.75rem', color: 'var(--color-danger)', fontWeight: 700 }}>fora do contrato</div>}
+                  </td>
+                  <td style={{ minWidth: '180px', maxWidth: '340px' }}>{i.descricao || '—'}</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{i.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 4 })} un</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{i.valorUnitario == null ? '—' : formatCurrencyOrDash(i.valorUnitario)}</td>
+                  <td
+                    style={{
+                      textAlign: 'right',
+                      whiteSpace: 'nowrap',
+                      fontVariantNumeric: 'tabular-nums',
+                      ...(difere(i.numeroItem, i.valorUnitario) ? { color: 'var(--warning-text, #854d0e)', fontWeight: 700 } : {})
+                    }}
+                  >
+                    {precoDoContrato.get(i.numeroItem) == null ? '—' : formatCurrencyOrDash(precoDoContrato.get(i.numeroItem) as number)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {nota.valorEmDobro && nota.totalSiafi != null && (
+        <NoticeBar tone="info" testId={`empenho-valor-em-dobro-${numero}`}>
+          O Contratos.gov.br informa {formatCurrencyOrDash(valorNota)} para esta nota, e o SIAFI informa {formatCurrencyOrDash(nota.totalSiafi)}. As quantidades vêm do SIAFI.
+        </NoticeBar>
+      )}
+      {nota.precoDiferente && (
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          A quantidade conta normalmente. Se houve reajuste ou apostilamento, confira se está registrado no contrato no Contratos.gov.br.
+        </span>
+      )}
+    </div>
+  );
+};
+
 /** Divisão da nota entre os itens do contrato e as faturas que a citam: o que a setinha da linha abre. */
 export const EmpenhoDetalhe: React.FC<{
   empenho: EmpenhoRow;
@@ -199,7 +268,7 @@ export const EmpenhoDetalhe: React.FC<{
                 {fechada ? 'Editar o vínculo aos itens' : 'Vincular aos itens'}
               </AppButton>
             )}
-            {podeEditar && fechada && vinculoEditavel(d) && (
+            {podeEditar && fechada && vinculoDesfazivel(d) && (
               <ActionButton action="desfazer" size="sm" onClick={() => onDesfazer(d)} isLoading={desfazendo} disabled={desfazendo}>
                 Desfazer
               </ActionButton>
@@ -220,9 +289,10 @@ export const EmpenhoDetalhe: React.FC<{
               {revisao}
             </NoticeBar>
           )}
-          {d.observacao && fechada && (
+          {d.observacao && fechada && d.origem !== 'SIAFI' && (
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Observação: {d.observacao}</span>
           )}
+          {d.notaSiafi && <NotaNoSiafiDaLinha nota={d.notaSiafi} itens={itens} valorNota={d.valorNota} numero={empenho.numero_oficial} />}
           <div className="table-scroll" style={{ border: '1px solid #e2e8f0', borderRadius: '6px', background: '#ffffff' }}>
             <table className="ds-table">
               <thead>

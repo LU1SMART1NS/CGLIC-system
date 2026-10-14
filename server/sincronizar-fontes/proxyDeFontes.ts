@@ -10,7 +10,9 @@ export const DESTINOS_DAS_FONTES: ReadonlyArray<readonly [prefixo: string, desti
   ['/api-pncp/', 'https://pncp.gov.br/'],
   ['/api-contratos-gov/', 'https://contratos.comprasnet.gov.br/'],
   // Tesouro Nacional (STA): ordens bancárias por documento de origem (NP)
-  ['/api-sta/', 'https://sta.api.gov.br/']
+  ['/api-sta/', 'https://sta.api.gov.br/'],
+  // Portal da Transparência (SIAFI): itens de cada nota de empenho; exige a chave, que só o servidor tem
+  ['/api-transparencia/', 'https://api.portaldatransparencia.gov.br/']
 ];
 
 /** Identificação honesta do robô nas fontes oficiais. */

@@ -11,7 +11,7 @@
 
 import { supabase } from './supabaseClient';
 
-export type RecursoSincronizado = 'contratos' | 'atas' | 'saldos_itens' | 'itens_contratos' | 'unidades_itens' | 'atas_participacao' | 'contratos_participantes' | 'empenhos' | 'faturas' | 'ordens_bancarias' | 'cadastro_uasgs';
+export type RecursoSincronizado = 'contratos' | 'atas' | 'saldos_itens' | 'itens_contratos' | 'unidades_itens' | 'atas_participacao' | 'contratos_participantes' | 'empenhos' | 'faturas' | 'ordens_bancarias' | 'cadastro_uasgs' | 'itens_notas_siafi';
 
 /**
  * UASG usada nos recursos que valem para todas as carteiras (ex.: 'saldos_itens', que lê os contratos

@@ -9,7 +9,9 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../hooks/useVinculacaoEmpenhos';
 import { desfazerDistribuicaoEmpenho, vincularEmpenhoAosItens, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
-import { motivoDaRevisao, rotuloDaSituacao, sugestaoCurta, textoDaSugestao } from '../../utils/distribuicaoEmpenho';
+import { motivoDaNota, motivoDaRevisao, rotuloDaSituacao, sugestaoCurta, textoDaSugestao } from '../../utils/distribuicaoEmpenho';
+import { useConferenciasDaNota } from '../../hooks/useConferenciaNota';
+import { ConferirNoContratosGov } from './ConferirNoContratosGov';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../carteira/CarteiraFilterBar';
@@ -42,7 +44,7 @@ interface Filtros {
 const TODOS = 'TODOS';
 const PAGE_SIZE = 20;
 const SCHEMA: CarteiraFilterSchema<Filtros> = {
-  fila: { param: 'fila', default: 'A_VINCULAR', values: ['A_VINCULAR', 'VALOR', 'EQUIPE'] },
+  fila: { param: 'fila', default: 'A_VINCULAR', values: ['A_VINCULAR', 'CONFERIR', 'VALOR', 'EQUIPE'] },
   vigencia: { param: 'vigencia', default: 'VIGENTES', values: ['VIGENTES', 'ENCERRADOS', TODOS] },
   sugestao: { param: 'sugestao', default: TODOS, values: [TODOS, 'UNICA', 'VARIAS', 'NENHUMA'] },
   uasg: { param: 'uasg', default: TODOS },
@@ -58,8 +60,9 @@ const SUGESTAO_LABEL: Record<Exclude<FiltroSugestao, 'TODOS'>, string> = { UNICA
 
 /**
  * Vinculação → Empenhos aos itens: notas de contratos com dois ou mais itens que ainda não foram vinculadas aos
- * itens (a rever primeiro), as que o servidor vinculou pelo valor (para conferir) e as que a equipe vinculou nos
- * últimos dias. A linha abre a mesma janela do Contrato 360; as com sugestão única podem ser vinculadas em lote.
+ * itens (a rever primeiro), as que não batem com o contrato (conferir no Contratos.gov.br), as que o servidor
+ * vinculou pelo valor e as que a equipe vinculou nos últimos dias. As vinculadas pela nota no SIAFI não aparecem.
+ * A linha abre a mesma janela do Contrato 360; as com sugestão única podem ser vinculadas em lote.
  */
 export const EmpenhosItensPage: React.FC = () => {
   const navigate = useNavigateWithOrigin();
@@ -68,6 +71,7 @@ export const EmpenhosItensPage: React.FC = () => {
   const { role } = useAuth();
   const podeVincular = role === 'admin' || role === 'gestor';
   const { data: todas = [], isLoading, isFetching, error, refetch } = useEmpenhosParaVincularAosItens();
+  const { data: conferencias = [] } = useConferenciasDaNota();
   const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
 
@@ -76,6 +80,7 @@ export const EmpenhosItensPage: React.FC = () => {
   const aVincular = useMemo(() => visiveis.filter(aguardaVinculoAosItens), [visiveis]);
   const daEquipe = useMemo(() => visiveis.filter(vinculadaPelaEquipe), [visiveis]);
   const peloValor = useMemo(() => visiveis.filter(vinculadaPeloValor), [visiveis]);
+  const aConferir = useMemo(() => (escopo ? conferencias.filter((c) => escopo.has(c.contractKey)) : conferencias), [conferencias, escopo]);
   const vinculadas = filters.fila !== 'A_VINCULAR';
   const base = filters.fila === 'EQUIPE' ? daEquipe : filters.fila === 'VALOR' ? peloValor : aVincular;
   const gestorDe = (d: DistribuicaoDoEmpenho) => contrato(d.contractKey).gestorNome;
@@ -202,7 +207,7 @@ export const EmpenhosItensPage: React.FC = () => {
       <VinculacaoPageHeader
         title="Empenhos a vincular aos itens"
         subtitle="Notas de empenho de contratos com dois ou mais itens. Cada nota só entra no empenhado do item depois de vinculada aos itens."
-        hint="Notas de contratos de um item só são vinculadas ao item pelo servidor, sem clique, e não aparecem aqui. Em contratos de vários itens o servidor também vincula quando só um item explica o valor da nota; essas ficam em “Vinculadas pelo valor” para conferir."
+        hint="O servidor lê cada nota no SIAFI e a vincula aos itens que ela diz, sem clique; essas não aparecem aqui. Quando a nota e o contrato não batem, a nota vai para “Conferir no Contratos.gov.br”. Quando a nota não diz o item ou a quantidade, ela fica em “A vincular”."
       />
 
       {isBusy ? (
@@ -222,214 +227,226 @@ export const EmpenhosItensPage: React.FC = () => {
             segments={[
               { id: 'EQUIPE', label: 'Vinculadas pela equipe', count: daEquipe.length, dot: VERDE, title: 'Vinculadas aos itens pela equipe nos últimos 30 dias' },
               { id: 'VALOR', label: 'Vinculadas pelo valor', count: peloValor.length, dot: VERDE, title: 'O servidor vinculou porque só um item do contrato explica o valor da nota. Confira.' },
+              { id: 'CONFERIR', label: 'Conferir no Contratos.gov.br', count: aConferir.length, dot: VERMELHO, title: 'A nota no SIAFI e o contrato não batem' },
               { id: 'A_VINCULAR', label: 'A vincular', count: aVincular.length, dot: VERMELHO, title: 'Notas que ainda não entram no empenhado dos itens' }
             ]}
           />
 
-          <CarteiraFilterBar
-            busca={filters.busca}
-            searchPlaceholder="Buscar por empenho, contrato, fornecedor..."
-            onChangeBusca={(v) => setFilter('busca', v)}
-            hasActiveFilters={hasActive}
-            onResetFilters={resetFilters}
-            counter={carteiraCounter(lista.length, base.length, hasActive, 'nota', 'notas')}
-            testIdPrefix="vinc-empenhos"
-          >
-            <CarteiraFilterButton
-              label="Vigência"
-              value={filters.vigencia}
-              emptyValue={TODOS}
-              options={[
-                { value: 'VIGENTES', label: 'Vigentes' },
-                { value: 'ENCERRADOS', label: 'Encerrados' }
-              ]}
-              onChange={(v) => setFilter('vigencia', v)}
-              testId="vinc-empenhos-filter-vigencia"
-            />
-            {filters.fila === 'A_VINCULAR' && (
-              <CarteiraFilterButton
-                label="Sugestão"
-                value={filters.sugestao}
-                emptyValue={TODOS}
-                options={(['UNICA', 'VARIAS', 'NENHUMA'] as const).map((v) => ({ value: v, label: SUGESTAO_LABEL[v], count: base.filter((d) => passaFiltroSugestao(d, v)).length }))}
-                onChange={(v) => setFilter('sugestao', v)}
-                testId="vinc-empenhos-filter-sugestao"
-              />
-            )}
-            <CarteiraFilterButton
-              label="UASG"
-              value={filters.uasg}
-              emptyValue={TODOS}
-              options={[...uasgs.keys()].sort().map((u) => ({ value: u, label: u, count: uasgs.get(u) }))}
-              onChange={(v) => setFilter('uasg', v)}
-              testId="vinc-empenhos-filter-uasg"
-            />
-            {showGestorFilter && <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="vinc-empenhos-filter-gestor" />}
-          </CarteiraFilterBar>
-
-          {podeVincular && selecionadas.length > 0 && (
-            <div
-              role="region"
-              aria-label="Ações em lote"
-              data-testid="vinc-empenhos-selecao"
-              style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', padding: '0.55rem 0.85rem', background: SELECIONADA_BG, border: '1px solid var(--color-info-border)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--color-info-text-strong)' }}
-            >
-              <strong>{plural(selecionadas.length, 'nota selecionada', 'notas selecionadas')}</strong>
-              <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <ActionButton action="limpar" size="sm" onClick={selecao.limpar} />
-                <ActionButton action="vincular" size="sm" onClick={() => setConfirmandoLote(true)} data-testid="vinc-empenhos-lote">
-                  Vincular pela sugestão
-                </ActionButton>
-              </span>
-            </div>
-          )}
-
-          {base.length === 0 ? (
-            <EmptyState
-              title={
-                filters.fila === 'EQUIPE' ? 'Nenhuma nota vinculada pela equipe nos últimos 30 dias.' : filters.fila === 'VALOR' ? 'Nenhuma nota vinculada pelo valor.' : 'Nenhuma nota a vincular aos itens.'
-              }
-              description={
-                filters.fila === 'EQUIPE'
-                  ? 'As notas vinculadas aos itens pela equipe aparecem aqui por 30 dias.'
-                  : filters.fila === 'VALOR'
-                    ? 'Quando só um item do contrato explica o valor de uma nota, o servidor a vincula e ela aparece aqui.'
-                    : 'Todas as notas dos contratos da sua carteira já estão vinculadas aos itens.'
-              }
-              testId="vinc-empenhos-vazio"
-            />
-          ) : lista.length === 0 ? (
-            <CarteiraNoResults title="Nenhuma nota corresponde aos filtros." description="Altere os critérios ou limpe os filtros." onResetFilters={resetFilters} />
+          {filters.fila === 'CONFERIR' ? (
+            <ConferirNoContratosGov linhas={aConferir} contrato={contrato} showGestorFilter={showGestorFilter} podeMarcar={podeVincular} />
           ) : (
-            <div data-testid="vinc-empenhos-table" className="carteira-shell" style={carteiraTableShell}>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {podeVincular && filters.fila === 'A_VINCULAR' && (
-                        <SelecaoHeaderCell chavesDaPagina={chavesDaPagina} selecionadas={selecao.selecionadas} onToggle={() => selecao.alternarVarias(chavesDaPagina)} testId="vinc-empenhos-selecionar-pagina" />
-                      )}
-                      <CarteiraSortHeader label="Empenho" sortKey="empenho" {...sort} />
-                      <CarteiraSortHeader label="Contrato" sortKey="contrato" {...sort} />
-                      <CarteiraSortHeader label="Emissão" sortKey="emissao" {...sort} />
-                      <th style={carteiraTh}>{vinculadas ? 'Itens' : 'Sugestão'}</th>
-                      <CarteiraSortHeader label="Situação" sortKey="situacao" {...sort} />
-                      {showGestorFilter && <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sort} />}
-                      {podeVincular && <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageItems.map((d) => {
-                      const c = contrato(d.contractKey);
-                      const r = rotuloDaSituacao(d);
-                      const marcada = selecao.selecionadas.has(chave(d));
-                      const sugestao = sugestaoCurta(d.sugestaoTipo, d.sugestao);
-                      return (
-                        <tr
-                          key={chave(d)}
-                          data-testid={`vinc-empenhos-row-${d.numeroOficial}`}
-                          className="carteira-row-link"
-                          style={marcada ? { background: SELECIONADA_BG } : undefined}
-                          onClick={abrirAoClicarNaLinha(() => abrirNota(d))}
-                        >
-                          {podeVincular && filters.fila === 'A_VINCULAR' && (
-                            <SelecaoCell checked={marcada} onToggle={() => selecao.alternar(chave(d))} label={`Selecionar ${d.numeroOficial}`} testId={`vinc-empenhos-selecionar-${d.numeroOficial}`} disabled={!entraNoLote(d) || gravandoLote} />
-                          )}
-                          <td data-role="id" style={{ ...carteiraTd, minWidth: '160px' }}>
-                            <CarteiraIdLink onClick={() => abrirNota(d)} label={`${podeVincular ? 'Vincular' : 'Ver'} ${d.numeroOficial}`} title={podeVincular ? 'Vincular esta nota aos itens do contrato' : 'Ver a nota no contrato'}>
-                              {d.numeroOficial}
-                            </CarteiraIdLink>
-                            {d.uasgEmitente && <div style={subtle}>UASG {d.uasgEmitente}</div>}
-                          </td>
-                          <td data-label="Contrato" style={{ ...carteiraTd, minWidth: '180px', maxWidth: '300px' }}>
-                            <AppButton variant="link" size="xs" type="button" onClick={() => abrirContrato(d)} title="Abrir o contrato com esta nota aberta">
-                              {c.numero}
-                            </AppButton>
-                            <div style={carteiraFornecedor} title={c.fornecedorNome}>
-                              {c.fornecedorNome ?? '—'}
-                            </div>
-                            <div style={subtle}>
-                              {plural(d.itensNoContrato, 'item', 'itens')}
-                              {c.expirado ? ' · contrato encerrado' : ''}
-                            </div>
-                          </td>
-                          <td data-label="Emissão" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>{dataBR(d.dataEmissao)}</td>
-                          <td data-label={vinculadas ? 'Itens' : 'Sugestão'} style={carteiraTd}>
-                            {filters.fila === 'VALOR' ? (
-                              <>
-                                <span>{d.parcelas.map((p) => `item ${p.numeroItem}`).join(', ')}</span>
-                                <div style={subtle}>{d.observacao ?? 'só este item explica o valor'}</div>
-                              </>
-                            ) : filters.fila === 'EQUIPE' ? (
-                              <>
-                                <span>{d.parcelas.map((p) => `item ${p.numeroItem}${p.quantidadeInformada != null ? ` · ${p.quantidadeInformada} un` : ''}`).join(', ')}</span>
-                                <div style={subtle}>
-                                  por {d.distribuidoPorNome || 'usuário'}
-                                  {d.distribuidoEm ? ` em ${dataBR(d.distribuidoEm)}` : ''}
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <StatusBadge
-                                  label={temSugestaoUnica(d) ? 'Sugestão' : d.sugestaoTipo === 'VARIAS_POSSIBILIDADES' ? 'Mais de uma' : 'Sem sugestão'}
-                                  variant={temSugestaoUnica(d) ? 'info' : d.sugestaoTipo === 'VARIAS_POSSIBILIDADES' ? 'warning' : 'neutral'}
-                                  size="sm"
-                                  dot={false}
-                                />
-                                {sugestao && (
-                                  <div style={{ ...subtle, whiteSpace: 'nowrap' }} title={textoDaSugestao(d.sugestaoTipo, d.sugestao) ?? undefined}>
-                                    {sugestao.replace(/^sugestão: /, '')}
-                                  </div>
-                                )}
-                              </>
+            <>
+            <CarteiraFilterBar
+              busca={filters.busca}
+              searchPlaceholder="Buscar por empenho, contrato, fornecedor..."
+              onChangeBusca={(v) => setFilter('busca', v)}
+              hasActiveFilters={hasActive}
+              onResetFilters={resetFilters}
+              counter={carteiraCounter(lista.length, base.length, hasActive, 'nota', 'notas')}
+              testIdPrefix="vinc-empenhos"
+            >
+              <CarteiraFilterButton
+                label="Vigência"
+                value={filters.vigencia}
+                emptyValue={TODOS}
+                options={[
+                  { value: 'VIGENTES', label: 'Vigentes' },
+                  { value: 'ENCERRADOS', label: 'Encerrados' }
+                ]}
+                onChange={(v) => setFilter('vigencia', v)}
+                testId="vinc-empenhos-filter-vigencia"
+              />
+              {filters.fila === 'A_VINCULAR' && (
+                <CarteiraFilterButton
+                  label="Sugestão"
+                  value={filters.sugestao}
+                  emptyValue={TODOS}
+                  options={(['UNICA', 'VARIAS', 'NENHUMA'] as const).map((v) => ({ value: v, label: SUGESTAO_LABEL[v], count: base.filter((d) => passaFiltroSugestao(d, v)).length }))}
+                  onChange={(v) => setFilter('sugestao', v)}
+                  testId="vinc-empenhos-filter-sugestao"
+                />
+              )}
+              <CarteiraFilterButton
+                label="UASG"
+                value={filters.uasg}
+                emptyValue={TODOS}
+                options={[...uasgs.keys()].sort().map((u) => ({ value: u, label: u, count: uasgs.get(u) }))}
+                onChange={(v) => setFilter('uasg', v)}
+                testId="vinc-empenhos-filter-uasg"
+              />
+              {showGestorFilter && <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="vinc-empenhos-filter-gestor" />}
+            </CarteiraFilterBar>
+
+            {podeVincular && selecionadas.length > 0 && (
+              <div
+                role="region"
+                aria-label="Ações em lote"
+                data-testid="vinc-empenhos-selecao"
+                style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', padding: '0.55rem 0.85rem', background: SELECIONADA_BG, border: '1px solid var(--color-info-border)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--color-info-text-strong)' }}
+              >
+                <strong>{plural(selecionadas.length, 'nota selecionada', 'notas selecionadas')}</strong>
+                <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <ActionButton action="limpar" size="sm" onClick={selecao.limpar} />
+                  <ActionButton action="vincular" size="sm" onClick={() => setConfirmandoLote(true)} data-testid="vinc-empenhos-lote">
+                    Vincular pela sugestão
+                  </ActionButton>
+                </span>
+              </div>
+            )}
+
+            {base.length === 0 ? (
+              <EmptyState
+                title={
+                  filters.fila === 'EQUIPE' ? 'Nenhuma nota vinculada pela equipe nos últimos 30 dias.' : filters.fila === 'VALOR' ? 'Nenhuma nota vinculada pelo valor.' : 'Nenhuma nota a vincular aos itens.'
+                }
+                description={
+                  filters.fila === 'EQUIPE'
+                    ? 'As notas vinculadas aos itens pela equipe aparecem aqui por 30 dias.'
+                    : filters.fila === 'VALOR'
+                      ? 'Quando só um item do contrato explica o valor de uma nota, o servidor a vincula e ela aparece aqui.'
+                      : 'Todas as notas dos contratos da sua carteira já estão vinculadas aos itens.'
+                }
+                testId="vinc-empenhos-vazio"
+              />
+            ) : lista.length === 0 ? (
+              <CarteiraNoResults title="Nenhuma nota corresponde aos filtros." description="Altere os critérios ou limpe os filtros." onResetFilters={resetFilters} />
+            ) : (
+              <div data-testid="vinc-empenhos-table" className="carteira-shell" style={carteiraTableShell}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {podeVincular && filters.fila === 'A_VINCULAR' && (
+                          <SelecaoHeaderCell chavesDaPagina={chavesDaPagina} selecionadas={selecao.selecionadas} onToggle={() => selecao.alternarVarias(chavesDaPagina)} testId="vinc-empenhos-selecionar-pagina" />
+                        )}
+                        <CarteiraSortHeader label="Empenho" sortKey="empenho" {...sort} />
+                        <CarteiraSortHeader label="Contrato" sortKey="contrato" {...sort} />
+                        <CarteiraSortHeader label="Emissão" sortKey="emissao" {...sort} />
+                        <th style={carteiraTh}>{vinculadas ? 'Itens' : 'Sugestão'}</th>
+                        <CarteiraSortHeader label="Situação" sortKey="situacao" {...sort} />
+                        {showGestorFilter && <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sort} />}
+                        {podeVincular && <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageItems.map((d) => {
+                        const c = contrato(d.contractKey);
+                        const r = rotuloDaSituacao(d);
+                        const marcada = selecao.selecionadas.has(chave(d));
+                        const sugestao = sugestaoCurta(d.sugestaoTipo, d.sugestao);
+                        return (
+                          <tr
+                            key={chave(d)}
+                            data-testid={`vinc-empenhos-row-${d.numeroOficial}`}
+                            className="carteira-row-link"
+                            style={marcada ? { background: SELECIONADA_BG } : undefined}
+                            onClick={abrirAoClicarNaLinha(() => abrirNota(d))}
+                          >
+                            {podeVincular && filters.fila === 'A_VINCULAR' && (
+                              <SelecaoCell checked={marcada} onToggle={() => selecao.alternar(chave(d))} label={`Selecionar ${d.numeroOficial}`} testId={`vinc-empenhos-selecionar-${d.numeroOficial}`} disabled={!entraNoLote(d) || gravandoLote} />
                             )}
-                          </td>
-                          <td data-label="Situação" style={carteiraTd}>
-                            <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
-                            {d.situacao === 'REVISAR' && (
-                              <div style={subtle} title={motivoDaRevisao(d) ?? undefined}>
-                                {d.motivoRevisao === 'VALOR_MUDOU' ? 'valor da nota mudou' : 'item fora do contrato'}
+                            <td data-role="id" style={{ ...carteiraTd, minWidth: '160px' }}>
+                              <CarteiraIdLink onClick={() => abrirNota(d)} label={`${podeVincular ? 'Vincular' : 'Ver'} ${d.numeroOficial}`} title={podeVincular ? 'Vincular esta nota aos itens do contrato' : 'Ver a nota no contrato'}>
+                                {d.numeroOficial}
+                              </CarteiraIdLink>
+                              {d.uasgEmitente && <div style={subtle}>UASG {d.uasgEmitente}</div>}
+                            </td>
+                            <td data-label="Contrato" style={{ ...carteiraTd, minWidth: '180px', maxWidth: '300px' }}>
+                              <AppButton variant="link" size="xs" type="button" onClick={() => abrirContrato(d)} title="Abrir o contrato com esta nota aberta">
+                                {c.numero}
+                              </AppButton>
+                              <div style={carteiraFornecedor} title={c.fornecedorNome}>
+                                {c.fornecedorNome ?? '—'}
                               </div>
-                            )}
-                          </td>
-                          {showGestorFilter && (
-                            <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                              {c.gestorNome ? (
-                                <CarteiraCellFilter descricao={`gestor ${c.gestorNome}`} onFilter={() => setFilter('gestor', c.gestorNome!)}>
-                                  <span>{c.gestorNome}</span>
-                                </CarteiraCellFilter>
+                              <div style={subtle}>
+                                {plural(d.itensNoContrato, 'item', 'itens')}
+                                {c.expirado ? ' · contrato encerrado' : ''}
+                              </div>
+                            </td>
+                            <td data-label="Emissão" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>{dataBR(d.dataEmissao)}</td>
+                            <td data-label={vinculadas ? 'Itens' : 'Sugestão'} style={carteiraTd}>
+                              {filters.fila === 'VALOR' ? (
+                                <>
+                                  <span>{d.parcelas.map((p) => `item ${p.numeroItem}`).join(', ')}</span>
+                                  <div style={subtle}>{d.observacao ?? 'só este item explica o valor'}</div>
+                                </>
+                              ) : filters.fila === 'EQUIPE' ? (
+                                <>
+                                  <span>{d.parcelas.map((p) => `item ${p.numeroItem}${p.quantidadeInformada != null ? ` · ${p.quantidadeInformada} un` : ''}`).join(', ')}</span>
+                                  <div style={subtle}>
+                                    por {d.distribuidoPorNome || 'usuário'}
+                                    {d.distribuidoEm ? ` em ${dataBR(d.distribuidoEm)}` : ''}
+                                  </div>
+                                </>
                               ) : (
-                                <span style={{ color: '#94a3b8' }}>—</span>
+                                <>
+                                  <StatusBadge
+                                    label={temSugestaoUnica(d) ? 'Sugestão' : d.sugestaoTipo === 'VARIAS_POSSIBILIDADES' ? 'Mais de uma' : 'Sem sugestão'}
+                                    variant={temSugestaoUnica(d) ? 'info' : d.sugestaoTipo === 'VARIAS_POSSIBILIDADES' ? 'warning' : 'neutral'}
+                                    size="sm"
+                                    dot={false}
+                                  />
+                                  {sugestao && (
+                                    <div style={{ ...subtle, whiteSpace: 'nowrap' }} title={textoDaSugestao(d.sugestaoTipo, d.sugestao) ?? undefined}>
+                                      {sugestao.replace(/^sugestão: /, '')}
+                                    </div>
+                                  )}
+                                  {motivoDaNota(d.notaSiafi) && (
+                                    <div style={{ ...subtle, color: 'var(--text-muted)' }} data-testid={`vinc-empenhos-motivo-nota-${d.numeroOficial}`}>
+                                      SIAFI: {motivoDaNota(d.notaSiafi)}
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </td>
-                          )}
-                          {podeVincular && (
-                            <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                              {filters.fila === 'VALOR' && (
-                                <ActionButton
-                                  action="desfazer"
-                                  size="sm"
-                                  onClick={() => void naoEEsteItem(d)}
-                                  isLoading={desfazendo === d.contratoEmpenhoId}
-                                  disabled={desfazendo !== null}
-                                  data-testid={`vinc-empenhos-nao-e-${d.numeroOficial}`}
-                                >
-                                  Não é este item
-                                </ActionButton>
-                              )}{' '}
-                              <ActionButton action="vincular" size="sm" onClick={() => setNota(d)} data-testid={`vinc-empenhos-vincular-${d.numeroOficial}`}>
-                                {vinculadas ? 'Editar o vínculo' : 'Vincular aos itens'}
-                              </ActionButton>
+                            <td data-label="Situação" style={carteiraTd}>
+                              <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
+                              {d.situacao === 'REVISAR' && (
+                                <div style={subtle} title={motivoDaRevisao(d) ?? undefined}>
+                                  {d.motivoRevisao === 'VALOR_MUDOU' ? 'valor da nota mudou' : 'item fora do contrato'}
+                                </div>
+                              )}
                             </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            {showGestorFilter && (
+                              <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                                {c.gestorNome ? (
+                                  <CarteiraCellFilter descricao={`gestor ${c.gestorNome}`} onFilter={() => setFilter('gestor', c.gestorNome!)}>
+                                    <span>{c.gestorNome}</span>
+                                  </CarteiraCellFilter>
+                                ) : (
+                                  <span style={{ color: '#94a3b8' }}>—</span>
+                                )}
+                              </td>
+                            )}
+                            {podeVincular && (
+                              <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                {filters.fila === 'VALOR' && (
+                                  <ActionButton
+                                    action="desfazer"
+                                    size="sm"
+                                    onClick={() => void naoEEsteItem(d)}
+                                    isLoading={desfazendo === d.contratoEmpenhoId}
+                                    disabled={desfazendo !== null}
+                                    data-testid={`vinc-empenhos-nao-e-${d.numeroOficial}`}
+                                  >
+                                    Não é este item
+                                  </ActionButton>
+                                )}{' '}
+                                <ActionButton action="vincular" size="sm" onClick={() => setNota(d)} data-testid={`vinc-empenhos-vincular-${d.numeroOficial}`}>
+                                  {vinculadas ? 'Editar o vínculo' : 'Vincular aos itens'}
+                                </ActionButton>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <CarteiraPagination page={currentPage} pageSize={PAGE_SIZE} total={sorted.length} onChange={setPage} testIdPrefix="vinc-empenhos" />
               </div>
-              <CarteiraPagination page={currentPage} pageSize={PAGE_SIZE} total={sorted.length} onChange={setPage} testIdPrefix="vinc-empenhos" />
-            </div>
+            )}
+            </>
           )}
           {isFetching && <span style={subtle}>Atualizando...</span>}
         </>

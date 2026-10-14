@@ -1,3 +1,4 @@
+import { mapNotaSiafi } from '../../../services/distribuicaoEmpenhoService';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { SincronizacaoEmpenhosContrato } from '../../../services/contratoEmpenhosSincronizacaoService';
@@ -338,6 +339,28 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     const html = detalhe(dist({ situacao: 'REVISAR', motivoRevisao: 'ITEM_FORA_DO_CONTRATO', origem: 'USUARIO', parcelas: [{ numeroItem: 99, valor: 800, quantidadeInformada: null }] }));
     expect(html).toContain('item que o contrato não tem mais');
     expect(html).toContain('>Vincular aos itens<');
+  });
+
+  it('vinculada pela nota no SIAFI: mostra os itens da nota, o valor em dobro e deixa editar, sem desfazer', () => {
+    const notaSiafi = mapNotaSiafi({
+      lido_em: '2026-10-14T09:00:00Z',
+      valor_em_dobro: true,
+      total_siafi: 500,
+      itens: [
+        { numero_item: 13, quantidade: 2, valor_unitario: 250, valor_total: 500, descricao: 'PLACA BALISTICA', no_contrato: true },
+        { numero_item: 99, quantidade: 1, valor_unitario: 10, valor_total: 10, descricao: 'OUTRO', no_contrato: false }
+      ]
+    });
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'SIAFI', valorNota: 1000, notaSiafi, parcelas: [{ numeroItem: 13, valor: 500, quantidadeInformada: null, quantidadeNota: 2 }] });
+    const html = detalhe(d, true, [], { onInformarQuantidade: vi.fn() });
+    expect(html).toContain('Vinculada pela nota no SIAFI');
+    expect(html).toContain('Itens da nota no SIAFI');
+    expect(html).toContain('PLACA BALISTICA');
+    expect(html).toContain('fora do contrato');
+    expect(html).toContain('empenho-valor-em-dobro-2022NE000245');
+    expect(html).toContain('Editar o vínculo aos itens');
+    expect(html).not.toContain('>Desfazer<');
+    expect(html).toContain('value="2"');
   });
 
   it('vinculada pelo valor: diz a regra, deixa editar e desfazer', () => {
