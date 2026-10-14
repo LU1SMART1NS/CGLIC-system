@@ -95,7 +95,8 @@ export const ItensPortfolio: React.FC = () => {
       baseRows
         .filter(
           (r) =>
-            passaFiltroNivel(r.nivelAlocacao, filters.filtroAlocacao) && passaFiltroNivel(r.nivelEmpenho, filters.filtroEmpenho)
+            passaFiltroNivel(r.nivelAlocacao, filters.filtroAlocacao) && passaFiltroNivel(r.nivelEmpenho, filters.filtroEmpenho) &&
+            (filters.ataAssinada === 'TODOS' || r.ataAssinada === filters.ataAssinada)
         )
         .sort(
           (a, b) =>
@@ -103,18 +104,20 @@ export const ItensPortfolio: React.FC = () => {
             a.arp.numeroAtaRegistroPreco.localeCompare(b.arp.numeroAtaRegistroPreco) ||
             Number(a.item.numeroItem) - Number(b.item.numeroItem)
         ),
-    [baseRows, filters.filtroAlocacao, filters.filtroEmpenho]
+    [baseRows, filters.filtroAlocacao, filters.filtroEmpenho, filters.ataAssinada]
   );
 
   // Quantos itens (com os demais filtros) cairiam em cada nível de alocação / empenho: contagem no menu do filtro.
   const nivelCounts = useMemo(() => {
     const alocacao: Partial<Record<NivelAtendimento, number>> = {};
     const empenho: Partial<Record<NivelAtendimento, number>> = {};
+    const ataAssinada: Partial<Record<'A_INFORMAR' | 'INFORMADA', number>> = {};
     for (const r of baseRows) {
       alocacao[r.nivelAlocacao] = (alocacao[r.nivelAlocacao] ?? 0) + 1;
       empenho[r.nivelEmpenho] = (empenho[r.nivelEmpenho] ?? 0) + 1;
+      if (r.ataAssinada) ataAssinada[r.ataAssinada] = (ataAssinada[r.ataAssinada] ?? 0) + 1;
     }
-    return { alocacao, empenho };
+    return { alocacao, empenho, ataAssinada };
   }, [baseRows]);
 
   // Faixa da unidade: o que a unidade recebeu, em reais (somar quantidades de itens diferentes não faz sentido).
@@ -203,6 +206,7 @@ export const ItensPortfolio: React.FC = () => {
             unidades={unidades}
             alocacaoCounts={nivelCounts.alocacao}
             empenhoCounts={nivelCounts.empenho}
+            ataAssinadaCounts={nivelCounts.ataAssinada}
             papelCounts={papelCounts}
             showGestorFilter={showGestorFilter}
             onChangeFilter={setFilter}

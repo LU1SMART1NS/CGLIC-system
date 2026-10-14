@@ -72,7 +72,7 @@ import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
-import { quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
+import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
 import { QuantitativosTab } from './item-balances/QuantitativosTab';
 import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOrgaoTab';
@@ -466,6 +466,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Só na ata da SENASP: na ata de outro órgão (migration 114) a base continua o registrado (ou o aprovado na adesão).
   const cotaPropriaInformada = !ataDeOutroOrgao(arp) && quantitativos.informado;
   const baseSaldo = cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty;
+  // Ata da SENASP sem a ata assinada e com outros órgãos registrados: o limite da alocação é provisório (migration 116,
+  // só aviso). Enquanto os quantitativos carregam não avisa, para não piscar.
+  const outrosOrgaosRegistrados = unidades.filter((u) => !isUnidadeSenasp(u, arp.codigoUnidadeGerenciadora) && (Number(u.quantidadeRegistrada) || 0) > 0).length;
+  const limiteProvisorioOutrosOrgaos = !ataDeOutroOrgao(arp) && !quantitativosLoading && !quantitativos.informado ? outrosOrgaosRegistrados : 0;
 
   const handleLinkEmpenho = async (empenhoUnidade: string, departmentId: string) => {
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
@@ -648,6 +652,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         numeroItem: String(item.numeroItem),
         descricao: item.descricaoItem,
         quantitativoSenasp: baseSaldo,
+        limiteProvisorioOutrosOrgaos,
         rotuloLimite: cotaPropriaInformada ? 'Cota própria da SENASP' : papelDoAItem === 'ADESAO' ? 'Quantidade aprovada da SENASP' : papelDoAItem === 'PARTICIPANTE' ? 'Quantidade registrada da SENASP' : undefined
       }}
       totalUG={baseSaldo}

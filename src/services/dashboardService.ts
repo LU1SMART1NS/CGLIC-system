@@ -57,7 +57,7 @@ function chaveDoSaldo(item: any): string {
   return numero ? chaveGestaoAta(numero, item?.codigo_uasg || item?.codigoUasg) : '';
 }
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
-import { chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, chaveAvisoFonte, fetchAvisosResolvidos } from './avisosResolvidosService';
+import { chaveAvisoAtaAssinada, chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, chaveAvisoFonte, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -65,6 +65,7 @@ import { severityFromReajusteRadarNivel, severityFromPaymentStatusPrazo } from '
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
 import { fetchPaymentCyclesForContracts } from '../adapters/paymentCycleRpcAdapter';
 import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
+import { alocadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../utils/ataAssinadaPendente';
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
 
@@ -226,6 +227,17 @@ export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; text
   const motivos: Array<{ chave: string; texto: string; selo: string; critico: boolean }> = [];
   const cota = n(aItem.quantidade_base_senasp);
   if (cota < 0) motivos.push({ chave: `COTA${cota}`, texto: `cota própria negativa (${fmt(cota)}): a SENASP remanejou quantidade de órgãos que não abriram mão`, selo: 'cota negativa', critico: true });
+  // Migration 116: o limite caiu abaixo do que já estava alocado (ata assinada informada, registrado menor na fonte,
+  // adesão reduzida). A janela de alocação só deixa diminuir.
+  const acimaDoLimite = alocadoAcimaDoLimite(aItem);
+  if (acimaDoLimite > 0) {
+    motivos.push({
+      chave: `ALOC${acimaDoLimite}`,
+      texto: `alocado às unidades (${fmt(n(aItem.total_alocado_unidades))}) acima ${limiteComPreposicao(aItem)} (${fmt(Math.max(cota, 0))}): diminua ${fmt(acimaDoLimite)} na alocação`,
+      selo: 'alocado acima',
+      critico: false
+    });
+  }
   const fora = n(aItem.orgaos_fora_da_ata);
   if (fora > 0) motivos.push({ chave: `FORA${fora}`, texto: `${fora} ${fora === 1 ? 'órgão registrado' : 'órgãos registrados'} sem quantidade na ata assinada`, selo: 'fora da ata', critico: false });
   const homologado = n(aItem.quantidade_homologada);
@@ -730,7 +742,7 @@ export function calculateAttentionSummary(params: {
   // 5c. Quantitativos do item a conferir (migration 109): só nos itens com a ata assinada informada. Pendência do
   // gestor de saldo; cota própria negativa é crítica (a SENASP repassou quantidade de órgão que não abriu mão).
   for (const aItem of (arpItems || []) as any[]) {
-    if (!aItem.ata_assinada_informada && !((Number(aItem.gerenciado_pela_gerenciadora) || 0) > 0)) continue;
+    if (!aItem.ata_assinada_informada && !((Number(aItem.gerenciado_pela_gerenciadora) || 0) > 0) && alocadoAcimaDoLimite(aItem) <= 0) continue;
     const motivos = motivosDosQuantitativos(aItem);
     if (motivos.length === 0) continue;
     const numAta = aItem.numero_ata || aItem.numeroAta;
@@ -756,6 +768,46 @@ export function calculateAttentionSummary(params: {
         ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}/itens/${encodeURIComponent(String(numItem))}`
         : undefined,
       badgeLabel: motivos.length === 1 ? motivos[0].selo : `${motivos.length} pontos a conferir`
+    });
+  }
+
+  // 5d. Qtd. da ata assinada a informar (migration 116), uma pendência por ata: só na ata da CGLIC vigente que já tem
+  // item alocado com o limite provisório (outros órgãos registrados e ata assinada não informada). As demais atas sem
+  // a quantidade ficam no filtro "Qtd. assinada" da Carteira › Atas. Pendência do gestor da ata e do coordenador.
+  type AtaProvisoria = { numAta: string; uasg: string; alocados: any[]; comOutros: number; descricao?: string; fornecedor?: string };
+  const provisoriosPorAta = new Map<string, AtaProvisoria>();
+  for (const aItem of (arpItems || []) as any[]) {
+    if (!limiteProvisorio(aItem)) continue;
+    const numAta = aItem.numero_ata || aItem.numeroAta;
+    const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
+    if (!numAta) continue;
+    const chave = `${numAta}-${uasgItem}`;
+    const grupo: AtaProvisoria = provisoriosPorAta.get(chave) ?? { numAta, uasg: uasgItem, alocados: [], comOutros: 0 };
+    grupo.comOutros += 1;
+    if ((Number(aItem.total_alocado_unidades) || 0) > 0) {
+      grupo.alocados.push(aItem);
+      grupo.descricao ??= aItem.descricao_item || aItem.descricaoItem;
+      grupo.fornecedor ??= aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial;
+    }
+    provisoriosPorAta.set(chave, grupo);
+  }
+  for (const [ataKey, g] of provisoriosPorAta) {
+    if (g.alocados.length === 0) continue;
+    const primeiro = [...g.alocados].sort((a, b) => Number(a.numero_item) - Number(b.numero_item))[0];
+    const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+    items.push({
+      id: `ATT-ATA-ASSINADA-${ataKey}`,
+      category: 'ATA_ASSINADA',
+      severity: 'INFO',
+      avisoChave: chaveAvisoAtaAssinada(g.numAta, g.uasg, g.alocados.length),
+      title: 'Informar qtd. da ata assinada',
+      description: `Ata ${g.numAta}: ${plural(g.alocados.length, 'item já alocado', 'itens já alocados')} com limite provisório (registrado da SENASP); ${plural(g.comOutros, 'item', 'itens')} com outros órgãos registrados`,
+      arpKey: ataKey,
+      numeroAta: g.numAta,
+      objetoItem: g.descricao || 'Item de ARP',
+      fornecedorNome: g.fornecedor,
+      targetUrl: `/atas/detalhe/${encodeURIComponent(ataKey)}/itens/${encodeURIComponent(String(primeiro.numero_item ?? primeiro.numeroItem))}?aba=quantitativos`,
+      badgeLabel: 'sem ata assinada'
     });
   }
 

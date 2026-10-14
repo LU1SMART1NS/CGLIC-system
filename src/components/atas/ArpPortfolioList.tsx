@@ -42,7 +42,7 @@ interface ArpPortfolioListProps {
   /** Unidades internas (para exibir o nome da unidade filtrada). */
   unidades?: Array<{ chave: string; nome: string }>;
   /** Filtros ativos: alocação, empenho e unidade ganham uma coluna quando filtrados. */
-  filters?: Pick<ArpPortfolioFilterState, 'filtroAlocacao' | 'filtroEmpenho' | 'unidade'>;
+  filters?: Pick<ArpPortfolioFilterState, 'filtroAlocacao' | 'filtroEmpenho' | 'unidade' | 'ataAssinada'>;
   /** Nome do gestor por número de ata. */
   gestorByAta?: Record<string, string>;
   /** Texto da busca — quando algum item da ata casa com ela, a linha abre já mostrando esse item. */
@@ -125,7 +125,8 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   const colAlocacao = filters != null && filters.filtroAlocacao !== 'TODOS';
   const colEmpenho = filters != null && filters.filtroEmpenho !== 'TODOS';
   const colUnidade = filters != null && filters.unidade !== TODAS_UNIDADES;
-  const totalColunas = 6 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade);
+  const colAtaAssinada = filters != null && filters.ataAssinada !== 'TODOS';
+  const totalColunas = 6 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade) + Number(colAtaAssinada);
 
   if (isLoading && totalAtas === 0) {
     return (
@@ -170,6 +171,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               <CarteiraSortHeader label="Maior consumo" sortKey="consumo" {...sortProps} />
               {colAlocacao && <th style={carteiraTh}>Alocação interna</th>}
               {colEmpenho && <th style={carteiraTh}>Empenho</th>}
+              {colAtaAssinada && <th style={carteiraTh}>Qtd. assinada</th>}
               {colUnidade && <th style={carteiraTh}>Unidade</th>}
               <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sortProps} />
             </tr>
@@ -288,6 +290,15 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         >
                           <CarteiraNivelPill nivel={execucaoPorAta?.get(ataKey)?.nivelEmpenho ?? null} labels={NIVEL_EMPENHO_LABEL} />
                         </CarteiraCellFilter>
+                      </td>
+                    )}
+                    {colAtaAssinada && (
+                      <td data-label="Qtd. assinada" style={{ ...carteiraTd, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                        {(() => {
+                          const a = execucaoPorAta?.get(ataKey)?.ataAssinada;
+                          if (!a) return '—';
+                          return a.total === 1 ? (a.informados === 1 ? 'Informada' : 'A informar') : `${a.informados} de ${a.total} itens informados`;
+                        })()}
                       </td>
                     )}
                     {colUnidade && (

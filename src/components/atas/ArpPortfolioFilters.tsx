@@ -5,6 +5,9 @@ import { TODOS_GESTORES } from '../carteira/carteiraGestor';
 import type { ArpVigenciaFilterOption } from './ArpPortfolioSummary';
 import {
   CarteiraAlocacaoSelect,
+  CarteiraAtaAssinadaSelect,
+  FILTRO_ATA_ASSINADA_VALUES,
+  type FiltroAtaAssinada,
   CarteiraEmpenhoSelect,
   CarteiraUnidadeSelect,
   NIVEL_FILTER_VALUES,
@@ -22,6 +25,8 @@ export interface ArpPortfolioFilterState {
   filtroEmpenho: FiltroNivel;
   /** Unidade interna (nome normalizado; 'TODAS' = sem filtro). */
   unidade: string;
+  /** Qtd. da ata assinada a informar ou informada (migration 116). */
+  ataAssinada: FiltroAtaAssinada;
   /** Nome do gestor ('TODOS' = sem filtro; '__SEM_GESTOR__' = atas sem gestor atribuído). */
   gestor: string;
   /** Papel da SENASP na ata: gerenciada pela CGLIC ou de outro órgão (participante ou adesão, migration 106). */
@@ -34,6 +39,7 @@ export const ARP_FILTER_SCHEMA: CarteiraFilterSchema<ArpPortfolioFilterState> = 
   filtroAlocacao: { param: 'alocacao', default: 'TODOS', values: NIVEL_FILTER_VALUES },
   filtroEmpenho: { param: 'empenho', default: 'TODOS', values: NIVEL_FILTER_VALUES },
   unidade: { param: 'unidade', default: TODAS_UNIDADES },
+  ataAssinada: { param: 'assinada', default: 'TODOS', values: FILTRO_ATA_ASSINADA_VALUES },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   papel: { param: 'papel', default: 'TODOS', values: FILTRO_PAPEL_VALUES },
   busca: { param: 'busca', default: '' }
@@ -44,6 +50,7 @@ export const DEFAULT_ARP_FILTERS: ArpPortfolioFilterState = {
   filtroAlocacao: 'TODOS',
   filtroEmpenho: 'TODOS',
   unidade: TODAS_UNIDADES,
+  ataAssinada: 'TODOS',
   gestor: TODOS_GESTORES,
   papel: 'TODOS',
   busca: ''
@@ -57,6 +64,8 @@ interface ArpPortfolioFiltersProps {
   /** Quantas atas cada nível de alocação / empenho traria (aparece no menu do filtro). */
   alocacaoCounts?: Partial<Record<NivelAtendimento, number>>;
   empenhoCounts?: Partial<Record<NivelAtendimento, number>>;
+  /** Quantas atas cada situação da qtd. da ata assinada traria (aparece no menu do filtro). */
+  ataAssinadaCounts?: Partial<Record<Exclude<FiltroAtaAssinada, 'TODOS'>, number>>;
   /** Quantas atas cada papel da SENASP traria (aparece no menu do filtro). */
   papelCounts?: Partial<Record<Exclude<FiltroPapelSenasp, 'TODOS'>, number>>;
   /** Esconde o seletor de gestor (perfil "gestor", que já vê só as próprias atas). */
@@ -73,6 +82,7 @@ export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
   unidades = [],
   alocacaoCounts,
   empenhoCounts,
+  ataAssinadaCounts,
   papelCounts,
   showGestorFilter = true,
   onChangeFilter,
@@ -111,6 +121,13 @@ export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
         unidades={unidades}
         onChange={(value) => onChangeFilter('unidade', value)}
         testId="arp-filter-unidade"
+      />
+
+      <CarteiraAtaAssinadaSelect
+        value={filters.ataAssinada}
+        onChange={(value) => onChangeFilter('ataAssinada', value)}
+        counts={ataAssinadaCounts}
+        testId="arp-filter-ata-assinada"
       />
 
       <CarteiraPapelSelect

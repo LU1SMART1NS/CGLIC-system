@@ -70,6 +70,7 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   VINCULO_A_CONFERIR: { label: 'Vínculo a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   FONTE_A_CONFERIR: { label: 'Fonte a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   QUANTITATIVOS: { label: 'Quantitativos a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  ATA_ASSINADA: { label: 'Qtd. assinada a informar', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
   PAGAMENTO_PREVISTO: { label: 'Pagamento previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
@@ -147,6 +148,8 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
       return { label: 'Informar unidades', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'QUANTITATIVOS':
       return { label: 'Conferir quantitativos', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'ATA_ASSINADA':
+      return { label: 'Informar qtd. da ata assinada', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'FORNECEDOR_PNCP':
       return { label: item.badgeLabel === 'conferir itens' ? 'Conferir Fornecedor' : 'Indicar Fornecedor', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'FONTE_A_CONFERIR':

@@ -11,6 +11,7 @@ import type { CarteiraItemEmpenho, CarteiraItemLink } from '../services/carteira
 import type { GlobalAllocationRecord } from '../services/allocationService';
 import type { ArpItemRecord, ArpRecord } from '../types';
 import { chaveGestaoAta } from './ataIdentidade';
+import { limiteProvisorio, resumirAtaAssinada, situacaoAtaAssinada, type AtaAssinadaDaAta, type SituacaoAtaAssinada } from './ataAssinadaPendente';
 
 /** Uma linha da aba Itens: o item da ata com prazo da ata, alocação por unidade e empenho. */
 export interface CarteiraItemRow {
@@ -37,6 +38,10 @@ export interface CarteiraItemRow {
   /** Soma das parcelas deste item nas notas vinculadas aos itens dos contratos (em unidades). */
   empenhado: number;
   nivelEmpenho: NivelAtendimento;
+  /** Qtd. da ata assinada do item (migration 116); nula quando informar não muda nada (adesão, só a SENASP registrada). */
+  ataAssinada: SituacaoAtaAssinada | null;
+  /** Outros órgãos registrados quando o limite da alocação é provisório (ata da CGLIC sem a ata assinada); senão 0. */
+  limiteProvisorioOutrosOrgaos: number;
 }
 
 /** Resumo de uma ata a partir dos itens: usado pelos filtros de alocação, empenho e unidade na carteira de Atas. */
@@ -46,6 +51,8 @@ export interface CarteiraAtaExecucao {
   nivelEmpenho: NivelAtendimento | null;
   /** Chaves (normalizadas) das unidades que receberam alguma alocação em itens da ata. */
   unidades: Set<string>;
+  /** Qtd. da ata assinada: itens em que informar importa e quantos já foram informados (nula quando nenhum importa). */
+  ataAssinada: AtaAssinadaDaAta | null;
 }
 
 export interface CarteiraItensInput {
@@ -162,7 +169,9 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
         contratada,
         contratadoSemUnidade: saldo ? Number(saldo.quantidade_contratada_sem_unidade) || 0 : 0,
         empenhado,
-        nivelEmpenho: nivelEmpenho(empenhado, contratada)
+        nivelEmpenho: nivelEmpenho(empenhado, contratada),
+        ataAssinada: saldo ? situacaoAtaAssinada(saldo) : null,
+        limiteProvisorioOutrosOrgaos: saldo && limiteProvisorio(saldo) ? Number(saldo.outros_orgaos_registrados) || 0 : 0
       });
     }
   }
@@ -182,7 +191,8 @@ export function resumirAtas(rows: CarteiraItemRow[]): Map<string, CarteiraAtaExe
       itens: itens.length,
       nivelAlocacao: agregarNivel(itens.map((r) => r.nivelAlocacao)),
       nivelEmpenho: agregarNivel(itens.map((r) => r.nivelEmpenho)),
-      unidades
+      unidades,
+      ataAssinada: resumirAtaAssinada(itens.map((r) => r.ataAssinada))
     });
   }
   return resumo;
