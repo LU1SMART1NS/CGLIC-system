@@ -48,8 +48,24 @@ describe('obCitaFatura', () => {
     expect(obCitaFatura(OBS_NF, '32554104')).toBe(false);
   });
 
+  it('número só de dígitos vale com ou sem zeros à esquerda, dos dois lados', () => {
+    // carta de crédito do contrato 00202/2025: fatura "000003007", OB 2026OB002064 da UG 200330
+    const carta = 'PAGAMENTO DA CARTA DE CREDITO REFERENTE A INVOICE 3007, CONTRATO 202/2025 - FIRMADO COM A EMPRESA SIG SAUER';
+    expect(obCitaFatura(carta, '000003007')).toBe(true);
+    expect(obCitaFatura('PGTO NUM.(S): 000003007, CONTRATO', '3007')).toBe(true);
+    expect(obCitaFatura('PGTO NUM.(S): 6764681, CONTRATO', '006764681')).toBe(true);
+    expect(obCitaFatura('PGTO NUM.(S): 30070, CONTRATO', '000003007')).toBe(false);
+    expect(obCitaFatura('PGTO NUM.(S): 13007, CONTRATO', '000003007')).toBe(false);
+    // o ano do contrato continua fora, mesmo com zeros
+    expect(obCitaFatura(carta, '0002025')).toBe(false);
+    // número com pontuação continua exato
+    expect(obCitaFatura('PGTO NUM.(S): 50.961-0, CONTRATO', '050.961-0')).toBe(false);
+  });
+
   it('número curto, vazio ou observação vazia não contam', () => {
     expect(obCitaFatura('PGTO NUM.: 123, CONTRATO', '123')).toBe(false);
+    expect(obCitaFatura('PGTO NUM.: 123, CONTRATO', '0000123')).toBe(false);
+    expect(obCitaFatura('PGTO NUM.: 0000, CONTRATO', '0000')).toBe(false);
     expect(obCitaFatura(OBS_LISTA, null)).toBe(false);
     expect(obCitaFatura(null, '73469')).toBe(false);
   });
