@@ -33,7 +33,6 @@ import {
   buildFlattenedReportData, 
   generateCustomExcelReport 
 } from '../excelExportService';
-import { saveManualEmpenhos } from '../allocationService';
 import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { ReportExportConfig, ReportDataPayload } from '../../types/reportTypes';
 
@@ -184,8 +183,8 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
 
   it('5. Deve achatar os dados respeitando estritamente os invariantes contábeis de Saldo', async () => {
     const itemKey = '00001/2026-200331-1';
-    // Simula empenho manual salvo
-    await saveManualEmpenhos(itemKey, [
+    // Simula empenho manual antigo guardado no navegador (o relatório ainda lê essa cópia local)
+    localStorage.setItem(`saldoarp-manual-empenhos-${itemKey}`, JSON.stringify([
       {
         id: 'e1',
         numero: '2026NE0001',
@@ -199,7 +198,7 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
         criadoEm: new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       }
-    ], 1);
+    ]));
 
     const payload: ReportDataPayload = {
       atas: [mockAta],
