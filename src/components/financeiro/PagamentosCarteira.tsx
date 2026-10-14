@@ -114,11 +114,13 @@ export const PagamentosCarteira: React.FC = () => {
   const resumo = useMemo(() => {
     const porEtapa = new Map<string, number>();
     let aguardandoOb = 0;
+    const tesouro = { PAGO: 0, PARCIAL: 0, NAO_PAGO: 0 };
     for (const { row, linha } of itens) {
       porEtapa.set(row.etapa, (porEtapa.get(row.etapa) ?? 0) + 1);
       if (row.etapa === 'AGUARDANDO_OB') aguardandoOb += linha.valor;
+      if (row.etapa === 'SEM_CONFIRMACAO' && row.tipo === 'FATURA' && row.fatura.situacaoTesouro) tesouro[row.fatura.situacaoTesouro]++;
     }
-    return { porEtapa, aguardandoOb };
+    return { porEtapa, aguardandoOb, tesouro };
   }, [itens]);
 
   const anos = useMemo(() => {
@@ -225,7 +227,9 @@ export const PagamentosCarteira: React.FC = () => {
                 id: 'CONFERIR',
                 label: 'A conferir',
                 count: nGrupo('CONFERIR'),
-                title: 'Faturas cujo pagamento não dá para confirmar pelas fontes abertas: sem NP no Contratos.gov.br ou com a OB da NP de outra despesa. Confira no SIAFI.'
+                title:
+                  'Faturas cujo pagamento não dá para confirmar pelas fontes abertas: sem NP no Contratos.gov.br ou com a OB da NP de outra despesa. Confira no SIAFI.' +
+                  ` Pelo Tesouro: ${resumo.tesouro.PAGO} com o empenho pago, ${resumo.tesouro.PARCIAL} pago em parte, ${resumo.tesouro.NAO_PAGO} sem pagamento.`
               },
               { id: 'PAGA', label: 'Pagas', count: nGrupo('PAGA'), title: 'Faturas com ordem bancária que confirma o pagamento' },
               { id: TODOS, label: 'Todas', count: itens.length }

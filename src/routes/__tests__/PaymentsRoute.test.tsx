@@ -79,7 +79,15 @@ describe('Financeiro → Pagamentos', () => {
           fatura({ idFatura: 4, numero: 'NF-SEM-NP', dataLiquidacao: '2024-01-31', np: null, situacao: 'Siafi Apropriado', valorLiquido: 9000000 }),
           fatura({
             idFatura: 5, numero: 'NF-OUTRA-DESPESA', dataLiquidacao: '2026-07-17', np: '2026NP000204', situacao: 'Siafi Apropriado',
-            valorLiquido: 283968.84, pagamentoAConferir: true, obsAConferir: '2026OB033585 (BANCO DO BRASIL SA)'
+            valorLiquido: 283968.84, pagamentoAConferir: true, obsAConferir: '2026OB033585 (BANCO DO BRASIL SA)', situacaoTesouro: 'NAO_PAGO'
+          }),
+          fatura({
+            idFatura: 6, numero: 'NF-EMPENHO-PAGO', dataLiquidacao: '2025-03-10', np: '2025NP000104', situacao: 'Siafi Apropriado',
+            valorLiquido: 1000, pagamentoAConferir: true, obsAConferir: '2025OB000643 (CREDOR SEM CADASTRO)', situacaoTesouro: 'PAGO'
+          }),
+          fatura({
+            idFatura: 7, numero: 'NF-EMPENHO-PARCIAL', dataLiquidacao: '2025-03-10', np: '2025NP000105', situacao: 'Siafi Apropriado',
+            valorLiquido: 1000, pagamentoAConferir: true, obsAConferir: '2025OB000644 (BANCO DO BRASIL SA)', situacaoTesouro: 'PARCIAL'
           })
         ]
       ),
@@ -96,7 +104,8 @@ describe('Financeiro → Pagamentos', () => {
     expect(html).toMatch(/Precisa de ação<span[^>]*>1</);
     // Em tramitação: a fatura não liquidada e a liquidada aguardando OB. A conferir: sem NP e OB de outra despesa.
     expect(html).toMatch(/Em tramitação<span[^>]*>2</);
-    expect(html).toMatch(/A conferir<span[^>]*>2</);
+    expect(html).toMatch(/A conferir<span[^>]*>4</);
+    expect(html).toContain('Pelo Tesouro: 1 com o empenho pago, 1 pago em parte, 1 sem pagamento.');
     expect(html).toMatch(/Pagas<span[^>]*>1</);
     expect(html).toContain('data-testid="pagamentos-filter-etapa"');
     expect(html).toContain('Atesto 4512345');
@@ -134,6 +143,18 @@ describe('Financeiro → Pagamentos', () => {
     expect(html).toContain('NF-SEM-NP');
     expect(render('/pagamentos?situacao=PAGA')).not.toContain('NF-OUTRA-DESPESA');
     expect(render('/pagamentos?situacao=TRAMITACAO')).not.toContain('NF-OUTRA-DESPESA');
+  });
+
+  it('a conferir: aviso do Tesouro sobre o empenho na linha; sem o Tesouro, "confira no SIAFI"', () => {
+    const html = render('/pagamentos?situacao=CONFERIR');
+    expect(html).toMatch(/NF-EMPENHO-PAGO[\s\S]*?empenho pago no Tesouro/);
+    expect(html).toMatch(/NF-EMPENHO-PARCIAL[\s\S]*?empenho pago em parte no Tesouro/);
+    expect(html).toMatch(/NF-OUTRA-DESPESA[\s\S]*?empenho sem pagamento no Tesouro/);
+    expect(html).toMatch(/NF-SEM-NP[\s\S]*?confira o pagamento no SIAFI/);
+    // a busca acha pelo aviso
+    const busca = render('/pagamentos?situacao=CONFERIR&busca=empenho%20pago%20no%20Tesouro');
+    expect(busca).toContain('NF-EMPENHO-PAGO');
+    expect(busca).not.toContain('NF-OUTRA-DESPESA');
   });
 
   it('não mostra os quadros antigos de CGOFI nem o fluxo de tramitação', () => {
