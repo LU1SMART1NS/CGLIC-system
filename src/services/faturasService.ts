@@ -109,6 +109,55 @@ export function normalizarFatura(raw: any, contratoIdGov?: string | number | nul
   };
 }
 
+/**
+ * As duas UGs da CGLIC. A fatura só informa a UG contratante, mas a NP pode ter sido emitida (e paga) pela outra:
+ * em 14/10/2026, 82 faturas (R$ 14,4 mi) tinham OB na outra UG citando o número delas.
+ */
+const UG_PAR: Record<string, string> = { '200330': '200331', '200331': '200330' };
+
+/**
+ * A observação da OB cita o número da fatura como palavra inteira ("NUM.(S): 72834, 73469, CONTRATO..."), separada
+ * por espaço, vírgula, ponto e vírgula, dois-pontos ou ponto final. Entre parênteses costuma vir outro documento
+ * ("CONTRATO Nº 99/2024 (32554104)"), por isso não conta. Números com menos de 4 caracteres também não contam:
+ * confundiriam com o número do contrato ou do ano. Mesma regra da
+ * função ob_cita_fatura do banco (migration 119), usada pela view para ligar a OB da outra UG à fatura.
+ */
+export function obCitaFatura(observacao: string | null | undefined, numero: string | null | undefined): boolean {
+  const n = String(numero ?? '').trim().toUpperCase();
+  const obs = String(observacao ?? '').toUpperCase();
+  if (n.length < 4 || !obs) return false;
+  const escapado = n.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
+  return new RegExp(`(^|[\\s,;:])${escapado}($|[\\s,;:]|\\.(\\s|$))`).test(obs);
+}
+
+/**
+ * NPs da UG que já têm pagamento gravado: OB válida na própria UG ou, na outra UG da CGLIC, OB válida da mesma NP
+ * que cita o número de todas as faturas dela. O mesmo número de NP nas duas UGs pode ser documento distinto, por
+ * isso a OB da outra UG só vale quando cita a fatura.
+ */
+export function npsComPagamento(
+  faturas: Array<{ np: string | null; numero: string | null; cancelada: boolean }>,
+  obsValidas: Array<{ ug: string; np: string; observacao: string | null }>,
+  uasg: string
+): Set<string> {
+  const resultado = new Set(obsValidas.filter((o) => o.ug === uasg).map((o) => o.np));
+  const par = UG_PAR[uasg];
+  if (!par) return resultado;
+  const textosDaOutra = new Map<string, string[]>();
+  for (const o of obsValidas) {
+    if (o.ug === par) textosDaOutra.set(o.np, [...(textosDaOutra.get(o.np) ?? []), o.observacao ?? '']);
+  }
+  const numerosPorNp = new Map<string, Array<string | null>>();
+  for (const f of faturas) {
+    if (f.np && !f.cancelada) numerosPorNp.set(f.np, [...(numerosPorNp.get(f.np) ?? []), f.numero]);
+  }
+  for (const [np, numeros] of numerosPorNp) {
+    const textos = textosDaOutra.get(np);
+    if (textos && numeros.every((n) => textos.some((t) => obCitaFatura(t, n)))) resultado.add(np);
+  }
+  return resultado;
+}
+
 export interface OrdemBancariaParaGravar {
   numero: string;
   gestao: string;
@@ -176,9 +225,20 @@ export async function gravarFaturasDoContrato(contractKey: string, faturas: Fatu
   return { gravadas: Number(r?.gravadas ?? 0), removidas: Number(r?.removidas ?? 0), remocao_bloqueada: Number(r?.remocao_bloqueada ?? 0), a_conferir: Number(r?.a_conferir ?? 0) };
 }
 
-export async function gravarOrdensBancarias(ug: string, np: string, ordens: OrdemBancariaParaGravar[]): Promise<number | null> {
+/**
+ * Grava as OBs de uma NP. `registrarConsulta: false` (OBs achadas na outra UG) não marca a NP daquela UG como
+ * consultada: o mesmo número lá pode ser outra NP, que precisa entrar na fila dela.
+ */
+export async function gravarOrdensBancarias(
+  ug: string,
+  np: string,
+  ordens: OrdemBancariaParaGravar[],
+  opts: { registrarConsulta?: boolean } = {}
+): Promise<number | null> {
   if (!isSupabaseConfigured || !supabase) return null;
-  const { data: n, error } = await supabase.rpc('gravar_ordens_bancarias', { p_ug: ug, p_np: np, p_ordens: ordens });
+  const args: Record<string, unknown> = { p_ug: ug, p_np: np, p_ordens: ordens };
+  if (opts.registrarConsulta === false) args.p_registrar_consulta = false;
+  const { data: n, error } = await supabase.rpc('gravar_ordens_bancarias', args);
   if (error) throw mapPostgresErrorToAppError(error);
   return Number(n ?? 0);
 }
@@ -319,25 +379,35 @@ export function filaDeNps(
   return [...nps].filter((np) => ctx.forcar || quando(np) < limite).sort((a, b) => quando(a) - quando(b) || b.localeCompare(a));
 }
 
-/** Busca no Tesouro as OBs das NPs da UG que ainda não têm pagamento gravado. */
+/**
+ * Busca no Tesouro as OBs das NPs da UG que ainda não têm pagamento gravado. Quando a própria UG não tem OB
+ * válida da NP, consulta a outra UG da CGLIC e grava só as OBs cuja observação cita uma fatura da NP.
+ */
 export async function sincronizarOrdensBancariasDaCarteira(uasg: string, opts: OpcoesSincronizacao = {}): Promise<ResultadoSincronizacao> {
   const agora = opts.agora ?? (() => Date.now());
   return executarComReserva(RECURSO_ORDENS_BANCARIAS, uasg, { forcar: opts.forcar, validade: VALIDADE_FATURAS }, async () => {
     const [faturas, obs, consultas] = await Promise.all([
-      lerPaginado<{ np: string | null; data_liquidacao: string | null; cancelada: boolean }>(
+      lerPaginado<{ np: string | null; numero: string | null; data_liquidacao: string | null; cancelada: boolean }>(
         'contrato_faturas',
-        'np, data_liquidacao, cancelada',
+        'np, numero, data_liquidacao, cancelada',
         (q) => q.eq('ug_np', uasg).not('np', 'is', null)
       ),
-      lerPaginado<{ np: string }>('ordens_bancarias', 'np', (q) => q.eq('ug', uasg).eq('cancelada', false)),
+      // As duas UGs: a OB da outra UG que cita as faturas da NP também conta como pagamento.
+      lerPaginado<{ ug: string; np: string; observacao: string | null }>('ordens_bancarias', 'ug, np, observacao', (q) => q.eq('cancelada', false)),
       lerPaginado<{ np: string; consultado_em: string }>('np_consultas', 'np, consultado_em', (q) => q.eq('ug', uasg))
     ]);
-    const fila = filaDeNps(faturas, new Set(obs.map((o) => o.np)), new Map(consultas.map((c) => [c.np, c.consultado_em])), {
+    const fila = filaDeNps(faturas, npsComPagamento(faturas, obs, uasg), new Map(consultas.map((c) => [c.np, c.consultado_em])), {
       agora: agora(),
       forcar: opts.forcar
     });
+    const numerosPorNp = new Map<string, string[]>();
+    for (const f of faturas) {
+      if (f.np && f.numero && !f.cancelada) numerosPorNp.set(f.np, [...(numerosPorNp.get(f.np) ?? []), f.numero]);
+    }
+    const par = UG_PAR[uasg];
 
     let comOb = 0;
+    let naOutraUg = 0;
     let gravadas = 0;
     const erros: string[] = [];
     const { processados, adiados } = await processarComOrcamento(
@@ -350,7 +420,20 @@ export async function sincronizarOrdensBancariasDaCarteira(uasg: string, opts: O
           // paralelo, sobrescreve as somas dos outros (06/10/2026: 309 contadas contra 386 gravadas).
           const gravadasDaNp = (await gravarOrdensBancarias(uasg, np, lista)) ?? 0;
           gravadas += gravadasDaNp;
-          if (lista.some((o) => !o.cancelada)) comOb++;
+          if (lista.some((o) => !o.cancelada)) {
+            comOb++;
+            return;
+          }
+          const numeros = numerosPorNp.get(np) ?? [];
+          if (!par || numeros.length === 0) return;
+          const daOutra = (await fetchOrdensBancariasDaNp(par, np))
+            .map(normalizarOrdemBancaria)
+            .filter((o): o is OrdemBancariaParaGravar => o !== null && !o.cancelada && numeros.some((n) => obCitaFatura(o.observacao, n)));
+          if (daOutra.length === 0) return;
+          const gravadasDaOutra = (await gravarOrdensBancarias(par, np, daOutra, { registrarConsulta: false })) ?? 0;
+          gravadas += gravadasDaOutra;
+          comOb++;
+          naOutraUg++;
         } catch (err) {
           erros.push(`${np}: ${mensagemDeErro(err)}`);
         }
@@ -359,6 +442,7 @@ export async function sincronizarOrdensBancariasDaCarteira(uasg: string, opts: O
     );
 
     const partes = [`${processados} de ${fila.length} NP(s) consultada(s)`, `${comOb} com ordem bancária`, `${gravadas} OB(s) gravada(s)`];
+    if (naOutraUg) partes.push(`${naOutraUg} paga(s) pela UG ${par}`);
     if (erros.length) partes.push(`${erros.length} com falha (ex.: ${erros[0]})`);
     if (adiados) partes.push(`o tempo da execução acabou e ${adiados} NP(s) ficam para a próxima`);
     const mensagem = `${partes.join(', ')}.`;
