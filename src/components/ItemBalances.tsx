@@ -14,9 +14,6 @@ import { useDepartments } from '../hooks/useDepartments';
 import { useItemAllocations } from '../hooks/useItemAllocations';
 import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
 import { useSaveEmpenhoLinks } from '../hooks/useSaveEmpenhoLinks';
-import { useItemManualContracts } from '../hooks/useItemManualContracts';
-import { useDeleteManualContract } from '../hooks/useDeleteManualContract';
-import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLinks';
 import { useItemContractLinks } from '../hooks/useItemContractLinks';
 import { useUnlinkContractFromItem } from '../hooks/useUnlinkContractFromItem';
 import { useDismissedContractSuggestions } from '../hooks/useDismissedContractSuggestions';
@@ -183,22 +180,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const [allocationError, setAllocationError] = useState<string | null>(null);
 
-  const deleteManualContractMutation = useDeleteManualContract();
-
-  const { data: manualContratos = [], refetch: refetchManualContracts } = useItemManualContracts(
-    arp.numeroAtaRegistroPreco,
-    arp.codigoUnidadeGerenciadora,
-    item.numeroItem
-  );
-
-  const { refetch: refetchContractEmpenhoLinks } = useItemContractEmpenhoLinks(
-    arp.numeroAtaRegistroPreco,
-    arp.codigoUnidadeGerenciadora,
-    item.numeroItem
-  );
-
   // Estados Locais de Formulários e Modais (UI State)
-  const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
   const canonicalItemKey = normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
 
   // Contratado por unidade (migration 103): quantidade de cada contrato (fonte, ajuste) e a divisão entre as unidades.
@@ -224,37 +206,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
 
 
-
-  const loadManualData = async () => {
-    try {
-      await Promise.all([
-        refetchManualContracts(),
-        refetchContractEmpenhoLinks()
-      ]);
-    } catch (e) {
-      console.warn('Erro ao recarregar dados manuais:', e);
-    }
-  };
-
-  const handleDeleteManualContrato = async (contratoId: string) => {
-    if (await confirm({ title: 'Excluir contrato manual', message: 'Tem certeza que deseja excluir este contrato manual?', tone: 'danger', confirmLabel: 'Excluir' })) {
-      try {
-        await deleteManualContractMutation.mutateAsync({
-          id: contratoId,
-          itemKey
-        });
-      } catch (err: any) {
-        console.error('Erro ao excluir contrato manual:', err);
-        if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
-        } else if (err?.code === 'CONTRACT_NOT_FOUND' || err?.sqlState === 'P0002') {
-          toast.error('Contrato manual não encontrado ou já excluído.');
-        } else {
-          toast.error(`Erro ao excluir contrato manual: ${err?.message || 'Erro desconhecido'}`);
-        }
-      }
-    }
-  };
 
   const handleUnlinkOfficialContract = async (linkId: string, contractKey?: string, numeroContrato?: string, origem?: string) => {
     if (await confirm({ title: 'Desvincular contrato', message: mensagemDesvincular(numeroContrato || contractKey || '', String(item.numeroItem ?? ''), origem), tone: 'danger', confirmLabel: 'Desvincular' })) {
@@ -347,7 +298,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const handleRefresh = async () => {
     refetchItemNosContratos();
-    loadManualData();
     if (!canEditData) return;
     // Quantitativo SENASP deste item (as demais leituras são em segundo plano).
     syncSenasp({ numeroAta: arp.numeroAtaRegistroPreco, uasg: arp.codigoUnidadeGerenciadora, numeroItem: item.numeroItem });
@@ -673,7 +623,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     />
   );
 
-  const linkedContractsCount = manualContratos.length + enrichedOfficialLinks.length;
+  const linkedContractsCount = enrichedOfficialLinks.length;
   const contractsCount = linkedContractsCount;
 
   return (
@@ -846,7 +796,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                         quantidadeContratada: oc.quantidadeContratada,
                         dataVigenciaFim: oc.dataVigenciaFim,
                         statusVigencia: oc.statusVigencia,
-                        _isManual: false,
                         _isOfficialLink: true,
                         _linkId: oc.linkId,
                         _origem: oc.origem,
@@ -865,8 +814,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                           map.set(canKey, {
                             ...existing,
                             ...c,
-                            _isManual: existing._isManual || c._isManual,
-                            _manualId: existing._manualId || c._manualId,
                             _isOfficialLink: existing._isOfficialLink || c._isOfficialLink,
                             _linkId: existing._linkId || c._linkId,
                             _origem: existing._origem || c._origem,
@@ -883,20 +830,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                       {
                         title: 'Contratos vinculados',
                         list: deduplicateContractsList([
-                          ...officialContractsList,
-                          ...manualContratos.map(mc => ({
-                            numeroContrato: mc.numero,
-                            anoContrato: mc.ano,
-                            uasg: mc.uasg,
-                            orgaoNome: isGerenciadora(mc.uasg) ? 'SENASP / MJSP' : `UASG ${mc.uasg}`,
-                            nomeRazaoSocialFornecedor: mc.fornecedor || item.nomeRazaoSocialFornecedor,
-                            niFornecedor: mc.cnpjFornecedor || item.niFornecedor,
-                            numeroControlePncp: mc.numeroControlePncp,
-                            linkVisualizacao: mc.linkPncp,
-                            tipoUnidade: isGerenciadora(mc.uasg) ? 'GERENCIADORA' : 'PARTICIPANTE',
-                            _isManual: true,
-                            _manualId: mc.id
-                          } as any))
+                          ...officialContractsList
                         ])
                       }
                     ];
@@ -1060,9 +994,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
                                           {c.dataVigenciaFim ? (
                                             <span style={{ color: c.statusVigencia === 'Expirado' ? 'var(--danger)' : 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatDate(c.dataVigenciaFim)}</span>
-                                          ) : !c._isManual ? (
+                                          ) : (
                                             <span style={{ color: 'var(--text-muted)' }}>-</span>
-                                          ) : null}
+                                          )}
                                           {/* Só alertas: contrato vigente mostra apenas a data. */}
                                           {c.dataVigenciaFim && (c.statusVigencia === 'Expirado' || c.statusVigencia === STATUS_A_VENCER) && (
                                             <StatusBadge
@@ -1071,9 +1005,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                               size="sm"
                                               dot={false}
                                             />
-                                          )}
-                                          {c._isManual && (
-                                            <StatusBadge label="Manual" variant="warning" size="sm" dot={false} />
                                           )}
                                           {c._isOfficialLink && <OrigemVinculoBadge origem={c._origem} />}
                                           {c._isOfficialLink && <VinculoAConferirAviso itemKey={canonicalItemKey} contractKey={c.contractKey} formato="selo" />}
@@ -1101,16 +1032,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                               title="Desvincular contrato deste item"
                                             >
                                               <span className="payment-action-label">Desvincular</span>
-                                            </ActionButton>
-                                          )}
-                                          {canEditData && c._isManual && c._manualId && (
-                                            <ActionButton action="excluir"
-                                              size="sm"
-                                              onClick={() => handleDeleteManualContrato(c._manualId)}
-                                              disabled={deleteManualContractMutation.isPending}
-                                              title="Excluir contrato manual"
-                                            >
-                                              <span className="payment-action-label">Excluir</span>
                                             </ActionButton>
                                           )}
                                         </div>
