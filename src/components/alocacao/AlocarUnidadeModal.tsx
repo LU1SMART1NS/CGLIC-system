@@ -312,8 +312,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                   a.podeRemover
                                     ? `Remover a alocação de ${l.unitName}`
                                     : l.contratado > 0
-                                      ? `${l.unitName} tem ${formatNumber(l.contratado)} contratados. Para remover, tire a unidade das divisões dos contratos na aba Contratos e empenhos.`
-                                      : `${l.unitName} tem ${l.vinculados} ${l.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, desvincule os empenhos na aba Contratos e empenhos.`
+                                      ? `${l.unitName} tem ${formatNumber(l.contratado)} contratados. Para remover, a unidade precisa sair antes das divisões dos contratos (feito pelo gestor da ata).`
+                                      : `${l.unitName} tem ${l.vinculados} ${l.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, os empenhos precisam ser desvinculados antes (feito pelo gestor da ata).`
                                 }
                                 onClick={() => remover(l)}
                                 disabled={salvando || !a.podeRemover}

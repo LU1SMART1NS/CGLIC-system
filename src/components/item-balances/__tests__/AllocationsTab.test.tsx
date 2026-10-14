@@ -145,6 +145,9 @@ describe('AllocationsTab', () => {
   it('com contrato a lixeira fica desativada e diz para tirar a unidade das divisões', () => {
     const out = html({ rows: [{ id: 'a1', unitName: 'DSUSP', allocatedQty: 300, contratado: 250, empenhado: 0, vinculados: 0 }] });
     expect(out).toContain('DSUSP tem 250 contratados. Para remover, tire a unidade das divisões dos contratos');
+    const semAba = html({ canInformUnits: false, rows: [{ id: 'a1', unitName: 'DSUSP', allocatedQty: 300, contratado: 250, empenhado: 0, vinculados: 0 }] });
+    expect(semAba).toContain('DSUSP tem 250 contratados. Para remover, o gestor da ata precisa tirar a unidade das divisões dos contratos.');
+    expect(semAba).not.toContain('Contratos e empenhos');
   });
 
   it('avisa do contratado ainda sem unidade e dos contratos a conferir', () => {
@@ -157,13 +160,22 @@ describe('AllocationsTab', () => {
     expect(html()).not.toContain('contratado-sem-unidade');
   });
 
-  it('quem não informa unidades (gestor de saldo) vê o aviso sem botão, pedindo ao gestor da ata', () => {
+  it('quem não informa unidades (gestor de saldo) vê uma linha só, informativa, sem botão nem a aba de contratos', () => {
     const out = html({ canInformUnits: false, contratadoSemUnidade: { quantidade: 4, contratos: 2 }, semUnidade: { empenhado: 34, count: 3 } });
-    expect(out).toContain('<strong>4 un</strong> contratados em 2 contratos ainda estão sem unidade interna');
-    expect(out).toContain('unidade for informada pelo gestor da ata em Contratos e empenhos.');
-    expect(out).not.toContain('Informar unidades em Contratos e empenhos');
-    expect(out).toContain('unidade for escolhida pelo gestor da ata em Contratos e empenhos.');
-    expect(out).not.toContain('Escolher a unidade em Contratos e empenhos');
+    expect(out).toContain('aguardando-gestor-da-ata');
+    expect(out).toContain('Aguardando o gestor da ata: 4 un contratadas e 34 un empenhadas (3 notas) ainda sem unidade interna.');
+    expect(out).toContain('Entram nas unidades quando ele informar.');
+    expect(out).not.toContain('contratado-sem-unidade');
+    expect(out).not.toContain('empenhos-sem-unidade');
+    expect(out).not.toContain('Contratos e empenhos');
+    expect(out).not.toContain('background:var(--color-warning-bg)');
+    // só uma das partes, no singular
+    expect(html({ canInformUnits: false, semUnidade: { empenhado: 5, count: 1 } })).toContain(
+      'Aguardando o gestor da ata: 5 un empenhadas (1 nota) ainda sem unidade interna.'
+    );
+    expect(html({ canInformUnits: false })).not.toContain('aguardando-gestor-da-ata');
+    // quem informa continua com os dois avisos e os botões
+    expect(html({ contratadoSemUnidade: { quantidade: 4, contratos: 2 }, semUnidade: { empenhado: 34, count: 3 } })).not.toContain('aguardando-gestor-da-ata');
   });
 
   it('sem alocações mostra o estado vazio', () => {

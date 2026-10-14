@@ -164,9 +164,9 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
                   iconOnly
                   label={
                     r.contratado > 0
-                      ? `${r.unitName} tem ${formatNumber(r.contratado)} contratados. Para remover, tire a unidade das divisões dos contratos na aba Contratos e empenhos.`
+                      ? `${r.unitName} tem ${formatNumber(r.contratado)} contratados. ${canInformUnits ? 'Para remover, tire a unidade das divisões dos contratos na aba Contratos e empenhos.' : 'Para remover, o gestor da ata precisa tirar a unidade das divisões dos contratos.'}`
                       : r.vinculados > 0
-                        ? `${r.unitName} tem ${r.vinculados} ${r.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, desvincule os empenhos na aba Contratos e empenhos.`
+                        ? `${r.unitName} tem ${r.vinculados} ${r.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. ${canInformUnits ? 'Para remover, desvincule os empenhos na aba Contratos e empenhos.' : 'Para remover, o gestor da ata precisa desvincular os empenhos.'}`
                         : `Excluir a alocação de ${r.unitName}`
                   }
                   size="sm"
@@ -192,21 +192,34 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
         ]}
         progress={{ value: totalAllocated, max: totalUG }}
       >
-        {contratadoSemUnidade.quantidade > 0 && (
+        {canInformUnits && contratadoSemUnidade.quantidade > 0 && (
           <NoticeBar
             testId="contratado-sem-unidade"
             action={
-              canInformUnits ? (
-                <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
-                  Informar unidades em Contratos e empenhos
-                </AppButton>
-              ) : undefined
+              <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
+                Informar unidades em Contratos e empenhos
+              </AppButton>
             }
           >
             <strong>{formatNumber(contratadoSemUnidade.quantidade)} un</strong> contratados
             {contratadoSemUnidade.contratos > 0 ? ` em ${contratadoSemUnidade.contratos} ${contratadoSemUnidade.contratos === 1 ? 'contrato' : 'contratos'}` : ''} ainda
             {contratadoSemUnidade.quantidade === 1 ? ' está' : ' estão'} sem unidade interna. Só {contratadoSemUnidade.quantidade === 1 ? 'entra' : 'entram'} no contratado das unidades depois que a
-            unidade for informada{canInformUnits ? '.' : ' pelo gestor da ata em Contratos e empenhos.'}
+            unidade for informada.
+          </NoticeBar>
+        )}
+        {/* Quem não informa unidades (gestor de saldo, consulta) não tem o que fazer aqui: uma linha só, informativa. */}
+        {!canInformUnits && (contratadoSemUnidade.quantidade > 0 || semUnidade.count > 0) && (
+          <NoticeBar tone="info" testId="aguardando-gestor-da-ata">
+            Aguardando o gestor da ata:{' '}
+            {[
+              contratadoSemUnidade.quantidade > 0 ? `${formatNumber(contratadoSemUnidade.quantidade)} un contratadas` : null,
+              semUnidade.count > 0
+                ? `${formatNumber(semUnidade.empenhado)} un empenhadas (${semUnidade.count} ${semUnidade.count === 1 ? 'nota' : 'notas'})`
+                : null
+            ]
+              .filter(Boolean)
+              .join(' e ')}{' '}
+            ainda sem unidade interna. Entram nas unidades quando ele informar.
           </NoticeBar>
         )}
         {contratosAConferir > 0 && (
@@ -215,20 +228,18 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
             contrato mudou, a soma passa do contrato ou há unidade sem alocação.
           </NoticeBar>
         )}
-        {semUnidade.count > 0 && (
+        {canInformUnits && semUnidade.count > 0 && (
           <NoticeBar
             testId="empenhos-sem-unidade"
             action={
-              canInformUnits ? (
-                <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
-                  Escolher a unidade em Contratos e empenhos
-                </AppButton>
-              ) : undefined
+              <AppButton variant="outline" size="sm" onClick={onGoToContracts}>
+                Escolher a unidade em Contratos e empenhos
+              </AppButton>
             }
           >
             <strong>{semUnidade.count}</strong> {semUnidade.count === 1 ? 'nota vinculada a este item está' : 'notas vinculadas a este item estão'} ({formatNumber(semUnidade.empenhado)} un)
             sem unidade interna. {semUnidade.count === 1 ? 'Só entra' : 'Só entram'} no empenhado das unidades depois que a unidade for
-            escolhida{canInformUnits ? '.' : ' pelo gestor da ata em Contratos e empenhos.'}
+            escolhida.
           </NoticeBar>
         )}
       </SummaryBar>
