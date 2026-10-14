@@ -190,13 +190,20 @@ export async function conferirFornecedorPelaFonte(
   if (!ehServidor || !isSupabaseConfigured || !supabase) return null;
   const fonte = fornecedorDosItens(itensDaFonte);
   if (!fonte) return null;
+  // O registro foi lido no começo da rodada; o coordenador pode ter indicado (ou trocado) o fornecedor depois.
+  // Cada gravação só vale se o registro ainda estiver como foi lido; senão nada muda e a próxima rodada confere.
   if (registro.estado === 'PENDENTE') {
-    const { error } = await supabase.from('atas_fornecedor_pncp').delete().eq('numero_controle_pncp', registro.numeroControlePncp);
+    const { data, error } = await supabase
+      .from('atas_fornecedor_pncp')
+      .delete()
+      .eq('numero_controle_pncp', registro.numeroControlePncp)
+      .eq('estado', 'PENDENTE')
+      .select('numero_controle_pncp');
     if (error) throw error;
-    return 'APAGADO';
+    return (data ?? []).length > 0 ? 'APAGADO' : null;
   }
   const estado: EstadoFornecedorPncp = normalizarIdentificadorFornecedor(registro.fornecedorIdentificador) === fonte.identificador ? 'CONFERIDO' : 'DIVERGENTE';
-  const { error } = await supabase
+  let gravar = supabase
     .from('atas_fornecedor_pncp')
     .update({
       estado,
@@ -205,9 +212,14 @@ export async function conferirFornecedorPelaFonte(
       conferido_em: new Date().toISOString(),
       atualizado_em: new Date().toISOString()
     })
-    .eq('numero_controle_pncp', registro.numeroControlePncp);
+    .eq('numero_controle_pncp', registro.numeroControlePncp)
+    .eq('estado', registro.estado);
+  gravar = registro.fornecedorIdentificador
+    ? gravar.eq('fornecedor_identificador', registro.fornecedorIdentificador)
+    : gravar.is('fornecedor_identificador', null);
+  const { data, error } = await gravar.select('numero_controle_pncp');
   if (error) throw error;
-  return estado;
+  return (data ?? []).length > 0 ? estado : null;
 }
 
 /** Indicações do coordenador (e já conferidas): número de controle da ata → identificador do fornecedor. */
