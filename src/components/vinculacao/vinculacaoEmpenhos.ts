@@ -6,6 +6,9 @@ import { credorDiferenteDoFornecedor } from '../../utils/fornecedorMatch';
 /** Nota que espera a equipe: a vincular ou a rever (as vinculadas automaticamente não entram na fila). */
 export const aguardaVinculoAosItens = (d: DistribuicaoDoEmpenho) => d.situacao === 'A_DISTRIBUIR' || d.situacao === 'REVISAR';
 
+/** Nota que o servidor vinculou porque só um item explica o valor dela (aparece em "Vinculadas pelo valor"). */
+export const vinculadaPeloValor = (d: DistribuicaoDoEmpenho) => d.situacao === 'DISTRIBUIDA' && d.origem === 'VALOR';
+
 /** Nota que a equipe vinculou (aparece em "Vinculadas pela equipe"). */
 export const vinculadaPelaEquipe = (d: DistribuicaoDoEmpenho) => d.situacao === 'DISTRIBUIDA' && d.origem === 'USUARIO';
 

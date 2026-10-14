@@ -54,7 +54,8 @@ describe('Vinculação → Empenhos aos itens', () => {
         nota({ ne: '2024NE000328', sugestao_tipo: 'MULTIPLO_DO_PRECO', sugestao: [{ numero_item: 13, quantidade: 3 }] }),
         nota({ ne: '2024NE000330', situacao: 'REVISAR', motivo_revisao: 'VALOR_MUDOU', valor_na_distribuicao: 9800, origem: 'USUARIO' }),
         nota({ ne: '2026NE000001', contract_key: 'OUTRO' }),
-        nota({ ne: '2024NE000337', situacao: 'DISTRIBUIDA', origem: 'USUARIO', parcelas: [{ numero_item: 43, valor: 14700 }], distribuido_por_nome: 'Maria' })
+        nota({ ne: '2024NE000337', situacao: 'DISTRIBUIDA', origem: 'USUARIO', parcelas: [{ numero_item: 43, valor: 14700 }], distribuido_por_nome: 'Maria' }),
+        nota({ ne: '2024NE000340', situacao: 'DISTRIBUIDA', origem: 'VALOR', parcelas: [{ numero_item: 13, valor: 14700 }], observacao: 'Valor da nota = 3 × preço unitário do item 13.' })
       ],
       isLoading: false,
       isFetching: false,
@@ -74,7 +75,9 @@ describe('Vinculação → Empenhos aos itens', () => {
     expect(html).toContain('vinc-empenhos-selecionar-2024NE000328');
     // A vinculada pela equipe fica no outro segmento.
     expect(html).not.toContain('vinc-empenhos-row-2024NE000337');
+    expect(html).not.toContain('vinc-empenhos-row-2024NE000340');
     expect(html).not.toContain('Distribu');
+    expect(html).toContain('Vinculadas pelo valor');
   });
 
   it('consulta não vê botões nem seleção', () => {
@@ -91,6 +94,18 @@ describe('Vinculação → Empenhos aos itens', () => {
     expect(html).toContain('vinc-empenhos-row-2024NE000337');
     expect(html).toContain('por Maria');
     expect(html).toContain('Editar o vínculo');
+    expect(html).not.toContain('vinc-empenhos-row-2024NE000340');
+  });
+
+  it('segmento "Vinculadas pelo valor" mostra a regra e deixa desfazer', () => {
+    const html = render(<EmpenhosItensPage />, '/?fila=VALOR');
+    expect(html).toContain('vinc-empenhos-row-2024NE000340');
+    expect(html).toContain('item 13');
+    expect(html).toContain('Valor da nota = 3 × preço unitário do item 13.');
+    expect(html).toContain('vinc-empenhos-nao-e-2024NE000340');
+    expect(html).toContain('Editar o vínculo');
+    expect(html).not.toContain('vinc-empenhos-row-2024NE000337');
+    expect(html).not.toContain('vinc-empenhos-selecionar-');
   });
 });
 

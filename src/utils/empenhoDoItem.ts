@@ -1,4 +1,4 @@
-import type { DistribuicaoDoEmpenho } from '../services/distribuicaoEmpenhoService';
+import type { DistribuicaoDoEmpenho, OrigemDoVinculo } from '../services/distribuicaoEmpenhoService';
 import { quantidadeCalculada, quantidadeFoiInformada } from './distribuicaoEmpenho';
 
 /**
@@ -27,7 +27,7 @@ export interface ParcelaDoItem {
   informada: boolean;
   /** O valor da nota mudou depois do vínculo: as quantidades continuam contando, mas pedem conferência. */
   valorMudou: { antes: number; agora: number } | null;
-  origem: 'AUTO' | 'USUARIO' | null;
+  origem: OrigemDoVinculo | null;
   vinculadaPorNome: string | null;
   vinculadaEm: string | null;
 }

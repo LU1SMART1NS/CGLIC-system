@@ -4,11 +4,11 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import { ActionButton, AppButton, AppTextarea, Modal, StatusBadge, useToast, AvisoCarregando } from '../../design-system';
+import { ActionButton, AppButton, AppTextarea, Modal, StatusBadge, useToast, useConfirm, AvisoCarregando } from '../../design-system';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../hooks/useVinculacaoEmpenhos';
-import { vincularEmpenhoAosItens, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
+import { desfazerDistribuicaoEmpenho, vincularEmpenhoAosItens, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
 import { motivoDaRevisao, rotuloDaSituacao, sugestaoCurta, textoDaSugestao } from '../../utils/distribuicaoEmpenho';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
@@ -28,7 +28,7 @@ import { useContratosDoFinanceiro, uasgDaChave } from '../financeiro/useContrato
 import { dataBR, normalizarBusca } from '../financeiro/financeiroFormat';
 import { VinculacaoPageHeader } from './VinculacaoPageHeader';
 import { VincularAosItensDialog } from './VincularAosItensDialog';
-import { aguardaVinculoAosItens, entraNoLote, ordenarFila, passaFiltroSugestao, temSugestaoUnica, vinculadaPelaEquipe, type FiltroSugestao } from './vinculacaoEmpenhos';
+import { aguardaVinculoAosItens, entraNoLote, ordenarFila, passaFiltroSugestao, temSugestaoUnica, vinculadaPelaEquipe, vinculadaPeloValor, type FiltroSugestao } from './vinculacaoEmpenhos';
 
 interface Filtros {
   fila: string;
@@ -42,7 +42,7 @@ interface Filtros {
 const TODOS = 'TODOS';
 const PAGE_SIZE = 20;
 const SCHEMA: CarteiraFilterSchema<Filtros> = {
-  fila: { param: 'fila', default: 'A_VINCULAR', values: ['A_VINCULAR', 'EQUIPE'] },
+  fila: { param: 'fila', default: 'A_VINCULAR', values: ['A_VINCULAR', 'VALOR', 'EQUIPE'] },
   vigencia: { param: 'vigencia', default: 'VIGENTES', values: ['VIGENTES', 'ENCERRADOS', TODOS] },
   sugestao: { param: 'sugestao', default: TODOS, values: [TODOS, 'UNICA', 'VARIAS', 'NENHUMA'] },
   uasg: { param: 'uasg', default: TODOS },
@@ -58,8 +58,8 @@ const SUGESTAO_LABEL: Record<Exclude<FiltroSugestao, 'TODOS'>, string> = { UNICA
 
 /**
  * Vinculação → Empenhos aos itens: notas de contratos com dois ou mais itens que ainda não foram vinculadas aos
- * itens (a rever primeiro) e as que a equipe vinculou nos últimos dias. A linha abre a mesma janela do Contrato
- * 360; as com sugestão única podem ser vinculadas em lote.
+ * itens (a rever primeiro), as que o servidor vinculou pelo valor (para conferir) e as que a equipe vinculou nos
+ * últimos dias. A linha abre a mesma janela do Contrato 360; as com sugestão única podem ser vinculadas em lote.
  */
 export const EmpenhosItensPage: React.FC = () => {
   const navigate = useNavigateWithOrigin();
@@ -75,7 +75,9 @@ export const EmpenhosItensPage: React.FC = () => {
   const visiveis = useMemo(() => (escopo ? todas.filter((d) => escopo.has(d.contractKey)) : todas), [todas, escopo]);
   const aVincular = useMemo(() => visiveis.filter(aguardaVinculoAosItens), [visiveis]);
   const daEquipe = useMemo(() => visiveis.filter(vinculadaPelaEquipe), [visiveis]);
-  const base = filters.fila === 'EQUIPE' ? daEquipe : aVincular;
+  const peloValor = useMemo(() => visiveis.filter(vinculadaPeloValor), [visiveis]);
+  const vinculadas = filters.fila !== 'A_VINCULAR';
+  const base = filters.fila === 'EQUIPE' ? daEquipe : filters.fila === 'VALOR' ? peloValor : aVincular;
   const gestorDe = (d: DistribuicaoDoEmpenho) => contrato(d.contractKey).gestorNome;
 
   const uasgs = useMemo(() => {
@@ -100,10 +102,10 @@ export const EmpenhosItensPage: React.FC = () => {
       if (q && !normalizarBusca(d.numeroOficial).includes(q) && !normalizarBusca(c.numero).includes(q) && !normalizarBusca(c.fornecedorNome ?? '').includes(q)) return false;
       return true;
     });
-    return filters.fila === 'EQUIPE'
+    return vinculadas
       ? [...filtradas].sort((a, b) => (b.distribuidoEm ?? '').localeCompare(a.distribuidoEm ?? ''))
       : ordenarFila(filtradas, (d) => d.dataEmissao);
-  }, [base, filters, contrato, showGestorFilter]);
+  }, [base, filters, contrato, showGestorFilter, vinculadas]);
 
   const colunas = useMemo<Record<string, CarteiraSortColumn<DistribuicaoDoEmpenho>>>(
     () => ({
@@ -154,6 +156,33 @@ export const EmpenhosItensPage: React.FC = () => {
     if (erros.length > 0) toast.error(`${plural(erros.length, 'nota não foi vinculada', 'notas não foram vinculadas')}: ${erros.join('; ')}`);
   };
 
+  // "Não é este item": desfaz o vínculo pelo valor; a nota volta para "A vincular" e o servidor não a refaz.
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [desfazendo, setDesfazendo] = useState<string | null>(null);
+  const naoEEsteItem = async (d: DistribuicaoDoEmpenho) => {
+    const ok = await confirm({
+      title: 'Não é este item',
+      message: (
+        <>
+          A nota <strong>{d.numeroOficial}</strong> volta para "A vincular" e sai do empenhado do item até ser vinculada de novo. O sistema não volta a vincular esta nota pelo valor.
+        </>
+      ),
+      confirmLabel: 'Desfazer o vínculo',
+      tone: 'danger'
+    });
+    if (!ok) return;
+    setDesfazendo(d.contratoEmpenhoId);
+    try {
+      await desfazerDistribuicaoEmpenho(d.contratoEmpenhoId);
+      await queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao'] });
+      toast.success(`${d.numeroOficial} voltou para "A vincular".`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível desfazer o vínculo.');
+    } finally {
+      setDesfazendo(null);
+    }
+  };
+
   const abrirContrato = (d: DistribuicaoDoEmpenho) => navigate(`/contratos/${encodeURIComponent(d.contractKey)}?aba=financeiro&abrir=${encodeURIComponent(d.numeroOficial)}`);
   const abrirNota = (d: DistribuicaoDoEmpenho) => (podeVincular ? setNota(d) : abrirContrato(d));
 
@@ -173,7 +202,7 @@ export const EmpenhosItensPage: React.FC = () => {
       <VinculacaoPageHeader
         title="Empenhos a vincular aos itens"
         subtitle="Notas de empenho de contratos com dois ou mais itens. Cada nota só entra no empenhado do item depois de vinculada aos itens."
-        hint="Notas de contratos de um item só são vinculadas ao item pelo servidor, sem clique, e não aparecem aqui."
+        hint="Notas de contratos de um item só são vinculadas ao item pelo servidor, sem clique, e não aparecem aqui. Em contratos de vários itens o servidor também vincula quando só um item explica o valor da nota; essas ficam em “Vinculadas pelo valor” para conferir."
       />
 
       {isBusy ? (
@@ -192,6 +221,7 @@ export const EmpenhosItensPage: React.FC = () => {
             onSelect={(v) => setFilter('fila', v)}
             segments={[
               { id: 'EQUIPE', label: 'Vinculadas pela equipe', count: daEquipe.length, dot: VERDE, title: 'Vinculadas aos itens pela equipe nos últimos 30 dias' },
+              { id: 'VALOR', label: 'Vinculadas pelo valor', count: peloValor.length, dot: VERDE, title: 'O servidor vinculou porque só um item do contrato explica o valor da nota. Confira.' },
               { id: 'A_VINCULAR', label: 'A vincular', count: aVincular.length, dot: VERMELHO, title: 'Notas que ainda não entram no empenhado dos itens' }
             ]}
           />
@@ -256,8 +286,16 @@ export const EmpenhosItensPage: React.FC = () => {
 
           {base.length === 0 ? (
             <EmptyState
-              title={filters.fila === 'EQUIPE' ? 'Nenhuma nota vinculada pela equipe nos últimos 30 dias.' : 'Nenhuma nota a vincular aos itens.'}
-              description={filters.fila === 'EQUIPE' ? 'As notas vinculadas aos itens pela equipe aparecem aqui por 30 dias.' : 'Todas as notas dos contratos da sua carteira já estão vinculadas aos itens.'}
+              title={
+                filters.fila === 'EQUIPE' ? 'Nenhuma nota vinculada pela equipe nos últimos 30 dias.' : filters.fila === 'VALOR' ? 'Nenhuma nota vinculada pelo valor.' : 'Nenhuma nota a vincular aos itens.'
+              }
+              description={
+                filters.fila === 'EQUIPE'
+                  ? 'As notas vinculadas aos itens pela equipe aparecem aqui por 30 dias.'
+                  : filters.fila === 'VALOR'
+                    ? 'Quando só um item do contrato explica o valor de uma nota, o servidor a vincula e ela aparece aqui.'
+                    : 'Todas as notas dos contratos da sua carteira já estão vinculadas aos itens.'
+              }
               testId="vinc-empenhos-vazio"
             />
           ) : lista.length === 0 ? (
@@ -274,7 +312,7 @@ export const EmpenhosItensPage: React.FC = () => {
                       <CarteiraSortHeader label="Empenho" sortKey="empenho" {...sort} />
                       <CarteiraSortHeader label="Contrato" sortKey="contrato" {...sort} />
                       <CarteiraSortHeader label="Emissão" sortKey="emissao" {...sort} />
-                      <th style={carteiraTh}>{filters.fila === 'EQUIPE' ? 'Itens' : 'Sugestão'}</th>
+                      <th style={carteiraTh}>{vinculadas ? 'Itens' : 'Sugestão'}</th>
                       <CarteiraSortHeader label="Situação" sortKey="situacao" {...sort} />
                       {showGestorFilter && <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sort} />}
                       {podeVincular && <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>}
@@ -316,8 +354,13 @@ export const EmpenhosItensPage: React.FC = () => {
                             </div>
                           </td>
                           <td data-label="Emissão" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>{dataBR(d.dataEmissao)}</td>
-                          <td data-label={filters.fila === 'EQUIPE' ? 'Itens' : 'Sugestão'} style={carteiraTd}>
-                            {filters.fila === 'EQUIPE' ? (
+                          <td data-label={vinculadas ? 'Itens' : 'Sugestão'} style={carteiraTd}>
+                            {filters.fila === 'VALOR' ? (
+                              <>
+                                <span>{d.parcelas.map((p) => `item ${p.numeroItem}`).join(', ')}</span>
+                                <div style={subtle}>{d.observacao ?? 'só este item explica o valor'}</div>
+                              </>
+                            ) : filters.fila === 'EQUIPE' ? (
                               <>
                                 <span>{d.parcelas.map((p) => `item ${p.numeroItem}${p.quantidadeInformada != null ? ` · ${p.quantidadeInformada} un` : ''}`).join(', ')}</span>
                                 <div style={subtle}>
@@ -362,8 +405,20 @@ export const EmpenhosItensPage: React.FC = () => {
                           )}
                           {podeVincular && (
                             <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                              {filters.fila === 'VALOR' && (
+                                <ActionButton
+                                  action="desfazer"
+                                  size="sm"
+                                  onClick={() => void naoEEsteItem(d)}
+                                  isLoading={desfazendo === d.contratoEmpenhoId}
+                                  disabled={desfazendo !== null}
+                                  data-testid={`vinc-empenhos-nao-e-${d.numeroOficial}`}
+                                >
+                                  Não é este item
+                                </ActionButton>
+                              )}{' '}
                               <ActionButton action="vincular" size="sm" onClick={() => setNota(d)} data-testid={`vinc-empenhos-vincular-${d.numeroOficial}`}>
-                                {filters.fila === 'EQUIPE' ? 'Editar o vínculo' : 'Vincular aos itens'}
+                                {vinculadas ? 'Editar o vínculo' : 'Vincular aos itens'}
                               </ActionButton>
                             </td>
                           )}
@@ -380,6 +435,7 @@ export const EmpenhosItensPage: React.FC = () => {
         </>
       )}
 
+      {confirmDialog}
       <VincularAosItensDialog nota={nota} numeroContrato={nota ? contrato(nota.contractKey).numero : ''} onFechar={() => setNota(null)} />
 
       <Modal

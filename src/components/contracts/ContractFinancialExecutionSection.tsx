@@ -19,7 +19,9 @@ import {
   quantidadeQuebrada,
   rotuloDaSituacao,
   sugestaoCurta,
+  textoDaOrigem,
   textoDaSugestao,
+  vinculoEditavel,
   type ItemNumerado
 } from '../../utils/distribuicaoEmpenho';
 import { AvisoQuantidade, CampoQuantidadeNota } from '../item-balances/CampoQuantidadeNota';
@@ -151,7 +153,7 @@ export const EmpenhoDetalhe: React.FC<{
 }) => {
   const parcelaDe = new Map((d?.parcelas ?? []).map((p) => [p.numeroItem, p]));
   const fechada = d?.situacao === 'DISTRIBUIDA';
-  const podeDistribuir = podeEditar && d && (d.situacao === 'A_DISTRIBUIR' || d.situacao === 'REVISAR' || (d.situacao === 'DISTRIBUIDA' && d.origem === 'USUARIO'));
+  const podeDistribuir = podeEditar && d && (d.situacao === 'A_DISTRIBUIR' || d.situacao === 'REVISAR' || (d.situacao === 'DISTRIBUIDA' && vinculoEditavel(d)));
   const sugestao = d && !fechada ? textoDaSugestao(d.sugestaoTipo, d.sugestao) : null;
   const revisao = d ? motivoDaRevisao(d) : null;
 
@@ -172,7 +174,7 @@ export const EmpenhoDetalhe: React.FC<{
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem 1.25rem', fontSize: '0.82rem' }}>
             {fechada ? (
               <StatusBadge
-                label={d.origem === 'AUTO' ? 'Vinculada automaticamente: contrato de um item' : `Vinculada por ${d.distribuidoPorNome || 'usuário'}${d.distribuidoEm ? ` em ${formatDate(d.distribuidoEm)}` : ''}`}
+                label={textoDaOrigem(d, formatDate)}
                 variant="info"
                 size="sm"
                 dot={false}
@@ -181,6 +183,11 @@ export const EmpenhoDetalhe: React.FC<{
               <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar o vínculo aos itens' : 'A vincular aos itens'} variant="warning" size="sm" dot={false} />
             )}
             {sugestao && <span style={{ color: 'var(--text-muted)' }}>sugestão: {sugestao}</span>}
+            {fechada && d.origem === 'VALOR' && (
+              <span style={{ color: 'var(--text-muted)' }} data-testid={`empenho-pelo-valor-${empenho.numero_oficial}`}>
+                {d.observacao ?? 'Só um item do contrato explica o valor da nota.'} Se não for este item, desfaça ou edite.
+              </span>
+            )}
             <span style={{ flex: 1 }} />
             {podeDistribuir && (
               <AppButton
@@ -192,7 +199,7 @@ export const EmpenhoDetalhe: React.FC<{
                 {fechada ? 'Editar o vínculo aos itens' : 'Vincular aos itens'}
               </AppButton>
             )}
-            {podeEditar && fechada && d.origem === 'USUARIO' && (
+            {podeEditar && fechada && vinculoEditavel(d) && (
               <ActionButton action="desfazer" size="sm" onClick={() => onDesfazer(d)} isLoading={desfazendo} disabled={desfazendo}>
                 Desfazer
               </ActionButton>
@@ -379,6 +386,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
       message: (
         <>
           A nota <strong>{d.numeroOficial}</strong> volta para "a vincular aos itens" e sai do empenhado dos itens até ser vinculada de novo.
+          {d.origem === 'VALOR' && ' O sistema não volta a vincular esta nota pelo valor.'}
         </>
       ),
       confirmLabel: 'Desfazer',

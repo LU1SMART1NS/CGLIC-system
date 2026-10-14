@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { empenhadoPorItem, itensNumerados, motivoDaRevisao, quantidadeDaParcela, quantidadeFoiInformada, quantidadeQuebrada, rotuloDaSituacao, textoDaSugestao } from '../distribuicaoEmpenho';
+import { empenhadoPorItem, itensNumerados, motivoDaRevisao, quantidadeDaParcela, quantidadeFoiInformada, quantidadeQuebrada, rotuloDaSituacao, textoDaOrigem, textoDaSugestao, vinculoEditavel } from '../distribuicaoEmpenho';
 import { mapDistribuicao, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
 
 const linha = (over: any) => ({ posicao: 1, numeroItem: 13, descricao: 'Placa', tipo: 'Material', quantidade: 10, valorUnitario: 4900, valorTotal: 49000, ...over });
@@ -75,6 +75,17 @@ describe('textos da distribuição', () => {
     expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO' })).label).toBe('Vinculada automaticamente');
     expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO' })).label).toBe('Vinculada');
     expect(rotuloDaSituacao(dist({ situacao: 'REVISAR' })).variant).toBe('danger');
+  });
+
+  it('vínculo pelo valor: rótulo próprio, pode ser editado ou desfeito (o de um item só, não)', () => {
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'VALOR' });
+    expect(rotuloDaSituacao(d)).toEqual({ label: 'Vinculada pelo valor', variant: 'success' });
+    expect(textoDaOrigem(d, (x) => x)).toBe('Vinculada pelo valor da nota');
+    expect(textoDaOrigem(dist({ origem: 'AUTO' }), (x) => x)).toBe('Vinculada automaticamente: contrato de um item');
+    expect(textoDaOrigem(dist({ origem: 'USUARIO', distribuido_por_nome: 'Maria', distribuido_em: '2026-10-13' } as any), (x) => x.split('-').reverse().join('/'))).toBe('Vinculada por Maria em 13/10/2026');
+    expect(vinculoEditavel(d)).toBe(true);
+    expect(vinculoEditavel(dist({ origem: 'USUARIO' }))).toBe(true);
+    expect(vinculoEditavel(dist({ origem: 'AUTO' }))).toBe(false);
   });
 
   it('valor mudou: diz o valor antigo e o novo e que as quantidades continuam contando', () => {

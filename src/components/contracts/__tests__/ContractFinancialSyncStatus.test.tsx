@@ -340,6 +340,18 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).toContain('>Vincular aos itens<');
   });
 
+  it('vinculada pelo valor: diz a regra, deixa editar e desfazer', () => {
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'VALOR', observacao: 'Valor da nota = 4 × preço unitário do item 13.', parcelas: [{ numeroItem: 13, valor: 1000, quantidadeInformada: null }] });
+    const html = detalhe(d, true, [], { onInformarQuantidade: vi.fn() });
+    expect(html).toContain('Vinculada pelo valor da nota');
+    expect(html).toContain('Valor da nota = 4 × preço unitário do item 13.');
+    expect(html).toContain('Editar o vínculo aos itens');
+    expect(html).toContain('Desfazer');
+    const leitor = detalhe(d, false);
+    expect(leitor).not.toContain('Editar o vínculo aos itens');
+    expect(leitor).not.toContain('>Desfazer<');
+  });
+
   it('valor da nota mudou: a nota continua vinculada, avisa e oferece conferir as quantidades', () => {
     const d = dist({ situacao: 'DISTRIBUIDA', motivoRevisao: 'VALOR_MUDOU', origem: 'AUTO', valorNota: 1200, valorNaDistribuicao: 1000, parcelas: [{ numeroItem: 13, valor: 1200, quantidadeInformada: 4 }] });
     const html = detalhe(d, true, [], { onConferir: vi.fn(), onInformarQuantidade: vi.fn() });
