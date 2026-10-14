@@ -24,3 +24,9 @@ const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julh
 export function rotuloDoMes(mes: string): string {
   return `${MESES[Number(mes.slice(5, 7)) - 1]}/${mes.slice(0, 4)}`;
 }
+
+/** Data e hora do saldo do Tesouro ("2026-10-14 14:55:14", horário de Brasília) como "14/10/2026 14:55". */
+export const dataHoraTesouro = (v: string): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(v);
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : v;
+};

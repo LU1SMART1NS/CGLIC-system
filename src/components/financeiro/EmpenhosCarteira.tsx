@@ -16,7 +16,7 @@ import { TODOS_GESTORES, listGestores, matchesGestorFilter } from '../carteira/c
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { situacaoDoSaldo, type EmpenhoCarteiraRow } from '../../services/financeiroCarteiraService';
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
-import { normalizarBusca } from './financeiroFormat';
+import { dataHoraTesouro, normalizarBusca } from './financeiroFormat';
 import { EmpenhosCarteiraTable } from './EmpenhosCarteiraTable';
 import { AvisoCarregando } from '../../design-system';
 import { useSituacaoDistribuicaoPorEmpenho } from '../../hooks/useVinculacaoEmpenhos';
@@ -74,14 +74,16 @@ export const EmpenhosCarteira: React.FC = () => {
     let comSaldo = 0;
     let semSaldo = 0;
     let saldoTotal = 0;
+    let tesouroEm: string | null = null;
     for (const r of rows) {
+      if (r.tesouroAtualizadoEm && (!tesouroEm || r.tesouroAtualizadoEm > tesouroEm)) tesouroEm = r.tesouroAtualizadoEm;
       const s = situacaoDoSaldo(r);
       if (s === 'COM_SALDO') {
         comSaldo++;
         saldoTotal += r.saldo ?? 0;
       } else if (s === 'SEM_SALDO') semSaldo++;
     }
-    return { comSaldo, semSaldo, saldoTotal };
+    return { comSaldo, semSaldo, saldoTotal, tesouroEm };
   }, [rows]);
 
   const anos = useMemo(() => contar(rows, (r) => (r.ano ? String(r.ano) : null)), [rows]);
@@ -128,7 +130,7 @@ export const EmpenhosCarteira: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Empenhos"
-        subtitle="Notas de empenho dos contratos, com o que já foi pago por fatura e o saldo de cada uma."
+        subtitle="Notas de empenho dos contratos, com o pago e o saldo do Tesouro (SIAFI) e a soma das faturas para comparar."
         icon={<Banknote size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
@@ -161,11 +163,11 @@ export const EmpenhosCarteira: React.FC = () => {
             active={filters.saldo}
             onSelect={(v) => setFilter('saldo', v)}
             segments={[
-              { id: 'COM_SALDO', label: 'Com saldo', count: resumo.comSaldo, title: 'Empenhado maior que o pago pelas faturas' },
-              { id: 'SEM_SALDO', label: 'Sem saldo', count: resumo.semSaldo, title: 'Empenho todo pago' },
+              { id: 'COM_SALDO', label: 'Com saldo', count: resumo.comSaldo, title: 'Ainda há valor a liquidar ou liquidado a pagar no Tesouro' },
+              { id: 'SEM_SALDO', label: 'Sem saldo', count: resumo.semSaldo, title: 'Empenho todo pago ou cancelado' },
               { id: TODOS, label: 'Todos', count: rows.length }
             ]}
-            meta={`${formatCurrencyCompact(resumo.saldoTotal)} de saldo a pagar`}
+            meta={`${formatCurrencyCompact(resumo.saldoTotal)} de saldo a pagar${resumo.tesouroEm ? ` · Tesouro em ${dataHoraTesouro(resumo.tesouroEm)}` : ''}`}
           />
 
           <CarteiraFilterBar
