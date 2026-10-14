@@ -11,6 +11,28 @@ const corsHeaders = {
 // ~100 anos: usado como "permanente" pois o Supabase Auth não expõe um ban sem prazo.
 const PERMANENT_BAN_DURATION = "876000h";
 
+/**
+ * Coordenadores ativos (perfil admin e sem bloqueio no Auth) além de `alvoId`. O sistema nunca fica sem coordenador
+ * ativo: sem ele, ninguém administra usuários (item 10 do diagnóstico de multiusuários, 14/10/2026).
+ */
+async function outrosCoordenadoresAtivos(supabaseAdmin: any, alvoId: string): Promise<number> {
+  const { data, error } = await supabaseAdmin.from("user_roles").select("user_id").eq("role_id", "admin").neq("user_id", alvoId);
+  if (error) throw new Error("Falha ao conferir os coordenadores ativos.");
+  const ids = [...new Set((data ?? []).map((r: { user_id: string }) => r.user_id))] as string[];
+  let ativos = 0;
+  for (const id of ids) {
+    const { data: u } = await supabaseAdmin.auth.admin.getUserById(id);
+    const bloqueadoAte = u?.user?.banned_until ? new Date(u.user.banned_until).getTime() : 0;
+    if (u?.user && bloqueadoAte <= Date.now()) ativos++;
+  }
+  return ativos;
+}
+
+async function alvoEhCoordenador(supabaseAdmin: any, userId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin.from("user_roles").select("role_id").eq("user_id", userId).eq("role_id", "admin");
+  return (data?.length ?? 0) > 0;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -88,6 +110,25 @@ serve(async (req) => {
 
     if (action === "update-role" || action === "update-user") {
       const { perfil, nome, email } = body;
+      const alvoCoordenador = await alvoEhCoordenador(supabaseAdmin, userId);
+
+      // Só coordenador muda dados (nome, e-mail, perfil) de outro coordenador.
+      if (alvoCoordenador && !isCallerAdmin) {
+        return new Response(
+          JSON.stringify({ error: "Apenas coordenadores podem alterar os dados de outro coordenador." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // O último coordenador ativo não deixa de ser coordenador (o sistema ficaria sem quem administra usuários).
+      if (alvoCoordenador && perfil !== undefined && mapPerfilToDbRole(perfil) !== "admin") {
+        if ((await outrosCoordenadoresAtivos(supabaseAdmin, userId)) === 0) {
+          return new Response(
+            JSON.stringify({ error: "Este é o único coordenador ativo. Dê o perfil de coordenador a outra pessoa antes de mudar este." }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
 
       // Atualiza metadados no Supabase Auth (nome, email) se fornecidos
       const userUpdatePayload: Record<string, unknown> = {};
@@ -314,6 +355,23 @@ serve(async (req) => {
           JSON.stringify({ error: "Apenas administradores podem desativar ou reativar outro administrador." }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      if (action === "deactivate") {
+        // Ninguém desativa o próprio acesso (ficaria trancado fora do sistema).
+        if (userId === callerUser.id) {
+          return new Response(
+            JSON.stringify({ error: "Você não pode desativar o próprio acesso." }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        // O último coordenador ativo não é desativado.
+        if ((await alvoEhCoordenador(supabaseAdmin, userId)) && (await outrosCoordenadoresAtivos(supabaseAdmin, userId)) === 0) {
+          return new Response(
+            JSON.stringify({ error: "Este é o único coordenador ativo. Dê o perfil de coordenador a outra pessoa antes de desativar este." }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
 
       const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
