@@ -136,6 +136,7 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 | 122 | `20261014000122_resumo_faturas_sem_np.sql` | Resumo separa liquidadas sem NP. |
 | 123 | `20261014000123_pagamento_a_conferir.sql` | `fatura_pagamento`: OB só confirma se citar a fatura ou pagar o fornecedor certo; job de recálculo. |
 | 124 | `20261014000124_perfil_canonico_e_usuario_desativado.sql` | `has_role` lê `role_id`; `usuario_ativo`; usuário desativado perde o acesso na hora. |
+| 134 | `20261014000134_cron_mais_leve.sql` | Cron mais leve: quatro jobs passam a uma vez por hora, nenhum minuto com dois jobs; `rotinas_controle` e `recalcular_pagamento_faturas()` sai cedo quando nada mudou. |
 
 ## Por tema
 
@@ -156,25 +157,25 @@ Os jobs de sincronização chamam `disparar_sincronizacao(recurso, uasg)`, que a
 
 | Job | Horário | O que faz | Migration |
 |---|---|---|---|
-| sincronizar-contratos-200330 / -200331 | :05 | contratos | 77 |
+| sincronizar-itens-notas-siafi-200330 / -200331 | :02 / :17 | itens da nota (Portal da Transparência) | 121 (134 passa a 1×/h) |
+| sincronizar-contratos-200330 / -200331 | :05 / :07 | contratos | 77 (134 separa) |
+| sincronizar-saldo-contabil-200330 / -200331 | :09 / :27, de 6 em 6 h | saldo contábil das notas no Tesouro (STA) | 128 (134 move a 200330) |
 | sincronizar-atas-participacao-200330 / -200331 | :10 / :12 | atas em que a SENASP participa ou aderiu | 105 |
-| sincronizar-atas-200330 / -200331 | :15 | atas | 77 |
+| sincronizar-atas-200330 / -200331 | :15 / :18 | atas | 77 (134 separa) |
 | sincronizar-faturas-200330 / -200331 | :20 / :22 | faturas | 83 |
-| sincronizar-itens-contratos-200330 / -200331 | :25 | itens, histórico, responsáveis e garantias dos contratos | 78 (93 amplia) |
-| recalcular-pagamento-faturas | :28 e :58 | `recalcular_pagamento_faturas()` | 123 |
-| conciliar-ciclos-pagamento | :29 e :59 | `conciliar_ciclos_pagamento()` | 87 |
+| sincronizar-itens-contratos-200330 / -200331 | :25 / :38 | itens, histórico, responsáveis e garantias dos contratos | 78 (93 amplia; 134 separa) |
+| recalcular-pagamento-faturas | :28 | `recalcular_pagamento_faturas()`; sai cedo se nada mudou | 123 (134 passa a 1×/h) |
+| conciliar-ciclos-pagamento | :31 | `conciliar_ciclos_pagamento()` | 87 (134 passa a 1×/h) |
 | sincronizar-contratos-participantes-200330 / -200331 | :32 / :34 | contratos dos órgãos participantes | 109 |
 | sincronizar-saldos-itens | :35 | saldos dos itens | 77 |
 | sincronizar-unidades-itens-200330 / -200331 | :40 / :42 | órgãos e adesões dos itens | 91 |
 | sincronizar-empenhos-200330 / -200331 | :45 / :50 | empenhos | 82 |
 | sincronizar-cadastro-uasgs | :48 | cadastro de UASGs | 111 |
+| sincronizar-ordens-bancarias-200330 / -200331 | :53 / :57 | ordens bancárias | 83 (134 move a 200330) |
 | vincular-contratos-automaticamente | :55 | `executar_vinculos_automaticos(...,'CRON')` | 95 |
-| sincronizar-ordens-bancarias-200330 / -200331 | :55 / :57 | ordens bancárias | 83 |
-| sincronizar-itens-notas-siafi-200330 | :02 e :32 | itens da nota (Portal da Transparência) | 121 |
-| sincronizar-itens-notas-siafi-200331 | :17 e :47 | itens da nota (Portal da Transparência) | 121 |
 | limpar-historico-do-cron | domingo 03:00 | apaga o histórico do cron com mais de 7 dias | 77 |
 
-Nenhum job foi removido: as migrations 87 e 123 usam `cron.unschedule` só para recriar o próprio job. O endereço da função e o segredo ficam no Vault, fora das migrations.
+Nenhum job foi removido: as migrations 87 e 123 usam `cron.unschedule` só para recriar o próprio job; a 134 só troca horários (`cron.alter_job` pelo nome) e confere no fim que nenhum minuto ficou com dois jobs. O endereço da função e o segredo ficam no Vault, fora das migrations.
 
 ## Tabelas no estado final
 

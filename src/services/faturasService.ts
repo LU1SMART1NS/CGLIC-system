@@ -236,7 +236,8 @@ export async function gravarOrdensBancarias(
 
 /**
  * Recalcula quais OBs confirmam o pagamento de cada fatura (fatura_pagamento, migration 123). Chamado ao fim das
- * sincronizações de faturas e de OBs; o pg_cron também chama aos minutos 28 e 58.
+ * sincronizações de faturas e de OBs; o pg_cron também chama ao minuto 28. Desde a migration 134 sai cedo (pulado) quando
+ * faturas, OBs e fornecedores não mudaram desde a última rodada.
  */
 export async function recalcularPagamentoFaturas(): Promise<{ alteradas: number; removidas: number } | null> {
   if (!isSupabaseConfigured || !supabase) return null;
