@@ -484,7 +484,10 @@ export interface ResumoFaturasContrato {
   valorFaturado: number;
   valorLiquidado: number;
   valorPago: number;
+  /** Liquidadas com NP e sem OB: aguardam a OB (migration 122). */
   liquidadasSemPagamento: number;
+  /** Liquidadas sem NP: sem como confirmar o pagamento (migration 122). */
+  liquidadasSemNp: number;
   faturasComNeSemVinculo: number;
   ultimaLiquidacao: string | null;
   ultimoPagamento: string | null;
@@ -497,7 +500,7 @@ export interface FaturasDoContrato {
   sincronizadoEm: string | null;
 }
 
-/** Faturas, resumo e data da última consulta do contrato (views da migration 83). */
+/** Faturas, resumo e data da última consulta do contrato (views das migrations 83, 119 e 122). */
 export async function fetchFaturasDoContrato(contractKey: string): Promise<FaturasDoContrato> {
   if (!isSupabaseConfigured || !supabase || !contractKey) return { faturas: [], resumo: null, sincronizadoEm: null };
   const [lista, resumo, sinc] = await Promise.all([
@@ -535,6 +538,7 @@ export async function fetchFaturasDoContrato(contractKey: string): Promise<Fatur
           valorLiquidado: Number(r.valor_liquidado ?? 0),
           valorPago: Number(r.valor_pago ?? 0),
           liquidadasSemPagamento: Number(r.liquidadas_sem_pagamento ?? 0),
+          liquidadasSemNp: Number(r.liquidadas_sem_np ?? 0),
           faturasComNeSemVinculo: Number(r.faturas_com_ne_sem_vinculo ?? 0),
           ultimaLiquidacao: r.ultima_liquidacao ?? null,
           ultimoPagamento: r.ultimo_pagamento ?? null
