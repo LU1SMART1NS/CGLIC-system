@@ -3,7 +3,7 @@ import { rpcInexistente } from './empenhoSyncService';
 import { mapNotaSiafi, type ItemDaNota } from './distribuicaoEmpenhoService';
 
 /**
- * Notas em que a nota no SIAFI e o contrato no Contratos.gov.br não batem (migration 120,
+ * Notas em que a nota no SIAFI e o contrato no Contratos.gov.br não batem (migration 121,
  * v_empenho_conferencia_nota). A correção é do próprio gestor, quase sempre no Contratos.gov.br; o sistema mostra
  * o que aconteceu, guarda a marca "Vou corrigir" e tira a linha da fila quando a sincronização trouxer a correção.
  */
@@ -106,7 +106,7 @@ export async function fetchConferenciasDaNota(): Promise<ConferenciaDaNota[]> {
   for (let de = 0; ; de += 1000) {
     const { data, error } = await supabase.from('v_empenho_conferencia_nota').select('*').range(de, de + 999);
     if (error) {
-      // Banco sem a migration 120: a fila segue sem a conferência.
+      // Banco sem a migration 121: a fila segue sem a conferência.
       if (rpcInexistente(error) || error.code === '42P01' || error.code === 'PGRST205') return [];
       throw new Error(error.message);
     }

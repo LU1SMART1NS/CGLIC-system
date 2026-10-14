@@ -1,6 +1,6 @@
 -- ==============================================================================
--- MIGRATION 120: ITENS DA NOTA DE EMPENHO PELO SIAFI (PORTAL DA TRANSPARÊNCIA)
--- Versão: 20261014000120_itens_da_nota_siafi.sql
+-- MIGRATION 121: ITENS DA NOTA DE EMPENHO PELO SIAFI (PORTAL DA TRANSPARÊNCIA)
+-- Versão: 20261014000121_itens_da_nota_siafi.sql
 --
 -- Contexto (caminho 2, protótipo aprovado em 14/10/2026: https://claude.ai/artifact/9H1pH4VYF3S1TxNymwqYRe):
 -- o Portal da Transparência (com chave) lista as linhas de cada nota de empenho, com o item da compra

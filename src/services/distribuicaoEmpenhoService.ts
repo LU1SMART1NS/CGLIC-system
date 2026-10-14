@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { rpcInexistente } from './empenhoSyncService';
 
 /**
- * Vínculo da nota de empenho aos itens do contrato (migrations 94, 104, 118 e 120). Contrato de um item recebe a nota
+ * Vínculo da nota de empenho aos itens do contrato (migrations 94, 104, 118 e 121). Contrato de um item recebe a nota
  * inteira sozinho (AUTO); em contrato de vários itens o servidor lê a nota no SIAFI (Portal da Transparência) e a
  * vincula aos itens que ela diz (SIAFI); sem leitura que feche, vincula pelo valor quando só um item explica o valor
  * (VALOR); nos demais o gestor diz a quantidade de cada item. A quantidade da nota em um item é a informada pelo
@@ -15,7 +15,7 @@ export type TipoSugestao = 'TOTAL_DO_ITEM' | 'MULTIPLO_DO_PRECO' | 'VARIAS_POSSI
 /** Quem vinculou a nota aos itens: o servidor (contrato de um item, pela nota no SIAFI ou pelo valor) ou o gestor. */
 export type OrigemDoVinculo = 'AUTO' | 'SIAFI' | 'VALOR' | 'USUARIO';
 
-/** Por que a leitura da nota no SIAFI não serve para vincular (migration 120). */
+/** Por que a leitura da nota no SIAFI não serve para vincular (migration 121). */
 export type MotivoDaNota = 'NOTA_SEM_ITENS' | 'LINHA_SEM_ITEM' | 'QUANTIDADE_QUEBRADA' | 'SOMA_NAO_FECHA';
 
 /** Um item da nota no SIAFI: quantidade, preço e valor líquidos. */
@@ -165,7 +165,7 @@ export function mapNotaSiafi(r: any): NotaNoSiafi {
 const viewAusente = (error: any) => rpcInexistente(error) || error?.code === '42P01' || error?.code === 'PGRST205';
 
 /**
- * Junta a cada nota o que ela diz no SIAFI (v_empenho_nota_siafi, migration 120). Sem a migration, ou se a leitura
+ * Junta a cada nota o que ela diz no SIAFI (v_empenho_nota_siafi, migration 121). Sem a migration, ou se a leitura
  * falhar, a tela segue sem essa parte: as notas ficam com notaSiafi nulo.
  */
 async function anexarNotasSiafi(lista: DistribuicaoDoEmpenho[], contractKey?: string): Promise<DistribuicaoDoEmpenho[]> {

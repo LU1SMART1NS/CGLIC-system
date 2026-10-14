@@ -1,5 +1,5 @@
 /**
- * Itens de cada nota de empenho no SIAFI, lidos no Portal da Transparência (migration 120), em segundo plano
+ * Itens de cada nota de empenho no SIAFI, lidos no Portal da Transparência (migration 121), em segundo plano
  * e sob a trava do banco (recurso 'itens_notas_siafi', uma execução por UG emitente).
  *
  * O portal exige chave (cabeçalho chave-api-dados), que fica só no servidor (PORTAL_TRANSPARENCIA_CHAVE).
