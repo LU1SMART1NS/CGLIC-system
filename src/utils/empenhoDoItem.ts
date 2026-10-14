@@ -1,5 +1,5 @@
 import type { DistribuicaoDoEmpenho, OrigemDoVinculo } from '../services/distribuicaoEmpenhoService';
-import { quantidadeCalculada, quantidadeFoiInformada } from './distribuicaoEmpenho';
+import { quantidadeCalculada, quantidadeDaParcela, quantidadeFoiInformada } from './distribuicaoEmpenho';
 
 /**
  * Empenho de um item da ata a partir do vínculo das notas aos itens do contrato (migration 94). O item da ata
@@ -102,9 +102,9 @@ export function montarEmpenhoDoItem(input: {
       }
       if (d.situacao === 'DISTRIBUIDA') {
         const parcela = d.parcelas.find((p) => p.numeroItem === input.numeroItem);
-        if (!parcela || ((parcela.valor ?? 0) <= EPS && parcela.quantidadeInformada == null)) continue;
+        if (!parcela || ((parcela.valor ?? 0) <= EPS && parcela.quantidadeInformada == null && parcela.quantidadeNota == null)) continue;
         const calculada = quantidadeCalculada(parcela, vu);
-        const quantidade = parcela.quantidadeInformada ?? calculada;
+        const quantidade = quantidadeDaParcela(parcela, vu);
         e.parcelas.push({
           contratoEmpenhoId: d.contratoEmpenhoId,
           contractKey: c.contractKey,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActionButton, AppButton, AppTextarea, Modal, NoticeBar, StatusBadge } from '../../design-system';
 import type { DistribuicaoDoEmpenho, QuantidadeNoItem } from '../../services/distribuicaoEmpenhoService';
-import { motivoDaRevisao, quantidadeDaParcela, quantidadeQuebrada, type ItemNumerado } from '../../utils/distribuicaoEmpenho';
+import { motivoDaNota, motivoDaRevisao, quantidadeDaParcela, quantidadesDaNota, quantidadeQuebrada, type ItemNumerado } from '../../utils/distribuicaoEmpenho';
 
 const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 const OBS_MAX = 500;
@@ -50,7 +50,9 @@ const JanelaVincular: React.FC<DistribuirEmpenhoModalProps & { d: DistribuicaoDo
   const sugestaoUnica = (d.sugestaoTipo === 'TOTAL_DO_ITEM' || d.sugestaoTipo === 'MULTIPLO_DO_PRECO') && d.sugestao.length === 1;
   const sugerida = new Map(sugestaoUnica ? d.sugestao.map((s) => [s.numeroItem, s.quantidade]) : []);
   const precoDe = new Map(itens.map((i) => [i.numeroItem, i.valorUnitario]));
-  // Começa pelo vínculo atual (quantidade inteira) ou pela sugestão única.
+  // O que a nota diz no SIAFI, nos itens do contrato (quantidades inteiras).
+  const daNota = quantidadesDaNota(d.notaSiafi);
+  // Começa pelo vínculo atual (quantidade inteira), pelo que a nota diz no SIAFI ou pela sugestão única.
   const inicial = (): Record<number, string> => {
     if (d.parcelas.length > 0) {
       return Object.fromEntries(
@@ -60,6 +62,7 @@ const JanelaVincular: React.FC<DistribuirEmpenhoModalProps & { d: DistribuicaoDo
         })
       );
     }
+    if (daNota.size > 0) return Object.fromEntries([...daNota.entries()].map(([n, q]) => [n, String(q)]));
     return Object.fromEntries([...sugerida.entries()].map(([n, q]) => [n, String(q)]));
   };
   const [textos, setTextos] = React.useState<Record<number, string>>(inicial);
@@ -127,6 +130,16 @@ const JanelaVincular: React.FC<DistribuirEmpenhoModalProps & { d: DistribuicaoDo
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
         {erro && <NoticeBar tone="danger" testId="distribuir-erro">{erro}</NoticeBar>}
         {revisao && <NoticeBar tone="warning">{revisao}</NoticeBar>}
+        {d.notaSiafi && !jaVinculada && (
+          <NoticeBar tone="info" testId="distribuir-nota-siafi">
+            {daNota.size > 0
+              ? `A nota no SIAFI diz: ${[...daNota.entries()].map(([n, q]) => `${q} un do item ${n}`).join(', ')}. Confira e grave.`
+              : `Nota no SIAFI: ${motivoDaNota(d.notaSiafi)}. Informe a quantidade inteira de cada item.`}
+          </NoticeBar>
+        )}
+        {jaVinculada && !revisao && d.origem === 'SIAFI' && (
+          <NoticeBar tone="info">Vinculada pela nota no SIAFI. Salvar substitui o vínculo atual, que passa a ser seu.</NoticeBar>
+        )}
         {jaVinculada && !revisao && d.origem === 'VALOR' && (
           <NoticeBar tone="info">
             Vinculada pelo valor da nota{d.observacao ? ` (${d.observacao.replace(/\.$/, '')})` : ''}. Salvar substitui o vínculo atual.

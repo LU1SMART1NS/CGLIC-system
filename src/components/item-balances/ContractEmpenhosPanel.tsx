@@ -169,7 +169,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
       header: 'Vínculo',
       render: (p) => (
         <>
-          <StatusBadge label={p.origem === 'AUTO' ? 'Vinculada automaticamente' : p.origem === 'VALOR' ? 'Vinculada pelo valor' : 'Vinculada'} variant="success" size="sm" dot={false} />
+          <StatusBadge label={p.origem === 'AUTO' ? 'Vinculada automaticamente' : p.origem === 'SIAFI' ? 'Vinculada pela nota' : p.origem === 'VALOR' ? 'Vinculada pelo valor' : 'Vinculada'} variant="success" size="sm" dot={false} />
           {p.origem === 'USUARIO' && (
             <div style={subtle}>
               por {p.vinculadaPorNome || 'usuário'}

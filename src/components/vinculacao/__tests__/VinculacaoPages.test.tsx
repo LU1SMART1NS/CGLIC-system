@@ -6,6 +6,10 @@ import { mapDistribuicao } from '../../../services/distribuicaoEmpenhoService';
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'gestor' })) }));
 vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => vi.fn() }));
 vi.mock('../../../hooks/useVinculacaoEmpenhos', () => ({ useEmpenhosParaVincularAosItens: vi.fn() }));
+vi.mock('../../../hooks/useConferenciaNota', () => ({
+  useConferenciasDaNota: vi.fn(() => ({ data: [] })),
+  useAcoesCorrecaoDaNota: () => ({ marcar: { mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null }, desfazer: { mutate: vi.fn(), isPending: false } })
+}));
 vi.mock('../../../hooks/useEmpenhosForaDoContrato', () => ({
   useEmpenhosForaDoContrato: vi.fn(),
   useAcoesCorrecaoNaFonte: () => ({ marcar: { mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null }, desfazer: { mutate: vi.fn(), isPending: false } })
@@ -23,6 +27,9 @@ vi.mock('@tanstack/react-query', async (orig) => ({ ...(await orig<typeof import
 
 import { useAuth } from '../../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../../hooks/useVinculacaoEmpenhos';
+import { useConferenciasDaNota } from '../../../hooks/useConferenciaNota';
+import { mapConferencia } from '../../../services/conferenciaNotaService';
+import { mapNotaSiafi } from '../../../services/distribuicaoEmpenhoService';
 import { useEmpenhosForaDoContrato } from '../../../hooks/useEmpenhosForaDoContrato';
 import { linhaForaDoContrato } from '../../../services/empenhosForaDoContratoService';
 import { PainelDaConferencia } from '../ConferenciaForaDoContrato';
@@ -47,6 +54,7 @@ const nota = (over: any) =>
 
 describe('Vinculação → Empenhos aos itens', () => {
   beforeEach(() => {
+    vi.mocked(useConferenciasDaNota).mockReturnValue({ data: [] } as any);
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     contratos(new Set(['K1']));
     vi.mocked(useEmpenhosParaVincularAosItens).mockReturnValue({
@@ -105,6 +113,38 @@ describe('Vinculação → Empenhos aos itens', () => {
     expect(html).toContain('vinc-empenhos-nao-e-2024NE000340');
     expect(html).toContain('Editar o vínculo');
     expect(html).not.toContain('vinc-empenhos-row-2024NE000337');
+    expect(html).not.toContain('vinc-empenhos-selecionar-');
+  });
+
+  it('a vincular: diz por que o SIAFI não resolveu a nota', () => {
+    const comNota = { ...nota({ ne: '2025NE000015' }), notaSiafi: mapNotaSiafi({ motivo: 'QUANTIDADE_QUEBRADA', itens: [{ numero_item: 3, quantidade: 5.08, valor_unitario: 422.92, valor_total: 2150.08, no_contrato: true }], lido_em: '2026-10-14' }) };
+    const semLeitura = { ...nota({ ne: '2025NE000016' }), notaSiafi: null };
+    vi.mocked(useEmpenhosParaVincularAosItens).mockReturnValue({ data: [comNota, semLeitura], isLoading: false, isFetching: false, error: null, refetch: vi.fn() } as any);
+    const html = render(<EmpenhosItensPage />);
+    expect(html).toContain('SIAFI: a nota diz 5,08 un do item 3');
+    expect(html).toContain('SIAFI: nota ainda não lida no SIAFI');
+  });
+
+  it('segmento "Conferir no Contratos.gov.br": notas do escopo, com a conferência e sem o lote', () => {
+    const linha = (over: any) =>
+      mapConferencia({
+        contrato_empenho_id: over.ne, contract_key: 'K1', numero_oficial: over.ne, uasg_emitente: '200330', valor_nota: 36234,
+        tipo: 'ITEM_FORA_DO_CONTRATO', itens_nota: [], itens_fora: [], outro_preco: [], parcelas: [], itens_contrato: [], situacao: 'A_CONFERIR', ...over
+      });
+    vi.mocked(useConferenciasDaNota).mockReturnValue({
+      data: [
+        linha({ ne: '2024NE000335' }),
+        linha({ ne: '2026NE000218', tipo: 'ITEM_COM_OUTRO_PRECO', situacao: 'CORRIGINDO', correcao_id: 1, correcao_tipo: 'CORRIGIR_ITENS_DO_CONTRATO', correcao_por_nome: 'Maria', correcao_em: '2026-10-14T10:00:00Z' }),
+        linha({ ne: '2026NE000999', contract_key: 'OUTRO' })
+      ]
+    } as any);
+    const html = render(<EmpenhosItensPage />, '/?fila=CONFERIR');
+    expect(html).toContain('Conferir no Contratos.gov.br');
+    expect(html).toContain('vinc-nota-row-2024NE000335');
+    expect(html).toContain('Item fora do contrato');
+    expect(html).toContain('Corrigindo · Maria');
+    expect(html).toContain('vinc-nota-desfazer-2026NE000218');
+    expect(html).not.toContain('2026NE000999');
     expect(html).not.toContain('vinc-empenhos-selecionar-');
   });
 });

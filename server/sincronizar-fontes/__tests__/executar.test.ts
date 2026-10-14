@@ -20,6 +20,9 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarContratosParticipantesPendentes: vi.fn(async () => ({ orgaos: 184, pendentes: 184 })),
     sincronizarCadastroUasgs: vi.fn(async () => sucesso(23)),
     contarCadastroUasgsPendentes: vi.fn(async () => ({ pendentes: 260, amostra: null })),
+    sincronizarItensNotasSiafi: vi.fn(async () => sucesso(25)),
+    contarItensNotasSiafiPendentes: vi.fn(async () => ({ pendentes: 416, amostra: null })),
+    chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
     sincronizarFaturasDaCarteira: vi.fn(async () => sucesso(13)),
@@ -202,6 +205,18 @@ describe('executarPedido', () => {
     const r = await executarPedido({ recurso: 'saldos_itens', dry: true }, d);
     expect(r.dry).toBe(true);
     expect(d.sincronizarSaldosItens).not.toHaveBeenCalled();
+  });
+
+  it('itens_notas_siafi: por UG emitente, com a chave do servidor', async () => {
+    expect(validarPedido({ recurso: 'itens_notas_siafi' })).toMatchObject({ ok: false });
+    expect(validarPedido({ recurso: 'itens_notas_siafi', uasg: '200330' })).toMatchObject({ ok: true });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'itens_notas_siafi', uasg: '200330' }, d);
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 25 } });
+    expect(vi.mocked(d.sincronizarItensNotasSiafi).mock.calls[0]).toEqual(['200330', expect.objectContaining({ chave: 'chave-de-teste' })]);
+    const dry = await executarPedido({ recurso: 'itens_notas_siafi', uasg: '200331', dry: true }, d);
+    expect(dry).toMatchObject({ dry: true, consulta: { pendentes: 416 } });
+    expect(vi.mocked(d.contarItensNotasSiafiPendentes).mock.calls[0]).toEqual(['200331', 'chave-de-teste']);
   });
 
   it('cadastro_uasgs: vale para todas as carteiras, sem UASG', async () => {

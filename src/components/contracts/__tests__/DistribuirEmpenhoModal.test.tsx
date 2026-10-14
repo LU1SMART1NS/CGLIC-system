@@ -15,7 +15,7 @@ vi.mock('../../../design-system', async (orig) => ({
     ) : null
 }));
 import { DistribuirEmpenhoModal } from '../DistribuirEmpenhoModal';
-import { mapDistribuicao } from '../../../services/distribuicaoEmpenhoService';
+import { mapDistribuicao, mapNotaSiafi } from '../../../services/distribuicaoEmpenhoService';
 
 const itens = [
   { numeroItem: 13, descricao: 'Placa balística', tipo: 'Material', quantidade: 79, valorUnitario: 4900, valorTotal: 387100 },
@@ -68,6 +68,20 @@ describe('DistribuirEmpenhoModal (vínculo por quantidade)', () => {
     expect(html).not.toContain('distribuir-informada-43');
     expect(html).toContain('1 de 2');
     expect(html).not.toMatch(/aria-disabled="true"[^>]*data-testid="distribuir-salvar"/);
+  });
+
+  it('nota lida no SIAFI: começa pelo que a nota diz, não pela sugestão do valor', () => {
+    const notaSiafi = mapNotaSiafi({ lido_em: '2026-10-14', motivo: 'SOMA_NAO_FECHA', itens: [{ numero_item: 13, quantidade: 7, valor_total: 34300, no_contrato: true }] });
+    const html = render({ ...nota(), notaSiafi });
+    expect(html).toMatch(/data-testid="distribuir-quantidade-13"[^>]*value="7"/);
+    expect(html).not.toMatch(/data-testid="distribuir-quantidade-43"[^>]*value="342"/);
+    expect(html).toContain('A nota no SIAFI diz: 7 un do item 13. Confira e grave.');
+  });
+
+  it('nota no SIAFI com quantidade quebrada: diz o motivo e deixa o gestor informar', () => {
+    const notaSiafi = mapNotaSiafi({ lido_em: '2026-10-14', motivo: 'QUANTIDADE_QUEBRADA', itens: [{ numero_item: 13, quantidade: 5.08, valor_total: 2150.08, no_contrato: true }] });
+    const html = render({ ...nota({ sugestao_tipo: 'SEM_SUGESTAO', sugestao: [] }), notaSiafi });
+    expect(html).toContain('Nota no SIAFI: a nota diz 5,08 un do item 13. Informe a quantidade inteira de cada item.');
   });
 
   it('sem sugestão: nenhum item com quantidade e salvar fica desligado', () => {
