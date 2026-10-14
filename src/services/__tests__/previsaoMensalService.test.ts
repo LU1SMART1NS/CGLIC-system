@@ -77,6 +77,13 @@ describe('montagem das linhas', () => {
     expect(linhas.map((l) => l.chave).sort()).toEqual(['fatura-2', 'fatura-3']);
   });
 
+  it('fatura com OB da NP de outra despesa ("a conferir") também fica fora da previsão', () => {
+    const linhas = montarPrevisao(
+      dados({ faturas: [fatura({ idFatura: 1, dataLiquidacao: '2026-07-17', situacao: 'Siafi Apropriado', np: '2026NP000204', pagamentoAConferir: true }), fatura({ idFatura: 2 })] })
+    );
+    expect(linhas.map((l) => l.chave)).toEqual(['fatura-2']);
+  });
+
   it('contrato mensal cuja única fatura em aberto é liquidada sem NP entra pela linha mensal', () => {
     const linhas = montarPrevisao(
       dados({ marcas: new Map([marca('A', 700)]), faturas: [fatura({ contractKey: 'A', dataLiquidacao: '2024-01-31', situacao: 'Siafi Apropriado', np: null })] })
