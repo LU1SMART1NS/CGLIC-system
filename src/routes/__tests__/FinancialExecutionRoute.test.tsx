@@ -55,7 +55,12 @@ describe('Financeiro → Empenhos', () => {
       rows: [
         empenho({}),
         empenho({ empenhoId: 'e2', numero: '2025NE000010', ano: 2025, valorPago: 1000, saldo: 0 }),
-        empenho({ empenhoId: 'e3', numero: '2024NE000005', ano: 2024, uasgEmitente: '200330', contractKeys: ['200330-00020-2020'] })
+        empenho({ empenhoId: 'e3', numero: '2024NE000005', ano: 2024, uasgEmitente: '200330', contractKeys: ['200330-00020-2020'] }),
+        empenho({
+          empenhoId: 'e4', numero: '2025NE000471', ano: 2025, valorEmpenhado: 38150244, valorPago: 0, fontePago: 'TESOURO', valorPagoFaturas: 37861227,
+          saldo: 109826460, liquidadoAPagar: 37861227, tesouroAtualizadoEm: '2026-10-14 14:55:14'
+        }),
+        empenho({ empenhoId: 'e5', numero: '2025NE000500', ano: 2025, fontePago: 'FATURAS', valorPagoFaturas: 400 })
       ],
       isLoading: false,
       isFetching: false,
@@ -71,7 +76,7 @@ describe('Financeiro → Empenhos', () => {
     expect(html).toContain('A vincular');
     expect(html).toContain('Empenhos');
     expect(html).toContain('data-testid="empenhos-saldo-COM_SALDO"');
-    expect(html).toMatch(/Com saldo<span[^>]*>2</);
+    expect(html).toMatch(/Com saldo<span[^>]*>4</);
     expect(html).toMatch(/Sem saldo<span[^>]*>1</);
     expect(html).toContain('data-testid="empenhos-filter-ano"');
     expect(html).toContain('data-testid="empenhos-filter-gestor"');
@@ -83,6 +88,17 @@ describe('Financeiro → Empenhos', () => {
     expect(html).toContain('00094/2022');
     expect(html).toContain('Marina Costa');
     expect(html).toContain('00020/2020');
+  });
+
+  it('pago e saldo do Tesouro, com a soma das faturas quando difere e a data do Tesouro no topo', () => {
+    const html = render();
+    expect(html).toContain('Tesouro em 14/10/2026 14:55');
+    // GM: Tesouro sem pagamento; faturas dizem 37,9 mi pagos
+    expect(html).toContain('data-testid="empenhos-pago-faturas-2025NE000471"');
+    expect(html).toMatch(/faturas: R\$\s?37\.861\.227,00/);
+    expect(html).toMatch(/R\$\s?37\.861\.227,00 liquidado a pagar/);
+    // empenho fora do Tesouro: avisa que o pago é o das faturas
+    expect(html).toContain('pelas faturas');
   });
 
   it('não mostra os quadros antigos nem as abas de UASG', () => {

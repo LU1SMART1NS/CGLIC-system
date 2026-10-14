@@ -55,6 +55,62 @@ describe('montarEmpenhosCarteira', () => {
     expect(situacaoDoSaldo(row)).toBe('SEM_CONSULTA');
   });
 
+  it('com o saldo do Tesouro: pago e saldo vêm de lá; a soma das faturas fica ao lado', () => {
+    const tesouro = new Map([['e1', { pagoTotal: 900, aLiquidar: 50, liquidadoAPagar: 30, atualizadoEm: '2026-10-14 14:55:14' }]]);
+    const [row] = montarEmpenhosCarteira([emp({})], [{ empenho_id: 'e1', contract_key: 'K' }], fe, faturas, new Set(['K']), tesouro);
+    expect(row).toMatchObject({ valorPago: 900, fontePago: 'TESOURO', valorPagoFaturas: 300, saldo: 80, liquidadoAPagar: 30, tesouroAtualizadoEm: '2026-10-14 14:55:14' });
+    expect(situacaoDoSaldo(row)).toBe('COM_SALDO');
+  });
+
+  it('Tesouro sem saldo (todo pago ou cancelado) fica sem saldo, mesmo com empenhado maior que o pago', () => {
+    const tesouro = new Map([['e1', { pagoTotal: 300, aLiquidar: 0, liquidadoAPagar: 0, atualizadoEm: null }]]);
+    const [row] = montarEmpenhosCarteira([emp({})], [{ empenho_id: 'e1', contract_key: 'K' }], fe, faturas, new Set(['K']), tesouro);
+    expect(row.saldo).toBe(0);
+    expect(situacaoDoSaldo(row)).toBe('SEM_SALDO');
+  });
+
+  it('sem o Tesouro, vale a soma das faturas (fonte FATURAS)', () => {
+    const [row] = montarEmpenhosCarteira([emp({})], [{ empenho_id: 'e1', contract_key: 'K' }], fe, faturas, new Set(['K']));
+    expect(row).toMatchObject({ valorPago: 300, fontePago: 'FATURAS', valorPagoFaturas: 300, saldo: 700, liquidadoAPagar: null });
+  });
+
+  it('soma das faturas: partes que passam do valor da fatura são reduzidas na proporção', () => {
+    // fatura de R$ 100 que cita dois empenhos com o valor inteiro de cada um (300 + 100): fica 75 + 25
+    const fe2 = [
+      { id_fatura: 9, id_empenho_gov: '111', valor: 300 },
+      { id_fatura: 9, id_empenho_gov: '222', valor: 100 }
+    ];
+    const rows = montarEmpenhosCarteira(
+      [emp({}), emp({ empenho_id: 'e2', identificador_fonte: '222', numero_oficial: '2026NE000028' })],
+      [
+        { empenho_id: 'e1', contract_key: 'K' },
+        { empenho_id: 'e2', contract_key: 'K' }
+      ],
+      fe2,
+      [{ idFatura: 9, paga: true, cancelada: false, valorLiquido: 100 }],
+      new Set(['K'])
+    );
+    expect(rows.map((r) => r.valorPagoFaturas)).toEqual([75, 25]);
+  });
+
+  it('partes dentro do valor da fatura ficam como estão', () => {
+    const fe2 = [
+      { id_fatura: 9, id_empenho_gov: '111', valor: 60 },
+      { id_fatura: 9, id_empenho_gov: '222', valor: 40 }
+    ];
+    const rows = montarEmpenhosCarteira(
+      [emp({}), emp({ empenho_id: 'e2', identificador_fonte: '222' })],
+      [
+        { empenho_id: 'e1', contract_key: 'K' },
+        { empenho_id: 'e2', contract_key: 'K' }
+      ],
+      fe2,
+      [{ idFatura: 9, paga: true, cancelada: false, valorLiquido: 100 }],
+      new Set(['K'])
+    );
+    expect(rows.map((r) => r.valorPagoFaturas)).toEqual([60, 40]);
+  });
+
   it('empenho sem contrato não entra; vínculos repetidos não duplicam', () => {
     const rows = montarEmpenhosCarteira(
       [emp({}), emp({ empenho_id: 'e2' })],

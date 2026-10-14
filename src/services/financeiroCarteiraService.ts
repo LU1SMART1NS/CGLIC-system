@@ -113,9 +113,21 @@ export interface EmpenhoCarteiraRow {
   credorNome: string | null;
   credorDocumento: string | null;
   valorEmpenhado: number;
-  /** Soma das faturas pagas que citam o empenho; null quando nenhum contrato dele teve as faturas consultadas. */
+  /**
+   * Pago do empenho. Pelo Tesouro (saldo contábil do SIAFI, migration 128) quando o empenho está lá; senão, a soma
+   * das faturas pagas. Null quando não há nenhuma das duas fontes.
+   */
   valorPago: number | null;
+  /** De onde veio o pago e o saldo. */
+  fontePago?: 'TESOURO' | 'FATURAS' | null;
+  /** Soma das faturas pagas que citam o empenho (para comparar com o Tesouro); null sem faturas consultadas. */
+  valorPagoFaturas?: number | null;
+  /** Saldo a pagar. Pelo Tesouro: a liquidar + liquidado a pagar (no ano e em restos a pagar). Pelas faturas: empenhado − pago. */
   saldo: number | null;
+  /** Parte do saldo já liquidada, esperando pagamento (só pelo Tesouro). */
+  liquidadoAPagar?: number | null;
+  /** Quando o Tesouro publicou o saldo usado (horário de Brasília). */
+  tesouroAtualizadoEm?: string | null;
   /** Contratos a que o empenho está vinculado (quase sempre um). */
   contractKeys: string[];
   /** Plano interno e natureza de despesa (migration 87; vazios até a sincronização reler o contrato). */
@@ -149,16 +161,31 @@ export interface FaturaEmpenhoDb {
   valor: number | null;
 }
 
+/** Saldo contábil do Tesouro de um empenho do sistema (v_empenho_saldo_contabil, migration 128). */
+export interface SaldoTesouroEmpenho {
+  pagoTotal: number;
+  aLiquidar: number;
+  liquidadoAPagar: number;
+  atualizadoEm: string | null;
+}
+
+const centavos = (v: number) => Math.round(v * 100) / 100;
+
 /**
- * Junta empenho, vínculos de contrato e faturas pagas. Sem vínculo de contrato o empenho fica de fora: a aba lista
- * os empenhos dos contratos (o vínculo é o que dá gestor, escopo do perfil e destino do clique).
+ * Junta empenho, vínculos de contrato, faturas pagas e o saldo do Tesouro. Sem vínculo de contrato o empenho fica de
+ * fora: a aba lista os empenhos dos contratos (o vínculo é o que dá gestor, escopo do perfil e destino do clique).
+ *
+ * Pago e saldo vêm do Tesouro quando o empenho está no saldo contábil; a soma das faturas fica ao lado, para comparar.
+ * Na soma das faturas, a parte de cada empenho vem da fatura; quando as partes passam do valor da fatura (a fonte às
+ * vezes manda o valor do empenho inteiro), elas são reduzidas na proporção (estudo do saldo contábil, 14/10/2026).
  */
 export function montarEmpenhosCarteira(
   empenhos: EmpenhoResumoDb[],
   vinculos: Array<{ empenho_id: string; contract_key: string }>,
   faturaEmpenhos: FaturaEmpenhoDb[],
-  faturas: Array<Pick<FaturaCarteira, 'idFatura' | 'paga' | 'cancelada'>>,
-  contratosConsultados: Set<string>
+  faturas: Array<Pick<FaturaCarteira, 'idFatura' | 'paga' | 'cancelada'> & { valorLiquido?: number }>,
+  contratosConsultados: Set<string>,
+  saldosTesouro: Map<string, SaldoTesouroEmpenho> = new Map()
 ): EmpenhoCarteiraRow[] {
   const contratosDoEmpenho = new Map<string, string[]>();
   for (const v of vinculos) {
@@ -167,11 +194,21 @@ export function montarEmpenhosCarteira(
     contratosDoEmpenho.set(v.empenho_id, lista);
   }
 
-  const faturasPagas = new Set(faturas.filter((f) => f.paga && !f.cancelada).map((f) => f.idFatura));
+  const faturasPagas = new Map(faturas.filter((f) => f.paga && !f.cancelada).map((f) => [f.idFatura, f]));
+  const somaDasPartes = new Map<number, number>();
+  for (const fe of faturaEmpenhos) {
+    const id = Number(fe.id_fatura);
+    if (faturasPagas.has(id)) somaDasPartes.set(id, (somaDasPartes.get(id) ?? 0) + Number(fe.valor ?? 0));
+  }
   const pagoPorIdGov = new Map<string, number>();
   for (const fe of faturaEmpenhos) {
-    if (!faturasPagas.has(Number(fe.id_fatura))) continue;
-    pagoPorIdGov.set(fe.id_empenho_gov, (pagoPorIdGov.get(fe.id_empenho_gov) ?? 0) + Number(fe.valor ?? 0));
+    const id = Number(fe.id_fatura);
+    const fatura = faturasPagas.get(id);
+    if (!fatura) continue;
+    const soma = somaDasPartes.get(id) ?? 0;
+    const teto = fatura.valorLiquido;
+    const fator = teto !== undefined && soma > teto && soma > 0 ? teto / soma : 1;
+    pagoPorIdGov.set(fe.id_empenho_gov, (pagoPorIdGov.get(fe.id_empenho_gov) ?? 0) + Number(fe.valor ?? 0) * fator);
   }
 
   const rows: EmpenhoCarteiraRow[] = [];
@@ -180,7 +217,14 @@ export function montarEmpenhosCarteira(
     if (!contractKeys || contractKeys.length === 0) continue;
     const valorEmpenhado = Number(e.valor_empenhado ?? 0);
     const consultado = contractKeys.some((k) => contratosConsultados.has(k));
-    const valorPago = consultado ? Math.round((pagoPorIdGov.get(String(e.identificador_fonte ?? '')) ?? 0) * 100) / 100 : null;
+    const valorPagoFaturas = consultado ? centavos(pagoPorIdGov.get(String(e.identificador_fonte ?? '')) ?? 0) : null;
+    const tesouro = saldosTesouro.get(e.empenho_id);
+    const valorPago = tesouro ? centavos(tesouro.pagoTotal) : valorPagoFaturas;
+    const saldo = tesouro
+      ? centavos(tesouro.aLiquidar + tesouro.liquidadoAPagar)
+      : valorPagoFaturas === null
+        ? null
+        : Math.max(0, centavos(valorEmpenhado - valorPagoFaturas));
     rows.push({
       empenhoId: e.empenho_id,
       canonicalKey: e.canonical_key ?? null,
@@ -192,15 +236,44 @@ export function montarEmpenhosCarteira(
       credorDocumento: e.credor_cnpj_cpf ?? null,
       valorEmpenhado,
       valorPago,
-      saldo: valorPago === null ? null : Math.max(0, Math.round((valorEmpenhado - valorPago) * 100) / 100),
+      fontePago: tesouro ? 'TESOURO' : valorPagoFaturas === null ? null : 'FATURAS',
+      valorPagoFaturas,
+      saldo,
+      liquidadoAPagar: tesouro ? centavos(tesouro.liquidadoAPagar) : null,
+      tesouroAtualizadoEm: tesouro?.atualizadoEm ?? null,
       contractKeys: [...contractKeys].sort()
     });
   }
   return rows;
 }
 
+/** Saldo do Tesouro dos empenhos do sistema, por id do empenho. */
+async function lerSaldosTesouro(): Promise<Map<string, SaldoTesouroEmpenho>> {
+  const mapa = new Map<string, SaldoTesouroEmpenho>();
+  if (!isSupabaseConfigured || !supabase) return mapa;
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await supabase
+      .from('v_empenho_saldo_contabil')
+      .select('empenho_id, pago_total, exercicio_a_liquidar, exercicio_liquidado_a_pagar, rp_a_liquidar, rp_liquidado_a_pagar, atualizado_tesouro')
+      .not('empenho_id', 'is', null)
+      .order('empenho_id', { ascending: true })
+      .range(de, de + PAGINA - 1);
+    if (error) throw mapPostgresErrorToAppError(error);
+    for (const r of (data ?? []) as any[]) {
+      mapa.set(String(r.empenho_id), {
+        pagoTotal: Number(r.pago_total ?? 0),
+        aLiquidar: Number(r.exercicio_a_liquidar ?? 0) + Number(r.rp_a_liquidar ?? 0),
+        liquidadoAPagar: Number(r.exercicio_liquidado_a_pagar ?? 0) + Number(r.rp_liquidado_a_pagar ?? 0),
+        atualizadoEm: r.atualizado_tesouro ?? null
+      });
+    }
+    if (!data || data.length < PAGINA) break;
+  }
+  return mapa;
+}
+
 export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<EmpenhoCarteiraRow[]> {
-  const [empenhos, vinculos, faturaEmpenhos, consultados, classificacao] = await Promise.all([
+  const [empenhos, vinculos, faturaEmpenhos, consultados, classificacao, tesouro] = await Promise.all([
     lerTudo<EmpenhoResumoDb>(
       'v_empenhos_resumo',
       'empenho_id, canonical_key, numero_oficial, ano_exercicio, uasg_emitente, data_emissao, valor_empenhado, credor_nome, credor_cnpj_cpf, identificador_fonte',
@@ -209,10 +282,11 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
     lerTudo<{ empenho_id: string; contract_key: string }>('contrato_empenhos', 'empenho_id, contract_key', 'empenho_id'),
     lerTudo<FaturaEmpenhoDb>('fatura_empenhos', 'id_fatura, id_empenho_gov, valor', 'id_fatura'),
     lerTudo<{ contract_key: string }>('contrato_faturas_sincronizacao', 'contract_key', 'contract_key'),
-    lerTudo<{ id: string; plano_interno: string | null; natureza_despesa: string | null }>('empenhos', 'id, plano_interno, natureza_despesa', 'id')
+    lerTudo<{ id: string; plano_interno: string | null; natureza_despesa: string | null }>('empenhos', 'id, plano_interno, natureza_despesa', 'id'),
+    lerSaldosTesouro()
   ]);
   const porId = new Map(classificacao.map((c) => [String(c.id), c]));
-  return montarEmpenhosCarteira(empenhos, vinculos, faturaEmpenhos, faturas, new Set(consultados.map((c) => c.contract_key))).map((r) => ({
+  return montarEmpenhosCarteira(empenhos, vinculos, faturaEmpenhos, faturas, new Set(consultados.map((c) => c.contract_key)), tesouro).map((r) => ({
     ...r,
     planoInterno: porId.get(r.empenhoId)?.plano_interno ?? null,
     naturezaDespesa: porId.get(r.empenhoId)?.natureza_despesa ?? null

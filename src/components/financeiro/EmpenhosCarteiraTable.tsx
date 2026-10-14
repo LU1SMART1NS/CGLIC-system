@@ -31,22 +31,42 @@ interface EmpenhosCarteiraTableProps {
 
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 
-/** Pago do empenhado: número e barra (verde; cheia = empenho todo pago). */
-const PagoBar: React.FC<{ pago: number | null; empenhado: number }> = ({ pago, empenhado }) => {
+/** Diferença que vale mostrar entre o pago do Tesouro e a soma das faturas (1% ou R$ 1). */
+const difere = (a: number, b: number) => Math.abs(a - b) > Math.max(1, 0.01 * Math.max(a, b));
+
+/**
+ * Pago do empenhado: número e barra (verde; cheia = empenho todo pago). Pelo Tesouro, com a soma das faturas embaixo
+ * quando elas diferem; sem o Tesouro, avisa que o valor é o das faturas.
+ */
+const PagoBar: React.FC<{ row: EmpenhoCarteiraRow }> = ({ row }) => {
+  const { valorPago: pago, valorEmpenhado: empenhado } = row;
   if (pago === null) {
     return (
-      <span style={subtle} title="As faturas do contrato ainda não foram consultadas no Contratos.gov.br">
+      <span style={subtle} title="O empenho não está no saldo do Tesouro e as faturas do contrato ainda não foram consultadas">
         não consultado
       </span>
     );
   }
   const pct = empenhado > 0 ? Math.min(100, (pago / empenhado) * 100) : 0;
+  const faturas = row.valorPagoFaturas ?? null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-      <span>{formatCurrency(pago)}</span>
+      <span title={row.fontePago === 'TESOURO' ? 'Pago no Tesouro (SIAFI), somando todos os anos' : 'Soma das faturas pagas no Contratos.gov.br'}>
+        {formatCurrency(pago)}
+      </span>
       <div aria-hidden="true" style={{ width: '96px', height: '5px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: 'var(--color-success-solid)' }} />
       </div>
+      {row.fontePago === 'TESOURO' && faturas !== null && difere(pago, faturas) && (
+        <span style={subtle} title="Soma das faturas pagas no Contratos.gov.br que citam este empenho" data-testid={`empenhos-pago-faturas-${row.numero}`}>
+          faturas: {formatCurrency(faturas)}
+        </span>
+      )}
+      {row.fontePago === 'FATURAS' && (
+        <span style={subtle} title="O empenho ainda não está no saldo do Tesouro; o pago é a soma das faturas">
+          pelas faturas
+        </span>
+      )}
     </div>
   );
 };
@@ -161,10 +181,21 @@ export const EmpenhosCarteiraTable: React.FC<EmpenhosCarteiraTableProps> = ({
                     {formatCurrency(row.valorEmpenhado)}
                   </td>
                   <td data-label="Pago" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <PagoBar pago={row.valorPago} empenhado={row.valorEmpenhado} />
+                    <PagoBar row={row} />
                   </td>
                   <td data-label="Saldo" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800 }}>
-                    {row.saldo === null ? <span style={{ color: '#94a3b8' }}>—</span> : formatCurrency(row.saldo)}
+                    {row.saldo === null ? (
+                      <span style={{ color: '#94a3b8' }}>—</span>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
+                        <span>{formatCurrency(row.saldo)}</span>
+                        {(row.liquidadoAPagar ?? 0) > 0.005 && (
+                          <span style={{ ...subtle, fontWeight: 600 }} title="Parte do saldo já liquidada no SIAFI, esperando a ordem bancária">
+                            {formatCurrency(row.liquidadoAPagar!)} liquidado a pagar
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td data-label="Itens" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                     {(() => {
