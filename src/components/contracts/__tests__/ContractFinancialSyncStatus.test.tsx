@@ -404,4 +404,13 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).not.toContain('Vincular aos itens');
     expect(html).toContain('nenhuma fatura cita esta nota');
   });
+
+  it('item com a soma das notas acima do contratado: aviso na linha, sem bloquear (item 6)', () => {
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'SIAFI', valorDistribuido: 1000, parcelas: [{ numeroItem: 43, valor: 1000, quantidadeInformada: null, quantidadeNota: 4 }] });
+    const acima = detalhe(d, true, [], { empenhadoNoItem: new Map([[43, 12]]) });
+    expect(acima).toContain('empenho-acima-2022NE000245-43');
+    expect(acima).toContain('item com 12 empenhadas (2 acima)');
+    const dentro = detalhe(d, true, [], { empenhadoNoItem: new Map([[43, 10]]) });
+    expect(dentro).not.toContain('empenho-acima-');
+  });
 });

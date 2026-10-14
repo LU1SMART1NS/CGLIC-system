@@ -60,6 +60,9 @@ export type DashboardAttentionCategory =
   | 'FORNECEDOR_PNCP'
   /** Nota ou fatura que a fonte deixou de listar e que tem trabalho da equipe: a sincronização não a apaga e o coordenador decide (migration 113). */
   | 'FONTE_A_CONFERIR'
+  /** Contrato × item com a soma da quantidade real das notas (informada ou da nota no SIAFI) acima do contratado. Só
+   *  aviso (migration 133); pendência do gestor do contrato e do coordenador, na aba Pagamentos. */
+  | 'EMPENHO_ACIMA'
   /** Vínculo automático que a fonte desmentiu mas que tem trabalho do gestor: o cron não o apaga e o coordenador decide (migration 112). */
   | 'VINCULO_A_CONFERIR'
   /** Quantitativos do item a conferir: cota própria negativa, órgão fora da ata assinada, soma que não fecha ou

@@ -16,6 +16,7 @@
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
 import { fetchAusentesDaFonte, rotuloAusente, trabalhoNaFonte, type AusenteDaFonte } from './ausentesDaFonteService';
+import { fetchEmpenhadoAcima, textoDaOrigem, type EmpenhadoAcima } from './empenhadoAcimaService';
 import { fetchVinculosAConferir, numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
 import type {
   ContractDashboardRecord,
@@ -57,7 +58,7 @@ function chaveDoSaldo(item: any): string {
   return numero ? chaveGestaoAta(numero, item?.codigo_uasg || item?.codigoUasg) : '';
 }
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
-import { chaveAvisoAtaAssinada, chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, chaveAvisoFonte, fetchAvisosResolvidos } from './avisosResolvidosService';
+import { chaveAvisoAtaAssinada, chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, chaveAvisoFonte, chaveAvisoEmpenhoAcima, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -286,6 +287,8 @@ export function calculateAttentionSummary(params: {
   vinculosAConferir?: VinculoAConferir[];
   /** Notas e faturas que a fonte deixou de listar e têm trabalho da equipe (migration 113). */
   ausentesDaFonte?: AusenteDaFonte[];
+  /** Contrato × item com a quantidade real das notas acima do contratado (migration 133). */
+  empenhadoAcima?: EmpenhadoAcima[];
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -301,6 +304,7 @@ export function calculateAttentionSummary(params: {
     fornecedoresPncp = [],
     vinculosAConferir = [],
     ausentesDaFonte = [],
+    empenhadoAcima = [],
     currentDate
   } = params;
 
@@ -433,6 +437,32 @@ export function calculateAttentionSummary(params: {
       numeroContrato,
       fornecedorNome: contrato.fornecedorNome,
       badgeLabel: 'a conferir'
+    });
+  }
+
+  // 0d. Empenhado acima do contratado num item do contrato (migration 133): só aviso, a gravação nunca é bloqueada.
+  // Conta só a quantidade real das notas (informada pelo gestor ou da nota no SIAFI).
+  for (const a of empenhadoAcima) {
+    const contrato = contratosDoPainel.get(a.contractKey);
+    if (!contrato) continue; // só contratos da carteira em tela
+    const numeroContrato = contrato.numeroFormatado || `${contrato.numero}/${contrato.ano}`;
+    const fmt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+    const origem = textoDaOrigem(a.ultimaOrigem);
+    const ultima = a.ultimaNota ? ` · última nota: ${a.ultimaNota}${origem ? `, ${origem}` : ''}` : '';
+    items.push({
+      id: `ATT-ACIMA-${a.contractKey}-${a.numeroItem}`,
+      category: 'EMPENHO_ACIMA',
+      severity: 'ATENCAO',
+      avisoChave: chaveAvisoEmpenhoAcima(a.contractKey, a.numeroItem, a.quantidadeEmpenhada),
+      title: 'Empenhado acima do contratado',
+      description: `Item ${a.numeroItem}: ${fmt(a.quantidadeEmpenhada)} empenhados para ${fmt(a.quantidadeContratada)} contratados (${fmt(a.quantidadeAcima)} acima)${ultima}`,
+      contractKey: a.contractKey,
+      numeroContrato,
+      fornecedorNome: contrato.fornecedorNome,
+      objetoItem: a.descricao || undefined,
+      // Sem prazo: a coluna Prazo mostra "—". A linha abre a aba Financeiro na última nota.
+      targetUrl: `/contratos/${encodeURIComponent(a.contractKey)}?aba=financeiro${a.ultimaNota ? `&abrir=${encodeURIComponent(a.ultimaNota)}` : ''}`,
+      badgeLabel: `${fmt(a.quantidadeAcima)} acima`
     });
   }
 
@@ -1299,6 +1329,7 @@ export function buildManagementDashboardReadModel(params: {
   fornecedoresPncp?: RegistroFornecedorPncp[];
   vinculosAConferir?: VinculoAConferir[];
   ausentesDaFonte?: AusenteDaFonte[];
+  empenhadoAcima?: EmpenhadoAcima[];
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1558,6 +1589,7 @@ export function buildManagementDashboardReadModel(params: {
     fornecedoresPncp: params.fornecedoresPncp,
     vinculosAConferir: params.vinculosAConferir,
     ausentesDaFonte: params.ausentesDaFonte,
+    empenhadoAcima: params.empenhadoAcima,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1608,7 +1640,8 @@ export async function fetchManagementDashboardData(
     itensComAlocacao,
     fornecedoresPncp,
     vinculosAConferir,
-    ausentesDaFonte
+    ausentesDaFonte,
+    empenhadoAcima
   ] = await Promise.all([
     fetchContratosParaTela(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar contratos para o dashboard:', err);
@@ -1654,6 +1687,10 @@ export async function fetchManagementDashboardData(
     fetchAusentesDaFonte().catch((err) => {
       console.warn('Erro ao consultar as notas e faturas a conferir para o dashboard:', err);
       return [] as AusenteDaFonte[];
+    }),
+    fetchEmpenhadoAcima().catch((err) => {
+      console.warn('Erro ao consultar os itens com empenhado acima do contratado para o dashboard:', err);
+      return [] as EmpenhadoAcima[];
     })
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
@@ -1675,6 +1712,7 @@ export async function fetchManagementDashboardData(
     fornecedoresPncp,
     vinculosAConferir,
     ausentesDaFonte,
+    empenhadoAcima,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate
