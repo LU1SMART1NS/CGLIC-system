@@ -16,7 +16,7 @@ export const DESTINOS_DAS_FONTES: ReadonlyArray<readonly [prefixo: string, desti
 ];
 
 /** Identificação honesta do robô nas fontes oficiais. */
-export const USER_AGENT_DA_SINCRONIZACAO = 'CGLIC-SaldoARP/1.0 (sincronizacao automatica; cglic.vercel.app)';
+export const USER_AGENT_DA_SINCRONIZACAO = 'CGLIC-SaldoARP/1.0 (sincronizacao automatica; comprassusp.app)';
 
 /** Endereço real de uma chamada a uma fonte; endereços que não são das fontes passam como vieram. */
 export function resolverUrlDaFonte(url: string): string {
