@@ -65,14 +65,35 @@ export interface FaturaCarteira {
    */
   pagamentoAConferir?: boolean;
   obsAConferir?: string | null;
+  /**
+   * Para fatura a conferir: o que o saldo contábil do Tesouro diz dos empenhos dela (migration 132). PAGO = o pago
+   * no Tesouro cobre as faturas do empenho; PARCIAL = cobre em parte; NAO_PAGO = não passa do já confirmado.
+   */
+  situacaoTesouro?: SituacaoTesouroFatura | null;
+}
+
+export type SituacaoTesouroFatura = 'PAGO' | 'PARCIAL' | 'NAO_PAGO';
+
+/** O que o Tesouro diz das faturas a conferir, por id da fatura (v_fatura_conferencia_tesouro). */
+async function lerConferenciaTesouro(): Promise<Map<number, SituacaoTesouroFatura>> {
+  const linhas = await lerTudo<{ id_fatura: number; situacao_tesouro: SituacaoTesouroFatura }>(
+    'v_fatura_conferencia_tesouro',
+    'id_fatura, situacao_tesouro',
+    'id_fatura'
+  );
+  return new Map(linhas.map((l) => [Number(l.id_fatura), l.situacao_tesouro]));
 }
 
 export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
-  const linhas = await lerTudo<any>(
-    'v_contrato_faturas',
-    'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros, pagamento_a_conferir, obs_a_conferir',
-    'id_fatura'
-  );
+  const [linhas, tesouro] = await Promise.all([
+    lerTudo<any>(
+      'v_contrato_faturas',
+      'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros, pagamento_a_conferir, obs_a_conferir',
+      'id_fatura'
+    ),
+    // O aviso do Tesouro é um extra: se a leitura falhar, a lista de pagamentos sai sem ele.
+    lerConferenciaTesouro().catch(() => new Map<number, SituacaoTesouroFatura>())
+  ]);
   return linhas.map((f) => ({
     idFatura: Number(f.id_fatura),
     contractKey: String(f.contract_key),
@@ -94,7 +115,8 @@ export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
     empenhosSemVinculo: Number(f.empenhos_sem_vinculo ?? 0),
     empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null,
     pagamentoAConferir: Boolean(f.pagamento_a_conferir),
-    obsAConferir: f.obs_a_conferir ?? null
+    obsAConferir: f.obs_a_conferir ?? null,
+    situacaoTesouro: tesouro.get(Number(f.id_fatura)) ?? null
   }));
 }
 
