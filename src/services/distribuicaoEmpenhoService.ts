@@ -2,14 +2,17 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { rpcInexistente } from './empenhoSyncService';
 
 /**
- * Vínculo da nota de empenho aos itens do contrato (migrations 94 e 104). Nenhuma fonte aberta diz o item da NE:
- * contrato de um item recebe a nota inteira sozinho (AUTO); nos demais o gestor diz a quantidade de cada item. A
+ * Vínculo da nota de empenho aos itens do contrato (migrations 94, 104 e 118). Nenhuma fonte aberta diz o item da NE:
+ * contrato de um item recebe a nota inteira sozinho (AUTO); em contrato de vários itens o servidor vincula pelo valor
+ * quando só um item explica o valor da nota (VALOR); nos demais o gestor diz a quantidade de cada item. A
  * quantidade da nota em um item é a informada pelo gestor, senão a parcela em R$ ÷ preço unitário do item.
  */
 
 export type SituacaoDistribuicao = 'A_DISTRIBUIR' | 'DISTRIBUIDA' | 'REVISAR' | 'SEM_ITENS' | 'SEM_VALOR';
 export type MotivoRevisao = 'ITEM_FORA_DO_CONTRATO' | 'VALOR_MUDOU';
 export type TipoSugestao = 'TOTAL_DO_ITEM' | 'MULTIPLO_DO_PRECO' | 'VARIAS_POSSIBILIDADES' | 'SEM_SUGESTAO';
+/** Quem vinculou a nota aos itens: o servidor (contrato de um item ou pelo valor) ou o gestor. */
+export type OrigemDoVinculo = 'AUTO' | 'VALOR' | 'USUARIO';
 
 export interface ParcelaDoItem {
   numeroItem: number;
@@ -41,8 +44,8 @@ export interface DistribuicaoDoEmpenho {
   itensNoContrato: number;
   situacao: SituacaoDistribuicao;
   motivoRevisao: MotivoRevisao | null;
-  /** AUTO (contrato de um item) ou USUARIO; nulo enquanto não distribuída. */
-  origem: 'AUTO' | 'USUARIO' | null;
+  /** AUTO (contrato de um item), VALOR (só um item explica o valor da nota) ou USUARIO; nulo enquanto não vinculada. */
+  origem: OrigemDoVinculo | null;
   /** Valor da NE quando foi vinculada ou conferida (difere do atual se a nota mudou depois: aviso, a nota continua contando). */
   valorNaDistribuicao: number | null;
   valorDistribuido: number;
@@ -114,8 +117,8 @@ export async function fetchDistribuicoesDoContrato(contractKey: string): Promise
 export const DIAS_VINCULADAS_RECENTES = 30;
 
 /**
- * Fila do menu Vinculação: notas a vincular aos itens (A_DISTRIBUIR e REVISAR) de todos os contratos e as que a
- * equipe vinculou nos últimos dias. Contratos de um item só (AUTO) ficam de fora.
+ * Fila do menu Vinculação: notas a vincular aos itens (A_DISTRIBUIR e REVISAR) de todos os contratos, as vinculadas
+ * pelo valor (para conferir) e as que a equipe vinculou nos últimos dias. Contratos de um item só (AUTO) ficam de fora.
  */
 export async function fetchDistribuicoesParaVincular(): Promise<DistribuicaoDoEmpenho[]> {
   if (!isSupabaseConfigured || !supabase) return [];
@@ -123,7 +126,7 @@ export async function fetchDistribuicoesParaVincular(): Promise<DistribuicaoDoEm
   const { data, error } = await supabase
     .from('v_contrato_empenho_distribuicao')
     .select('*')
-    .or(`situacao.in.(A_DISTRIBUIR,REVISAR),and(origem.eq.USUARIO,distribuido_em.gte.${desde})`);
+    .or(`situacao.in.(A_DISTRIBUIR,REVISAR),origem.eq.VALOR,and(origem.eq.USUARIO,distribuido_em.gte.${desde})`);
   if (error) {
     if (rpcInexistente(error) || error.code === '42P01') return [];
     throw new Error(error.message);
@@ -135,7 +138,7 @@ export interface SituacaoDistribuicaoEmpenho {
   empenhoId: string;
   contractKey: string;
   situacao: SituacaoDistribuicao;
-  origem: 'AUTO' | 'USUARIO' | null;
+  origem: OrigemDoVinculo | null;
 }
 
 /** Situação da divisão por item de cada NE (coluna "Itens" da carteira de Empenhos). */
@@ -185,7 +188,7 @@ export async function conferirQuantidadesEmpenho(contratoEmpenhoId: string): Pro
   if (error) throw new Error(mensagemDoErroDeDistribuicao(error));
 }
 
-/** Desfaz a distribuição feita pelo gestor; a nota volta para "a distribuir". */
+/** Desfaz o vínculo aos itens (do gestor ou pelo valor); a nota volta para a fila e o servidor não a vincula de novo pelo valor. */
 export async function desfazerDistribuicaoEmpenho(contratoEmpenhoId: string): Promise<void> {
   const { error } = await requireSupabase().rpc('desfazer_distribuicao_empenho', { p_contrato_empenho_id: contratoEmpenhoId });
   if (error) throw new Error(mensagemDoErroDeDistribuicao(error));

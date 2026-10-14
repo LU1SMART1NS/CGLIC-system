@@ -127,6 +127,11 @@ const JanelaVincular: React.FC<DistribuirEmpenhoModalProps & { d: DistribuicaoDo
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
         {erro && <NoticeBar tone="danger" testId="distribuir-erro">{erro}</NoticeBar>}
         {revisao && <NoticeBar tone="warning">{revisao}</NoticeBar>}
+        {jaVinculada && !revisao && d.origem === 'VALOR' && (
+          <NoticeBar tone="info">
+            Vinculada pelo valor da nota{d.observacao ? ` (${d.observacao.replace(/\.$/, '')})` : ''}. Salvar substitui o vínculo atual.
+          </NoticeBar>
+        )}
         {jaVinculada && !revisao && d.origem === 'USUARIO' && (
           <NoticeBar tone="info">
             Vinculada aos itens por {d.distribuidoPorNome || 'usuário'}

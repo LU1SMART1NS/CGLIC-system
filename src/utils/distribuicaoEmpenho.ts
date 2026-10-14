@@ -91,7 +91,7 @@ export function sugestaoCurta(tipo: TipoSugestao | null, sugestao: SugestaoDeIte
 export function rotuloDaSituacao(d: Pick<DistribuicaoDoEmpenho, 'situacao' | 'origem'>): { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' } {
   switch (d.situacao) {
     case 'DISTRIBUIDA':
-      return { label: d.origem === 'AUTO' ? 'Vinculada automaticamente' : 'Vinculada', variant: 'success' };
+      return { label: d.origem === 'AUTO' ? 'Vinculada automaticamente' : d.origem === 'VALOR' ? 'Vinculada pelo valor' : 'Vinculada', variant: 'success' };
     case 'A_DISTRIBUIR':
       return { label: 'A vincular', variant: 'warning' };
     case 'REVISAR':
@@ -102,6 +102,16 @@ export function rotuloDaSituacao(d: Pick<DistribuicaoDoEmpenho, 'situacao' | 'or
       return { label: 'Sem valor', variant: 'neutral' };
   }
 }
+
+/** Quem vinculou a nota aos itens, numa frase curta (Contrato 360). */
+export function textoDaOrigem(d: Pick<DistribuicaoDoEmpenho, 'origem' | 'distribuidoPorNome' | 'distribuidoEm'>, formatarData: (iso: string) => string): string {
+  if (d.origem === 'AUTO') return 'Vinculada automaticamente: contrato de um item';
+  if (d.origem === 'VALOR') return 'Vinculada pelo valor da nota';
+  return `Vinculada por ${d.distribuidoPorNome || 'usuário'}${d.distribuidoEm ? ` em ${formatarData(d.distribuidoEm)}` : ''}`;
+}
+
+/** Vínculo que o gestor pode editar ou desfazer: o dele e o feito pelo valor (o de contrato de um item, não). */
+export const vinculoEditavel = (d: Pick<DistribuicaoDoEmpenho, 'origem'>) => d.origem === 'USUARIO' || d.origem === 'VALOR';
 
 /** Por que o vínculo aos itens precisa de atenção, em uma frase. */
 export function motivoDaRevisao(d: DistribuicaoDoEmpenho): string | null {
