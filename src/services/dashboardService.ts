@@ -449,13 +449,16 @@ export function calculateAttentionSummary(params: {
     const fmt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
     const origem = textoDaOrigem(a.ultimaOrigem);
     const ultima = a.ultimaNota ? ` · última nota: ${a.ultimaNota}${origem ? `, ${origem}` : ''}` : '';
+    // Item de serviço: o excesso é de um período de 12 meses da vigência (migration 137).
+    const dataBr = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
+    const periodo = a.periodoInicio && a.periodoFim ? ` de ${dataBr(a.periodoInicio)} a ${dataBr(a.periodoFim)}` : '';
     items.push({
       id: `ATT-ACIMA-${a.contractKey}-${a.numeroItem}`,
       category: 'EMPENHO_ACIMA',
       severity: 'ATENCAO',
       avisoChave: chaveAvisoEmpenhoAcima(a.contractKey, a.numeroItem, a.quantidadeEmpenhada),
       title: 'Empenhado acima do contratado',
-      description: `Item ${a.numeroItem}: ${fmt(a.quantidadeEmpenhada)} empenhados para ${fmt(a.quantidadeContratada)} contratados (${fmt(a.quantidadeAcima)} acima)${ultima}`,
+      description: `Item ${a.numeroItem}: ${fmt(a.quantidadeEmpenhada)} empenhados${periodo} para ${fmt(a.quantidadeContratada)} contratados (${fmt(a.quantidadeAcima)} acima)${ultima}`,
       contractKey: a.contractKey,
       numeroContrato,
       fornecedorNome: contrato.fornecedorNome,
