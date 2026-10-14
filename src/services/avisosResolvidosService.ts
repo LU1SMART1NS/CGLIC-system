@@ -74,6 +74,14 @@ export function chaveAvisoFonte(contractKey: string, tipo: 'NOTA' | 'FATURA', ch
   return `FONTE::${contractKey}::${tipo}-${chave}-${epoch}`;
 }
 
+/**
+ * Empenhado acima do contratado num item do contrato (migration 133). Usa o tipo FONTE (notas do contrato); a
+ * quantidade empenhada entra na chave, então o aviso volta se o excesso mudar.
+ */
+export function chaveAvisoEmpenhoAcima(contractKey: string, numeroItem: number, quantidadeEmpenhada: number): string {
+  return `FONTE::${contractKey}::ACIMA-${numeroItem}-${Math.round(quantidadeEmpenhada * 100) / 100}`;
+}
+
 /** Reajuste: vale para o ciclo; o próximo ciclo avisa de novo. */
 export function chaveAvisoReajuste(contractKey: string, ciclo: string | number): string {
   return `REAJUSTE::${contractKey}::${ciclo}`;

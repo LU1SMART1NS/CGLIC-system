@@ -202,6 +202,8 @@ export const EmpenhoDetalhe: React.FC<{
   onInformarQuantidade?: (d: DistribuicaoDoEmpenho, numeroItem: number, quantidade: number | null) => void;
   /** Confirma as quantidades depois que o valor da nota mudou. */
   onConferir?: (d: DistribuicaoDoEmpenho) => void;
+  /** Empenhado em cada item do contrato somando todas as notas (para avisar quando passa do contratado). */
+  empenhadoNoItem?: Map<number, number>;
   onAbrirItem: (v: VinculoDoContrato) => void;
   onAbrirFatura?: (idFatura: number) => void;
 }> = ({
@@ -217,6 +219,7 @@ export const EmpenhoDetalhe: React.FC<{
   onDesfazer,
   onInformarQuantidade,
   onConferir,
+  empenhadoNoItem,
   onAbrirItem,
   onAbrirFatura
 }) => {
@@ -338,6 +341,15 @@ export const EmpenhoDetalhe: React.FC<{
                         {i.quantidade != null && (
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>de {qtd(i.quantidade)} contratadas</div>
                         )}
+                        {p && i.quantidade != null && i.quantidade > 0 && (empenhadoNoItem?.get(i.numeroItem) ?? 0) > i.quantidade + 1e-6 && (
+                          // Só aviso (item 6, 14/10/2026): a soma das notas no item passou do contratado.
+                          <div
+                            style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-warning-text)' }}
+                            data-testid={`empenho-acima-${empenho.numero_oficial}-${i.numeroItem}`}
+                          >
+                            item com {qtd(empenhadoNoItem?.get(i.numeroItem) ?? 0)} empenhadas ({qtd((empenhadoNoItem?.get(i.numeroItem) ?? 0) - i.quantidade)} acima)
+                          </div>
+                        )}
                       </td>
                       <td>
                         {vinculo ? (
@@ -415,6 +427,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const vinculoPorItem = React.useMemo(() => new Map((itensDoContrato?.vinculos ?? []).map((v) => [v.numeroItem, v])), [itensDoContrato]);
   const precoDoItem = React.useMemo(() => new Map(itens.map((i) => [i.numeroItem, i.valorUnitario])), [itens]);
   const distribuicaoPorEmpenho = React.useMemo(() => new Map(distribuicoes.map((d) => [d.empenhoId, d])), [distribuicoes]);
+  const empenhadoNoContrato = React.useMemo(() => empenhadoPorItem(distribuicoes, itens), [distribuicoes, itens]);
   const faturas = faturasData?.faturas ?? [];
   const faturasDaNota = (numero: string) => faturas.filter((f) => empenhosDaFatura(f.empenhos).includes(numero));
   const linhas = useLinhasAbertas(abrirEmpenho, 'contract-financial-table', empenhosList.length > 0);
@@ -444,8 +457,21 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
     acoesDistribuicao.informar.mutate(
       { contratoEmpenhoId: d.contratoEmpenhoId, numeroItem, quantidade, versao: d.versao },
       {
-        onSuccess: () =>
-          toast.success(quantidade == null ? `${d.numeroOficial}: quantidade do item ${numeroItem} voltou à calculada.` : `${d.numeroOficial}: ${quantidade} un no item ${numeroItem}.`),
+        onSuccess: () => {
+          toast.success(quantidade == null ? `${d.numeroOficial}: quantidade do item ${numeroItem} voltou à calculada.` : `${d.numeroOficial}: ${quantidade} un no item ${numeroItem}.`);
+          // Só aviso (item 6, 14/10/2026): a gravação vale; avisa se o item passou do contratado.
+          const contratado = itens.find((i) => i.numeroItem === numeroItem)?.quantidade;
+          if (quantidade != null && contratado != null && contratado > 0) {
+            const total = (empenhadoPorItem(distribuicoes, itens, d.contratoEmpenhoId).get(numeroItem) ?? 0) + quantidade;
+            if (total > contratado + 1e-6) {
+              const n = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+              toast.show(
+                `A nota foi gravada. Com ela, o item ${numeroItem} fica com ${n(total)} empenhados para ${n(contratado)} contratados (${n(total - contratado)} acima). Confira as quantidades das notas ou a quantidade contratada.`,
+                'warning'
+              );
+            }
+          }
+        },
         onError: (err: any) => toast.error(err?.message || 'Não foi possível gravar a quantidade.')
       }
     );
@@ -782,7 +808,12 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
               vinculoPorItem={vinculoPorItem}
               faturas={faturasDaNota(e.numero_oficial)}
               podeEditar={podeEditar}
-              desfazendo={acoesDistribuicao.desfazer.isPending && acoesDistribuicao.desfazer.variables === distribuicaoDe(e)?.contratoEmpenhoId}
+              desfazendo={
+                acoesDistribuicao.desfazer.isPending &&
+                (typeof acoesDistribuicao.desfazer.variables === 'string'
+                  ? acoesDistribuicao.desfazer.variables
+                  : acoesDistribuicao.desfazer.variables?.contratoEmpenhoId) === distribuicaoDe(e)?.contratoEmpenhoId
+              }
               gravando={
                 (acoesDistribuicao.informar.isPending && acoesDistribuicao.informar.variables?.contratoEmpenhoId === distribuicaoDe(e)?.contratoEmpenhoId) ||
                 (acoesDistribuicao.conferir.isPending && acoesDistribuicao.conferir.variables === distribuicaoDe(e)?.contratoEmpenhoId)
@@ -791,6 +822,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
               onDesfazer={(d) => void desfazerDistribuicao(d)}
               onInformarQuantidade={informarQuantidade}
               onConferir={conferirQuantidades}
+              empenhadoNoItem={empenhadoNoContrato}
               onAbrirItem={(v) => navigate(`${buildAtaItemPath(v.numeroAta, v.uasgAta, v.numeroItem)}?aba=contratos`)}
               onAbrirFatura={onAbrirFatura}
             />
