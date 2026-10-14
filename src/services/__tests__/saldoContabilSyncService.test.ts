@@ -82,7 +82,7 @@ describe('sincronizarSaldoContabil', () => {
     expect(fetchSaldo.mock.calls.every((c) => c[0] === 2026 && c[1] === '200330')).toBe(true);
     const args = rpc.mock.calls.map((c) => c[1]);
     expect(args.every((a: any) => a.p_ug === '200330' && a.p_ano === 2026 && a.p_linhas.length === 2)).toBe(true);
-    expect(args.map((a: any) => a.p_conta)).toEqual([...CONTAS_SALDO_CONTABIL]);
+    expect(args.map((a: any) => a.p_conta).sort()).toEqual([...CONTAS_SALDO_CONTABIL].sort());
   });
 
   it('falha numa conta vira parcial sem perder as outras; lista vazia mantida vira aviso', async () => {
@@ -95,6 +95,32 @@ describe('sincronizarSaldoContabil', () => {
     expect(r.mensagem).toContain('9 de 10 conta(s) lida(s)');
     expect(r.mensagem).toContain('1 com falha');
     expect(r.mensagem).toContain('1 conta(s) vieram vazias e o saldo anterior foi mantido');
+  });
+
+  it('erro da gravação (objeto do banco) aparece com o texto, não "[object Object]"', async () => {
+    rpc.mockImplementationOnce(async () => ({ data: null, error: { message: 'canceling statement due to statement timeout', code: '57014' } }));
+    const r: any = await sincronizarSaldoContabil('200330', { agora: () => AGORA });
+    expect(r.status).toBe('PARCIAL');
+    expect(r.mensagem).not.toContain('[object Object]');
+    expect(r.mensagem).toMatch(/1 com falha \(ex\.: \d{9}\/2026: .+\)/);
+  });
+
+  it('lê várias contas ao mesmo tempo e conta todas certo', async () => {
+    let emVoo = 0;
+    let maximo = 0;
+    const padrao = fetchSaldo.getMockImplementation()!;
+    fetchSaldo.mockImplementation(async (_a: number, _u: string, conta: string) => {
+      emVoo++;
+      maximo = Math.max(maximo, emVoo);
+      await new Promise((r) => setTimeout(r, 5 + (Number(conta.slice(-2)) % 4) * 3));
+      emVoo--;
+      return [{ conta_corrente: '2025NE00047152', saldo: '1', created_at: '2026-10-13 08:36:23' }];
+    });
+    const r: any = await sincronizarSaldoContabil('200330', { agora: () => AGORA, concorrencia: 4 });
+    expect(maximo).toBe(4);
+    expect(r).toMatchObject({ status: 'SUCESSO', total: 10 });
+    expect(r.mensagem).toContain('10 linha(s) gravada(s)');
+    fetchSaldo.mockImplementation(padrao);
   });
 
   it('o orçamento de tempo deixa o resto para a próxima', async () => {

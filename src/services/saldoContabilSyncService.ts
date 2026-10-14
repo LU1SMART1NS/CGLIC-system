@@ -9,7 +9,7 @@
 import { supabase } from './supabaseClient';
 import { fetchSaldoContabil } from './api';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
-import { executarComReserva, type ResultadoSincronizacao } from './sincronizacaoFontesService';
+import { executarComReserva, mensagemDeErro, type ResultadoSincronizacao } from './sincronizacaoFontesService';
 
 export const RECURSO_SALDO_CONTABIL = 'saldo_contabil' as const;
 export const FONTE_SALDO_CONTABIL = 'Saldo contábil (Tesouro, STA)';
@@ -18,6 +18,11 @@ export const VALIDADE_SALDO_CONTABIL = '5 hours';
 /** Primeiro ano lido: o empenho mais antigo do sistema é de 2016. */
 export const ANO_INICIAL_SALDO_CONTABIL = 2016;
 export const ORCAMENTO_SALDO_CONTABIL_MS = 100_000;
+/**
+ * Contas lidas ao mesmo tempo. Do servidor, cada consulta ao Tesouro levou de 2 a 60 s na primeira execução
+ * (14/10/2026), e uma por vez só cabiam 3 a 5 contas no orçamento; a carga inicial tem 110 por UG.
+ */
+export const CONCORRENCIA_SALDO_CONTABIL = 4;
 
 /** Contas de controle da execução da despesa (exercício e restos a pagar). */
 export const CONTAS_SALDO_CONTABIL = [
@@ -104,7 +109,7 @@ export async function contarSaldoContabilPendentes(ug: string, agora: () => numb
 
 export async function sincronizarSaldoContabil(
   ug: string,
-  opts: { forcar?: boolean; orcamentoMs?: number; agora?: () => number } = {}
+  opts: { forcar?: boolean; orcamentoMs?: number; agora?: () => number; concorrencia?: number } = {}
 ): Promise<ResultadoSincronizacao> {
   const agora = opts.agora ?? (() => Date.now());
   const orcamento = opts.orcamentoMs ?? ORCAMENTO_SALDO_CONTABIL_MS;
@@ -116,24 +121,27 @@ export async function sincronizarSaldoContabil(
     let lidas = 0;
     let linhas = 0;
     let bloqueadas = 0;
-    let pendentes = 0;
+    let proxima = 0;
     const erros: string[] = [];
-    for (let i = 0; i < plano.length; i++) {
-      if (agora() - inicio > orcamento) {
-        pendentes = plano.length - i;
-        break;
+    // Vários trabalhadores pegam a próxima conta da fila; cada um para quando o orçamento de tempo acaba.
+    // Não somar na mesma linha do await (`x += await f()`): com trabalhadores em paralelo, perde somas.
+    const trabalhador = async () => {
+      while (proxima < plano.length) {
+        if (agora() - inicio > orcamento) return;
+        const { ano, conta } = plano[proxima++];
+        try {
+          const lista = (await fetchSaldoContabil(ano, ug, conta)).map(normalizarLinhaSaldo).filter((l): l is LinhaSaldoContabil => l !== null);
+          const r = await gravar(ug, ano, conta, lista);
+          lidas++;
+          linhas += r.gravadas;
+          if (r.bloqueada) bloqueadas++;
+        } catch (err) {
+          erros.push(`${conta}/${ano}: ${mensagemDeErro(err)}`);
+        }
       }
-      const { ano, conta } = plano[i];
-      try {
-        const lista = (await fetchSaldoContabil(ano, ug, conta)).map(normalizarLinhaSaldo).filter((l): l is LinhaSaldoContabil => l !== null);
-        const r = await gravar(ug, ano, conta, lista);
-        lidas++;
-        linhas += r.gravadas;
-        if (r.bloqueada) bloqueadas++;
-      } catch (err) {
-        erros.push(`${conta}/${ano}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.max(1, opts.concorrencia ?? CONCORRENCIA_SALDO_CONTABIL) }, trabalhador));
+    const pendentes = plano.length - proxima;
 
     const partes = [`${lidas} de ${plano.length} conta(s) lida(s)`, `${linhas} linha(s) gravada(s)`];
     if (bloqueadas) partes.push(`${bloqueadas} conta(s) vieram vazias e o saldo anterior foi mantido`);
