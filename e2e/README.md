@@ -8,7 +8,7 @@ Usam o **Chrome instalado na máquina** (nenhum navegador é baixado).
 
 ## Primeira vez
 
-1. Suba nada: o `npm run e2e` inicia o servidor de desenvolvimento sozinho (ou reaproveita o que já estiver em :5173).
+1. Suba o sistema com `npm run dev` (o `e2e:login` precisa dele rodando; o `npm run e2e` sobe sozinho se nada estiver em :5173).
 2. Salve uma sessão: `npm run e2e:login`. Abre o Chrome; entre no sistema normalmente. A senha é digitada
    por você no navegador e nunca é lida pelo script. Só o estado do navegador vai para `e2e/.auth/state.json`
    (ignorado pelo git). Use um usuário com acesso amplo (admin ou gestor) para cobrir as telas de administração.
