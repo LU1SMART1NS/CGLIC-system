@@ -8,7 +8,8 @@ vi.mock('../supabaseClient', () => ({
     },
     functions: {
       invoke: vi.fn()
-    }
+    },
+    rpc: vi.fn()
   }
 }));
 
@@ -19,7 +20,9 @@ import {
   deactivateSystemUser,
   reactivateSystemUser,
   resetUsersInMemory,
-  fetchSystemUsers
+  fetchSystemUsers,
+  fetchSystemUsersAsync,
+  saveSystemUser
 } from '../userService';
 import { supabase } from '../supabaseClient';
 
@@ -198,6 +201,29 @@ describe('userService — integração com Supabase (convite, papéis e desativa
 
       expect(invokeMock).not.toHaveBeenCalled();
       expect(result.ativo).toBe(false);
+    });
+  });
+
+  describe('fetchSystemUsersAsync (item 9, 14/10/2026)', () => {
+    const rpcMock = supabase!.rpc as unknown as ReturnType<typeof vi.fn>;
+
+    it('falha na leitura vira erro, não a cópia antiga do navegador', async () => {
+      saveSystemUser({ nome: 'Antigo Local', email: 'antigo@mj.gov.br', perfil: 'gestor', ativo: true });
+      rpcMock.mockResolvedValue({ data: null, error: { message: 'sem conexão' } });
+      await expect(fetchSystemUsersAsync()).rejects.toThrow('sem conexão');
+    });
+
+    it('lista vazia do banco fica vazia (não completa com o navegador)', async () => {
+      saveSystemUser({ nome: 'Antigo Local', email: 'antigo@mj.gov.br', perfil: 'gestor', ativo: true });
+      rpcMock.mockResolvedValue({ data: [], error: null });
+      expect(await fetchSystemUsersAsync()).toEqual([]);
+    });
+
+    it('usa só o que vem do banco', async () => {
+      rpcMock.mockResolvedValue({ data: [{ id: 'u1', nome: 'Maria', email: 'maria@mj.gov.br', perfil: 'gestor', ativo: true }], error: null });
+      const [u] = await fetchSystemUsersAsync();
+      expect(u).toMatchObject({ id: 'u1', nome: 'Maria', perfil: 'gestor', status: 'ativo' });
+      expect(u).not.toHaveProperty('cargo');
     });
   });
 });

@@ -85,7 +85,7 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     areas: [
       { label: 'Painel', description: 'Consulta, somente os alertas de saldo das Atas' },
       { label: 'Atas e Itens', description: 'Consulta, para acompanhar o saldo dos itens' },
-      { label: 'Alocações', description: 'Gestão completa, inclusive vincular empenhos à unidade interna' },
+      { label: 'Alocações', description: 'Gestão completa das alocações; a unidade interna de cada nota de empenho fica com o gestor da ata e o coordenador' },
       { label: 'Unidades internas', description: 'Gestão' }
     ],
     scope: 'Todas as Atas'

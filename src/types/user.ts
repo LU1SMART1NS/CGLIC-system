@@ -320,9 +320,6 @@ export interface SystemUser {
   id: string;
   nome: string;
   email: string;
-  matricula?: string;
-  cargo?: string;
-  departamento?: string;
   perfil: UserRole;
   status?: UserStatus;
   ativo: boolean;

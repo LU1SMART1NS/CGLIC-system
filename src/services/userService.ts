@@ -60,46 +60,29 @@ export function fetchSystemUsers(): SystemUser[] {
 }
 
 export async function fetchSystemUsersAsync(): Promise<SystemUser[]> {
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase.rpc('get_system_users');
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const localList = fetchSystemUsers();
-        const mappedRemote: SystemUser[] = data.map((u: any) => {
-          const localMatch = localList.find(l => l.email.toLowerCase() === u.email?.toLowerCase());
-          return {
-            id: u.id,
-            nome: u.nome || localMatch?.nome || u.email.split('@')[0],
-            email: u.email,
-            // Fase 0.2: nunca usar 'gestor' como fallback de exibição — get_system_users()
-            // já retorna UNASSIGNED_ROLE_ID quando o usuário não tem nenhuma role real.
-            perfil: (u.perfil as UserRole) || localMatch?.perfil || UNASSIGNED_ROLE_ID,
-            matricula: localMatch?.matricula,
-            cargo: localMatch?.cargo,
-            departamento: localMatch?.departamento,
-            status: (u.status as any) || (u.ativo ? 'ativo' : 'inativo'),
-            ativo: u.ativo ?? true,
-            createdAt: u.created_at,
-            lastSignInAt: u.last_sign_in_at,
-            // Fase 3A: escopo de alocação (não é departamento/lotação do
-            // usuário — é só o valor de autorização, quando aplicável).
-            allocationScopeType: (u.allocation_scope_type as AllocationScopeType) || undefined,
-            allocationScopeValue: u.allocation_scope_value || undefined
-          };
-        });
+  // Sem banco configurado (testes, uso local): lista do navegador.
+  if (!isSupabaseConfigured || !supabase) return fetchSystemUsers();
 
-        // Não complementa com usuários locais que não vieram do Supabase: a RPC
-        // já consulta auth.users diretamente, então qualquer conta real aparece
-        // aqui. Um registro presente só no localStorage é resíduo de uso local
-        // (ex.: convite salvo antes de confirmar) e não deve ser exibido como
-        // se fosse um usuário do sistema.
-        return mappedRemote;
-      }
-    } catch {
-      // Falha graciosa para fallback local
-    }
-  }
-  return fetchSystemUsers();
+  // Com o banco, a lista vem só dele: falha vira erro na tela (antes caía, sem avisar, numa cópia antiga guardada no
+  // navegador). A RPC lê auth.users, então toda conta real aparece aqui.
+  const { data, error } = await supabase.rpc('get_system_users');
+  if (error) throw new Error(error.message || 'Não foi possível carregar os usuários.');
+  return (Array.isArray(data) ? data : []).map((u: any) => ({
+    id: u.id,
+    nome: u.nome || u.email.split('@')[0],
+    email: u.email,
+    // Fase 0.2: nunca usar 'gestor' como fallback de exibição — get_system_users()
+    // já retorna UNASSIGNED_ROLE_ID quando o usuário não tem nenhuma role real.
+    perfil: (u.perfil as UserRole) || UNASSIGNED_ROLE_ID,
+    status: (u.status as any) || (u.ativo ? 'ativo' : 'inativo'),
+    ativo: u.ativo ?? true,
+    createdAt: u.created_at,
+    lastSignInAt: u.last_sign_in_at,
+    // Fase 3A: escopo de alocação (não é departamento/lotação do
+    // usuário — é só o valor de autorização, quando aplicável).
+    allocationScopeType: (u.allocation_scope_type as AllocationScopeType) || undefined,
+    allocationScopeValue: u.allocation_scope_value || undefined
+  }));
 }
 
 export function saveSystemUser(user: Partial<SystemUser> & { nome: string; email: string }): SystemUser {
@@ -138,9 +121,6 @@ export function saveSystemUser(user: Partial<SystemUser> & { nome: string; email
     id: user.id || `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     nome: user.nome.trim(),
     email: user.email.trim(),
-    matricula: user.matricula?.trim() || '',
-    cargo: user.cargo?.trim() || 'Servidor Público',
-    departamento: user.departamento?.trim() || 'SENASP / MJSP',
     perfil: user.perfil || 'gestor',
     status: user.status || 'ativo',
     ativo: user.ativo ?? true,
