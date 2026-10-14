@@ -28,6 +28,15 @@ export const VALIDADE_FATURAS = '6 hours';
 const PAGINA = 1000;
 const NP_FORMATO = /^\d{4}NP\d{6}$/;
 
+/**
+ * NP real: formato ano+NP+6 dígitos e número diferente de zero. A fatura com "Siafi Erro" vem do Contratos.gov.br
+ * com a NP zerada (ex.: 2026NP000000), que não é documento do SIAFI: se entrasse como NP, contratos diferentes
+ * pareceriam pagos pela mesma nota e o Tesouro seria consultado à toa.
+ */
+export function npValida(np: string | null | undefined): boolean {
+  return Boolean(np) && NP_FORMATO.test(np as string) && !/NP0{6}$/.test(np as string);
+}
+
 // -----------------------------------------------------------------------------------------------------
 // Normalização
 // -----------------------------------------------------------------------------------------------------
@@ -86,7 +95,7 @@ export function normalizarFatura(raw: any, contratoIdGov?: string | number | nul
     data_liquidacao: data(raw?.data_liquidacao),
     situacao,
     cancelada: String(raw?.nota_cancelada ?? '').trim().toLowerCase() === 'sim' || situacao === 'Siafi Cancelado',
-    np: NP_FORMATO.test(np) ? np : null,
+    np: npValida(np) ? np : null,
     ug_np: ug,
     referencia: referencias.length > 0 ? [...new Set(referencias)].join(', ') : null,
     processo: texto(raw?.processo),
@@ -301,7 +310,7 @@ export function filaDeNps(
   const limite = ctx.agora - RECONSULTA_HORAS * 3600_000;
   const nps = new Set<string>();
   for (const f of faturas) {
-    if (f.np && !f.cancelada && NP_FORMATO.test(f.np) && !comObValida.has(f.np)) nps.add(f.np);
+    if (f.np && !f.cancelada && npValida(f.np) && !comObValida.has(f.np)) nps.add(f.np);
   }
   const quando = (np: string) => {
     const t = consultas.get(np);

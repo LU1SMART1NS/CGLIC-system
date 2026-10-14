@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   normalizarFatura,
+  npValida,
   normalizarOrdemBancaria,
   filaDeNps,
   filaDeContratos,
@@ -70,6 +71,24 @@ describe('normalizarFatura', () => {
     expect(normalizarFatura({ ...faturaReal, sfadrao_id: '' })?.np).toBeNull();
   });
 
+  it('"Siafi Erro" vem com a NP zerada: não é NP, vira nula e a situação é mantida', () => {
+    const f = normalizarFatura({ ...faturaReal, situacao: 'Siafi Erro', sfadrao_id: '2026NP000000' });
+    expect(f?.np).toBeNull();
+    expect(f?.situacao).toBe('Siafi Erro');
+    expect(f?.ug_np).toBe('200331');
+  });
+
+  it('npValida: aceita NP real, recusa zerada, formato errado e vazio', () => {
+    expect(npValida('2025NP000545')).toBe(true);
+    expect(npValida('2025NP000010')).toBe(true);
+    expect(npValida('2025NP000304')).toBe(true);
+    expect(npValida('2026NP000000')).toBe(false);
+    expect(npValida('2024NP000000')).toBe(false);
+    expect(npValida('2025NP00054')).toBe(false);
+    expect(npValida('')).toBe(false);
+    expect(npValida(null)).toBe(false);
+  });
+
   it('sem id não grava', () => {
     expect(normalizarFatura({ ...faturaReal, id: null })).toBeNull();
   });
@@ -106,7 +125,8 @@ describe('filas', () => {
       { np: '2025NP000004', data_liquidacao: '2025-10-01', cancelada: true },
       { np: '2025NP000005', data_liquidacao: '2025-10-01', cancelada: false },
       { np: '2025NP000005', data_liquidacao: '2025-10-02', cancelada: false },
-      { np: null, data_liquidacao: null, cancelada: false }
+      { np: null, data_liquidacao: null, cancelada: false },
+      { np: '2026NP000000', data_liquidacao: null, cancelada: false }
     ];
     const comOb = new Set(['2025NP000001']);
     const consultas = new Map([
