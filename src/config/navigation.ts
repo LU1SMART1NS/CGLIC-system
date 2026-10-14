@@ -120,7 +120,8 @@ export const navigationConfig: NavItem[] = [
         route: '/contratos',
         status: 'active',
         matchPrefixes: ['/contratos'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        // Gestor de saldo cuida da alocação: sem contratos (o empenhado por unidade fica na Alocação e no Item).
+        allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
         id: 'itens-carteira',

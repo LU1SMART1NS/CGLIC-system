@@ -201,6 +201,17 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     expect(sem).not.toContain('Atenção');
   });
 
+  it('15b. gestor de saldo (sem contratos): some "Notas a vincular" e o saldo não leva à aba de contratos', () => {
+    const onGoTo = vi.fn();
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} onGoTo={onGoTo} verContratos={false} metrics={{ ...baseProps.metrics, notasAVincular: 3 }} />);
+    expect(html).not.toContain('Notas a vincular');
+    expect(html).toContain('data-columns="4"');
+    expect(html).toContain('Saldo SENASP');
+    const completo = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, notasAVincular: 3 }} />);
+    expect(completo).toContain('Notas a vincular');
+    expect(completo).toContain('data-columns="5"');
+  });
+
   it('10. situação do saldo segue as faixas das barras de progresso', () => {
     expect(itemSaldoStatus(0, 0).label).toBe('Saldo esgotado');
     expect(itemSaldoStatus(10, 10).label).toBe('Saldo crítico');

@@ -55,6 +55,8 @@ export interface ItemHeroProps {
   /** Consumo informado pelo Compras.gov comparado ao contratado (só referência). */
   referencia: ComprasGovReferencia;
   onGoTo: (tab: ItemTab) => void;
+  /** false para o gestor de saldo: sem a aba de contratos, os indicadores não levam a ela e "Notas a vincular" some. */
+  verContratos?: boolean;
   /** Abre a Ata 360. Sem ele, o número da ata aparece como texto. */
   onOpenAta?: () => void;
 }
@@ -82,6 +84,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   metrics,
   referencia,
   onGoTo,
+  verContratos = true,
   onOpenAta
 }) => {
   // O item não tem gestor próprio: vale o da ata. Se a consulta falhar, o bloco some (não vira "Não atribuído").
@@ -198,7 +201,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
       ]}
     >
       <div data-testid="item-health-strip">
-        <HealthTileGrid columns={5}>
+        <HealthTileGrid columns={verContratos ? 5 : 4}>
           <HealthTile
             label="Saldo SENASP"
             value={`${formatNumber(metrics.officialSaldo)} un`}
@@ -206,7 +209,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             tooltip={`Saldo de ${formatNumber(metrics.officialSaldo)} un do quantitativo SENASP de ${formatNumber(metrics.itemTotalQty)} un · ${formatCurrencyCompact(metrics.valorFinanceiroDisponivel)} disponíveis · contratado ${formatNumber(metrics.totalEmpenhado)} un (${formatNumber(metrics.empenhoConsumidoPercent)}%)`}
             tone={saldoTone}
             badge={saldoBadge}
-            onClick={() => onGoTo('contratos')}
+            onClick={verContratos ? () => onGoTo('contratos') : undefined}
             testId="item-health-saldo"
           />
           <HealthTile
@@ -232,6 +235,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             onClick={() => onGoTo('quantitativos')}
             testId="item-health-alocacao"
           />
+          {verContratos && (
           <HealthTile
             label="Notas a vincular"
             value={String(notasAVincular)}
@@ -241,13 +245,14 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             onClick={() => onGoTo('contratos')}
             testId="item-health-empenhos"
           />
+          )}
           {acima ? (
             <HealthTile
               label="Pendências"
               value="1"
               hint={[`Diferença ${delta} un`, 'consumo sem contrato vinculado?']}
               tone="ATENCAO"
-              onClick={() => onGoTo('contratos')}
+              onClick={verContratos ? () => onGoTo('contratos') : undefined}
               testId="item-health-reconciliacao"
             />
           ) : (

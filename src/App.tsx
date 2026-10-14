@@ -293,7 +293,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/contratos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                   <ContractsRoute />
                 </RequireRole>
               }
@@ -301,7 +301,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/contratos/:contractKey"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                   <Contract360Route />
                 </RequireRole>
               }
