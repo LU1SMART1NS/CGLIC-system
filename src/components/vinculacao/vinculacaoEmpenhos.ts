@@ -1,5 +1,7 @@
 import type { DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
-import type { EmpenhoForaDoContrato } from '../../services/empenhosForaDoContratoService';
+import type { EmpenhoForaDoContrato, TipoDeCorrecao } from '../../services/empenhosForaDoContratoService';
+import { TIPO_SUGERIDO } from '../../services/empenhosForaDoContratoService';
+import { chaveDaNota, type PagamentoDaFatura } from '../../services/pagamentoDaFaturaService';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { credorDiferenteDoFornecedor } from '../../utils/fornecedorMatch';
 
@@ -98,8 +100,24 @@ const data = (v: string | null) => {
   return d ? `${d}/${m}/${a}` : v;
 };
 
+/**
+ * Notas deste contrato que a OB pagou e a fatura não cita: é nelas que a fatura devia estar. Só quando a OB não paga a
+ * nota citada (se paga, a citação está certa e falta a nota no contrato) e não é nota em dobro (esse caso já manda trocar).
+ */
+export function trocaSugeridaPelaOb(l: EmpenhoForaDoContrato, pagamento?: PagamentoDaFatura | null): string[] {
+  if (!pagamento || l.veredito === 'NOTA_EM_DOBRO') return [];
+  const pagas = new Set(pagamento.obs.flatMap((o) => o.notas.map(chaveDaNota)));
+  if (pagas.has(chaveDaNota(l.numeroEmpenho))) return [];
+  const citadas = new Set([l.numeroEmpenho, ...l.outrasNotasDaFatura.map((n) => n.numeroEmpenho ?? '')].map(chaveDaNota));
+  return pagamento.notasDoContrato.filter((n) => pagas.has(chaveDaNota(n)) && !citadas.has(chaveDaNota(n)));
+}
+
+/** O que a janela "Vou corrigir" já marca: trocar o número quando a OB mostra a nota certa; senão, conforme o veredito. */
+export const tipoSugerido = (l: EmpenhoForaDoContrato, pagamento?: PagamentoDaFatura | null): TipoDeCorrecao =>
+  trocaSugeridaPelaOb(l, pagamento).length > 0 ? 'CORRIGIR_NUMERO_NA_FATURA' : TIPO_SUGERIDO[l.veredito];
+
 /** Texto da conferência de uma nota: o que aconteceu, o que fazer no Contratos.gov.br e os dados. */
-export function conferenciaDaNota(l: EmpenhoForaDoContrato, contrato: ContratoDaConferencia): ConferenciaDaNota {
+export function conferenciaDaNota(l: EmpenhoForaDoContrato, contrato: ContratoDaConferencia, pagamento?: PagamentoDaFatura | null): ConferenciaDaNota {
   const numeroFatura = l.fatura.numero || String(l.idFatura);
   const outros = l.outrosContratos.map(numeroDaChave);
   let frase: string;
@@ -148,6 +166,20 @@ export function conferenciaDaNota(l: EmpenhoForaDoContrato, contrato: ContratoDa
   );
   for (const h of l.homonimas) {
     dados.push(`Há também uma ${l.numeroEmpenho} da UG ${h.uasgEmitente}${h.credorNome ? `, de ${h.credorNome}` : ''}, sem relação com esta.`);
+  }
+
+  // O que a OB diz: qual nota pagou a fatura. Vem por último nos dados e, havendo nota certa neste contrato, abre o "o que fazer".
+  for (const o of pagamento?.obs ?? []) {
+    if (o.notas.length === 0) continue;
+    const cita = o.notas.some((n) => chaveDaNota(n) === chaveDaNota(l.numeroEmpenho));
+    dados.push(`A OB ${o.numero}${o.emissao ? ` (${data(o.emissao)})` : ''} pagou esta fatura com ${juntar(o.notas)}${cita ? ', e a nota citada está entre elas' : ''}.`);
+  }
+  const troca = trocaSugeridaPelaOb(l, pagamento);
+  if (troca.length > 0) {
+    fazer.unshift({
+      se: `A OB pagou esta fatura com ${juntar(troca)}, que ${troca.length === 1 ? 'está' : 'estão'} neste contrato:`,
+      faca: `na fatura ${numeroFatura}, troque a ${l.numeroEmpenho} por ${troca.length === 1 ? 'ela' : 'elas'}.`
+    });
   }
   return { frase, fazer, dados };
 }

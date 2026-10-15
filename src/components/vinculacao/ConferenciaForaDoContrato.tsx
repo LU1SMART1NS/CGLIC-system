@@ -2,11 +2,11 @@ import React from 'react';
 import { ActionButton, AppButton, AppSelect, AppTextarea, Modal, NoticeBar } from '../../design-system';
 import {
   ROTULO_DO_TIPO,
-  TIPO_SUGERIDO,
   type EmpenhoForaDoContrato,
   type TipoDeCorrecao
 } from '../../services/empenhosForaDoContratoService';
-import { abrirContratosGov, conferenciaDaNota, type ContratoDaConferencia } from './vinculacaoEmpenhos';
+import { usePagamentoDaFatura } from '../../hooks/usePagamentoDaFatura';
+import { abrirContratosGov, conferenciaDaNota, tipoSugerido, type ContratoDaConferencia } from './vinculacaoEmpenhos';
 
 const OBS_MAX = 500;
 
@@ -30,7 +30,8 @@ export const PainelDaConferencia: React.FC<{
   podeMarcar: boolean;
   onVouCorrigir: () => void;
 }> = ({ linha, contrato, podeMarcar, onVouCorrigir }) => {
-  const c = conferenciaDaNota(linha, contrato);
+  const pagamento = usePagamentoDaFatura(linha.idFatura, linha.contractKey).data;
+  const c = conferenciaDaNota(linha, contrato, pagamento);
   return (
     <div
       data-testid={`vinc-ne-contrato-conferencia-${linha.chave}`}
@@ -108,9 +109,10 @@ export const VouCorrigirDialog: React.FC<{
   onMarcar: (tipo: TipoDeCorrecao, observacao: string) => void;
   onFechar: () => void;
 }> = ({ linha, contrato, isLoading, erro, onMarcar, onFechar }) => {
-  const [tipo, setTipo] = React.useState<TipoDeCorrecao>(TIPO_SUGERIDO[linha.veredito]);
+  const pagamento = usePagamentoDaFatura(linha.idFatura, linha.contractKey).data;
+  const [tipo, setTipo] = React.useState<TipoDeCorrecao>(tipoSugerido(linha, pagamento));
   const [obs, setObs] = React.useState('');
-  const c = conferenciaDaNota(linha, contrato);
+  const c = conferenciaDaNota(linha, contrato, pagamento);
   const longa = obs.trim().length > OBS_MAX;
   return (
     <Modal

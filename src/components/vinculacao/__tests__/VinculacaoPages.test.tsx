@@ -10,6 +10,7 @@ vi.mock('../../../hooks/useConferenciaNota', () => ({
   useConferenciasDaNota: vi.fn(() => ({ data: [] })),
   useAcoesCorrecaoDaNota: () => ({ marcar: { mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null }, desfazer: { mutate: vi.fn(), isPending: false } })
 }));
+vi.mock('../../../hooks/usePagamentoDaFatura', () => ({ usePagamentoDaFatura: () => ({ data: null }) }));
 vi.mock('../../../hooks/useEmpenhosForaDoContrato', () => ({
   useEmpenhosForaDoContrato: vi.fn(),
   useAcoesCorrecaoNaFonte: () => ({ marcar: { mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null }, desfazer: { mutate: vi.fn(), isPending: false } })
