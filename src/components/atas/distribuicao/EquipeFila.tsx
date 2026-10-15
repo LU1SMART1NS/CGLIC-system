@@ -12,16 +12,13 @@ import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { DistribuicaoItens } from './DistribuicaoItens';
 import type { DistribuicaoLinha } from './distribuicaoEquipe';
 import type { ContratoAVincular } from './contratosSemAta';
-import { PESO_COMPLEXIDADE, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import { contemBusca } from './filaComum';
 import { AlterarNivelModal } from './AlterarNivelModal';
-import { ROTULO_NIVEL, avaliarSubida, percentual, type AvaliacaoSubida, type NivelGestor, type NivelRegistrado } from './nivelGestor';
+import { OcupacaoBarra, escalaDeOcupacao } from './OcupacaoBarra';
+import { PESO_COMPLEXIDADE } from './complexidade';
+import { ROTULO_NIVEL, avaliarSubida, type AvaliacaoSubida, type NivelGestor, type NivelRegistrado } from './nivelGestor';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
-
-/** Cores das faixas de complexidade (barra empilhada e legenda). */
-export const COR_COMPLEXIDADE: Record<NivelComplexidade, string> = { ALTA: 'var(--primary)', MEDIA: '#5b8bd6', BAIXA: '#c7d7f0' };
-const NIVEIS: NivelComplexidade[] = ['ALTA', 'MEDIA', 'BAIXA'];
 
 const CarteiraCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
   <div title={`Valor registrado das atas: ${formatCurrencyCompact(l.atas.valor)} · Valor vigente dos contratos: ${formatCurrencyCompact(l.contratos.valor)}`}>
@@ -30,44 +27,6 @@ const CarteiraCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
     </div>
   </div>
 );
-
-const RELACAO_ROTULO = { ACIMA: 'Acima da média', NA_MEDIA: 'Na média', ABAIXO: 'Abaixo da média' } as const;
-
-/**
- * Ocupação e complexidade numa coluna só: a barra tem o tamanho da ocupação (carga ÷ capacidade do nível), dividida
- * pelo peso de cada complexidade; o tracejado marca a média da equipe. Sem número: a palavra já diz a situação.
- */
-const OcupacaoCell: React.FC<{ l: DistribuicaoLinha; escala: number; media: number | null }> = ({ l, escala, media }) => {
-  const largura = escala > 0 ? Math.min(l.ocupacao / escala, 1) * 100 : 0;
-  return (
-    <div
-      style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '190px' }}
-      title={`A barra mostra a ocupação (carga ÷ capacidade do nível ${percentual(l.capacidade)}), dividida pelo peso de cada complexidade. O tracejado é a média da equipe.`}
-    >
-      {l.relacaoEquipe && (
-        <span
-          data-testid={`distribuicao-relacao-${l.gestorNome}`}
-          style={{ fontSize: '0.78rem', fontWeight: 800, color: l.relacaoEquipe === 'ACIMA' ? 'var(--color-danger-text)' : '#475569', whiteSpace: 'nowrap' }}
-        >
-          {RELACAO_ROTULO[l.relacaoEquipe]}
-        </span>
-      )}
-      <div style={{ position: 'relative', height: '10px', background: '#f1f5f9', borderRadius: '3px' }} aria-hidden="true">
-        <div style={{ display: 'flex', gap: '1px', height: '100%', width: `${largura}%`, borderRadius: '3px', overflow: 'hidden' }}>
-          {NIVEIS.map((n) => (
-            <div key={n} style={{ flex: l.complexidade[n] * PESO_COMPLEXIDADE[n], background: COR_COMPLEXIDADE[n] }} />
-          ))}
-        </div>
-        {media !== null && escala > 0 && (
-          <span style={{ position: 'absolute', top: '-3px', bottom: '-3px', left: `${Math.min(media / escala, 1) * 100}%`, borderLeft: '2px dashed #64748b' }} />
-        )}
-      </div>
-      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
-        {NIVEIS.map((n) => `${l.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')}
-      </div>
-    </div>
-  );
-};
 
 const COR_NIVEL: Record<NivelGestor, { bg: string; fg: string }> = {
   INICIANTE: { bg: 'var(--color-warning-bg-strong)', fg: 'var(--color-warning-text)' },
@@ -191,7 +150,7 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, c
   const sort = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
 
   // Mesma régua para todas as barras: a maior ocupação da equipe ocupa quase toda a largura.
-  const escala = React.useMemo(() => Math.max(0, ...linhas.map((l) => l.ocupacao), mediaOcupacao ?? 0) * 1.1, [linhas, mediaOcupacao]);
+  const escala = React.useMemo(() => escalaDeOcupacao(linhas, mediaOcupacao), [linhas, mediaOcupacao]);
   const avaliacoes = React.useMemo(() => {
     const map = new Map<string, AvaliacaoSubida | null>();
     for (const l of linhas) {
@@ -288,7 +247,7 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, c
                           <CarteiraCell l={l} />
                         </td>
                         <td data-label="Ocupação" style={carteiraTd} data-testid={`distribuicao-ocupacao-${nome}`}>
-                          <OcupacaoCell l={l} escala={escala} media={mediaOcupacao} />
+                          <OcupacaoBarra l={l} escala={escala} media={mediaOcupacao} />
                         </td>
                         <td data-label="Pressão agora" style={carteiraTd}>
                           <PressaoCell l={l} aVincular={aVincularDe(nome).length} />
