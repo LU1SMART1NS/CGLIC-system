@@ -184,6 +184,14 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
 
   const totalAtasCount = selectedAta ? 1 : atas.length;
 
+  // No resumo por ata, só ata e fornecedor saem preenchidos; o resto (item, saldo, alocação, contrato) sai "Consolidado" ou "-".
+  const colunasSoPorItem = granularity === 'BY_ATA'
+    ? ALL_REPORT_COLUMNS.filter(c =>
+        selectedColumnIds.includes(c.id) &&
+        c.group !== 'ata' && c.group !== 'link' &&
+        c.id !== 'fornecedorRazaoSocial' && c.id !== 'fornecedorCnpj' && c.id !== 'descricaoItem')
+    : [];
+
   return (
     <Modal
       isOpen={isOpen}
@@ -365,7 +373,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
               <select
                 className="form-input"
                 value={granularity}
-                onChange={(e) => setGranularity(e.target.value as ReportGranularity)}
+                onChange={(e) => { const g = e.target.value as ReportGranularity; setGranularity(g); savePreferences(selectedColumnIds, preset, g); }}
                 style={{ width: '100%', fontSize: '0.82rem', padding: '0.45rem 0.6rem', fontWeight: 600 }}
               >
                 <option value="BY_ITEM">1 Linha por Item (Detalhado com Saldos)</option>
@@ -373,6 +381,18 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 <option value="BY_ALLOCATION">1 Linha por Alocação Setorial (Diretorias)</option>
                 <option value="MULTI_SHEET">Pasta Completa com Múltiplas Abas</option>
               </select>
+              {colunasSoPorItem.length > 0 && (
+                <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.6rem', borderRadius: '6px', background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', color: 'var(--color-warning-text)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                  Neste nível sai uma linha por ata: {colunasSoPorItem.length === 1 ? 'a coluna' : 'as colunas'} {colunasSoPorItem.slice(0, 3).map(c => `"${c.label}"`).join(', ')}{colunasSoPorItem.length > 3 ? ` e mais ${colunasSoPorItem.length - 3}` : ''} não {colunasSoPorItem.length === 1 ? 'terá' : 'terão'} os dados de cada item.{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setGranularity('BY_ITEM'); savePreferences(selectedColumnIds, preset, 'BY_ITEM'); }}
+                    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+                  >
+                    Mudar para 1 linha por item
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Escopo */}

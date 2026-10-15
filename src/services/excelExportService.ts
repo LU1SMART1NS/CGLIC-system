@@ -656,13 +656,21 @@ export async function buildFlattenedReportData(
     };
 
     if (granularity === 'BY_ATA' || items.length === 0) {
+      // Fornecedor(es) da ata vêm dos itens: em regra um por ata; se houver mais, todos separados por "; ".
+      const fornecedores = new Map<string, { nome: string; cnpj: string }>();
+      for (const item of items) {
+        const nome = item.nomeRazaoSocialFornecedor?.trim() || '';
+        const cnpj = item.niFornecedor ? formatCnpjBr(item.niFornecedor) : '';
+        if (nome || cnpj) fornecedores.set(cnpj || nome, { nome: nome || '-', cnpj: cnpj || '-' });
+      }
+      const listaFornecedores = [...fornecedores.values()];
       rows.push({
         ...baseAtaInfo,
         numeroItem: items.length === 0 ? '-' : 'Consolidado',
         codigoPdm: null,
         descricaoItem: arp.objeto || '-',
-        fornecedorRazaoSocial: '-',
-        fornecedorCnpj: '-',
+        fornecedorRazaoSocial: listaFornecedores.map((f) => f.nome).join('; ') || '-',
+        fornecedorCnpj: listaFornecedores.map((f) => f.cnpj).join('; ') || '-',
         classificacaoFornecedor: '-',
         tipoItem: '-',
         valorUnitario: 0,
