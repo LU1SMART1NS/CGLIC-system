@@ -9,17 +9,23 @@
  * com erro explícito, sem enviar o convite.
  */
 export const ALLOWED_INVITE_ORIGINS: readonly string[] = Object.freeze([
-  // Domínio canônico de produção.
   'https://comprassusp.app',
-  // Domínios anteriores da Vercel. Ainda são aceitos como origem do admin, mas o link do
-  // convite é sempre redirecionado ao domínio canônico.
   'https://cglic.vercel.app',
   'https://cglic-lu1smart1ns-projects.vercel.app',
   'http://localhost:5173'
 ]);
 
-const CANONICAL_ORIGIN = 'https://comprassusp.app';
-const LEGACY_ORIGINS: readonly string[] = [
+/**
+ * Endereço para onde o link do convite leva, qualquer que seja a origem de produção do admin.
+ *
+ * Provisório (15/10/2026): na rede do Ministério da Justiça o firewall troca o certificado de
+ * comprassusp.app (domínio novo) por um da CA interna, e o navegador recusa o site. Enquanto a
+ * CGTI não libera o domínio, os convites levam a cglic.vercel.app, que abre normalmente.
+ * Para voltar ao domínio novo, trocar esta constante por 'https://comprassusp.app'.
+ */
+const CANONICAL_ORIGIN = 'https://cglic.vercel.app';
+const PRODUCTION_ORIGINS: readonly string[] = [
+  'https://comprassusp.app',
   'https://cglic.vercel.app',
   'https://cglic-lu1smart1ns-projects.vercel.app'
 ];
@@ -38,6 +44,6 @@ export function resolveInviteRedirect(origin: unknown): InviteRedirectResult {
     };
   }
 
-  const finalOrigin = LEGACY_ORIGINS.includes(requestedOrigin) ? CANONICAL_ORIGIN : requestedOrigin;
+  const finalOrigin = PRODUCTION_ORIGINS.includes(requestedOrigin) ? CANONICAL_ORIGIN : requestedOrigin;
   return { ok: true, redirectTo: `${finalOrigin}/definir-senha` };
 }
