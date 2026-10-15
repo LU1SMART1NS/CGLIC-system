@@ -73,7 +73,8 @@ import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
 import { QuantitativosTab } from './item-balances/QuantitativosTab';
-import { InteresseGtiBotao, InteresseGtiGaveta, useInteresseGti } from './item-balances/InteresseGti';
+import { useInteresseGti } from './item-balances/InteresseGti';
+import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from './gti/InteresseGti';
 import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOrgaoTab';
 import { adesoesDaSenasp, papelDoItem } from '../utils/quantitativosOutroOrgao';
 import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
@@ -671,15 +672,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       />
 
       {/* Gaveta entre o cartão e as abas; some junto com o cartão quando ele encolhe ao rolar. */}
-      {ataDaCglic && gtiAberto && (
-        <div className="i360-fold" data-i360-fold="">
-          <div className="i360-fold-in">
-            <div style={{ marginBottom: '1.5rem' }}>
-              <InteresseGtiGaveta fatias={fatiasGti} onFechar={() => setGtiAberto(false)} />
-            </div>
-          </div>
-        </div>
-      )}
+      {ataDaCglic && <InteresseGtiNoTopo fatias={fatiasGti} aberto={gtiAberto} onFechar={() => setGtiAberto(false)} explicacao={EXPLICACAO_GTI.item} />}
 
       <Instrument360Tabs
         ref={tabsRef}

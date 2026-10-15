@@ -42,6 +42,8 @@ interface Ata360HeaderProps {
   /** Ata publicada no PNCP sem fornecedor (atas_fornecedor_pncp): selo no cartão e botão do coordenador. */
   fornecedorPncp?: RegistroFornecedorPncp | null;
   onIndicarFornecedor?: () => void;
+  /** Botões abaixo dos indicadores (ex.: Interesse por GTI); encolhem junto com o cartão. */
+  verMais?: React.ReactNode;
 }
 
 export const pncpLinkStyle: React.CSSProperties = {
@@ -88,7 +90,8 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   onOpenItens,
   onBack,
   fornecedorPncp = null,
-  onIndicarFornecedor
+  onIndicarFornecedor,
+  verMais
 }) => {
   const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
@@ -272,6 +275,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
             <HealthTile label="Ações" value="Nenhuma" hint="tudo em dia" positive onClick={onOpenActions} testId="ata-health-acoes" />
           )}
         </HealthTileGrid>
+        {verMais}
       </div>
     </Instrument360Hero>
   );

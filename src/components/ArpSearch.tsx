@@ -165,7 +165,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       // 4. Papel da SENASP (gerenciada pela CGLIC ou de outro órgão)
       if (!passaFiltroPapel(arp, filterState.papel)) return false;
 
-      // 4b. GTI do ComprasSUSP (fatia da quantidade registrada dos participantes)
+      // 4b. GTI do ComprasSUSP (fatia do valor registrado dos participantes, migration 141)
       if (!passaFiltroGti(fatiasDaArp(arp), filterState.gti, filterState.gtiModo)) return false;
 
       // 5. Filtro de Gestor
