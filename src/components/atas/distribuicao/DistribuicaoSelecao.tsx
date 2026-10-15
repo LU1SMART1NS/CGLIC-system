@@ -110,7 +110,9 @@ interface SelecaoBarProps {
   totalFiltrado: number;
   onSelecionarTodas: () => void;
   onLimpar: () => void;
-  onAtribuir: () => void;
+  onAtribuir?: () => void;
+  /** Botão de ação no lugar de "Atribuir a..." (ex.: confirmar as sugestões das UASGs selecionadas). */
+  acao?: React.ReactNode;
   testIdPrefix: string;
 }
 
@@ -124,6 +126,7 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
   onSelecionarTodas,
   onLimpar,
   onAtribuir,
+  acao,
   testIdPrefix
 }) => (
   <div
@@ -155,16 +158,18 @@ export const SelecaoBar: React.FC<SelecaoBarProps> = ({
     )}
     <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.4rem' }}>
       <ActionButton action="limpar" type="button" size="sm" onClick={onLimpar} data-testid={`${testIdPrefix}-limpar-selecao`} />
-      <AppButton
-        type="button"
-        variant="primary"
-        size="sm"
-        onClick={onAtribuir}
-        data-testid={`${testIdPrefix}-atribuir-selecionadas`}
-        icon={<UserPlus size={14} />}
-      >
-        Atribuir a...
-      </AppButton>
+      {acao ?? (
+        <AppButton
+          type="button"
+          variant="primary"
+          size="sm"
+          onClick={onAtribuir}
+          data-testid={`${testIdPrefix}-atribuir-selecionadas`}
+          icon={<UserPlus size={14} />}
+        >
+          Atribuir a...
+        </AppButton>
+      )}
     </span>
   </div>
 );

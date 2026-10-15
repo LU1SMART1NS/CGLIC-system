@@ -14,6 +14,7 @@ import {
 } from '../../design-system';
 import { AdminListShell } from './shared/AdminListShell';
 import { CarteiraSegmentTabs, type CarteiraSegment } from '../carteira/CarteiraSegmentTabs';
+import { SELECIONADA_BG, SelecaoBar, useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
 import { GtiTag } from '../gti/GtiVisual';
 import { useAuth } from '../../context/AuthContext';
 import { useDefinirGruposUasgs, useUasgsParticipantesGti } from '../../hooks/useGruposGti';
@@ -71,7 +72,16 @@ export const GruposUasgsPage: React.FC = () => {
     );
   }, [linhas, situacao, busca]);
 
-  const comSugestaoVisiveis = visiveis.filter((l) => l.situacao === 'A_CONFIRMAR');
+  // Seleção em lote (mesmo padrão da Central de Distribuição): só UASG com sugestão e ainda sem grupo.
+  const selecionavel = (l: Linha) => podeEditar && !l.grupo && l.sugestao !== null;
+  const chavesSelecionaveis = React.useMemo(() => visiveis.filter(selecionavel).map((l) => l.uasg), [visiveis, podeEditar]); // eslint-disable-line react-hooks/exhaustive-deps
+  const selecao = useSelecaoFila(chavesSelecionaveis);
+  const selecionadas = visiveis.filter((l) => selecao.selecionadas.has(l.uasg) && l.sugestao);
+  const todasMarcadas = chavesSelecionaveis.length > 0 && chavesSelecionaveis.every((k) => selecao.selecionadas.has(k));
+  const marcarTodasRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (marcarTodasRef.current) marcarTodasRef.current.indeterminate = selecao.selecionadas.size > 0 && !todasMarcadas;
+  }, [selecao.selecionadas, todasMarcadas]);
 
   const escolher = async (l: Linha, valor: string) => {
     const grupo = (GRUPOS_CONFIRMAVEIS as readonly string[]).includes(valor) ? (valor as GrupoConfirmavel) : null;
@@ -86,17 +96,21 @@ export const GruposUasgsPage: React.FC = () => {
     }
   };
 
-  const confirmarSugestoes = async () => {
-    const lista = comSugestaoVisiveis.filter((l) => l.sugestao);
+  const confirmarSelecionadas = async () => {
+    const lista = selecionadas;
     if (lista.length === 0) return;
+    const porGrupo = new Map<GrupoConfirmavel, number>();
+    for (const l of lista) if (l.sugestao) porGrupo.set(l.sugestao, (porGrupo.get(l.sugestao) ?? 0) + 1);
+    const resumo = GRUPOS_CONFIRMAVEIS.filter((g) => porGrupo.has(g)).map((g) => `${GRUPO_GTI_INFO[g].rotulo} ${porGrupo.get(g)}`).join(' · ');
     const ok = await confirm({
-      title: `Confirmar ${lista.length} ${lista.length === 1 ? 'sugestão' : 'sugestões'}?`,
-      message: 'Cada UASG desta lista fica com o grupo sugerido pelo sistema. Confira a lista antes: dá para corrigir uma a uma depois.',
+      title: `Confirmar a sugestão de ${lista.length} ${lista.length === 1 ? 'UASG' : 'UASGs'}?`,
+      message: `Cada UASG selecionada fica com o grupo sugerido: ${resumo}. Dá para corrigir uma a uma depois.`,
       confirmLabel: 'Confirmar sugestões'
     });
     if (!ok) return;
     try {
       const n = await definir.mutateAsync(lista.map((l) => ({ uasg: l.uasg, grupo: l.sugestao })));
+      selecao.limpar();
       toast.success(`${n} ${n === 1 ? 'UASG confirmada' : 'UASGs confirmadas'}.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível confirmar as sugestões.');
@@ -111,6 +125,27 @@ export const GruposUasgsPage: React.FC = () => {
   ];
 
   const columns: Column<Linha>[] = [
+    ...(podeEditar
+      ? [
+          {
+            key: 'selecionar',
+            header: '',
+            width: '36px',
+            mobileLabel: 'Selecionar',
+            render: (l: Linha) =>
+              selecionavel(l) ? (
+                <input
+                  type="checkbox"
+                  checked={selecao.selecionadas.has(l.uasg)}
+                  onChange={() => selecao.alternar(l.uasg)}
+                  aria-label={`Selecionar UASG ${l.uasg}`}
+                  data-testid={`selecionar-uasg-${l.uasg}`}
+                  style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                />
+              ) : null
+          } as Column<Linha>
+        ]
+      : []),
     {
       key: 'uasg',
       header: 'UASG',
@@ -226,17 +261,42 @@ export const GruposUasgsPage: React.FC = () => {
                 data-testid="grupos-uasgs-busca"
               />
             </div>
-            {podeEditar && situacao === 'A_CONFIRMAR' && comSugestaoVisiveis.length > 0 && (
-              <ActionButton
-                action="aplicarSugestao"
-                size="sm"
-                label={`Confirmar ${comSugestaoVisiveis.length === 1 ? 'a sugestão' : `as ${comSugestaoVisiveis.length} sugestões`} da lista`}
-                onClick={() => void confirmarSugestoes()}
-                isLoading={definir.isPending && salvando === null}
-                data-testid="confirmar-sugestoes"
-              />
+            {chavesSelecionaveis.length > 0 && (
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                <input
+                  ref={marcarTodasRef}
+                  type="checkbox"
+                  checked={todasMarcadas}
+                  onChange={() => selecao.alternarVarias(chavesSelecionaveis)}
+                  data-testid="marcar-todas-sugestoes"
+                  style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                />
+                Marcar as {chavesSelecionaveis.length} com sugestão nesta lista
+              </label>
             )}
           </div>
+
+          {selecionadas.length > 0 && (
+            <SelecaoBar
+              quantidade={selecionadas.length}
+              singular="UASG"
+              plural="UASGs"
+              totalFiltrado={chavesSelecionaveis.length}
+              onSelecionarTodas={() => selecao.selecionarTodas(chavesSelecionaveis)}
+              onLimpar={selecao.limpar}
+              acao={
+                <ActionButton
+                  action="aplicarSugestao"
+                  size="sm"
+                  label={`Confirmar ${selecionadas.length === 1 ? 'a sugestão' : 'as sugestões'}`}
+                  onClick={() => void confirmarSelecionadas()}
+                  isLoading={definir.isPending && salvando === null}
+                  data-testid="confirmar-selecionadas"
+                />
+              }
+              testIdPrefix="grupos-uasgs"
+            />
+          )}
 
           <AdminListShell
             title="UASGs participantes"
@@ -250,7 +310,13 @@ export const GruposUasgsPage: React.FC = () => {
             emptyTitle={situacao === 'A_CONFIRMAR' && !busca ? 'Nenhuma UASG com sugestão a confirmar.' : 'Nenhuma UASG nesta lista.'}
             testId="grupos-uasgs-lista"
           >
-            <DataTable columns={columns} data={visiveis} keyExtractor={(l) => l.uasg} testId="grupos-uasgs-tabela" />
+            <DataTable
+              columns={columns}
+              data={visiveis}
+              keyExtractor={(l) => l.uasg}
+              rowStyle={(l) => (selecao.selecionadas.has(l.uasg) ? { background: SELECIONADA_BG } : undefined)}
+              testId="grupos-uasgs-tabela"
+            />
           </AdminListShell>
         </>
       )}
