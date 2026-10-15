@@ -32,10 +32,13 @@ import { useContratosDoFinanceiro, uasgDaChave } from '../financeiro/useContrato
 import { dataBR, normalizarBusca } from '../financeiro/financeiroFormat';
 import { VinculacaoPageHeader } from './VinculacaoPageHeader';
 import { PainelDaConferencia, VouCorrigirDialog } from './ConferenciaForaDoContrato';
-import { abrirContratosGov, noSegmento, type SegmentoForaDoContrato } from './vinculacaoEmpenhos';
+import { abrirContratosGov, deixadaComoEsta, noSegmento, passaVigencia, pedeOGestor, type FiltroVigencia, type SegmentoForaDoContrato } from './vinculacaoEmpenhos';
+import { MarcaDeixada, textoEncerrado, useDeixarComoEsta } from './DeixarComoEsta';
+import { chaveAvisoDeixarFatura } from '../../services/avisosResolvidosService';
 
 interface Filtros {
   situacao: SegmentoForaDoContrato;
+  vigencia: string;
   veredito: string;
   uasg: string;
   gestor: string;
@@ -45,6 +48,7 @@ const TODOS = 'TODOS';
 const PAGE_SIZE = 20;
 const SCHEMA: CarteiraFilterSchema<Filtros> = {
   situacao: { param: 'situacao', default: 'A_CONFERIR' },
+  vigencia: { param: 'vigencia', default: 'VIGENTES', values: ['VIGENTES', 'ENCERRADOS', TODOS] },
   veredito: { param: 'conferencia', default: TODOS },
   uasg: { param: 'uasg', default: TODOS },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
@@ -75,16 +79,35 @@ export const EmpenhosContratoPage: React.FC = () => {
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
   const [marcando, setMarcando] = useState<EmpenhoForaDoContrato | null>(null);
 
-  const todas = useMemo(() => {
+  // Contrato encerrado: se a correção na fonte não muda mais nada, o gestor deixa a linha como está (sai da fila e do menu).
+  const deixar = useDeixarComoEsta(
+    'A fatura continua citando a nota fora do contrato no Contratos.gov.br; só a fila e o número do menu deixam de cobrar. Se o contrato voltar a ficar vigente, a linha volta à fila. Dá para reexibir a qualquer momento.'
+  );
+  const marcaDe = (l: EmpenhoForaDoContrato) => deixar.porChave.get(chaveAvisoDeixarFatura(l.contractKey, l.idFatura, l.idEmpenhoGov));
+  const deixada = (l: EmpenhoForaDoContrato) => deixadaComoEsta(contrato(l.contractKey).expirado, Boolean(marcaDe(l)));
+
+  const noEscopo = useMemo(() => {
     const linhas = consulta.data ?? [];
     return escopo ? linhas.filter((l) => escopo.has(l.contractKey)) : linhas;
   }, [consulta.data, escopo]);
+  // O filtro Vigência vale para todos os segmentos; as deixadas como está só aparecem em "Todas".
+  const todas = useMemo(
+    () => noEscopo.filter((l) => passaVigencia(contrato(l.contractKey).expirado, filters.vigencia as FiltroVigencia)),
+    [noEscopo, contrato, filters.vigencia]
+  );
   const doContrato = (l: EmpenhoForaDoContrato) => contrato(l.contractKey);
   const contagem = useMemo(
-    () => ({ A_CONFERIR: todas.filter((l) => noSegmento(l, 'A_CONFERIR')).length, CORRIGINDO: todas.filter((l) => noSegmento(l, 'CORRIGINDO')).length, TODAS: todas.length }),
-    [todas]
+    () => ({
+      A_CONFERIR: todas.filter((l) => noSegmento(l, 'A_CONFERIR') && !deixada(l)).length,
+      CORRIGINDO: todas.filter((l) => noSegmento(l, 'CORRIGINDO') && !deixada(l)).length,
+      TODAS: todas.length
+    }),
+    [todas, deixar.porChave, contrato] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const doSegmento = useMemo(() => todas.filter((l) => noSegmento(l, filters.situacao)), [todas, filters.situacao]);
+  const doSegmento = useMemo(
+    () => todas.filter((l) => noSegmento(l, filters.situacao) && (filters.situacao === 'TODAS' || !deixada(l))),
+    [todas, filters.situacao, deixar.porChave, contrato] // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const uasgs = useMemo(() => {
     const m = new Map<string, number>();
     for (const l of doSegmento) m.set(uasgDaChave(l.contractKey), (m.get(uasgDaChave(l.contractKey)) ?? 0) + 1);
@@ -172,7 +195,7 @@ export const EmpenhosContratoPage: React.FC = () => {
       <VinculacaoPageHeader
         title="Empenhos citados fora do contrato"
         subtitle="Notas que uma fatura cita, mas que o Contratos.gov.br não lista no contrato da fatura."
-        hint={'Abra a conferência para ver o que aconteceu. A correção é sempre no Contratos.gov.br: incluir a nota no contrato, mudar a fatura de contrato ou corrigir o número. Marque "Vou corrigir" e corrija lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a correção.'}
+        hint={'Abra a conferência para ver o que aconteceu. A correção é sempre no Contratos.gov.br: incluir a nota no contrato, mudar a fatura de contrato ou corrigir o número. Marque "Vou corrigir" e corrija lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a correção. Em contrato encerrado, se a correção não muda mais nada, deixe como está, com justificativa.'}
       />
 
       {isBusy ? (
@@ -205,6 +228,17 @@ export const EmpenhosContratoPage: React.FC = () => {
             counter={carteiraCounter(lista.length, doSegmento.length, hasActive, 'nota', 'notas')}
             testIdPrefix="vinc-ne-contrato"
           >
+            <CarteiraFilterButton
+              label="Vigência"
+              value={filters.vigencia}
+              emptyValue={TODOS}
+              options={[
+                { value: 'VIGENTES', label: 'Vigentes' },
+                { value: 'ENCERRADOS', label: 'Encerrados', count: noEscopo.filter((l) => pedeOGestor(l) && contrato(l.contractKey).expirado).length }
+              ]}
+              onChange={(v) => setFilter('vigencia', v)}
+              testId="vinc-ne-contrato-filter-vigencia"
+            />
             <CarteiraFilterButton
               label="Conferência"
               value={filters.veredito}
@@ -273,10 +307,13 @@ export const EmpenhosContratoPage: React.FC = () => {
                               <div style={carteiraFornecedor} title={c.fornecedorNome}>
                                 {c.fornecedorNome ?? '—'}
                               </div>
+                              {c.expirado && <div style={subtle}>{textoEncerrado(c.vigenciaFim)}</div>}
                             </td>
                             <td data-label="Conferência" style={carteiraTd}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-                                {l.situacao === 'CORRIGINDO' && l.correcao ? (
+                                {deixada(l) ? (
+                                  <MarcaDeixada marca={marcaDe(l)!} testId={`vinc-ne-contrato-deixada-${l.chave}`} />
+                                ) : l.situacao === 'CORRIGINDO' && l.correcao ? (
                                   <StatusBadge
                                     label={`Corrigindo na fonte · ${l.correcao.porNome || '—'}, ${new Date(l.correcao.em).toLocaleDateString('pt-BR')}`}
                                     variant="info"
@@ -287,7 +324,7 @@ export const EmpenhosContratoPage: React.FC = () => {
                                 ) : (
                                   <StatusBadge label={ROTULO_DO_VEREDITO[l.veredito]} variant={COR_DO_VEREDITO[l.veredito]} size="sm" dot={false} />
                                 )}
-                                {l.situacao === 'CORRECAO_NAO_CHEGOU' && <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>A correção não chegou</span>}
+                                {!deixada(l) && l.situacao === 'CORRECAO_NAO_CHEGOU' && <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>A correção não chegou</span>}
                               </div>
                             </td>
                             <td data-label="Valor da fatura" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>{formatCurrency(l.fatura.valorLiquido)}</td>
@@ -311,7 +348,32 @@ export const EmpenhosContratoPage: React.FC = () => {
                                   onClick={() => alternar(l.chave)}
                                   data-testid={`vinc-ne-contrato-conferir-${l.chave}`}
                                 />
-                                {podeMarcar && l.situacao === 'CORRIGINDO' && (
+                                {podeMarcar && deixada(l) && (
+                                  <ActionButton
+                                    action="reexibir"
+                                    size="sm"
+                                    title="Tira a marca: a linha volta para a fila"
+                                    onClick={() => deixar.reexibir(chaveAvisoDeixarFatura(l.contractKey, l.idFatura, l.idEmpenhoGov), l.numeroEmpenho)}
+                                    disabled={deixar.reexibindo}
+                                    data-testid={`vinc-ne-contrato-reexibir-${l.chave}`}
+                                  />
+                                )}
+                                {podeMarcar && c.expirado && !deixada(l) && (
+                                  <ActionButton
+                                    action="deixarComoEsta"
+                                    size="sm"
+                                    title="Contrato encerrado: a linha sai da fila e do número do menu, com justificativa"
+                                    onClick={() =>
+                                      deixar.abrir({
+                                        chave: chaveAvisoDeixarFatura(l.contractKey, l.idFatura, l.idEmpenhoGov),
+                                        titulo: l.numeroEmpenho,
+                                        contexto: `fatura ${l.fatura.numero || l.idFatura} · ${formatCurrency(l.fatura.valorLiquido)} · contrato ${c.numero}${c.fornecedorNome ? ` (${c.fornecedorNome})` : ''}, ${textoEncerrado(c.vigenciaFim)}`
+                                      })
+                                    }
+                                    data-testid={`vinc-ne-contrato-deixar-${l.chave}`}
+                                  />
+                                )}
+                                {podeMarcar && !deixada(l) && l.situacao === 'CORRIGINDO' && (
                                   <ActionButton
                                     action="desfazer"
                                     label="Desfazer marca"
@@ -352,6 +414,7 @@ export const EmpenhosContratoPage: React.FC = () => {
         </>
       )}
 
+      {deixar.dialog}
       {marcando && (
         <VouCorrigirDialog
           linha={marcando}

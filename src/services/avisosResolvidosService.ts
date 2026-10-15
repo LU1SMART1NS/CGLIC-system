@@ -83,6 +83,20 @@ export function chaveAvisoEmpenhoAcima(contractKey: string, numeroItem: number, 
   return `FONTE::${contractKey}::ACIMA-${numeroItem}-${Math.round(quantidadeEmpenhada * 100) / 100}`;
 }
 
+/**
+ * Nota de contrato encerrado que o gestor deixou sem vincular aos itens (fila Vínculos › Empenhos aos itens).
+ * Usa o tipo FONTE. A marca só vale enquanto o contrato está encerrado: se ele voltar a ficar vigente
+ * (prorrogação), a nota volta à fila e a marca fica guardada para o próximo encerramento.
+ */
+export function chaveAvisoDeixarNota(contractKey: string, contratoEmpenhoId: string): string {
+  return `FONTE::${contractKey}::DEIXAR-NOTA-${contratoEmpenhoId}`;
+}
+
+/** Nota citada fora de contrato encerrado que o gestor deixou sem corrigir na fonte (fila Vínculos › Empenhos ao contrato). */
+export function chaveAvisoDeixarFatura(contractKey: string, idFatura: number, idEmpenhoGov: string): string {
+  return `FONTE::${contractKey}::DEIXAR-FATURA-${idFatura}-${idEmpenhoGov}`;
+}
+
 /** Reajuste: vale para o ciclo; o próximo ciclo avisa de novo. */
 export function chaveAvisoReajuste(contractKey: string, ciclo: string | number): string {
   return `REAJUSTE::${contractKey}::${ciclo}`;

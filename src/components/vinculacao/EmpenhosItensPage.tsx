@@ -24,6 +24,7 @@ import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
+import { formatCurrency } from '../carteira/carteiraFormat';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { SELECIONADA_BG, SelecaoCell, SelecaoHeaderCell, useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
@@ -31,7 +32,21 @@ import { useContratosDoFinanceiro, uasgDaChave } from '../financeiro/useContrato
 import { dataBR, normalizarBusca } from '../financeiro/financeiroFormat';
 import { VinculacaoPageHeader } from './VinculacaoPageHeader';
 import { VincularAosItensDialog } from './VincularAosItensDialog';
-import { aguardaVinculoAosItens, entraNoLote, ordenarFila, passaFiltroSugestao, temSugestaoUnica, vinculadaPelaEquipe, vinculadaPeloValor, type FiltroSugestao } from './vinculacaoEmpenhos';
+import { MarcaDeixada, textoEncerrado, useDeixarComoEsta } from './DeixarComoEsta';
+import { chaveAvisoDeixarNota } from '../../services/avisosResolvidosService';
+import {
+  aguardaVinculoAosItens,
+  deixadaComoEsta,
+  entraNoLote,
+  ordenarFila,
+  passaFiltroSugestao,
+  passaVigencia,
+  temSugestaoUnica,
+  vinculadaPelaEquipe,
+  vinculadaPeloValor,
+  type FiltroSugestao,
+  type FiltroVigencia
+} from './vinculacaoEmpenhos';
 
 interface Filtros {
   fila: string;
@@ -76,11 +91,26 @@ export const EmpenhosItensPage: React.FC = () => {
   const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
 
-  // Perfil gestor: só as notas dos próprios contratos.
+  // Contrato encerrado: nada mais será empenhado; o gestor pode deixar a nota como está (sai da fila e do menu).
+  const deixar = useDeixarComoEsta(
+    'A nota continua "a vincular" no Contrato 360 e no Financeiro; só a fila e o número do menu deixam de cobrar. Se o contrato voltar a ficar vigente, a nota volta à fila. Dá para reexibir a qualquer momento.'
+  );
+  const marcaDe = (d: DistribuicaoDoEmpenho) => deixar.porChave.get(chaveAvisoDeixarNota(d.contractKey, d.contratoEmpenhoId));
+  const deixada = (d: DistribuicaoDoEmpenho) => deixadaComoEsta(contrato(d.contractKey).expirado, Boolean(marcaDe(d)));
+
+  // Perfil gestor: só as notas dos próprios contratos. O filtro Vigência vale para todos os segmentos; as deixadas
+  // como está só aparecem em "Todos".
   const visiveis = useMemo(() => (escopo ? todas.filter((d) => escopo.has(d.contractKey)) : todas), [todas, escopo]);
-  const aVincular = useMemo(() => visiveis.filter(aguardaVinculoAosItens), [visiveis]);
-  const daEquipe = useMemo(() => visiveis.filter(vinculadaPelaEquipe), [visiveis]);
-  const peloValor = useMemo(() => visiveis.filter(vinculadaPeloValor), [visiveis]);
+  const naVigencia = useMemo(
+    () => visiveis.filter((d) => passaVigencia(contrato(d.contractKey).expirado, filters.vigencia as FiltroVigencia)),
+    [visiveis, contrato, filters.vigencia]
+  );
+  const aVincular = useMemo(
+    () => naVigencia.filter((d) => aguardaVinculoAosItens(d) && (filters.vigencia === TODOS || !deixada(d))),
+    [naVigencia, filters.vigencia, deixar.porChave, contrato] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const daEquipe = useMemo(() => naVigencia.filter(vinculadaPelaEquipe), [naVigencia]);
+  const peloValor = useMemo(() => naVigencia.filter(vinculadaPeloValor), [naVigencia]);
   const aConferir = useMemo(() => (escopo ? conferencias.filter((c) => escopo.has(c.contractKey)) : conferencias), [conferencias, escopo]);
   const vinculadas = filters.fila !== 'A_VINCULAR';
   const base = filters.fila === 'EQUIPE' ? daEquipe : filters.fila === 'VALOR' ? peloValor : aVincular;
@@ -100,8 +130,6 @@ export const EmpenhosItensPage: React.FC = () => {
     const q = normalizarBusca(filters.busca);
     const filtradas = base.filter((d) => {
       const c = contrato(d.contractKey);
-      if (filters.vigencia === 'VIGENTES' && c.expirado) return false;
-      if (filters.vigencia === 'ENCERRADOS' && !c.expirado) return false;
       if (!passaFiltroSugestao(d, filters.sugestao as FiltroSugestao)) return false;
       if (filters.uasg !== TODOS && (d.uasgEmitente || uasgDaChave(d.contractKey)) !== filters.uasg) return false;
       if (showGestorFilter && !matchesGestorFilter(c.gestorNome, filters.gestor)) return false;
@@ -129,7 +157,7 @@ export const EmpenhosItensPage: React.FC = () => {
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chave, PAGE_SIZE);
 
   // Lote "Vincular pela sugestão": só notas a vincular com sugestão única.
-  const selecao = useSelecaoFila(useMemo(() => aVincular.filter(entraNoLote).map(chave), [aVincular, chave]));
+  const selecao = useSelecaoFila(useMemo(() => aVincular.filter((d) => entraNoLote(d) && !deixada(d)).map(chave), [aVincular, chave])); // eslint-disable-line react-hooks/exhaustive-deps
   const selecionadas = aVincular.filter((d) => selecao.selecionadas.has(chave(d)));
   const chavesDaPagina = pageItems.filter(entraNoLote).map(chave);
   const [confirmandoLote, setConfirmandoLote] = useState(false);
@@ -218,7 +246,7 @@ export const EmpenhosItensPage: React.FC = () => {
       <VinculacaoPageHeader
         title="Empenhos a vincular aos itens"
         subtitle="Notas de empenho de contratos com dois ou mais itens. Cada nota só entra no empenhado do item depois de vinculada aos itens."
-        hint="O servidor lê cada nota no SIAFI e a vincula aos itens que ela diz, sem clique; essas não aparecem aqui. Quando a nota e o contrato não batem, a nota vai para “Conferir no Contratos.gov.br”. Quando a nota não diz o item ou a quantidade, ela fica em “A vincular”."
+        hint="O servidor lê cada nota no SIAFI e a vincula aos itens que ela diz, sem clique; essas não aparecem aqui. Quando a nota e o contrato não batem, a nota vai para “Conferir no Contratos.gov.br”. Quando a nota não diz o item ou a quantidade, ela fica em “A vincular”. Em contrato encerrado nada mais será empenhado: se a nota não vale o trabalho de vincular, deixe como está, com justificativa; a linha sai da fila e do número do menu."
       />
 
       {isBusy ? (
@@ -262,8 +290,9 @@ export const EmpenhosItensPage: React.FC = () => {
                 emptyValue={TODOS}
                 options={[
                   { value: 'VIGENTES', label: 'Vigentes' },
-                  { value: 'ENCERRADOS', label: 'Encerrados' }
+                  { value: 'ENCERRADOS', label: 'Encerrados', count: visiveis.filter((d) => aguardaVinculoAosItens(d) && contrato(d.contractKey).expirado).length }
                 ]}
+
                 onChange={(v) => setFilter('vigencia', v)}
                 testId="vinc-empenhos-filter-vigencia"
               />
@@ -371,7 +400,7 @@ export const EmpenhosItensPage: React.FC = () => {
                               </div>
                               <div style={subtle}>
                                 {plural(d.itensNoContrato, 'item', 'itens')}
-                                {c.expirado ? ' · contrato encerrado' : ''}
+                                {c.expirado ? ` · ${textoEncerrado(c.vigenciaFim)}` : ''}
                               </div>
                             </td>
                             <td data-label="Emissão" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>{dataBR(d.dataEmissao)}</td>
@@ -411,11 +440,17 @@ export const EmpenhosItensPage: React.FC = () => {
                               )}
                             </td>
                             <td data-label="Situação" style={carteiraTd}>
-                              <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
-                              {d.situacao === 'REVISAR' && (
-                                <div style={subtle} title={motivoDaRevisao(d) ?? undefined}>
-                                  {d.motivoRevisao === 'VALOR_MUDOU' ? 'valor da nota mudou' : 'item fora do contrato'}
-                                </div>
+                              {deixada(d) ? (
+                                <MarcaDeixada marca={marcaDe(d)!} testId={`vinc-empenhos-deixada-${d.numeroOficial}`} />
+                              ) : (
+                                <>
+                                  <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
+                                  {d.situacao === 'REVISAR' && (
+                                    <div style={subtle} title={motivoDaRevisao(d) ?? undefined}>
+                                      {d.motivoRevisao === 'VALOR_MUDOU' ? 'valor da nota mudou' : 'item fora do contrato'}
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </td>
                             {showGestorFilter && (
@@ -443,6 +478,31 @@ export const EmpenhosItensPage: React.FC = () => {
                                     Não é este item
                                   </ActionButton>
                                 )}{' '}
+                                {filters.fila === 'A_VINCULAR' && deixada(d) && (
+                                  <ActionButton
+                                    action="reexibir"
+                                    size="sm"
+                                    title="Tira a marca: a nota volta para a fila"
+                                    onClick={() => deixar.reexibir(chaveAvisoDeixarNota(d.contractKey, d.contratoEmpenhoId), d.numeroOficial)}
+                                    disabled={deixar.reexibindo}
+                                    data-testid={`vinc-empenhos-reexibir-${d.numeroOficial}`}
+                                  />
+                                )}
+                                {filters.fila === 'A_VINCULAR' && c.expirado && !deixada(d) && (
+                                  <ActionButton
+                                    action="deixarComoEsta"
+                                    size="sm"
+                                    title="Contrato encerrado: a nota sai da fila e do número do menu, com justificativa"
+                                    onClick={() =>
+                                      deixar.abrir({
+                                        chave: chaveAvisoDeixarNota(d.contractKey, d.contratoEmpenhoId),
+                                        titulo: d.numeroOficial,
+                                        contexto: `${formatCurrency(d.valorNota)} · contrato ${c.numero}${c.fornecedorNome ? ` (${c.fornecedorNome})` : ''}, ${textoEncerrado(c.vigenciaFim)}`
+                                      })
+                                    }
+                                    data-testid={`vinc-empenhos-deixar-${d.numeroOficial}`}
+                                  />
+                                )}{' '}
                                 <ActionButton action="vincular" size="sm" onClick={() => setNota(d)} data-testid={`vinc-empenhos-vincular-${d.numeroOficial}`}>
                                   {vinculadas ? 'Editar o vínculo' : 'Vincular aos itens'}
                                 </ActionButton>
@@ -464,6 +524,7 @@ export const EmpenhosItensPage: React.FC = () => {
       )}
 
       {confirmDialog}
+      {deixar.dialog}
       <VincularAosItensDialog nota={nota} numeroContrato={nota ? contrato(nota.contractKey).numero : ''} onFechar={() => setNota(null)} />
 
       <Modal
