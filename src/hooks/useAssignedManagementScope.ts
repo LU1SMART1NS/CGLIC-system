@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAllContractManagers } from './useAllContractManagers';
 import { useAllAtaManagers, useArpItemContractLinks } from './useAtaManagers';
+import { escopoDoGestor } from '../utils/escopoDoGestor';
 
 export interface AssignedManagementScope {
   /** `undefined` = sem restrição (perfil diferente de "gestor"). */
@@ -24,41 +25,33 @@ export interface AssignedManagementScope {
  * nunca um array vazio nesse caso, para não ser confundido com "gestor sem
  * nada atribuído ainda".
  */
-export function useAssignedManagementScope(uasg?: string): AssignedManagementScope {
+export function useAssignedManagementScope(
+  uasg?: string,
+  /** Coordenador e consulta: carteira de um gestor escolhido no filtro da Visão Geral (o perfil "gestor" ignora). */
+  opts: { gestorUserId?: string } = {}
+): AssignedManagementScope {
   const { user, role } = useAuth();
   const isGestor = role === 'gestor';
+  const userId = isGestor ? user?.id : opts.gestorUserId;
 
   const { data: contractManagers, isLoading: loadingContractManagers } = useAllContractManagers(uasg);
   const { data: ataManagers, isLoading: loadingAtaManagers } = useAllAtaManagers();
-  const { data: links, isLoading: loadingLinks } = useArpItemContractLinks(isGestor);
+  const { data: links, isLoading: loadingLinks } = useArpItemContractLinks(Boolean(userId));
 
   return useMemo(() => {
-    if (!isGestor || !user) {
+    if (!userId) {
       return { contractKeys: undefined, ataKeys: undefined, isLoading: false };
     }
-
-    const directContractKeys = new Set<string>();
-    for (const manager of Object.values(contractManagers || {})) {
-      if (manager.gestorUserId === user.id) directContractKeys.add(manager.contractKey);
-    }
-
-    const directAtaKeys = new Set<string>();
-    for (const manager of Object.values(ataManagers || {})) {
-      if (manager.gestorUserId === user.id) directAtaKeys.add(manager.ataKey);
-    }
-
-    const contractKeys = new Set(directContractKeys);
-    const ataKeys = new Set(directAtaKeys);
-
-    for (const link of links || []) {
-      if (directAtaKeys.has(link.ataKey)) contractKeys.add(link.contractKey);
-      if (directContractKeys.has(link.contractKey)) ataKeys.add(link.ataKey);
-    }
-
+    const { contractKeys, ataKeys } = escopoDoGestor(
+      userId,
+      Object.values(contractManagers || {}),
+      Object.values(ataManagers || {}),
+      links || []
+    );
     return {
       contractKeys: Array.from(contractKeys),
       ataKeys: Array.from(ataKeys),
       isLoading: loadingContractManagers || loadingAtaManagers || loadingLinks
     };
-  }, [isGestor, user, contractManagers, ataManagers, links, loadingContractManagers, loadingAtaManagers, loadingLinks]);
+  }, [userId, contractManagers, ataManagers, links, loadingContractManagers, loadingAtaManagers, loadingLinks]);
 }

@@ -30,6 +30,11 @@ vi.mock('../../hooks/useSincronizacaoContratos', () => ({
   })
 }));
 
+// Carteiras de atas e contratos das gavetas: só são lidas com uma gaveta aberta.
+vi.mock('../../hooks/usePainelCarteira', () => ({
+  usePainelCarteira: () => ({ atas: [], contratos: [], gestores: [], isLoading: false })
+}));
+
 vi.mock('../../hooks/useRefreshItemSaldos', () => ({
   useRefreshItemSaldos: () => ({ refresh: vi.fn(), isRefreshing: false })
 }));

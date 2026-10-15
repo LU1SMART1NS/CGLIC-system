@@ -959,6 +959,69 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
 .vg-chip:hover { background: rgba(255, 255, 255, 0.18); }
 .vg-chip[aria-pressed='true'] { background: #ffffff; color: var(--primary); }
 .vg-chip[aria-pressed='true'] strong { color: var(--primary); }
+/* Visão Geral: botões das áreas (gavetas) na faixa encolhida, separados dos números. */
+.vg-chips--gavetas { padding-left: 14px; border-left: 1px solid rgba(255, 255, 255, 0.3); }
+.vg-chips--gavetas .vg-chip { align-items: center; }
+.vg-chips--gavetas .vg-chip[aria-expanded='true'] { background: #ffffff; color: var(--primary); }
+@media (max-width: 767px) { .vg-chips--gavetas { display: none; } }
+
+/* Visão Geral: filtros, botões das áreas e gavetas (PainelFiltros, PainelGavetas, Gaveta*). */
+.pn-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: -0.5rem; }
+.pn-gavetas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pn-gavetas-lbl { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.pn-gaveta-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px 6px 14px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill); background: var(--bg-card); color: var(--primary); font: inherit; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
+.pn-gaveta-btn:hover { border-color: var(--border-color-hover); background: var(--primary-light); }
+.pn-gaveta-btn:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.pn-gaveta-resumo { font-weight: 500; font-size: 0.8rem; color: var(--text-secondary); }
+.pn-gaveta-resumo--atencao { color: var(--color-warning-text); font-weight: 700; }
+.pn-gaveta-seta { color: var(--text-muted); transition: transform 0.2s ease-in-out; flex: none; }
+.pn-gaveta-btn[aria-expanded='true'] { background: var(--primary); border-color: var(--primary); color: #ffffff; }
+.pn-gaveta-btn[aria-expanded='true'] .pn-gaveta-resumo, .pn-gaveta-btn[aria-expanded='true'] .pn-gaveta-seta { color: #ffffff; }
+.pn-gaveta-btn[aria-expanded='true'] .pn-gaveta-seta { transform: rotate(180deg); }
+.pn-gaveta { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 14px 16px; }
+.pn-gaveta-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 12px; }
+.pn-gaveta-head h2 { margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-primary); }
+.pn-gaveta-sub { flex: 1 1 16rem; font-size: 0.8rem; color: var(--text-muted); }
+
+/* Gaveta Situação e Alocação: barras divididas em faixas. */
+.pn-situacao { display: grid; gap: 12px 28px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.pn-situacao-bloco { min-width: 0; }
+.pn-situacao-bloco h3 { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 10px; font-size: 0.875rem; font-weight: 700; color: var(--text-primary); }
+.pn-situacao-bloco h3 span { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
+.pn-barra-linha { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.8125rem; color: var(--text-secondary); }
+.pn-barra-rotulo strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.pn-barra { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; background: var(--border-color); }
+.pn-barra-trecho { flex-basis: 0; min-width: 6px; height: 100%; padding: 0; border: 0; cursor: pointer; }
+.pn-barra-trecho:hover { filter: brightness(0.92); }
+.pn-barra-trecho:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; }
+.pn-legenda { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.75rem; color: var(--text-secondary); }
+.pn-legenda i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; }
+.pn-legenda strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.pn-cor-ok { background: var(--color-success-solid); }
+.pn-cor-atencao { background: var(--color-warning-solid); }
+.pn-cor-critico { background: var(--color-danger-solid); }
+.pn-cor-neutro { background: var(--color-info-border); }
+
+/* Gaveta Distribuição: um cartão por gestor, lado a lado. */
+.pn-gcards { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+.pn-gcard { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+  background: var(--bg-card); font: inherit; color: var(--text-primary); text-align: left; cursor: pointer; }
+.pn-gcard:hover { border-color: var(--border-color-hover); box-shadow: var(--shadow-sm); }
+.pn-gcard:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.pn-gcard--sem { background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+.pn-gc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 0.85rem; }
+.pn-gc-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pn-gc-ir { flex: none; font-size: 0.78rem; font-weight: 700; color: var(--primary); }
+.pn-gc-corpo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pn-gc-lado { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pn-gc-lado + .pn-gc-lado { padding-left: 8px; border-left: 1px solid var(--border-color); }
+.pn-gc-rotulo { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
+.pn-gc-num { font-size: 1.25rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pn-gc-tags { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 0.75rem; color: var(--text-muted); }
+.pn-gc-tag--atencao { color: var(--color-warning-text); font-weight: 700; }
+.pn-gc-tag--critico { color: var(--color-danger-text); font-weight: 700; }
+
 .vg-rail { border-radius: 8px 8px 0 0; transition: background-color var(--i360-t) var(--i360-ease), padding var(--i360-t) var(--i360-ease); }
 .i360-head.min .vg-rail { background-color: #eef3fb; border-bottom: 2px solid #bfcde6; padding: 6px 8px; }
 .i360-head.min .vg-rail .segment-pills__rail { background: #ffffff; }
