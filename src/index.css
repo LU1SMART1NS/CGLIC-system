@@ -19,6 +19,15 @@
   --primary-light: rgba(12, 50, 111, 0.1);
   --primary-rgb: 12, 50, 111;
 
+  /* Grupos de Trabalho Integrados (GTI) do ComprasSUSP: cor de cada grupo nas fatias das atas (migration 139). */
+  --gti-ligabom: #c2410c;
+  --gti-cncg: #1f5fbf;
+  --gti-cnpc: #6d3fc0;
+  --gti-condpci: #0f766e;
+  --gti-consesp: #0c326f;
+  --gti-outros: #94a3b8;
+  --gti-a-confirmar: #e2e8f0;
+
   /* Cores semânticas: fonte única. Todo componente deve usar estes tokens, nunca o hex.
      Hoje têm os valores históricos do app; a adoção da paleta gov.br muda só estas linhas. */
   --color-danger-bg: #fdf2f0;

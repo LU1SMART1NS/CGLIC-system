@@ -20,6 +20,9 @@ import { SincronizacaoFalhaNotice } from './carteira/SincronizacaoFalhaNotice';
 import type { ArpRecord, ArpItemRecord } from '../types';
 import { AvisoCarregando } from '../design-system';
 import { chaveGestaoDaArp, contarPorPapel, passaFiltroPapel } from '../utils/ataIdentidade';
+import { useFatiasGti } from '../hooks/useGruposGti';
+import { chaveAtaGti, contarPorGti, passaFiltroGti, pctDoGti } from '../config/gruposGti';
+import type { ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
 
 interface ArpSearchProps {
   onSelectArp: (arp: ArpRecord) => void;
@@ -63,8 +66,23 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   }, [scopedArps, itemsByAta, onArpsLoaded]);
 
   // Filtros na URL (?situacao=&alocacao=&empenho=&gestor=&busca=): sobrevivem à ida ao detalhe e permitem link já filtrado.
-  const { filters: filterState, setFilter: handleFilterChange, resetFilters: handleResetFilters } =
+  const { filters: filterState, setFilter, setFilters, resetFilters: handleResetFilters } =
     useCarteiraFilters(ARP_FILTER_SCHEMA);
+  // Tirar o GTI também volta o "Contar" ao padrão (uma só mudança de endereço).
+  const handleFilterChange = useCallback(
+    <K extends keyof ArpPortfolioFilterState>(key: K, value: ArpPortfolioFilterState[K]) => {
+      if (key === 'gti' && value === 'TODOS') setFilters({ gti: 'TODOS', gtiModo: 'PRINCIPAL' });
+      else setFilter(key, value);
+    },
+    [setFilter, setFilters]
+  );
+
+  // Fatia de cada GTI do ComprasSUSP nas atas (migration 139): coluna e filtro "GTI".
+  const fatiasGti = useFatiasGti();
+  const fatiasDaArp = useCallback(
+    (arp: ArpRecord) => fatiasGti.get(chaveAtaGti(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora)),
+    [fatiasGti]
+  );
 
   const handleSelectStatus = useCallback(
     (status: ArpVigenciaFilterOption) => handleFilterChange('statusVigencia', status),
@@ -110,6 +128,16 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     [scopedArps, filterState.statusVigencia]
   );
 
+  // Quantas atas da situação escolhida cada GTI traria no modo de contar escolhido.
+  const gtiCounts = useMemo(
+    () =>
+      contarPorGti(
+        scopedArps.filter((arp) => matchesStatusFilter(getArpPrazo(arp).faixa, filterState.statusVigencia)).map(fatiasDaArp),
+        filterState.gtiModo
+      ),
+    [scopedArps, filterState.statusVigencia, filterState.gtiModo, fatiasDaArp]
+  );
+
   const gestoresDisponiveis = useMemo(
     () => listGestores(scopedArps.map((arp) => gestorByAta[chaveGestaoDaArp(arp)])),
     [scopedArps, gestorByAta]
@@ -137,6 +165,9 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       // 4. Papel da SENASP (gerenciada pela CGLIC ou de outro órgão)
       if (!passaFiltroPapel(arp, filterState.papel)) return false;
 
+      // 4b. GTI do ComprasSUSP (fatia da quantidade registrada dos participantes)
+      if (!passaFiltroGti(fatiasDaArp(arp), filterState.gti, filterState.gtiModo)) return false;
+
       // 5. Filtro de Gestor
       if (showGestorFilter && !matchesGestorFilter(gestorByAta[chaveGestaoDaArp(arp)], filterState.gestor)) return false;
 
@@ -162,8 +193,16 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       }
 
       return true;
-    }).sort((a, b) => comparePrazo(getArpPrazo(a).dias, getArpPrazo(b).dias));
-  }, [scopedArps, filterState, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta]);
+    }).sort((a, b) => {
+      // Com o GTI escolhido, as atas em que ele tem a maior fatia vêm primeiro.
+      const gti = filterState.gti;
+      if (gti !== 'TODOS') {
+        const diferenca = pctDoGti(fatiasDaArp(b), gti) - pctDoGti(fatiasDaArp(a), gti);
+        if (diferenca !== 0) return diferenca;
+      }
+      return comparePrazo(getArpPrazo(a).dias, getArpPrazo(b).dias);
+    });
+  }, [scopedArps, filterState, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta, fatiasDaArp]);
 
   // Carregar itens para as atas filtradas
   useEffect(() => {
@@ -245,6 +284,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         empenhoCounts={nivelCounts.empenho}
         ataAssinadaCounts={nivelCounts.ataAssinada}
         papelCounts={papelCounts}
+        gtiCounts={gtiCounts}
         showGestorFilter={showGestorFilter}
         onChangeFilter={handleFilterChange}
         onResetFilters={handleResetFilters}
@@ -261,6 +301,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         itemsLoadingByAta={itemsLoadingByAta}
         saldoStatsByAta={saldoStatsByAta}
         execucaoPorAta={resumoPorAta}
+        fatiasGti={fatiasGti}
         unidades={unidades}
         filters={filterState}
         gestorByAta={gestorByAta}

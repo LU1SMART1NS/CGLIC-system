@@ -3,6 +3,8 @@ import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../car
 import { hasActiveCarteiraFilters } from '../carteira/carteiraFilters';
 import { CarteiraAlocacaoSelect, CarteiraAtaAssinadaSelect, CarteiraEmpenhoSelect, CarteiraUnidadeSelect, type FiltroAtaAssinada } from '../carteira/CarteiraExecucaoSelects';
 import { ARP_FILTER_SCHEMA, type ArpPortfolioFilterState } from '../atas/ArpPortfolioFilters';
+import { CarteiraGtiSelect } from '../gti/CarteiraGtiSelect';
+import type { GrupoGti } from '../../config/gruposGti';
 import type { NivelAtendimento } from '../../utils/itemAtendimento';
 import { CarteiraPapelSelect } from '../carteira/CarteiraPapelSelect';
 import type { FiltroPapelSenasp } from '../../utils/ataIdentidade';
@@ -25,6 +27,8 @@ interface ItensPortfolioFiltersProps {
   ataAssinadaCounts?: Partial<Record<Exclude<FiltroAtaAssinada, 'TODOS'>, number>>;
   /** Quantos itens cada papel da SENASP traria (aparece no menu do filtro). */
   papelCounts?: Partial<Record<Exclude<FiltroPapelSenasp, 'TODOS'>, number>>;
+  /** Quantos itens cada GTI traria no modo escolhido (aparece no menu do filtro). */
+  gtiCounts?: Partial<Record<GrupoGti, number>>;
   /** Esconde o seletor de gestor (perfil "gestor", que já vê só os itens das próprias atas). */
   showGestorFilter?: boolean;
   onChangeFilter: <K extends keyof ItensPortfolioFilterState>(key: K, value: ItensPortfolioFilterState[K]) => void;
@@ -41,6 +45,7 @@ export const ItensPortfolioFilters: React.FC<ItensPortfolioFiltersProps> = ({
   empenhoCounts,
   ataAssinadaCounts,
   papelCounts,
+  gtiCounts,
   showGestorFilter = true,
   onChangeFilter,
   onResetFilters,
@@ -92,6 +97,15 @@ export const ItensPortfolioFilters: React.FC<ItensPortfolioFiltersProps> = ({
         onChange={(value) => onChangeFilter('papel', value)}
         counts={papelCounts}
         testId="itens-filter-papel"
+      />
+
+      <CarteiraGtiSelect
+        gti={filters.gti}
+        modo={filters.gtiModo}
+        onChangeGti={(value) => onChangeFilter('gti', value)}
+        onChangeModo={(value) => onChangeFilter('gtiModo', value)}
+        counts={gtiCounts}
+        testIdPrefix="itens"
       />
 
       {showGestorFilter && (

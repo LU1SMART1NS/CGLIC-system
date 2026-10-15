@@ -24,6 +24,8 @@ export const FONTE_CADASTRO_UASGS = 'Cadastro de UASGs do Compras.gov.br';
 export const ORCAMENTO_CADASTRO_UASGS_MS = 100_000;
 
 const URL_CADASTRO = '/api-arp/modulo-uasg/1_consultarUasg';
+/** Órgão da UASG: sigla (nomeMnemonicoOrgao) e esfera, base da sugestão do GTI (migration 139). */
+const URL_ORGAO = '/api-arp/modulo-uasg/2_consultarOrgao';
 const LOTE_GRAVACAO = 50;
 
 /**
@@ -68,6 +70,18 @@ export interface UasgDoCadastro {
   municipio?: string | null;
   sigla_uf?: string | null;
   ativa?: boolean | null;
+  /**
+   * Órgão da UASG (migration 139). Com a chave presente, o órgão foi lido (null = a fonte não deu órgão);
+   * sem a chave, não foi lido e a UASG volta para a fila na próxima execução.
+   */
+  codigo_orgao?: number | null;
+  sigla_orgao?: string | null;
+  esfera_orgao?: string | null;
+}
+
+export interface OrgaoDoCadastro {
+  sigla: string | null;
+  esfera: 'F' | 'E' | 'M' | null;
 }
 
 /**
@@ -95,11 +109,59 @@ export async function lerUasgNoCadastro(
         nome,
         municipio: typeof r.nomeMunicipioIbge === 'string' ? r.nomeMunicipioIbge.trim() || null : null,
         sigla_uf: typeof r.siglaUf === 'string' ? r.siglaUf.trim().toUpperCase() || null : null,
-        ativa: typeof r.statusUasg === 'boolean' ? r.statusUasg : null
+        ativa: typeof r.statusUasg === 'boolean' ? r.statusUasg : null,
+        ...(typeof r.codigoOrgao === 'number' && r.codigoOrgao > 0 ? { codigo_orgao: r.codigoOrgao } : {})
       };
     }
   }
   return { codigo_uasg: codigo };
+}
+
+/** Lê o órgão no cadastro: ativo primeiro, depois inativo. Sem resultado nos dois: null. Lança em falha. */
+export async function lerOrgaoNoCadastro(
+  codigoOrgao: number,
+  fetcher: typeof fetch = fetch,
+  esperar: (ms: number) => Promise<void> = dormir
+): Promise<OrgaoDoCadastro | null> {
+  for (const status of ['true', 'false']) {
+    const resposta = await consultar(`${URL_ORGAO}?pagina=1&codigoOrgao=${codigoOrgao}&statusOrgao=${status}`, fetcher, esperar);
+    const dados = (await resposta.json()) as { resultado?: Array<Record<string, unknown>> };
+    const r = (dados.resultado ?? []).find((x) => Number(x.codigoOrgao) === codigoOrgao);
+    if (r) {
+      const sigla = typeof r.nomeMnemonicoOrgao === 'string' ? r.nomeMnemonicoOrgao.replace(/\s+/g, ' ').trim() : '';
+      const esfera = typeof r.esfera === 'string' ? r.esfera.trim().toUpperCase() : '';
+      return { sigla: sigla || null, esfera: esfera === 'F' || esfera === 'E' || esfera === 'M' ? esfera : null };
+    }
+  }
+  return null;
+}
+
+/**
+ * Completa a UASG achada com a sigla e a esfera do órgão. O mesmo órgão é lido uma vez por execução.
+ * Falha na leitura do órgão não derruba a UASG: ela é gravada sem o órgão e volta para a fila.
+ */
+export async function completarComOrgao(
+  uasg: UasgDoCadastro,
+  cache: Map<number, OrgaoDoCadastro | null>,
+  fetcher: typeof fetch = fetch,
+  esperar: (ms: number) => Promise<void> = dormir
+): Promise<UasgDoCadastro> {
+  if (!uasg.nome) return uasg;
+  const codigo = uasg.codigo_orgao;
+  if (codigo == null) return { ...uasg, codigo_orgao: null, sigla_orgao: null, esfera_orgao: null };
+  try {
+    if (!cache.has(codigo)) {
+      await esperar(PAUSA_ENTRE_UASGS_MS);
+      cache.set(codigo, await lerOrgaoNoCadastro(codigo, fetcher, esperar));
+    }
+    const orgao = cache.get(codigo) ?? null;
+    return { ...uasg, sigla_orgao: orgao?.sigla ?? null, esfera_orgao: orgao?.esfera ?? null };
+  } catch (err) {
+    console.warn(`[cadastroUasgs] órgão ${codigo} da UASG ${uasg.codigo_uasg} não pôde ser lido:`, mensagemDeErro(err));
+    const semOrgao = { ...uasg };
+    delete semOrgao.codigo_orgao;
+    return semOrgao;
+  }
 }
 
 async function uasgsParaCadastrar(): Promise<string[]> {
@@ -119,7 +181,7 @@ async function gravar(lote: UasgDoCadastro[]): Promise<number> {
 /** Quantas UASGs estão na fila de leitura (modo de teste do servidor; não grava nada). */
 export async function contarCadastroUasgsPendentes(): Promise<{ pendentes: number; amostra: UasgDoCadastro | null }> {
   const fila = await uasgsParaCadastrar();
-  return { pendentes: fila.length, amostra: fila[0] ? await lerUasgNoCadastro(fila[0]) : null };
+  return { pendentes: fila.length, amostra: fila[0] ? await completarComOrgao(await lerUasgNoCadastro(fila[0]), new Map()) : null };
 }
 
 export async function sincronizarCadastroUasgs(
@@ -144,6 +206,7 @@ export async function sincronizarCadastroUasgs(
       let seguidas = 0;
       let primeiroErro: string | null = null;
       let lote: UasgDoCadastro[] = [];
+      const orgaos = new Map<number, OrgaoDoCadastro | null>();
 
       for (let i = 0; i < fila.length; i++) {
         if (agora() - inicio > orcamento) {
@@ -152,7 +215,7 @@ export async function sincronizarCadastroUasgs(
         }
         if (i > 0) await esperar(PAUSA_ENTRE_UASGS_MS);
         try {
-          const uasg = await lerUasgNoCadastro(fila[i], fetch, esperar);
+          const uasg = await completarComOrgao(await lerUasgNoCadastro(fila[i], fetch, esperar), orgaos, fetch, esperar);
           if (!uasg.nome) naoAchadas++;
           lote.push(uasg);
           seguidas = 0;

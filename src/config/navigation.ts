@@ -17,7 +17,8 @@ import {
   Building2,
   Link2,
   FileSignature,
-  Boxes
+  Boxes,
+  Network
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -248,6 +249,17 @@ export const navigationConfig: NavItem[] = [
         group: 'Gestão',
         matchPrefixes: ['/admin/feriados'],
         allowedRoles: ['admin']
+      },
+      {
+        // GTI do ComprasSUSP de cada órgão participante (migration 139). Confirma: só o coordenador (admin).
+        id: 'admin-grupos-uasgs',
+        label: 'Grupos das UASGs',
+        icon: Network,
+        route: '/admin/grupos-uasgs',
+        status: 'active',
+        group: 'Gestão',
+        matchPrefixes: ['/admin/grupos-uasgs'],
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
         // Cadastro das unidades internas usadas na alocação de itens. Edição: admin e gestor_saldos.

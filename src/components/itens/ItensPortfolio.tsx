@@ -23,6 +23,9 @@ import { ItensPortfolioFilters, ITENS_FILTER_SCHEMA } from './ItensPortfolioFilt
 import { ItensPortfolioTable } from './ItensPortfolioTable';
 import { AvisoCarregando } from '../../design-system';
 import { contarPorPapel, passaFiltroPapel } from '../../utils/ataIdentidade';
+import { useFatiasItensGti } from '../../hooks/useGruposGti';
+import { chaveItemGti, contarPorGti, passaFiltroGti, pctDoGti } from '../../config/gruposGti';
+import type { ItensPortfolioFilterState } from './ItensPortfolioFilters';
 
 /**
  * Carteira → Itens: todos os itens das atas com vigência da ata, alocação por unidade interna (contra o
@@ -36,7 +39,22 @@ export const ItensPortfolio: React.FC = () => {
   const { arps, scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, syncError, reload } = useAtasPortfolio();
   const { rows, unidades, isLoading: loadingExecucao } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
 
-  const { filters, setFilter, resetFilters } = useCarteiraFilters(ITENS_FILTER_SCHEMA);
+  const { filters, setFilter: setFilterUrl, setFilters, resetFilters } = useCarteiraFilters(ITENS_FILTER_SCHEMA);
+  // Tirar o GTI também volta o "Contar" ao padrão (uma só mudança de endereço).
+  const setFilter = useCallback(
+    <K extends keyof ItensPortfolioFilterState>(key: K, value: ItensPortfolioFilterState[K]) => {
+      if (key === 'gti' && value === 'TODOS') setFilters({ gti: 'TODOS', gtiModo: 'PRINCIPAL' });
+      else setFilterUrl(key, value);
+    },
+    [setFilterUrl, setFilters]
+  );
+
+  // Fatia de cada GTI do ComprasSUSP no item (migration 139): coluna e filtro "GTI".
+  const fatiasItens = useFatiasItensGti();
+  const fatiasDaLinha = useCallback(
+    (r: CarteiraItemRow) => fatiasItens.get(chaveItemGti(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)),
+    [fatiasItens]
+  );
   const [isExportOpen, setIsExportOpen] = useState(false);
 
   const unidadeNome = unidades.find((u) => u.chave === filters.unidade)?.nome;
@@ -69,6 +87,7 @@ export const ItensPortfolio: React.FC = () => {
       if (filters.unidade !== TODAS_UNIDADES && !(r.alocadoPorUnidade[filters.unidade] > 0)) return false;
       if (showGestorFilter && !matchesGestorFilter(r.gestorNome, filters.gestor)) return false;
       if (!passaFiltroPapel(r.arp, filters.papel)) return false;
+      if (!passaFiltroGti(fatiasDaLinha(r), filters.gti, filters.gtiModo)) return false;
       if (query) {
         const { item, arp } = r;
         const cnpj = (item.niFornecedor || '').replace(/\D/g, '');
@@ -82,7 +101,13 @@ export const ItensPortfolio: React.FC = () => {
       }
       return true;
     });
-  }, [rows, filters.busca, filters.statusVigencia, filters.unidade, filters.gestor, filters.papel, showGestorFilter]);
+  }, [rows, filters.busca, filters.statusVigencia, filters.unidade, filters.gestor, filters.papel, filters.gti, filters.gtiModo, fatiasDaLinha, showGestorFilter]);
+
+  // Quantos itens da situação escolhida cada GTI traria no modo de contar escolhido.
+  const gtiCounts = useMemo(
+    () => contarPorGti(rows.filter((r) => matchesStatusFilter(r.faixa, filters.statusVigencia)).map(fatiasDaLinha), filters.gtiModo),
+    [rows, filters.statusVigencia, filters.gtiModo, fatiasDaLinha]
+  );
 
   // Quantos itens da situação escolhida cairiam em cada papel da SENASP (contagem no menu do filtro).
   const papelCounts = useMemo(
@@ -100,11 +125,13 @@ export const ItensPortfolio: React.FC = () => {
         )
         .sort(
           (a, b) =>
+            // Com o GTI escolhido, os itens em que ele tem a maior fatia vêm primeiro.
+            (filters.gti !== 'TODOS' ? pctDoGti(fatiasDaLinha(b), filters.gti) - pctDoGti(fatiasDaLinha(a), filters.gti) : 0) ||
             comparePrazo(a.diasRestantes, b.diasRestantes) ||
             a.arp.numeroAtaRegistroPreco.localeCompare(b.arp.numeroAtaRegistroPreco) ||
             Number(a.item.numeroItem) - Number(b.item.numeroItem)
         ),
-    [baseRows, filters.filtroAlocacao, filters.filtroEmpenho, filters.ataAssinada]
+    [baseRows, filters.filtroAlocacao, filters.filtroEmpenho, filters.ataAssinada, filters.gti, fatiasDaLinha]
   );
 
   // Quantos itens (com os demais filtros) cairiam em cada nível de alocação / empenho: contagem no menu do filtro.
@@ -208,6 +235,7 @@ export const ItensPortfolio: React.FC = () => {
             empenhoCounts={nivelCounts.empenho}
             ataAssinadaCounts={nivelCounts.ataAssinada}
             papelCounts={papelCounts}
+            gtiCounts={gtiCounts}
             showGestorFilter={showGestorFilter}
             onChangeFilter={setFilter}
             onResetFilters={resetFilters}
@@ -221,6 +249,7 @@ export const ItensPortfolio: React.FC = () => {
             unidade={filters.unidade}
             unidadeNome={unidadeNome}
             onSelectItem={abrirItem}
+            fatiasDaLinha={fatiasDaLinha}
             onFilter={setFilter}
             canFilterGestor={showGestorFilter}
             onResetFilters={resetFilters}

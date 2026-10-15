@@ -72,11 +72,12 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Modelos de Gestão', '/configuracoes/modelos'],
         ['Regras de Alertas', '/admin/regras-alertas'],
         ['Feriados', '/admin/feriados'],
+        ['Grupos das UASGs', '/admin/grupos-uasgs'],
         ['Unidades Internas', '/admin/departamentos'],
         ['Usuários e Servidores', '/admin/usuarios'],
         ['Perfis e Permissões', '/admin/perfis']
       ]);
-      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Acesso', 'Acesso']);
+      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Acesso', 'Acesso']);
     });
 
     it('não deve conter itens legados isolados no menu (SEI, Exportar Excel, Prorrogações soltas)', () => {
@@ -285,9 +286,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
 
-      // Ajustes aparece para o gestor com os modelos de gestão e a consulta das unidades internas
+      // Ajustes aparece para o gestor com os modelos de gestão e a consulta dos grupos das UASGs e das unidades internas
       const config = visible.find((i) => i.id === 'configuracoes');
-      expect(config?.children?.map((c) => c.label)).toEqual(['Modelos de Gestão', 'Unidades Internas']);
+      expect(config?.children?.map((c) => c.label)).toEqual(['Modelos de Gestão', 'Grupos das UASGs', 'Unidades Internas']);
     });
 
     it('Gestor de Saldo (gestor_saldos) vê Início (restrita a saldos), Atas e Itens — sem Contratos, Financeiro, Usuários ou Perfis', () => {
@@ -303,8 +304,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
       expect(labels).not.toContain('Contratos');
       expect(labels).not.toContain('Modelos de Gestão');
-      // Ajustes aparece só com o cadastro de unidades internas, que ele mantém
-      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);
+      // Ajustes aparece com a consulta dos grupos das UASGs e o cadastro de unidades internas, que ele mantém
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Grupos das UASGs', 'Unidades Internas']);
       expect(labels).not.toContain('Pagamentos');
       expect(labels).not.toContain('Empenhos');
       expect(labels).not.toContain('Usuários e Servidores');
@@ -328,8 +329,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Distribuição');
 
       expect(labels).not.toContain('Modelos de Gestão');
-      // Ajustes aparece para o leitor só com a consulta das unidades internas
-      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);
+      // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs e das unidades internas
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Grupos das UASGs', 'Unidades Internas']);
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
     });

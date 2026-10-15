@@ -1,4 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
+import { GtiCelulaAta } from '../gti/GtiVisual';
+import type { FatiasDaAta } from '../../config/gruposGti';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
@@ -32,6 +34,8 @@ interface ItensPortfolioTableProps {
   onFilter?: <K extends keyof ItensPortfolioFilterState>(key: K, value: ItensPortfolioFilterState[K]) => void;
   /** O perfil gestor não filtra por gestor (já vê só as próprias atas). */
   canFilterGestor?: boolean;
+  /** Fatia de cada GTI do ComprasSUSP no item (migration 139). */
+  fatiasDaLinha?: (row: CarteiraItemRow) => FatiasDaAta | undefined;
 }
 
 const formatNumber = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
@@ -70,7 +74,8 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
   onResetFilters,
   pageSize = 20,
   onFilter,
-  canFilterGestor = true
+  canFilterGestor = true,
+  fatiasDaLinha
 }) => {
   const comUnidade = unidade !== TODAS_UNIDADES;
   const sortColumns = useMemo<Record<string, CarteiraSortColumn<CarteiraItemRow>>>(
@@ -138,6 +143,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                 </span>
               </th>
               <CarteiraSortHeader label="Consumo" sortKey="consumo" {...sortProps} />
+              <th style={carteiraTh} title="Interesse principal e fatia de cada Grupo de Trabalho Integrado na quantidade registrada dos participantes">GTI</th>
               <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sortProps} />
             </tr>
           </thead>
@@ -212,6 +218,17 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                   </td>
                   <td data-label="Consumo" style={carteiraTd}>
                     <ConsumoBar pct={row.consumoPct} />
+                  </td>
+                  <td data-label="GTI" style={carteiraTd}>
+                    {(() => {
+                      const fatias = fatiasDaLinha?.(row);
+                      const principal = fatias?.principal?.grupo;
+                      return (
+                        <CarteiraCellFilter descricao="este GTI" onFilter={onFilter && principal ? () => onFilter('gti', principal) : undefined}>
+                          <GtiCelulaAta fatias={fatias} testId={`itens-gti-${row.key}`} />
+                        </CarteiraCellFilter>
+                      );
+                    })()}
                   </td>
                   <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                     {row.gestorNome ? (

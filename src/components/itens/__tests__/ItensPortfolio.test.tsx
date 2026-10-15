@@ -151,7 +151,7 @@ describe('ItensPortfolioFilters', () => {
   it('oferece alocação, empenho, unidade e gestor (a vigência fica nos segmentos)', () => {
     const html = renderToStaticMarkup(
       <ItensPortfolioFilters
-        filters={{ statusVigencia: 'VIGENTES', filtroAlocacao: 'TODOS', filtroEmpenho: 'TODOS', unidade: 'TODAS', ataAssinada: 'TODOS', gestor: 'TODOS', papel: 'TODOS', busca: '' }}
+        filters={{ statusVigencia: 'VIGENTES', filtroAlocacao: 'TODOS', filtroEmpenho: 'TODOS', unidade: 'TODAS', ataAssinada: 'TODOS', gestor: 'TODOS', papel: 'TODOS', gti: 'TODOS', gtiModo: 'PRINCIPAL', busca: '' }}
         unidades={[{ chave: 'cglic', nome: 'CGLIC' }]}
         gestores={['Marina Costa']}
         onChangeFilter={noop}
@@ -171,7 +171,7 @@ describe('ItensPortfolioFilters', () => {
   it('esconde o seletor de gestor para o perfil gestor', () => {
     const html = renderToStaticMarkup(
       <ItensPortfolioFilters
-        filters={{ statusVigencia: 'VIGENTES', filtroAlocacao: 'TODOS', filtroEmpenho: 'TODOS', unidade: 'TODAS', ataAssinada: 'TODOS', gestor: 'TODOS', papel: 'TODOS', busca: '' }}
+        filters={{ statusVigencia: 'VIGENTES', filtroAlocacao: 'TODOS', filtroEmpenho: 'TODOS', unidade: 'TODAS', ataAssinada: 'TODOS', gestor: 'TODOS', papel: 'TODOS', gti: 'TODOS', gtiModo: 'PRINCIPAL', busca: '' }}
         showGestorFilter={false}
         onChangeFilter={noop}
         onResetFilters={noop}
@@ -187,7 +187,7 @@ describe('filtro em botão', () => {
   it('mostra o valor escolhido no botão, com opção de remover', () => {
     const html = renderToStaticMarkup(
       <ItensPortfolioFilters
-        filters={{ statusVigencia: 'VIGENTES', filtroAlocacao: 'SEM', filtroEmpenho: 'TODOS', unidade: 'cglic', ataAssinada: 'TODOS', gestor: 'TODOS', papel: 'TODOS', busca: '' }}
+        filters={{ statusVigencia: 'VIGENTES', filtroAlocacao: 'SEM', filtroEmpenho: 'TODOS', unidade: 'cglic', ataAssinada: 'TODOS', gestor: 'TODOS', papel: 'TODOS', gti: 'TODOS', gtiModo: 'PRINCIPAL', busca: '' }}
         unidades={[{ chave: 'cglic', nome: 'CGLIC' }]}
         onChangeFilter={noop}
         onResetFilters={noop}
