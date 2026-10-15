@@ -165,8 +165,8 @@ main {
   flex: 1;
   width: 100%;
   padding: 2rem var(--page-gutter);
-  max-width: 1800px;
-  margin: 0 auto;
+  /* Sem largura máxima: todas as telas ocupam a largura toda, alinhadas ao cabeçalho, com a mesma margem (--page-gutter). */
+  margin: 0;
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -722,7 +722,7 @@ h1, h2, h3, h4 {
 .app-bottom-nav .app-rail-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Abas da área no topo das páginas de lista. */
-.area-tabs { max-width: 1600px; margin: 0 auto; }
+.area-tabs { margin: 0; }
 .area-tabs-row { display: flex; align-items: stretch; gap: 1rem; }
 .area-tabs-row .area-tabs-list { flex: 1; min-width: 0; }
 /* Ações da página (ex.: Atualizar) sobem para a linha das abas e continuam a linha de base. */
