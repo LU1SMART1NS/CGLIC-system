@@ -23,6 +23,8 @@ import { ManagerCell, type DestinoSemGestor } from '../../carteira/ManagerAssign
 import { getAcaoInfo, getMotivoInfo } from '../../instrumentos/gestaoInstrumentosRowHelpers';
 import type { DashboardAttentionItem } from '../../../types/managementDashboard';
 import type { ContractDashboardRecord } from '../../../types';
+import { CarteiraNovoBadge } from '../../carteira/CarteiraNovoBadge';
+import { contratoEhNovo } from '../../carteira/carteiraNovidade';
 
 /** Contrato já enriquecido com o que a tabela precisa exibir (prazo, gestor e pendências). */
 export interface ContractPortfolioRow {
@@ -56,6 +58,8 @@ const SORT_COLUMNS: Record<string, CarteiraSortColumn<ContractPortfolioRow>> = {
   pendencias: { value: (r) => r.pendencias.length, firstDir: 'desc' },
   gestor: { value: (r) => r.gestorNome }
 };
+
+const linhaNova = (r: ContractPortfolioRow) => contratoEhNovo(r.contract);
 
 function formatTipoInstrumento(tipo?: string): string {
   switch (tipo) {
@@ -104,7 +108,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
 }) => {
   const navigate = useNavigateWithOrigin();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, SORT_COLUMNS);
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, SORT_COLUMNS, linhaNova);
   const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
   const { currentPage, setPage, pageItems: pageRows, signature } = useCarteiraPagination(
     sorted,
@@ -184,6 +188,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                       >
                         {numDisplay}
                       </CarteiraIdLink>
+                      {contratoEhNovo(contract) && <CarteiraNovoBadge genero="m" testId={`contracts-novo-${contractKey}`} />}
                       {tipoLabel !== 'Contrato' && <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>{tipoLabel}</span>}
                       {atas.length > 0 && (
                         <>

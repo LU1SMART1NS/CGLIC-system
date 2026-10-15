@@ -23,6 +23,7 @@ import { HealthTile, HealthTileGrid, LifelineRule } from '../instrument360/Healt
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp, papelSenaspDaAta } from '../../utils/ataIdentidade';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
+import { ehNovidade } from '../carteira/carteiraNovidade';
 import { SeloFornecedorPncp } from './SeloFornecedorPncp';
 import type { RegistroFornecedorPncp } from '../../services/fornecedorAtaPncpService';
 
@@ -175,6 +176,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       }
       eyebrow={eyebrow}
       title={`Ata nº ${arp.numeroAtaRegistroPreco}`}
+      novidade={ehNovidade(dataAssinatura || arp.dataVigenciaInicial) ? 'f' : undefined}
       status={{ faixa: encerrada ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, cancelada), neutral: !encerrada }}
       dockAlert={
         faixa === 'CRITICO' && dias !== null && dias >= 0

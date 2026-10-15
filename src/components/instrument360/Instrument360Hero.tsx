@@ -4,6 +4,7 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
+import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
 import { scrollToSummary, useInstrument360Dock } from './instrument360Dock';
 
 /** Identificador do rodapé (processo, categoria, Id PNCP...). Nunca data nem valor. */
@@ -44,6 +45,8 @@ interface Instrument360HeroProps {
   eyebrow?: React.ReactNode;
   /** Situação ao lado do título. `neutral` mostra o selo cinza (a gravidade fica no indicador). */
   status?: { faixa: PrazoFaixa; label: string; neutral?: boolean };
+  /** Etiqueta "Nova" (f) ou "Novo" (m) ao lado da situação, para o que começou há no máximo 45 dias. */
+  novidade?: 'f' | 'm';
   /** Aviso em selo vermelho ao lado da situação (ex.: "Ata vence em 8 dias"). */
   statusAlert?: React.ReactNode;
   /** Aviso da barra fixa quando o `statusAlert` não é texto ou a tela não o mostra no cartão (ex.: "Vence em 8 dias"). */
@@ -85,6 +88,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
   title,
   eyebrow,
   status,
+  novidade,
   statusAlert,
   dockAlert,
   dockSubtitle,
@@ -149,6 +153,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
               </button>
             </h1>
             {status && <InstrumentStatusBadge status={status} testId="instrument-360-status" compact={min} />}
+            {novidade && <CarteiraNovoBadge genero={novidade} testId="instrument-360-novidade" />}
             {statusAlert && <InstrumentAlertBadge testId="instrument-360-status-alert" compact={min}>{statusAlert}</InstrumentAlertBadge>}
             {dockAlert && !statusAlert && <span className="i360-min-only"><InstrumentAlertBadge compact>{dockAlert}</InstrumentAlertBadge></span>}
             {dockSubtitle && <span className="i360-sub-inline" aria-hidden="true">{dockSubtitle}</span>}

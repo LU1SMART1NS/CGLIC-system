@@ -10,6 +10,7 @@ import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
 import { formatCnpj, formatCurrency, formatProcessoSei, formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { differenceInDays, formatDateBR, parseDateBRT } from '../../services/temporalEngineService';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
+import { ataEhNova } from '../carteira/carteiraNovidade';
 import { pncpLinkStyle } from '../atas/Ata360Header';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import type { SeverityLevel } from '../../design-system/tokens';
@@ -166,6 +167,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           <ManagerInfo label="Gestor da ata" gestorNome={gestorAta?.gestorNome} isLoading={carregandoGestor} testId="item-manager-info" />
         )
       }
+      novidade={ataEhNova(arp) ? 'm' : undefined}
       status={{ ...status, neutral: status.faixa === 'REGULAR' }}
       subtitle={
         <>
