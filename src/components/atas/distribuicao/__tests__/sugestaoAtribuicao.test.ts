@@ -104,3 +104,50 @@ describe('avaliarCandidatos', () => {
     expect(r.opcoes.map((o) => o.nome)).toEqual(['Carla']); // Ana e Bruno têm carteira, mas não são usuários da lista
   });
 });
+
+describe('avaliarCandidatos com nível do gestor', () => {
+  // Lote com Alta (contrato de serviços de 24 meses) e Média (ata de 3 itens).
+  const lote = montarLote([{ tipo: 'ATA', ataKey: '00010/2025' }], links, indexarItens(distribuicao.linhas));
+
+  it('compara pela ocupação: carga ÷ capacidade do nível', () => {
+    const { opcoes } = avaliarCandidatos(lote, [{ nome: 'Ana', userId: 'u1', ehGestor: true, nivel: 'AVANCADO' }, { nome: 'Bruno', userId: 'u2', ehGestor: true, nivel: 'INICIANTE' }], distribuicao.linhas);
+    const ana = opcoes.find((o) => o.nome === 'Ana')!;
+    const bruno = opcoes.find((o) => o.nome === 'Bruno')!;
+    expect(ana).toMatchObject({ capacidade: 1, ocupacaoAtual: 3, ocupacaoDepois: 8 });
+    expect(bruno.capacidade).toBe(0.6);
+    expect(bruno.ocupacaoDepois).toBeCloseTo(10); // 6 ÷ 0,6
+  });
+
+  it('sem nível usa a capacidade de Intermediário', () => {
+    const { opcoes } = avaliarCandidatos(lote, [{ nome: 'Carla', userId: 'u3', ehGestor: true }], distribuicao.linhas);
+    expect(opcoes[0].capacidade).toBe(0.85);
+  });
+
+  it('com Alta no lote, o iniciante recebe aviso e sai da sugestão', () => {
+    const r = avaliarCandidatos(
+      lote,
+      [
+        { nome: 'Carla', userId: 'u3', ehGestor: true, nivel: 'INICIANTE' }, // carga 0: seria a sugestão pela carga
+        { nome: 'Ana', userId: 'u1', ehGestor: true, nivel: 'AVANCADO' },
+        { nome: 'Bruno', userId: 'u2', ehGestor: true, nivel: 'INTERMEDIARIO' }
+      ],
+      distribuicao.linhas
+    );
+    expect(r.opcoes.find((o) => o.nome === 'Carla')!.avisoAlta).toBe(true);
+    expect(r.sugestao).toBe('Bruno'); // 6 ÷ 0,85 ≈ 7,1 < Ana 8
+  });
+
+  it('sem Alta no lote, o iniciante pode ser a sugestão', () => {
+    const loteBaixa = montarLote([{ tipo: 'CONTRATO', contractKey: '200331-00001-2025' }], [], indexarItens(distribuicao.linhas));
+    const r = avaliarCandidatos(
+      loteBaixa,
+      [
+        { nome: 'Carla', userId: 'u3', ehGestor: true, nivel: 'INICIANTE' },
+        { nome: 'Ana', userId: 'u1', ehGestor: true, nivel: 'AVANCADO' }
+      ],
+      distribuicao.linhas
+    );
+    expect(r.opcoes.find((o) => o.nome === 'Carla')!.avisoAlta).toBe(false);
+    expect(r.sugestao).toBe('Carla');
+  });
+});

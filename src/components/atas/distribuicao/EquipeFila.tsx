@@ -10,10 +10,13 @@ import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCart
 import { formatCurrencyCompact } from '../../carteira/carteiraFormat';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { DistribuicaoItens } from './DistribuicaoItens';
-import { FAIXA_MEDIA_EQUIPE, type DistribuicaoLinha } from './distribuicaoEquipe';
+import type { DistribuicaoLinha } from './distribuicaoEquipe';
 import type { ContratoAVincular } from './contratosSemAta';
 import { PESO_COMPLEXIDADE, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import { contemBusca } from './filaComum';
+import { AlterarNivelModal } from './AlterarNivelModal';
+import { NivelPainel } from './NivelPainel';
+import { ROTULO_NIVEL, avaliarSubida, mesAno, percentual, type AvaliacaoSubida, type NivelGestor, type NivelRegistrado } from './nivelGestor';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -29,28 +32,70 @@ const CarteiraCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
   </div>
 );
 
-/** Composição da carteira por complexidade: barra empilhada e "3 A · 6 M · 4 B". */
-const ComplexidadeCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => {
-  const total = l.complexidade.ALTA + l.complexidade.MEDIA + l.complexidade.BAIXA;
+const RELACAO_ROTULO = { ACIMA: 'Acima da média', NA_MEDIA: 'Na média', ABAIXO: 'Abaixo da média' } as const;
+
+/**
+ * Ocupação e complexidade numa coluna só: a barra tem o tamanho da ocupação (carga ÷ capacidade do nível), dividida
+ * pelo peso de cada complexidade; o tracejado marca a média da equipe. Sem número: a palavra já diz a situação.
+ */
+const OcupacaoCell: React.FC<{ l: DistribuicaoLinha; escala: number; media: number | null }> = ({ l, escala, media }) => {
+  const largura = escala > 0 ? Math.min(l.ocupacao / escala, 1) * 100 : 0;
   return (
-    <div style={{ minWidth: '130px' }}>
-      <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', background: '#f1f5f9' }} aria-hidden="true">
-        {total > 0 && NIVEIS.map((n) => <div key={n} style={{ width: `${(l.complexidade[n] / total) * 100}%`, background: COR_COMPLEXIDADE[n] }} />)}
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '190px' }}
+      title={`A barra mostra a ocupação (carga ÷ capacidade do nível ${percentual(l.capacidade)}), dividida pelo peso de cada complexidade. O tracejado é a média da equipe.`}
+    >
+      {l.relacaoEquipe && (
+        <span
+          data-testid={`distribuicao-relacao-${l.gestorNome}`}
+          style={{ fontSize: '0.78rem', fontWeight: 800, color: l.relacaoEquipe === 'ACIMA' ? 'var(--color-danger-text)' : '#475569', whiteSpace: 'nowrap' }}
+        >
+          {RELACAO_ROTULO[l.relacaoEquipe]}
+        </span>
+      )}
+      <div style={{ position: 'relative', height: '10px', background: '#f1f5f9', borderRadius: '3px' }} aria-hidden="true">
+        <div style={{ display: 'flex', gap: '1px', height: '100%', width: `${largura}%`, borderRadius: '3px', overflow: 'hidden' }}>
+          {NIVEIS.map((n) => (
+            <div key={n} style={{ flex: l.complexidade[n] * PESO_COMPLEXIDADE[n], background: COR_COMPLEXIDADE[n] }} />
+          ))}
+        </div>
+        {media !== null && escala > 0 && (
+          <span style={{ position: 'absolute', top: '-3px', bottom: '-3px', left: `${Math.min(media / escala, 1) * 100}%`, borderLeft: '2px dashed #64748b' }} />
+        )}
       </div>
-      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>
-        {NIVEIS.map((n) => `${l.complexidade[n]} ${ROTULO_COMPLEXIDADE[n].charAt(0)}`).join(' · ')}
+      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+        {NIVEIS.map((n) => `${l.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')}
       </div>
     </div>
   );
 };
 
-const RELACAO_ROTULO = { ACIMA: 'Acima da média', NA_MEDIA: 'Na média', ABAIXO: 'Abaixo da média' } as const;
+const COR_NIVEL: Record<NivelGestor, { bg: string; fg: string }> = {
+  INICIANTE: { bg: 'var(--color-warning-bg-strong)', fg: 'var(--color-warning-text)' },
+  INTERMEDIARIO: { bg: 'var(--color-info-bg)', fg: 'var(--color-info-text-strong)' },
+  AVANCADO: { bg: 'var(--color-success-bg-strong)', fg: 'var(--color-success-text)' }
+};
 
-/** Carga equivalente e posição neutra em relação à equipe (sem ranking, sem cor de alerta). */
-const CargaEquivalenteCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
-  <div title={`Soma dos pesos: Baixa = ${PESO_COMPLEXIDADE.BAIXA}, Média = ${PESO_COMPLEXIDADE.MEDIA}, Alta = ${PESO_COMPLEXIDADE.ALTA}`}>
-    <div style={{ fontWeight: 800 }}>{l.equivalente}</div>
-    {l.relacaoEquipe && <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>{RELACAO_ROTULO[l.relacaoEquipe]}</div>}
+const seloStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', fontSize: '0.75rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '4px', whiteSpace: 'nowrap' };
+
+export const SeloNivel: React.FC<{ nivel: NivelGestor | null | undefined }> = ({ nivel }) =>
+  nivel ? (
+    <span style={{ ...seloStyle, background: COR_NIVEL[nivel].bg, color: COR_NIVEL[nivel].fg }}>{ROTULO_NIVEL[nivel]}</span>
+  ) : (
+    <span style={{ ...seloStyle, background: '#f1f5f9', color: '#475569' }} title="Até o coordenador informar, a ocupação usa a capacidade de Intermediário.">
+      Não informado
+    </span>
+  );
+
+const NivelCell: React.FC<{ registro: NivelRegistrado | null; avaliacao: AvaliacaoSubida | null }> = ({ registro, avaliacao }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+    <SeloNivel nivel={registro?.nivel} />
+    {registro && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>desde {mesAno(registro.desde)}</span>}
+    {avaliacao?.pronto && (
+      <span style={{ ...seloStyle, background: '#ffffff', color: 'var(--color-success-text)', border: '1px dashed var(--color-success-text)' }}>
+        ↑ Pronto para {ROTULO_NIVEL[avaliacao.proximo]}
+      </span>
+    )}
   </div>
 );
 
@@ -78,34 +123,67 @@ const SCHEMA: CarteiraFilterSchema<{ busca: string }> = { busca: { param: 'busca
 const COLUNAS: Record<string, CarteiraSortColumn<DistribuicaoLinha>> = {
   gestor: { value: (l) => l.gestorNome },
   carteira: { value: (l) => l.atas.vigentes + l.contratos.vigentes, firstDir: 'desc' },
-  carga: { value: (l) => l.equivalente, firstDir: 'desc' }
+  ocupacao: { value: (l) => l.ocupacao, firstDir: 'desc' }
 };
 
-const TITULO_COMPLEXIDADE =
-  `Alta (peso ${PESO_COMPLEXIDADE.ALTA}): serviço/TIC com 12+ meses, obra ou engenharia; ata com 6+ itens. ` +
-  `Baixa (peso ${PESO_COMPLEXIDADE.BAIXA}): compra de até 12 meses; ata com 1 item. Média (peso ${PESO_COMPLEXIDADE.MEDIA}): o resto.`;
+const TITULO_OCUPACAO =
+  `Carga ajustada ao nível. Pesos: Alta ${PESO_COMPLEXIDADE.ALTA} (serviço/TIC com 12+ meses, obra ou engenharia; ata com 6+ itens), ` +
+  `Média ${PESO_COMPLEXIDADE.MEDIA}, Baixa ${PESO_COMPLEXIDADE.BAIXA} (compra de até 12 meses; ata com 1 item). ` +
+  `Capacidade: Iniciante 60%, Intermediário 85%, Avançado 100%.`;
+
+/** Nível de um gestor da linha: conta (para alterar) e nível gravado. */
+export interface NivelDoGestor {
+  userId: string | null;
+  registro: NivelRegistrado | null;
+}
 
 interface EquipeFilaProps {
   /** Linhas com gestor (a carteira sem gestor fica nas filas). */
   linhas: DistribuicaoLinha[];
-  mediaEquivalente: number | null;
+  mediaOcupacao: number | null;
   canAssign: boolean;
   canAjustar: boolean;
   aVincularDe: (gestorNome: string) => ContratoAVincular[];
   /** Abre o "Para quem atribuo?" (carteira inteira ou itens marcados de um gestor). */
   onTransfer: (targets: ManagerTarget[], origem: string, done?: () => void) => void;
+  /** Nível de cada gestor (migration 140). */
+  nivelDe: (gestorNome: string) => NivelDoGestor;
+  /** Desde quando o gestor atual cuida do instrumento (para os critérios de subida). */
+  gestorDesde: (tipo: 'ATA' | 'CONTRATO', chave: string) => string | undefined;
 }
 
-/** Carga de cada gestor: carteira vigente, complexidade, carga equivalente e pressão do momento. */
-export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente, canAssign, canAjustar, aVincularDe, onTransfer }) => {
+/** Carga de cada gestor: nível, carteira vigente, ocupação (com a complexidade) e pressão do momento. */
+export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, canAssign, canAjustar, aVincularDe, onTransfer, nivelDe, gestorDesde }) => {
   const [expanded, setExpanded] = React.useState<string | null>(null);
+  const [alterando, setAlterando] = React.useState<{ nome: string; userId: string; sugerido?: NivelGestor; motivo?: string } | null>(null);
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
   const hasActive = hasActiveCarteiraFilters(SCHEMA, filters);
   const filtradas = React.useMemo(() => linhas.filter((l) => contemBusca(filters.busca, l.gestorNome)), [linhas, filters.busca]);
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, COLUNAS);
   const sort = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
 
-  const media = mediaEquivalente !== null ? ` · média da equipe: ${mediaEquivalente.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}` : '';
+  // Mesma régua para todas as barras: a maior ocupação da equipe ocupa quase toda a largura.
+  const escala = React.useMemo(() => Math.max(0, ...linhas.map((l) => l.ocupacao), mediaOcupacao ?? 0) * 1.1, [linhas, mediaOcupacao]);
+  const avaliacoes = React.useMemo(() => {
+    const map = new Map<string, AvaliacaoSubida | null>();
+    for (const l of linhas) {
+      if (!l.gestorNome) continue;
+      map.set(
+        l.gestorNome,
+        avaliarSubida({
+          nivel: nivelDe(l.gestorNome).registro,
+          atrasadas: l.pendencias.atrasadas,
+          itens: l.itens.map((i) => ({
+            rotulo: `${i.tipo === 'ATA' ? 'Ata' : 'Contrato'} ${i.numero}`,
+            complexidade: i.complexidade.nivel,
+            gestorDesde: gestorDesde(i.tipo, i.chave)
+          }))
+        })
+      );
+    }
+    return map;
+  }, [linhas, nivelDe, gestorDesde]);
+  const media = mediaOcupacao !== null ? ' · o tracejado na barra é a média da equipe' : '';
   const counter = hasActive ? `Exibindo ${filtradas.length} de ${plural(linhas.length, 'gestor', 'gestores')}` : `${plural(linhas.length, 'gestor', 'gestores')}${media}`;
 
   return (
@@ -134,9 +212,9 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                 <tr>
                   <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
                   <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sort} />
+                  <th style={carteiraTh}>Nível</th>
                   <CarteiraSortHeader label="Carteira" sortKey="carteira" {...sort} />
-                  <th style={carteiraTh} title={TITULO_COMPLEXIDADE}>Complexidade</th>
-                  <CarteiraSortHeader label="Carga" sortKey="carga" {...sort} />
+                  <CarteiraSortHeader label="Ocupação" sortKey="ocupacao" hint={TITULO_OCUPACAO} {...sort} />
                   <th style={carteiraTh}>Pressão agora</th>
                   <th style={{ ...carteiraTh, textAlign: 'right' }}>Ações</th>
                 </tr>
@@ -145,6 +223,8 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                 {sorted.map((l) => {
                   const nome = l.gestorNome as string;
                   const isExpanded = expanded === nome;
+                  const nivel = nivelDe(nome);
+                  const avaliacao = avaliacoes.get(nome) ?? null;
                   return (
                     <React.Fragment key={nome}>
                       <tr data-testid={`distribuicao-row-${nome}`}>
@@ -163,18 +243,14 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                         <td style={{ ...carteiraTd, minWidth: '160px' }}>
                           <span style={{ fontWeight: 800 }}>{nome}</span>
                         </td>
+                        <td data-label="Nível" style={carteiraTd}>
+                          <NivelCell registro={nivel.registro} avaliacao={avaliacao} />
+                        </td>
                         <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                           <CarteiraCell l={l} />
                         </td>
-                        <td data-label="Complexidade" style={carteiraTd}>
-                          <ComplexidadeCell l={l} />
-                        </td>
-                        <td
-                          data-label="Carga"
-                          style={{ ...carteiraTd, whiteSpace: 'nowrap' }}
-                          title={`Comparada à média da equipe (±${FAIXA_MEDIA_EQUIPE * 100}%)`}
-                        >
-                          <CargaEquivalenteCell l={l} />
+                        <td data-label="Ocupação" style={carteiraTd} data-testid={`distribuicao-ocupacao-${nome}`}>
+                          <OcupacaoCell l={l} escala={escala} media={mediaOcupacao} />
                         </td>
                         <td data-label="Pressão agora" style={carteiraTd}>
                           <PressaoCell l={l} aVincular={aVincularDe(nome).length} />
@@ -204,6 +280,14 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
                       {isExpanded && (
                         <tr className="carteira-expanded" data-testid={`distribuicao-expanded-${nome}`}>
                           <td colSpan={7} style={CARTEIRA_EXPANDED_CELL_STYLE}>
+                            <NivelPainel
+                              nome={nome}
+                              nivel={nivel}
+                              avaliacao={avaliacao}
+                              capacidade={l.capacidade}
+                              podeAlterar={canAjustar}
+                              onAlterar={(sugerido, motivo) => nivel.userId && setAlterando({ nome, userId: nivel.userId, sugerido, motivo })}
+                            />
                             <DistribuicaoItens
                               linha={l}
                               canAssign={canAssign}
@@ -221,6 +305,18 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaEquivalente
             </table>
           </div>
         </div>
+      )}
+
+      {alterando && (
+        <AlterarNivelModal
+          userId={alterando.userId}
+          nome={alterando.nome}
+          atual={nivelDe(alterando.nome).registro}
+          sugerido={alterando.sugerido}
+          motivoInicial={alterando.motivo}
+          carga={linhas.find((l) => l.gestorNome === alterando.nome)?.equivalente ?? 0}
+          onClose={() => setAlterando(null)}
+        />
       )}
     </section>
   );
