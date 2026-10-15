@@ -198,3 +198,34 @@ export function contarPorGti(fatiasDasAtas: Array<FatiasDaAta | undefined>, modo
 export function pctDoGti(fatias: FatiasDaAta | undefined, gti: GrupoGti): number {
   return fatias?.fatias.find((f) => f.grupo === gti)?.pct ?? 0;
 }
+
+// ------------------------------------------------------------------------------
+// Texto da célula "GTI" das carteiras
+// ------------------------------------------------------------------------------
+
+/** Fatia que vira texto ao lado do destaque a partir deste percentual. */
+export const FATIA_SECUNDARIA_MIN_PCT = 20;
+
+export interface ResumoCelulaGti {
+  /** Em negrito, com a bolinha: o GTI com a maior fatia ou, sem GTI, a maior fatia (Outros ou a confirmar). */
+  destaque: FatiaGti | null;
+  /** Em cinza, depois do destaque: a maior das outras fatias, se tiver 20% ou mais (outro GTI, Outros ou a confirmar). */
+  secundaria: FatiaGti | null;
+}
+
+/**
+ * O que a célula escreve: o GTI principal em destaque (é por ele que o filtro conta) e a maior outra fatia
+ * quando ela pesa, para não esconder um segundo grupo, órgãos de fora dos GTIs ou o que falta confirmar.
+ */
+export function resumirCelulaGti(fatias: FatiasDaAta | undefined): ResumoCelulaGti {
+  if (!fatias || fatias.fatias.length === 0) return { destaque: null, secundaria: null };
+  const porTamanho = [...fatias.fatias].sort((a, b) => b.quantidade - a.quantidade || ORDEM_FATIA.indexOf(a.grupo) - ORDEM_FATIA.indexOf(b.grupo));
+  const destaque = fatias.principal ?? porTamanho[0] ?? null;
+  const secundaria = porTamanho.find((f) => f.grupo !== destaque?.grupo && f.pct >= FATIA_SECUNDARIA_MIN_PCT) ?? null;
+  return { destaque, secundaria };
+}
+
+/** "LIGABOM 92%", "Outros 55%", "72% a confirmar". */
+export function textoDaFatia(f: Pick<FatiaGti, 'grupo' | 'pct'>): string {
+  return f.grupo === 'A_CONFIRMAR' ? `${f.pct}% a confirmar` : `${GRUPO_GTI_INFO[f.grupo].rotulo} ${f.pct}%`;
+}

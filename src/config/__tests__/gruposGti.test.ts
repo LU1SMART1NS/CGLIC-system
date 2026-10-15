@@ -5,8 +5,10 @@ import {
   montarFatiasGti,
   montarFatiasItensGti,
   passaFiltroGti,
+  resumirCelulaGti,
   resumirFatias,
   sugerirGrupoGti,
+  textoDaFatia,
   type LinhaFatiaGti
 } from '../gruposGti';
 
@@ -124,5 +126,34 @@ describe('fatias dos itens', () => {
       { item_key: '00022/2025-200331-00007', grupo: 'CONSESP', quantidade: 10, orgaos: 1 }
     ]);
     expect(m.get('00022/2025-200331-00007')?.principal).toMatchObject({ grupo: 'LIGABOM', pct: 95 });
+  });
+});
+
+describe('texto da célula GTI (casos reais de 15/10/2026)', () => {
+  const celula = (grupos: Array<[string, number]>) => {
+    const r = resumirCelulaGti(resumirFatias(grupos.map(([grupo, quantidade]) => ({ grupo: grupo as never, quantidade, orgaos: 1 }))));
+    return [r.destaque && textoDaFatia(r.destaque), r.secundaria && textoDaFatia(r.secundaria)];
+  };
+
+  it('um grupo domina: só ele', () => {
+    expect(celula([['LIGABOM', 92], ['CONSESP', 8]])).toEqual(['LIGABOM 92%', null]);
+  });
+  it('dois grupos próximos: o segundo aparece', () => {
+    expect(celula([['CNCG', 14], ['CNPC', 46], ['CONDPCI', 2], ['CONSESP', 38]])).toEqual(['CNPC 46%', 'CONSESP 38%']);
+  });
+  it('maior parte a confirmar: diz quanto falta', () => {
+    expect(celula([['LIGABOM', 12], ['CNPC', 6], ['CONSESP', 10], ['A_CONFIRMAR', 72]])).toEqual(['LIGABOM 12%', '72% a confirmar']);
+  });
+  it('Outros dominam: o GTI continua em destaque e Outros aparece ao lado', () => {
+    expect(celula([['CNCG', 1], ['CNPC', 6], ['CONSESP', 38], ['OUTROS', 55]])).toEqual(['CONSESP 38%', 'Outros 55%']);
+  });
+  it('só órgãos fora dos GTIs: Outros 100%', () => {
+    expect(celula([['OUTROS', 10]])).toEqual(['Outros 100%', null]);
+  });
+  it('sem GTI, com Outros e a confirmar: o maior primeiro', () => {
+    expect(celula([['OUTROS', 6], ['A_CONFIRMAR', 4]])).toEqual(['Outros 60%', '40% a confirmar']);
+  });
+  it('sem fatias: nada', () => {
+    expect(resumirCelulaGti(undefined)).toEqual({ destaque: null, secundaria: null });
   });
 });
