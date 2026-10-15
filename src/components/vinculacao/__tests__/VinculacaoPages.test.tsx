@@ -20,6 +20,7 @@ vi.mock('../../financeiro/useContratosDoFinanceiro', async (orig) => ({
 }));
 vi.mock('../../../hooks/useAtasPortfolio', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useAtasPortfolio')>()), useAtasPortfolio: vi.fn() }));
 vi.mock('../../../hooks/useCarteiraItens', () => ({ useCarteiraItens: vi.fn() }));
+vi.mock('../../../hooks/useAvisosResolvidos', () => ({ useAvisosResolvidos: vi.fn() }));
 // Janelas: não abrem no render estático; os hooks delas não rodam.
 vi.mock('../VincularAosItensDialog', () => ({ VincularAosItensDialog: () => null }));
 vi.mock('../../alocacao/AlocarUnidadeModal', () => ({ AlocarUnidadeModal: () => null }));
@@ -36,18 +37,36 @@ import { PainelDaConferencia } from '../ConferenciaForaDoContrato';
 import { useContratosDoFinanceiro } from '../../financeiro/useContratosDoFinanceiro';
 import { useAtasPortfolio } from '../../../hooks/useAtasPortfolio';
 import { useCarteiraItens } from '../../../hooks/useCarteiraItens';
+import { useAvisosResolvidos } from '../../../hooks/useAvisosResolvidos';
+import { chaveAvisoDeixarFatura, chaveAvisoDeixarNota } from '../../../services/avisosResolvidosService';
 import { EmpenhosItensPage } from '../EmpenhosItensPage';
 import { EmpenhosContratoPage } from '../EmpenhosContratoPage';
 import { ItensUnidadesPage } from '../../alocacao/ItensUnidadesPage';
 
 const render = (el: React.ReactElement, url = '/') => renderToStaticMarkup(<MemoryRouter initialEntries={[url]}>{el}</MemoryRouter>);
+// K3: contrato encerrado em 06/05/2025.
 const contratos = (escopo: Set<string> | null = null) =>
   vi.mocked(useContratosDoFinanceiro).mockReturnValue({
-    contrato: (k: string) => ({ numero: k === 'K1' ? '00002/2025' : '00009/2025', fornecedorNome: 'INBRA', gestorNome: 'Maria', expirado: false }),
+    contrato: (k: string) => ({
+      numero: k === 'K1' ? '00002/2025' : k === 'K3' ? '00026/2024' : '00009/2025',
+      fornecedorNome: 'INBRA',
+      gestorNome: 'Maria',
+      expirado: k === 'K3',
+      vigenciaFim: k === 'K3' ? '2025-05-06' : undefined
+    }),
     lista: [],
     escopo,
     showGestorFilter: escopo === null,
     isLoading: false
+  } as any);
+/** Marcas "Deixar como está" gravadas (avisos_resolvidos). */
+const deixadas = (...chaves: string[]) =>
+  vi.mocked(useAvisosResolvidos).mockReturnValue({
+    porChave: new Map(chaves.map((c) => [c, { chave: c, tipo: 'FONTE', justificativa: 'Contrato encerrado e pago; nada mais muda.', resolvidoPorNome: 'João', resolvidoEm: '2026-10-15T12:00:00Z' }])),
+    resolver: { mutateAsync: vi.fn() },
+    reexibir: { mutate: vi.fn(), isPending: false },
+    podeResolver: true,
+    podeConcluirTarefas: true
   } as any);
 const nota = (over: any) =>
   mapDistribuicao({ contrato_empenho_id: over.ne, contract_key: 'K1', empenho_id: over.ne, numero_oficial: over.ne, valor_nota: 14700, itens_no_contrato: 3, parcelas: [], sugestao: [], situacao: 'A_DISTRIBUIR', ...over });
@@ -56,10 +75,12 @@ describe('Vínculos → Empenhos aos itens', () => {
   beforeEach(() => {
     vi.mocked(useConferenciasDaNota).mockReturnValue({ data: [] } as any);
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
-    contratos(new Set(['K1']));
+    contratos(new Set(['K1', 'K3']));
+    deixadas();
     vi.mocked(useEmpenhosParaVincularAosItens).mockReturnValue({
       data: [
         nota({ ne: '2024NE000328', sugestao_tipo: 'MULTIPLO_DO_PRECO', sugestao: [{ numero_item: 13, quantidade: 3 }] }),
+        nota({ ne: '2024NE000022', contract_key: 'K3' }),
         nota({ ne: '2024NE000330', situacao: 'REVISAR', motivo_revisao: 'VALOR_MUDOU', valor_na_distribuicao: 9800, origem: 'USUARIO' }),
         nota({ ne: '2026NE000001', contract_key: 'OUTRO' }),
         nota({ ne: '2024NE000337', situacao: 'DISTRIBUIDA', origem: 'USUARIO', parcelas: [{ numero_item: 43, valor: 14700 }], distribuido_por_nome: 'Maria' }),
@@ -125,6 +146,33 @@ describe('Vínculos → Empenhos aos itens', () => {
     expect(html).toContain('SIAFI: nota ainda não lida no SIAFI');
   });
 
+  it('contrato encerrado: fora do padrão "Vigentes", com "Deixar como está" em "Encerrados"', () => {
+    let html = render(<EmpenhosItensPage />);
+    expect(html).not.toContain('2024NE000022');
+    expect(html).toMatch(/A vincular<span class="segment-pill__count">2</);
+    html = render(<EmpenhosItensPage />, '/?vigencia=ENCERRADOS');
+    expect(html).toContain('2024NE000022');
+    expect(html).toContain('contrato encerrado em 06/05/2025');
+    expect(html).toContain('vinc-empenhos-deixar-2024NE000022');
+    expect(html).not.toContain('vinc-empenhos-deixar-2024NE000328');
+    expect(html).toMatch(/A vincular<span class="segment-pill__count">1</);
+  });
+
+  it('nota deixada como está: some de "Encerrados" e aparece em "Todos" com a justificativa e Reexibir', () => {
+    deixadas(chaveAvisoDeixarNota('K3', '2024NE000022'));
+    let html = render(<EmpenhosItensPage />, '/?vigencia=ENCERRADOS');
+    expect(html).not.toContain('2024NE000022');
+    html = render(<EmpenhosItensPage />, '/?vigencia=TODOS');
+    expect(html).toContain('vinc-empenhos-deixada-2024NE000022');
+    expect(html).toContain('Deixada como está');
+    expect(html).toContain('João, 15/10/2026');
+    expect(html).toContain('Contrato encerrado e pago; nada mais muda.');
+    expect(html).toContain('vinc-empenhos-reexibir-2024NE000022');
+    expect(html).not.toContain('vinc-empenhos-deixar-2024NE000022');
+    // A vincular continua disponível; a nota não entra no lote.
+    expect(html).toContain('vinc-empenhos-vincular-2024NE000022');
+  });
+
   it('segmento "Conferir no Contratos.gov.br": notas do escopo, com a conferência e sem o lote', () => {
     const linha = (over: any) =>
       mapConferencia({
@@ -159,10 +207,12 @@ const fora = (over: any) =>
 describe('Vínculos → Empenhos ao contrato', () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
-    contratos(new Set(['K1']));
+    contratos(new Set(['K1', 'K3']));
+    deixadas();
     vi.mocked(useEmpenhosForaDoContrato).mockReturnValue({
       data: [
         fora({}),
+        fora({ id_fatura: 1800, contract_key: 'K3', fatura_numero: '47257254', id_empenho_gov: 'g345', numero_empenho: '2024NE000345' }),
         fora({ id_fatura: 2231, contract_key: 'K2', fatura_numero: '2231', id_empenho_gov: 'g603', numero_empenho: '2025NE000603' }),
         fora({ id_fatura: 1500, id_empenho_gov: 'g700', numero_empenho: '2024NE000700', veredito: 'EM_OUTRO_CONTRATO', outros_contratos: ['200331-00004-2017'], situacao: 'CORRIGINDO', correcao_tipo: 'MUDAR_FATURA_DE_CONTRATO', correcao_por_nome: 'Maria', correcao_em: '2026-10-13T12:00:00Z' })
       ],
@@ -209,6 +259,26 @@ describe('Vínculos → Empenhos ao contrato', () => {
     html = renderToStaticMarkup(<PainelDaConferencia linha={l} contrato={{ numero: '00088/2013' }} podeMarcar={false} onVouCorrigir={vi.fn()} />);
     expect(html).not.toContain('Vou corrigir no Contratos.gov.br');
     expect(html).toContain('Abrir o Contratos.gov.br');
+  });
+
+  it('contrato encerrado: fora do padrão "Vigentes"; em "Encerrados" tem "Deixar como está"; deixada só em "Todas"', () => {
+    let html = render(<EmpenhosContratoPage />);
+    expect(html).not.toContain('2024NE000345');
+    expect(html).toMatch(/A conferir<span class="segment-pill__count">1</);
+    html = render(<EmpenhosContratoPage />, '/?vigencia=ENCERRADOS');
+    expect(html).toContain('2024NE000345');
+    expect(html).toContain('contrato encerrado em 06/05/2025');
+    expect(html).toContain('vinc-ne-contrato-deixar-1800|g345');
+    expect(html).not.toContain('vinc-ne-contrato-deixar-1490|g412');
+    deixadas(chaveAvisoDeixarFatura('K3', 1800, 'g345'));
+    html = render(<EmpenhosContratoPage />, '/?vigencia=ENCERRADOS');
+    expect(html).not.toContain('2024NE000345');
+    html = render(<EmpenhosContratoPage />, '/?vigencia=TODOS&situacao=TODAS');
+    expect(html).toContain('vinc-ne-contrato-deixada-1800|g345');
+    expect(html).toContain('Deixada como está');
+    expect(html).toContain('vinc-ne-contrato-reexibir-1800|g345');
+    expect(html).toMatch(/A conferir<span class="segment-pill__count">1</);
+    expect(html).toMatch(/Todas<span class="segment-pill__count">3</);
   });
 
   it('marca vencida volta para "A conferir" com o aviso de que a correção não chegou', () => {

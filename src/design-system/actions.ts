@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, ArrowLeftRight, ArrowRight, Ban, Check, FlaskConical, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, FileSearch, FileX, Link2, Pencil, Plus,
+  Archive, ArrowLeft, ArrowLeftRight, ArrowRight, Ban, Check, FlaskConical, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, FileSearch, FileX, Link2, Pencil, Plus,
   RefreshCw, RotateCcw, Search, Trash2, Unlink, UserCheck, UserPlus, UserX, X, XCircle,
   type LucideIcon
 } from 'lucide-react';
@@ -47,6 +47,7 @@ export const ACTIONS = {
   manterVinculo: { label: 'Manter vínculo', icon: Link2, variant: 'outline' },
   concluir: { label: 'Concluir', icon: Check, variant: 'outline' },
   resolvido: { label: 'Resolvido', icon: Check, variant: 'outline' },
+  deixarComoEsta: { label: 'Deixar como está', icon: Archive, variant: 'outline' },
   reexibir: { label: 'Reexibir', icon: RotateCcw, variant: 'outline' },
   restaurar: { label: 'Restaurar', icon: RotateCcw, variant: 'outline' },
   desfazer: { label: 'Desfazer', icon: RotateCcw, variant: 'outline' },

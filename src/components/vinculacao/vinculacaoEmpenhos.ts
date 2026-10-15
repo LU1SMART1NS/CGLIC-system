@@ -54,6 +54,27 @@ export function noSegmento(l: Pick<EmpenhoForaDoContrato, 'situacao'>, segmento:
 /** Conta no menu: o que ainda pede o gestor (sem marca, ou marcada e a correção não chegou). */
 export const pedeOGestor = (l: Pick<EmpenhoForaDoContrato, 'situacao'>) => noSegmento(l, 'A_CONFERIR');
 
+// -----------------------------------------------------------------------------------------------------
+// Contratos encerrados (decisão de 15/10/2026): fora do número do menu; "Deixar como está" com justificativa
+// -----------------------------------------------------------------------------------------------------
+
+export type FiltroVigencia = 'VIGENTES' | 'ENCERRADOS' | 'TODOS';
+
+/** Filtro Vigência das duas filas. Contrato sem data de fim conta como vigente. */
+export function passaVigencia(expirado: boolean | undefined, filtro: FiltroVigencia): boolean {
+  if (filtro === 'TODOS') return true;
+  return filtro === 'ENCERRADOS' ? Boolean(expirado) : !expirado;
+}
+
+/**
+ * Linha deixada como está: tem a marca do gestor E o contrato está encerrado. Se o contrato voltar a ficar
+ * vigente (prorrogação), a marca deixa de valer e a linha volta à fila.
+ */
+export const deixadaComoEsta = (expirado: boolean | undefined, temMarca: boolean) => Boolean(expirado) && temMarca;
+
+/** O número do ícone do menu conta só linhas de contratos vigentes (as encerradas ficam no filtro "Encerrados"). */
+export const contaNoMenu = (expirado: boolean | undefined) => !expirado;
+
 export interface ContratoDaConferencia {
   numero: string;
   fornecedorNome?: string;

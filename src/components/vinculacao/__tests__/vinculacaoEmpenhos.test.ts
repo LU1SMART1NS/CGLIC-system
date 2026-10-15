@@ -4,6 +4,9 @@ import { linhaForaDoContrato } from '../../../services/empenhosForaDoContratoSer
 import {
   aguardaVinculoAosItens,
   conferenciaDaNota,
+  contaNoMenu,
+  deixadaComoEsta,
+  passaVigencia,
   noSegmento,
   pedeOGestor,
   entraNoLote,
@@ -121,5 +124,25 @@ describe('conferência de Empenhos ao contrato', () => {
     expect([a, c, n].filter(pedeOGestor)).toHaveLength(2);
     expect(c.correcao).toEqual({ tipo: 'OUTRO', observacao: null, porNome: null, em: '2026-10-13T12:00:00Z' });
     expect(a.chave).toBe('1|11628150');
+  });
+});
+
+describe('contratos encerrados nas filas (15/10/2026)', () => {
+  it('filtro Vigência: sem data de fim conta como vigente; "Todos" mostra tudo', () => {
+    expect(passaVigencia(false, 'VIGENTES')).toBe(true);
+    expect(passaVigencia(undefined, 'VIGENTES')).toBe(true);
+    expect(passaVigencia(true, 'VIGENTES')).toBe(false);
+    expect(passaVigencia(true, 'ENCERRADOS')).toBe(true);
+    expect(passaVigencia(false, 'ENCERRADOS')).toBe(false);
+    expect(passaVigencia(true, 'TODOS')).toBe(true);
+  });
+
+  it('deixada como está só com marca E contrato encerrado; prorrogado volta à fila; o menu conta só vigentes', () => {
+    expect(deixadaComoEsta(true, true)).toBe(true);
+    expect(deixadaComoEsta(false, true)).toBe(false);
+    expect(deixadaComoEsta(true, false)).toBe(false);
+    expect(contaNoMenu(false)).toBe(true);
+    expect(contaNoMenu(undefined)).toBe(true);
+    expect(contaNoMenu(true)).toBe(false);
   });
 });
