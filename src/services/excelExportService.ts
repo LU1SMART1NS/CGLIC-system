@@ -567,6 +567,13 @@ export function formatDateBr(dateStr?: string | null): string {
   return dateStr;
 }
 
+/** Colunas que só têm valor por item (no resumo por ata saem "Consolidado" ou "-"); fornecedor e descrição têm valor nos dois níveis. */
+const COLUNAS_COM_VALOR_POR_ATA = new Set(['fornecedorRazaoSocial', 'fornecedorCnpj', 'descricaoItem']);
+export function colunasSoPorItem(ids: string[]): ReportColumnDef[] {
+  return ALL_REPORT_COLUMNS.filter(c =>
+    ids.includes(c.id) && c.group !== 'ata' && c.group !== 'link' && !COLUNAS_COM_VALOR_POR_ATA.has(c.id));
+}
+
 export function formatCnpjBr(cnpj?: string): string {
   if (!cnpj) return '-';
   const digits = cnpj.replace(/\D/g, '');

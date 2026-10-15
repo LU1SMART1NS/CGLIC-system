@@ -24,6 +24,7 @@ if (typeof globalThis.localStorage === 'undefined') {
 }
 
 import { 
+  colunasSoPorItem,
   ALL_REPORT_COLUMNS, 
   COLUMNS_MAP, 
   getDefaultColumnsForPreset, 
@@ -243,6 +244,11 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
     expect(rows[0].numeroItem).toBe('Consolidado');
     expect(rows[0].fornecedorRazaoSocial).toBe('DEFENSE MOBILITY LTDA');
     expect(rows[0].fornecedorCnpj).toBe('00.394.494/0001-36');
+  });
+
+  it('5d. Colunas de item, saldo e contrato contam como "só por item"; ata, links, fornecedor e descrição não', () => {
+    expect(colunasSoPorItem(['numeroAta', 'linkPncpAta', 'fornecedorRazaoSocial', 'fornecedorCnpj', 'descricaoItem'])).toEqual([]);
+    expect(colunasSoPorItem(['numeroAta', 'numeroItem', 'valorUnitario']).map(c => c.id)).toEqual(['numeroItem', 'valorUnitario']);
   });
 
   it('6. Deve gerar planilha Excel .xlsx válida via ExcelJS', async () => {
