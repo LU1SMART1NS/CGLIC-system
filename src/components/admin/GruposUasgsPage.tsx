@@ -2,7 +2,6 @@ import React from 'react';
 import { Network } from 'lucide-react';
 import {
   ActionButton,
-  AppInput,
   AppSelect,
   DataTable,
   NoticeBar,
@@ -16,6 +15,8 @@ import { AdminListShell } from './shared/AdminListShell';
 import { CarteiraSegmentTabs, type CarteiraSegment } from '../carteira/CarteiraSegmentTabs';
 import { SELECIONADA_BG, SelecaoBar, useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
+import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
+import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { GtiTag } from '../gti/GtiVisual';
 import { useAuth } from '../../context/AuthContext';
@@ -50,6 +51,8 @@ export const GruposUasgsPage: React.FC = () => {
   const definir = useDefinirGruposUasgs();
   const [situacao, setSituacao] = React.useState<Situacao>('A_CONFIRMAR');
   const [busca, setBusca] = React.useState('');
+  /** GTI do filtro: o grupo confirmado ou, sem confirmação, o sugerido. '' = todos. */
+  const [filtroGrupo, setFiltroGrupo] = React.useState<string>('');
   const [salvando, setSalvando] = React.useState<string | null>(null);
 
   const linhas: Linha[] = React.useMemo(
@@ -67,14 +70,28 @@ export const GruposUasgsPage: React.FC = () => {
     return c;
   }, [linhas]);
 
+  const grupoParaFiltro = (l: Linha) => l.grupo ?? l.sugestao;
+  // Quantas UASGs da aba escolhida cada grupo traria (contagem no menu do filtro).
+  const contagemPorGrupo = React.useMemo(() => {
+    const c: Partial<Record<GrupoConfirmavel, number>> = {};
+    for (const l of linhas) {
+      const g = grupoParaFiltro(l);
+      if (g && (situacao === 'TODAS' || l.situacao === situacao)) c[g] = (c[g] ?? 0) + 1;
+    }
+    return c;
+  }, [linhas, situacao]);
+
+  const totalDaAba = situacao === 'TODAS' ? linhas.length : contagem[situacao];
+
   const visiveis = React.useMemo(() => {
     const q = semAcento(busca.trim());
     return linhas.filter(
       (l) =>
         (situacao === 'TODAS' || l.situacao === situacao) &&
+        (!filtroGrupo || grupoParaFiltro(l) === filtroGrupo) &&
         (!q || l.uasg.includes(q) || semAcento(`${l.nome ?? ''} ${l.nomeNaAta ?? ''} ${l.siglaOrgao ?? ''} ${l.siglaUf ?? ''}`).includes(q))
     );
-  }, [linhas, situacao, busca]);
+  }, [linhas, situacao, busca, filtroGrupo]);
 
   // Paginação das carteiras; a seleção e o "marcar todas" valem para a lista inteira, não só para a página.
   const { currentPage, setPage, pageItems } = useCarteiraPagination(visiveis, chaveDaLinha, POR_PAGINA);
@@ -235,13 +252,8 @@ export const GruposUasgsPage: React.FC = () => {
         title="Grupos das UASGs"
         subtitle="De qual Grupo de Trabalho Integrado (GTI) do ComprasSUSP é cada órgão participante das atas."
         icon={<Network size={20} />}
-        hint="O grupo confirmado aqui vale para todas as atas e itens: a carteira de Atas mostra a fatia de cada GTI e filtra pelo interesse de cada um."
+        hint="O sistema sugere o grupo pelo nome da UASG e pela sigla do órgão; quem confirma é o coordenador. Só o grupo confirmado conta nas atas e itens, e adesões não entram."
       />
-
-      <NoticeBar tone="info" testId="grupos-uasgs-aviso">
-        O Compras.gov.br não tem um campo que diga a força de segurança. O sistema sugere o grupo pelo nome da UASG e pela sigla do órgão, e a sugestão pode errar. Nas atas só conta o grupo <b>confirmado</b>; UASG a confirmar aparece em cinza e fica fora do filtro por GTI. Adesões não contam.
-        {podeEditar ? '' : ' Quem confirma é o coordenador.'}
-      </NoticeBar>
 
       {consulta.data === null ? (
         <NoticeBar tone="warning" testId="grupos-uasgs-sem-migration">
@@ -258,30 +270,31 @@ export const GruposUasgsPage: React.FC = () => {
             meta={`${contagem.TODAS} UASGs participam de atas da carteira`}
           />
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            <div style={{ flex: '1 1 260px', maxWidth: '400px' }}>
-              <AppInput
-                aria-label="Buscar UASG"
-                placeholder="Buscar por UASG, nome, sigla ou UF..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                data-testid="grupos-uasgs-busca"
-              />
-            </div>
-            {chavesSelecionaveis.length > 0 && (
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                <input
-                  ref={marcarTodasRef}
-                  type="checkbox"
-                  checked={todasMarcadas}
-                  onChange={() => selecao.alternarVarias(chavesSelecionaveis)}
-                  data-testid="marcar-todas-sugestoes"
-                  style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
-                />
-                Marcar as {chavesSelecionaveis.length} com sugestão nesta lista
-              </label>
-            )}
-          </div>
+          <CarteiraFilterBar
+            busca={busca}
+            searchPlaceholder="Buscar por UASG, nome, sigla ou UF..."
+            onChangeBusca={setBusca}
+            hasActiveFilters={Boolean(busca.trim() || filtroGrupo)}
+            onResetFilters={() => {
+              setBusca('');
+              setFiltroGrupo('');
+            }}
+            counter={carteiraCounter(visiveis.length, totalDaAba, Boolean(busca.trim() || filtroGrupo), 'UASG', 'UASGs')}
+            testIdPrefix="grupos-uasgs"
+          >
+            <CarteiraFilterButton
+              label="GTI"
+              value={filtroGrupo}
+              emptyValue=""
+              options={GRUPOS_CONFIRMAVEIS.map((g) => ({
+                value: g,
+                label: g === 'OUTROS' ? GRUPO_GTI_INFO[g].rotulo : `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`,
+                count: contagemPorGrupo[g] ?? 0
+              }))}
+              onChange={setFiltroGrupo}
+              testId="grupos-uasgs-filtro-gti"
+            />
+          </CarteiraFilterBar>
 
           {selecionadas.length > 0 && (
             <SelecaoBar
@@ -307,8 +320,22 @@ export const GruposUasgsPage: React.FC = () => {
 
           <AdminListShell
             title="UASGs participantes"
-            countLabel={`${visiveis.length} de ${linhas.length}`}
             icon={<Network size={16} />}
+              stripActions={
+                chavesSelecionaveis.length > 0 ? (
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                    <input
+                      ref={marcarTodasRef}
+                      type="checkbox"
+                      checked={todasMarcadas}
+                      onChange={() => selecao.alternarVarias(chavesSelecionaveis)}
+                      data-testid="marcar-todas-sugestoes"
+                      style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                    />
+                    Marcar as {chavesSelecionaveis.length} com sugestão
+                  </label>
+                ) : undefined
+              }
             isLoading={consulta.isLoading}
             isError={consulta.isError}
             errorMessage={consulta.error instanceof Error ? consulta.error.message : undefined}
