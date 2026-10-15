@@ -334,3 +334,26 @@ export function ordenarDistribuicao(linhas: DistribuicaoLinha[], por: 'NOME' | '
     return por === 'CARGA' ? b.equivalente - a.equivalente || porNome : porNome;
   });
 }
+
+/** "00041/2024" → [2024, 41]; sem o formato número/ano, o número inteiro vale e o ano fica 0 (vai para o começo). */
+function numeroAno(numero: string): [number, number] {
+  const m = numero.match(/(\d+)\s*\/\s*(\d{4})/);
+  if (m) return [Number(m[2]), Number(m[1])];
+  const n = Number(numero.replace(/\D/g, ''));
+  return [0, Number.isFinite(n) ? n : 0];
+}
+
+/**
+ * Itens de um gestor pelo número da ata ou do contrato: atas primeiro, depois contratos, cada grupo pelo ano e,
+ * no mesmo ano, pelo número (00002/2024 → 00041/2024 → 00002/2026). `desc` = do mais novo para o mais antigo.
+ */
+export function ordenarItensPorNumero(itens: DistribuicaoItem[], dir: 'asc' | 'desc'): DistribuicaoItem[] {
+  const sinal = dir === 'asc' ? 1 : -1;
+  return [...itens].sort((a, b) => {
+    const tipo = a.tipo.localeCompare(b.tipo);
+    if (tipo !== 0) return tipo;
+    const [anoA, numA] = numeroAno(a.numero);
+    const [anoB, numB] = numeroAno(b.numero);
+    return sinal * (anoA - anoB || numA - numB) || a.numero.localeCompare(b.numero);
+  });
+}
