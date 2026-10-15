@@ -40,20 +40,33 @@ export function sortRows<T>(rows: T[], column: CarteiraSortColumn<T>, dir: SortD
     .map((x) => x.row);
 }
 
+/** Separa as linhas destacadas no topo, mantendo a ordem da página dentro de cada grupo. */
+export function subirPrimeiro<T>(rows: T[], primeiro: (row: T) => boolean): T[] {
+  const topo: T[] = [];
+  const resto: T[] = [];
+  for (const row of rows) (primeiro(row) ? topo : resto).push(row);
+  return topo.length === 0 ? rows : [...topo, ...resto];
+}
+
 /**
  * Ordenação das tabelas das carteiras pelo cabeçalho, guardada na URL (?ordem=) para sobreviver à ida ao detalhe.
  * Clicar na coluna ordena no sentido inicial dela; clicar de novo inverte; um terceiro clique volta à ordem padrão.
  */
-export function useCarteiraSort<T>(rows: T[], columns: Record<string, CarteiraSortColumn<T>>) {
+export function useCarteiraSort<T>(
+  rows: T[],
+  columns: Record<string, CarteiraSortColumn<T>>,
+  /** Linhas que sobem para o topo na ordem padrão (ex.: novas); a ordem escolhida no cabeçalho prevalece. */
+  primeiro?: (row: T) => boolean
+) {
   const [searchParams, setSearchParams] = useSearchParams();
   const keys = Object.keys(columns);
   const sort = readSort(searchParams.get(PARAM), keys);
 
   const sorted = useMemo(
-    () => (sort ? sortRows(rows, columns[sort.key], sort.dir) : rows),
-    // `columns` deve ser estável (constante ou useMemo): quando muda (ex.: saldos chegaram), reordena.
+    () => (sort ? sortRows(rows, columns[sort.key], sort.dir) : primeiro ? subirPrimeiro(rows, primeiro) : rows),
+    // `columns` e `primeiro` devem ser estáveis (constante ou useMemo): quando mudam (ex.: saldos chegaram), reordena.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, columns, sort?.key, sort?.dir]
+    [rows, columns, primeiro, sort?.key, sort?.dir]
   );
 
   const toggle = useCallback(

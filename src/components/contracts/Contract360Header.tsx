@@ -12,6 +12,7 @@ import { MissingValue } from '../instrument360/MissingValue';
 import { getContractDaysRemaining } from '../../services/dashboardService';
 import { formatContractNumber } from '../../utils/contractNumber';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
+import { contratoEhNovo } from '../carteira/carteiraNovidade';
 import { ActionButton, AppButton, NoticeBar, type NoticeBarTone } from '../../design-system';
 import { pncpLinkStyle } from '../atas/Ata360Header';
 import { Instrument360Hero, instrumentSituationLabel } from '../instrument360/Instrument360Hero';
@@ -255,6 +256,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       }
       eyebrow={[contract.uasg ? `UASG ${contract.uasg}` : '', contract.nomeUnidadeGestora].filter(Boolean).join(' · ')}
       title={`Contrato nº ${numDisplay}`}
+      novidade={contratoEhNovo(contract) ? 'm' : undefined}
       status={{ faixa: expirado ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, false), neutral: !expirado }}
       dockSubtitle={contract.fornecedorNome || undefined}
       manager={<ManagerInfo label="Gestor do contrato" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="contract-manager-info" />}
