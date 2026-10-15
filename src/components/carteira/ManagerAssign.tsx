@@ -5,7 +5,7 @@ import { AppButton } from '../../design-system/components/AppButton';
 
 /** Endereço da Central de Distribuição, onde se atribui gestor às atas. */
 export const CENTRAL_DISTRIBUICAO_PATH = '/atas/distribuicao';
-/** Vinculação › Contratos à ata: onde o contrato sem ata ganha ata (e herda o gestor) ou é marcado "não pertence". */
+/** Vínculos › Contratos à ata: onde o contrato sem ata ganha ata (e herda o gestor) ou é marcado "não pertence". */
 export const VINCULACAO_CONTRATOS_PATH = '/vinculacao/contratos';
 
 /** Para onde leva o "Sem gestor" de uma linha: rótulo do botão, endereço e dica. */
@@ -24,8 +24,8 @@ const DESTINO_CENTRAL: DestinoSemGestor = {
 /**
  * Contrato sem gestor: o caminho depende de por que ele está sem gestor (o contrato herda o gestor da ata).
  * - vinculado a ata sem gestor: a Central dá gestor à ata e o contrato acompanha;
- * - marcado "não pertence a ata": o gestor é escolhido direto no contrato, na Vinculação;
- * - sem vínculo: a Vinculação liga o contrato à ata (ou marca que não pertence a nenhuma).
+ * - marcado "não pertence a ata": o gestor é escolhido direto no contrato, em Vínculos;
+ * - sem vínculo: os Vínculos liga o contrato à ata (ou marca que não pertence a nenhuma).
  */
 export function destinoContratoSemGestor(opts: {
   numero: string;
@@ -44,13 +44,13 @@ export function destinoContratoSemGestor(opts: {
     return {
       rotulo: 'Sem gestor · atribuir',
       para: `${VINCULACAO_CONTRATOS_PATH}?situacao=NAO_PERTENCE&${busca}`,
-      dica: 'Contrato marcado como "não pertence a ata": o gestor é escolhido na Vinculação › Contratos à ata'
+      dica: 'Contrato marcado como "não pertence a ata": o gestor é escolhido em Vínculos › Contratos à ata'
     };
   }
   return {
     rotulo: 'Sem ata · vincular',
     para: `${VINCULACAO_CONTRATOS_PATH}?${busca}`,
-    dica: 'O contrato herda o gestor da ata: vincule-o à ata (ou marque que não pertence a nenhuma) na Vinculação › Contratos à ata'
+    dica: 'O contrato herda o gestor da ata: vincule-o à ata (ou marque que não pertence a nenhuma) em Vínculos › Contratos à ata'
   };
 }
 

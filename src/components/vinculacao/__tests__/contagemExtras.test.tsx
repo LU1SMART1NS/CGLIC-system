@@ -45,7 +45,7 @@ describe('número no ícone das áreas', () => {
     vi.mocked(useContagemFinanceiro).mockReturnValue(null);
   });
 
-  it('Vinculação soma as filas de empenho e os contratos sem ata, quando a carteira já foi carregada', () => {
+  it('Vínculos soma as filas de empenho e os contratos sem ata, quando a carteira já foi carregada', () => {
     definirContagemExtra('contratosAta', 20);
     expect(menu()).toMatch(/data-testid="rail-count-vinculacao"[^>]*>25</);
   });
@@ -61,7 +61,7 @@ describe('número no ícone das áreas', () => {
     expect(menu()).not.toContain('rail-count-alocacao');
   });
 
-  it('gestor de saldos vê o número da Alocação e nenhuma Vinculação', () => {
+  it('gestor de saldos vê o número da Alocação e nenhumos Vínculos', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
     vi.mocked(useContagemVinculacao).mockReturnValue(null);
     definirContagemExtra('itensAAlocar', 3);
@@ -82,7 +82,7 @@ describe('número no ícone das áreas', () => {
   });
 });
 
-describe('números novos: Financeiro e Visão Geral', () => {
+describe('números novos: Financeiro e Início', () => {
   beforeEach(() => {
     zerarContagensExtras();
     vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
@@ -99,7 +99,7 @@ describe('números novos: Financeiro e Visão Geral', () => {
     expect(menu()).toMatch(/class="app-rail-count"[^>]*data-testid="rail-count-execucao-financeira"[^>]*>2</);
   });
 
-  it('Visão Geral (coordenador): atas sem gestor + gestor diferente, e o clique abre a Central', () => {
+  it('Início (coordenador): atas sem gestor + gestor diferente, e o clique abre a Central', () => {
     definirContagemExtra('atasSemGestor', 182);
     definirContagemExtra('gestorDiferente', 2);
     const html = menu();
@@ -109,7 +109,7 @@ describe('números novos: Financeiro e Visão Geral', () => {
     expect(menu()).toContain('href="/atas/distribuicao?aba=DIVERGENCIAS"');
   });
 
-  it('Vinculação abre na primeira fila com pendência', () => {
+  it('Vínculos abre na primeira fila com pendência', () => {
     vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0 });
     expect(menu()).toContain('href="/vinculacao/empenhos-itens"');
     definirContagemExtra('contratosAta', 1);

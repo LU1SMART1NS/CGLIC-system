@@ -6,7 +6,7 @@ import { empenhadoAcimaDaLinha, textoDaOrigem } from '../empenhadoAcimaService';
 
 /**
  * Item 6 do diagnóstico de multiusuários (14/10/2026): empenhado acima do contratado só avisa. A pendência vai para a
- * aba Pagamentos da Visão Geral e conta só a quantidade real das notas (informada ou da nota no SIAFI).
+ * aba Pagamentos do Início e conta só a quantidade real das notas (informada ou da nota no SIAFI).
  */
 vi.useFakeTimers({ toFake: ['Date'] });
 vi.setSystemTime(new Date('2026-10-14T12:00:00-03:00'));

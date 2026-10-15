@@ -8,12 +8,12 @@ Os dados vêm das fontes oficiais abertas (Compras.gov.br, PNCP, Contratos.gov.b
 
 | Área | Páginas |
 | --- | --- |
-| **Visão Geral** (no celular, "Início") | Painel com o que exige atenção; Distribuição de atas e contratos aos gestores |
+| **Início** | Painel com o que exige atenção; Distribuição de atas e contratos aos gestores |
 | **Carteira** | Atas · Contratos · Itens, com filtros por situação, unidade, gestor e órgão; telas de detalhe Ata 360, Contrato 360 e Item |
 | **Alocação** | Quantitativo de cada item para as unidades internas |
-| **Vinculação** (no celular, "Vínculos") | Contratos à ata · Empenhos ao contrato · Empenhos aos itens |
+| **Vínculos** | Contratos à ata · Empenhos ao contrato · Empenhos aos itens |
 | **Financeiro** | Empenhos · Pagamentos (ciclo da Portaria 50) · Previsão mensal |
-| **Configurações** (no celular, "Ajustes") | Modelos de gestão, regras de alertas, feriados, unidades internas, usuários e perfis |
+| **Ajustes** | Modelos de gestão, regras de alertas, feriados, unidades internas, usuários e perfis |
 
 Perfis: **Coordenador** (`admin`), **Gestor de atas e contratos** (`gestor`), **Gestor de saldos** (`gestor_saldos`) e **Consulta** (`leitor`). O detalhe de quem vê e faz o quê está em [CONTEXT.md](CONTEXT.md).
 
@@ -35,7 +35,7 @@ cp .env.example .env.local   # preencha VITE_SUPABASE_URL e VITE_SUPABASE_ANON_K
 npm run dev                  # http://localhost:5173
 ```
 
-O sistema exige login. Os usuários são convidados pela tela Configurações › Usuários; não há cadastro aberto.
+O sistema exige login. Os usuários são convidados pela tela Ajustes › Usuários; não há cadastro aberto.
 
 ### Comandos
 

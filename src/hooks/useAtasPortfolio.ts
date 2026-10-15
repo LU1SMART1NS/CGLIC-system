@@ -38,7 +38,7 @@ function relerAtas(queryClient: QueryClient) {
 export type SyncProgress = { step: string; percent: number; current?: number; total?: number };
 
 /**
- * Faixa de prazo da Ata (mesmas faixas da Visão Geral: crítico ≤30 dias, atenção 31–90).
+ * Faixa de prazo da Ata (mesmas faixas do Início: crítico ≤30 dias, atenção 31–90).
  * Vigência vem do motor temporal canônico (temporalEngineService.getArpVigenciaStatus);
  * `isCanceladaPncp` continua sendo um critério adicional de encerramento (fonte PNCP).
  */
@@ -130,7 +130,7 @@ export function useAtasPortfolio() {
   const empenhosDbSet = empenhosQuery.data ?? emptySet;
   const allocationsDbSet = allocationsQuery.data ?? emptySet;
 
-  // Gestor por ata (mesma fonte do detalhe da Ata e da Visão Geral), indexado pela chave de gestão (chaveGestaoDaArp).
+  // Gestor por ata (mesma fonte do detalhe da Ata e do Início), indexado pela chave de gestão (chaveGestaoDaArp).
   const { data: ataManagers } = useAllAtaManagers();
   const gestorByAta = useMemo(() => {
     const map: Record<string, string> = {};
@@ -140,8 +140,8 @@ export function useAtasPortfolio() {
     return map;
   }, [ataManagers]);
 
-  // Consumo de saldo por item (mesma fonte do detalhe da Ata e da Visão Geral).
-  // Atas vencidas, canceladas ou sem data não geram alerta de saldo (mesma regra da Visão Geral).
+  // Consumo de saldo por item (mesma fonte do detalhe da Ata e do Início).
+  // Atas vencidas, canceladas ou sem data não geram alerta de saldo (mesma regra do Início).
   const { data: saldos200330 } = useAllAtaItemSaldos(UASGS_CGLIC[0]);
   const { data: saldos200331 } = useAllAtaItemSaldos(UASGS_CGLIC[1]);
   const saldoStatsByAta = useMemo(() => {

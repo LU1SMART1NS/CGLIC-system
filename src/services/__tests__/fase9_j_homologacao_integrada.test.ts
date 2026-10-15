@@ -9,7 +9,7 @@ import { calculateFinancialBalances } from '../financialExecutionService';
 describe('FASE 9-J — Homologação Integrada do Frontend com Dados Reais', () => {
   describe('1. Fluxo Principal de Navegação e Breadcrumbs', () => {
     const routeFlow = [
-      { path: '/instrumentos', expectedBreadcrumb: 'Visão Geral' },
+      { path: '/instrumentos', expectedBreadcrumb: 'Início' },
       { path: '/atas', expectedBreadcrumb: 'Carteira de Atas' },
       { path: '/itens', expectedBreadcrumb: 'Carteira de Itens' },
       { path: '/contratos', expectedBreadcrumb: 'Carteira de Contratos' },
@@ -24,9 +24,9 @@ describe('FASE 9-J — Homologação Integrada do Frontend com Dados Reais', () 
         expect(crumbs.length).toBeGreaterThan(0);
         const lastCrumb = crumbs[crumbs.length - 1];
         expect(lastCrumb.label).toBe(step.expectedBreadcrumb);
-        // Toda rota filha deve ter a Visão Geral como primeira raiz
+        // Toda rota filha deve ter o Início como primeira raiz
         if (step.path !== '/instrumentos') {
-          expect(crumbs[0].label).toBe('Visão Geral');
+          expect(crumbs[0].label).toBe('Início');
           expect(crumbs[0].route).toBe('/instrumentos');
         }
       }

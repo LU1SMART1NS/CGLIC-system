@@ -56,7 +56,7 @@ export const ContractsRoute: React.FC = () => {
   // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
 
-  // "Sem gestor" leva a quem resolve: o contrato herda o gestor da ata (Central) ou ainda precisa de ata (Vinculação).
+  // "Sem gestor" leva a quem resolve: o contrato herda o gestor da ata (Central) ou ainda precisa de ata (Vínculos).
   const { data: ataManagers } = useAllAtaManagers();
   const { data: confirmacoesSemAta } = useContratosSemAta();
   const destinoSemGestor = useCallback(

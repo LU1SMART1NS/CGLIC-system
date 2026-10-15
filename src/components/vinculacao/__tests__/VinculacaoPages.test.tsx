@@ -52,7 +52,7 @@ const contratos = (escopo: Set<string> | null = null) =>
 const nota = (over: any) =>
   mapDistribuicao({ contrato_empenho_id: over.ne, contract_key: 'K1', empenho_id: over.ne, numero_oficial: over.ne, valor_nota: 14700, itens_no_contrato: 3, parcelas: [], sugestao: [], situacao: 'A_DISTRIBUIR', ...over });
 
-describe('Vinculação → Empenhos aos itens', () => {
+describe('Vínculos → Empenhos aos itens', () => {
   beforeEach(() => {
     vi.mocked(useConferenciasDaNota).mockReturnValue({ data: [] } as any);
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
@@ -156,7 +156,7 @@ const fora = (over: any) =>
     veredito: 'FORA_DOS_CONTRATOS', situacao: 'A_CONFERIR', ...over
   });
 
-describe('Vinculação → Empenhos ao contrato', () => {
+describe('Vínculos → Empenhos ao contrato', () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     contratos(new Set(['K1']));

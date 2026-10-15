@@ -86,7 +86,7 @@ const overdueCycle = {
 describe('buildContractActionQueue', () => {
   const queue = buildContractActionQueue({ contract, contractKey: KEY, plan, paymentCycles: [overdueCycle] });
 
-  it('tem os mesmos itens CRÍTICA/URGENTE da Visão Geral, na mesma ordem', () => {
+  it('tem os mesmos itens CRÍTICA/URGENTE do Início, na mesma ordem', () => {
     const funnel = calculateAttentionSummary({ contracts: [contract], plans: { [KEY]: plan }, paymentCycles: [overdueCycle] });
     const pick = (list: { id: string; severity: string }[]) =>
       list.filter((i) => i.severity === 'CRITICA' || i.severity === 'URGENTE').map((i) => [i.id, i.severity]);

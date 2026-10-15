@@ -60,7 +60,7 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 const SUGESTAO_LABEL: Record<Exclude<FiltroSugestao, 'TODOS'>, string> = { UNICA: 'Única', VARIAS: 'Mais de uma', NENHUMA: 'Nenhuma' };
 
 /**
- * Vinculação → Empenhos aos itens: notas de contratos com dois ou mais itens que ainda não foram vinculadas aos
+ * Vínculos → Empenhos aos itens: notas de contratos com dois ou mais itens que ainda não foram vinculadas aos
  * itens (a rever primeiro), as que não batem com o contrato (conferir no Contratos.gov.br), as que o servidor
  * vinculou pelo valor e as que a equipe vinculou nos últimos dias. As vinculadas pela nota no SIAFI não aparecem.
  * A linha abre a mesma janela do Contrato 360; as com sugestão única podem ser vinculadas em lote.

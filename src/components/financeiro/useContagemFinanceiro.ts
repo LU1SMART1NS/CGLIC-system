@@ -7,7 +7,7 @@ import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
 /**
  * Número no ícone do Financeiro: o segmento "Precisa de ação" de Pagamentos (ciclos com a CGLIC e faturas com erro no
  * SIAFI), urgente quando há erro no SIAFI ou prazo da CGLIC vencido. Coordenador vê todos; gestor, os próprios
- * contratos. Consultas leves (faturas, ciclos em aberto), já usadas pelo número da Vinculação.
+ * contratos. Consultas leves (faturas, ciclos em aberto), já usadas pelo número de Vínculos.
  */
 export function useContagemFinanceiro(): { total: number; urgente: boolean } | null {
   const { role } = useAuth();

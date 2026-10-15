@@ -8,7 +8,7 @@ function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] 
 
 describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', () => {
   describe('Menu chave com 4 áreas e páginas como abas', () => {
-    it('deve conter as 6 áreas do menu chave, com Configurações no pé', () => {
+    it('deve conter as 6 áreas do menu chave, com Ajustes no pé', () => {
       expect(navigationConfig.map((item) => item.id)).toEqual([
         'visao-geral',
         'carteira',
@@ -17,12 +17,12 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         'execucao-financeira',
         'configuracoes'
       ]);
-      expect(navigationConfig.map((item) => item.label)).toEqual(['Visão Geral', 'Carteira', 'Alocação', 'Vinculação', 'Financeiro', 'Configurações']);
+      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Carteira', 'Alocação', 'Vínculos', 'Financeiro', 'Ajustes']);
       expect(navigationConfig.find((i) => i.id === 'configuracoes')?.placement).toBe('bottom');
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
 
-    it('Visão Geral tem as abas Painel (/instrumentos) e Distribuição (/atas/distribuicao)', () => {
+    it('Início tem as abas Painel (/instrumentos) e Distribuição (/atas/distribuicao)', () => {
       const area = navigationConfig.find((i) => i.id === 'visao-geral')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Painel', '/instrumentos'],
@@ -40,7 +40,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       ]);
     });
 
-    it('Alocação tem uma página só (itens às unidades); Vinculação tem as três filas de vínculo na ordem do caminho', () => {
+    it('Alocação tem uma página só (itens às unidades); Vínculos tem as três filas de vínculo na ordem do caminho', () => {
       const alocacao = navigationConfig.find((i) => i.id === 'alocacao')!;
       expect(alocacao.children!.map((c) => [c.label, c.route])).toEqual([['Itens às unidades', '/alocacao']]);
       const area = navigationConfig.find((i) => i.id === 'vinculacao')!;
@@ -49,7 +49,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Empenhos ao contrato', '/vinculacao/empenhos-contrato'],
         ['Empenhos aos itens', '/vinculacao/empenhos-itens']
       ]);
-      // O gestor de saldos vê a Alocação e não a Vinculação.
+      // O gestor de saldos vê a Alocação e não os Vínculos.
       const saldos = filterNavigationByRole(navigationConfig, 'gestor_saldos').map((i) => i.id);
       expect(saldos).toContain('alocacao');
       expect(saldos).not.toContain('vinculacao');
@@ -66,7 +66,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(area.children!.every((c) => c.status === 'active')).toBe(true);
     });
 
-    it('Configurações tem os Modelos de Gestão e a administração do sistema', () => {
+    it('Ajustes tem os Modelos de Gestão e a administração do sistema', () => {
       const area = navigationConfig.find((i) => i.id === 'configuracoes')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Modelos de Gestão', '/configuracoes/modelos'],
@@ -105,7 +105,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(findAreaForTabs(admin, '/contratos/200331-00015-2026')).toBeNull();
     });
 
-    it('o gestor vê a Visão Geral com uma aba só (sem Distribuição)', () => {
+    it('o gestor vê o Início com uma aba só (sem Distribuição)', () => {
       const gestor = filterNavigationByRole(navigationConfig, 'gestor');
       expect(findAreaForTabs(gestor, '/instrumentos')?.children?.map((c) => c.label)).toEqual(['Painel']);
     });
@@ -114,23 +114,23 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
   describe('Geração de Breadcrumbs Hierárquicos', () => {
     it('deve gerar breadcrumb para a rota raiz / (redireciona para /instrumentos)', () => {
       const crumbs = getBreadcrumbs('/');
-      expect(crumbs).toEqual([{ label: 'Visão Geral' }]);
+      expect(crumbs).toEqual([{ label: 'Início' }]);
     });
 
-    it('deve gerar breadcrumb para /instrumentos (Visão Geral)', () => {
+    it('deve gerar breadcrumb para /instrumentos (Início)', () => {
       const crumbs = getBreadcrumbs('/instrumentos');
-      expect(crumbs).toEqual([{ label: 'Visão Geral' }]);
+      expect(crumbs).toEqual([{ label: 'Início' }]);
     });
 
     it('deve gerar breadcrumb para /prazos (rota legada, redireciona para /instrumentos)', () => {
       const crumbs = getBreadcrumbs('/prazos');
-      expect(crumbs).toEqual([{ label: 'Visão Geral', route: '/instrumentos' }]);
+      expect(crumbs).toEqual([{ label: 'Início', route: '/instrumentos' }]);
     });
 
     it('deve gerar breadcrumb para /contratos', () => {
       const crumbs = getBreadcrumbs('/contratos');
       expect(crumbs).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Carteira de Contratos', route: '/contratos' }
       ]);
     });
@@ -138,7 +138,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('deve gerar breadcrumb dinâmico para a rota dedicada /contratos/:contractKey', () => {
       const crumbs = getBreadcrumbs('/contratos/200331-00015-2026');
       expect(crumbs).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Carteira de Contratos', route: '/contratos' },
         { label: 'Contrato 200331-00015-2026', route: '/contratos/200331-00015-2026' }
       ]);
@@ -147,7 +147,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('deve gerar breadcrumb para /pagamentos', () => {
       const crumbs = getBreadcrumbs('/pagamentos');
       expect(crumbs).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Pagamentos', route: '/pagamentos' }
       ]);
     });
@@ -155,26 +155,26 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('deve gerar breadcrumb para /empenhos', () => {
       const crumbs = getBreadcrumbs('/empenhos');
       expect(crumbs).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Empenhos', route: '/empenhos' }
       ]);
     });
 
     it('deve gerar breadcrumb para /atas, subrotas e itens', () => {
       expect(getBreadcrumbs('/atas')).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Carteira de Atas', route: '/atas' }
       ]);
       expect(getBreadcrumbs('/itens')).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Carteira de Itens', route: '/itens' }
       ]);
       expect(getBreadcrumbs('/atas/distribuicao')).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Central de Distribuição', route: '/atas/distribuicao' }
       ]);
       expect(getBreadcrumbs('/configuracoes/modelos')).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Modelos de Gestão', route: '/configuracoes/modelos' }
       ]);
     });
@@ -182,7 +182,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('deve gerar breadcrumb dinâmico para a rota dedicada /atas/detalhe/:ataKey', () => {
       const crumbs = getBreadcrumbs('/atas/detalhe/00011%2F2026-200331');
       expect(crumbs).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Carteira de Atas', route: '/atas' },
         { label: 'Ata 00011/2026', route: '/atas/detalhe/00011%2F2026-200331' }
       ]);
@@ -190,7 +190,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
     it('deve gerar breadcrumb Carteira › Ata › Item para o endereço próprio do item', () => {
       expect(getBreadcrumbs('/atas/detalhe/00011%2F2026-200331/itens/00003')).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Carteira de Atas', route: '/atas' },
         { label: 'Ata 00011/2026', route: '/atas/detalhe/00011%2F2026-200331' },
         { label: 'Item 00003', route: '/atas/detalhe/00011%2F2026-200331/itens/00003' }
@@ -199,11 +199,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
     it('deve gerar breadcrumb para rotas de administração', () => {
       expect(getBreadcrumbs('/admin/usuarios')).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Usuários e Servidores', route: '/admin/usuarios' }
       ]);
       expect(getBreadcrumbs('/admin/perfis')).toEqual([
-        { label: 'Visão Geral', route: '/instrumentos' },
+        { label: 'Início', route: '/instrumentos' },
         { label: 'Perfis e Permissões', route: '/admin/perfis' }
       ]);
     });
@@ -232,13 +232,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(isItemActive(area('carteira'), pathname)).toBe(true);
     });
 
-    it('em /atas/distribuicao só a Visão Geral fica ativa, sem acender a Carteira', () => {
+    it('em /atas/distribuicao só o Início fica ativa, sem acender a Carteira', () => {
       const pathname = '/atas/distribuicao';
       expect(isItemActive(area('visao-geral'), pathname)).toBe(true);
       expect(isItemActive(area('carteira'), pathname)).toBe(false);
     });
 
-    it('em /configuracoes/modelos só Configurações fica ativa', () => {
+    it('em /configuracoes/modelos só Ajustes fica ativa', () => {
       const pathname = '/configuracoes/modelos';
       expect(isExactChildActive(child('configuracoes', 'config-modelos'), pathname)).toBe(true);
       expect(isItemActive(area('configuracoes'), pathname)).toBe(true);
@@ -249,7 +249,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(isItemActive(area('carteira'), '/atas/detalhe/00011%2F2026-200331')).toBe(true);
     });
 
-    it('o cadastro de unidades internas fica em Configurações, não na Carteira', () => {
+    it('o cadastro de unidades internas fica em Ajustes, não na Carteira', () => {
       expect(isItemActive(area('configuracoes'), '/admin/departamentos')).toBe(true);
       expect(isItemActive(area('carteira'), '/admin/departamentos')).toBe(false);
     });
@@ -260,7 +260,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const visible = filterNavigationByRole(navigationConfig, 'admin');
       const labels = flatLabels(visible);
 
-      expect(labels).toContain('Visão Geral');
+      expect(labels).toContain('Início');
       expect(labels).toContain('Itens');
       expect(labels).toContain('Modelos de Gestão');
       expect(labels).toContain('Distribuição');
@@ -272,7 +272,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const visible = filterNavigationByRole(navigationConfig, 'gestor');
       const labels = flatLabels(visible);
 
-      expect(labels).toContain('Visão Geral');
+      expect(labels).toContain('Início');
       expect(labels).toContain('Atas');
       expect(labels).toContain('Contratos');
       expect(labels).toContain('Itens');
@@ -285,25 +285,25 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
 
-      // Configurações aparece para o gestor com os modelos de gestão e a consulta das unidades internas
+      // Ajustes aparece para o gestor com os modelos de gestão e a consulta das unidades internas
       const config = visible.find((i) => i.id === 'configuracoes');
       expect(config?.children?.map((c) => c.label)).toEqual(['Modelos de Gestão', 'Unidades Internas']);
     });
 
-    it('Gestor de Saldo (gestor_saldos) vê Visão Geral (restrita a saldos), Atas e Itens — sem Contratos, Financeiro, Usuários ou Perfis', () => {
+    it('Gestor de Saldo (gestor_saldos) vê Início (restrita a saldos), Atas e Itens — sem Contratos, Financeiro, Usuários ou Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor_saldos');
       const labels = flatLabels(visible);
 
       expect(labels).toContain('Itens');
       expect(labels).not.toContain('Distribuição');
 
-      expect(labels).toContain('Visão Geral');
+      expect(labels).toContain('Início');
       expect(labels).toContain('Atas');
       // Carteira dele é Atas · Itens: contratos são do gestor da ata (o empenhado por unidade fica na Alocação e no Item)
       expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
       expect(labels).not.toContain('Contratos');
       expect(labels).not.toContain('Modelos de Gestão');
-      // Configurações aparece só com o cadastro de unidades internas, que ele mantém
+      // Ajustes aparece só com o cadastro de unidades internas, que ele mantém
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);
       expect(labels).not.toContain('Pagamentos');
       expect(labels).not.toContain('Empenhos');
@@ -319,7 +319,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const visible = filterNavigationByRole(navigationConfig, 'leitor');
       const labels = flatLabels(visible);
 
-      expect(labels).toContain('Visão Geral');
+      expect(labels).toContain('Início');
       expect(labels).toContain('Atas');
       expect(labels).toContain('Contratos');
       expect(labels).toContain('Pagamentos');
@@ -328,7 +328,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Distribuição');
 
       expect(labels).not.toContain('Modelos de Gestão');
-      // Configurações aparece para o leitor só com a consulta das unidades internas
+      // Ajustes aparece para o leitor só com a consulta das unidades internas
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Unidades Internas']);
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');

@@ -28,7 +28,7 @@ export function useDistribuicoesEmpenhoContrato(contractKey: string) {
 export function useAcoesDistribuicaoEmpenho(contractKey?: string) {
   const queryClient = useQueryClient();
   const aoTerminar = () => {
-    // O prefixo cobre o contrato, a fila do menu Vinculação e a coluna da carteira de Empenhos.
+    // O prefixo cobre o contrato, a fila do menu Vínculos e a coluna da carteira de Empenhos.
     queryClient.invalidateQueries({ queryKey: ['contrato-empenho-distribuicao'] });
     queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
     if (contractKey) queryClient.invalidateQueries({ queryKey: ['contract-events', contractKey] });

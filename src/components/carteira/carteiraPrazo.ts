@@ -1,6 +1,6 @@
 /**
  * Faixas de prazo únicas para as carteiras de Contratos e de Atas — as mesmas
- * usadas na Visão Geral: crítico (até 30 dias) e atenção (31 a 90 dias).
+ * usadas no Início: crítico (até 30 dias) e atenção (31 a 90 dias).
  */
 import { VIGENCIA_RULES } from '../../config/alertRules';
 /** Faixas lidas no momento do uso, para valerem as regras ajustadas na Administração. */
@@ -23,7 +23,7 @@ export function classifyPrazo(diasRestantes: number | null, expirado = false): P
 export function matchesStatusFilter(faixa: PrazoFaixa, filter: CarteiraStatusFilter | 'TODOS'): boolean {
   switch (filter) {
     case 'VIGENTES':
-      // Sem data de vigência não conta como vigente (mesmo critério da Visão Geral); segue visível em "Todas as Situações".
+      // Sem data de vigência não conta como vigente (mesmo critério do Início); segue visível em "Todas as Situações".
       return faixa !== 'EXPIRADO' && faixa !== 'SEM_DATA';
     case 'CRITICO':
       return faixa === 'CRITICO';

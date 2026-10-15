@@ -34,7 +34,7 @@ const VERMELHO = 'var(--color-danger)';
 /**
  * Central de Distribuição, no padrão das carteiras: atas e contratos para gestores. Filas em abas com contagem
  * (Atas sem gestor, Histórico sem gestor, Gestor diferente da ata) e a carga de cada gestor (Equipe). A aba fica na URL. O vínculo de
- * contrato à ata saiu daqui para o menu Vinculação.
+ * contrato à ata saiu daqui para o menu Vínculos.
  */
 export const DistribuicaoEquipePage: React.FC = () => {
   const { atas, contratos, links, pendencias, totalSemVinculo, gestorDoContrato, isBusy, refresh } = usePendenciasVinculoAta();
@@ -52,7 +52,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // Fila aberta (?aba=); trocar de fila limpa a busca, os filtros e a ordenação da anterior.
   const [searchParams, setSearchParams] = useSearchParams();
   const abaParam = searchParams.get('aba');
-  // "Contratos sem vínculo" e "A vincular" moraram aqui: os endereços antigos levam à fila do menu Vinculação.
+  // "Contratos sem vínculo" e "A vincular" moraram aqui: os endereços antigos levam à fila do menu Vínculos.
   const vaiParaVinculacao = abaParam === 'CONTRATOS' || abaParam === 'A_VINCULAR';
   const abaDaUrl: Fila = abaParam && (FILAS as readonly string[]).includes(abaParam) ? (abaParam as Fila) : FILA_INICIAL;
   const trocarAba = (nova: Fila) => setSearchParams(nova === FILA_INICIAL ? {} : { aba: nova }, { replace: true });
@@ -164,12 +164,12 @@ export const DistribuicaoEquipePage: React.FC = () => {
               testId="distribuicao-contratos-sem-vinculo"
               action={
                 <AppButton variant="outline" size="sm" onClick={() => navigate(ROTAS_VINCULACAO.contratos)}>
-                  Abrir Vinculação
+                  Abrir Vínculos
                 </AppButton>
               }
             >
               <strong>{totalSemVinculo}</strong> {totalSemVinculo === 1 ? 'contrato ainda não tem' : 'contratos ainda não têm'} item de ata vinculado. O vínculo é
-              feito no menu Vinculação; quando vinculado, o contrato segue o gestor da ata.
+              feito no menu Vínculos; quando vinculado, o contrato segue o gestor da ata.
             </NoticeBar>
           )}
 

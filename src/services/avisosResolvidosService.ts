@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 
 /**
- * Avisos marcados como resolvidos (✓) na Visão Geral e nas Ações da ata e do contrato
+ * Avisos marcados como resolvidos (✓) no Início e nas Ações da ata e do contrato
  * (tabela avisos_resolvidos, migration 101). Os avisos são calculados na tela; a chave
  * embute o que faz o aviso voltar: o nível do saldo, o ciclo do reajuste ou a vigência
  * do lembrete. Tarefa se resolve concluindo-a no plano; pagamento, registrando a etapa.
@@ -21,7 +21,7 @@ export interface AvisoResolvido {
 export const JUSTIFICATIVA_MIN = 10;
 export const JUSTIFICATIVA_MAX = 500;
 
-/** Número do item sem zeros à esquerda: a Ata 360 e a Visão Geral leem o item de formas diferentes. */
+/** Número do item sem zeros à esquerda: a Ata 360 e o Início leem o item de formas diferentes. */
 function numeroItemCanonico(numeroItem: string | number): string {
   const s = String(numeroItem ?? '').trim();
   return /^\d+$/.test(s) ? String(Number(s)) : s;

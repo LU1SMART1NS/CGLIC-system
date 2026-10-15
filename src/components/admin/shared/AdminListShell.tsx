@@ -29,7 +29,7 @@ export interface AdminListShellProps {
 }
 
 /**
- * Cartão padrão das listas administrativas de Configurações: faixa com título e contagem
+ * Cartão padrão das listas administrativas de Ajustes: faixa com título e contagem
  * + os mesmos estados de carregando, erro e vazio em todas as telas.
  */
 export const AdminListShell: React.FC<AdminListShellProps> = ({

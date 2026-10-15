@@ -17,7 +17,7 @@ export const GestaoInstrumentosHeader: React.FC<GestaoInstrumentosHeaderProps> =
 }) => {
   return (
     <PageHeader
-      title="Visão Geral"
+      title="Início"
       subtitle="Resumo da carteira de atas e contratos e o que exige sua atenção."
       icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
       actions={

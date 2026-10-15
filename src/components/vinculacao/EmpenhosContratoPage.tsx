@@ -59,7 +59,7 @@ const COR_DO_VEREDITO: Record<VereditoForaDoContrato, StatusBadgeVariant> = {
 const COLUNAS = 6;
 
 /**
- * Vinculação → Empenhos ao contrato: notas que uma fatura cita e que o Contratos.gov.br não lista no contrato da
+ * Vínculos → Empenhos ao contrato: notas que uma fatura cita e que o Contratos.gov.br não lista no contrato da
  * fatura. A correção é sempre lá, feita pelo próprio gestor; aqui ele confere o que aconteceu e marca "Vou corrigir".
  * A linha sai da fila quando a sincronização trouxer a correção (migration 117).
  */

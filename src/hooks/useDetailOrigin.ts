@@ -27,7 +27,7 @@ export function isDetailPath(to: string): boolean {
 export function originLabel(path: string): string | null {
   const pathname = path.split(/[?#]/)[0];
   switch (pathname) {
-    case '/instrumentos': return 'Visão Geral';
+    case '/instrumentos': return 'Início';
     case '/atas': return 'Carteira';
     case '/contratos': return 'Carteira';
     case '/itens': return 'Carteira';

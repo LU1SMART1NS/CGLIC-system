@@ -18,7 +18,7 @@ function categoriaDoContrato(raw: unknown): string | undefined {
 
 /**
  * Carga de cada gestor e contratos com gestor diferente da ata, a partir da carteira já carregada. Serve à Central de
- * Distribuição e ao número da Visão Geral no menu (mesma conta nos dois lugares).
+ * Distribuição e ao número do Início no menu (mesma conta nos dois lugares).
  */
 export function useDistribuicaoDaCarteira({ atas, contratos, links, ajustes }: Carteira & { ajustes?: Record<string, ComplexidadeAjuste> }) {
   return useMemo(

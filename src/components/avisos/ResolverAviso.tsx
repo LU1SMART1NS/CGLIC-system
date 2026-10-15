@@ -41,7 +41,7 @@ async function observacaoComJustificativa(tabela: 'ata_tasks' | 'contract_tasks'
 }
 
 /**
- * Botão ✓ e janela de justificativa, iguais na Visão Geral, na Ata 360 e no Contrato 360.
+ * Botão ✓ e janela de justificativa, iguais no Início, na Ata 360 e no Contrato 360.
  * `abrir(alvo)` pede a justificativa; ao confirmar, grava o aviso resolvido ou conclui a tarefa.
  */
 export function useResolverAviso() {
@@ -52,7 +52,7 @@ export function useResolverAviso() {
   const [texto, setTexto] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
   const [gravando, setGravando] = React.useState(false);
-  // Tarefas concluídas aqui: somem já, sem esperar a Visão Geral recarregar.
+  // Tarefas concluídas aqui: somem já, sem esperar o Início recarregar.
   const [tarefasConcluidas, setTarefasConcluidas] = React.useState<ReadonlySet<string>>(new Set());
 
   const abrir = React.useCallback((a: AlvoResolucao) => {
