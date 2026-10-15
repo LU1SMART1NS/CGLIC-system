@@ -162,7 +162,7 @@ export const GruposUasgsPage: React.FC = () => {
             <option value="">{l.sugestao ? `A confirmar (sugestão: ${GRUPO_GTI_INFO[l.sugestao].rotulo})` : 'A confirmar'}</option>
             {GRUPOS_CONFIRMAVEIS.map((g) => (
               <option key={g} value={g}>
-                {GRUPO_GTI_INFO[g].rotulo} · {GRUPO_GTI_INFO[g].descricao}
+                {g === 'OUTROS' ? GRUPO_GTI_INFO[g].rotulo : `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`}
               </option>
             ))}
           </AppSelect>

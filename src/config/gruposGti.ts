@@ -21,7 +21,7 @@ export const GRUPO_GTI_INFO: Record<GrupoDaFatia, { rotulo: string; curto: strin
   LIGABOM: { rotulo: 'LIGABOM', curto: 'LIGABOM', descricao: 'Corpos de Bombeiros', cor: 'var(--gti-ligabom)' },
   CNCG: { rotulo: 'CNCG', curto: 'CNCG', descricao: 'Polícias Militares', cor: 'var(--gti-cncg)' },
   CNPC: { rotulo: 'CNPC', curto: 'CNPC', descricao: 'Polícias Civis', cor: 'var(--gti-cnpc)' },
-  CONDPCI: { rotulo: 'CONDPCI', curto: 'CONDPCI', descricao: 'Polícia Científica e Perícia', cor: 'var(--gti-condpci)' },
+  CONDPCI: { rotulo: 'CONDPCI', curto: 'CONDPCI', descricao: 'Polícias Científicas', cor: 'var(--gti-condpci)' },
   CONSESP: { rotulo: 'CONSESP', curto: 'CONSESP', descricao: 'Secretarias de Segurança Pública', cor: 'var(--gti-consesp)' },
   OUTROS: { rotulo: 'Outros', curto: 'Outros', descricao: 'Fora dos cinco GTIs', cor: 'var(--gti-outros)' },
   A_CONFIRMAR: { rotulo: 'A confirmar', curto: 'A confirmar', descricao: 'Grupo da UASG ainda não confirmado', cor: 'var(--gti-a-confirmar)' }
