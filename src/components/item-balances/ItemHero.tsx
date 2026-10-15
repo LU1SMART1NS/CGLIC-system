@@ -60,6 +60,8 @@ export interface ItemHeroProps {
   verContratos?: boolean;
   /** Abre a Ata 360. Sem ele, o número da ata aparece como texto. */
   onOpenAta?: () => void;
+  /** Botões "Ver mais" abaixo dos indicadores (ex.: Interesse por GTI); encolhem junto com o cartão. */
+  verMais?: React.ReactNode;
 }
 
 /** Situação do saldo pela régua única do sistema (balanceService.classifyArpItemSaldo): resta <20% crítico, <50% atenção. */
@@ -86,7 +88,8 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   referencia,
   onGoTo,
   verContratos = true,
-  onOpenAta
+  onOpenAta,
+  verMais
 }) => {
   // O item não tem gestor próprio: vale o da ata. Se a consulta falhar, o bloco some (não vira "Não atribuído").
   const { data: gestorAta, isLoading: carregandoGestor, isError: erroGestor } = useAtaManager(chaveGestaoDaArp(arp));
@@ -268,6 +271,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             />
           )}
         </HealthTileGrid>
+        {verMais}
       </div>
     </Instrument360Hero>
   );

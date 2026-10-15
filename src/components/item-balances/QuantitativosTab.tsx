@@ -37,8 +37,8 @@ import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { ConfirmarRemanejamentoModal, ContinuaDoOrgaoModal } from './RemanejamentoModals';
 import { useOrgaosRecolhidos } from './useOrgaosRecolhidos';
 import { useGruposDasUasgs } from '../../hooks/useGruposGti';
-import { GtiFatiaBar, GtiTag } from '../gti/GtiVisual';
-import { GRUPO_GTI_INFO, resumirFatias, type GrupoDaFatia } from '../../config/gruposGti';
+import { GtiTag } from '../gti/GtiVisual';
+import type { GrupoDaFatia } from '../../config/gruposGti';
 
 export interface QuantitativosTabProps {
   itemKey: string;
@@ -146,17 +146,6 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
   const gruposGti = useGruposDasUasgs(linhas.map((l) => l.uasg));
   const contaNoGti = (l: Linha) => !l.ehSenasp && !l.gerenciadora;
   const grupoDaLinha = (l: Linha): GrupoDaFatia => gruposGti.get(l.uasg) ?? 'A_CONFIRMAR';
-  const fatiasGti = React.useMemo(() => {
-    const porGrupo = new Map<GrupoDaFatia, { quantidade: number; orgaos: number }>();
-    for (const l of linhas) {
-      if (!contaNoGti(l)) continue;
-      const g = gruposGti.get(l.uasg) ?? 'A_CONFIRMAR';
-      const atual = porGrupo.get(g) ?? { quantidade: 0, orgaos: 0 };
-      porGrupo.set(g, { quantidade: atual.quantidade + Math.max(0, l.registrado ?? 0), orgaos: atual.orgaos + 1 });
-    }
-    return resumirFatias([...porGrupo].map(([grupo, v]) => ({ grupo, ...v })));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linhas, gruposGti]);
 
   const estado = (l: Linha): EstadoContratado => contratadoDoOrgao(l.uasg, l.ehSenasp, q, p.contratadoSenasp);
   const extrato = q.informado ? extratoDaCotaPropria(q) : null;
@@ -440,34 +429,6 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       {foraDaAta > 0 && <NoticeBar tone="warning" testId="orgaos-fora-da-ata">{foraDaAta} {foraDaAta > 1 ? 'órgãos registrados' : 'órgão registrado'} sem quantidade na ata assinada. Confira os números informados.</NoticeBar>}
       {contratouAcima > 0 && <NoticeBar tone="warning" testId="contratado-acima-do-registrado">{contratouAcima} {contratouAcima > 1 ? 'órgãos contrataram' : 'órgão contratou'} mais do que o registrado no Compras.gov.br. Confira os contratos do órgão.</NoticeBar>}
 
-      {fatiasGti.fatias.length > 0 && (
-        <div data-testid="interesse-gti" style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '0.75rem 1rem', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.25rem 0.75rem' }}>
-            <span style={{ fontWeight: 800 }}>Interesse por GTI</span>
-            <span style={pequeno}>Quantidade registrada dos participantes, somada por grupo. A SENASP e a gerenciadora ficam fora; adesões não contam.</span>
-          </div>
-          <GtiFatiaBar fatias={fatiasGti} />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem 1rem' }}>
-            {fatiasGti.fatias.map((f) => (
-              <span key={f.grupo} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}>
-                <GtiTag grupo={f.grupo} />
-                <b style={{ fontVariantNumeric: 'tabular-nums' }}>{f.pct}%</b>
-                <span style={pequeno}>{formatNumber(f.quantidade)} · {f.orgaos} {f.orgaos === 1 ? 'órgão' : 'órgãos'}</span>
-              </span>
-            ))}
-          </div>
-          {fatiasGti.orgaosAConfirmar > 0 && (
-            <span style={pequeno}>
-              {fatiasGti.orgaosAConfirmar} {fatiasGti.orgaosAConfirmar === 1 ? 'órgão ainda sem grupo confirmado' : 'órgãos ainda sem grupo confirmado'}: o coordenador confirma em Ajustes › Grupos das UASGs.
-            </span>
-          )}
-          {fatiasGti.principal && (
-            <span style={{ ...pequeno, color: 'var(--text-secondary)' }}>
-              Interesse principal: <b>{GRUPO_GTI_INFO[fatiasGti.principal.grupo].rotulo}</b> ({GRUPO_GTI_INFO[fatiasGti.principal.grupo].descricao}).
-            </span>
-          )}
-        </div>
-      )}
 
       <div>
         <SectionHeader

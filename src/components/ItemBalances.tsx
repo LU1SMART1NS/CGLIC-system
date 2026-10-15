@@ -73,6 +73,7 @@ import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
 import { QuantitativosTab } from './item-balances/QuantitativosTab';
+import { InteresseGtiBotao, InteresseGtiGaveta, useInteresseGti } from './item-balances/InteresseGti';
 import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOrgaoTab';
 import { adesoesDaSenasp, papelDoItem } from '../utils/quantitativosOutroOrgao';
 import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
@@ -597,6 +598,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     return (a.codigoUnidade || '').localeCompare(b.codigoUnidade || '');
   });
 
+  // Interesse por GTI (só na ata da SENASP): botão no cartão do topo e gaveta logo abaixo dele, como no Início.
+  const fatiasGti = useInteresseGti({ unidades, quantitativos, ataDaCglic });
+  const [gtiAberto, setGtiAberto] = React.useState(false);
+
   // Papel da SENASP neste item (ata de outro órgão: participante ou adesão, migration 114).
   const papelDoAItem = papelDoItem(papelSenaspDaAta(arp), unidades, adesoesDaSenasp(adesoes));
   const unidadesInternasDoItem = (
@@ -662,6 +667,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         onGoTo={(tab) => setActiveTab(tab)}
         verContratos={verContratos}
         onOpenAta={onOpenAta}
+        verMais={ataDaCglic ? <InteresseGtiBotao fatias={fatiasGti} aberto={gtiAberto} onToggle={() => setGtiAberto((v) => !v)} /> : undefined}
       />
 
       <Instrument360Tabs
@@ -677,6 +683,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         ariaLabel="Seções do item"
       />
       </Instrument360Head>
+
+      {ataDaCglic && gtiAberto && <InteresseGtiGaveta fatias={fatiasGti} onFechar={() => setGtiAberto(false)} />}
 
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'quantitativos' ? (

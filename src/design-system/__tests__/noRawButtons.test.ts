@@ -30,6 +30,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/instrumentos/GestaoInstrumentosDockStrip.tsx': 3, // nome que volta ao topo, números-filtro e botões das áreas (faixa encolhida)
   'src/components/instrumentos/GestaoInstrumentosSummaryCards.tsx': 4, // cartões-filtro
   'src/components/instrumentos/PainelGavetas.tsx': 1, // botão de área que abre a gaveta (chip com resumo)
+  'src/components/item-balances/InteresseGti.tsx': 1, // botão de gaveta "Interesse por GTI" (mesmo padrão do Início)
   'src/components/modals/ExportExcelModal.tsx': 7, // presets e chips de grupo
   'src/components/plan/TaskPlanSection.tsx': 1, // seletor de status
   'src/design-system/components/AppButton.tsx': 2, // o próprio componente (e a menção no comentário)
