@@ -19,6 +19,8 @@ import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import type { ItensPortfolioFilterState } from './ItensPortfolioFilters';
+import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
+import { ataEhNova } from '../carteira/carteiraNovidade';
 
 interface ItensPortfolioTableProps {
   rows: CarteiraItemRow[];
@@ -37,6 +39,9 @@ interface ItensPortfolioTableProps {
   /** Fatia de cada GTI do ComprasSUSP no item (migration 139). */
   fatiasDaLinha?: (row: CarteiraItemRow) => FatiasDaAta | undefined;
 }
+
+/** Item novo = item de ata nova (o item não tem data própria na fonte). */
+const itemNovo = (r: CarteiraItemRow) => ataEhNova(r.arp);
 
 const formatNumber = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
@@ -98,7 +103,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
     }),
     [comUnidade, unidade]
   );
-  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, sortColumns);
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, sortColumns, itemNovo);
   const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, useCallback((r: CarteiraItemRow) => r.key, []), pageSize);
 
@@ -169,6 +174,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                           Ata {arp.numeroAtaRegistroPreco}
                         </span>
                       </CarteiraCellFilter>
+                      {itemNovo(row) && <CarteiraNovoBadge genero="m" testId={`itens-novo-${row.key}`} />}
                     </div>
                     <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp(2) }}>
                       {toSentenceCaseIfAllCaps(item.descricaoItem)}

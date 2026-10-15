@@ -31,6 +31,8 @@ import { AvisoCarregando } from '../../design-system';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
 import { GtiCelulaAta } from '../gti/GtiVisual';
 import { chaveAtaGti, type FatiasDaAta } from '../../config/gruposGti';
+import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
+import { ataEhNova } from '../carteira/carteiraNovidade';
 
 interface ArpPortfolioListProps {
   cards: AtaGroupedCard[];
@@ -63,6 +65,7 @@ interface ArpPortfolioListProps {
 }
 
 const MAX_ITENS_EXPANDIDOS = 5;
+const cardNovo = (c: AtaGroupedCard) => ataEhNova(c.arp);
 
 function formatDateBR(dateStr?: string): string {
   if (!dateStr) return '—';
@@ -114,7 +117,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
     }),
     [saldoStatsByAta, gestorByAta]
   );
-  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(cards, sortColumns);
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(cards, sortColumns, cardNovo);
   const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
   const { currentPage, setPage, pageItems: pageCards, signature } = useCarteiraPagination(
     sorted,
@@ -241,6 +244,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                       <CarteiraIdLink onClick={abrirAta} label={`Ver detalhes da ata ${numeroAta}`} title={`Ver detalhes · UASG ${arp.codigoUnidadeGerenciadora}`} testId={`ata-360-link-${numeroAta}`}>
                         {numeroAta}
                       </CarteiraIdLink>
+                      {ataEhNova(arp) && <CarteiraNovoBadge genero="f" testId={`ata-nova-${numeroAta}`} />}
                       <SeloPapelSenasp arp={arp} testId={`ata-papel-${numeroAta}-${arp.codigoUnidadeGerenciadora}`} />
                       </div>
                       {card.fornecedorNome && (
