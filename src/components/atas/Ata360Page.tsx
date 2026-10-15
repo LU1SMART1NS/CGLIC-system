@@ -8,6 +8,9 @@ import { useAssignedManagementScope } from '../../hooks/useAssignedManagementSco
 import { useAuth } from '../../context/AuthContext';
 import { InstrumentPageState } from '../instrument360/InstrumentPageState';
 import { Ata360Header } from './Ata360Header';
+import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from '../gti/InteresseGti';
+import { useFatiasGti } from '../../hooks/useGruposGti';
+import { chaveAtaGti } from '../../config/gruposGti';
 import { AtaActionQueue, type Ata360Tab } from './AtaActionQueue';
 import { useAtaActionQueue } from '../../hooks/useAtaActionQueue';
 import { Instrument360Head } from '../instrument360/Instrument360Head';
@@ -27,7 +30,7 @@ import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 import { mensagemDesvincular } from '../../utils/vinculoAutomatico';
-import { carteiraDaAta, chaveGestaoDaArp } from '../../utils/ataIdentidade';
+import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { useFornecedorAtaPncp } from '../../hooks/useFornecedorAtaPncp';
 import { IndicarFornecedorModal } from './IndicarFornecedorModal';
 
@@ -49,6 +52,10 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const uasg = uasgProp || uasgFromAtaKey(ataKey) || UASG_LINK_LEGADO;
 
   const { arp, itens, isLoading, isError, error, refetch } = useAta(ataKey, uasg);
+  // Interesse por GTI da ata (só nas atas da SENASP): a fatia é pelo valor de todos os itens (migration 141).
+  const fatiasGtiPorAta = useFatiasGti();
+  const fatiasGti = arp && !ataDeOutroOrgao(arp) ? fatiasGtiPorAta.get(chaveAtaGti(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora)) : undefined;
+  const [gtiAberto, setGtiAberto] = React.useState(false);
   const { saldos, isLoading: loadingSaldos } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);
   // Carteira da CGLIC da ata (nas de outros órgãos, a UASG da SENASP): dela vêm contratos, gestores e escopo.
   const carteira = arp ? carteiraDaAta(arp) : uasg;
@@ -233,7 +240,11 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         onOpenContratos={() => goToTab('contratos')}
         fornecedorPncp={registroFornecedor}
         onIndicarFornecedor={abrirIndicar}
+        verMais={<InteresseGtiBotao fatias={fatiasGti} aberto={gtiAberto} onToggle={() => setGtiAberto((v) => !v)} />}
       />
+
+      {/* Gaveta entre o cartão e as abas; some junto com o cartão quando ele encolhe ao rolar. */}
+      <InteresseGtiNoTopo fatias={fatiasGti} aberto={gtiAberto} onFechar={() => setGtiAberto(false)} explicacao={EXPLICACAO_GTI.ata} />
 
       <Instrument360Tabs
         ref={tabsRef}

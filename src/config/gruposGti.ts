@@ -3,8 +3,10 @@
  *
  * O Compras.gov.br não diz de qual força é a UASG: o sistema sugere pelo nome da UASG e pela sigla do órgão,
  * e o coordenador confirma em Ajustes › Grupos das UASGs. Só o grupo confirmado entra nas fatias.
- * A fatia é a quantidade registrada dos órgãos participantes somada por grupo (sem a SENASP, a gerenciadora
- * e as adesões). Protótipo aprovado em 15/10/2026: o filtro padrão é o "interesse principal" (maior fatia).
+ * No item, a fatia é a quantidade registrada dos órgãos participantes somada por grupo; na ata (vários itens),
+ * é o valor dessa quantidade (quantidade × valor unitário de cada item, migration 141), porque unidades de itens
+ * diferentes não se comparam. Fora da conta: a SENASP, a gerenciadora e as adesões. Protótipo aprovado em
+ * 15/10/2026: o filtro padrão é o "interesse principal" (maior fatia).
  */
 
 export const GRUPOS_GTI = ['LIGABOM', 'CNCG', 'CNPC', 'CONDPCI', 'CONSESP'] as const;
@@ -78,13 +80,15 @@ export interface LinhaFatiaGti {
   grupo: string;
   quantidade: number | string;
   orgaos: number;
+  /** Quantidade × valor unitário de cada item (migration 141). Ausente antes da migration: vale a quantidade. */
+  valor?: number | string | null;
 }
 
 export interface FatiaGti {
   grupo: GrupoDaFatia;
   quantidade: number;
   orgaos: number;
-  /** Percentual inteiro da quantidade registrada dos participantes (0 quando o total é zero). */
+  /** Percentual inteiro do total da ata ou do item (0 quando o total é zero). */
   pct: number;
 }
 
@@ -96,6 +100,8 @@ export interface FatiasDaAta {
   principal: (FatiaGti & { grupo: GrupoGti }) | null;
   /** Órgãos participantes ainda sem grupo confirmado. */
   orgaosAConfirmar: number;
+  /** O que `quantidade` mede: unidades (item) ou valor em R$ (ata, migration 141). Ausente = unidades. */
+  medida?: 'UNIDADES' | 'VALOR';
 }
 
 /** Chave igual à da carteira: "{numeroAta}-{uasgGerenciadora}". */
@@ -113,9 +119,22 @@ export interface LinhaFatiaItemGti {
 export const chaveItemGti = (numeroAta: string, uasg: string, numeroItem: string | number) =>
   `${numeroAta}-${uasg}-${String(numeroItem).replace(/\D/g, '').padStart(5, '0')}`;
 
-/** Monta as fatias de cada ata a partir das linhas da v_ata_gti_fatias. */
+/**
+ * Monta as fatias de cada ata a partir das linhas da v_ata_gti_fatias. A fatia da ata é pelo valor (quantidade ×
+ * valor unitário de cada item, migration 141): `quantidade` das fatias passa a ser esse valor em R$.
+ */
 export function montarFatiasGti(linhas: LinhaFatiaGti[]): Map<string, FatiasDaAta> {
-  return montarFatiasPorChave(linhas.map((l) => ({ ...l, chave: chaveAtaGti(l.numero_ata, l.uasg_gerenciadora) })));
+  const temValor = (l: LinhaFatiaGti) => l.valor != null && l.valor !== '';
+  const porAta = montarFatiasPorChave(
+    linhas.map((l) => ({
+      chave: chaveAtaGti(l.numero_ata, l.uasg_gerenciadora),
+      grupo: l.grupo,
+      orgaos: l.orgaos,
+      quantidade: temValor(l) ? (l.valor as number | string) : l.quantidade
+    }))
+  );
+  if (linhas.some(temValor)) for (const f of porAta.values()) f.medida = 'VALOR';
+  return porAta;
 }
 
 /** Monta as fatias de cada item a partir das linhas da v_item_gti_fatias. */

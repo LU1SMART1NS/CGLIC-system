@@ -22,6 +22,30 @@ export async function fetchFatiasGti(): Promise<Map<string, FatiasDaAta>> {
   for (let de = 0; ; de += 1000) {
     const { data, error } = await supabase
       .from('v_ata_gti_fatias')
+      .select('numero_ata, uasg_gerenciadora, grupo, quantidade, orgaos, valor')
+      .order('numero_ata')
+      .order('uasg_gerenciadora')
+      .order('grupo')
+      .range(de, de + 999);
+    if (error) {
+      if (semMigration(error.code)) return new Map();
+      // Antes da migration 141 a coluna `valor` não existe: lê como antes (por quantidade).
+      if (error.code === '42703') return fetchFatiasGtiSemValor();
+      throw new Error(error.message);
+    }
+    linhas.push(...((data ?? []) as LinhaFatiaGti[]));
+    if (!data || data.length < 1000) break;
+  }
+  return montarFatiasGti(linhas);
+}
+
+/** Leitura antiga, sem a coluna `valor` (migration 141 ainda não aplicada). */
+async function fetchFatiasGtiSemValor(): Promise<Map<string, FatiasDaAta>> {
+  if (!supabase) return new Map();
+  const linhas: LinhaFatiaGti[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await supabase
+      .from('v_ata_gti_fatias')
       .select('numero_ata, uasg_gerenciadora, grupo, quantidade, orgaos')
       .order('numero_ata')
       .order('uasg_gerenciadora')

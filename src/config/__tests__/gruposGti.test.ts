@@ -65,6 +65,28 @@ const linhas: LinhaFatiaGti[] = [
   { numero_ata: '00003/2025', uasg_gerenciadora: '200331', grupo: 'LIGABOM', quantidade: 0, orgaos: 1 }
 ];
 
+describe('fatia da ata pelo valor (migration 141)', () => {
+  it('com a coluna valor, a fatia é pelo valor e não pelas unidades', () => {
+    // 2 drones (R$ 200 mil, CONSESP) contra 500 cartuchos (R$ 5 mil, Bombeiros).
+    const m = montarFatiasGti([
+      { numero_ata: '00010/2026', uasg_gerenciadora: '200331', grupo: 'CONSESP', quantidade: 2, orgaos: 1, valor: '200000' },
+      { numero_ata: '00010/2026', uasg_gerenciadora: '200331', grupo: 'LIGABOM', quantidade: 500, orgaos: 1, valor: '5000' }
+    ]);
+    const f = m.get('00010/2026-200331')!;
+    expect(f.principal?.grupo).toBe('CONSESP');
+    expect(f.principal?.pct).toBe(98);
+    expect(f.total).toBe(205000);
+  });
+
+  it('sem a coluna valor (antes da migration), vale a quantidade', () => {
+    const m = montarFatiasGti([
+      { numero_ata: '00010/2026', uasg_gerenciadora: '200331', grupo: 'CONSESP', quantidade: 2, orgaos: 1 },
+      { numero_ata: '00010/2026', uasg_gerenciadora: '200331', grupo: 'LIGABOM', quantidade: 500, orgaos: 1 }
+    ]);
+    expect(m.get('00010/2026-200331')!.principal?.grupo).toBe('LIGABOM');
+  });
+});
+
 describe('fatias das atas', () => {
   const m = montarFatiasGti(linhas);
 
