@@ -27,11 +27,12 @@ describe('leitura do empenhado acima do contratado', () => {
     chamadas.length = 0;
   });
 
-  it('sem a migration 137, lê de novo sem o período', async () => {
+  it('sem as migrations 137 e 138, lê de novo só com as colunas da 133', async () => {
     const linhas = await fetchEmpenhadoAcima();
     expect(chamadas).toHaveLength(2);
     expect(chamadas[1]).not.toContain('periodo_');
+    expect(chamadas[1]).not.toContain('pelo_valor');
     expect(linhas).toHaveLength(1);
-    expect(linhas[0]).toMatchObject({ quantidadeAcima: 12, periodoInicio: null, periodoFim: null });
+    expect(linhas[0]).toMatchObject({ quantidadeAcima: 12, periodoInicio: null, periodoFim: null, peloValor: false });
   });
 });

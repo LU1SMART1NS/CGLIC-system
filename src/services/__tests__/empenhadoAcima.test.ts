@@ -94,4 +94,32 @@ describe('empenhado acima do contratado', () => {
       'Item 1: 25 empenhados de 01/10/2025 a 30/09/2026 para 23 contratados (2 acima) · última nota: 2026NE000323, vinculada pela nota no SIAFI'
     );
   });
+
+  it('quantidade contratada quebrada: o aviso é em valor (migration 138)', () => {
+    const quebrada = empenhadoAcimaDaLinha({
+      contract_key: K,
+      numero_item: 37,
+      descricao: 'Aparelho',
+      quantidade_contratada: '0.9508',
+      quantidade_empenhada: '1.0000',
+      quantidade_acima: '0.0492',
+      notas: 2,
+      ultima_nota: '2026NE000900',
+      ultima_origem: 'SIAFI',
+      pelo_valor: true,
+      valor_contratado: '235.0000',
+      valor_empenhado: '250.0000',
+      valor_acima: '15.0000'
+    });
+    expect(quebrada).toMatchObject({ peloValor: true, valorContratado: 235, valorEmpenhado: 250, valorAcima: 15 });
+    expect(linha).toMatchObject({ peloValor: false });
+    const { items } = calculateAttentionSummary({ contracts: [contrato], empenhadoAcima: [quebrada] });
+    const item = items.find((i) => i.category === 'EMPENHO_ACIMA');
+    const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    expect(item?.description).toBe(
+      `Item 37: ${brl(250)} empenhados para ${brl(235)} contratados (${brl(15)} acima; quantidade no contrato quebrada, 0,9508, comparado pelo valor) · última nota: 2026NE000900, vinculada pela nota no SIAFI`
+    );
+    expect(item?.badgeLabel).toBe(`${brl(15)} acima`);
+    expect(item?.avisoChave).toBe(chaveAvisoEmpenhoAcima(K, 37, 250));
+  });
 });
