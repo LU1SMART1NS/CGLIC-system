@@ -428,7 +428,7 @@ export async function deleteContractTaskRpc(id: string): Promise<RpcGenericDelet
 }
 
 // -------------------------------------------------------------
-// Avisos marcados como resolvidos (Visão Geral, Ata 360 e Contrato 360)
+// Avisos marcados como resolvidos (Início, Ata 360 e Contrato 360)
 // -------------------------------------------------------------
 export interface ResolverAvisoInput {
   chave: string;

@@ -96,7 +96,7 @@ describe('vínculo a conferir — leitura', () => {
   });
 });
 
-describe('Visão Geral — vínculo a conferir', () => {
+describe('Início — vínculo a conferir', () => {
   it('só a ata em tela entra; urgente, destino na aba Contratos do item, resolvível pelo ✓', () => {
     const fora = vinculo({ itemKey: '00099/2026-200331-00001', numeroAta: '00099/2026', numeroItem: '00001' });
     const resumo = calculateAttentionSummary({ arps: [arp], vinculosAConferir: [vinculo(), fora], currentDate: new Date('2026-10-13T12:00:00-03:00') });

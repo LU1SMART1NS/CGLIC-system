@@ -46,7 +46,7 @@ function matchesTab(item: AttentionItemWithUasg, tab: GestaoInstrumentosCategory
 /**
  * Painel Unificado de Gestão e Monitoramento — Lei 14.133.
  *
- * Consolida a antiga "Visão Geral" (/) e "Central de Atenção" (/prazos) numa única
+ * Consolida a antiga "Início" (/) e "Central de Atenção" (/prazos) numa única
  * camada de apresentação sobre o mesmo Read Model do `useManagementDashboard`
  * (Funil Único de Atenção). Nenhuma nova query, RPC ou regra de negócio é criada aqui —
  * apenas leitura, agregação em memória e formatação do que o dashboardService já calcula.
@@ -71,7 +71,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
   // migration 20260925000023), agora derivado também das Atas atribuídas
-  // (ata_managers): a Visão Geral consolida 2 UASGs, então o recorte de
+  // (ata_managers): o Início consolida 2 UASGs, então o recorte de
   // contratos é resolvido por UASG e repassado ao Read Model de cada uma —
   // mesmo princípio já aplicado em ContractsRoute.tsx (aba "Acompanhamento
   // e Prazos"), agora estendido a todos os blocos agregados (financeiro,
@@ -121,7 +121,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const { avisos: avisosPagamento } = useAvisosPagamentoGerais({ enabled: !saldosOnly });
 
   // ✓ Resolvido: a separação usa a lista viva de avisos resolvidos, para o aviso sumir na hora
-  // (a Visão Geral já vem do banco sem os resolvidos, mas fica em cache por alguns minutos).
+  // (o Início já vem do banco sem os resolvidos, mas fica em cache por alguns minutos).
   const resolucao = useResolverAviso();
   const { porChave: avisosResolvidos, tarefasConcluidas } = resolucao;
 
@@ -295,7 +295,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     return (
       <PageContainer style={{ padding: '2rem 0' }}>
         <ErrorState
-          title="Erro ao carregar a Visão Geral"
+          title="Erro ao carregar o Início"
           message={error?.message || 'Não foi possível consolidar a carteira de ARPs e contratos.'}
           onRetry={() => refetch()}
         />

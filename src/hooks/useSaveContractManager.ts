@@ -20,7 +20,7 @@ export function useSaveContractManager() {
     onSuccess: (_data, variables) => {
       const contractKey = getContractManagementKey(variables.uasg, variables.numero, variables.ano);
       queryClient.invalidateQueries({ queryKey: ['contract-manager', contractKey] });
-      // Lista completa de gestores (Carteira de Contratos, Visão Geral e escopo do perfil gestor).
+      // Lista completa de gestores (Carteira de Contratos, Início e escopo do perfil gestor).
       queryClient.invalidateQueries({ queryKey: ['all-contract-managers'] });
     }
   });

@@ -21,7 +21,7 @@ describe('motivosDosQuantitativos', () => {
   });
 });
 
-describe('Visão Geral — quantitativos a conferir', () => {
+describe('Início — quantitativos a conferir', () => {
   const avisos = (arpItems: any[]) =>
     calculateAttentionSummary({ arpItems, currentDate: new Date('2026-10-13T12:00:00') } as any).items.filter((i) => i.category === 'QUANTITATIVOS');
 

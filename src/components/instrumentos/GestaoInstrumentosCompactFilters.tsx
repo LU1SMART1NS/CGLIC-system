@@ -20,7 +20,7 @@ interface GestaoInstrumentosCompactFiltersProps {
 }
 
 /**
- * Filtros da Visão Geral no padrão das carteiras: busca, "+ Prioridade", "Limpar" e contador.
+ * Filtros do Início no padrão das carteiras: busca, "+ Prioridade", "Limpar" e contador.
  * Prioridade em níveis (Máxima/Alta/Média) para não confundir com "vencida" (vigência) nem com Crítico/Atenção das carteiras.
  */
 export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompactFiltersProps> = ({

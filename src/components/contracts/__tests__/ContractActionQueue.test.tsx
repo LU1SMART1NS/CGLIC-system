@@ -171,7 +171,7 @@ describe('ContractActionQueue', () => {
     expect(html).toContain('background-color:var(--color-info-bg)');
   });
 
-  it('não pede mais para confirmar a quantidade do empenho no item da ata (o vínculo aos itens fica na Vinculação)', () => {
+  it('não pede mais para confirmar a quantidade do empenho no item da ata (o vínculo aos itens fica em Vínculos)', () => {
     mockCycles = [];
     const html = render(baseContract, null);
     expect(html).not.toContain('Confirmar a quantidade');

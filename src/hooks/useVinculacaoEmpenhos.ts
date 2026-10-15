@@ -7,7 +7,7 @@ import {
 } from '../services/distribuicaoEmpenhoService';
 import { fetchContratosComEmpenhosConsultados } from '../services/contratoEmpenhosSincronizacaoService';
 
-/** Chaves de cache das filas de empenho do menu Vinculação; "contrato-empenho-distribuicao" as invalida junto com as do contrato. */
+/** Chaves de cache das filas de empenho do menu Vínculos; "contrato-empenho-distribuicao" as invalida junto com as do contrato. */
 export const VINCULACAO_EMPENHOS_ITENS_KEY = ['contrato-empenho-distribuicao', 'fila'] as const;
 export const SITUACAO_DISTRIBUICAO_EMPENHOS_KEY = ['contrato-empenho-distribuicao', 'por-empenho'] as const;
 export const CONTRATOS_EMPENHOS_CONSULTADOS_KEY = ['contrato-empenhos-sincronizacao', 'consultados'] as const;

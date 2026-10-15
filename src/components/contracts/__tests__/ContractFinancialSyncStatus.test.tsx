@@ -276,7 +276,7 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).not.toContain('contract-financial-a-distribuir');
   });
 
-  it('fatura que cita NE fora do contrato aparece no resumo e leva à conferência no menu Vinculação', () => {
+  it('fatura que cita NE fora do contrato aparece no resumo e leva à conferência no menu Vínculos', () => {
     vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({ data: [] } as any);
     vi.mocked(useFaturasDoContrato).mockReturnValue({
       data: { faturas: [{ idFatura: 7, numero: '1490', empenhos: '2024NE000412', empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2024NE000412', valor: 10 }], resumo: null, sincronizadoEm: null }

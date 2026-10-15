@@ -214,7 +214,7 @@ export async function fetchDistribuicoesDoContrato(contractKey: string): Promise
 export const DIAS_VINCULADAS_RECENTES = 30;
 
 /**
- * Fila do menu Vinculação: notas a vincular aos itens (A_DISTRIBUIR e REVISAR) de todos os contratos, as vinculadas
+ * Fila do menu Vínculos: notas a vincular aos itens (A_DISTRIBUIR e REVISAR) de todos os contratos, as vinculadas
  * pelo valor (para conferir) e as que a equipe vinculou nos últimos dias, com o que cada uma diz no SIAFI. Contratos de
  * um item só (AUTO) e as vinculadas pela nota ficam de fora.
  */

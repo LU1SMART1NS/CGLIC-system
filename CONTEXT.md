@@ -31,14 +31,14 @@ Perfis: **A** = Coordenador (`admin`), **G** = Gestor de atas e contratos (`gest
 
 | Área | Página | Rota | Quem vê |
 | --- | --- | --- | --- |
-| Visão Geral ("Início") | Painel | `/instrumentos` | A G GS L |
+| Início | Painel | `/instrumentos` | A G GS L |
 | | Distribuição | `/atas/distribuicao` | A L |
 | Carteira | Atas · Contratos · Itens | `/atas` · `/contratos` · `/itens` | A G GS L |
 | | Ata 360 · Item · Contrato 360 | `/atas/detalhe/:ataKey` · `…/itens/:numeroItem` · `/contratos/:contractKey` | A G GS L |
 | Alocação | Itens às unidades | `/alocacao` | A G GS L |
-| Vinculação ("Vínculos") | Contratos à ata · Empenhos ao contrato · Empenhos aos itens | `/vinculacao/contratos` · `/vinculacao/empenhos-contrato` · `/vinculacao/empenhos-itens` | A G L |
+| Vínculos | Contratos à ata · Empenhos ao contrato · Empenhos aos itens | `/vinculacao/contratos` · `/vinculacao/empenhos-contrato` · `/vinculacao/empenhos-itens` | A G L |
 | Financeiro | Empenhos · Pagamentos · Previsão | `/empenhos` · `/pagamentos` · `/pagamentos/previsao` | A G L |
-| Configurações ("Ajustes") | Modelos de Gestão | `/configuracoes/modelos` | A G |
+| Ajustes | Modelos de Gestão | `/configuracoes/modelos` | A G |
 | | Regras de Alertas · Feriados | `/admin/regras-alertas` · `/admin/feriados` | A |
 | | Unidades Internas | `/admin/departamentos` | A G GS L (edita: A GS) |
 | | Usuários · Perfis | `/admin/usuarios` · `/admin/perfis` | A |
@@ -49,7 +49,7 @@ O que cada perfil pode fazer (`role_permissions`, migrations 23, 30, 33 e 55):
 
 - **Coordenador:** tudo. É o único que gerencia usuários, perfis, regras de alertas e feriados, decide conflitos de gestor, marca avisos como resolvidos e força a sincronização ("Atualizar").
 - **Gestor:** contratos atribuídos a ele (escopo ASSIGNED), vincular contrato à ata, vincular nota aos itens e à unidade interna, informar a quantidade da ata assinada, exportar.
-- **Gestor de saldos:** alocações (ver, gerenciar, ligar nota à unidade), unidades internas, remanejamentos de quantitativos. Não vê Financeiro nem Vinculação.
+- **Gestor de saldos:** alocações (ver, gerenciar, ligar nota à unidade), unidades internas, remanejamentos de quantitativos. Não vê Financeiro nem Vínculos.
 - **Consulta:** só leitura e exportação.
 
 Os nomes exibidos dos perfis são editáveis pelo coordenador (migration 68). As Edge Functions `invite-user` e `manage-user` convertem os nomes da tela (coordenador, gestor, consulta, gestor_saldos) nos perfis do banco (`supabase/functions/_shared/roleMapping.ts`).

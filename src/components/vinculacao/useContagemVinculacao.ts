@@ -6,7 +6,7 @@ import { useContratosDoFinanceiro } from '../financeiro/useContratosDoFinanceiro
 import { aguardaVinculoAosItens, pedeOGestor } from './vinculacaoEmpenhos';
 
 /**
- * Número no ícone do menu Vinculação, parte leve: as notas a vincular aos itens e as citadas fora do contrato que pedem o gestor. Só coordenador e
+ * Número no ícone do menu Vínculos, parte leve: as notas a vincular aos itens e as citadas fora do contrato que pedem o gestor. Só coordenador e
  * gestor (este, nos próprios contratos). Os contratos sem ata e os itens a alocar dependem da carteira inteira: vêm de
  * ContagensDaCarteira, só depois de a carteira estar no navegador.
  */

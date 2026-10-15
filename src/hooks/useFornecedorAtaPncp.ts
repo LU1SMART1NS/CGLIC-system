@@ -13,7 +13,7 @@ export function podeIndicarFornecedor(role: string | null | undefined): boolean 
 
 /**
  * Atas que o PNCP publicou sem fornecedor (atas_fornecedor_pncp): uma consulta só, pequena, compartilhada pela
- * Ata 360 e pela Visão Geral, com as ações do coordenador (indicar e desfazer).
+ * Ata 360 e pelo Início, com as ações do coordenador (indicar e desfazer).
  */
 export function useFornecedorAtaPncp() {
   const queryClient = useQueryClient();

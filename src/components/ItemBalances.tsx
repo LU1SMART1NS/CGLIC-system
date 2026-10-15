@@ -472,7 +472,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     }),
     [baseSaldo, enrichedOfficialLinks, empenhoDoItem]
   );
-  // Abre a fila Vinculação › Empenhos aos itens; com um contrato só, já filtrada por ele.
+  // Abre a filos Vínculos › Empenhos aos itens; com um contrato só, já filtrada por ele.
   const abrirVinculacaoDoItem = () => {
     const contratos = [...empenhoDoItem.porContrato.values()].filter((e) => e.aVincular.length > 0);
     const numero = contratos.length === 1 ? enrichedOfficialLinks.find((l) => l.contractKey === contratos[0].contractKey)?.numeroContratoFormatado : undefined;
@@ -1157,7 +1157,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         onFechar={() => setContratoDividindo(null)}
       />
 
-      {/* "Vincular aos itens" de uma nota do contrato: a mesma janela do Contrato 360 e da Vinculação. */}
+      {/* "Vincular aos itens" de uma nota do contrato: a mesma janela do Contrato 360 e de Vínculos. */}
       <VincularAosItensDialog
         nota={notaParaVincular}
         numeroContrato={

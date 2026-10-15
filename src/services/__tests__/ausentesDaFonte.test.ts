@@ -82,7 +82,7 @@ describe('nota ou fatura a conferir — leitura', () => {
   });
 });
 
-describe('Visão Geral — nota ou fatura a conferir', () => {
+describe('Início — nota ou fatura a conferir', () => {
   it('só contratos em tela entram, urgentes, com a nota ou a fatura para a decisão', () => {
     const outro = nota({ contractKey: '200331-00001-2026', chave: 'ce-9' });
     const resumo = calculateAttentionSummary({ contracts: [contrato], ausentesDaFonte: [nota(), fatura(), outro], currentDate: new Date('2026-10-13T12:00:00-03:00') });
@@ -107,7 +107,7 @@ describe('Visão Geral — nota ou fatura a conferir', () => {
 });
 
 describe('Contrato 360 — nota ou fatura a conferir', () => {
-  it('entra na fila com o mesmo id da Visão Geral (o link ?item= destaca a linha) e o ✓ a dispensa', () => {
+  it('entra na fila com o mesmo id do Início (o link ?item= destaca a linha) e o ✓ a dispensa', () => {
     const fila = buildContractActionQueue({ contract: contrato, contractKey: K, plan: null, ausentesDaFonte: [nota(), fatura()], currentDate: new Date('2026-10-13T12:00:00-03:00') });
     const fontes = fila.items.filter((i) => i.kind === 'FONTE');
     expect(fontes.map((i) => i.id).sort()).toEqual(['ATT-FONTE-FATURA-987', 'ATT-FONTE-NOTA-ce-1']);

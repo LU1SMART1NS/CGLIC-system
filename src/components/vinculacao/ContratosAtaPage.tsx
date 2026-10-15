@@ -23,7 +23,7 @@ import { AvisoCarregando } from '../../design-system';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
 /**
- * Vinculação → Contratos à ata: contratos sem item de ata vinculado, com a ata provável pela compra e pelo
+ * Vínculos → Contratos à ata: contratos sem item de ata vinculado, com a ata provável pela compra e pelo
  * fornecedor. O coordenador e o gestor vinculam (o gestor só os próprios contratos); descartar ata, marcar "não
  * pertence" e atribuir gestor continuam só do coordenador. Era a aba "Contratos sem vínculo" da Central.
  */

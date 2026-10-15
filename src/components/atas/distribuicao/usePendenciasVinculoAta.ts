@@ -14,7 +14,7 @@ import type { EstadoMotivos } from '../../../utils/vinculoAutomatico';
 
 /**
  * Atas, contratos e vínculos da carteira, cruzados para dizer quais contratos ainda não têm ata (e qual é a ata
- * provável). Serve à fila "Contratos à ata" do menu Vinculação e à Central de Distribuição (atas sem gestor e carga
+ * provável). Serve à fila "Contratos à ata" do menu Vínculos e à Central de Distribuição (atas sem gestor e carga
  * por gestor usam as mesmas pendências).
  */
 export function usePendenciasVinculoAta() {
@@ -111,7 +111,7 @@ export function usePendenciasVinculoAta() {
   // Só mostra números com atas, contratos e vínculos carregados: totais parciais enganariam a leitura.
   const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading || semAtaLoading;
   const totalSemVinculo = pendencias.aVincular.length + pendencias.precisamDecisao.length;
-  // Marcados "não pertence a ata" e ainda sem gestor: continuam pendentes na fila da Vinculação.
+  // Marcados "não pertence a ata" e ainda sem gestor: continuam pendentes na fila de Vínculos.
   const naoPertencemSemGestor = pendencias.naoPertencem.filter((i) => !i.gestorNome).length;
 
   return {

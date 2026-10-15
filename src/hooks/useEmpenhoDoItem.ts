@@ -9,7 +9,7 @@ import { montarEmpenhoDoItem, type EmpenhoDoItem } from '../utils/empenhoDoItem'
 /**
  * Empenho do item da ata pelo vínculo das notas aos itens do contrato: as parcelas deste item nas notas dos contratos
  * vinculados, as notas que ainda faltam vincular e os contratos sem itens na fonte. Lê os vínculos do item (com o preço
- * unitário do item em cada contrato) e as notas de cada contrato (o mesmo cache do Contrato 360 e da Vinculação, que
+ * unitário do item em cada contrato) e as notas de cada contrato (o mesmo cache do Contrato 360 e de Vínculos, que
  * as ações de vincular invalidam).
  */
 export function useEmpenhoDoItem(itemKey: string): { data: EmpenhoDoItem; isLoading: boolean; isReady: boolean } {

@@ -1391,7 +1391,7 @@ export function buildManagementDashboardReadModel(params: {
   let filteredContracts = rawContracts;
   let filteredArps = rawArps;
   let filteredItemsSaldo = rawItemsSaldo;
-  // v_empenhos_resumo é global (não filtra por UASG) e a Visão Geral soma os read models
+  // v_empenhos_resumo é global (não filtra por UASG) e o Início soma os read models
   // das duas UASGs: sem este recorte, cada empenho entrava uma vez por UASG (valor em dobro).
   // Fica o que a UASG emitiu OU o que está ligado a um contrato/ata dela; sem
   // `uasg_emitente` informado (dado legado), mantém — nunca descarta o que não sabe classificar.
@@ -1555,7 +1555,7 @@ export function buildManagementDashboardReadModel(params: {
   }
 
   // 3. Recalcula todos os blocos determinísticos sobre os dados filtrados
-  // Só Atas vigentes entram na Visão Geral (mesma definição da Carteira de Atas): Atas vencidas,
+  // Só Atas vigentes entram no Início (mesma definição da Carteira de Atas): Atas vencidas,
   // canceladas ou sem data não contam no total, nem no saldo, nem nas tarefas e lembretes.
   const encerradasAtaNumbers = new Set<string>();
   filteredArps = filteredArps.filter((arp) => {

@@ -43,7 +43,7 @@ interface ContractsPortfolioTableProps {
   pageSize?: number;
   /** Coordenador: "Sem gestor" vira atalho para onde o gestor do contrato se resolve. */
   canAssign?: boolean;
-  /** Para onde o "Sem gestor" de cada contrato leva (Vinculação ou Central, conforme o caso). */
+  /** Para onde o "Sem gestor" de cada contrato leva (Vínculos ou Central, conforme o caso). */
   destinoSemGestor?: (row: ContractPortfolioRow) => DestinoSemGestor;
   /** Clique num valor da célula aplica o filtro correspondente (prazo → situação, pendências, fornecedor → busca). */
   onFilter?: <K extends keyof ContractsPortfolioFilterState>(key: K, value: ContractsPortfolioFilterState[K]) => void;

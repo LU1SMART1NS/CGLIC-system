@@ -6,7 +6,7 @@ import {
   type EmpenhoForaDoContrato
 } from '../services/empenhosForaDoContratoService';
 
-/** Fila Vinculação › Empenhos ao contrato (e o número no menu). */
+/** Filos Vínculos › Empenhos ao contrato (e o número no menu). */
 export const EMPENHOS_FORA_DO_CONTRATO_KEY = ['empenhos-fora-do-contrato'] as const;
 
 export function useEmpenhosForaDoContrato(enabled = true) {

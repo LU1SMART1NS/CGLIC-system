@@ -80,7 +80,7 @@ describe('Financeiro → Empenhos', () => {
 
   it('segue a moldura da Carteira: segmentos de saldo, filtros em botão e linha clicável', () => {
     const html = render();
-    // Coluna Itens: a situação do vínculo da nota aos itens (o trabalho fica no menu Vinculação).
+    // Coluna Itens: a situação do vínculo da nota aos itens (o trabalho fica no menu Vínculos).
     expect(html).toContain('A vincular');
     expect(html).toContain('Empenhos');
     expect(html).toContain('data-testid="empenhos-saldo-COM_SALDO"');
