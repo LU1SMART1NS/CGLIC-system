@@ -234,6 +234,17 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
     expect(COLUMNS_MAP.get('quantidadeSenasp')?.label).toBe('Qtd. Registrada (SENASP)');
   });
 
+  it('5c. Uma linha por ata traz o fornecedor e o CNPJ tirados dos itens', async () => {
+    const payload: ReportDataPayload = { atas: [mockAta], itemsByAta: { '00001/2026-200331': mockItems } };
+
+    const rows = await buildFlattenedReportData(payload, 'BY_ATA');
+
+    expect(rows.length).toBe(1);
+    expect(rows[0].numeroItem).toBe('Consolidado');
+    expect(rows[0].fornecedorRazaoSocial).toBe('DEFENSE MOBILITY LTDA');
+    expect(rows[0].fornecedorCnpj).toBe('00.394.494/0001-36');
+  });
+
   it('6. Deve gerar planilha Excel .xlsx válida via ExcelJS', async () => {
     const payload: ReportDataPayload = {
       atas: [mockAta],
