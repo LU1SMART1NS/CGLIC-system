@@ -9,11 +9,47 @@ import { resolveRoleLabel } from '../../../services/roleService';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import type { ArpItemContractLinkPair } from '../../../services/arpContractLinkService';
 import type { ContractDashboardRecord } from '../../../types';
-import type { DistribuicaoLinha } from './distribuicaoEquipe';
+import { relacaoComMedia, type DistribuicaoLinha } from './distribuicaoEquipe';
 import { ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import { avaliarCandidatos, indexarItens, montarLote, type CandidatoAtribuicao } from './sugestaoAtribuicao';
+import { useGestorNiveis } from '../../../hooks/useGestorNiveis';
+import { percentual } from './nivelGestor';
+import { SeloNivel } from './EquipeFila';
 
 const NIVEIS: NivelComplexidade[] = ['ALTA', 'MEDIA', 'BAIXA'];
+const FICA = { ACIMA: 'Fica acima da média', NA_MEDIA: 'Fica na média', ABAIXO: 'Fica abaixo da média' } as const;
+
+/**
+ * Ocupação antes → depois sem número: a parte cheia é o que a pessoa já tem, a parte listrada é o que o lote acrescenta
+ * (pelo nível dela); o tracejado é a média da equipe.
+ */
+const BarraLote: React.FC<{ atual: number; depois: number; escala: number; media: number | null }> = ({ atual, depois, escala, media }) => {
+  const pct = (v: number) => (escala > 0 ? Math.min(v / escala, 1) * 100 : 0);
+  const relacao = media !== null ? relacaoComMedia(depois, media) : null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: '1 1 160px', minWidth: '140px' }}>
+      <div style={{ position: 'relative', height: '10px', background: '#f1f5f9', borderRadius: '3px' }} aria-hidden="true">
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', borderRadius: '3px', overflow: 'hidden' }}>
+          <div style={{ width: `${pct(atual)}%`, background: 'var(--primary)' }} />
+          <div
+            style={{
+              width: `${Math.max(pct(depois) - pct(atual), 0)}%`,
+              background: 'repeating-linear-gradient(135deg, #5b8bd6 0 3px, #c7d7f0 3px 6px)'
+            }}
+          />
+        </div>
+        {media !== null && escala > 0 && (
+          <span style={{ position: 'absolute', top: '-3px', bottom: '-3px', left: `${pct(media)}%`, borderLeft: '2px dashed #64748b' }} />
+        )}
+      </div>
+      {relacao && (
+        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: relacao === 'ACIMA' ? 'var(--color-danger-text)' : '#475569', whiteSpace: 'nowrap' }}>
+          {FICA[relacao]}
+        </span>
+      )}
+    </div>
+  );
+};
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 interface AtribuirGestorModalProps {
@@ -37,6 +73,7 @@ interface AtribuirGestorModalProps {
 export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ targets, origem, linhas, links, contractsByKey, onClose, onDone, provaveis = 0 }) => {
   const { data: users = [] } = useUsers();
   const { data: roles = [] } = useRoles();
+  const { data: niveis } = useGestorNiveis();
   const assign = useAssignManager();
   const [escolhido, setEscolhido] = React.useState<{ nome: string; userId: string | null } | null>(null);
 
@@ -45,10 +82,22 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
     () =>
       users
         .filter((u) => u.ativo)
-        .map((u) => ({ nome: u.nome, userId: u.id, ehGestor: u.perfil === 'gestor', perfilLabel: resolveRoleLabel(roles, u.perfil) })),
-    [users, roles]
+        .map((u) => ({
+          nome: u.nome,
+          userId: u.id,
+          ehGestor: u.perfil === 'gestor',
+          perfilLabel: resolveRoleLabel(roles, u.perfil),
+          nivel: niveis?.[u.id]?.nivel ?? null
+        })),
+    [users, roles, niveis]
   );
   const { opcoes, sugestao } = React.useMemo(() => avaliarCandidatos(lote, candidatos, linhas), [lote, candidatos, linhas]);
+  // Média de ocupação da equipe (gestores com carteira) e uma régua comum para todas as barras.
+  const media = React.useMemo(() => {
+    const gestores = linhas.filter((l) => l.gestorNome !== null);
+    return gestores.length >= 2 ? gestores.reduce((s, l) => s + l.ocupacao, 0) / gestores.length : null;
+  }, [linhas]);
+  const escala = Math.max(0, media ?? 0, ...opcoes.map((o) => o.ocupacaoDepois)) * 1.1;
 
   // Só servidores cadastrados: o gestor precisa da conta para ver a própria carteira (escopo pelo usuário).
   const nomeFinal = escolhido?.nome ?? '';
@@ -79,7 +128,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
       dismissible={!assign.isPending}
       size="lg"
       title={titulo}
-      subtitle="Para quem atribuo? Compare a carga de cada um antes de decidir."
+      subtitle="Para quem atribuo? Compare a ocupação de cada um antes de decidir."
       testId="atribuir-gestor-modal"
       footer={
         <>
@@ -116,7 +165,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
             )}
           </div>
           <div style={{ color: '#475569' }}>
-            Complexidade: {NIVEIS.map((n) => `${lote.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')} — soma {lote.equivalente} de carga
+            Complexidade: {NIVEIS.map((n) => `${lote.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')}
           </div>
           {provaveis > 0 && (
             <div data-testid="atribuir-gestor-provaveis" style={{ color: 'var(--color-warning-text)', fontWeight: 600 }}>
@@ -169,21 +218,45 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
                       {sugestao === o.nome && (
                         <span
                           data-testid="atribuir-sugestao"
-                          title="Menor carga depois da atribuição entre os gestores (empate: menos urgentes). É só uma sugestão."
+                          title="Menor ocupação depois da atribuição entre os gestores (empate: menos urgentes). Com Alta no lote, iniciantes ficam fora. É só uma sugestão."
                           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-success-text)', background: 'var(--color-success-bg)', border: '1px solid var(--color-success-border)', borderRadius: '4px', padding: '0 0.35rem' }}
                         >
                           <Lightbulb size={12} aria-hidden="true" /> Sugestão
                         </span>
                       )}
                     </div>
-                    {o.perfilLabel && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{o.perfilLabel}</div>}
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+                      {o.ehGestor ? (
+                        <>
+                          <SeloNivel nivel={o.nivel} /> capacidade {percentual(o.capacidade)}
+                        </>
+                      ) : (
+                        o.perfilLabel
+                      )}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap' }} title="Carga equivalente: Baixa = 1, Média = 2, Alta = 3">
-                    {o.jaEhGestor ? 'Já é o gestor' : <>Carga {o.cargaAtual} → <span style={{ color: 'var(--primary)', fontWeight: 900 }}>{o.cargaDepois}</span></>}
-                  </div>
+                  {o.jaEhGestor ? (
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap' }}>Já é o gestor</div>
+                  ) : (
+                    <div
+                      style={{ display: 'flex', flex: '1 1 160px' }}
+                      title={`Parte cheia: o que já tem. Parte listrada: o que este lote acrescenta (capacidade ${percentual(o.capacidade)}). Tracejado: média da equipe.`}
+                      data-testid={`atribuir-ocupacao-${o.nome}`}
+                    >
+                      <BarraLote atual={o.ocupacaoAtual} depois={o.ocupacaoDepois} escala={escala} media={o.ehGestor ? media : null} />
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, minWidth: '120px', color: pressao.length ? 'var(--color-danger-text)' : '#94a3b8' }}>
                     {pressao.length ? pressao.join(' · ') : 'Sem urgências'}
                   </div>
+                  {o.avisoAlta && !o.jaEhGestor && (
+                    <div
+                      data-testid={`atribuir-aviso-alta-${o.nome}`}
+                      style={{ flexBasis: '100%', fontSize: '0.76rem', fontWeight: 600, color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: '4px', padding: '0.3rem 0.5rem' }}
+                    >
+                      O lote tem complexidade Alta e {o.nome.split(' ')[0]} é iniciante. Dá para atribuir, mas vale acompanhar de perto.
+                    </div>
+                  )}
                 </label>
               </React.Fragment>
             );

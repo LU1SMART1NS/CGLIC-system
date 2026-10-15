@@ -243,3 +243,36 @@ describe('ordenarItensPorNumero', () => {
     expect(itens).toEqual(copia);
   });
 });
+
+describe('ocupação pelo nível do gestor', () => {
+  it('compara a equipe pela ocupação (carga ÷ capacidade), não pela carga', () => {
+    const { linhas, totais } = buildDistribuicaoEquipe({
+      atas: [
+        { numeroAta: '00001/2025', gestorNome: 'Ana', faixa: 'REGULAR', valor: 1, itens: 10 },
+        { numeroAta: '00002/2025', gestorNome: 'Ana', faixa: 'REGULAR', valor: 1, itens: 10 },
+        { numeroAta: '00003/2025', gestorNome: 'Bruno', faixa: 'REGULAR', valor: 1, itens: 10 },
+        { numeroAta: '00004/2025', gestorNome: 'Carla', faixa: 'REGULAR', valor: 1, itens: 10 }
+      ],
+      contratos: [],
+      links: [],
+      attentionItems: [],
+      capacidadeDoGestor: (nome) => (nome === 'Bruno' ? 0.5 : 1)
+    });
+    const por = (n: string) => linhas.find((l) => l.gestorNome === n)!;
+    // Ana: carga 6, ocupação 6; Bruno: carga 3, ocupação 6; Carla: carga 3, ocupação 3. Média 5.
+    expect(por('Bruno')).toMatchObject({ equivalente: 3, capacidade: 0.5, ocupacao: 6, relacaoEquipe: 'NA_MEDIA' });
+    expect(por('Carla').relacaoEquipe).toBe('ABAIXO');
+    expect(totais.mediaOcupacao).toBe(5);
+    expect(totais.mediaEquivalente).toBe(4);
+  });
+
+  it('sem níveis, ocupação = carga', () => {
+    const { linhas } = buildDistribuicaoEquipe({
+      atas: [{ numeroAta: '00001/2025', gestorNome: 'Ana', faixa: 'REGULAR', valor: 1, itens: 10 }],
+      contratos: [],
+      links: [],
+      attentionItems: []
+    });
+    expect(linhas[0]).toMatchObject({ capacidade: 1, ocupacao: 3 });
+  });
+});

@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
  */
 const PERMITIDOS: Record<string, number> = {
   'src/components/UserMenu.tsx': 4, // gatilho do menu, itens de menu e fechar do modal
+  'src/components/atas/distribuicao/AlterarNivelModal.tsx': 1, // chips de motivo rápido
   'src/components/atas/distribuicao/DistribuicaoItens.tsx': 1, // chip de complexidade
   'src/components/atas/distribuicao/EscolherAtaModal.tsx': 1, // cartão clicável de cada ata da lista
   'src/components/auth/AuthLayout.tsx': 1, // olho da senha

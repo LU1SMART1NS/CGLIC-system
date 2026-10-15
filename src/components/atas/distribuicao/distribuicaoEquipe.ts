@@ -82,7 +82,11 @@ export interface DistribuicaoLinha {
   complexidade: Record<NivelComplexidade, number>;
   /** Carga estrutural: soma dos pesos (Baixa = 1, Média = 2, Alta = 3). */
   equivalente: number;
-  /** Carga em relação à média da equipe (±25%); `null` para "Sem gestor" ou com menos de 2 gestores. */
+  /** Parte da carga cheia que o gestor aguenta, pelo nível (1 sem nível informado na entrada). */
+  capacidade: number;
+  /** Carga ajustada ao nível: equivalente ÷ capacidade. */
+  ocupacao: number;
+  /** Ocupação em relação à média da equipe (±25%); `null` para "Sem gestor" ou com menos de 2 gestores. */
   relacaoEquipe: 'ACIMA' | 'NA_MEDIA' | 'ABAIXO' | null;
 }
 
@@ -114,11 +118,18 @@ export interface DistribuicaoEquipe {
     gestores: number;
     /** Média da carga equivalente entre os gestores com carteira; `null` com menos de 2 gestores. */
     mediaEquivalente: number | null;
+    /** Média da ocupação entre os gestores com carteira; `null` com menos de 2 gestores. */
+    mediaOcupacao: number | null;
   };
 }
 
 /** Faixa de ±25% em torno da média da equipe. */
 export const FAIXA_MEDIA_EQUIPE = 0.25;
+
+/** Posição de uma ocupação em relação à média da equipe (±25%). */
+export function relacaoComMedia(valor: number, media: number): 'ACIMA' | 'NA_MEDIA' | 'ABAIXO' {
+  return valor > media * (1 + FAIXA_MEDIA_EQUIPE) ? 'ACIMA' : valor < media * (1 - FAIXA_MEDIA_EQUIPE) ? 'ABAIXO' : 'NA_MEDIA';
+}
 
 /** Vigente = mesmo critério dos cards e do filtro padrão das carteiras (sem expirados e sem data). */
 export function isVigente(faixa: PrazoFaixa): boolean {
@@ -154,6 +165,8 @@ export function buildDistribuicaoEquipe(input: {
   attentionItems: DashboardAttentionItem[];
   /** Ajustes manuais de complexidade, por "TIPO:chave" (migration 66). */
   ajustes?: Record<string, ComplexidadeAjuste>;
+  /** Capacidade de cada gestor pelo nível (migration 140). Sem ela, ocupação = carga (capacidade 1). */
+  capacidadeDoGestor?: (gestorNome: string) => number;
 }): DistribuicaoEquipe {
   const linhas = new Map<string | null, DistribuicaoLinha>();
   const linha = (gestorNome?: string) => {
@@ -170,6 +183,8 @@ export function buildDistribuicaoEquipe(input: {
         itens: [],
         complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 },
         equivalente: 0,
+        capacidade: 1,
+        ocupacao: 0,
         relacaoEquipe: null
       };
       linhas.set(key, l);
@@ -177,7 +192,7 @@ export function buildDistribuicaoEquipe(input: {
     return l;
   };
 
-  const totais: DistribuicaoEquipe['totais'] = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0, mediaEquivalente: null };
+  const totais: DistribuicaoEquipe['totais'] = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0, mediaEquivalente: null, mediaOcupacao: null };
   const contarComplexidade = (l: DistribuicaoLinha, c: Complexidade) => {
     l.complexidade[c.nivel]++;
     l.equivalente += PESO_COMPLEXIDADE[c.nivel];
@@ -311,15 +326,18 @@ export function buildDistribuicaoEquipe(input: {
     );
   }
   const gestores = ordenadas.filter((l) => l.gestorNome !== null);
+  for (const l of ordenadas) {
+    l.capacidade = l.gestorNome !== null && input.capacidadeDoGestor ? input.capacidadeDoGestor(l.gestorNome) : 1;
+    l.ocupacao = l.capacidade > 0 ? l.equivalente / l.capacidade : l.equivalente;
+  }
   totais.gestores = gestores.length;
   // Comparar com a média só faz sentido com pelo menos 2 gestores (com 1, ele é a própria média).
+  // A comparação usa a ocupação (carga ajustada ao nível); sem níveis, ela é a própria carga.
   if (gestores.length >= 2) {
-    const media = gestores.reduce((soma, l) => soma + l.equivalente, 0) / gestores.length;
-    totais.mediaEquivalente = media;
-    for (const l of gestores) {
-      l.relacaoEquipe =
-        l.equivalente > media * (1 + FAIXA_MEDIA_EQUIPE) ? 'ACIMA' : l.equivalente < media * (1 - FAIXA_MEDIA_EQUIPE) ? 'ABAIXO' : 'NA_MEDIA';
-    }
+    totais.mediaEquivalente = gestores.reduce((soma, l) => soma + l.equivalente, 0) / gestores.length;
+    const media = gestores.reduce((soma, l) => soma + l.ocupacao, 0) / gestores.length;
+    totais.mediaOcupacao = media;
+    for (const l of gestores) l.relacaoEquipe = relacaoComMedia(l.ocupacao, media);
   }
 
   return { linhas: ordenadas, divergencias, totais };
