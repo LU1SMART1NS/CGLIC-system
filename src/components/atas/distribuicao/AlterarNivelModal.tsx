@@ -8,9 +8,8 @@ import {
   MOTIVOS_NIVEL,
   NIVEIS_GESTOR,
   ROTULO_NIVEL,
-  capacidadeDe,
-  ocupacao,
   percentual,
+  type AvaliacaoSubida,
   type NivelGestor,
   type NivelRegistrado
 } from './nivelGestor';
@@ -21,17 +20,17 @@ interface AlterarNivelModalProps {
   atual: NivelRegistrado | null;
   /** Nível já marcado ao abrir (ex.: "Subir para Intermediário"). */
   sugerido?: NivelGestor;
-  /** Carga do gestor, para mostrar como a ocupação muda. */
-  carga: number;
   /** Motivo já preenchido ao abrir. */
   motivoInicial?: string;
+  /** Critérios de subida do gestor (`null` sem nível ou no topo). */
+  avaliacao?: AvaliacaoSubida | null;
   onClose: () => void;
 }
 
 const dataCurta = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
 /** Nível do gestor (só coordenador): escolhe o nível, com motivo obrigatório; mostra o histórico de mudanças. */
-export const AlterarNivelModal: React.FC<AlterarNivelModalProps> = ({ userId, nome, atual, sugerido, carga, motivoInicial = '', onClose }) => {
+export const AlterarNivelModal: React.FC<AlterarNivelModalProps> = ({ userId, nome, atual, sugerido, motivoInicial = '', avaliacao = null, onClose }) => {
   const salvar = useSalvarGestorNivel();
   const { data: historico = [] } = useGestorNivelHistorico(userId);
   const [nivel, setNivel] = React.useState<NivelGestor | null>(sugerido ?? atual?.nivel ?? null);
@@ -39,7 +38,6 @@ export const AlterarNivelModal: React.FC<AlterarNivelModalProps> = ({ userId, no
 
   const mudou = nivel !== null && nivel !== atual?.nivel;
   const podeSalvar = mudou && motivo.trim().length > 0 && !salvar.isPending;
-  const primeiroNome = nome.split(' ')[0];
 
   const handleSalvar = () => {
     if (!podeSalvar || !nivel) return;
@@ -104,11 +102,28 @@ export const AlterarNivelModal: React.FC<AlterarNivelModalProps> = ({ userId, no
           })}
         </div>
 
-        {mudou && nivel && (
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: '6px', padding: '0.5rem 0.7rem' }}>
-            Ocupação de {primeiroNome}: {Math.round(ocupacao(carga, capacidadeDe(atual?.nivel)))} → {Math.round(ocupacao(carga, CAPACIDADE_NIVEL[nivel]))}
-            {CAPACIDADE_NIVEL[nivel] < capacidadeDe(atual?.nivel) ? '. Baixar o nível aumenta a ocupação.' : '.'}
-          </div>
+        {avaliacao && (
+          <section data-testid="alterar-nivel-criterios" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.7rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+            <strong style={{ fontSize: '0.84rem' }}>Para subir a {ROTULO_NIVEL[avaliacao.proximo]}</strong>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {avaliacao.criterios.map((c) => (
+                <li key={c.texto} style={{ display: 'grid', gridTemplateColumns: '20px 1fr', gap: '0.4rem', fontSize: '0.82rem', lineHeight: 1.4 }}>
+                  <span aria-label={c.ok ? 'Cumprido' : 'Ainda não'} style={{ fontWeight: 900, color: c.ok ? 'var(--color-success-text)' : '#94a3b8' }}>
+                    {c.ok ? '✓' : '○'}
+                  </span>
+                  <span>
+                    {c.texto}
+                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>{c.detalhe}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: avaliacao.pronto ? 'var(--color-success-text)' : '#64748b' }}>
+              {avaliacao.pronto
+                ? `Cumpre os critérios para ${ROTULO_NIVEL[avaliacao.proximo]}. Só sobe quando você confirmar.`
+                : `Ainda não cumpre os critérios para ${ROTULO_NIVEL[avaliacao.proximo]}.`}
+            </span>
+          </section>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>

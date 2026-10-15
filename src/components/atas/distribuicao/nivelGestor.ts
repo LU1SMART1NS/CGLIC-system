@@ -70,13 +70,6 @@ export function mesesDesde(data: string | undefined | null, hoje: Date = new Dat
 
 const txtMeses = (n: number) => `${n} ${n === 1 ? 'mês' : 'meses'}`;
 
-/** Mês e ano curtos ("mar/2026"). */
-export function mesAno(data: string): string {
-  const d = new Date(data);
-  if (!Number.isFinite(d.getTime())) return '';
-  return `${d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}/${d.getFullYear()}`;
-}
-
 export interface CriterioSubida {
   ok: boolean;
   texto: string;
@@ -118,7 +111,7 @@ export function avaliarSubida(input: {
   const tempo: CriterioSubida = {
     ok: noNivel >= regra.mesesNoNivel,
     texto: `Pelo menos ${txtMeses(regra.mesesNoNivel)} como ${ROTULO_NIVEL[nivel.nivel]}`,
-    detalhe: `${txtMeses(noNivel)} (desde ${mesAno(nivel.desde)})`
+    detalhe: txtMeses(noNivel)
   };
 
   // O instrumento da complexidade pedida (ou acima) que ele cuida há mais tempo.

@@ -15,8 +15,7 @@ import type { ContratoAVincular } from './contratosSemAta';
 import { PESO_COMPLEXIDADE, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import { contemBusca } from './filaComum';
 import { AlterarNivelModal } from './AlterarNivelModal';
-import { NivelPainel } from './NivelPainel';
-import { ROTULO_NIVEL, avaliarSubida, mesAno, percentual, type AvaliacaoSubida, type NivelGestor, type NivelRegistrado } from './nivelGestor';
+import { ROTULO_NIVEL, avaliarSubida, percentual, type AvaliacaoSubida, type NivelGestor, type NivelRegistrado } from './nivelGestor';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -78,24 +77,53 @@ const COR_NIVEL: Record<NivelGestor, { bg: string; fg: string }> = {
 
 const seloStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', fontSize: '0.75rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '4px', whiteSpace: 'nowrap' };
 
-export const SeloNivel: React.FC<{ nivel: NivelGestor | null | undefined }> = ({ nivel }) =>
-  nivel ? (
-    <span style={{ ...seloStyle, background: COR_NIVEL[nivel].bg, color: COR_NIVEL[nivel].fg }}>{ROTULO_NIVEL[nivel]}</span>
-  ) : (
-    <span style={{ ...seloStyle, background: '#f1f5f9', color: '#475569' }} title="Até o coordenador informar, a ocupação usa a capacidade de Intermediário.">
-      Não informado
-    </span>
+/** Selo do nível. Com `onClick` (só o coordenador), o próprio selo abre a troca de nível, como a etiqueta de complexidade. */
+export const SeloNivel: React.FC<{ nivel: NivelGestor | null | undefined; onClick?: () => void; testId?: string }> = ({ nivel, onClick, testId }) => {
+  const cores = nivel ? { background: COR_NIVEL[nivel].bg, color: COR_NIVEL[nivel].fg } : { background: '#f1f5f9', color: '#475569' };
+  const rotulo = nivel ? ROTULO_NIVEL[nivel] : 'Não informado';
+  const dica = nivel ? '' : 'Até o coordenador informar, a ocupação usa a capacidade de Intermediário.';
+  if (!onClick) return <span style={{ ...seloStyle, ...cores }} title={dica || undefined}>{rotulo}</span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${dica ? `${dica}\n` : ''}Clique para ${nivel ? 'alterar' : 'informar'} o nível.`}
+      aria-label={`${nivel ? 'Alterar' : 'Informar'} nível (${rotulo})`}
+      data-testid={testId}
+      style={{ ...seloStyle, ...cores, border: 'none', fontFamily: 'inherit', lineHeight: 1.5, cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: '2px' }}
+    >
+      {rotulo}
+    </button>
   );
+};
 
-const NivelCell: React.FC<{ registro: NivelRegistrado | null; avaliacao: AvaliacaoSubida | null }> = ({ registro, avaliacao }) => (
+/** "Pronto para…": o sistema só sugere. Para o coordenador o selo abre a troca de nível já com a subida marcada. */
+const ProntoParaSubir: React.FC<{ proximo: NivelGestor; onClick?: () => void; testId: string }> = ({ proximo, onClick, testId }) => {
+  const estilo: React.CSSProperties = { ...seloStyle, background: '#ffffff', color: 'var(--color-success-text)', border: '1px dashed var(--color-success-text)' };
+  if (!onClick) return <span style={estilo}>↑ Pronto para {ROTULO_NIVEL[proximo]}</span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`Cumpre os critérios para ${ROTULO_NIVEL[proximo]}. Clique para ver e confirmar a subida.`}
+      data-testid={testId}
+      style={{ ...estilo, fontFamily: 'inherit', lineHeight: 1.5, cursor: 'pointer' }}
+    >
+      ↑ Pronto para {ROTULO_NIVEL[proximo]}
+    </button>
+  );
+};
+
+const NivelCell: React.FC<{
+  registro: NivelRegistrado | null;
+  avaliacao: AvaliacaoSubida | null;
+  onAlterar?: () => void;
+  onSubir?: () => void;
+  nome: string;
+}> = ({ registro, avaliacao, onAlterar, onSubir, nome }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-    <SeloNivel nivel={registro?.nivel} />
-    {registro && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>desde {mesAno(registro.desde)}</span>}
-    {avaliacao?.pronto && (
-      <span style={{ ...seloStyle, background: '#ffffff', color: 'var(--color-success-text)', border: '1px dashed var(--color-success-text)' }}>
-        ↑ Pronto para {ROTULO_NIVEL[avaliacao.proximo]}
-      </span>
-    )}
+    <SeloNivel nivel={registro?.nivel} onClick={onAlterar} testId={`nivel-selo-${nome}`} />
+    {avaliacao?.pronto && <ProntoParaSubir proximo={avaliacao.proximo} onClick={onSubir} testId={`nivel-pronto-${nome}`} />}
   </div>
 );
 
@@ -244,7 +272,17 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, c
                           <span style={{ fontWeight: 800 }}>{nome}</span>
                         </td>
                         <td data-label="Nível" style={carteiraTd}>
-                          <NivelCell registro={nivel.registro} avaliacao={avaliacao} />
+                          <NivelCell
+                            nome={nome}
+                            registro={nivel.registro}
+                            avaliacao={avaliacao}
+                            onAlterar={canAjustar && nivel.userId ? () => setAlterando({ nome, userId: nivel.userId as string }) : undefined}
+                            onSubir={
+                              canAjustar && nivel.userId && avaliacao?.pronto
+                                ? () => setAlterando({ nome, userId: nivel.userId as string, sugerido: avaliacao.proximo, motivo: 'Cumpriu os critérios de subida' })
+                                : undefined
+                            }
+                          />
                         </td>
                         <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                           <CarteiraCell l={l} />
@@ -280,14 +318,6 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, c
                       {isExpanded && (
                         <tr className="carteira-expanded" data-testid={`distribuicao-expanded-${nome}`}>
                           <td colSpan={7} style={CARTEIRA_EXPANDED_CELL_STYLE}>
-                            <NivelPainel
-                              nome={nome}
-                              nivel={nivel}
-                              avaliacao={avaliacao}
-                              capacidade={l.capacidade}
-                              podeAlterar={canAjustar}
-                              onAlterar={(sugerido, motivo) => nivel.userId && setAlterando({ nome, userId: nivel.userId, sugerido, motivo })}
-                            />
                             <DistribuicaoItens
                               linha={l}
                               canAssign={canAssign}
@@ -314,7 +344,7 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, c
           atual={nivelDe(alterando.nome).registro}
           sugerido={alterando.sugerido}
           motivoInicial={alterando.motivo}
-          carga={linhas.find((l) => l.gestorNome === alterando.nome)?.equivalente ?? 0}
+          avaliacao={avaliacoes.get(alterando.nome) ?? null}
           onClose={() => setAlterando(null)}
         />
       )}

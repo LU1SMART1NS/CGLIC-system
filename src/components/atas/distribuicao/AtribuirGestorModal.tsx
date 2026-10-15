@@ -13,7 +13,6 @@ import { relacaoComMedia, type DistribuicaoLinha } from './distribuicaoEquipe';
 import { ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import { avaliarCandidatos, indexarItens, montarLote, type CandidatoAtribuicao } from './sugestaoAtribuicao';
 import { useGestorNiveis } from '../../../hooks/useGestorNiveis';
-import { percentual } from './nivelGestor';
 import { SeloNivel } from './EquipeFila';
 
 const NIVEIS: NivelComplexidade[] = ['ALTA', 'MEDIA', 'BAIXA'];
@@ -227,9 +226,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
                       {o.ehGestor ? (
-                        <>
-                          <SeloNivel nivel={o.nivel} /> capacidade {percentual(o.capacidade)}
-                        </>
+                        <SeloNivel nivel={o.nivel} />
                       ) : (
                         o.perfilLabel
                       )}
@@ -240,7 +237,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
                   ) : (
                     <div
                       style={{ display: 'flex', flex: '1 1 160px' }}
-                      title={`Parte cheia: o que já tem. Parte listrada: o que este lote acrescenta (capacidade ${percentual(o.capacidade)}). Tracejado: média da equipe.`}
+                      title="Parte cheia: o que já tem. Parte listrada: o que este lote acrescenta. Tracejado: média da equipe."
                       data-testid={`atribuir-ocupacao-${o.nome}`}
                     >
                       <BarraLote atual={o.ocupacaoAtual} depois={o.ocupacaoDepois} escala={escala} media={o.ehGestor ? media : null} />
