@@ -1,8 +1,9 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
-import { ArrowDown, ArrowLeftRight, ArrowUp, UserPlus } from 'lucide-react';
+import { ArrowLeftRight, UserPlus } from 'lucide-react';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
+import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { AppButton } from '../../../design-system/components/AppButton';
 import { buildAtaPath } from '../../../hooks/useAta';
@@ -136,43 +137,27 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
         ) : (
           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>Atas primeiro, depois contratos</span>
         )}
-        <div role="group" aria-label="Ordenar por" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginRight: 'auto' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginRight: 'auto' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Ordenar por</span>
-          <div className="segment-pills__rail">
-            <button
-              type="button"
-              className="segment-pill"
-              aria-pressed={ordem === 'PRAZO'}
-              onClick={() => escolherOrdem('PRAZO')}
-              title="Atas primeiro, depois contratos; o que vence antes no topo"
-              data-testid="distribuicao-ordem-prazo"
-              style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}
-            >
-              Prazo
-            </button>
-            <button
-              type="button"
-              className="segment-pill"
-              aria-pressed={ordem !== 'PRAZO'}
-              onClick={() => escolherOrdem('NUMERO')}
-              title={
-                ordem === 'NUMERO_ASC'
-                  ? 'Do mais antigo para o mais novo (ano e número). Clique para inverter.'
-                  : ordem === 'NUMERO_DESC'
-                    ? 'Do mais novo para o mais antigo (ano e número). Clique para inverter.'
-                    : 'Atas primeiro, depois contratos; cada grupo pelo ano e pelo número'
+          <CarteiraSegmentTabs
+            testIdPrefix="distribuicao-ordem"
+            ariaLabel="Ordenar por"
+            active={ordem === 'PRAZO' ? 'PRAZO' : 'NUMERO'}
+            onSelect={escolherOrdem}
+            segments={[
+              { id: 'PRAZO', label: 'Prazo', title: 'Atas primeiro, depois contratos; o que vence antes no topo' },
+              {
+                id: 'NUMERO',
+                label: ordem === 'NUMERO_ASC' ? 'Número ↑' : ordem === 'NUMERO_DESC' ? 'Número ↓' : 'Número',
+                title:
+                  ordem === 'NUMERO_ASC'
+                    ? 'Do mais antigo para o mais novo (ano e número). Clique para inverter.'
+                    : ordem === 'NUMERO_DESC'
+                      ? 'Do mais novo para o mais antigo (ano e número). Clique para inverter.'
+                      : 'Atas primeiro, depois contratos; cada grupo pelo ano e pelo número'
               }
-              aria-label={
-                ordem === 'NUMERO_ASC' ? 'Número, do mais antigo para o mais novo' : ordem === 'NUMERO_DESC' ? 'Número, do mais novo para o mais antigo' : 'Número'
-              }
-              data-testid="distribuicao-ordem-numero"
-              style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}
-            >
-              Número
-              {ordem === 'NUMERO_ASC' && <ArrowUp size={12} aria-hidden="true" />}
-              {ordem === 'NUMERO_DESC' && <ArrowDown size={12} aria-hidden="true" />}
-            </button>
-          </div>
+            ]}
+          />
         </div>
         {canAssign && selected.size > 0 && (
           <AppButton

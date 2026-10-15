@@ -1,7 +1,8 @@
 export interface CarteiraSegment<T extends string> {
   id: T;
   label: string;
-  count: number;
+  /** Sem contagem (ex.: escolha de ordenação), o número não aparece. */
+  count?: number;
   /** Ponto colorido antes do rótulo (ex.: crítico, fila com pendência). */
   dot?: string;
   title?: string;
@@ -40,7 +41,7 @@ export function CarteiraSegmentTabs<T extends string>({ segments, active, onSele
             >
               {s.dot && <span aria-hidden="true" className="segment-pill__dot" style={{ background: s.dot }} />}
               {s.label}
-              <span className="segment-pill__count">{s.count}</span>
+              {s.count !== undefined && <span className="segment-pill__count">{s.count}</span>}
             </button>
           );
         })}
