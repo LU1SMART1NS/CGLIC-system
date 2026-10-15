@@ -23,6 +23,13 @@ import { usePendenciasVinculoAta } from './usePendenciasVinculoAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { useAuth } from '../../../context/AuthContext';
 import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
+import { useGestorNiveis } from '../../../hooks/useGestorNiveis';
+import { useUsers } from '../../../hooks/useUsers';
+import { useAllAtaManagers } from '../../../hooks/useAtaManagers';
+import { useAllContractManagers } from '../../../hooks/useAllContractManagers';
+import { UASGS_CGLIC } from '../../../config/unidadesGestoras';
+import { capacidadeDe } from './nivelGestor';
+import type { NivelDoGestor } from './EquipeFila';
 import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
 import { chaveGestaoAta } from '../../../utils/ataIdentidade';
@@ -46,6 +53,30 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const { data: ajustes } = useComplexidadeAjustes();
   const navigate = useNavigate();
 
+  // Nível de cada gestor (migration 140), pelo nome da carteira → conta → nível gravado.
+  const { data: niveis } = useGestorNiveis();
+  const { data: usuarios } = useUsers();
+  const nivelDe = React.useCallback(
+    (gestorNome: string): NivelDoGestor => {
+      const userId = usuarios?.find((u) => u.nome === gestorNome)?.id ?? null;
+      return { userId, registro: (userId && niveis?.[userId]) || null };
+    },
+    [usuarios, niveis]
+  );
+  const capacidadeDoGestor = React.useCallback((gestorNome: string) => capacidadeDe(nivelDe(gestorNome).registro?.nivel), [nivelDe]);
+
+  // Desde quando o gestor atual cuida de cada ata e contrato (última troca de gestor), para os critérios de subida.
+  const { data: ataManagers } = useAllAtaManagers();
+  const managers200330 = useAllContractManagers(UASGS_CGLIC[0]);
+  const managers200331 = useAllContractManagers(UASGS_CGLIC[1]);
+  const gestorDesde = React.useCallback(
+    (tipo: 'ATA' | 'CONTRATO', chave: string) =>
+      tipo === 'ATA'
+        ? ataManagers?.[chave]?.updatedAt
+        : (managers200330.data?.[chave] ?? managers200331.data?.[chave])?.updatedAt,
+    [ataManagers, managers200330.data, managers200331.data]
+  );
+
   // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void; provaveis?: number } | null>(null);
 
@@ -57,7 +88,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const abaDaUrl: Fila = abaParam && (FILAS as readonly string[]).includes(abaParam) ? (abaParam as Fila) : FILA_INICIAL;
   const trocarAba = (nova: Fila) => setSearchParams(nova === FILA_INICIAL ? {} : { aba: nova }, { replace: true });
 
-  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes });
+  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes, capacidadeDoGestor });
 
   const aVincularDe = (gestorNome: string): ContratoAVincular[] => pendencias.aVincularPorGestor.get(gestorNome) || [];
 
@@ -178,7 +209,9 @@ export const DistribuicaoEquipePage: React.FC = () => {
           {aba === 'EQUIPE' && (
             <EquipeFila
               linhas={linhasEquipe}
-              mediaEquivalente={totais.mediaEquivalente}
+              mediaOcupacao={totais.mediaOcupacao}
+              nivelDe={nivelDe}
+              gestorDesde={gestorDesde}
               canAssign={canAssign}
               canAjustar={canAjustar}
               aVincularDe={aVincularDe}

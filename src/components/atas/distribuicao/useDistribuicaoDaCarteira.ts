@@ -20,7 +20,13 @@ function categoriaDoContrato(raw: unknown): string | undefined {
  * Carga de cada gestor e contratos com gestor diferente da ata, a partir da carteira já carregada. Serve à Central de
  * Distribuição e ao número do Início no menu (mesma conta nos dois lugares).
  */
-export function useDistribuicaoDaCarteira({ atas, contratos, links, ajustes }: Carteira & { ajustes?: Record<string, ComplexidadeAjuste> }) {
+export function useDistribuicaoDaCarteira({
+  atas,
+  contratos,
+  links,
+  ajustes,
+  capacidadeDoGestor
+}: Carteira & { ajustes?: Record<string, ComplexidadeAjuste>; capacidadeDoGestor?: (gestorNome: string) => number }) {
   return useMemo(
     () =>
       buildDistribuicaoEquipe({
@@ -48,8 +54,9 @@ export function useDistribuicaoDaCarteira({ atas, contratos, links, ajustes }: C
         })),
         links,
         attentionItems: contratos.attentionItems,
-        ajustes
+        ajustes,
+        capacidadeDoGestor
       }),
-    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes]
+    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes, capacidadeDoGestor]
   );
 }
