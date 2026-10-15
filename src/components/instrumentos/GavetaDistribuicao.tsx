@@ -2,6 +2,16 @@ import React from 'react';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { formatNumber } from '../../utils/format';
 import { organizarCartoesDistribuicao, type ResumoDoGestor, type ResumoDoLado } from './painelResumo';
+import { OcupacaoBarra } from '../atas/distribuicao/OcupacaoBarra';
+import type { DistribuicaoLinha } from '../atas/distribuicao/distribuicaoEquipe';
+
+/** Ocupação de cada gestor, calculada como na Central de Distribuição (pelo nome do gestor). */
+export interface OcupacoesDaEquipe {
+  linhas: Map<string, DistribuicaoLinha>;
+  media: number | null;
+  /** Régua comum a todas as barras. */
+  escala: number;
+}
 
 const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${n === 1 ? um : varios}`;
 
@@ -27,15 +37,17 @@ const Cartao: React.FC<{ sem?: boolean; onClick: () => void; rotulo: string; tes
 /**
  * Gaveta Distribuição (coordenador e consulta). "Sem gestor" vem primeiro e abre a Distribuição. Depois, um cartão por
  * gestor, com as pendências críticas no cabeçalho, as atas e os contratos vigentes (e quantos vencem em 90 dias) e uma
- * barra com a carga em relação à maior carteira; ordem: mais críticas, depois a maior carteira. Gestor sem carteira vai
- * para uma linha no rodapé. O cartão do gestor filtra o painel pela carteira dele.
+ * barra de ocupação, a mesma da coluna Ocupação da Central (carga ajustada ao nível, por complexidade, com a média da
+ * equipe); sem ela, a barra mostra a carga em relação à maior carteira. Ordem: mais críticas, depois a maior carteira.
+ * Gestor sem carteira vai para uma linha no rodapé. O cartão do gestor filtra o painel pela carteira dele.
  */
 export const GavetaDistribuicao: React.FC<{
   linhas: ResumoDoGestor[];
   isLoading: boolean;
   onEscolherGestor: (nome: string) => void;
   onDistribuir: () => void;
-}> = ({ linhas, isLoading, onEscolherGestor, onDistribuir }) => {
+  ocupacoes?: OcupacoesDaEquipe | null;
+}> = ({ linhas, isLoading, onEscolherGestor, onDistribuir, ocupacoes }) => {
   if (isLoading) return <SkeletonLoader variant="card" height="88px" />;
   const { semGestor, gestores, semCarteira } = organizarCartoesDistribuicao(linhas);
   return (
@@ -75,15 +87,24 @@ export const GavetaDistribuicao: React.FC<{
               <Lado rotulo="Atas" lado={g.atas} comCriticas={false} />
               <Lado rotulo="Contratos" lado={g.contratos} comCriticas={false} />
             </span>
-            <span className="pn-gc-carga">
-              <span className="pn-gc-barra" aria-hidden="true">
-                <span style={{ width: `${Math.max(2, g.pctDaMaior)}%` }} />
-              </span>
-              <span className="pn-gc-carga-texto">
-                {plural(g.carga, 'instrumento', 'instrumentos')}
-                {g.maiorCarteira && gestores.length > 1 ? ' · maior carteira' : ''}
-              </span>
-            </span>
+            {(() => {
+              const ocupacao = ocupacoes?.linhas.get(g.gestor.nome);
+              return ocupacao && ocupacoes ? (
+                <span className="pn-gc-carga" data-testid="painel-distribuicao-ocupacao">
+                  <OcupacaoBarra l={ocupacao} escala={ocupacoes.escala} media={ocupacoes.media} minWidth="0" />
+                </span>
+              ) : (
+                <span className="pn-gc-carga">
+                  <span className="pn-gc-barra" aria-hidden="true">
+                    <span style={{ width: `${Math.max(2, g.pctDaMaior)}%` }} />
+                  </span>
+                  <span className="pn-gc-carga-texto">
+                    {plural(g.carga, 'instrumento', 'instrumentos')}
+                    {g.maiorCarteira && gestores.length > 1 ? ' · maior carteira' : ''}
+                  </span>
+                </span>
+              );
+            })()}
           </Cartao>
         ))}
       </div>

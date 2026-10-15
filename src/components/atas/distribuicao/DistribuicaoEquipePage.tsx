@@ -23,13 +23,10 @@ import { usePendenciasVinculoAta } from './usePendenciasVinculoAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { useAuth } from '../../../context/AuthContext';
 import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
-import { useGestorNiveis } from '../../../hooks/useGestorNiveis';
-import { useUsers } from '../../../hooks/useUsers';
 import { useAllAtaManagers } from '../../../hooks/useAtaManagers';
 import { useAllContractManagers } from '../../../hooks/useAllContractManagers';
 import { UASGS_CGLIC } from '../../../config/unidadesGestoras';
-import { capacidadeDe } from './nivelGestor';
-import type { NivelDoGestor } from './EquipeFila';
+import { useCapacidadeDosGestores } from './useCapacidadeDosGestores';
 import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
 import { chaveGestaoAta } from '../../../utils/ataIdentidade';
@@ -53,17 +50,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const { data: ajustes } = useComplexidadeAjustes();
   const navigate = useNavigate();
 
-  // Nível de cada gestor (migration 140), pelo nome da carteira → conta → nível gravado.
-  const { data: niveis } = useGestorNiveis();
-  const { data: usuarios } = useUsers();
-  const nivelDe = React.useCallback(
-    (gestorNome: string): NivelDoGestor => {
-      const userId = usuarios?.find((u) => u.nome === gestorNome)?.id ?? null;
-      return { userId, registro: (userId && niveis?.[userId]) || null };
-    },
-    [usuarios, niveis]
-  );
-  const capacidadeDoGestor = React.useCallback((gestorNome: string) => capacidadeDe(nivelDe(gestorNome).registro?.nivel), [nivelDe]);
+  // Nível de cada gestor (migration 140) e a capacidade que ele dá.
+  const { nivelDe, capacidadeDoGestor } = useCapacidadeDosGestores();
 
   // Desde quando o gestor atual cuida de cada ata e contrato (última troca de gestor), para os critérios de subida.
   const { data: ataManagers } = useAllAtaManagers();

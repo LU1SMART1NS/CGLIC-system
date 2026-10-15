@@ -57,3 +57,42 @@ describe('GavetaDistribuicao — cartões organizados', () => {
     expect(html).toContain('Sem carteira: Daniela');
   });
 });
+
+describe('GavetaDistribuicao — barra de ocupação da Central', () => {
+  const lado = (total: number, vencem90 = 0, criticas = 0) => ({ total, vencem90, criticas });
+  const linhas = [
+    { gestor: { userId: 'alan', nome: 'Alan Jonne' }, atas: lado(3), contratos: lado(2) },
+    { gestor: { userId: 'borges', nome: 'Borges' }, atas: lado(30), contratos: lado(40) }
+  ];
+  const linhaCentral = (gestorNome: string, ocupacao: number, relacaoEquipe: 'ACIMA' | 'NA_MEDIA' | 'ABAIXO') =>
+    ({
+      gestorNome,
+      complexidade: { ALTA: 1, MEDIA: 2, BAIXA: 3 },
+      capacidade: 0.85,
+      ocupacao,
+      relacaoEquipe
+    }) as never;
+  const ocupacoes = {
+    linhas: new Map([
+      ['Alan Jonne', linhaCentral('Alan Jonne', 10, 'ABAIXO')],
+      ['Borges', linhaCentral('Borges', 40, 'ACIMA')]
+    ]),
+    media: 25,
+    escala: 44
+  };
+
+  it('com as ocupações da Central, o cartão mostra a mesma barra (palavra + contagem por complexidade), sem a barra por quantidade', () => {
+    const html = renderToStaticMarkup(<GavetaDistribuicao linhas={linhas} isLoading={false} onEscolherGestor={() => {}} onDistribuir={() => {}} ocupacoes={ocupacoes} />);
+    expect(html).toContain('painel-distribuicao-ocupacao');
+    expect(html).toContain('Acima da média');
+    expect(html).toContain('Abaixo da média');
+    expect(html).toContain('1 Alta · 2 Média · 3 Baixa');
+    expect(html).not.toContain('maior carteira');
+  });
+
+  it('sem as ocupações (carregando), volta à barra por quantidade', () => {
+    const html = renderToStaticMarkup(<GavetaDistribuicao linhas={linhas} isLoading={false} onEscolherGestor={() => {}} onDistribuir={() => {}} ocupacoes={null} />);
+    expect(html).not.toContain('painel-distribuicao-ocupacao');
+    expect(html).toContain('70 instrumentos · maior carteira');
+  });
+});
