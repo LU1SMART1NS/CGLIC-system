@@ -452,20 +452,25 @@ export function calculateAttentionSummary(params: {
     // Item de serviço: o excesso é de um período de 12 meses da vigência (migration 137).
     const dataBr = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
     const periodo = a.periodoInicio && a.periodoFim ? ` de ${dataBr(a.periodoInicio)} a ${dataBr(a.periodoFim)}` : '';
+    // Quantidade contratada quebrada (valor com desconto ÷ preço da ata): o excesso é em valor (migration 138).
+    const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const descricaoExcesso = a.peloValor
+      ? `${brl(a.valorEmpenhado)} empenhados${periodo} para ${brl(a.valorContratado)} contratados (${brl(a.valorAcima)} acima; quantidade no contrato quebrada, ${a.quantidadeContratada.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}, comparado pelo valor)`
+      : `${fmt(a.quantidadeEmpenhada)} empenhados${periodo} para ${fmt(a.quantidadeContratada)} contratados (${fmt(a.quantidadeAcima)} acima)`;
     items.push({
       id: `ATT-ACIMA-${a.contractKey}-${a.numeroItem}`,
       category: 'EMPENHO_ACIMA',
       severity: 'ATENCAO',
-      avisoChave: chaveAvisoEmpenhoAcima(a.contractKey, a.numeroItem, a.quantidadeEmpenhada),
+      avisoChave: chaveAvisoEmpenhoAcima(a.contractKey, a.numeroItem, a.peloValor ? a.valorEmpenhado : a.quantidadeEmpenhada),
       title: 'Empenhado acima do contratado',
-      description: `Item ${a.numeroItem}: ${fmt(a.quantidadeEmpenhada)} empenhados${periodo} para ${fmt(a.quantidadeContratada)} contratados (${fmt(a.quantidadeAcima)} acima)${ultima}`,
+      description: `Item ${a.numeroItem}: ${descricaoExcesso}${ultima}`,
       contractKey: a.contractKey,
       numeroContrato,
       fornecedorNome: contrato.fornecedorNome,
       objetoItem: a.descricao || undefined,
       // Sem prazo: a coluna Prazo mostra "—". A linha abre a aba Financeiro na última nota.
       targetUrl: `/contratos/${encodeURIComponent(a.contractKey)}?aba=financeiro${a.ultimaNota ? `&abrir=${encodeURIComponent(a.ultimaNota)}` : ''}`,
-      badgeLabel: `${fmt(a.quantidadeAcima)} acima`
+      badgeLabel: a.peloValor ? `${brl(a.valorAcima)} acima` : `${fmt(a.quantidadeAcima)} acima`
     });
   }
 

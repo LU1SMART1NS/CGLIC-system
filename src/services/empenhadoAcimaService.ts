@@ -4,7 +4,8 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
  * Contrato × item em que a soma da quantidade REAL das notas (informada pelo gestor ou lida da nota no SIAFI) passa da
  * quantidade contratada (v_contrato_itens_empenhado_acima, migration 133). Só aviso: a gravação nunca é bloqueada. A
  * quantidade calculada pelo valor não entra (reajuste e aditivo sobem o valor sem mudar a quantidade). Item de serviço
- * conta por período de 12 meses da vigência e mostra o pior período (migration 137).
+ * conta por período de 12 meses da vigência e mostra o pior período (migration 137). Quantidade contratada quebrada
+ * (valor com desconto ÷ preço da ata): compara pelo valor (migration 138).
  */
 export interface EmpenhadoAcima {
   contractKey: string;
@@ -20,11 +21,16 @@ export interface EmpenhadoAcima {
   /** Item de serviço: o excesso é do período de 12 meses da vigência abaixo (AAAA-MM-DD); nulos quando conta o total. */
   periodoInicio: string | null;
   periodoFim: string | null;
+  /** Quantidade contratada quebrada: o excesso é em valor (R$), e não em quantidade. */
+  peloValor: boolean;
+  valorContratado: number;
+  valorEmpenhado: number;
+  valorAcima: number;
 }
 
 const COLUNAS =
   'contract_key, numero_item, descricao, quantidade_contratada, quantidade_empenhada, quantidade_acima, notas, ultima_nota, ultima_origem';
-const COLUNAS_PERIODO = 'periodo_inicio, periodo_fim';
+const COLUNAS_NOVAS = 'periodo_inicio, periodo_fim, pelo_valor, valor_contratado, valor_empenhado, valor_acima';
 
 const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
@@ -40,7 +46,11 @@ export function empenhadoAcimaDaLinha(r: any): EmpenhadoAcima {
     ultimaNota: r.ultima_nota ?? null,
     ultimaOrigem: r.ultima_origem ?? null,
     periodoInicio: r.periodo_inicio ?? null,
-    periodoFim: r.periodo_fim ?? null
+    periodoFim: r.periodo_fim ?? null,
+    peloValor: r.pelo_valor === true,
+    valorContratado: num(r.valor_contratado),
+    valorEmpenhado: num(r.valor_empenhado),
+    valorAcima: num(r.valor_acima)
   };
 }
 
@@ -64,9 +74,9 @@ export function textoDaOrigem(origem: string | null): string | null {
 
 export async function fetchEmpenhadoAcima(): Promise<EmpenhadoAcima[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  let { data, error } = await supabase.from('v_contrato_itens_empenhado_acima').select(`${COLUNAS}, ${COLUNAS_PERIODO}`);
-  // Banco sem a migration 137: lê sem o período.
-  if (error && (error.code === '42703' || /periodo_/.test(error.message ?? ''))) {
+  let { data, error } = await supabase.from('v_contrato_itens_empenhado_acima').select(`${COLUNAS}, ${COLUNAS_NOVAS}`);
+  // Banco sem as migrations 137/138: lê só as colunas da 133.
+  if (error && (error.code === '42703' || /periodo_|pelo_valor|valor_(contratado|empenhado|acima)/.test(error.message ?? ''))) {
     ({ data, error } = await supabase.from('v_contrato_itens_empenhado_acima').select(COLUNAS));
   }
   if (error) {
