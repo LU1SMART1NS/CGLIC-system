@@ -110,3 +110,46 @@ export function resumoPorGestor(
   });
   return linhas;
 }
+
+export interface CartaoDoGestor extends ResumoDoGestor {
+  gestor: GestorDaCarteira;
+  /** Atas + contratos vigentes. */
+  carga: number;
+  /** Pendências críticas somadas dos dois lados. */
+  criticas: number;
+  /** Carga em relação à maior carteira (0 a 100): a barra do cartão. */
+  pctDaMaior: number;
+  maiorCarteira: boolean;
+}
+
+export interface CartoesDaDistribuicao {
+  /** "Sem gestor" vem primeiro (é o único cartão que pede ação); ausente quando não sobra nada sem gestor. */
+  semGestor: ResumoDoGestor | null;
+  /** Gestores com carteira: mais pendências críticas primeiro, depois a maior carteira, depois o nome. */
+  gestores: CartaoDoGestor[];
+  /** Gestores sem nenhuma ata nem contrato vigente: uma linha no rodapé, em vez de um cartão zerado. */
+  semCarteira: string[];
+}
+
+/** Organiza as linhas de resumoPorGestor para os cartões da gaveta Distribuição. */
+export function organizarCartoesDistribuicao(linhas: ResumoDoGestor[]): CartoesDaDistribuicao {
+  const sem = linhas.find((l) => !l.gestor) ?? null;
+  const comGestor = linhas.filter((l): l is ResumoDoGestor & { gestor: GestorDaCarteira } => Boolean(l.gestor));
+  const carga = (l: ResumoDoGestor) => l.atas.total + l.contratos.total;
+  const comCarteira = comGestor.filter((l) => carga(l) > 0);
+  const maior = Math.max(0, ...comCarteira.map(carga));
+  const gestores = comCarteira
+    .map((l) => ({
+      ...l,
+      carga: carga(l),
+      criticas: l.atas.criticas + l.contratos.criticas,
+      pctDaMaior: maior > 0 ? Math.round((100 * carga(l)) / maior) : 0,
+      maiorCarteira: carga(l) === maior
+    }))
+    .sort((a, b) => b.criticas - a.criticas || b.carga - a.carga || a.gestor.nome.localeCompare(b.gestor.nome, 'pt-BR'));
+  return {
+    semGestor: sem && carga(sem) > 0 ? sem : null,
+    gestores,
+    semCarteira: comGestor.filter((l) => carga(l) === 0).map((l) => l.gestor.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  };
+}

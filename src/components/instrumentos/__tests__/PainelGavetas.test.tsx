@@ -31,3 +31,29 @@ describe('GavetaDistribuicao — cartões por gestor', () => {
     expect(html).not.toContain('painel-distribuicao-sem-gestor');
   });
 });
+
+describe('GavetaDistribuicao — cartões organizados', () => {
+  const lado = (total: number, vencem90 = 0, criticas = 0) => ({ total, vencem90, criticas });
+  const linhas = [
+    { gestor: { userId: 'alan', nome: 'Alan Jonne' }, atas: lado(3), contratos: lado(2) },
+    { gestor: { userId: 'borges', nome: 'Borges' }, atas: lado(30, 5, 13), contratos: lado(40, 9, 3) },
+    { gestor: { userId: 'daniela', nome: 'Daniela' }, atas: lado(0), contratos: lado(0) },
+    { atas: lado(0), contratos: lado(36, 8, 2) }
+  ];
+  const html = renderToStaticMarkup(<GavetaDistribuicao linhas={linhas} isLoading={false} onEscolherGestor={() => {}} onDistribuir={() => {}} />);
+
+  it('sem gestor primeiro, só com o lado que tem algo', () => {
+    expect(html.indexOf('painel-distribuicao-sem-gestor')).toBeLessThan(html.indexOf('painel-distribuicao-gestor'));
+    expect(html).toContain('Distribuir');
+  });
+  it('críticas somadas no cabeçalho e gestor com mais críticas antes', () => {
+    expect(html).toContain('16 críticas');
+    expect(html.indexOf('Borges')).toBeLessThan(html.indexOf('Alan Jonne'));
+  });
+  it('sem zeros, com a carga e o gestor sem carteira no rodapé', () => {
+    expect(html).not.toContain('0 vencem');
+    expect(html).not.toContain('0 críticas');
+    expect(html).toContain('70 instrumentos · maior carteira');
+    expect(html).toContain('Sem carteira: Daniela');
+  });
+});

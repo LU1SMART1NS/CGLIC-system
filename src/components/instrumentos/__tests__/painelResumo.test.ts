@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { contarFaixas, criticasPorInstrumento, resumoPorGestor, type InstrumentoNoPainel } from '../painelResumo';
+import { contarFaixas, criticasPorInstrumento, organizarCartoesDistribuicao, resumoPorGestor, type InstrumentoNoPainel, type ResumoDoGestor } from '../painelResumo';
 import type { DashboardAttentionItem } from '../../../types/managementDashboard';
 
 const atas: InstrumentoNoPainel[] = [
@@ -55,5 +55,38 @@ describe('resumoPorGestor', () => {
       atas: { total: 1, vencem90: 1, criticas: 0 },
       contratos: { total: 1, vencem90: 0, criticas: 1 }
     });
+  });
+});
+
+describe('organizarCartoesDistribuicao (números da tela de 15/10/2026)', () => {
+  const lado = (total: number, vencem90 = 0, criticas = 0) => ({ total, vencem90, criticas });
+  const g = (nome: string, atas: ReturnType<typeof lado>, contratos: ReturnType<typeof lado>): ResumoDoGestor => ({ gestor: { userId: nome, nome }, atas, contratos });
+  const linhas: ResumoDoGestor[] = [
+    g('Alan Jonne', lado(3), lado(2)),
+    g('Borges', lado(30, 5, 13), lado(40, 9, 3)),
+    g('Daniela', lado(0), lado(0)),
+    g('Renilda', lado(16, 7), lado(66, 5)),
+    g('Vanessa', lado(33, 10, 6), lado(96, 29, 2)),
+    { atas: lado(0), contratos: lado(36, 8, 2) }
+  ];
+  const r = organizarCartoesDistribuicao(linhas);
+
+  it('sem gestor separado e primeiro', () => {
+    expect(r.semGestor?.contratos.total).toBe(36);
+  });
+  it('mais críticas primeiro, depois a maior carteira', () => {
+    expect(r.gestores.map((x) => x.gestor.nome)).toEqual(['Borges', 'Vanessa', 'Renilda', 'Alan Jonne']);
+    expect(r.gestores[0].criticas).toBe(16);
+  });
+  it('barra relativa à maior carteira', () => {
+    const v = r.gestores.find((x) => x.gestor.nome === 'Vanessa')!;
+    expect(v).toMatchObject({ carga: 129, pctDaMaior: 100, maiorCarteira: true });
+    expect(r.gestores.find((x) => x.gestor.nome === 'Alan Jonne')!.pctDaMaior).toBe(4);
+  });
+  it('gestor sem carteira vai para o rodapé', () => {
+    expect(r.semCarteira).toEqual(['Daniela']);
+  });
+  it('sem gestor vazio não aparece', () => {
+    expect(organizarCartoesDistribuicao([g('Ana', lado(1), lado(0)), { atas: lado(0), contratos: lado(0) }]).semGestor).toBeNull();
   });
 });
