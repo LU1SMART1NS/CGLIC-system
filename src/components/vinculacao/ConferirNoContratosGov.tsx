@@ -307,6 +307,17 @@ export const ConferirNoContratosGov: React.FC<{
         testIdPrefix="vinc-nota"
       >
         <CarteiraFilterButton
+          label="Vigência"
+          value={filters.vigencia}
+          emptyValue={TODOS}
+          options={[
+            { value: 'VIGENTES', label: 'Vigentes' },
+            { value: 'ENCERRADOS', label: 'Encerrados' }
+          ]}
+          onChange={(v) => setFilter('vigencia', v)}
+          testId="vinc-nota-filter-vigencia"
+        />
+        <CarteiraFilterButton
           label="Conferência"
           value={filters.tipo}
           emptyValue={TODOS}
@@ -324,17 +335,6 @@ export const ConferirNoContratosGov: React.FC<{
           ]}
           onChange={(v) => setFilter('marca', v)}
           testId="vinc-nota-filter-marca"
-        />
-        <CarteiraFilterButton
-          label="Vigência"
-          value={filters.vigencia}
-          emptyValue={TODOS}
-          options={[
-            { value: 'VIGENTES', label: 'Vigentes' },
-            { value: 'ENCERRADOS', label: 'Encerrados' }
-          ]}
-          onChange={(v) => setFilter('vigencia', v)}
-          testId="vinc-nota-filter-vigencia"
         />
         <CarteiraFilterButton
           label="UASG"
