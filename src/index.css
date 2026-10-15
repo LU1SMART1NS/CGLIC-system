@@ -1030,6 +1030,15 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
 .pn-gc-tags { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 0.75rem; color: var(--text-muted); }
 .pn-gc-tag--atencao { color: var(--color-warning-text); font-weight: 700; }
 .pn-gc-tag--critico { color: var(--color-danger-text); font-weight: 700; }
+.pn-gdist { display: flex; flex-direction: column; gap: 8px; }
+.pn-gc-head strong { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.pn-gc-ponto { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger); }
+.pn-gc-criticas { flex: none; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: var(--color-danger-text-strong); background: var(--color-danger-bg-strong); }
+.pn-gc-carga { display: flex; flex-direction: column; gap: 3px; }
+.pn-gc-barra { display: block; height: 5px; border-radius: 3px; background: #f1f5f9; overflow: hidden; }
+.pn-gc-barra > span { display: block; height: 100%; background: var(--color-info-solid); }
+.pn-gc-carga-texto { font-size: 0.75rem; color: var(--text-muted); }
+.pn-gc-sem-carteira { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
 
 .vg-rail { border-radius: 8px 8px 0 0; transition: background-color var(--i360-t) var(--i360-ease), padding var(--i360-t) var(--i360-ease); }
 .i360-head.min .vg-rail { background-color: #eef3fb; border-bottom: 2px solid #bfcde6; padding: 6px 8px; }
