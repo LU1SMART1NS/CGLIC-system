@@ -15,6 +15,8 @@ import {
 import { AdminListShell } from './shared/AdminListShell';
 import { CarteiraSegmentTabs, type CarteiraSegment } from '../carteira/CarteiraSegmentTabs';
 import { SELECIONADA_BG, SelecaoBar, useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
+import { CarteiraPagination } from '../carteira/CarteiraPagination';
+import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { GtiTag } from '../gti/GtiVisual';
 import { useAuth } from '../../context/AuthContext';
 import { useDefinirGruposUasgs, useUasgsParticipantesGti } from '../../hooks/useGruposGti';
@@ -30,6 +32,8 @@ interface Linha extends UasgParticipanteGti {
   situacao: Exclude<Situacao, 'TODAS'>;
 }
 
+const POR_PAGINA = 25;
+const chaveDaLinha = (l: { uasg: string }) => l.uasg;
 const pequeno: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)' };
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -71,6 +75,9 @@ export const GruposUasgsPage: React.FC = () => {
         (!q || l.uasg.includes(q) || semAcento(`${l.nome ?? ''} ${l.nomeNaAta ?? ''} ${l.siglaOrgao ?? ''} ${l.siglaUf ?? ''}`).includes(q))
     );
   }, [linhas, situacao, busca]);
+
+  // Paginação das carteiras; a seleção e o "marcar todas" valem para a lista inteira, não só para a página.
+  const { currentPage, setPage, pageItems } = useCarteiraPagination(visiveis, chaveDaLinha, POR_PAGINA);
 
   // Seleção em lote (mesmo padrão da Central de Distribuição): só UASG com sugestão e ainda sem grupo.
   const selecionavel = (l: Linha) => podeEditar && !l.grupo && l.sugestao !== null;
@@ -312,11 +319,12 @@ export const GruposUasgsPage: React.FC = () => {
           >
             <DataTable
               columns={columns}
-              data={visiveis}
+              data={pageItems}
               keyExtractor={(l) => l.uasg}
               rowStyle={(l) => (selecao.selecionadas.has(l.uasg) ? { background: SELECIONADA_BG } : undefined)}
               testId="grupos-uasgs-tabela"
             />
+            <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={visiveis.length} onChange={setPage} testIdPrefix="grupos-uasgs" />
           </AdminListShell>
         </>
       )}
