@@ -598,7 +598,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     return (a.codigoUnidade || '').localeCompare(b.codigoUnidade || '');
   });
 
-  // Interesse por GTI (só na ata da SENASP): botão no cartão do topo e gaveta logo abaixo dele, como no Início.
+  // Interesse por GTI (só na ata da SENASP): botão no cartão do topo e gaveta entre o cartão e as abas, como no Início.
   const fatiasGti = useInteresseGti({ unidades, quantitativos, ataDaCglic });
   const [gtiAberto, setGtiAberto] = React.useState(false);
 
@@ -670,6 +670,17 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         verMais={ataDaCglic ? <InteresseGtiBotao fatias={fatiasGti} aberto={gtiAberto} onToggle={() => setGtiAberto((v) => !v)} /> : undefined}
       />
 
+      {/* Gaveta entre o cartão e as abas; some junto com o cartão quando ele encolhe ao rolar. */}
+      {ataDaCglic && gtiAberto && (
+        <div className="i360-fold" data-i360-fold="">
+          <div className="i360-fold-in">
+            <div style={{ marginBottom: '1.5rem' }}>
+              <InteresseGtiGaveta fatias={fatiasGti} onFechar={() => setGtiAberto(false)} />
+            </div>
+          </div>
+        </div>
+      )}
+
       <Instrument360Tabs
         ref={tabsRef}
         tabs={[
@@ -683,8 +694,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         ariaLabel="Seções do item"
       />
       </Instrument360Head>
-
-      {ataDaCglic && gtiAberto && <InteresseGtiGaveta fatias={fatiasGti} onFechar={() => setGtiAberto(false)} />}
 
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'quantitativos' ? (

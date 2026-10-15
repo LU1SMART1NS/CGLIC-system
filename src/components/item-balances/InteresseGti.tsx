@@ -71,7 +71,7 @@ export const InteresseGtiBotao: React.FC<{ fatias: FatiasDaAta; aberto: boolean;
   );
 };
 
-/** Gaveta aberta: fica fora do cartão do topo (que encolhe ao rolar), logo acima das abas do item. */
+/** Gaveta aberta: entre o cartão do topo e as abas do item; some junto com o cartão quando ele encolhe ao rolar. */
 export const InteresseGtiGaveta: React.FC<{ fatias: FatiasDaAta; onFechar: () => void }> = ({ fatias, onFechar }) => {
   if (fatias.fatias.length === 0) return null;
   return (
