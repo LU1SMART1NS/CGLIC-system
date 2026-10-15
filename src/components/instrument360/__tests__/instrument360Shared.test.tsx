@@ -28,8 +28,9 @@ describe('resolveInstrumentTab / tabSearchParams', () => {
 describe('Instrument360Page', () => {
   it('é a mesma casca para todas as telas', () => {
     const html = renderToStaticMarkup(<Instrument360Page>x</Instrument360Page>);
-    expect(html).toContain('max-width:1400px');
-    expect(html).toContain('padding:1.5rem');
+    // Mesma largura e margens das demais telas: sem limite próprio, só o respiro do PageContainer.
+    expect(html).toContain('max-width:none');
+    expect(html).toContain('padding:0.75rem 0 2rem');
   });
 });
 
