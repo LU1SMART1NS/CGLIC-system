@@ -29,7 +29,7 @@ interface GestaoInstrumentosCategoryTabsProps {
   onSelect: (tab: GestaoInstrumentosCategoryTab) => void;
 }
 
-/** Categorias da Visão Geral no mesmo trilho das carteiras. */
+/** Categorias do Início no mesmo trilho das carteiras. */
 export const GestaoInstrumentosCategoryTabs: React.FC<GestaoInstrumentosCategoryTabsProps> = ({
   counts,
   active,

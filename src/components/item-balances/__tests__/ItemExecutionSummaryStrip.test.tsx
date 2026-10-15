@@ -24,7 +24,7 @@ describe('ItemExecutionSummaryStrip', () => {
     expect(out).not.toContain('kpi-card');
   });
 
-  it('avisa as notas ainda a vincular aos itens e leva à Vinculação quem pode vincular', () => {
+  it('avisa as notas ainda a vincular aos itens e leva a Vínculos quem pode vincular', () => {
     const out = html({ onVincularAosItens: vi.fn() });
     expect(out).toContain('item-notas-a-vincular');
     expect(out).toContain('ainda não foram vinculadas');

@@ -47,32 +47,29 @@ export interface NavItem {
    * filtro — ver `filterNavigationByRole`.
    */
   allowedRoles?: AppRole[];
-  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Configurações → Gestão · Acesso). */
+  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Acesso). */
   group?: string;
-  /** 'bottom' = área fica no pé do menu chave (ex.: Configurações). */
+  /** 'bottom' = área fica no pé do menu chave (ex.: Ajustes). */
   placement?: 'bottom';
-  /** Nome curto da área na barra inferior do celular, onde o nome inteiro era cortado ("Visão Ge…"). */
-  shortLabel?: string;
 }
 
 /**
  * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
- * - Visão Geral: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
+ * - Início: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
- * - Vinculação: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
+ * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Configurações (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
+ * - Ajustes (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
 export const navigationConfig: NavItem[] = [
   {
     id: 'visao-geral',
-    label: 'Visão Geral',
-    shortLabel: 'Início',
+    label: 'Início',
     icon: LayoutDashboard,
     status: 'active',
     children: [
@@ -153,10 +150,9 @@ export const navigationConfig: NavItem[] = [
     ]
   },
   {
-    // Filas de vínculo: ligar uma coisa à outra. "Distribuição" (Visão Geral) fica só com atas e contratos para gestores.
+    // Filas de vínculo: ligar uma coisa à outra. "Distribuição" (Início) fica só com atas e contratos para gestores.
     id: 'vinculacao',
-    label: 'Vinculação',
-    shortLabel: 'Vínculos',
+    label: 'Vínculos',
     icon: Link2,
     status: 'active',
     children: [
@@ -218,8 +214,7 @@ export const navigationConfig: NavItem[] = [
   },
   {
     id: 'configuracoes',
-    label: 'Configurações',
-    shortLabel: 'Ajustes',
+    label: 'Ajustes',
     icon: Settings,
     status: 'active',
     placement: 'bottom',
@@ -337,7 +332,7 @@ export interface BreadcrumbEntry {
 }
 
 const staticRouteLabels: Record<string, string> = {
-  '/instrumentos': 'Visão Geral',
+  '/instrumentos': 'Início',
   '/atas': 'Carteira de Atas',
   '/itens': 'Carteira de Itens',
   '/atas/distribuicao': 'Central de Distribuição',
@@ -356,19 +351,19 @@ const staticRouteLabels: Record<string, string> = {
 
 export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   if (pathname === '/' || pathname === '/instrumentos') {
-    return [{ label: 'Visão Geral' }];
+    return [{ label: 'Início' }];
   }
 
   // Item de topo do menu: não herda o "Carteira de Atas" do prefixo /atas da rota.
   if (pathname === '/atas/distribuicao') {
     return [
-      { label: 'Visão Geral', route: '/instrumentos' },
+      { label: 'Início', route: '/instrumentos' },
       { label: 'Central de Distribuição', route: '/atas/distribuicao' }
     ];
   }
 
   const segments = pathname.split('/').filter(Boolean);
-  const crumbs: BreadcrumbEntry[] = [{ label: 'Visão Geral', route: '/instrumentos' }];
+  const crumbs: BreadcrumbEntry[] = [{ label: 'Início', route: '/instrumentos' }];
   let accPath = '';
 
   for (let i = 0; i < segments.length; i++) {

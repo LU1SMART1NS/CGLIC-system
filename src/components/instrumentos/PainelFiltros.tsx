@@ -7,7 +7,7 @@ export const TODAS_UASGS = '';
 export const TODOS_OS_GESTORES = '';
 
 /**
- * Filtros da Visão Geral, no padrão das carteiras e guardados no endereço: UASG para todos os perfis e, para o
+ * Filtros do Início, no padrão das carteiras e guardados no endereço: UASG para todos os perfis e, para o
  * coordenador e a consulta, o gestor (o painel passa a mostrar a carteira dele, com o mesmo recorte que ele vê).
  */
 export const PainelFiltros: React.FC<{

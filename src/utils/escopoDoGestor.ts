@@ -15,7 +15,7 @@ export interface EscopoDoGestor {
  * Carteira de um gestor (perfil "Gestor de Atas e Contratos"): as atas atribuídas a ele (ata_managers) trazem os
  * contratos vinculados a elas, e os contratos atribuídos (contract_managers) trazem as atas de que vêm. Contrato sem
  * ata ("avulso") só entra por atribuição direta. Regra única para o painel do próprio gestor, para o filtro de gestor
- * do coordenador e para o resumo por gestor da Visão Geral.
+ * do coordenador e para o resumo por gestor do Início.
  */
 export function escopoDoGestor(
   userId: string,

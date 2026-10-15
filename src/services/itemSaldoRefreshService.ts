@@ -2,7 +2,7 @@
  * Atualiza em lote a cópia da quantidade contratada (arp_item_contract_links.quantidade_contratada_api)
  * de todos os itens de ata vinculados a contratos.
  *
- * A tela do Item relê a quantidade da API ao abrir; os painéis (Visão Geral, carteiras) só enxergam a
+ * A tela do Item relê a quantidade da API ao abrir; os painéis (Início, carteiras) só enxergam a
  * cópia gravada no banco. Sem esta rotina, o saldo de um item que ninguém abriu aparecia como 0% consumido.
  * Uma leitura de API por contrato (a resposta traz todos os itens), e só o que está sem leitura ou velho.
  */

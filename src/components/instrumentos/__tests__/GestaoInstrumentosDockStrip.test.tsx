@@ -48,7 +48,7 @@ describe('GestaoInstrumentosDockStrip — faixa dos cartões encolhidos', () => 
         onToggleGaveta={() => {}}
       />
     );
-    expect(html).toContain('Visão Geral · Ana');
+    expect(html).toContain('Início · Ana');
     expect(html).toMatch(/aria-expanded="true"[^>]*instrumentos-dock-gaveta-situacao/);
     expect(html).toMatch(/aria-expanded="false"[^>]*instrumentos-dock-gaveta-distribuicao/);
   });

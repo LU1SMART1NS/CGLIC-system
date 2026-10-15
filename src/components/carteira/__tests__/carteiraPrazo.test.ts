@@ -3,7 +3,7 @@ import { classifyPrazo, comparePrazo, matchesStatusFilter } from '../carteiraPra
 import { buildAtaSaldoStats } from '../../atas/ataSaldoStats';
 
 describe('carteiraPrazo — faixas únicas (crítico ≤30, atenção 31–90)', () => {
-  it('classifica pelas faixas da Visão Geral', () => {
+  it('classifica pelas faixas do Início', () => {
     expect(classifyPrazo(-1)).toBe('EXPIRADO');
     expect(classifyPrazo(0)).toBe('CRITICO');
     expect(classifyPrazo(30)).toBe('CRITICO');

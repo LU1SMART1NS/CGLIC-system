@@ -21,7 +21,7 @@ export interface FontesDoMenu {
 export function pendenciasDoMenu({ empenhos, financeiro, extras }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
   const r: Record<string, PendenciaDaArea | undefined> = {};
 
-  // Visão Geral (coordenador): as filas da Central de Distribuição.
+  // Início (coordenador): as filas da Central de Distribuição.
   const atas = extras.atasSemGestor ?? 0;
   const diverg = extras.gestorDiferente ?? 0;
   if (atas + diverg > 0) r['visao-geral'] = { contagem: atas + diverg, destino: atas > 0 ? '/atas/distribuicao' : '/atas/distribuicao?aba=DIVERGENCIAS' };
@@ -29,7 +29,7 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras }: FontesDoMenu)
   // Alocação: itens sem alocação ou alocados em parte.
   if ((extras.itensAAlocar ?? 0) > 0) r.alocacao = { contagem: extras.itensAAlocar!, destino: ROTA_ALOCACAO };
 
-  // Vinculação: abre na primeira fila com pendência, na ordem das abas.
+  // Vínculos: abre na primeira fila com pendência, na ordem das abas.
   const contratos = extras.contratosAta ?? 0;
   const aoContrato = empenhos?.aoContrato ?? 0;
   const aosItens = empenhos?.aosItens ?? 0;

@@ -15,7 +15,7 @@ export interface PainelBotaoGaveta {
 }
 
 /**
- * Botões das áreas da Visão Geral: cada um diz como está a área e abre a gaveta com o detalhe, uma por vez. Ficam
+ * Botões das áreas do Início: cada um diz como está a área e abre a gaveta com o detalhe, uma por vez. Ficam
  * logo abaixo dos cartões e encolhem com eles; a faixa azul repete os botões.
  */
 export const PainelBotoesGavetas: React.FC<{

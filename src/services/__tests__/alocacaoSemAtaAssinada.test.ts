@@ -46,7 +46,7 @@ describe('regras da ata assinada no item', () => {
   });
 });
 
-describe('Visão Geral — alocado acima do limite', () => {
+describe('Início — alocado acima do limite', () => {
   const avisos = (arpItems: any[]) =>
     calculateAttentionSummary({ arpItems, currentDate: new Date('2026-10-13T12:00:00') } as any).items.filter((i) => i.category === 'QUANTITATIVOS');
 
@@ -77,7 +77,7 @@ describe('Visão Geral — alocado acima do limite', () => {
   });
 });
 
-describe('Visão Geral — informar qtd. da ata assinada', () => {
+describe('Início — informar qtd. da ata assinada', () => {
   const pendencias = (arpItems: any[]) =>
     calculateAttentionSummary({ arpItems, currentDate: new Date('2026-10-13T12:00:00') } as any).items.filter((i) => i.category === 'ATA_ASSINADA');
 

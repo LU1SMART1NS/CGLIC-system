@@ -260,7 +260,7 @@ describe('fila de ações da Ata 360 — pendência de fornecedor', () => {
   });
 });
 
-describe('Visão Geral — pendência de fornecedor', () => {
+describe('Início — pendência de fornecedor', () => {
   it('só a ata em tela entra, pendente em atenção e divergente em urgente, com destino na aba Ações', () => {
     const outra = registro({ numeroControlePncp: CTRL_42, numeroAta: '00042/2026' });
     const resumo = calculateAttentionSummary({

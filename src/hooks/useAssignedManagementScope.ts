@@ -27,7 +27,7 @@ export interface AssignedManagementScope {
  */
 export function useAssignedManagementScope(
   uasg?: string,
-  /** Coordenador e consulta: carteira de um gestor escolhido no filtro da Visão Geral (o perfil "gestor" ignora). */
+  /** Coordenador e consulta: carteira de um gestor escolhido no filtro do Início (o perfil "gestor" ignora). */
   opts: { gestorUserId?: string } = {}
 ): AssignedManagementScope {
   const { user, role } = useAuth();

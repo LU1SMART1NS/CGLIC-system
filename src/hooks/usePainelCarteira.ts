@@ -16,7 +16,7 @@ import { useAllAtaManagers, useArpItemContractLinks } from './useAtaManagers';
 /**
  * Atas e contratos das duas UASGs já classificados pela faixa de prazo das carteiras, mais os gestores e a carteira de
  * cada um. Lê as mesmas consultas (e o mesmo cache) das carteiras de Atas e Contratos; só consulta quando `enabled`,
- * isto é, quando uma gaveta da Visão Geral que precisa disso está aberta.
+ * isto é, quando uma gaveta do Início que precisa disso está aberta.
  */
 export function usePainelCarteira(enabled: boolean) {
   const atasQ = useQueries({ queries: UASGS_CGLIC.map((u) => ({ ...getAtaSourceQueryOptions(u), enabled })) });

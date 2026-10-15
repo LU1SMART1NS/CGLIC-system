@@ -12,7 +12,7 @@ import { contarItensAAlocar, definirContagemExtra } from './contagemExtras';
 import { carregarCarteiraParaOMenu, ESPERA_CARGA_DO_MENU_MS } from './cargaDaCarteiraDoMenu';
 
 /**
- * Calcula os contratos sem ata (os mesmos da fila da Vinculação) e, para o coordenador, as filas da Central de
+ * Calcula os contratos sem ata (os mesmos da fila de Vínculos) e, para o coordenador, as filas da Central de
  * Distribuição (atas sem gestor e gestor diferente da ata), e entrega os números ao menu.
  */
 const CalculoDaCarteira: React.FC<{ contaDistribuicao: boolean }> = ({ contaDistribuicao }) => {
@@ -52,7 +52,7 @@ const CalculoItensAAlocar: React.FC = () => {
 
 /**
  * Invisível. Espia o cache para saber se as atas e os contratos já estão no navegador; só então monta os cálculos
- * pesados, que passam a ler o cache. Se o usuário entrou por uma tela que não carrega a carteira (ex.: Visão Geral),
+ * pesados, que passam a ler o cache. Se o usuário entrou por uma tela que não carrega a carteira (ex.: Início),
  * ela é carregada uma vez, em segundo plano, alguns segundos depois de abrir o sistema; daí os números aparecem em
  * qualquer tela.
  */

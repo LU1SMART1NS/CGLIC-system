@@ -26,7 +26,7 @@ describe('originLabel: nome do destino do Voltar', () => {
     expect(originLabel('/atas/distribuicao')).toBe('Distribuição');
     expect(originLabel('/itens')).toBe('Carteira');
     expect(originLabel('/itens?unidade=cglic')).toBe('Carteira');
-    expect(originLabel('/instrumentos')).toBe('Visão Geral');
+    expect(originLabel('/instrumentos')).toBe('Início');
   });
 
   it('nomeia as telas de detalhe de origem', () => {

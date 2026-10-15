@@ -66,7 +66,7 @@ function lembreteLabel(diasRestantes: number, atrasado: boolean): string {
 
 /**
  * Fila única do Contrato 360. Os itens CRÍTICA/URGENTE vêm do mesmo motor da
- * Visão Geral (calculateAttentionSummary) para que as contagens coincidam; os
+ * Início (calculateAttentionSummary) para que as contagens coincidam; os
  * extras locais (tarefas em 8–30 dias e lembretes de planejamento) entram só
  * como ATENCAO/INFO.
  */

@@ -12,7 +12,7 @@ const ITEM = process.env.E2E_ITEM ?? '00001';
 const ata = encodeURIComponent(ATA_KEY);
 
 const ROUTES: Array<{ name: string; url: string }> = [
-  { name: 'Visão Geral', url: '/instrumentos' },
+  { name: 'Início', url: '/instrumentos' },
   { name: 'Carteira de Atas', url: '/atas' },
   { name: 'Itens da carteira', url: '/itens' },
   { name: 'Carteira de Contratos', url: '/contratos' },

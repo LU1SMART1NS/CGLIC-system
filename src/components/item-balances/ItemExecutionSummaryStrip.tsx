@@ -15,7 +15,7 @@ interface ItemExecutionSummaryStripProps {
   summary: ItemExecutionSummary;
   referencia: ComprasGovReferencia;
   loading?: boolean;
-  /** Abre a fila Vinculação › Empenhos aos itens (gestor e coordenador); sem ela, o aviso não tem botão. */
+  /** Abre a filos Vínculos › Empenhos aos itens (gestor e coordenador); sem ela, o aviso não tem botão. */
   onVincularAosItens?: () => void;
 }
 

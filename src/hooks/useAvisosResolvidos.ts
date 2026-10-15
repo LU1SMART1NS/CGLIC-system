@@ -34,7 +34,7 @@ export function useAvisosResolvidos() {
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: AVISOS_RESOLVIDOS_QUERY_KEY });
-    // Os números da Visão Geral (cartões, outras telas) leem os avisos já sem os resolvidos.
+    // Os números do Início (cartões, outras telas) leem os avisos já sem os resolvidos.
     void queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
   };
 

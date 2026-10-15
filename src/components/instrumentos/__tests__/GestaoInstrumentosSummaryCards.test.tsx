@@ -14,7 +14,7 @@ const render = (saldosOnly: boolean) =>
     <GestaoInstrumentosSummaryCards counts={counts} activeCard={null} onSelectCard={() => {}} saldosOnly={saldosOnly} />
   );
 
-describe('GestaoInstrumentosSummaryCards — cards da Visão Geral', () => {
+describe('GestaoInstrumentosSummaryCards — cards do Início', () => {
   it('coordenador vê os 4 cards, com o card de Alertas Críticos', () => {
     const html = render(false);
     for (const id of ['arp', 'contratos', 'valor', 'alertas']) expect(html).toContain(`instrumentos-card-${id}`);

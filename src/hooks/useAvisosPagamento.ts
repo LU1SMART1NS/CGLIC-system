@@ -23,7 +23,7 @@ const paraAviso = (c: PaymentFollowUpCycle): CicloParaAviso => ({
 });
 
 /**
- * Avisos da expectativa de pagamento para a Visão Geral: previsão mensal (só o coordenador envia), nota mensal que
+ * Avisos da expectativa de pagamento para o Início: previsão mensal (só o coordenador envia), nota mensal que
  * não chegou e entrega prevista sem nota. O perfil gestor vê só os contratos da carteira dele.
  */
 export function useAvisosPagamentoGerais(opts: { enabled?: boolean } = {}) {
@@ -82,7 +82,7 @@ export function useAvisosPagamentoDoContrato(contractKey: string, cycles: Paymen
   }, [marcado, vigente, faturas.isSuccess, faturas.data, marcas, entregas, contractKey, cycles]);
 }
 
-/** Aviso como linha da Visão Geral (categoria PAGAMENTO_PREVISTO, aba Pagamentos). A previsão não tem UASG própria. */
+/** Aviso como linha do Início (categoria PAGAMENTO_PREVISTO, aba Pagamentos). A previsão não tem UASG própria. */
 export function avisoComoItemDeAtencao(a: AvisoPagamento, uasgPadrao: string): AttentionItemWithUasg {
   return {
     id: a.id,

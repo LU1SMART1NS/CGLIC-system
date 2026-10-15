@@ -12,12 +12,12 @@ import type { ContractPortfolioRow } from '../components/contracts/portfolio/Con
 import type { DashboardAttentionItem } from '../types/managementDashboard';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
 
-/** UASGs consolidadas — mesmo escopo já usado na Visão Geral (/instrumentos), para que os painéis reportem os mesmos números. */
+/** UASGs consolidadas — mesmo escopo já usado no Início (/instrumentos), para que os painéis reportem os mesmos números. */
 const UASGS = UASGS_CGLIC;
 
 /**
  * Carteira de Contratos das UASGs da CGLIC, no escopo do usuário: contratos enriquecidos com prazo,
- * gestor e pendências (Funil Único de Atenção). Mesmas consultas e parâmetros da Visão Geral, logo
+ * gestor e pendências (Funil Único de Atenção). Mesmas consultas e parâmetros do Início, logo
  * mesmo cache do React Query. Fonte única para a Carteira de Contratos e a Central de Distribuição.
  */
 export function useContractsPortfolio() {

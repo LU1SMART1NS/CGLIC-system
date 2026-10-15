@@ -86,7 +86,7 @@ export interface DistribuicaoLinha {
   relacaoEquipe: 'ACIMA' | 'NA_MEDIA' | 'ABAIXO' | null;
 }
 
-/** Mesma gravidade da Visão Geral: urgentes = crítica ou urgente (tarefa vencida, fatura vencida, saldo crítico…); o resto é acompanhamento. */
+/** Mesma gravidade do Início: urgentes = crítica ou urgente (tarefa vencida, fatura vencida, saldo crítico…); o resto é acompanhamento. */
 export interface Pendencias {
   urgentes: number;
   acompanhar: number;

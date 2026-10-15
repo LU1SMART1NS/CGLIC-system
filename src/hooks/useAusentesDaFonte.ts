@@ -8,7 +8,7 @@ export const AUSENTES_DA_FONTE_QUERY_KEY = ['ausentes-da-fonte'] as const;
 
 /**
  * Notas e faturas que a fonte deixou de listar e têm trabalho da equipe (migration 113): uma consulta pequena,
- * compartilhada pela Visão Geral e pelo Contrato 360, com a decisão do coordenador (has_role('admin')).
+ * compartilhada pelo Início e pelo Contrato 360, com a decisão do coordenador (has_role('admin')).
  */
 export function useAusentesDaFonte() {
   const queryClient = useQueryClient();

@@ -1,4 +1,4 @@
-/** Endereços das páginas do menu Vinculação. */
+/** Endereços das páginas do menu Vínculos. */
 export const ROTAS_VINCULACAO = {
   contratos: '/vinculacao/contratos',
   empenhosItens: '/vinculacao/empenhos-itens',

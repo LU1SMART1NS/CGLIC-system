@@ -19,7 +19,7 @@ interface GestaoInstrumentosDockStripProps {
 }
 
 /**
- * Faixa azul da Visão Geral com os cartões encolhidos (mesmo bloco das telas 360): o nome leva de volta ao
+ * Faixa azul do Início com os cartões encolhidos (mesmo bloco das telas 360): o nome leva de volta ao
  * topo e os números em miniatura filtram a lista como os cartões. Só aparece com o bloco encolhido.
  */
 export const GestaoInstrumentosDockStrip: React.FC<GestaoInstrumentosDockStripProps> = ({
@@ -49,8 +49,8 @@ export const GestaoInstrumentosDockStrip: React.FC<GestaoInstrumentosDockStripPr
     <div className="vg-strip" aria-hidden={!min} data-testid="instrumentos-dock-strip">
       <div className="vg-strip-in">
         <div className="vg-strip-row">
-          <button type="button" className="vg-strip-title" onClick={scrollToSummary} tabIndex={tab} aria-label="Visão Geral: voltar ao resumo completo">
-            Visão Geral{gestorNome ? ` · ${gestorNome}` : ''}
+          <button type="button" className="vg-strip-title" onClick={scrollToSummary} tabIndex={tab} aria-label="Início: voltar ao resumo completo">
+            Início{gestorNome ? ` · ${gestorNome}` : ''}
           </button>
           <div className="vg-chips">
             {chips.map((c) => (
