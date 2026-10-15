@@ -29,6 +29,8 @@ import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { AvisoCarregando } from '../../design-system';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
+import { GtiCelulaAta } from '../gti/GtiVisual';
+import { chaveAtaGti, type FatiasDaAta } from '../../config/gruposGti';
 import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
 import { ataEhNova } from '../carteira/carteiraNovidade';
 
@@ -41,6 +43,8 @@ interface ArpPortfolioListProps {
   saldoStatsByAta?: Record<string, AtaSaldoStats>;
   /** Alocação, empenho e unidades de cada ata (chave "{numeroAta}-{uasg}"), somados dos itens. */
   execucaoPorAta?: Map<string, CarteiraAtaExecucao>;
+  /** Fatia de cada GTI do ComprasSUSP por ata (chave "{numeroAta}-{uasg}", migration 139). */
+  fatiasGti?: Map<string, FatiasDaAta>;
   /** Unidades internas (para exibir o nome da unidade filtrada). */
   unidades?: Array<{ chave: string; nome: string }>;
   /** Filtros ativos: alocação, empenho e unidade ganham uma coluna quando filtrados. */
@@ -88,6 +92,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   itemsLoadingByAta = {},
   saldoStatsByAta = {},
   execucaoPorAta,
+  fatiasGti,
   unidades = [],
   filters,
   gestorByAta = {},
@@ -129,7 +134,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   const colEmpenho = filters != null && filters.filtroEmpenho !== 'TODOS';
   const colUnidade = filters != null && filters.unidade !== TODAS_UNIDADES;
   const colAtaAssinada = filters != null && filters.ataAssinada !== 'TODOS';
-  const totalColunas = 6 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade) + Number(colAtaAssinada);
+  const totalColunas = 7 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade) + Number(colAtaAssinada);
 
   if (isLoading && totalAtas === 0) {
     return (
@@ -172,6 +177,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               <CarteiraSortHeader label="Vigência" sortKey="vigencia" {...sortProps} />
               <CarteiraSortHeader label="Itens" sortKey="itens" {...sortProps} />
               <CarteiraSortHeader label="Maior consumo" sortKey="consumo" {...sortProps} />
+              <th style={carteiraTh} title="Interesse principal e fatia de cada Grupo de Trabalho Integrado na quantidade registrada dos participantes">GTI</th>
               {colAlocacao && <th style={carteiraTh}>Alocação interna</th>}
               {colEmpenho && <th style={carteiraTh}>Empenho</th>}
               {colAtaAssinada && <th style={carteiraTh}>Qtd. assinada</th>}
@@ -275,6 +281,20 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     </td>
                     <td data-label="Maior consumo" style={carteiraTd}>
                       <SaldoBar pct={stats?.maxPct ?? null} />
+                    </td>
+                    <td data-label="GTI" style={carteiraTd}>
+                      {(() => {
+                        const fatias = fatiasGti?.get(chaveAtaGti(numeroAta, arp.codigoUnidadeGerenciadora));
+                        const principal = fatias?.principal?.grupo;
+                        return (
+                          <CarteiraCellFilter
+                            descricao="este GTI"
+                            onFilter={onFilter && principal ? () => onFilter('gti', principal) : undefined}
+                          >
+                            <GtiCelulaAta fatias={fatias} testId={`arp-gti-${numeroAta}`} />
+                          </CarteiraCellFilter>
+                        );
+                      })()}
                     </td>
                     {colAlocacao && (
                       <td data-label="Alocação interna" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>

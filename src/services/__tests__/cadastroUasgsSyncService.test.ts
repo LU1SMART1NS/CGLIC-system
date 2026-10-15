@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { lerUasgNoCadastro, localDaUasg, normalizarNomeDoCadastro } from '../cadastroUasgsSyncService';
+import { completarComOrgao, lerOrgaoNoCadastro, lerUasgNoCadastro, localDaUasg, normalizarNomeDoCadastro } from '../cadastroUasgsSyncService';
 
 const resposta = (resultado: unknown[], ok = true, status = 200) =>
   ({ ok, status, json: async () => ({ resultado }) }) as unknown as Response;
@@ -60,5 +60,56 @@ describe('cadastro de UASGs', () => {
     const fetcher = vi.fn(async () => resposta([], false, 404));
     await expect(lerUasgNoCadastro('462492', fetcher as unknown as typeof fetch, async () => {})).rejects.toThrow('404');
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('órgão da UASG (migration 139)', () => {
+  const uasgEs = { codigo_uasg: '927117', nome: 'EES-CORPO DE BOMB MILITAR EST. ESPÍRITO SANTO', sigla_uf: 'ES', codigo_orgao: 85633 };
+  const orgaoEs = { codigoOrgao: 85633, nomeMnemonicoOrgao: 'CBMES/ES', esfera: 'E' };
+
+  it('a UASG traz o código do órgão quando o cadastro tem', async () => {
+    const fetcher = vi.fn(async () => resposta([{ codigoUasg: '927117', nomeUasg: 'EES-CORPO DE BOMB', codigoOrgao: 85633, statusUasg: true }]));
+    expect((await lerUasgNoCadastro('927117', fetcher as unknown as typeof fetch)).codigo_orgao).toBe(85633);
+  });
+
+  it('lê sigla e esfera do órgão (caso real de 15/10/2026)', async () => {
+    const fetcher = vi.fn(async () => resposta([orgaoEs]));
+    expect(await lerOrgaoNoCadastro(85633, fetcher as unknown as typeof fetch)).toEqual({ sigla: 'CBMES/ES', esfera: 'E' });
+    expect(fetcher).toHaveBeenCalledWith('/api-arp/modulo-uasg/2_consultarOrgao?pagina=1&codigoOrgao=85633&statusOrgao=true');
+  });
+
+  it('órgão que não aparece nem entre os inativos: null', async () => {
+    const fetcher = vi.fn(async () => resposta([]));
+    expect(await lerOrgaoNoCadastro(1, fetcher as unknown as typeof fetch)).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('completa a UASG e lê cada órgão uma vez por execução', async () => {
+    const fetcher = vi.fn(async () => resposta([orgaoEs]));
+    const cache = new Map();
+    const esperar = async () => {};
+    const a = await completarComOrgao(uasgEs, cache, fetcher as unknown as typeof fetch, esperar);
+    const b = await completarComOrgao({ ...uasgEs, codigo_uasg: '999999' }, cache, fetcher as unknown as typeof fetch, esperar);
+    expect(a).toMatchObject({ codigo_orgao: 85633, sigla_orgao: 'CBMES/ES', esfera_orgao: 'E' });
+    expect(b.sigla_orgao).toBe('CBMES/ES');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('UASG achada sem órgão na fonte: marca o órgão como lido (null)', async () => {
+    const fetcher = vi.fn();
+    const r = await completarComOrgao({ codigo_uasg: '123456', nome: 'X' }, new Map(), fetcher as unknown as typeof fetch, async () => {});
+    expect(r).toEqual({ codigo_uasg: '123456', nome: 'X', codigo_orgao: null, sigla_orgao: null, esfera_orgao: null });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('UASG não achada fica como está', async () => {
+    expect(await completarComOrgao({ codigo_uasg: '123456' }, new Map(), vi.fn() as unknown as typeof fetch)).toEqual({ codigo_uasg: '123456' });
+  });
+
+  it('falha ao ler o órgão: grava a UASG sem a chave do órgão (volta para a fila)', async () => {
+    const fetcher = vi.fn(async () => resposta([], false, 503));
+    const r = await completarComOrgao(uasgEs, new Map(), fetcher as unknown as typeof fetch, async () => {});
+    expect(r.nome).toBe(uasgEs.nome);
+    expect('codigo_orgao' in r).toBe(false);
   });
 });
