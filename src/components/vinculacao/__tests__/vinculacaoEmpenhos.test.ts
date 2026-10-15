@@ -4,6 +4,8 @@ import { linhaForaDoContrato } from '../../../services/empenhosForaDoContratoSer
 import {
   aguardaVinculoAosItens,
   conferenciaDaNota,
+  tipoSugerido,
+  trocaSugeridaPelaOb,
   contaNoMenu,
   deixadaComoEsta,
   passaVigencia,
@@ -95,6 +97,44 @@ describe('conferência de Empenhos ao contrato', () => {
     expect(c.frase).toMatch(/^O Contratos.gov.br tem dois registros da nota 2025NE000215\. Este contrato tem um, com valor R\$\s?0,00\./);
     expect(c.fazer[0]).toEqual({ se: 'Na fatura 900:', faca: 'troque a nota pelo registro que está neste contrato.' });
     expect(c.dados[0]).toMatch(/^No contrato: 2025ne000215 · UG 200331/);
+  });
+
+  it('a OB pagou outra nota deste contrato: manda trocar o número na fatura e marca o tipo certo (fatura 7216218, 15/10/2026)', () => {
+    const l = linha({
+      contract_key: '200331-00088-2013', fatura_numero: '7216218', numero_empenho: '2024NE000027', veredito: 'EM_OUTRO_CONTRATO',
+      outros_contratos: ['200331-00004-2017'], outras_notas_da_fatura: [{ numero_empenho: '2024NE000565', no_contrato: true }]
+    });
+    const pagamento = {
+      obs: [{ numero: '2024OB073730', emissao: '2024-08-21', valor: 2333.27, notas: ['2024NE000566', '2024NE000565'] }],
+      notasDoContrato: ['2024NE000565', '2024NE000566', '2024NE000395']
+    };
+    const c = conferenciaDaNota(l, { numero: '00088/2013' }, pagamento);
+    expect(c.fazer[0]).toEqual({
+      se: 'A OB pagou esta fatura com 2024NE000566, que está neste contrato:',
+      faca: 'na fatura 7216218, troque a 2024NE000027 por ela.'
+    });
+    expect(c.fazer).toHaveLength(3);
+    expect(c.dados.at(-1)).toBe('A OB 2024OB073730 (21/08/2024) pagou esta fatura com 2024NE000566 e 2024NE000565.');
+    expect(trocaSugeridaPelaOb(l, pagamento)).toEqual(['2024NE000566']);
+    expect(tipoSugerido(l, pagamento)).toBe('CORRIGIR_NUMERO_NA_FATURA');
+    expect(tipoSugerido(l, null)).toBe('MUDAR_FATURA_DE_CONTRATO');
+  });
+
+  it('a OB pagou a nota citada: só diz isso; a citação está certa e não há troca (00033/2023)', () => {
+    const l = linha({ numero_empenho: '2023NE000180', veredito: 'EM_OUTRO_CONTRATO', outros_contratos: ['200331-00054-2023'] });
+    const pagamento = { obs: [{ numero: '2024OB000159', emissao: null, valor: 120135.4, notas: ['2023NE000180'] }], notasDoContrato: ['2023NE000051'] };
+    const c = conferenciaDaNota(l, { numero: '00033/2023' }, pagamento);
+    expect(trocaSugeridaPelaOb(l, pagamento)).toEqual([]);
+    expect(c.fazer).toHaveLength(2);
+    expect(c.dados.at(-1)).toBe('A OB 2024OB000159 pagou esta fatura com 2023NE000180, e a nota citada está entre elas.');
+  });
+
+  it('sem OB confirmada ou nota em dobro: nada muda no texto', () => {
+    const l = linha({ veredito: 'EM_OUTRO_CONTRATO', outros_contratos: ['200331-00024-2018'] });
+    expect(conferenciaDaNota(l, caesb, null)).toEqual(conferenciaDaNota(l, caesb));
+    const dobro = linha({ veredito: 'NOTA_EM_DOBRO' });
+    const pagamento = { obs: [{ numero: '2024OB000001', emissao: null, valor: 1, notas: ['2024NE000999'] }], notasDoContrato: ['2024NE000999'] };
+    expect(trocaSugeridaPelaOb(dobro, pagamento)).toEqual([]);
   });
 
   it('fora dos contratos: incluir no contrato ou corrigir o número; sem dados da nota, só a fatura', () => {
