@@ -1,12 +1,14 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { ArrowLeftRight, UserPlus } from 'lucide-react';
 import { CarteiraPrazoPill } from '../../carteira/CarteiraPrazoPill';
+import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { AppButton } from '../../../design-system/components/AppButton';
 import { buildAtaPath } from '../../../hooks/useAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
-import type { DistribuicaoItem, DistribuicaoLinha } from './distribuicaoEquipe';
+import { ordenarItensPorNumero, type DistribuicaoItem, type DistribuicaoLinha } from './distribuicaoEquipe';
 import { ROTULO_COMPLEXIDADE, type Complexidade, type NivelComplexidade } from './complexidade';
 import { AjusteComplexidadePanel } from './AjusteComplexidadePanel';
 import type { ContratoAVincular } from './contratosSemAta';
@@ -20,6 +22,15 @@ const ETIQUETA_COMPLEXIDADE: Record<NivelComplexidade, { color: string; bg: stri
 
 const PAGE_SIZE = 10;
 const MORE_SIZE = 20;
+
+/** Ordem da lista guardada na URL (?ordemItens=numero:asc); sem o parâmetro vale o prazo, a ordem que a tela já dá. */
+const PARAM_ORDEM = 'ordemItens';
+type OrdemItens = 'PRAZO' | 'NUMERO_ASC' | 'NUMERO_DESC';
+function lerOrdem(raw: string | null): OrdemItens {
+  if (raw === 'numero:asc') return 'NUMERO_ASC';
+  if (raw === 'numero:desc') return 'NUMERO_DESC';
+  return 'PRAZO';
+}
 
 const itemId = (item: DistribuicaoItem) => `${item.tipo}:${item.chave}`;
 const toTarget = (item: DistribuicaoItem): ManagerTarget =>
@@ -52,7 +63,7 @@ function tituloComplexidade(c: Complexidade): string {
 }
 
 /**
- * Atas e contratos vigentes de um gestor, atas primeiro, depois contratos, cada grupo pelo prazo. Marcar itens e transferir
+ * Atas e contratos vigentes de um gestor, atas primeiro, depois contratos, cada grupo pelo prazo (ou pelo número/ano). Marcar itens e transferir
  * só eles (o gestor da ata se propaga aos contratos vinculados, como nas carteiras).
  */
 export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, canAssign, onTransfer, canAjustar = false, aVincular = [] }) => {
@@ -61,8 +72,26 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [ajustando, setAjustando] = React.useState<{ item: DistribuicaoItem; anchor: DOMRect } | null>(null);
   const isSemGestor = linha.gestorNome === null;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ordem = lerOrdem(searchParams.get(PARAM_ORDEM));
 
-  const shown = linha.itens.slice(0, visible);
+  const itens = React.useMemo(
+    () => (ordem === 'PRAZO' ? linha.itens : ordenarItensPorNumero(linha.itens, ordem === 'NUMERO_ASC' ? 'asc' : 'desc')),
+    [linha.itens, ordem]
+  );
+  const shown = itens.slice(0, visible);
+
+  // Prazo = ordem padrão (tira o parâmetro); Número: o primeiro clique ordena do mais antigo, o seguinte inverte.
+  const escolherOrdem = (alvo: 'PRAZO' | 'NUMERO') =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (alvo === 'PRAZO') next.delete(PARAM_ORDEM);
+        else next.set(PARAM_ORDEM, ordem === 'NUMERO_ASC' ? 'numero:desc' : 'numero:asc');
+        return next;
+      },
+      { replace: true }
+    );
   const allShownSelected = shown.length > 0 && shown.every((i) => selected.has(itemId(i)));
 
   const toggle = (item: DistribuicaoItem) =>
@@ -84,7 +113,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
     });
 
   const transferSelected = () => {
-    const targets = linha.itens.filter((i) => selected.has(itemId(i))).map(toTarget);
+    const targets = itens.filter((i) => selected.has(itemId(i))).map(toTarget);
     onTransfer(targets, () => setSelected(new Set()));
   };
 
@@ -108,6 +137,28 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
         ) : (
           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>Atas primeiro, depois contratos</span>
         )}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginRight: 'auto' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Ordenar por</span>
+          <CarteiraSegmentTabs
+            testIdPrefix="distribuicao-ordem"
+            ariaLabel="Ordenar por"
+            active={ordem === 'PRAZO' ? 'PRAZO' : 'NUMERO'}
+            onSelect={escolherOrdem}
+            segments={[
+              { id: 'PRAZO', label: 'Prazo', title: 'Atas primeiro, depois contratos; o que vence antes no topo' },
+              {
+                id: 'NUMERO',
+                label: ordem === 'NUMERO_ASC' ? 'Número ↑' : ordem === 'NUMERO_DESC' ? 'Número ↓' : 'Número',
+                title:
+                  ordem === 'NUMERO_ASC'
+                    ? 'Do mais antigo para o mais novo (ano e número). Clique para inverter.'
+                    : ordem === 'NUMERO_DESC'
+                      ? 'Do mais novo para o mais antigo (ano e número). Clique para inverter.'
+                      : 'Atas primeiro, depois contratos; cada grupo pelo ano e pelo número'
+              }
+            ]}
+          />
+        </div>
         {canAssign && selected.size > 0 && (
           <AppButton
             type="button"
@@ -219,10 +270,10 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
       </ul>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.78rem', color: '#64748b' }}>
-        <span>Mostrando {shown.length} de {linha.itens.length}</span>
-        {shown.length < linha.itens.length && (
+        <span>Mostrando {shown.length} de {itens.length}</span>
+        {shown.length < itens.length && (
           <AppButton type="button" variant="outline" size="sm" onClick={() => setVisible((v) => v + MORE_SIZE)} data-testid="distribuicao-mostrar-mais">
-            Mostrar mais {Math.min(MORE_SIZE, linha.itens.length - shown.length)}
+            Mostrar mais {Math.min(MORE_SIZE, itens.length - shown.length)}
           </AppButton>
         )}
       </div>
