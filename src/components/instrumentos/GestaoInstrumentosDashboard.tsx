@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { useSearchParams } from 'react-router-dom';
 import { useManagementDashboard } from '../../hooks/useManagementDashboard';
@@ -24,6 +24,19 @@ import { Instrument360DockProvider } from '../instrument360/Instrument360DockPro
 import { Instrument360Head } from '../instrument360/Instrument360Head';
 import { scrollToDock } from '../instrument360/instrument360Dock';
 import { GestaoInstrumentosDockStrip } from './GestaoInstrumentosDockStrip';
+import { useAllAtaManagers } from '../../hooks/useAtaManagers';
+import { usePainelCarteira } from '../../hooks/usePainelCarteira';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
+import { useContagensExtras } from '../vinculacao/contagemExtras';
+import { listarGestores } from '../../utils/escopoDoGestor';
+import { EmptyState } from '../../design-system/components/EmptyState';
+import { PainelFiltros, TODAS_UASGS, TODOS_OS_GESTORES } from './PainelFiltros';
+import { PainelBotoesGavetas, PainelGaveta, type PainelBotaoGaveta, type PainelGavetaId } from './PainelGavetas';
+import { GavetaSituacao } from './GavetaSituacao';
+import { GavetaDistribuicao } from './GavetaDistribuicao';
+import { GavetaAlocacao } from './GavetaAlocacao';
+import { contarFaixas, criticasPorInstrumento, resumoPorGestor, type InstrumentoNoPainel } from './painelResumo';
+import { formatNumber } from '../../utils/format';
 
 type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 
@@ -52,22 +65,50 @@ function matchesTab(item: AttentionItemWithUasg, tab: GestaoInstrumentosCategory
  * apenas leitura, agregação em memória e formatação do que o dashboardService já calcula.
  */
 export const GestaoInstrumentosDashboard: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const initialSeverity = searchParams.get('severity');
-  const isValidSeverity = (value: string | null): value is GestaoInstrumentosCompactFiltersState['severidade'] =>
-    // "Info" saiu do filtro: são os lembretes, que já têm a categoria própria no trilho.
-    !!value && ['CRITICA', 'URGENTE', 'ATENCAO'].includes(value);
-
-  const [activeTab, setActiveTab] = useState<GestaoInstrumentosCategoryTab>('TODAS');
-  const [severidade, setSeveridade] = useState<GestaoInstrumentosCompactFiltersState['severidade']>(
-    isValidSeverity(initialSeverity) ? initialSeverity : 'TODAS'
-  );
+  // Aba, severidade, gaveta aberta, UASG e gestor ficam no endereço: o link leva o painel como estava e o "Voltar"
+  // de um detalhe devolve a mesma visão.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mudarEndereco = useCallback((mudancas: Record<string, string | null>) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [k, v] of Object.entries(mudancas)) {
+        if (v) next.set(k, v);
+        else next.delete(k);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const severidadeUrl = searchParams.get('severity');
+  // "Info" saiu do filtro: são os lembretes, que já têm a categoria própria no trilho.
+  const severidade: GestaoInstrumentosCompactFiltersState['severidade'] =
+    severidadeUrl === 'CRITICA' || severidadeUrl === 'URGENTE' || severidadeUrl === 'ATENCAO' ? severidadeUrl : 'TODAS';
+  const abaUrl = searchParams.get('aba') as GestaoInstrumentosCategoryTab | null;
+  const activeTab: GestaoInstrumentosCategoryTab = abaUrl && abaUrl in TAB_CATEGORY_MAP ? abaUrl : 'TODAS';
+  const uasgUrl = searchParams.get('uasg');
+  const uasgFiltro = uasgUrl && (UASGS as readonly string[]).includes(uasgUrl) ? uasgUrl : TODAS_UASGS;
+  const uasgsAtivas = useMemo(() => (uasgFiltro ? [uasgFiltro] : [...UASGS]), [uasgFiltro]);
   const [busca, setBusca] = useState('');
   /** Acionado apenas pelos cards de resumo (ex.: "Contratos Vigentes" deve mostrar só Contratos, não ARPs). */
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('TODOS');
 
   const managers200330 = useAllContractManagers(UASGS[0]);
   const managers200331 = useAllContractManagers(UASGS[1]);
+  const { data: ataManagers, isLoading: ataManagersLoading } = useAllAtaManagers();
+
+  const { role } = useAuth();
+  const saldosOnly = role === 'gestor_saldos';
+  const semQuantitativos = role === 'gestor';
+  const ehGestor = role === 'gestor';
+  // Coordenador e consulta escolhem um gestor: o painel inteiro passa a ser a carteira dele, com o mesmo recorte
+  // que ele vê no próprio painel (useAssignedManagementScope / escopoDoGestor).
+  const podeFiltrarGestor = role === 'admin' || role === 'leitor';
+  const gestores = useMemo(
+    () => listarGestores([...Object.values(managers200330.data || {}), ...Object.values(managers200331.data || {})], Object.values(ataManagers || {})),
+    [managers200330.data, managers200331.data, ataManagers]
+  );
+  const gestorNome = podeFiltrarGestor ? searchParams.get('gestor') || TODOS_OS_GESTORES : TODOS_OS_GESTORES;
+  const gestorEscolhido = gestorNome ? gestores.find((g) => g.nome === gestorNome) : undefined;
+  const gestoresCarregando = Boolean(gestorNome) && (managers200330.isLoading || managers200331.isLoading || ataManagersLoading);
 
   // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
   // migration 20260925000023), agora derivado também das Atas atribuídas
@@ -76,24 +117,29 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // mesmo princípio já aplicado em ContractsRoute.tsx (aba "Acompanhamento
   // e Prazos"), agora estendido a todos os blocos agregados (financeiro,
   // ARP, pagamentos, atenção) via buildManagementDashboardReadModel.
-  const scope200330 = useAssignedManagementScope(UASGS[0]);
-  const scope200331 = useAssignedManagementScope(UASGS[1]);
+  const scope200330 = useAssignedManagementScope(UASGS[0], { gestorUserId: gestorEscolhido?.userId });
+  const scope200331 = useAssignedManagementScope(UASGS[1], { gestorUserId: gestorEscolhido?.userId });
+  const scopeLoading = scope200330.isLoading || scope200331.isLoading || gestoresCarregando;
 
   // Só consulta depois do escopo do gestor: a chave inclui o escopo, e consultar antes carregava tudo duas vezes.
   const dash200330 = useManagementDashboard(
     { uasg: UASGS[0], assignedContractKeys: scope200330.contractKeys, assignedAtaKeys: scope200330.ataKeys },
-    { enabled: !scope200330.isLoading }
+    { enabled: !scopeLoading }
   );
   const dash200331 = useManagementDashboard(
     { uasg: UASGS[1], assignedContractKeys: scope200331.contractKeys, assignedAtaKeys: scope200331.ataKeys },
-    { enabled: !scope200331.isLoading }
+    { enabled: !scopeLoading }
   );
-  const dashboards = [dash200330, dash200331];
+  const dashboards = useMemo(
+    () => [dash200330, dash200331].filter((_, i) => uasgsAtivas.includes(UASGS[i])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dash200330.readModel, dash200331.readModel, dash200330.isLoading, dash200331.isLoading, dash200330.isFetching, dash200331.isFetching, dash200330.isError, dash200331.isError, uasgsAtivas]
+  );
 
   // Aguarda também os gestores carregarem antes de liberar a tela: evita
   // que o perfil "gestor" veja, por um instante, os agregados sem nenhum
   // recorte de escopo (assignedContractKeys ainda vazio por falta de dado).
-  const isLoading = dashboards.some((d) => d.isLoading) || scope200330.isLoading || scope200331.isLoading;
+  const isLoading = dashboards.some((d) => d.isLoading) || scopeLoading;
   const isFetching = dashboards.some((d) => d.isFetching);
   const hasAnyReadModel = dashboards.some((d) => d.readModel);
   const isError = dashboards.some((d) => d.isError) && !hasAnyReadModel;
@@ -114,9 +160,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // conferir (cota própria, migration 109), que são pendência dele. O gestor da ata vê o saldo crítico, mas não os
   // quantitativos: quem os resolve é o gestor de saldo (o coordenador vê tudo). A qtd. da ata assinada a informar
   // (migration 116) é o contrário: quem informa é o gestor da ata, e o gestor de saldo não a vê.
-  const { role } = useAuth();
-  const saldosOnly = role === 'gestor_saldos';
-  const semQuantitativos = role === 'gestor';
   // Expectativa de pagamento (Portaria 50): avisos calculados na tela a partir das marcas dos contratos.
   const { avisos: avisosPagamento } = useAvisosPagamentoGerais({ enabled: !saldosOnly });
 
@@ -128,7 +171,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const { allItems, itensResolvidos } = useMemo(() => {
     const ativos: AttentionItemWithUasg[] = [];
     const resolvidos: AttentionItemWithUasg[] = [];
-    for (const uasg of UASGS) {
+    for (const uasg of uasgsAtivas) {
       const dash = uasg === UASGS[0] ? dash200330 : dash200331;
       const attention = dash.readModel?.attention;
       for (const item of [...(attention?.items || []), ...(attention?.resolvidos || [])]) {
@@ -138,10 +181,18 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         (item.avisoChave && avisosResolvidos.has(item.avisoChave) ? resolvidos : ativos).push({ ...item, uasg });
       }
     }
-    for (const a of avisosPagamento) ativos.push(avisoComoItemDeAtencao(a, UASGS[0]));
+    // Avisos de pagamento são calculados para a carteira inteira do perfil: com UASG ou gestor escolhido, ficam só os
+    // dos contratos que estão no painel.
+    const contratosDoGestor = gestorEscolhido ? new Set([...(scope200330.contractKeys || []), ...(scope200331.contractKeys || [])]) : null;
+    for (const a of avisosPagamento) {
+      const item = avisoComoItemDeAtencao(a, UASGS[0]);
+      if (!uasgsAtivas.includes(item.uasg)) continue;
+      if (contratosDoGestor && !(item.contractKey && contratosDoGestor.has(item.contractKey))) continue;
+      ativos.push(item);
+    }
     return { allItems: ativos, itensResolvidos: resolvidos };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, saldosOnly, semQuantitativos, avisosPagamento, avisosResolvidos, tarefasConcluidas]);
+  }, [dash200330.readModel, dash200331.readModel, uasgsAtivas, gestorEscolhido, scope200330.contractKeys, scope200331.contractKeys, saldosOnly, semQuantitativos, avisosPagamento, avisosResolvidos, tarefasConcluidas]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -205,7 +256,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       atencaoCount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, allItems, saldosOnly]);
+  }, [dashboards, allItems, saldosOnly]);
 
   const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
     if (activeTab === 'SALDOS') return 'ARP';
@@ -216,28 +267,26 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   const handleSelectCard = useCallback((card: GestaoInstrumentosCardId) => {
     if (card === 'ARP') {
-      setActiveTab((prev) => (prev === 'SALDOS' ? 'TODAS' : 'SALDOS'));
+      mudarEndereco({ aba: activeTab === 'SALDOS' ? null : 'SALDOS' });
       setTipoFilter('TODOS');
     } else if (card === 'CONTRATOS') {
       const isActive = tipoFilter === 'CONTRATO';
-      setActiveTab('TODAS');
+      mudarEndereco({ aba: null });
       setTipoFilter(isActive ? 'TODOS' : 'CONTRATO');
     } else if (card === 'ALERTAS') {
-      setSeveridade((prev) => (prev === 'CRITICA' ? 'TODAS' : 'CRITICA'));
-      setActiveTab('TODAS');
+      mudarEndereco({ severity: severidade === 'CRITICA' ? null : 'CRITICA', aba: null });
       setTipoFilter('TODOS');
     } else {
       // VALOR: card de composição da carteira, não é um balde de alerta — apenas limpa os filtros.
-      setActiveTab('TODAS');
-      setSeveridade('TODAS');
+      mudarEndereco({ aba: null, severity: null });
       setTipoFilter('TODOS');
     }
-  }, [activeTab, tipoFilter]);
+  }, [activeTab, tipoFilter, severidade, mudarEndereco]);
 
   const handleSelectTab = useCallback((tab: GestaoInstrumentosCategoryTab) => {
-    setActiveTab(tab);
+    mudarEndereco({ aba: tab === 'TODAS' ? null : tab });
     setTipoFilter('TODOS');
-  }, []);
+  }, [mudarEndereco]);
 
   // Como nas telas 360: clicar num cartão, num número da faixa ou no trilho encolhe os cartões e leva à lista.
   const dockRef = React.useRef<HTMLDivElement>(null);
@@ -278,18 +327,129 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     value: GestaoInstrumentosCompactFiltersState[K]
   ) => {
     if (key === 'severidade') {
-      setSeveridade(value as GestaoInstrumentosCompactFiltersState['severidade']);
+      const sev = value as GestaoInstrumentosCompactFiltersState['severidade'];
+      mudarEndereco({ severity: sev === 'TODAS' ? null : sev });
     } else {
       setBusca(value as string);
     }
-  }, []);
+  }, [mudarEndereco]);
 
   const handleResetFilters = useCallback(() => {
-    setActiveTab('TODAS');
-    setSeveridade('TODAS');
+    mudarEndereco({ aba: null, severity: null });
     setTipoFilter('TODOS');
     setBusca('');
-  }, []);
+  }, [mudarEndereco]);
+
+  // ---- Filtros do painel (UASG e gestor) -------------------------------------------------------------------------
+  const navigate = useNavigateWithOrigin();
+  const escolherUasg = useCallback((u: string) => mudarEndereco({ uasg: u || null }), [mudarEndereco]);
+  const escolherGestor = useCallback((nome: string) => {
+    // Sem gestor escolhido volta a Distribuição; com gestor, a gaveta Distribuição não existe.
+    mudarEndereco({ gestor: nome || null, gaveta: nome && searchParams.get('gaveta') === 'distribuicao' ? null : searchParams.get('gaveta') });
+  }, [mudarEndereco, searchParams]);
+  const limparFiltrosDoPainel = useCallback(() => mudarEndereco({ uasg: null, gestor: null }), [mudarEndereco]);
+
+  // ---- Gavetas: botões com resumo e uma área aberta por vez -------------------------------------------------------
+  const extras = useContagensExtras();
+  const gavetasDisponiveis: PainelGavetaId[] = saldosOnly
+    ? ['situacao', 'alocacao']
+    : podeFiltrarGestor && !gestorNome
+      ? ['situacao', 'distribuicao']
+      : ['situacao'];
+  const gavetaUrl = searchParams.get('gaveta') as PainelGavetaId | null;
+  const gavetaAberta: PainelGavetaId | null = gavetaUrl && gavetasDisponiveis.includes(gavetaUrl) ? gavetaUrl : null;
+  const rolarParaGaveta = useRef(false);
+  const alternarGaveta = useCallback((id: PainelGavetaId) => {
+    const abrir = gavetaAberta !== id;
+    rolarParaGaveta.current = abrir;
+    mudarEndereco({ gaveta: abrir ? id : null });
+  }, [gavetaAberta, mudarEndereco]);
+  // Ao abrir, a gaveta vem para logo abaixo da faixa (como os cartões levam à lista): continua visível ao rolar.
+  useEffect(() => {
+    if (!gavetaAberta || !rolarParaGaveta.current) return;
+    rolarParaGaveta.current = false;
+    scrollToDock(dockRef.current);
+  }, [gavetaAberta]);
+
+  const vencem90Contratos = summaryCounts.contratosEmAtencao60a90d + summaryCounts.contratosAVencer30d;
+  const botoesGavetas: PainelBotaoGaveta[] = gavetasDisponiveis.map((id) => {
+    if (id === 'situacao') {
+      return saldosOnly
+        ? { id, resumo: `${formatNumber(summaryCounts.itensCriticosArp)} itens acima de 80%`, atencao: summaryCounts.itensCriticosArp > 0 }
+        : { id, resumo: `${formatNumber(vencem90Contratos)} ${vencem90Contratos === 1 ? 'contrato vence' : 'contratos vencem'} em 90 dias`, atencao: vencem90Contratos > 0 };
+    }
+    if (id === 'distribuicao') {
+      const sem = extras.atasSemGestor;
+      return sem == null ? { id, resumo: 'por gestor' } : { id, resumo: `${formatNumber(sem)} ${sem === 1 ? 'ata' : 'atas'} sem gestor`, atencao: sem > 0 };
+    }
+    const aAlocar = extras.itensAAlocar;
+    return aAlocar == null ? { id } : { id, resumo: `${formatNumber(aAlocar)} ${aAlocar === 1 ? 'item' : 'itens'} a alocar`, atencao: aAlocar > 0 };
+  });
+
+  // Situação e Distribuição leem as carteiras de atas e contratos (mesmo cache); só com a gaveta aberta.
+  const carteira = usePainelCarteira(gavetaAberta === 'situacao' || gavetaAberta === 'distribuicao');
+  const recorte = useMemo(() => {
+    const doEscopo = scope200330.contractKeys !== undefined || scope200331.contractKeys !== undefined;
+    const contratos = doEscopo ? new Set([...(scope200330.contractKeys || []), ...(scope200331.contractKeys || [])]) : null;
+    const atas = doEscopo ? new Set([...(scope200330.ataKeys || []), ...(scope200331.ataKeys || [])]) : null;
+    const filtrar = (lista: InstrumentoNoPainel[], chaves: Set<string> | null) =>
+      lista.filter((i) => uasgsAtivas.includes(i.uasg) && (!chaves || chaves.has(i.chave)));
+    return { atas: filtrar(carteira.atas, atas), contratos: filtrar(carteira.contratos, contratos) };
+  }, [carteira.atas, carteira.contratos, scope200330.contractKeys, scope200331.contractKeys, scope200330.ataKeys, scope200331.ataKeys, uasgsAtivas]);
+  const consumo = useMemo(() => {
+    const sum = (pick: (rm: NonNullable<ReturnType<typeof useManagementDashboard>['readModel']>) => number) =>
+      dashboards.reduce((acc, d) => acc + (d.readModel ? pick(d.readModel) : 0), 0);
+    return {
+      totalItens: sum((rm) => rm.arp.totalItens),
+      criticos: sum((rm) => rm.arp.itensCriticosCount),
+      emAtencao: sum((rm) => rm.arp.itensProximosLimiteCount ?? 0)
+    };
+  }, [dashboards]);
+  const resumoGestores = useMemo(
+    () => (gavetaAberta === 'distribuicao' ? resumoPorGestor(carteira.gestores, recorte.atas, recorte.contratos, criticasPorInstrumento(allItems)) : []),
+    [gavetaAberta, carteira.gestores, recorte, allItems]
+  );
+
+  const gaveta = gavetaAberta && (
+    <PainelGaveta
+      id={gavetaAberta}
+      onFechar={() => alternarGaveta(gavetaAberta)}
+      subtitulo={
+        gavetaAberta === 'situacao'
+          ? 'Clique numa faixa para abrir os registros.'
+          : gavetaAberta === 'distribuicao'
+            ? 'Vigentes de cada carteira; vencem = em até 90 dias; críticas = pendências críticas. Clique num gestor para ver o painel dele.'
+            : 'Itens com quantitativo SENASP das atas não encerradas, pelo quanto já foi alocado às unidades.'
+      }
+    >
+      {gavetaAberta === 'situacao' && (
+        <GavetaSituacao
+          atas={carteira.isLoading ? null : contarFaixas(recorte.atas)}
+          contratos={saldosOnly ? undefined : carteira.isLoading ? null : contarFaixas(recorte.contratos)}
+          consumo={consumo}
+          gestorNome={gestorNome || undefined}
+          isLoading={carteira.isLoading}
+          onAbrir={navigate}
+        />
+      )}
+      {gavetaAberta === 'distribuicao' && (
+        <GavetaDistribuicao
+          linhas={resumoGestores}
+          isLoading={carteira.isLoading}
+          onEscolherGestor={(nome) => {
+            mudarEndereco({ gestor: nome, gaveta: null });
+            window.scrollTo({ top: 0 });
+          }}
+          onDistribuir={() => navigate('/atas/distribuicao')}
+        />
+      )}
+      {gavetaAberta === 'alocacao' && <GavetaAlocacao onAbrir={navigate} />}
+    </PainelGaveta>
+  );
+
+  // Gestor sem nenhuma ata ou contrato atribuído: em vez de um painel zerado, explica o que falta.
+  const semCarteira =
+    ehGestor && !scopeLoading && (scope200330.contractKeys?.length ?? 0) + (scope200331.contractKeys?.length ?? 0) + (scope200330.ataKeys?.length ?? 0) === 0;
 
   if (isError) {
     return (
@@ -312,8 +472,22 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         lastUpdated={sincronizacao.ultimoSucessoEm ?? dataUpdatedAt}
       />
 
-      {/* Cartões + trilho grudam no alto e encolhem em faixa azul ao rolar (mesmo bloco das telas 360).
-          A lista tem de ser o irmão seguinte do bloco; o espaço perdido ao encolher volta no fim (--i360-lost). */}
+      <PainelFiltros
+        uasg={uasgFiltro}
+        onUasg={escolherUasg}
+        gestor={podeFiltrarGestor ? { valor: gestorNome, nomes: gestores.map((g) => g.nome), onChange: escolherGestor } : undefined}
+        onLimpar={limparFiltrosDoPainel}
+      />
+
+      {semCarteira ? (
+        <EmptyState
+          title="Você ainda não tem atas ou contratos atribuídos"
+          description="Este painel mostra a sua carteira. Quando a coordenação distribuir atas ou contratos para você, os números e as pendências aparecem aqui."
+          testId="instrumentos-sem-carteira"
+        />
+      ) : (
+      // Cartões + trilho grudam no alto e encolhem em faixa azul ao rolar (mesmo bloco das telas 360).
+      // A lista tem de ser o irmão seguinte do bloco; o espaço perdido ao encolher volta no fim (--i360-lost).
       <Instrument360DockProvider>
         <div style={{ paddingBottom: 'var(--i360-lost, 0px)' }}>
           <Instrument360Head>
@@ -322,6 +496,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
               activeCard={activeCard}
               onSelectCard={selectCardAndDock}
               saldosOnly={saldosOnly}
+              gestorNome={gestorNome || undefined}
+              gavetas={gavetasDisponiveis}
+              gavetaAberta={gavetaAberta}
+              onToggleGaveta={alternarGaveta}
             />
             <div className="i360-fold" ref={dockRef}>
               <div className="i360-fold-in">
@@ -332,6 +510,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
                     onSelectCard={selectCardAndDock}
                     saldosOnly={saldosOnly}
                   />
+                  <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
                   <SectionHeader
                     title="Pendências da carteira"
                     subtitle="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação."
@@ -354,6 +533,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           </Instrument360Head>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {gaveta}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -393,6 +573,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           </div>
         </div>
       </Instrument360DockProvider>
+      )}
 
       <AvisosResolvidosLista
         itens={itensResolvidos.map((item) => ({

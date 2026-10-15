@@ -23,8 +23,11 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/instrument360/Instrument360Hero.tsx': 1, // nome que volta ao resumo (barra encolhida)
   'src/components/instrument360/Instrument360Tabs.tsx': 1, // abas
   'src/components/instrumentos/GestaoInstrumentosCategoryTabs.tsx': 1, // abas
-  'src/components/instrumentos/GestaoInstrumentosDockStrip.tsx': 2, // nome que volta ao topo e números-filtro (faixa encolhida)
+  'src/components/instrumentos/GavetaDistribuicao.tsx': 1, // cartão clicável de cada gestor
+  'src/components/instrumentos/GavetaSituacao.tsx': 1, // trecho clicável da barra de faixas
+  'src/components/instrumentos/GestaoInstrumentosDockStrip.tsx': 3, // nome que volta ao topo, números-filtro e botões das áreas (faixa encolhida)
   'src/components/instrumentos/GestaoInstrumentosSummaryCards.tsx': 4, // cartões-filtro
+  'src/components/instrumentos/PainelGavetas.tsx': 1, // botão de área que abre a gaveta (chip com resumo)
   'src/components/modals/ExportExcelModal.tsx': 7, // presets e chips de grupo
   'src/components/plan/TaskPlanSection.tsx': 1, // seletor de status
   'src/design-system/components/AppButton.tsx': 2, // o próprio componente (e a menção no comentário)

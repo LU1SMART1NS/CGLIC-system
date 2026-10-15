@@ -1,13 +1,21 @@
 import React from 'react';
+import { ChevronDown } from 'lucide-react';
 import { formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { scrollToSummary, useInstrument360Dock } from '../instrument360/instrument360Dock';
 import type { GestaoInstrumentosCardId, GestaoInstrumentosCounts } from './GestaoInstrumentosSummaryCards';
+import { PAINEL_GAVETA_NOMES, type PainelGavetaId } from './painelGavetasConfig';
 
 interface GestaoInstrumentosDockStripProps {
   counts: GestaoInstrumentosCounts;
   activeCard: GestaoInstrumentosCardId | null;
   onSelectCard: (card: GestaoInstrumentosCardId) => void;
   saldosOnly?: boolean;
+  /** Gestor escolhido no filtro do coordenador: aparece ao lado do nome, para lembrar de quem é a carteira. */
+  gestorNome?: string;
+  /** Botões das áreas (gavetas): abrem a gaveta sem voltar ao topo. */
+  gavetas?: PainelGavetaId[];
+  gavetaAberta?: PainelGavetaId | null;
+  onToggleGaveta?: (id: PainelGavetaId) => void;
 }
 
 /**
@@ -18,7 +26,11 @@ export const GestaoInstrumentosDockStrip: React.FC<GestaoInstrumentosDockStripPr
   counts,
   activeCard,
   onSelectCard,
-  saldosOnly = false
+  saldosOnly = false,
+  gestorNome,
+  gavetas = [],
+  gavetaAberta = null,
+  onToggleGaveta
 }) => {
   const min = useInstrument360Dock()?.min ?? false;
   const tab = min ? 0 : -1;
@@ -38,7 +50,7 @@ export const GestaoInstrumentosDockStrip: React.FC<GestaoInstrumentosDockStripPr
       <div className="vg-strip-in">
         <div className="vg-strip-row">
           <button type="button" className="vg-strip-title" onClick={scrollToSummary} tabIndex={tab} aria-label="Início: voltar ao resumo completo">
-            Início
+            Início{gestorNome ? ` · ${gestorNome}` : ''}
           </button>
           <div className="vg-chips">
             {chips.map((c) => (
@@ -55,6 +67,23 @@ export const GestaoInstrumentosDockStrip: React.FC<GestaoInstrumentosDockStripPr
               </button>
             ))}
           </div>
+          {gavetas.length > 0 && onToggleGaveta && (
+            <div className="vg-chips vg-chips--gavetas">
+              {gavetas.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  tabIndex={tab}
+                  aria-expanded={gavetaAberta === id}
+                  className="vg-chip"
+                  onClick={() => onToggleGaveta(id)}
+                  data-testid={`instrumentos-dock-gaveta-${id}`}
+                >
+                  {PAINEL_GAVETA_NOMES[id]} <ChevronDown size={14} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -35,4 +35,21 @@ describe('GestaoInstrumentosDockStrip — faixa dos cartões encolhidos', () => 
     expect(html).toContain('aria-hidden="true"');
     expect(html).not.toContain('tabindex="0"');
   });
+
+  it('repete os botões das áreas, com a aberta marcada, e o gestor escolhido ao lado do nome', () => {
+    const html = renderToStaticMarkup(
+      <GestaoInstrumentosDockStrip
+        counts={counts}
+        activeCard={null}
+        onSelectCard={() => {}}
+        gestorNome="Ana"
+        gavetas={['situacao', 'distribuicao']}
+        gavetaAberta="situacao"
+        onToggleGaveta={() => {}}
+      />
+    );
+    expect(html).toContain('Início · Ana');
+    expect(html).toMatch(/aria-expanded="true"[^>]*instrumentos-dock-gaveta-situacao/);
+    expect(html).toMatch(/aria-expanded="false"[^>]*instrumentos-dock-gaveta-distribuicao/);
+  });
 });
