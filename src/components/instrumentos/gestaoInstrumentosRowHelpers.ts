@@ -85,6 +85,13 @@ export function getMotivoInfo(category: DashboardAttentionCategory): MotivoInfo 
   return MOTIVO_POR_CATEGORIA[category] || { label: 'Situação de atenção', color: '#475569', bg: '#f1f5f9' };
 }
 
+/** Categorias de motivo reconhecidas — usada para validar o filtro "Motivo" vindo do endereço. */
+export const MOTIVOS_CATEGORIAS = Object.keys(MOTIVO_POR_CATEGORIA) as DashboardAttentionCategory[];
+
+export function isMotivoCategoria(value: string | null): value is DashboardAttentionCategory {
+  return !!value && (MOTIVOS_CATEGORIAS as string[]).includes(value);
+}
+
 /** Situação atual em texto curto, composta apenas de campos reais já calculados (badgeLabel/dataAlvo). */
 export function getSituacaoAtual(item: DashboardAttentionItem): string {
   if (item.dataAlvo && item.category === 'REAJUSTE_RADAR') {
