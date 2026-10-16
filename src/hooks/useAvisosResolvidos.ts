@@ -36,6 +36,8 @@ export function useAvisosResolvidos() {
     void queryClient.invalidateQueries({ queryKey: AVISOS_RESOLVIDOS_QUERY_KEY });
     // Os números do Início (cartões, outras telas) leem os avisos já sem os resolvidos.
     void queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
+    // Registrado acima do homologado (migration 142): resolver ou reexibir muda a base do saldo do item.
+    void queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] });
   };
 
   const resolver = useMutation<unknown, Error, ResolverAvisoInput>({

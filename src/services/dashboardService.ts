@@ -219,6 +219,39 @@ export function calculateDeadlinesSummary(
  * 3. Cálculo puro do Bloco "Atenção Agora"
  */
 /**
+ * Aviso "Registrado acima do homologado" de um item (linha de v_arp_item_saldo_detalhado, migration 142). Crítico quando
+ * o saldo da SENASP, já sem o excedente dela, está em 20% da base ou menos (inclusive negativo).
+ */
+export function itemRegistradoAcima(aItem: any, itemKey: string, numAta: string, uasgItem: string, numItem: string | number, chave: string): import('../types/managementDashboard').DashboardAttentionItem {
+  const n = (v: unknown) => Number(v) || 0;
+  const fmt = (v: number) => v.toLocaleString('pt-BR');
+  const excedente = n(aItem.excedente_registrado);
+  const naSenasp = n(aItem.excedente_registrado_senasp);
+  const base = n(aItem.quantidade_base_senasp);
+  const saldo = n(aItem.saldo_disponivel);
+  const critico = saldo <= 0.2 * Math.max(base, 0);
+  const senasp = naSenasp > 0
+    ? `; ${fmt(naSenasp)} na SENASP${aItem.ata_assinada_informada ? '' : ' (provisório: ata assinada não informada)'} fora do saldo`
+    : '; nada na SENASP';
+  return {
+    id: `ATT-REGISTRADO-ACIMA-${itemKey}`,
+    category: 'REGISTRADO_ACIMA',
+    severity: critico ? 'CRITICA' : 'ATENCAO',
+    avisoChave: chave,
+    title: 'Registrado acima do homologado',
+    description: `Ata ${numAta || 's/n'} — Item ${Number(numItem) || numItem || 's/n'}: homologado ${fmt(n(aItem.quantidade_homologada))} × registrado ${fmt(n(aItem.soma_registrado))} (excedente ${fmt(excedente)}${senasp})`,
+    arpKey: itemKey,
+    numeroAta: numAta,
+    objetoItem: aItem.descricao_item || aItem.descricaoItem || 'Item de ARP',
+    fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
+    targetUrl: numAta && numItem
+      ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}/itens/${encodeURIComponent(String(numItem))}`
+      : undefined,
+    badgeLabel: `+${fmt(excedente)} acima`
+  };
+}
+
+/**
  * Motivos do aviso de quantitativos de um item (linha de v_arp_item_saldo_detalhado com a ata assinada informada).
  * Na ata de outro órgão (migration 114), o motivo é o saldo crítico com quantidade da SENASP ainda na gerenciadora.
  */
@@ -245,8 +278,10 @@ export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; text
   if (aItem.total_assinada != null && n(aItem.total_assinada) !== homologado) {
     motivos.push({ chave: `ASS${n(aItem.total_assinada)}`, texto: `soma da ata assinada (${fmt(n(aItem.total_assinada))}) diferente do homologado (${fmt(homologado)})`, selo: 'soma não fecha', critico: false });
   }
-  if (aItem.total_registrado != null && n(aItem.total_registrado) !== homologado) {
-    motivos.push({ chave: `REG${n(aItem.total_registrado)}`, texto: `soma do registrado (${fmt(n(aItem.total_registrado))}) diferente do homologado (${fmt(homologado)})`, selo: 'soma não fecha', critico: false });
+  // Soma do registrado acima do homologado tem aviso próprio, do gestor da ata (REGISTRADO_ACIMA, migration 142);
+  // aqui fica só a soma abaixo (cancelamento ou supressão de parte do item).
+  if (aItem.total_registrado != null && n(aItem.total_registrado) < homologado) {
+    motivos.push({ chave: `REG${n(aItem.total_registrado)}`, texto: `soma do registrado (${fmt(n(aItem.total_registrado))}) abaixo do homologado (${fmt(homologado)})`, selo: 'soma não fecha', critico: false });
   }
   const acima = n(aItem.orgaos_contratado_acima);
   if (acima > 0) motivos.push({ chave: `ACIMA${acima}`, texto: `${acima} ${acima === 1 ? 'órgão contratou' : 'órgãos contrataram'} acima do registrado`, selo: 'contratado acima', critico: false });
@@ -807,6 +842,20 @@ export function calculateAttentionSummary(params: {
         : undefined,
       badgeLabel: motivos.length === 1 ? motivos[0].selo : `${motivos.length} pontos a conferir`
     });
+  }
+
+  // 5c'. Registrado acima do homologado (migration 142): a soma do registrado no Compras.gov.br passa do homologado do
+  // item. Enquanto aberto, a parte da SENASP sai da base do saldo (a view já desconta). Pendência do gestor da ata e do
+  // coordenador; o gestor de saldo só vê o aviso dentro do item.
+  for (const aItem of (arpItems || []) as any[]) {
+    const chave = aItem.registrado_acima_chave;
+    if (!chave) continue;
+    const numAta = aItem.numero_ata || aItem.numeroAta;
+    const numItem = aItem.numero_item || aItem.numeroItem;
+    const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
+    const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : '');
+    if (!itemKey) continue;
+    items.push(itemRegistradoAcima(aItem, itemKey, numAta, uasgItem, numItem, chave));
   }
 
   // 5d. Qtd. da ata assinada a informar (migration 116), uma pendência por ata: só na ata da CGLIC vigente que já tem

@@ -73,6 +73,8 @@ import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
 import { QuantitativosTab } from './item-balances/QuantitativosTab';
+import { registradoAcimaDoSaldo } from '../utils/registradoAcima';
+import { formatPncpAtaPdfUrl } from '../utils/pncpUtils';
 import { useInteresseGti } from './item-balances/InteresseGti';
 import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from './gti/InteresseGti';
 import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOrgaoTab';
@@ -411,17 +413,21 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Sem os órgãos do item (API de unidades vazia), vale o quantitativo SENASP gravado no banco, o mesmo
   // da aba Itens da ata; o homologado da ata só entra se o item nunca foi sincronizado.
   const saldoDoItem = saldosDaAta.find((s: any) => Number(s.numero_item) === Number(item.numeroItem));
+  // Registrado acima do homologado (migration 142): com o aviso aberto, a view já tira da base a parte da SENASP.
+  const registradoAcima = registradoAcimaDoSaldo(saldoDoItem);
+  const descontoRegistradoAcima = registradoAcima?.desconto ?? 0;
   const totalUGQty = quantitativoSenasp(
     unidades,
     arp.codigoUnidadeGerenciadora,
-    saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) : Number(item.quantidadeHomologadaItem) || 0
+    // Sem os órgãos do item, o registrado vem da base da view, que já tem o desconto: devolve antes de descontar aqui.
+    saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) + descontoRegistradoAcima : Number(item.quantidadeHomologadaItem) || 0
   );
   // Com a ata assinada informada (migration 109), a base do saldo e o limite da alocação são a cota própria:
   // o registrado da SENASP menos o que ela gerencia para os órgãos participantes.
   const { data: quantitativos, isLoading: quantitativosLoading } = useQuantitativosDoItem(canonicalItemKey);
   // Só na ata da SENASP: na ata de outro órgão (migration 114) a base continua o registrado (ou o aprovado na adesão).
   const cotaPropriaInformada = !ataDeOutroOrgao(arp) && quantitativos.informado;
-  const baseSaldo = cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty;
+  const baseSaldo = (cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty) - descontoRegistradoAcima;
   // Ata da SENASP sem a ata assinada e com outros órgãos registrados: o limite da alocação é provisório (migration 116,
   // só aviso). Enquanto os quantitativos carregam não avisa, para não piscar.
   const outrosOrgaosRegistrados = unidades.filter((u) => !isUnidadeSenasp(u, arp.codigoUnidadeGerenciadora) && (Number(u.quantidadeRegistrada) || 0) > 0).length;
@@ -705,6 +711,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               baseSaldo={baseSaldo}
               contratadoSenasp={executionSummary.contratado}
               quantitativos={quantitativos}
+              registradoAcima={registradoAcima}
+              pdfDaAta={formatPncpAtaPdfUrl(arp.numeroControlePncpAta)}
+              pregaoItem={`${arp.numeroCompra ? `Pregão ${arp.numeroCompra}${arp.anoCompra ? `/${arp.anoCompra}` : ''} · ` : ''}item ${Number(item.numeroItem) || item.numeroItem}`}
               podeInformar={canEditData}
               podeRemanejar={canManageAllocations}
               alocado={totalAllocatedSum}

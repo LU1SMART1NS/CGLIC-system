@@ -32,6 +32,8 @@ import { isUasgCglic } from '../../config/unidadesGestoras';
 import type { UnidadeItemRecord } from '../../types';
 import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
 import { InformarAtaAssinadaModal } from './InformarAtaAssinadaModal';
+import { RegistradoAcimaAviso } from './RegistradoAcimaAviso';
+import type { RegistradoAcima } from '../../utils/registradoAcima';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { ConfirmarRemanejamentoModal, ContinuaDoOrgaoModal } from './RemanejamentoModals';
@@ -58,6 +60,12 @@ export interface QuantitativosTabProps {
   baseSaldo: number;
   contratadoSenasp: number;
   quantitativos: QuantitativosDoItem;
+  /** Soma do registrado acima do homologado (migration 142); a base do saldo já vem com o desconto. */
+  registradoAcima?: RegistradoAcima | null;
+  /** PDF da ata no PNCP, para conferir o aviso de registrado acima do homologado. */
+  pdfDaAta?: string;
+  /** "Pregão 90023/2024 · item 5". */
+  pregaoItem?: string;
   podeInformar: boolean;
   podeRemanejar: boolean;
   alocado: number;
@@ -380,20 +388,23 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
     </NoticeBar>
   ) : null;
 
+  // Registrado acima do homologado (migration 142): com o aviso aberto, p.baseSaldo já vem sem a parte da SENASP.
+  const ra = p.registradoAcima ?? null;
+  const desconto = ra && !ra.resolvido ? ra.desconto : 0;
   const metricas: MetricStripItem[] = q.informado
     ? [
         { label: 'Registrado', value: formatNumber(p.registradoSenasp), hint: `no Compras.gov.br · ata assinada ${formatNumber(q.assinadaSenasp)}`, testId: 'metrica-registrado' },
         { label: 'Gerenciado p/ participantes', value: formatNumber(q.gerenciadoParticipantes), hint: 'dos órgãos, dentro do registrado', tone: 'warning', testId: 'metrica-gerenciado' },
-        { label: 'Cota própria', value: formatNumber(p.baseSaldo), hint: 'registrado − gerenciado', tone: p.baseSaldo < 0 ? 'danger' : 'default', testId: 'metrica-cota' },
+        { label: 'Cota própria', value: formatNumber(p.baseSaldo), hint: desconto > 0 ? `menor entre registrado (${formatNumber(p.registradoSenasp - q.gerenciadoParticipantes)}) e ata assinada (${formatNumber(q.assinadaSenasp)})` : 'registrado − gerenciado', tone: p.baseSaldo < 0 ? 'danger' : 'default', testId: 'metrica-cota' },
         { label: 'Alocado às unidades', value: formatNumber(p.alocado), hint: livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
         { label: 'Contratado', value: formatNumber(p.contratadoSenasp), hint: 'contratos vinculados', testId: 'metrica-contratado' },
-        { label: 'Saldo da cota própria', value: formatNumber(saldoSenasp), hint: `registrado − contratado: ${formatNumber(p.registradoSenasp - p.contratadoSenasp)}`, tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
+        { label: 'Saldo da cota própria', value: formatNumber(saldoSenasp), hint: desconto > 0 ? `${formatNumber(desconto)} acima da ata assinada fora do saldo` : `registrado − contratado: ${formatNumber(p.registradoSenasp - p.contratadoSenasp)}`, tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
       ]
     : [
-        { label: 'Quantidade SENASP', value: formatNumber(p.baseSaldo), hint: p.ataDaCglic ? 'ata assinada não informada' : 'registrado no Compras.gov.br', testId: 'metrica-cota' },
+        { label: 'Quantidade SENASP', value: formatNumber(p.baseSaldo), hint: desconto > 0 ? `registrado ${formatNumber(p.registradoSenasp)} − excedente ${formatNumber(desconto)} (provisório)` : p.ataDaCglic ? 'ata assinada não informada' : 'registrado no Compras.gov.br', testId: 'metrica-cota' },
         { label: 'Alocado às unidades', value: formatNumber(p.alocado), hint: livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
         { label: 'Contratado', value: formatNumber(p.contratadoSenasp), hint: 'contratos vinculados', testId: 'metrica-contratado' },
-        { label: 'Saldo', value: formatNumber(saldoSenasp), hint: 'registrado − contratado', tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
+        { label: 'Saldo', value: formatNumber(saldoSenasp), hint: desconto > 0 ? 'quantidade − contratado' : 'registrado − contratado', tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
       ];
 
   const semOrgaos = !p.loading && linhas.length === 0;
@@ -407,6 +418,19 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         </NoticeBar>
       )}
       {cabecalho}
+      {ra && p.ataDaCglic && (
+        <RegistradoAcimaAviso
+          aviso={ra}
+          quantitativos={q}
+          pregaoItem={p.pregaoItem || 'Item'}
+          tituloItem={p.tituloItem}
+          pdfDaAta={p.pdfDaAta || ''}
+          podeResolver={p.podeInformar}
+          baseSemDesconto={p.baseSaldo + desconto}
+          contratado={p.contratadoSenasp}
+          nomeDe={nomeDe}
+        />
+      )}
       {verRegistros && q.registros.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }} data-testid="alteracoes-ata-assinada">
           {q.registros.map((r) => (
@@ -423,7 +447,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       {q.informado && q.totalAssinada !== q.homologado && (
         <NoticeBar tone="danger" testId="soma-assinada-nao-fecha">A soma da ata assinada ({formatNumber(q.totalAssinada)}) é diferente do homologado do item ({formatNumber(q.homologado)}). Confira as quantidades informadas.</NoticeBar>
       )}
-      {q.informado && q.totalRegistrado !== q.homologado && (
+      {/* Soma acima do homologado tem aviso próprio (RegistradoAcimaAviso, migration 142). */}
+      {q.informado && q.totalRegistrado < q.homologado && (
         <NoticeBar tone="danger" testId="soma-registrado-nao-fecha">A soma do registrado no Compras.gov.br ({formatNumber(q.totalRegistrado)}) é diferente do homologado do item ({formatNumber(q.homologado)}). Pode ser cancelamento ou supressão de parte do item.</NoticeBar>
       )}
       {foraDaAta > 0 && <NoticeBar tone="warning" testId="orgaos-fora-da-ata">{foraDaAta} {foraDaAta > 1 ? 'órgãos registrados' : 'órgão registrado'} sem quantidade na ata assinada. Confira os números informados.</NoticeBar>}
