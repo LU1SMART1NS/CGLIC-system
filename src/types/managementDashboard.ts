@@ -262,6 +262,17 @@ export interface ManagementDashboardAvailableFilters {
 }
 
 /**
+ * Fonte do painel que falhou nesta leitura (ex.: consulta estourando o tempo limite).
+ * DESATUALIZADA: o painel usou a última leitura boa da fonte. NAO_CARREGOU: não havia
+ * leitura anterior, então as contagens que dependem dela podem estar incompletas.
+ */
+export interface FonteComFalha {
+  rotulo: string;
+  situacao: 'DESATUALIZADA' | 'NAO_CARREGOU';
+  mensagem: string;
+}
+
+/**
  * Read Model Unificado do Dashboard Gerencial
  */
 export interface ManagementDashboardReadModel {
@@ -276,4 +287,6 @@ export interface ManagementDashboardReadModel {
   filtersApplied?: ManagementDashboardFilters;
   availableFilters?: ManagementDashboardAvailableFilters;
   syncInfo?: SyncMetadata;
+  /** Fontes que falharam nesta leitura; o painel carrega o resto e avisa (não trava a tela inteira). */
+  fontesComFalha?: FonteComFalha[];
 }

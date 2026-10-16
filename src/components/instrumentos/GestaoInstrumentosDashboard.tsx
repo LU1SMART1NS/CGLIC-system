@@ -16,7 +16,8 @@ import { GestaoInstrumentosCompactFilters, type GestaoInstrumentosCompactFilters
 import { GestaoInstrumentosTable } from './GestaoInstrumentosTable';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
-import type { DashboardAttentionCategory } from '../../types/managementDashboard';
+import type { DashboardAttentionCategory, FonteComFalha } from '../../types/managementDashboard';
+import { FontesComFalhaAviso } from './FontesComFalhaAviso';
 import { getLookupKey, getInstrumentoInfo, motivoDoEndereco, motivoNoFiltro, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
 import type { CarteiraFilterOption } from '../carteira/CarteiraFilterButton';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
@@ -165,6 +166,21 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const isError = dashboards.some((d) => d.isError) && !hasAnyReadModel;
   const error = dashboards.find((d) => d.isError)?.error ?? null;
   const dataUpdatedAt = Math.max(...dashboards.map((d) => d.dataUpdatedAt || 0)) || undefined;
+  // Fontes que falharam nesta leitura (ex.: saldo dos itens estourando o tempo limite): o resto da tela segue
+  // e o aviso diz o que ficou de fora. Uma linha por fonte; "não carregou" vence "não atualizou".
+  const fontesComFalha = useMemo(() => {
+    const porRotulo = new Map<string, FonteComFalha>();
+    for (const d of dashboards) {
+      for (const f of d.readModel?.fontesComFalha ?? []) {
+        if (!porRotulo.has(f.rotulo) || f.situacao === 'NAO_CARREGOU') porRotulo.set(f.rotulo, f);
+      }
+    }
+    return [...porRotulo.values()];
+  }, [dashboards]);
+  // Relê só o painel (sem disparar a sincronização com as fontes oficiais, que é pesada).
+  const lerPainelDeNovo = useCallback(() => {
+    for (const d of dashboards) void d.refetch();
+  }, [dashboards]);
   // Mantém em dia a quantidade contratada dos itens (base do saldo SENASP) que este painel lê do banco.
   const itemSaldos = useRefreshItemSaldos();
   // Coordenador: atualiza os contratos com as fontes oficiais. Demais perfis: relê o banco.
@@ -521,6 +537,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         gestor={podeFiltrarGestor ? { valor: gestorNome, nomes: gestores.map((g) => g.nome), onChange: escolherGestor } : undefined}
         onLimpar={limparFiltrosDoPainel}
       />
+
+      <FontesComFalhaAviso falhas={fontesComFalha} onTentar={lerPainelDeNovo} tentando={isFetching} />
 
       {semCarteira ? (
         <EmptyState
