@@ -227,7 +227,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   return (
     <Instrument360Page>
-      <Instrument360Head>
+      <Instrument360Head resumoNoCelular>
       <Ata360Header
         arp={arp}
         itens={itens}

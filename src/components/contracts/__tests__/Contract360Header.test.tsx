@@ -99,7 +99,7 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
       <Contract360Header contract={mockContract} userRole="gestor" />
     );
 
-    expect(html).toContain('Atualizar empenhos');
+    expect(html).toContain('aria-label="Atualizar empenhos"');
     expect(html).not.toContain('disabled=""');
     expect(html).not.toContain('Atualizando...');
   });
@@ -140,7 +140,7 @@ describe('Contract360Header Component — Integração UI de Sincronização de 
       <Contract360Header contract={mockContract} userRole="consulta" />
     );
 
-    expect(html).toContain('Atualizar empenhos');
+    expect(html).toContain('aria-label="Atualizar empenhos"');
     expect(html).toContain('disabled=""');
     expect(html).toContain('Você não possui permissão para atualizar empenhos.');
   });

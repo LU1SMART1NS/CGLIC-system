@@ -7,6 +7,10 @@ import { DockContext } from './instrument360Dock';
  */
 export const Instrument360DockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [min, setMin] = React.useState(false);
-  const value = React.useMemo(() => ({ min, setMin }), [min]);
+  const [phone, setPhone] = React.useState<{ active: boolean; docked: boolean; slot: HTMLElement | null }>({ active: false, docked: false, slot: null });
+  const value = React.useMemo(
+    () => ({ min, setMin, phone: phone.active, phoneDocked: phone.docked, phoneBarSlot: phone.slot, setPhone }),
+    [min, phone]
+  );
   return <DockContext.Provider value={value}>{children}</DockContext.Provider>;
 };

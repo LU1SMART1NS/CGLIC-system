@@ -44,6 +44,13 @@ const HINT_CLAMP: React.CSSProperties = {
   overflow: 'hidden'
 };
 
+/**
+ * Como os indicadores aparecem: `normal` (cartão inteiro), `resumo` (celular: só rótulo, selo e valor, sem
+ * dica nem régua) e `leitura` (resumo completo do celular: cartão inteiro, sem clique, porque a janela fecha).
+ */
+export type HealthTileMode = 'normal' | 'resumo' | 'leitura';
+export const HealthTileModeContext = React.createContext<HealthTileMode>('normal');
+
 export const HealthTile: React.FC<{
   label: string;
   value: string;
@@ -64,12 +71,15 @@ export const HealthTile: React.FC<{
   tooltip?: string;
   onClick?: () => void;
   testId?: string;
-}> = ({ label, value, hint, tone, badge, positive = false, compact = false, wide = false, children, tooltip, onClick, testId }) => {
+}> = ({ label, value, hint, tone, badge, positive = false, compact = false, wide = false, children, tooltip, onClick: onClickProp, testId }) => {
+  const mode = React.useContext(HealthTileModeContext);
+  const resumo = mode === 'resumo';
+  const onClick = mode === 'leitura' ? undefined : onClickProp;
   const token = tone && tone !== 'INFO' ? severityTokens[tone] : null;
   const badgeText = token ? (badge ?? BADGE_LABEL[tone as SeverityLevel]) : null;
   const hints = (Array.isArray(hint) ? hint : hint ? [hint] : []).filter(Boolean);
   // Cartão com a régua: a dica vai ao lado do valor, para o cartão ter a altura dos demais.
-  const inlineHints = wide && Boolean(children);
+  const inlineHints = wide && Boolean(children) && !resumo;
 
   const style: React.CSSProperties = {
     display: 'grid',
@@ -77,7 +87,7 @@ export const HealthTile: React.FC<{
     alignContent: 'start',
     gap: '4px',
     minWidth: 0,
-    padding: '12px 14px',
+    padding: resumo ? '9px 10px' : '12px 14px',
     borderRadius: '10px',
     border: `1px solid ${COLORS.line}`,
     borderLeft: `3px solid ${token ? token.borderLeft : COLORS.line}`,
@@ -121,7 +131,7 @@ export const HealthTile: React.FC<{
         <div
           title={compact ? value : undefined}
           style={{
-            fontSize: compact ? '0.92rem' : '1.4rem',
+            fontSize: compact ? '0.92rem' : resumo ? '1.15rem' : '1.4rem',
             fontWeight: 800,
             color: COLORS.ink,
             lineHeight: 1.2,
@@ -139,6 +149,8 @@ export const HealthTile: React.FC<{
             </span>
           ))}
       </div>
+      {/* No resumo do celular a dica e a régua ficam de fora: aparecem no resumo completo. */}
+      {!resumo && (
       <div
         title={inlineHints ? undefined : tooltip || hints.join(' · ') || undefined}
         style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, minHeight: 0, overflow: 'hidden' }}
@@ -157,6 +169,7 @@ export const HealthTile: React.FC<{
         )}
         {children}
       </div>
+      )}
     </>
   );
 
