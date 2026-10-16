@@ -90,6 +90,12 @@ describe('lerItemNasFontes', () => {
     expect(r).toEqual({ linha: { item_key: it0.itemKey, unidades: [{ codigoUnidade: '200331' }], adesoes: [] }, falhaAdesoes: false });
   });
 
+  it('pede os órgãos com falharSeErro: lista incompleta ou divergente lança e o item não é gravado', async () => {
+    const unidades = vi.fn(async () => { throw new Error('vieram 50 de 80 linhas de órgãos'); });
+    await expect(lerItemNasFontes(it0, { unidades, adesoes: vi.fn() } as any)).rejects.toThrow('50 de 80');
+    expect(unidades).toHaveBeenCalledWith('00036/2024', '200331', '00002', { falharSeErro: true });
+  });
+
   it('órgãos vazios (API fora do ar): nem consulta as adesões; a cópia delas fica', async () => {
     const adesoes = vi.fn();
     const r = await lerItemNasFontes(it0, { unidades: vi.fn(async () => resp([])), adesoes } as any);
