@@ -1,6 +1,7 @@
 import { buildAtaPath } from '../../hooks/useAta';
 import type { AlvoResolucao } from '../avisos/ResolverAviso';
 import type { DashboardAttentionCategory, DashboardAttentionItem } from '../../types/managementDashboard';
+import { chaveDoMotivo } from '../../utils/motivoDetalhe';
 
 /** Item de atenção enriquecido com a UASG de origem (a Gestão de Instrumentos consolida 200330 e 200331). */
 export interface AttentionItemWithUasg extends DashboardAttentionItem {
@@ -90,6 +91,28 @@ export const MOTIVOS_CATEGORIAS = Object.keys(MOTIVO_POR_CATEGORIA) as Dashboard
 
 export function isMotivoCategoria(value: string | null): value is DashboardAttentionCategory {
   return !!value && (MOTIVOS_CATEGORIAS as string[]).includes(value);
+}
+
+/**
+ * Motivo de um aviso no filtro "Motivo". Numa aba de uma categoria só (Reajustes, Lembretes) a categoria não separa
+ * nada: usa o motivo detalhado (situação da data-base, regra do lembrete). Nas demais, a categoria do aviso.
+ */
+export function motivoNoFiltro(
+  item: Pick<DashboardAttentionItem, 'category' | 'motivoDetalhe'>,
+  abaDeUmaCategoria: boolean
+): { value: string; label: string } {
+  if (abaDeUmaCategoria && item.motivoDetalhe) return { value: chaveDoMotivo(item), label: item.motivoDetalhe.label };
+  return { value: item.category, label: getMotivoInfo(item.category).label };
+}
+
+/** Motivo vindo do endereço: "CATEGORIA" ou "CATEGORIA.chave" com categoria conhecida; o resto vira 'TODAS'. */
+export function motivoDoEndereco(valor: string | null): string {
+  if (!valor) return 'TODAS';
+  const ponto = valor.indexOf('.');
+  const categoria = ponto < 0 ? valor : valor.slice(0, ponto);
+  const detalhe = ponto < 0 ? null : valor.slice(ponto + 1);
+  if (!isMotivoCategoria(categoria)) return 'TODAS';
+  return detalhe === null || /^[A-Za-z0-9-]+$/.test(detalhe) ? valor : 'TODAS';
 }
 
 /** Situação atual em texto curto, composta apenas de campos reais já calculados (badgeLabel/dataAlvo). */

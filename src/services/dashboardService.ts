@@ -69,6 +69,7 @@ import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import { alocadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../utils/ataAssinadaPendente';
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
+import { motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
 
 /**
  * Auxiliar para cálculo de dias restantes de vigência
@@ -618,6 +619,7 @@ export function calculateAttentionSummary(params: {
       title: pItem.regraNome,
       description: `${pItem.identificadorFormatado} — ${pItem.acaoDescricao}`,
       avisoChave: chaveAvisoLembrete(pItem.id),
+      motivoDetalhe: motivoDoLembrete(pItem.regraNome),
       contractKey: isAta ? undefined : pItem.contractKey,
       numeroContrato: pItem.identificadorFormatado,
       arpKey: isAta ? pItem.arpKey : undefined,
@@ -703,6 +705,7 @@ export function calculateAttentionSummary(params: {
       id: `ATT-REAJUSTE-${alert.contractKey}-${alert.ciclo}`,
       category: 'REAJUSTE_RADAR',
       avisoChave: chaveAvisoReajuste(alert.contractKey, alert.ciclo),
+      motivoDetalhe: motivoDoReajuste(alert.nivel),
       severity,
       title: alert.titulo || 'Radar de Reajuste / Repactuação',
       description: `Contrato ${numDisplay} — ${alert.descricao || ''}`,

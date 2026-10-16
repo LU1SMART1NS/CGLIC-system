@@ -104,6 +104,11 @@ export interface DashboardAttentionItem {
   /** Alertas de saldo: descrição do item da Ata e seu fornecedor (a coluna Objeto/Fornecedor prefere estes). */
   objetoItem?: string;
   fornecedorNome?: string;
+  /**
+   * Motivo mais detalhado que a categoria, para o filtro "Motivo" das abas de uma categoria só:
+   * lembrete = regra do lembrete; reajuste = situação da data-base. Sem ele, o motivo é a categoria.
+   */
+  motivoDetalhe?: { chave: string; label: string };
 }
 
 /**

@@ -17,7 +17,7 @@ import { GestaoInstrumentosTable } from './GestaoInstrumentosTable';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import type { DashboardAttentionCategory } from '../../types/managementDashboard';
-import { getLookupKey, getInstrumentoInfo, getMotivoInfo, isMotivoCategoria, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
+import { getLookupKey, getInstrumentoInfo, motivoDoEndereco, motivoNoFiltro, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
 import type { CarteiraFilterOption } from '../carteira/CarteiraFilterButton';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
 import { AvisosResolvidosLista, useResolverAviso } from '../avisos/ResolverAviso';
@@ -57,6 +57,11 @@ function matchesTab(item: AttentionItemWithUasg, tab: GestaoInstrumentosCategory
   return TAB_CATEGORY_MAP[tab].includes(item.category);
 }
 
+/** Motivo do aviso no filtro, conforme a aba (detalhado nas abas de uma categoria só). */
+function motivoNaAba(item: AttentionItemWithUasg, tab: GestaoInstrumentosCategoryTab): { value: string; label: string } {
+  return motivoNoFiltro(item, tab !== 'TODAS' && TAB_CATEGORY_MAP[tab].length === 1);
+}
+
 /**
  * Painel Unificado de Gestão e Monitoramento — Lei 14.133.
  *
@@ -86,7 +91,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const abaUrl = searchParams.get('aba') as GestaoInstrumentosCategoryTab | null;
   const activeTab: GestaoInstrumentosCategoryTab = abaUrl && abaUrl in TAB_CATEGORY_MAP ? abaUrl : 'TODAS';
   const motivoUrl = searchParams.get('motivo');
-  const motivo: GestaoInstrumentosCompactFiltersState['motivo'] = isMotivoCategoria(motivoUrl) ? motivoUrl : 'TODAS';
+  const motivo: GestaoInstrumentosCompactFiltersState['motivo'] = motivoDoEndereco(motivoUrl);
   const uasgUrl = searchParams.get('uasg');
   const uasgFiltro = uasgUrl && (UASGS as readonly string[]).includes(uasgUrl) ? uasgUrl : TODAS_UASGS;
   const uasgsAtivas = useMemo(() => (uasgFiltro ? [uasgFiltro] : [...UASGS]), [uasgFiltro]);
@@ -328,19 +333,21 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   // Motivos presentes na aba aberta (já com os demais filtros aplicados), do mais frequente ao menos, com a contagem.
   const motivoOptions = useMemo<CarteiraFilterOption[]>(() => {
-    const counts = new Map<DashboardAttentionCategory, number>();
+    const counts = new Map<string, { label: string; count: number }>();
     for (const item of allItems) {
       if (!matchesBaseFilters(item)) continue;
-      counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
+      const m = motivoNaAba(item, activeTab);
+      const atual = counts.get(m.value);
+      counts.set(m.value, { label: m.label, count: (atual?.count ?? 0) + 1 });
     }
     return [...counts.entries()]
-      .map(([category, count]) => ({ value: category, label: getMotivoInfo(category).label, count }))
+      .map(([value, { label, count }]) => ({ value, label, count }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'pt-BR'));
-  }, [allItems, matchesBaseFilters]);
+  }, [allItems, matchesBaseFilters, activeTab]);
 
   const filteredItems = useMemo(
-    () => allItems.filter((item) => matchesBaseFilters(item) && (motivo === 'TODAS' || item.category === motivo)),
-    [allItems, matchesBaseFilters, motivo]
+    () => allItems.filter((item) => matchesBaseFilters(item) && (motivo === 'TODAS' || motivoNaAba(item, activeTab).value === motivo)),
+    [allItems, matchesBaseFilters, motivo, activeTab]
   );
 
   const handleChangeFilter = useCallback(<K extends keyof GestaoInstrumentosCompactFiltersState>(
