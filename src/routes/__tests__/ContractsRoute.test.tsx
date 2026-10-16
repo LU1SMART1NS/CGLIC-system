@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ContractsRoute } from '../ContractsRoute';
 import { ContractsPortfolioHeader } from '../../components/contracts/portfolio/ContractsPortfolioHeader';
@@ -39,6 +39,14 @@ vi.mock('../../hooks/useSincronizacaoContratos', () => ({
 vi.mock('../../hooks/useCarteiraItens', () => ({
   useCarteiraItens: () => ({ unidades: [], unidadesDoContrato: new Map(), rows: [], resumoPorAta: new Map(), isLoading: false })
 }));
+
+// As vigências abaixo foram montadas para 24/09/2026. Sem relógio fixo, o
+// 00002/2024 (fim em 15/10/2026) passou a "Encerrado" e sumiu da lista padrão.
+vi.useFakeTimers({ toFake: ['Date'] });
+vi.setSystemTime(new Date('2026-09-24T12:00:00-03:00'));
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 // Contratos marcados "não pertence a ata" (consulta ao banco): cada teste escolhe.
 let semAtaConfirmados: Record<string, unknown> = {};
