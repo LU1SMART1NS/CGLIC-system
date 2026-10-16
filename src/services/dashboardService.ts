@@ -1687,7 +1687,21 @@ export async function fetchManagementDashboardData(
 
   const cleanUasg = filters.uasg || '200331';
 
-  // Execução paralela das fontes soberanas
+  // Execução paralela das fontes soberanas.
+  //
+  // Fontes de CONTAGEM: se a leitura falhar (ex.: banco estrangulado, consulta
+  // estourando o tempo), o painel NÃO pode mostrar 0 no lugar do dado real.
+  // Propagamos o erro para o React Query segurar o último valor bom e tentar de
+  // novo, em vez de sobrescrever a contagem boa com vazio — era o que fazia os
+  // avisos "sumirem" da tela (Saldos, Reajustes, Pagamentos...) em momentos de
+  // carga. Fontes de ENRIQUECIMENTO (gestores, alocação interna) seguem
+  // tolerantes: a falha delas não zera contagem, no máximo omite um nome ou marca.
+  const soberana = <T,>(label: string, p: Promise<T>): Promise<T> =>
+    p.catch((err) => {
+      console.error(`Erro ao consultar ${label} para o dashboard:`, err);
+      throw err;
+    });
+
   const [
     contracts,
     arpsRes,
@@ -1703,55 +1717,25 @@ export async function fetchManagementDashboardData(
     ausentesDaFonte,
     empenhadoAcima
   ] = await Promise.all([
-    fetchContratosParaTela(cleanUasg).catch((err) => {
-      console.warn('Erro ao consultar contratos para o dashboard:', err);
-      return [] as ContractDashboardRecord[];
-    }),
-    fetchArpsFromDb(cleanUasg).catch((err) => {
-      console.warn('Erro ao consultar ARPs para o dashboard:', err);
-      return { arps: [], syncInfo: { isCachedInDb: false } };
-    }),
+    soberana('contratos', fetchContratosParaTela(cleanUasg)),
+    soberana('ARPs', fetchArpsFromDb(cleanUasg)),
     fetchAllContractManagers(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar gestores para o dashboard:', err);
       return {} as Record<string, ContractManager>;
     }),
-    fetchAllContractTaskPlans(cleanUasg).catch((err) => {
-      console.warn('Erro ao consultar planos de tarefas para o dashboard:', err);
-      return {} as Record<string, ContractTaskPlan>;
-    }),
-    fetchAllAtaTaskPlans().catch((err) => {
-      console.warn('Erro ao consultar planos de gestão das atas para o dashboard:', err);
-      return {} as Record<string, AtaTaskPlan>;
-    }),
+    soberana('planos de tarefas', fetchAllContractTaskPlans(cleanUasg)),
+    soberana('planos de gestão das atas', fetchAllAtaTaskPlans()),
     fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))),
-    fetchEmpenhosResumoFromDb(cleanUasg).catch((err) => {
-      console.error('Erro ao consultar empenhos para o dashboard:', err);
-      return [] as any[];
-    }),
-    fetchArpItemSaldosFromDb(cleanUasg).catch((err) => {
-      console.error('Erro ao consultar saldos de itens de ARP para o dashboard:', err);
-      return [] as any[];
-    }),
+    soberana('empenhos', fetchEmpenhosResumoFromDb(cleanUasg)),
+    soberana('saldos de itens de ARP', fetchArpItemSaldosFromDb(cleanUasg)),
     fetchItensComAlocacao().catch((err) => {
       console.warn('Erro ao consultar os itens com alocação interna para o dashboard:', err);
       return new Set<string>();
     }),
-    fetchRegistrosFornecedorPncp().catch((err) => {
-      console.warn('Erro ao consultar as atas sem fornecedor no PNCP para o dashboard:', err);
-      return [] as RegistroFornecedorPncp[];
-    }),
-    fetchVinculosAConferir().catch((err) => {
-      console.warn('Erro ao consultar os vínculos a conferir para o dashboard:', err);
-      return [] as VinculoAConferir[];
-    }),
-    fetchAusentesDaFonte().catch((err) => {
-      console.warn('Erro ao consultar as notas e faturas a conferir para o dashboard:', err);
-      return [] as AusenteDaFonte[];
-    }),
-    fetchEmpenhadoAcima().catch((err) => {
-      console.warn('Erro ao consultar os itens com empenhado acima do contratado para o dashboard:', err);
-      return [] as EmpenhadoAcima[];
-    })
+    soberana('atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp()),
+    soberana('vínculos a conferir', fetchVinculosAConferir()),
+    soberana('notas e faturas a conferir', fetchAusentesDaFonte()),
+    soberana('itens com empenhado acima do contratado', fetchEmpenhadoAcima())
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
