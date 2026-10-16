@@ -41,9 +41,12 @@ export async function cacheArpsInDb(arps: ArpRecord[]): Promise<boolean> {
       ultimo_sync_em: new Date().toISOString()
     }));
 
+    // A identidade da ata é o número de controle do PNCP, não o número da ata: a fonte às vezes
+    // muda o número (põe um 9 à frente, ex.: "90068/2024" vira "00068/2024"). Casar pelo controle
+    // atualiza a mesma linha em vez de criar uma ata duplicada (migration 20261016000145).
     const { error } = await supabase
       .from('atas_registro_preco')
-      .upsert(rows, { onConflict: 'numero_ata,codigo_uasg' });
+      .upsert(rows, { onConflict: 'numero_controle_pncp' });
     if (error) throw error;
     return true;
   } catch (error) {
