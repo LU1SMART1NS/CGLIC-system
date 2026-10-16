@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   getContractDaysRemaining,
   calculateExecutiveKPIs,
@@ -9,7 +9,8 @@ import {
   calculatePaymentsSummary,
   buildManagementDashboardReadModel,
   fetchManagementDashboardData,
-  fetchAllPaymentCyclesForDashboard
+  fetchAllPaymentCyclesForDashboard,
+  lerUmaVez
 } from '../dashboardService';
 import type {
   ContractDashboardRecord,
@@ -23,11 +24,71 @@ import * as dbCacheService from '../dbCacheService';
 import * as contractService from '../contractService';
 import * as contractManagementService from '../contractManagementService';
 import * as paymentCycleRpcAdapter from '../../adapters/paymentCycleRpcAdapter';
+import * as ataManagementService from '../ataManagementService';
+import * as avisosResolvidosService from '../avisosResolvidosService';
+import * as fornecedorAtaPncpService from '../fornecedorAtaPncpService';
+import * as vinculosAConferirService from '../vinculosAConferirService';
+import * as ausentesDaFonteService from '../ausentesDaFonteService';
+import * as empenhadoAcimaService from '../empenhadoAcimaService';
+import type { EmpenhadoAcima } from '../empenhadoAcimaService';
 
 vi.mock('../dbCacheService');
 vi.mock('../contractService');
 vi.mock('../contractManagementService');
 vi.mock('../../adapters/paymentCycleRpcAdapter');
+
+// Fontes do Início que não dependem da UASG: espiadas para contar quantas vezes cada uma é lida.
+vi.mock('../ataManagementService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ataManagementService')>()),
+  fetchAllAtaTaskPlans: vi.fn(async () => ({}))
+}));
+vi.mock('../avisosResolvidosService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../avisosResolvidosService')>()),
+  fetchAvisosResolvidos: vi.fn(async () => [])
+}));
+vi.mock('../fornecedorAtaPncpService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../fornecedorAtaPncpService')>()),
+  fetchRegistrosFornecedorPncp: vi.fn(async () => [])
+}));
+vi.mock('../vinculosAConferirService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../vinculosAConferirService')>()),
+  fetchVinculosAConferir: vi.fn(async () => [])
+}));
+vi.mock('../ausentesDaFonteService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ausentesDaFonteService')>()),
+  fetchAusentesDaFonte: vi.fn(async () => [])
+}));
+vi.mock('../empenhadoAcimaService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../empenhadoAcimaService')>()),
+  fetchEmpenhadoAcima: vi.fn(async () => [])
+}));
+
+// A alocação (arp_allocations) é lida dentro do próprio dashboardService: para contá-la, um banco de mentira
+// que responde vazio a tudo e anota as tabelas lidas. Ligado só nos testes que pedem.
+const bancoFalso = vi.hoisted(() => ({ ligado: false, tabelas: [] as string[] }));
+vi.mock('../supabaseClient', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../supabaseClient')>();
+  const consulta = (): any =>
+    new Proxy({}, {
+      get: (_alvo, prop) => (prop === 'then' ? (ok: (r: unknown) => void) => ok({ data: [], error: null }) : () => consulta())
+    });
+  const cliente = {
+    from: (tabela: string) => {
+      bancoFalso.tabelas.push(tabela);
+      return consulta();
+    },
+    rpc: () => consulta()
+  };
+  return {
+    ...original,
+    get isSupabaseConfigured() {
+      return bancoFalso.ligado || original.isSupabaseConfigured;
+    },
+    get supabase() {
+      return bancoFalso.ligado ? cliente : original.supabase;
+    }
+  };
+});
 
 describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
   const referenceDate = new Date('2026-09-24T12:00:00Z');
@@ -1066,6 +1127,132 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       const segunda = await fetchManagementDashboardData('209992', referenceDate);
       expect(segunda.arp.totalAtas).toBe(1);
       expect(segunda.fontesComFalha?.[0]).toMatchObject({ rotulo: 'atas (ARPs)', situacao: 'DESATUALIZADA' });
+    });
+  });
+
+  describe('fontes sem UASG lidas uma vez só no Início (as duas UASGs abrem juntas)', () => {
+    const contrato = (id: string, uasg: string) =>
+      ({ id, numero: id, ano: 2026, numeroFormatado: `${id}/2026`, objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', uasg, fonteDados: 'Compras.gov.br' }) as ContractDashboardRecord;
+    const acima = (contractKey: string): EmpenhadoAcima => ({
+      contractKey,
+      numeroItem: 1,
+      descricao: null,
+      quantidadeContratada: 10,
+      quantidadeEmpenhada: 12,
+      quantidadeAcima: 2,
+      notas: 1,
+      ultimaNota: null,
+      ultimaOrigem: null,
+      periodoInicio: null,
+      periodoFim: null,
+      peloValor: false,
+      valorContratado: 0,
+      valorEmpenhado: 0,
+      valorAcima: 0
+    });
+    const fontesSemUasg = () => [
+      ataManagementService.fetchAllAtaTaskPlans,
+      avisosResolvidosService.fetchAvisosResolvidos,
+      fornecedorAtaPncpService.fetchRegistrosFornecedorPncp,
+      vinculosAConferirService.fetchVinculosAConferir,
+      ausentesDaFonteService.fetchAusentesDaFonte,
+      empenhadoAcimaService.fetchEmpenhadoAcima
+    ];
+    const leiturasDaAlocacao = () => bancoFalso.tabelas.filter((t) => t === 'arp_allocations').length;
+    const avisosAcima = (rm: { attention: { items: { id: string }[] } }) =>
+      rm.attention.items.map((i) => i.id).filter((id) => id.startsWith('ATT-ACIMA-')).sort();
+    const abrirInicio = () =>
+      Promise.all([fetchManagementDashboardData('200330', referenceDate), fetchManagementDashboardData('200331', referenceDate)]);
+
+    beforeEach(() => {
+      bancoFalso.ligado = true;
+      bancoFalso.tabelas = [];
+      vi.mocked(contractService.fetchContractsForDashboard).mockImplementation(async (uasg?: string) =>
+        uasg === '200330' ? [contrato('C330', '200330')] : [contrato('C331', '200331')]
+      );
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValue({ arps: [], syncInfo: { isCachedInDb: true } as any });
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+      // Uma lista nova a cada leitura: se a fonte fosse lida duas vezes, as UASGs receberiam listas diferentes.
+      vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockImplementation(async () => [acima('C330'), acima('C331')]);
+    });
+
+    afterEach(() => {
+      bancoFalso.ligado = false;
+    });
+
+    it('cada uma das 7 fontes é lida 1 vez e as duas UASGs recebem o mesmo dado, recortado depois por UASG', async () => {
+      const [r330, r331] = await abrirInicio();
+
+      for (const fonte of fontesSemUasg()) expect(fonte).toHaveBeenCalledTimes(1);
+      expect(leiturasDaAlocacao()).toBe(1);
+      // Fontes que dependem da UASG continuam lidas uma vez por UASG.
+      expect(contractService.fetchContractsForDashboard).toHaveBeenCalledTimes(2);
+
+      expect(r330.fontesComFalha).toBeUndefined();
+      expect(r331.fontesComFalha).toBeUndefined();
+      // A mesma lista chegou às duas; cada uma mostra só o aviso do seu contrato.
+      expect(avisosAcima(r330)).toEqual(['ATT-ACIMA-C330-1']);
+      expect(avisosAcima(r331)).toEqual(['ATT-ACIMA-C331-1']);
+    });
+
+    it('a próxima abertura lê de novo (nada fica guardado depois que a leitura termina)', async () => {
+      await abrirInicio();
+      await abrirInicio();
+
+      for (const fonte of fontesSemUasg()) expect(fonte).toHaveBeenCalledTimes(2);
+      expect(leiturasDaAlocacao()).toBe(2);
+    });
+
+    it('falha numa fonte sem UASG: lida 1 vez, as duas usam a mesma última leitura boa e avisam igual', async () => {
+      await abrirInicio();
+      vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockClear();
+      vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
+
+      const [r330, r331] = await abrirInicio();
+
+      expect(empenhadoAcimaService.fetchEmpenhadoAcima).toHaveBeenCalledTimes(1);
+      const falha = { rotulo: 'empenhado acima do contratado', situacao: 'DESATUALIZADA', mensagem: 'canceling statement due to statement timeout' };
+      expect(r330.fontesComFalha).toEqual([falha]);
+      expect(r331.fontesComFalha).toEqual([falha]);
+      expect(avisosAcima(r330)).toEqual(['ATT-ACIMA-C330-1']);
+      expect(avisosAcima(r331)).toEqual(['ATT-ACIMA-C331-1']);
+    });
+  });
+
+  describe('lerUmaVez', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('quem chega enquanto a leitura está em andamento recebe a mesma promessa', async () => {
+      const buscar = vi.fn(async () => ['dado']);
+      const a = lerUmaVez('teste-junto', buscar);
+      const b = lerUmaVez('teste-junto', buscar);
+      expect(b).toBe(a);
+      expect(buscar).toHaveBeenCalledTimes(1);
+      expect(await b).toEqual(['dado']);
+    });
+
+    it('leitura que começou há mais de 1 s não é aproveitada (pode ser anterior a uma gravação)', async () => {
+      const agora = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+      let terminar!: (v: string) => void;
+      const lenta = vi.fn(() => new Promise<string>((ok) => { terminar = ok; }));
+      const primeira = lerUmaVez('teste-janela', lenta);
+
+      agora.mockReturnValue(11_500);
+      const nova = vi.fn(async () => 'nova');
+      expect(await lerUmaVez('teste-janela', nova)).toBe('nova');
+      expect(nova).toHaveBeenCalledTimes(1);
+      terminar('antiga');
+      expect(await primeira).toBe('antiga');
+    });
+
+    it('depois de uma falha a próxima chamada tenta de novo', async () => {
+      const buscar = vi.fn().mockRejectedValueOnce(new Error('tempo limite')).mockResolvedValueOnce('ok');
+      await expect(lerUmaVez('teste-falha', buscar)).rejects.toThrow('tempo limite');
+      expect(await lerUmaVez('teste-falha', buscar)).toBe('ok');
+      expect(buscar).toHaveBeenCalledTimes(2);
     });
   });
 

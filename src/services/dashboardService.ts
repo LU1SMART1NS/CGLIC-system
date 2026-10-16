@@ -1694,6 +1694,10 @@ export async function fetchManagementDashboardData(
   const falhas: FonteComFalha[] = [];
   const ler = <T,>(nome: string, rotulo: string, p: Promise<T>, vazio: T) =>
     lerFonte(`${cleanUasg}:${nome}`, rotulo, p, vazio, falhas);
+  // Fontes que não dependem da UASG: o Início abre as duas UASGs ao mesmo tempo e lia cada uma em dobro.
+  // Agora as duas chamadas dividem a mesma leitura; o recorte por UASG é feito depois, no read model.
+  const lerSemUasg = <T,>(nome: string, rotulo: string, buscar: () => Promise<T>, vazio: T) =>
+    lerFonte(`todas:${nome}`, rotulo, lerUmaVez(nome, buscar), vazio, falhas);
 
   const [
     contracts,
@@ -1714,15 +1718,15 @@ export async function fetchManagementDashboardData(
     ler('arps', 'atas (ARPs)', fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
     ler('gestores', 'gestores', fetchAllContractManagers(cleanUasg), {} as Record<string, ContractManager>),
     ler('planos', 'planos de tarefas dos contratos', fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
-    ler('planosAtas', 'planos de gestão das atas', fetchAllAtaTaskPlans(), {} as Record<string, AtaTaskPlan>),
-    ler('avisosResolvidos', 'avisos resolvidos', fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
+    lerSemUasg('planosAtas', 'planos de gestão das atas', fetchAllAtaTaskPlans, {} as Record<string, AtaTaskPlan>),
+    lerSemUasg('avisosResolvidos', 'avisos resolvidos', () => fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
     ler('empenhos', 'empenhos', fetchEmpenhosResumoFromDb(cleanUasg), [] as any[]),
     ler('saldoItens', 'saldo dos itens', fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
-    ler('alocacao', 'alocação interna dos itens', fetchItensComAlocacao(), new Set<string>()),
-    ler('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp(), [] as RegistroFornecedorPncp[]),
-    ler('vinculos', 'vínculos a conferir', fetchVinculosAConferir(), [] as VinculoAConferir[]),
-    ler('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte(), [] as AusenteDaFonte[]),
-    ler('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima(), [] as EmpenhadoAcima[])
+    lerSemUasg('alocacao', 'alocação interna dos itens', fetchItensComAlocacao, new Set<string>()),
+    lerSemUasg('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp, [] as RegistroFornecedorPncp[]),
+    lerSemUasg('vinculos', 'vínculos a conferir', fetchVinculosAConferir, [] as VinculoAConferir[]),
+    lerSemUasg('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte, [] as AusenteDaFonte[]),
+    lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[])
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
@@ -1751,8 +1755,40 @@ export async function fetchManagementDashboardData(
   return falhas.length > 0 ? { ...readModel, fontesComFalha: falhas } : readModel;
 }
 
-/** Última leitura boa de cada fonte do painel (por UASG), guardada na memória da aba. */
+/** Última leitura boa de cada fonte do painel (por UASG, ou `todas:` nas fontes sem UASG), guardada na memória da aba. */
 const ultimaLeituraBoa = new Map<string, unknown>();
+
+/**
+ * Por quanto tempo uma leitura em andamento pode ser aproveitada por outra chamada. As duas UASGs do Início
+ * pedem juntas (milissegundos de diferença); a janela curta evita que uma releitura pedida depois de uma
+ * gravação (ex.: aviso resolvido) pegue a leitura antiga, que começou antes da gravação.
+ */
+const JANELA_LEITURA_COMPARTILHADA_MS = 1000;
+const leiturasEmAndamento = new Map<string, { promessa: Promise<unknown>; inicio: number }>();
+
+/**
+ * Busca uma fonte sem UASG uma vez só para as chamadas que chegam juntas: quem chega enquanto a leitura
+ * está em andamento (e começou há menos de 1 s) recebe a mesma promessa. Terminada (com dado ou falha),
+ * a próxima chamada lê de novo — nada fica guardado aqui além da leitura em andamento.
+ */
+export function lerUmaVez<T>(nome: string, buscar: () => Promise<T>): Promise<T> {
+  const agora = Date.now();
+  const atual = leiturasEmAndamento.get(nome);
+  if (atual && agora - atual.inicio < JANELA_LEITURA_COMPARTILHADA_MS) return atual.promessa as Promise<T>;
+  let promessa: Promise<T>;
+  try {
+    promessa = buscar();
+  } catch (err) {
+    promessa = Promise.reject(err);
+  }
+  const entrada = { promessa, inicio: agora };
+  leiturasEmAndamento.set(nome, entrada);
+  const terminar = () => {
+    if (leiturasEmAndamento.get(nome) === entrada) leiturasEmAndamento.delete(nome);
+  };
+  promessa.then(terminar, terminar);
+  return promessa;
+}
 
 /**
  * Lê uma fonte do painel sem deixar a falha dela derrubar a tela. Se a leitura falhar,
