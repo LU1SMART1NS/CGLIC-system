@@ -7,6 +7,7 @@ import { GestaoInstrumentosTable } from '../../components/instrumentos/GestaoIns
 import * as useManagementDashboardModule from '../../hooks/useManagementDashboard';
 import * as useAllContractManagersModule from '../../hooks/useAllContractManagers';
 import * as useAtaManagersModule from '../../hooks/useAtaManagers';
+import * as useUsersModule from '../../hooks/useUsers';
 import type { ManagementDashboardReadModel } from '../../types/managementDashboard';
 
 vi.mock('react-router-dom', () => ({
@@ -201,6 +202,11 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
     } as any);
     vi.spyOn(useAtaManagersModule, 'useArpItemContractLinks').mockReturnValue({
       data: [],
+      isLoading: false
+    } as any);
+    vi.spyOn(useUsersModule, 'useUsers').mockReturnValue({
+      data: [{ id: 'u1', nome: 'Ana Costa', email: 'ana@mj.gov.br', perfil: 'gestor', ativo: true }],
+      isPending: false,
       isLoading: false
     } as any);
   });
