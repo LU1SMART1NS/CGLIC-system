@@ -7,6 +7,7 @@ import { matchesStatusFilter, comparePrazo } from './carteira/carteiraPrazo';
 import { getArpPrazo, useAtasPortfolio } from '../hooks/useAtasPortfolio';
 import { useAuth } from '../context/AuthContext';
 import { useCarteiraItens } from '../hooks/useCarteiraItens';
+import { SaldoItensFalhaNotice } from './carteira/SaldoItensFalhaNotice';
 import { passaFiltroNivel, type NivelAtendimento } from '../utils/itemAtendimento';
 import { TODAS_UNIDADES } from './carteira/CarteiraExecucaoSelects';
 import { canAssignManager } from './carteira/ManagerAssign';
@@ -57,7 +58,11 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   } = useAtasPortfolio();
 
   // Alocação, empenho e unidades de cada ata, somados dos itens (filtros e colunas da carteira).
-  const { resumoPorAta, unidades } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  const { resumoPorAta, unidades, saldosComErro, recarregandoSaldos, recarregarSaldos } = useCarteiraItens({
+    arps: scopedArps,
+    itemsByAta,
+    gestorByAta
+  });
 
   useEffect(() => {
     if (onArpsLoaded && scopedArps.length > 0) {
@@ -68,6 +73,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   // Filtros na URL (?situacao=&alocacao=&empenho=&gestor=&busca=): sobrevivem à ida ao detalhe e permitem link já filtrado.
   const { filters: filterState, setFilter, setFilters, resetFilters: handleResetFilters } =
     useCarteiraFilters(ARP_FILTER_SCHEMA);
+  // Sem o saldo dos itens a situação da ata assinada é desconhecida: o filtro "Qtd. assinada" não filtra.
+  const filtroAtaAssinada = saldosComErro ? 'TODOS' : filterState.ataAssinada;
   // Tirar o GTI também volta o "Contar" ao padrão (uma só mudança de endereço).
   const handleFilterChange = useCallback(
     <K extends keyof ArpPortfolioFilterState>(key: K, value: ArpPortfolioFilterState[K]) => {
@@ -160,7 +167,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       if (!passaFiltroNivel(execucao?.nivelEmpenho ?? null, filterState.filtroEmpenho)) return false;
       if (filterState.unidade !== TODAS_UNIDADES && !execucao?.unidades.has(filterState.unidade)) return false;
       // Qtd. da ata assinada (migration 116): ata em que informar não muda nada (adesão, só a SENASP) fica de fora.
-      if (filterState.ataAssinada !== 'TODOS' && execucao?.ataAssinada?.situacao !== filterState.ataAssinada) return false;
+      if (filtroAtaAssinada !== 'TODOS' && execucao?.ataAssinada?.situacao !== filtroAtaAssinada) return false;
 
       // 4. Papel da SENASP (gerenciada pela CGLIC ou de outro órgão)
       if (!passaFiltroPapel(arp, filterState.papel)) return false;
@@ -202,7 +209,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       }
       return comparePrazo(getArpPrazo(a).dias, getArpPrazo(b).dias);
     });
-  }, [scopedArps, filterState, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta, fatiasDaArp]);
+  }, [scopedArps, filterState, filtroAtaAssinada, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta, fatiasDaArp]);
 
   // Carregar itens para as atas filtradas
   useEffect(() => {
@@ -266,6 +273,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         />
       )}
 
+      {saldosComErro && <SaldoItensFalhaNotice onRetry={recarregarSaldos} isRetrying={recarregandoSaldos} />}
+
       <ArpPortfolioSummary
         totalAtas={summaryMetrics.total}
         vigentes={summaryMetrics.vigentes}
@@ -282,7 +291,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         unidades={unidades}
         alocacaoCounts={nivelCounts.alocacao}
         empenhoCounts={nivelCounts.empenho}
-        ataAssinadaCounts={nivelCounts.ataAssinada}
+        ataAssinadaCounts={saldosComErro ? undefined : nivelCounts.ataAssinada}
         papelCounts={papelCounts}
         gtiCounts={gtiCounts}
         showGestorFilter={showGestorFilter}

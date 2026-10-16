@@ -9,6 +9,7 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
 import { useCarteiraItens } from '../../hooks/useCarteiraItens';
+import { SaldoItensFalhaNotice } from '../carteira/SaldoItensFalhaNotice';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { CarteiraSituacaoTabs } from '../carteira/CarteiraSituacaoTabs';
 import { useCarteiraFilters } from '../carteira/carteiraFilters';
@@ -37,9 +38,18 @@ export const ItensPortfolio: React.FC = () => {
   const showGestorFilter = canFilterByGestor(role);
 
   const { arps, scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, syncError, reload } = useAtasPortfolio();
-  const { rows, unidades, isLoading: loadingExecucao } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  const {
+    rows,
+    unidades,
+    isLoading: loadingExecucao,
+    saldosComErro,
+    recarregandoSaldos,
+    recarregarSaldos
+  } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
 
   const { filters, setFilter: setFilterUrl, setFilters, resetFilters } = useCarteiraFilters(ITENS_FILTER_SCHEMA);
+  // Sem o saldo dos itens a situação da ata assinada é desconhecida: o filtro "Qtd. assinada" não filtra.
+  const filtroAtaAssinada = saldosComErro ? 'TODOS' : filters.ataAssinada;
   // Tirar o GTI também volta o "Contar" ao padrão (uma só mudança de endereço).
   const setFilter = useCallback(
     <K extends keyof ItensPortfolioFilterState>(key: K, value: ItensPortfolioFilterState[K]) => {
@@ -121,7 +131,7 @@ export const ItensPortfolio: React.FC = () => {
         .filter(
           (r) =>
             passaFiltroNivel(r.nivelAlocacao, filters.filtroAlocacao) && passaFiltroNivel(r.nivelEmpenho, filters.filtroEmpenho) &&
-            (filters.ataAssinada === 'TODOS' || r.ataAssinada === filters.ataAssinada)
+            (filtroAtaAssinada === 'TODOS' || r.ataAssinada === filtroAtaAssinada)
         )
         .sort(
           (a, b) =>
@@ -131,7 +141,7 @@ export const ItensPortfolio: React.FC = () => {
             a.arp.numeroAtaRegistroPreco.localeCompare(b.arp.numeroAtaRegistroPreco) ||
             Number(a.item.numeroItem) - Number(b.item.numeroItem)
         ),
-    [baseRows, filters.filtroAlocacao, filters.filtroEmpenho, filters.ataAssinada, filters.gti, fatiasDaLinha]
+    [baseRows, filters.filtroAlocacao, filters.filtroEmpenho, filtroAtaAssinada, filters.gti, fatiasDaLinha]
   );
 
   // Quantos itens (com os demais filtros) cairiam em cada nível de alocação / empenho: contagem no menu do filtro.
@@ -195,6 +205,8 @@ export const ItensPortfolio: React.FC = () => {
         </div>
       ) : (
         <>
+          {saldosComErro && <SaldoItensFalhaNotice onRetry={recarregarSaldos} isRetrying={recarregandoSaldos} />}
+
           <CarteiraSituacaoTabs
             testIdPrefix="itens"
             genero="m"
@@ -233,7 +245,7 @@ export const ItensPortfolio: React.FC = () => {
             unidades={unidades}
             alocacaoCounts={nivelCounts.alocacao}
             empenhoCounts={nivelCounts.empenho}
-            ataAssinadaCounts={nivelCounts.ataAssinada}
+            ataAssinadaCounts={saldosComErro ? undefined : nivelCounts.ataAssinada}
             papelCounts={papelCounts}
             gtiCounts={gtiCounts}
             showGestorFilter={showGestorFilter}

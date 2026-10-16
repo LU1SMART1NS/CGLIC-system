@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAllAllocationsGlobal } from '../services/allocationService';
 import { fetchCarteiraItemEmpenhos, fetchCarteiraItemLinks } from '../services/carteiraItensService';
@@ -74,11 +74,26 @@ export function useCarteiraItens(params?: {
     [links, allocations]
   );
 
+  // Sem o saldo, a situação da qtd. da ata assinada e o consumo de cada item ficam desconhecidos: a tela avisa
+  // em vez de mostrar os filtros de "Qtd. assinada" zerados.
+  const saldosComErro = !apenasUnidadesDeContratos && (saldos200330.isError || saldos200331.isError);
+  const { refetch: relerSaldosA } = saldos200330;
+  const { refetch: relerSaldosB } = saldos200331;
+  const recarregarSaldos = useCallback(() => {
+    void relerSaldosA();
+    void relerSaldosB();
+  }, [relerSaldosA, relerSaldosB]);
+
   return {
     rows,
     resumoPorAta,
     unidades,
     unidadesDoContrato,
+    /** A leitura do saldo dos itens falhou: a situação da ata assinada não é confiável. */
+    saldosComErro,
+    /** Saldo sendo lido de novo (depois de "Tentar de novo"). */
+    recarregandoSaldos: saldos200330.isFetching || saldos200331.isFetching,
+    recarregarSaldos,
     isLoading:
       allocationsQuery.isPending ||
       linksQuery.isPending ||

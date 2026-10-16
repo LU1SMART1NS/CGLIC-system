@@ -622,11 +622,12 @@ export async function buildFlattenedReportData(
     }
   } catch {}
 
-  // Quantitativo SENASP por item, lido da view de saldo (uma consulta por UASG).
+  // Quantitativo SENASP por item, lido da view de saldo (uma consulta por UASG). Se a leitura falhar, o
+  // relatório não sai: sem ela a planilha traria o quantitativo SENASP em branco sem avisar.
   const saldosPorItem = new Map<string, any>();
   if (granularity !== 'BY_ATA') {
     const uasgs = [...new Set(atasToProcess.map((a) => a.codigoUnidadeGerenciadora).filter(Boolean))];
-    const porUasg = await Promise.all(uasgs.map((u) => fetchArpItemSaldosFromDb(u).catch(() => [] as any[])));
+    const porUasg = await Promise.all(uasgs.map((u) => fetchArpItemSaldosFromDb(u)));
     for (const s of porUasg.flat()) {
       saldosPorItem.set(`${s.numero_ata}|${s.codigo_uasg}|${Number(s.numero_item)}`, s);
     }
