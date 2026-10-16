@@ -1035,6 +1035,37 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(result.uasg).toBe('200331');
       expect(result.executive.totalContratos).toBe(1);
       expect(result.arp.totalAtas).toBe(1);
+      expect(result.fontesComFalha).toBeUndefined();
+    });
+
+    it('fonte que falha não derruba o painel: sem leitura anterior, avisa que não carregou', async () => {
+      vi.mocked(contractService.fetchContractsForDashboard).mockResolvedValue([]);
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValue(new Error('canceling statement due to statement timeout'));
+
+      const result = await fetchManagementDashboardData('209991', referenceDate);
+      expect(result.arp.totalAtas).toBe(0);
+      expect(result.fontesComFalha).toEqual([
+        { rotulo: 'atas (ARPs)', situacao: 'NAO_CARREGOU', mensagem: 'canceling statement due to statement timeout' }
+      ]);
+    });
+
+    it('fonte que falha depois de uma leitura boa: usa a última leitura e avisa que está desatualizada', async () => {
+      vi.mocked(contractService.fetchContractsForDashboard).mockResolvedValue([]);
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValueOnce({
+        arps: [{ id: 'a1', numero: '01/2026', ano: 2026, objeto: 'Ata Teste', dataVigenciaFinal: '2027-06-30' } as any],
+        syncInfo: { isCachedInDb: true } as any
+      });
+      const primeira = await fetchManagementDashboardData('209992', referenceDate);
+      expect(primeira.arp.totalAtas).toBe(1);
+
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
+      const segunda = await fetchManagementDashboardData('209992', referenceDate);
+      expect(segunda.arp.totalAtas).toBe(1);
+      expect(segunda.fontesComFalha?.[0]).toMatchObject({ rotulo: 'atas (ARPs)', situacao: 'DESATUALIZADA' });
     });
   });
 
