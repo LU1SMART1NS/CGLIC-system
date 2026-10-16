@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchArpsWithItemsFromDb } from '../services/dbCacheService';
-import { fetchArpItemSaldosFromDb } from '../services/dashboardService';
+import { COLUNAS_SALDO_CARTEIRA, fetchArpItemSaldosFromDb } from '../services/dashboardService';
 import { fetchArpItemContractLinksByAta, enrichContractLinks } from '../services/arpContractLinkService';
 import { useContractsDashboard } from './useContractsDashboard';
 import type { ArpRecord, ArpItemRecord } from '../types';
@@ -75,19 +75,26 @@ export function useAta(ataKey?: string, uasg?: string) {
   };
 }
 
-/** Saldo físico (homologado/consumido/percentual) dos itens de UMA Ata, via v_arp_item_saldo_detalhado. */
-/** Saldos por item de todas as Atas da UASG (mesmo cache de useAtaItemSaldos). */
-export function useAllAtaItemSaldos(uasg?: string) {
+/**
+ * Saldos por item de todas as Atas da UASG, só com as colunas das carteiras (COLUNAS_SALDO_CARTEIRA).
+ * Fica sob o prefixo 'ata-item-saldos': quem invalida o saldo invalida também este cache.
+ * Se a leitura falhar, a consulta fica em erro (isError) em vez de devolver uma lista vazia.
+ */
+export function getCarteiraSaldosQueryOptions(uasg?: string) {
   const cleanUasg = (uasg || '').trim();
-
-  return useQuery({
-    queryKey: ['ata-item-saldos', cleanUasg] as const,
-    queryFn: () => fetchArpItemSaldosFromDb(cleanUasg),
+  return {
+    queryKey: ['ata-item-saldos', cleanUasg, 'carteira'] as const,
+    queryFn: () => fetchArpItemSaldosFromDb(cleanUasg, COLUNAS_SALDO_CARTEIRA),
     enabled: Boolean(cleanUasg),
     staleTime: 5 * 60 * 1000
-  });
+  };
 }
 
+export function useAllAtaItemSaldos(uasg?: string) {
+  return useQuery(getCarteiraSaldosQueryOptions(uasg));
+}
+
+/** Saldo físico (homologado/consumido/percentual) dos itens de UMA Ata, via v_arp_item_saldo_detalhado (todas as colunas). */
 export function useAtaItemSaldos(numeroAta?: string, uasg?: string) {
   const cleanUasg = (uasg || '').trim();
 
