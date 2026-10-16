@@ -3,6 +3,9 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
 import type { FonteComFalha } from '../../types/managementDashboard';
 
+/** "empenhado acima do contratado" → "Empenhado acima do contratado" (só a primeira letra, como frase). */
+const comoFrase = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1);
+
 /** Motivo em linguagem do usuário; o tempo limite do banco é o caso mais comum. */
 function motivo(mensagem: string): string {
   if (/statement timeout/i.test(mensagem)) return 'a consulta demorou mais que o tempo limite do banco';
@@ -49,7 +52,7 @@ export const FontesComFalhaAviso: React.FC<FontesComFalhaAvisoProps> = ({ falhas
       <ul style={{ margin: '0.45rem 0 0', paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
         {falhas.map((f) => (
           <li key={f.rotulo}>
-            <strong style={{ textTransform: 'capitalize' }}>{f.rotulo}</strong>
+            <strong>{comoFrase(f.rotulo)}</strong>
             {f.situacao === 'DESATUALIZADA'
               ? ': não atualizou — mostrando a última leitura.'
               : ': não carregou — as contagens que dependem dela podem estar incompletas.'}{' '}
