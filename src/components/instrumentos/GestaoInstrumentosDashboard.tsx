@@ -17,7 +17,8 @@ import { GestaoInstrumentosTable } from './GestaoInstrumentosTable';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import type { DashboardAttentionCategory } from '../../types/managementDashboard';
-import { getLookupKey, getInstrumentoInfo, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
+import { getLookupKey, getInstrumentoInfo, getMotivoInfo, isMotivoCategoria, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
+import type { CarteiraFilterOption } from '../carteira/CarteiraFilterButton';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
 import { AvisosResolvidosLista, useResolverAviso } from '../avisos/ResolverAviso';
 import { Instrument360DockProvider } from '../instrument360/Instrument360DockProvider';
@@ -84,6 +85,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     severidadeUrl === 'CRITICA' || severidadeUrl === 'URGENTE' || severidadeUrl === 'ATENCAO' ? severidadeUrl : 'TODAS';
   const abaUrl = searchParams.get('aba') as GestaoInstrumentosCategoryTab | null;
   const activeTab: GestaoInstrumentosCategoryTab = abaUrl && abaUrl in TAB_CATEGORY_MAP ? abaUrl : 'TODAS';
+  const motivoUrl = searchParams.get('motivo');
+  const motivo: GestaoInstrumentosCompactFiltersState['motivo'] = isMotivoCategoria(motivoUrl) ? motivoUrl : 'TODAS';
   const uasgUrl = searchParams.get('uasg');
   const uasgFiltro = uasgUrl && (UASGS as readonly string[]).includes(uasgUrl) ? uasgUrl : TODAS_UASGS;
   const uasgsAtivas = useMemo(() => (uasgFiltro ? [uasgFiltro] : [...UASGS]), [uasgFiltro]);
@@ -268,24 +271,26 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   const handleSelectCard = useCallback((card: GestaoInstrumentosCardId) => {
     if (card === 'ARP') {
-      mudarEndereco({ aba: activeTab === 'SALDOS' ? null : 'SALDOS' });
+      // Troca de aba: o motivo é por aba, então sai junto (o da aba anterior pode nem existir nesta).
+      mudarEndereco({ aba: activeTab === 'SALDOS' ? null : 'SALDOS', motivo: null });
       setTipoFilter('TODOS');
     } else if (card === 'CONTRATOS') {
       const isActive = tipoFilter === 'CONTRATO';
-      mudarEndereco({ aba: null });
+      mudarEndereco({ aba: null, motivo: null });
       setTipoFilter(isActive ? 'TODOS' : 'CONTRATO');
     } else if (card === 'ALERTAS') {
-      mudarEndereco({ severity: severidade === 'CRITICA' ? null : 'CRITICA', aba: null });
+      mudarEndereco({ severity: severidade === 'CRITICA' ? null : 'CRITICA', aba: null, motivo: null });
       setTipoFilter('TODOS');
     } else {
       // VALOR: card de composição da carteira, não é um balde de alerta — apenas limpa os filtros.
-      mudarEndereco({ aba: null, severity: null });
+      mudarEndereco({ aba: null, severity: null, motivo: null });
       setTipoFilter('TODOS');
     }
   }, [activeTab, tipoFilter, severidade, mudarEndereco]);
 
   const handleSelectTab = useCallback((tab: GestaoInstrumentosCategoryTab) => {
-    mudarEndereco({ aba: tab === 'TODAS' ? null : tab });
+    // Cada aba tem os seus motivos; ao trocar de aba o filtro de Motivo é zerado.
+    mudarEndereco({ aba: tab === 'TODAS' ? null : tab, motivo: null });
     setTipoFilter('TODOS');
   }, [mudarEndereco]);
 
@@ -300,28 +305,43 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     scrollToDock(dockRef.current);
   }, [handleSelectTab]);
 
-  const filteredItems = useMemo(() => {
+  // Filtros de base (aba, prioridade, tipo e busca), sem o de Motivo: a lista aplica todos; o seletor de Motivo
+  // usa só estes para contar quantos itens cada motivo traria na aba aberta (a contagem não muda ao escolher um motivo).
+  const matchesBaseFilters = useCallback((item: AttentionItemWithUasg): boolean => {
+    if (!matchesTab(item, activeTab)) return false;
+    if (severidade !== 'TODAS' && item.severity !== severidade) return false;
+    if (tipoFilter !== 'TODOS') {
+      const tipo = getInstrumentoInfo(item).tipo === 'ARP' ? 'ARP' : 'CONTRATO';
+      if (tipo !== tipoFilter) return false;
+    }
     const query = busca.trim().toLowerCase();
-    return allItems.filter((item) => {
-      if (!matchesTab(item, activeTab)) return false;
-      if (severidade !== 'TODAS' && item.severity !== severidade) return false;
-      if (tipoFilter !== 'TODOS') {
-        const tipo = getInstrumentoInfo(item).tipo === 'ARP' ? 'ARP' : 'CONTRATO';
-        if (tipo !== tipoFilter) return false;
-      }
+    if (query) {
+      const fornecedor = (fornecedorByKey.get(getLookupKey(item)) || '').toLowerCase();
+      const haystack = [item.title, item.description, item.numeroContrato, item.contractKey, item.numeroAta, item.uasg, fornecedor, item.objetoItem, item.fornecedorNome]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!haystack.includes(query)) return false;
+    }
+    return true;
+  }, [activeTab, severidade, tipoFilter, busca, fornecedorByKey]);
 
-      if (query) {
-        const fornecedor = (fornecedorByKey.get(getLookupKey(item)) || '').toLowerCase();
-        const haystack = [item.title, item.description, item.numeroContrato, item.contractKey, item.numeroAta, item.uasg, fornecedor, item.objetoItem, item.fornecedorNome]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
+  // Motivos presentes na aba aberta (já com os demais filtros aplicados), do mais frequente ao menos, com a contagem.
+  const motivoOptions = useMemo<CarteiraFilterOption[]>(() => {
+    const counts = new Map<DashboardAttentionCategory, number>();
+    for (const item of allItems) {
+      if (!matchesBaseFilters(item)) continue;
+      counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([category, count]) => ({ value: category, label: getMotivoInfo(category).label, count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'pt-BR'));
+  }, [allItems, matchesBaseFilters]);
 
-      return true;
-    });
-  }, [allItems, activeTab, severidade, tipoFilter, busca, fornecedorByKey]);
+  const filteredItems = useMemo(
+    () => allItems.filter((item) => matchesBaseFilters(item) && (motivo === 'TODAS' || item.category === motivo)),
+    [allItems, matchesBaseFilters, motivo]
+  );
 
   const handleChangeFilter = useCallback(<K extends keyof GestaoInstrumentosCompactFiltersState>(
     key: K,
@@ -330,13 +350,16 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     if (key === 'severidade') {
       const sev = value as GestaoInstrumentosCompactFiltersState['severidade'];
       mudarEndereco({ severity: sev === 'TODAS' ? null : sev });
+    } else if (key === 'motivo') {
+      const m = value as GestaoInstrumentosCompactFiltersState['motivo'];
+      mudarEndereco({ motivo: m === 'TODAS' ? null : m });
     } else {
       setBusca(value as string);
     }
   }, [mudarEndereco]);
 
   const handleResetFilters = useCallback(() => {
-    mudarEndereco({ aba: null, severity: null });
+    mudarEndereco({ aba: null, severity: null, motivo: null });
     setTipoFilter('TODOS');
     setBusca('');
   }, [mudarEndereco]);
@@ -544,9 +567,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
             }}>
               <div style={{ flex: '1 1 360px', minWidth: 0 }}>
                 <GestaoInstrumentosCompactFilters
-                  filters={{ severidade, busca }}
+                  filters={{ severidade, motivo, busca }}
                   onChangeFilter={handleChangeFilter}
                   onResetFilters={handleResetFilters}
+                  motivoOptions={motivoOptions}
                   totalFiltered={filteredItems.length}
                   totalItems={allItems.length}
                 />

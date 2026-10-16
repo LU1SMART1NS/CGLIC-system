@@ -1,10 +1,12 @@
 import React from 'react';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
-import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
-import type { DashboardAttentionSeverity } from '../../types/managementDashboard';
+import { CarteiraFilterButton, type CarteiraFilterOption } from '../carteira/CarteiraFilterButton';
+import type { DashboardAttentionCategory, DashboardAttentionSeverity } from '../../types/managementDashboard';
 
 export interface GestaoInstrumentosCompactFiltersState {
   severidade: DashboardAttentionSeverity | 'TODAS';
+  /** Motivo da atenção (categoria do alerta); 'TODAS' = sem filtro. */
+  motivo: DashboardAttentionCategory | 'TODAS';
   busca: string;
 }
 
@@ -15,6 +17,8 @@ interface GestaoInstrumentosCompactFiltersProps {
     value: GestaoInstrumentosCompactFiltersState[K]
   ) => void;
   onResetFilters: () => void;
+  /** Motivos presentes na aba aberta (com contagem), já calculados pelo painel. */
+  motivoOptions: CarteiraFilterOption[];
   totalFiltered: number;
   totalItems: number;
 }
@@ -27,10 +31,14 @@ export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompac
   filters,
   onChangeFilter,
   onResetFilters,
+  motivoOptions,
   totalFiltered,
   totalItems
 }) => {
-  const hasActiveFilters = Boolean(filters.severidade !== 'TODAS' || filters.busca.trim().length > 0);
+  const hasActiveFilters = Boolean(filters.severidade !== 'TODAS' || filters.motivo !== 'TODAS' || filters.busca.trim().length > 0);
+  // Só mostra o filtro de Motivo quando há de fato o que escolher na aba aberta (mais de um motivo),
+  // ou quando já há um motivo escolhido (para dar como removê-lo).
+  const mostrarMotivo = motivoOptions.length > 1 || filters.motivo !== 'TODAS';
 
   return (
     <CarteiraFilterBar
@@ -54,6 +62,16 @@ export const GestaoInstrumentosCompactFilters: React.FC<GestaoInstrumentosCompac
         onChange={(value) => onChangeFilter('severidade', value as GestaoInstrumentosCompactFiltersState['severidade'])}
         testId="instrumentos-filter-severity"
       />
+      {mostrarMotivo && (
+        <CarteiraFilterButton
+          label="Motivo"
+          value={filters.motivo}
+          emptyValue="TODAS"
+          options={motivoOptions}
+          onChange={(value) => onChangeFilter('motivo', value as GestaoInstrumentosCompactFiltersState['motivo'])}
+          testId="instrumentos-filter-motivo"
+        />
+      )}
     </CarteiraFilterBar>
   );
 };
