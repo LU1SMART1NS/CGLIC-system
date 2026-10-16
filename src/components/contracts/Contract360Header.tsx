@@ -225,8 +225,8 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       actions={
         <>
           {pncpUrl && (
-            <a href={pncpUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
-              <ExternalLink size={13} /> Contrato no PNCP
+            <a href={pncpUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle} aria-label="Contrato no PNCP">
+              <ExternalLink size={13} /> Contrato<span className="i360-so-largo"> no PNCP</span>
             </a>
           )}
           {/* Empenhos de contrato não são atualizados automaticamente: este é o único
@@ -237,13 +237,14 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
             onClick={handleSync}
             disabled={!isAuthorized || syncMutation.isPending}
             isLoading={syncMutation.isPending}
+            aria-label={syncMutation.isPending ? undefined : 'Atualizar empenhos'}
             title={
               !isAuthorized
                 ? 'Você não possui permissão para atualizar empenhos.'
                 : `Buscar empenhos deste contrato nas fontes oficiais (fonte do contrato: ${contract.fonteDados || 'PNCP'})`
             }
           >
-            {syncMutation.isPending ? 'Atualizando...' : 'Atualizar empenhos'}
+            {syncMutation.isPending ? 'Atualizando...' : <>Atualizar<span className="i360-so-largo"> empenhos</span></>}
           </ActionButton>
         </>
       }

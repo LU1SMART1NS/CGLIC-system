@@ -1063,6 +1063,43 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
   .i360-head.min .i360-identity { row-gap: 0; }
 }
 
+/* Telas 360 no celular (cartão resumido, aprovado por protótipo em 16/10/2026): o cartão não gruda nem encolhe; rola com a
+   página e, quando sai inteiro da tela, aparece a barra azul (.i360-pbar, com nome, situação e Resumo) e as abas grudam logo
+   abaixo dela. O bloco do topo vira display: contents para a barra e as abas grudarem na página inteira, não só no bloco. */
+.i360-pbar-name, .i360-pbar-title { min-width: 0; }
+@media (max-width: 767px) {
+  .i360-head--resumo { display: contents; }
+  .i360-head--resumo::before { display: none; } /* a faixa azul do cartão encolhido não existe aqui (e sairia da tela) */
+  .i360-head--resumo .i360-tabs { position: sticky; top: calc(var(--app-header-h, 0px) + 52px); z-index: 22; margin-bottom: 1.25rem; }
+  .i360-pbar { position: sticky; top: var(--app-header-h, 0px); z-index: 21; height: 52px; margin-bottom: -52px; opacity: 0; visibility: hidden; transform: translateY(-6px); pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 0.25s; }
+  .i360-pbar.on { opacity: 1; visibility: visible; transform: none; pointer-events: auto; transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s; }
+  /* Faixa que sangra até as bordas: azul na altura da barra e clara atrás das abas, para a lista não aparecer dos lados. */
+  .i360-pbar::before { content: ''; position: absolute; top: 0; left: -100vmax; right: -100vmax; bottom: -44px; z-index: -1; pointer-events: none;
+    background: linear-gradient(var(--primary) 0 52px, #eef3fb 52px); box-shadow: 0 -1px 0 var(--primary), 0 4px 10px -6px rgba(15, 23, 42, 0.35); }
+  .i360-pbar-row { height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .i360-pbar-title { all: unset; cursor: pointer; flex: 0 1 auto; display: flex; align-items: center; gap: 8px; min-height: 44px; border-radius: 6px; overflow: hidden; color: #ffffff; }
+  .i360-pbar-title:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+  .i360-pbar-name { font-size: 1.05rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .i360-pbar .ds-btn.i360-pbar-resumo { flex: none; min-height: 40px; border-radius: 999px; color: #ffffff; background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.55); }
+  .i360-pbar .ds-btn.i360-pbar-resumo:hover { background: rgba(255, 255, 255, 0.22); color: #ffffff; }
+  .i360-pbar .ds-btn.i360-pbar-resumo:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+
+  .i360-hero--resumo { gap: 10px; padding: 14px 14px 4px; margin-bottom: 12px; }
+  .i360-hero--resumo .i360-title { font-size: 1.55rem; }
+  .i360-pfacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+  .i360-hero--resumo .health-tile-grid[data-columns] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .i360-hero--resumo .health-tile-grid[data-columns] .health-tile { height: auto; min-height: 0; }
+  .i360-hero--resumo .health-tile-grid[data-columns] .health-tile--wide { grid-column: auto; height: auto; min-height: 0; }
+  .ds-modal .health-tile-grid[data-columns] .health-tile { height: auto; }
+  .i360-hero--resumo .ds-btn.i360-pmais { min-height: 44px; justify-content: center; gap: 6px; }
+  /* Rótulos curtos dos botões do topo (ex.: "Ata" em vez de "Ata no PNCP"): o nome inteiro fica no aria-label. */
+  .i360-so-largo { display: none; }
+}
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .i360-pbar, .i360-pbar.on { transition: none; }
+}
+
 /* ==========================================================================
    DataTable (Fase 2 / P2) — tabela rolável e modo cartões no mobile
    ========================================================================== */

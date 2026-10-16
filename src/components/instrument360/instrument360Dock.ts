@@ -4,6 +4,15 @@ import React from 'react';
 export interface DockContextValue {
   min: boolean;
   setMin: (min: boolean) => void;
+  /**
+   * Celular com o cartão resumido (`Instrument360Head` com `resumoNoCelular`): o cartão rola com a página e,
+   * quando sai inteiro da tela, aparece a barra azul (`phoneDocked`). A barra é desenhada pelo cartão dentro
+   * de `phoneBarSlot`, um lugar que o bloco do topo reserva acima dele.
+   */
+  phone: boolean;
+  phoneDocked: boolean;
+  phoneBarSlot: HTMLElement | null;
+  setPhone: (phone: { active: boolean; docked: boolean; slot: HTMLElement | null }) => void;
 }
 
 export const DockContext = React.createContext<DockContextValue | null>(null);
@@ -20,6 +29,10 @@ export function scrollBehavior(): ScrollBehavior {
 /** Rolagem passa deste ponto: o cartão encolhe. Só volta a abrir ao chegar ao topo (abaixo de DOCK_OPEN_AT). */
 export const DOCK_MIN_AT = 60;
 export const DOCK_OPEN_AT = 4;
+/** Altura da barra azul do celular (nome, situação e Resumo), acima das abas que grudam. */
+export const PHONE_BAR_H = 52;
+/** Celular: abaixo desta largura o menu vira barra inferior e as telas 360 usam o cartão resumido. */
+export const PHONE_QUERY = '(max-width: 767px)';
 /** Duração da transição de encolher (igual a --i360-t no CSS). */
 export const DOCK_TRANSITION_MS = 650;
 /** Evento que a barra de abas dispara no bloco do topo para ele encolher e ficar assim até a pessoa rolar além de DOCK_MIN_AT. */
@@ -37,7 +50,17 @@ export function scrollToSummary(): void {
  */
 export function scrollToDock(tablist: HTMLElement | null): void {
   const head = tablist?.closest<HTMLElement>('[data-i360-head]');
-  if (!head) return;
+  if (!head || !tablist) return;
+  if (head.dataset.phone === 'true') {
+    // Celular: as abas grudam abaixo da barra azul; rola até o conteúdo da aba ficar logo abaixo delas.
+    const panel = head.nextElementSibling;
+    if (!(panel instanceof HTMLElement)) return;
+    const headerHeight = parseFloat(getComputedStyle(tablist).getPropertyValue('--app-header-h')) || 0;
+    const gap = parseFloat(getComputedStyle(tablist).marginBottom) || 0;
+    const top = panel.getBoundingClientRect().top + window.scrollY - headerHeight - PHONE_BAR_H - tablist.offsetHeight - gap;
+    if (Math.abs(top - window.scrollY) > 2) window.scrollTo({ top: Math.max(0, top), behavior: scrollBehavior() });
+    return;
+  }
   const wasMin = head.dataset.min === 'true';
   head.dispatchEvent(new CustomEvent(DOCK_PIN_EVENT));
   const go = () => {

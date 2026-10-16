@@ -646,7 +646,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   return (
     <Instrument360Page>
-      <Instrument360Head>
+      <Instrument360Head resumoNoCelular>
       <ItemHero
         arp={arp}
         item={item}

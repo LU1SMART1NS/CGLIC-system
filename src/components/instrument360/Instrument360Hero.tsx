@@ -6,6 +6,7 @@ import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
 import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
 import { scrollToSummary, useInstrument360Dock } from './instrument360Dock';
+import { Instrument360HeroResumo } from './Instrument360HeroResumo';
 
 /** Identificador do rodapé (processo, categoria, Id PNCP...). Nunca data nem valor. */
 export interface Instrument360MetaItem {
@@ -31,7 +32,7 @@ export interface Instrument360Origin {
   value: React.ReactNode;
 }
 
-interface Instrument360HeroProps {
+export interface Instrument360HeroProps {
   backLabel: string;
   onBack: () => void;
   backTestId?: string;
@@ -78,7 +79,14 @@ const COLORS = { ink: '#0f172a', inkSoft: '#334155', muted: '#64748b', line: '#e
  * UASG, título com a situação e o gestor, fornecedor, objeto, linha da ata, datas, indicadores e,
  * por último, os identificadores. Cada dado aparece uma vez por tela.
  */
-export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
+export const Instrument360Hero: React.FC<Instrument360HeroProps> = (props) => {
+  const dock = useInstrument360Dock();
+  // Celular com o cartão resumido (o bloco do topo decide): outra apresentação, mesmos dados.
+  if (dock?.phone) return <Instrument360HeroResumo {...props} />;
+  return <Instrument360HeroCompleto {...props} />;
+};
+
+const Instrument360HeroCompleto: React.FC<Instrument360HeroProps> = ({
   backLabel,
   onBack,
   backTestId,
