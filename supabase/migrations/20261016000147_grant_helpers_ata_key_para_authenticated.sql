@@ -1,0 +1,35 @@
+-- ============================================================================
+-- Devolve o EXECUTE de dois parsers de texto ao papel `authenticated`.
+--
+-- Contexto
+-- --------
+-- ata_key_from_item_key(TEXT) e ata_uasg_from_item_key(TEXT) são funções
+-- IMMUTABLE puras: só recortam a chave do item ("00059/2025-200331-00001")
+-- com regex, sem ler nenhuma tabela. A migration 20261005000069 as revogou do
+-- `authenticated` por serem "auxiliares internas".
+--
+-- Acontece que migrations posteriores passaram a usá-las dentro de VIEWS
+-- declaradas WITH (security_invoker = true), que o painel (Início) lê como
+-- `authenticated`:
+--   - v_arp_item_saldo_detalhado  (20261009000106) → saldos dos itens
+--                                   (avisos de saldo / quantitativos)
+--   - v_vinculos_a_conferir       (20261013000112) → avisos de vínculo a conferir
+--
+-- Como `security_invoker = true` executa as funções COMO o usuário logado, e o
+-- `authenticated` não tinha mais EXECUTE, toda leitura dessas views falhava com
+-- "permission denied for function ata_key_from_item_key" — derrubando as
+-- consultas de saldo do painel. Antes o erro ficava escondido por um `.catch`
+-- que devolvia lista vazia (avisos "sumindo" da tela); o PR #241 passou a
+-- propagá-lo, revelando esta causa raiz.
+--
+-- Correção
+-- --------
+-- Devolver apenas o EXECUTE dessas duas funções-parser. As demais auxiliares
+-- revogadas na 069 (ex.: herdar_gestor_da_ata, que grava dados) continuam
+-- revogadas. Como são parsers sem acesso a dado, expor o EXECUTE não revela
+-- informação alguma. chave_gestao_ata (encadeada por ata_key_from_item_key)
+-- nunca foi revogada, então mantém o EXECUTE padrão.
+-- ============================================================================
+
+GRANT EXECUTE ON FUNCTION public.ata_key_from_item_key(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ata_uasg_from_item_key(TEXT) TO authenticated;
