@@ -27,6 +27,7 @@ import { scrollToDock } from '../instrument360/instrument360Dock';
 import { GestaoInstrumentosDockStrip } from './GestaoInstrumentosDockStrip';
 import { useAllAtaManagers } from '../../hooks/useAtaManagers';
 import { usePainelCarteira } from '../../hooks/usePainelCarteira';
+import { useUsers } from '../../hooks/useUsers';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContagensExtras } from '../vinculacao/contagemExtras';
 import { listarGestores } from '../../utils/escopoDoGestor';
@@ -110,9 +111,20 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // Coordenador e consulta escolhem um gestor: o painel inteiro passa a ser a carteira dele, com o mesmo recorte
   // que ele vê no próprio painel (useAssignedManagementScope / escopoDoGestor).
   const podeFiltrarGestor = role === 'admin' || role === 'leitor';
+  const { data: usuarios } = useUsers();
+  // Só gestores de atas e contratos ativos podem ser escolhidos: coordenador, consulta e inativos ficam fora.
+  const idsGestoresAtivos = useMemo(
+    () => new Set((usuarios || []).filter((u) => u.ativo && u.perfil === 'gestor').map((u) => u.id)),
+    [usuarios]
+  );
   const gestores = useMemo(
-    () => listarGestores([...Object.values(managers200330.data || {}), ...Object.values(managers200331.data || {})], Object.values(ataManagers || {})),
-    [managers200330.data, managers200331.data, ataManagers]
+    () =>
+      listarGestores(
+        [...Object.values(managers200330.data || {}), ...Object.values(managers200331.data || {})],
+        Object.values(ataManagers || {}),
+        idsGestoresAtivos
+      ),
+    [managers200330.data, managers200331.data, ataManagers, idsGestoresAtivos]
   );
   const gestorNome = podeFiltrarGestor ? searchParams.get('gestor') || TODOS_OS_GESTORES : TODOS_OS_GESTORES;
   const gestorEscolhido = gestorNome ? gestores.find((g) => g.nome === gestorNome) : undefined;

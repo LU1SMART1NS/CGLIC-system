@@ -36,4 +36,13 @@ describe('listarGestores', () => {
       { userId: 'bruno', nome: 'Bruno' }
     ]);
   });
+
+  it('com idsPermitidos, deixa de fora quem não está no conjunto (inativo/coordenador)', () => {
+    // Só Ana é gestora ativa; Bruno (inativo ou coordenador) tem atribuição antiga mas não entra.
+    expect(listarGestores(contratos, atas, new Set(['ana']))).toEqual([{ userId: 'ana', nome: 'Ana' }]);
+  });
+
+  it('conjunto vazio não lista ninguém', () => {
+    expect(listarGestores(contratos, atas, new Set())).toEqual([]);
+  });
 });

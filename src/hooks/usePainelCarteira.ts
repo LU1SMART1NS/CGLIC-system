@@ -12,6 +12,7 @@ import { getArpPrazo } from './useAtasPortfolio';
 import { getContractsDashboardQueryOptions } from './useContractsDashboard';
 import { getAllContractManagersQueryOptions } from './useAllContractManagers';
 import { useAllAtaManagers, useArpItemContractLinks } from './useAtaManagers';
+import { useUsers } from './useUsers';
 
 /**
  * Atas e contratos das duas UASGs já classificados pela faixa de prazo das carteiras, mais os gestores e a carteira de
@@ -24,8 +25,16 @@ export function usePainelCarteira(enabled: boolean) {
   const gestoresQ = useQueries({ queries: UASGS_CGLIC.map((u) => ({ ...getAllContractManagersQueryOptions(u), enabled })) });
   const { data: ataManagers, isPending: ataManagersPending } = useAllAtaManagers();
   const { data: vinculos, isPending: vinculosPending } = useArpItemContractLinks(enabled);
+  const { data: users, isPending: usersPending } = useUsers();
 
   const assinatura = [...atasQ, ...contratosQ, ...gestoresQ].map((q) => q.dataUpdatedAt).join('|');
+
+  // Só entra na carteira quem é gestor de atas e contratos ativo. Coordenador, perfil consulta ou usuário inativado
+  // que ainda tenha atribuição antiga (ata/contrato encerrado) fica de fora — inclusive do rodapé "Sem carteira".
+  const idsGestoresAtivos = useMemo(
+    () => new Set((users || []).filter((u) => u.ativo && u.perfil === 'gestor').map((u) => u.id)),
+    [users]
+  );
 
   const atas = useMemo<InstrumentoNoPainel[]>(
     () =>
@@ -52,16 +61,19 @@ export function usePainelCarteira(enabled: boolean) {
   const gestores = useMemo<Array<{ gestor: GestorDaCarteira; escopo: EscopoDoGestor }>>(() => {
     const contractManagers = gestoresQ.flatMap((q) => Object.values(q.data || {}));
     const atasM = Object.values(ataManagers || {});
-    return listarGestores(contractManagers, atasM).map((gestor) => ({
+    return listarGestores(contractManagers, atasM, idsGestoresAtivos).map((gestor) => ({
       gestor,
       escopo: escopoDoGestor(gestor.userId, contractManagers, atasM, vinculos || [])
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assinatura, ataManagers, vinculos]);
+  }, [assinatura, ataManagers, vinculos, idsGestoresAtivos]);
 
   const isLoading =
     enabled &&
-    ([...atasQ, ...contratosQ, ...gestoresQ].some((q) => q.isPending) || ataManagersPending || vinculosPending);
+    ([...atasQ, ...contratosQ, ...gestoresQ].some((q) => q.isPending) ||
+      ataManagersPending ||
+      vinculosPending ||
+      usersPending);
 
   return { atas, contratos, gestores, isLoading };
 }
