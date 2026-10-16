@@ -15,9 +15,54 @@ describe('motivosDosQuantitativos', () => {
   });
   it('cada problema vira um motivo; cota negativa é crítica', () => {
     const m = motivosDosQuantitativos(linha({ quantidade_base_senasp: -15, orgaos_fora_da_ata: 1, total_assinada: 4800, total_registrado: 4900, orgaos_contratado_acima: 2 }));
-    expect(m.map((x) => x.selo)).toEqual(['cota negativa', 'fora da ata', 'soma não fecha', 'soma não fecha', 'contratado acima']);
+    // A soma do registrado acima do homologado tem aviso próprio (REGISTRADO_ACIMA, migration 142).
+    expect(m.map((x) => x.selo)).toEqual(['cota negativa', 'fora da ata', 'soma não fecha', 'contratado acima']);
     expect(m[0].critico).toBe(true);
     expect(m.slice(1).every((x) => !x.critico)).toBe(true);
+  });
+  it('soma do registrado abaixo do homologado continua motivo (cancelamento ou supressão)', () => {
+    const m = motivosDosQuantitativos(linha({ total_registrado: 4800 }));
+    expect(m.map((x) => x.texto)).toEqual(['soma do registrado (4.800) abaixo do homologado (4.863)']);
+  });
+});
+
+// Ata 00065/2024 item 5 (dados reais de 16/10/2026): homologado 1.782, soma do registrado 2.081, 7 da SENASP acima da
+// ata assinada (96 × 89), base já com o desconto na view (migration 142).
+const acima = (over: Record<string, unknown> = {}) => ({
+  item_key: '00065/2024-200331-00005', numero_ata: '00065/2024', numero_item: '00005', codigo_uasg: '200331',
+  descricao_item: 'Conjunto regulador para mergulho', quantidade_homologada: 1782, quantidade_base_senasp: 89, quantidade_consumida: 64,
+  saldo_disponivel: 25, percentual_consumido: 71.91, ata_assinada_informada: true, total_assinada: 1782, total_registrado: 2081,
+  orgaos_fora_da_ata: 0, orgaos_contratado_acima: 0, soma_registrado: 2081, excedente_registrado: 299, excedente_registrado_senasp: 7,
+  desconto_registrado_acima: 7, registrado_acima_chave: 'SALDO::00065/2024-200331::5::REGISTRADO-ACIMA-2081.00-1782.00', registrado_acima_resolvido: false,
+  ...over
+});
+
+describe('Início — registrado acima do homologado', () => {
+  const avisos = (arpItems: any[]) =>
+    calculateAttentionSummary({ arpItems, currentDate: new Date('2026-10-16T12:00:00') } as any).items.filter((i) => i.category === 'REGISTRADO_ACIMA');
+
+  it('item com excedente: atenção, chave da view e destino no Item', () => {
+    const [a] = avisos([acima()]);
+    expect(a).toMatchObject({
+      id: 'ATT-REGISTRADO-ACIMA-00065/2024-200331-00005',
+      severity: 'ATENCAO',
+      title: 'Registrado acima do homologado',
+      avisoChave: 'SALDO::00065/2024-200331::5::REGISTRADO-ACIMA-2081.00-1782.00',
+      badgeLabel: '+299 acima',
+      targetUrl: '/atas/detalhe/00065%2F2024-200331/itens/00005'
+    });
+    expect(a.description).toBe('Ata 00065/2024 — Item 5: homologado 1.782 × registrado 2.081 (excedente 299; 7 na SENASP fora do saldo)');
+  });
+
+  it('saldo protegido em 20% da base ou menos (ou negativo) é crítico; sem ata assinada, provisório', () => {
+    const [a] = avisos([acima({ ata_assinada_informada: false, quantidade_base_senasp: 60800, saldo_disponivel: 0, excedente_registrado: 60800, excedente_registrado_senasp: 60800 })]);
+    expect(a.severity).toBe('CRITICA');
+    expect(a.description).toContain('60.800 na SENASP (provisório: ata assinada não informada) fora do saldo');
+  });
+
+  it('item sem excedente não gera aviso; o aviso de quantitativos não repete a soma acima', () => {
+    expect(avisos([acima({ registrado_acima_chave: null })])).toEqual([]);
+    expect(motivosDosQuantitativos(acima())).toEqual([]);
   });
 });
 

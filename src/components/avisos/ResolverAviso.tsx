@@ -29,6 +29,8 @@ const REGRA: Record<AvisoResolvivelTipo, string> = {
 };
 /** Aviso de vínculo a conferir (migration 112): resolver só esconde, não decide o vínculo. */
 const REGRA_VINCULO = 'Só esconde o aviso: o vínculo continua como está até o coordenador decidir. O aviso volta se o motivo mudar.';
+/** Registrado acima do homologado (migration 142): resolver devolve ao saldo a parte da SENASP. */
+const REGRA_REGISTRADO_ACIMA = 'Ao resolver, o excedente que está na SENASP volta a contar como saldo. O aviso volta se a soma do registrado ou o homologado mudarem.';
 const REGRA_TAREFA = 'A tarefa será marcada como concluída no plano, com a justificativa na observação.';
 
 /** Junta a justificativa à observação que a tarefa já tinha (o RPC substitui a observação). */
@@ -103,7 +105,7 @@ export function useResolverAviso() {
     }
   };
 
-  const regra = alvo ? (alvo.tipo === 'AVISO' ? (alvo.chave.includes('::VINCULO-') ? REGRA_VINCULO : REGRA[tipoDaChave(alvo.chave)]) : REGRA_TAREFA) : '';
+  const regra = alvo ? (alvo.tipo === 'AVISO' ? (alvo.chave.includes('::VINCULO-') ? REGRA_VINCULO : alvo.chave.includes('::REGISTRADO-ACIMA-') ? REGRA_REGISTRADO_ACIMA : REGRA[tipoDaChave(alvo.chave)]) : REGRA_TAREFA) : '';
 
   const dialog = (
     <Modal

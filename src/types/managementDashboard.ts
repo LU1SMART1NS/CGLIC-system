@@ -71,6 +71,9 @@ export type DashboardAttentionCategory =
   /** Ata da CGLIC com item alocado antes de informar a qtd. da ata assinada, com outros órgãos registrados: o limite
    *  é provisório (migration 116). Pendência do gestor da ata e do coordenador. */
   | 'ATA_ASSINADA'
+  /** Soma do registrado no Compras.gov.br acima do homologado do item: quantidade sem lastro na licitação. Enquanto
+   *  aberto, a parte da SENASP sai do saldo (migration 142). Pendência do gestor da ata e do coordenador. */
+  | 'REGISTRADO_ACIMA'
   | 'LEMBRETE';
 
 export type DashboardAttentionSeverity = 'CRITICA' | 'URGENTE' | 'ATENCAO' | 'INFO';

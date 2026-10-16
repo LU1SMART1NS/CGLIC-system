@@ -44,7 +44,7 @@ type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 const UASGS = UASGS_CGLIC;
 
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
-  SALDOS: ['ATA_CRITICA', 'QUANTITATIVOS', 'ATA_ASSINADA', 'UNIDADE_PENDENTE', 'FORNECEDOR_PNCP', 'VINCULO_A_CONFERIR'],
+  SALDOS: ['ATA_CRITICA', 'QUANTITATIVOS', 'REGISTRADO_ACIMA', 'ATA_ASSINADA', 'UNIDADE_PENDENTE', 'FORNECEDOR_PNCP', 'VINCULO_A_CONFERIR'],
   REAJUSTES: ['REAJUSTE_RADAR'],
   PAGAMENTOS: ['PAGAMENTO_CRITICO', 'PAGAMENTO_PREVISTO', 'FONTE_A_CONFERIR', 'EMPENHO_ACIMA'],
   TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA'],
@@ -159,7 +159,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // Gestor de Saldo (domínio de alocações, sem contratos): enxerga os alertas de saldo das Atas e os quantitativos a
   // conferir (cota própria, migration 109), que são pendência dele. O gestor da ata vê o saldo crítico, mas não os
   // quantitativos: quem os resolve é o gestor de saldo (o coordenador vê tudo). A qtd. da ata assinada a informar
-  // (migration 116) é o contrário: quem informa é o gestor da ata, e o gestor de saldo não a vê.
+  // (migration 116) é o contrário: quem informa é o gestor da ata, e o gestor de saldo não a vê. Registrado acima do
+  // homologado (migration 142) também é do gestor da ata: o gestor de saldo só vê o aviso dentro do item.
   // Expectativa de pagamento (Portaria 50): avisos calculados na tela a partir das marcas dos contratos.
   const { avisos: avisosPagamento } = useAvisosPagamentoGerais({ enabled: !saldosOnly });
 
