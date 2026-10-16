@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { fetchManagementDashboardData } from '../services/dashboardService';
 import type {
   ManagementDashboardReadModel,
@@ -87,7 +87,13 @@ export function getManagementDashboardQueryOptions(
     // Todas as fontes vêm do banco; a sincronização de contratos invalida esta query ao terminar.
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    // Se um recarregamento falhar (fonte soberana estourando o tempo sob carga),
+    // mantém o último Read Model bom na tela em vez de piscar contagens vazias,
+    // enquanto o React Query tenta de novo. Evita os avisos "sumirem" da tela.
+    placeholderData: keepPreviousData,
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 8000)
   };
 }
 
