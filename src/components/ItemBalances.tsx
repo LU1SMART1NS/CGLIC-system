@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { mensagemDesvincular } from '../utils/vinculoAutomatico';
 import { OrigemVinculoBadge } from './vinculos/OrigemVinculoBadge';
+import { VinculoAConferirAviso } from './vinculos/VinculoAConferirAviso';
 import { useNavigateWithOrigin } from '../hooks/useDetailOrigin';
 import { Building2, ExternalLink } from 'lucide-react';
 import { getCanonicalContractKey } from '../services/api';
 import { calculateItemCardMetrics } from '../services/balanceService';
 import { useItemUnidades } from '../hooks/useItemUnidades';
+import { useCadastroUasgs } from '../hooks/useCadastroUasgs';
+import { localDaUasg } from '../services/cadastroUasgsSyncService';
 import { escolherAdesoes, useItemAdesoes } from '../hooks/useItemAdesoes';
 import { useDepartments } from '../hooks/useDepartments';
 import { useItemAllocations } from '../hooks/useItemAllocations';
 import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
 import { useSaveEmpenhoLinks } from '../hooks/useSaveEmpenhoLinks';
-import { useItemManualContracts } from '../hooks/useItemManualContracts';
-import { useDeleteManualContract } from '../hooks/useDeleteManualContract';
-import { useItemContractEmpenhoLinks } from '../hooks/useItemContractEmpenhoLinks';
 import { useItemContractLinks } from '../hooks/useItemContractLinks';
 import { useUnlinkContractFromItem } from '../hooks/useUnlinkContractFromItem';
 import { useDismissedContractSuggestions } from '../hooks/useDismissedContractSuggestions';
@@ -43,6 +43,7 @@ import { useContractsDashboard } from '../hooks/useContractsDashboard';
 import { useItemNosContratos } from '../hooks/useItensDoContrato';
 import { enrichContractLinks } from '../services/arpContractLinkService';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
+import { MENSAGEM_CONFLITO_EDICAO } from '../utils/conflitoEdicao';
 import {
   buildItemContractSuggestions,
   buildItemSuggestionCriteria,
@@ -69,16 +70,22 @@ import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
-import { quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
+import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
 import { QuantitativosTab } from './item-balances/QuantitativosTab';
+import { registradoAcimaDoSaldo } from '../utils/registradoAcima';
+import { formatPncpAtaPdfUrl } from '../utils/pncpUtils';
+import { useInteresseGti } from './item-balances/InteresseGti';
+import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from './gti/InteresseGti';
+import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOrgaoTab';
+import { adesoesDaSenasp, papelDoItem } from '../utils/quantitativosOutroOrgao';
 import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract, UnidadeItemRecord } from '../types';
 import { STATUS_A_VENCER, formatStatusVigencia } from '../utils/statusVigencia';
-import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
+import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp, papelSenaspDaAta } from '../utils/ataIdentidade';
 
 interface ItemBalancesProps {
   arp: ArpRecord;
@@ -91,6 +98,8 @@ interface ItemBalancesProps {
 }
 
 const ITEM_TABS: ItemTab[] = ['quantitativos', 'contratos', 'adesoes'];
+// Gestor de saldo não vê contratos: fica com os quantitativos (empenhado por unidade incluído) e as adesões.
+const SALDOS_ITEM_TABS: ItemTab[] = ['quantitativos', 'adesoes'];
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 const EMPTY_UNIDADES: UnidadeItemRecord[] = [];
@@ -107,6 +116,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     item.numeroItem
   );
   const unidades = unidadesDoItem?.unidades ?? EMPTY_UNIDADES;
+  // Nome, cidade e UF dos órgãos no cadastro de UASGs (o nome da ata vem cortado em 45 letras).
+  const cadastroUasgs = useCadastroUasgs(unidades.map((u) => String(u.codigoUnidade ?? '').replace(/\D/g, '')));
   const { saldos: saldosDaAta } = useAtaItemSaldos(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
   const error = unidadesQueryError ? (unidadesQueryError.message || 'Erro ao buscar saldos por unidade.') : null;
 
@@ -130,8 +141,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Aba no endereço (?aba=), com o mesmo comportamento das telas de Ata e Contrato.
   // 'empenhos' era uma aba própria; os empenhos agora ficam dentro de cada contrato.
   const navigate = useNavigateWithOrigin();
+  const { role } = useAuth();
+  const verContratos = role !== 'gestor_saldos';
   const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
-    tabs: ITEM_TABS,
+    tabs: verContratos ? ITEM_TABS : SALDOS_ITEM_TABS,
     defaultTab: 'quantitativos',
     // Órgãos participantes e Alocação interna viraram a aba Órgãos e quantitativos (migration 109).
     aliases: { empenhos: 'contratos', unidades: 'quantitativos', alocacao: 'quantitativos' }
@@ -140,7 +153,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Mesmas regras do backend: alocações exigem allocations.manage (admin e gestor de saldos); escolher a unidade
   // interna da nota é do gestor e do coordenador (allocations.link_empenho, migration 98); contratos e empenhos
   // manuais, admin e gestor.
-  const { role } = useAuth();
   const toast = useToast();
   const confirm = useConfirmDialog();
   const canManageAllocations = role === 'admin' || role === 'gestor_saldos';
@@ -176,22 +188,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const [allocationError, setAllocationError] = useState<string | null>(null);
 
-  const deleteManualContractMutation = useDeleteManualContract();
-
-  const { data: manualContratos = [], refetch: refetchManualContracts } = useItemManualContracts(
-    arp.numeroAtaRegistroPreco,
-    arp.codigoUnidadeGerenciadora,
-    item.numeroItem
-  );
-
-  const { refetch: refetchContractEmpenhoLinks } = useItemContractEmpenhoLinks(
-    arp.numeroAtaRegistroPreco,
-    arp.codigoUnidadeGerenciadora,
-    item.numeroItem
-  );
-
   // Estados Locais de Formulários e Modais (UI State)
-  const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
   const canonicalItemKey = normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
 
   // Contratado por unidade (migration 103): quantidade de cada contrato (fonte, ajuste) e a divisão entre as unidades.
@@ -217,37 +214,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
 
 
-
-  const loadManualData = async () => {
-    try {
-      await Promise.all([
-        refetchManualContracts(),
-        refetchContractEmpenhoLinks()
-      ]);
-    } catch (e) {
-      console.warn('Erro ao recarregar dados manuais:', e);
-    }
-  };
-
-  const handleDeleteManualContrato = async (contratoId: string) => {
-    if (await confirm({ title: 'Excluir contrato manual', message: 'Tem certeza que deseja excluir este contrato manual?', tone: 'danger', confirmLabel: 'Excluir' })) {
-      try {
-        await deleteManualContractMutation.mutateAsync({
-          id: contratoId,
-          itemKey
-        });
-      } catch (err: any) {
-        console.error('Erro ao excluir contrato manual:', err);
-        if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
-          toast.error('Acesso negado: operação restrita a gestores e administradores do CGLIC.');
-        } else if (err?.code === 'CONTRACT_NOT_FOUND' || err?.sqlState === 'P0002') {
-          toast.error('Contrato manual não encontrado ou já excluído.');
-        } else {
-          toast.error(`Erro ao excluir contrato manual: ${err?.message || 'Erro desconhecido'}`);
-        }
-      }
-    }
-  };
 
   const handleUnlinkOfficialContract = async (linkId: string, contractKey?: string, numeroContrato?: string, origem?: string) => {
     if (await confirm({ title: 'Desvincular contrato', message: mensagemDesvincular(numeroContrato || contractKey || '', String(item.numeroItem ?? ''), origem), tone: 'danger', confirmLabel: 'Desvincular' })) {
@@ -340,7 +306,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const handleRefresh = async () => {
     refetchItemNosContratos();
-    loadManualData();
     if (!canEditData) return;
     // Quantitativo SENASP deste item (as demais leituras são em segundo plano).
     syncSenasp({ numeroAta: arp.numeroAtaRegistroPreco, uasg: arp.codigoUnidadeGerenciadora, numeroItem: item.numeroItem });
@@ -448,15 +413,25 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Sem os órgãos do item (API de unidades vazia), vale o quantitativo SENASP gravado no banco, o mesmo
   // da aba Itens da ata; o homologado da ata só entra se o item nunca foi sincronizado.
   const saldoDoItem = saldosDaAta.find((s: any) => Number(s.numero_item) === Number(item.numeroItem));
+  // Registrado acima do homologado (migration 142): com o aviso aberto, a view já tira da base a parte da SENASP.
+  const registradoAcima = registradoAcimaDoSaldo(saldoDoItem);
+  const descontoRegistradoAcima = registradoAcima?.desconto ?? 0;
   const totalUGQty = quantitativoSenasp(
     unidades,
     arp.codigoUnidadeGerenciadora,
-    saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) : Number(item.quantidadeHomologadaItem) || 0
+    // Sem os órgãos do item, o registrado vem da base da view, que já tem o desconto: devolve antes de descontar aqui.
+    saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) + descontoRegistradoAcima : Number(item.quantidadeHomologadaItem) || 0
   );
   // Com a ata assinada informada (migration 109), a base do saldo e o limite da alocação são a cota própria:
   // o registrado da SENASP menos o que ela gerencia para os órgãos participantes.
   const { data: quantitativos, isLoading: quantitativosLoading } = useQuantitativosDoItem(canonicalItemKey);
-  const baseSaldo = quantitativos.informado ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty;
+  // Só na ata da SENASP: na ata de outro órgão (migration 114) a base continua o registrado (ou o aprovado na adesão).
+  const cotaPropriaInformada = !ataDeOutroOrgao(arp) && quantitativos.informado;
+  const baseSaldo = (cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty) - descontoRegistradoAcima;
+  // Ata da SENASP sem a ata assinada e com outros órgãos registrados: o limite da alocação é provisório (migration 116,
+  // só aviso). Enquanto os quantitativos carregam não avisa, para não piscar.
+  const outrosOrgaosRegistrados = unidades.filter((u) => !isUnidadeSenasp(u, arp.codigoUnidadeGerenciadora) && (Number(u.quantidadeRegistrada) || 0) > 0).length;
+  const limiteProvisorioOutrosOrgaos = !ataDeOutroOrgao(arp) && !quantitativosLoading && !quantitativos.informado ? outrosOrgaosRegistrados : 0;
 
   const handleLinkEmpenho = async (empenhoUnidade: string, departmentId: string) => {
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
@@ -476,7 +451,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       });
     } catch (err: any) {
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        setAllocationError('Conflito de concorrência: os vínculos de empenhos foram modificados por outro usuário. Recarregue a página antes de salvar novamente.');
+        setAllocationError(MENSAGEM_CONFLITO_EDICAO);
       } else {
         setAllocationError(err?.message || 'Erro ao salvar vínculo de empenho.');
       }
@@ -505,7 +480,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     }),
     [baseSaldo, enrichedOfficialLinks, empenhoDoItem]
   );
-  // Abre a fila Vinculação › Empenhos aos itens; com um contrato só, já filtrada por ele.
+  // Abre a filos Vínculos › Empenhos aos itens; com um contrato só, já filtrada por ele.
   const abrirVinculacaoDoItem = () => {
     const contratos = [...empenhoDoItem.porContrato.values()].filter((e) => e.aVincular.length > 0);
     const numero = contratos.length === 1 ? enrichedOfficialLinks.find((l) => l.contractKey === contratos[0].contractKey)?.numeroContratoFormatado : undefined;
@@ -583,13 +558,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     saveEmpenhoLinksMutation
       .mutateAsync({ itemKey, links: limpeza.restantes, expectedVersion: empenhoLinkVersion })
       .then(() => setVinculosDesfeitos((antes) => [...antes, ...limpeza.removidos.map((r) => ({ numero: r.numero, unidade: nomes.get(r.allocationId) ?? 'unidade removida' }))]))
+      // Conflito (outra pessoa mexeu nos vínculos): a mutação relê os vínculos; com a versão nova, a limpeza tenta de
+      // novo com o que está gravado agora.
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empenhoDoItemPronto, empenhoLinksCarregados, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
 
   const handleInformarQuantidade = (p: ParcelaDoItem, quantidade: number | null, sairDaUnidade: string | null) =>
     acoesQuantidade.informar.mutate(
-      { contratoEmpenhoId: p.contratoEmpenhoId, numeroItem: p.numeroItem, quantidade },
+      { contratoEmpenhoId: p.contratoEmpenhoId, numeroItem: p.numeroItem, quantidade, versao: p.versao },
       {
         onSuccess: async () => {
           toast.success(quantidade == null ? `${p.numeroOficial}: quantidade voltou à calculada.` : `${p.numeroOficial}: ${formatNumber(quantidade)} un neste item.`);
@@ -628,12 +605,48 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     return (a.codigoUnidade || '').localeCompare(b.codigoUnidade || '');
   });
 
-  const linkedContractsCount = manualContratos.length + enrichedOfficialLinks.length;
+  // Interesse por GTI (só na ata da SENASP): botão no cartão do topo e gaveta entre o cartão e as abas, como no Início.
+  const fatiasGti = useInteresseGti({ unidades, quantitativos, ataDaCglic });
+  const [gtiAberto, setGtiAberto] = React.useState(false);
+
+  // Papel da SENASP neste item (ata de outro órgão: participante ou adesão, migration 114).
+  const papelDoAItem = papelDoItem(papelSenaspDaAta(arp), unidades, adesoesDaSenasp(adesoes));
+  const unidadesInternasDoItem = (
+    <AllocationsTab
+      ugUasg={arp.codigoUnidadeGerenciadora}
+      item={{
+        numeroAta: arp.numeroAtaRegistroPreco,
+        uasg: arp.codigoUnidadeGerenciadora,
+        numeroItem: String(item.numeroItem),
+        descricao: item.descricaoItem,
+        quantitativoSenasp: baseSaldo,
+        limiteProvisorioOutrosOrgaos,
+        rotuloLimite: cotaPropriaInformada ? 'Cota própria da SENASP' : papelDoAItem === 'ADESAO' ? 'Quantidade aprovada da SENASP' : papelDoAItem === 'PARTICIPANTE' ? 'Quantidade registrada da SENASP' : undefined
+      }}
+      totalUG={baseSaldo}
+      totalAllocated={totalAllocatedSum}
+      remaining={remainingUGQty}
+      percentAllocated={percentAllocated}
+      rows={allocationRows}
+      semUnidade={allocationExecution.semUnidade}
+      contratadoItem={executionSummary.contratado}
+      contratadoSemUnidade={contratadoSemUnidade}
+      contratosAConferir={contratosAConferir}
+      departments={departments}
+      departmentsLoading={departmentsLoading}
+      canManage={canManageAllocations}
+      canInformUnits={canEditData}
+      error={allocationError}
+      onGoToContracts={() => setActiveTab('contratos')}
+    />
+  );
+
+  const linkedContractsCount = enrichedOfficialLinks.length;
   const contractsCount = linkedContractsCount;
 
   return (
     <Instrument360Page>
-      <Instrument360Head>
+      <Instrument360Head resumoNoCelular>
       <ItemHero
         arp={arp}
         item={item}
@@ -659,14 +672,19 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         }}
         referencia={comprasGovReferencia}
         onGoTo={(tab) => setActiveTab(tab)}
+        verContratos={verContratos}
         onOpenAta={onOpenAta}
+        verMais={ataDaCglic ? <InteresseGtiBotao fatias={fatiasGti} aberto={gtiAberto} onToggle={() => setGtiAberto((v) => !v)} /> : undefined}
       />
+
+      {/* Gaveta entre o cartão e as abas; some junto com o cartão quando ele encolhe ao rolar. */}
+      {ataDaCglic && <InteresseGtiNoTopo fatias={fatiasGti} aberto={gtiAberto} onFechar={() => setGtiAberto(false)} explicacao={EXPLICACAO_GTI.item} />}
 
       <Instrument360Tabs
         ref={tabsRef}
         tabs={[
           { id: 'quantitativos', label: 'Órgãos e quantitativos' },
-          { id: 'contratos', label: `Contratos e empenhos (${contractsCount})` },
+          ...(verContratos ? [{ id: 'contratos' as const, label: `Contratos e empenhos (${contractsCount})` }] : []),
           { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` }
         ]}
         active={activeTab}
@@ -678,53 +696,53 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'quantitativos' ? (
-          <QuantitativosTab
-            itemKey={canonicalItemKey}
-            tituloItem={tituloItem}
-            ataDaCglic={ataDaCglic}
-            homologado={Number(item.quantidadeHomologadaItem) || 0}
-            unidades={sortedUnidades}
-            loading={loading || quantitativosLoading}
-            error={error}
-            origem={unidadesDoItem?.origem ?? 'API'}
-            copiadoEm={unidadesDoItem?.copiadoEm ?? null}
-            registradoSenasp={totalUGQty}
-            baseSaldo={baseSaldo}
-            contratadoSenasp={executionSummary.contratado}
-            quantitativos={quantitativos}
-            podeInformar={canEditData}
-            podeRemanejar={canManageAllocations}
-            alocado={totalAllocatedSum}
-            totalUnidadesInternas={allocations.length}
-            unidadesInternas={
-              <AllocationsTab
-                ugUasg={arp.codigoUnidadeGerenciadora}
-                item={{
-                  numeroAta: arp.numeroAtaRegistroPreco,
-                  uasg: arp.codigoUnidadeGerenciadora,
-                  numeroItem: String(item.numeroItem),
-                  descricao: item.descricaoItem,
-                  quantitativoSenasp: baseSaldo,
-                  rotuloLimite: quantitativos.informado ? 'Cota própria da SENASP' : undefined
-                }}
-                totalUG={baseSaldo}
-                totalAllocated={totalAllocatedSum}
-                remaining={remainingUGQty}
-                percentAllocated={percentAllocated}
-                rows={allocationRows}
-                semUnidade={allocationExecution.semUnidade}
-                contratadoItem={executionSummary.contratado}
-                contratadoSemUnidade={contratadoSemUnidade}
-                contratosAConferir={contratosAConferir}
-                departments={departments}
-                departmentsLoading={departmentsLoading}
-                canManage={canManageAllocations}
-                canInformUnits={canEditData}
-                error={allocationError}
-                onGoToContracts={() => setActiveTab('contratos')}
-              />
-            }
-          />
+          ataDaCglic ? (
+            <QuantitativosTab
+              itemKey={canonicalItemKey}
+              tituloItem={tituloItem}
+              ataDaCglic={ataDaCglic}
+              homologado={Number(item.quantidadeHomologadaItem) || 0}
+              unidades={sortedUnidades}
+              loading={loading || quantitativosLoading}
+              error={error}
+              origem={unidadesDoItem?.origem ?? 'API'}
+              copiadoEm={unidadesDoItem?.copiadoEm ?? null}
+              registradoSenasp={totalUGQty}
+              baseSaldo={baseSaldo}
+              contratadoSenasp={executionSummary.contratado}
+              quantitativos={quantitativos}
+              registradoAcima={registradoAcima}
+              pdfDaAta={formatPncpAtaPdfUrl(arp.numeroControlePncpAta)}
+              pregaoItem={`${arp.numeroCompra ? `Pregão ${arp.numeroCompra}${arp.anoCompra ? `/${arp.anoCompra}` : ''} · ` : ''}item ${Number(item.numeroItem) || item.numeroItem}`}
+              podeInformar={canEditData}
+              podeRemanejar={canManageAllocations}
+              alocado={totalAllocatedSum}
+              totalUnidadesInternas={allocations.length}
+              unidadesInternas={unidadesInternasDoItem}
+            />
+          ) : (
+            <QuantitativosOutroOrgaoTab
+              itemKey={canonicalItemKey}
+              tituloItem={tituloItem}
+              papel={papelDoAItem === 'ADESAO' ? 'ADESAO' : 'PARTICIPANTE'}
+              uasgGerenciadora={arp.codigoUnidadeGerenciadora}
+              uasgSenasp={carteiraDaAta(arp)}
+              unidades={sortedUnidades}
+              loading={loading || quantitativosLoading || adesoesLoading}
+              error={error}
+              origem={unidadesDoItem?.origem ?? 'API'}
+              copiadoEm={unidadesDoItem?.copiadoEm ?? null}
+              quantidadeSenasp={totalUGQty}
+              contratadoSenasp={executionSummary.contratado}
+              quantitativos={quantitativos}
+              adesoes={adesoes}
+              podeInformar={canEditData}
+              podeRemanejar={canManageAllocations}
+              alocado={totalAllocatedSum}
+              totalUnidadesInternas={allocations.length}
+              unidadesInternas={unidadesInternasDoItem}
+            />
+          )
         ) : activeTab === 'contratos' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="contratos-tab">
               <div>
@@ -804,7 +822,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                         quantidadeContratada: oc.quantidadeContratada,
                         dataVigenciaFim: oc.dataVigenciaFim,
                         statusVigencia: oc.statusVigencia,
-                        _isManual: false,
                         _isOfficialLink: true,
                         _linkId: oc.linkId,
                         _origem: oc.origem,
@@ -823,8 +840,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                           map.set(canKey, {
                             ...existing,
                             ...c,
-                            _isManual: existing._isManual || c._isManual,
-                            _manualId: existing._manualId || c._manualId,
                             _isOfficialLink: existing._isOfficialLink || c._isOfficialLink,
                             _linkId: existing._linkId || c._linkId,
                             _origem: existing._origem || c._origem,
@@ -841,20 +856,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                       {
                         title: 'Contratos vinculados',
                         list: deduplicateContractsList([
-                          ...officialContractsList,
-                          ...manualContratos.map(mc => ({
-                            numeroContrato: mc.numero,
-                            anoContrato: mc.ano,
-                            uasg: mc.uasg,
-                            orgaoNome: isGerenciadora(mc.uasg) ? 'SENASP / MJSP' : `UASG ${mc.uasg}`,
-                            nomeRazaoSocialFornecedor: mc.fornecedor || item.nomeRazaoSocialFornecedor,
-                            niFornecedor: mc.cnpjFornecedor || item.niFornecedor,
-                            numeroControlePncp: mc.numeroControlePncp,
-                            linkVisualizacao: mc.linkPncp,
-                            tipoUnidade: isGerenciadora(mc.uasg) ? 'GERENCIADORA' : 'PARTICIPANTE',
-                            _isManual: true,
-                            _manualId: mc.id
-                          } as any))
+                          ...officialContractsList
                         ])
                       }
                     ];
@@ -898,9 +900,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                 const isGer = isGerenciadoraUasg(c.uasg, arp.codigoUnidadeGerenciadora) || c.tipoUnidade === 'GERENCIADORA';
                                 const contractUasg = c.uasg || (isGer ? (arp.codigoUnidadeGerenciadora || '200331') : '');
                                 const matchedUnit = unidades.find(u => String(u.codigoUnidade).trim() === String(contractUasg).trim());
+                                const cadastroDoOrgao = isGer ? undefined : cadastroUasgs.get(String(contractUasg).trim());
                                 const resolvedOrgaoName = isGer
                                   ? (arp.nomeOrgao || arp.nomeUnidadeGerenciadora || c.orgaoNome)
-                                  : (matchedUnit?.nomeUnidade || (c.orgaoNome && !c.orgaoNome.includes('SECRETARIA NACIONAL') ? c.orgaoNome : `Órgão Participante`));
+                                  : (cadastroDoOrgao?.nome || matchedUnit?.nomeUnidade || (c.orgaoNome && !c.orgaoNome.includes('SECRETARIA NACIONAL') ? c.orgaoNome : `Órgão Participante`));
+                                const localDoOrgao = cadastroDoOrgao ? localDaUasg(cadastroDoOrgao) : null;
                                 const qtdDoContrato = c._isOfficialLink && c.contractKey ? quantidadePorContrato.get(c.contractKey) : undefined;
 
                                 return (
@@ -933,13 +937,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                       </td>
                                       <td data-label="Unidade" style={{ fontSize: '0.85rem' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                          {contractUasg ? null : resolvedOrgaoName}
-                                          {contractUasg ? (
+                                          {contractUasg && !cadastroDoOrgao ? null : resolvedOrgaoName}
+                                          {contractUasg && !cadastroDoOrgao ? (
                                             <span style={{ fontSize: '0.75rem', color: 'var(--color-info-text)', fontWeight: 600, background: 'var(--color-info-bg)', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid var(--color-info-border)' }}>
                                               UASG: {contractUasg}
                                             </span>
                                           ) : null}
                                         </div>
+                                        {cadastroDoOrgao && (
+                                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }} data-testid={`vinculado-orgao-local-${idx}`}>
+                                            UASG {contractUasg}{localDoOrgao ? ` · ${localDoOrgao}` : ''}
+                                          </div>
+                                        )}
                                         {!isGer && (
                                           <div style={{ marginTop: '0.25rem' }}>
                                             <StatusBadge label="Participante" variant="neutral" size="sm" dot={false} />
@@ -1011,9 +1020,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
                                           {c.dataVigenciaFim ? (
                                             <span style={{ color: c.statusVigencia === 'Expirado' ? 'var(--danger)' : 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatDate(c.dataVigenciaFim)}</span>
-                                          ) : !c._isManual ? (
+                                          ) : (
                                             <span style={{ color: 'var(--text-muted)' }}>-</span>
-                                          ) : null}
+                                          )}
                                           {/* Só alertas: contrato vigente mostra apenas a data. */}
                                           {c.dataVigenciaFim && (c.statusVigencia === 'Expirado' || c.statusVigencia === STATUS_A_VENCER) && (
                                             <StatusBadge
@@ -1023,10 +1032,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                               dot={false}
                                             />
                                           )}
-                                          {c._isManual && (
-                                            <StatusBadge label="Manual" variant="warning" size="sm" dot={false} />
-                                          )}
                                           {c._isOfficialLink && <OrigemVinculoBadge origem={c._origem} />}
+                                          {c._isOfficialLink && <VinculoAConferirAviso itemKey={canonicalItemKey} contractKey={c.contractKey} formato="selo" />}
                                         </div>
                                       </td>
                                       <td data-role="action" style={{ textAlign: 'center' }}>
@@ -1051,16 +1058,6 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                                               title="Desvincular contrato deste item"
                                             >
                                               <span className="payment-action-label">Desvincular</span>
-                                            </ActionButton>
-                                          )}
-                                          {canEditData && c._isManual && c._manualId && (
-                                            <ActionButton action="excluir"
-                                              size="sm"
-                                              onClick={() => handleDeleteManualContrato(c._manualId)}
-                                              disabled={deleteManualContractMutation.isPending}
-                                              title="Excluir contrato manual"
-                                            >
-                                              <span className="payment-action-label">Excluir</span>
                                             </ActionButton>
                                           )}
                                         </div>
@@ -1163,7 +1160,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       <UnidadesDoContratoModal
         itemKey={canonicalItemKey}
         tituloItem={tituloItem}
-        contrato={contratoDividindo}
+        // O contrato como está agora (depois de um conflito de edição, a leitura nova traz a divisão gravada).
+        contrato={
+          contratoDividindo
+            ? {
+                ...contratoDividindo,
+                quantidade: contratadoDoItem?.contratos.find((c) => c.contractKey === contratoDividindo.contractKey) ?? contratoDividindo.quantidade
+              }
+            : null
+        }
         allocations={allocations}
         unidades={contratadoDoItem.unidades}
         nomeDaUnidade={(sigla) => departments.find((d) => d.sigla.trim().toLowerCase() === sigla.trim().toLowerCase())?.nomeCompleto}
@@ -1171,7 +1176,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         onFechar={() => setContratoDividindo(null)}
       />
 
-      {/* "Vincular aos itens" de uma nota do contrato: a mesma janela do Contrato 360 e da Vinculação. */}
+      {/* "Vincular aos itens" de uma nota do contrato: a mesma janela do Contrato 360 e de Vínculos. */}
       <VincularAosItensDialog
         nota={notaParaVincular}
         numeroContrato={

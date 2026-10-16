@@ -8,7 +8,7 @@ const efeitos: Array<() => void> = [];
 const refs: Array<{ current: unknown }> = [];
 let indiceRef = 0;
 vi.mock('react', () => ({
-  useEffect: (fn: () => void) => efeitos.push(fn),
+  useLayoutEffect: (fn: () => void) => efeitos.push(fn),
   useRef: (inicial: unknown) => {
     if (!refs[indiceRef]) refs[indiceRef] = { current: inicial };
     return refs[indiceRef++];

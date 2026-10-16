@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { empenhadoPorItem, itensNumerados, motivoDaRevisao, quantidadeDaParcela, quantidadeFoiInformada, quantidadeQuebrada, rotuloDaSituacao, textoDaSugestao } from '../distribuicaoEmpenho';
-import { mapDistribuicao, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
+import { empenhadoPorItem, itensNumerados, motivoDaNota, motivoDaRevisao, quantidadeDaParcela, quantidadeFoiInformada, quantidadeQuebrada, quantidadesDaNota, rotuloDaSituacao, textoDaOrigem, textoDaSugestao, vinculoDesfazivel, vinculoEditavel } from '../distribuicaoEmpenho';
+import { mapDistribuicao, mapNotaSiafi, type DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
 
 const linha = (over: any) => ({ posicao: 1, numeroItem: 13, descricao: 'Placa', tipo: 'Material', quantidade: 10, valorUnitario: 4900, valorTotal: 49000, ...over });
 const dist = (over: Partial<DistribuicaoDoEmpenho>): DistribuicaoDoEmpenho =>
@@ -75,6 +75,44 @@ describe('textos da distribuição', () => {
     expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO' })).label).toBe('Vinculada automaticamente');
     expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO' })).label).toBe('Vinculada');
     expect(rotuloDaSituacao(dist({ situacao: 'REVISAR' })).variant).toBe('danger');
+  });
+
+  it('vínculo pela nota no SIAFI: rótulo próprio, edita mas não desfaz; a quantidade da nota vale antes da calculada', () => {
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'SIAFI' } as any);
+    expect(rotuloDaSituacao(d).label).toBe('Vinculada pela nota');
+    expect(textoDaOrigem(d, (x) => x)).toBe('Vinculada pela nota no SIAFI');
+    expect(vinculoEditavel(d)).toBe(true);
+    expect(vinculoDesfazivel(d)).toBe(false);
+    expect(vinculoDesfazivel(dist({ origem: 'VALOR' } as any))).toBe(true);
+    // 2025NE000406, item 54: a nota diz 2 un a R$ 291,20; o contrato tem R$ 306,26 (582,40 ÷ 306,26 daria 1,9)
+    expect(quantidadeDaParcela({ valor: 582.4, quantidadeInformada: null, quantidadeNota: 2 }, 306.26)).toBe(2);
+    expect(quantidadeDaParcela({ valor: 582.4, quantidadeInformada: 3, quantidadeNota: 2 }, 306.26)).toBe(3);
+  });
+
+  it('motivo da nota no SIAFI e quantidades para começar a janela', () => {
+    const nota = (over: any) => mapNotaSiafi({ lido_em: '2026-10-14', itens: [], ...over });
+    expect(motivoDaNota(undefined)).toBeNull();
+    expect(motivoDaNota(null)).toBe('nota ainda não lida no SIAFI');
+    expect(motivoDaNota(nota({ motivo: 'QUANTIDADE_QUEBRADA', itens: [{ numero_item: 3, quantidade: 5.08, valor_total: 2150.08, no_contrato: true }] }))).toBe('a nota diz 5,08 un do item 3');
+    expect(motivoDaNota(nota({ motivo: 'SOMA_NAO_FECHA' }))).toBe('a soma dos itens da nota não fecha com o valor');
+    expect(motivoDaNota(nota({ motivo: null }))).toBeNull();
+    const q = quantidadesDaNota(nota({ itens: [
+      { numero_item: 30, quantidade: 6, no_contrato: true },
+      { numero_item: 29, quantidade: 3, no_contrato: false },
+      { numero_item: 3, quantidade: 5.08, no_contrato: true }
+    ] }));
+    expect([...q.entries()]).toEqual([[30, 6]]);
+  });
+
+  it('vínculo pelo valor: rótulo próprio, pode ser editado ou desfeito (o de um item só, não)', () => {
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'VALOR' });
+    expect(rotuloDaSituacao(d)).toEqual({ label: 'Vinculada pelo valor', variant: 'success' });
+    expect(textoDaOrigem(d, (x) => x)).toBe('Vinculada pelo valor da nota');
+    expect(textoDaOrigem(dist({ origem: 'AUTO' }), (x) => x)).toBe('Vinculada automaticamente: contrato de um item');
+    expect(textoDaOrigem(dist({ origem: 'USUARIO', distribuido_por_nome: 'Maria', distribuido_em: '2026-10-13' } as any), (x) => x.split('-').reverse().join('/'))).toBe('Vinculada por Maria em 13/10/2026');
+    expect(vinculoEditavel(d)).toBe(true);
+    expect(vinculoEditavel(dist({ origem: 'USUARIO' }))).toBe(true);
+    expect(vinculoEditavel(dist({ origem: 'AUTO' }))).toBe(false);
   });
 
   it('valor mudou: diz o valor antigo e o novo e que as quantidades continuam contando', () => {

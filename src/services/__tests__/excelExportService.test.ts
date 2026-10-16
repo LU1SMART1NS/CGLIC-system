@@ -24,6 +24,7 @@ if (typeof globalThis.localStorage === 'undefined') {
 }
 
 import { 
+  colunasSoPorItem,
   ALL_REPORT_COLUMNS, 
   COLUMNS_MAP, 
   getDefaultColumnsForPreset, 
@@ -33,7 +34,6 @@ import {
   buildFlattenedReportData, 
   generateCustomExcelReport 
 } from '../excelExportService';
-import { saveManualEmpenhos } from '../allocationService';
 import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { ReportExportConfig, ReportDataPayload } from '../../types/reportTypes';
 
@@ -184,8 +184,8 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
 
   it('5. Deve achatar os dados respeitando estritamente os invariantes contábeis de Saldo', async () => {
     const itemKey = '00001/2026-200331-1';
-    // Simula empenho manual salvo
-    await saveManualEmpenhos(itemKey, [
+    // Simula empenho manual antigo guardado no navegador (o relatório ainda lê essa cópia local)
+    localStorage.setItem(`saldoarp-manual-empenhos-${itemKey}`, JSON.stringify([
       {
         id: 'e1',
         numero: '2026NE0001',
@@ -199,7 +199,7 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
         criadoEm: new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       }
-    ], 1);
+    ]));
 
     const payload: ReportDataPayload = {
       atas: [mockAta],
@@ -233,6 +233,22 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
     expect(row?.quantidadeSenasp).toBe(40);
     expect(row?.saldoQuantidade).toBe(40 - (row?.quantidadeEmpenhada ?? 0));
     expect(COLUMNS_MAP.get('quantidadeSenasp')?.label).toBe('Qtd. Registrada (SENASP)');
+  });
+
+  it('5c. Uma linha por ata traz o fornecedor e o CNPJ tirados dos itens', async () => {
+    const payload: ReportDataPayload = { atas: [mockAta], itemsByAta: { '00001/2026-200331': mockItems } };
+
+    const rows = await buildFlattenedReportData(payload, 'BY_ATA');
+
+    expect(rows.length).toBe(1);
+    expect(rows[0].numeroItem).toBe('Consolidado');
+    expect(rows[0].fornecedorRazaoSocial).toBe('DEFENSE MOBILITY LTDA');
+    expect(rows[0].fornecedorCnpj).toBe('00.394.494/0001-36');
+  });
+
+  it('5d. Colunas de item, saldo e contrato contam como "só por item"; ata, links, fornecedor e descrição não', () => {
+    expect(colunasSoPorItem(['numeroAta', 'linkPncpAta', 'fornecedorRazaoSocial', 'fornecedorCnpj', 'descricaoItem'])).toEqual([]);
+    expect(colunasSoPorItem(['numeroAta', 'numeroItem', 'valorUnitario']).map(c => c.id)).toEqual(['numeroItem', 'valorUnitario']);
   });
 
   it('6. Deve gerar planilha Excel .xlsx válida via ExcelJS', async () => {

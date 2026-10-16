@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mapPostgresErrorToAppError } from '../rpcErrorAdapter';
 import { executeSaveAllocationsRpc } from '../allocationRpcAdapter';
-import { executeSaveContratoRpc } from '../contractRpcAdapter';
 import { executeSaveEmpenhoLinksRpc } from '../empenhoLinkRpcAdapter';
-import { executeSaveManualEmpenhosRpc } from '../manualEmpenhoRpcAdapter';
-import { saveAllocations, saveManualContratoWithEmpenhos, saveEmpenhoLinks, saveManualEmpenhos } from '../../services/allocationService';
+import { saveAllocations, saveEmpenhoLinks } from '../../services/allocationService';
 import * as supabaseClientModule from '../../services/supabaseClient';
 
 describe('RPC Persistence Adapters & Error Mapping (Fase 3 & Fase 4.3C.3)', () => {
@@ -122,50 +120,6 @@ describe('RPC Persistence Adapters & Error Mapping (Fase 3 & Fase 4.3C.3)', () =
     });
   });
 
-  describe('contractRpcAdapter - Invocação e Payload', () => {
-    it('deve normalizar contrato e empenhos e invocar save_manual_contrato_atomic', async () => {
-      const mockRpc = vi.fn().mockResolvedValue({
-        data: {
-          success: true,
-          contrato_id: 'ctr_00037/2026-200331-00001_12/2026_2026_uuid',
-          item_key: '00037/2026-200331-00001',
-          links_count: 2,
-          timestamp: new Date().toISOString()
-        },
-        error: null
-      });
-
-      const mockSupabase = { rpc: mockRpc } as any;
-      vi.spyOn(supabaseClientModule, 'isSupabaseConfigured', 'get').mockReturnValue(true);
-      vi.spyOn(supabaseClientModule, 'supabase', 'get').mockReturnValue(mockSupabase);
-
-      const result = await executeSaveContratoRpc({
-        contrato: {
-          item_key: '37/2026-200331-1',
-          numero: '12/2026',
-          ano: 2026,
-          arp_id: '00037/2026',
-          uasg: '200331',
-          objeto: 'Aquisição de suprimentos'
-        },
-        empenhoIds: ['2026NE000123', '2026NE000124']
-      });
-
-      expect(mockRpc).toHaveBeenCalledWith('save_manual_contrato_atomic', {
-        p_contrato: expect.objectContaining({
-          item_key: '00037/2026-200331-00001',
-          numero: '12/2026',
-          ano: 2026,
-          uasg: '200331'
-        }),
-        p_empenho_ids: ['2026NE000123', '2026NE000124']
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.links_count).toBe(2);
-    });
-  });
-
   describe('allocationService - Integração com RPCs', () => {
     it('saveAllocations deve propagar chamada para executeSaveAllocationsRpc', async () => {
       const mockRpc = vi.fn().mockResolvedValue({
@@ -180,37 +134,6 @@ describe('RPC Persistence Adapters & Error Mapping (Fase 3 & Fase 4.3C.3)', () =
       await saveAllocations('00037/2026-200331-00001', [
         { id: '1', unitName: 'DTI', allocatedQty: 10, empenhadaQty: 0 }
       ], 1);
-
-      expect(mockRpc).toHaveBeenCalled();
-    });
-
-    it('saveManualContratoWithEmpenhos deve validar e persistir contrato via RPC', async () => {
-      const mockRpc = vi.fn().mockResolvedValue({
-        data: { success: true, contrato_id: 'c1', item_key: '00037/2026-200331-00001', links_count: 1, timestamp: '' },
-        error: null
-      });
-
-      const mockFrom = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-
-      const mockSupabase = { rpc: mockRpc, from: mockFrom } as any;
-      vi.spyOn(supabaseClientModule, 'isSupabaseConfigured', 'get').mockReturnValue(true);
-      vi.spyOn(supabaseClientModule, 'supabase', 'get').mockReturnValue(mockSupabase);
-
-      await saveManualContratoWithEmpenhos({
-        id: 'c1',
-        numero: '01/2026',
-        ano: 2026,
-        arpId: '00037/2026',
-        itemId: '00001',
-        uasg: '200331',
-        origem: 'MANUAL',
-        criadoEm: new Date().toISOString(),
-        atualizadoEm: new Date().toISOString()
-      }, ['2026NE000123']);
 
       expect(mockRpc).toHaveBeenCalled();
     });
@@ -234,45 +157,6 @@ describe('RPC Persistence Adapters & Error Mapping (Fase 3 & Fase 4.3C.3)', () =
       });
     });
 
-    it('saveManualEmpenhos deve invocar executeSaveManualEmpenhosRpc com payload normalizado', async () => {
-      const mockRpc = vi.fn().mockResolvedValue({
-        data: { success: true, item_key: '00037/2026-200331-00001', previous_version: 1, new_version: 2, count: 1, timestamp: '' },
-        error: null
-      });
-
-      const mockSupabase = { rpc: mockRpc } as any;
-      vi.spyOn(supabaseClientModule, 'isSupabaseConfigured', 'get').mockReturnValue(true);
-      vi.spyOn(supabaseClientModule, 'supabase', 'get').mockReturnValue(mockSupabase);
-
-      await saveManualEmpenhos('37/2026-200331-1', [
-        {
-          id: 'emp-1',
-          numero: '2026NE000123',
-          ano: 2026,
-          arpId: '00037/2026',
-          itemId: '00001',
-          uasg: '200331',
-          quantidade: 10,
-          origem: 'MANUAL',
-          status: 'CONFIRMADO',
-          criadoEm: '',
-          atualizadoEm: ''
-        }
-      ], 1);
-
-      expect(mockRpc).toHaveBeenCalledWith('save_manual_empenhos_atomic', {
-        p_item_key: '00037/2026-200331-00001',
-        p_empenhos: [
-          expect.objectContaining({
-            numero: '2026NE000123',
-            ano: 2026,
-            quantidade: 10,
-            origem: 'MANUAL'
-          })
-        ],
-        p_expected_version: 1
-      });
-    });
   });
 
   describe('empenhoLinkRpcAdapter - Invocação e Payload', () => {
@@ -330,109 +214,6 @@ describe('RPC Persistence Adapters & Error Mapping (Fase 3 & Fase 4.3C.3)', () =
     });
   });
 
-  describe('manualEmpenhoRpcAdapter - Invocação e Payload (Fase 4.3D.2B)', () => {
-    it('deve normalizar chave canônica e payload estruturado para save_manual_empenhos_atomic', async () => {
-      const mockRpc = vi.fn().mockResolvedValue({
-        data: {
-          success: true,
-          item_key: '00037/2026-200331-00001',
-          previous_version: 1,
-          new_version: 2,
-          count: 1,
-          timestamp: new Date().toISOString()
-        },
-        error: null
-      });
-
-      const mockSupabase = { rpc: mockRpc } as any;
-      vi.spyOn(supabaseClientModule, 'isSupabaseConfigured', 'get').mockReturnValue(true);
-      vi.spyOn(supabaseClientModule, 'supabase', 'get').mockReturnValue(mockSupabase);
-
-      const result = await executeSaveManualEmpenhosRpc(
-        '37/2026-200331-1',
-        [
-          {
-            id: 'emp-1',
-            numero: '2026ne000123',
-            ano: 2026,
-            arpId: '00037/2026',
-            itemId: '00001',
-            uasg: '200331',
-            quantidade: 25.5,
-            valorUnitario: 100,
-            valorTotal: 2550,
-            origem: 'MANUAL',
-            status: 'CONFIRMADO',
-            criadoEm: '',
-            atualizadoEm: ''
-          }
-        ],
-        1
-      );
-
-      expect(mockRpc).toHaveBeenCalledWith('save_manual_empenhos_atomic', {
-        p_item_key: '00037/2026-200331-00001',
-        p_empenhos: [
-          {
-            id: 'emp-1',
-            numero: '2026NE000123',
-            ano: 2026,
-            arp_id: '00037/2026',
-            item_id: '00001',
-            uasg: '200331',
-            quantidade: 25.5,
-            valor_unitario: 100,
-            valor_total: 2550,
-            data: null,
-            fornecedor: null,
-            cnpj_fornecedor: null,
-            unidade_interna_id: null,
-            observacao: null,
-            origem: 'MANUAL',
-            status: 'CONFIRMADO'
-          }
-        ],
-        p_expected_version: 1
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.new_version).toBe(2);
-    });
-
-    it('deve rejeitar e mapear erro de concorrência 40001 na RPC de empenhos manuais', async () => {
-      const mockRpc = vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'CONCURRENT_MODIFICATION_ERROR: Conflito de versão detectado', code: '40001' }
-      });
-
-      const mockSupabase = { rpc: mockRpc } as any;
-      vi.spyOn(supabaseClientModule, 'isSupabaseConfigured', 'get').mockReturnValue(true);
-      vi.spyOn(supabaseClientModule, 'supabase', 'get').mockReturnValue(mockSupabase);
-
-      await expect(executeSaveManualEmpenhosRpc('00037/2026-200331-00001', [], 1))
-        .rejects.toMatchObject({
-          code: 'CONCURRENT_MODIFICATION_ERROR',
-          sqlState: '40001'
-        });
-    });
-
-    it('deve rejeitar e mapear erro de autorização 42501', async () => {
-      const mockRpc = vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'UNAUTHORIZED: Acesso restrito', code: '42501' }
-      });
-
-      const mockSupabase = { rpc: mockRpc } as any;
-      vi.spyOn(supabaseClientModule, 'isSupabaseConfigured', 'get').mockReturnValue(true);
-      vi.spyOn(supabaseClientModule, 'supabase', 'get').mockReturnValue(mockSupabase);
-
-      await expect(executeSaveManualEmpenhosRpc('00037/2026-200331-00001', [], 1))
-        .rejects.toMatchObject({
-          code: 'UNAUTHORIZED',
-          sqlState: '42501'
-        });
-    });
-  });
 });
 
 describe('mapPostgresErrorToAppError: departamento recusado pelo catálogo', () => {

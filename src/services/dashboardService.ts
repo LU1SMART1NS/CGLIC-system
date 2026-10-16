@@ -15,6 +15,9 @@
 
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
+import { fetchAusentesDaFonte, rotuloAusente, trabalhoNaFonte, type AusenteDaFonte } from './ausentesDaFonteService';
+import { fetchEmpenhadoAcima, textoDaOrigem, type EmpenhadoAcima } from './empenhadoAcimaService';
+import { fetchVinculosAConferir, numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
 import type {
   ContractDashboardRecord,
   ArpRecord,
@@ -55,7 +58,7 @@ function chaveDoSaldo(item: any): string {
   return numero ? chaveGestaoAta(numero, item?.codigo_uasg || item?.codigoUasg) : '';
 }
 import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractManagementService';
-import { chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, fetchAvisosResolvidos } from './avisosResolvidosService';
+import { chaveAvisoAtaAssinada, chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, chaveAvisoFonte, chaveAvisoEmpenhoAcima, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { classifyArpItemSaldo } from './balanceService';
@@ -63,8 +66,10 @@ import { severityFromReajusteRadarNivel, severityFromPaymentStatusPrazo } from '
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
 import { fetchPaymentCyclesForContracts } from '../adapters/paymentCycleRpcAdapter';
 import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
+import { alocadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../utils/ataAssinadaPendente';
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
+import { motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
 
 /**
  * Auxiliar para cálculo de dias restantes de vigência
@@ -214,25 +219,90 @@ export function calculateDeadlinesSummary(
 /**
  * 3. Cálculo puro do Bloco "Atenção Agora"
  */
-/** Motivos do aviso de quantitativos de um item (linha de v_arp_item_saldo_detalhado com a ata assinada informada). */
+/**
+ * Aviso "Registrado acima do homologado" de um item (linha de v_arp_item_saldo_detalhado, migration 142). Crítico quando
+ * o saldo da SENASP, já sem o excedente dela, está em 20% da base ou menos (inclusive negativo).
+ */
+export function itemRegistradoAcima(aItem: any, itemKey: string, numAta: string, uasgItem: string, numItem: string | number, chave: string): import('../types/managementDashboard').DashboardAttentionItem {
+  const n = (v: unknown) => Number(v) || 0;
+  const fmt = (v: number) => v.toLocaleString('pt-BR');
+  const excedente = n(aItem.excedente_registrado);
+  const naSenasp = n(aItem.excedente_registrado_senasp);
+  const base = n(aItem.quantidade_base_senasp);
+  const saldo = n(aItem.saldo_disponivel);
+  const critico = saldo <= 0.2 * Math.max(base, 0);
+  const senasp = naSenasp > 0
+    ? `; ${fmt(naSenasp)} na SENASP${aItem.ata_assinada_informada ? '' : ' (provisório: ata assinada não informada)'} fora do saldo`
+    : '; nada na SENASP';
+  return {
+    id: `ATT-REGISTRADO-ACIMA-${itemKey}`,
+    category: 'REGISTRADO_ACIMA',
+    severity: critico ? 'CRITICA' : 'ATENCAO',
+    avisoChave: chave,
+    title: 'Registrado acima do homologado',
+    description: `Ata ${numAta || 's/n'} — Item ${Number(numItem) || numItem || 's/n'}: homologado ${fmt(n(aItem.quantidade_homologada))} × registrado ${fmt(n(aItem.soma_registrado))} (excedente ${fmt(excedente)}${senasp})`,
+    arpKey: itemKey,
+    numeroAta: numAta,
+    objetoItem: aItem.descricao_item || aItem.descricaoItem || 'Item de ARP',
+    fornecedorNome: aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial,
+    targetUrl: numAta && numItem
+      ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}/itens/${encodeURIComponent(String(numItem))}`
+      : undefined,
+    badgeLabel: `+${fmt(excedente)} acima`
+  };
+}
+
+/**
+ * Motivos do aviso de quantitativos de um item (linha de v_arp_item_saldo_detalhado com a ata assinada informada).
+ * Na ata de outro órgão (migration 114), o motivo é o saldo crítico com quantidade da SENASP ainda na gerenciadora.
+ */
 export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; texto: string; selo: string; critico: boolean }> {
   const n = (v: unknown) => Number(v) || 0;
   const fmt = (v: number) => v.toLocaleString('pt-BR');
   const motivos: Array<{ chave: string; texto: string; selo: string; critico: boolean }> = [];
   const cota = n(aItem.quantidade_base_senasp);
   if (cota < 0) motivos.push({ chave: `COTA${cota}`, texto: `cota própria negativa (${fmt(cota)}): a SENASP remanejou quantidade de órgãos que não abriram mão`, selo: 'cota negativa', critico: true });
+  // Migration 116: o limite caiu abaixo do que já estava alocado (ata assinada informada, registrado menor na fonte,
+  // adesão reduzida). A janela de alocação só deixa diminuir.
+  const acimaDoLimite = alocadoAcimaDoLimite(aItem);
+  if (acimaDoLimite > 0) {
+    motivos.push({
+      chave: `ALOC${acimaDoLimite}`,
+      texto: `alocado às unidades (${fmt(n(aItem.total_alocado_unidades))}) acima ${limiteComPreposicao(aItem)} (${fmt(Math.max(cota, 0))}): diminua ${fmt(acimaDoLimite)} na alocação`,
+      selo: 'alocado acima',
+      critico: false
+    });
+  }
   const fora = n(aItem.orgaos_fora_da_ata);
   if (fora > 0) motivos.push({ chave: `FORA${fora}`, texto: `${fora} ${fora === 1 ? 'órgão registrado' : 'órgãos registrados'} sem quantidade na ata assinada`, selo: 'fora da ata', critico: false });
   const homologado = n(aItem.quantidade_homologada);
   if (aItem.total_assinada != null && n(aItem.total_assinada) !== homologado) {
     motivos.push({ chave: `ASS${n(aItem.total_assinada)}`, texto: `soma da ata assinada (${fmt(n(aItem.total_assinada))}) diferente do homologado (${fmt(homologado)})`, selo: 'soma não fecha', critico: false });
   }
-  if (aItem.total_registrado != null && n(aItem.total_registrado) !== homologado) {
-    motivos.push({ chave: `REG${n(aItem.total_registrado)}`, texto: `soma do registrado (${fmt(n(aItem.total_registrado))}) diferente do homologado (${fmt(homologado)})`, selo: 'soma não fecha', critico: false });
+  // Soma do registrado acima do homologado tem aviso próprio, do gestor da ata (REGISTRADO_ACIMA, migration 142);
+  // aqui fica só a soma abaixo (cancelamento ou supressão de parte do item).
+  if (aItem.total_registrado != null && n(aItem.total_registrado) < homologado) {
+    motivos.push({ chave: `REG${n(aItem.total_registrado)}`, texto: `soma do registrado (${fmt(n(aItem.total_registrado))}) abaixo do homologado (${fmt(homologado)})`, selo: 'soma não fecha', critico: false });
   }
   const acima = n(aItem.orgaos_contratado_acima);
   if (acima > 0) motivos.push({ chave: `ACIMA${acima}`, texto: `${acima} ${acima === 1 ? 'órgão contratou' : 'órgãos contrataram'} acima do registrado`, selo: 'contratado acima', critico: false });
+  const naGerenciadora = n(aItem.gerenciado_pela_gerenciadora);
+  if (naGerenciadora > 0 && classifyArpItemSaldo(n(aItem.percentual_consumido)).isCritico) {
+    const ger = aItem.codigo_uasg || aItem.codigoUasg || '';
+    motivos.push({
+      chave: `GER${naGerenciadora}`,
+      texto: `saldo crítico com ${fmt(naGerenciadora)} da SENASP na gerenciadora${ger ? ` (UASG ${ger})` : ''}: peça o remanejamento`,
+      selo: 'pedir à gerenciadora',
+      critico: false
+    });
+  }
   return motivos;
+}
+
+/** Ata de outro órgão (migration 114): " · há N na gerenciadora para pedir", quando a ata assinada dá mais à SENASP. */
+function naGerenciadoraTexto(aItem: any): string {
+  const n = Number(aItem.gerenciado_pela_gerenciadora) || 0;
+  return n > 0 ? ` · há ${n.toLocaleString('pt-BR')} na gerenciadora para pedir` : '';
 }
 
 export function calculateAttentionSummary(params: {
@@ -249,6 +319,12 @@ export function calculateAttentionSummary(params: {
   arpItems?: Array<{ percentual_consumido?: number }>;
   /** Atas publicadas no PNCP sem fornecedor (atas_fornecedor_pncp, migration 107). */
   fornecedoresPncp?: RegistroFornecedorPncp[];
+  /** Vínculos automáticos desmentidos pela fonte com trabalho do gestor (vinculo_automatico_a_conferir, migration 112). */
+  vinculosAConferir?: VinculoAConferir[];
+  /** Notas e faturas que a fonte deixou de listar e têm trabalho da equipe (migration 113). */
+  ausentesDaFonte?: AusenteDaFonte[];
+  /** Contrato × item com a quantidade real das notas acima do contratado (migration 133). */
+  empenhadoAcima?: EmpenhadoAcima[];
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -262,6 +338,9 @@ export function calculateAttentionSummary(params: {
     paymentCycles = [],
     arpItems = [],
     fornecedoresPncp = [],
+    vinculosAConferir = [],
+    ausentesDaFonte = [],
+    empenhadoAcima = [],
     currentDate
   } = params;
 
@@ -349,6 +428,87 @@ export function calculateAttentionSummary(params: {
     });
   }
 
+
+  // 0b. Vínculo automático desmentido pela fonte com trabalho do gestor (migration 112): o cron não o apaga, e o
+  // gestor da ata e do contrato precisa saber. O coordenador decide manter ou retirar; o gestor pode marcar o aviso
+  // como resolvido (só esconde, não decide).
+  const arpsDoPainel = new Set(arps.map((a) => `${a.numeroAtaRegistroPreco}|${a.codigoUnidadeGerenciadora}`));
+  for (const v of vinculosAConferir) {
+    if (!v.numeroAta || !arpsDoPainel.has(`${v.numeroAta}|${v.uasg}`)) continue; // só atas da carteira em tela
+    const trabalho = trabalhoDoGestor(v);
+    const numeroContrato = numeroDoContrato(v.contractKey);
+    items.push({
+      id: `ATT-VINCULO-${v.itemKey}-${v.contractKey}`,
+      category: 'VINCULO_A_CONFERIR',
+      severity: 'URGENTE',
+      avisoChave: chaveAvisoVinculo(v.numeroAta, v.uasg, v.numeroItem, v.contractKey, v.motivo, v.detectadoEm),
+      title: 'Vínculo automático desmentido pela fonte',
+      description: `Ata ${v.numeroAta} — Item ${Number(v.numeroItem) || v.numeroItem}, contrato ${numeroContrato}: ${textoDoMotivoVinculo(v.motivo)}. Mantido porque tem ${trabalho || 'trabalho do gestor'}; o coordenador decide`,
+      arpKey: `${v.numeroAta}-${v.uasg}`,
+      numeroAta: v.numeroAta,
+      contractKey: v.contractKey,
+      numeroContrato,
+      targetUrl: `/atas/detalhe/${encodeURIComponent(`${v.numeroAta}-${v.uasg}`)}/itens/${encodeURIComponent(String(Number(v.numeroItem) || v.numeroItem))}?aba=contratos`,
+      badgeLabel: 'a conferir'
+    });
+  }
+
+  // 0c. Nota ou fatura que o Contratos.gov.br deixou de listar e que tem trabalho da equipe (migration 113): a
+  // sincronização não a apaga. O coordenador decide manter ou retirar; o ✓ só esconde o aviso.
+  const contratosDoPainel = new Map(contracts.map((c) => [c.id, c]));
+  for (const a of ausentesDaFonte) {
+    const contrato = contratosDoPainel.get(a.contractKey);
+    if (!contrato) continue; // só contratos da carteira em tela
+    const numeroContrato = contrato.numeroFormatado || `${contrato.numero}/${contrato.ano}`;
+    const rotulo = rotuloAusente(a);
+    items.push({
+      id: `ATT-FONTE-${a.tipo}-${a.chave}`,
+      category: 'FONTE_A_CONFERIR',
+      severity: 'URGENTE',
+      avisoChave: chaveAvisoFonte(a.contractKey, a.tipo, a.chave, a.detectadoEm),
+      ausenteDaFonte: { tipo: a.tipo, chave: a.chave },
+      title: `${rotulo.charAt(0).toUpperCase()}${rotulo.slice(1)} saiu do contrato na fonte`,
+      description: `Contrato ${numeroContrato}: o Contratos.gov.br deixou de listar a ${a.tipo === 'NOTA' ? 'nota' : 'fatura'}. Mantida porque ${a.tipo === 'NOTA' ? `tem ${trabalhoNaFonte(a)}` : trabalhoNaFonte(a)}; o coordenador decide`,
+      contractKey: a.contractKey,
+      numeroContrato,
+      fornecedorNome: contrato.fornecedorNome,
+      badgeLabel: 'a conferir'
+    });
+  }
+
+  // 0d. Empenhado acima do contratado num item do contrato (migration 133): só aviso, a gravação nunca é bloqueada.
+  // Conta só a quantidade real das notas (informada pelo gestor ou da nota no SIAFI).
+  for (const a of empenhadoAcima) {
+    const contrato = contratosDoPainel.get(a.contractKey);
+    if (!contrato) continue; // só contratos da carteira em tela
+    const numeroContrato = contrato.numeroFormatado || `${contrato.numero}/${contrato.ano}`;
+    const fmt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+    const origem = textoDaOrigem(a.ultimaOrigem);
+    const ultima = a.ultimaNota ? ` · última nota: ${a.ultimaNota}${origem ? `, ${origem}` : ''}` : '';
+    // Item de serviço: o excesso é de um período de 12 meses da vigência (migration 137).
+    const dataBr = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
+    const periodo = a.periodoInicio && a.periodoFim ? ` de ${dataBr(a.periodoInicio)} a ${dataBr(a.periodoFim)}` : '';
+    // Quantidade contratada quebrada (valor com desconto ÷ preço da ata): o excesso é em valor (migration 138).
+    const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const descricaoExcesso = a.peloValor
+      ? `${brl(a.valorEmpenhado)} empenhados${periodo} para ${brl(a.valorContratado)} contratados (${brl(a.valorAcima)} acima; quantidade no contrato quebrada, ${a.quantidadeContratada.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}, comparado pelo valor)`
+      : `${fmt(a.quantidadeEmpenhada)} empenhados${periodo} para ${fmt(a.quantidadeContratada)} contratados (${fmt(a.quantidadeAcima)} acima)`;
+    items.push({
+      id: `ATT-ACIMA-${a.contractKey}-${a.numeroItem}`,
+      category: 'EMPENHO_ACIMA',
+      severity: 'ATENCAO',
+      avisoChave: chaveAvisoEmpenhoAcima(a.contractKey, a.numeroItem, a.peloValor ? a.valorEmpenhado : a.quantidadeEmpenhada),
+      title: 'Empenhado acima do contratado',
+      description: `Item ${a.numeroItem}: ${descricaoExcesso}${ultima}`,
+      contractKey: a.contractKey,
+      numeroContrato,
+      fornecedorNome: contrato.fornecedorNome,
+      objetoItem: a.descricao || undefined,
+      // Sem prazo: a coluna Prazo mostra "—". A linha abre a aba Financeiro na última nota.
+      targetUrl: `/contratos/${encodeURIComponent(a.contractKey)}?aba=financeiro${a.ultimaNota ? `&abrir=${encodeURIComponent(a.ultimaNota)}` : ''}`,
+      badgeLabel: a.peloValor ? `${brl(a.valorAcima)} acima` : `${fmt(a.quantidadeAcima)} acima`
+    });
+  }
 
   // 1. Tarefas Atrasadas e Próximas da Central de Prazos
   //
@@ -459,6 +619,7 @@ export function calculateAttentionSummary(params: {
       title: pItem.regraNome,
       description: `${pItem.identificadorFormatado} — ${pItem.acaoDescricao}`,
       avisoChave: chaveAvisoLembrete(pItem.id),
+      motivoDetalhe: motivoDoLembrete(pItem.regraNome),
       contractKey: isAta ? undefined : pItem.contractKey,
       numeroContrato: pItem.identificadorFormatado,
       arpKey: isAta ? pItem.arpKey : undefined,
@@ -544,6 +705,7 @@ export function calculateAttentionSummary(params: {
       id: `ATT-REAJUSTE-${alert.contractKey}-${alert.ciclo}`,
       category: 'REAJUSTE_RADAR',
       avisoChave: chaveAvisoReajuste(alert.contractKey, alert.ciclo),
+      motivoDetalhe: motivoDoReajuste(alert.nivel),
       severity,
       title: alert.titulo || 'Radar de Reajuste / Repactuação',
       description: `Contrato ${numDisplay} — ${alert.descricao || ''}`,
@@ -575,7 +737,7 @@ export function calculateAttentionSummary(params: {
       severity,
       avisoChave: numAta && numItem ? chaveAvisoSaldo(numAta, uasgItem, numItem, severity) : undefined,
       title: `Consumo Crítico em Ata (${roundedPerc.toFixed(1)}%)`,
-      description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}`,
+      description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${descItem}${naGerenciadoraTexto(aItem)}`,
       arpKey: itemKey,
       numeroAta: numAta,
       objetoItem: descItem,
@@ -656,7 +818,7 @@ export function calculateAttentionSummary(params: {
   // 5c. Quantitativos do item a conferir (migration 109): só nos itens com a ata assinada informada. Pendência do
   // gestor de saldo; cota própria negativa é crítica (a SENASP repassou quantidade de órgão que não abriu mão).
   for (const aItem of (arpItems || []) as any[]) {
-    if (!aItem.ata_assinada_informada) continue;
+    if (!aItem.ata_assinada_informada && !((Number(aItem.gerenciado_pela_gerenciadora) || 0) > 0) && alocadoAcimaDoLimite(aItem) <= 0) continue;
     const motivos = motivosDosQuantitativos(aItem);
     if (motivos.length === 0) continue;
     const numAta = aItem.numero_ata || aItem.numeroAta;
@@ -670,7 +832,9 @@ export function calculateAttentionSummary(params: {
       category: 'QUANTITATIVOS',
       severity: critico ? 'CRITICA' : 'ATENCAO',
       avisoChave: numAta && numItem ? chaveAvisoQuantitativos(numAta, uasgItem, numItem, motivos.map((m) => m.chave).join('|')) : undefined,
-      title: critico ? 'Cota própria da SENASP negativa' : 'Quantitativos do item a conferir',
+      title: critico
+        ? 'Cota própria da SENASP negativa'
+        : motivos.every((m) => m.chave.startsWith('GER')) ? 'Pedir remanejamento à gerenciadora' : 'Quantitativos do item a conferir',
       description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${motivos.map((m) => m.texto).join('; ')}`,
       arpKey: itemKey,
       numeroAta: numAta,
@@ -680,6 +844,60 @@ export function calculateAttentionSummary(params: {
         ? `/atas/detalhe/${encodeURIComponent(`${numAta}-${uasgItem}`)}/itens/${encodeURIComponent(String(numItem))}`
         : undefined,
       badgeLabel: motivos.length === 1 ? motivos[0].selo : `${motivos.length} pontos a conferir`
+    });
+  }
+
+  // 5c'. Registrado acima do homologado (migration 142): a soma do registrado no Compras.gov.br passa do homologado do
+  // item. Enquanto aberto, a parte da SENASP sai da base do saldo (a view já desconta). Pendência do gestor da ata e do
+  // coordenador; o gestor de saldo só vê o aviso dentro do item.
+  for (const aItem of (arpItems || []) as any[]) {
+    const chave = aItem.registrado_acima_chave;
+    if (!chave) continue;
+    const numAta = aItem.numero_ata || aItem.numeroAta;
+    const numItem = aItem.numero_item || aItem.numeroItem;
+    const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
+    const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : '');
+    if (!itemKey) continue;
+    items.push(itemRegistradoAcima(aItem, itemKey, numAta, uasgItem, numItem, chave));
+  }
+
+  // 5d. Qtd. da ata assinada a informar (migration 116), uma pendência por ata: só na ata da CGLIC vigente que já tem
+  // item alocado com o limite provisório (outros órgãos registrados e ata assinada não informada). As demais atas sem
+  // a quantidade ficam no filtro "Qtd. assinada" da Carteira › Atas. Pendência do gestor da ata e do coordenador.
+  type AtaProvisoria = { numAta: string; uasg: string; alocados: any[]; comOutros: number; descricao?: string; fornecedor?: string };
+  const provisoriosPorAta = new Map<string, AtaProvisoria>();
+  for (const aItem of (arpItems || []) as any[]) {
+    if (!limiteProvisorio(aItem)) continue;
+    const numAta = aItem.numero_ata || aItem.numeroAta;
+    const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
+    if (!numAta) continue;
+    const chave = `${numAta}-${uasgItem}`;
+    const grupo: AtaProvisoria = provisoriosPorAta.get(chave) ?? { numAta, uasg: uasgItem, alocados: [], comOutros: 0 };
+    grupo.comOutros += 1;
+    if ((Number(aItem.total_alocado_unidades) || 0) > 0) {
+      grupo.alocados.push(aItem);
+      grupo.descricao ??= aItem.descricao_item || aItem.descricaoItem;
+      grupo.fornecedor ??= aItem.fornecedor_razao_social || aItem.fornecedorRazaoSocial;
+    }
+    provisoriosPorAta.set(chave, grupo);
+  }
+  for (const [ataKey, g] of provisoriosPorAta) {
+    if (g.alocados.length === 0) continue;
+    const primeiro = [...g.alocados].sort((a, b) => Number(a.numero_item) - Number(b.numero_item))[0];
+    const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+    items.push({
+      id: `ATT-ATA-ASSINADA-${ataKey}`,
+      category: 'ATA_ASSINADA',
+      severity: 'INFO',
+      avisoChave: chaveAvisoAtaAssinada(g.numAta, g.uasg, g.alocados.length),
+      title: 'Informar qtd. da ata assinada',
+      description: `Ata ${g.numAta}: ${plural(g.alocados.length, 'item já alocado', 'itens já alocados')} com limite provisório (registrado da SENASP); ${plural(g.comOutros, 'item', 'itens')} com outros órgãos registrados`,
+      arpKey: ataKey,
+      numeroAta: g.numAta,
+      objetoItem: g.descricao || 'Item de ARP',
+      fornecedorNome: g.fornecedor,
+      targetUrl: `/atas/detalhe/${encodeURIComponent(ataKey)}/itens/${encodeURIComponent(String(primeiro.numero_item ?? primeiro.numeroItem))}?aba=quantitativos`,
+      badgeLabel: 'sem ata assinada'
     });
   }
 
@@ -1169,6 +1387,9 @@ export function buildManagementDashboardReadModel(params: {
   itemsSaldo?: Array<any>;
   paymentCycles?: PaymentFollowUpCycle[];
   fornecedoresPncp?: RegistroFornecedorPncp[];
+  vinculosAConferir?: VinculoAConferir[];
+  ausentesDaFonte?: AusenteDaFonte[];
+  empenhadoAcima?: EmpenhadoAcima[];
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1230,7 +1451,7 @@ export function buildManagementDashboardReadModel(params: {
   let filteredContracts = rawContracts;
   let filteredArps = rawArps;
   let filteredItemsSaldo = rawItemsSaldo;
-  // v_empenhos_resumo é global (não filtra por UASG) e a Visão Geral soma os read models
+  // v_empenhos_resumo é global (não filtra por UASG) e o Início soma os read models
   // das duas UASGs: sem este recorte, cada empenho entrava uma vez por UASG (valor em dobro).
   // Fica o que a UASG emitiu OU o que está ligado a um contrato/ata dela; sem
   // `uasg_emitente` informado (dado legado), mantém — nunca descarta o que não sabe classificar.
@@ -1394,7 +1615,7 @@ export function buildManagementDashboardReadModel(params: {
   }
 
   // 3. Recalcula todos os blocos determinísticos sobre os dados filtrados
-  // Só Atas vigentes entram na Visão Geral (mesma definição da Carteira de Atas): Atas vencidas,
+  // Só Atas vigentes entram no Início (mesma definição da Carteira de Atas): Atas vencidas,
   // canceladas ou sem data não contam no total, nem no saldo, nem nas tarefas e lembretes.
   const encerradasAtaNumbers = new Set<string>();
   filteredArps = filteredArps.filter((arp) => {
@@ -1426,6 +1647,9 @@ export function buildManagementDashboardReadModel(params: {
     paymentCycles: filteredPaymentCycles,
     arpItems: filteredItemsSaldo,
     fornecedoresPncp: params.fornecedoresPncp,
+    vinculosAConferir: params.vinculosAConferir,
+    ausentesDaFonte: params.ausentesDaFonte,
+    empenhadoAcima: params.empenhadoAcima,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1474,7 +1698,10 @@ export async function fetchManagementDashboardData(
     empenhosResumo,
     arpItemsSaldo,
     itensComAlocacao,
-    fornecedoresPncp
+    fornecedoresPncp,
+    vinculosAConferir,
+    ausentesDaFonte,
+    empenhadoAcima
   ] = await Promise.all([
     fetchContratosParaTela(cleanUasg).catch((err) => {
       console.warn('Erro ao consultar contratos para o dashboard:', err);
@@ -1512,6 +1739,18 @@ export async function fetchManagementDashboardData(
     fetchRegistrosFornecedorPncp().catch((err) => {
       console.warn('Erro ao consultar as atas sem fornecedor no PNCP para o dashboard:', err);
       return [] as RegistroFornecedorPncp[];
+    }),
+    fetchVinculosAConferir().catch((err) => {
+      console.warn('Erro ao consultar os vínculos a conferir para o dashboard:', err);
+      return [] as VinculoAConferir[];
+    }),
+    fetchAusentesDaFonte().catch((err) => {
+      console.warn('Erro ao consultar as notas e faturas a conferir para o dashboard:', err);
+      return [] as AusenteDaFonte[];
+    }),
+    fetchEmpenhadoAcima().catch((err) => {
+      console.warn('Erro ao consultar os itens com empenhado acima do contratado para o dashboard:', err);
+      return [] as EmpenhadoAcima[];
     })
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
@@ -1531,6 +1770,9 @@ export async function fetchManagementDashboardData(
     itemsSaldo: arpItemsSaldoComAlocacao,
     paymentCycles,
     fornecedoresPncp,
+    vinculosAConferir,
+    ausentesDaFonte,
+    empenhadoAcima,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate
@@ -1659,25 +1901,41 @@ export async function fetchItensComAlocacao(): Promise<Set<string>> {
 }
 
 /**
- * Consulta segura à view SQL v_arp_item_saldo_detalhado
+ * Colunas de v_arp_item_saldo_detalhado que as carteiras de Atas e de Itens usam (buildCarteiraItemRows,
+ * buildAtaSaldoStats, situacaoAtaAssinada, limiteProvisorio, quantidadeBaseSenasp). Pedir só estas deixa a
+ * consulta da carteira bem mais leve: a view inteira chegou perto do tempo limite do banco (16/10/2026).
  */
-export async function fetchArpItemSaldosFromDb(uasg?: string): Promise<any[]> {
+export const COLUNAS_SALDO_CARTEIRA = [
+  'numero_ata',
+  'codigo_uasg',
+  'numero_item',
+  'papel_senasp',
+  'quantidade_base_senasp',
+  'quantidade_senasp',
+  'quantidade_homologada',
+  'quantidade_consumida',
+  'percentual_consumido',
+  'quantidade_contratada_sem_unidade',
+  'ata_assinada_informada',
+  'assinada_senasp_participante',
+  'outros_orgaos_registrados'
+] as const;
+
+/**
+ * Saldo por item da view v_arp_item_saldo_detalhado (todas as colunas, ou só as pedidas).
+ * Falha da consulta vira erro: um vazio aqui parecia "nenhum item informado" e zerava os filtros da carteira.
+ */
+export async function fetchArpItemSaldosFromDb(uasg?: string, colunas?: readonly string[]): Promise<any[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  try {
-    let query = supabase.from('v_arp_item_saldo_detalhado').select('*');
-    if (uasg) {
-      // Carteira da CGLIC inclui as atas de outros órgãos em que a SENASP participa (migration 106).
-      query = query.eq(colunaDaUasgDaAta(uasg), uasg);
-    }
-    const { data, error } = await query;
-    if (error) {
-      console.error('Erro ao consultar v_arp_item_saldo_detalhado:', error);
-      return [];
-    }
-    if (!data) return [];
-    return data;
-  } catch (err) {
-    console.warn('Erro ao consultar v_arp_item_saldo_detalhado:', err);
-    return [];
+  let query = supabase.from('v_arp_item_saldo_detalhado').select(colunas?.length ? colunas.join(',') : '*');
+  if (uasg) {
+    // Carteira da CGLIC inclui as atas de outros órgãos em que a SENASP participa (migration 106).
+    query = query.eq(colunaDaUasgDaAta(uasg), uasg);
   }
+  const { data, error } = await query;
+  if (error) {
+    console.error('Erro ao consultar v_arp_item_saldo_detalhado:', error);
+    throw new Error(`Não foi possível ler o saldo dos itens: ${error.message}`);
+  }
+  return data ?? [];
 }

@@ -2,12 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { resolveInviteRedirect, ALLOWED_INVITE_ORIGINS } from '../inviteOrigin';
 
 describe('resolveInviteRedirect — allow-list de origem do redirectTo do convite', () => {
-  it('origin permitido (Vercel produção — domínio canônico) -> redirectTo correto', () => {
+  it('domínio novo (bloqueado pelo firewall do MJ) -> redirectTo aponta a cglic.vercel.app', () => {
+    const result = resolveInviteRedirect('https://comprassusp.app');
+    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
+  });
+
+  it('cglic.vercel.app -> redirectTo continua em cglic.vercel.app', () => {
     const result = resolveInviteRedirect('https://cglic.vercel.app');
     expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
   });
 
-  it('domínio anterior (protegido por SSO da Vercel) -> redirectTo aponta ao domínio canônico', () => {
+  it('domínio protegido por SSO da Vercel -> redirectTo aponta a cglic.vercel.app', () => {
     const result = resolveInviteRedirect('https://cglic-lu1smart1ns-projects.vercel.app');
     expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
   });
@@ -18,7 +23,7 @@ describe('resolveInviteRedirect — allow-list de origem do redirectTo do convit
   });
 
   it('tolera barra final na origem recebida', () => {
-    const result = resolveInviteRedirect('https://cglic.vercel.app/');
+    const result = resolveInviteRedirect('https://comprassusp.app/');
     expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
   });
 
@@ -40,6 +45,7 @@ describe('resolveInviteRedirect — allow-list de origem do redirectTo do convit
   });
 
   it('a allow-list contém exatamente as origens de produção (atual e anterior) e desenvolvimento local esperadas', () => {
+    expect(ALLOWED_INVITE_ORIGINS).toContain('https://comprassusp.app');
     expect(ALLOWED_INVITE_ORIGINS).toContain('https://cglic.vercel.app');
     expect(ALLOWED_INVITE_ORIGINS).toContain('https://cglic-lu1smart1ns-projects.vercel.app');
     expect(ALLOWED_INVITE_ORIGINS).toContain('http://localhost:5173');

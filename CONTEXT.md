@@ -1,299 +1,111 @@
-# CONTEXT.md — Documentação e Arquitetura Geral do SaldoARP
+# CONTEXT.md · Arquitetura e funcionamento
 
----
+Guia para quem vai trabalhar no código: como o sistema está montado, de onde vêm os dados, quem pode o quê e como publicar e diagnosticar. Visão geral e comandos estão no [README](README.md); as regras de negócio, em [docs/regras-de-dados.md](docs/regras-de-dados.md).
 
-## 1. Visão Geral e Propósito
+Atualizado em 14/10/2026.
 
-O **SaldoARP** é uma aplicação web moderna e de alta confiabilidade voltada à **auditoria, governança, consulta e reconciliação contábil de Atas de Registro de Preços (ARP)** da Administração Pública Federal brasileira.
-
-O sistema atua consolidando dados públicos de múltiplos portais estruturantes governamentais:
-- **Compras.gov.br (SIASG / módulo-arp)**: Consulta de atas homologadas, itens, quantitativos e saldos por órgão participante/gerenciador.
-- **Portal Nacional de Contratações Públicas (PNCP)**: Consulta oficial de atas publicadas e contratos administrativos celebrados.
-- **Contratos.gov.br**: Detalhamento de contratos, itens de contratação e histórico de execução financeira de notas de empenho.
-
----
-
-## 2. Invariantes Contábeis e Regras de Negócio Fundamentais
-
-### 2.1. Hierarquia e Cardinalidade Canônica
-A estrutura do domínio segue estritamente a hierarquia orçamentária e contratual pública:
-
-$$\text{ARP (Ata de Registro de Preços)} \longrightarrow \text{Itens da Ata} \longrightarrow \text{Órgãos / UASGs} \longrightarrow \text{Notas de Empenho (NE)} \longleftrightarrow \text{Contratos}$$
-
-- **Item $\to$ Empenhos**: Relação de $1 : N$. Um item da ata pode ser empenhado através de múltiplas Notas de Empenho ao longo de sua vigência.
-- **Contrato $\longleftrightarrow$ Empenhos**: Relação $N : N$ modelada através da entidade associativa `contrato_empenho`. Um contrato pode vincular 1 ou mais empenhos, e um empenho pode estar associado a um contrato ou ser uma execução direta por Nota de Empenho.
-
-### 2.2. A Fórmula Oficial do Saldo da Ata
-O saldo remanescente de um item de Ata de Registro de Preços é consumido **exclusivamente por Notas de Empenho**:
-
-$$\mathbf{SaldoARP} = \mathbf{QuantidadeRegistrada} - \sum \mathbf{Empenhos}$$
-
-> [!IMPORTANT]
-> **Contratos e Alocações NÃO reduzem o saldo da Ata de Registro de Preços:**
-> 1. **Contratos**: São instrumentos jurídicos formais que formalizam a relação com o fornecedor e agrupam/lastreiam notas de empenho. Subtrair contratos e empenhos simultaneamente geraria contagem dupla.
-> 2. **Alocações Internas (Departamentais)**: Representam divisões administrativas/planejamento interno de cotas entre diretorias ou coordenações. O saldo da alocação departamental é $\text{SaldoAlocação} = \text{CotaAlocada} - \sum \text{EmpenhosDoDepartamento}$, não afetando o saldo global da Ata.
-
-### 2.3. Reconciliação Contábil (`reconcileBalances`)
-O sistema realiza conferência contínua entre duas fontes:
-- **Fonte 1**: Saldo reportado diretamente pela API do Compras.gov.br.
-- **Fonte 2**: Saldo calculado matematicamente pelo somatório das Notas de Empenho apuradas.
-
-**Regra de Não-Interferência Destrutiva**: Em caso de divergência entre o saldo calculado e o saldo da API, o sistema **NÃO** altera nenhum dos valores arbitrariamente; ele exibe um alerta explícito com o delta numérico (ex: `⚠️ Divergência de 7 unidades`) e classifica o item com status `DIVERGENTE`.
-
-### 2.4. Matriz de Confiança dos Registros
-Todos os registros de empenho e contrato são classificados de forma visual e auditável:
-
-| Indicador | Classificação | Descrição |
-| :--- | :--- | :--- |
-| 🟢 | **Oficial** | Registro retornado diretamente pela API oficial (SIASG/PNCP/Contratos.gov). |
-| 🟡 | **Manual** | Inserido manualmente pelo usuário por ausência momentânea nos dados abertos. |
-| 🔵 | **Sincronizado** | Inserido manualmente e posteriormente confirmado e vinculado pela API oficial. |
-| 🔴 | **Divergente** | Registro com discrepância de quantidade ou valor entre fontes. |
-
-### 2.5. Promoção Automática (`matchAndMergeEmpenhos`)
-Quando uma Nota de Empenho cadastrada como `MANUAL` passa a ser retornada pela API do Compras.gov.br / Contratos.gov.br com a mesma chave canônica ($\text{número normalizado} + \text{ano} + \text{UASG} + \text{item}$), o sistema **promove** o registro para `SINCRONIZADO`, preservando vínculos departamentais e evitando duplicidade.
-
-### 2.6. Integridade e Segurança dos Dados (Fim dos Dados Fictícios)
-- Proibição estrita de gerar números de controle PNCP artificiais (`numeroControlePncp`). Se o PNCP não fornecer o identificador, o campo permanece vazio/nulo.
-- Links e URLs do PNCP só são renderizados se oficiais e válidos.
-- Remoção total de CNPJs ou identificadores mockados em código.
-- Travas de formulário: **Impossível criar um Contrato Manual sem vincular previamente a pelo menos 1 Nota de Empenho**.
-
----
-
-## 3. Entidades do Domínio
-
-Todas as interfaces e contratos de tipo TypeScript estão centralizados em [`src/types/index.ts`](src/types/index.ts):
-
-### 3.1. `Empenho`
-Representa a Nota de Empenho emitida contra um item da Ata:
-```typescript
-export interface Empenho {
-  id: string;
-  numero: string;               // Ex: "2026NE000142"
-  ano: number;                  // Ex: 2026
-  arpId: string;                // Ex: "00003/2026"
-  itemId: string;               // Ex: "1"
-  uasg: string;                 // Ex: "200331"
-  quantidade: number;           // Quantidade física consumida do item
-  valorUnitario?: number;       // Valor unitário homologado
-  valorTotal?: number;          // Valor total empenhado
-  data?: string;                // Data de emissão (YYYY-MM-DD)
-  fornecedor?: string;          // Razão social do fornecedor
-  cnpjFornecedor?: string;      // CNPJ formatado
-  unidadeInternaId?: string;    // ID da alocação interna vinculada
-  origem: 'API' | 'MANUAL' | 'SINCRONIZADO';
-  status?: 'CONFIRMADO' | 'PENDENTE' | 'DIVERGENTE';
-  observacao?: string;
-  criadoEm: string;
-  atualizadoEm: string;
-}
-```
-
-### 3.2. `Contrato`
-Representa o Contrato Administrativo celebrado:
-```typescript
-export interface Contrato {
-  id: string;
-  numero: string;               // Ex: "12/2026"
-  ano: number;                  // Ex: 2026
-  uasg: string;                 // Ex: "200331"
-  objeto?: string;
-  fornecedor?: string;
-  cnpjFornecedor?: string;
-  quantidadeContratada?: number;
-  valorTotal?: number;
-  dataAssinatura?: string;
-  dataVigenciaInicio?: string;
-  dataVigenciaFim?: string;
-  numeroControlePncp?: string;  // Apenas se fornecido oficialmente pelo PNCP
-  linkPncp?: string;            // Apenas se fornecido oficialmente pelo PNCP
-  origem: 'API' | 'MANUAL';
-  criadoEm: string;
-  atualizadoEm: string;
-}
-```
-
-### 3.3. `ContratoEmpenho` (Tabela Associativa $N:N$)
-```typescript
-export interface ContratoEmpenho {
-  id: string;
-  contratoId: string;
-  empenhoId: string;
-  quantidadeVinculada?: number;
-  dataVinculo: string;
-  origem: 'API' | 'MANUAL';
-}
-```
-
-### 3.4. `InternalAllocation` (Alocação Interna Departamental)
-```typescript
-export interface InternalAllocation {
-  id: string;
-  unitName: string;            // Sigla da Unidade (ex: "DITEL", "DTI", "CGTI")
-  allocatedQty: number;        // Cota alocada
-  empenhadaQty: number;        // Total de empenhos vinculados à unidade
-}
-```
-
-### 3.5. `ReconciliationReport` (Relatório de Reconciliação)
-```typescript
-export interface ReconciliationReport {
-  quantidadeRegistrada: number;
-  totalEmpenhadoApi: number;
-  totalEmpenhadoManual: number;
-  totalEmpenhado: number;
-  saldoCalculado: number;
-  saldoApi: number | null;
-  divergencia: number;
-  status: 'CONSISTENTE' | 'DIVERGENTE' | 'SEM_DADOS_API';
-  mensagem: string;
-}
-```
-
----
-
-## 4. Arquitetura de Frontend
-
-Construído com **React 18/19 + TypeScript + Vite**, priorizando performance e usabilidade:
+## 1. Visão geral
 
 ```
-src/
-├── App.tsx                          # Roteamento global de estados (Busca -> Detalhes -> Alocações Globais)
-├── components/
-│   ├── ArpSearch.tsx                # Painel de busca e filtros de Atas (Vigência, UASG, Órgão, Número)
-│   ├── Header.tsx                   # Barra de navegação institucional e alternância de visões
-│   ├── ItemBalances.tsx             # Orquestrador da visualização do Item, saldos e abas
-│   ├── ItemReconciliationCard.tsx   # Card executivo visual de Reconciliação Contábil
-│   ├── InternalAllocationsDashboard.tsx # Painel de governança de cotas de todas as atas
-│   ├── ManageDepartmentsModal.tsx   # Modal de gestão de siglas oficiais de unidades
-│   ├── cards/                       # Componentes modulares para listagem de atas e itens
-│   └── modals/
-│       ├── ManualEmpenhoModal.tsx   # Modal de inclusão/edição de Nota de Empenho
-│       └── ManualContratoModal.tsx  # Modal de Contrato com trava de empenho obrigatório
-└── index.css                        # Design System Vanilla CSS (Tokens, Glassmorphism, Dark/Light)
+Fontes oficiais (Compras.gov.br, PNCP, Contratos.gov.br, STA, Portal da Transparência)
+        │  lidas só pelo servidor
+        ▼
+Edge Function sincronizar-fontes  ◄── pg_cron (de hora em hora)  ◄── botão "Atualizar" do coordenador
+        │  grava com service_role
+        ▼
+Supabase Postgres (RLS, RPCs, views)
+        │  leitura de usuário logado; gravação só por RPC
+        ▼
+Site React (Vercel)
 ```
 
----
+- **O navegador só lê o banco.** Toda leitura das fontes oficiais roda no servidor. Exceções: algumas telas de detalhe ainda fazem leituras pontuais ao vivo pelo proxy da Vercel (divulgação no PNCP, contrato avulso, data de assinatura da ata, empenhos de um contrato).
+- **Gravação do usuário** passa por funções do banco (RPC) que conferem `has_role` / `has_permission`. Desde a migration 65 a leitura é só para logados; desde a 84, atas e itens só o servidor grava; desde a 124, usuário desativado perde o acesso na hora.
+- UASGs da CGLIC: 200330 e 200331 (`src/config/unidadesGestoras.ts`).
 
-## 5. Arquitetura de Backend e Proxies (BFF Serverless)
+## 2. Áreas, páginas e perfis
 
-A aplicação utiliza uma arquitetura **BFF (Backend-For-Frontend) Serverless**:
+Navegação em dois níveis (`src/config/navigation.ts`): o menu chave lista as áreas (trilho lateral no computador, barra inferior no celular) e as páginas da área aparecem como abas no topo (`AreaTabs`). Cada rota é protegida por `<RequireRole>` em `src/App.tsx`.
 
-```
-[ Frontend React (SPA) ] 
-       │
-       ▼
-[ Proxy Vercel Edge (vercel.json) ] ──┬──► [ API Compras.gov.br (SIASG/módulo-arp) ]
-                                      ├──► [ API PNCP (Portal Nac. Contratações) ]
-                                      └──► [ API Contratos.gov.br ]
-       │
-       ▼
-[ Supabase Backend (PostgreSQL) ]
-```
+Perfis: **A** = Coordenador (`admin`), **G** = Gestor de atas e contratos (`gestor`), **GS** = Gestor de saldos (`gestor_saldos`), **L** = Consulta (`leitor`).
 
-### Arquivos Principais:
-1. [`vercel.json`](vercel.json): Configura os proxies reversos em tempo de execução para contornar problemas de CORS:
-   - `/api-arp/*` $\to$ `https://dadosabertos.compras.gov.br/*`
-   - `/api-pncp/*` $\to$ `https://pncp.gov.br/*`
-   - `/api-contratos-gov/*` $\to$ `https://contratos.comprasnet.gov.br/*`
-2. [`src/services/api.ts`](src/services/api.ts): Camada de integração com sanitização de parâmetros, fallback por UASG/Ano e agregação de dados.
-3. [`src/services/balanceService.ts`](src/services/balanceService.ts): **Motor matemático oficial** isolado (cálculo de saldo $\mathbf{Saldo} = \mathbf{Qtd} - \sum \mathbf{Empenhos}$, conciliação e matching inteligente).
+| Área | Página | Rota | Quem vê |
+| --- | --- | --- | --- |
+| Início | Painel | `/instrumentos` | A G GS L |
+| | Distribuição | `/atas/distribuicao` | A L |
+| Carteira | Atas · Contratos · Itens | `/atas` · `/contratos` · `/itens` | A G GS L |
+| | Ata 360 · Item · Contrato 360 | `/atas/detalhe/:ataKey` · `…/itens/:numeroItem` · `/contratos/:contractKey` | A G GS L |
+| Alocação | Itens às unidades | `/alocacao` | A G GS L |
+| Vínculos | Contratos à ata · Empenhos ao contrato · Empenhos aos itens | `/vinculacao/contratos` · `/vinculacao/empenhos-contrato` · `/vinculacao/empenhos-itens` | A G L |
+| Financeiro | Empenhos · Pagamentos · Previsão | `/empenhos` · `/pagamentos` · `/pagamentos/previsao` | A G L |
+| Ajustes | Modelos de Gestão | `/configuracoes/modelos` | A G |
+| | Regras de Alertas · Feriados | `/admin/regras-alertas` · `/admin/feriados` | A |
+| | Unidades Internas | `/admin/departamentos` | A G GS L (edita: A GS) |
+| | Usuários · Perfis | `/admin/usuarios` · `/admin/perfis` | A |
 
----
+Rotas públicas: `/login`, `/definir-senha` (convite), `/redefinir-senha`. Endereços antigos redirecionam para os novos.
 
-## 6. Arquitetura de Banco de Dados (DB)
+O que cada perfil pode fazer (`role_permissions`, migrations 23, 30, 33 e 55):
 
-A persistência do sistema é **híbrida (Supabase PostgreSQL + LocalStorage Fallback)**:
+- **Coordenador:** tudo. É o único que gerencia usuários, perfis, regras de alertas e feriados, decide conflitos de gestor, marca avisos como resolvidos e força a sincronização ("Atualizar").
+- **Gestor:** contratos atribuídos a ele (escopo ASSIGNED), vincular contrato à ata, vincular nota aos itens e à unidade interna, informar a quantidade da ata assinada, exportar.
+- **Gestor de saldos:** alocações (ver, gerenciar, ligar nota à unidade), unidades internas, remanejamentos de quantitativos. Não vê Financeiro nem Vínculos.
+- **Consulta:** só leitura e exportação.
 
-### Serviços de Banco de Dados:
-- [`src/services/dbCacheService.ts`](src/services/dbCacheService.ts): Cache relacional das Atas e Itens consultados.
-- [`src/services/allocationService.ts`](src/services/allocationService.ts): CRUD de alocações departamentais, empenhos manuais, contratos manuais e tabela associativa `contrato_empenho`.
-- [`src/services/unitService.ts`](src/services/unitService.ts): Gestão do catálogo oficial de unidades internas.
+Os nomes exibidos dos perfis são editáveis pelo coordenador (migration 68). As Edge Functions `invite-user` e `manage-user` convertem os nomes da tela (coordenador, gestor, consulta, gestor_saldos) nos perfis do banco (`supabase/functions/_shared/roleMapping.ts`).
 
-### Schema Relacional no Supabase (PostgreSQL):
-```sql
--- 1. Catálogo Oficial de Departamentos
-CREATE TABLE departments (
-  id TEXT PRIMARY KEY,
-  sigla TEXT NOT NULL,
-  name TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+## 3. Sincronização com as fontes
 
--- 2. Alocações Internas (Cotas por Item da Ata)
-CREATE TABLE allocations (
-  item_key TEXT PRIMARY KEY, -- formato: {numeroAta}-{codigoUasg}-{numeroItem}
-  data JSONB NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+- **Código:** `server/sincronizar-fontes/` (`index.ts` com `Deno.serve`, `handler.ts`, `executar.ts`, `proxyDeFontes.ts`, `supabaseServidor.ts`). Reaproveita os serviços de `src/services`.
+- **Empacotamento:** `scripts/build-sincronizar-fontes.mjs` junta tudo com rolldown num arquivo só (`supabase/functions/sincronizar-fontes/index.ts`, gerado e fora do git), troca o cliente do navegador pelo cliente do servidor e recusa o pacote se encontrar chave ou variável do navegador.
+- **Quem chama:** o pg_cron, com o cabeçalho `x-cron-secret` (nunca força), ou o coordenador logado, que pode forçar. A resposta é 202 e o trabalho segue em segundo plano. O modo `dry` só consulta e conta, sem gravar.
+- **Recursos** (`RECURSOS_DO_SERVIDOR` em `executar.ts`): `contratos`, `atas`, `saldos_itens`, `itens_contratos`, `unidades_itens`, `atas_participacao`, `contratos_participantes`, `empenhos`, `faturas`, `ordens_bancarias`, `cadastro_uasgs`, `itens_notas_siafi`.
+- **Fontes** (prefixos em `vercel.json`, `vite.config.ts` e `proxyDeFontes.ts`): `/api-arp` → Compras.gov.br dados abertos; `/api-pncp` → PNCP; `/api-contratos-gov` → Contratos.gov.br; `/api-sta` → STA do Tesouro; `/api-transparencia` → Portal da Transparência (só no servidor, exige chave).
+- **Agendamento:** `disparar_sincronizacao(recurso, uasg)` (migration 77) lê o endereço e o segredo do Vault e chama a função. Jobs e horários em [docs/migrations.md](docs/migrations.md#jobs-do-pg_cron).
+- **Limites:** cada execução tem orçamento de ~100 s (a Edge Function para em 150 s); o que não couber fica para a próxima. Cada chamada a uma fonte tem 30 s. O recurso só roda se passou da validade e respeita a trava em `sincronizacao_fontes`.
+- **Instalação inicial:** `scripts/ativar-sincronizacao-no-servidor.sh` gera o segredo, publica a função, aplica as migrations, grava o Vault e faz um teste `dry`.
 
--- 3. Vínculos de Empenhos a Departamentos
-CREATE TABLE empenho_links (
-  item_key TEXT PRIMARY KEY,
-  data JSONB NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+### Diagnóstico
 
--- 4. Notas de Empenho Manuais
-CREATE TABLE manual_empenhos (
-  item_key TEXT PRIMARY KEY,
-  data JSONB NOT NULL, -- Array de objetos Empenho
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+- Situação de cada recurso: `select * from sincronizacao_fontes;`
+- Execuções do cron: `cron.job_run_details`; resposta de cada disparo: `net._http_response`.
+- Para obrigar uma releitura sem o botão do coordenador: recuar as datas de controle (`ultimo_sucesso_em` além da validade e `ultima_tentativa_em` além de 30 min em `sincronizacao_fontes`; por contrato ou NP, `contrato_faturas_sincronizacao.sincronizado_em` e `np_consultas`) e chamar `select public.disparar_sincronizacao('<recurso>', '<uasg>');`.
+- Trava presa (função derrubada aos 150 s) só solta na reserva seguinte, depois de 10 min.
 
--- 5. Contratos Manuais
-CREATE TABLE manual_contratos (
-  item_key TEXT PRIMARY KEY,
-  data JSONB NOT NULL, -- Array de objetos Contrato
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+## 4. Pastas
 
--- 6. Tabela Associativa Contrato-Empenho (N:N)
-CREATE TABLE contrato_empenho (
-  item_key TEXT PRIMARY KEY,
-  data JSONB NOT NULL, -- Array de objetos ContratoEmpenho
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+| Pasta | Conteúdo |
+| --- | --- |
+| `src/routes/` | Páginas de rota (carregadas sob demanda) |
+| `src/components/` | Telas e partes, por área: `layout`, `auth`, `carteira`, `atas`, `contracts`, `itens`, `item-balances`, `instrument360`, `instrumentos`, `alocacao`, `vinculacao`, `financeiro`, `admin`, `avisos`… |
+| `src/design-system/` | Tokens, catálogo de ações (`actions.ts`) e componentes (AppButton, ActionButton, DataTable, Modal, KpiCard, MetricStrip, NoticeBar, StatusBadge…) |
+| `src/hooks/` | Hooks React Query de leitura e de gravação por RPC |
+| `src/services/` | Acesso a dados e às fontes; também rodam no servidor. Atenção: algumas leituras de `api.ts` gravam no banco quando rodam no servidor |
+| `src/adapters/`, `src/utils/` | Conversão das respostas das fontes; regras puras (saldos, quantitativos, vínculos, formatação) |
+| `src/config/` | Navegação, regras de alerta, feriados, limites da Lei 14.133, UASGs |
+| `src/context/`, `src/types/` | Sessão e perfil (`AuthContext`), tipos de domínio e de RBAC |
+| `server/sincronizar-fontes/` | Código da Edge Function de sincronização |
+| `supabase/migrations/` | Migrations (ver [docs/migrations.md](docs/migrations.md)) |
+| `supabase/functions/` | `invite-user`, `manage-user` e o pacote gerado de `sincronizar-fontes` |
+| `supabase/tests/` | Testes SQL de regressão de RLS e RBAC |
+| `supabase/limpezas/` | Limpezas únicas feitas à mão; rodam como ensaio por padrão (só gravam com `SET limpeza.aplicar = 'sim'`) |
+| `e2e/` | Testes de layout no celular (Playwright) |
+| `docs/` | Regras de dados, índice das migrations e `historico/` (relatórios das fases anteriores) |
+| `db/` | Sobras de fases antigas, fora do build |
 
--- 7. Cache de Atas e Itens
-CREATE TABLE arps_cache (
-  id TEXT PRIMARY KEY,
-  data JSONB NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+## 5. Convenções de tela
 
----
+- **Padrão gov.br:** cor primária `#0c326f`, tokens de cor no `:root`, botões só pelo `AppButton`/`ActionButton` com o catálogo de ações.
+- **Tabelas:** a linha inteira abre o detalhe; ordenação pelo cabeçalho guardada na URL; ações da linha no menu ⋯. No celular, as tabelas viram cartões.
+- **Carteiras:** situações em trilho (Vigentes · Atenção · Crítico · Todas · Encerradas), barra de filtros comum e filtros na URL; um trilho por tela.
+- **Telas 360:** cartão no topo que encolhe em barra ao rolar; abas na URL (`?aba=`); "Voltar" leva à origem.
+- **Celular:** sem rolagem lateral, alvo de toque de 44 px (os botões compactos ganham a área por um `::after` invisível), campos com 16 px e texto com no mínimo 12 px. Conferido pelo `npm run e2e`.
+- **Palavras:** "distribuir" só para atas e contratos aos gestores; "alocar" para quantitativo às unidades; "vincular" sempre diz a quê.
 
-## 7. Como Executar, Testar e Publicar
+## 6. Fluxo de trabalho
 
-### 7.1. Instalação e Execução Local
-```powershell
-# Instalar dependências
-npm install
-
-# Iniciar servidor de desenvolvimento local
-npm run dev
-```
-
-### 7.2. Execução da Suíte de Testes Unitários
-```powershell
-# Executar testes unitários com Vitest
-npx vitest run
-```
-
-### 7.3. Build de Produção
-```powershell
-# Validar tipagem TypeScript e gerar pacote otimizado em dist/
-npm run build
-```
-
----
-
-## 8. Links e Ambientes Oficiais
-
-- **Ambiente de Produção (Vercel)**: [https://cglic.vercel.app](https://cglic.vercel.app)
-- **Repositório GitHub**: [https://github.com/LU1SMART1NS/CGLIC-system](https://github.com/LU1SMART1NS/CGLIC-system)
-- **Branch Principal de Produção**: `main`
-- **Branch de Release da Versão 2**: `v2.0`
+1. Trabalho novo em branch própria a partir da `main` e PR para a `main` (o merge publica o site).
+2. Antes do PR: `npx tsc --noEmit -p tsconfig.app.json`, `npm test` e, quando mexer em tipos de teste ou `server/`, `npm run build` (o `tsc -b` da Vercel também checa os testes).
+3. **Migration:** testar antes (PGlite ou ensaio em transação desfeita no banco real), conferir o próximo número livre no histórico do banco, aplicar com `supabase db push --linked` só com autorização da coordenação.
+4. Se a mudança afeta o servidor, republicar a função (`npm run deploy:sincronizar-fontes`) depois da migration, a partir de um checkout limpo da `main`.
+5. Tabela nova nasce com RLS de leitura só para logados e escrita só por RPC ou pelo servidor.

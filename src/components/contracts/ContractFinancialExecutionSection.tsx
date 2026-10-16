@@ -1,12 +1,12 @@
 import React from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight, Ban, Layers, Receipt } from 'lucide-react';
+import { ArrowRight, Layers, Receipt } from 'lucide-react';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 import { useFaturasDoContrato, empenhosDaFatura } from '../../hooks/useFaturasDoContrato';
 import { useAcoesDistribuicaoEmpenho, useDistribuicoesEmpenhoContrato } from '../../hooks/useDistribuicaoEmpenhos';
-import type { DistribuicaoDoEmpenho, QuantidadeNoItem } from '../../services/distribuicaoEmpenhoService';
+import type { DistribuicaoDoEmpenho, NotaNoSiafi, QuantidadeNoItem } from '../../services/distribuicaoEmpenhoService';
 import type { FaturaDoContrato } from '../../services/faturasService';
 import type { VinculoDoContrato } from '../../services/itensContratoService';
 import {
@@ -19,7 +19,10 @@ import {
   quantidadeQuebrada,
   rotuloDaSituacao,
   sugestaoCurta,
+  textoDaOrigem,
   textoDaSugestao,
+  vinculoDesfazivel,
+  vinculoEditavel,
   type ItemNumerado
 } from '../../utils/distribuicaoEmpenho';
 import { AvisoQuantidade, CampoQuantidadeNota } from '../item-balances/CampoQuantidadeNota';
@@ -31,10 +34,7 @@ import { useSincronizacaoEmpenhosContrato } from '../../hooks/useSincronizacaoEm
 import type { SincronizacaoEmpenhosContrato } from '../../services/contratoEmpenhosSincronizacaoService';
 import { CarteiraIdLink } from '../carteira/CarteiraRowLink';
 import { useAuth } from '../../context/AuthContext';
-import { useAcoesVinculoEmpenho, useDescartesEmpenhoContrato } from '../../hooks/useVinculoEmpenhosContrato';
-import type { DescarteEmpenhoContrato } from '../../services/contratoEmpenhoVinculoService';
 import { credorDiferenteDoFornecedor } from '../../utils/fornecedorMatch';
-import { VincularEmpenhoModal, type PedidoDeVinculo } from './EmpenhoVinculoModals';
 import {
   ActionButton,
   AppButton,
@@ -66,7 +66,7 @@ const formatDate = (val?: string | null) => (val ? formatDateBR(val) : '—');
 
 /** O sistema só repete o vínculo do Contratos.gov.br: a correção é lá. */
 const COMO_CORRIGIR_NA_FONTE =
-  'Se não for deste contrato, peça ao setor responsável que retire a nota do contrato no Contratos.gov.br. A correção aparece aqui na próxima sincronização.';
+  'Se não for deste contrato, retire a nota do contrato no Contratos.gov.br. A correção aparece aqui na próxima sincronização.';
 
 type EmpenhoRow = ReturnType<typeof useContractFinancialSummary>['empenhosList'][number];
 
@@ -114,68 +114,76 @@ const SituacaoSincronizacaoEmpenhos: React.FC<{ sync?: SincronizacaoEmpenhosCont
   );
 };
 
-/**
- * Descartes feitos antes de o sistema passar a seguir só o Contratos.gov.br. Não há como descartar
- * novos; restaurar devolve o empenho ao contrato e às somas até a fonte ser corrigida.
- */
-const EmpenhosDescartados: React.FC<{
-  descartes: DescarteEmpenhoContrato[];
-  podeEditar: boolean;
-  restaurando?: string;
-  onRestaurar: (d: DescarteEmpenhoContrato) => void;
-}> = ({ descartes, podeEditar, restaurando, onRestaurar }) => {
-  if (descartes.length === 0) return null;
-  const columns: Column<DescarteEmpenhoContrato>[] = [
-    { key: 'numero', header: 'Empenho', priority: 'primary', render: (d) => <strong>{d.numeroOficial || '—'}</strong> },
-    { key: 'credor', header: 'Credor', render: (d) => d.credorNome || '—' },
-    { key: 'valor', header: 'Empenhado', align: 'right', render: (d) => formatCurrencyOrDash(d.valorEmpenhado) },
-    { key: 'motivo', header: 'Motivo', render: (d) => d.motivo },
-    {
-      key: 'por',
-      header: 'Descartado por',
-      render: (d) => (
-        <span>
-          {d.descartadoPorNome || '—'}
-          <br />
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatDataHora(d.descartadoEm)}</span>
-        </span>
-      )
-    }
-  ];
+const brlCurto = (v: number) => formatCurrencyOrDash(v);
+const qtd = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+
+/** O que a nota diz no SIAFI (Portal da Transparência): itens, quantidade e preço, comparados com o contrato. */
+export const NotaNoSiafiDaLinha: React.FC<{ nota: NotaNoSiafi; itens: ItemNumerado[]; valorNota: number; numero: string }> = ({ nota, itens, valorNota, numero }) => {
+  const precoDoContrato = new Map(itens.map((i) => [i.numeroItem, i.valorUnitario]));
+  const difere = (n: number, pu: number | null) => {
+    const pc = precoDoContrato.get(n);
+    return pu != null && pc != null && Math.abs(pu - pc) > 0.011;
+  };
   return (
-    <div data-testid="contract-financial-descartados">
-      <SectionHeader
-        title="Empenhos descartados"
-        subtitle="Tirados do contrato pela equipe antes de o sistema passar a seguir só o Contratos.gov.br. Ficam fora das somas até serem restaurados. Restaure e, se o vínculo estiver errado, retire a nota do contrato no Contratos.gov.br."
-        icon={<Ban size={16} />}
-        countBadge={descartes.length}
-      />
-      <DataTable
-        columns={columns}
-        data={descartes}
-        keyExtractor={(d) => d.empenhoId}
-        testId="contract-financial-descartados-table"
-        rowActions={
-          podeEditar
-            ? (d) => (
-                <ActionButton
-                  action="restaurar"
-                  size="sm"
-                  onClick={() => onRestaurar(d)}
-                  isLoading={restaurando === d.empenhoId}
-                  disabled={Boolean(restaurando)}
-                  data-testid="contract-financial-restaurar"
-                />
-              )
-            : undefined
-        }
-      />
+    <div data-testid={`empenho-nota-siafi-${numero}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem 0.75rem', fontSize: '0.78rem' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Itens da nota no SIAFI</span>
+        {nota.lidoEm && <span style={{ color: 'var(--text-muted)' }}>lida no Portal da Transparência em {formatDate(nota.lidoEm)}</span>}
+        {nota.precoDiferente && <StatusBadge label="Preço da nota diferente do contrato" variant="neutral" size="sm" dot={false} />}
+      </div>
+      {nota.itens.length === 0 ? (
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>A nota não tem itens no SIAFI.</span>
+      ) : (
+        <div className="table-scroll" style={{ border: '1px solid #e2e8f0', borderRadius: '6px', background: '#ffffff' }}>
+          <table className="ds-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Descrição na nota</th>
+                <th style={{ textAlign: 'right' }}>Quantidade</th>
+                <th style={{ textAlign: 'right' }}>Preço na nota</th>
+                <th style={{ textAlign: 'right' }}>Preço no contrato</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nota.itens.map((i) => (
+                <tr key={i.numeroItem}>
+                  <td style={{ fontWeight: 700 }}>
+                    {i.numeroItem}
+                    {!i.noContrato && <div style={{ fontSize: '0.75rem', color: 'var(--color-danger)', fontWeight: 700 }}>fora do contrato</div>}
+                  </td>
+                  <td style={{ minWidth: '180px', maxWidth: '340px' }}>{i.descricao || '—'}</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{i.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 4 })} un</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{i.valorUnitario == null ? '—' : formatCurrencyOrDash(i.valorUnitario)}</td>
+                  <td
+                    style={{
+                      textAlign: 'right',
+                      whiteSpace: 'nowrap',
+                      fontVariantNumeric: 'tabular-nums',
+                      ...(difere(i.numeroItem, i.valorUnitario) ? { color: 'var(--warning-text, #854d0e)', fontWeight: 700 } : {})
+                    }}
+                  >
+                    {precoDoContrato.get(i.numeroItem) == null ? '—' : formatCurrencyOrDash(precoDoContrato.get(i.numeroItem) as number)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {nota.valorEmDobro && nota.totalSiafi != null && (
+        <NoticeBar tone="info" testId={`empenho-valor-em-dobro-${numero}`}>
+          O Contratos.gov.br informa {formatCurrencyOrDash(valorNota)} para esta nota, e o SIAFI informa {formatCurrencyOrDash(nota.totalSiafi)}. As quantidades vêm do SIAFI.
+        </NoticeBar>
+      )}
+      {nota.precoDiferente && (
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          A quantidade conta normalmente. Se houve reajuste ou apostilamento, confira se está registrado no contrato no Contratos.gov.br.
+        </span>
+      )}
     </div>
   );
 };
-
-const brlCurto = (v: number) => formatCurrencyOrDash(v);
-const qtd = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
 /** Divisão da nota entre os itens do contrato e as faturas que a citam: o que a setinha da linha abre. */
 export const EmpenhoDetalhe: React.FC<{
@@ -194,6 +202,8 @@ export const EmpenhoDetalhe: React.FC<{
   onInformarQuantidade?: (d: DistribuicaoDoEmpenho, numeroItem: number, quantidade: number | null) => void;
   /** Confirma as quantidades depois que o valor da nota mudou. */
   onConferir?: (d: DistribuicaoDoEmpenho) => void;
+  /** Empenhado em cada item do contrato somando todas as notas (para avisar quando passa do contratado). */
+  empenhadoNoItem?: Map<number, number>;
   onAbrirItem: (v: VinculoDoContrato) => void;
   onAbrirFatura?: (idFatura: number) => void;
 }> = ({
@@ -209,12 +219,13 @@ export const EmpenhoDetalhe: React.FC<{
   onDesfazer,
   onInformarQuantidade,
   onConferir,
+  empenhadoNoItem,
   onAbrirItem,
   onAbrirFatura
 }) => {
   const parcelaDe = new Map((d?.parcelas ?? []).map((p) => [p.numeroItem, p]));
   const fechada = d?.situacao === 'DISTRIBUIDA';
-  const podeDistribuir = podeEditar && d && (d.situacao === 'A_DISTRIBUIR' || d.situacao === 'REVISAR' || (d.situacao === 'DISTRIBUIDA' && d.origem === 'USUARIO'));
+  const podeDistribuir = podeEditar && d && (d.situacao === 'A_DISTRIBUIR' || d.situacao === 'REVISAR' || (d.situacao === 'DISTRIBUIDA' && vinculoEditavel(d)));
   const sugestao = d && !fechada ? textoDaSugestao(d.sugestaoTipo, d.sugestao) : null;
   const revisao = d ? motivoDaRevisao(d) : null;
 
@@ -235,7 +246,7 @@ export const EmpenhoDetalhe: React.FC<{
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem 1.25rem', fontSize: '0.82rem' }}>
             {fechada ? (
               <StatusBadge
-                label={d.origem === 'AUTO' ? 'Vinculada automaticamente: contrato de um item' : `Vinculada por ${d.distribuidoPorNome || 'usuário'}${d.distribuidoEm ? ` em ${formatDate(d.distribuidoEm)}` : ''}`}
+                label={textoDaOrigem(d, formatDate)}
                 variant="info"
                 size="sm"
                 dot={false}
@@ -244,6 +255,11 @@ export const EmpenhoDetalhe: React.FC<{
               <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar o vínculo aos itens' : 'A vincular aos itens'} variant="warning" size="sm" dot={false} />
             )}
             {sugestao && <span style={{ color: 'var(--text-muted)' }}>sugestão: {sugestao}</span>}
+            {fechada && d.origem === 'VALOR' && (
+              <span style={{ color: 'var(--text-muted)' }} data-testid={`empenho-pelo-valor-${empenho.numero_oficial}`}>
+                {d.observacao ?? 'Só um item do contrato explica o valor da nota.'} Se não for este item, desfaça ou edite.
+              </span>
+            )}
             <span style={{ flex: 1 }} />
             {podeDistribuir && (
               <AppButton
@@ -255,7 +271,7 @@ export const EmpenhoDetalhe: React.FC<{
                 {fechada ? 'Editar o vínculo aos itens' : 'Vincular aos itens'}
               </AppButton>
             )}
-            {podeEditar && fechada && d.origem === 'USUARIO' && (
+            {podeEditar && fechada && vinculoDesfazivel(d) && (
               <ActionButton action="desfazer" size="sm" onClick={() => onDesfazer(d)} isLoading={desfazendo} disabled={desfazendo}>
                 Desfazer
               </ActionButton>
@@ -276,9 +292,10 @@ export const EmpenhoDetalhe: React.FC<{
               {revisao}
             </NoticeBar>
           )}
-          {d.observacao && fechada && (
+          {d.observacao && fechada && d.origem !== 'SIAFI' && (
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Observação: {d.observacao}</span>
           )}
+          {d.notaSiafi && <NotaNoSiafiDaLinha nota={d.notaSiafi} itens={itens} valorNota={d.valorNota} numero={empenho.numero_oficial} />}
           <div className="table-scroll" style={{ border: '1px solid #e2e8f0', borderRadius: '6px', background: '#ffffff' }}>
             <table className="ds-table">
               <thead>
@@ -323,6 +340,15 @@ export const EmpenhoDetalhe: React.FC<{
                         {p && <AvisoQuantidade quantidade={q} />}
                         {i.quantidade != null && (
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>de {qtd(i.quantidade)} contratadas</div>
+                        )}
+                        {p && i.quantidade != null && i.quantidade > 0 && (empenhadoNoItem?.get(i.numeroItem) ?? 0) > i.quantidade + 1e-6 && (
+                          // Só aviso (item 6, 14/10/2026): a soma das notas no item passou do contratado.
+                          <div
+                            style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-warning-text)' }}
+                            data-testid={`empenho-acima-${empenho.numero_oficial}-${i.numeroItem}`}
+                          >
+                            item com {qtd(empenhadoNoItem?.get(i.numeroItem) ?? 0)} empenhadas ({qtd((empenhadoNoItem?.get(i.numeroItem) ?? 0) - i.quantidade)} acima)
+                          </div>
                         )}
                       </td>
                       <td>
@@ -385,16 +411,13 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const { data: itensDoContrato } = useItensDoContrato(contractKey);
   const { data: faturasData } = useFaturasDoContrato(contractKey);
 
-  // Vínculo híbrido (migration 85): a fonte vincula e a equipe vincula à mão o que falta. Vínculo errado
-  // vindo da fonte se corrige no Contratos.gov.br; a sincronização traz a correção.
+  // Os empenhos do contrato vêm só do Contratos.gov.br (migration 117 tirou o vínculo à mão): vínculo errado ou
+  // nota que falta se corrigem lá, pelo próprio gestor, e a sincronização traz a correção.
   const { role } = useAuth();
   const podeEditar = role === 'admin' || role === 'gestor';
   const toast = useToast();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const { data: descartes = [] } = useDescartesEmpenhoContrato(contractKey);
-  const acoes = useAcoesVinculoEmpenho(contractKey);
   const acoesDistribuicao = useAcoesDistribuicaoEmpenho(contractKey);
-  const [vinculando, setVinculando] = React.useState(false);
   const [distribuindo, setDistribuindo] = React.useState<DistribuicaoDoEmpenho | null>(null);
   const numeroContrato = contract.numero || numeroDaChave(contractKey);
   const fornecedor = { cnpj: contract.fornecedorCnpjCpf, nome: contract.fornecedorNome };
@@ -404,54 +427,24 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const vinculoPorItem = React.useMemo(() => new Map((itensDoContrato?.vinculos ?? []).map((v) => [v.numeroItem, v])), [itensDoContrato]);
   const precoDoItem = React.useMemo(() => new Map(itens.map((i) => [i.numeroItem, i.valorUnitario])), [itens]);
   const distribuicaoPorEmpenho = React.useMemo(() => new Map(distribuicoes.map((d) => [d.empenhoId, d])), [distribuicoes]);
+  const empenhadoNoContrato = React.useMemo(() => empenhadoPorItem(distribuicoes, itens), [distribuicoes, itens]);
   const faturas = faturasData?.faturas ?? [];
   const faturasDaNota = (numero: string) => faturas.filter((f) => empenhosDaFatura(f.empenhos).includes(numero));
   const linhas = useLinhasAbertas(abrirEmpenho, 'contract-financial-table', empenhosList.length > 0);
 
-  const restaurar = (d: DescarteEmpenhoContrato) =>
-    acoes.restaurar.mutate(d.empenhoId, {
-      onSuccess: () => toast.success(`${d.numeroOficial || 'Empenho'} voltou para o contrato ${numeroContrato}.`),
-      onError: (err: any) => toast.error(err?.message || 'Não foi possível restaurar o empenho.')
-    });
-  const desvincular = async (e: EmpenhoRow) => {
-    if (!e.empenho_id) return;
-    const ok = await confirm({
-      title: 'Desvincular empenho',
-      message: (
-        <>
-          O empenho <strong>{e.numero_oficial}</strong> foi vinculado à mão
-          {e.vinculado_por_nome ? ` por ${e.vinculado_por_nome}` : ''} e sai deste contrato e das somas dele.
-        </>
-      ),
-      confirmLabel: 'Desvincular',
-      tone: 'danger'
-    });
-    if (!ok) return;
-    acoes.desvincular.mutate(e.empenho_id, {
-      onSuccess: () => toast.success(`${e.numero_oficial} desvinculado do contrato ${numeroContrato}.`),
-      onError: (err: any) => toast.error(err?.message || 'Não foi possível desvincular o empenho.')
-    });
-  };
-  const abrirVinculo = () => {
-    acoes.vincular.reset();
-    setVinculando(true);
-  };
-  const confirmarVinculo = (pedido: PedidoDeVinculo) =>
-    acoes.vincular.mutate(pedido, {
-      onSuccess: (r) => {
-        setVinculando(false);
-        toast.success(`${r.numeroOficial || 'Empenho'} vinculado ao contrato ${numeroContrato}${r.empenhoCriado ? ' (nota informada à mão)' : ''}.`);
-      }
-    });
   const abrirDistribuicao = (d: DistribuicaoDoEmpenho) => {
     acoesDistribuicao.vincular.reset();
     setDistribuindo(d);
   };
+  // A janela mostra a nota como está agora (depois de um conflito, a lista relida traz a versão nova).
+  const distribuindoAtual = distribuindo
+    ? distribuicoes.find((d) => d.contratoEmpenhoId === distribuindo.contratoEmpenhoId) ?? distribuindo
+    : null;
   const salvarDistribuicao = (quantidades: QuantidadeNoItem[], observacao: string) => {
-    if (!distribuindo) return;
-    const alvo = distribuindo;
+    if (!distribuindoAtual) return;
+    const alvo = distribuindoAtual;
     acoesDistribuicao.vincular.mutate(
-      { contratoEmpenhoId: alvo.contratoEmpenhoId, itens: quantidades, observacao },
+      { contratoEmpenhoId: alvo.contratoEmpenhoId, itens: quantidades, observacao, versao: alvo.versao },
       {
         onSuccess: () => {
           setDistribuindo(null);
@@ -462,10 +455,23 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   };
   const informarQuantidade = (d: DistribuicaoDoEmpenho, numeroItem: number, quantidade: number | null) =>
     acoesDistribuicao.informar.mutate(
-      { contratoEmpenhoId: d.contratoEmpenhoId, numeroItem, quantidade },
+      { contratoEmpenhoId: d.contratoEmpenhoId, numeroItem, quantidade, versao: d.versao },
       {
-        onSuccess: () =>
-          toast.success(quantidade == null ? `${d.numeroOficial}: quantidade do item ${numeroItem} voltou à calculada.` : `${d.numeroOficial}: ${quantidade} un no item ${numeroItem}.`),
+        onSuccess: () => {
+          toast.success(quantidade == null ? `${d.numeroOficial}: quantidade do item ${numeroItem} voltou à calculada.` : `${d.numeroOficial}: ${quantidade} un no item ${numeroItem}.`);
+          // Só aviso (item 6, 14/10/2026): a gravação vale; avisa se o item passou do contratado.
+          const contratado = itens.find((i) => i.numeroItem === numeroItem)?.quantidade;
+          if (quantidade != null && contratado != null && contratado > 0) {
+            const total = (empenhadoPorItem(distribuicoes, itens, d.contratoEmpenhoId).get(numeroItem) ?? 0) + quantidade;
+            if (total > contratado + 1e-6) {
+              const n = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+              toast.show(
+                `A nota foi gravada. Com ela, o item ${numeroItem} fica com ${n(total)} empenhados para ${n(contratado)} contratados (${n(total - contratado)} acima). Confira as quantidades das notas ou a quantidade contratada.`,
+                'warning'
+              );
+            }
+          }
+        },
         onError: (err: any) => toast.error(err?.message || 'Não foi possível gravar a quantidade.')
       }
     );
@@ -480,45 +486,27 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
       message: (
         <>
           A nota <strong>{d.numeroOficial}</strong> volta para "a vincular aos itens" e sai do empenhado dos itens até ser vinculada de novo.
+          {d.origem === 'VALOR' && ' O sistema não volta a vincular esta nota pelo valor.'}
         </>
       ),
       confirmLabel: 'Desfazer',
       tone: 'danger'
     });
     if (!ok) return;
-    acoesDistribuicao.desfazer.mutate(d.contratoEmpenhoId, {
+    acoesDistribuicao.desfazer.mutate({ contratoEmpenhoId: d.contratoEmpenhoId, versao: d.versao }, {
       onSuccess: () => toast.success(`Vínculo de ${d.numeroOficial} aos itens desfeito.`),
       onError: (err: any) => toast.error(err?.message || 'Não foi possível desfazer o vínculo aos itens.')
     });
   };
 
-  const botaoVincular = podeEditar ? (
-    <ActionButton action="vincular" label="Vincular empenho" size="sm" onClick={abrirVinculo} data-testid="contract-financial-vincular" />
-  ) : null;
-
-  // Modais e lista de descartados valem para a aba com ou sem empenhos vinculados.
+  // Modais valem para a aba com ou sem empenhos vinculados.
   const extras = (
     <>
-      <EmpenhosDescartados
-        descartes={descartes}
-        podeEditar={podeEditar}
-        restaurando={acoes.restaurar.isPending ? acoes.restaurar.variables : undefined}
-        onRestaurar={restaurar}
-      />
-      <VincularEmpenhoModal
-        isOpen={vinculando}
-        contrato={{ numero: numeroContrato, uasg: contract.uasg, fornecedorNome: contract.fornecedorNome, fornecedorCnpjCpf: contract.fornecedorCnpjCpf }}
-        idsVinculados={new Set(empenhosList.map((e) => e.empenho_id).filter(Boolean) as string[])}
-        isLoading={acoes.vincular.isPending}
-        erro={acoes.vincular.error?.message}
-        onVincular={confirmarVinculo}
-        onFechar={() => setVinculando(false)}
-      />
       <DistribuirEmpenhoModal
-        distribuicao={distribuindo}
+        distribuicao={distribuindoAtual}
         numeroContrato={numeroContrato}
         itens={itens}
-        empenhadoOutras={empenhadoPorItem(distribuicoes, itens, distribuindo?.contratoEmpenhoId)}
+        empenhadoOutras={empenhadoPorItem(distribuicoes, itens, distribuindoAtual?.contratoEmpenhoId)}
         isLoading={acoesDistribuicao.vincular.isPending}
         erro={acoesDistribuicao.vincular.error?.message}
         onSalvar={salvarDistribuicao}
@@ -571,10 +559,11 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           description={vazio.description}
           action={
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <AppButton variant="outline" size="sm" icon={<ArrowRight size={14} />} onClick={() => navigate(empenhosUrl)}>
-                Consultar em Empenhos
-              </AppButton>
-              {botaoVincular}
+              {role !== 'gestor_saldos' && (
+                <AppButton variant="outline" size="sm" icon={<ArrowRight size={14} />} onClick={() => navigate(empenhosUrl)}>
+                  Consultar em Empenhos
+                </AppButton>
+              )}
             </div>
           }
           testId="contract-financial-empty"
@@ -687,8 +676,8 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
         const algumaInformada = fechada && d.parcelas.some((p) => quantidadeFoiInformada(p, precoDoItem.get(p.numeroItem)));
         const aDefinir = quantidades.some(({ q }) => q == null || quantidadeQuebrada(q));
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start' }} data-testid="contract-financial-situacao-itens">
-            <span style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start', minWidth: 0, maxWidth: '100%' }} data-testid="contract-financial-situacao-itens">
+            <span style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap', maxWidth: '100%' }}>
               <StatusBadge label={r.label} variant={r.variant} size="sm" dot={false} />
               {algumaInformada && <StatusBadge label="Informada" variant="info" size="sm" dot={false} />}
             </span>
@@ -748,11 +737,14 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
             tone="info"
             testId="contract-financial-fatura-ne-fora"
             action={
-              onAbrirFatura ? (
-                <AppButton variant="outline" size="sm" onClick={() => onAbrirFatura(faturasComNeFora[0].idFatura)}>
-                  Ver a fatura
-                </AppButton>
-              ) : undefined
+              <AppButton
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/vinculacao/empenhos-contrato?situacao=TODAS&busca=${encodeURIComponent(numeroContrato)}`)}
+                data-testid="contract-financial-fatura-ne-fora-conferir"
+              >
+                Ver a conferência
+              </AppButton>
             }
           >
             {faturasComNeFora.length === 1 ? (
@@ -764,9 +756,9 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
                 <strong>{faturasComNeFora.length}</strong> faturas citam
               </>
             )}{' '}
-            empenho que não está vinculado a este contrato:{' '}
-            <strong>{[...new Set(faturasComNeFora.flatMap((f) => empenhosDaFatura(f.empenhosSemVinculoNumeros)))].join(', ')}</strong>. Confira o
-            contrato no Contratos.gov.br.
+            empenho que o Contratos.gov.br não lista neste contrato:{' '}
+            <strong>{[...new Set(faturasComNeFora.flatMap((f) => empenhosDaFatura(f.empenhosSemVinculoNumeros)))].join(', ')}</strong>. A conferência mostra
+            o que corrigir no Contratos.gov.br.
           </NoticeBar>
         )}
         {compartilhadas.length > 0 && (
@@ -801,7 +793,6 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           title="Notas de empenho do contrato"
           icon={<Layers size={16} />}
           countBadge={empenhosList.length}
-          actions={botaoVincular}
         />
         <DataTable
           columns={columns}
@@ -817,7 +808,12 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
               vinculoPorItem={vinculoPorItem}
               faturas={faturasDaNota(e.numero_oficial)}
               podeEditar={podeEditar}
-              desfazendo={acoesDistribuicao.desfazer.isPending && acoesDistribuicao.desfazer.variables === distribuicaoDe(e)?.contratoEmpenhoId}
+              desfazendo={
+                acoesDistribuicao.desfazer.isPending &&
+                (typeof acoesDistribuicao.desfazer.variables === 'string'
+                  ? acoesDistribuicao.desfazer.variables
+                  : acoesDistribuicao.desfazer.variables?.contratoEmpenhoId) === distribuicaoDe(e)?.contratoEmpenhoId
+              }
               gravando={
                 (acoesDistribuicao.informar.isPending && acoesDistribuicao.informar.variables?.contratoEmpenhoId === distribuicaoDe(e)?.contratoEmpenhoId) ||
                 (acoesDistribuicao.conferir.isPending && acoesDistribuicao.conferir.variables === distribuicaoDe(e)?.contratoEmpenhoId)
@@ -826,6 +822,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
               onDesfazer={(d) => void desfazerDistribuicao(d)}
               onInformarQuantidade={informarQuantidade}
               onConferir={conferirQuantidades}
+              empenhadoNoItem={empenhadoNoContrato}
               onAbrirItem={(v) => navigate(`${buildAtaItemPath(v.numeroAta, v.uasgAta, v.numeroItem)}?aba=contratos`)}
               onAbrirFatura={onAbrirFatura}
             />
@@ -833,23 +830,6 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           expandedKeys={linhas.abertas}
           onToggleExpand={linhas.alternar}
           expandLabel={(e) => e.numero_oficial}
-          rowActions={
-            podeEditar
-              ? (e) =>
-                  // Só o vínculo feito à mão se desfaz aqui; o da fonte se corrige no Contratos.gov.br.
-                  e.empenho_id && e.origem_vinculo === 'MANUAL' ? (
-                    <ActionButton
-                      action="desvincular"
-                      iconOnly
-                      size="sm"
-                      label={`Desvincular ${e.numero_oficial}`}
-                      onClick={() => desvincular(e)}
-                      disabled={acoes.desvincular.isPending}
-                      data-testid="contract-financial-desvincular"
-                    />
-                  ) : null
-              : undefined
-          }
         />
       </div>
       {extras}

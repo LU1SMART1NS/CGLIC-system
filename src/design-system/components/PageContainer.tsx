@@ -1,18 +1,19 @@
 import React from 'react';
 
 export interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Largura máxima do conteúdo (px ou string CSS). */
+  /** Largura máxima do conteúdo (px ou string CSS). Padrão: nenhuma — todas as telas usam a largura toda, com a mesma margem. */
   maxWidth?: number | string;
   children: React.ReactNode;
 }
 
 /**
- * Contêiner de página: limita a largura e centraliza, mas NÃO define padding lateral.
+ * Contêiner de página: NÃO define padding lateral nem largura máxima por padrão, para que todas as telas
+ * comecem e terminem no mesmo lugar (antes cada tela tinha um limite centralizado e a folga lateral mudava).
  * O gutter horizontal vem uma única vez do <main className="app-main"> (--page-gutter),
  * para não somar paddings em telas estreitas.
  */
 export const PageContainer: React.FC<PageContainerProps> = ({
-  maxWidth = 1600,
+  maxWidth = 'none',
   className,
   style,
   children,

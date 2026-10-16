@@ -98,7 +98,7 @@ export const Modal: React.FC<ModalProps> = ({
               {title}
             </h2>
             {subtitle && (
-              <p style={{ margin: '0.25rem 0 0', fontSize: typography.fontSize.bodySm, color: colors.text.muted }}>{subtitle}</p>
+              <p className="ds-modal__subtitle" style={{ margin: '0.25rem 0 0', fontSize: typography.fontSize.bodySm, color: colors.text.muted }}>{subtitle}</p>
             )}
           </div>
           {dismissible && (

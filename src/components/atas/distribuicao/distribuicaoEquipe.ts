@@ -82,11 +82,15 @@ export interface DistribuicaoLinha {
   complexidade: Record<NivelComplexidade, number>;
   /** Carga estrutural: soma dos pesos (Baixa = 1, Média = 2, Alta = 3). */
   equivalente: number;
-  /** Carga em relação à média da equipe (±25%); `null` para "Sem gestor" ou com menos de 2 gestores. */
+  /** Parte da carga cheia que o gestor aguenta, pelo nível (1 sem nível informado na entrada). */
+  capacidade: number;
+  /** Carga ajustada ao nível: equivalente ÷ capacidade. */
+  ocupacao: number;
+  /** Ocupação em relação à média da equipe (±25%); `null` para "Sem gestor" ou com menos de 2 gestores. */
   relacaoEquipe: 'ACIMA' | 'NA_MEDIA' | 'ABAIXO' | null;
 }
 
-/** Mesma gravidade da Visão Geral: urgentes = crítica ou urgente (tarefa vencida, fatura vencida, saldo crítico…); o resto é acompanhamento. */
+/** Mesma gravidade do Início: urgentes = crítica ou urgente (tarefa vencida, fatura vencida, saldo crítico…); o resto é acompanhamento. */
 export interface Pendencias {
   urgentes: number;
   acompanhar: number;
@@ -114,11 +118,18 @@ export interface DistribuicaoEquipe {
     gestores: number;
     /** Média da carga equivalente entre os gestores com carteira; `null` com menos de 2 gestores. */
     mediaEquivalente: number | null;
+    /** Média da ocupação entre os gestores com carteira; `null` com menos de 2 gestores. */
+    mediaOcupacao: number | null;
   };
 }
 
 /** Faixa de ±25% em torno da média da equipe. */
 export const FAIXA_MEDIA_EQUIPE = 0.25;
+
+/** Posição de uma ocupação em relação à média da equipe (±25%). */
+export function relacaoComMedia(valor: number, media: number): 'ACIMA' | 'NA_MEDIA' | 'ABAIXO' {
+  return valor > media * (1 + FAIXA_MEDIA_EQUIPE) ? 'ACIMA' : valor < media * (1 - FAIXA_MEDIA_EQUIPE) ? 'ABAIXO' : 'NA_MEDIA';
+}
 
 /** Vigente = mesmo critério dos cards e do filtro padrão das carteiras (sem expirados e sem data). */
 export function isVigente(faixa: PrazoFaixa): boolean {
@@ -154,6 +165,8 @@ export function buildDistribuicaoEquipe(input: {
   attentionItems: DashboardAttentionItem[];
   /** Ajustes manuais de complexidade, por "TIPO:chave" (migration 66). */
   ajustes?: Record<string, ComplexidadeAjuste>;
+  /** Capacidade de cada gestor pelo nível (migration 140). Sem ela, ocupação = carga (capacidade 1). */
+  capacidadeDoGestor?: (gestorNome: string) => number;
 }): DistribuicaoEquipe {
   const linhas = new Map<string | null, DistribuicaoLinha>();
   const linha = (gestorNome?: string) => {
@@ -170,6 +183,8 @@ export function buildDistribuicaoEquipe(input: {
         itens: [],
         complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 },
         equivalente: 0,
+        capacidade: 1,
+        ocupacao: 0,
         relacaoEquipe: null
       };
       linhas.set(key, l);
@@ -177,7 +192,7 @@ export function buildDistribuicaoEquipe(input: {
     return l;
   };
 
-  const totais: DistribuicaoEquipe['totais'] = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0, mediaEquivalente: null };
+  const totais: DistribuicaoEquipe['totais'] = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0, mediaEquivalente: null, mediaOcupacao: null };
   const contarComplexidade = (l: DistribuicaoLinha, c: Complexidade) => {
     l.complexidade[c.nivel]++;
     l.equivalente += PESO_COMPLEXIDADE[c.nivel];
@@ -311,15 +326,18 @@ export function buildDistribuicaoEquipe(input: {
     );
   }
   const gestores = ordenadas.filter((l) => l.gestorNome !== null);
+  for (const l of ordenadas) {
+    l.capacidade = l.gestorNome !== null && input.capacidadeDoGestor ? input.capacidadeDoGestor(l.gestorNome) : 1;
+    l.ocupacao = l.capacidade > 0 ? l.equivalente / l.capacidade : l.equivalente;
+  }
   totais.gestores = gestores.length;
   // Comparar com a média só faz sentido com pelo menos 2 gestores (com 1, ele é a própria média).
+  // A comparação usa a ocupação (carga ajustada ao nível); sem níveis, ela é a própria carga.
   if (gestores.length >= 2) {
-    const media = gestores.reduce((soma, l) => soma + l.equivalente, 0) / gestores.length;
-    totais.mediaEquivalente = media;
-    for (const l of gestores) {
-      l.relacaoEquipe =
-        l.equivalente > media * (1 + FAIXA_MEDIA_EQUIPE) ? 'ACIMA' : l.equivalente < media * (1 - FAIXA_MEDIA_EQUIPE) ? 'ABAIXO' : 'NA_MEDIA';
-    }
+    totais.mediaEquivalente = gestores.reduce((soma, l) => soma + l.equivalente, 0) / gestores.length;
+    const media = gestores.reduce((soma, l) => soma + l.ocupacao, 0) / gestores.length;
+    totais.mediaOcupacao = media;
+    for (const l of gestores) l.relacaoEquipe = relacaoComMedia(l.ocupacao, media);
   }
 
   return { linhas: ordenadas, divergencias, totais };
@@ -332,5 +350,28 @@ export function ordenarDistribuicao(linhas: DistribuicaoLinha[], por: 'NOME' | '
     if (b.gestorNome === null) return 1;
     const porNome = a.gestorNome.localeCompare(b.gestorNome, 'pt-BR');
     return por === 'CARGA' ? b.equivalente - a.equivalente || porNome : porNome;
+  });
+}
+
+/** "00041/2024" → [2024, 41]; sem o formato número/ano, o número inteiro vale e o ano fica 0 (vai para o começo). */
+function numeroAno(numero: string): [number, number] {
+  const m = numero.match(/(\d+)\s*\/\s*(\d{4})/);
+  if (m) return [Number(m[2]), Number(m[1])];
+  const n = Number(numero.replace(/\D/g, ''));
+  return [0, Number.isFinite(n) ? n : 0];
+}
+
+/**
+ * Itens de um gestor pelo número da ata ou do contrato: atas primeiro, depois contratos, cada grupo pelo ano e,
+ * no mesmo ano, pelo número (00002/2024 → 00041/2024 → 00002/2026). `desc` = do mais novo para o mais antigo.
+ */
+export function ordenarItensPorNumero(itens: DistribuicaoItem[], dir: 'asc' | 'desc'): DistribuicaoItem[] {
+  const sinal = dir === 'asc' ? 1 : -1;
+  return [...itens].sort((a, b) => {
+    const tipo = a.tipo.localeCompare(b.tipo);
+    if (tipo !== 0) return tipo;
+    const [anoA, numA] = numeroAno(a.numero);
+    const [anoB, numB] = numeroAno(b.numero);
+    return sinal * (anoA - anoB || numA - numB) || a.numero.localeCompare(b.numero);
   });
 }

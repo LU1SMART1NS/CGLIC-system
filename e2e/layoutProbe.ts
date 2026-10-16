@@ -17,7 +17,8 @@ export interface LayoutMetrics {
 export function measureLayout(page: Page): Promise<LayoutMetrics> {
   return page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
-    const main = document.querySelector('main') as HTMLElement;
+    // Sem <main> (troca de página em andamento), mede a página inteira em vez de quebrar.
+    const main = (document.querySelector('main') as HTMLElement | null) ?? document.body;
     const visible = (e: Element) => {
       const r = e.getBoundingClientRect();
       return r.width > 0 && r.height > 0;
@@ -44,8 +45,20 @@ export function measureLayout(page: Page): Promise<LayoutMetrics> {
       viewportWidth: vw,
       scrollWidth: document.documentElement.scrollWidth,
       unreachable: controls.filter((b) => outside(b) && !inScroller(b)).map(label),
-      offscreenInScroller: controls.filter((b) => outside(b) && inScroller(b) && !b.closest('[role=tablist]')).map(label),
-      smallTargets: controls.filter((b) => b.getBoundingClientRect().height < 43.5).map(label),
+      // Faixas que rolam para o lado de propósito (abas, abas de área e o trilho de situações) ficam de fora.
+      offscreenInScroller: controls
+        .filter((b) => outside(b) && inScroller(b) && !b.closest('[role=tablist], .area-tabs-list, .area-subtabs, .segment-pills__rail'))
+        .map(label),
+      // Conta a área clicável, não só o desenho: .ds-btn e outros controles compactos ganham 44 px por um ::after
+      // invisível em telas de toque. O número da carteira (.carteira-id-link) fica de fora: o cartão inteiro abre o mesmo detalhe.
+      smallTargets: controls
+        .filter((b) => !b.classList.contains('carteira-id-link'))
+        .filter((b) => {
+          const after = getComputedStyle(b, '::after');
+          const extra = after.position === 'absolute' && after.content !== 'none' ? parseFloat(after.height) || 0 : 0;
+          return Math.max(b.getBoundingClientRect().height, extra) < 43.5;
+        })
+        .map(label),
       inputsBelow16: fields.filter((e) => parseFloat(getComputedStyle(e).fontSize) < 16).length,
       textBelow12: Array.from(main.querySelectorAll('*')).filter(
         (e) => e.children.length === 0 && ((e as HTMLElement).innerText || '').trim() && parseFloat(getComputedStyle(e).fontSize) < 12
@@ -55,21 +68,28 @@ export function measureLayout(page: Page): Promise<LayoutMetrics> {
 }
 
 /**
- * Espera o carregamento da tela terminar (as telas 360 chegam a levar ~15s em desenvolvimento).
- * Só conta o carregamento da PÁGINA (texto "Carregando" ou esqueletos). Atualizações em segundo plano
- * ("Atualizando...", ícone girando) não bloqueiam: na tela do Item elas duram enquanto as APIs
- * externas de empenhos respondem, e o conteúdo já está na tela.
+ * Espera a tela assentar: há <main>, nenhum carregamento de PÁGINA ("Carregando" ou esqueletos dentro do <main>) e o
+ * texto do <main> parou de mudar por ~1,5 s. Atualizações em segundo plano ("Atualizando...", aviso de demora fora do
+ * <main>) não bloqueiam. Se em 45 s a tela não assentar (fonte lenta), mede assim mesmo: o que importa é o layout.
  */
 export async function waitForSettled(page: Page): Promise<void> {
   await page.waitForSelector('main', { timeout: 60_000 });
-  await page.waitForFunction(
-    () => {
-      const text = (document.querySelector('main') as HTMLElement | null)?.innerText ?? '';
-      const loading = /Carregando/.test(text) || document.querySelector('.animate-pulse, [data-testid$="-loading"]');
-      return !loading;
-    },
-    undefined,
-    { timeout: 60_000 }
-  );
-  await page.waitForTimeout(800);
+  try {
+    await page.waitForFunction(
+      () => {
+        const w = window as unknown as { __layoutProbe?: { len: number; estavel: number } };
+        const main = document.querySelector('main') as HTMLElement | null;
+        const carregando = !main || /Carregando/.test(main.innerText) || main.querySelector('.animate-pulse, [data-testid$="-loading"]');
+        const len = main?.innerText.length ?? -1;
+        const anterior = w.__layoutProbe;
+        w.__layoutProbe = { len, estavel: !carregando && anterior?.len === len ? (anterior.estavel ?? 0) + 1 : 0 };
+        return w.__layoutProbe.estavel >= 3;
+      },
+      undefined,
+      { timeout: 45_000, polling: 500 }
+    );
+  } catch {
+    // Mede mesmo sem assentar; o teste falha só pelos critérios de layout.
+  }
+  await page.waitForTimeout(500);
 }

@@ -6,6 +6,7 @@ import type { ArpRecord, ArpItemRecord } from '../../../types';
 import { addDays, formatDateISO } from '../../../services/temporalEngineService';
 
 vi.mock('../../../hooks/useAtaManagers', () => ({ useAtaManager: vi.fn() }));
+vi.mock('../../../hooks/useCadastroUasgs', () => ({ useEyebrowDaGerenciadora: (uasg: string, nome?: string) => [`UASG ${uasg}`, nome].filter(Boolean).join(' · ') }));
 
 const mockArp: ArpRecord = {
   numeroAtaRegistroPreco: '90001/2026',
@@ -198,6 +199,17 @@ describe('ItemHero — topo do Item da Ata: indicadores e atualização', () => 
     expect(com).toContain('Atenção');
     const sem = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, notasAVincular: 0 }} />);
     expect(sem).not.toContain('Atenção');
+  });
+
+  it('15b. gestor de saldo (sem contratos): some "Notas a vincular" e o saldo não leva à aba de contratos', () => {
+    const onGoTo = vi.fn();
+    const html = renderToStaticMarkup(<ItemHero {...baseProps} onGoTo={onGoTo} verContratos={false} metrics={{ ...baseProps.metrics, notasAVincular: 3 }} />);
+    expect(html).not.toContain('Notas a vincular');
+    expect(html).toContain('data-columns="4"');
+    expect(html).toContain('Saldo SENASP');
+    const completo = renderToStaticMarkup(<ItemHero {...baseProps} metrics={{ ...baseProps.metrics, notasAVincular: 3 }} />);
+    expect(completo).toContain('Notas a vincular');
+    expect(completo).toContain('data-columns="5"');
   });
 
   it('10. situação do saldo segue as faixas das barras de progresso', () => {

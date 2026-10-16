@@ -10,10 +10,11 @@ import { formatContractNumber } from '../../../utils/contractNumber';
 import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParcial, type FilaAta, type FilaContrato } from './contratosSemAta';
 import type { ItemDaAta } from './vinculoEmMassa';
 import { chaveGestaoDaArp } from '../../../utils/ataIdentidade';
+import type { EstadoMotivos } from '../../../utils/vinculoAutomatico';
 
 /**
  * Atas, contratos e vínculos da carteira, cruzados para dizer quais contratos ainda não têm ata (e qual é a ata
- * provável). Serve à fila "Contratos à ata" do menu Vinculação e à Central de Distribuição (atas sem gestor e carga
+ * provável). Serve à fila "Contratos à ata" do menu Vínculos e à Central de Distribuição (atas sem gestor e carga
  * por gestor usam as mesmas pendências).
  */
 export function usePendenciasVinculoAta() {
@@ -22,7 +23,11 @@ export function usePendenciasVinculoAta() {
   const { data: links = [], isLoading: linksLoading } = useArpItemContractLinks();
   const { data: confirmacoesSemAta = {}, isLoading: semAtaLoading } = useContratosSemAta();
   const { data: descartesAta = {} } = useDescartesAtaContrato();
-  const { data: motivosManual } = useMotivosVinculoManual();
+  const motivosQuery = useMotivosVinculoManual();
+  const motivosManual = motivosQuery.data;
+  /** Leitura dos motivos (RPC prever_vinculos_automaticos): a fila não promete vínculo automático enquanto carrega ou se falhou. */
+  const motivosEstado: EstadoMotivos = motivosQuery.isError ? 'FALHOU' : motivosQuery.data ? 'OK' : 'CARREGANDO';
+  const relerMotivos = () => void motivosQuery.refetch();
 
   const atasFila = useMemo<FilaAta[]>(
     () =>
@@ -106,7 +111,7 @@ export function usePendenciasVinculoAta() {
   // Só mostra números com atas, contratos e vínculos carregados: totais parciais enganariam a leitura.
   const isBusy = atas.isLoading || atas.scopeLoading || contratos.isLoading || contratos.isLoadingScope || linksLoading || semAtaLoading;
   const totalSemVinculo = pendencias.aVincular.length + pendencias.precisamDecisao.length;
-  // Marcados "não pertence a ata" e ainda sem gestor: continuam pendentes na fila da Vinculação.
+  // Marcados "não pertence a ata" e ainda sem gestor: continuam pendentes na fila de Vínculos.
   const naoPertencemSemGestor = pendencias.naoPertencem.filter((i) => !i.gestorNome).length;
 
   return {
@@ -115,6 +120,8 @@ export function usePendenciasVinculoAta() {
     links,
     confirmacoesSemAta,
     motivosManual,
+    motivosEstado,
+    relerMotivos,
     atasFila,
     contratosFila,
     pendencias,

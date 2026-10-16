@@ -7,6 +7,7 @@ import { GestaoInstrumentosTable } from '../../components/instrumentos/GestaoIns
 import * as useManagementDashboardModule from '../../hooks/useManagementDashboard';
 import * as useAllContractManagersModule from '../../hooks/useAllContractManagers';
 import * as useAtaManagersModule from '../../hooks/useAtaManagers';
+import * as useUsersModule from '../../hooks/useUsers';
 import type { ManagementDashboardReadModel } from '../../types/managementDashboard';
 
 vi.mock('react-router-dom', () => ({
@@ -28,6 +29,11 @@ vi.mock('../../hooks/useSincronizacaoContratos', () => ({
     atualizar: vi.fn(),
     isAtualizando: false
   })
+}));
+
+// Carteiras de atas e contratos das gavetas: só são lidas com uma gaveta aberta.
+vi.mock('../../hooks/usePainelCarteira', () => ({
+  usePainelCarteira: () => ({ atas: [], contratos: [], gestores: [], isLoading: false })
 }));
 
 vi.mock('../../hooks/useRefreshItemSaldos', () => ({
@@ -198,9 +204,14 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
       data: [],
       isLoading: false
     } as any);
+    vi.spyOn(useUsersModule, 'useUsers').mockReturnValue({
+      data: [{ id: 'u1', nome: 'Ana Costa', email: 'ana@mj.gov.br', perfil: 'gestor', ativo: true }],
+      isPending: false,
+      isLoading: false
+    } as any);
   });
 
-  it('1. deve renderizar a rota com cabeçalho "Visão Geral", subtítulo institucional e UASG', () => {
+  it('1. deve renderizar a rota com cabeçalho "Início", subtítulo institucional e UASG', () => {
     vi.spyOn(useManagementDashboardModule, 'useManagementDashboard').mockReturnValue({
       readModel: mockReadModel,
       data: mockReadModel,
@@ -213,7 +224,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
 
     const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
 
-    expect(html).toContain('Visão Geral');
+    expect(html).toContain('Início');
     expect(html).toContain('Resumo da carteira de atas e contratos e o que exige sua atenção');
     expect(html).toContain('Pendências da carteira');
   });
@@ -445,7 +456,7 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
 
     const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
 
-    expect(html).toContain('Erro ao carregar a Visão Geral');
+    expect(html).toContain('Erro ao carregar o Início');
     expect(html).toContain('Erro de conexão ao carregar a carteira de instrumentos');
     expect(html).toContain('Tentar Novamente');
   });

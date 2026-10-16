@@ -24,8 +24,13 @@ export type AlvoResolucao =
 const REGRA: Record<AvisoResolvivelTipo, string> = {
   SALDO: 'O aviso volta se a situação do saldo piorar.',
   REAJUSTE: 'O aviso não aparece mais neste ciclo de reajuste.',
-  LEMBRETE: 'O lembrete não aparece mais nesta vigência.'
+  LEMBRETE: 'O lembrete não aparece mais nesta vigência.',
+  FONTE: 'Só esconde o aviso: a nota ou a fatura continua no contrato até o coordenador decidir.'
 };
+/** Aviso de vínculo a conferir (migration 112): resolver só esconde, não decide o vínculo. */
+const REGRA_VINCULO = 'Só esconde o aviso: o vínculo continua como está até o coordenador decidir. O aviso volta se o motivo mudar.';
+/** Registrado acima do homologado (migration 142): resolver devolve ao saldo a parte da SENASP. */
+const REGRA_REGISTRADO_ACIMA = 'Ao resolver, o excedente que está na SENASP volta a contar como saldo. O aviso volta se a soma do registrado ou o homologado mudarem.';
 const REGRA_TAREFA = 'A tarefa será marcada como concluída no plano, com a justificativa na observação.';
 
 /** Junta a justificativa à observação que a tarefa já tinha (o RPC substitui a observação). */
@@ -38,7 +43,7 @@ async function observacaoComJustificativa(tabela: 'ata_tasks' | 'contract_tasks'
 }
 
 /**
- * Botão ✓ e janela de justificativa, iguais na Visão Geral, na Ata 360 e no Contrato 360.
+ * Botão ✓ e janela de justificativa, iguais no Início, na Ata 360 e no Contrato 360.
  * `abrir(alvo)` pede a justificativa; ao confirmar, grava o aviso resolvido ou conclui a tarefa.
  */
 export function useResolverAviso() {
@@ -49,7 +54,7 @@ export function useResolverAviso() {
   const [texto, setTexto] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
   const [gravando, setGravando] = React.useState(false);
-  // Tarefas concluídas aqui: somem já, sem esperar a Visão Geral recarregar.
+  // Tarefas concluídas aqui: somem já, sem esperar o Início recarregar.
   const [tarefasConcluidas, setTarefasConcluidas] = React.useState<ReadonlySet<string>>(new Set());
 
   const abrir = React.useCallback((a: AlvoResolucao) => {
@@ -100,7 +105,7 @@ export function useResolverAviso() {
     }
   };
 
-  const regra = alvo ? (alvo.tipo === 'AVISO' ? REGRA[tipoDaChave(alvo.chave)] : REGRA_TAREFA) : '';
+  const regra = alvo ? (alvo.tipo === 'AVISO' ? (alvo.chave.includes('::VINCULO-') ? REGRA_VINCULO : alvo.chave.includes('::REGISTRADO-ACIMA-') ? REGRA_REGISTRADO_ACIMA : REGRA[tipoDaChave(alvo.chave)]) : REGRA_TAREFA) : '';
 
   const dialog = (
     <Modal

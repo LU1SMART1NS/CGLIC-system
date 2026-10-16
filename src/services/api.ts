@@ -1,8 +1,10 @@
-import type { ArpResponse, ArpItemsResponse, ArpItemRecord, UnidadesItemResponse, FilterParams, ArpRecord, EmpenhosSaldoItemResponse, EmpenhoSaldoItemRecord, PncpContractEmpenho, AdesoesItemResponse, AdesaoItemRecord, ComprasGovContratoItemRecord, ComprasGovContratosItemResponse, ContratosGovEmpenhoRecord } from '../types';
+import type { ArpResponse, ArpItemsResponse, ArpItemRecord, UnidadesItemResponse, UnidadeItemRecord, FilterParams, ArpRecord, EmpenhosSaldoItemResponse, EmpenhoSaldoItemRecord, PncpContractEmpenho, AdesoesItemResponse, AdesaoItemRecord, ComprasGovContratoItemRecord, ComprasGovContratosItemResponse, ContratosGovEmpenhoRecord } from '../types';
+import { fetchComTempoLimite, TEMPO_LIMITE_EMPENHOS_MS, TEMPO_LIMITE_DETALHE_EMPENHO_MS, TEMPO_LIMITE_ITENS_MS } from './fetchComTempoLimite';
 import { cacheArpsInDb, cacheArpItemsInDb, fetchArpsFromDb } from './dbCacheService';
 import type { ContratosGovHistoricoRecord } from '../types/contractHistorico';
 import type { ContratosGovResponsavelRecord, ContratosGovGarantiaRecord } from '../types/contractResponsaveis';
 import { CNPJ_SENASP, cnpjDaUasg, codigoOrgaoDaUasg } from '../config/unidadesGestoras';
+import { juntarUnidadesRepetidas } from '../utils/unidadesRepetidas';
 
 const BASE_URL = '/api-arp/modulo-arp';
 
@@ -1250,41 +1252,68 @@ export async function fetchArpItemsBatch(params: FilterParams): Promise<Record<s
   }
 }
 
+/** A lista de órgãos do item veio incompleta ou com cópias diferentes do mesmo órgão: não serve para gravar. */
+export class UnidadesItemIncompletasError extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = 'UnidadesItemIncompletasError';
+  }
+}
+
+/** Páginas lidas no máximo (500 linhas cada); nenhum item chega perto disso. */
+const MAX_PAGINAS_UNIDADES_ITEM = 20;
+
 /**
  * 3. Consultar Unidades Item
  * Endereço: /modulo-arp/3_consultarUnidadesItem
+ *
+ * Lê todas as páginas e tira as linhas repetidas (juntarUnidadesRepetidas). Se uma página falha, se vierem
+ * menos linhas que totalRegistros ou se as cópias de um órgão divergem, a lista não é devolvida pela metade:
+ * volta vazia ou, com falharSeErro (sincronização), lança UnidadesItemIncompletasError / o erro HTTP.
  */
 export async function fetchUnidadesItem(
   numeroAta: string,
   unidadeGerenciadora: string,
-  numeroItem: string
+  numeroItem: string,
+  opts: { falharSeErro?: boolean } = {}
 ): Promise<UnidadesItemResponse> {
   const formattedItem = (numeroItem || '').toString().padStart(5, '0');
-  
-  const queryParams = {
-    pagina: 1,
-    tamanhoPagina: 50,
-    numeroAta,
-    unidadeGerenciadora,
-    numeroItem: formattedItem
-  };
-
-  const url = `${BASE_URL}/3_consultarUnidadesItem${buildQueryString(queryParams)}`;
+  const vazio: UnidadesItemResponse = { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 };
 
   try {
-    const response = await fetch(url);
-    if (response.ok) {
+    const linhas: UnidadeItemRecord[] = [];
+    let totalRegistros: number | null = null;
+    for (let pagina = 1; ; pagina++) {
+      const queryParams = { pagina, tamanhoPagina: 500, numeroAta, unidadeGerenciadora, numeroItem: formattedItem };
+      const response = await fetch(`${BASE_URL}/3_consultarUnidadesItem${buildQueryString(queryParams)}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json() as UnidadesItemResponse;
-      if (data.resultado && data.resultado.length > 0) {
-        return data;
+      linhas.push(...(data.resultado || []));
+      if (pagina === 1 && typeof data.totalRegistros === 'number') totalRegistros = data.totalRegistros;
+      if (!data.paginasRestantes || data.paginasRestantes <= 0 || (data.resultado || []).length === 0) break;
+      if (pagina >= MAX_PAGINAS_UNIDADES_ITEM) {
+        throw new UnidadesItemIncompletasError(`mais de ${MAX_PAGINAS_UNIDADES_ITEM} páginas de órgãos`);
       }
     }
+    if (linhas.length === 0) return vazio;
+    if (totalRegistros != null && linhas.length < totalRegistros) {
+      throw new UnidadesItemIncompletasError(`vieram ${linhas.length} de ${totalRegistros} linhas de órgãos`);
+    }
+
+    const { unidades, divergentes } = juntarUnidadesRepetidas(linhas);
+    if (divergentes.length > 0) {
+      throw new UnidadesItemIncompletasError(
+        `${divergentes.length} ${divergentes.length === 1 ? 'órgão veio repetido' : 'órgãos vieram repetidos'} com valores diferentes (${divergentes.slice(0, 3).map((c) => c.split('|')[0]).join(', ')})`
+      );
+    }
+    return { resultado: unidades, totalRegistros: unidades.length, totalPaginas: 1, paginasRestantes: 0 };
   } catch (error) {
+    if (opts.falharSeErro) throw error;
     console.warn("Falha na consulta de unidades do item.", error);
   }
 
-  // Sem dados reais retornados pela API: retorna vazio em vez de fabricar um registro fictício.
-  return { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 };
+  // Sem dados reais (ou sem dados confiáveis) retornados pela API: retorna vazio em vez de fabricar um registro.
+  return vazio;
 }
 
 /** Resultado da busca do nome de uma UASG no Compras.gov.br. */
@@ -1467,7 +1496,7 @@ export async function fetchContratosGovData(
 
   for (const ug of candidateUgs) {
     try {
-      const listRes = await fetch(`/api-contratos-gov/api/contrato/ugorigem/${ug}/numeroano/${numeroAno}`);
+      const listRes = await fetchComTempoLimite(`/api-contratos-gov/api/contrato/ugorigem/${ug}/numeroano/${numeroAno}`, TEMPO_LIMITE_ITENS_MS, 'Contratos.gov.br');
       if (listRes.ok) {
         const data = await listRes.json();
         const cObj = Array.isArray(data) ? data[0] : data;
@@ -1475,7 +1504,7 @@ export async function fetchContratosGovData(
         const orgaoNome = cObj?.contratante?.orgao?.nome || cObj?.contratante?.orgao_origem?.nome;
 
         if (contratoId) {
-          const itemsRes = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/itens`);
+          const itemsRes = await fetchComTempoLimite(`/api-contratos-gov/api/contrato/${contratoId}/itens`, TEMPO_LIMITE_ITENS_MS, 'Contratos.gov.br');
           const itemsData = itemsRes.ok ? await itemsRes.json() : [];
           return {
             contratoId,
@@ -1492,32 +1521,7 @@ export async function fetchContratosGovData(
   return { items: [] };
 }
 
-/** Tempo máximo de espera pela lista de empenhos de um contrato (Contratos.gov.br e PNCP). */
-export const TEMPO_LIMITE_EMPENHOS_MS = 30_000;
-/** Tempo máximo de espera pela minuta de um empenho. */
-const TEMPO_LIMITE_DETALHE_EMPENHO_MS = 15_000;
-
-/** Erro de uma consulta que não terminou no tempo limite. Quem chama pode tentar de novo. */
-export class TempoEsgotadoError extends Error {
-  constructor(fonte: string, ms: number) {
-    super(`${fonte} não respondeu em ${Math.round(ms / 1000)} s.`);
-    this.name = 'TempoEsgotadoError';
-  }
-}
-
-/** fetch que desiste depois de `ms` milissegundos, com mensagem legível em falha de rede ou de tempo. */
-async function fetchComTempoLimite(url: string, ms: number, fonte: string): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } catch (err: any) {
-    if (controller.signal.aborted) throw new TempoEsgotadoError(fonte, ms);
-    throw new Error(`Falha de rede ao consultar o ${fonte}: ${err?.message || err}`);
-  } finally {
-    clearTimeout(timer);
-  }
-}
+export { TempoEsgotadoError, TEMPO_LIMITE_EMPENHOS_MS } from './fetchComTempoLimite';
 
 /**
  * Consulta empenhos do contrato no Contratos.gov.br (comprasnet)
@@ -1584,6 +1588,27 @@ export async function fetchOrdensBancariasDaNp(ug: string, np: string, gestao = 
   const data = await res.json().catch(() => null);
   if (!Array.isArray(data)) {
     throw new Error(`Tesouro (STA) devolveu um formato inesperado para as ordens bancárias da ${np}.`);
+  }
+  return data;
+}
+
+/**
+ * Saldo contábil do SIAFI de uma conta, numa UG e ano, pela API aberta do Tesouro (STA):
+ * GET https://sta.api.gov.br/api/saldocontabil/ano/{ano}/ug/{ug}/gestao/{gestão}/contacontabil/{conta}.
+ * Uma linha por conta corrente (empenho + subitem). Atualizado uma vez por dia (migration 128).
+ */
+export async function fetchSaldoContabil(ano: number, ug: string, conta: string, gestao = '00001'): Promise<any[]> {
+  const res = await fetchComTempoLimite(
+    `/api-sta/api/saldocontabil/ano/${ano}/ug/${ug}/gestao/${gestao}/contacontabil/${conta}`,
+    TEMPO_LIMITE_EMPENHOS_MS,
+    'Tesouro (STA)'
+  );
+  if (!res.ok) {
+    throw new Error(`Tesouro (STA) respondeu ${res.status} ao consultar o saldo contábil ${conta} de ${ano}.`);
+  }
+  const data = await res.json().catch(() => null);
+  if (!Array.isArray(data)) {
+    throw new Error(`Tesouro (STA) devolveu um formato inesperado para o saldo contábil ${conta} de ${ano}.`);
   }
   return data;
 }
@@ -1676,7 +1701,7 @@ export async function fetchContratoItensComprasGov(
 
   try {
     const url = `${BASE_URL.replace('/modulo-arp', '/modulo-contratos')}/2.1_consultarContratosItem_Id?tipo=numeroControlePncpContrato&codigo=${encodeURIComponent(numeroControlePncp)}`;
-    const response = await fetch(url);
+    const response = await fetchComTempoLimite(url, TEMPO_LIMITE_ITENS_MS, 'Compras.gov.br');
     if (response.ok) {
       const data = await response.json() as ComprasGovContratosItemResponse;
       if (data.resultado && data.resultado.length > 0) {

@@ -4,7 +4,8 @@
  *
  * Lê a lista de unidades de cada item no Compras.gov.br (3_consultarUnidadesItem) e grava a última lista
  * válida. A tela do Item consulta a API ao vivo e, quando ela volta vazia, mostra esta cópia com a data.
- * Leitura vazia não apaga a cópia.
+ * Leitura vazia não apaga a cópia. A lista vem de todas as páginas e sem as linhas que a fonte repete; se
+ * vier incompleta ou com cópias diferentes do mesmo órgão, o item não é gravado.
  *
  * Adesões (5_consultarAdesoesItem): item sem carona devolve vazio de verdade, então elas só são lidas e
  * gravadas quando a consulta de órgãos do mesmo item respondeu (API de pé); aí a lista vazia também vale. Incremental: lê o item nunca lido, o de ata vigente lido há mais de
@@ -13,7 +14,7 @@
  * próxima execução (PARCIAL).
  */
 import { supabase } from './supabaseClient';
-import { fetchAdesoesItem, fetchUnidadesItem } from './api';
+import { fetchAdesoesItem, fetchUnidadesItem, UnidadesItemIncompletasError } from './api';
 import {
   executarComReserva,
   mensagemDeErro,
@@ -184,7 +185,8 @@ export async function lerItemNasFontes(
   item: ItemDaCarteira,
   fontes: { unidades: typeof fetchUnidadesItem; adesoes: typeof fetchAdesoesItem } = { unidades: fetchUnidadesItem, adesoes: fetchAdesoesItem }
 ): Promise<{ linha: LinhaParaGravar; falhaAdesoes: boolean }> {
-  const resposta = await fontes.unidades(item.numeroAta, item.uasg, item.numeroItem);
+  // Lista incompleta ou com cópias divergentes lança: o item não é gravado (a cópia anterior fica).
+  const resposta = await fontes.unidades(item.numeroAta, item.uasg, item.numeroItem, { falharSeErro: true });
   const unidades = (resposta.resultado || []).map(unidadeParaGravar);
   const linha: LinhaParaGravar = { item_key: item.itemKey, unidades };
   if (unidades.length === 0) return { linha, falhaAdesoes: false };
@@ -232,6 +234,7 @@ export async function sincronizarUnidadesItens(
       let copiados = 0;
       let vazios = 0;
       let falhas = 0;
+      let incompletos = 0;
       let falhasAdesoes = 0;
       let pendentes = 0;
       let lote: LinhaParaGravar[] = [];
@@ -248,7 +251,8 @@ export async function sincronizarUnidadesItens(
           if (falhaAdesoes) falhasAdesoes++;
           lote.push(linha);
         } catch (err) {
-          falhas++;
+          if (err instanceof UnidadesItemIncompletasError) incompletos++;
+          else falhas++;
           console.warn(`[unidadesItens] órgãos do item ${item.itemKey} não puderam ser lidos:`, mensagemDeErro(err));
         }
         if (lote.length >= LOTE_GRAVACAO) {
@@ -260,11 +264,12 @@ export async function sincronizarUnidadesItens(
 
       const problemas: string[] = [];
       if (falhas > 0) problemas.push(`${falhas} ${falhas === 1 ? 'item não teve os órgãos lidos' : 'itens não tiveram os órgãos lidos'}`);
+      if (incompletos > 0) problemas.push(`${incompletos} ${incompletos === 1 ? 'item veio com a lista de órgãos incompleta ou repetida de forma diferente e não foi gravado' : 'itens vieram com a lista de órgãos incompleta ou repetida de forma diferente e não foram gravados'}`);
       if (falhasAdesoes > 0) problemas.push(`${falhasAdesoes} ${falhasAdesoes === 1 ? 'item não teve as adesões lidas' : 'itens não tiveram as adesões lidas'}`);
       if (vazios > 0) problemas.push(`o Compras.gov.br não devolveu órgãos para ${vazios} ${vazios === 1 ? 'item' : 'itens'}`);
       if (pendentes > 0) problemas.push(`${pendentes} ${pendentes === 1 ? 'item ficou' : 'itens ficaram'} para a próxima execução`);
       const fontesComFalha = [
-        ...(falhas > 0 || vazios > 0 ? [FONTE_UNIDADES_ITENS] : []),
+        ...(falhas > 0 || incompletos > 0 || vazios > 0 ? [FONTE_UNIDADES_ITENS] : []),
         ...(falhasAdesoes > 0 ? [FONTE_ADESOES_ITENS] : [])
       ];
       return problemas.length > 0

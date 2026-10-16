@@ -1,3 +1,4 @@
+import { mapNotaSiafi } from '../../../services/distribuicaoEmpenhoService';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { SincronizacaoEmpenhosContrato } from '../../../services/contratoEmpenhosSincronizacaoService';
@@ -17,19 +18,10 @@ vi.mock('../../../hooks/useFaturasDoContrato', async (orig) => ({
 }));
 vi.mock('../../../hooks/useContractFinancialSummary', () => ({ useContractFinancialSummary: vi.fn() }));
 vi.mock('../../../hooks/useSincronizacaoEmpenhosContrato', () => ({ useSincronizacaoEmpenhosContrato: vi.fn() }));
-vi.mock('../../../hooks/useVinculoEmpenhosContrato', () => {
-  const mut = () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, variables: undefined });
-  return {
-    useDescartesEmpenhoContrato: vi.fn(() => ({ data: [] })),
-    useAcoesVinculoEmpenho: () => ({ descartar: mut(), restaurar: mut(), vincular: mut(), desvincular: mut() }),
-    useBuscaEmpenhoPorNumero: () => ({ data: [], isLoading: false, isError: false })
-  };
-});
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'leitor' })) }));
 
 import { useContractFinancialSummary } from '../../../hooks/useContractFinancialSummary';
 import { useSincronizacaoEmpenhosContrato } from '../../../hooks/useSincronizacaoEmpenhosContrato';
-import { useDescartesEmpenhoContrato } from '../../../hooks/useVinculoEmpenhosContrato';
 import { useAuth } from '../../../context/AuthContext';
 import { useDistribuicoesEmpenhoContrato } from '../../../hooks/useDistribuicaoEmpenhos';
 import { useItensDoContrato } from '../../../hooks/useItensDoContrato';
@@ -183,46 +175,34 @@ describe('ContractFinancialExecutionSection: vínculo híbrido', () => {
     expect(html).toContain('contract-financial-manuais');
   });
 
-  it('leitor não vê as ações; gestor só desvincula o manual e não descarta o que veio da fonte', () => {
-    vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
-    let html = renderEq();
-    expect(html).not.toContain('contract-financial-desvincular');
-    expect(html).not.toContain('contract-financial-vincular');
-
-    vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
-    html = renderEq();
-    expect(html).not.toContain('contract-financial-descartar');
-    expect(html).not.toContain('descartar-empenho-modal');
-    expect(html.match(/data-testid="contract-financial-desvincular"/g)).toHaveLength(1);
-    expect(html).toContain('contract-financial-vincular');
-    expect(html).toContain('retire a nota do contrato no Contratos.gov.br');
+  it('vínculo à mão saiu: ninguém vê vincular, desvincular, descartar nem restaurar; a correção é no Contratos.gov.br', () => {
+    for (const role of ['leitor', 'gestor', 'admin']) {
+      vi.mocked(useAuth).mockReturnValue({ role } as any);
+      const html = renderEq();
+      expect(html).not.toContain('contract-financial-desvincular');
+      expect(html).not.toContain('contract-financial-vincular"');
+      expect(html).not.toContain('contract-financial-descartados');
+      expect(html).not.toContain('contract-financial-restaurar');
+      expect(html).not.toContain('vincular-empenho-modal');
+      expect(html).toContain('retire a nota do contrato no Contratos.gov.br');
+    }
   });
 
-  it('lista os descartados com motivo e autor; restaurar só para gestor', () => {
-    vi.mocked(useDescartesEmpenhoContrato).mockReturnValue({
-      data: [{ contractKey: equilibrio.id, empenhoId: 'x', motivo: 'Credor é a HPE', descartadoPorNome: 'Maria', descartadoEm: '2026-10-06T20:00:00Z', numeroOficial: '2024NE000765', credorNome: 'HPE AUTOMOTORES', valorEmpenhado: 567513.93 }]
-    } as any);
-    vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
-    let html = renderEq();
-    expect(html).toContain('Empenhos descartados');
-    expect(html).toContain('Credor é a HPE');
-    expect(html).toContain('contract-financial-restaurar');
-    vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
-    html = renderEq();
-    expect(html).toContain('Empenhos descartados');
-    expect(html).not.toContain('contract-financial-restaurar');
-  });
-
-  it('contrato sem empenho: gestor pode vincular à mão e vê os descartados', () => {
+  it('contrato sem empenho: sem botão de vincular à mão', () => {
     vi.mocked(useContractFinancialSummary).mockReturnValue(vazio as any);
-    vi.mocked(useDescartesEmpenhoContrato).mockReturnValue({
-      data: [{ contractKey: equilibrio.id, empenhoId: 'x', motivo: 'Credor é a HPE', numeroOficial: '2024NE000765' }]
-    } as any);
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     const html = renderEq();
     expect(html).toContain('contract-financial-empty');
-    expect(html).toContain('contract-financial-vincular');
-    expect(html).toContain('contract-financial-descartados');
+    expect(html).not.toContain('contract-financial-vincular"');
+    expect(html).toContain('Consultar em Empenhos');
+  });
+
+  it('contrato sem empenho: gestor de saldo não recebe atalho para o Financeiro', () => {
+    vi.mocked(useContractFinancialSummary).mockReturnValue(vazio as any);
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
+    const html = renderEq();
+    expect(html).toContain('contract-financial-empty');
+    expect(html).not.toContain('Consultar em Empenhos');
   });
 });
 
@@ -296,7 +276,7 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).not.toContain('contract-financial-a-distribuir');
   });
 
-  it('fatura que cita NE fora do contrato aparece no resumo e leva à aba Pagamentos', () => {
+  it('fatura que cita NE fora do contrato aparece no resumo e leva à conferência no menu Vínculos', () => {
     vi.mocked(useDistribuicoesEmpenhoContrato).mockReturnValue({ data: [] } as any);
     vi.mocked(useFaturasDoContrato).mockReturnValue({
       data: { faturas: [{ idFatura: 7, numero: '1490', empenhos: '2024NE000412', empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2024NE000412', valor: 10 }], resumo: null, sincronizadoEm: null }
@@ -304,7 +284,8 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     const html = renderToStaticMarkup(<ContractFinancialExecutionSection contract={contract} contractKey={contract.id} onAbrirFatura={vi.fn()} />);
     expect(html).toContain('contract-financial-fatura-ne-fora');
     expect(html).toContain('2024NE000412');
-    expect(html).toContain('Ver a fatura');
+    expect(html).toContain('Ver a conferência');
+    expect(html).toContain('contract-financial-fatura-ne-fora-conferir');
   });
 
   const detalhe = (d: DistribuicaoDoEmpenho | undefined, podeEditar = true, faturas: any[] = [], extra: Record<string, unknown> = {}) =>
@@ -360,6 +341,40 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).toContain('>Vincular aos itens<');
   });
 
+  it('vinculada pela nota no SIAFI: mostra os itens da nota, o valor em dobro e deixa editar, sem desfazer', () => {
+    const notaSiafi = mapNotaSiafi({
+      lido_em: '2026-10-14T09:00:00Z',
+      valor_em_dobro: true,
+      total_siafi: 500,
+      itens: [
+        { numero_item: 13, quantidade: 2, valor_unitario: 250, valor_total: 500, descricao: 'PLACA BALISTICA', no_contrato: true },
+        { numero_item: 99, quantidade: 1, valor_unitario: 10, valor_total: 10, descricao: 'OUTRO', no_contrato: false }
+      ]
+    });
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'SIAFI', valorNota: 1000, notaSiafi, parcelas: [{ numeroItem: 13, valor: 500, quantidadeInformada: null, quantidadeNota: 2 }] });
+    const html = detalhe(d, true, [], { onInformarQuantidade: vi.fn() });
+    expect(html).toContain('Vinculada pela nota no SIAFI');
+    expect(html).toContain('Itens da nota no SIAFI');
+    expect(html).toContain('PLACA BALISTICA');
+    expect(html).toContain('fora do contrato');
+    expect(html).toContain('empenho-valor-em-dobro-2022NE000245');
+    expect(html).toContain('Editar o vínculo aos itens');
+    expect(html).not.toContain('>Desfazer<');
+    expect(html).toContain('value="2"');
+  });
+
+  it('vinculada pelo valor: diz a regra, deixa editar e desfazer', () => {
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'VALOR', observacao: 'Valor da nota = 4 × preço unitário do item 13.', parcelas: [{ numeroItem: 13, valor: 1000, quantidadeInformada: null }] });
+    const html = detalhe(d, true, [], { onInformarQuantidade: vi.fn() });
+    expect(html).toContain('Vinculada pelo valor da nota');
+    expect(html).toContain('Valor da nota = 4 × preço unitário do item 13.');
+    expect(html).toContain('Editar o vínculo aos itens');
+    expect(html).toContain('Desfazer');
+    const leitor = detalhe(d, false);
+    expect(leitor).not.toContain('Editar o vínculo aos itens');
+    expect(leitor).not.toContain('>Desfazer<');
+  });
+
   it('valor da nota mudou: a nota continua vinculada, avisa e oferece conferir as quantidades', () => {
     const d = dist({ situacao: 'DISTRIBUIDA', motivoRevisao: 'VALOR_MUDOU', origem: 'AUTO', valorNota: 1200, valorNaDistribuicao: 1000, parcelas: [{ numeroItem: 13, valor: 1200, quantidadeInformada: 4 }] });
     const html = detalhe(d, true, [], { onConferir: vi.fn(), onInformarQuantidade: vi.fn() });
@@ -388,5 +403,14 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     expect(html).toContain('não tem itens numerados');
     expect(html).not.toContain('Vincular aos itens');
     expect(html).toContain('nenhuma fatura cita esta nota');
+  });
+
+  it('item com a soma das notas acima do contratado: aviso na linha, sem bloquear (item 6)', () => {
+    const d = dist({ situacao: 'DISTRIBUIDA', origem: 'SIAFI', valorDistribuido: 1000, parcelas: [{ numeroItem: 43, valor: 1000, quantidadeInformada: null, quantidadeNota: 4 }] });
+    const acima = detalhe(d, true, [], { empenhadoNoItem: new Map([[43, 12]]) });
+    expect(acima).toContain('empenho-acima-2022NE000245-43');
+    expect(acima).toContain('item com 12 empenhadas (2 acima)');
+    const dentro = detalhe(d, true, [], { empenhadoNoItem: new Map([[43, 10]]) });
+    expect(dentro).not.toContain('empenho-acima-');
   });
 });

@@ -10,12 +10,14 @@ import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
 import { formatCnpj, formatCurrency, formatProcessoSei, formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { differenceInDays, formatDateBR, parseDateBRT } from '../../services/temporalEngineService';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
+import { ataEhNova } from '../carteira/carteiraNovidade';
 import { pncpLinkStyle } from '../atas/Ata360Header';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import type { SeverityLevel } from '../../design-system/tokens';
 import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { ComprasGovReferencia } from './ItemExecutionSummaryStrip';
-import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
+import { ataDeOutroOrgao, chaveGestaoDaArp } from '../../utils/ataIdentidade';
+import { useEyebrowDaGerenciadora } from '../../hooks/useCadastroUasgs';
 
 export type ItemTab = 'quantitativos' | 'contratos' | 'adesoes';
 
@@ -54,8 +56,12 @@ export interface ItemHeroProps {
   /** Consumo informado pelo Compras.gov comparado ao contratado (só referência). */
   referencia: ComprasGovReferencia;
   onGoTo: (tab: ItemTab) => void;
+  /** false para o gestor de saldo: sem a aba de contratos, os indicadores não levam a ela e "Notas a vincular" some. */
+  verContratos?: boolean;
   /** Abre a Ata 360. Sem ele, o número da ata aparece como texto. */
   onOpenAta?: () => void;
+  /** Botões "Ver mais" abaixo dos indicadores (ex.: Interesse por GTI); encolhem junto com o cartão. */
+  verMais?: React.ReactNode;
 }
 
 /** Situação do saldo pela régua única do sistema (balanceService.classifyArpItemSaldo): resta <20% crítico, <50% atenção. */
@@ -81,10 +87,13 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   metrics,
   referencia,
   onGoTo,
-  onOpenAta
+  verContratos = true,
+  onOpenAta,
+  verMais
 }) => {
   // O item não tem gestor próprio: vale o da ata. Se a consulta falhar, o bloco some (não vira "Não atribuído").
   const { data: gestorAta, isLoading: carregandoGestor, isError: erroGestor } = useAtaManager(chaveGestaoDaArp(arp));
+  const eyebrow = useEyebrowDaGerenciadora(String(arp.codigoUnidadeGerenciadora ?? ''), arp.nomeUnidadeGerenciadora, ataDeOutroOrgao(arp));
 
   const ataUrl = formatPncpAtaUrl(arp.linkAtaPNCP, arp.numeroControlePncpAta, arp.numeroAtaRegistroPreco);
   const compraUrl = formatPncpCompraUrl(arp.linkCompraPNCP, arp.numeroControlePncpCompra, arp.numeroControlePncpAta);
@@ -133,13 +142,13 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
       actions={
         <>
           {ataUrl && (
-            <a href={ataUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
-              <ExternalLink size={13} /> Ata no PNCP
+            <a href={ataUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle} aria-label="Ata no PNCP">
+              <ExternalLink size={13} /> Ata<span className="i360-so-largo"> no PNCP</span>
             </a>
           )}
           {compraUrl && (
-            <a href={compraUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
-              <ExternalLink size={13} /> Edital no PNCP
+            <a href={compraUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle} aria-label="Edital no PNCP">
+              <ExternalLink size={13} /> Edital<span className="i360-so-largo"> no PNCP</span>
             </a>
           )}
           <ActionButton
@@ -154,13 +163,14 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           </ActionButton>
         </>
       }
-      eyebrow={[`UASG ${arp.codigoUnidadeGerenciadora}`, arp.nomeUnidadeGerenciadora].filter(Boolean).join(' · ')}
+      eyebrow={eyebrow}
       title={`Item ${item.numeroItem}`}
       manager={
         erroGestor ? undefined : (
           <ManagerInfo label="Gestor da ata" gestorNome={gestorAta?.gestorNome} isLoading={carregandoGestor} testId="item-manager-info" />
         )
       }
+      novidade={ataEhNova(arp) ? 'm' : undefined}
       status={{ ...status, neutral: status.faixa === 'REGULAR' }}
       subtitle={
         <>
@@ -196,7 +206,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
       ]}
     >
       <div data-testid="item-health-strip">
-        <HealthTileGrid columns={5}>
+        <HealthTileGrid columns={verContratos ? 5 : 4}>
           <HealthTile
             label="Saldo SENASP"
             value={`${formatNumber(metrics.officialSaldo)} un`}
@@ -204,7 +214,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             tooltip={`Saldo de ${formatNumber(metrics.officialSaldo)} un do quantitativo SENASP de ${formatNumber(metrics.itemTotalQty)} un · ${formatCurrencyCompact(metrics.valorFinanceiroDisponivel)} disponíveis · contratado ${formatNumber(metrics.totalEmpenhado)} un (${formatNumber(metrics.empenhoConsumidoPercent)}%)`}
             tone={saldoTone}
             badge={saldoBadge}
-            onClick={() => onGoTo('contratos')}
+            onClick={verContratos ? () => onGoTo('contratos') : undefined}
             testId="item-health-saldo"
           />
           <HealthTile
@@ -230,6 +240,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             onClick={() => onGoTo('quantitativos')}
             testId="item-health-alocacao"
           />
+          {verContratos && (
           <HealthTile
             label="Notas a vincular"
             value={String(notasAVincular)}
@@ -239,13 +250,14 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             onClick={() => onGoTo('contratos')}
             testId="item-health-empenhos"
           />
+          )}
           {acima ? (
             <HealthTile
               label="Pendências"
               value="1"
               hint={[`Diferença ${delta} un`, 'consumo sem contrato vinculado?']}
               tone="ATENCAO"
-              onClick={() => onGoTo('contratos')}
+              onClick={verContratos ? () => onGoTo('contratos') : undefined}
               testId="item-health-reconciliacao"
             />
           ) : (
@@ -259,6 +271,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             />
           )}
         </HealthTileGrid>
+        {verMais}
       </div>
     </Instrument360Hero>
   );

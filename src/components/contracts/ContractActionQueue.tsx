@@ -1,5 +1,9 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
+import { useAusentesDaFonte } from '../../hooks/useAusentesDaFonte';
+import { ActionButton } from '../../design-system/components/ActionButton';
+import { AusenteDaFonteDecisao } from '../fonte/AusenteDaFonteDecisao';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { propsDeLinhaClicavel, SetaDaLinha } from '../carteira/CarteiraRowLink';
 import type { ContractTaskPlan } from '../../types';
@@ -10,6 +14,7 @@ import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { AvisosResolvidosLista, BotaoResolvido, EspacoResolvido, useResolverAviso, type AlvoResolucao } from '../avisos/ResolverAviso';
+import { AvisoCarregando } from '../../design-system';
 import type { ContractActionItem, ContractActionQueue as ActionQueueData } from '../../services/contractActionQueueService';
 
 export type Contract360Tab = 'acoes' | 'plano' | 'itens' | 'financeiro' | 'pagamentos' | 'historico';
@@ -33,23 +38,35 @@ const KIND_LABELS: Record<ContractActionItem['kind'], string> = {
   TAREFA: 'Tarefa',
   PAGAMENTO: 'Pagamento',
   REAJUSTE: 'Reajuste / repactuação',
-  LEMBRETE: 'Prazo legal'
+  LEMBRETE: 'Prazo legal',
+  VINCULO: 'Vínculo com a ata',
+  FONTE: 'Fonte a conferir'
 };
 
 export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue, plan, isLoading = false, onGoTo }) => {
   const { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo } = useResolverAviso();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigateWithOrigin();
+  const { podeDecidir } = useAusentesDaFonte();
+  const [decidindo, setDecidindo] = React.useState<{ tipo: 'NOTA' | 'FATURA'; chave: string } | null>(null);
   const highlightedId = searchParams.get('item');
 
   React.useEffect(() => {
     if (!highlightedId) return;
     const el = document.querySelector(`[data-action-id="${CSS.escape(highlightedId)}"]`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (!el) return;
+    // Só rola quando a ação está fora da área visível abaixo da barra grudada. Rolar sempre brigava com a ancoragem das
+    // telas 360 (useInstrumentTab): as duas rolagens se alternavam e o cartão encolhia e reabria, ou ficava um vão em branco.
+    const barraAte = document.querySelector('[data-i360-head]')?.getBoundingClientRect().bottom ?? 0;
+    const caixa = el.getBoundingClientRect();
+    if (caixa.top >= barraAte && caixa.bottom <= window.innerHeight) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [highlightedId, queue.items]);
 
   if (isLoading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem 0' }} aria-busy="true" aria-label="Carregando ações do contrato...">
+        <AvisoCarregando label="Carregando ações do contrato" />
         <SkeletonLoader variant="rectangular" height="44px" count={3} />
       </div>
     );
@@ -60,6 +77,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
     switch (item.kind) {
       case 'PAGAMENTO': return { label: item.id.startsWith('AVISO-') ? 'Ver pagamentos do contrato' : 'Abrir ciclo', go: () => onGoTo('pagamentos') };
       case 'REAJUSTE': return { label: 'Ver histórico', go: () => onGoTo('historico') };
+      case 'VINCULO': return item.targetUrl ? { label: 'Conferir o vínculo no item', go: () => navigate(item.targetUrl!) } : null;
       default: return null;
     }
   };
@@ -79,10 +97,20 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
         return check;
       case 'PAGAMENTO':
       case 'REAJUSTE':
+      case 'VINCULO':
         return (
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
             {check}
             {rowGo(item) ? <SetaDaLinha /> : null}
+          </div>
+        );
+      case 'FONTE':
+        return (
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            {check}
+            {podeDecidir && item.ausenteDaFonte ? (
+              <ActionButton action="conferir" size="sm" onClick={() => setDecidindo(item.ausenteDaFonte!)} data-testid={`decidir-${item.id}`} />
+            ) : null}
           </div>
         );
       case 'LEMBRETE':
@@ -213,6 +241,7 @@ export const ContractActionQueue: React.FC<ContractActionQueueProps> = ({ queue,
         </AppButton>
       )}
       {dialog}
+      {decidindo && <AusenteDaFonteDecisao tipo={decidindo.tipo} chave={decidindo.chave} onClose={() => setDecidindo(null)} />}
     </div>
   );
 };

@@ -6,12 +6,12 @@
  * Forçar (botão "Atualizar") é só para o coordenador: a função do banco recusa para os outros perfis.
  *
  * Provisório: a sincronização roda no navegador de quem tem perfil de gravação (gestor/coordenador).
- * Ela vai para uma Edge Function agendada (PLANO_PERSISTENCIA_CONTRATOS_E_CACHE.md).
+ * Ela vai para uma Edge Function agendada (docs/historico/PLANO_PERSISTENCIA_CONTRATOS_E_CACHE.md).
  */
 
 import { supabase } from './supabaseClient';
 
-export type RecursoSincronizado = 'contratos' | 'atas' | 'saldos_itens' | 'itens_contratos' | 'unidades_itens' | 'atas_participacao' | 'contratos_participantes' | 'empenhos' | 'faturas' | 'ordens_bancarias';
+export type RecursoSincronizado = 'contratos' | 'atas' | 'saldos_itens' | 'itens_contratos' | 'unidades_itens' | 'atas_participacao' | 'contratos_participantes' | 'empenhos' | 'faturas' | 'ordens_bancarias' | 'cadastro_uasgs' | 'itens_notas_siafi' | 'saldo_contabil';
 
 /**
  * UASG usada nos recursos que valem para todas as carteiras (ex.: 'saldos_itens', que lê os contratos

@@ -15,13 +15,58 @@ describe('motivosDosQuantitativos', () => {
   });
   it('cada problema vira um motivo; cota negativa é crítica', () => {
     const m = motivosDosQuantitativos(linha({ quantidade_base_senasp: -15, orgaos_fora_da_ata: 1, total_assinada: 4800, total_registrado: 4900, orgaos_contratado_acima: 2 }));
-    expect(m.map((x) => x.selo)).toEqual(['cota negativa', 'fora da ata', 'soma não fecha', 'soma não fecha', 'contratado acima']);
+    // A soma do registrado acima do homologado tem aviso próprio (REGISTRADO_ACIMA, migration 142).
+    expect(m.map((x) => x.selo)).toEqual(['cota negativa', 'fora da ata', 'soma não fecha', 'contratado acima']);
     expect(m[0].critico).toBe(true);
     expect(m.slice(1).every((x) => !x.critico)).toBe(true);
   });
+  it('soma do registrado abaixo do homologado continua motivo (cancelamento ou supressão)', () => {
+    const m = motivosDosQuantitativos(linha({ total_registrado: 4800 }));
+    expect(m.map((x) => x.texto)).toEqual(['soma do registrado (4.800) abaixo do homologado (4.863)']);
+  });
 });
 
-describe('Visão Geral — quantitativos a conferir', () => {
+// Ata 00065/2024 item 5 (dados reais de 16/10/2026): homologado 1.782, soma do registrado 2.081, 7 da SENASP acima da
+// ata assinada (96 × 89), base já com o desconto na view (migration 142).
+const acima = (over: Record<string, unknown> = {}) => ({
+  item_key: '00065/2024-200331-00005', numero_ata: '00065/2024', numero_item: '00005', codigo_uasg: '200331',
+  descricao_item: 'Conjunto regulador para mergulho', quantidade_homologada: 1782, quantidade_base_senasp: 89, quantidade_consumida: 64,
+  saldo_disponivel: 25, percentual_consumido: 71.91, ata_assinada_informada: true, total_assinada: 1782, total_registrado: 2081,
+  orgaos_fora_da_ata: 0, orgaos_contratado_acima: 0, soma_registrado: 2081, excedente_registrado: 299, excedente_registrado_senasp: 7,
+  desconto_registrado_acima: 7, registrado_acima_chave: 'SALDO::00065/2024-200331::5::REGISTRADO-ACIMA-2081.00-1782.00', registrado_acima_resolvido: false,
+  ...over
+});
+
+describe('Início — registrado acima do homologado', () => {
+  const avisos = (arpItems: any[]) =>
+    calculateAttentionSummary({ arpItems, currentDate: new Date('2026-10-16T12:00:00') } as any).items.filter((i) => i.category === 'REGISTRADO_ACIMA');
+
+  it('item com excedente: atenção, chave da view e destino no Item', () => {
+    const [a] = avisos([acima()]);
+    expect(a).toMatchObject({
+      id: 'ATT-REGISTRADO-ACIMA-00065/2024-200331-00005',
+      severity: 'ATENCAO',
+      title: 'Registrado acima do homologado',
+      avisoChave: 'SALDO::00065/2024-200331::5::REGISTRADO-ACIMA-2081.00-1782.00',
+      badgeLabel: '+299 acima',
+      targetUrl: '/atas/detalhe/00065%2F2024-200331/itens/00005'
+    });
+    expect(a.description).toBe('Ata 00065/2024 — Item 5: homologado 1.782 × registrado 2.081 (excedente 299; 7 na SENASP fora do saldo)');
+  });
+
+  it('saldo protegido em 20% da base ou menos (ou negativo) é crítico; sem ata assinada, provisório', () => {
+    const [a] = avisos([acima({ ata_assinada_informada: false, quantidade_base_senasp: 60800, saldo_disponivel: 0, excedente_registrado: 60800, excedente_registrado_senasp: 60800 })]);
+    expect(a.severity).toBe('CRITICA');
+    expect(a.description).toContain('60.800 na SENASP (provisório: ata assinada não informada) fora do saldo');
+  });
+
+  it('item sem excedente não gera aviso; o aviso de quantitativos não repete a soma acima', () => {
+    expect(avisos([acima({ registrado_acima_chave: null })])).toEqual([]);
+    expect(motivosDosQuantitativos(acima())).toEqual([]);
+  });
+});
+
+describe('Início — quantitativos a conferir', () => {
   const avisos = (arpItems: any[]) =>
     calculateAttentionSummary({ arpItems, currentDate: new Date('2026-10-13T12:00:00') } as any).items.filter((i) => i.category === 'QUANTITATIVOS');
 
@@ -52,5 +97,32 @@ describe('Visão Geral — quantitativos a conferir', () => {
     const lista = avisos([linha({ orgaos_fora_da_ata: 1, orgaos_contratado_acima: 1 })]);
     expect(lista).toHaveLength(1);
     expect(lista[0].badgeLabel).toBe('2 pontos a conferir');
+  });
+});
+
+describe('Ata de outro órgão — quantidade da SENASP na gerenciadora (migration 114)', () => {
+  // 00010/2025 da UASG 200342, item 7: a ata assinada dá 397 a mais à SENASP, ainda no registrado da gerenciadora.
+  const part = (over: Record<string, unknown> = {}) => linha({
+    item_key: '00010/2025-200342-00007', numero_ata: '00010/2025', numero_item: '00007', codigo_uasg: '200342', descricao_item: 'Monitor',
+    quantidade_homologada: 19389, quantidade_base_senasp: 2003, quantidade_consumida: 1800, percentual_consumido: 89.87,
+    ata_assinada_informada: false, total_assinada: null, total_registrado: null, gerenciado_pela_gerenciadora: 397, ...over
+  });
+  const avisos = (arpItems: any[]) =>
+    calculateAttentionSummary({ arpItems, currentDate: new Date('2026-10-13T12:00:00') } as any).items;
+
+  it('saldo crítico com quantidade na gerenciadora vira pendência do gestor de saldo', () => {
+    const [a] = avisos([part()]).filter((i) => i.category === 'QUANTITATIVOS');
+    expect(a).toMatchObject({ title: 'Pedir remanejamento à gerenciadora', badgeLabel: 'pedir à gerenciadora', severity: 'ATENCAO' });
+    expect(a.description).toContain('saldo crítico com 397 da SENASP na gerenciadora (UASG 200342)');
+  });
+
+  it('sem saldo crítico, ou nada na gerenciadora, não há pendência', () => {
+    expect(avisos([part({ quantidade_consumida: 100, percentual_consumido: 5 })]).filter((i) => i.category === 'QUANTITATIVOS')).toEqual([]);
+    expect(avisos([part({ gerenciado_pela_gerenciadora: 0 })]).filter((i) => i.category === 'QUANTITATIVOS')).toEqual([]);
+  });
+
+  it('o aviso de consumo crítico diz quanto há na gerenciadora para pedir', () => {
+    const [c] = avisos([part()]).filter((i) => i.category === 'ATA_CRITICA');
+    expect(c.description).toContain('há 397 na gerenciadora para pedir');
   });
 });

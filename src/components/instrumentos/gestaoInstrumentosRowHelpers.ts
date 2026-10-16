@@ -1,6 +1,7 @@
 import { buildAtaPath } from '../../hooks/useAta';
 import type { AlvoResolucao } from '../avisos/ResolverAviso';
 import type { DashboardAttentionCategory, DashboardAttentionItem } from '../../types/managementDashboard';
+import { chaveDoMotivo } from '../../utils/motivoDetalhe';
 
 /** Item de atenção enriquecido com a UASG de origem (a Gestão de Instrumentos consolida 200330 e 200331). */
 export interface AttentionItemWithUasg extends DashboardAttentionItem {
@@ -67,7 +68,12 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   ATA_CRITICA: { label: 'Saldo em atenção', color: 'var(--color-success)', bg: '#ecfdf5' },
   UNIDADE_PENDENTE: { label: 'Unidades do contratado', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   FORNECEDOR_PNCP: { label: 'Fornecedor da ata', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
+  VINCULO_A_CONFERIR: { label: 'Vínculo a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  FONTE_A_CONFERIR: { label: 'Fonte a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  EMPENHO_ACIMA: { label: 'Empenhado acima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   QUANTITATIVOS: { label: 'Quantitativos a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  ATA_ASSINADA: { label: 'Qtd. assinada a informar', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
+  REGISTRADO_ACIMA: { label: 'Registrado acima do homologado', color: 'var(--color-danger-text)', bg: 'var(--color-danger-bg)' },
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
   PAGAMENTO_PREVISTO: { label: 'Pagamento previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
@@ -78,6 +84,35 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
 
 export function getMotivoInfo(category: DashboardAttentionCategory): MotivoInfo {
   return MOTIVO_POR_CATEGORIA[category] || { label: 'Situação de atenção', color: '#475569', bg: '#f1f5f9' };
+}
+
+/** Categorias de motivo reconhecidas — usada para validar o filtro "Motivo" vindo do endereço. */
+export const MOTIVOS_CATEGORIAS = Object.keys(MOTIVO_POR_CATEGORIA) as DashboardAttentionCategory[];
+
+export function isMotivoCategoria(value: string | null): value is DashboardAttentionCategory {
+  return !!value && (MOTIVOS_CATEGORIAS as string[]).includes(value);
+}
+
+/**
+ * Motivo de um aviso no filtro "Motivo". Numa aba de uma categoria só (Reajustes, Lembretes) a categoria não separa
+ * nada: usa o motivo detalhado (situação da data-base, regra do lembrete). Nas demais, a categoria do aviso.
+ */
+export function motivoNoFiltro(
+  item: Pick<DashboardAttentionItem, 'category' | 'motivoDetalhe'>,
+  abaDeUmaCategoria: boolean
+): { value: string; label: string } {
+  if (abaDeUmaCategoria && item.motivoDetalhe) return { value: chaveDoMotivo(item), label: item.motivoDetalhe.label };
+  return { value: item.category, label: getMotivoInfo(item.category).label };
+}
+
+/** Motivo vindo do endereço: "CATEGORIA" ou "CATEGORIA.chave" com categoria conhecida; o resto vira 'TODAS'. */
+export function motivoDoEndereco(valor: string | null): string {
+  if (!valor) return 'TODAS';
+  const ponto = valor.indexOf('.');
+  const categoria = ponto < 0 ? valor : valor.slice(0, ponto);
+  const detalhe = ponto < 0 ? null : valor.slice(ponto + 1);
+  if (!isMotivoCategoria(categoria)) return 'TODAS';
+  return detalhe === null || /^[A-Za-z0-9-]+$/.test(detalhe) ? valor : 'TODAS';
 }
 
 /** Situação atual em texto curto, composta apenas de campos reais já calculados (badgeLabel/dataAlvo). */
@@ -145,10 +180,23 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
       return { label: 'Informar unidades', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'QUANTITATIVOS':
       return { label: 'Conferir quantitativos', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'ATA_ASSINADA':
+      return { label: 'Informar qtd. da ata assinada', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'REGISTRADO_ACIMA':
+      return { label: 'Conferir quantitativos', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'FORNECEDOR_PNCP':
       return { label: item.badgeLabel === 'conferir itens' ? 'Conferir Fornecedor' : 'Indicar Fornecedor', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'FONTE_A_CONFERIR':
+      return { label: 'Conferir no contrato', targetUrl: contractItemUrl(item) };
+    case 'EMPENHO_ACIMA':
+      return { label: 'Conferir as notas', targetUrl: item.targetUrl || contractItemUrl(item) };
+    case 'VINCULO_A_CONFERIR':
+      return { label: 'Conferir vínculo', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'PAGAMENTO_CRITICO':
-      return { label: 'Abrir pagamento', targetUrl: '/pagamentos' };
+      return {
+        label: 'Abrir pagamento',
+        targetUrl: item.contractKey ? `/contratos/${encodeURIComponent(item.contractKey)}?aba=pagamentos` : '/pagamentos'
+      };
     case 'PAGAMENTO_PREVISTO':
       return { label: item.contractKey ? 'Abrir Pagamentos do Contrato' : 'Abrir Previsão', targetUrl: item.targetUrl || '/pagamentos' };
     case 'REAJUSTE_RADAR':

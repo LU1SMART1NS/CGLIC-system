@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ActionButton, AlertCard, AppButton, Modal, StatusBadge } from '../../design-system';
+import { ActionButton, AlertCard, AppButton, Modal, NoticeBar, StatusBadge } from '../../design-system';
 import { useDepartments } from '../../hooks/useDepartments';
 import { useItemAllocations } from '../../hooks/useItemAllocations';
 import { useItemEmpenhoLinks } from '../../hooks/useItemEmpenhoLinks';
@@ -12,6 +12,7 @@ import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../../utils/co
 import { summarizeAllocationExecution } from '../../utils/allocationExecution';
 import { avaliarEdicao, linhasIniciais, listaParaGravar, normUnidade, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
+import { MENSAGEM_CONFLITO_EDICAO } from '../../utils/conflitoEdicao';
 import { formatNumber } from '../item-balances/itemBalanceUtils';
 
 export interface ItemParaAlocar {
@@ -23,6 +24,11 @@ export interface ItemParaAlocar {
   quantitativoSenasp: number;
   /** Nome do teto na régua (padrão "Quantitativo SENASP"). */
   rotuloLimite?: string;
+  /**
+   * Ata da CGLIC sem a qtd. da ata assinada e com outros órgãos registrados no item: o teto é o registrado da SENASP,
+   * provisório até informar a ata assinada (migration 116; a alocação não é bloqueada). Número de outros órgãos.
+   */
+  limiteProvisorioOutrosOrgaos?: number;
 }
 
 interface AlocarUnidadeModalProps {
@@ -126,7 +132,9 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
       await salvarAlocacoes.mutateAsync({ itemKey, allocations: listaParaGravar(linhas, estado?.allocations ?? []), expectedVersion: estado?.version });
     } catch (err: any) {
       if (err?.code === 'CONCURRENT_MODIFICATION_ERROR' || err?.sqlState === '40001') {
-        setErro('As alocações deste item mudaram por outro usuário. Feche e abra de novo antes de salvar.');
+        // A janela volta ao que está gravado agora (a mutação relê as alocações).
+        setEditadas(null);
+        setErro(MENSAGEM_CONFLITO_EDICAO);
       } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
         setErro('Só o coordenador e o gestor de saldos alocam quantitativo.');
       } else {
@@ -189,6 +197,13 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
         <p style={{ margin: 0, fontSize: '0.85rem', color: CINZA }}>Carregando as alocações do item…</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          {item.limiteProvisorioOutrosOrgaos ? (
+            <NoticeBar tone="info" testId="alocar-limite-provisorio">
+              <strong>Limite provisório: registrado da SENASP ({formatNumber(item.quantitativoSenasp)}).</strong> A quantidade da ata assinada
+              ainda não foi informada. Há {item.limiteProvisorioOutrosOrgaos === 1 ? 'outro órgão' : `${formatNumber(item.limiteProvisorioOutrosOrgaos)} outros órgãos`} neste
+              item; se parte do registrado da SENASP for deles, a cota própria será menor que {formatNumber(item.quantitativoSenasp)}.
+            </NoticeBar>
+          ) : null}
           {/* Régua: quantitativo SENASP, fatia de cada unidade e o que falta alocar */}
           <div data-testid="alocar-unidade-regua">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1.25rem', fontSize: '0.82rem', color: '#334155', marginBottom: '0.45rem', fontVariantNumeric: 'tabular-nums' }}>
@@ -232,8 +247,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
             {lista.length === 0 ? (
               <p style={{ margin: 0, fontSize: '0.85rem', color: CINZA }}>Nenhuma unidade alocada neste item ainda.</p>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table data-testid="alocar-unidade-lista" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <div className="alocar-tabela-wrap" style={{ overflowX: 'auto' }}>
+                <table className="alocar-tabela" data-testid="alocar-unidade-lista" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr>
                       <th style={thStyle}>Unidade interna</th>
@@ -262,9 +277,9 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                             </strong>
                             {nomeDe(l.unitName) && <small style={{ color: CINZA, fontSize: '0.75rem' }}>{nomeDe(l.unitName)}</small>}
                           </td>
-                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.contratado)}</td>
-                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.empenhado)}</td>
-                          <td style={{ ...td, textAlign: 'right' }}>
+                          <td data-rotulo="Contratado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.contratado)}</td>
+                          <td data-rotulo="Empenhado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.empenhado)}</td>
+                          <td data-rotulo="Alocado" style={{ ...td, textAlign: 'right' }}>
                             {l.removida ? (
                               <span style={{ fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.original)}</span>
                             ) : (
@@ -300,8 +315,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                   a.podeRemover
                                     ? `Remover a alocação de ${l.unitName}`
                                     : l.contratado > 0
-                                      ? `${l.unitName} tem ${formatNumber(l.contratado)} contratados. Para remover, tire a unidade das divisões dos contratos na aba Contratos e empenhos.`
-                                      : `${l.unitName} tem ${l.vinculados} ${l.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, desvincule os empenhos na aba Contratos e empenhos.`
+                                      ? `${l.unitName} tem ${formatNumber(l.contratado)} contratados. Para remover, a unidade precisa sair antes das divisões dos contratos (feito pelo gestor da ata).`
+                                      : `${l.unitName} tem ${l.vinculados} ${l.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, os empenhos precisam ser desvinculados antes (feito pelo gestor da ata).`
                                 }
                                 onClick={() => remover(l)}
                                 disabled={salvando || !a.podeRemover}

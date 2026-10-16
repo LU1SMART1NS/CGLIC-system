@@ -29,7 +29,8 @@ export function useSaveAllocations() {
       return saveAllocations(itemKey, allocations, expectedVersion);
     },
     retry: 0,
-    onSuccess: (_data, variables) => {
+    // Também no erro: depois de um conflito (40001), a tela relê as alocações e a versão atuais.
+    onSettled: (_data, _error, variables) => {
       const parsed = parseItemKey(variables.itemKey);
       const canonicalKey = normalizeItemKey(parsed.numeroAta, parsed.uasg, parsed.itemNum);
 
@@ -39,7 +40,7 @@ export function useSaveAllocations() {
       });
       // A carteira (aba Itens e filtros de alocação) soma as alocações de todos os itens.
       queryClient.invalidateQueries({ queryKey: ['carteira-alocacoes'] });
-      // Alocação muda a divisão automática do contratado entre as unidades (migration 103).
+      // Alocação muda a divisão automática do contratado entre as unidades (migrations 103 e 110).
       queryClient.invalidateQueries({ queryKey: ['contratado-do-item', canonicalKey] });
     }
   });

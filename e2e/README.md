@@ -2,13 +2,13 @@
 
 Percorrem as rotas e abas do sistema em 375px (e conferem estouro de página também em 320px e 768px) com os
 critérios da auditoria mobile: sem rolagem horizontal da página, nenhum controle inalcançável, ações visíveis,
-alvos de toque ≥ 44px, inputs ≥ 16px e texto ≥ 12px (ver `AUDITORIA_MOBILE_FECHAMENTO.md`).
+alvos de toque ≥ 44px, inputs ≥ 16px e texto ≥ 12px (ver `docs/historico/AUDITORIA_MOBILE_FECHAMENTO.md`). Lista de telas revisada em 14/10/2026.
 
 Usam o **Chrome instalado na máquina** (nenhum navegador é baixado).
 
 ## Primeira vez
 
-1. Suba nada: o `npm run e2e` inicia o servidor de desenvolvimento sozinho (ou reaproveita o que já estiver em :5173).
+1. Suba o sistema com `npm run dev` (o `e2e:login` precisa dele rodando; o `npm run e2e` sobe sozinho se nada estiver em :5173).
 2. Salve uma sessão: `npm run e2e:login`. Abre o Chrome; entre no sistema normalmente. A senha é digitada
    por você no navegador e nunca é lida pelo script. Só o estado do navegador vai para `e2e/.auth/state.json`
    (ignorado pelo git). Use um usuário com acesso amplo (admin ou gestor) para cobrir as telas de administração.

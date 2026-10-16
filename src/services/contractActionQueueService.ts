@@ -7,9 +7,13 @@ import { buildCentralPrazosItems } from './centralPrazosService';
 import { parseDateBRT } from './temporalEngineService';
 import { isLembreteNaJanela } from '../config/alertRules';
 import type { AvisoPagamento } from './avisosPagamentoService';
-import { chaveAvisoLembrete } from './avisosResolvidosService';
+import { chaveAvisoLembrete, chaveAvisoVinculo } from './avisosResolvidosService';
+import { textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
+import type { AusenteDaFonte } from './ausentesDaFonteService';
 
-export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE';
+/** VINCULO: vínculo automático com a ata desmentido pela fonte, com trabalho do gestor, a conferir (migration 112). */
+/** FONTE: nota ou fatura que a fonte deixou de listar e tem trabalho da equipe, a conferir (migration 113). */
+export type ContractActionKind = 'TAREFA' | 'PAGAMENTO' | 'REAJUSTE' | 'LEMBRETE' | 'VINCULO' | 'FONTE';
 
 export interface ContractActionItem {
   id: string;
@@ -24,8 +28,12 @@ export interface ContractActionItem {
   macrotaskName?: string;
   executionMode?: TaskExecutionMode;
   sistemaDestino?: string;
-  /** Chave para marcar como resolvido (reajuste e lembrete); tarefa se resolve concluindo. */
+  /** Chave para marcar como resolvido (reajuste, lembrete e vínculo); tarefa se resolve concluindo. */
   avisoChave?: string;
+  /** Tela onde o aviso se resolve (kind VINCULO: Contratos vinculados do item). */
+  targetUrl?: string;
+  /** kind FONTE: qual nota ou fatura, para a decisão do coordenador. */
+  ausenteDaFonte?: { tipo: 'NOTA' | 'FATURA'; chave: string };
 }
 
 export interface ContractActionQueue {
@@ -42,7 +50,8 @@ const KIND_BY_CATEGORY: Partial<Record<DashboardAttentionItem['category'], Contr
   TAREFA_ATRASADA: 'TAREFA',
   TAREFA_PROXIMA: 'TAREFA',
   PAGAMENTO_CRITICO: 'PAGAMENTO',
-  REAJUSTE_RADAR: 'REAJUSTE'
+  REAJUSTE_RADAR: 'REAJUSTE',
+  FONTE_A_CONFERIR: 'FONTE'
 };
 
 function isTaskOpen(status?: string): boolean {
@@ -57,7 +66,7 @@ function lembreteLabel(diasRestantes: number, atrasado: boolean): string {
 
 /**
  * Fila única do Contrato 360. Os itens CRÍTICA/URGENTE vêm do mesmo motor da
- * Visão Geral (calculateAttentionSummary) para que as contagens coincidam; os
+ * Início (calculateAttentionSummary) para que as contagens coincidam; os
  * extras locais (tarefas em 8–30 dias e lembretes de planejamento) entram só
  * como ATENCAO/INFO.
  */
@@ -70,9 +79,13 @@ export function buildContractActionQueue(params: {
   avisosPagamento?: AvisoPagamento[];
   /** Chaves de avisos_resolvidos. */
   avisosResolvidos?: ReadonlySet<string>;
+  /** Vínculos automáticos desmentidos pela fonte com trabalho do gestor (qualquer contrato; a fila pega os deste). */
+  vinculosAConferir?: VinculoAConferir[];
+  /** Notas e faturas a conferir (qualquer contrato; o funil pega as deste). */
+  ausentesDaFonte?: AusenteDaFonte[];
   currentDate?: Date;
 }): ContractActionQueue {
-  const { contractKey, plan, paymentCycles = [], avisosPagamento = [], avisosResolvidos = new Set<string>(), currentDate } = params;
+  const { contractKey, plan, paymentCycles = [], avisosPagamento = [], avisosResolvidos = new Set<string>(), vinculosAConferir = [], ausentesDaFonte = [], currentDate } = params;
   const dispensados: ContractActionItem[] = [];
   // Vigência encerrada: os lembretes de prorrogação (D-180/D-60) perdem o sentido.
   const fimVigencia = parseDateBRT(params.contract.dataVigenciaFim);
@@ -107,6 +120,7 @@ export function buildContractActionQueue(params: {
     plans,
     paymentCycles,
     avisosResolvidos,
+    ausentesDaFonte,
     currentDate
   });
   for (const f of [...funnelItems, ...resolvidos]) {
@@ -123,7 +137,8 @@ export function buildContractActionQueue(params: {
         diasRelevantes: f.diasRelevantes,
         dataAlvo: f.dataAlvo,
         taskId: f.taskId,
-        avisoChave: f.avisoChave
+        avisoChave: f.avisoChave,
+        ausenteDaFonte: f.ausenteDaFonte
       })
     );
   }
@@ -148,6 +163,23 @@ export function buildContractActionQueue(params: {
       };
       (avisosResolvidos.has(lembrete.avisoChave!) ? dispensados : items).push(lembrete);
     }
+  }
+
+  for (const v of vinculosAConferir) {
+    if (v.contractKey !== contractKey) continue;
+    const numeroItem = String(Number(v.numeroItem) || v.numeroItem);
+    const trabalho = trabalhoDoGestor(v);
+    const aviso: ContractActionItem = {
+      id: `ACT-VINCULO-${v.itemKey}`,
+      kind: 'VINCULO',
+      severity: 'URGENTE',
+      title: `Vínculo com a ata ${v.numeroAta}, item ${numeroItem}, desmentido pela fonte`,
+      description: `${textoDoMotivoVinculo(v.motivo)}; mantido porque tem ${trabalho || 'trabalho do gestor'}`,
+      badgeLabel: 'a conferir',
+      avisoChave: chaveAvisoVinculo(v.numeroAta, v.uasg, v.numeroItem, v.contractKey, v.motivo, v.detectadoEm),
+      targetUrl: `/atas/detalhe/${encodeURIComponent(`${v.numeroAta}-${v.uasg}`)}/itens/${encodeURIComponent(numeroItem)}?aba=contratos`
+    };
+    (avisosResolvidos.has(aviso.avisoChave!) ? dispensados : items).push(aviso);
   }
 
   for (const a of avisosPagamento) {

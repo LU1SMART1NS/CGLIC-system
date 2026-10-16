@@ -5,6 +5,9 @@ import { TODOS_GESTORES } from '../carteira/carteiraGestor';
 import type { ArpVigenciaFilterOption } from './ArpPortfolioSummary';
 import {
   CarteiraAlocacaoSelect,
+  CarteiraAtaAssinadaSelect,
+  FILTRO_ATA_ASSINADA_VALUES,
+  type FiltroAtaAssinada,
   CarteiraEmpenhoSelect,
   CarteiraUnidadeSelect,
   NIVEL_FILTER_VALUES,
@@ -13,6 +16,8 @@ import {
 import type { FiltroNivel, NivelAtendimento } from '../../utils/itemAtendimento';
 import { CarteiraPapelSelect } from '../carteira/CarteiraPapelSelect';
 import { FILTRO_PAPEL_VALUES, type FiltroPapelSenasp } from '../../utils/ataIdentidade';
+import { CarteiraGtiSelect } from '../gti/CarteiraGtiSelect';
+import { FILTRO_GTI_VALUES, MODO_FILTRO_GTI_VALUES, type FiltroGti, type GrupoGti, type ModoFiltroGti } from '../../config/gruposGti';
 
 export interface ArpPortfolioFilterState {
   statusVigencia: ArpVigenciaFilterOption;
@@ -22,10 +27,15 @@ export interface ArpPortfolioFilterState {
   filtroEmpenho: FiltroNivel;
   /** Unidade interna (nome normalizado; 'TODAS' = sem filtro). */
   unidade: string;
+  /** Qtd. da ata assinada a informar ou informada (migration 116). */
+  ataAssinada: FiltroAtaAssinada;
   /** Nome do gestor ('TODOS' = sem filtro; '__SEM_GESTOR__' = atas sem gestor atribuído). */
   gestor: string;
   /** Papel da SENASP na ata: gerenciada pela CGLIC ou de outro órgão (participante ou adesão, migration 106). */
   papel: FiltroPapelSenasp;
+  /** GTI do ComprasSUSP com interesse na ata (migration 139) e como contar o interesse. */
+  gti: FiltroGti;
+  gtiModo: ModoFiltroGti;
   busca: string;
 }
 
@@ -34,8 +44,11 @@ export const ARP_FILTER_SCHEMA: CarteiraFilterSchema<ArpPortfolioFilterState> = 
   filtroAlocacao: { param: 'alocacao', default: 'TODOS', values: NIVEL_FILTER_VALUES },
   filtroEmpenho: { param: 'empenho', default: 'TODOS', values: NIVEL_FILTER_VALUES },
   unidade: { param: 'unidade', default: TODAS_UNIDADES },
+  ataAssinada: { param: 'assinada', default: 'TODOS', values: FILTRO_ATA_ASSINADA_VALUES },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   papel: { param: 'papel', default: 'TODOS', values: FILTRO_PAPEL_VALUES },
+  gti: { param: 'gti', default: 'TODOS', values: FILTRO_GTI_VALUES },
+  gtiModo: { param: 'gtiConta', default: 'PRINCIPAL', values: MODO_FILTRO_GTI_VALUES },
   busca: { param: 'busca', default: '' }
 };
 
@@ -44,8 +57,11 @@ export const DEFAULT_ARP_FILTERS: ArpPortfolioFilterState = {
   filtroAlocacao: 'TODOS',
   filtroEmpenho: 'TODOS',
   unidade: TODAS_UNIDADES,
+  ataAssinada: 'TODOS',
   gestor: TODOS_GESTORES,
   papel: 'TODOS',
+  gti: 'TODOS',
+  gtiModo: 'PRINCIPAL',
   busca: ''
 };
 
@@ -57,8 +73,12 @@ interface ArpPortfolioFiltersProps {
   /** Quantas atas cada nível de alocação / empenho traria (aparece no menu do filtro). */
   alocacaoCounts?: Partial<Record<NivelAtendimento, number>>;
   empenhoCounts?: Partial<Record<NivelAtendimento, number>>;
+  /** Quantas atas cada situação da qtd. da ata assinada traria (aparece no menu do filtro). */
+  ataAssinadaCounts?: Partial<Record<Exclude<FiltroAtaAssinada, 'TODOS'>, number>>;
   /** Quantas atas cada papel da SENASP traria (aparece no menu do filtro). */
   papelCounts?: Partial<Record<Exclude<FiltroPapelSenasp, 'TODOS'>, number>>;
+  /** Quantas atas cada GTI traria no modo escolhido (aparece no menu do filtro). */
+  gtiCounts?: Partial<Record<GrupoGti, number>>;
   /** Esconde o seletor de gestor (perfil "gestor", que já vê só as próprias atas). */
   showGestorFilter?: boolean;
   onChangeFilter: <K extends keyof ArpPortfolioFilterState>(key: K, value: ArpPortfolioFilterState[K]) => void;
@@ -73,7 +93,9 @@ export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
   unidades = [],
   alocacaoCounts,
   empenhoCounts,
+  ataAssinadaCounts,
   papelCounts,
+  gtiCounts,
   showGestorFilter = true,
   onChangeFilter,
   onResetFilters,
@@ -113,11 +135,27 @@ export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
         testId="arp-filter-unidade"
       />
 
+      <CarteiraAtaAssinadaSelect
+        value={filters.ataAssinada}
+        onChange={(value) => onChangeFilter('ataAssinada', value)}
+        counts={ataAssinadaCounts}
+        testId="arp-filter-ata-assinada"
+      />
+
       <CarteiraPapelSelect
         value={filters.papel}
         onChange={(value) => onChangeFilter('papel', value)}
         counts={papelCounts}
         testId="arp-filter-papel"
+      />
+
+      <CarteiraGtiSelect
+        gti={filters.gti}
+        modo={filters.gtiModo}
+        onChangeGti={(value) => onChangeFilter('gti', value)}
+        onChangeModo={(value) => onChangeFilter('gtiModo', value)}
+        counts={gtiCounts}
+        testIdPrefix="arp"
       />
 
       {showGestorFilter && (

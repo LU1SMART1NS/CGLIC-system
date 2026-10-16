@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { useIsFetching, useQueries, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
@@ -13,7 +13,7 @@ import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../../carteira/carteiraFilters';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
-import { ActionButton, AppButton } from '../../../design-system';
+import { ActionButton, AppButton, NoticeBar } from '../../../design-system';
 import { useConfirmDialog } from '../../../design-system/components/ConfirmDialog';
 import { useToast } from '../../../design-system/components/Toast';
 import { useConfirmarContratoSemAta, useDesfazerContratoSemAta } from '../../../hooks/useContratosSemAta';
@@ -26,7 +26,7 @@ import type { PlanoVinculo } from '../../../services/vinculoEmMassaService';
 import type { ContractDashboardRecord } from '../../../types';
 import { formatDateBR } from '../../../utils/format';
 import type { MotivoVinculoManual } from '../../../services/vinculoAutomaticoService';
-import { ROTULO_TIPO_MOTIVO, textoMotivoDaFila, type TextoMotivo, type TipoMotivo } from '../../../utils/vinculoAutomatico';
+import { ROTULO_TIPO_MOTIVO, textoMotivoDaFila, type EstadoMotivos, type TextoMotivo, type TipoMotivo } from '../../../utils/vinculoAutomatico';
 import { ConferenciaAtaModal } from './ConferenciaAtaModal';
 import type { AtaSugerida, FilaAta, ItemFila, MotivoSugestao, PendenciasDistribuicao } from './contratosSemAta';
 import { DescartadosLista } from './DescartadosLista';
@@ -148,6 +148,10 @@ interface ContratosSemVinculoFilaProps {
   atas: FilaAta[];
   /** Por que o vínculo automático (migration 95) deixou cada contrato para a equipe, por chave do contrato. */
   motivos?: ReadonlyMap<string, MotivoVinculoManual>;
+  /** Como está a leitura dos motivos: enquanto carrega ou se falhou, a linha não diz que o sistema vai vincular. */
+  motivosEstado?: EstadoMotivos;
+  /** Tenta ler os motivos de novo (aviso quando a leitura falhou). */
+  onRelerMotivos?: () => void;
 }
 
 /**
@@ -156,7 +160,7 @@ interface ContratosSemVinculoFilaProps {
  * parcial e os sem pista (o coordenador confere a ata ou marca "não pertence a nenhuma ata" e escolhe o gestor). O nome
  * da ata abre o painel de conferência; descartar tira a ata das sugestões do contrato.
  */
-export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = ({ pendencias, confirmacoes, podeAgir, podeDecidir = podeAgir, onAtribuir, itensDaAta, ataDe: ataCompleta, atas, motivos }) => {
+export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = ({ pendencias, confirmacoes, podeAgir, podeDecidir = podeAgir, onAtribuir, itensDaAta, ataDe: ataCompleta, atas, motivos, motivosEstado = 'OK', onRelerMotivos }) => {
   const navigate = useNavigateWithOrigin();
   const queryClient = useQueryClient();
   const confirmDialog = useConfirmDialog();
@@ -218,11 +222,15 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
         numeroAta: s?.numeroAta,
         gestorAta: s?.gestorNome,
         gestorContrato: l.gestorNome,
-        vinculoParcial: Boolean(l.atasVinculadas?.length)
+        vinculoParcial: Boolean(l.atasVinculadas?.length),
+        motivos: motivosEstado
       });
     },
-    [motivos]
+    [motivos, motivosEstado]
   );
+  // Depois de vincular (aqui ou na conferência), a lista só muda quando os vínculos e a carteira recarregam.
+  const atualizandoLista =
+    useIsFetching({ queryKey: ['all-arp-item-contract-links'] }) + useIsFetching({ queryKey: ['management-dashboard'] }) + useIsFetching({ queryKey: ['contratos-sem-ata'] }) > 0;
   const contagemMotivo = (t: TipoMotivo) => universo.filter((l) => motivoDe(l).tipo === t).length;
 
   const filtradas = React.useMemo(
@@ -437,6 +445,27 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
 
   return (
     <section data-testid="distribuicao-sem-vinculo" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {motivosEstado === 'FALHOU' && (
+        <NoticeBar
+          tone="warning"
+          testId="sem-vinculo-motivos-falhou"
+          action={
+            onRelerMotivos && (
+              <AppButton type="button" variant="outline" size="sm" onClick={onRelerMotivos}>
+                Tentar de novo
+              </AppButton>
+            )
+          }
+        >
+          Não foi possível ler por que o sistema deixou cada contrato para a equipe. A fila continua válida; só a coluna "Por que ficou para a equipe" fica sem
+          o motivo.
+        </NoticeBar>
+      )}
+      {atualizandoLista && !estado.rodando && (
+        <div role="status" data-testid="sem-vinculo-atualizando" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#475569' }}>
+          <Loader2 size={14} className="animate-spin" aria-hidden="true" /> Atualizando a lista com os vínculos gravados…
+        </div>
+      )}
       {(estado.rodando || estado.resultados.length > 0) && (
         <div
           role="status"

@@ -1,5 +1,6 @@
 import { saveArpContractItemLinks } from './arpContractLinkService';
 import { syncContractItemQuantity } from './contractItemQuantitySyncService';
+import { fetchContractItemDetails, type ContractItemDetails } from './contractItemsService';
 import { saveContractManagerRpc } from '../adapters/contractManagementRpcAdapter';
 import type { ContractDashboardRecord } from '../types';
 
@@ -30,20 +31,18 @@ export interface ResultadoVinculo {
   avisos: string[];
 }
 
-const OBSERVACAO = 'Vínculo atribuído pela Coordenação';
-
 /**
- * Vincula um contrato aos itens da ata e lê, para cada item, a quantidade contratada (que entra no saldo) e os
- * empenhos do contrato. A falha do vínculo é do contrato; a falha da leitura da API vira aviso (o vínculo vale e a
- * quantidade é lida de novo ao abrir o item).
+ * Vincula um contrato aos itens da ata e lê uma vez os itens do contrato na API oficial para gravar a quantidade
+ * contratada de cada item (que entra no saldo). A falha do vínculo é do contrato; a falha da leitura da API vira aviso
+ * (o vínculo vale e a quantidade é lida de novo ao abrir o item).
  */
 export async function vincularContrato(plano: PlanoVinculo): Promise<ResultadoVinculo> {
   const base = { contractKey: plano.contractKey, numero: plano.numero };
   try {
     await saveArpContractItemLinks({
       contractKey: plano.contractKey,
-      itemKeys: plano.itens.map((i) => i.itemKey),
-      observacoes: OBSERVACAO
+      // Quem vinculou e quando o banco grava sozinho (migration 115); não há observação fixa.
+      itemKeys: plano.itens.map((i) => i.itemKey)
     });
   } catch (err: any) {
     return { ...base, ok: false, itens: 0, erro: err?.message || 'Falha ao vincular o contrato.', avisos: [] };
@@ -63,15 +62,28 @@ export async function vincularContrato(plano: PlanoVinculo): Promise<ResultadoVi
       avisos.push(`gestor ${plano.gestorFinal.nome} (troque na Central)`);
     }
   }
-  // Quantidade contratada de cada item (entra no saldo). O empenho do item vem do vínculo das notas aos itens.
+  // Quantidade contratada de cada item (entra no saldo): uma leitura da API por contrato, gravada item a item.
+  // O empenho do item vem do vínculo das notas aos itens.
+  let detalhes: ContractItemDetails | null = null;
+  try {
+    const lidos = await fetchContractItemDetails(plano.contract);
+    if (lidos.size > 0) detalhes = lidos;
+  } catch {
+    detalhes = null;
+  }
   for (const item of plano.itens) {
+    if (!detalhes) {
+      avisos.push(`quantidade do item ${item.numeroItem}`);
+      continue;
+    }
     try {
       await syncContractItemQuantity({
         numeroAta: plano.numeroAta,
         uasg: plano.uasg,
         numeroItem: item.numeroItem,
         contractKey: plano.contractKey,
-        contract: plano.contract
+        contract: plano.contract,
+        detalhes
       });
     } catch {
       avisos.push(`quantidade do item ${item.numeroItem}`);

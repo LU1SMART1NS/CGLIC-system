@@ -9,7 +9,7 @@ import { HeaderRefreshAction } from '../../../design-system/components/HeaderRef
 import { SkeletonLoader } from '../../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../../design-system/components/ErrorState';
 import { EmptyState } from '../../../design-system/components/EmptyState';
-import { AppButton, NoticeBar } from '../../../design-system';
+import { AppButton, NoticeBar, AvisoCarregando } from '../../../design-system';
 import { useNavigate } from 'react-router-dom';
 import { canAssignManager } from '../../carteira/ManagerAssign';
 import { AtribuirGestorModal } from './AtribuirGestorModal';
@@ -23,6 +23,10 @@ import { usePendenciasVinculoAta } from './usePendenciasVinculoAta';
 import type { ManagerTarget } from '../../../services/managerAssignmentService';
 import { useAuth } from '../../../context/AuthContext';
 import { useComplexidadeAjustes } from '../../../hooks/useComplexidadeAjustes';
+import { useAllAtaManagers } from '../../../hooks/useAtaManagers';
+import { useAllContractManagers } from '../../../hooks/useAllContractManagers';
+import { UASGS_CGLIC } from '../../../config/unidadesGestoras';
+import { useCapacidadeDosGestores } from './useCapacidadeDosGestores';
 import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
 import { chaveGestaoAta } from '../../../utils/ataIdentidade';
@@ -34,7 +38,7 @@ const VERMELHO = 'var(--color-danger)';
 /**
  * Central de Distribuição, no padrão das carteiras: atas e contratos para gestores. Filas em abas com contagem
  * (Atas sem gestor, Histórico sem gestor, Gestor diferente da ata) e a carga de cada gestor (Equipe). A aba fica na URL. O vínculo de
- * contrato à ata saiu daqui para o menu Vinculação.
+ * contrato à ata saiu daqui para o menu Vínculos.
  */
 export const DistribuicaoEquipePage: React.FC = () => {
   const { atas, contratos, links, pendencias, totalSemVinculo, gestorDoContrato, isBusy, refresh } = usePendenciasVinculoAta();
@@ -46,18 +50,33 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const { data: ajustes } = useComplexidadeAjustes();
   const navigate = useNavigate();
 
+  // Nível de cada gestor (migration 140) e a capacidade que ele dá.
+  const { nivelDe, capacidadeDoGestor } = useCapacidadeDosGestores();
+
+  // Desde quando o gestor atual cuida de cada ata e contrato (última troca de gestor), para os critérios de subida.
+  const { data: ataManagers } = useAllAtaManagers();
+  const managers200330 = useAllContractManagers(UASGS_CGLIC[0]);
+  const managers200331 = useAllContractManagers(UASGS_CGLIC[1]);
+  const gestorDesde = React.useCallback(
+    (tipo: 'ATA' | 'CONTRATO', chave: string) =>
+      tipo === 'ATA'
+        ? ataManagers?.[chave]?.updatedAt
+        : (managers200330.data?.[chave] ?? managers200331.data?.[chave])?.updatedAt,
+    [ataManagers, managers200330.data, managers200331.data]
+  );
+
   // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void; provaveis?: number } | null>(null);
 
   // Fila aberta (?aba=); trocar de fila limpa a busca, os filtros e a ordenação da anterior.
   const [searchParams, setSearchParams] = useSearchParams();
   const abaParam = searchParams.get('aba');
-  // "Contratos sem vínculo" e "A vincular" moraram aqui: os endereços antigos levam à fila do menu Vinculação.
+  // "Contratos sem vínculo" e "A vincular" moraram aqui: os endereços antigos levam à fila do menu Vínculos.
   const vaiParaVinculacao = abaParam === 'CONTRATOS' || abaParam === 'A_VINCULAR';
   const abaDaUrl: Fila = abaParam && (FILAS as readonly string[]).includes(abaParam) ? (abaParam as Fila) : FILA_INICIAL;
   const trocarAba = (nova: Fila) => setSearchParams(nova === FILA_INICIAL ? {} : { aba: nova }, { replace: true });
 
-  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes });
+  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes, capacidadeDoGestor });
 
   const aVincularDe = (gestorNome: string): ContratoAVincular[] => pendencias.aVincularPorGestor.get(gestorNome) || [];
 
@@ -136,6 +155,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando distribuição...">
+          <AvisoCarregando label="Carregando distribuição" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
@@ -163,12 +183,12 @@ export const DistribuicaoEquipePage: React.FC = () => {
               testId="distribuicao-contratos-sem-vinculo"
               action={
                 <AppButton variant="outline" size="sm" onClick={() => navigate(ROTAS_VINCULACAO.contratos)}>
-                  Abrir Vinculação
+                  Abrir Vínculos
                 </AppButton>
               }
             >
               <strong>{totalSemVinculo}</strong> {totalSemVinculo === 1 ? 'contrato ainda não tem' : 'contratos ainda não têm'} item de ata vinculado. O vínculo é
-              feito no menu Vinculação; quando vinculado, o contrato segue o gestor da ata.
+              feito no menu Vínculos; quando vinculado, o contrato segue o gestor da ata.
             </NoticeBar>
           )}
 
@@ -177,7 +197,9 @@ export const DistribuicaoEquipePage: React.FC = () => {
           {aba === 'EQUIPE' && (
             <EquipeFila
               linhas={linhasEquipe}
-              mediaEquivalente={totais.mediaEquivalente}
+              mediaOcupacao={totais.mediaOcupacao}
+              nivelDe={nivelDe}
+              gestorDesde={gestorDesde}
               canAssign={canAssign}
               canAjustar={canAjustar}
               aVincularDe={aVincularDe}

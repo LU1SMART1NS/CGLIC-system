@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { ArrowRight } from 'lucide-react';
 import { AtaCardSkeleton } from '../cards/AtaCardSkeleton';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { buildAtaKey } from '../../hooks/useAta';
@@ -11,7 +10,6 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
-import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
@@ -22,13 +20,19 @@ import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteir
 import { ManagerCell } from '../carteira/ManagerAssign';
 import { CarteiraNivelPill } from '../carteira/CarteiraNivelPill';
 import { TODAS_UNIDADES } from '../carteira/CarteiraExecucaoSelects';
-import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
+import { NIVEL_ALOCACAO_ATA_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
 import type { CarteiraAtaExecucao } from '../../utils/carteiraItens';
 import type { ArpPortfolioFilterState } from './ArpPortfolioFilters';
 import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
+import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
+import { AvisoCarregando } from '../../design-system';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
+import { GtiCelulaAta } from '../gti/GtiVisual';
+import { chaveAtaGti, type FatiasDaAta } from '../../config/gruposGti';
+import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
+import { ataEhNova } from '../carteira/carteiraNovidade';
 
 interface ArpPortfolioListProps {
   cards: AtaGroupedCard[];
@@ -39,10 +43,12 @@ interface ArpPortfolioListProps {
   saldoStatsByAta?: Record<string, AtaSaldoStats>;
   /** Alocação, empenho e unidades de cada ata (chave "{numeroAta}-{uasg}"), somados dos itens. */
   execucaoPorAta?: Map<string, CarteiraAtaExecucao>;
+  /** Fatia de cada GTI do ComprasSUSP por ata (chave "{numeroAta}-{uasg}", migration 139). */
+  fatiasGti?: Map<string, FatiasDaAta>;
   /** Unidades internas (para exibir o nome da unidade filtrada). */
   unidades?: Array<{ chave: string; nome: string }>;
   /** Filtros ativos: alocação, empenho e unidade ganham uma coluna quando filtrados. */
-  filters?: Pick<ArpPortfolioFilterState, 'filtroAlocacao' | 'filtroEmpenho' | 'unidade'>;
+  filters?: Pick<ArpPortfolioFilterState, 'filtroAlocacao' | 'filtroEmpenho' | 'unidade' | 'ataAssinada'>;
   /** Nome do gestor por número de ata. */
   gestorByAta?: Record<string, string>;
   /** Texto da busca — quando algum item da ata casa com ela, a linha abre já mostrando esse item. */
@@ -59,6 +65,7 @@ interface ArpPortfolioListProps {
 }
 
 const MAX_ITENS_EXPANDIDOS = 5;
+const cardNovo = (c: AtaGroupedCard) => ataEhNova(c.arp);
 
 function formatDateBR(dateStr?: string): string {
   if (!dateStr) return '—';
@@ -85,6 +92,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   itemsLoadingByAta = {},
   saldoStatsByAta = {},
   execucaoPorAta,
+  fatiasGti,
   unidades = [],
   filters,
   gestorByAta = {},
@@ -109,7 +117,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
     }),
     [saldoStatsByAta, gestorByAta]
   );
-  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(cards, sortColumns);
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(cards, sortColumns, cardNovo);
   const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
   const { currentPage, setPage, pageItems: pageCards, signature } = useCarteiraPagination(
     sorted,
@@ -125,11 +133,13 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   const colAlocacao = filters != null && filters.filtroAlocacao !== 'TODOS';
   const colEmpenho = filters != null && filters.filtroEmpenho !== 'TODOS';
   const colUnidade = filters != null && filters.unidade !== TODAS_UNIDADES;
-  const totalColunas = 6 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade);
+  const colAtaAssinada = filters != null && filters.ataAssinada !== 'TODOS';
+  const totalColunas = 7 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade) + Number(colAtaAssinada);
 
   if (isLoading && totalAtas === 0) {
     return (
       <div className="ata-cards-container" aria-busy="true" aria-label="Carregando atas...">
+        <AvisoCarregando label="Carregando atas" />
         <AtaCardSkeleton />
         <AtaCardSkeleton />
         <AtaCardSkeleton />
@@ -167,8 +177,10 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               <CarteiraSortHeader label="Vigência" sortKey="vigencia" {...sortProps} />
               <CarteiraSortHeader label="Itens" sortKey="itens" {...sortProps} />
               <CarteiraSortHeader label="Maior consumo" sortKey="consumo" {...sortProps} />
+              <th style={carteiraTh} title="Interesse principal e fatia de cada Grupo de Trabalho Integrado no valor registrado dos participantes (quantidade × valor unitário de cada item)">GTI</th>
               {colAlocacao && <th style={carteiraTh}>Alocação interna</th>}
               {colEmpenho && <th style={carteiraTh}>Empenho</th>}
+              {colAtaAssinada && <th style={carteiraTh}>Qtd. assinada</th>}
               {colUnidade && <th style={carteiraTh}>Unidade</th>}
               <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sortProps} />
             </tr>
@@ -232,6 +244,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                       <CarteiraIdLink onClick={abrirAta} label={`Ver detalhes da ata ${numeroAta}`} title={`Ver detalhes · UASG ${arp.codigoUnidadeGerenciadora}`} testId={`ata-360-link-${numeroAta}`}>
                         {numeroAta}
                       </CarteiraIdLink>
+                      {ataEhNova(arp) && <CarteiraNovoBadge genero="f" testId={`ata-nova-${numeroAta}`} />}
                       <SeloPapelSenasp arp={arp} testId={`ata-papel-${numeroAta}-${arp.codigoUnidadeGerenciadora}`} />
                       </div>
                       {card.fornecedorNome && (
@@ -269,13 +282,27 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                     <td data-label="Maior consumo" style={carteiraTd}>
                       <SaldoBar pct={stats?.maxPct ?? null} />
                     </td>
+                    <td data-label="GTI" style={carteiraTd}>
+                      {(() => {
+                        const fatias = fatiasGti?.get(chaveAtaGti(numeroAta, arp.codigoUnidadeGerenciadora));
+                        const principal = fatias?.principal?.grupo;
+                        return (
+                          <CarteiraCellFilter
+                            descricao="este GTI"
+                            onFilter={onFilter && principal ? () => onFilter('gti', principal) : undefined}
+                          >
+                            <GtiCelulaAta fatias={fatias} testId={`arp-gti-${numeroAta}`} />
+                          </CarteiraCellFilter>
+                        );
+                      })()}
+                    </td>
                     {colAlocacao && (
                       <td data-label="Alocação interna" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                         <CarteiraCellFilter
                           descricao="este nível de alocação"
                           onFilter={onFilter && execucaoPorAta?.get(ataKey)?.nivelAlocacao ? () => onFilter('filtroAlocacao', execucaoPorAta.get(ataKey)!.nivelAlocacao!) : undefined}
                         >
-                          <CarteiraNivelPill nivel={execucaoPorAta?.get(ataKey)?.nivelAlocacao ?? null} labels={NIVEL_ALOCACAO_LABEL} />
+                          <CarteiraNivelPill nivel={execucaoPorAta?.get(ataKey)?.nivelAlocacao ?? null} labels={NIVEL_ALOCACAO_ATA_LABEL} />
                         </CarteiraCellFilter>
                       </td>
                     )}
@@ -287,6 +314,15 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         >
                           <CarteiraNivelPill nivel={execucaoPorAta?.get(ataKey)?.nivelEmpenho ?? null} labels={NIVEL_EMPENHO_LABEL} />
                         </CarteiraCellFilter>
+                      </td>
+                    )}
+                    {colAtaAssinada && (
+                      <td data-label="Qtd. assinada" style={{ ...carteiraTd, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                        {(() => {
+                          const a = execucaoPorAta?.get(ataKey)?.ataAssinada;
+                          if (!a) return '—';
+                          return a.total === 1 ? (a.informados === 1 ? 'Informada' : 'A informar') : `${a.informados} de ${a.total} itens informados`;
+                        })()}
                       </td>
                     )}
                     {colUnidade && (
@@ -309,29 +345,44 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         ) : (
                           <>
                             <CarteiraDetailLabel>Itens da ata</CarteiraDetailLabel>
-                            {visibleItems.map((item, idx) => (
-                              <div
-                                key={`${item.numeroItem}-${item.codigoItem}-${idx}`}
-                                className="arp-item-row"
-                                style={{ display: 'grid', gridTemplateColumns: '56px minmax(0, 1fr) 120px 110px auto', gap: '0.75rem', alignItems: 'center', fontSize: '0.82rem', padding: '0.45rem 0', borderTop: '1px solid #e2e8f0' }}
-                              >
-                                <span style={{ fontWeight: 700 }}>{item.numeroItem}</span>
-                                <span title={item.descricaoItem} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.descricaoItem}</span>
-                                <span>{formatCurrencyOrDash(item.valorUnitario)}</span>
-                                <SaldoBar pct={pctOf(item)} />
-                                <AppButton
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => onSelectItem(arp, item)}
-                                  data-testid={`arp-item-${numeroAta}-${item.numeroItem}`}
-                                >
-                                  Ver saldo <ArrowRight size={13} />
-                                </AppButton>
-                              </div>
-                            ))}
+                            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+                              <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr>
+                                    <th style={carteiraTh}>Descrição</th>
+                                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor unitário</th>
+                                    <th style={carteiraTh}>Consumo</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {visibleItems.map((item, idx) => (
+                                    <tr
+                                      key={`${item.numeroItem}-${item.codigoItem}-${idx}`}
+                                      data-testid={`arp-item-${numeroAta}-${item.numeroItem}`}
+                                      className="carteira-row-link"
+                                      onClick={abrirAoClicarNaLinha(() => onSelectItem(arp, item))}
+                                    >
+                                      <td data-role="id" style={{ ...carteiraTd, minWidth: '240px', maxWidth: '520px' }}>
+                                        <CarteiraIdLink onClick={() => onSelectItem(arp, item)} label={`Ver saldo do item ${item.numeroItem} da ata ${numeroAta}`} title="Ver o saldo do item">
+                                          {item.numeroItem}
+                                        </CarteiraIdLink>
+                                        <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                          {toSentenceCaseIfAllCaps(item.descricaoItem) || '—'}
+                                        </div>
+                                      </td>
+                                      <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                        {formatCurrencyOrDash(item.valorUnitario)}
+                                      </td>
+                                      <td data-label="Consumo" style={carteiraTd}>
+                                        <SaldoBar pct={pctOf(item)} />
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                             {hiddenCount > 0 && (
-                              <div style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700, paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+                              <div style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700, paddingTop: '0.5rem' }}>
                                 + {hiddenCount} {hiddenCount === 1 ? 'item' : 'itens'} · veja todos nos detalhes da ata
                               </div>
                             )}

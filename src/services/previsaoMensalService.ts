@@ -2,7 +2,8 @@
  * Previsão mensal de pagamentos (Portaria DGFNSP 50/2025, art. 5º, § 2º, III): até o último dia útil de cada mês, a
  * CGLIC informa os pagamentos previstos para o mês seguinte (contrato, contratada, UG do empenho, nota de empenho,
  * subitem, valor). As linhas saem de:
- *   FATURA   faturas do Contratos.gov.br ainda não pagas (fora de ciclo em aberto);
+ *   FATURA   faturas do Contratos.gov.br ainda não pagas (fora de ciclo em aberto), menos as liquidadas sem NP
+ *            ("Sem como confirmar": antigas ou pagas por outro documento; sem NP não há como saber se falta pagar);
  *   CICLO    ciclos de pagamento em aberto (um por nota fiscal do item "DO PAGAMENTO");
  *   MENSAL   contratos marcados como mensais sem fatura nem ciclo em aberto (valor mensal informado ou média de 3 meses);
  *   ENTREGA  entregas previstas para o mês da previsão;
@@ -12,7 +13,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { isBusinessDay } from './temporalEngineService';
-import type { FaturaCarteira, EmpenhoCarteiraRow } from './financeiroCarteiraService';
+import { etapaDaFatura, type FaturaCarteira, type EmpenhoCarteiraRow } from './financeiroCarteiraService';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
 import type { EntregaPrevista, ExpectativaPagamento, HistoricoPagamentos } from './expectativaPagamentoService';
 
@@ -176,9 +177,11 @@ export function montarPrevisao(d: DadosDaPrevisao): LinhaPrevisao[] {
     }
   }
 
-  // Faturas ainda não pagas, fora de ciclo em aberto.
+  // Faturas ainda não pagas, fora de ciclo em aberto. A liquidada sem NP ("Sem como confirmar") não entra: são
+  // faturas antigas ou pagas por outro documento (DD), e a previsão é do que a CGOFI ainda vai pagar.
   for (const f of d.faturas) {
     if (f.paga || f.cancelada || faturasEmCiclo.has(f.idFatura)) continue;
+    if (etapaDaFatura(f) === 'SEM_CONFIRMACAO') continue;
     const numero = f.empenhos ? f.empenhos.split(',')[0].trim() : null;
     const e = acharEmpenho(f.contractKey, numero);
     base.push({

@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { EmptyState } from '../../../design-system/components/EmptyState';
 import { ActionButton } from '../../../design-system/components/ActionButton';
@@ -22,6 +23,8 @@ import { ManagerCell, type DestinoSemGestor } from '../../carteira/ManagerAssign
 import { getAcaoInfo, getMotivoInfo } from '../../instrumentos/gestaoInstrumentosRowHelpers';
 import type { DashboardAttentionItem } from '../../../types/managementDashboard';
 import type { ContractDashboardRecord } from '../../../types';
+import { CarteiraNovoBadge } from '../../carteira/CarteiraNovoBadge';
+import { contratoEhNovo } from '../../carteira/carteiraNovidade';
 
 /** Contrato já enriquecido com o que a tabela precisa exibir (prazo, gestor e pendências). */
 export interface ContractPortfolioRow {
@@ -42,7 +45,7 @@ interface ContractsPortfolioTableProps {
   pageSize?: number;
   /** Coordenador: "Sem gestor" vira atalho para onde o gestor do contrato se resolve. */
   canAssign?: boolean;
-  /** Para onde o "Sem gestor" de cada contrato leva (Vinculação ou Central, conforme o caso). */
+  /** Para onde o "Sem gestor" de cada contrato leva (Vínculos ou Central, conforme o caso). */
   destinoSemGestor?: (row: ContractPortfolioRow) => DestinoSemGestor;
   /** Clique num valor da célula aplica o filtro correspondente (prazo → situação, pendências, fornecedor → busca). */
   onFilter?: <K extends keyof ContractsPortfolioFilterState>(key: K, value: ContractsPortfolioFilterState[K]) => void;
@@ -55,6 +58,8 @@ const SORT_COLUMNS: Record<string, CarteiraSortColumn<ContractPortfolioRow>> = {
   pendencias: { value: (r) => r.pendencias.length, firstDir: 'desc' },
   gestor: { value: (r) => r.gestorNome }
 };
+
+const linhaNova = (r: ContractPortfolioRow) => contratoEhNovo(r.contract);
 
 function formatTipoInstrumento(tipo?: string): string {
   switch (tipo) {
@@ -103,7 +108,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
 }) => {
   const navigate = useNavigateWithOrigin();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, SORT_COLUMNS);
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, SORT_COLUMNS, linhaNova);
   const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
   const { currentPage, setPage, pageItems: pageRows, signature } = useCarteiraPagination(
     sorted,
@@ -183,6 +188,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                       >
                         {numDisplay}
                       </CarteiraIdLink>
+                      {contratoEhNovo(contract) && <CarteiraNovoBadge genero="m" testId={`contracts-novo-${contractKey}`} />}
                       {tipoLabel !== 'Contrato' && <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>{tipoLabel}</span>}
                       {atas.length > 0 && (
                         <>
@@ -295,28 +301,45 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                           {pendencias.length === 0 ? (
                             <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Nenhuma pendência em aberto.</div>
                           ) : (
-                            pendencias.map((p) => {
-                              const motivo = getMotivoInfo(p.category);
-                              const acao = getAcaoInfo(p);
-                              return (
-                                <div
-                                  key={p.id}
-                                  className="carteira-pend-row"
-                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.45rem 0', borderTop: '1px solid #e2e8f0' }}
-                                >
-                                  <div className="carteira-pend-main" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-                                    <SeverityBadge severity={p.severity} />
-                                    <span style={{ fontWeight: 700, color: motivo.color }}>{motivo.label}</span>
-                                    <span style={{ color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {p.badgeLabel || p.description || p.title}
-                                    </span>
-                                  </div>
-                                  <ActionButton action="abrir" type="button" size="sm" onClick={() => navigate(acao.targetUrl)}>
-                                    {acao.label}
-                                  </ActionButton>
-                                </div>
-                              );
-                            })
+                            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+                              <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr>
+                                    <th style={carteiraTh}>Prioridade</th>
+                                    <th style={carteiraTh}>Descrição</th>
+                                    <th style={carteiraTh}>Detalhe</th>
+                                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pendencias.map((p) => {
+                                    const motivo = getMotivoInfo(p.category);
+                                    const acao = getAcaoInfo(p);
+                                    const abrirPendencia = () => navigate(acao.targetUrl, { state: { ancorar: true } });
+                                    return (
+                                      <tr key={p.id} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirPendencia)}>
+                                        <td data-label="Prioridade" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                                          <SeverityBadge severity={p.severity} />
+                                        </td>
+                                        <td data-role="id" style={carteiraTd}>
+                                          <CarteiraIdLink onClick={abrirPendencia} label={`${acao.label}: ${motivo.label}`} title={acao.label}>
+                                            <span style={{ color: motivo.color }}>{motivo.label}</span>
+                                          </CarteiraIdLink>
+                                        </td>
+                                        <td data-label="Detalhe" style={{ ...carteiraTd, color: '#64748b' }}>
+                                          {p.badgeLabel || p.description || p.title || '—'}
+                                        </td>
+                                        <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                            {acao.label} <ArrowRight size={14} aria-hidden="true" />
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
                           )}
                         </div>
                       </td>

@@ -428,11 +428,11 @@ export async function deleteContractTaskRpc(id: string): Promise<RpcGenericDelet
 }
 
 // -------------------------------------------------------------
-// Avisos marcados como resolvidos (Visão Geral, Ata 360 e Contrato 360)
+// Avisos marcados como resolvidos (Início, Ata 360 e Contrato 360)
 // -------------------------------------------------------------
 export interface ResolverAvisoInput {
   chave: string;
-  tipo: 'SALDO' | 'REAJUSTE' | 'LEMBRETE';
+  tipo: 'SALDO' | 'REAJUSTE' | 'LEMBRETE' | 'FONTE';
   justificativa: string;
 }
 
@@ -462,5 +462,33 @@ export async function indicarFornecedorDaAtaRpc(input: { numeroControlePncp: str
 export async function desfazerIndicacaoFornecedorDaAtaRpc(numeroControlePncp: string): Promise<{ success: boolean }> {
   return callPlanRpc<{ success: boolean }>('desfazer_indicacao_fornecedor_da_ata', {
     p_numero_controle_pncp: requireField(numeroControlePncp, 'Ata não identificada.')
+  });
+}
+
+/** Coordenador mantém o vínculo automático que a fonte desmentiu: ele passa a MANUAL (migration 112). */
+export async function manterVinculoAConferirRpc(input: { itemKey: string; contractKey: string; justificativa: string }): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('manter_vinculo_a_conferir', {
+    p_item_key: requireField(input.itemKey, 'Item não identificado.'),
+    p_contract_key: requireField(input.contractKey, 'Contrato não identificado.'),
+    p_justificativa: requireField(input.justificativa, 'Escreva a justificativa.')
+  });
+}
+
+/** Coordenador decide sobre nota ou fatura que a fonte deixou de listar e tem trabalho da equipe (migration 113). */
+export async function decidirAusenteDaFonteRpc(input: { tipo: 'NOTA' | 'FATURA'; chave: string; decisao: 'MANTER' | 'RETIRAR'; justificativa: string }): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('decidir_ausente_da_fonte', {
+    p_tipo: input.tipo,
+    p_chave: requireField(input.chave, 'Nota ou fatura não identificada.'),
+    p_decisao: input.decisao,
+    p_justificativa: requireField(input.justificativa, 'Escreva a justificativa.')
+  });
+}
+
+/** Coordenador retira o vínculo automático que a fonte desmentiu; a quantidade ajustada e a divisão saem junto (migration 112). */
+export async function retirarVinculoAConferirRpc(input: { itemKey: string; contractKey: string; justificativa: string }): Promise<{ success: boolean }> {
+  return callPlanRpc<{ success: boolean }>('retirar_vinculo_a_conferir', {
+    p_item_key: requireField(input.itemKey, 'Item não identificado.'),
+    p_contract_key: requireField(input.contractKey, 'Contrato não identificado.'),
+    p_justificativa: requireField(input.justificativa, 'Escreva a justificativa.')
   });
 }

@@ -17,7 +17,8 @@ import {
   Building2,
   Link2,
   FileSignature,
-  Boxes
+  Boxes,
+  Network
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -47,9 +48,9 @@ export interface NavItem {
    * filtro — ver `filterNavigationByRole`.
    */
   allowedRoles?: AppRole[];
-  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Configurações → Gestão · Acesso). */
+  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Acesso). */
   group?: string;
-  /** 'bottom' = área fica no pé do menu chave (ex.: Configurações). */
+  /** 'bottom' = área fica no pé do menu chave (ex.: Ajustes). */
   placement?: 'bottom';
 }
 
@@ -57,19 +58,19 @@ export interface NavItem {
  * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
- * - Visão Geral: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
+ * - Início: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
- * - Vinculação: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
+ * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Configurações (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
+ * - Ajustes (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
 export const navigationConfig: NavItem[] = [
   {
     id: 'visao-geral',
-    label: 'Visão Geral',
+    label: 'Início',
     icon: LayoutDashboard,
     status: 'active',
     children: [
@@ -117,7 +118,8 @@ export const navigationConfig: NavItem[] = [
         route: '/contratos',
         status: 'active',
         matchPrefixes: ['/contratos'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        // Gestor de saldo cuida da alocação: sem contratos (o empenhado por unidade fica na Alocação e no Item).
+        allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
         id: 'itens-carteira',
@@ -149,9 +151,9 @@ export const navigationConfig: NavItem[] = [
     ]
   },
   {
-    // Filas de vínculo: ligar uma coisa à outra. "Distribuição" (Visão Geral) fica só com atas e contratos para gestores.
+    // Filas de vínculo: ligar uma coisa à outra. "Distribuição" (Início) fica só com atas e contratos para gestores.
     id: 'vinculacao',
-    label: 'Vinculação',
+    label: 'Vínculos',
     icon: Link2,
     status: 'active',
     children: [
@@ -197,7 +199,8 @@ export const navigationConfig: NavItem[] = [
         route: '/empenhos',
         status: 'active',
         matchPrefixes: ['/empenhos'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        // Gestor de saldo fica fora do Financeiro: o empenhado que ele usa já aparece no Item e na Alocação.
+        allowedRoles: ['admin', 'gestor', 'leitor']
       },
       {
         id: 'execucao-pagamentos',
@@ -212,7 +215,7 @@ export const navigationConfig: NavItem[] = [
   },
   {
     id: 'configuracoes',
-    label: 'Configurações',
+    label: 'Ajustes',
     icon: Settings,
     status: 'active',
     placement: 'bottom',
@@ -246,6 +249,17 @@ export const navigationConfig: NavItem[] = [
         group: 'Gestão',
         matchPrefixes: ['/admin/feriados'],
         allowedRoles: ['admin']
+      },
+      {
+        // GTI do ComprasSUSP de cada órgão participante (migration 139). Confirma: só o coordenador (admin).
+        id: 'admin-grupos-uasgs',
+        label: 'Grupos das UASGs',
+        icon: Network,
+        route: '/admin/grupos-uasgs',
+        status: 'active',
+        group: 'Gestão',
+        matchPrefixes: ['/admin/grupos-uasgs'],
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
         // Cadastro das unidades internas usadas na alocação de itens. Edição: admin e gestor_saldos.
@@ -330,7 +344,7 @@ export interface BreadcrumbEntry {
 }
 
 const staticRouteLabels: Record<string, string> = {
-  '/instrumentos': 'Visão Geral',
+  '/instrumentos': 'Início',
   '/atas': 'Carteira de Atas',
   '/itens': 'Carteira de Itens',
   '/atas/distribuicao': 'Central de Distribuição',
@@ -349,19 +363,19 @@ const staticRouteLabels: Record<string, string> = {
 
 export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   if (pathname === '/' || pathname === '/instrumentos') {
-    return [{ label: 'Visão Geral' }];
+    return [{ label: 'Início' }];
   }
 
   // Item de topo do menu: não herda o "Carteira de Atas" do prefixo /atas da rota.
   if (pathname === '/atas/distribuicao') {
     return [
-      { label: 'Visão Geral', route: '/instrumentos' },
+      { label: 'Início', route: '/instrumentos' },
       { label: 'Central de Distribuição', route: '/atas/distribuicao' }
     ];
   }
 
   const segments = pathname.split('/').filter(Boolean);
-  const crumbs: BreadcrumbEntry[] = [{ label: 'Visão Geral', route: '/instrumentos' }];
+  const crumbs: BreadcrumbEntry[] = [{ label: 'Início', route: '/instrumentos' }];
   let accPath = '';
 
   for (let i = 0; i < segments.length; i++) {

@@ -159,7 +159,7 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
 
   return (
     <Instrument360Page>
-      <Instrument360Head>
+      <Instrument360Head resumoNoCelular>
       <Contract360Header contract={contract} loadingOfficial={enriching}>
         <ContractHealthStrip
           contract={contract}

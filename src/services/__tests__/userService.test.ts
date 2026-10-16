@@ -15,8 +15,6 @@ describe('userService - Testes Unitários de Gestão de Usuários e Perfis', () 
     const created = saveSystemUser({
       nome: 'José Oliveira',
       email: 'jose.oliveira@mj.gov.br',
-      cargo: 'Auditor',
-      departamento: 'CGLIC',
       perfil: 'gestor',
       ativo: true
     });

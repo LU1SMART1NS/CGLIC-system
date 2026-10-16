@@ -36,7 +36,7 @@ import {
 } from '../../types/user';
 
 export const UsersManagement: React.FC = () => {
-  const { data: users = [], isLoading } = useUsers();
+  const { data: users = [], isLoading, isError, error: erroUsuarios, refetch: recarregarUsuarios } = useUsers();
   const { data: roles = [] } = useRoles();
   const inviteUserMutation = useInviteUser();
   const reinviteUserMutation = useReinviteUser();
@@ -94,9 +94,6 @@ export const UsersManagement: React.FC = () => {
             nome: formNome.trim(),
             email: formEmail.trim(),
             perfil: formPerfil,
-            matricula: editingUser.matricula,
-            cargo: editingUser.cargo,
-            departamento: editingUser.departamento,
             ativo: editingUser.ativo
           }
         },
@@ -197,9 +194,7 @@ export const UsersManagement: React.FC = () => {
     return users.filter((u) => {
       const matchSearch =
         u.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (u.cargo && u.cargo.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (u.departamento && u.departamento.toLowerCase().includes(searchTerm.toLowerCase()));
+        u.email.toLowerCase().includes(searchTerm.toLowerCase());
       const matchRole = filterRole === 'todos' || u.perfil === filterRole;
       return matchSearch && matchRole;
     });
@@ -250,6 +245,10 @@ export const UsersManagement: React.FC = () => {
         testId="users-table-container"
         title="Servidores e usuários"
         isLoading={isLoading}
+        isError={isError}
+        errorTitle="Não foi possível carregar os usuários"
+        errorMessage={erroUsuarios?.message}
+        onRetry={() => void recarregarUsuarios()}
         isEmpty={filteredUsers.length === 0}
         emptyTitle="Nenhum usuário encontrado"
         emptyDescription="Nenhum servidor ou usuário corresponde aos filtros aplicados."

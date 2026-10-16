@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, ArrowLeftRight, ArrowRight, Ban, Check, FlaskConical, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, FileSearch, FileX, Link2, Pencil, Plus,
+  Archive, ArrowLeft, ArrowLeftRight, ArrowRight, Ban, Check, FlaskConical, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, FileSearch, FileX, Link2, Pencil, Plus,
   RefreshCw, RotateCcw, Search, Trash2, Unlink, UserCheck, UserPlus, UserX, X, XCircle,
   type LucideIcon
 } from 'lucide-react';
@@ -43,8 +43,11 @@ export const ACTIONS = {
   editar: { label: 'Editar', icon: Pencil, variant: 'outline' },
   renomear: { label: 'Renomear', icon: Pencil, variant: 'outline' },
   conferir: { label: 'Conferir', icon: Search, variant: 'outline' },
+  /** Coordenador mantém o vínculo automático que a fonte desmentiu (migration 112). */
+  manterVinculo: { label: 'Manter vínculo', icon: Link2, variant: 'outline' },
   concluir: { label: 'Concluir', icon: Check, variant: 'outline' },
   resolvido: { label: 'Resolvido', icon: Check, variant: 'outline' },
+  deixarComoEsta: { label: 'Deixar como está', icon: Archive, variant: 'outline' },
   reexibir: { label: 'Reexibir', icon: RotateCcw, variant: 'outline' },
   restaurar: { label: 'Restaurar', icon: RotateCcw, variant: 'outline' },
   desfazer: { label: 'Desfazer', icon: RotateCcw, variant: 'outline' },
@@ -78,6 +81,8 @@ export const ACTIONS = {
   desativarCadastro: { label: 'Desativar', icon: Ban, variant: 'ghostDanger' },
   cancelarCiclo: { label: 'Cancelar ciclo', icon: Ban, variant: 'ghostDanger' },
   descartar: { label: 'Descartar', icon: XCircle, variant: 'ghostDanger' },
+  /** Coordenador retira o vínculo automático desmentido; a quantidade ajustada e a divisão saem junto (migration 112). */
+  retirarVinculo: { label: 'Retirar vínculo', icon: Unlink, variant: 'ghostDanger' },
   naoPertence: { label: 'Não pertence a nenhuma ata', icon: FileX, variant: 'ghostDanger' }
 } as const satisfies Record<string, ActionDef>;
 

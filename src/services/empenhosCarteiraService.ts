@@ -82,22 +82,63 @@ export function selecionarContratos(
 }
 
 /**
- * Ordem da execução: nunca consultados primeiro, depois do mais antigo para o mais recente. Sem forçar,
- * tira os consultados há menos de RECONSULTA_HORAS.
+ * Ordem da execução: os que precisam de releitura (`prioritarios`) primeiro, mesmo lidos há pouco; depois os
+ * nunca consultados e do mais antigo para o mais recente. Sem forçar, tira os consultados há menos de
+ * RECONSULTA_HORAS.
  */
 export function ordenarParaSincronizar(
   contratos: ContractDashboardRecord[],
   tentativas: Map<string, string>,
-  ctx: { agora: number; forcar?: boolean }
+  ctx: { agora: number; forcar?: boolean; prioritarios?: ReadonlySet<string> }
 ): ContractDashboardRecord[] {
   const limite = ctx.agora - RECONSULTA_HORAS * 3600_000;
+  const prioritario = (c: ContractDashboardRecord) => Boolean(ctx.prioritarios?.has(chaveDoContrato(c)));
   const quando = (c: ContractDashboardRecord) => {
     const t = tentativas.get(chaveDoContrato(c));
     return t ? new Date(t).getTime() : -Infinity;
   };
   return contratos
-    .filter((c) => ctx.forcar || quando(c) < limite)
-    .sort((a, b) => quando(a) - quando(b));
+    .filter((c) => ctx.forcar || prioritario(c) || quando(c) < limite)
+    .sort((a, b) => Number(prioritario(b)) - Number(prioritario(a)) || quando(a) - quando(b));
+}
+
+/**
+ * Contratos a reler já: uma fatura cita nota fora do contrato e as notas do contrato foram lidas antes da última
+ * leitura das faturas. A nota pode ter sido incluída no contrato depois (em 13/10/2026 a 2026NE000228 ficou na
+ * fila por isso); se a releitura não a achar, o contrato só volta a ser relido depois da próxima leitura das faturas.
+ */
+export function escolherReleituras(
+  citadas: Iterable<string>,
+  faturasLidasEm: Map<string, string>,
+  empenhosLidosEm: Map<string, string>
+): Set<string> {
+  const reler = new Set<string>();
+  for (const chave of citadas) {
+    const faturas = faturasLidasEm.get(chave);
+    const empenhos = empenhosLidosEm.get(chave);
+    if (!faturas || !empenhos || new Date(empenhos).getTime() < new Date(faturas).getTime()) reler.add(chave);
+  }
+  return reler;
+}
+
+/** Contratos com nota citada fora do contrato a reler nesta execução (vazio se a migration 117 não estiver aplicada). */
+export async function fetchContratosARelerPorFatura(): Promise<Set<string>> {
+  if (!isSupabaseConfigured || !supabase) return new Set();
+  try {
+    const [citadas, faturas, empenhos] = await Promise.all([
+      lerPaginado<{ contract_key: string }>('v_empenhos_citados_fora_do_contrato', 'contract_key'),
+      lerPaginado<{ contract_key: string; sincronizado_em: string }>('contrato_faturas_sincronizacao', 'contract_key, sincronizado_em'),
+      lerPaginado<{ contract_key: string; tentativa_em: string }>('contrato_empenhos_sincronizacao', 'contract_key, tentativa_em')
+    ]);
+    return escolherReleituras(
+      new Set(citadas.map((c) => String(c.contract_key))),
+      new Map(faturas.map((f) => [String(f.contract_key), String(f.sincronizado_em)])),
+      new Map(empenhos.map((e) => [String(e.contract_key), String(e.tentativa_em)]))
+    );
+  } catch (err) {
+    console.warn('[empenhosCarteira] notas citadas fora do contrato não lidas; nenhum contrato relido antes da hora:', err);
+    return new Set();
+  }
 }
 
 async function lerPaginado<T>(tabela: string, colunas: string): Promise<T[]> {
@@ -270,16 +311,17 @@ export async function sincronizarEmpenhosDaCarteira(uasg: string, opts: OpcoesCa
   const agora = opts.agora ?? (() => Date.now());
   const hoje = opts.hoje ?? (() => new Date(agora()).toISOString().slice(0, 10));
   return executarComReserva(RECURSO_EMPENHOS, uasg, { forcar: opts.forcar, validade: VALIDADE_EMPENHOS }, async () => {
-    const [carteira, comEmpenhoAPagar, situacoes] = await Promise.all([
+    const [carteira, comEmpenhoAPagar, situacoes, prioritarios] = await Promise.all([
       fetchContratosOficiaisDoBanco(uasg),
       contratosComEmpenhoAPagar(),
-      fetchSituacoesEmpenhos(agora())
+      fetchSituacoesEmpenhos(agora()),
+      fetchContratosARelerPorFatura()
     ]);
     if (carteira.length === 0) {
       return { status: 'ERRO', erro: 'A carteira de contratos da UASG está vazia no banco: sincronize os contratos antes.' };
     }
     const elegiveis = selecionarContratos([carteira], { hoje: hoje(), comEmpenhoAPagar });
-    const fila = ordenarParaSincronizar(elegiveis, situacoes.tentativas, { agora: agora(), forcar: opts.forcar });
+    const fila = ordenarParaSincronizar(elegiveis, situacoes.tentativas, { agora: agora(), forcar: opts.forcar, prioritarios });
     const esperando = falhasEsperandoNovaTentativa(elegiveis, fila, situacoes.comFalhaRecente);
     const parcial = await processarFila(fila, opts);
     const resumo: ResumoCarteira = { elegiveis: elegiveis.length, naFila: fila.length, ...parcial };

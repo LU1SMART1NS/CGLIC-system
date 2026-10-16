@@ -64,6 +64,34 @@ describe('montagem das linhas', () => {
     expect(linhas.find((l) => l.chave === 'fatura-1')).toMatchObject({ ug: '200331', empenho: '2026NE000412', valor: 100, origem: 'FATURA' });
   });
 
+  it('liquidada sem NP ("Sem como confirmar") não entra; liquidada com NP e não liquidada entram', () => {
+    const linhas = montarPrevisao(
+      dados({
+        faturas: [
+          fatura({ idFatura: 1, dataLiquidacao: '2024-01-31', situacao: 'Siafi Apropriado', np: null }),
+          fatura({ idFatura: 2, dataLiquidacao: '2026-10-06', situacao: 'Siafi Apropriado', np: '2026NP000555' }),
+          fatura({ idFatura: 3 })
+        ]
+      })
+    );
+    expect(linhas.map((l) => l.chave).sort()).toEqual(['fatura-2', 'fatura-3']);
+  });
+
+  it('fatura com OB da NP de outra despesa ("a conferir") também fica fora da previsão', () => {
+    const linhas = montarPrevisao(
+      dados({ faturas: [fatura({ idFatura: 1, dataLiquidacao: '2026-07-17', situacao: 'Siafi Apropriado', np: '2026NP000204', pagamentoAConferir: true }), fatura({ idFatura: 2 })] })
+    );
+    expect(linhas.map((l) => l.chave)).toEqual(['fatura-2']);
+  });
+
+  it('contrato mensal cuja única fatura em aberto é liquidada sem NP entra pela linha mensal', () => {
+    const linhas = montarPrevisao(
+      dados({ marcas: new Map([marca('A', 700)]), faturas: [fatura({ contractKey: 'A', dataLiquidacao: '2024-01-31', situacao: 'Siafi Apropriado', np: null })] })
+    );
+    expect(linhas.map((l) => l.chave)).toEqual(['mensal-A']);
+    expect(linhas[0]).toMatchObject({ valor: 700, origem: 'MENSAL' });
+  });
+
   it('ciclo entra uma vez por nota do item "DO PAGAMENTO", com o subitem', () => {
     const ciclo = {
       id: 'c1', cycleKey: 'C1', contractKey: 'A', status: 'RECEBIDO', input: { valorAtesto: 300, documentoAtestoSei: '7' },

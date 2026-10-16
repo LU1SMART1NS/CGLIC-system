@@ -15,7 +15,7 @@ export async function invalidarDadosDeSaldosItens(queryClient: QueryClient): Pro
 }
 
 /**
- * Botão "Atualizar" da Visão Geral para o coordenador: pede ao servidor a releitura forçada dos saldos dos
+ * Botão "Atualizar" do Início para o coordenador: pede ao servidor a releitura forçada dos saldos dos
  * itens (quantidade contratada nos contratos vinculados e quantitativo SENASP) e espera terminar.
  *
  * Não roda sozinho ao abrir a tela: a atualização periódica é feita pelo servidor, de hora em hora

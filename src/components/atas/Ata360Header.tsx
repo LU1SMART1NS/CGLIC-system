@@ -10,6 +10,7 @@ import type { AtaActionItem, AtaItemSaldoInput } from '../../services/ataActionQ
 import { SALDO_RULES } from '../../config/alertRules';
 import { useAtaManager } from '../../hooks/useAtaManagers';
 import { useAtaPncp } from '../../hooks/useAtaPncp';
+import { useEyebrowDaGerenciadora } from '../../hooks/useCadastroUasgs';
 import { useAtaAssinatura } from '../../hooks/useAtaAssinatura';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
 import { MissingValue } from '../instrument360/MissingValue';
@@ -22,6 +23,7 @@ import { HealthTile, HealthTileGrid, LifelineRule } from '../instrument360/Healt
 import { quantidadeBaseSenasp } from '../../utils/quantitativoSenasp';
 import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp, papelSenaspDaAta } from '../../utils/ataIdentidade';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
+import { ehNovidade } from '../carteira/carteiraNovidade';
 import { SeloFornecedorPncp } from './SeloFornecedorPncp';
 import type { RegistroFornecedorPncp } from '../../services/fornecedorAtaPncpService';
 
@@ -40,6 +42,8 @@ interface Ata360HeaderProps {
   /** Ata publicada no PNCP sem fornecedor (atas_fornecedor_pncp): selo no cartão e botão do coordenador. */
   fornecedorPncp?: RegistroFornecedorPncp | null;
   onIndicarFornecedor?: () => void;
+  /** Botões abaixo dos indicadores (ex.: Interesse por GTI); encolhem junto com o cartão. */
+  verMais?: React.ReactNode;
 }
 
 export const pncpLinkStyle: React.CSSProperties = {
@@ -86,13 +90,15 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   onOpenItens,
   onBack,
   fornecedorPncp = null,
-  onIndicarFornecedor
+  onIndicarFornecedor,
+  verMais
 }) => {
   const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
   const { data: manager, isLoading: loadingManager } = useAtaManager(chaveGestaoDaArp(arp));
   // Ata de outro órgão em que a SENASP é participante ou fez adesão (migration 106).
   const outroOrgao = ataDeOutroOrgao(arp);
+  const eyebrow = useEyebrowDaGerenciadora(String(arp.codigoUnidadeGerenciadora ?? ''), arp.nomeUnidadeGerenciadora, outroOrgao);
   const papel = papelSenaspDaAta(arp);
   // A divulgação no PNCP só aparece quando o PNCP responde; sem resposta, a linha de datas fica sem ela.
   const { data: pncp, isLoading: loadingPncp } = useAtaPncp(arp);
@@ -160,19 +166,20 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       actions={
         <>
           {ataUrl && (
-            <a href={ataUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
-              <ExternalLink size={13} /> Ata no PNCP
+            <a href={ataUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle} aria-label="Ata no PNCP">
+              <ExternalLink size={13} /> Ata<span className="i360-so-largo"> no PNCP</span>
             </a>
           )}
           {compraUrl && (
-            <a href={compraUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle}>
-              <ExternalLink size={13} /> Edital no PNCP
+            <a href={compraUrl} target="_blank" rel="noopener noreferrer" className="pncp-link" style={pncpLinkStyle} aria-label="Edital no PNCP">
+              <ExternalLink size={13} /> Edital<span className="i360-so-largo"> no PNCP</span>
             </a>
           )}
         </>
       }
-      eyebrow={[`UASG ${arp.codigoUnidadeGerenciadora}`, arp.nomeUnidadeGerenciadora].filter(Boolean).join(' · ')}
+      eyebrow={eyebrow}
       title={`Ata nº ${arp.numeroAtaRegistroPreco}`}
+      novidade={ehNovidade(dataAssinatura || arp.dataVigenciaInicial) ? 'f' : undefined}
       status={{ faixa: encerrada ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, cancelada), neutral: !encerrada }}
       dockAlert={
         faixa === 'CRITICO' && dias !== null && dias >= 0
@@ -268,6 +275,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
             <HealthTile label="Ações" value="Nenhuma" hint="tudo em dia" positive onClick={onOpenActions} testId="ata-health-acoes" />
           )}
         </HealthTileGrid>
+        {verMais}
       </div>
     </Instrument360Hero>
   );

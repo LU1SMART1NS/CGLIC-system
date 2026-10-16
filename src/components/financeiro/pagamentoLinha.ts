@@ -11,8 +11,9 @@ export const ORDEM_ETAPA: Record<EtapaPagamento, number> = {
   EM_ANDAMENTO: 2,
   ERRO_SIAFI: 3,
   AGUARDANDO_OB: 4,
-  PAGA: 5,
-  CANCELADA: 6
+  SEM_CONFIRMACAO: 5,
+  PAGA: 6,
+  CANCELADA: 7
 };
 
 export interface LinhaPagamento {
@@ -30,6 +31,17 @@ export interface LinhaPagamento {
 }
 
 const ETAPA_DO_CICLO = { CONFERENCIA: 'Conferir até', ENVIO: 'Enviar à CGOFI até', COBRANCA_CGOFI: 'Cobrar a CGOFI em' } as const;
+
+/**
+ * Aviso na fatura "sem como confirmar", pelo saldo contábil do Tesouro dos empenhos dela (migration 132). Não confirma
+ * a fatura: o Tesouro diz quanto o empenho pagou, não qual fatura.
+ */
+const AVISO_DO_TESOURO: Record<'PAGO' | 'PARCIAL' | 'NAO_PAGO' | 'SEM', string> = {
+  PAGO: 'empenho pago no Tesouro',
+  PARCIAL: 'empenho pago em parte no Tesouro',
+  NAO_PAGO: 'empenho sem pagamento no Tesouro',
+  SEM: 'confira o pagamento no SIAFI'
+};
 
 const diasUteis = (n: number) => `${n} ${n === 1 ? 'dia útil' : 'dias úteis'}`;
 const dias = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`;
@@ -93,7 +105,9 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
     empenho: f.empenhos,
     valor: f.valorLiquido,
     ano: f.emissao?.slice(0, 4) ?? null,
-    busca: [f.numero, f.np, f.ordensBancarias, f.empenhos, f.referencia].filter(Boolean).join(' ')
+    busca: [f.numero, f.np, f.ordensBancarias, f.obsAConferir, f.empenhos, f.referencia, f.situacaoTesouro ? AVISO_DO_TESOURO[f.situacaoTesouro] : null]
+      .filter(Boolean)
+      .join(' ')
   };
   const npCompartilhada = f.npContratos > 1 ? ` · paga também ${f.npContratos - 1} outro(s) contrato(s)` : '';
   const vencimento = f.vencimento
@@ -115,6 +129,21 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
         prazo: { texto: `Liquidada em ${dataBR(f.dataLiquidacao)}`, detalhe: `aguardando OB há ${dias(n)}`, atrasado: n > 5, ordem: f.dataLiquidacao }
       };
     }
+    case 'SEM_CONFIRMACAO':
+      return {
+        ...base,
+        etapa: {
+          label: 'Sem como confirmar',
+          variant: 'neutral',
+          detalhe: f.pagamentoAConferir ? `a OB da ${f.np} é de outra despesa: ${f.obsAConferir}` : 'a fonte não informa a NP'
+        },
+        prazo: {
+          texto: f.dataLiquidacao ? `Liquidada em ${dataBR(f.dataLiquidacao)}` : `Emitida em ${dataBR(f.emissao)}`,
+          detalhe: AVISO_DO_TESOURO[f.situacaoTesouro ?? 'SEM'],
+          atrasado: false,
+          ordem: f.dataLiquidacao ?? f.emissao
+        }
+      };
     case 'ERRO_SIAFI':
       return { ...base, etapa: { label: 'Erro no SIAFI', variant: 'danger', detalhe: null }, prazo: vencimento };
     case 'CANCELADA':

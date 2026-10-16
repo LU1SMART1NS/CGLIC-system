@@ -10,11 +10,13 @@ export const DESTINOS_DAS_FONTES: ReadonlyArray<readonly [prefixo: string, desti
   ['/api-pncp/', 'https://pncp.gov.br/'],
   ['/api-contratos-gov/', 'https://contratos.comprasnet.gov.br/'],
   // Tesouro Nacional (STA): ordens bancárias por documento de origem (NP)
-  ['/api-sta/', 'https://sta.api.gov.br/']
+  ['/api-sta/', 'https://sta.api.gov.br/'],
+  // Portal da Transparência (SIAFI): itens de cada nota de empenho; exige a chave, que só o servidor tem
+  ['/api-transparencia/', 'https://api.portaldatransparencia.gov.br/']
 ];
 
 /** Identificação honesta do robô nas fontes oficiais. */
-export const USER_AGENT_DA_SINCRONIZACAO = 'CGLIC-SaldoARP/1.0 (sincronizacao automatica; cglic.vercel.app)';
+export const USER_AGENT_DA_SINCRONIZACAO = 'CGLIC-SaldoARP/1.0 (sincronizacao automatica; comprassusp.app)';
 
 /** Endereço real de uma chamada a uma fonte; endereços que não são das fontes passam como vieram. */
 export function resolverUrlDaFonte(url: string): string {

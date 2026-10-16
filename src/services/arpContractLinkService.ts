@@ -63,6 +63,7 @@ export async function fetchArpItemContractLinks(itemKey: string): Promise<ArpIte
     valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
     quantidadeLidaEm: d.quantidade_lida_em || undefined,
     origem: d.origem === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL',
+    criadoPorNome: d.criado_por_nome || undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at
   }));
@@ -279,6 +280,7 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
       valorUnitarioApi: d.valor_unitario_api == null ? null : Number(d.valor_unitario_api),
       quantidadeLidaEm: d.quantidade_lida_em || undefined,
       origem: d.origem === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL',
+      criadoPorNome: d.criado_por_nome || undefined,
       createdAt: d.created_at,
       updatedAt: d.updated_at
     }));
@@ -336,6 +338,8 @@ export function enrichContractLinks(
         valorUnitarioContrato: link.valorUnitarioApi ?? undefined,
         observacoes: link.observacoes,
         origem: link.origem,
+        criadoPorNome: link.criadoPorNome,
+        criadoEm: link.createdAt,
         contract,
         numeroContratoFormatado: displayContractNumber(contract) || `${contract.numero}/${contract.ano}`,
         uasg,
@@ -365,6 +369,8 @@ export function enrichContractLinks(
         valorUnitarioContrato: link.valorUnitarioApi ?? undefined,
       observacoes: link.observacoes,
       origem: link.origem,
+      criadoPorNome: link.criadoPorNome,
+      criadoEm: link.createdAt,
       numeroContratoFormatado: numeroDisplay,
       uasg,
       orgaoNome,

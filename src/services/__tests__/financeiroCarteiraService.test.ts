@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   etapaDaFatura,
+  GRUPO_DA_ETAPA,
   etapaDoCiclo,
   montarEmpenhosCarteira,
   montarPagamentosCarteira,
+  saldoRestosAPagar,
   situacaoDoSaldo,
+  situacaoRestosAPagar,
   type EmpenhoResumoDb
 } from '../financeiroCarteiraService';
 import { descreverLinha } from '../../components/financeiro/pagamentoLinha';
@@ -54,6 +57,76 @@ describe('montarEmpenhosCarteira', () => {
     expect(situacaoDoSaldo(row)).toBe('SEM_CONSULTA');
   });
 
+  it('com o saldo do Tesouro: pago e saldo vêm de lá; a soma das faturas fica ao lado', () => {
+    const tesouro = new Map([['e1', { pagoTotal: 900, aLiquidar: 50, liquidadoAPagar: 30, atualizadoEm: '2026-10-14 14:55:14' }]]);
+    const [row] = montarEmpenhosCarteira([emp({})], [{ empenho_id: 'e1', contract_key: 'K' }], fe, faturas, new Set(['K']), tesouro);
+    expect(row).toMatchObject({ valorPago: 900, fontePago: 'TESOURO', valorPagoFaturas: 300, saldo: 80, liquidadoAPagar: 30, tesouroAtualizadoEm: '2026-10-14 14:55:14' });
+    expect(situacaoDoSaldo(row)).toBe('COM_SALDO');
+  });
+
+  it('Tesouro sem saldo (todo pago ou cancelado) fica sem saldo, mesmo com empenhado maior que o pago', () => {
+    const tesouro = new Map([['e1', { pagoTotal: 300, aLiquidar: 0, liquidadoAPagar: 0, atualizadoEm: null }]]);
+    const [row] = montarEmpenhosCarteira([emp({})], [{ empenho_id: 'e1', contract_key: 'K' }], fe, faturas, new Set(['K']), tesouro);
+    expect(row.saldo).toBe(0);
+    expect(situacaoDoSaldo(row)).toBe('SEM_SALDO');
+  });
+
+  it('sem o Tesouro, vale a soma das faturas (fonte FATURAS)', () => {
+    const [row] = montarEmpenhosCarteira([emp({})], [{ empenho_id: 'e1', contract_key: 'K' }], fe, faturas, new Set(['K']));
+    expect(row).toMatchObject({ valorPago: 300, fontePago: 'FATURAS', valorPagoFaturas: 300, saldo: 700, liquidadoAPagar: null });
+  });
+
+  it('soma das faturas: partes que passam do valor da fatura são reduzidas na proporção', () => {
+    // fatura de R$ 100 que cita dois empenhos com o valor inteiro de cada um (300 + 100): fica 75 + 25
+    const fe2 = [
+      { id_fatura: 9, id_empenho_gov: '111', valor: 300 },
+      { id_fatura: 9, id_empenho_gov: '222', valor: 100 }
+    ];
+    const rows = montarEmpenhosCarteira(
+      [emp({}), emp({ empenho_id: 'e2', identificador_fonte: '222', numero_oficial: '2026NE000028' })],
+      [
+        { empenho_id: 'e1', contract_key: 'K' },
+        { empenho_id: 'e2', contract_key: 'K' }
+      ],
+      fe2,
+      [{ idFatura: 9, paga: true, cancelada: false, valorLiquido: 100 }],
+      new Set(['K'])
+    );
+    expect(rows.map((r) => r.valorPagoFaturas)).toEqual([75, 25]);
+  });
+
+  it('partes dentro do valor da fatura ficam como estão', () => {
+    const fe2 = [
+      { id_fatura: 9, id_empenho_gov: '111', valor: 60 },
+      { id_fatura: 9, id_empenho_gov: '222', valor: 40 }
+    ];
+    const rows = montarEmpenhosCarteira(
+      [emp({}), emp({ empenho_id: 'e2', identificador_fonte: '222' })],
+      [
+        { empenho_id: 'e1', contract_key: 'K' },
+        { empenho_id: 'e2', contract_key: 'K' }
+      ],
+      fe2,
+      [{ idFatura: 9, paga: true, cancelada: false, valorLiquido: 100 }],
+      new Set(['K'])
+    );
+    expect(rows.map((r) => r.valorPagoFaturas)).toEqual([60, 40]);
+  });
+
+  it('restos a pagar do Tesouro vão para a linha; tipo e saldo pelo que ainda está em aberto', () => {
+    const rp = { naoProcessadoALiquidar: 70, naoProcessadoLiquidadoAPagar: 30, processadoAPagar: 0, pagoNoAno: 500 };
+    const tesouro = new Map([['e1', { pagoTotal: 900, aLiquidar: 70, liquidadoAPagar: 30, atualizadoEm: null, restosAPagar: rp }]]);
+    const [row] = montarEmpenhosCarteira([emp({})], [{ empenho_id: 'e1', contract_key: 'K' }], fe, faturas, new Set(['K']), tesouro);
+    expect(row.restosAPagar).toEqual(rp);
+    expect(situacaoRestosAPagar(row.restosAPagar)).toBe('NAO_PROCESSADO');
+    expect(saldoRestosAPagar(row.restosAPagar)).toBe(100);
+    expect(situacaoRestosAPagar({ ...rp, naoProcessadoALiquidar: 0, naoProcessadoLiquidadoAPagar: 0, processadoAPagar: 10 })).toBe('PROCESSADO');
+    expect(situacaoRestosAPagar({ ...rp, processadoAPagar: 10 })).toBe('OS_DOIS');
+    // resto a pagar todo pago no ano: sem saldo, não conta como resto a pagar em aberto
+    expect(situacaoRestosAPagar({ naoProcessadoALiquidar: 0, naoProcessadoLiquidadoAPagar: 0, processadoAPagar: 0, pagoNoAno: 500 })).toBeNull();
+    expect(situacaoRestosAPagar(null)).toBeNull();
+  });
+
   it('empenho sem contrato não entra; vínculos repetidos não duplicam', () => {
     const rows = montarEmpenhosCarteira(
       [emp({}), emp({ empenho_id: 'e2' })],
@@ -73,11 +146,23 @@ describe('montarEmpenhosCarteira', () => {
 
 describe('etapas do pagamento', () => {
   it('fatura: cancelada > paga > liquidada > erro > em andamento', () => {
-    expect(etapaDaFatura({ cancelada: true, paga: true, dataLiquidacao: 'x', situacao: null })).toBe('CANCELADA');
-    expect(etapaDaFatura({ cancelada: false, paga: true, dataLiquidacao: 'x', situacao: null })).toBe('PAGA');
-    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2026-10-01', situacao: 'Siafi Apropriado' })).toBe('AGUARDANDO_OB');
-    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Siafi Erro' })).toBe('ERRO_SIAFI');
-    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Pendente' })).toBe('EM_ANDAMENTO');
+    expect(etapaDaFatura({ cancelada: true, paga: true, dataLiquidacao: 'x', situacao: null, np: null })).toBe('CANCELADA');
+    expect(etapaDaFatura({ cancelada: false, paga: true, dataLiquidacao: 'x', situacao: null, np: null })).toBe('PAGA');
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2026-10-01', situacao: 'Siafi Apropriado', np: '2026NP000001' })).toBe('AGUARDANDO_OB');
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Siafi Erro', np: null })).toBe('ERRO_SIAFI');
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Pendente', np: null })).toBe('EM_ANDAMENTO');
+  });
+
+  it('liquidada sem NP ou com OB de outra despesa fica "sem como confirmar", no segmento A conferir', () => {
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2024-01-31', situacao: 'Siafi Apropriado', np: null })).toBe('SEM_CONFIRMACAO');
+    expect(
+      etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: '2026-07-17', situacao: 'Siafi Apropriado', np: '2026NP000204', pagamentoAConferir: true })
+    ).toBe('SEM_CONFIRMACAO');
+    // a conferir sem liquidação também não é "não liquidada"
+    expect(etapaDaFatura({ cancelada: false, paga: false, dataLiquidacao: null, situacao: 'Pendente', np: '2026NP000204', pagamentoAConferir: true })).toBe('SEM_CONFIRMACAO');
+    expect(GRUPO_DA_ETAPA.SEM_CONFIRMACAO).toBe('CONFERIR');
+    // paga continua paga, com ou sem NP
+    expect(etapaDaFatura({ cancelada: false, paga: true, dataLiquidacao: '2024-01-31', situacao: 'Pago', np: null })).toBe('PAGA');
   });
 
   it('ciclo: conferência na CGLIC, devolvido em correção, enviado na CGOFI, liquidado aguardando OB; pago e cancelado saem', () => {

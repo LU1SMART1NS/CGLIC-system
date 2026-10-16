@@ -1,5 +1,5 @@
-import type { DistribuicaoDoEmpenho } from '../services/distribuicaoEmpenhoService';
-import { quantidadeCalculada, quantidadeFoiInformada } from './distribuicaoEmpenho';
+import type { DistribuicaoDoEmpenho, OrigemDoVinculo } from '../services/distribuicaoEmpenhoService';
+import { quantidadeCalculada, quantidadeDaParcela, quantidadeFoiInformada } from './distribuicaoEmpenho';
 
 /**
  * Empenho de um item da ata a partir do vínculo das notas aos itens do contrato (migration 94). O item da ata
@@ -27,9 +27,11 @@ export interface ParcelaDoItem {
   informada: boolean;
   /** O valor da nota mudou depois do vínculo: as quantidades continuam contando, mas pedem conferência. */
   valorMudou: { antes: number; agora: number } | null;
-  origem: 'AUTO' | 'USUARIO' | null;
+  origem: OrigemDoVinculo | null;
   vinculadaPorNome: string | null;
   vinculadaEm: string | null;
+  /** Versão do vínculo da nota quando a tela leu (migration 129). */
+  versao?: string | null;
 }
 
 /** Execução do item em UM contrato. */
@@ -102,9 +104,9 @@ export function montarEmpenhoDoItem(input: {
       }
       if (d.situacao === 'DISTRIBUIDA') {
         const parcela = d.parcelas.find((p) => p.numeroItem === input.numeroItem);
-        if (!parcela || ((parcela.valor ?? 0) <= EPS && parcela.quantidadeInformada == null)) continue;
+        if (!parcela || ((parcela.valor ?? 0) <= EPS && parcela.quantidadeInformada == null && parcela.quantidadeNota == null)) continue;
         const calculada = quantidadeCalculada(parcela, vu);
-        const quantidade = parcela.quantidadeInformada ?? calculada;
+        const quantidade = quantidadeDaParcela(parcela, vu);
         e.parcelas.push({
           contratoEmpenhoId: d.contratoEmpenhoId,
           contractKey: c.contractKey,
@@ -120,7 +122,8 @@ export function montarEmpenhoDoItem(input: {
           valorMudou: d.motivoRevisao === 'VALOR_MUDOU' ? { antes: d.valorNaDistribuicao ?? d.valorDistribuido, agora: d.valorNota } : null,
           origem: d.origem,
           vinculadaPorNome: d.distribuidoPorNome,
-          vinculadaEm: d.distribuidoEm
+          vinculadaEm: d.distribuidoEm,
+          versao: d.versao ?? null
         });
         e.valorEmpenhado += parcela.valor ?? 0;
         if (quantidade != null) e.empenhado += quantidade;

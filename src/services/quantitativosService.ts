@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { rpcInexistente } from './empenhoSyncService';
+import { ConflitoEdicaoError, comVersao, erroDeConflito } from '../utils/conflitoEdicao';
 
 /**
  * Quantitativos do item (migration 109): ata assinada × registrado no Compras.gov.br, remanejamentos,
@@ -40,6 +41,23 @@ export interface OrgaoQuantitativo {
   mudouEm: string | null;
   /** Última atualização do órgão no Compras.gov.br (a mesma em dois órgãos = mesma operação). */
   atualizadoEm: string | null;
+  /** Item de ata da SENASP (gerenciadora). Falso na ata de outro órgão, em que só a linha da SENASP aparece (migration 114). */
+  ataDaSenasp: boolean;
+}
+
+/**
+ * Quantidade aprovada de uma adesão da SENASP que veio sem quantidade do Compras.gov.br, informada pelo gestor da
+ * ata ou pelo coordenador (migration 114). A adesão é a da UASG e da data de aprovação.
+ */
+export interface AdesaoInformada {
+  uasg: string;
+  /** dataAprovacaoAnalise da adesão, sem fuso (ex.: 2026-10-02T09:57:35). */
+  aprovadaEm: string;
+  quantidade: number;
+  documentoSei: string;
+  justificativa: string | null;
+  informadoPorNome: string;
+  informadoEm: string;
 }
 
 export interface Remanejamento {
@@ -109,6 +127,10 @@ export interface QuantitativosDoItem {
   registros: RegistroAtaAssinada[];
   contratos: ContratoDoParticipante[];
   leituras: Map<string, LeituraDoParticipante>;
+  adesoesInformadas: AdesaoInformada[];
+  /** Versões lidas antes dos dados (migration 129); voltam ao salvar para o banco recusar se outra pessoa mexeu. */
+  versaoAssinada?: string | null;
+  versaoAdesoes?: string | null;
 }
 
 export const MIGRATION_109_AUSENTE = 'Os quantitativos da ata assinada ainda não estão disponíveis no banco (migration 109).';
@@ -148,7 +170,10 @@ export function vazioDoItem(): QuantitativosDoItem {
     continua: [],
     registros: [],
     contratos: [],
-    leituras: new Map()
+    leituras: new Map(),
+    adesoesInformadas: [],
+    versaoAssinada: null,
+    versaoAdesoes: null
   };
 }
 
@@ -170,7 +195,8 @@ export function mapOrgao(r: any): OrgaoQuantitativo {
     gerenciado: num(r.gerenciado),
     mudou: r.mudou === true,
     mudouEm: r.mudou_em ?? null,
-    atualizadoEm: r.atualizado_em ?? null
+    atualizadoEm: r.atualizado_em ?? null,
+    ataDaSenasp: r.ata_da_senasp !== false
   };
 }
 
@@ -181,29 +207,38 @@ export async function fetchQuantitativosDoItem(itemKey: string): Promise<Quantit
   if (!key || !isSupabaseConfigured || !supabase) return vazio;
   const uasgGerenciadora = key.split('-')[1] ?? '';
 
-  const [item, orgaos, remanejamentos, continua, registros, contratos, leituras] = await Promise.all([
+  // A versão vem ANTES dos dados: se alguém gravar entre as leituras, a versão fica velha e o banco recusa (seguro);
+  // o contrário deixaria a tela com dados velhos e versão nova. Sem a migration 129, segue sem versão.
+  const versoes = await supabase.rpc('versao_quantitativos_item', { p_item_key: key });
+  const versao = versoes.error ? null : ((versoes.data ?? null) as { assinada?: string; adesoes?: string } | null);
+
+  const [item, orgaos, remanejamentos, continua, registros, contratos, leituras, adesoesInformadas] = await Promise.all([
     supabase.from('v_item_quantitativos').select('*').eq('item_key', key).maybeSingle(),
     supabase.from('v_item_quantitativos_orgaos').select('*').eq('item_key', key),
     supabase.from('ata_item_remanejamentos').select('*').eq('item_key', key).is('desfeito_em', null).order('confirmado_em'),
     supabase.from('ata_item_continua_orgao').select('*').eq('item_key', key),
     supabase.from('ata_item_assinada_registros').select('id, documento_sei, justificativa, informado_por_nome, informado_em, total').eq('item_key', key).order('informado_em', { ascending: false }),
     supabase.from('participantes_contratos_itens').select('*').eq('item_key', key),
-    supabase.from('participantes_contratos_leituras').select('uasg, lido_em, contratos_na_ug').eq('uasg_gerenciadora', uasgGerenciadora)
+    supabase.from('participantes_contratos_leituras').select('uasg, lido_em, contratos_na_ug').eq('uasg_gerenciadora', uasgGerenciadora),
+    supabase.from('adesao_quantidade_informada').select('*').eq('item_key', key)
   ]);
   if (item.error) {
     if (tabelaAusente(item.error)) return vazio;
     throw new Error(item.error.message);
   }
-  for (const r of [orgaos, remanejamentos, continua, registros, contratos, leituras]) {
+  for (const r of [orgaos, remanejamentos, continua, registros, contratos, leituras, adesoesInformadas]) {
     if (r.error && !tabelaAusente(r.error)) throw new Error(r.error.message);
   }
 
   const i = item.data as any;
+  // A view por item só tem as atas da SENASP; na ata de outro órgão (migration 114), a ata assinada informada
+  // aparece pelos registros, já ordenados do mais novo para o mais antigo.
+  const ultimo = (registros.data ?? [])[0] as any;
   return {
-    informado: Boolean(i),
-    documentoSei: i?.documento_sei ?? null,
-    informadoPorNome: i?.informado_por_nome ?? null,
-    informadoEm: i?.informado_em ?? null,
+    informado: Boolean(i) || Boolean(ultimo),
+    documentoSei: i?.documento_sei ?? ultimo?.documento_sei ?? null,
+    informadoPorNome: i?.informado_por_nome ?? ultimo?.informado_por_nome ?? null,
+    informadoEm: i?.informado_em ?? ultimo?.informado_em ?? null,
     homologado: num(i?.homologado),
     totalAssinada: num(i?.total_assinada),
     totalRegistrado: num(i?.total_registrado),
@@ -249,8 +284,24 @@ export async function fetchQuantitativosDoItem(itemKey: string): Promise<Quantit
       vigenciaFim: r.vigencia_fim ?? null,
       vistoEm: r.visto_em
     })),
-    leituras: new Map((leituras.data ?? []).map((r: any) => [String(r.uasg), { lidoEm: r.lido_em, contratosNaUg: num(r.contratos_na_ug) }]))
+    leituras: new Map((leituras.data ?? []).map((r: any) => [String(r.uasg), { lidoEm: r.lido_em, contratosNaUg: num(r.contratos_na_ug) }])),
+    adesoesInformadas: (adesoesInformadas.data ?? []).map((r: any) => ({
+      uasg: String(r.uasg),
+      aprovadaEm: String(r.aprovada_em ?? '').slice(0, 19),
+      quantidade: num(r.quantidade),
+      documentoSei: r.documento_sei,
+      justificativa: r.justificativa ?? null,
+      informadoPorNome: r.informado_por_nome ?? '',
+      informadoEm: r.informado_em
+    })),
+    versaoAssinada: versao?.assinada ?? null,
+    versaoAdesoes: versao?.adesoes ?? null
   };
+}
+
+/** Erro das RPCs de quantitativos: o conflito de edição vira ConflitoEdicaoError; o resto, mensagem legível. */
+function erroDosQuantitativos(error: any): Error {
+  return erroDeConflito(error) ? new ConflitoEdicaoError() : new Error(mensagemDoErroQuantitativos(error));
 }
 
 export interface QuantidadeInformada {
@@ -265,14 +316,17 @@ export async function informarQuantidadesAtaAssinada(p: {
   quantidades: QuantidadeInformada[];
   documentoSei: string;
   justificativa?: string | null;
+  /** versaoAssinada lida com o item; o banco recusa se outra pessoa informou nesse meio-tempo. */
+  versao?: string | null;
 }): Promise<void> {
   const { error } = await requireSupabase().rpc('informar_quantidades_ata_assinada', {
     p_item_key: p.itemKey,
     p_quantidades: p.quantidades.map((q) => ({ uasg: q.uasg, quantidade: q.quantidade, nome: q.nome?.trim() || null })),
     p_documento_sei: p.documentoSei.trim(),
-    p_justificativa: p.justificativa?.trim() || null
+    p_justificativa: p.justificativa?.trim() || null,
+    ...comVersao(p.versao)
   });
-  if (error) throw new Error(mensagemDoErroQuantitativos(error));
+  if (error) throw erroDosQuantitativos(error);
 }
 
 export async function confirmarRemanejamento(p: {
@@ -310,4 +364,31 @@ export async function marcarContinuaDoOrgao(p: { itemKey: string; uasg: string; 
 export async function desfazerContinuaDoOrgao(p: { itemKey: string; uasg: string }): Promise<void> {
   const { error } = await requireSupabase().rpc('desfazer_continua_do_orgao', { p_item_key: p.itemKey, p_uasg: p.uasg });
   if (error) throw new Error(mensagemDoErroQuantitativos(error));
+}
+
+/** Quantidade aprovada de uma adesão da SENASP que veio sem quantidade do Compras.gov.br (migration 114). */
+export async function informarQuantidadeAdesao(p: {
+  itemKey: string;
+  uasg: string;
+  /** dataAprovacaoAnalise da adesão, como veio do Compras.gov.br. */
+  aprovadaEm: string;
+  quantidade: number;
+  documentoSei: string;
+  justificativa?: string | null;
+  /** versaoAdesoes lida com o item. */
+  versao?: string | null;
+}): Promise<void> {
+  const { error } = await requireSupabase().rpc('informar_quantidade_adesao', {
+    p_item_key: p.itemKey,
+    p_uasg: p.uasg,
+    p_aprovada_em: p.aprovadaEm,
+    p_quantidade: p.quantidade,
+    p_documento_sei: p.documentoSei.trim(),
+    p_justificativa: p.justificativa?.trim() || null,
+    ...comVersao(p.versao)
+  });
+  if (error) {
+    if (rpcInexistente(error)) throw new Error('A quantidade da adesão ainda não pode ser informada no banco (migration 114).');
+    throw erroDosQuantitativos(error);
+  }
 }

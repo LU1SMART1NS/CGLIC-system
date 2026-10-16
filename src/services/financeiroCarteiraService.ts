@@ -59,14 +59,41 @@ export interface FaturaCarteira {
   /** NEs citadas pela fatura que não estão vinculadas ao contrato no sistema (quantidade e números). */
   empenhosSemVinculo: number;
   empenhosSemVinculoNumeros: string | null;
+  /**
+   * Há OB da NP na UG da fatura, mas ela não confirma o pagamento (favorecido de outra despesa, migration 123): a
+   * fatura não está paga e fica "a conferir". obsAConferir traz as OBs e os favorecidos.
+   */
+  pagamentoAConferir?: boolean;
+  obsAConferir?: string | null;
+  /**
+   * Para fatura a conferir: o que o saldo contábil do Tesouro diz dos empenhos dela (migration 132). PAGO = o pago
+   * no Tesouro cobre as faturas do empenho; PARCIAL = cobre em parte; NAO_PAGO = não passa do já confirmado.
+   */
+  situacaoTesouro?: SituacaoTesouroFatura | null;
+}
+
+export type SituacaoTesouroFatura = 'PAGO' | 'PARCIAL' | 'NAO_PAGO';
+
+/** O que o Tesouro diz das faturas a conferir, por id da fatura (v_fatura_conferencia_tesouro). */
+async function lerConferenciaTesouro(): Promise<Map<number, SituacaoTesouroFatura>> {
+  const linhas = await lerTudo<{ id_fatura: number; situacao_tesouro: SituacaoTesouroFatura }>(
+    'v_fatura_conferencia_tesouro',
+    'id_fatura, situacao_tesouro',
+    'id_fatura'
+  );
+  return new Map(linhas.map((l) => [Number(l.id_fatura), l.situacao_tesouro]));
 }
 
 export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
-  const linhas = await lerTudo<any>(
-    'v_contrato_faturas',
-    'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros',
-    'id_fatura'
-  );
+  const [linhas, tesouro] = await Promise.all([
+    lerTudo<any>(
+      'v_contrato_faturas',
+      'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros, pagamento_a_conferir, obs_a_conferir',
+      'id_fatura'
+    ),
+    // O aviso do Tesouro é um extra: se a leitura falhar, a lista de pagamentos sai sem ele.
+    lerConferenciaTesouro().catch(() => new Map<number, SituacaoTesouroFatura>())
+  ]);
   return linhas.map((f) => ({
     idFatura: Number(f.id_fatura),
     contractKey: String(f.contract_key),
@@ -86,7 +113,10 @@ export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
     npContratos: Number(f.np_contratos ?? 0),
     empenhos: f.empenhos ?? null,
     empenhosSemVinculo: Number(f.empenhos_sem_vinculo ?? 0),
-    empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null
+    empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null,
+    pagamentoAConferir: Boolean(f.pagamento_a_conferir),
+    obsAConferir: f.obs_a_conferir ?? null,
+    situacaoTesouro: tesouro.get(Number(f.id_fatura)) ?? null
   }));
 }
 
@@ -105,9 +135,23 @@ export interface EmpenhoCarteiraRow {
   credorNome: string | null;
   credorDocumento: string | null;
   valorEmpenhado: number;
-  /** Soma das faturas pagas que citam o empenho; null quando nenhum contrato dele teve as faturas consultadas. */
+  /**
+   * Pago do empenho. Pelo Tesouro (saldo contábil do SIAFI, migration 128) quando o empenho está lá; senão, a soma
+   * das faturas pagas. Null quando não há nenhuma das duas fontes.
+   */
   valorPago: number | null;
+  /** De onde veio o pago e o saldo. */
+  fontePago?: 'TESOURO' | 'FATURAS' | null;
+  /** Soma das faturas pagas que citam o empenho (para comparar com o Tesouro); null sem faturas consultadas. */
+  valorPagoFaturas?: number | null;
+  /** Saldo a pagar. Pelo Tesouro: a liquidar + liquidado a pagar (no ano e em restos a pagar). Pelas faturas: empenhado − pago. */
   saldo: number | null;
+  /** Parte do saldo já liquidada, esperando pagamento (só pelo Tesouro). */
+  liquidadoAPagar?: number | null;
+  /** Quando o Tesouro publicou o saldo usado (horário de Brasília). */
+  tesouroAtualizadoEm?: string | null;
+  /** Restos a pagar do empenho no ano corrente, pelo Tesouro (migration 135); null sem Tesouro ou sem resto a pagar. */
+  restosAPagar?: RestosAPagarEmpenho | null;
   /** Contratos a que o empenho está vinculado (quase sempre um). */
   contractKeys: string[];
   /** Plano interno e natureza de despesa (migration 87; vazios até a sincronização reler o contrato). */
@@ -142,15 +186,63 @@ export interface FaturaEmpenhoDb {
 }
 
 /**
- * Junta empenho, vínculos de contrato e faturas pagas. Sem vínculo de contrato o empenho fica de fora: a aba lista
- * os empenhos dos contratos (o vínculo é o que dá gestor, escopo do perfil e destino do clique).
+ * Restos a pagar de um empenho no ano corrente (Tesouro). Não processados: ainda a liquidar ou já liquidados a pagar;
+ * processados: liquidados no ano do empenho, a pagar.
+ */
+export interface RestosAPagarEmpenho {
+  naoProcessadoALiquidar: number;
+  naoProcessadoLiquidadoAPagar: number;
+  processadoAPagar: number;
+  pagoNoAno: number;
+}
+
+/** Saldo contábil do Tesouro de um empenho do sistema (v_empenho_saldo_contabil, migrations 128 e 135). */
+export interface SaldoTesouroEmpenho {
+  pagoTotal: number;
+  aLiquidar: number;
+  liquidadoAPagar: number;
+  atualizadoEm: string | null;
+  restosAPagar?: RestosAPagarEmpenho | null;
+}
+
+export type SituacaoRestosAPagar = 'NAO_PROCESSADO' | 'PROCESSADO' | 'OS_DOIS';
+
+/** Saldo em restos a pagar (não processados + processados). */
+export function saldoRestosAPagar(rp: RestosAPagarEmpenho | null | undefined): number {
+  if (!rp) return 0;
+  return centavosRp(rp.naoProcessadoALiquidar + rp.naoProcessadoLiquidadoAPagar + rp.processadoAPagar);
+}
+
+/** Tipo do resto a pagar com saldo; null quando o empenho não tem saldo em restos a pagar. */
+export function situacaoRestosAPagar(rp: RestosAPagarEmpenho | null | undefined): SituacaoRestosAPagar | null {
+  if (!rp) return null;
+  const naoProcessado = rp.naoProcessadoALiquidar + rp.naoProcessadoLiquidadoAPagar > 0.005;
+  const processado = rp.processadoAPagar > 0.005;
+  if (naoProcessado && processado) return 'OS_DOIS';
+  if (naoProcessado) return 'NAO_PROCESSADO';
+  if (processado) return 'PROCESSADO';
+  return null;
+}
+
+const centavosRp = (v: number) => Math.round(v * 100) / 100;
+
+const centavos = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * Junta empenho, vínculos de contrato, faturas pagas e o saldo do Tesouro. Sem vínculo de contrato o empenho fica de
+ * fora: a aba lista os empenhos dos contratos (o vínculo é o que dá gestor, escopo do perfil e destino do clique).
+ *
+ * Pago e saldo vêm do Tesouro quando o empenho está no saldo contábil; a soma das faturas fica ao lado, para comparar.
+ * Na soma das faturas, a parte de cada empenho vem da fatura; quando as partes passam do valor da fatura (a fonte às
+ * vezes manda o valor do empenho inteiro), elas são reduzidas na proporção (estudo do saldo contábil, 14/10/2026).
  */
 export function montarEmpenhosCarteira(
   empenhos: EmpenhoResumoDb[],
   vinculos: Array<{ empenho_id: string; contract_key: string }>,
   faturaEmpenhos: FaturaEmpenhoDb[],
-  faturas: Array<Pick<FaturaCarteira, 'idFatura' | 'paga' | 'cancelada'>>,
-  contratosConsultados: Set<string>
+  faturas: Array<Pick<FaturaCarteira, 'idFatura' | 'paga' | 'cancelada'> & { valorLiquido?: number }>,
+  contratosConsultados: Set<string>,
+  saldosTesouro: Map<string, SaldoTesouroEmpenho> = new Map()
 ): EmpenhoCarteiraRow[] {
   const contratosDoEmpenho = new Map<string, string[]>();
   for (const v of vinculos) {
@@ -159,11 +251,21 @@ export function montarEmpenhosCarteira(
     contratosDoEmpenho.set(v.empenho_id, lista);
   }
 
-  const faturasPagas = new Set(faturas.filter((f) => f.paga && !f.cancelada).map((f) => f.idFatura));
+  const faturasPagas = new Map(faturas.filter((f) => f.paga && !f.cancelada).map((f) => [f.idFatura, f]));
+  const somaDasPartes = new Map<number, number>();
+  for (const fe of faturaEmpenhos) {
+    const id = Number(fe.id_fatura);
+    if (faturasPagas.has(id)) somaDasPartes.set(id, (somaDasPartes.get(id) ?? 0) + Number(fe.valor ?? 0));
+  }
   const pagoPorIdGov = new Map<string, number>();
   for (const fe of faturaEmpenhos) {
-    if (!faturasPagas.has(Number(fe.id_fatura))) continue;
-    pagoPorIdGov.set(fe.id_empenho_gov, (pagoPorIdGov.get(fe.id_empenho_gov) ?? 0) + Number(fe.valor ?? 0));
+    const id = Number(fe.id_fatura);
+    const fatura = faturasPagas.get(id);
+    if (!fatura) continue;
+    const soma = somaDasPartes.get(id) ?? 0;
+    const teto = fatura.valorLiquido;
+    const fator = teto !== undefined && soma > teto && soma > 0 ? teto / soma : 1;
+    pagoPorIdGov.set(fe.id_empenho_gov, (pagoPorIdGov.get(fe.id_empenho_gov) ?? 0) + Number(fe.valor ?? 0) * fator);
   }
 
   const rows: EmpenhoCarteiraRow[] = [];
@@ -172,7 +274,14 @@ export function montarEmpenhosCarteira(
     if (!contractKeys || contractKeys.length === 0) continue;
     const valorEmpenhado = Number(e.valor_empenhado ?? 0);
     const consultado = contractKeys.some((k) => contratosConsultados.has(k));
-    const valorPago = consultado ? Math.round((pagoPorIdGov.get(String(e.identificador_fonte ?? '')) ?? 0) * 100) / 100 : null;
+    const valorPagoFaturas = consultado ? centavos(pagoPorIdGov.get(String(e.identificador_fonte ?? '')) ?? 0) : null;
+    const tesouro = saldosTesouro.get(e.empenho_id);
+    const valorPago = tesouro ? centavos(tesouro.pagoTotal) : valorPagoFaturas;
+    const saldo = tesouro
+      ? centavos(tesouro.aLiquidar + tesouro.liquidadoAPagar)
+      : valorPagoFaturas === null
+        ? null
+        : Math.max(0, centavos(valorEmpenhado - valorPagoFaturas));
     rows.push({
       empenhoId: e.empenho_id,
       canonicalKey: e.canonical_key ?? null,
@@ -184,15 +293,66 @@ export function montarEmpenhosCarteira(
       credorDocumento: e.credor_cnpj_cpf ?? null,
       valorEmpenhado,
       valorPago,
-      saldo: valorPago === null ? null : Math.max(0, Math.round((valorEmpenhado - valorPago) * 100) / 100),
+      fontePago: tesouro ? 'TESOURO' : valorPagoFaturas === null ? null : 'FATURAS',
+      valorPagoFaturas,
+      saldo,
+      liquidadoAPagar: tesouro ? centavos(tesouro.liquidadoAPagar) : null,
+      tesouroAtualizadoEm: tesouro?.atualizadoEm ?? null,
+      restosAPagar: tesouro?.restosAPagar ?? null,
       contractKeys: [...contractKeys].sort()
     });
   }
   return rows;
 }
 
+const COLUNAS_TESOURO = 'empenho_id, pago_total, exercicio_a_liquidar, exercicio_liquidado_a_pagar, rp_a_liquidar, rp_liquidado_a_pagar, atualizado_tesouro';
+const COLUNAS_RESTOS_A_PAGAR = 'rpnp_liquidado_a_pagar, rpp_a_pagar, rp_pago_no_ano';
+
+/**
+ * Saldo do Tesouro dos empenhos do sistema, por id do empenho. Lê também os restos a pagar (migration 135); se o
+ * banco ainda não tiver essas colunas (tela publicada antes da migration), lê o resto sem elas.
+ */
+async function lerSaldosTesouro(): Promise<Map<string, SaldoTesouroEmpenho>> {
+  const mapa = new Map<string, SaldoTesouroEmpenho>();
+  if (!isSupabaseConfigured || !supabase) return mapa;
+  let comRestos = true;
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await supabase
+      .from('v_empenho_saldo_contabil')
+      .select(comRestos ? `${COLUNAS_TESOURO}, ${COLUNAS_RESTOS_A_PAGAR}` : COLUNAS_TESOURO)
+      .not('empenho_id', 'is', null)
+      .order('empenho_id', { ascending: true })
+      .range(de, de + PAGINA - 1);
+    if (error && comRestos && (error.code === '42703' || /rpnp_|rpp_|rp_pago/.test(String(error.message ?? '')))) {
+      comRestos = false;
+      de -= PAGINA;
+      continue;
+    }
+    if (error) throw mapPostgresErrorToAppError(error);
+    for (const r of (data ?? []) as any[]) {
+      const rpnpALiquidar = Number(r.rp_a_liquidar ?? 0);
+      mapa.set(String(r.empenho_id), {
+        pagoTotal: Number(r.pago_total ?? 0),
+        aLiquidar: Number(r.exercicio_a_liquidar ?? 0) + rpnpALiquidar,
+        liquidadoAPagar: Number(r.exercicio_liquidado_a_pagar ?? 0) + Number(r.rp_liquidado_a_pagar ?? 0),
+        atualizadoEm: r.atualizado_tesouro ?? null,
+        restosAPagar: comRestos
+          ? {
+              naoProcessadoALiquidar: rpnpALiquidar,
+              naoProcessadoLiquidadoAPagar: Number(r.rpnp_liquidado_a_pagar ?? 0),
+              processadoAPagar: Number(r.rpp_a_pagar ?? 0),
+              pagoNoAno: Number(r.rp_pago_no_ano ?? 0)
+            }
+          : null
+      });
+    }
+    if (!data || data.length < PAGINA) break;
+  }
+  return mapa;
+}
+
 export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<EmpenhoCarteiraRow[]> {
-  const [empenhos, vinculos, faturaEmpenhos, consultados, classificacao] = await Promise.all([
+  const [empenhos, vinculos, faturaEmpenhos, consultados, classificacao, tesouro] = await Promise.all([
     lerTudo<EmpenhoResumoDb>(
       'v_empenhos_resumo',
       'empenho_id, canonical_key, numero_oficial, ano_exercicio, uasg_emitente, data_emissao, valor_empenhado, credor_nome, credor_cnpj_cpf, identificador_fonte',
@@ -201,10 +361,11 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
     lerTudo<{ empenho_id: string; contract_key: string }>('contrato_empenhos', 'empenho_id, contract_key', 'empenho_id'),
     lerTudo<FaturaEmpenhoDb>('fatura_empenhos', 'id_fatura, id_empenho_gov, valor', 'id_fatura'),
     lerTudo<{ contract_key: string }>('contrato_faturas_sincronizacao', 'contract_key', 'contract_key'),
-    lerTudo<{ id: string; plano_interno: string | null; natureza_despesa: string | null }>('empenhos', 'id, plano_interno, natureza_despesa', 'id')
+    lerTudo<{ id: string; plano_interno: string | null; natureza_despesa: string | null }>('empenhos', 'id, plano_interno, natureza_despesa', 'id'),
+    lerSaldosTesouro()
   ]);
   const porId = new Map(classificacao.map((c) => [String(c.id), c]));
-  return montarEmpenhosCarteira(empenhos, vinculos, faturaEmpenhos, faturas, new Set(consultados.map((c) => c.contract_key))).map((r) => ({
+  return montarEmpenhosCarteira(empenhos, vinculos, faturaEmpenhos, faturas, new Set(consultados.map((c) => c.contract_key)), tesouro).map((r) => ({
     ...r,
     planoInterno: porId.get(r.empenhoId)?.plano_interno ?? null,
     naturezaDespesa: porId.get(r.empenhoId)?.natureza_despesa ?? null
@@ -215,18 +376,26 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
 // Pagamentos
 // -----------------------------------------------------------------------------------------------------
 
-/** Etapa do pagamento: as duas primeiras vêm do ciclo da CGLIC; as demais, da fatura no SIAFI e no Tesouro. */
+/**
+ * Etapa do pagamento: as duas primeiras vêm do ciclo da CGLIC; as demais, da fatura no SIAFI e no Tesouro.
+ * SEM_CONFIRMACAO: não há como confirmar o pagamento pelas fontes abertas, e ele se confere no SIAFI. Ou a fatura
+ * está liquidada sem NP na fonte (antigas ou pagas por outro documento, como DD), ou a OB da NP é de outra despesa
+ * (pagamento a conferir, migration 123). Não é "aguardando OB" nem "paga".
+ */
 export type EtapaPagamento =
-  | 'NA_CGLIC' | 'DEVOLVIDO_CORRECAO' | 'NA_CGOFI' | 'EM_ANDAMENTO' | 'AGUARDANDO_OB' | 'ERRO_SIAFI' | 'PAGA' | 'CANCELADA';
+  | 'NA_CGLIC' | 'DEVOLVIDO_CORRECAO' | 'NA_CGOFI' | 'EM_ANDAMENTO' | 'AGUARDANDO_OB' | 'SEM_CONFIRMACAO' | 'ERRO_SIAFI' | 'PAGA' | 'CANCELADA';
 
 export type PagamentoCarteiraRow =
   | { tipo: 'CICLO'; chave: string; contractKey: string; etapa: EtapaPagamento; ciclo: PaymentFollowUpCycle; faturas: FaturaCarteira[] }
   | { tipo: 'FATURA'; chave: string; contractKey: string; etapa: EtapaPagamento; fatura: FaturaCarteira };
 
-export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'dataLiquidacao' | 'situacao'>): EtapaPagamento {
+export function etapaDaFatura(
+  f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'dataLiquidacao' | 'situacao' | 'np' | 'pagamentoAConferir'>
+): EtapaPagamento {
   if (f.cancelada) return 'CANCELADA';
   if (f.paga) return 'PAGA';
-  if (f.dataLiquidacao) return 'AGUARDANDO_OB';
+  if (f.pagamentoAConferir) return 'SEM_CONFIRMACAO';
+  if (f.dataLiquidacao) return f.np ? 'AGUARDANDO_OB' : 'SEM_CONFIRMACAO';
   if (f.situacao === 'Siafi Erro') return 'ERRO_SIAFI';
   return 'EM_ANDAMENTO';
 }
@@ -234,9 +403,10 @@ export function etapaDaFatura(f: Pick<FaturaCarteira, 'cancelada' | 'paga' | 'da
 /** Etapa do ciclo em aberto; ciclo pago ou cancelado não entra na lista (a fatura dele já aparece). */
 /**
  * Segmentos de Pagamentos: o que precisa de ação da equipe (ciclo na CGLIC, erro no SIAFI), o que anda sem a CGLIC (na
- * CGOFI, fatura ainda não liquidada, liquidada esperando OB) e o que já foi pago. Cancelada só aparece em Todas.
+ * CGOFI, fatura ainda não liquidada, liquidada esperando OB), o que não dá para confirmar pelas fontes abertas (sem NP
+ * ou com a OB da NP de outra despesa) e o que já foi pago. Cancelada só aparece em Todas.
  */
-export type GrupoPagamento = 'ACAO' | 'TRAMITACAO' | 'PAGA';
+export type GrupoPagamento = 'ACAO' | 'TRAMITACAO' | 'CONFERIR' | 'PAGA';
 export const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
   NA_CGLIC: 'ACAO',
   ERRO_SIAFI: 'ACAO',
@@ -244,6 +414,8 @@ export const GRUPO_DA_ETAPA: Record<EtapaPagamento, GrupoPagamento | null> = {
   NA_CGOFI: 'TRAMITACAO',
   EM_ANDAMENTO: 'TRAMITACAO',
   AGUARDANDO_OB: 'TRAMITACAO',
+  // Segmento próprio "A conferir": não está confirmada como paga nem anda sozinha; fora do valor "aguardando OB".
+  SEM_CONFIRMACAO: 'CONFERIR',
   PAGA: 'PAGA',
   CANCELADA: null
 };

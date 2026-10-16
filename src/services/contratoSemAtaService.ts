@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 
 /** Confirmação do coordenador de que o contrato não tem ata (public.contract_sem_ata_confirmacoes, migration 69). */
@@ -12,8 +13,8 @@ export interface ContratoSemAtaConfirmacao {
 export async function fetchContratosSemAta(): Promise<Record<string, ContratoSemAtaConfirmacao>> {
   if (!isSupabaseConfigured || !supabase) return {};
   try {
-    const { data, error } = await supabase.from('contract_sem_ata_confirmacoes').select('*');
-    if (error) throw error;
+    const db = supabase;
+    const data = await lerTodasAsPaginas<any>((de, ate) => db.from('contract_sem_ata_confirmacoes').select('*').order('contract_key').range(de, ate));
     const map: Record<string, ContratoSemAtaConfirmacao> = {};
     for (const row of data || []) {
       map[row.contract_key] = {

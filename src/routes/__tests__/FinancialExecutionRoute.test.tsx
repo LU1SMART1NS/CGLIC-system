@@ -55,7 +55,20 @@ describe('Financeiro → Empenhos', () => {
       rows: [
         empenho({}),
         empenho({ empenhoId: 'e2', numero: '2025NE000010', ano: 2025, valorPago: 1000, saldo: 0 }),
-        empenho({ empenhoId: 'e3', numero: '2024NE000005', ano: 2024, uasgEmitente: '200330', contractKeys: ['200330-00020-2020'] })
+        empenho({ empenhoId: 'e3', numero: '2024NE000005', ano: 2024, uasgEmitente: '200330', contractKeys: ['200330-00020-2020'] }),
+        empenho({
+          empenhoId: 'e4', numero: '2025NE000471', ano: 2025, valorEmpenhado: 38150244, valorPago: 0, fontePago: 'TESOURO', valorPagoFaturas: 37861227,
+          saldo: 109826460, liquidadoAPagar: 37861227, tesouroAtualizadoEm: '2026-10-14 14:55:14'
+        }),
+        empenho({ empenhoId: 'e5', numero: '2025NE000500', ano: 2025, fontePago: 'FATURAS', valorPagoFaturas: 400 }),
+        empenho({
+          empenhoId: 'e6', numero: '2024NE000600', ano: 2024, fontePago: 'TESOURO', saldo: 300, liquidadoAPagar: 100,
+          restosAPagar: { naoProcessadoALiquidar: 200, naoProcessadoLiquidadoAPagar: 100, processadoAPagar: 0, pagoNoAno: 50 }
+        }),
+        empenho({
+          empenhoId: 'e7', numero: '2023NE000700', ano: 2023, fontePago: 'TESOURO', saldo: 40, liquidadoAPagar: 40,
+          restosAPagar: { naoProcessadoALiquidar: 0, naoProcessadoLiquidadoAPagar: 0, processadoAPagar: 40, pagoNoAno: 10 }
+        })
       ],
       isLoading: false,
       isFetching: false,
@@ -67,11 +80,11 @@ describe('Financeiro → Empenhos', () => {
 
   it('segue a moldura da Carteira: segmentos de saldo, filtros em botão e linha clicável', () => {
     const html = render();
-    // Coluna Itens: a situação do vínculo da nota aos itens (o trabalho fica no menu Vinculação).
+    // Coluna Itens: a situação do vínculo da nota aos itens (o trabalho fica no menu Vínculos).
     expect(html).toContain('A vincular');
     expect(html).toContain('Empenhos');
     expect(html).toContain('data-testid="empenhos-saldo-COM_SALDO"');
-    expect(html).toMatch(/Com saldo<span[^>]*>2</);
+    expect(html).toMatch(/Com saldo<span[^>]*>6</);
     expect(html).toMatch(/Sem saldo<span[^>]*>1</);
     expect(html).toContain('data-testid="empenhos-filter-ano"');
     expect(html).toContain('data-testid="empenhos-filter-gestor"');
@@ -83,6 +96,37 @@ describe('Financeiro → Empenhos', () => {
     expect(html).toContain('00094/2022');
     expect(html).toContain('Marina Costa');
     expect(html).toContain('00020/2020');
+  });
+
+  it('pago e saldo do Tesouro, com a soma das faturas quando difere e a data do Tesouro no topo', () => {
+    const html = render();
+    expect(html).toContain('Tesouro em 14/10/2026 14:55');
+    // GM: Tesouro sem pagamento; faturas dizem 37,9 mi pagos
+    expect(html).toContain('data-testid="empenhos-pago-faturas-2025NE000471"');
+    expect(html).toMatch(/faturas: R\$\s?37\.861\.227,00/);
+    expect(html).toMatch(/R\$\s?37\.861\.227,00 liquidado a pagar/);
+    // empenho fora do Tesouro: avisa que o pago é o das faturas
+    expect(html).toContain('pelas faturas');
+  });
+
+  it('restos a pagar: filtro, tipo na linha e resumo no topo', () => {
+    const todos = render();
+    expect(todos).toContain('data-testid="empenhos-filter-rp"');
+    expect(todos).toContain('data-testid="empenhos-rp-2024NE000600"');
+    expect(todos).toContain('resto a pagar não processado');
+    expect(todos).toContain('resto a pagar processado');
+    const rp = render('/empenhos?rp=RP');
+    expect(rp).toContain('2024NE000600');
+    expect(rp).toContain('2023NE000700');
+    expect(rp).not.toContain('2026NE000027');
+    expect(rp).toMatch(/R\$\s?340(,00)? em restos a pagar \(R\$\s?140(,00)? liquidados\) · R\$\s?60(,00)? pagos no ano/);
+    const processados = render('/empenhos?rp=PROCESSADO');
+    expect(processados).toContain('2023NE000700');
+    expect(processados).not.toContain('2024NE000600');
+    const sem = render('/empenhos?rp=SEM_RP');
+    expect(sem).toContain('2026NE000027');
+    expect(sem).not.toContain('2024NE000600');
+    expect(sem).toMatch(/de saldo a pagar/);
   });
 
   it('não mostra os quadros antigos nem as abas de UASG', () => {

@@ -14,14 +14,16 @@ import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../car
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
 import { TODOS_GESTORES, listGestores, matchesGestorFilter } from '../carteira/carteiraGestor';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
-import { situacaoDoSaldo, type EmpenhoCarteiraRow } from '../../services/financeiroCarteiraService';
+import { saldoRestosAPagar, situacaoDoSaldo, situacaoRestosAPagar, type EmpenhoCarteiraRow } from '../../services/financeiroCarteiraService';
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
-import { normalizarBusca } from './financeiroFormat';
+import { dataHoraTesouro, normalizarBusca } from './financeiroFormat';
 import { EmpenhosCarteiraTable } from './EmpenhosCarteiraTable';
+import { AvisoCarregando } from '../../design-system';
 import { useSituacaoDistribuicaoPorEmpenho } from '../../hooks/useVinculacaoEmpenhos';
 
 export interface EmpenhosFilterState {
   saldo: string;
+  rp: string;
   ano: string;
   uasg: string;
   gestor: string;
@@ -30,8 +32,26 @@ export interface EmpenhosFilterState {
 
 const TODOS = 'TODOS';
 
+/** Filtro "Restos a pagar" (Tesouro, ano corrente). */
+const OPCOES_RP = [
+  { value: 'RP', label: 'Com restos a pagar' },
+  { value: 'NAO_PROCESSADO', label: 'Não processados' },
+  { value: 'PROCESSADO', label: 'Processados' },
+  { value: 'SEM_RP', label: 'Sem restos a pagar' }
+] as const;
+
+function casaComRp(r: EmpenhoCarteiraRow, filtro: string): boolean {
+  const s = situacaoRestosAPagar(r.restosAPagar);
+  if (filtro === 'RP') return s !== null;
+  if (filtro === 'NAO_PROCESSADO') return s === 'NAO_PROCESSADO' || s === 'OS_DOIS';
+  if (filtro === 'PROCESSADO') return s === 'PROCESSADO' || s === 'OS_DOIS';
+  if (filtro === 'SEM_RP') return s === null;
+  return true;
+}
+
 const EMPENHOS_FILTER_SCHEMA: CarteiraFilterSchema<EmpenhosFilterState> = {
   saldo: { param: 'saldo', default: 'COM_SALDO', values: ['COM_SALDO', 'SEM_SALDO', TODOS] },
+  rp: { param: 'rp', default: TODOS, values: [...OPCOES_RP.map((o) => o.value), TODOS] },
   ano: { param: 'ano', default: TODOS },
   uasg: { param: 'uasg', default: TODOS },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
@@ -58,7 +78,7 @@ export const EmpenhosCarteira: React.FC = () => {
   const { rows: todos, isLoading, isFetching, error, refetch } = useEmpenhosCarteira();
   const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(EMPENHOS_FILTER_SCHEMA);
-  // Coluna "Itens": situação do vínculo de cada nota aos itens do contrato (o trabalho fica no menu Vinculação).
+  // Coluna "Itens": situação do vínculo de cada nota aos itens do contrato (o trabalho fica no menu Vínculos).
   const { data: situacaoItens } = useSituacaoDistribuicaoPorEmpenho();
 
   // Perfil gestor: só os empenhos dos próprios contratos.
@@ -73,15 +93,35 @@ export const EmpenhosCarteira: React.FC = () => {
     let comSaldo = 0;
     let semSaldo = 0;
     let saldoTotal = 0;
+    let tesouroEm: string | null = null;
     for (const r of rows) {
+      if (r.tesouroAtualizadoEm && (!tesouroEm || r.tesouroAtualizadoEm > tesouroEm)) tesouroEm = r.tesouroAtualizadoEm;
       const s = situacaoDoSaldo(r);
       if (s === 'COM_SALDO') {
         comSaldo++;
         saldoTotal += r.saldo ?? 0;
       } else if (s === 'SEM_SALDO') semSaldo++;
     }
-    return { comSaldo, semSaldo, saldoTotal };
+    return { comSaldo, semSaldo, saldoTotal, tesouroEm };
   }, [rows]);
+
+  // Restos a pagar (Tesouro, ano corrente): contagem de cada opção do filtro e totais das que casam com o filtro.
+  const restos = useMemo(() => {
+    const contagem = new Map<string, number>(OPCOES_RP.map((o) => [o.value, 0]));
+    let saldo = 0;
+    let liquidado = 0;
+    let pagoNoAno = 0;
+    for (const r of rows) {
+      for (const o of OPCOES_RP) if (casaComRp(r, o.value)) contagem.set(o.value, (contagem.get(o.value) ?? 0) + 1);
+      if (filters.rp !== TODOS && filters.rp !== 'SEM_RP' && casaComRp(r, filters.rp) && r.restosAPagar) {
+        saldo += saldoRestosAPagar(r.restosAPagar);
+        liquidado += r.restosAPagar.naoProcessadoLiquidadoAPagar + r.restosAPagar.processadoAPagar;
+        pagoNoAno += r.restosAPagar.pagoNoAno;
+      }
+    }
+    return { contagem, saldo, liquidado, pagoNoAno };
+  }, [rows, filters.rp]);
+  const resumoRp = filters.rp !== TODOS && filters.rp !== 'SEM_RP';
 
   const anos = useMemo(() => contar(rows, (r) => (r.ano ? String(r.ano) : null)), [rows]);
   const uasgs = useMemo(() => contar(rows, (r) => r.uasgEmitente), [rows]);
@@ -93,6 +133,7 @@ export const EmpenhosCarteira: React.FC = () => {
     return rows
       .filter((r) => {
         if (filters.saldo !== TODOS && situacaoDoSaldo(r) !== filters.saldo) return false;
+        if (filters.rp !== TODOS && !casaComRp(r, filters.rp)) return false;
         if (filters.ano !== TODOS && String(r.ano ?? '') !== filters.ano) return false;
         if (filters.uasg !== TODOS && r.uasgEmitente !== filters.uasg) return false;
         if (showGestorFilter && !matchesGestorFilter(gestorDe(r), filters.gestor)) return false;
@@ -127,7 +168,7 @@ export const EmpenhosCarteira: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Empenhos"
-        subtitle="Notas de empenho dos contratos, com o que já foi pago por fatura e o saldo de cada uma."
+        subtitle="Notas de empenho dos contratos, com o pago e o saldo do Tesouro (SIAFI) e a soma das faturas para comparar."
         icon={<Banknote size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
@@ -147,6 +188,7 @@ export const EmpenhosCarteira: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando empenhos...">
+          <AvisoCarregando label="Carregando empenhos" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
@@ -159,11 +201,15 @@ export const EmpenhosCarteira: React.FC = () => {
             active={filters.saldo}
             onSelect={(v) => setFilter('saldo', v)}
             segments={[
-              { id: 'COM_SALDO', label: 'Com saldo', count: resumo.comSaldo, title: 'Empenhado maior que o pago pelas faturas' },
-              { id: 'SEM_SALDO', label: 'Sem saldo', count: resumo.semSaldo, title: 'Empenho todo pago' },
+              { id: 'COM_SALDO', label: 'Com saldo', count: resumo.comSaldo, title: 'Ainda há valor a liquidar ou liquidado a pagar no Tesouro' },
+              { id: 'SEM_SALDO', label: 'Sem saldo', count: resumo.semSaldo, title: 'Empenho todo pago ou cancelado' },
               { id: TODOS, label: 'Todos', count: rows.length }
             ]}
-            meta={`${formatCurrencyCompact(resumo.saldoTotal)} de saldo a pagar`}
+            meta={
+              (resumoRp
+                ? `${formatCurrencyCompact(restos.saldo)} em restos a pagar (${formatCurrencyCompact(restos.liquidado)} liquidados) · ${formatCurrencyCompact(restos.pagoNoAno)} pagos no ano`
+                : `${formatCurrencyCompact(resumo.saldoTotal)} de saldo a pagar`) + (resumo.tesouroEm ? ` · Tesouro em ${dataHoraTesouro(resumo.tesouroEm)}` : '')
+            }
           />
 
           <CarteiraFilterBar
@@ -175,6 +221,14 @@ export const EmpenhosCarteira: React.FC = () => {
             counter={carteiraCounter(lista.length, rows.length, hasActive, 'empenho', 'empenhos')}
             testIdPrefix="empenhos"
           >
+            <CarteiraFilterButton
+              label="Restos a pagar"
+              value={filters.rp}
+              emptyValue={TODOS}
+              options={OPCOES_RP.map((o) => ({ value: o.value, label: o.label, count: restos.contagem.get(o.value) }))}
+              onChange={(v) => setFilter('rp', v)}
+              testId="empenhos-filter-rp"
+            />
             <CarteiraFilterButton
               label="Ano"
               value={filters.ano}

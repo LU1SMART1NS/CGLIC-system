@@ -6,8 +6,8 @@
  * 1. Consulta e persistência REAL (Supabase — contract_payment_cycles) dos ciclos
  *    operacionais de faturamento/atesto vinculados a um contrato. Antes da Fase
  *    10-A.2, este hook persistia exclusivamente em localStorage do navegador —
- *    ver FASE_10_A_AUDITORIA_AUTOMACAO_NOTIFICACOES.md e
- *    FASE_10_A1_SANEAMENTO_PRE_REQUISITOS_AUTOMACAO.md para o histórico do GAP.
+ *    ver docs/historico/FASE_10_A_AUDITORIA_AUTOMACAO_NOTIFICACOES.md e
+ *    docs/historico/FASE_10_A1_SANEAMENTO_PRE_REQUISITOS_AUTOMACAO.md para o histórico do GAP.
  * 2. Instanciação determinística e idempotente do template de 3 etapas
  *    (só tarefas humanas) (agora via contract_task_plans/contract_tasks reais, reaproveitando
  *    a mesma infraestrutura de tarefas contratuais — nenhum segundo sistema de

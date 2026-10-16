@@ -58,9 +58,22 @@ export type DashboardAttentionCategory =
   | 'UNIDADE_PENDENTE'
   /** Ata publicada no PNCP sem fornecedor: o coordenador indica, ou a indicação diverge do Compras.gov.br (migration 107). */
   | 'FORNECEDOR_PNCP'
+  /** Nota ou fatura que a fonte deixou de listar e que tem trabalho da equipe: a sincronização não a apaga e o coordenador decide (migration 113). */
+  | 'FONTE_A_CONFERIR'
+  /** Contrato × item com a soma da quantidade real das notas (informada ou da nota no SIAFI) acima do contratado. Só
+   *  aviso (migration 133); pendência do gestor do contrato e do coordenador, na aba Pagamentos. */
+  | 'EMPENHO_ACIMA'
+  /** Vínculo automático que a fonte desmentiu mas que tem trabalho do gestor: o cron não o apaga e o coordenador decide (migration 112). */
+  | 'VINCULO_A_CONFERIR'
   /** Quantitativos do item a conferir: cota própria negativa, órgão fora da ata assinada, soma que não fecha ou
    *  participante com contratado acima do registrado (migration 109). Pendência do gestor de saldo. */
   | 'QUANTITATIVOS'
+  /** Ata da CGLIC com item alocado antes de informar a qtd. da ata assinada, com outros órgãos registrados: o limite
+   *  é provisório (migration 116). Pendência do gestor da ata e do coordenador. */
+  | 'ATA_ASSINADA'
+  /** Soma do registrado no Compras.gov.br acima do homologado do item: quantidade sem lastro na licitação. Enquanto
+   *  aberto, a parte da SENASP sai do saldo (migration 142). Pendência do gestor da ata e do coordenador. */
+  | 'REGISTRADO_ACIMA'
   | 'LEMBRETE';
 
 export type DashboardAttentionSeverity = 'CRITICA' | 'URGENTE' | 'ATENCAO' | 'INFO';
@@ -86,9 +99,16 @@ export interface DashboardAttentionItem {
    * Tarefa se resolve concluindo-a; pagamento, registrando a etapa (sem chave).
    */
   avisoChave?: string;
+  /** FONTE_A_CONFERIR: qual nota ou fatura (v_ausentes_da_fonte), para a decisão do coordenador. */
+  ausenteDaFonte?: { tipo: 'NOTA' | 'FATURA'; chave: string };
   /** Alertas de saldo: descrição do item da Ata e seu fornecedor (a coluna Objeto/Fornecedor prefere estes). */
   objetoItem?: string;
   fornecedorNome?: string;
+  /**
+   * Motivo mais detalhado que a categoria, para o filtro "Motivo" das abas de uma categoria só:
+   * lembrete = regra do lembrete; reajuste = situação da data-base. Sem ele, o motivo é a categoria.
+   */
+  motivoDetalhe?: { chave: string; label: string };
 }
 
 /**

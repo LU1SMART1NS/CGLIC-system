@@ -1,4 +1,5 @@
 import { fetchContratosGovData, fetchContratoItensComprasGov } from './api';
+import { fetchComTempoLimite, TEMPO_LIMITE_ITENS_MS } from './fetchComTempoLimite';
 import { parseMoneyValue } from './balanceService';
 import type { ContractDashboardRecord } from '../types';
 
@@ -64,7 +65,7 @@ async function itensContratosGov(
   const contratoId = String(contract.contratoId ?? '').trim();
   if (/^\d+$/.test(contratoId)) {
     try {
-      const res = await fetch(`/api-contratos-gov/api/contrato/${contratoId}/itens`);
+      const res = await fetchComTempoLimite(`/api-contratos-gov/api/contrato/${contratoId}/itens`, TEMPO_LIMITE_ITENS_MS, 'Contratos.gov.br');
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) return data;

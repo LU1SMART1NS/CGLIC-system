@@ -36,13 +36,13 @@ describe('destinoContratoSemGestor — para onde vai o contrato sem gestor', () 
   const comGestor = new Set(['00001/2025']);
   const ataTemGestor = (n: string) => comGestor.has(n);
 
-  it('sem vínculo: Vinculação › Contratos à ata, filtrada pelo número', () => {
+  it('sem vínculo: Vínculos › Contratos à ata, filtrada pelo número', () => {
     const d = destinoContratoSemGestor({ numero: '00156/2025', atas: [], naoPertenceAAta: false, ataTemGestor });
     expect(d.rotulo).toBe('Sem ata · vincular');
     expect(d.para).toBe('/vinculacao/contratos?busca=00156%2F2025');
   });
 
-  it('marcado "não pertence a ata": Vinculação já na situação dos marcados', () => {
+  it('marcado "não pertence a ata": Vínculos já na situação dos marcados', () => {
     const d = destinoContratoSemGestor({ numero: '00156/2025', atas: [], naoPertenceAAta: true, ataTemGestor });
     expect(d.rotulo).toBe('Sem gestor · atribuir');
     expect(d.para).toBe('/vinculacao/contratos?situacao=NAO_PERTENCE&busca=00156%2F2025');

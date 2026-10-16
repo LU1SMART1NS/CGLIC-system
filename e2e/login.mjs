@@ -10,6 +10,14 @@ import { chromium } from '@playwright/test';
 const STATE = path.join('e2e', '.auth', 'state.json');
 const base = process.env.E2E_BASE_URL ?? 'http://localhost:5173';
 
+// O login precisa do sistema rodando (o `npm run e2e` sobe sozinho; este script não).
+try {
+  await fetch(base);
+} catch {
+  console.error(`Nada respondeu em ${base}. Rode antes "npm run dev" (em outro terminal) e tente de novo.`);
+  process.exit(1);
+}
+
 const browser = await chromium.launch({ channel: 'chrome', headless: false });
 const context = await browser.newContext();
 const page = await context.newPage();

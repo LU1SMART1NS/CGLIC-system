@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDistribuicaoEquipe, ordenarDistribuicao, type DistribuicaoAta, type DistribuicaoContrato } from '../distribuicaoEquipe';
+import { buildDistribuicaoEquipe, ordenarDistribuicao, ordenarItensPorNumero, type DistribuicaoAta, type DistribuicaoContrato, type DistribuicaoItem } from '../distribuicaoEquipe';
 import type { DashboardAttentionItem } from '../../../../types/managementDashboard';
 
 const ata = (numeroAta: string, gestorNome?: string, faixa: DistribuicaoAta['faixa'] = 'REGULAR', valor = 100): DistribuicaoAta => ({
@@ -208,5 +208,71 @@ describe('ajuste manual de complexidade', () => {
     expect(divergencias).toEqual([
       { numeroAta: '00005/2025', chaveAta: '00005/2025-200342', gestorAta: 'Bruno', contractKey: '200331-00008-2026', numeroContrato: '00008', gestorContrato: 'Ana' }
     ]);
+  });
+});
+
+describe('ordenarItensPorNumero', () => {
+  const item = (tipo: 'ATA' | 'CONTRATO', numero: string) => ({ tipo, numero, chave: `${tipo}-${numero}` }) as unknown as DistribuicaoItem;
+  const itens = [item('CONTRATO', '00238/2026'), item('ATA', '00041/2024'), item('ATA', '00002/2026'), item('CONTRATO', '00142/2025'), item('ATA', '00002/2024'), item('ATA', '00047/2024')];
+
+  it('atas primeiro, depois contratos, pelo ano e depois pelo número (não pelo texto)', () => {
+    expect(ordenarItensPorNumero(itens, 'asc').map((i) => `${i.tipo} ${i.numero}`)).toEqual([
+      'ATA 00002/2024',
+      'ATA 00041/2024',
+      'ATA 00047/2024',
+      'ATA 00002/2026',
+      'CONTRATO 00142/2025',
+      'CONTRATO 00238/2026'
+    ]);
+  });
+
+  it('desc inverte dentro de cada grupo, mantendo atas antes dos contratos', () => {
+    expect(ordenarItensPorNumero(itens, 'desc').map((i) => i.numero)).toEqual([
+      '00002/2026',
+      '00047/2024',
+      '00041/2024',
+      '00002/2024',
+      '00238/2026',
+      '00142/2025'
+    ]);
+  });
+
+  it('não altera a lista recebida', () => {
+    const copia = [...itens];
+    ordenarItensPorNumero(itens, 'asc');
+    expect(itens).toEqual(copia);
+  });
+});
+
+describe('ocupação pelo nível do gestor', () => {
+  it('compara a equipe pela ocupação (carga ÷ capacidade), não pela carga', () => {
+    const { linhas, totais } = buildDistribuicaoEquipe({
+      atas: [
+        { numeroAta: '00001/2025', gestorNome: 'Ana', faixa: 'REGULAR', valor: 1, itens: 10 },
+        { numeroAta: '00002/2025', gestorNome: 'Ana', faixa: 'REGULAR', valor: 1, itens: 10 },
+        { numeroAta: '00003/2025', gestorNome: 'Bruno', faixa: 'REGULAR', valor: 1, itens: 10 },
+        { numeroAta: '00004/2025', gestorNome: 'Carla', faixa: 'REGULAR', valor: 1, itens: 10 }
+      ],
+      contratos: [],
+      links: [],
+      attentionItems: [],
+      capacidadeDoGestor: (nome) => (nome === 'Bruno' ? 0.5 : 1)
+    });
+    const por = (n: string) => linhas.find((l) => l.gestorNome === n)!;
+    // Ana: carga 6, ocupação 6; Bruno: carga 3, ocupação 6; Carla: carga 3, ocupação 3. Média 5.
+    expect(por('Bruno')).toMatchObject({ equivalente: 3, capacidade: 0.5, ocupacao: 6, relacaoEquipe: 'NA_MEDIA' });
+    expect(por('Carla').relacaoEquipe).toBe('ABAIXO');
+    expect(totais.mediaOcupacao).toBe(5);
+    expect(totais.mediaEquivalente).toBe(4);
+  });
+
+  it('sem níveis, ocupação = carga', () => {
+    const { linhas } = buildDistribuicaoEquipe({
+      atas: [{ numeroAta: '00001/2025', gestorNome: 'Ana', faixa: 'REGULAR', valor: 1, itens: 10 }],
+      contratos: [],
+      links: [],
+      attentionItems: []
+    });
+    expect(linhas[0]).toMatchObject({ capacidade: 1, ocupacao: 3 });
   });
 });

@@ -13,7 +13,7 @@ export const FILTRO_NIVEL_VALUES = ['TODOS', 'TOTAL', 'PARCIAL', 'SEM'] as const
 
 const EPS = 0.0001;
 
-/** Totalmente alocado = o alocado alcança o quantitativo SENASP; sem alocação = nada alocado. */
+/** Alocado = o alocado alcança o quantitativo SENASP; sem alocação = nada alocado. */
 export function nivelAlocacao(alocado: number, quantitativoSenasp: number): NivelAtendimento {
   if (alocado <= EPS) return 'SEM';
   if (quantitativoSenasp > 0 && alocado + EPS < quantitativoSenasp) return 'PARCIAL';
@@ -44,8 +44,15 @@ export function passaFiltroNivel(nivel: NivelAtendimento | null, filtro: FiltroN
 }
 
 export const NIVEL_ALOCACAO_LABEL: Record<NivelAtendimento, string> = {
-  TOTAL: 'Totalmente alocado',
+  TOTAL: 'Alocado',
   PARCIAL: 'Parcialmente alocado',
+  SEM: 'Sem alocação'
+};
+
+/** Os mesmos níveis para a ata (feminino): a situação da ata vem da soma dos itens. */
+export const NIVEL_ALOCACAO_ATA_LABEL: Record<NivelAtendimento, string> = {
+  TOTAL: 'Alocada',
+  PARCIAL: 'Parcialmente alocada',
   SEM: 'Sem alocação'
 };
 

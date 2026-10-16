@@ -8,6 +8,7 @@ import type { ArpRecord } from '../../../types';
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn(), useLocation: () => ({ pathname: '/', search: '', state: null }) }));
 vi.mock('../../../hooks/useAtaManagers', () => ({ useAtaManager: () => ({ data: { gestorNome: 'Gestora Teste' }, isLoading: false }) }));
 vi.mock('../../../hooks/useAtaPncp', () => ({ useAtaPncp: vi.fn() }));
+vi.mock('../../../hooks/useCadastroUasgs', () => ({ useEyebrowDaGerenciadora: (uasg: string, nome?: string) => [`UASG ${uasg}`, nome].filter(Boolean).join(' · ') }));
 vi.mock('../../../hooks/useAtaAssinatura', () => ({ useAtaAssinatura: vi.fn() }));
 
 const arp = {

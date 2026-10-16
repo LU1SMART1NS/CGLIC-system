@@ -29,7 +29,8 @@ export function useSaveEmpenhoLinks() {
       return saveEmpenhoLinks(itemKey, links, expectedVersion);
     },
     retry: 0,
-    onSuccess: (_data, variables) => {
+    // Também no erro: depois de um conflito (40001), a tela relê os vínculos e a versão atuais.
+    onSettled: (_data, _error, variables) => {
       const parsed = parseItemKey(variables.itemKey);
       const canonicalKey = normalizeItemKey(parsed.numeroAta, parsed.uasg, parsed.itemNum);
 

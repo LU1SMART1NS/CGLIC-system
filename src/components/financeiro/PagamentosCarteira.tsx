@@ -8,7 +8,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { useToast } from '../../design-system';
+import { useToast, AvisoCarregando } from '../../design-system';
 import { useAuth } from '../../context/AuthContext';
 import { createPaymentCycleRpc, type CreatePaymentCycleInput } from '../../adapters/paymentCycleRpcAdapter';
 import { CreateCycleModal } from '../contracts/payment/PaymentCycleModals';
@@ -38,7 +38,7 @@ export interface PagamentosFilterState {
 }
 
 const TODOS = 'TODOS';
-const ETAPAS: EtapaPagamento[] = ['NA_CGLIC', 'ERRO_SIAFI', 'DEVOLVIDO_CORRECAO', 'NA_CGOFI', 'EM_ANDAMENTO', 'AGUARDANDO_OB', 'PAGA', 'CANCELADA'];
+const ETAPAS: EtapaPagamento[] = ['NA_CGLIC', 'ERRO_SIAFI', 'DEVOLVIDO_CORRECAO', 'NA_CGOFI', 'EM_ANDAMENTO', 'AGUARDANDO_OB', 'SEM_CONFIRMACAO', 'PAGA', 'CANCELADA'];
 
 const ROTULO_ETAPA: Record<EtapaPagamento, string> = {
   NA_CGLIC: 'Na CGLIC',
@@ -47,12 +47,13 @@ const ROTULO_ETAPA: Record<EtapaPagamento, string> = {
   NA_CGOFI: 'Na CGOFI',
   EM_ANDAMENTO: 'Não liquidada',
   AGUARDANDO_OB: 'Aguardando OB',
+  SEM_CONFIRMACAO: 'Sem como confirmar',
   PAGA: 'Paga',
   CANCELADA: 'Cancelada'
 };
 
 const PAGAMENTOS_FILTER_SCHEMA: CarteiraFilterSchema<PagamentosFilterState> = {
-  grupo: { param: 'situacao', default: 'ACAO', values: ['ACAO', 'TRAMITACAO', 'PAGA', TODOS] },
+  grupo: { param: 'situacao', default: 'ACAO', values: ['ACAO', 'TRAMITACAO', 'CONFERIR', 'PAGA', TODOS] },
   etapa: { param: 'etapa', default: TODOS, values: [...ETAPAS, TODOS] },
   ano: { param: 'ano', default: TODOS },
   uasg: { param: 'uasg', default: TODOS },
@@ -113,11 +114,13 @@ export const PagamentosCarteira: React.FC = () => {
   const resumo = useMemo(() => {
     const porEtapa = new Map<string, number>();
     let aguardandoOb = 0;
+    const tesouro = { PAGO: 0, PARCIAL: 0, NAO_PAGO: 0 };
     for (const { row, linha } of itens) {
       porEtapa.set(row.etapa, (porEtapa.get(row.etapa) ?? 0) + 1);
       if (row.etapa === 'AGUARDANDO_OB') aguardandoOb += linha.valor;
+      if (row.etapa === 'SEM_CONFIRMACAO' && row.tipo === 'FATURA' && row.fatura.situacaoTesouro) tesouro[row.fatura.situacaoTesouro]++;
     }
-    return { porEtapa, aguardandoOb };
+    return { porEtapa, aguardandoOb, tesouro };
   }, [itens]);
 
   const anos = useMemo(() => {
@@ -199,6 +202,7 @@ export const PagamentosCarteira: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando pagamentos...">
+          <AvisoCarregando label="Carregando pagamentos" />
           <SkeletonLoader variant="rectangular" height="40px" count={1} />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
@@ -219,7 +223,15 @@ export const PagamentosCarteira: React.FC = () => {
                 title: 'Ciclos com a CGLIC (conferência, pendência, envio) e faturas com erro no SIAFI'
               },
               { id: 'TRAMITACAO', label: 'Em tramitação', count: nGrupo('TRAMITACAO'), title: 'Devolvidos para correção, na CGOFI, faturas ainda não liquidadas e liquidadas aguardando a ordem bancária' },
-              { id: 'PAGA', label: 'Pagas', count: nGrupo('PAGA'), title: 'Faturas cuja nota de pagamento tem ordem bancária válida' },
+              {
+                id: 'CONFERIR',
+                label: 'A conferir',
+                count: nGrupo('CONFERIR'),
+                title:
+                  'Faturas cujo pagamento não dá para confirmar pelas fontes abertas: sem NP no Contratos.gov.br ou com a OB da NP de outra despesa. Confira no SIAFI.' +
+                  ` Pelo Tesouro: ${resumo.tesouro.PAGO} com o empenho pago, ${resumo.tesouro.PARCIAL} pago em parte, ${resumo.tesouro.NAO_PAGO} sem pagamento.`
+              },
+              { id: 'PAGA', label: 'Pagas', count: nGrupo('PAGA'), title: 'Faturas com ordem bancária que confirma o pagamento' },
               { id: TODOS, label: 'Todas', count: itens.length }
             ]}
             meta={`${formatCurrencyCompact(resumo.aguardandoOb)} aguardando OB`}

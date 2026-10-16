@@ -4,7 +4,9 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import type { PrazoFaixa } from '../carteira/carteiraPrazo';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { InstrumentAlertBadge, InstrumentStatusBadge } from './Instrument360Badges';
+import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
 import { scrollToSummary, useInstrument360Dock } from './instrument360Dock';
+import { Instrument360HeroResumo } from './Instrument360HeroResumo';
 
 /** Identificador do rodapé (processo, categoria, Id PNCP...). Nunca data nem valor. */
 export interface Instrument360MetaItem {
@@ -30,7 +32,7 @@ export interface Instrument360Origin {
   value: React.ReactNode;
 }
 
-interface Instrument360HeroProps {
+export interface Instrument360HeroProps {
   backLabel: string;
   onBack: () => void;
   backTestId?: string;
@@ -44,6 +46,8 @@ interface Instrument360HeroProps {
   eyebrow?: React.ReactNode;
   /** Situação ao lado do título. `neutral` mostra o selo cinza (a gravidade fica no indicador). */
   status?: { faixa: PrazoFaixa; label: string; neutral?: boolean };
+  /** Etiqueta "Nova" (f) ou "Novo" (m) ao lado da situação, para o que começou há no máximo 45 dias. */
+  novidade?: 'f' | 'm';
   /** Aviso em selo vermelho ao lado da situação (ex.: "Ata vence em 8 dias"). */
   statusAlert?: React.ReactNode;
   /** Aviso da barra fixa quando o `statusAlert` não é texto ou a tela não o mostra no cartão (ex.: "Vence em 8 dias"). */
@@ -75,7 +79,14 @@ const COLORS = { ink: '#0f172a', inkSoft: '#334155', muted: '#64748b', line: '#e
  * UASG, título com a situação e o gestor, fornecedor, objeto, linha da ata, datas, indicadores e,
  * por último, os identificadores. Cada dado aparece uma vez por tela.
  */
-export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
+export const Instrument360Hero: React.FC<Instrument360HeroProps> = (props) => {
+  const dock = useInstrument360Dock();
+  // Celular com o cartão resumido (o bloco do topo decide): outra apresentação, mesmos dados.
+  if (dock?.phone) return <Instrument360HeroResumo {...props} />;
+  return <Instrument360HeroCompleto {...props} />;
+};
+
+const Instrument360HeroCompleto: React.FC<Instrument360HeroProps> = ({
   backLabel,
   onBack,
   backTestId,
@@ -85,6 +96,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
   title,
   eyebrow,
   status,
+  novidade,
   statusAlert,
   dockAlert,
   dockSubtitle,
@@ -106,14 +118,19 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
   return (
     <header className="i360-hero i360-hero-wrap" data-testid="instrument-360-hero">
       <Fold>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '14px' }}>
+        <div className="i360-topo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '14px' }}>
           <ActionButton action="voltar"
             type="button"
             size="sm"
             onClick={onBack}
+            aria-label={backLabel}
             data-testid={backTestId}
-          >{backLabel}</ActionButton>
-          {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
+          >
+            {/* No celular só "Voltar": o rótulo inteiro empurrava as ações para linhas de baixo. */}
+            <span className="i360-voltar-longo">{backLabel}</span>
+            <span className="i360-voltar-curto" aria-hidden="true">Voltar</span>
+          </ActionButton>
+          {actions && <div className="i360-topo-acoes" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>{actions}</div>}
         </div>
       </Fold>
 
@@ -144,6 +161,7 @@ export const Instrument360Hero: React.FC<Instrument360HeroProps> = ({
               </button>
             </h1>
             {status && <InstrumentStatusBadge status={status} testId="instrument-360-status" compact={min} />}
+            {novidade && <CarteiraNovoBadge genero={novidade} testId="instrument-360-novidade" />}
             {statusAlert && <InstrumentAlertBadge testId="instrument-360-status-alert" compact={min}>{statusAlert}</InstrumentAlertBadge>}
             {dockAlert && !statusAlert && <span className="i360-min-only"><InstrumentAlertBadge compact>{dockAlert}</InstrumentAlertBadge></span>}
             {dockSubtitle && <span className="i360-sub-inline" aria-hidden="true">{dockSubtitle}</span>}

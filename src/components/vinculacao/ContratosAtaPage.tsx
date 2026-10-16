@@ -19,10 +19,11 @@ import { getArpPrazo } from '../../hooks/useAtasPortfolio';
 import { useComplexidadeAjustes } from '../../hooks/useComplexidadeAjustes';
 import { formatContractNumber } from '../../utils/contractNumber';
 import type { ManagerTarget } from '../../services/managerAssignmentService';
+import { AvisoCarregando } from '../../design-system';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
 /**
- * Vinculação → Contratos à ata: contratos sem item de ata vinculado, com a ata provável pela compra e pelo
+ * Vínculos → Contratos à ata: contratos sem item de ata vinculado, com a ata provável pela compra e pelo
  * fornecedor. O coordenador e o gestor vinculam (o gestor só os próprios contratos); descartar ata, marcar "não
  * pertence" e atribuir gestor continuam só do coordenador. Era a aba "Contratos sem vínculo" da Central.
  */
@@ -30,7 +31,7 @@ export const ContratosAtaPage: React.FC = () => {
   const { role } = useAuth();
   const podeVincular = role === 'admin' || role === 'gestor';
   const podeDecidir = canAssignManager(role);
-  const { atas, contratos, links, confirmacoesSemAta, motivosManual, pendencias, totalSemVinculo, ataDe, itensDaAta, atasFila, isBusy, refresh } =
+  const { atas, contratos, links, confirmacoesSemAta, motivosManual, motivosEstado, relerMotivos, pendencias, totalSemVinculo, ataDe, itensDaAta, atasFila, isBusy, refresh } =
     usePendenciasVinculoAta();
   const { data: ajustes } = useComplexidadeAjustes();
 
@@ -97,6 +98,7 @@ export const ContratosAtaPage: React.FC = () => {
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando contratos...">
+          <AvisoCarregando label="Carregando contratos" />
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
         </div>
@@ -120,6 +122,8 @@ export const ContratosAtaPage: React.FC = () => {
           ) : (
             <ContratosSemVinculoFila
               motivos={motivosManual}
+              motivosEstado={motivosEstado}
+              onRelerMotivos={relerMotivos}
               pendencias={pendencias}
               confirmacoes={confirmacoesSemAta}
               podeAgir={podeVincular}

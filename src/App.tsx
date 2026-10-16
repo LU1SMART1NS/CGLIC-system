@@ -42,6 +42,7 @@ const DefinirSenhaRoute = lazyComRecarga(() => import('./routes/DefinirSenhaRout
 const RedefinirSenhaRoute = lazyComRecarga(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
 const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
+const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
 const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
 const AuthRedirectHandler: React.FC = () => {
@@ -293,7 +294,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/contratos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                   <ContractsRoute />
                 </RequireRole>
               }
@@ -301,7 +302,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/contratos/:contractKey"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                   <Contract360Route />
                 </RequireRole>
               }
@@ -328,7 +329,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/empenhos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
                   <FinancialExecutionRoute />
                 </RequireRole>
               }
@@ -362,6 +363,14 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin']}>
                   <AlertRulesRoute />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/grupos-uasgs"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                  <GruposUasgsRoute />
                 </RequireRole>
               }
             />

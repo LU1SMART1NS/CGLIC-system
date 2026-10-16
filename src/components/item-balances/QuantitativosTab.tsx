@@ -32,7 +32,15 @@ import { isUasgCglic } from '../../config/unidadesGestoras';
 import type { UnidadeItemRecord } from '../../types';
 import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
 import { InformarAtaAssinadaModal } from './InformarAtaAssinadaModal';
+import { RegistradoAcimaAviso } from './RegistradoAcimaAviso';
+import type { RegistradoAcima } from '../../utils/registradoAcima';
+import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
+import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { ConfirmarRemanejamentoModal, ContinuaDoOrgaoModal } from './RemanejamentoModals';
+import { useOrgaosRecolhidos } from './useOrgaosRecolhidos';
+import { useGruposDasUasgs } from '../../hooks/useGruposGti';
+import { GtiTag } from '../gti/GtiVisual';
+import type { GrupoDaFatia } from '../../config/gruposGti';
 
 export interface QuantitativosTabProps {
   itemKey: string;
@@ -52,6 +60,12 @@ export interface QuantitativosTabProps {
   baseSaldo: number;
   contratadoSenasp: number;
   quantitativos: QuantitativosDoItem;
+  /** Soma do registrado acima do homologado (migration 142); a base do saldo já vem com o desconto. */
+  registradoAcima?: RegistradoAcima | null;
+  /** PDF da ata no PNCP, para conferir o aviso de registrado acima do homologado. */
+  pdfDaAta?: string;
+  /** "Pregão 90023/2024 · item 5". */
+  pregaoItem?: string;
   podeInformar: boolean;
   podeRemanejar: boolean;
   alocado: number;
@@ -62,7 +76,12 @@ export interface QuantitativosTabProps {
 
 interface Linha {
   uasg: string;
+  /** Nome do cadastro de UASGs; sem cadastro, o nome que veio com a ata. */
   nome: string;
+  /** Nome que veio com a ata (a fonte corta em 45 letras). */
+  nomeNaAta: string;
+  /** "Boa Vista/RR", do cadastro de UASGs. */
+  local: string | null;
   ehSenasp: boolean;
   gerenciadora: boolean;
   registrado: number | null;
@@ -89,11 +108,16 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
   const [continuando, setContinuando] = React.useState<OrgaoQuantitativo | null>(null);
 
   const nomesVivos = React.useMemo(() => new Map(p.unidades.map((u) => [digitos(u.codigoUnidade), u.nomeUnidade])), [p.unidades]);
+  const cadastro = useCadastroUasgs([...q.orgaos.map((o) => o.uasg), ...p.unidades.map((u) => digitos(u.codigoUnidade))]);
   const linhas: Linha[] = React.useMemo(() => {
+    const identidade = (uasg: string, nomeNaAta: string) => {
+      const c = cadastro.get(uasg);
+      return { nome: c?.nome ?? nomeNaAta, nomeNaAta, local: c ? localDaUasg(c) : null };
+    };
     const base: Linha[] = q.informado
       ? q.orgaos.map((o) => ({
           uasg: o.uasg,
-          nome: nomesVivos.get(o.uasg) ?? o.nomeOrgao ?? `UASG ${o.uasg}`,
+          ...identidade(o.uasg, nomesVivos.get(o.uasg) ?? o.nomeOrgao ?? `UASG ${o.uasg}`),
           ehSenasp: o.ehSenasp,
           gerenciadora: o.ehSenasp && p.ataDaCglic,
           registrado: o.quantidadeRegistrada,
@@ -101,14 +125,14 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         }))
       : p.unidades.map((u) => {
           const uasg = digitos(u.codigoUnidade);
-          return { uasg, nome: u.nomeUnidade, ehSenasp: isUasgCglic(uasg), gerenciadora: u.tipoUnidade === 'GERENCIADORA', registrado: Number(u.quantidadeRegistrada) || 0, orgao: null };
+          return { uasg, ...identidade(uasg, u.nomeUnidade), ehSenasp: isUasgCglic(uasg), gerenciadora: u.tipoUnidade === 'GERENCIADORA', registrado: Number(u.quantidadeRegistrada) || 0, orgao: null };
         });
     return base.sort((a, b) =>
       Number(b.ehSenasp) - Number(a.ehSenasp)
       || Number(b.gerenciadora) - Number(a.gerenciadora)
       || (a.orgao && b.orgao ? ORDEM[a.orgao.situacao] - ORDEM[b.orgao.situacao] : 0)
       || (b.registrado ?? -1) - (a.registrado ?? -1));
-  }, [q.informado, q.orgaos, p.unidades, p.ataDaCglic, nomesVivos]);
+  }, [q.informado, q.orgaos, p.unidades, p.ataDaCglic, nomesVivos, cadastro]);
   const nomeDe = React.useCallback((uasg: string) => linhas.find((l) => l.uasg === uasg)?.nome ?? (isUasgCglic(uasg) ? 'SENASP' : `UASG ${uasg}`), [linhas]);
   const linhaSenasp = linhas.find((l) => l.ehSenasp);
 
@@ -123,6 +147,13 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
     if (n.has(uasg)) n.delete(uasg); else n.add(uasg);
     return n;
   });
+
+  const recolhidos = useOrgaosRecolhidos(linhas, p.itemKey);
+
+  // GTI de cada participante (migration 139): só o grupo confirmado pelo coordenador; o resto é "a confirmar".
+  const gruposGti = useGruposDasUasgs(linhas.map((l) => l.uasg));
+  const contaNoGti = (l: Linha) => !l.ehSenasp && !l.gerenciadora;
+  const grupoDaLinha = (l: Linha): GrupoDaFatia => gruposGti.get(l.uasg) ?? 'A_CONFIRMAR';
 
   const estado = (l: Linha): EstadoContratado => contratadoDoOrgao(l.uasg, l.ehSenasp, q, p.contratadoSenasp);
   const extrato = q.informado ? extratoDaCotaPropria(q) : null;
@@ -213,14 +244,19 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       minWidth: '260px',
       render: (l) => (
         <>
-          <div style={{ fontWeight: 700 }}>{l.nome}</div>
+          <div style={{ fontWeight: 700 }} title={l.nome !== l.nomeNaAta ? `Nome na ata: ${l.nomeNaAta}` : undefined}>{l.nome}</div>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.15rem', flexWrap: 'wrap' }}>
-            <span style={pequeno}>UASG {l.uasg}</span>
+            <span style={pequeno}>UASG {l.uasg}{l.local ? ` · ${l.local}` : ''}</span>
             <StatusBadge label={l.gerenciadora ? 'Gerenciadora' : 'Participante'} variant={l.gerenciadora ? 'info' : 'neutral'} size="sm" dot={false} />
             {l.ehSenasp && <span style={pequeno}>{p.totalUnidadesInternas} {p.totalUnidadesInternas === 1 ? 'unidade interna' : 'unidades internas'}</span>}
           </div>
         </>
       )
+    },
+    {
+      key: 'gti',
+      header: 'GTI',
+      render: (l: Linha) => (contaNoGti(l) ? <GtiTag grupo={grupoDaLinha(l)} testId={`gti-${l.uasg}`} /> : <span style={{ color: 'var(--text-muted)' }}>—</span>)
     },
     ...(q.informado ? [{ key: 'assinada', header: 'Qtd. na ata assinada', align: 'right' as const, render: (l: Linha) => <span style={mono}>{formatNumber(l.orgao?.quantidadeAssinada ?? 0)}</span> }] : []),
     {
@@ -347,25 +383,28 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       action={p.podeInformar ? <AppButton variant="primary" size="sm" onClick={() => setInformando(true)} data-testid="informar-ata-assinada">Informar qtd. da ata assinada</AppButton> : undefined}
     >
       <StatusBadge label="Não informado" variant="neutral" size="sm" dot={false} />{' '}
-      As quantidades da ata assinada ainda não foram informadas. Sem elas, a SENASP usa todo o registrado no Compras.gov.br, sem separar o que é dos participantes, e esse é o limite da alocação.
+      Sem a ata assinada, o limite da alocação é todo o registrado da SENASP, sem separar o que é dos participantes.
       {p.podeInformar ? '' : ' Quem informa é o gestor da ata.'}
     </NoticeBar>
   ) : null;
 
+  // Registrado acima do homologado (migration 142): com o aviso aberto, p.baseSaldo já vem sem a parte da SENASP.
+  const ra = p.registradoAcima ?? null;
+  const desconto = ra && !ra.resolvido ? ra.desconto : 0;
   const metricas: MetricStripItem[] = q.informado
     ? [
         { label: 'Registrado', value: formatNumber(p.registradoSenasp), hint: `no Compras.gov.br · ata assinada ${formatNumber(q.assinadaSenasp)}`, testId: 'metrica-registrado' },
         { label: 'Gerenciado p/ participantes', value: formatNumber(q.gerenciadoParticipantes), hint: 'dos órgãos, dentro do registrado', tone: 'warning', testId: 'metrica-gerenciado' },
-        { label: 'Cota própria', value: formatNumber(p.baseSaldo), hint: 'registrado − gerenciado', tone: p.baseSaldo < 0 ? 'danger' : 'default', testId: 'metrica-cota' },
+        { label: 'Cota própria', value: formatNumber(p.baseSaldo), hint: desconto > 0 ? `menor entre registrado (${formatNumber(p.registradoSenasp - q.gerenciadoParticipantes)}) e ata assinada (${formatNumber(q.assinadaSenasp)})` : 'registrado − gerenciado', tone: p.baseSaldo < 0 ? 'danger' : 'default', testId: 'metrica-cota' },
         { label: 'Alocado às unidades', value: formatNumber(p.alocado), hint: livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
         { label: 'Contratado', value: formatNumber(p.contratadoSenasp), hint: 'contratos vinculados', testId: 'metrica-contratado' },
-        { label: 'Saldo da cota própria', value: formatNumber(saldoSenasp), hint: `registrado − contratado: ${formatNumber(p.registradoSenasp - p.contratadoSenasp)}`, tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
+        { label: 'Saldo da cota própria', value: formatNumber(saldoSenasp), hint: desconto > 0 ? `${formatNumber(desconto)} acima da ata assinada fora do saldo` : `registrado − contratado: ${formatNumber(p.registradoSenasp - p.contratadoSenasp)}`, tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
       ]
     : [
-        { label: 'Quantidade SENASP', value: formatNumber(p.baseSaldo), hint: p.ataDaCglic ? 'ata assinada não informada' : 'registrado no Compras.gov.br', testId: 'metrica-cota' },
+        { label: 'Quantidade SENASP', value: formatNumber(p.baseSaldo), hint: desconto > 0 ? `registrado ${formatNumber(p.registradoSenasp)} − excedente ${formatNumber(desconto)} (provisório)` : p.ataDaCglic ? 'ata assinada não informada' : 'registrado no Compras.gov.br', testId: 'metrica-cota' },
         { label: 'Alocado às unidades', value: formatNumber(p.alocado), hint: livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
         { label: 'Contratado', value: formatNumber(p.contratadoSenasp), hint: 'contratos vinculados', testId: 'metrica-contratado' },
-        { label: 'Saldo', value: formatNumber(saldoSenasp), hint: 'registrado − contratado', tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
+        { label: 'Saldo', value: formatNumber(saldoSenasp), hint: desconto > 0 ? 'quantidade − contratado' : 'registrado − contratado', tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
       ];
 
   const semOrgaos = !p.loading && linhas.length === 0;
@@ -379,6 +418,19 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         </NoticeBar>
       )}
       {cabecalho}
+      {ra && p.ataDaCglic && (
+        <RegistradoAcimaAviso
+          aviso={ra}
+          quantitativos={q}
+          pregaoItem={p.pregaoItem || 'Item'}
+          tituloItem={p.tituloItem}
+          pdfDaAta={p.pdfDaAta || ''}
+          podeResolver={p.podeInformar}
+          baseSemDesconto={p.baseSaldo + desconto}
+          contratado={p.contratadoSenasp}
+          nomeDe={nomeDe}
+        />
+      )}
       {verRegistros && q.registros.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }} data-testid="alteracoes-ata-assinada">
           {q.registros.map((r) => (
@@ -395,11 +447,13 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       {q.informado && q.totalAssinada !== q.homologado && (
         <NoticeBar tone="danger" testId="soma-assinada-nao-fecha">A soma da ata assinada ({formatNumber(q.totalAssinada)}) é diferente do homologado do item ({formatNumber(q.homologado)}). Confira as quantidades informadas.</NoticeBar>
       )}
-      {q.informado && q.totalRegistrado !== q.homologado && (
+      {/* Soma acima do homologado tem aviso próprio (RegistradoAcimaAviso, migration 142). */}
+      {q.informado && q.totalRegistrado < q.homologado && (
         <NoticeBar tone="danger" testId="soma-registrado-nao-fecha">A soma do registrado no Compras.gov.br ({formatNumber(q.totalRegistrado)}) é diferente do homologado do item ({formatNumber(q.homologado)}). Pode ser cancelamento ou supressão de parte do item.</NoticeBar>
       )}
       {foraDaAta > 0 && <NoticeBar tone="warning" testId="orgaos-fora-da-ata">{foraDaAta} {foraDaAta > 1 ? 'órgãos registrados' : 'órgão registrado'} sem quantidade na ata assinada. Confira os números informados.</NoticeBar>}
       {contratouAcima > 0 && <NoticeBar tone="warning" testId="contratado-acima-do-registrado">{contratouAcima} {contratouAcima > 1 ? 'órgãos contrataram' : 'órgão contratou'} mais do que o registrado no Compras.gov.br. Confira os contratos do órgão.</NoticeBar>}
+
 
       <div>
         <SectionHeader
@@ -414,9 +468,10 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
             <div style={{ marginTop: '0.75rem' }}>{p.unidadesInternas}</div>
           </>
         ) : (
+          <>
           <DataTable
             columns={columns}
-            data={linhas}
+            data={recolhidos.visiveis}
             keyExtractor={(l) => l.uasg}
             isLoading={p.loading}
             testId="quantitativos-tabela"
@@ -426,6 +481,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
             expandLabel={(l) => l.nome}
             rowActions={q.informado && p.podeRemanejar ? (l) => <RowActionsMenu label={`Ações de ${l.nome}`} actions={acoesDaLinha(l)} testId={`acoes-${l.uasg}`} /> : undefined}
           />
+          {recolhidos.botao}
+          </>
         )}
       </div>
 
@@ -436,7 +493,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         homologado={p.homologado}
         corrigir={q.informado}
         documentoSeiAtual={q.documentoSei}
-        orgaos={linhas.map((l) => ({ uasg: l.uasg, nome: l.nome, registrado: l.registrado, assinada: l.orgao ? l.orgao.quantidadeAssinada : null, ehSenasp: l.ehSenasp }))}
+        versao={q.versaoAssinada}
+        orgaos={linhas.map((l) => ({ uasg: l.uasg, nome: l.nome, nomeNaAta: l.nomeNaAta, local: l.local, registrado: l.registrado, assinada: l.orgao ? l.orgao.quantidadeAssinada : null, ehSenasp: l.ehSenasp }))}
         onFechar={() => setInformando(false)}
       />
       <ConfirmarRemanejamentoModal itemKey={p.itemKey} orgao={confirmando} quantitativos={q} nomeDe={nomeDe} onFechar={() => setConfirmando(null)} />

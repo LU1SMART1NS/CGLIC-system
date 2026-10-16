@@ -11,6 +11,7 @@
  *   empenhos.identificador_fonte), que já traz a UASG emitente certa.
  */
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { fetchContratosGovFaturas, fetchOrdensBancariasDaNp } from './api';
 import { parseMoneyValue } from './balanceService';
 import { fetchContratosOficiaisDoBanco } from './contratosOficiaisService';
@@ -25,8 +26,16 @@ export const RECURSO_ORDENS_BANCARIAS = 'ordens_bancarias' as const;
 export const FONTE_FATURAS = 'Faturas dos contratos (Contratos.gov.br)';
 export const FONTE_ORDENS_BANCARIAS = 'Ordens bancárias (Tesouro, STA)';
 export const VALIDADE_FATURAS = '6 hours';
-const PAGINA = 1000;
 const NP_FORMATO = /^\d{4}NP\d{6}$/;
+
+/**
+ * NP real: formato ano+NP+6 dígitos e número diferente de zero. A fatura com "Siafi Erro" vem do Contratos.gov.br
+ * com a NP zerada (ex.: 2026NP000000), que não é documento do SIAFI: se entrasse como NP, contratos diferentes
+ * pareceriam pagos pela mesma nota e o Tesouro seria consultado à toa.
+ */
+export function npValida(np: string | null | undefined): boolean {
+  return Boolean(np) && NP_FORMATO.test(np as string) && !/NP0{6}$/.test(np as string);
+}
 
 // -----------------------------------------------------------------------------------------------------
 // Normalização
@@ -86,7 +95,7 @@ export function normalizarFatura(raw: any, contratoIdGov?: string | number | nul
     data_liquidacao: data(raw?.data_liquidacao),
     situacao,
     cancelada: String(raw?.nota_cancelada ?? '').trim().toLowerCase() === 'sim' || situacao === 'Siafi Cancelado',
-    np: NP_FORMATO.test(np) ? np : null,
+    np: npValida(np) ? np : null,
     ug_np: ug,
     referencia: referencias.length > 0 ? [...new Set(referencias)].join(', ') : null,
     processo: texto(raw?.processo),
@@ -98,6 +107,46 @@ export function normalizarFatura(raw: any, contratoIdGov?: string | number | nul
         valor: parseMoneyValue(d.valor_empenho)
       }))
   };
+}
+
+/**
+ * As duas UGs da CGLIC. A fatura só informa a UG contratante, mas a NP pode ter sido emitida (e paga) pela outra:
+ * em 14/10/2026, 82 faturas (R$ 14,4 mi) tinham OB na outra UG citando o número delas.
+ */
+const UG_PAR: Record<string, string> = { '200330': '200331', '200331': '200330' };
+
+/**
+ * A observação da OB cita o número da fatura como palavra inteira ("NUM.(S): 72834, 73469, CONTRATO..."), separada
+ * por espaço, vírgula, ponto e vírgula, dois-pontos ou ponto final. Entre parênteses costuma vir outro documento
+ * ("CONTRATO Nº 99/2024 (32554104)"), por isso não conta. Número só de dígitos vale com ou sem zeros à esquerda,
+ * dos dois lados: a fatura "000003007" é a "INVOICE 3007" da OB. Números com menos de 4 caracteres (sem contar
+ * esses zeros) não contam: confundiriam com o número do contrato ou do ano. Mesma regra da função ob_cita_fatura
+ * do banco (migrations 119 e 120), usada pela view para ligar a OB da outra UG à fatura.
+ */
+export function obCitaFatura(observacao: string | null | undefined, numero: string | null | undefined): boolean {
+  const bruto = String(numero ?? '').trim().toUpperCase();
+  const obs = String(observacao ?? '').toUpperCase();
+  const soDigitos = /^\d+$/.test(bruto);
+  const n = soDigitos ? bruto.replace(/^0+/, '') : bruto;
+  if (n.length < 4 || !obs) return false;
+  const escapado = (soDigitos ? '0*' : '') + n.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
+  return new RegExp(`(^|[\\s,;:])${escapado}($|[\\s,;:]|\\.(\\s|$))`).test(obs);
+}
+
+/**
+ * NPs da UG com o pagamento de todas as faturas confirmado (coluna ordens_bancarias de v_contrato_faturas, que só
+ * traz OB que confirma a fatura pela regra da migration 123). NP com alguma fatura não confirmada (sem OB ou com OB
+ * de outra despesa) continua na fila de consulta.
+ */
+export function npsConfirmadas(faturas: Array<{ np: string | null; cancelada: boolean; ordens_bancarias: string | null }>): Set<string> {
+  const pendentes = new Set<string>();
+  const todas = new Set<string>();
+  for (const f of faturas) {
+    if (!f.np || f.cancelada) continue;
+    todas.add(f.np);
+    if (!f.ordens_bancarias) pendentes.add(f.np);
+  }
+  return new Set([...todas].filter((np) => !pendentes.has(np)));
 }
 
 export interface OrdemBancariaParaGravar {
@@ -152,6 +201,8 @@ export interface ResultadoFaturasContrato {
   gravadas: number;
   removidas: number;
   remocao_bloqueada: number;
+  /** Faturas que a fonte deixou de listar mas estão num ciclo de pagamento: ficam a conferir (migration 113). */
+  a_conferir: number;
 }
 
 export async function gravarFaturasDoContrato(contractKey: string, faturas: FaturaParaGravar[]): Promise<ResultadoFaturasContrato | null> {
@@ -162,31 +213,60 @@ export async function gravarFaturasDoContrato(contractKey: string, faturas: Fatu
     p_remover_ausentes: true
   });
   if (error) throw mapPostgresErrorToAppError(error);
-  return { gravadas: Number(r?.gravadas ?? 0), removidas: Number(r?.removidas ?? 0), remocao_bloqueada: Number(r?.remocao_bloqueada ?? 0) };
+  return { gravadas: Number(r?.gravadas ?? 0), removidas: Number(r?.removidas ?? 0), remocao_bloqueada: Number(r?.remocao_bloqueada ?? 0), a_conferir: Number(r?.a_conferir ?? 0) };
 }
 
-export async function gravarOrdensBancarias(ug: string, np: string, ordens: OrdemBancariaParaGravar[]): Promise<number | null> {
+/**
+ * Grava as OBs de uma NP. `registrarConsulta: false` (OBs achadas na outra UG) não marca a NP daquela UG como
+ * consultada: o mesmo número lá pode ser outra NP, que precisa entrar na fila dela.
+ */
+export async function gravarOrdensBancarias(
+  ug: string,
+  np: string,
+  ordens: OrdemBancariaParaGravar[],
+  opts: { registrarConsulta?: boolean } = {}
+): Promise<number | null> {
   if (!isSupabaseConfigured || !supabase) return null;
-  const { data: n, error } = await supabase.rpc('gravar_ordens_bancarias', { p_ug: ug, p_np: np, p_ordens: ordens });
+  const args: Record<string, unknown> = { p_ug: ug, p_np: np, p_ordens: ordens };
+  if (opts.registrarConsulta === false) args.p_registrar_consulta = false;
+  const { data: n, error } = await supabase.rpc('gravar_ordens_bancarias', args);
   if (error) throw mapPostgresErrorToAppError(error);
   return Number(n ?? 0);
+}
+
+/**
+ * Recalcula quais OBs confirmam o pagamento de cada fatura (fatura_pagamento, migration 123). Chamado ao fim das
+ * sincronizações de faturas e de OBs; o pg_cron também chama ao minuto 28. Desde a migration 134 sai cedo (pulado) quando
+ * faturas, OBs e fornecedores não mudaram desde a última rodada.
+ */
+export async function recalcularPagamentoFaturas(): Promise<{ alteradas: number; removidas: number } | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  const { data: r, error } = await supabase.rpc('recalcular_pagamento_faturas');
+  if (error) throw mapPostgresErrorToAppError(error);
+  return { alteradas: Number((r as any)?.alteradas ?? 0), removidas: Number((r as any)?.removidas ?? 0) };
+}
+
+/** Recalcula o pagamento ao fim de uma sincronização; a falha vira aviso na mensagem, sem perder o que foi gravado. */
+async function recalcularAoFim(partes: string[], erros: string[]): Promise<void> {
+  try {
+    const r = await recalcularPagamentoFaturas();
+    if (r && (r.alteradas || r.removidas)) partes.push(`pagamento recalculado em ${r.alteradas + r.removidas} fatura(s)`);
+  } catch (err) {
+    erros.push(`recálculo do pagamento: ${mensagemDeErro(err)}`);
+  }
 }
 
 // -----------------------------------------------------------------------------------------------------
 // Sincronização por carteira
 // -----------------------------------------------------------------------------------------------------
 
-async function lerPaginado<T>(tabela: string, colunas: string, filtro?: (q: any) => any): Promise<T[]> {
-  const linhas: T[] = [];
-  for (let from = 0; ; from += PAGINA) {
+/** Lê a tabela inteira de mil em mil, na ordem de `ordem` (coluna única: sem ordem fixa as páginas repetem ou pulam linhas). */
+async function lerPaginado<T>(tabela: string, colunas: string, ordem: string, filtro?: (q: any) => any): Promise<T[]> {
+  return lerTodasAsPaginas<T>((de, ate) => {
     let q = supabase!.from(tabela).select(colunas);
     if (filtro) q = filtro(q);
-    const { data: d, error } = await q.range(from, from + PAGINA - 1);
-    if (error) throw error;
-    linhas.push(...((d ?? []) as T[]));
-    if (!d || d.length < PAGINA) break;
-  }
-  return linhas;
+    return q.order(ordem, { ascending: true }).range(de, ate);
+  });
 }
 
 export interface OpcoesSincronizacao {
@@ -242,7 +322,7 @@ export async function sincronizarFaturasDaCarteira(uasg: string, opts: OpcoesSin
     const [carteira, comEmpenhoAPagar, sinc] = await Promise.all([
       fetchContratosOficiaisDoBanco(uasg),
       contratosComEmpenhoAPagar(),
-      lerPaginado<{ contract_key: string; sincronizado_em: string }>('contrato_faturas_sincronizacao', 'contract_key, sincronizado_em')
+      lerPaginado<{ contract_key: string; sincronizado_em: string }>('contrato_faturas_sincronizacao', 'contract_key, sincronizado_em', 'contract_key')
     ]);
     if (carteira.length === 0) {
       return { status: 'ERRO', erro: 'A carteira de contratos da UASG está vazia no banco: sincronize os contratos antes.' };
@@ -277,6 +357,8 @@ export async function sincronizarFaturasDaCarteira(uasg: string, opts: OpcoesSin
 
     const partes = [`${processados} de ${fila.length} contrato(s) consultado(s)`, `${faturas} fatura(s) gravada(s)`];
     if (bloqueados) partes.push(`${bloqueados} contrato(s) com lista vazia na fonte e faturas no banco (nada removido)`);
+    // Fatura nova ou com NP trocada muda a confirmação do pagamento (migration 123).
+    if (processados > 0) await recalcularAoFim(partes, erros);
     if (erros.length) partes.push(`${erros.length} com falha (ex.: ${erros[0]})`);
     if (adiados) partes.push(`o tempo da execução acabou e ${adiados} contrato(s) ficam para a próxima`);
     const mensagem = `${partes.join(', ')}.`;
@@ -299,7 +381,7 @@ export function filaDeNps(
   const limite = ctx.agora - RECONSULTA_HORAS * 3600_000;
   const nps = new Set<string>();
   for (const f of faturas) {
-    if (f.np && !f.cancelada && NP_FORMATO.test(f.np) && !comObValida.has(f.np)) nps.add(f.np);
+    if (f.np && !f.cancelada && npValida(f.np) && !comObValida.has(f.np)) nps.add(f.np);
   }
   const quando = (np: string) => {
     const t = consultas.get(np);
@@ -308,25 +390,36 @@ export function filaDeNps(
   return [...nps].filter((np) => ctx.forcar || quando(np) < limite).sort((a, b) => quando(a) - quando(b) || b.localeCompare(a));
 }
 
-/** Busca no Tesouro as OBs das NPs da UG que ainda não têm pagamento gravado. */
+/**
+ * Busca no Tesouro as OBs das NPs da UG cujas faturas ainda não têm o pagamento confirmado. Consulta também a outra
+ * UG da CGLIC e grava de lá só as OBs cuja observação cita uma fatura da NP: o número de NP da fonte às vezes aponta,
+ * na própria UG, para outra despesa (migration 123). No fim, recalcula o pagamento das faturas.
+ */
 export async function sincronizarOrdensBancariasDaCarteira(uasg: string, opts: OpcoesSincronizacao = {}): Promise<ResultadoSincronizacao> {
   const agora = opts.agora ?? (() => Date.now());
   return executarComReserva(RECURSO_ORDENS_BANCARIAS, uasg, { forcar: opts.forcar, validade: VALIDADE_FATURAS }, async () => {
-    const [faturas, obs, consultas] = await Promise.all([
-      lerPaginado<{ np: string | null; data_liquidacao: string | null; cancelada: boolean }>(
-        'contrato_faturas',
-        'np, data_liquidacao, cancelada',
+    const [faturas, consultas] = await Promise.all([
+      // ordens_bancarias da view = só as OBs que confirmam a fatura
+      lerPaginado<{ np: string | null; numero: string | null; data_liquidacao: string | null; cancelada: boolean; ordens_bancarias: string | null }>(
+        'v_contrato_faturas',
+        'np, numero, data_liquidacao, cancelada, ordens_bancarias, id_fatura',
+        'id_fatura',
         (q) => q.eq('ug_np', uasg).not('np', 'is', null)
       ),
-      lerPaginado<{ np: string }>('ordens_bancarias', 'np', (q) => q.eq('ug', uasg).eq('cancelada', false)),
-      lerPaginado<{ np: string; consultado_em: string }>('np_consultas', 'np, consultado_em', (q) => q.eq('ug', uasg))
+      lerPaginado<{ np: string; consultado_em: string }>('np_consultas', 'np, consultado_em', 'np', (q) => q.eq('ug', uasg))
     ]);
-    const fila = filaDeNps(faturas, new Set(obs.map((o) => o.np)), new Map(consultas.map((c) => [c.np, c.consultado_em])), {
+    const fila = filaDeNps(faturas, npsConfirmadas(faturas), new Map(consultas.map((c) => [c.np, c.consultado_em])), {
       agora: agora(),
       forcar: opts.forcar
     });
+    const numerosPorNp = new Map<string, string[]>();
+    for (const f of faturas) {
+      if (f.np && f.numero && !f.cancelada) numerosPorNp.set(f.np, [...(numerosPorNp.get(f.np) ?? []), f.numero]);
+    }
+    const par = UG_PAR[uasg];
 
     let comOb = 0;
+    let naOutraUg = 0;
     let gravadas = 0;
     const erros: string[] = [];
     const { processados, adiados } = await processarComOrcamento(
@@ -339,7 +432,19 @@ export async function sincronizarOrdensBancariasDaCarteira(uasg: string, opts: O
           // paralelo, sobrescreve as somas dos outros (06/10/2026: 309 contadas contra 386 gravadas).
           const gravadasDaNp = (await gravarOrdensBancarias(uasg, np, lista)) ?? 0;
           gravadas += gravadasDaNp;
-          if (lista.some((o) => !o.cancelada)) comOb++;
+          const temNaPropria = lista.some((o) => !o.cancelada);
+          if (temNaPropria) comOb++;
+          // A OB da própria UG pode ser de outra despesa com o mesmo número de NP: a outra UG é consultada sempre.
+          const numeros = numerosPorNp.get(np) ?? [];
+          if (!par || numeros.length === 0) return;
+          const daOutra = (await fetchOrdensBancariasDaNp(par, np))
+            .map(normalizarOrdemBancaria)
+            .filter((o): o is OrdemBancariaParaGravar => o !== null && !o.cancelada && numeros.some((n) => obCitaFatura(o.observacao, n)));
+          if (daOutra.length === 0) return;
+          const gravadasDaOutra = (await gravarOrdensBancarias(par, np, daOutra, { registrarConsulta: false })) ?? 0;
+          gravadas += gravadasDaOutra;
+          if (!temNaPropria) comOb++;
+          naOutraUg++;
         } catch (err) {
           erros.push(`${np}: ${mensagemDeErro(err)}`);
         }
@@ -348,6 +453,8 @@ export async function sincronizarOrdensBancariasDaCarteira(uasg: string, opts: O
     );
 
     const partes = [`${processados} de ${fila.length} NP(s) consultada(s)`, `${comOb} com ordem bancária`, `${gravadas} OB(s) gravada(s)`];
+    if (naOutraUg) partes.push(`${naOutraUg} com OB na UG ${par}`);
+    await recalcularAoFim(partes, erros);
     if (erros.length) partes.push(`${erros.length} com falha (ex.: ${erros[0]})`);
     if (adiados) partes.push(`o tempo da execução acabou e ${adiados} NP(s) ficam para a próxima`);
     const mensagem = `${partes.join(', ')}.`;
@@ -379,6 +486,9 @@ export interface FaturaDoContrato {
   empenhos: string | null;
   empenhosSemVinculo: number;
   empenhosSemVinculoNumeros: string | null;
+  /** OB da NP na UG da fatura que não confirma o pagamento (migration 123): fatura "a conferir". */
+  pagamentoAConferir?: boolean;
+  obsAConferir?: string | null;
 }
 
 export interface ResumoFaturasContrato {
@@ -386,7 +496,12 @@ export interface ResumoFaturasContrato {
   valorFaturado: number;
   valorLiquidado: number;
   valorPago: number;
+  /** Liquidadas com NP e sem OB: aguardam a OB (migration 122). */
   liquidadasSemPagamento: number;
+  /** Liquidadas sem NP: sem como confirmar o pagamento (migration 122). */
+  liquidadasSemNp: number;
+  /** OB da NP é de outra despesa: pagamento a conferir (migration 123). */
+  pagamentosAConferir: number;
   faturasComNeSemVinculo: number;
   ultimaLiquidacao: string | null;
   ultimoPagamento: string | null;
@@ -399,7 +514,7 @@ export interface FaturasDoContrato {
   sincronizadoEm: string | null;
 }
 
-/** Faturas, resumo e data da última consulta do contrato (views da migration 83). */
+/** Faturas, resumo e data da última consulta do contrato (views das migrations 83, 119 e 122). */
 export async function fetchFaturasDoContrato(contractKey: string): Promise<FaturasDoContrato> {
   if (!isSupabaseConfigured || !supabase || !contractKey) return { faturas: [], resumo: null, sincronizadoEm: null };
   const [lista, resumo, sinc] = await Promise.all([
@@ -428,7 +543,9 @@ export async function fetchFaturasDoContrato(contractKey: string): Promise<Fatur
       npContratos: Number(f.np_contratos ?? 0),
       empenhos: f.empenhos ?? null,
       empenhosSemVinculo: Number(f.empenhos_sem_vinculo ?? 0),
-      empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null
+      empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null,
+      pagamentoAConferir: Boolean(f.pagamento_a_conferir),
+      obsAConferir: f.obs_a_conferir ?? null
     })),
     resumo: r
       ? {
@@ -437,6 +554,8 @@ export async function fetchFaturasDoContrato(contractKey: string): Promise<Fatur
           valorLiquidado: Number(r.valor_liquidado ?? 0),
           valorPago: Number(r.valor_pago ?? 0),
           liquidadasSemPagamento: Number(r.liquidadas_sem_pagamento ?? 0),
+          liquidadasSemNp: Number(r.liquidadas_sem_np ?? 0),
+          pagamentosAConferir: Number(r.pagamentos_a_conferir ?? 0),
           faturasComNeSemVinculo: Number(r.faturas_com_ne_sem_vinculo ?? 0),
           ultimaLiquidacao: r.ultima_liquidacao ?? null,
           ultimoPagamento: r.ultimo_pagamento ?? null

@@ -10,6 +10,8 @@ export interface ContratoDoFinanceiro {
   gestorNome?: string;
   /** Vigência encerrada. */
   expirado?: boolean;
+  /** Fim da vigência (YYYY-MM-DD), quando a fonte informa. */
+  vigenciaFim?: string;
   /** Valor global (ou inicial) do contrato. */
   valor?: number;
   fornecedorCnpj?: string;
@@ -43,6 +45,7 @@ export function useContratosDoFinanceiro() {
         fornecedorNome: r.contract.fornecedorNome || undefined,
         gestorNome: r.gestorNome,
         expirado: r.faixa === 'EXPIRADO',
+        vigenciaFim: r.contract.dataVigenciaFim || undefined,
         valor: r.contract.valorGlobal || r.contract.valorInicial || undefined,
         fornecedorCnpj: r.contract.fornecedorCnpjCpf || undefined
       });

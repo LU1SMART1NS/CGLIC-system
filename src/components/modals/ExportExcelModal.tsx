@@ -14,7 +14,8 @@ import {
   COLUMN_GROUPS, 
   getDefaultColumnsForPreset, 
   generateCustomExcelReport, 
-  downloadExcelFile 
+  downloadExcelFile,
+  colunasSoPorItem
 } from '../../services/excelExportService';
 
 interface ExportExcelModalProps {
@@ -59,7 +60,9 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed.preset) setPreset(parsed.preset);
-          if (parsed.granularity) setGranularity(parsed.granularity);
+          const colunasSalvas: string[] = Array.isArray(parsed.selectedColumnIds) ? parsed.selectedColumnIds : [];
+          const presaPorAta = parsed.granularity === 'BY_ATA' && parsed.preset === 'CUSTOM' && colunasSoPorItem(colunasSalvas).length > 0;
+          if (parsed.granularity) setGranularity(presaPorAta ? 'BY_ITEM' : parsed.granularity);
           if (parsed.selectedColumnIds && Array.isArray(parsed.selectedColumnIds)) {
             setSelectedColumnIds(parsed.selectedColumnIds);
             return;
@@ -87,22 +90,29 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
     }
   };
 
+  /** Marcar coluna de item no resumo por ata muda o nível para 1 linha por item (senão a coluna sairia vazia). */
+  const nivelParaColunas = (cols: string[]): ReportGranularity => {
+    if (granularity !== 'BY_ATA' || colunasSoPorItem(cols).length === 0) return granularity;
+    setGranularity('BY_ITEM');
+    toast.show('Nível mudado para "1 Linha por Item" para trazer os dados de cada item.', 'info');
+    return 'BY_ITEM';
+  };
+
   const handleToggleColumn = (colId: string) => {
     setPreset('CUSTOM');
-    setSelectedColumnIds(prev => {
-      const next = prev.includes(colId) 
-        ? prev.filter(id => id !== colId) 
-        : [...prev, colId];
-      savePreferences(next, 'CUSTOM', granularity);
-      return next;
-    });
+    const next = selectedColumnIds.includes(colId)
+      ? selectedColumnIds.filter(id => id !== colId)
+      : [...selectedColumnIds, colId];
+    setSelectedColumnIds(next);
+    const nivel = next.length > selectedColumnIds.length ? nivelParaColunas(next) : granularity;
+    savePreferences(next, 'CUSTOM', nivel);
   };
 
   const handleSelectAll = () => {
     setPreset('CUSTOM');
     const allIds = ALL_REPORT_COLUMNS.map(c => c.id);
     setSelectedColumnIds(allIds);
-    savePreferences(allIds, 'CUSTOM', granularity);
+    savePreferences(allIds, 'CUSTOM', nivelParaColunas(allIds));
   };
 
   const handleClearAll = () => {
@@ -183,6 +193,9 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
     : ALL_REPORT_COLUMNS.filter(c => c.group === activeGroupFilter);
 
   const totalAtasCount = selectedAta ? 1 : atas.length;
+
+  // No resumo por ata, só ata e fornecedor saem preenchidos; o resto (item, saldo, alocação, contrato) sai "Consolidado" ou "-".
+  const colunasVaziasNoResumo = granularity === 'BY_ATA' ? colunasSoPorItem(selectedColumnIds) : [];
 
   return (
     <Modal
@@ -365,7 +378,7 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
               <select
                 className="form-input"
                 value={granularity}
-                onChange={(e) => setGranularity(e.target.value as ReportGranularity)}
+                onChange={(e) => { const g = e.target.value as ReportGranularity; setGranularity(g); savePreferences(selectedColumnIds, preset, g); }}
                 style={{ width: '100%', fontSize: '0.82rem', padding: '0.45rem 0.6rem', fontWeight: 600 }}
               >
                 <option value="BY_ITEM">1 Linha por Item (Detalhado com Saldos)</option>
@@ -373,6 +386,19 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 <option value="BY_ALLOCATION">1 Linha por Alocação Setorial (Diretorias)</option>
                 <option value="MULTI_SHEET">Pasta Completa com Múltiplas Abas</option>
               </select>
+              {colunasVaziasNoResumo.length > 0 && (
+                <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.6rem', borderRadius: '6px', background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', color: 'var(--color-warning-text)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                  Neste nível sai uma linha por ata: {colunasVaziasNoResumo.length === 1 ? 'a coluna' : 'as colunas'} {colunasVaziasNoResumo.slice(0, 3).map(c => `"${c.label}"`).join(', ')}{colunasVaziasNoResumo.length > 3 ? ` e mais ${colunasVaziasNoResumo.length - 3}` : ''} não {colunasVaziasNoResumo.length === 1 ? 'terá' : 'terão'} os dados de cada item.{' '}
+                  <AppButton
+                    variant="link"
+                    size="sm"
+                    type="button"
+                    onClick={() => { setGranularity('BY_ITEM'); savePreferences(selectedColumnIds, preset, 'BY_ITEM'); }}
+                  >
+                    Mudar para 1 linha por item
+                  </AppButton>
+                </div>
+              )}
             </div>
 
             {/* Escopo */}

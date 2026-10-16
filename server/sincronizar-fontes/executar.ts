@@ -32,7 +32,23 @@ import {
   ORCAMENTO_CONTRATOS_PARTICIPANTES_MS,
   sincronizarContratosParticipantes
 } from '../../src/services/contratosParticipantesSyncService';
+import {
+  contarCadastroUasgsPendentes,
+  ORCAMENTO_CADASTRO_UASGS_MS,
+  sincronizarCadastroUasgs
+} from '../../src/services/cadastroUasgsSyncService';
+import {
+  contarItensNotasSiafiPendentes,
+  ORCAMENTO_ITENS_NOTAS_SIAFI_MS,
+  sincronizarItensNotasSiafi
+} from '../../src/services/itensNotasSiafiSyncService';
+import {
+  contarSaldoContabilPendentes,
+  ORCAMENTO_SALDO_CONTABIL_MS,
+  sincronizarSaldoContabil
+} from '../../src/services/saldoContabilSyncService';
 import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFontesService';
+import { lerAmbiente } from './ambiente';
 
 /**
  * Tempo máximo para consultar itens de atas numa execução. A Edge Function tem no máximo 150 s (plano
@@ -40,12 +56,12 @@ import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFon
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
   recurso: RecursoDoServidor;
-  /** Obrigatória para todos os recursos, exceto saldos_itens, que vale para todas as carteiras. */
+  /** Obrigatória para todos os recursos, exceto saldos_itens e cadastro_uasgs, que valem para todas as carteiras. */
   uasg?: string;
   /** Ignora a validade (só o coordenador). */
   forcar?: boolean;
@@ -77,6 +93,14 @@ export interface DependenciasDeExecucao {
   testarAtasParticipacao: typeof testarAtasParticipacao;
   sincronizarContratosParticipantes: typeof sincronizarContratosParticipantes;
   contarContratosParticipantesPendentes: typeof contarContratosParticipantesPendentes;
+  sincronizarCadastroUasgs: typeof sincronizarCadastroUasgs;
+  contarCadastroUasgsPendentes: typeof contarCadastroUasgsPendentes;
+  sincronizarItensNotasSiafi: typeof sincronizarItensNotasSiafi;
+  contarItensNotasSiafiPendentes: typeof contarItensNotasSiafiPendentes;
+  sincronizarSaldoContabil: typeof sincronizarSaldoContabil;
+  contarSaldoContabilPendentes: typeof contarSaldoContabilPendentes;
+  /** Chave da API do Portal da Transparência (segredo PORTAL_TRANSPARENCIA_CHAVE da Edge Function). */
+  chaveDoPortal: () => string | undefined;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
   fetchArpsDasFontes: typeof fetchArpsDasFontes;
   agora: () => number;
@@ -129,6 +153,13 @@ const PADRAO: DependenciasDeExecucao = {
   testarAtasParticipacao,
   sincronizarContratosParticipantes,
   contarContratosParticipantesPendentes,
+  sincronizarCadastroUasgs,
+  contarCadastroUasgsPendentes,
+  sincronizarItensNotasSiafi,
+  contarItensNotasSiafiPendentes,
+  sincronizarSaldoContabil,
+  contarSaldoContabilPendentes,
+  chaveDoPortal: () => lerAmbiente('PORTAL_TRANSPARENCIA_CHAVE')?.trim() || undefined,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
   agora: () => Date.now()
@@ -141,7 +172,7 @@ export function validarPedido(corpo: unknown): { ok: true; pedido: PedidoDeSincr
   if (typeof recurso !== 'string' || !(RECURSOS_DO_SERVIDOR as readonly string[]).includes(recurso)) {
     return { ok: false, erro: `Recurso inválido. Use: ${RECURSOS_DO_SERVIDOR.join(', ')}.` };
   }
-  if (recurso !== 'saldos_itens') {
+  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs') {
     if (typeof uasg !== 'string' || !UASGS_CGLIC.includes(uasg.trim())) {
       return { ok: false, erro: `UASG inválida. Use: ${UASGS_CGLIC.join(', ')}.` };
     }
@@ -185,6 +216,12 @@ export async function executarPedido(
       consulta = { ...(await deps.testarAtasParticipacao(uasg as string, { orcamentoMs: ORCAMENTO_ATAS_PARTICIPACAO_MS })) };
     } else if (pedido.recurso === 'contratos_participantes') {
       consulta = { ...(await deps.contarContratosParticipantesPendentes(uasg as string)) };
+    } else if (pedido.recurso === 'cadastro_uasgs') {
+      consulta = { ...(await deps.contarCadastroUasgsPendentes()) };
+    } else if (pedido.recurso === 'itens_notas_siafi') {
+      consulta = { ...(await deps.contarItensNotasSiafiPendentes(uasg as string, deps.chaveDoPortal())) };
+    } else if (pedido.recurso === 'saldo_contabil') {
+      consulta = await deps.contarSaldoContabilPendentes(uasg as string);
     } else if (pedido.recurso === 'empenhos') {
       consulta = await deps.consultarEmpenhosDeTeste(uasg as string);
     } else if (pedido.recurso === 'faturas' || pedido.recurso === 'ordens_bancarias') {
@@ -206,6 +243,16 @@ export async function executarPedido(
     resultado = await deps.sincronizarAtasParticipacao(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_ATAS_PARTICIPACAO_MS });
   } else if (pedido.recurso === 'contratos_participantes') {
     resultado = await deps.sincronizarContratosParticipantes(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_CONTRATOS_PARTICIPANTES_MS });
+  } else if (pedido.recurso === 'cadastro_uasgs') {
+    resultado = await deps.sincronizarCadastroUasgs({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_CADASTRO_UASGS_MS });
+  } else if (pedido.recurso === 'itens_notas_siafi') {
+    resultado = await deps.sincronizarItensNotasSiafi(uasg as string, {
+      chave: deps.chaveDoPortal(),
+      forcar: pedido.forcar,
+      orcamentoMs: ORCAMENTO_ITENS_NOTAS_SIAFI_MS
+    });
+  } else if (pedido.recurso === 'saldo_contabil') {
+    resultado = await deps.sincronizarSaldoContabil(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_SALDO_CONTABIL_MS });
   } else if (pedido.recurso === 'empenhos') {
     resultado = await deps.sincronizarEmpenhosDaCarteira(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
   } else if (pedido.recurso === 'faturas') {

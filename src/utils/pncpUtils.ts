@@ -106,6 +106,17 @@ export function formatPncpAtaUrl(
 }
 
 /**
+ * PDF da ata assinada no PNCP: o primeiro arquivo da ata (os seguintes são aditivos e apostilamentos).
+ * Padrão: https://pncp.gov.br/pncp-api/v1/orgaos/{cnpj}/compras/{ano}/{seqCompra}/atas/{seqAta}/arquivos/1
+ */
+export function formatPncpAtaPdfUrl(numeroControlePncpAta?: string | null): string {
+  const match = (numeroControlePncpAta || '').trim().match(/^(\d{14})-1-0*(\d+)\/(\d{4})-0*(\d+)$/);
+  if (!match) return '';
+  const [, cnpj, seqCompra, ano, seqAta] = match;
+  return `https://pncp.gov.br/pncp-api/v1/orgaos/${cnpj}/compras/${ano}/${seqCompra}/atas/${seqAta}/arquivos/1`;
+}
+
+/**
  * Retorna a URL oficial do Edital / Compra da Ata no PNCP
  * Padrão oficial: https://pncp.gov.br/app/editais/{cnpj}/{ano}/{seqCompraComZeros}
  */
