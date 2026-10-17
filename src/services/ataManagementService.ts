@@ -284,7 +284,8 @@ export async function fetchAllAtaTaskPlans(): Promise<Record<string, AtaTaskPlan
     }
     return map;
   } catch (err) {
+    // Falha vira erro (o Início avisa): um mapa vazio fazia as tarefas atrasadas sumirem.
     console.warn('Erro ao carregar todos os planos de gestão de Ata', err);
-    return {};
+    throw err;
   }
 }

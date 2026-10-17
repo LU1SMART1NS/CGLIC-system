@@ -278,7 +278,11 @@ export async function fetchArps(params: FilterParams): Promise<ArpResponse> {
     };
   } catch (error) {
     console.warn("Falha na requisição API. Consultando cache do Supabase...", error);
-    const cached = await fetchArpsFromDb(params.codigoUnidadeGerenciadora, params.numeroAtaRegistroPreco);
+    // Reserva da sincronização: se o banco também não responder, segue como antes (lista vazia), sem derrubar quem chamou.
+    const cached = await fetchArpsFromDb(params.codigoUnidadeGerenciadora, params.numeroAtaRegistroPreco).catch((erroDoBanco) => {
+      console.warn('Falha ao ler as atas do banco como reserva da API', erroDoBanco);
+      return { arps: [] as ArpRecord[] };
+    });
     return {
       resultado: cached.arps,
       totalRegistros: cached.arps.length,

@@ -11,18 +11,30 @@ import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParc
 import type { ItemDaAta } from './vinculoEmMassa';
 import { chaveGestaoDaArp } from '../../../utils/ataIdentidade';
 import type { EstadoMotivos } from '../../../utils/vinculoAutomatico';
+import type { ArpItemContractLinkPair } from '../../../services/arpContractLinkService';
+import type { ContratoSemAtaConfirmacao } from '../../../services/contratoSemAtaService';
+import type { DescarteAtaContrato } from '../../../services/contratoAtaDescarteService';
+import { ROTULO_VINCULOS_ITEM_CONTRATO } from '../../../hooks/useAssignedManagementScope';
+import { naoCarregou, type LeituraDaTela } from '../../fonte/useLeiturasComFalha';
 
 /**
  * Atas, contratos e vínculos da carteira, cruzados para dizer quais contratos ainda não têm ata (e qual é a ata
  * provável). Serve à fila "Contratos à ata" do menu Vínculos e à Central de Distribuição (atas sem gestor e carga
  * por gestor usam as mesmas pendências).
  */
+const SEM_LINKS: ArpItemContractLinkPair[] = [];
+const SEM_CONFIRMACOES: Record<string, ContratoSemAtaConfirmacao> = {};
+const SEM_DESCARTES: Record<string, DescarteAtaContrato> = {};
+
 export function usePendenciasVinculoAta() {
   const atas = useAtasPortfolio();
   const contratos = useContractsPortfolio();
-  const { data: links = [], isLoading: linksLoading } = useArpItemContractLinks();
-  const { data: confirmacoesSemAta = {}, isLoading: semAtaLoading } = useContratosSemAta();
-  const { data: descartesAta = {} } = useDescartesAtaContrato();
+  const linksQuery = useArpItemContractLinks();
+  const { data: links = SEM_LINKS, isLoading: linksLoading } = linksQuery;
+  const semAtaQuery = useContratosSemAta();
+  const { data: confirmacoesSemAta = SEM_CONFIRMACOES, isLoading: semAtaLoading } = semAtaQuery;
+  const descartesQuery = useDescartesAtaContrato();
+  const { data: descartesAta = SEM_DESCARTES } = descartesQuery;
   const motivosQuery = useMotivosVinculoManual();
   const motivosManual = motivosQuery.data;
   /** Leitura dos motivos (RPC prever_vinculos_automaticos): a fila não promete vínculo automático enquanto carrega ou se falhou. */
@@ -114,10 +126,26 @@ export function usePendenciasVinculoAta() {
   // Marcados "não pertence a ata" e ainda sem gestor: continuam pendentes na fila de Vínculos.
   const naoPertencemSemGestor = pendencias.naoPertencem.filter((i) => !i.gestorNome).length;
 
+  /** Leituras da fila, para a faixa "não carregou". */
+  const leituras: LeituraDaTela[] = [
+    ...(atas.leiturasDasAtas ?? []),
+    ...(contratos.leiturasDosContratos ?? []),
+    { rotulo: ROTULO_VINCULOS_ITEM_CONTRATO, query: linksQuery },
+    { rotulo: 'contratos marcados "não pertence a ata"', query: semAtaQuery },
+    { rotulo: 'atas descartadas', query: descartesQuery }
+  ];
+  /**
+   * Sem os vínculos, todo contrato pareceria sem ata; sem as marcas "não pertence", eles voltariam à fila. A fila e o
+   * número do menu esperam essas duas leituras em vez de mostrar uma pendência que não existe.
+   */
+  const filaIndisponivel = naoCarregou(linksQuery) || naoCarregou(semAtaQuery);
+
   return {
     atas,
     contratos,
     links,
+    leituras,
+    filaIndisponivel,
     confirmacoesSemAta,
     motivosManual,
     motivosEstado,

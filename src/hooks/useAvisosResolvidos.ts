@@ -5,6 +5,9 @@ import { fetchAvisosResolvidos, type AvisoResolvido } from '../services/avisosRe
 import { useAuth } from '../context/AuthContext';
 
 export const AVISOS_RESOLVIDOS_QUERY_KEY = ['avisos-resolvidos'] as const;
+/** Rótulo da leitura na faixa "não carregou": sem ela, avisos resolvidos e notas deixadas como estão voltam a aparecer. */
+export const ROTULO_AVISOS_RESOLVIDOS = 'avisos resolvidos e notas deixadas como estão';
+const SEM_AVISOS: AvisoResolvido[] = [];
 
 /** Quem pode marcar aviso como resolvido e reexibir (decisão de 08/10/2026). */
 export function podeResolverAvisos(role: string | null | undefined): boolean {
@@ -24,11 +27,12 @@ export function useAvisosResolvidos() {
   const queryClient = useQueryClient();
   const { role } = useAuth();
 
-  const { data = [] } = useQuery<AvisoResolvido[], Error>({
+  const consulta = useQuery<AvisoResolvido[], Error>({
     queryKey: AVISOS_RESOLVIDOS_QUERY_KEY,
     queryFn: fetchAvisosResolvidos,
     staleTime: 5 * 60 * 1000
   });
+  const data = consulta.data ?? SEM_AVISOS;
 
   const porChave = useMemo(() => new Map(data.map((a) => [a.chave, a])), [data]);
 
@@ -52,5 +56,13 @@ export function useAvisosResolvidos() {
     onSuccess: invalidate
   });
 
-  return { porChave, resolver, reexibir, podeResolver: podeResolverAvisos(role), podeConcluirTarefas: podeConcluirTarefas(role) };
+  return {
+    porChave,
+    resolver,
+    reexibir,
+    podeResolver: podeResolverAvisos(role),
+    podeConcluirTarefas: podeConcluirTarefas(role),
+    /** A leitura, para a faixa "não carregou". */
+    consulta
+  };
 }

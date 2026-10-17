@@ -115,6 +115,8 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Banco sem ciclos de pagamento (o padrão do vi.fn() é undefined, que agora vira falha da fonte).
+    vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockResolvedValue([]);
   });
 
   describe('getContractDaysRemaining', () => {
@@ -1132,6 +1134,25 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       ]);
     });
 
+    it('as seis fontes que devolviam vazio caladas (atas, gestores, planos, avisos resolvidos, ciclos) entram na faixa; os contratos ficam', async () => {
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockResolvedValue([
+        { id: 'c1', numero: '01/2026', ano: 2026, uasg: '209995', objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', dataVigenciaFim: '2027-06-30', fonteDados: 'PNCP' } as any
+      ]);
+      const timeout = () => new Error('canceling statement due to statement timeout');
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValueOnce(timeout());
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockRejectedValueOnce(timeout());
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockRejectedValueOnce(timeout());
+      vi.mocked(ataManagementService.fetchAllAtaTaskPlans).mockRejectedValueOnce(timeout());
+      vi.mocked(avisosResolvidosService.fetchAvisosResolvidos).mockRejectedValueOnce(timeout());
+      vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockRejectedValueOnce(timeout());
+
+      const result = await fetchManagementDashboardData('209995', referenceDate);
+      expect(result.executive.totalContratos).toBe(1);
+      expect((result.fontesComFalha ?? []).map((f) => f.rotulo).sort()).toEqual(
+        ['atas (ARPs)', 'avisos resolvidos e notas deixadas como estão', 'ciclos de pagamento', 'gestores dos contratos', 'planos de gestão das atas', 'planos de tarefas dos contratos'].sort()
+      );
+    });
+
     it('contratos que não carregaram do banco: o painel avisa (faixa "não carregou"), sem lista inventada', async () => {
       vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockRejectedValue(
         new Error('Não foi possível ler os contratos da UASG 209993 no banco (página 1): canceling statement due to statement timeout')
@@ -1416,14 +1437,13 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(result[0].contractKey).toBe('c1');
     });
 
-    it('retorna array vazio (sem lançar) se a consulta ao Supabase falhar', async () => {
+    it('falha do banco vira erro (o painel avisa na faixa), e não uma lista vazia calada', async () => {
       const contracts: ContractDashboardRecord[] = [
         { id: 'c1', numero: '01/2026', ano: 2026, numeroFormatado: '01/2026', uasg: '200331', objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', fonteDados: 'PNCP' } as any
       ];
       vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockRejectedValue(new Error('network error'));
 
-      const result = await fetchAllPaymentCyclesForDashboard(contracts);
-      expect(result).toEqual([]);
+      await expect(fetchAllPaymentCyclesForDashboard(contracts)).rejects.toThrow('network error');
     });
   });
 });

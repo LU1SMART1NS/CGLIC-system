@@ -1729,10 +1729,11 @@ export async function fetchManagementDashboardData(
   ] = await Promise.all([
     ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
     ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
-    ler('gestores', 'gestores', cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg), {} as Record<string, ContractManager>),
+    // Rótulos iguais aos das leituras da tela (ROTULO_GESTORES_CONTRATOS, ROTULO_AVISOS_RESOLVIDOS): a faixa junta numa linha.
+    ler('gestores', 'gestores dos contratos', cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg), {} as Record<string, ContractManager>),
     ler('planos', 'planos de tarefas dos contratos', fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
     lerSemUasg('planosAtas', 'planos de gestão das atas', fetchAllAtaTaskPlans, {} as Record<string, AtaTaskPlan>),
-    lerSemUasg('avisosResolvidos', 'avisos resolvidos', () => fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
+    lerSemUasg('avisosResolvidos', 'avisos resolvidos e notas deixadas como estão', () => fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
     lerSemUasg('empenhos', 'empenhos', fetchEmpenhosResumoFromDb, [] as any[]),
     ler('saldoItens', 'saldo dos itens', fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
     lerSemUasg('alocacao', 'alocação interna dos itens', fetchItensComAlocacao, new Set<string>()),
@@ -1844,13 +1845,9 @@ export async function fetchAllPaymentCyclesForDashboard(contracts?: ContractDash
     .map((c) => c?.id || (c as any)?.contractKey || `${c?.numero || ''}${c?.ano ? `/${c.ano}` : ''}`)
     .filter(Boolean);
 
-  try {
-    const rows = await fetchPaymentCyclesForContracts(contractKeys);
-    return rows.map((row) => rowToPaymentFollowUpCycle(row));
-  } catch (err) {
-    console.warn('Erro ao carregar ciclos de pagamento persistidos:', err);
-    return [];
-  }
+  // Falha vira erro: o painel (lerFonte) usa a última leitura boa e avisa, em vez de sumir com os ciclos.
+  const rows = await fetchPaymentCyclesForContracts(contractKeys);
+  return rows.map((row) => rowToPaymentFollowUpCycle(row));
 }
 
 /**

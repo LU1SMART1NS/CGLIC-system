@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActionButton, AppTextarea, Modal, StatusBadge, useToast } from '../../design-system';
-import { useAvisosResolvidos } from '../../hooks/useAvisosResolvidos';
+import { ROTULO_AVISOS_RESOLVIDOS, useAvisosResolvidos } from '../../hooks/useAvisosResolvidos';
 import { JUSTIFICATIVA_MAX, JUSTIFICATIVA_MIN, type AvisoResolvido } from '../../services/avisosResolvidosService';
 import { dataBR } from '../financeiro/financeiroFormat';
 
@@ -20,7 +20,7 @@ const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fon
  */
 export function useDeixarComoEsta(regra: string) {
   const toast = useToast();
-  const { porChave, resolver, reexibir, podeResolver } = useAvisosResolvidos();
+  const { porChave, resolver, reexibir, podeResolver, consulta } = useAvisosResolvidos();
   const [alvo, setAlvo] = React.useState<AlvoDeixarComoEsta | null>(null);
   const [texto, setTexto] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
@@ -105,7 +105,16 @@ export function useDeixarComoEsta(regra: string) {
     </Modal>
   );
 
-  return { abrir, dialog, porChave, reexibir: reexibirLinha, reexibindo: reexibir.isPending, podeDeixar: podeResolver };
+  return {
+    abrir,
+    dialog,
+    porChave,
+    reexibir: reexibirLinha,
+    reexibindo: reexibir.isPending,
+    podeDeixar: podeResolver,
+    /** Leitura das marcas, para a faixa "não carregou" (sem ela as notas deixadas como estão voltam à fila). */
+    leitura: { rotulo: ROTULO_AVISOS_RESOLVIDOS, query: consulta }
+  };
 }
 
 /** Na coluna de situação: "Deixada como está · quem, quando" e a justificativa. */

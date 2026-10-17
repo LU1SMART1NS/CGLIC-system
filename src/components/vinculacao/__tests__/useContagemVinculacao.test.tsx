@@ -64,4 +64,16 @@ describe('número do menu Vínculos (empenhos)', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
     expect(render()).toContain('nulo');
   });
+
+  it('contratos que não carregaram: sem número (a vigência e o recorte dependem deles), em vez de um número errado', () => {
+    vi.mocked(useContratosDoFinanceiro).mockReturnValue({
+      contrato: (k: string) => ({ numero: k }),
+      escopo: null,
+      isLoading: false,
+      lista: [],
+      showGestorFilter: true,
+      contratosNaoCarregaram: true
+    } as any);
+    expect(render()).toContain('nulo');
+  });
 });

@@ -3,7 +3,9 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { useSearchParams } from 'react-router-dom';
 import { useManagementDashboard } from '../../hooks/useManagementDashboard';
 import { useAllContractManagers } from '../../hooks/useAllContractManagers';
-import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
+import { ROTULO_GESTORES_ATAS, ROTULO_GESTORES_CONTRATOS, useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
+import { ROTULO_AVISOS_RESOLVIDOS } from '../../hooks/useAvisosResolvidos';
+import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
 import { useRefreshItemSaldos } from '../../hooks/useRefreshItemSaldos';
 import { useSincronizacaoContratos } from '../../hooks/useSincronizacaoContratos';
 import { avisoComoItemDeAtencao, useAvisosPagamentoGerais } from '../../hooks/useAvisosPagamento';
@@ -17,7 +19,7 @@ import { GestaoInstrumentosTable } from './GestaoInstrumentosTable';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import type { DashboardAttentionCategory, FonteComFalha } from '../../types/managementDashboard';
-import { FontesComFalhaAviso } from './FontesComFalhaAviso';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 import { getLookupKey, getInstrumentoInfo, motivoDoEndereco, motivoNoFiltro, type AttentionItemWithUasg } from './gestaoInstrumentosRowHelpers';
 import type { CarteiraFilterOption } from '../carteira/CarteiraFilterButton';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
@@ -103,7 +105,8 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   const managers200330 = useAllContractManagers(UASGS[0]);
   const managers200331 = useAllContractManagers(UASGS[1]);
-  const { data: ataManagers, isLoading: ataManagersLoading } = useAllAtaManagers();
+  const ataManagersQuery = useAllAtaManagers();
+  const { data: ataManagers, isLoading: ataManagersLoading } = ataManagersQuery;
 
   const { role } = useAuth();
   const saldosOnly = role === 'gestor_saldos';
@@ -168,15 +171,16 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const dataUpdatedAt = Math.max(...dashboards.map((d) => d.dataUpdatedAt || 0)) || undefined;
   // Fontes que falharam nesta leitura (ex.: saldo dos itens estourando o tempo limite): o resto da tela segue
   // e o aviso diz o que ficou de fora. Uma linha por fonte; "não carregou" vence "não atualizou".
-  const fontesComFalha = useMemo(() => {
-    const porRotulo = new Map<string, FonteComFalha>();
-    for (const d of dashboards) {
-      for (const f of d.readModel?.fontesComFalha ?? []) {
-        if (!porRotulo.has(f.rotulo) || f.situacao === 'NAO_CARREGOU') porRotulo.set(f.rotulo, f);
-      }
-    }
-    return [...porRotulo.values()];
-  }, [dashboards]);
+  // As leituras que a tela faz por fora do painel (gestores, recorte do gestor) entram na mesma faixa: sem elas o
+  // perfil gestor via o Início vazio e a coluna Responsável em branco, sem aviso.
+  const leiturasDaTela = useLeiturasComFalha([
+    { rotulo: ROTULO_GESTORES_CONTRATOS, query: managers200330 },
+    { rotulo: ROTULO_GESTORES_CONTRATOS, query: managers200331 },
+    { rotulo: ROTULO_GESTORES_ATAS, query: ataManagersQuery },
+    ...(scope200330.leituras ?? []),
+    ...(scope200331.leituras ?? [])
+  ]);
+  const fontesDoPainel = useMemo(() => dashboards.flatMap((d) => d.readModel?.fontesComFalha ?? []), [dashboards]);
   // Relê só o painel (sem disparar a sincronização com as fontes oficiais, que é pesada).
   const lerPainelDeNovo = useCallback(() => {
     for (const d of dashboards) void d.refetch();
@@ -204,6 +208,23 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // (o Início já vem do banco sem os resolvidos, mas fica em cache por alguns minutos).
   const resolucao = useResolverAviso();
   const { porChave: avisosResolvidos, tarefasConcluidas } = resolucao;
+  // A lista viva dos resolvidos não carregou: vale a separação que o painel já fez (attention.resolvidos), senão os
+  // avisos resolvidos voltariam para a lista como se estivessem em aberto.
+  const resolvidosDoPainel = resolucao.consulta ? naoCarregou(resolucao.consulta) : false;
+  const leituraDosResolvidos = useLeiturasComFalha(resolucao.consulta ? [{ rotulo: ROTULO_AVISOS_RESOLVIDOS, query: resolucao.consulta }] : []);
+  // Uma linha por fonte na faixa; "não carregou" vence "não atualizou".
+  const fontesComFalha = useMemo(() => {
+    const porRotulo = new Map<string, FonteComFalha>();
+    for (const f of [...fontesDoPainel, ...leiturasDaTela.falhas, ...leituraDosResolvidos.falhas]) {
+      if (!porRotulo.has(f.rotulo) || f.situacao === 'NAO_CARREGOU') porRotulo.set(f.rotulo, f);
+    }
+    return [...porRotulo.values()];
+  }, [fontesDoPainel, leiturasDaTela.falhas, leituraDosResolvidos.falhas]);
+  const tentarDeNovo = () => {
+    lerPainelDeNovo();
+    void leiturasDaTela.tentarDeNovo();
+    void leituraDosResolvidos.tentarDeNovo();
+  };
 
   const { allItems, itensResolvidos } = useMemo(() => {
     const ativos: AttentionItemWithUasg[] = [];
@@ -211,11 +232,13 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     for (const uasg of uasgsAtivas) {
       const dash = uasg === UASGS[0] ? dash200330 : dash200331;
       const attention = dash.readModel?.attention;
+      const jaResolvidos = new Set(attention?.resolvidos || []);
       for (const item of [...(attention?.items || []), ...(attention?.resolvidos || [])]) {
         if (saldosOnly && item.category !== 'ATA_CRITICA' && item.category !== 'QUANTITATIVOS') continue;
         if (semQuantitativos && item.category === 'QUANTITATIVOS') continue;
         if (item.taskId && tarefasConcluidas.has(item.taskId)) continue;
-        (item.avisoChave && avisosResolvidos.has(item.avisoChave) ? resolvidos : ativos).push({ ...item, uasg });
+        const resolvido = resolvidosDoPainel ? jaResolvidos.has(item) : Boolean(item.avisoChave && avisosResolvidos.has(item.avisoChave));
+        (resolvido ? resolvidos : ativos).push({ ...item, uasg });
       }
     }
     // Avisos de pagamento são calculados para a carteira inteira do perfil: com UASG ou gestor escolhido, ficam só os
@@ -229,7 +252,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     }
     return { allItems: ativos, itensResolvidos: resolvidos };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, uasgsAtivas, gestorEscolhido, scope200330.contractKeys, scope200331.contractKeys, saldosOnly, semQuantitativos, avisosPagamento, avisosResolvidos, tarefasConcluidas]);
+  }, [dash200330.readModel, dash200331.readModel, uasgsAtivas, gestorEscolhido, scope200330.contractKeys, scope200331.contractKeys, saldosOnly, semQuantitativos, avisosPagamento, avisosResolvidos, resolvidosDoPainel, tarefasConcluidas]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -506,9 +529,14 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     </PainelGaveta>
   );
 
-  // Gestor sem nenhuma ata ou contrato atribuído: em vez de um painel zerado, explica o que falta.
+  // Gestor sem nenhuma ata ou contrato atribuído: em vez de um painel zerado, explica o que falta. Se a leitura das
+  // atribuições falhou, não é "sem carteira": a faixa diz o que não carregou.
+  const escopoNaoCarregou = [...(scope200330.leituras ?? []), ...(scope200331.leituras ?? [])].some((l) => naoCarregou(l.query));
   const semCarteira =
-    ehGestor && !scopeLoading && (scope200330.contractKeys?.length ?? 0) + (scope200331.contractKeys?.length ?? 0) + (scope200330.ataKeys?.length ?? 0) === 0;
+    ehGestor &&
+    !scopeLoading &&
+    !escopoNaoCarregou &&
+    (scope200330.contractKeys?.length ?? 0) + (scope200331.contractKeys?.length ?? 0) + (scope200330.ataKeys?.length ?? 0) === 0;
 
   if (isError) {
     return (
@@ -538,7 +566,13 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         onLimpar={limparFiltrosDoPainel}
       />
 
-      <FontesComFalhaAviso falhas={fontesComFalha} onTentar={lerPainelDeNovo} tentando={isFetching} />
+      <FontesComFalhaAviso
+        falhas={fontesComFalha}
+        onTentar={tentarDeNovo}
+        tentando={isFetching || leiturasDaTela.tentando || leituraDosResolvidos.tentando}
+        onde="do Início"
+        testIdPrefix="inicio-fontes"
+      />
 
       {semCarteira ? (
         <EmptyState

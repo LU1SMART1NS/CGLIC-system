@@ -11,7 +11,11 @@ vi.mock('@tanstack/react-query', async (importOriginal) => ({
   useQuery: vi.fn(() => ({ data: undefined, isLoading: false, refetch: vi.fn() })),
   useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() }))
 }));
-vi.mock('../../hooks/useFinanceiroCarteira', () => ({ usePagamentosCarteira: vi.fn(), useSincronizacaoPagamentos: vi.fn() }));
+vi.mock('../../hooks/useFinanceiroCarteira', async (orig) => ({
+  ...(await orig<typeof import('../../hooks/useFinanceiroCarteira')>()),
+  usePagamentosCarteira: vi.fn(),
+  useSincronizacaoPagamentos: vi.fn()
+}));
 vi.mock('../../hooks/useContractsPortfolio', () => ({
   useContractsPortfolio: vi.fn(() => ({
     rows: [{ contractKey: '200331-00094-2022', contract: { numero: '00094', ano: 2022, fornecedorNome: 'MIRANDA TURISMO' }, gestorNome: 'Marina Costa' }],
@@ -94,7 +98,8 @@ describe('Financeiro → Pagamentos', () => {
       isLoading: false,
       isFetching: false,
       error: null,
-      refetch: vi.fn()
+      refetch: vi.fn(),
+      leituras: []
     } as never);
   });
 
@@ -162,5 +167,58 @@ describe('Financeiro → Pagamentos', () => {
     expect(html).not.toContain('Gargalo CGOFI');
     expect(html).not.toContain('Fluxo Operacional');
     expect(html).not.toContain('Ver contrato');
+  });
+
+  describe('uma leitura falha: a faixa avisa e o resto fica', () => {
+    const falhou = (mensagem = 'canceling statement due to statement timeout') => ({ data: undefined, isError: true, error: new Error(mensagem), refetch: vi.fn() });
+    const ok = { data: [], isError: false, error: null, refetch: vi.fn() };
+
+    it('conferência do Tesouro não carregou: a faixa diz o quê, o segmento não inventa zeros e as contagens ficam', () => {
+      const atual = vi.mocked(financeiroModule.usePagamentosCarteira)();
+      vi.mocked(financeiroModule.usePagamentosCarteira).mockReturnValue({
+        ...atual,
+        leituras: [
+          { rotulo: financeiroModule.ROTULOS_FINANCEIRO.faturas, query: ok },
+          { rotulo: financeiroModule.ROTULOS_FINANCEIRO.tesouro, query: falhou() },
+          { rotulo: financeiroModule.ROTULOS_FINANCEIRO.ciclos, query: ok }
+        ]
+      } as never);
+      const html = render();
+      expect(html).toContain('data-testid="pagamentos-fontes-com-falha"');
+      expect(html).toContain('Parte dos Pagamentos não carregou');
+      expect(html).toContain('<strong>Conferência das faturas pelo Tesouro</strong>');
+      expect(html).toContain('a consulta demorou mais que o tempo limite do banco');
+      expect(html).toContain('A conferência pelo Tesouro não carregou.');
+      expect(html).not.toContain('Pelo Tesouro: ');
+      // Os números das outras fontes não mudam.
+      expect(html).toMatch(/Precisa de ação<span[^>]*>1</);
+      expect(html).toMatch(/Em tramitação<span[^>]*>2</);
+      expect(html).toMatch(/A conferir<span[^>]*>4</);
+    });
+
+    it('faturas e ciclos não carregaram: "os pagamentos não carregaram" no lugar de "nenhum pagamento"', () => {
+      vi.mocked(financeiroModule.usePagamentosCarteira).mockReturnValue({
+        rows: [],
+        isLoading: false,
+        isFetching: false,
+        error: new Error('Failed to fetch'),
+        refetch: vi.fn(),
+        leituras: [
+          { rotulo: financeiroModule.ROTULOS_FINANCEIRO.faturas, query: falhou('Failed to fetch') },
+          { rotulo: financeiroModule.ROTULOS_FINANCEIRO.ciclos, query: falhou('Failed to fetch') }
+        ]
+      } as never);
+      const html = render();
+      expect(html).toContain('data-testid="pagamentos-fontes-com-falha"');
+      expect(html).toContain('<strong>Faturas</strong>');
+      expect(html).toContain('<strong>Ciclos de pagamento</strong>');
+      expect(html).toContain('data-testid="pagamentos-nao-carregou"');
+      expect(html).not.toContain('Nenhum pagamento encontrado');
+      expect(html).not.toContain('Erro ao carregar os pagamentos');
+    });
+
+    it('tudo carregou: sem faixa', () => {
+      expect(render()).not.toContain('pagamentos-fontes-com-falha');
+    });
   });
 });

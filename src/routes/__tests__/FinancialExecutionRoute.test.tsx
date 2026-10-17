@@ -6,10 +6,13 @@ import * as sincronizacaoModule from '../../hooks/useSincronizacaoEmpenhos';
 import * as financeiroModule from '../../hooks/useFinanceiroCarteira';
 import * as authModule from '../../context/AuthContext';
 import type { EmpenhoCarteiraRow } from '../../services/financeiroCarteiraService';
+import * as vinculacaoModule from '../../hooks/useVinculacaoEmpenhos';
+import * as portfolioModule from '../../hooks/useContractsPortfolio';
 
-vi.mock('../../hooks/useFinanceiroCarteira', () => ({ useEmpenhosCarteira: vi.fn() }));
+vi.mock('../../hooks/useFinanceiroCarteira', async (orig) => ({ ...(await orig<typeof import('../../hooks/useFinanceiroCarteira')>()), useEmpenhosCarteira: vi.fn() }));
 vi.mock('../../hooks/useSincronizacaoEmpenhos', () => ({ useSincronizacaoEmpenhos: vi.fn() }));
-vi.mock('../../hooks/useVinculacaoEmpenhos', () => ({ useSituacaoDistribuicaoPorEmpenho: () => ({ data: new Map([['e1', { empenhoId: 'e1', contractKey: 'K', situacao: 'A_DISTRIBUIR', origem: null }]]) }) }));
+const situacaoPadrao = () => ({ data: new Map([['e1', { empenhoId: 'e1', contractKey: 'K', situacao: 'A_DISTRIBUIR', origem: null }]]) });
+vi.mock('../../hooks/useVinculacaoEmpenhos', () => ({ useSituacaoDistribuicaoPorEmpenho: vi.fn(() => situacaoPadrao()) }));
 vi.mock('../../hooks/useContractsPortfolio', () => ({
   useContractsPortfolio: vi.fn(() => ({
     rows: [
@@ -73,7 +76,8 @@ describe('Financeiro → Empenhos', () => {
       isLoading: false,
       isFetching: false,
       error: null,
-      refetch: vi.fn()
+      refetch: vi.fn(),
+      leituras: []
     } as never);
     vi.mocked(authModule.useAuth).mockReturnValue({ role: 'admin' } as never);
   });
@@ -161,5 +165,39 @@ describe('Financeiro → Empenhos', () => {
     const html = render();
     expect(html).toContain('Atualizado');
     expect(html).not.toContain('data-testid="financial-execution-refresh-btn"');
+  });
+
+  describe('uma leitura falha: a faixa avisa e o resto fica', () => {
+    const falhou = () => ({ data: undefined, isError: true, error: new Error('canceling statement due to statement timeout'), refetch: vi.fn() });
+
+    it('situação das notas nos itens não carregou: a faixa diz o quê e os segmentos de saldo ficam', () => {
+      vi.mocked(vinculacaoModule.useSituacaoDistribuicaoPorEmpenho).mockReturnValue(falhou() as never);
+      const html = render();
+      expect(html).toContain('data-testid="empenhos-fontes-com-falha"');
+      expect(html).toContain('Parte dos Empenhos não carregou');
+      expect(html).toContain('<strong>Situação das notas nos itens (coluna Itens)</strong>');
+      expect(html).toMatch(/Com saldo<span[^>]*>6</);
+      expect(html).toMatch(/Sem saldo<span[^>]*>1</);
+      expect(html).toContain('2026NE000027');
+      vi.mocked(vinculacaoModule.useSituacaoDistribuicaoPorEmpenho).mockImplementation(() => situacaoPadrao() as never);
+    });
+
+    it('perfil gestor sem os contratos do recorte: "os empenhos não carregaram", e não "nenhum empenho"', () => {
+      vi.mocked(authModule.useAuth).mockReturnValue({ role: 'gestor' } as never);
+      vi.mocked(portfolioModule.useContractsPortfolio).mockReturnValueOnce({
+        rows: [],
+        isLoading: false,
+        isLoadingScope: false,
+        leiturasDosContratos: [{ rotulo: 'gestores das atas', query: falhou() }]
+      } as never);
+      const html = render('/empenhos?saldo=TODOS');
+      expect(html).toContain('<strong>Gestores das atas</strong>');
+      expect(html).toContain('data-testid="empenhos-nao-carregou"');
+      expect(html).not.toContain('Nenhum empenho encontrado');
+    });
+
+    it('tudo carregou: sem faixa', () => {
+      expect(render()).not.toContain('empenhos-fontes-com-falha');
+    });
   });
 });

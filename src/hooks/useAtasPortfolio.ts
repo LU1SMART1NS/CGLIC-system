@@ -11,7 +11,8 @@ import { buildAtaSaldoStats } from '../components/atas/ataSaldoStats';
 import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import { buildAtaKey, getAtaSourceQueryOptions, useAllAtaItemSaldos } from './useAta';
 import { useAllAtaManagers } from './useAtaManagers';
-import { useAssignedManagementScope } from './useAssignedManagementScope';
+import { ROTULO_GESTORES_ATAS, useAssignedManagementScope } from './useAssignedManagementScope';
+import type { LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 import { carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
 
@@ -118,7 +119,8 @@ export function useAtasPortfolio() {
   }, [itemsByAta, itemsLoadingByAta, loadItemsForArp]);
 
   // Gestor por ata (mesma fonte do detalhe da Ata e do Início), indexado pela chave de gestão (chaveGestaoDaArp).
-  const { data: ataManagers } = useAllAtaManagers();
+  const ataManagersQuery = useAllAtaManagers();
+  const { data: ataManagers } = ataManagersQuery;
   const gestorByAta = useMemo(() => {
     const map: Record<string, string> = {};
     for (const [ataKey, manager] of Object.entries(ataManagers || {})) {
@@ -184,9 +186,21 @@ export function useAtasPortfolio() {
     }
   }, [podeForcar, reload, atualizarNoServidor]);
 
+  /**
+   * Leituras das atas, dos gestores e do recorte do perfil gestor, para a faixa "não carregou": sem elas a carteira
+   * dizia "0 atas" ou "Ata não encontrada" e o gestor via a carteira vazia, como se fosse verdade.
+   */
+  const leiturasDasAtas: LeituraDaTela[] = [
+    ...sources.map((query, i) => ({ rotulo: `atas da UASG ${UASGS_CGLIC[i]}`, query })),
+    { rotulo: ROTULO_GESTORES_ATAS, query: ataManagersQuery },
+    ...(scope200330.leituras ?? []),
+    ...(scope200331.leituras ?? [])
+  ];
+
   return {
     /** Todas as atas carregadas (sem o escopo do gestor). */
     arps,
+    leiturasDasAtas,
     /** Atas no escopo do usuário. */
     scopedArps,
     isLoading,

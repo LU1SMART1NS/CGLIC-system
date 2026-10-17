@@ -13,6 +13,7 @@ describe('FontesComFalhaAviso', () => {
         falhas={[{ rotulo: 'empenhado acima do contratado', situacao: 'NAO_CARREGOU', mensagem: 'canceling statement due to statement timeout' }]}
         onTentar={() => undefined}
         tentando={false}
+        onde="do Início"
       />
     );
     expect(html).toContain('Parte do Início não carregou');
@@ -27,10 +28,26 @@ describe('FontesComFalhaAviso', () => {
         falhas={[{ rotulo: 'saldo dos itens', situacao: 'DESATUALIZADA', mensagem: 'erro qualquer' }]}
         onTentar={() => undefined}
         tentando
+        onde="do Início"
       />
     );
     expect(html).toContain('Parte do Início não atualizou');
     expect(html).toContain('mostrando a última leitura');
     expect(html).toContain('Tentando…');
+  });
+
+  it('fora do Início: título genérico e testid pelo prefixo; falta de conexão em linguagem simples', () => {
+    const html = renderToStaticMarkup(
+      <FontesComFalhaAviso
+        falhas={[{ rotulo: 'faturas', situacao: 'NAO_CARREGOU', mensagem: 'TypeError: Failed to fetch' }]}
+        onTentar={() => undefined}
+        tentando={false}
+        testIdPrefix="pagamentos-fontes"
+      />
+    );
+    expect(html).toContain('Parte da tela não carregou');
+    expect(html).toContain('data-testid="pagamentos-fontes-com-falha"');
+    expect(html).toContain('data-testid="pagamentos-fontes-tentar"');
+    expect(html).toContain('sem conexão com o banco');
   });
 });

@@ -90,67 +90,58 @@ export async function fetchArpsFromDb(codigoUasg?: string, numeroAta?: string): 
     return { arps: [], syncInfo: { isCachedInDb: false } };
   }
 
-  try {
-    // Todas as páginas, em ordem fixa (o PostgREST corta em mil).
-    const db = supabase;
-    let data: any[] | null = null;
-    let error: unknown = null;
-    try {
-      data = await lerTodasAsPaginas<any>((de, ate) => {
-        let query = db.from('atas_registro_preco').select('*');
-        if (codigoUasg) query = query.eq(colunaDaUasgDaAta(codigoUasg), codigoUasg);
-        if (numeroAta) query = query.ilike('numero_ata', `%${numeroAta}%`);
-        return query.order('id').range(de, ate);
-      });
-    } catch (e) {
-      error = e;
-    }
+  // Todas as páginas, em ordem fixa (o PostgREST corta em mil). Falha de leitura vira erro: "o banco não tem
+  // atas" (lista vazia) e "o banco não respondeu" são coisas diferentes, e a tela precisa avisar a segunda.
+  const db = supabase;
+  const data = await lerTodasAsPaginas<any>((de, ate) => {
+    let query = db.from('atas_registro_preco').select('*');
+    if (codigoUasg) query = query.eq(colunaDaUasgDaAta(codigoUasg), codigoUasg);
+    if (numeroAta) query = query.ilike('numero_ata', `%${numeroAta}%`);
+    return query.order('id').range(de, ate);
+  });
 
-    if (!error && data && data.length > 0) {
-      const arps: ArpRecord[] = data.map((d: DbAta) => ({
-        numeroAtaRegistroPreco: d.numero_ata,
-        codigoUnidadeGerenciadora: d.codigo_uasg,
-        nomeUnidadeGerenciadora: d.nome_uasg || '',
-        linkAtaPNCP: formatPncpAtaUrl(null, d.numero_controle_pncp, d.numero_ata),
-        linkCompraPNCP: formatPncpCompraUrl(null, null, d.numero_controle_pncp),
-        codigoOrgao: 0,
-        nomeOrgao: d.nome_uasg || '',
-        numeroCompra: d.numero_compra || '',
-        anoCompra: d.ano_compra || '',
-        codigoModalidadeCompra: '05',
-        nomeModalidadeCompra: d.modalidade || 'Pregão',
-        // O banco não guarda a assinatura: vazio, e não o início da vigência (a Ata 360 a busca no Compras.gov.br).
-        dataAssinatura: '',
-        dataVigenciaInicial: d.data_vigencia_inicial || '',
-        dataVigenciaFinal: d.data_vigencia_final || '',
-        valorTotal: Number(d.valor_total) || 0,
-        statusAta: d.status_ata || 'Ata de Registro de Preços',
-        objeto: d.objeto || '',
-        quantidadeItens: 0,
-        dataHoraAtualizacao: d.data_hora_atualizacao_api || new Date().toISOString(),
-        dataHoraInclusao: d.ultimo_sync_em || new Date().toISOString(),
-        dataHoraExclusao: null,
-        ataExcluido: false,
-        numeroControlePncpAta: d.numero_controle_pncp || '',
-        numeroControlePncpCompra: '',
-        idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
-        processoCompra: d.processo_compra ?? undefined,
-        isCanceladaPncp: ataCanceladaNoBanco(d.status_ata),
-        uasgCarteira: d.uasg_carteira || d.codigo_uasg,
-        papelSenasp: d.papel_senasp || 'GERENCIADORA'
-      }));
+  if (data.length > 0) {
+    const arps: ArpRecord[] = data.map((d: DbAta) => ({
+      numeroAtaRegistroPreco: d.numero_ata,
+      codigoUnidadeGerenciadora: d.codigo_uasg,
+      nomeUnidadeGerenciadora: d.nome_uasg || '',
+      linkAtaPNCP: formatPncpAtaUrl(null, d.numero_controle_pncp, d.numero_ata),
+      linkCompraPNCP: formatPncpCompraUrl(null, null, d.numero_controle_pncp),
+      codigoOrgao: 0,
+      nomeOrgao: d.nome_uasg || '',
+      numeroCompra: d.numero_compra || '',
+      anoCompra: d.ano_compra || '',
+      codigoModalidadeCompra: '05',
+      nomeModalidadeCompra: d.modalidade || 'Pregão',
+      // O banco não guarda a assinatura: vazio, e não o início da vigência (a Ata 360 a busca no Compras.gov.br).
+      dataAssinatura: '',
+      dataVigenciaInicial: d.data_vigencia_inicial || '',
+      dataVigenciaFinal: d.data_vigencia_final || '',
+      valorTotal: Number(d.valor_total) || 0,
+      statusAta: d.status_ata || 'Ata de Registro de Preços',
+      objeto: d.objeto || '',
+      quantidadeItens: 0,
+      dataHoraAtualizacao: d.data_hora_atualizacao_api || new Date().toISOString(),
+      dataHoraInclusao: d.ultimo_sync_em || new Date().toISOString(),
+      dataHoraExclusao: null,
+      ataExcluido: false,
+      numeroControlePncpAta: d.numero_controle_pncp || '',
+      numeroControlePncpCompra: '',
+      idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
+      processoCompra: d.processo_compra ?? undefined,
+      isCanceladaPncp: ataCanceladaNoBanco(d.status_ata),
+      uasgCarteira: d.uasg_carteira || d.codigo_uasg,
+      papelSenasp: d.papel_senasp || 'GERENCIADORA'
+    }));
 
-      const syncInfo: SyncMetadata = {
-        isCachedInDb: true,
-        ultimoSyncEm: data[0].ultimo_sync_em,
-        dataHoraAtualizacaoApi: data[0].data_hora_atualizacao_api,
-        totalAtas: arps.length
-      };
+    const syncInfo: SyncMetadata = {
+      isCachedInDb: true,
+      ultimoSyncEm: data[0].ultimo_sync_em,
+      dataHoraAtualizacaoApi: data[0].data_hora_atualizacao_api,
+      totalAtas: arps.length
+    };
 
-      return { arps, syncInfo };
-    }
-  } catch (error) {
-    console.warn('Falha ao ler cache de ARPs do Supabase', error);
+    return { arps, syncInfo };
   }
 
   return { arps: [], syncInfo: { isCachedInDb: false } };
@@ -168,122 +159,113 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
     return { arps: [], itemsByAta: {}, syncInfo: { isCachedInDb: false } };
   }
 
-  try {
-    // Todas as páginas, em ordem fixa (o PostgREST corta em mil atas; os itens vêm dentro de cada ata).
-    const db = supabase;
-    let data: any[] | null = null;
-    let error: unknown = null;
-    try {
-      data = await lerTodasAsPaginas<any>((de, ate) => {
-        let query = db.from('atas_registro_preco').select('*, itens_ata(*)');
-        if (uasg) query = query.eq(colunaDaUasgDaAta(uasg), uasg);
-        return query.order('id').range(de, ate);
-      });
-    } catch (e) {
-      error = e;
-    }
+  // Todas as páginas, em ordem fixa (o PostgREST corta em mil atas; os itens vêm dentro de cada ata). Falha de
+  // leitura vira erro: antes virava "0 atas" e "Ata não encontrada", como se o banco estivesse vazio.
+  const db = supabase;
+  const data = await lerTodasAsPaginas<any>((de, ate) => {
+    let query = db.from('atas_registro_preco').select('*, itens_ata(*)');
+    if (uasg) query = query.eq(colunaDaUasgDaAta(uasg), uasg);
+    return query.order('id').range(de, ate);
+  });
 
-    if (!error && data && data.length > 0) {
-      const itemsByAta: Record<string, ArpItemRecord[]> = {};
-      const arps: ArpRecord[] = data.map((d: any) => {
-        const key = `${d.numero_ata}-${d.codigo_uasg}`;
+  if (data.length > 0) {
+    const itemsByAta: Record<string, ArpItemRecord[]> = {};
+    const arps: ArpRecord[] = data.map((d: any) => {
+      const key = `${d.numero_ata}-${d.codigo_uasg}`;
 
-        if (d.itens_ata && Array.isArray(d.itens_ata) && d.itens_ata.length > 0) {
-          const mappedItems = d.itens_ata.map((it: any) => ({
-            numeroAtaRegistroPreco: d.numero_ata,
-            codigoUnidadeGerenciadora: d.codigo_uasg,
-            numeroCompra: d.numero_compra || '',
-            anoCompra: d.ano_compra || '',
-            codigoModalidadeCompra: '05',
-            // O banco não guarda a assinatura: vazio, e não o início da vigência (a Ata 360 a busca no Compras.gov.br).
-        dataAssinatura: '',
-            dataVigenciaInicial: d.data_vigencia_inicial || '',
-            dataVigenciaFinal: d.data_vigencia_final || '',
-            numeroItem: it.numero_item,
-            codigoItem: parseInt(it.numero_item, 10) || 1,
-            descricaoItem: it.descricao_item || '',
-            tipoItem: 'Material',
-            quantidadeHomologadaItem: Number(it.quantidade_homologada) || 0,
-            classificacaoFornecedor: '001',
-            niFornecedor: it.fornecedor_cnpj_cpf || '',
-            nomeRazaoSocialFornecedor: it.fornecedor_razao_social || '',
-            quantidadeHomologadaVencedor: Number(it.quantidade_homologada) || 0,
-            valorUnitario: Number(it.valor_unitario) || 0,
-            valorTotal: Number(it.valor_total) || 0,
-            maximoAdesao: Number(it.maximo_adesao) || 0,
-            nomeUnidadeGerenciadora: d.nome_uasg || '',
-            nomeModalidadeCompra: d.modalidade || 'Pregão',
-            idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
-            numeroControlePncpCompra: '',
-            dataHoraInclusao: it.ultimo_sync_em || '',
-            dataHoraAtualizacao: it.ultimo_sync_em || '',
-            quantidadeEmpenhada: 0,
-            percentualMaiorDesconto: 0,
-            situacaoSicaf: '1',
-            dataHoraExclusao: null,
-            itemExcluido: false,
-            numeroControlePncpAta: d.numero_controle_pncp || '',
-            codigoPdm: it.codigo_pdm || 0,
-            nomePdm: it.descricao_item || '',
-            quantidadeEstimadaEdital: Number(it.quantidade_homologada) || 0
-          } as ArpItemRecord));
-
-          // Os itens do banco já são os da ata: a sincronização só grava itens do fornecedor certo (Compras.gov.br,
-          // ou PNCP com o fornecedor indicado pelo coordenador em atas_fornecedor_pncp).
-          itemsByAta[key] = mappedItems;
-        }
-
-        const itemsCount = itemsByAta[key] ? itemsByAta[key].length : (d.itens_ata?.length || 0);
-
-        return {
+      if (d.itens_ata && Array.isArray(d.itens_ata) && d.itens_ata.length > 0) {
+        const mappedItems = d.itens_ata.map((it: any) => ({
           numeroAtaRegistroPreco: d.numero_ata,
           codigoUnidadeGerenciadora: d.codigo_uasg,
-          nomeUnidadeGerenciadora: d.nome_uasg || '',
-          linkAtaPNCP: formatPncpAtaUrl(null, d.numero_controle_pncp, d.numero_ata),
-          linkCompraPNCP: formatPncpCompraUrl(null, null, d.numero_controle_pncp),
-          codigoOrgao: 0,
-          nomeOrgao: d.nome_uasg || '',
           numeroCompra: d.numero_compra || '',
           anoCompra: d.ano_compra || '',
           codigoModalidadeCompra: '05',
-          nomeModalidadeCompra: d.modalidade || 'Pregão',
           // O banco não guarda a assinatura: vazio, e não o início da vigência (a Ata 360 a busca no Compras.gov.br).
-        dataAssinatura: '',
+      dataAssinatura: '',
           dataVigenciaInicial: d.data_vigencia_inicial || '',
           dataVigenciaFinal: d.data_vigencia_final || '',
-          valorTotal: Number(d.valor_total) || 0,
-          statusAta: d.status_ata || 'Ata de Registro de Preços',
-          objeto: d.objeto || '',
-          quantidadeItens: itemsCount,
-          dataHoraAtualizacao: d.data_hora_atualizacao_api || new Date().toISOString(),
-          dataHoraInclusao: d.ultimo_sync_em || new Date().toISOString(),
-          dataHoraExclusao: null,
-          ataExcluido: false,
-          numeroControlePncpAta: d.numero_controle_pncp || '',
-          numeroControlePncpCompra: '',
+          numeroItem: it.numero_item,
+          codigoItem: parseInt(it.numero_item, 10) || 1,
+          descricaoItem: it.descricao_item || '',
+          tipoItem: 'Material',
+          quantidadeHomologadaItem: Number(it.quantidade_homologada) || 0,
+          classificacaoFornecedor: '001',
+          niFornecedor: it.fornecedor_cnpj_cpf || '',
+          nomeRazaoSocialFornecedor: it.fornecedor_razao_social || '',
+          quantidadeHomologadaVencedor: Number(it.quantidade_homologada) || 0,
+          valorUnitario: Number(it.valor_unitario) || 0,
+          valorTotal: Number(it.valor_total) || 0,
+          maximoAdesao: Number(it.maximo_adesao) || 0,
+          nomeUnidadeGerenciadora: d.nome_uasg || '',
+          nomeModalidadeCompra: d.modalidade || 'Pregão',
           idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
-          processoCompra: d.processo_compra ?? undefined,
-          isCanceladaPncp: ataCanceladaNoBanco(d.status_ata),
-          uasgCarteira: d.uasg_carteira || d.codigo_uasg,
-          papelSenasp: d.papel_senasp || 'GERENCIADORA'
-        };
-      });
+          numeroControlePncpCompra: '',
+          dataHoraInclusao: it.ultimo_sync_em || '',
+          dataHoraAtualizacao: it.ultimo_sync_em || '',
+          quantidadeEmpenhada: 0,
+          percentualMaiorDesconto: 0,
+          situacaoSicaf: '1',
+          dataHoraExclusao: null,
+          itemExcluido: false,
+          numeroControlePncpAta: d.numero_controle_pncp || '',
+          codigoPdm: it.codigo_pdm || 0,
+          nomePdm: it.descricao_item || '',
+          quantidadeEstimadaEdital: Number(it.quantidade_homologada) || 0
+        } as ArpItemRecord));
 
-      const totalItemsCount = Object.values(itemsByAta).reduce((acc, list) => acc + list.length, 0);
+        // Os itens do banco já são os da ata: a sincronização só grava itens do fornecedor certo (Compras.gov.br,
+        // ou PNCP com o fornecedor indicado pelo coordenador em atas_fornecedor_pncp).
+        itemsByAta[key] = mappedItems;
+      }
 
-      const syncInfo: SyncMetadata = {
-        isCachedInDb: true,
-        ultimoSyncEm: data[0]?.ultimo_sync_em || new Date().toISOString(),
-        dataHoraAtualizacaoApi: data[0]?.data_hora_atualizacao_api,
-        totalAtas: arps.length,
-        totalItens: totalItemsCount,
-        status: 'SUCCESS'
+      const itemsCount = itemsByAta[key] ? itemsByAta[key].length : (d.itens_ata?.length || 0);
+
+      return {
+        numeroAtaRegistroPreco: d.numero_ata,
+        codigoUnidadeGerenciadora: d.codigo_uasg,
+        nomeUnidadeGerenciadora: d.nome_uasg || '',
+        linkAtaPNCP: formatPncpAtaUrl(null, d.numero_controle_pncp, d.numero_ata),
+        linkCompraPNCP: formatPncpCompraUrl(null, null, d.numero_controle_pncp),
+        codigoOrgao: 0,
+        nomeOrgao: d.nome_uasg || '',
+        numeroCompra: d.numero_compra || '',
+        anoCompra: d.ano_compra || '',
+        codigoModalidadeCompra: '05',
+        nomeModalidadeCompra: d.modalidade || 'Pregão',
+        // O banco não guarda a assinatura: vazio, e não o início da vigência (a Ata 360 a busca no Compras.gov.br).
+      dataAssinatura: '',
+        dataVigenciaInicial: d.data_vigencia_inicial || '',
+        dataVigenciaFinal: d.data_vigencia_final || '',
+        valorTotal: Number(d.valor_total) || 0,
+        statusAta: d.status_ata || 'Ata de Registro de Preços',
+        objeto: d.objeto || '',
+        quantidadeItens: itemsCount,
+        dataHoraAtualizacao: d.data_hora_atualizacao_api || new Date().toISOString(),
+        dataHoraInclusao: d.ultimo_sync_em || new Date().toISOString(),
+        dataHoraExclusao: null,
+        ataExcluido: false,
+        numeroControlePncpAta: d.numero_controle_pncp || '',
+        numeroControlePncpCompra: '',
+        idCompra: `${d.codigo_uasg}${d.numero_compra}${d.ano_compra}`,
+        processoCompra: d.processo_compra ?? undefined,
+        isCanceladaPncp: ataCanceladaNoBanco(d.status_ata),
+        uasgCarteira: d.uasg_carteira || d.codigo_uasg,
+        papelSenasp: d.papel_senasp || 'GERENCIADORA'
       };
+    });
 
-      return { arps, itemsByAta, syncInfo };
-    }
-  } catch (error) {
-    console.warn('Falha ao ler ARPs com itens do Supabase', error);
+    const totalItemsCount = Object.values(itemsByAta).reduce((acc, list) => acc + list.length, 0);
+
+    const syncInfo: SyncMetadata = {
+      isCachedInDb: true,
+      ultimoSyncEm: data[0]?.ultimo_sync_em || new Date().toISOString(),
+      dataHoraAtualizacaoApi: data[0]?.data_hora_atualizacao_api,
+      totalAtas: arps.length,
+      totalItens: totalItemsCount,
+      status: 'SUCCESS'
+    };
+
+    return { arps, itemsByAta, syncInfo };
   }
 
   return { arps: [], itemsByAta: {}, syncInfo: { isCachedInDb: false } };

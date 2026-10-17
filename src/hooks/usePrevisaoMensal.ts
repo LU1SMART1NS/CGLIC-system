@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FINANCEIRO_QUERY_KEYS, useEmpenhosCarteira, useFaturasCarteira } from './useFinanceiroCarteira';
+import { FINANCEIRO_QUERY_KEYS, ROTULOS_FINANCEIRO, leiturasDasFaturas, useEmpenhosCarteira, useFaturasCarteira } from './useFinanceiroCarteira';
+import type { LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
 import { useExpectativasPagamento } from './useExpectativasPagamento';
 import { fetchCiclosEmAberto, fetchLigacoesCicloFatura } from '../services/financeiroCarteiraService';
 import { historicoDePagamentos, ultimosMesesFechados } from '../services/expectativaPagamentoService';
@@ -16,6 +17,8 @@ import {
 } from '../services/previsaoMensalService';
 
 const OPCOES = { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false } as const;
+/** Marcas de como o contrato costuma ser pago (mensal, por entrega...) e as entregas previstas. */
+export const ROTULO_EXPECTATIVAS = 'como cada contrato costuma ser pago e entregas previstas';
 export const PRAZOS_EMENDAS_QUERY_KEY = ['prazos-emendas'] as const;
 
 /** Prazos das emendas (portaria anual), cadastrados pelo coordenador em Regras de Alertas. */
@@ -29,7 +32,7 @@ export function usePrazosEmendas() {
     },
     [queryClient]
   );
-  return { prazos: query.data ?? [], isLoading: query.isLoading, salvar };
+  return { prazos: query.data ?? [], isLoading: query.isLoading, salvar, consulta: query };
 }
 
 /**
@@ -100,6 +103,17 @@ export function usePrevisaoMensal(mes: string, contratosVigentes: Set<string>) {
     prazoEmenda,
     sugeridosSemMarca: [...historicos.entries()].filter(([k, h]) => h.mesesComPagamento >= meses.length && !expectativas.marcas.has(k) && contratosVigentes.has(k)).length,
     isLoading: faturas.isLoading || empenhos.isLoading || ciclos.isLoading || ligacoes.isLoading || expectativas.isLoading || ajustes.isLoading || envio.isLoading,
+    /** Cada fonte da previsão: se uma falhar, a tela avisa em vez de dizer "nada a pagar". */
+    leituras: [
+      ...leiturasDasFaturas(faturas),
+      ...empenhos.leituras.filter((l) => l.rotulo !== ROTULOS_FINANCEIRO.faturas),
+      { rotulo: ROTULOS_FINANCEIRO.ciclos, query: ciclos },
+      { rotulo: ROTULOS_FINANCEIRO.ligacoes, query: ligacoes },
+      { rotulo: ROTULO_EXPECTATIVAS, query: expectativas.consulta },
+      { rotulo: 'ajustes da previsão do mês', query: ajustes },
+      { rotulo: 'envio da previsão do mês', query: envio },
+      { rotulo: 'prazos das emendas', query: prazosEmendas.consulta }
+    ] as LeituraDaTela[],
     ajustar,
     registrarEnvio
   };
