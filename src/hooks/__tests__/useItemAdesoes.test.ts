@@ -59,7 +59,7 @@ describe('useItemAdesoes Hook / Query Options - Testes Unitários de Contrato e 
     const options = getItemAdesoesQueryOptions(' 00041/2025 ', '200331', '1');
     const result = await options.queryFn();
 
-    expect(api.fetchAdesoesItem).toHaveBeenCalledWith('00041/2025', '200331', '1');
+    expect(api.fetchAdesoesItem).toHaveBeenCalledWith('00041/2025', '200331', '1', { falharSeErro: true });
     expect(result.copia).toBeNull();
     expect(copia.lerCopiaAdesoesItem).not.toHaveBeenCalled();
     expect(result.aoVivo.map(r => r.unidadeNaoParticipante)).toEqual([
@@ -82,16 +82,33 @@ describe('useItemAdesoes Hook / Query Options - Testes Unitários de Contrato e 
     const options = getItemAdesoesQueryOptions('00041/2025', '200331', '1');
     const result = await options.queryFn();
 
-    expect(api.fetchAdesoesItem).toHaveBeenCalledWith('00041/2025', '200331', '1');
+    expect(api.fetchAdesoesItem).toHaveBeenCalledWith('00041/2025', '200331', '1', { falharSeErro: true });
     expect(copia.lerCopiaAdesoesItem).toHaveBeenCalledWith('00041/2025-200331-00001');
-    expect(result).toEqual({ aoVivo: [], copia: guardada });
+    expect(result).toEqual({ aoVivo: [], copia: guardada, falhaAoVivo: null });
   });
 
   it('falha ao ler a cópia não derruba a tela', async () => {
     vi.mocked(api.fetchAdesoesItem).mockResolvedValueOnce({ resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 });
     vi.mocked(copia.lerCopiaAdesoesItem).mockRejectedValueOnce(new Error('rede'));
     const result = await getItemAdesoesQueryOptions('00041/2025', '200331', '1').queryFn();
-    expect(result).toEqual({ aoVivo: [], copia: null });
+    expect(result).toEqual({ aoVivo: [], copia: null, falhaAoVivo: null });
+  });
+
+  it('a API falhou numa página (3h): sem cópia, a consulta fica em erro, e não com a lista pela metade', async () => {
+    vi.mocked(api.fetchAdesoesItem).mockRejectedValueOnce(new Error('HTTP error! status: 504'));
+    vi.mocked(copia.lerCopiaAdesoesItem).mockResolvedValueOnce(null);
+    await expect(getItemAdesoesQueryOptions('00041/2025', '200331', '1').queryFn()).rejects.toThrow('O Compras.gov.br não respondeu às adesões do item: HTTP error! status: 504');
+  });
+
+  it('a API falhou e há cópia do servidor: a cópia, marcada com a falha', async () => {
+    vi.mocked(api.fetchAdesoesItem).mockRejectedValueOnce(new Error('HTTP error! status: 504'));
+    const guardada = { adesoes: [{ unidadeNaoParticipante: '929777 - X', quantidadeAprovadaAdesao: 5 }] as any[], copiadoEm: '2026-10-05T17:32:00Z' };
+    vi.mocked(copia.lerCopiaAdesoesItem).mockResolvedValueOnce(guardada);
+    const result = await getItemAdesoesQueryOptions('00041/2025', '200331', '1').queryFn();
+    expect(result).toEqual({ aoVivo: [], copia: guardada, falhaAoVivo: 'HTTP error! status: 504' });
+    // Mesmo com os órgãos lidos agora, a lista vazia da falha não vira "nenhuma adesão": vale a cópia.
+    expect(escolherAdesoes(result, 'API').origem).toBe('COPIA');
+    expect(escolherAdesoes({ aoVivo: [], copia: null, falhaAoVivo: 'x' }, 'API').origem).toBe('SEM_DADOS');
   });
 
   it('deve retornar lista vazia se os parâmetros forem vazios durante a execução de queryFn', async () => {

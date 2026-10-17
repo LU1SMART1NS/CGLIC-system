@@ -26,7 +26,8 @@ export function useContratadoDoItem(itemKey: string) {
     enabled: Boolean(itemKey),
     staleTime: 60 * 1000
   });
-  return { ...query, data: query.data ?? VAZIO };
+  // `consulta`: a leitura sem o vazio no lugar, para saber se ela falhou sem leitura anterior (faixa "não carregou").
+  return { ...query, data: query.data ?? VAZIO, consulta: query };
 }
 
 export const CONTRATADO_DO_CONTRATO_KEY = (contractKey: string) => ['contratado-do-contrato', contractKey] as const;
