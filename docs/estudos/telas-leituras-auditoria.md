@@ -8,9 +8,11 @@ Estudo de 16/10/2026. Pergunta: o Início foi consertado em camadas (#241, #244,
 - O aviso de falha (`lerFonte` + faixa "não carregou") existe **só no Início**, e lá ainda tem buracos.
 - Nas outras nove telas, quando uma leitura falha, a tela mostra quase sempre "nenhum", "0", "Não atribuído" ou "Ata não encontrada", como se fosse verdade.
 - Há **um caso que pode gravar dado velho** no Item 360.
-- Há **duas leituras paginadas com ordem não única** que já hoje podem repetir ou pular linhas.
+- **Já hoje há dado errado na tela Empenhos, mesmo sem falha:**
+  - a coluna "Itens" lê 1.000 de 2.116 linhas, e cerca de metade das notas aparece com "—";
+  - duas leituras paginadas têm ordem não única e podem repetir ou pular linhas.
 
-Nada aqui muda o sistema. É só leitura de código. A contagem de linhas no banco ficou pronta num script, mas não rodou (ver abaixo).
+Nada aqui muda o sistema. É leitura de código e uma contagem só de leitura no banco (16/10/2026).
 
 Telas olhadas:
 
@@ -25,11 +27,13 @@ O menu lateral ficou de fora: já foi tratado no estudo do Início (`docs/estudo
 ## O que foi medido e o que falta medir
 
 - **Lido no código:** toda a árvore rota → componente → hook → serviço → tabela, view ou API de cada tela.
-- **Não medido no banco:** o verificador automático do Claude Code bloqueou a leitura do banco de produção nesta sessão, como no estudo anterior. O script está pronto em `scripts/estudo-telas-contagem.sql`. É um único `SELECT`, que não grava nada. Ele devolve:
+- **Contado no banco (16/10/2026, só leitura, autorizado pelo usuário):** `scripts/estudo-telas-contagem.sql`. É um único `SELECT`, que não grava nada. Ele devolve:
   - para cada fonte sem paginação: as linhas de hoje e quanto falta para 1.000;
   - as linhas repetidas nas duas páginas com ordem não única;
   - o tamanho da URL do `IN` de ciclos.
-- **Números já conhecidos (16/10/2026, estudo do Início):**
+
+  Os números estão na tabela do achado 4.
+- **Números do estudo do Início (16/10/2026):**
 
   | Tabela | Linhas |
   |---|---|
@@ -60,14 +64,27 @@ A trava de versão do banco segura quase todos os casos: se o item já foi salvo
 
 A mesma cópia do navegador também aparece, sem aviso, na Carteira de Itens e na Alocação (`fetchAllAllocationsGlobal`, `:26-85`).
 
-### 2. Dado errado hoje, mesmo sem falha
+### 2. Dado errado hoje, mesmo sem falha (tela Empenhos)
 
-Na tela **Empenhos** (`fetchEmpenhosCarteira`, `src/services/financeiroCarteiraService.ts:394-395`), duas tabelas são lidas em páginas de mil com ordem **que não é única**:
+**2a. Coluna "Itens" cortada em 1.000.**
+- `fetchSituacaoDistribuicaoPorEmpenho` (`src/services/distribuicaoEmpenhoService.ts:246-258`) lê `v_contrato_empenho_distribuicao` inteira, sem páginas e sem ordem.
+- A view tem **2.116 linhas**. O PostgREST devolve 1.000 quaisquer.
+- As **1.116** linhas que ficam de fora (cerca de metade das notas) aparecem com "—" na coluna Itens (`EmpenhosCarteiraTable.tsx:216-217`), como se não tivessem item.
+- O conjunto que some pode mudar a cada leitura.
+- Além do corte, o mapa é por `empenho_id`: uma nota ligada a dois contratos fica com a situação de um só.
 
-- `contrato_empenhos` por `empenho_id`: são 2.116 linhas, logo 3 páginas;
-- `fatura_empenhos` por `id_fatura`: a chave é `id_fatura + id_empenho_gov`.
+**2b. Páginas com ordem que não é única.**
 
-Sem ordem única, o banco pode devolver as linhas empatadas em outra ordem a cada página. Aí repete umas e pula outras. Uma nota pode sair sem o contrato, ou o "pago" pode sair a mais ou a menos. O painel do Início lê a mesma `contrato_empenhos` por `id`, que é o certo.
+`fetchEmpenhosCarteira` (`src/services/financeiroCarteiraService.ts:394-395`) lê duas tabelas em páginas de mil:
+
+| Tabela | Ordem | Linhas | Linhas que repetem a chave |
+|---|---|---|---|
+| `contrato_empenhos` | `empenho_id` | 2.116 (3 páginas) | 67 |
+| `fatura_empenhos` | `id_fatura` | 7.341 (8 páginas) | 474 |
+
+Sem ordem única, o banco pode devolver as linhas empatadas em outra ordem a cada página: aí repete umas e pula outras. Quando o empate cai na virada de uma página, uma nota pode sair sem o contrato, ou o "pago" sair a mais ou a menos.
+
+O painel do Início lê a mesma `contrato_empenhos` por `id`, que é o certo.
 
 ### 3. Falha vira "nenhum" sem aviso
 
@@ -102,21 +119,26 @@ Ex.: se a leitura das atas falha, o Início perde todos os avisos de atas sem di
 
 O PostgREST corta em 1.000 linhas. Ele não avisa: a tela recebe as primeiras mil e segue.
 
-"Hoje" = número conhecido; "a contar" = sai do script.
+Contagem de 16/10/2026, da maior para a menor:
 
-| Fonte e filtro | Onde | Telas | Hoje | Folga |
+| Fonte e filtro | Onde | Telas | Linhas hoje | Falta para 1.000 |
 |---|---|---|---|---|
-| `v_arp_item_saldo_detalhado`, uma UASG (13 colunas ou todas) | `dashboardService.ts:1962-1973` | Carteiras de Atas e Itens, Alocação, Contratos, Ata 360, Item 360, Início | até 667 (total de itens das duas UASGs) | ~330. **É o maior risco**: cresce com cada ata nova. |
-| `contract_payment_cycle_checklist`, `_events`, `_documents`, `_itens`, `_faturas` por `IN` de ciclos de **um** contrato | `paymentCycleRpcAdapter.ts:81-85` | Contrato 360 | a contar | 16 linhas de checklist por ciclo: passa de 1.000 com ~63 ciclos num contrato |
-| `contrato_entregas_previstas` (tudo, por data crescente) e `contrato_expectativa_pagamento` | `expectativaPagamentoService.ts:41-42` | Previsão, Contrato 360, avisos de pagamento | a contar | O corte tira as **entregas mais novas** |
-| `v_contrato_empenho_distribuicao`, tudo | `distribuicaoEmpenhoService.ts:248` | Empenhos (coluna Itens) | a contar (uma linha por NE ligada a contrato: perto das 2.116 de `contrato_empenhos`) | **Provavelmente já passou de 1.000.** Conferir primeiro. |
-| `v_contrato_empenho_distribuicao`, fila (A_DISTRIBUIR/REVISAR, pelo valor, equipe em 30 dias) | `distribuicaoEmpenhoService.ts:226` | Vínculos › Empenhos aos itens | a contar (308 a distribuir em 08/10) | — |
-| `contract_payment_cycles` por `IN` de **todos** os contratos da UASG (1.081 chaves numa URL de ~19 kB), sem lotes | `paymentCycleRpcAdapter.ts:59-63`, via painel | Início e toda tela que carrega o painel | a contar | Além do corte, a URL pode ser recusada. A falha vira `[]` calado (3, Início). **Conferir ao vivo.** |
-| `contract_payment_cycles` em aberto + `contract_payment_cycle_itens` por `IN` | `financeiroCarteiraService.ts:521-535` | Pagamentos, Previsão | a contar | — |
-| RPC `prever_vinculos_automaticos`, situação MANUAL | `vinculoAutomaticoService.ts:69` | Contratos à ata | a contar (407 sem ata em 08/10) | ~600 |
-| `ata_managers`, tudo | `ataManagerService.ts:44` | Todas (escopo do gestor) | até 214 (uma por ata) | ~790 |
-| `v_vinculos_a_conferir`, `v_contrato_itens_empenhado_acima` (38), `atas_fornecedor_pncp` | serviços de mesmo nome | Início e telas que carregam o painel; filas de Ações das telas 360 | pequenas | folgadas hoje |
-| Tarefas por `IN` (`contract_tasks`, `ata_tasks`, `*_macrotasks`), `ata_task_plans` | `contractManagementService.ts:304/317`, `ataManagementService.ts:206-225` | painel | a contar | URL longa com muitos planos |
+| `v_contrato_empenho_distribuicao`, tudo | `distribuicaoEmpenhoService.ts:248` | Empenhos (coluna Itens) | **2.116** | **já passou: −1.116** (achado 2a) |
+| `v_arp_item_saldo_detalhado`, UASG 200331 (13 colunas ou todas) | `dashboardService.ts:1962-1973` | Carteiras de Atas e Itens, Alocação, Contratos, Ata 360, Item 360, Início | 667 | **333**. É o próximo a estourar: cresce com cada ata nova e é lido por quase todas as telas. A 200330 tem 0 itens na carteira. |
+| `v_uasgs_participantes_gti` | `gruposGtiService.ts:103` | Ajustes › Grupos de UASGs | 395 | 605 |
+| `ata_managers`, tudo | `ataManagerService.ts:44` | Todas (escopo do gestor) | 214 | 786 |
+| `arp_item_contract_links` da maior ata | `arpContractLinkService.ts:258` | Ata 360 | 90 | 910 |
+| `v_contrato_empenho_distribuicao`, fila (a vincular, pelo valor, equipe em 30 dias) | `distribuicaoEmpenhoService.ts:226` | Vínculos › Empenhos aos itens | 85 | 915 |
+| `v_contrato_itens_empenhado_acima` | `empenhadoAcimaService.ts:77` | Início e telas que carregam o painel | 38 | 962 |
+| RPC `prever_vinculos_automaticos`, situação MANUAL | `vinculoAutomaticoService.ts:69` | Contratos à ata | 20 | 980 |
+| `atas_fornecedor_pncp`, `internal_departments`, `ata_task_plans` | serviços de mesmo nome | painel, telas 360 | 2, 8 e 1 | folgadas |
+| `contract_payment_cycles` (em aberto e por `IN`), `contract_payment_cycle_itens`, `contract_payment_cycle_checklist`, `contrato_expectativa_pagamento`, `contrato_entregas_previstas`, `v_vinculos_a_conferir`, `ata_tasks`, `contract_tasks` | `paymentCycleRpcAdapter.ts`, `financeiroCarteiraService.ts:521-535`, `expectativaPagamentoService.ts:41-42` etc. | Pagamentos, Previsão, Contrato 360, painel | **0** (ainda sem uso) | 1.000 |
+
+Sobre as tabelas que estão vazias:
+
+- **Ciclos e checklist:** ainda não há nenhum ciclo de pagamento, mas o risco chega com o uso. Cada ciclo tem 16 linhas de checklist, então um contrato passa de 1.000 com ~63 ciclos.
+- **Entregas previstas:** vêm em ordem de data crescente, então o corte tiraria as **mais novas**.
+- **URL dos ciclos:** o painel pede os ciclos com um `IN` de **todas** as chaves de contrato da UASG. Para a 200331 são 1.081 chaves e **19,5 kB** de URL. Hoje não aparece porque a tabela está vazia: uma recusa da URL vira `[]` calado, igual ao resultado certo. Conferir ao vivo ou já pôr em lotes.
 
 Os itens embutidos nas atas (`itens_ata(*)`) vêm dentro de cada ata, e as atas já são paginadas: sem risco hoje.
 
@@ -157,11 +179,16 @@ Todos dão para fazer **só no navegador**, sem migration. Cada um cabe num PR p
 - **Arquivos:** `src/services/allocationService.ts`, `src/components/ItemBalances.tsx` e os testes de `allocationService`.
 - **Risco:** baixo. Sem banco, a aba mostra erro em vez de números velhos.
 
-### 2. Ordem única nas páginas de Empenhos (achado 2)
+### 2. Tela Empenhos sem corte e com ordem única (achado 2)
 
-- **O quê:** `contrato_empenhos` passa a ser lida por `id`, e `fatura_empenhos` por `id_fatura, id_empenho_gov`. Com isso `lerTudo` precisa aceitar mais de uma coluna de ordem.
-- **Arquivo:** `src/services/financeiroCarteiraService.ts`.
-- **Risco:** baixo. Conferir que os totais da tela Empenhos ficam iguais ou mais certos.
+- **O quê:**
+  - `fetchSituacaoDistribuicaoPorEmpenho` lê todas as páginas, com `lerTodasAsPaginas` e ordem por `contrato_empenho_id`, e só as 4 colunas que já pede.
+  - `contrato_empenhos` passa a ser lida por `id`.
+  - `fatura_empenhos` passa a ser lida por `id_fatura, id_empenho_gov`. Para isso `lerTudo` precisa aceitar mais de uma coluna de ordem.
+- **Arquivos:** `src/services/distribuicaoEmpenhoService.ts` e `src/services/financeiroCarteiraService.ts`.
+- **Risco:** baixo.
+- **Conferir:** a coluna Itens passa a ter situação em todas as notas com item, e os totais da tela ficam iguais ou mais certos.
+- **Prioridade:** é o único dado errado **hoje, sem falha nenhuma**. Pode ir antes do passo 1.
 
 ### 3. Atas, gestores, vínculos e decisões param de engolir o erro (achados 3a a 3c)
 
@@ -207,7 +234,10 @@ Todos dão para fazer **só no navegador**, sem migration. Cada um cabe num PR p
 - **IN longos:** os `IN` grandes passam a ir em lotes de 100 a 200, como já fazem `itens_contrato` e `uasgs_grupo_gti`. São os ciclos por contrato do painel, os itens dos ciclos e as tarefas.
 - **Arquivos:** os serviços citados na tabela do achado 4.
 - **Risco:** baixo. Cada view precisa de uma coluna única para ordenar; conferir na view antes.
-- **Antes:** rodar o script de contagem. O que já estiver perto de 1.000 vai primeiro.
+- **Ordem pela contagem:**
+  1. o saldo dos itens: 667 linhas, folga de 333, lido por quase todas as telas;
+  2. as tabelas de ciclos e de previsão, antes de começarem a ser usadas;
+  3. o resto, que está folgado.
 
 ### 6. Cortar leituras pesadas e sem uso (achado 5)
 
@@ -241,12 +271,12 @@ O que pode vir depois, se a medição mostrar que vale: uma RPC com o total empe
 
 ## Como medir
 
-1. **Contagem (só leitura):** rodar o comando abaixo fora do minuto dos jobs do cron. A resposta diz quantas linhas cada fonte tem e quanto falta para 1.000.
+1. **Contagem (só leitura):** rodar o comando abaixo de novo depois dos consertos, fora do minuto dos jobs do cron. A resposta diz quantas linhas cada fonte tem e quanto falta para 1.000.
 
    ```bash
    supabase db query --linked -f scripts/estudo-telas-contagem.sql
    ```
 
 2. **Pedidos por tela, no navegador:** abrir cada tela com a aba Rede filtrada por `/rest/v1` e anotar quantos pedidos saem e quanto tempo leva até encher. Medir antes e depois dos passos 3 e 6.
-3. **URL dos ciclos:** no Início, procurar o pedido `contract_payment_cycles?contract_key=in.(…)` da 200331. Se vier com erro (414 ou 400), os ciclos do painel estão vazios hoje sem aviso.
+3. **URL dos ciclos:** no Início, procurar o pedido `contract_payment_cycles?contract_key=in.(…)` da 200331 (19,5 kB). Se vier com erro (414 ou 400), os ciclos do painel vão sumir sem aviso quando começarem a ser usados.
 4. **Teste de falha:** com o navegador em modo "Offline" logo depois de a tela abrir, apertar "Atualizar". Cada tela deve mostrar o que não carregou em vez de zerar.
