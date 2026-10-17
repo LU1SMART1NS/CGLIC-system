@@ -53,9 +53,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const saldos = filterNavigationByRole(navigationConfig, 'gestor_saldos').map((i) => i.id);
       expect(saldos).toContain('alocacao');
       expect(saldos).not.toContain('vinculacao');
-      // O gestor de atas e contratos não vê a Alocação (lá só consultaria); coordenador e consulta veem.
+      // Gestor de atas e contratos e consulta não veem a Alocação (lá só consultariam); só o coordenador e o gestor de saldo.
       expect(filterNavigationByRole(navigationConfig, 'gestor').map((i) => i.id)).not.toContain('alocacao');
-      expect(filterNavigationByRole(navigationConfig, 'leitor').map((i) => i.id)).toContain('alocacao');
+      expect(filterNavigationByRole(navigationConfig, 'leitor').map((i) => i.id)).not.toContain('alocacao');
       // Página única: a área não mostra abas no topo.
       expect(findAreaForTabs(filterNavigationByRole(navigationConfig, 'admin'), '/alocacao')?.children).toHaveLength(1);
     });
@@ -330,6 +330,12 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Empenhos');
       expect(labels).toContain('Itens');
       expect(labels).toContain('Distribuição');
+
+      // Vínculos e Alocação são filas de trabalho: a consulta vê o resultado na Carteira e nas telas 360.
+      const areas = visible.map((i) => i.id);
+      expect(areas).not.toContain('vinculacao');
+      expect(areas).not.toContain('alocacao');
+      expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'configuracoes']);
 
       expect(labels).not.toContain('Modelos de Gestão');
       // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs e das unidades internas

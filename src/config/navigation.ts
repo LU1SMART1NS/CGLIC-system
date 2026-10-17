@@ -146,13 +146,14 @@ export const navigationConfig: NavItem[] = [
         route: '/alocacao',
         status: 'active',
         matchPrefixes: ['/alocacao'],
-        // O gestor de atas e contratos só consultaria: o alocado já aparece na Carteira › Itens e no Item 360.
-        allowedRoles: ['admin', 'gestor_saldos', 'leitor']
+        // Gestor de atas e contratos e consulta só olhariam a fila: o alocado já aparece na Carteira › Itens e no Item 360.
+        allowedRoles: ['admin', 'gestor_saldos']
       }
     ]
   },
   {
     // Filas de vínculo: ligar uma coisa à outra. "Distribuição" (Início) fica só com atas e contratos para gestores.
+    // A consulta fica de fora: são filas de trabalho, e o vínculo feito já aparece na Carteira e nas telas 360.
     id: 'vinculacao',
     label: 'Vínculos',
     icon: Link2,
@@ -165,7 +166,7 @@ export const navigationConfig: NavItem[] = [
         route: '/vinculacao/contratos',
         status: 'active',
         matchPrefixes: ['/vinculacao/contratos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor']
       },
       {
         id: 'vinculacao-empenhos-contrato',
@@ -174,7 +175,7 @@ export const navigationConfig: NavItem[] = [
         route: '/vinculacao/empenhos-contrato',
         status: 'active',
         matchPrefixes: ['/vinculacao/empenhos-contrato'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor']
       },
       {
         id: 'vinculacao-empenhos-itens',
@@ -183,7 +184,7 @@ export const navigationConfig: NavItem[] = [
         route: '/vinculacao/empenhos-itens',
         status: 'active',
         matchPrefixes: ['/vinculacao/empenhos-itens'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor']
       }
     ]
   },

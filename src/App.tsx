@@ -235,7 +235,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/vinculacao/contratos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor']}>
                   <ContratosAtaPage />
                 </RequireRole>
               }
@@ -243,7 +243,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/vinculacao/empenhos-itens"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor']}>
                   <EmpenhosItensPage />
                 </RequireRole>
               }
@@ -251,7 +251,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/vinculacao/empenhos-contrato"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor']}>
                   <EmpenhosContratoPage />
                 </RequireRole>
               }
@@ -260,7 +260,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/alocacao"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor_saldos']}>
                   <ItensUnidadesPage />
                 </RequireRole>
               }
