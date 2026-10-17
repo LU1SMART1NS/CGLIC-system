@@ -27,6 +27,8 @@ export interface CarteiraItemRow {
   quantitativoSenasp: number;
   /** Percentual do quantitativo SENASP já consumido (nulo sem saldo sincronizado). */
   consumoPct: number | null;
+  /** Quantidade já consumida do quantitativo SENASP (nula sem saldo sincronizado): dá o saldo em unidades. */
+  consumido?: number | null;
   /** Total alocado às unidades internas e a parte de cada unidade (chave = nome normalizado). */
   alocado: number;
   alocadoPorUnidade: Record<string, number>;
@@ -163,6 +165,7 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
         faixa,
         quantitativoSenasp: senasp,
         consumoPct: rawPct,
+        consumido: saldo && saldo.quantidade_consumida != null ? Number(saldo.quantidade_consumida) || 0 : null,
         alocado,
         alocadoPorUnidade,
         nivelAlocacao: nivelAlocacao(alocado, senasp),

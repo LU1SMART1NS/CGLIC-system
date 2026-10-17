@@ -61,7 +61,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   } = useAtasPortfolio();
 
   // Alocação, empenho e unidades de cada ata, somados dos itens (filtros e colunas da carteira).
-  const { resumoPorAta, unidades, saldosComErro, leituras: leiturasDosItens } = useCarteiraItens({
+  const { rows: linhasDosItens, resumoPorAta, unidades, saldosComErro, leituras: leiturasDosItens } = useCarteiraItens({
     arps: scopedArps,
     itemsByAta,
     gestorByAta
@@ -317,6 +317,8 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         isLoading={isLoading}
         saldoStatsByAta={saldoStatsByAta}
         execucaoPorAta={resumoPorAta}
+        linhasDosItens={linhasDosItens}
+        mostrarEmpenhoDosItens={role !== 'gestor_saldos'}
         fatiasGti={fatiasGti}
         unidades={unidades}
         filters={filterState}
