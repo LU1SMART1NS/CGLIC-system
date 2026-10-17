@@ -11,7 +11,7 @@ import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTdBarra, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
@@ -278,16 +278,17 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         </div>
                       ) : null}
                     </td>
-                    <td data-label="Consumo dos itens" style={carteiraTd}>
+                    <td data-label="Consumo dos itens" style={carteiraTdBarra}>
                       <ConsumoItensCelula itens={consumoItens} testId={`arp-consumo-${numeroAta}`} />
                     </td>
-                    <td data-label="GTI" style={carteiraTd}>
+                    <td data-label="GTI" style={carteiraTdBarra}>
                       {(() => {
                         const fatias = fatiasGti?.get(chaveAtaGti(numeroAta, arp.codigoUnidadeGerenciadora));
                         const principal = fatias?.principal?.grupo;
                         return (
                           <CarteiraCellFilter
                             descricao="este GTI"
+                            bloco
                             onFilter={onFilter && principal ? () => onFilter('gti', principal) : undefined}
                           >
                             <GtiCelulaAta fatias={fatias} testId={`arp-gti-${numeroAta}`} />
