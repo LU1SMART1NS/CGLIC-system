@@ -87,7 +87,13 @@ function formatDateBR(dateStr?: string): string {
 }
 
 
-export const LinkContractModal: React.FC<LinkContractModalProps> = ({
+/**
+ * Fechado, o modal não monta: os contratos, gestores, vínculos, marcas "não pertence" e descartes só são lidos quando
+ * ele abre (antes eram 5 leituras com ele fechado, na Ata 360 e no Item 360). Fechar já zerava todo o formulário.
+ */
+export const LinkContractModal: React.FC<LinkContractModalProps> = (props) => (props.isOpen ? <LinkContractModalAberto {...props} /> : null);
+
+const LinkContractModalAberto: React.FC<LinkContractModalProps> = ({
   isOpen,
   onClose,
   itemKey,
@@ -132,7 +138,7 @@ export const LinkContractModal: React.FC<LinkContractModalProps> = ({
   // Regras de vínculo da CGLIC: cada item do contrato pertence a uma só ata, e o contrato pode estar em várias atas da
   // mesma compra (migration 86; o banco recusa o resto). O contrato marcado pelo coordenador como "não pertence a ata"
   // sai das sugestões. Ao vincular, o contrato herda o gestor da ata (migrations 69, 70 e 86) — o passo 2 avisa.
-  const { data: todosVinculos = [] } = useArpItemContractLinks(isOpen);
+  const { data: todosVinculos = [] } = useArpItemContractLinks();
   const { data: semAta = {} } = useContratosSemAta();
   const { data: ataManagers } = useAllAtaManagers();
   const { data: contractManagers } = useAllContractManagers(uasgDosContratos);

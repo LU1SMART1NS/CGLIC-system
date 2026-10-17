@@ -31,11 +31,12 @@ export function uasgDaChave(contractKey: string): string {
 
 /**
  * Contratos da carteira (mesmo cache da Carteira de Contratos) para as abas do Financeiro: número, fornecedor e
- * gestor de cada chave, e o recorte do perfil "gestor", que vê só o financeiro dos próprios contratos.
+ * gestor de cada chave, e o recorte do perfil "gestor", que vê só o financeiro dos próprios contratos. Usa a versão
+ * leve da carteira, sem o painel do Início: nenhuma aba do Financeiro mostra as pendências dos contratos.
  */
 export function useContratosDoFinanceiro() {
   const { role } = useAuth();
-  const { rows, isLoading, isLoadingScope, leiturasDosContratos } = useContractsPortfolio();
+  const { rows, isLoading, isLoadingScope, leiturasDosContratos } = useContractsPortfolio({ pendencias: false });
   const showGestorFilter = canFilterByGestor(role);
 
   const porChave = useMemo(() => {

@@ -118,10 +118,10 @@ export const ItensUnidadesPage: React.FC = () => {
   const podeAlocar = role === 'admin' || role === 'gestor_saldos';
   const showGestorFilter = canFilterByGestor(role);
   const { arps, scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, syncError, reload, leiturasDasAtas, atasNaoCarregaram } = useAtasPortfolio();
-  const { rows, unidades, isLoading: loadingExecucao, leituras: leiturasDosItens } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
-  // Uma fonte que falha não some calada: a tela mostra o que carregou e a faixa diz o que ficou de fora. O empenhado
-  // não aparece nesta tela e fica de fora da faixa.
-  const leiturasDaTela = [...(leiturasDasAtas ?? []), ...(leiturasDosItens ?? []).filter((l) => l.rotulo !== ROTULOS_CARTEIRA_ITENS.empenhos)];
+  // O empenhado não aparece nesta tela: nem é lido.
+  const { rows, unidades, isLoading: loadingExecucao, leituras: leiturasDosItens } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta, semEmpenhado: true });
+  // Uma fonte que falha não some calada: a tela mostra o que carregou e a faixa diz o que ficou de fora.
+  const leiturasDaTela = [...(leiturasDasAtas ?? []), ...(leiturasDosItens ?? [])];
   const leituras = useLeiturasComFalha(leiturasDaTela);
   const naoCarregouAlgo = (rotulo: string) => leiturasDaTela.some((l) => l.rotulo === rotulo && naoCarregou(l.query));
   // Sem as alocações, todo item pareceria "Sem alocação"; sem o saldo, nenhum item teria quantitativo SENASP; sem as

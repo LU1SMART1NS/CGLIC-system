@@ -26,9 +26,13 @@ const SEM_LINKS: ArpItemContractLinkPair[] = [];
 const SEM_CONFIRMACOES: Record<string, ContratoSemAtaConfirmacao> = {};
 const SEM_DESCARTES: Record<string, DescarteAtaContrato> = {};
 
-export function usePendenciasVinculoAta() {
+/**
+ * `pendencias: true` lê também o painel do Início (pendências de cada contrato), que só a carga dos gestores usa: a
+ * Central de Distribuição e o "Atribuir gestor" aberto. A fila, os números do menu e a gaveta do Início não precisam.
+ */
+export function usePendenciasVinculoAta({ pendencias: comPendencias = false }: { pendencias?: boolean } = {}) {
   const atas = useAtasPortfolio();
-  const contratos = useContractsPortfolio();
+  const contratos = useContractsPortfolio({ pendencias: comPendencias });
   const linksQuery = useArpItemContractLinks();
   const { data: links = SEM_LINKS, isLoading: linksLoading } = linksQuery;
   const semAtaQuery = useContratosSemAta();

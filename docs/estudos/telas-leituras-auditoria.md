@@ -258,6 +258,7 @@ Todos dão para fazer **só no navegador**, sem migration. Cada um cabe num PR p
   - **Risco:** médio. Hoje elas dividem o cache com as carteiras, e quem vem da carteira abre na hora. Medir com `EXPLAIN` a view de saldo filtrada por uma ata: o estudo da migration 148 mostrou que o filtro muda o plano.
 - **d. Contrato 360:** uma leitura de `v_contrato_faturas` e uma de `contrato_empenhos`, repartidas entre as seções.
 - **e. Carteira de Atas sem chamadas ao Compras.gov.br/PNCP pelo navegador:** quem preenche os itens é a sincronização do servidor.
+- **Andamento (17/10/2026):** 6a e 6b no PR "passo 3, parte 1". Achado a mais: o menu lateral (contadores de Vínculos, Financeiro e Distribuição) passava pela carteira completa, então **toda tela** lia o painel das duas UASGs, não só as 6. Agora só o Início, a Carteira de Contratos e a Central de Distribuição leem o painel; o "Atribuir gestor" de Contratos à ata o lê quando abre. Os conjuntos `empenhosDbSet`/`allocationsDbSet` de `useAtasPortfolio` já tinham saído.
 - **Arquivos:**
   - `src/hooks/useContractsPortfolio.ts`, `src/components/financeiro/useContratosDoFinanceiro.ts`, `src/components/vinculacao/usePendenciasVinculoAta.ts`;
   - `src/hooks/useAtasPortfolio.ts`, `src/hooks/useCarteiraItens.ts`, `src/hooks/useAta.ts`, `src/hooks/useContract.ts`;

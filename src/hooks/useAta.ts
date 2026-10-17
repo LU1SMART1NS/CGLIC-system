@@ -90,8 +90,9 @@ export function getCarteiraSaldosQueryOptions(uasg?: string) {
   };
 }
 
-export function useAllAtaItemSaldos(uasg?: string) {
-  return useQuery(getCarteiraSaldosQueryOptions(uasg));
+export function useAllAtaItemSaldos(uasg?: string, { enabled = true }: { enabled?: boolean } = {}) {
+  const opcoes = getCarteiraSaldosQueryOptions(uasg);
+  return useQuery({ ...opcoes, enabled: opcoes.enabled && enabled });
 }
 
 /** Saldo físico (homologado/consumido/percentual) dos itens de UMA Ata, via v_arp_item_saldo_detalhado (todas as colunas). */

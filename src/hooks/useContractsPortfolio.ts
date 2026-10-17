@@ -16,12 +16,19 @@ import { chaveDoContrato } from '../utils/contractKeyUtils';
 /** UASGs consolidadas — mesmo escopo já usado no Início (/instrumentos), para que os painéis reportem os mesmos números. */
 const UASGS = UASGS_CGLIC;
 
+/** Sem o painel: nenhuma pendência (constante, para não refazer as contas a cada render). */
+const SEM_ALERTAS: DashboardAttentionItem[] = [];
+
 /**
  * Carteira de Contratos das UASGs da CGLIC, no escopo do usuário: contratos enriquecidos com prazo,
  * gestor e pendências (Funil Único de Atenção). Mesmas consultas e parâmetros do Início, logo
  * mesmo cache do React Query. Fonte única para a Carteira de Contratos e a Central de Distribuição.
+ *
+ * `pendencias: false` é a versão leve: não lê o painel do Início (13 fontes por UASG, as duas UASGs), e as linhas
+ * saem sem pendências. Serve às telas que só usam número, fornecedor, gestor e vigência (Financeiro, Vínculos e o
+ * contador do menu).
  */
-export function useContractsPortfolio() {
+export function useContractsPortfolio({ pendencias: comPendencias = true }: { pendencias?: boolean } = {}) {
   const dash200330 = useContractsDashboard(UASGS[0]);
   const dash200331 = useContractsDashboard(UASGS[1]);
 
@@ -69,11 +76,11 @@ export function useContractsPortfolio() {
   // Só consulta depois do escopo do gestor: a chave inclui o escopo, e consultar antes carregava tudo duas vezes.
   const mgmt200330 = useManagementDashboard(
     { uasg: UASGS[0], assignedContractKeys: scope200330.contractKeys, assignedAtaKeys: scope200330.ataKeys },
-    { enabled: !scope200330.isLoading }
+    { enabled: comPendencias && !scope200330.isLoading }
   );
   const mgmt200331 = useManagementDashboard(
     { uasg: UASGS[1], assignedContractKeys: scope200331.contractKeys, assignedAtaKeys: scope200331.ataKeys },
-    { enabled: !scope200331.isLoading }
+    { enabled: comPendencias && !scope200331.isLoading }
   );
 
   const gestorByContractKey = useMemo(() => {
@@ -87,11 +94,25 @@ export function useContractsPortfolio() {
   }, [managers200330.data, managers200331.data]);
 
   /** Todos os alertas do Funil Único de Atenção das duas UASGs (de contratos e de atas). */
+  // Na versão leve o painel não é lido; mesmo que outra tela o tenha posto no cache, as pendências ficam de fora.
   const attentionItems = useMemo<DashboardAttentionItem[]>(
-    () => [...(mgmt200330.readModel?.attention?.items || []), ...(mgmt200331.readModel?.attention?.items || [])],
+    () =>
+      comPendencias
+        ? [...(mgmt200330.readModel?.attention?.items || []), ...(mgmt200331.readModel?.attention?.items || [])]
+        : SEM_ALERTAS,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mgmt200330.readModel, mgmt200331.readModel]
+    [comPendencias, mgmt200330.readModel, mgmt200331.readModel]
   );
+  /** O painel (pendências) ainda não chegou: contas que dependem dele esperam. Na versão leve, nunca. */
+  const pendenciasCarregando =
+    comPendencias && (isLoadingScope || (!mgmt200330.readModel && !mgmt200330.isError) || (!mgmt200331.readModel && !mgmt200331.isError));
+  /** O painel de alguma UASG falhou sem leitura anterior: as pendências sairiam pela metade. */
+  const pendenciasComErro = comPendencias && ((mgmt200330.isError && !mgmt200330.readModel) || (mgmt200331.isError && !mgmt200331.readModel));
+  const { refetch: relerPainel200330 } = mgmt200330;
+  const { refetch: relerPainel200331 } = mgmt200331;
+  const relerPendencias = async () => {
+    await Promise.all([relerPainel200330(), relerPainel200331()]);
+  };
 
   const pendenciasByContractKey = useMemo(() => {
     const map = new Map<string, DashboardAttentionItem[]>();
@@ -159,6 +180,9 @@ export function useContractsPortfolio() {
     leituraDosVinculos,
     contractsByKey,
     attentionItems,
+    pendenciasCarregando,
+    pendenciasComErro,
+    relerPendencias,
     hasAnyData: allContracts.length > 0,
     isLoading,
     isLoadingScope,
