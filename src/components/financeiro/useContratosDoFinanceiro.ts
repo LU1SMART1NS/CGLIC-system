@@ -34,9 +34,10 @@ export function uasgDaChave(contractKey: string): string {
  * gestor de cada chave, e o recorte do perfil "gestor", que vê só o financeiro dos próprios contratos. Usa a versão
  * leve da carteira, sem o painel do Início: nenhuma aba do Financeiro mostra as pendências dos contratos.
  */
-export function useContratosDoFinanceiro() {
+export function useContratosDoFinanceiro({ enabled = true }: { enabled?: boolean } = {}) {
   const { role } = useAuth();
-  const { rows, isLoading, isLoadingScope, leiturasDosContratos } = useContractsPortfolio({ pendencias: false });
+  // enabled: false (números do menu antes de a tela encher) não lê nada; as telas do Financeiro e de Vínculos leem na hora.
+  const { rows, isLoading, isLoadingScope, leiturasDosContratos } = useContractsPortfolio({ pendencias: false, enabled });
   const showGestorFilter = canFilterByGestor(role);
 
   const porChave = useMemo(() => {

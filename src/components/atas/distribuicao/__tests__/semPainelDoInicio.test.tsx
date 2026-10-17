@@ -51,9 +51,14 @@ describe('telas sem o painel do Início', () => {
     expect(useContractsPortfolio).toHaveBeenCalledWith({ pendencias: true });
   });
 
-  it('o Financeiro usa a carteira leve', () => {
+  it('o Financeiro usa a carteira leve, lida na hora', () => {
     rodar(() => useContratosDoFinanceiro());
-    expect(useContractsPortfolio).toHaveBeenCalledWith({ pendencias: false });
+    expect(useContractsPortfolio).toHaveBeenCalledWith({ pendencias: false, enabled: true });
+  });
+
+  it('os números do menu seguram a carteira até a tela encher (enabled: false)', () => {
+    rodar(() => useContratosDoFinanceiro({ enabled: false }));
+    expect(useContractsPortfolio).toHaveBeenCalledWith({ pendencias: false, enabled: false });
   });
 });
 

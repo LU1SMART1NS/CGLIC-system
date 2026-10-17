@@ -45,9 +45,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     isLoading,
     scopeLoading,
     itemsByAta,
-    itemsLoadingByAta,
-    loadItemsForArp,
-    loadItemsForArps,
     gestorByAta,
     saldoStatsByAta,
     syncInfo,
@@ -226,13 +223,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     });
   }, [scopedArps, filterState, filtroAtaAssinada, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta, fatiasDaArp]);
 
-  // Carregar itens para as atas filtradas
-  useEffect(() => {
-    if (filteredArps.length > 0) {
-      loadItemsForArps(filteredArps.slice(0, 15));
-    }
-  }, [filteredArps, loadItemsForArps]);
-
   // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
 
@@ -325,7 +315,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         cards={groupedCards}
         totalAtas={scopedArps.length}
         isLoading={isLoading}
-        itemsLoadingByAta={itemsLoadingByAta}
         saldoStatsByAta={saldoStatsByAta}
         execucaoPorAta={resumoPorAta}
         fatiasGti={fatiasGti}
@@ -333,7 +322,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         filters={filterState}
         gestorByAta={gestorByAta}
         busca={filterState.busca}
-        onExpandAta={loadItemsForArp}
         onSelectArp={onSelectArp}
         onSelectItem={(arp, item) => {
           if (onSelectItem) {

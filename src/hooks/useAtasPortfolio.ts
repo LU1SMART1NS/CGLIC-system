@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQueries, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { fetchArpItems } from '../services/api';
 import { RECURSO_ATAS } from '../services/syncService';
 import { useAtualizacaoNoServidor } from './useAtualizacaoNoServidor';
 import { useAuth } from '../context/AuthContext';
@@ -32,7 +31,7 @@ function relerAtas(queryClient: QueryClient) {
 
 /** Rótulo do saldo dos itens na faixa: o mesmo do Início (lerFonte), para juntar numa linha. */
 export const ROTULO_SALDO_ITENS = 'saldo dos itens';
-export const ROTULO_ITENS_NAS_FONTES = 'itens das atas buscados no Compras.gov.br e no PNCP';
+export const ROTULO_ITENS_NAS_FONTES = 'itens das atas';
 
 export type SyncProgress = { step: string; percent: number; current?: number; total?: number };
 
@@ -93,57 +92,34 @@ export function useAtasPortfolio() {
     });
   }, [arps, scope200330.ataKeys, scope200331.ataKeys]);
 
-  // Itens buscados sob demanda na API para atas que vieram do banco sem itens.
-  const [apiItemsByAta, setApiItemsByAta] = useState<Record<string, ArpItemRecord[]>>({});
-  const [itemsLoadingByAta, setItemsLoadingByAta] = useState<Record<string, boolean>>({});
-  // Atas cujos itens a fonte não devolveu (recusa, tempo esgotado): antes viravam "ata sem itens" até recarregar a
-  // página. Agora ficam à parte, entram na faixa "não carregou" e só são pedidas de novo no "Tentar novamente".
-  const [itensFalharamByAta, setItensFalharamByAta] = useState<Record<string, string>>({});
-  const itemsByAta = useMemo(() => ({ ...apiItemsByAta, ...dbItemsByAta }), [apiItemsByAta, dbItemsByAta]);
+  // Os itens vêm só do banco: quem os grava é a sincronização do servidor (de hora em hora). Antes, até 15 atas sem
+  // itens no banco disparavam chamadas ao Compras.gov.br e ao PNCP pelo navegador a cada troca de filtro.
+  const itemsByAta = dbItemsByAta;
 
-  const loadItemsForArp = useCallback(async (arp: ArpRecord) => {
-    const ataKey = buildAtaKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
-    if (itemsByAta[ataKey] || itemsLoadingByAta[ataKey] || itensFalharamByAta[ataKey]) return;
-
-    setItemsLoadingByAta((prev) => ({ ...prev, [ataKey]: true }));
-    try {
-      // estrito: a recusa da fonte vira erro, em vez de uma lista vazia igual à de uma ata que não tem itens.
-      const data = await fetchArpItems(arp.dataVigenciaInicial, arp.codigoUnidadeGerenciadora, arp.numeroAtaRegistroPreco, arp, { estrito: true });
-      if (data && data.resultado) {
-        setApiItemsByAta((prev) => ({ ...prev, [ataKey]: data.resultado }));
-      }
-    } catch (err) {
-      console.warn(`Erro ao carregar itens da Ata ${arp.numeroAtaRegistroPreco}:`, err);
-      const mensagem = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err);
-      setItensFalharamByAta((prev) => ({ ...prev, [ataKey]: mensagem }));
-    } finally {
-      setItemsLoadingByAta((prev) => ({ ...prev, [ataKey]: false }));
-    }
-  }, [itemsByAta, itemsLoadingByAta, itensFalharamByAta]);
-
-  const loadItemsForArps = useCallback((arpsToLoad: ArpRecord[]) => {
-    arpsToLoad.forEach((arp) => {
-      const ataKey = buildAtaKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
-      if (!itemsByAta[ataKey] && !itemsLoadingByAta[ataKey] && !itensFalharamByAta[ataKey]) loadItemsForArp(arp);
-    });
-  }, [itemsByAta, itemsLoadingByAta, itensFalharamByAta, loadItemsForArp]);
-
-  // As atas cujos itens não vieram, como uma leitura da faixa: "Tentar novamente" libera para pedir de novo.
-  const atasSemItensDaFonte = Object.keys(itensFalharamByAta);
+  // Atas da carteira ainda sem itens no banco: a faixa diz quais, em vez de a carteira mostrá-las vazias, caladas.
+  const atasSemItensNoBanco = useMemo(
+    () =>
+      isLoading
+        ? []
+        : scopedArps
+            .filter((a) => !dbItemsByAta[buildAtaKey(a.numeroAtaRegistroPreco, a.codigoUnidadeGerenciadora)]?.length)
+            .map((a) => a.numeroAtaRegistroPreco),
+    [isLoading, scopedArps, dbItemsByAta]
+  );
   const leituraDosItensNasFontes: LeituraDaTela | null =
-    atasSemItensDaFonte.length > 0
+    atasSemItensNoBanco.length > 0
       ? {
           rotulo: ROTULO_ITENS_NAS_FONTES,
           query: {
             data: undefined,
             isError: true,
             error: new Error(
-              `${atasSemItensDaFonte.length === 1 ? 'a ata' : `${atasSemItensDaFonte.length} atas`} ${atasSemItensDaFonte
-                .map((k) => k.replace(/-\d{6}$/, ''))
+              `${atasSemItensNoBanco.length === 1 ? 'a ata' : `${atasSemItensNoBanco.length} atas`} ${atasSemItensNoBanco
                 .slice(0, 5)
-                .join(', ')}${atasSemItensDaFonte.length > 5 ? '…' : ''} sem resposta: ${Object.values(itensFalharamByAta)[0]}`
+                .join(', ')}${atasSemItensNoBanco.length > 5 ? '…' : ''} ainda sem itens no banco; a sincronização do servidor traz os itens de hora em hora`
             ),
-            refetch: async () => setItensFalharamByAta({})
+            // "Tentar novamente" relê as atas do banco (não chama as fontes oficiais).
+            refetch: () => invalidarDadosDeAtas(queryClient)
           }
         }
       : null;
@@ -245,7 +221,7 @@ export function useAtasPortfolio() {
     arps,
     leiturasDasAtas,
     leiturasDosSaldos,
-    /** Atas cujos itens o Compras.gov.br ou o PNCP não devolveram (só na Carteira de Atas); null quando nenhuma. */
+    /** Atas da carteira ainda sem itens no banco (só na Carteira de Atas); null quando nenhuma. */
     leituraDosItensNasFontes,
     atasNaoCarregaram,
     /** Atas no escopo do usuário. */
@@ -253,9 +229,6 @@ export function useAtasPortfolio() {
     isLoading,
     scopeLoading,
     itemsByAta,
-    itemsLoadingByAta,
-    loadItemsForArp,
-    loadItemsForArps,
     gestorByAta,
     saldoStatsByAta,
     syncInfo,

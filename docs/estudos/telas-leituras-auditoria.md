@@ -272,6 +272,9 @@ Todos dão para fazer **só no navegador**, sem migration. Cada um cabe num PR p
 
     Os CTEs `MATERIALIZED` da migration 148 (órgãos e quantitativos) são calculados por inteiro com qualquer filtro, então ler por ata não alivia o banco.
   - **Contrato 360:** a fila de ações usa as faturas da página. A aba Pagamentos usa as notas já lidas, em vez de reler `contrato_empenhos`. A leitura de `v_contrato_faturas` por `id_fatura` da aba Pagamentos fica: cobre faturas de outros contratos que pagam pela mesma nota.
+- **Andamento (17/10/2026, parte 3):**
+  - **Menu:** os números de Financeiro e Vínculos, que aparecem em toda tela, só leem a carteira de contratos (contratos, gestores, escopo e vínculos) depois que a tela aberta enche. A medição ao vivo do PR #261 mostrou a carteira inteira saindo a 0,8–1,7 s nas telas 360, antes de a tela ficar pronta.
+  - **6e:** a Carteira de Atas não chama mais o Compras.gov.br nem o PNCP pelo navegador. Os itens vêm só do banco, e a faixa lista as atas ainda sem itens. Em 17/10/2026 eram 0 de 214.
 - **Arquivos:**
   - `src/hooks/useContractsPortfolio.ts`, `src/components/financeiro/useContratosDoFinanceiro.ts`, `src/components/vinculacao/usePendenciasVinculoAta.ts`;
   - `src/hooks/useAtasPortfolio.ts`, `src/hooks/useCarteiraItens.ts`, `src/hooks/useAta.ts`, `src/hooks/useContract.ts`;

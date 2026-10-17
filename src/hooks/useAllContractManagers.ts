@@ -15,8 +15,7 @@ export function getAllContractManagersQueryOptions(uasg?: string) {
   };
 }
 
-export function useAllContractManagers(uasg?: string) {
-  return useQuery<Record<string, ContractManager>, Error>(
-    getAllContractManagersQueryOptions(uasg)
-  );
+export function useAllContractManagers(uasg?: string, { enabled = true }: { enabled?: boolean } = {}) {
+  const opcoes = getAllContractManagersQueryOptions(uasg);
+  return useQuery<Record<string, ContractManager>, Error>({ ...opcoes, enabled: opcoes.enabled && enabled });
 }

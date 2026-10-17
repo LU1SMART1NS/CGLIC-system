@@ -20,7 +20,8 @@ export function useContagemVinculacao(): { aosItens: number; aoContrato: number 
   const { data: notas } = useEmpenhosParaVincularAosItens(ativo);
   const { data: foraDoContrato } = useEmpenhosForaDoContrato(ativo);
   // Sem os contratos (vigência e, no gestor, o recorte), o número sairia errado: o menu fica sem número.
-  const { contrato, escopo, isLoading, contratosNaoCarregaram } = useContratosDoFinanceiro();
+  // Os contratos também esperam a tela encher (eram a carteira inteira lida ao abrir qualquer tela).
+  const { contrato, escopo, isLoading, contratosNaoCarregaram } = useContratosDoFinanceiro({ enabled: ativo });
 
   return useMemo(() => {
     // Sem a carteira não dá para saber quais contratos estão encerrados: o número espera, em vez de mudar depois.

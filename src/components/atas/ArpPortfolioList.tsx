@@ -38,7 +38,6 @@ interface ArpPortfolioListProps {
   cards: AtaGroupedCard[];
   totalAtas: number;
   isLoading?: boolean;
-  itemsLoadingByAta?: Record<string, boolean>;
   /** Resumo de consumo de saldo por número de ata. */
   saldoStatsByAta?: Record<string, AtaSaldoStats>;
   /** Alocação, empenho e unidades de cada ata (chave "{numeroAta}-{uasg}"), somados dos itens. */
@@ -55,7 +54,6 @@ interface ArpPortfolioListProps {
   busca?: string;
   onSelectArp: (arp: ArpRecord) => void;
   onSelectItem: (arp: ArpRecord, item: ArpItemRecord) => void;
-  onExpandAta?: (arp: ArpRecord) => void;
   onResetFilters: () => void;
   pageSize?: number;
   /** Coordenador: "Sem gestor" vira atalho para a Central de Distribuição (a atribuição é feita só lá). */
@@ -89,7 +87,6 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   cards,
   totalAtas,
   isLoading = false,
-  itemsLoadingByAta = {},
   saldoStatsByAta = {},
   execucaoPorAta,
   fatiasGti,
@@ -98,7 +95,6 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   gestorByAta = {},
   busca = '',
   onSelectItem,
-  onExpandAta,
   onResetFilters,
   pageSize = 15,
   canAssign = false,
@@ -197,7 +193,6 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               const stats = saldoStatsByAta[chaveGestao];
               const gestor = gestorByAta[chaveGestao];
               const totalItens = card.itens.length || arp.quantidadeItens || 0;
-              const isItemsLoading = Boolean(itemsLoadingByAta[ataKey]);
               const abrirAta = () => navigate(`/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, arp.codigoUnidadeGerenciadora))}`);
 
               const matchedItems = query
@@ -230,7 +225,6 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         type="button"
                         size="xs"
                         onClick={() => {
-                          if (!isExpanded) onExpandAta?.(arp);
                           setOverrides((prev) => ({ ...prev, [card.key]: !isExpanded }));
                         }}
                         expanded={isExpanded}
@@ -338,10 +332,9 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                   {isExpanded && (
                     <tr className="carteira-expanded" data-testid={`arp-expanded-${numeroAta}`}>
                       <td colSpan={totalColunas} style={CARTEIRA_EXPANDED_CELL_STYLE}>
-                        {isItemsLoading ? (
-                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Carregando itens…</div>
-                        ) : orderedItems.length === 0 ? (
-                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Nenhum item disponível.</div>
+                        {orderedItems.length === 0 ? (
+                          // Os itens vêm só do banco (gravados pela sincronização do servidor); a faixa da carteira lista as atas sem itens.
+                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Itens ainda não gravados no banco. A sincronização do servidor traz os itens de hora em hora.</div>
                         ) : (
                           <>
                             <CarteiraDetailLabel>Itens da ata</CarteiraDetailLabel>
