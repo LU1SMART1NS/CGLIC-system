@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { useExpectativasPagamento } from './useExpectativasPagamento';
-import { FINANCEIRO_QUERY_KEYS, useFaturasCarteira } from './useFinanceiroCarteira';
+import { FINANCEIRO_QUERY_KEYS } from './useFinanceiroCarteira';
 import { useContratosDoFinanceiro } from '../components/financeiro/useContratosDoFinanceiro';
-import { fetchCiclosEmAberto } from '../services/financeiroCarteiraService';
+import { fetchCiclosEmAberto, fetchFaturasParaAvisos } from '../services/financeiroCarteiraService';
 import { fetchFaturasParaCiclo } from '../services/cicloPagamentoApoioService';
 import { fetchEnvioPrevisao, mesDaProximaPrevisao, prazoDaPrevisao } from '../services/previsaoMensalService';
 import { calcularAvisosPagamento, type AvisoPagamento, type CicloParaAviso } from '../services/avisosPagamentoService';
@@ -13,6 +13,12 @@ import type { AttentionItemWithUasg } from '../components/instrumentos/gestaoIns
 
 const OPCOES = { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false } as const;
 const SEM_AVISOS: AvisoPagamento[] = [];
+
+/**
+ * Faturas dos avisos, por contratos marcados. Fica sob o prefixo das faturas do Financeiro: quem relê as faturas
+ * (invalidarFinanceiro, ciclo de pagamento) relê também estas.
+ */
+export const faturasDosAvisosKey = (contratos: readonly string[]) => [...FINANCEIRO_QUERY_KEYS.faturas, 'avisos', contratos.join(',')] as const;
 
 const paraAviso = (c: PaymentFollowUpCycle): CicloParaAviso => ({
   contractKey: c.contractKey,
@@ -32,8 +38,19 @@ export function useAvisosPagamentoGerais(opts: { enabled?: boolean } = {}) {
   const { marcas, entregas, isLoading: carregandoMarcas } = useExpectativasPagamento();
   const { contrato, lista, escopo, isLoading: carregandoContratos } = useContratosDoFinanceiro();
   const temMarcas = marcas.size > 0 || entregas.length > 0;
+  // A regra só olha as faturas dos contratos marcados (mensal ou com entrega prevista) e só 4 campos: lê só isso, da
+  // tabela, em vez das 21 colunas da view e da conferência do Tesouro de todas as faturas.
+  const contratosMarcados = useMemo(
+    () => [...new Set([...marcas.keys(), ...entregas.map((e) => e.contractKey)])].sort(),
+    [marcas, entregas]
+  );
   // Sem nenhum contrato marcado, as faturas e os ciclos não são lidos.
-  const faturas = useFaturasCarteira({ enabled: enabled && temMarcas });
+  const faturas = useQuery({
+    queryKey: faturasDosAvisosKey(contratosMarcados),
+    queryFn: () => fetchFaturasParaAvisos(contratosMarcados),
+    enabled: enabled && temMarcas,
+    ...OPCOES
+  });
   const ciclos = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.ciclos, queryFn: fetchCiclosEmAberto, enabled: enabled && temMarcas, ...OPCOES });
   const mes = mesDaProximaPrevisao();
   const ehCoordenacao = role === 'admin';
@@ -46,7 +63,7 @@ export function useAvisosPagamentoGerais(opts: { enabled?: boolean } = {}) {
       previsao: ehCoordenacao && envio.isSuccess ? { mes, prazo: prazoDaPrevisao(mes), enviada: Boolean(envio.data) } : undefined,
       marcas,
       entregas,
-      faturas: (faturas.data ?? []).map((f) => ({ contractKey: f.contractKey, emissao: f.emissao, referencia: f.referencia, cancelada: f.cancelada })),
+      faturas: faturas.data ?? [],
       ciclos: (ciclos.data ?? []).map(paraAviso),
       contratosVigentes: vigentes,
       numeroDoContrato: (k) => contrato(k).numero
