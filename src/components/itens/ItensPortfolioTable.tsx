@@ -15,7 +15,7 @@ import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import { situacaoDaFaixa } from '../carteira/carteiraPrazo';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import type { ItensPortfolioFilterState } from './ItensPortfolioFilters';
@@ -177,7 +177,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                       {itemNovo(row) && <CarteiraNovoBadge genero="m" testId={`itens-novo-${row.key}`} />}
                     </div>
                     <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp(2) }}>
-                      {toSentenceCaseIfAllCaps(item.descricaoItem)}
+                      {descricaoItemEmFrase(item.descricaoItem)}
                     </div>
                   </td>
                   <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>

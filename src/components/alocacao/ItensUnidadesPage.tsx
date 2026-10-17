@@ -21,7 +21,7 @@ import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLin
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/CarteiraDetailLabel';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { SeloPapelSenasp } from '../atas/SeloPapelSenasp';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
@@ -292,7 +292,7 @@ export const ItensUnidadesPage: React.FC = () => {
             )}
           </div>
           <div title={r.item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp2 }}>
-            {toSentenceCaseIfAllCaps(r.item.descricaoItem) || '—'}
+            {descricaoItemEmFrase(r.item.descricaoItem) || '—'}
           </div>
         </td>
         <td data-label="Quantitativo SENASP" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatNumber(r.quantitativoSenasp)} un</td>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AnchoredPanel } from '../../design-system/components/AnchoredPanel';
 import { saldoBarColor } from './ataSaldoStats';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 
 export interface ConsumoItem {
   numero: string;
@@ -85,7 +85,7 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
           style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
         >
           {total > 1 && <strong style={{ color: '#334155' }}>{rotuloItem(topo.numero)} · </strong>}
-          {toSentenceCaseIfAllCaps(topo.descricao)}
+          {descricaoItemEmFrase(topo.descricao)}
         </span>
         {total > 1 && (
           <span aria-hidden="true" style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: '2px', marginTop: '0.35rem', height: '9px' }}>
@@ -107,7 +107,7 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
             {ordenados.map((item) => (
               <div key={item.numero} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.15rem 0.5rem', fontSize: '0.8rem' }}>
                 <span title={item.descricao} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  <strong>{rotuloItem(item.numero)}</strong> · {toSentenceCaseIfAllCaps(item.descricao)}
+                  <strong>{rotuloItem(item.numero)}</strong> · {descricaoItemEmFrase(item.descricao)}
                 </span>
                 <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{fmtPct(item.pct)}</span>
                 <span style={{ gridColumn: '1 / 3' }}><Barra pct={item.pct} altura={3} /></span>

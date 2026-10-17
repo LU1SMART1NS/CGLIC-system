@@ -25,7 +25,7 @@ import type { CarteiraAtaExecucao } from '../../utils/carteiraItens';
 import type { ArpPortfolioFilterState } from './ArpPortfolioFilters';
 import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { AvisoCarregando } from '../../design-system';
 import { ConsumoItensCelula, type ConsumoItem } from './ConsumoItensCelula';
@@ -365,7 +365,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                                           {item.numeroItem}
                                         </CarteiraIdLink>
                                         <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                          {toSentenceCaseIfAllCaps(item.descricaoItem) || '—'}
+                                          {descricaoItemEmFrase(item.descricaoItem) || '—'}
                                         </div>
                                       </td>
                                       <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
