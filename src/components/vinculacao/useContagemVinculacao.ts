@@ -19,14 +19,15 @@ export function useContagemVinculacao(): { aosItens: number; aoContrato: number 
   const ativo = (role === 'admin' || role === 'gestor') && telaCarregada;
   const { data: notas } = useEmpenhosParaVincularAosItens(ativo);
   const { data: foraDoContrato } = useEmpenhosForaDoContrato(ativo);
-  const { contrato, escopo, isLoading } = useContratosDoFinanceiro();
+  // Sem os contratos (vigência e, no gestor, o recorte), o número sairia errado: o menu fica sem número.
+  const { contrato, escopo, isLoading, contratosNaoCarregaram } = useContratosDoFinanceiro();
 
   return useMemo(() => {
     // Sem a carteira não dá para saber quais contratos estão encerrados: o número espera, em vez de mudar depois.
-    if (!ativo || !notas || !foraDoContrato || isLoading) return null;
+    if (!ativo || !notas || !foraDoContrato || isLoading || contratosNaoCarregaram) return null;
     const conta = (contractKey: string) => (!escopo || escopo.has(contractKey)) && contaNoMenu(contrato(contractKey).expirado);
     const aosItens = notas.filter((d) => aguardaVinculoAosItens(d) && conta(d.contractKey)).length;
     const aoContrato = foraDoContrato.filter((l) => pedeOGestor(l) && conta(l.contractKey)).length;
     return { aosItens, aoContrato };
-  }, [ativo, notas, foraDoContrato, escopo, isLoading, contrato]);
+  }, [ativo, notas, foraDoContrato, escopo, isLoading, contratosNaoCarregaram, contrato]);
 }

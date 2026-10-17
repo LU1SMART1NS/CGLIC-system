@@ -128,7 +128,8 @@ export async function fetchAvisosResolvidos(): Promise<AvisoResolvido[]> {
       resolvidoEm: row.resolvido_em
     }));
   } catch (err) {
+    // Falha vira erro: uma lista vazia fazia os avisos já resolvidos voltarem a aparecer, sem aviso.
     console.warn('[avisosResolvidosService] Falha ao consultar avisos resolvidos:', err);
-    return [];
+    throw err;
   }
 }

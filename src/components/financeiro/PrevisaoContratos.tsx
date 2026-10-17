@@ -3,7 +3,10 @@ import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { InfoHint, useToast, AvisoCarregando } from '../../design-system';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { useFaturasCarteira } from '../../hooks/useFinanceiroCarteira';
+import { ROTULOS_FINANCEIRO, useFaturasCarteira } from '../../hooks/useFinanceiroCarteira';
+import { ROTULO_EXPECTATIVAS } from '../../hooks/usePrevisaoMensal';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
 import { useExpectativasPagamento } from '../../hooks/useExpectativasPagamento';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../carteira/CarteiraFilterBar';
@@ -48,9 +51,15 @@ export const PrevisaoContratos: React.FC = () => {
   const podeMarcar = role === 'gestor' || role === 'admin';
   const registradoPorNome = (user?.user_metadata as { full_name?: string } | undefined)?.full_name || user?.email || undefined;
 
-  const { lista: contratos, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
+  const { lista: contratos, escopo, showGestorFilter, isLoading: carregandoContratos, leituras: leiturasContratos } = useContratosDoFinanceiro();
   const faturas = useFaturasCarteira();
-  const { marcas, entregas, isLoading: carregandoMarcas, definir } = useExpectativasPagamento();
+  const { marcas, entregas, isLoading: carregandoMarcas, definir, consulta: expectativasQuery } = useExpectativasPagamento();
+  // Uma fonte que falha não some calada: sem as faturas não há sugestão de mensal; sem as marcas, todos parecem sem marca.
+  const leituras = useLeiturasComFalha([
+    ...leiturasContratos,
+    { rotulo: ROTULOS_FINANCEIRO.faturas, query: faturas },
+    { rotulo: ROTULO_EXPECTATIVAS, query: expectativasQuery }
+  ]);
   const { filters, setFilter, resetFilters } = useCarteiraFilters(PREVISAO_FILTER_SCHEMA);
 
   const meses = useMemo(() => ultimosMesesFechados(), []);
@@ -123,6 +132,7 @@ export const PrevisaoContratos: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da tela" testIdPrefix="previsao-contratos-fontes" />
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando contratos...">
           <AvisoCarregando label="Carregando contratos" />

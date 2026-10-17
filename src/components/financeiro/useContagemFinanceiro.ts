@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { usePagamentosCarteira } from '../../hooks/useFinanceiroCarteira';
+import { ROTULOS_FINANCEIRO, usePagamentosCarteira } from '../../hooks/useFinanceiroCarteira';
+import { naoCarregou } from '../fonte/useLeiturasComFalha';
 import { resumirPrecisaDeAcao } from '../../services/financeiroCarteiraService';
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
 import { useTelaCarregada } from '../layout/useTelaCarregada';
@@ -15,10 +16,14 @@ export function useContagemFinanceiro(): { total: number; urgente: boolean } | n
   const { role } = useAuth();
   const telaCarregada = useTelaCarregada();
   const ativo = role === 'admin' || role === 'gestor';
-  const { rows, isLoading } = usePagamentosCarteira({ enabled: ativo && telaCarregada });
-  const { escopo, isLoading: carregandoEscopo } = useContratosDoFinanceiro();
+  const { rows, isLoading, leituras } = usePagamentosCarteira({ enabled: ativo && telaCarregada });
+  const { escopo, isLoading: carregandoEscopo, contratosNaoCarregaram } = useContratosDoFinanceiro();
+  // Uma leitura que falhou sem leitura anterior deixaria o número abaixo do real: o menu fica sem número. O aviso do
+  // Tesouro não entra na conta, e os contratos só importam para o recorte do gestor.
+  const algumaNaoCarregou =
+    (leituras ?? []).some((l) => l.rotulo !== ROTULOS_FINANCEIRO.tesouro && naoCarregou(l.query)) || (role === 'gestor' && Boolean(contratosNaoCarregaram));
   return useMemo(() => {
-    if (!ativo || !telaCarregada || isLoading || (role === 'gestor' && carregandoEscopo)) return null;
+    if (!ativo || !telaCarregada || isLoading || (role === 'gestor' && carregandoEscopo) || algumaNaoCarregou) return null;
     return resumirPrecisaDeAcao(escopo ? rows.filter((r) => escopo.has(r.contractKey)) : rows);
-  }, [ativo, telaCarregada, role, rows, isLoading, escopo, carregandoEscopo]);
+  }, [ativo, telaCarregada, role, rows, isLoading, escopo, carregandoEscopo, algumaNaoCarregou]);
 }

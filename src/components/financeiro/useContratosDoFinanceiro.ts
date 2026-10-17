@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useContractsPortfolio } from '../../hooks/useContractsPortfolio';
 import { canFilterByGestor } from '../carteira/carteiraGestor';
 import { formatContractNumber } from '../../utils/contractNumber';
+import { naoCarregou } from '../fonte/useLeiturasComFalha';
 
 export interface ContratoDoFinanceiro {
   numero: string;
@@ -34,7 +35,7 @@ export function uasgDaChave(contractKey: string): string {
  */
 export function useContratosDoFinanceiro() {
   const { role } = useAuth();
-  const { rows, isLoading, isLoadingScope } = useContractsPortfolio();
+  const { rows, isLoading, isLoadingScope, leiturasDosContratos } = useContractsPortfolio();
   const showGestorFilter = canFilterByGestor(role);
 
   const porChave = useMemo(() => {
@@ -52,6 +53,9 @@ export function useContratosDoFinanceiro() {
     }
     return map;
   }, [rows]);
+
+  const leituras = leiturasDosContratos ?? [];
+  const contratosNaoCarregaram = leituras.some((l) => (role === 'gestor' || l.rotulo.startsWith('contratos da UASG')) && naoCarregou(l.query));
 
   /** Perfil gestor: só as chaves da carteira dele. Demais perfis: sem recorte (null). */
   const escopo = useMemo(() => (role === 'gestor' ? new Set(porChave.keys()) : null), [role, porChave]);
@@ -81,6 +85,13 @@ export function useContratosDoFinanceiro() {
     lista,
     escopo,
     showGestorFilter,
-    isLoading: isLoading || (role === 'gestor' && isLoadingScope)
+    isLoading: isLoading || (role === 'gestor' && isLoadingScope),
+    /** Contratos, gestores e o escopo do gestor: se falharem, a tela avisa (sem eles o gestor veria o Financeiro vazio). */
+    leituras,
+    /**
+     * Os contratos (ou, no perfil gestor, alguma leitura do recorte dele) falharam sem leitura anterior: número,
+     * vigência e recorte dependem deles, então contagens e "nada a fazer" não valem.
+     */
+    contratosNaoCarregaram
   };
 }

@@ -59,8 +59,9 @@ export async function fetchAllAtaManagers(): Promise<Record<string, AtaManager>>
     }
     return map;
   } catch (err) {
+    // Falha vira erro: um mapa vazio deixava a coluna Gestor em branco e o perfil gestor sem carteira, sem aviso.
     console.warn('Erro ao carregar gestores de Ata', err);
-    return {};
+    throw err;
   }
 }
 

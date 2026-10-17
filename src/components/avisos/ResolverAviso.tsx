@@ -49,7 +49,7 @@ async function observacaoComJustificativa(tabela: 'ata_tasks' | 'contract_tasks'
 export function useResolverAviso() {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { porChave, resolver, reexibir, podeResolver, podeConcluirTarefas } = useAvisosResolvidos();
+  const { porChave, resolver, reexibir, podeResolver, podeConcluirTarefas, consulta } = useAvisosResolvidos();
   const [alvo, setAlvo] = React.useState<AlvoResolucao | null>(null);
   const [texto, setTexto] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
@@ -147,7 +147,7 @@ export function useResolverAviso() {
     </Modal>
   );
 
-  return { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo, tarefasConcluidas };
+  return { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo, tarefasConcluidas, consulta };
 }
 
 /** Botão ✓ (só o ícone, dica "Resolvido"). */

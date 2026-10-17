@@ -52,6 +52,8 @@ export function useExpectativasPagamento() {
     entregas: query.data?.entregas ?? SEM_ENTREGAS,
     isLoading: query.isLoading,
     error: query.error as Error | null,
+    /** A leitura, para a faixa "não carregou" (sem ela a Previsão sairia sem mensais e sem entregas, calada). */
+    consulta: query,
     definir,
     salvarEntrega,
     cancelarEntrega

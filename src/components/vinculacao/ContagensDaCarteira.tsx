@@ -11,22 +11,27 @@ import { useDistribuicaoDaCarteira } from '../atas/distribuicao/useDistribuicaoD
 import { contarItensAAlocar, definirContagemExtra } from './contagemExtras';
 import { carregarCarteiraParaOMenu } from './cargaDaCarteiraDoMenu';
 import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ROTULO_GESTORES_ATAS } from '../../hooks/useAssignedManagementScope';
+import { naoCarregou } from '../fonte/useLeiturasComFalha';
 
 /**
  * Calcula os contratos sem ata (os mesmos da fila de Vínculos) e, para o coordenador, as filas da Central de
  * Distribuição (atas sem gestor e gestor diferente da ata), e entrega os números ao menu.
  */
 const CalculoDaCarteira: React.FC<{ contaDistribuicao: boolean }> = ({ contaDistribuicao }) => {
-  const { atas, contratos, links, pendencias, totalSemVinculo, naoPertencemSemGestor, isBusy } = usePendenciasVinculoAta();
+  const { atas, contratos, links, pendencias, totalSemVinculo, naoPertencemSemGestor, isBusy, filaIndisponivel } = usePendenciasVinculoAta();
   // Mesmos contratos da lista principal da fila: sem vínculo e "não pertence a ata" ainda sem gestor.
   const contratosAta = totalSemVinculo + naoPertencemSemGestor;
   const { divergencias } = useDistribuicaoDaCarteira({ atas, contratos, links });
   const atasSemGestor = pendencias.atasSemGestor.length;
+  // Sem os gestores das atas, toda ata pareceria sem gestor: o menu fica sem número.
+  const gestoresDasAtasFalharam = (atas.leiturasDasAtas ?? []).some((l) => l.rotulo === ROTULO_GESTORES_ATAS && naoCarregou(l.query));
   React.useEffect(() => {
-    definirContagemExtra('contratosAta', isBusy ? null : contratosAta);
-    definirContagemExtra('atasSemGestor', isBusy || !contaDistribuicao ? null : atasSemGestor);
-    definirContagemExtra('gestorDiferente', isBusy || !contaDistribuicao ? null : divergencias.length);
-  }, [isBusy, contratosAta, contaDistribuicao, atasSemGestor, divergencias.length]);
+    // Sem os vínculos (ou as marcas "não pertence"), o número contaria contratos que têm ata: o menu fica sem número.
+    definirContagemExtra('contratosAta', isBusy || filaIndisponivel ? null : contratosAta);
+    definirContagemExtra('atasSemGestor', isBusy || !contaDistribuicao || gestoresDasAtasFalharam ? null : atasSemGestor);
+    definirContagemExtra('gestorDiferente', isBusy || !contaDistribuicao || gestoresDasAtasFalharam || filaIndisponivel ? null : divergencias.length);
+  }, [isBusy, filaIndisponivel, gestoresDasAtasFalharam, contratosAta, contaDistribuicao, atasSemGestor, divergencias.length]);
   React.useEffect(
     () => () => {
       definirContagemExtra('contratosAta', null);

@@ -9,7 +9,7 @@ export interface ContratoSemAtaConfirmacao {
   confirmadoEm?: string;
 }
 
-/** Todas as confirmações, por chave do contrato. Sem a tabela (migration 69 não aplicada), devolve vazio. */
+/** Todas as confirmações, por chave do contrato. Falha de leitura vira erro (a tela avisa). */
 export async function fetchContratosSemAta(): Promise<Record<string, ContratoSemAtaConfirmacao>> {
   if (!isSupabaseConfigured || !supabase) return {};
   try {
@@ -25,8 +25,9 @@ export async function fetchContratosSemAta(): Promise<Record<string, ContratoSem
     }
     return map;
   } catch (err) {
-    console.warn('Confirmações de contrato sem ata indisponíveis (migration 69 aplicada?)', err);
-    return {};
+    // Falha vira erro: um mapa vazio devolvia à fila os contratos já marcados "não pertence a ata".
+    console.warn('Confirmações de contrato sem ata indisponíveis', err);
+    throw err;
   }
 }
 

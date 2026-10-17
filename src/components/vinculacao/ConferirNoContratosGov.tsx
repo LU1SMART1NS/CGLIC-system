@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { EmptyState } from '../../design-system/components/EmptyState';
+import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { ActionButton, AppButton, AppSelect, AppTextarea, Modal, NoticeBar, StatusBadge, useToast } from '../../design-system';
 import type { StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
@@ -216,7 +217,9 @@ export const ConferirNoContratosGov: React.FC<{
   contrato: (contractKey: string) => ContratoDaLinha;
   showGestorFilter: boolean;
   podeMarcar: boolean;
-}> = ({ linhas, contrato, showGestorFilter, podeMarcar }) => {
+  /** A leitura das notas falhou sem leitura anterior: a lista vazia não quer dizer "nada a conferir". */
+  naoCarregou?: boolean;
+}> = ({ linhas, contrato, showGestorFilter, podeMarcar, naoCarregou = false }) => {
   const navigate = useNavigateWithOrigin();
   const toast = useToast();
   const acoes = useAcoesCorrecaoDaNota();
@@ -347,7 +350,9 @@ export const ConferirNoContratosGov: React.FC<{
         {showGestorFilter && <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="vinc-nota-filter-gestor" />}
       </CarteiraFilterBar>
 
-      {linhas.length === 0 ? (
+      {linhas.length === 0 && naoCarregou ? (
+        <ListaNaoCarregou titulo="As notas a conferir não carregaram." testId="vinc-nota-nao-carregou" />
+      ) : linhas.length === 0 ? (
         <EmptyState
           title="Nenhuma nota pede conferência no Contratos.gov.br."
           description="Quando a nota no SIAFI e o contrato não baterem, a nota aparece aqui com o que corrigir."

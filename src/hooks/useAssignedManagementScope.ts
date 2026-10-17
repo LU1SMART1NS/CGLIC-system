@@ -3,6 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import { useAllContractManagers } from './useAllContractManagers';
 import { useAllAtaManagers, useArpItemContractLinks } from './useAtaManagers';
 import { escopoDoGestor } from '../utils/escopoDoGestor';
+import type { LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
+
+/** Rótulos das leituras do escopo na faixa "não carregou" (os mesmos das telas, para a faixa juntar numa linha só). */
+export const ROTULO_GESTORES_CONTRATOS = 'gestores dos contratos';
+export const ROTULO_GESTORES_ATAS = 'gestores das atas';
+export const ROTULO_VINCULOS_ITEM_CONTRATO = 'vínculos entre itens de ata e contratos';
 
 export interface AssignedManagementScope {
   /** `undefined` = sem restrição (perfil diferente de "gestor"). */
@@ -10,6 +16,11 @@ export interface AssignedManagementScope {
   /** `undefined` = sem restrição (perfil diferente de "gestor"). */
   ataKeys: string[] | undefined;
   isLoading: boolean;
+  /**
+   * Leituras de que o escopo depende (só quando há escopo). Se uma falhar, a carteira do gestor sai vazia ou pela
+   * metade: a tela põe estas leituras na faixa "não carregou" em vez de mostrar "nada atribuído".
+   */
+  leituras?: LeituraDaTela[];
 }
 
 /**
@@ -34,11 +45,14 @@ export function useAssignedManagementScope(
   const isGestor = role === 'gestor';
   const userId = isGestor ? user?.id : opts.gestorUserId;
 
-  const { data: contractManagers, isLoading: loadingContractManagers } = useAllContractManagers(uasg);
-  const { data: ataManagers, isLoading: loadingAtaManagers } = useAllAtaManagers();
-  const { data: links, isLoading: loadingLinks } = useArpItemContractLinks(Boolean(userId));
+  const contractManagersQuery = useAllContractManagers(uasg);
+  const ataManagersQuery = useAllAtaManagers();
+  const linksQuery = useArpItemContractLinks(Boolean(userId));
+  const { data: contractManagers, isLoading: loadingContractManagers } = contractManagersQuery;
+  const { data: ataManagers, isLoading: loadingAtaManagers } = ataManagersQuery;
+  const { data: links, isLoading: loadingLinks } = linksQuery;
 
-  return useMemo(() => {
+  const escopo = useMemo(() => {
     if (!userId) {
       return { contractKeys: undefined, ataKeys: undefined, isLoading: false };
     }
@@ -54,4 +68,13 @@ export function useAssignedManagementScope(
       isLoading: loadingContractManagers || loadingAtaManagers || loadingLinks
     };
   }, [userId, contractManagers, ataManagers, links, loadingContractManagers, loadingAtaManagers, loadingLinks]);
+
+  const leituras: LeituraDaTela[] = userId
+    ? [
+        { rotulo: ROTULO_GESTORES_CONTRATOS, query: contractManagersQuery },
+        { rotulo: ROTULO_GESTORES_ATAS, query: ataManagersQuery },
+        { rotulo: ROTULO_VINCULOS_ITEM_CONTRATO, query: linksQuery }
+      ]
+    : [];
+  return { ...escopo, leituras };
 }

@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useContractsDashboard } from './useContractsDashboard';
 import { useSincronizacaoContratos } from './useSincronizacaoContratos';
-import { useAssignedManagementScope } from './useAssignedManagementScope';
+import { ROTULO_GESTORES_CONTRATOS, ROTULO_VINCULOS_ITEM_CONTRATO, useAssignedManagementScope } from './useAssignedManagementScope';
+import type { LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
 import { useAllContractManagers } from './useAllContractManagers';
 import { useManagementDashboard } from './useManagementDashboard';
 import { useArpItemContractLinks } from './useAtaManagers';
@@ -107,7 +108,8 @@ export function useContractsPortfolio() {
 
   // Atas de origem de cada contrato: o vínculo é por item, então um contrato pode vir de 0, 1 ou várias atas.
   // Mesma consulta (e cache) do escopo do perfil gestor.
-  const { data: ataLinks } = useArpItemContractLinks();
+  const ataLinksQuery = useArpItemContractLinks();
+  const { data: ataLinks } = ataLinksQuery;
   const atasByContractKey = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const { ataKey, contractKey } of ataLinks || []) {
@@ -136,9 +138,25 @@ export function useContractsPortfolio() {
     });
   }, [contracts, gestorByContractKey, pendenciasByContractKey, atasByContractKey]);
 
+  /**
+   * Leituras de que número, fornecedor, gestor e o recorte do perfil gestor dependem, para a faixa "não carregou"
+   * das telas. Os vínculos com as atas (coluna Atas) ficam à parte: só as telas que mostram as atas os usam.
+   */
+  const leiturasDosContratos: LeituraDaTela[] = [
+    { rotulo: `contratos da UASG ${UASGS[0]}`, query: dash200330 },
+    { rotulo: `contratos da UASG ${UASGS[1]}`, query: dash200331 },
+    { rotulo: ROTULO_GESTORES_CONTRATOS, query: managers200330 },
+    { rotulo: ROTULO_GESTORES_CONTRATOS, query: managers200331 },
+    ...(scope200330.leituras ?? []),
+    ...(scope200331.leituras ?? [])
+  ];
+  const leituraDosVinculos: LeituraDaTela = { rotulo: ROTULO_VINCULOS_ITEM_CONTRATO, query: ataLinksQuery };
+
   return {
     /** Contratos no escopo do usuário, enriquecidos. */
     rows,
+    leiturasDosContratos,
+    leituraDosVinculos,
     contractsByKey,
     attentionItems,
     hasAnyData: allContracts.length > 0,

@@ -9,6 +9,7 @@ const comoFrase = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice
 /** Motivo em linguagem do usuário; o tempo limite do banco é o caso mais comum. */
 function motivo(mensagem: string): string {
   if (/statement timeout/i.test(mensagem)) return 'a consulta demorou mais que o tempo limite do banco';
+  if (/failed to fetch|networkerror|network request failed|load failed/i.test(mensagem)) return 'sem conexão com o banco';
   return mensagem;
 }
 
@@ -16,26 +17,30 @@ interface FontesComFalhaAvisoProps {
   falhas: FonteComFalha[];
   onTentar: () => void;
   tentando: boolean;
+  /** Onde fica o que não carregou, no título: "do Início", "dos Pagamentos". Padrão: "da tela". */
+  onde?: string;
+  /** Prefixo dos data-testid (padrão "fontes"): "<prefixo>-com-falha" e "<prefixo>-tentar". */
+  testIdPrefix?: string;
 }
 
 /**
- * Parte do Início não carregou (ex.: o saldo dos itens estourou o tempo limite). O resto da tela segue
- * funcionando; aqui o usuário sabe o que ficou de fora e pode tentar de novo, em vez de ver contagens
- * zeradas sem explicação ou a tela inteira travada.
+ * Parte da tela não carregou (ex.: o saldo dos itens estourou o tempo limite). O resto da tela segue funcionando;
+ * aqui o usuário sabe o que ficou de fora e pode tentar de novo, em vez de ver contagens zeradas sem explicação ou a
+ * tela inteira travada. Usada pelo Início e pelas telas que leem várias fontes (useLeiturasComFalha).
  */
-export const FontesComFalhaAviso: React.FC<FontesComFalhaAvisoProps> = ({ falhas, onTentar, tentando }) => {
+export const FontesComFalhaAviso: React.FC<FontesComFalhaAvisoProps> = ({ falhas, onTentar, tentando, onde = 'da tela', testIdPrefix = 'fontes' }) => {
   if (falhas.length === 0) return null;
   const algumaSemLeitura = falhas.some((f) => f.situacao === 'NAO_CARREGOU');
 
   return (
     <section
       role="status"
-      data-testid="inicio-fontes-com-falha"
+      data-testid={`${testIdPrefix}-com-falha`}
       style={{ background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', borderRadius: '8px', padding: '0.75rem 0.9rem', color: 'var(--color-warning-text-strong)', fontSize: '0.85rem' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
         <AlertTriangle size={16} aria-hidden="true" />
-        <strong>{algumaSemLeitura ? 'Parte do Início não carregou' : 'Parte do Início não atualizou'}</strong>
+        <strong>{algumaSemLeitura ? `Parte ${onde} não carregou` : `Parte ${onde} não atualizou`}</strong>
         <AppButton
           type="button"
           variant="outline"
@@ -44,7 +49,7 @@ export const FontesComFalhaAviso: React.FC<FontesComFalhaAvisoProps> = ({ falhas
           disabled={tentando}
           icon={<RotateCcw size={14} />}
           style={{ marginLeft: 'auto' }}
-          data-testid="inicio-fontes-tentar"
+          data-testid={`${testIdPrefix}-tentar`}
         >
           {tentando ? 'Tentando…' : 'Tentar novamente'}
         </AppButton>

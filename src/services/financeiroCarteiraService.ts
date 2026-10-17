@@ -79,8 +79,11 @@ export interface FaturaCarteira {
 
 export type SituacaoTesouroFatura = 'PAGO' | 'PARCIAL' | 'NAO_PAGO';
 
-/** O que o Tesouro diz das faturas a conferir, por id da fatura (v_fatura_conferencia_tesouro). */
-async function lerConferenciaTesouro(): Promise<Map<number, SituacaoTesouroFatura>> {
+/**
+ * O que o Tesouro diz das faturas a conferir, por id da fatura (v_fatura_conferencia_tesouro). Leitura à parte das
+ * faturas: se falhar, a lista de pagamentos sai sem o aviso do Tesouro e a tela diz que ele não carregou.
+ */
+export async function fetchConferenciaTesouro(): Promise<Map<number, SituacaoTesouroFatura>> {
   const linhas = await lerTudo<{ id_fatura: number; situacao_tesouro: SituacaoTesouroFatura }>(
     'v_fatura_conferencia_tesouro',
     'id_fatura, situacao_tesouro',
@@ -89,16 +92,22 @@ async function lerConferenciaTesouro(): Promise<Map<number, SituacaoTesouroFatur
   return new Map(linhas.map((l) => [Number(l.id_fatura), l.situacao_tesouro]));
 }
 
+/** Põe nas faturas o que o Tesouro diz delas (fetchConferenciaTesouro); sem a leitura, ficam sem o aviso (null). */
+export function aplicarConferenciaTesouro(faturas: FaturaCarteira[], tesouro: Map<number, SituacaoTesouroFatura> | undefined): FaturaCarteira[] {
+  if (!tesouro || tesouro.size === 0) return faturas;
+  return faturas.map((f) => {
+    const situacao = tesouro.get(f.idFatura);
+    return situacao ? { ...f, situacaoTesouro: situacao } : f;
+  });
+}
+
+/** Faturas de todos os contratos (v_contrato_faturas), sem o aviso do Tesouro: ele vem de fetchConferenciaTesouro. */
 export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
-  const [linhas, tesouro] = await Promise.all([
-    lerTudo<any>(
-      'v_contrato_faturas',
-      'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros, pagamento_a_conferir, obs_a_conferir',
-      'id_fatura'
-    ),
-    // O aviso do Tesouro é um extra: se a leitura falhar, a lista de pagamentos sai sem ele.
-    lerConferenciaTesouro().catch(() => new Map<number, SituacaoTesouroFatura>())
-  ]);
+  const linhas = await lerTudo<any>(
+    'v_contrato_faturas',
+    'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros, pagamento_a_conferir, obs_a_conferir',
+    'id_fatura'
+  );
   return linhas.map((f) => ({
     idFatura: Number(f.id_fatura),
     contractKey: String(f.contract_key),
@@ -121,7 +130,7 @@ export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
     empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null,
     pagamentoAConferir: Boolean(f.pagamento_a_conferir),
     obsAConferir: f.obs_a_conferir ?? null,
-    situacaoTesouro: tesouro.get(Number(f.id_fatura)) ?? null
+    situacaoTesouro: null
   }));
 }
 

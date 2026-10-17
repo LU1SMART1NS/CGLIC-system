@@ -16,6 +16,8 @@ import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
 import { dataBR, normalizarBusca, rotuloDoMes } from './financeiroFormat';
 import { AjustarLinhaModal, IncluirLinhaModal, RegistrarEnvioModal } from './PrevisaoMesModais';
 import { PrevistoPagoMes } from './PrevistoPagoMes';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
 
 
 interface FiltrosPrevisaoMes {
@@ -62,9 +64,11 @@ export const PrevisaoMes: React.FC = () => {
       { replace: true }
     );
 
-  const { contrato, lista: contratos, escopo, isLoading: carregandoContratos } = useContratosDoFinanceiro();
+  const { contrato, lista: contratos, escopo, isLoading: carregandoContratos, leituras: leiturasContratos } = useContratosDoFinanceiro();
   const vigentes = useMemo(() => new Set(contratos.filter((c) => !c.expirado && (!escopo || escopo.has(c.contractKey))).map((c) => c.contractKey)), [contratos, escopo]);
-  const { linhas: todas, envio, prazoEmenda, sugeridosSemMarca, isLoading, ajustar, registrarEnvio } = usePrevisaoMensal(mes, vigentes);
+  const { linhas: todas, envio, prazoEmenda, sugeridosSemMarca, isLoading, ajustar, registrarEnvio, leituras: leiturasPrevisao } = usePrevisaoMensal(mes, vigentes);
+  // Uma fonte que falha não vira "nada a pagar": a previsão mostra o que carregou e a faixa diz o que ficou de fora.
+  const leituras = useLeiturasComFalha([...leiturasPrevisao, ...leiturasContratos]);
   const { filters, setFilter, resetFilters } = useCarteiraFilters(FILTROS);
 
   const [ajustando, setAjustando] = useState<LinhaPrevisao | null>(null);
@@ -142,6 +146,8 @@ export const PrevisaoMes: React.FC = () => {
           ))}
         </select>
       </div>
+
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da previsão" testIdPrefix="previsao-fontes" />
 
       {envio ? (
         <NoticeBar tone="success" testId="previsao-enviada">

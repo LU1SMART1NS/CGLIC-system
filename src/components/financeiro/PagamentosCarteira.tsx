@@ -13,9 +13,11 @@ import { useAuth } from '../../context/AuthContext';
 import { createPaymentCycleRpc, type CreatePaymentCycleInput } from '../../adapters/paymentCycleRpcAdapter';
 import { CreateCycleModal } from '../contracts/payment/PaymentCycleModals';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
-import { ErrorState } from '../../design-system/components/ErrorState';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { usePagamentosCarteira, useSincronizacaoPagamentos } from '../../hooks/useFinanceiroCarteira';
+import { ROTULOS_FINANCEIRO, usePagamentosCarteira, useSincronizacaoPagamentos } from '../../hooks/useFinanceiroCarteira';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../carteira/CarteiraFilterBar';
@@ -76,8 +78,8 @@ function ordemPadrao(a: PagamentoComLinha, b: PagamentoComLinha): number {
 export const PagamentosCarteira: React.FC = () => {
   const navigate = useNavigateWithOrigin();
   const sincronizacao = useSincronizacaoPagamentos();
-  const { rows: todos, isLoading, isFetching, error, refetch } = usePagamentosCarteira();
-  const { contrato, lista: contratos, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
+  const { rows: todos, isLoading, isFetching, leituras: leiturasPagamentos } = usePagamentosCarteira();
+  const { contrato, lista: contratos, escopo, showGestorFilter, isLoading: carregandoContratos, leituras: leiturasContratos, contratosNaoCarregaram } = useContratosDoFinanceiro();
   const { user, role } = useAuth();
   const podeAbrirCiclo = role === 'gestor' || role === 'admin';
   const [abrindoCiclo, setAbrindoCiclo] = useState(false);
@@ -89,6 +91,9 @@ export const PagamentosCarteira: React.FC = () => {
   const irPara = useNavigate();
   const mesPrevisao = mesDaProximaPrevisao();
   const envioPrevisao = useQuery({ queryKey: ['previsao-envio', mesPrevisao], queryFn: () => fetchEnvioPrevisao(mesPrevisao), staleTime: 5 * 60 * 1000 });
+  // Uma fonte que falha não trava a tela: o que carregou aparece e a faixa diz o que ficou de fora.
+  const leituras = useLeiturasComFalha([...leiturasPagamentos, ...leiturasContratos, { rotulo: 'envio da previsão do mês', query: envioPrevisao }]);
+  const tesouroNaoCarregou = leituras.falhas.some((f) => f.rotulo === ROTULOS_FINANCEIRO.tesouro && f.situacao === 'NAO_CARREGOU');
   const rotuloPrevisao = `Previsão de ${rotuloDoMes(mesPrevisao).split('/')[0]} · ${envioPrevisao.data ? 'enviada' : `até ${dataBR(prazoDaPrevisao(mesPrevisao)).slice(0, 5)}`}`;
 
   const abrirCiclo = async (input: CreatePaymentCycleInput) => {
@@ -150,15 +155,14 @@ export const PagamentosCarteira: React.FC = () => {
       .sort(ordemPadrao);
   }, [itens, filters, showGestorFilter]);
 
-  const abrir = ({ row }: PagamentoComLinha) => navigate(`/contratos/${encodeURIComponent(row.contractKey)}?aba=pagamentos`);
+  // Lista vazia porque a leitura falhou (faturas ou ciclos; no perfil gestor, também os contratos do recorte): não é
+  // "nenhum pagamento".
+  const listaNaoCarregou =
+    itens.length === 0 &&
+    (leiturasPagamentos.some((l) => (l.rotulo === ROTULOS_FINANCEIRO.faturas || l.rotulo === ROTULOS_FINANCEIRO.ciclos) && naoCarregou(l.query)) ||
+      (Boolean(escopo) && contratosNaoCarregaram));
 
-  if (error && todos.length === 0) {
-    return (
-      <PageContainer style={{ padding: '2rem 0' }}>
-        <ErrorState title="Erro ao carregar os pagamentos" message={error.message} onRetry={() => void refetch()} />
-      </PageContainer>
-    );
-  }
+  const abrir = ({ row }: PagamentoComLinha) => navigate(`/contratos/${encodeURIComponent(row.contractKey)}?aba=pagamentos`);
 
   const hasActive = hasActiveCarteiraFilters(PAGAMENTOS_FILTER_SCHEMA, filters);
   const isBusy = isLoading || carregandoContratos;
@@ -200,6 +204,8 @@ export const PagamentosCarteira: React.FC = () => {
         }
       />
 
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="dos Pagamentos" testIdPrefix="pagamentos-fontes" />
+
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando pagamentos...">
           <AvisoCarregando label="Carregando pagamentos" />
@@ -229,7 +235,9 @@ export const PagamentosCarteira: React.FC = () => {
                 count: nGrupo('CONFERIR'),
                 title:
                   'Faturas cujo pagamento não dá para confirmar pelas fontes abertas: sem NP no Contratos.gov.br ou com a OB da NP de outra despesa. Confira no SIAFI.' +
-                  ` Pelo Tesouro: ${resumo.tesouro.PAGO} com o empenho pago, ${resumo.tesouro.PARCIAL} pago em parte, ${resumo.tesouro.NAO_PAGO} sem pagamento.`
+                  (tesouroNaoCarregou
+                    ? ' A conferência pelo Tesouro não carregou.'
+                    : ` Pelo Tesouro: ${resumo.tesouro.PAGO} com o empenho pago, ${resumo.tesouro.PARCIAL} pago em parte, ${resumo.tesouro.NAO_PAGO} sem pagamento.`)
               },
               { id: 'PAGA', label: 'Pagas', count: nGrupo('PAGA'), title: 'Faturas com ordem bancária que confirma o pagamento' },
               { id: TODOS, label: 'Todas', count: itens.length }
@@ -275,14 +283,18 @@ export const PagamentosCarteira: React.FC = () => {
             )}
           </CarteiraFilterBar>
 
-          <PagamentosCarteiraTable
-            items={lista}
-            total={itens.length}
-            onOpen={abrir}
-            onResetFilters={resetFilters}
-            onFilter={filtrarPelaCelula}
-            canFilterGestor={showGestorFilter}
-          />
+          {listaNaoCarregou ? (
+            <ListaNaoCarregou titulo="Os pagamentos não carregaram." testId="pagamentos-nao-carregou" />
+          ) : (
+            <PagamentosCarteiraTable
+              items={lista}
+              total={itens.length}
+              onOpen={abrir}
+              onResetFilters={resetFilters}
+              onFilter={filtrarPelaCelula}
+              canFilterGestor={showGestorFilter}
+            />
+          )}
         </>
       )}
       <CreateCycleModal

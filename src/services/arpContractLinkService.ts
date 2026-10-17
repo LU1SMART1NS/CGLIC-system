@@ -244,8 +244,9 @@ export async function fetchAllArpItemContractLinks(): Promise<ArpItemContractLin
     }
     return pairs;
   } catch (err) {
+    // Falha vira erro: uma lista vazia mostrava todos os contratos sem ata e tirava do gestor os contratos das atas dele.
     console.warn('Erro ao carregar vínculos item↔contrato', err);
-    return [];
+    throw err;
   }
 }
 
@@ -285,8 +286,9 @@ export async function fetchArpItemContractLinksByAta(numeroAta: string, uasg: st
       updatedAt: d.updated_at
     }));
   } catch (err) {
+    // Falha vira erro: uma lista vazia dizia que a ata não tem contrato vinculado.
     console.warn('Erro ao carregar contratos vinculados à Ata', err);
-    return [];
+    throw err;
   }
 }
 

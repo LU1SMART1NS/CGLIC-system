@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
-import { ErrorState } from '../../design-system/components/ErrorState';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { ActionButton, StatusBadge, useToast, AvisoCarregando } from '../../design-system';
 import type { StatusBadgeVariant } from '../../design-system/components/StatusBadge';
@@ -74,7 +76,7 @@ export const EmpenhosContratoPage: React.FC = () => {
   const toast = useToast();
   const consulta = useEmpenhosForaDoContrato();
   const acoes = useAcoesCorrecaoNaFonte();
-  const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
+  const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos, leituras: leiturasContratos, contratosNaoCarregaram } = useContratosDoFinanceiro();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
   const [marcando, setMarcando] = useState<EmpenhoForaDoContrato | null>(null);
@@ -83,6 +85,8 @@ export const EmpenhosContratoPage: React.FC = () => {
   const deixar = useDeixarComoEsta(
     'A fatura continua citando a nota fora do contrato no Contratos.gov.br; só a fila e o número do menu deixam de cobrar. Se o contrato voltar a ficar vigente, a linha volta à fila. Dá para reexibir a qualquer momento.'
   );
+  // Uma fonte que falha não some calada: o que carregou aparece e a faixa diz o que ficou de fora.
+  const leituras = useLeiturasComFalha([{ rotulo: 'notas citadas fora do contrato', query: consulta }, ...leiturasContratos, deixar.leitura]);
   const marcaDe = (l: EmpenhoForaDoContrato) => deixar.porChave.get(chaveAvisoDeixarFatura(l.contractKey, l.idFatura, l.idEmpenhoGov));
   const deixada = (l: EmpenhoForaDoContrato) => deixadaComoEsta(contrato(l.contractKey).expirado, Boolean(marcaDe(l)));
 
@@ -179,13 +183,6 @@ export const EmpenhosContratoPage: React.FC = () => {
       }
     );
 
-  if (consulta.error && !consulta.data) {
-    return (
-      <PageContainer style={{ padding: '2rem 0' }}>
-        <ErrorState title="Erro ao carregar as notas" message={consulta.error.message} onRetry={() => void consulta.refetch()} />
-      </PageContainer>
-    );
-  }
   const hasActive = hasActiveCarteiraFilters(SCHEMA, filters) && filters.situacao === SCHEMA.situacao.default;
   const isBusy = consulta.isLoading || carregandoContratos;
   const colunasDaTabela = COLUNAS + (showGestorFilter ? 1 : 0);
@@ -197,6 +194,8 @@ export const EmpenhosContratoPage: React.FC = () => {
         subtitle="Notas que uma fatura cita, mas que o Contratos.gov.br não lista no contrato da fatura."
         hint={'Abra a conferência para ver o que aconteceu. A correção é sempre no Contratos.gov.br: incluir a nota no contrato, mudar a fatura de contrato ou corrigir o número. Marque "Vou corrigir" e corrija lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a correção. Em contrato encerrado, se a correção não muda mais nada, deixe como está, com justificativa.'}
       />
+
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da fila" testIdPrefix="vinc-ne-contrato-fontes" />
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando notas...">
@@ -255,7 +254,9 @@ export const EmpenhosContratoPage: React.FC = () => {
             {showGestorFilter && <CarteiraGestorSelect value={filters.gestor} gestores={gestores} onChange={(v) => setFilter('gestor', v)} testId="vinc-ne-contrato-filter-gestor" />}
           </CarteiraFilterBar>
 
-          {todas.length === 0 ? (
+          {todas.length === 0 && (naoCarregou(consulta) || (Boolean(escopo) && contratosNaoCarregaram)) ? (
+            <ListaNaoCarregou titulo="As notas citadas fora do contrato não carregaram." testId="vinc-ne-contrato-nao-carregou" />
+          ) : todas.length === 0 ? (
             <EmptyState
               title="Nenhuma fatura cita empenho fora do contrato."
               description="Quando o Contratos.gov.br trouxer uma fatura com nota que não está no contrato, ela aparece aqui."
