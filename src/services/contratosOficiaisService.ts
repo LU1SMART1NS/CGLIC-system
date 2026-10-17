@@ -1,21 +1,16 @@
 /**
  * Contratos oficiais persistidos no Supabase (migration 72).
  *
- * As telas leem a lista de contratos do banco (`contratos_oficiais`), e não mais das APIs do governo
- * a cada carga. A sincronização com o Contratos.gov.br e o Compras.gov.br roda em segundo plano, uma
- * vez para todos os usuários: a trava em `sincronizacao_fontes` garante que só um navegador sincroniza
- * por vez e só quando os dados passaram da validade. O coordenador força a atualização pelo botão.
- *
- * Provisório: a sincronização roda no navegador de quem tem perfil de gravação (gestor/coordenador).
- * Ela vai para uma Edge Function agendada no item 2 do docs/historico/PLANO_PERSISTENCIA_CONTRATOS_E_CACHE.md.
+ * As telas leem a lista de contratos do banco (`contratos_oficiais`) e nunca as APIs do governo: quem
+ * consulta o Contratos.gov.br e o Compras.gov.br é a sincronização no servidor (server/sincronizar-fontes,
+ * que usa `sincronizarContratos` daqui). A trava em `sincronizacao_fontes` garante uma sincronização por vez.
  */
 
 import type { ContractDashboardRecord } from '../types';
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import {
   buscarContratosNasFontes,
   calculateStatusVigencia,
-  fetchContractsForDashboard,
   ordenarContratos
 } from './contractService';
 import {
@@ -35,8 +30,12 @@ export {
 export const RECURSO_CONTRATOS = 'contratos' as const;
 /** Validade da lista no banco: passado isso, a próxima abertura de quem pode gravar sincroniza. */
 export const VALIDADE_CONTRATOS = VALIDADE_PADRAO;
-/** O Supabase devolve no máximo 1000 linhas por consulta e corta o resto sem avisar. */
-const PAGINA_LEITURA = 1000;
+/**
+ * Contratos por página na leitura. O Supabase devolve no máximo 1000 linhas e corta o resto sem avisar, mas a página
+ * de 1000 da UASG 200331 tem ~4 MB de `registro` e estourou o tempo limite de 8 s do usuário logado com o banco
+ * cheio (17/10/2026). Com 250 cada página tem ~1 MB e um quarto do trabalho.
+ */
+export const PAGINA_LEITURA = 250;
 /** Contratos por chamada de gravação (a função aceita até 500). */
 const LOTE_GRAVACAO = 100;
 
@@ -52,19 +51,27 @@ export function registroParaContrato(registro: Record<string, any>): ContractDas
   };
 }
 
-/** Contratos da carteira (UASG) gravados no banco, em páginas. Lista vazia quando nada foi sincronizado. */
+/**
+ * Contratos da carteira (UASG) gravados no banco, em páginas. Lista vazia quando nada foi sincronizado.
+ * A ordem é fixa (contract_key, único na UASG), para nenhuma linha pular ou repetir entre as páginas. Falha em
+ * qualquer página vira erro: nunca devolve a carteira pela metade.
+ */
 export async function fetchContratosOficiaisDoBanco(uasg: string): Promise<ContractDashboardRecord[]> {
   if (!supabase) return [];
   const cleanUasg = (uasg || '').trim();
   const contratos: ContractDashboardRecord[] = [];
-  for (let from = 0; ; from += PAGINA_LEITURA) {
+  for (let from = 0, pagina = 1; ; from += PAGINA_LEITURA, pagina++) {
     const { data, error } = await supabase
       .from('contratos_oficiais')
       .select('registro')
       .eq('uasg', cleanUasg)
       .order('contract_key', { ascending: true })
       .range(from, from + PAGINA_LEITURA - 1);
-    if (error) throw error;
+    if (error) {
+      throw new Error(`Não foi possível ler os contratos da UASG ${cleanUasg} no banco (página ${pagina}): ${error.message}`, {
+        cause: error
+      });
+    }
     for (const row of data ?? []) contratos.push(registroParaContrato(row.registro));
     if (!data || data.length < PAGINA_LEITURA) break;
   }
@@ -72,20 +79,13 @@ export async function fetchContratosOficiaisDoBanco(uasg: string): Promise<Contr
 }
 
 /**
- * Lista de contratos para as telas (queryFn de ['contracts-dashboard', uasg]).
- * Lê do banco. Só consulta as APIs do governo quando o banco ainda não tem a carteira (antes da
- * primeira sincronização) ou não respondeu.
+ * Lista de contratos para as telas (queryFn de ['contracts-dashboard', uasg]). Só lê o banco.
+ * Leitura que falha vira erro, e cada tela o trata: o painel do Início usa a última leitura boa ou avisa que não
+ * carregou; a Carteira de Contratos mostra o erro com "tentar novamente". O navegador não consulta as fontes oficiais
+ * nem quando o banco falha nem quando ainda não tem a carteira (devolve lista vazia).
  */
 export async function fetchContratosParaTela(uasg: string): Promise<ContractDashboardRecord[]> {
-  const cleanUasg = (uasg || '').trim();
-  if (!isSupabaseConfigured || !supabase) return fetchContractsForDashboard(cleanUasg, false);
-  try {
-    const doBanco = await fetchContratosOficiaisDoBanco(cleanUasg);
-    if (doBanco.length > 0) return doBanco;
-  } catch (err) {
-    console.warn(`[contratosOficiais] leitura do banco falhou para a UASG ${cleanUasg}; consultando as fontes oficiais.`, err);
-  }
-  return fetchContractsForDashboard(cleanUasg, false);
+  return fetchContratosOficiaisDoBanco(uasg);
 }
 
 // ------------------------------------------------------------------------------

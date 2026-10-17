@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  fetchContractsForDashboard,
-  clearContractsCache,
-  isContractsListPartial,
-  subscribeContractsPartial,
-  deriveIdCompraContratosGov
-} from '../contractService';
+import { buscarContratosNasFontes, deriveIdCompraContratosGov, FONTE_COMPRAS_GOV, FONTE_CONTRATOS_GOV } from '../contractService';
 
 const UASG = '200331';
 
@@ -52,9 +46,9 @@ function mockFetch({ gov, compras }: Handlers) {
   return spy;
 }
 
-describe('fetchContractsForDashboard — fontes, cache e lista incompleta', () => {
+// Só a sincronização no servidor consulta as fontes oficiais; as telas leem o banco (contratosOficiaisService).
+describe('buscarContratosNasFontes — fontes e lista incompleta', () => {
   beforeEach(() => {
-    clearContractsCache();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
   afterEach(() => {
@@ -69,12 +63,12 @@ describe('fetchContractsForDashboard — fontes, cache e lista incompleta', () =
       compras: async () => jsonResponse({ resultado: [comprasContrato('00001/2022'), comprasContrato('00002/2025')], paginasRestantes: 0 })
     });
 
-    const result = await fetchContractsForDashboard(UASG, false);
+    const { contracts, fontesComFalha } = await buscarContratosNasFontes(UASG);
 
-    expect(result.map((c) => c.id).sort()).toEqual([`${UASG}-00001-2022`, `${UASG}-00002-2025`]);
-    expect(result.find((c) => c.numero === '00001/2022')?.fonteDados).toBe('Contratos.gov.br');
-    expect(result.find((c) => c.numero === '00002/2025')?.fonteDados).toBe('Compras.gov.br');
-    expect(isContractsListPartial(UASG)).toBe(false);
+    expect(contracts.map((c) => c.id).sort()).toEqual([`${UASG}-00001-2022`, `${UASG}-00002-2025`]);
+    expect(contracts.find((c) => c.numero === '00001/2022')?.fonteDados).toBe('Contratos.gov.br');
+    expect(contracts.find((c) => c.numero === '00002/2025')?.fonteDados).toBe('Compras.gov.br');
+    expect(fontesComFalha).toEqual([]);
   });
 
   it('consulta as duas fontes ao mesmo tempo (a segunda não espera a primeira terminar)', async () => {
@@ -84,7 +78,7 @@ describe('fetchContractsForDashboard — fontes, cache e lista incompleta', () =
       compras: async () => jsonResponse({ resultado: [comprasContrato('00002/2025')], paginasRestantes: 0 })
     });
 
-    const pending = fetchContractsForDashboard(UASG, false);
+    const pending = buscarContratosNasFontes(UASG);
     await vi.waitFor(() => {
       const urls = spy.mock.calls.map((c) => String(c[0]));
       expect(urls.some((u) => u.includes('/api-contratos-gov/'))).toBe(true);
@@ -92,7 +86,7 @@ describe('fetchContractsForDashboard — fontes, cache e lista incompleta', () =
     });
 
     resolveGov(jsonResponse([govContrato('00001/2022')]));
-    expect(await pending).toHaveLength(2);
+    expect((await pending).contracts).toHaveLength(2);
   });
 
   it('espera mais de 40s pelo Contratos.gov.br (a UASG 200331 leva ~20s) e depois desiste', async () => {
@@ -106,7 +100,7 @@ describe('fetchContractsForDashboard — fontes, cache e lista incompleta', () =
       return Promise.resolve(jsonResponse({ resultado: [], paginasRestantes: 0 }));
     }));
 
-    const pending = fetchContractsForDashboard(UASG, false);
+    const pending = buscarContratosNasFontes(UASG);
     let settled = false;
     pending.then(() => { settled = true; });
 
@@ -114,48 +108,38 @@ describe('fetchContractsForDashboard — fontes, cache e lista incompleta', () =
     expect(settled).toBe(false);
 
     await vi.advanceTimersByTimeAsync(10_000);
-    await pending;
+    const { fontesComFalha } = await pending;
     expect(settled).toBe(true);
-    expect(isContractsListPartial(UASG)).toBe(true);
+    expect(fontesComFalha).toEqual([FONTE_CONTRATOS_GOV]);
   });
 
-  it('lista incompleta (fonte completa falhou): devolve o que veio, marca como incompleta e não guarda em cache', async () => {
-    const spy = mockFetch({
+  it('fonte completa fora do ar: devolve o que veio e lista a fonte que falhou', async () => {
+    mockFetch({
       gov: async () => { throw new Error('timeout'); },
       compras: async () => jsonResponse({ resultado: [comprasContrato('00002/2025')], paginasRestantes: 0 })
     });
 
-    const first = await fetchContractsForDashboard(UASG, false);
-    expect(first).toHaveLength(1);
-    expect(isContractsListPartial(UASG)).toBe(true);
-
-    // Sem cache: a próxima chamada consulta de novo, e ao vir completa limpa a marca.
-    const callsAntes = spy.mock.calls.length;
-    mockFetch({
-      gov: async () => jsonResponse([govContrato('00001/2022')]),
-      compras: async () => jsonResponse({ resultado: [comprasContrato('00002/2025')], paginasRestantes: 0 })
-    });
-    const second = await fetchContractsForDashboard(UASG, false);
-    expect(callsAntes).toBeGreaterThan(0);
-    expect(second).toHaveLength(2);
-    expect(isContractsListPartial(UASG)).toBe(false);
+    const { contracts, fontesComFalha } = await buscarContratosNasFontes(UASG);
+    expect(contracts).toHaveLength(1);
+    expect(fontesComFalha).toEqual([FONTE_CONTRATOS_GOV]);
   });
 
-  it('lista incompleta depois de uma completa não encolhe a carteira: soma à última completa', async () => {
+  it('fonte fora do ar não encolhe a carteira: o que já se sabia (base do banco) continua', async () => {
     mockFetch({
       gov: async () => jsonResponse([govContrato('00001/2022'), govContrato('00003/2020')]),
       compras: async () => jsonResponse({ resultado: [comprasContrato('00002/2025')], paginasRestantes: 0 })
     });
-    expect(await fetchContractsForDashboard(UASG, false)).toHaveLength(3);
+    const { contracts: base } = await buscarContratosNasFontes(UASG);
+    expect(base).toHaveLength(3);
 
-    // Atualização manual com a fonte completa fora do ar: o Compras.gov.br só traz o 00002/2025.
+    // Com a fonte completa fora do ar, o Compras.gov.br só traz o 00002/2025.
     mockFetch({
       gov: async () => { throw new Error('fora do ar'); },
       compras: async () => jsonResponse({ resultado: [comprasContrato('00002/2025')], paginasRestantes: 0 })
     });
-    const result = await fetchContractsForDashboard(UASG, true);
-    expect(result).toHaveLength(3);
-    expect(isContractsListPartial(UASG)).toBe(true);
+    const { contracts, fontesComFalha } = await buscarContratosNasFontes(UASG, base);
+    expect(contracts).toHaveLength(3);
+    expect(fontesComFalha).toEqual([FONTE_CONTRATOS_GOV]);
   });
 
   it('lista incompleta também quando o Compras.gov.br responde erro', async () => {
@@ -163,40 +147,14 @@ describe('fetchContractsForDashboard — fontes, cache e lista incompleta', () =
       gov: async () => jsonResponse([govContrato('00001/2022')]),
       compras: async () => jsonResponse({}, { ok: false, status: 503 })
     });
-    const result = await fetchContractsForDashboard(UASG, false);
-    expect(result).toHaveLength(1);
-    expect(isContractsListPartial(UASG)).toBe(true);
+    const { contracts, fontesComFalha } = await buscarContratosNasFontes(UASG);
+    expect(contracts).toHaveLength(1);
+    expect(fontesComFalha).toEqual([FONTE_COMPRAS_GOV]);
   });
 
   it('fonte que responde sem contratos não é falha', async () => {
     mockFetch({ gov: async () => jsonResponse([]), compras: async () => jsonResponse({ resultado: [], paginasRestantes: 0 }) });
-    await fetchContractsForDashboard(UASG, false);
-    expect(isContractsListPartial(UASG)).toBe(false);
-  });
-
-  it('lista completa vai para o cache: a segunda chamada não consulta as fontes', async () => {
-    const spy = mockFetch({ gov: async () => jsonResponse([govContrato('00001/2022')]) });
-    await fetchContractsForDashboard(UASG, false);
-    const chamadas = spy.mock.calls.length;
-    await fetchContractsForDashboard(UASG, false);
-    expect(spy.mock.calls.length).toBe(chamadas);
-  });
-
-  it('chamadas simultâneas para a mesma UASG dividem uma só consulta', async () => {
-    const spy = mockFetch({ gov: async () => jsonResponse([govContrato('00001/2022')]) });
-    const [a, b] = await Promise.all([fetchContractsForDashboard(UASG, false), fetchContractsForDashboard(UASG, false)]);
-    expect(a).toBe(b);
-    const govCalls = spy.mock.calls.filter((c) => String(c[0]).includes('/api-contratos-gov/'));
-    expect(govCalls).toHaveLength(1);
-  });
-
-  it('avisa os interessados quando o estado "incompleta" muda', async () => {
-    const listener = vi.fn();
-    const unsubscribe = subscribeContractsPartial(listener);
-    mockFetch({ gov: async () => { throw new Error('fora'); } });
-    await fetchContractsForDashboard(UASG, false);
-    expect(listener).toHaveBeenCalledTimes(1);
-    unsubscribe();
+    expect((await buscarContratosNasFontes(UASG)).fontesComFalha).toEqual([]);
   });
 });
 
@@ -223,9 +181,8 @@ describe('deriveIdCompraContratosGov — compra de origem a partir do Contratos.
   });
 });
 
-describe('fetchContractsForDashboard — idCompra do contrato', () => {
+describe('buscarContratosNasFontes — idCompra do contrato', () => {
   beforeEach(() => {
-    clearContractsCache();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
   afterEach(() => {
@@ -237,7 +194,9 @@ describe('fetchContractsForDashboard — idCompra do contrato', () => {
 
   it('contrato que só existe no Contratos.gov.br já sai com a compra de origem', async () => {
     mockFetch({ gov: async () => jsonResponse([comCompra('00200/2026')]) });
-    const [c] = await fetchContractsForDashboard(UASG, false);
+    const {
+      contracts: [c]
+    } = await buscarContratosNasFontes(UASG);
     expect(c.idCompra).toBe('20033105900242024');
   });
 
@@ -246,7 +205,7 @@ describe('fetchContractsForDashboard — idCompra do contrato', () => {
       gov: async () => jsonResponse([govContrato('00001/2022')]),
       compras: async () => jsonResponse({ resultado: [{ ...comprasContrato('00001/2022'), dataVigenciaInicial: '2022-01-10', idCompra: '20033105000012022' }], paginasRestantes: 0 })
     });
-    const result = await fetchContractsForDashboard(UASG, false);
+    const { contracts: result } = await buscarContratosNasFontes(UASG);
     expect(result.find((c) => c.numero === '00001/2022')?.idCompra).toBe('20033105000012022');
   });
 });

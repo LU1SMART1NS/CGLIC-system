@@ -34,6 +34,15 @@ export function useContractsPortfolio() {
   /** A última sincronização de alguma UASG saiu incompleta: os números podem estar abaixo do real. */
   const isPartial = sincronizacao.incompleta;
   const error = (dash200330.error || dash200331.error) as Error | null;
+  /**
+   * Alguma UASG falhou e não tem leitura anterior: a carteira sairia pela metade (só a outra UASG) ou vazia,
+   * então a tela mostra o erro. Com leitura anterior, o React Query mantém a lista boa e a tela segue.
+   */
+  const carteiraIncompleta = [dash200330, dash200331].some((dash) => Boolean(dash.error) && !dash.data);
+  /** "Tentar novamente" do erro: relê do banco só as UASGs que falharam (não pede sincronização às fontes). */
+  const tentarDeNovo = async () => {
+    await Promise.all([dash200330, dash200331].filter((dash) => dash.error).map((dash) => dash.refetch()));
+  };
   /** Data da última sincronização com as fontes oficiais; antes da primeira, a hora da consulta. */
   const dataUpdatedAt =
     sincronizacao.ultimoSucessoEm ?? (Math.max(dash200330.dataUpdatedAt || 0, dash200331.dataUpdatedAt || 0) || undefined);
@@ -142,6 +151,8 @@ export function useContractsPortfolio() {
     /** Coordenador pode forçar a atualização com as fontes oficiais. */
     podeForcarAtualizacao: sincronizacao.podeForcar,
     error,
+    carteiraIncompleta,
+    tentarDeNovo,
     dataUpdatedAt,
     refresh
   };
