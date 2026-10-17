@@ -97,6 +97,32 @@ describe('Previsão: uma leitura falha, a faixa avisa e o resto fica', () => {
     expect(render(<PrevisaoMes />)).not.toContain('previsao-fontes-com-falha');
   });
 
+  it('Registrar envio só para o coordenador; o gestor copia só as linhas dele', async () => {
+    const { useAuth } = await import('../../../context/AuthContext');
+    vi.mocked(usePrevisaoMensal).mockReturnValue({
+      linhas: [linha({})],
+      ajustes: [],
+      envio: null,
+      prazoEmenda: null,
+      sugeridosSemMarca: 0,
+      isLoading: false,
+      ajustar: vi.fn(),
+      registrarEnvio: vi.fn(),
+      leituras: [{ rotulo: ROTULOS_FINANCEIRO.faturas, query: ok }]
+    } as never);
+    const admin = render(<PrevisaoMes />);
+    expect(admin).toContain('previsao-registrar');
+    expect(admin).toContain('Copiar para o SEI');
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor', user: null } as never);
+    const gestor = render(<PrevisaoMes />);
+    expect(gestor).not.toContain('previsao-registrar');
+    expect(gestor).toContain('Copiar minhas linhas');
+    expect(gestor).toContain('o coordenador registra o envio');
+    // Ajustar as próprias linhas continua com o gestor.
+    expect(gestor).toContain('previsao-incluir');
+    vi.mocked(useAuth).mockReturnValue({ role: 'admin', user: null } as never);
+  });
+
   it('Como cada contrato é pago: as marcas não carregaram → a faixa diz, e os contratos ficam', () => {
     vi.mocked(useFaturasCarteira).mockReturnValue({ ...ok, isLoading: false, tesouro: ok } as never);
     vi.mocked(useExpectativasPagamento).mockReturnValue({

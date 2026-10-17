@@ -49,6 +49,9 @@ export const PrevisaoMes: React.FC = () => {
   const toast = useToast();
   const { user, role } = useAuth();
   const podeEditar = role === 'gestor' || role === 'admin';
+  // O envio vale para a CGLIC toda (um por mês) e o gestor só vê os próprios contratos: registrar fica com o coordenador.
+  const podeRegistrarEnvio = role === 'admin';
+  const soMinhasLinhas = role === 'gestor';
   const registradoPorNome = (user?.user_metadata as { full_name?: string } | undefined)?.full_name || user?.email || undefined;
   const [params, setParams] = useSearchParams();
   const proxima = mesDaProximaPrevisao();
@@ -153,12 +156,12 @@ export const PrevisaoMes: React.FC = () => {
         <NoticeBar tone="success" testId="previsao-enviada">
           Previsão de {rotuloDoMes(mes)} enviada em {dataBR(envio.enviadoEm)} (SEI {envio.sei}
           {envio.enviadoPorNome ? `, por ${envio.enviadoPorNome}` : ''}) · {envio.linhas.length} linhas · {formatCurrency(envio.total)}. Se mudar algo,
-          registre o envio de novo.
+          {podeRegistrarEnvio ? 'registre o envio de novo.' : 'avise o coordenador para registrar o envio de novo.'}
         </NoticeBar>
       ) : (
         <NoticeBar tone={prazoPassou ? 'danger' : diasAtePrazo <= 3 ? 'warning' : 'info'} testId="previsao-prazo">
           Previsão de {rotuloDoMes(mes)}: informar até {dataBR(prazo)} (último dia útil de {rotuloDoMes(somarMes(mes, -1))}, Portaria 50, art. 5º, § 2º, III) ·{' '}
-          {prazoPassou ? 'o prazo passou' : diasAtePrazo === 0 ? 'vence hoje' : `faltam ${diasAtePrazo} ${diasAtePrazo === 1 ? 'dia útil' : 'dias úteis'}`} · ainda não enviada.
+          {prazoPassou ? 'o prazo passou' : diasAtePrazo === 0 ? 'vence hoje' : `faltam ${diasAtePrazo} ${diasAtePrazo === 1 ? 'dia útil' : 'dias úteis'}`} · ainda não enviada{podeRegistrarEnvio ? '' : ' (o coordenador registra o envio)'}.
         </NoticeBar>
       )}
       {mostrarPrevistoPago && envio && <PrevistoPagoMes mes={mes} envio={envio} contrato={contrato} escopo={escopo} />}
@@ -227,8 +230,8 @@ export const PrevisaoMes: React.FC = () => {
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {podeEditar && <ActionButton action="adicionar" size="sm" onClick={() => setIncluindo(true)} label="Incluir linha" data-testid="previsao-incluir" />}
-            <ActionButton action="copiar" size="sm" onClick={() => void copiar()} label="Copiar para o SEI" data-testid="previsao-copiar" disabled={filters.origem === 'RETIRADAS'} />
-            {podeEditar && (
+            <ActionButton action="copiar" size="sm" onClick={() => void copiar()} label={soMinhasLinhas ? 'Copiar minhas linhas' : 'Copiar para o SEI'} title={soMinhasLinhas ? 'Copia só as linhas dos seus contratos' : undefined} data-testid="previsao-copiar" disabled={filters.origem === 'RETIRADAS'} />
+            {podeRegistrarEnvio && (
               <ActionButton action="confirmar" size="sm" onClick={() => setRegistrando(true)} label={envio ? 'Registrar envio de novo' : 'Registrar envio'} disabled={mantidas.length === 0} data-testid="previsao-registrar" />
             )}
           </div>
