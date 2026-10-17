@@ -34,27 +34,35 @@ export const GtiTag: React.FC<{ grupo: GrupoDaFatia; sufixo?: string; testId?: s
   );
 };
 
-/** Barra com a fatia de cada grupo (e, opcionalmente, a legenda dos grupos com 5% ou mais). */
-export const GtiFatiaBar: React.FC<{ fatias: FatiasDaAta; legenda?: boolean; largura?: string; testId?: string }> = ({
+/**
+ * Barra com a fatia de cada grupo (e, opcionalmente, a legenda dos grupos com 5% ou mais). Cada grupo é um pedaço
+ * separado por um vão de 2px; nas carteiras e no cartão do topo fica com 4px, a mesma espessura da barra de consumo.
+ */
+export const GtiFatiaBar: React.FC<{ fatias: FatiasDaAta; legenda?: boolean; largura?: string; altura?: number; testId?: string }> = ({
   fatias,
   legenda = false,
   largura = '100%',
+  altura = 8,
   testId
 }) => {
   const descricao = fatias.fatias.map((f) => `${GRUPO_GTI_INFO[f.grupo].rotulo} ${f.pct}%`).join(' · ');
   const comLegenda = fatias.fatias.filter((f) => f.pct >= 5);
+  const raio = Math.min(2, altura / 2);
   return (
     <div data-testid={testId} style={{ minWidth: 0 }}>
       <div
         role="img"
         aria-label={`Fatia por GTI: ${descricao}`}
         title={descricao}
-        style={{ display: 'flex', width: largura, maxWidth: '100%', height: 7, borderRadius: 4, overflow: 'hidden', background: '#f1f5f9' }}
+        style={{ display: 'flex', gap: '2px', width: largura, maxWidth: '100%', height: altura, borderRadius: raio, background: fatias.total > 0 ? undefined : '#f1f5f9' }}
       >
         {fatias.total > 0 &&
           fatias.fatias.map((f) =>
             f.quantidade > 0 ? (
-              <span key={f.grupo} style={{ width: `${(100 * f.quantidade) / fatias.total}%`, background: f.grupo === 'A_CONFIRMAR' ? LISTRADO : GRUPO_GTI_INFO[f.grupo].cor }} />
+              <span
+                key={f.grupo}
+                style={{ flex: `${f.quantidade} 1 0`, minWidth: 2, borderRadius: raio, background: f.grupo === 'A_CONFIRMAR' ? LISTRADO : GRUPO_GTI_INFO[f.grupo].cor }}
+              />
             ) : null
           )}
       </div>
@@ -72,7 +80,10 @@ export const GtiFatiaBar: React.FC<{ fatias: FatiasDaAta; legenda?: boolean; lar
   );
 };
 
-/** Célula "GTI" das carteiras: o GTI principal em destaque, a maior outra fatia em cinza (se pesa) e a barra. */
+/**
+ * Célula "GTI" das carteiras: o GTI principal em destaque, a maior outra fatia em cinza (se pesa) e a barra. Com um
+ * grupo só não há divisão a mostrar: fica o nome com "único grupo" e sem barra.
+ */
 export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string }> = ({ fatias, testId }) => {
   const { destaque, secundaria } = resumirCelulaGti(fatias);
   if (!fatias || !destaque) {
@@ -83,16 +94,18 @@ export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string }> =
     );
   }
   const ehGti = destaque.grupo !== 'OUTROS' && destaque.grupo !== 'A_CONFIRMAR';
+  const unico = fatias.fatias.filter((f) => f.quantidade > 0).length === 1;
   return (
     <div data-testid={testId} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '150px' }}>
       <div style={{ fontSize: '0.8rem', lineHeight: 1.3 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: ehGti ? 800 : 600, color: ehGti ? '#0f172a' : '#64748b', whiteSpace: 'nowrap' }}>
           {ehGti && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: GRUPO_GTI_INFO[destaque.grupo].cor }} />}
-          {textoDaFatia(destaque)}
+          {unico && ehGti ? GRUPO_GTI_INFO[destaque.grupo].rotulo : textoDaFatia(destaque)}
         </span>
+        {unico && ehGti && <span style={{ ...pequeno, whiteSpace: 'nowrap' }}> · único grupo</span>}
         {secundaria && <span style={{ ...pequeno, whiteSpace: 'nowrap' }}> · {textoDaFatia(secundaria)}</span>}
       </div>
-      <GtiFatiaBar fatias={fatias} largura="150px" />
+      {!unico && <GtiFatiaBar fatias={fatias} largura="150px" altura={4} />}
     </div>
   );
 };

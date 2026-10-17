@@ -79,7 +79,7 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
         style={{ display: 'block', width: '100%', minWidth: '140px', maxWidth: '240px', background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
       >
         <span style={{ display: 'block', fontWeight: 800 }}>{fmtPct(topo.pct)}</span>
-        <span style={{ display: 'block', marginTop: '0.2rem' }}><Barra pct={topo.pct} altura={5} /></span>
+        <span style={{ display: 'block', marginTop: '0.2rem' }}><Barra pct={topo.pct} altura={4} /></span>
         <span
           data-testid={testId ? `${testId}-descricao` : undefined}
           style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
@@ -88,9 +88,9 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
           {toSentenceCaseIfAllCaps(topo.descricao)}
         </span>
         {total > 1 && (
-          <span aria-hidden="true" style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: '3px', marginTop: '0.35rem', height: '12px' }}>
+          <span aria-hidden="true" style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: '2px', marginTop: '0.35rem', height: '9px' }}>
             {ordenados.slice(0, visiveis).map((item) => (
-              <span key={item.numero} data-quadradinho style={{ width: '10px', height: '10px', borderRadius: '2px', flex: 'none', background: saldoBarColor(item.pct) }} />
+              <span key={item.numero} data-quadradinho style={{ width: '7px', height: '7px', borderRadius: '1.5px', flex: 'none', background: saldoBarColor(item.pct) }} />
             ))}
             {total > visiveis && (
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', marginLeft: '3px', whiteSpace: 'nowrap' }}>+{total - visiveis}</span>

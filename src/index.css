@@ -19,12 +19,14 @@
   --primary-light: rgba(12, 50, 111, 0.1);
   --primary-rgb: 12, 50, 111;
 
-  /* Grupos de Trabalho Integrados (GTI) do ComprasSUSP: cor de cada grupo nas fatias das atas (migration 139). */
-  --gti-ligabom: #c2410c;
-  --gti-cncg: #1f5fbf;
-  --gti-cnpc: #6d3fc0;
-  --gti-condpci: #0f766e;
-  --gti-consesp: #0c326f;
+  /* Grupos de Trabalho Integrados (GTI) do ComprasSUSP: cor de cada grupo nas fatias das atas (migration 139).
+     Cor de cada força (bombeiros laranja, PM azul, Polícia Civil preto, Científica verde, secretarias roxo), em tons
+     fechados para não se confundir com o vermelho, o amarelo e o verde da situação do consumo. */
+  --gti-ligabom: #d4651c;
+  --gti-cncg: #2c64c4;
+  --gti-cnpc: #22262e;
+  --gti-condpci: #2e6b4a;
+  --gti-consesp: #7a4fb8;
   --gti-outros: #94a3b8;
   --gti-a-confirmar: #e2e8f0;
 
