@@ -3,17 +3,20 @@ import { useAuth } from '../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../hooks/useVinculacaoEmpenhos';
 import { useEmpenhosForaDoContrato } from '../../hooks/useEmpenhosForaDoContrato';
 import { useContratosDoFinanceiro } from '../financeiro/useContratosDoFinanceiro';
+import { useTelaCarregada } from '../layout/useTelaCarregada';
 import { aguardaVinculoAosItens, contaNoMenu, pedeOGestor } from './vinculacaoEmpenhos';
 
 /**
  * Número no ícone do menu Vínculos, parte leve: as notas a vincular aos itens e as citadas fora do contrato que pedem o gestor,
  * só de contratos vigentes (as de contrato encerrado ficam no filtro "Encerrados" das filas; decisão de 15/10/2026). Só
  * coordenador e gestor (este, nos próprios contratos). Os contratos sem ata e os itens a alocar dependem da carteira inteira:
- * vêm de ContagensDaCarteira, só depois de a carteira estar no navegador.
+ * vêm de ContagensDaCarteira, só depois de a carteira estar no navegador. As filas só são lidas depois que a tela aberta
+ * enche (useTelaCarregada), para não disputar a fila do banco com ela.
  */
 export function useContagemVinculacao(): { aosItens: number; aoContrato: number } | null {
   const { role } = useAuth();
-  const ativo = role === 'admin' || role === 'gestor';
+  const telaCarregada = useTelaCarregada();
+  const ativo = (role === 'admin' || role === 'gestor') && telaCarregada;
   const { data: notas } = useEmpenhosParaVincularAosItens(ativo);
   const { data: foraDoContrato } = useEmpenhosForaDoContrato(ativo);
   const { contrato, escopo, isLoading } = useContratosDoFinanceiro();

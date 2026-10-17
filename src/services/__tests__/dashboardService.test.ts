@@ -10,7 +10,8 @@ import {
   buildManagementDashboardReadModel,
   fetchManagementDashboardData,
   fetchAllPaymentCyclesForDashboard,
-  lerUmaVez
+  lerUmaVez,
+  COLUNAS_EMPENHOS_PAINEL
 } from '../dashboardService';
 import type {
   ContractDashboardRecord,
@@ -65,19 +66,33 @@ vi.mock('../empenhadoAcimaService', async (importOriginal) => ({
 
 // A alocação (arp_allocations) é lida dentro do próprio dashboardService: para contá-la, um banco de mentira
 // que responde vazio a tudo e anota as tabelas lidas. Ligado só nos testes que pedem.
-const bancoFalso = vi.hoisted(() => ({ ligado: false, tabelas: [] as string[] }));
+// `chamadas` guarda os métodos pedidos em cada tabela (select, order, range...); `responder` troca a resposta de uma
+// tabela (por página, pelo início do range).
+const bancoFalso = vi.hoisted(() => ({
+  ligado: false,
+  tabelas: [] as string[],
+  chamadas: [] as Array<{ tabela: string; metodo: string; args: unknown[] }>,
+  responder: undefined as undefined | ((tabela: string, de: number) => { data: unknown; error: unknown } | undefined)
+}));
 vi.mock('../supabaseClient', async (importOriginal) => {
   const original = await importOriginal<typeof import('../supabaseClient')>();
-  const consulta = (): any =>
+  const consulta = (tabela: string, estado = { de: 0 }): any =>
     new Proxy({}, {
-      get: (_alvo, prop) => (prop === 'then' ? (ok: (r: unknown) => void) => ok({ data: [], error: null }) : () => consulta())
+      get: (_alvo, prop) =>
+        prop === 'then'
+          ? (ok: (r: unknown) => void) => ok(bancoFalso.responder?.(tabela, estado.de) ?? { data: [], error: null })
+          : (...args: unknown[]) => {
+              bancoFalso.chamadas.push({ tabela, metodo: String(prop), args });
+              if (prop === 'range') estado.de = Number(args[0]);
+              return consulta(tabela, estado);
+            }
     });
   const cliente = {
     from: (tabela: string) => {
       bancoFalso.tabelas.push(tabela);
-      return consulta();
+      return consulta(tabela);
     },
-    rpc: () => consulta()
+    rpc: () => consulta('rpc')
   };
   return {
     ...original,
@@ -1217,6 +1232,90 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(r331.fontesComFalha).toEqual([falha]);
       expect(avisosAcima(r330)).toEqual(['ATT-ACIMA-C330-1']);
       expect(avisosAcima(r331)).toEqual(['ATT-ACIMA-C331-1']);
+    });
+  });
+
+  describe('empenhos do Início: lidos uma vez para as duas UASGs, em ordem fixa, e falha não vira lista parcial', () => {
+    const contrato = (id: string, uasg: string) =>
+      ({ id, numero: id, ano: 2026, numeroFormatado: `${id}/2026`, objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', uasg, fonteDados: 'Compras.gov.br' }) as ContractDashboardRecord;
+    const empenho = (id: string, uasg: string, valor: number) => ({ empenho_id: id, numero_oficial: `2026NE${id}`, ano_exercicio: 2026, uasg_emitente: uasg, valor_empenhado: valor });
+    const abrirInicio = () =>
+      Promise.all([fetchManagementDashboardData('200330', referenceDate), fetchManagementDashboardData('200331', referenceDate)]);
+    const leituras = (tabela: string) => bancoFalso.tabelas.filter((t) => t === tabela).length;
+    const metodos = (tabela: string, metodo: string) => bancoFalso.chamadas.filter((c) => c.tabela === tabela && c.metodo === metodo).map((c) => c.args);
+
+    beforeEach(() => {
+      bancoFalso.ligado = true;
+      bancoFalso.tabelas = [];
+      bancoFalso.chamadas = [];
+      vi.mocked(contractService.fetchContractsForDashboard).mockImplementation(async (uasg?: string) =>
+        uasg === '200330' ? [contrato('C330', '200330')] : [contrato('C331', '200331')]
+      );
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValue({ arps: [], syncInfo: { isCachedInDb: true } as any });
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+    });
+
+    afterEach(() => {
+      bancoFalso.ligado = false;
+      bancoFalso.responder = undefined;
+    });
+
+    it('1 leitura dos empenhos e 1 dos vínculos para as duas UASGs; cada uma soma só o que é dela', async () => {
+      bancoFalso.responder = (tabela) => {
+        if (tabela === 'v_empenhos_resumo') return { data: [empenho('e1', '200330', 100), empenho('e2', '200331', 40)], error: null };
+        return undefined;
+      };
+      const [r330, r331] = await abrirInicio();
+
+      expect(leituras('v_empenhos_resumo')).toBe(1);
+      expect(leituras('contrato_empenhos')).toBe(1);
+      expect(r330.financial.totalEmpenhado).toBe(100);
+      expect(r331.financial.totalEmpenhado).toBe(40);
+      expect(r330.fontesComFalha).toBeUndefined();
+    });
+
+    it('pede só as colunas que o número usa, com ordem fixa pela chave única nas duas leituras', async () => {
+      bancoFalso.responder = (tabela) => (tabela === 'v_empenhos_resumo' ? { data: [empenho('e1', '200330', 1)], error: null } : undefined);
+      await abrirInicio();
+
+      expect(metodos('v_empenhos_resumo', 'select')).toEqual([[COLUNAS_EMPENHOS_PAINEL.join(',')]]);
+      expect(metodos('v_empenhos_resumo', 'order')).toEqual([['empenho_id', { ascending: true }]]);
+      expect(metodos('contrato_empenhos', 'select')).toEqual([['empenho_id, contract_key']]);
+      expect(metodos('contrato_empenhos', 'order')).toEqual([['id', { ascending: true }]]);
+    });
+
+    it('falha na 2ª página vira falha da fonte (faixa "não carregou"), e não as mil linhas da 1ª página caladas', async () => {
+      // Uma leitura boa e vazia antes, para a última leitura boa ser conhecida.
+      await abrirInicio();
+      bancoFalso.tabelas = [];
+      const milLinhas = Array.from({ length: 1000 }, (_, i) => empenho(`p${i}`, '200331', 1));
+      bancoFalso.responder = (tabela, de) => {
+        if (tabela !== 'v_empenhos_resumo') return undefined;
+        return de === 0 ? { data: milLinhas, error: null } : { data: null, error: { message: 'canceling statement due to statement timeout' } };
+      };
+
+      const [r330, r331] = await abrirInicio();
+
+      expect(leituras('v_empenhos_resumo')).toBe(2);
+      for (const r of [r330, r331]) {
+        expect(r.fontesComFalha).toEqual([
+          { rotulo: 'empenhos', situacao: 'DESATUALIZADA', mensagem: 'Não foi possível ler os empenhos: canceling statement due to statement timeout' }
+        ]);
+      }
+      // Usa a última leitura boa (vazia), nunca a primeira página sozinha.
+      expect(r331.financial.totalEmpenhado).toBe(0);
+    });
+
+    it('falha nos vínculos aos contratos também vira falha da fonte', async () => {
+      bancoFalso.responder = (tabela) => {
+        if (tabela === 'v_empenhos_resumo') return { data: [empenho('e1', '200331', 10)], error: null };
+        if (tabela === 'contrato_empenhos') return { data: null, error: { message: 'tempo limite' } };
+        return undefined;
+      };
+      const [, r331] = await abrirInicio();
+      expect(r331.fontesComFalha?.map((f) => f.rotulo)).toEqual(['empenhos']);
+      expect(r331.fontesComFalha?.[0].mensagem).toContain('vínculos dos empenhos');
     });
   });
 

@@ -1676,11 +1676,23 @@ export function buildManagementDashboardReadModel(params: {
 }
 
 /**
+ * Leituras do painel que a página e o menu também fazem. O hook do painel (useManagementDashboard) as passa lendo pelo
+ * cache do React Query, com as mesmas chaves e opções das outras telas: o que já foi lido e ainda vale não é lido de
+ * novo, e o que está sendo lido é aproveitado. Sem elas (chamada direta), o painel lê do banco como antes.
+ */
+export interface FontesDoPainelNoCache {
+  contratos: (uasg: string) => Promise<ContractDashboardRecord[]>;
+  gestores: (uasg: string) => Promise<Record<string, ContractManager>>;
+  atas: (uasg: string) => Promise<{ arps: ArpRecord[]; syncInfo: SyncMetadata }>;
+}
+
+/**
  * 7. Consulta assíncrona consolidada via Supabase / Serviços oficiais (Promise.all)
  */
 export async function fetchManagementDashboardData(
   filtersOrUasg: string | ManagementDashboardFilters = '200331',
-  currentDate?: Date
+  currentDate?: Date,
+  cache?: FontesDoPainelNoCache
 ): Promise<ManagementDashboardReadModel> {
   const filters: ManagementDashboardFilters = typeof filtersOrUasg === 'string'
     ? { uasg: filtersOrUasg.trim() || '200331' }
@@ -1714,13 +1726,13 @@ export async function fetchManagementDashboardData(
     ausentesDaFonte,
     empenhadoAcima
   ] = await Promise.all([
-    ler('contratos', 'contratos', fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
-    ler('arps', 'atas (ARPs)', fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
-    ler('gestores', 'gestores', fetchAllContractManagers(cleanUasg), {} as Record<string, ContractManager>),
+    ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
+    ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
+    ler('gestores', 'gestores', cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg), {} as Record<string, ContractManager>),
     ler('planos', 'planos de tarefas dos contratos', fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
     lerSemUasg('planosAtas', 'planos de gestão das atas', fetchAllAtaTaskPlans, {} as Record<string, AtaTaskPlan>),
     lerSemUasg('avisosResolvidos', 'avisos resolvidos', () => fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
-    ler('empenhos', 'empenhos', fetchEmpenhosResumoFromDb(cleanUasg), [] as any[]),
+    lerSemUasg('empenhos', 'empenhos', fetchEmpenhosResumoFromDb, [] as any[]),
     ler('saldoItens', 'saldo dos itens', fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
     lerSemUasg('alocacao', 'alocação interna dos itens', fetchItensComAlocacao, new Set<string>()),
     lerSemUasg('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp, [] as RegistroFornecedorPncp[]),
@@ -1841,83 +1853,71 @@ export async function fetchAllPaymentCyclesForDashboard(contracts?: ContractDash
 }
 
 /**
- * Consulta segura à view SQL v_empenhos_resumo enriquecida com vínculos de contrato
+ * Colunas de v_empenhos_resumo que o Início usa: as somas de calculateFinancialSummary (valores, número, ano, credor)
+ * e o recorte por UASG e por contrato de buildManagementDashboardReadModel (uasg_emitente; o contrato vem de
+ * contrato_empenhos). As demais colunas da view não entram em nenhum número da tela.
  */
-export async function fetchEmpenhosResumoFromDb(_uasg?: string): Promise<any[]> {
+export const COLUNAS_EMPENHOS_PAINEL = [
+  'empenho_id',
+  'canonical_key',
+  'numero_oficial',
+  'ano_exercicio',
+  'uasg_emitente',
+  'valor_empenhado',
+  'valor_liquidado',
+  'valor_pago',
+  'valor_rpinscrito',
+  'credor_nome'
+] as const;
+
+/**
+ * Empenhos de v_empenhos_resumo (a view não depende da UASG) com os contratos de cada um (contrato_empenhos).
+ * As duas leituras vão em páginas de mil com ordem fixa pela chave única, para nenhuma linha repetir ou faltar
+ * entre páginas. Falha em qualquer página vira erro: uma lista pela metade mostrava um "Empenhado" errado sem aviso.
+ */
+export async function fetchEmpenhosResumoFromDb(): Promise<any[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  try {
-    const allEmpenhos: any[] = [];
-    const pageSize = 1000;
-    let from = 0;
+  const db = supabase;
+  const PAGINA = 1000;
 
-    // Busca paginada em v_empenhos_resumo para suportar universos superiores a 1.000 registros
-    while (true) {
-      const { data, error } = await supabase
-        .from('v_empenhos_resumo')
-        .select('*')
-        .range(from, from + pageSize - 1);
-
-      if (error) {
-        console.error('Erro ao consultar v_empenhos_resumo:', error);
-        break;
-      }
-      if (!data || data.length === 0) break;
-      allEmpenhos.push(...data);
-      if (data.length < pageSize) break;
-      from += pageSize;
-    }
-
-    if (allEmpenhos.length === 0) return [];
-
-    // Busca vínculos de contratos na tabela canônica contrato_empenhos de forma paginada e segura
-    try {
-      const linksByEmpenho = new Map<string, string[]>();
-      let linkFrom = 0;
-
-      while (true) {
-        const { data: links, error: linkErr } = await supabase
-          .from('contrato_empenhos')
-          .select('empenho_id, contract_key, valor_vinculado')
-          .range(linkFrom, linkFrom + pageSize - 1);
-
-        if (linkErr) {
-          console.error('Erro ao consultar vínculos contrato_empenhos:', linkErr);
-          break;
-        }
-        if (!links || links.length === 0) break;
-
-        for (const l of links) {
-          const key = String(l.empenho_id);
-          if (!linksByEmpenho.has(key)) {
-            linksByEmpenho.set(key, []);
-          }
-          if (l.contract_key && !linksByEmpenho.get(key)!.includes(l.contract_key)) {
-            linksByEmpenho.get(key)!.push(l.contract_key);
-          }
-        }
-
-        if (links.length < pageSize) break;
-        linkFrom += pageSize;
-      }
-
-      return allEmpenhos.map((item: any) => {
-        const empId = String(item.empenho_id || item.id || '');
-        const contractKeys = linksByEmpenho.get(empId) || [];
-        return {
-          ...item,
-          contract_keys: contractKeys,
-          contract_key: contractKeys[0] || item.contract_key || undefined
-        };
-      });
-    } catch (linkErr) {
-      console.warn('Erro ao consultar vínculos contrato_empenhos:', linkErr);
-    }
-
-    return allEmpenhos;
-  } catch (err) {
-    console.warn('Erro ao consultar v_empenhos_resumo:', err);
-    return [];
+  const allEmpenhos: any[] = [];
+  for (let from = 0; ; from += PAGINA) {
+    const { data, error } = await db
+      .from('v_empenhos_resumo')
+      .select(COLUNAS_EMPENHOS_PAINEL.join(','))
+      .order('empenho_id', { ascending: true })
+      .range(from, from + PAGINA - 1);
+    if (error) throw new Error(`Não foi possível ler os empenhos: ${error.message}`);
+    allEmpenhos.push(...(data ?? []));
+    if (!data || data.length < PAGINA) break;
   }
+  if (allEmpenhos.length === 0) return [];
+
+  const linksByEmpenho = new Map<string, string[]>();
+  for (let from = 0; ; from += PAGINA) {
+    const { data: links, error } = await db
+      .from('contrato_empenhos')
+      .select('empenho_id, contract_key')
+      .order('id', { ascending: true })
+      .range(from, from + PAGINA - 1);
+    if (error) throw new Error(`Não foi possível ler os vínculos dos empenhos aos contratos: ${error.message}`);
+    for (const l of links ?? []) {
+      const key = String(l.empenho_id);
+      const lista = linksByEmpenho.get(key) ?? [];
+      if (l.contract_key && !lista.includes(l.contract_key)) lista.push(l.contract_key);
+      linksByEmpenho.set(key, lista);
+    }
+    if (!links || links.length < PAGINA) break;
+  }
+
+  return allEmpenhos.map((item: any) => {
+    const contractKeys = linksByEmpenho.get(String(item.empenho_id || '')) || [];
+    return {
+      ...item,
+      contract_keys: contractKeys,
+      contract_key: contractKeys[0] || undefined
+    };
+  });
 }
 
 /** Chaves dos itens de ata com alguma unidade interna alocada (arp_allocations), em páginas de 1000. */

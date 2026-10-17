@@ -1,5 +1,8 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { fetchManagementDashboardData } from '../services/dashboardService';
+import { useQuery, keepPreviousData, type QueryClient, type QueryFunctionContext } from '@tanstack/react-query';
+import { fetchManagementDashboardData, type FontesDoPainelNoCache } from '../services/dashboardService';
+import { getContractsDashboardQueryOptions } from './useContractsDashboard';
+import { getAllContractManagersQueryOptions } from './useAllContractManagers';
+import { getAtaSourceQueryOptions } from './useAta';
 import type {
   ManagementDashboardReadModel,
   ManagementDashboardFilters
@@ -76,6 +79,20 @@ export const MANAGEMENT_DASHBOARD_QUERY_KEY = (filters?: string | ManagementDash
   ] as const;
 };
 
+/**
+ * Contratos, gestores e atas do painel lidos pelo cache, com as mesmas opções de useContractsDashboard,
+ * useAllContractManagers e getAtaSourceQueryOptions: a página e o menu leem os mesmos dados, e antes o painel os lia
+ * de novo por fora do cache. fetchQuery (e não ensureQueryData) porque ele relê o que foi invalidado: depois de
+ * "Atualizar" ou do fim de uma sincronização o painel não pode montar com a lista antiga.
+ */
+export function fontesDoPainelNoCache(client: QueryClient): FontesDoPainelNoCache {
+  return {
+    contratos: (uasg) => client.fetchQuery(getContractsDashboardQueryOptions(uasg)),
+    gestores: (uasg) => client.fetchQuery(getAllContractManagersQueryOptions(uasg)),
+    atas: (uasg) => client.fetchQuery(getAtaSourceQueryOptions(uasg))
+  };
+}
+
 export function getManagementDashboardQueryOptions(
   filtersOrUasg?: string | ManagementDashboardFilters,
   currentDate?: Date
@@ -83,7 +100,8 @@ export function getManagementDashboardQueryOptions(
   const norm = normalizeDashboardFilters(filtersOrUasg);
   return {
     queryKey: MANAGEMENT_DASHBOARD_QUERY_KEY(norm),
-    queryFn: async () => fetchManagementDashboardData(norm, currentDate),
+    queryFn: async (ctx?: Pick<QueryFunctionContext, 'client'>) =>
+      fetchManagementDashboardData(norm, currentDate, ctx?.client ? fontesDoPainelNoCache(ctx.client) : undefined),
     // Todas as fontes vêm do banco; a sincronização de contratos invalida esta query ao terminar.
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

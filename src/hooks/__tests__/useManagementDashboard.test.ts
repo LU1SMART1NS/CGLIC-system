@@ -52,6 +52,8 @@ describe('useManagementDashboard Hook / Query Options (CGLIC 3.0 — Fase 8-B)',
 
     expect(dashboardService.fetchManagementDashboardData).toHaveBeenCalledWith(
       { uasg: '200331', contractKey: undefined, numeroAta: undefined, statusContrato: undefined, assignedContractKeys: undefined, assignedAtaKeys: undefined },
+      undefined,
+      // Sem o client do React Query (chamada direta), o painel lê do banco, sem o cache.
       undefined
     );
     expect(result).toEqual(mockModel);

@@ -22,18 +22,22 @@ export const SINCRONIZACAO_STATUS_KEY = chaveStatusSincronizacao(RECURSO_CONTRAT
 /** Gestor e coordenador gravam contratos no banco (sincronização e contrato completado no 360). */
 export const podeSincronizarContratos = podeSincronizar;
 
+/**
+ * O painel do Início lê contratos, gestores e atas pelo cache (fontesDoPainelNoCache). Para ele reler tudo, como
+ * antes, as três listas são invalidadas junto com o painel; as fontes vêm antes, para o painel já pegar a leitura nova.
+ */
+const CHAVES_DO_PAINEL = [['contracts-dashboard'], ['all-contract-managers'], ['ata-detail-source'], ['management-dashboard']] as const;
+
 /** Relê do banco tudo o que depende da lista de contratos. */
 export async function invalidarDadosDeContratos(queryClient: QueryClient): Promise<void> {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['contracts-dashboard'] }),
-    queryClient.invalidateQueries({ queryKey: ['management-dashboard'] }),
+    ...CHAVES_DO_PAINEL.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     queryClient.invalidateQueries({ queryKey: SINCRONIZACAO_STATUS_KEY })
   ]);
 }
 
 function relerContratos(queryClient: QueryClient) {
-  void queryClient.invalidateQueries({ queryKey: ['contracts-dashboard'] });
-  void queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
+  for (const queryKey of CHAVES_DO_PAINEL) void queryClient.invalidateQueries({ queryKey });
 }
 
 /**

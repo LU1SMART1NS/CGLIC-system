@@ -14,6 +14,7 @@ import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
 import type { RpcContractPaymentCycleRow, RpcPaymentCycleItemRow } from '../types/rpc';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
+import type { FaturaParaAviso } from './avisosPagamentoService';
 
 const PAGINA = 1000;
 
@@ -118,6 +119,40 @@ export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
     obsAConferir: f.obs_a_conferir ?? null,
     situacaoTesouro: tesouro.get(Number(f.id_fatura)) ?? null
   }));
+}
+
+/** Contratos por pedido na leitura leve das faturas (a lista vai no endereço do pedido). */
+const CONTRATOS_POR_PEDIDO = 100;
+
+/**
+ * Faturas para os avisos de pagamento do Início (nota mensal que não chegou, entrega sem nota): só as quatro colunas
+ * que a regra usa (calcularAvisosPagamento), da TABELA contrato_faturas, e só dos contratos pedidos (os que têm
+ * expectativa de pagamento marcada). A view v_contrato_faturas recalcula OBs e notas de todas as faturas e não
+ * acrescenta nada a estes campos: contract_key, emissao, referencia e cancelada saem da tabela sem mudança.
+ * Falha vira erro, nunca lista parcial calada.
+ */
+export async function fetchFaturasParaAvisos(contractKeys: readonly string[]): Promise<FaturaParaAviso[]> {
+  if (!isSupabaseConfigured || !supabase || contractKeys.length === 0) return [];
+  const db = supabase;
+  const chaves = [...new Set(contractKeys)].sort();
+  const faturas: FaturaParaAviso[] = [];
+  for (let i = 0; i < chaves.length; i += CONTRATOS_POR_PEDIDO) {
+    const lote = chaves.slice(i, i + CONTRATOS_POR_PEDIDO);
+    for (let de = 0; ; de += PAGINA) {
+      const { data, error } = await db
+        .from('contrato_faturas')
+        .select('contract_key, emissao, referencia, cancelada')
+        .in('contract_key', lote)
+        .order('id_fatura', { ascending: true })
+        .range(de, de + PAGINA - 1);
+      if (error) throw mapPostgresErrorToAppError(error);
+      for (const f of (data ?? []) as Array<{ contract_key: string; emissao: string | null; referencia: string | null; cancelada: boolean | null }>) {
+        faturas.push({ contractKey: String(f.contract_key), emissao: f.emissao ?? null, referencia: f.referencia ?? null, cancelada: Boolean(f.cancelada) });
+      }
+      if (!data || data.length < PAGINA) break;
+    }
+  }
+  return faturas;
 }
 
 // -----------------------------------------------------------------------------------------------------
