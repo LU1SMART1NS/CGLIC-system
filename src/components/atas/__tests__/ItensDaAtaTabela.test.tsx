@@ -39,13 +39,14 @@ describe('Itens da ata na Carteira de Atas', () => {
     for (const c of ['Qtd. SENASP', 'Saldo SENASP', 'Alocação nas unidades', 'Empenho']) expect(h).toContain(c);
     expect(h).toContain('Aeronaves teleguiadas');
     expect(h).toContain('120');
-    expect(h).toContain('restam');
+    expect(h).toContain('un restam');
+    expect(h).toMatch(/>120<\/span> <span[^>]*>un</);
     expect(h).toContain('50% consumido');
   });
 
   it('consumo acima da cota: mostra quanto passou', () => {
     const h = montar({ '00002': linha({ consumido: 143, consumoPct: 119 }) }, true, 119);
-    expect(h).toContain('23 acima');
+    expect(h).toContain('23 un acima');
   });
 
   it('alocação: as três unidades com mais quantidade e "+N" para o resto', () => {
