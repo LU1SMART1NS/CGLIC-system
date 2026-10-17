@@ -41,7 +41,7 @@ const VERMELHO = 'var(--color-danger)';
  * contrato à ata saiu daqui para o menu Vínculos.
  */
 export const DistribuicaoEquipePage: React.FC = () => {
-  const { atas, contratos, links, pendencias, totalSemVinculo, gestorDoContrato, isBusy, refresh } = usePendenciasVinculoAta();
+  const { atas, contratos, links, pendencias, totalSemVinculo, gestorDoContrato, isBusy, refresh } = usePendenciasVinculoAta({ pendencias: true });
   // Só quem pode atribuir (admin) vê as ações de transferir; o leitor acompanha.
   const { role } = useAuth();
   const canAssign = canAssignManager(role);

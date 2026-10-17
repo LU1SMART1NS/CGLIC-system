@@ -46,7 +46,7 @@ const CalculoDaCarteira: React.FC<{ contaDistribuicao: boolean }> = ({ contaDist
 /** Calcula os itens a alocar (os mesmos da página Alocação) e entrega o número ao menu. */
 const CalculoItensAAlocar: React.FC = () => {
   const { scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, atasNaoCarregaram } = useAtasPortfolio();
-  const { rows, isLoading: carregando, alocacoesComErro, leituras } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  const { rows, isLoading: carregando, alocacoesComErro, leituras } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta, semEmpenhado: true });
   // Sem as alocações, o menu fica sem número em vez de contar todos os itens como a alocar; sem o saldo (quantitativo
   // SENASP) ou as atas, em vez de contar zero.
   const saldoNaoCarregou = (leituras ?? []).some((l) => l.rotulo === ROTULO_SALDO_ITENS && naoCarregou(l.query));

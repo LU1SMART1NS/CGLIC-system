@@ -383,15 +383,14 @@ describe('Alocação → Itens às unidades', () => {
       vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
       comLeituras([
         { rotulo: 'alocações às unidades internas', query: ok },
-        { rotulo: 'quantidade contratada dos itens', query: falhou() },
-        { rotulo: 'empenhado dos itens', query: falhou() }
+        { rotulo: 'quantidade contratada dos itens', query: falhou() }
       ]);
       const html = render(<ItensUnidadesPage />, '/?alocacao=TODOS&ver=ITEM');
       expect(html).toContain('data-testid="alocacao-fontes-com-falha"');
       expect(html).toContain('Parte da alocação não carregou');
       expect(html).toContain('<strong>Quantidade contratada dos itens</strong>');
-      // O empenhado não aparece nesta tela: fica fora da faixa.
-      expect(html).not.toContain('Empenhado dos itens');
+      // O empenhado não aparece nesta tela: nem é lido (o hook tira a leitura da lista).
+      expect(vi.mocked(useCarteiraItens)).toHaveBeenCalledWith(expect.objectContaining({ semEmpenhado: true }));
       expect(html).toMatch(/Sem alocação<span class="segment-pill__count">1</);
       expect(html).toContain('Placa balística');
     });

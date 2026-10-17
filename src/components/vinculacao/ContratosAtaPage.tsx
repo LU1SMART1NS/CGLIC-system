@@ -21,7 +21,7 @@ import { getArpPrazo } from '../../hooks/useAtasPortfolio';
 import { useComplexidadeAjustes } from '../../hooks/useComplexidadeAjustes';
 import { formatContractNumber } from '../../utils/contractNumber';
 import type { ManagerTarget } from '../../services/managerAssignmentService';
-import { AvisoCarregando } from '../../design-system';
+import { AvisoCarregando, ErrorState, Modal } from '../../design-system';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
 /**
@@ -33,8 +33,11 @@ export const ContratosAtaPage: React.FC = () => {
   const { role } = useAuth();
   const podeVincular = role === 'admin' || role === 'gestor';
   const podeDecidir = canAssignManager(role);
+  // "Para quem atribuo?" (depois de marcar "não pertence a ata"): precisa da carga de cada gestor.
+  const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void } | null>(null);
+  // As pendências de cada contrato (painel do Início) só entram na carga dos gestores: são lidas quando o modal abre.
   const { atas, contratos, links, confirmacoesSemAta, motivosManual, motivosEstado, relerMotivos, pendencias, totalSemVinculo, ataDe, itensDaAta, atasFila, isBusy, refresh, leituras: leiturasDaFila, filaIndisponivel } =
-    usePendenciasVinculoAta();
+    usePendenciasVinculoAta({ pendencias: Boolean(transferencia) });
   const ajustesQuery = useComplexidadeAjustes();
   const { data: ajustes } = ajustesQuery;
   // Uma fonte que falha não some calada: a fila mostra o que carregou e a faixa diz o que ficou de fora.
@@ -42,8 +45,6 @@ export const ContratosAtaPage: React.FC = () => {
   // Contratos de alguma UASG (ou, no perfil gestor, o recorte dele) não carregaram: "todos têm ata" não vale.
   const contratosNaoCarregaram = (contratos.leiturasDosContratos ?? []).some((l) => naoCarregou(l.query));
 
-  // "Para quem atribuo?" (depois de marcar "não pertence a ata"): precisa da carga de cada gestor.
-  const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void } | null>(null);
   const distribuicao = React.useMemo(
     () =>
       transferencia
@@ -147,7 +148,24 @@ export const ContratosAtaPage: React.FC = () => {
             />
           )}
 
-          {transferencia && distribuicao && (
+          {transferencia && contratos.pendenciasCarregando && (
+            <Modal isOpen onClose={() => setTransferencia(null)} size="lg" title="Atribuir gestor" testId="atribuir-gestor-carregando">
+              <AvisoCarregando label="Carregando a carga dos gestores" />
+            </Modal>
+          )}
+
+          {transferencia && !contratos.pendenciasCarregando && contratos.pendenciasComErro && (
+            <Modal isOpen onClose={() => setTransferencia(null)} size="lg" title="Atribuir gestor" testId="atribuir-gestor-erro">
+              <ErrorState
+                title="A carga dos gestores não carregou"
+                message="Sem as pendências de cada contrato, a comparação entre os gestores sairia errada."
+                onRetry={() => void contratos.relerPendencias()}
+                testId="atribuir-gestor-erro-estado"
+              />
+            </Modal>
+          )}
+
+          {transferencia && distribuicao && !contratos.pendenciasCarregando && !contratos.pendenciasComErro && (
             <AtribuirGestorModal
               targets={transferencia.targets}
               origem={transferencia.origem}

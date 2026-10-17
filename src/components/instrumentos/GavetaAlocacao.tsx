@@ -13,7 +13,7 @@ import { AlocacoesFalhaNotice } from '../carteira/AlocacoesFalhaNotice';
  */
 export const GavetaAlocacao: React.FC<{ onAbrir: (destino: string) => void }> = ({ onAbrir }) => {
   const { scopedArps, itemsByAta, gestorByAta, isLoading: atasLoading } = useAtasPortfolio();
-  const { rows, isLoading, alocacoesComErro, recarregandoAlocacoes, recarregarAlocacoes } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  const { rows, isLoading, alocacoesComErro, recarregandoAlocacoes, recarregarAlocacoes } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta, semEmpenhado: true });
 
   const faixas = useMemo<FaixaDaBarra[]>(() => {
     const conta = { TOTAL: 0, PARCIAL: 0, SEM: 0 };

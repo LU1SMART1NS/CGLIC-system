@@ -66,6 +66,13 @@ describe('Vínculos → Contratos à ata: uma leitura falha, a faixa avisa', () 
     vi.mocked(useDescartesAtaContrato).mockReturnValue(ok({}) as any);
   });
 
+  it('a fila não lê o painel do Início: as pendências só são pedidas quando o "Atribuir gestor" abre', () => {
+    vi.mocked(useContractsPortfolio).mockClear();
+    render();
+    expect(useContractsPortfolio).toHaveBeenCalledWith({ pendencias: false });
+    expect(useContractsPortfolio).not.toHaveBeenCalledWith({ pendencias: true });
+  });
+
   it('tudo carregou: a fila aparece, sem faixa', () => {
     const html = render();
     expect(html).toContain('data-testid="fila-contratos-sem-ata"');
