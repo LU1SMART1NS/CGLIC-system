@@ -736,7 +736,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           <NoticeBar
             tone="info"
             testId="contract-financial-fatura-ne-fora"
-            action={
+            action={podeEditar ? (
               <AppButton
                 variant="outline"
                 size="sm"
@@ -745,7 +745,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
               >
                 Ver a conferência
               </AppButton>
-            }
+            ) : undefined}
           >
             {faturasComNeFora.length === 1 ? (
               <>
