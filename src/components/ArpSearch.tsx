@@ -8,6 +8,7 @@ import { getArpPrazo, useAtasPortfolio } from '../hooks/useAtasPortfolio';
 import { useAuth } from '../context/AuthContext';
 import { useCarteiraItens } from '../hooks/useCarteiraItens';
 import { SaldoItensFalhaNotice } from './carteira/SaldoItensFalhaNotice';
+import { AlocacoesFalhaNotice } from './carteira/AlocacoesFalhaNotice';
 import { passaFiltroNivel, type NivelAtendimento } from '../utils/itemAtendimento';
 import { TODAS_UNIDADES } from './carteira/CarteiraExecucaoSelects';
 import { canAssignManager } from './carteira/ManagerAssign';
@@ -58,7 +59,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   } = useAtasPortfolio();
 
   // Alocação, empenho e unidades de cada ata, somados dos itens (filtros e colunas da carteira).
-  const { resumoPorAta, unidades, saldosComErro, recarregandoSaldos, recarregarSaldos } = useCarteiraItens({
+  const { resumoPorAta, unidades, saldosComErro, recarregandoSaldos, recarregarSaldos, alocacoesComErro, recarregandoAlocacoes, recarregarAlocacoes } = useCarteiraItens({
     arps: scopedArps,
     itemsByAta,
     gestorByAta
@@ -274,6 +275,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       )}
 
       {saldosComErro && <SaldoItensFalhaNotice onRetry={recarregarSaldos} isRetrying={recarregandoSaldos} />}
+      {alocacoesComErro && <AlocacoesFalhaNotice onRetry={recarregarAlocacoes} isRetrying={recarregandoAlocacoes} />}
 
       <ArpPortfolioSummary
         totalAtas={summaryMetrics.total}

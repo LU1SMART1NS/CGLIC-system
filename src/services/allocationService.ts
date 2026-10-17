@@ -23,36 +23,26 @@ function getCanonicalKey(itemKey: string): string {
   return normalizeItemKey(parsed.numeroAta, parsed.uasg, parsed.itemNum);
 }
 
+/**
+ * Todas as alocações às unidades internas (Carteira de Itens, Alocação, Carteira de Atas e Contratos). Com o banco
+ * configurado, lê só do banco, todas as páginas em ordem fixa; falha vira erro para a tela avisar e oferecer "Tentar
+ * de novo". Antes a falha (ou o banco sem alocações) caía na cópia do navegador, que podia ser velha.
+ */
 export async function fetchAllAllocationsGlobal(): Promise<GlobalAllocationRecord[]> {
-  const records: GlobalAllocationRecord[] = [];
-
   if (isSupabaseConfigured && supabase) {
-    try {
-      // Todas as páginas (o PostgREST corta em mil), em ordem fixa.
-      const db = supabase;
-      let data: any[] | null = null;
-      let error: unknown = null;
-      try {
-        data = await lerTodasAsPaginas<any>((de, ate) => db.from('arp_allocations').select('*').order('id').range(de, ate));
-      } catch (e) {
-        error = e;
-      }
-
-      if (!error && data && data.length > 0) {
-        return data.map((d: any) => ({
-          id: d.id,
-          itemKey: d.item_key,
-          unitName: d.unit_name,
-          allocatedQty: Number(d.allocated_qty),
-          empenhadaQty: Number(d.empenhada_qty) || 0
-        }));
-      }
-    } catch (e) {
-      console.warn('Erro ao carregar todas as alocações do Supabase', e);
-    }
+    const db = supabase;
+    const data = await lerTodasAsPaginas<any>((de, ate) => db.from('arp_allocations').select('*').order('id').range(de, ate));
+    return data.map((d: any) => ({
+      id: d.id,
+      itemKey: d.item_key,
+      unitName: d.unit_name,
+      allocatedQty: Number(d.allocated_qty),
+      empenhadaQty: Number(d.empenhada_qty) || 0
+    }));
   }
 
-  // Fallback para localStorage
+  // Sem banco configurado (desenvolvimento e testes sem Supabase): a cópia do navegador é a única fonte.
+  const records: GlobalAllocationRecord[] = [];
   if (typeof localStorage !== 'undefined') {
     try {
       for (let i = 0; i < localStorage.length; i++) {
@@ -89,51 +79,52 @@ export interface ItemAllocationsState {
   version: number;
 }
 
+/**
+ * Alocações de um item e a versão delas (Item 360 e janela de alocação). Com o banco configurado, lê só do banco:
+ * falha vira erro. Antes a falha devolvia a cópia do navegador com versão 1 como se fosse sucesso, e a tela podia
+ * gravar por cima do que outra pessoa salvou num item que ainda estava na versão 1.
+ */
 export async function fetchAllocationsWithState(itemKey: string): Promise<ItemAllocationsState> {
   const canonicalKey = getCanonicalKey(itemKey);
 
   if (isSupabaseConfigured && supabase) {
-    try {
-      // A versão vem ANTES dos dados: se alguém salvar entre as duas leituras, a versão fica velha e o banco recusa
-      // (seguro). Lida depois, a tela ficaria com dados velhos e versão nova, e o próximo salvar apagaria o do outro.
-      // Sem conseguir ler a versão, 0 faz o banco recusar em vez de gravar às cegas.
-      const { data: stateData, error: stateError } = await supabase
-        .from('item_allocation_state')
-        .select('version')
-        .eq('item_key', canonicalKey)
-        .maybeSingle();
-      const version = stateError ? 0 : stateData?.version ?? 1;
+    // A versão vem ANTES dos dados: se alguém salvar entre as duas leituras, a versão fica velha e o banco recusa
+    // (seguro). Lida depois, a tela ficaria com dados velhos e versão nova, e o próximo salvar apagaria o do outro.
+    const { data: stateData, error: stateError } = await supabase
+      .from('item_allocation_state')
+      .select('version')
+      .eq('item_key', canonicalKey)
+      .maybeSingle();
+    if (stateError) throw new Error(`Não foi possível ler as alocações do item: ${stateError.message}`);
+    const version = stateData?.version ?? 1;
 
-      const { data: allocData, error: allocError } = await supabase
-        .from('arp_allocations')
-        .select('*')
-        .eq('item_key', canonicalKey);
+    const { data: allocData, error: allocError } = await supabase
+      .from('arp_allocations')
+      .select('*')
+      .eq('item_key', canonicalKey);
+    if (allocError) throw new Error(`Não foi possível ler as alocações do item: ${allocError.message}`);
 
-      if (!allocError && allocData) {
-        const mapped: InternalAllocation[] = allocData.map((d: any) => ({
-          id: d.id,
-          unitName: d.unit_name,
-          allocatedQty: Number(d.allocated_qty),
-          empenhadaQty: Number(d.empenhada_qty) || 0
-        }));
+    const mapped: InternalAllocation[] = (allocData ?? []).map((d: any) => ({
+      id: d.id,
+      unitName: d.unit_name,
+      allocatedQty: Number(d.allocated_qty),
+      empenhadaQty: Number(d.empenhada_qty) || 0
+    }));
 
-        if (typeof localStorage !== 'undefined') {
-          try {
-            localStorage.setItem(`saldoarp-allocations-${canonicalKey}`, JSON.stringify(mapped));
-            if (itemKey !== canonicalKey) {
-              localStorage.setItem(`saldoarp-allocations-${itemKey}`, JSON.stringify(mapped));
-            }
-          } catch {}
+    // Cópia no navegador, só de leitura feita no banco: o relatório em Excel ainda lê as alocações dela.
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(`saldoarp-allocations-${canonicalKey}`, JSON.stringify(mapped));
+        if (itemKey !== canonicalKey) {
+          localStorage.setItem(`saldoarp-allocations-${itemKey}`, JSON.stringify(mapped));
         }
-
-        return { allocations: mapped, version };
-      }
-    } catch (e) {
-      console.warn('Erro ao conectar com Supabase (allocations with state), utilizando localStorage como fallback.', e);
+      } catch {}
     }
+
+    return { allocations: mapped, version };
   }
 
-  // LocalStorage Fallback (somente quando offline ou sem Supabase configurado)
+  // Sem banco configurado (desenvolvimento e testes sem Supabase): a cópia do navegador é a única fonte.
   if (typeof localStorage !== 'undefined') {
     try {
       const key = `saldoarp-allocations-${canonicalKey}`;
@@ -214,47 +205,44 @@ export interface ItemEmpenhoLinksState {
   version: number;
 }
 
+/** Vínculos nota → unidade interna de um item e a versão deles. Com o banco configurado, lê só do banco: falha vira erro (ver fetchAllocationsWithState). */
 export async function fetchEmpenhoLinksWithState(itemKey: string): Promise<ItemEmpenhoLinksState> {
   const canonicalKey = getCanonicalKey(itemKey);
 
   if (isSupabaseConfigured && supabase) {
-    try {
-      // Versão antes dos dados (ver fetchAllocationsWithState).
-      const { data: stateData, error: stateError } = await supabase
-        .from('item_empenho_link_state')
-        .select('version')
-        .eq('item_key', canonicalKey)
-        .maybeSingle();
-      const version = stateError ? 0 : stateData?.version ?? 1;
+    // Versão antes dos dados (ver fetchAllocationsWithState).
+    const { data: stateData, error: stateError } = await supabase
+      .from('item_empenho_link_state')
+      .select('version')
+      .eq('item_key', canonicalKey)
+      .maybeSingle();
+    if (stateError) throw new Error(`Não foi possível ler os vínculos das notas às unidades: ${stateError.message}`);
+    const version = stateData?.version ?? 1;
 
-      const { data: linkData, error: linkError } = await supabase
-        .from('empenho_links')
-        .select('*')
-        .eq('item_key', canonicalKey);
+    const { data: linkData, error: linkError } = await supabase
+      .from('empenho_links')
+      .select('*')
+      .eq('item_key', canonicalKey);
+    if (linkError) throw new Error(`Não foi possível ler os vínculos das notas às unidades: ${linkError.message}`);
 
-      if (!linkError && linkData) {
-        const map: Record<string, string> = {};
-        linkData.forEach((d: any) => {
-          map[d.empenho_numero] = d.allocation_id;
-        });
+    const map: Record<string, string> = {};
+    (linkData ?? []).forEach((d: any) => {
+      map[d.empenho_numero] = d.allocation_id;
+    });
 
-        if (typeof localStorage !== 'undefined') {
-          try {
-            localStorage.setItem(`saldoarp-empenho-links-${canonicalKey}`, JSON.stringify(map));
-            if (itemKey !== canonicalKey) {
-              localStorage.setItem(`saldoarp-empenho-links-${itemKey}`, JSON.stringify(map));
-            }
-          } catch {}
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(`saldoarp-empenho-links-${canonicalKey}`, JSON.stringify(map));
+        if (itemKey !== canonicalKey) {
+          localStorage.setItem(`saldoarp-empenho-links-${itemKey}`, JSON.stringify(map));
         }
-
-        return { links: map, version };
-      }
-    } catch (e) {
-      console.warn('Erro ao carregar vínculos de empenhos do Supabase', e);
+      } catch {}
     }
+
+    return { links: map, version };
   }
 
-  // LocalStorage Fallback (somente quando offline ou sem Supabase configurado)
+  // Sem banco configurado (desenvolvimento e testes sem Supabase): a cópia do navegador é a única fonte.
   if (typeof localStorage !== 'undefined') {
     try {
       const key = `saldoarp-empenho-links-${canonicalKey}`;

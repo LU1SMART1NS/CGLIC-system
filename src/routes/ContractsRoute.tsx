@@ -22,6 +22,7 @@ import { ContractsPortfolioTable, type ContractPortfolioRow } from '../component
 import { comparePrazo, matchesStatusFilter } from '../components/carteira/carteiraPrazo';
 import { ErrorState } from '../design-system/components/ErrorState';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
+import { AlocacoesFalhaNotice } from '../components/carteira/AlocacoesFalhaNotice';
 
 export const ContractsRoute: React.FC = () => {
   // Dados da carteira (contratos no escopo do usuário, com prazo, gestor e pendências).
@@ -41,7 +42,7 @@ export const ContractsRoute: React.FC = () => {
   } = useContractsPortfolio();
   const { role } = useAuth();
   // Unidades internas de cada contrato: as que receberam alocação de algum item vinculado a ele.
-  const { unidades, unidadesDoContrato } = useCarteiraItens({ apenasUnidadesDeContratos: true });
+  const { unidades, unidadesDoContrato, alocacoesComErro, recarregandoAlocacoes, recarregarAlocacoes } = useCarteiraItens({ apenasUnidadesDeContratos: true });
 
   // Filtros na URL (?situacao=&pendencia=&gestor=&busca=): sobrevivem à ida ao detalhe e permitem link já filtrado.
   const { filters: filterState, setFilter: handleFilterChange, resetFilters: handleResetFilters } =
@@ -164,6 +165,8 @@ export const ContractsRoute: React.FC = () => {
               isRetrying={isFetching}
             />
           )}
+
+          {alocacoesComErro && <AlocacoesFalhaNotice onRetry={recarregarAlocacoes} isRetrying={recarregandoAlocacoes} />}
 
           <ContractsPortfolioSummary
             vigentes={summaryMetrics.vigentes}

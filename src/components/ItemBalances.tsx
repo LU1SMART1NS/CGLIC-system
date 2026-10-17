@@ -63,7 +63,7 @@ import { Instrument360Page } from './instrument360/Instrument360Page';
 import { Instrument360TabPanel } from './instrument360/Instrument360TabPanel';
 import { useInstrumentTab } from './instrument360/useInstrumentTab';
 import { AllocationsTab, type AllocationRow } from './item-balances/AllocationsTab';
-import { summarizeAllocationExecution, vinculosSemQuantidade } from '../utils/allocationExecution';
+import { limpezaDeVinculosDoItem, summarizeAllocationExecution } from '../utils/allocationExecution';
 import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryStrip';
 import { Instrument360Head } from './instrument360/Instrument360Head';
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
@@ -164,8 +164,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
 
+  // Alocações e vínculos nota → unidade vêm só do banco: falha vira erro (aviso com "Tentar de novo"), nunca a cópia do
+  // navegador. Sem as duas leituras certas, a limpeza automática dos vínculos não roda.
   const {
-    data: allocationsState
+    data: allocationsState,
+    isSuccess: alocacoesCarregadas,
+    isError: alocacoesComErro,
+    isFetching: relendoAlocacoes,
+    refetch: relerAlocacoes
   } = useItemAllocations(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
@@ -175,7 +181,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const {
     data: empenhoLinksState,
-    isSuccess: empenhoLinksCarregados
+    isSuccess: empenhoLinksCarregados,
+    isError: empenhoLinksComErro,
+    isFetching: relendoEmpenhoLinks,
+    refetch: relerEmpenhoLinks
   } = useItemEmpenhoLinks(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
@@ -183,6 +192,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   );
   const empenhoLinks = empenhoLinksState?.links ?? EMPTY_RECORD;
   const empenhoLinkVersion = empenhoLinksState?.version ?? 1;
+  const unidadesNaoCarregaram = alocacoesComErro || empenhoLinksComErro;
+  const relerUnidades = () => {
+    if (alocacoesComErro) void relerAlocacoes();
+    if (empenhoLinksComErro) void relerEmpenhoLinks();
+  };
 
   const saveEmpenhoLinksMutation = useSaveEmpenhoLinks();
 
@@ -434,6 +448,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const limiteProvisorioOutrosOrgaos = !ataDeOutroOrgao(arp) && !quantitativosLoading && !quantitativos.informado ? outrosOrgaosRegistrados : 0;
 
   const handleLinkEmpenho = async (empenhoUnidade: string, departmentId: string) => {
+    // Sem os vínculos lidos do banco, gravar a lista nova apagaria os que não chegaram à tela.
+    if (!empenhoLinksCarregados) {
+      setAllocationError('Os vínculos das notas às unidades não carregaram. Tente de novo antes de mudar a unidade da nota.');
+      return;
+    }
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
     const updatedLinks = {
       ...empenhoLinks,
@@ -546,9 +565,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const [vinculosDesfeitos, setVinculosDesfeitos] = useState<Array<{ numero: string; unidade: string }>>([]);
   const limpezaTentada = React.useRef<string | null>(null);
   useEffect(() => {
-    if (!empenhoDoItemPronto || !empenhoLinksCarregados || !(canLinkEmpenhos || canManageAllocations)) return;
-    if (saveEmpenhoLinksMutation.isPending) return;
-    const limpeza = vinculosSemQuantidade(empenhoLinks, empenhoDoItem.parcelas);
+    const limpeza = limpezaDeVinculosDoItem({
+      alocacoesCarregadas,
+      vinculosCarregados: empenhoLinksCarregados,
+      empenhoDoItemPronto,
+      podeMexer: canLinkEmpenhos || canManageAllocations,
+      gravando: saveEmpenhoLinksMutation.isPending,
+      links: empenhoLinks,
+      parcelas: empenhoDoItem.parcelas
+    });
     if (!limpeza) return;
     const assinatura = `${empenhoLinkVersion}:${limpeza.removidos.map((r) => r.numero).join(',')}`;
     if (limpezaTentada.current === assinatura) return;
@@ -562,7 +587,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       // novo com o que está gravado agora.
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empenhoDoItemPronto, empenhoLinksCarregados, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
+  }, [empenhoDoItemPronto, empenhoLinksCarregados, alocacoesCarregadas, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
 
   const handleInformarQuantidade = (p: ParcelaDoItem, quantidade: number | null, sairDaUnidade: string | null) =>
     acoesQuantidade.informar.mutate(
@@ -611,7 +636,21 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   // Papel da SENASP neste item (ata de outro órgão: participante ou adesão, migration 114).
   const papelDoAItem = papelDoItem(papelSenaspDaAta(arp), unidades, adesoesDaSenasp(adesoes));
-  const unidadesInternasDoItem = (
+  const avisoUnidadesNaoCarregaram = unidadesNaoCarregaram ? (
+    <NoticeBar
+      tone="danger"
+      testId="item-unidades-falha"
+      action={
+        <AppButton variant="secondary" size="sm" onClick={relerUnidades} disabled={relendoAlocacoes || relendoEmpenhoLinks}>
+          {relendoAlocacoes || relendoEmpenhoLinks ? 'Carregando…' : 'Tentar de novo'}
+        </AppButton>
+      }
+    >
+      Não foi possível carregar {alocacoesComErro ? 'as alocações às unidades internas' : 'os vínculos das notas às unidades internas'} deste item.
+      Os números de alocação e a unidade de cada nota não aparecem até carregar.
+    </NoticeBar>
+  ) : null;
+  const unidadesInternasDoItem = unidadesNaoCarregaram ? avisoUnidadesNaoCarregaram : (
     <AllocationsTab
       ugUasg={arp.codigoUnidadeGerenciadora}
       item={{
@@ -665,7 +704,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
           valorFinanceiroDisponivel,
           valorFinanceiroConsumido,
           notasAVincular: executionSummary.notasAVincular,
-          quantidadeAlocada: totalAllocatedSum,
+          quantidadeAlocada: alocacoesComErro ? null : totalAllocatedSum,
           quantidadeTotalAta: item.quantidadeHomologadaItem || totalRegistrado,
           orgaosParticipantes: unidades.length,
           adesoesSemDados: !loading && !adesoesLoading && adesoesDoItem.origem === 'SEM_DADOS'
@@ -716,7 +755,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               pregaoItem={`${arp.numeroCompra ? `Pregão ${arp.numeroCompra}${arp.anoCompra ? `/${arp.anoCompra}` : ''} · ` : ''}item ${Number(item.numeroItem) || item.numeroItem}`}
               podeInformar={canEditData}
               podeRemanejar={canManageAllocations}
-              alocado={totalAllocatedSum}
+              alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}
             />
@@ -738,7 +777,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               adesoes={adesoes}
               podeInformar={canEditData}
               podeRemanejar={canManageAllocations}
-              alocado={totalAllocatedSum}
+              alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}
             />
@@ -766,6 +805,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                   {saidasDaUnidade.map((x) => `A nota ${x.numero} saiu da unidade ${x.unidade}: a nova quantidade (${formatNumber(x.quantidade)} un) não cabe no saldo dela.`).join(' ')}
                 </NoticeBar>
               )}
+              {avisoUnidadesNaoCarregaram}
               {allocationError && (
                 <NoticeBar tone="danger" testId="vinculo-unidade-erro">{allocationError}</NoticeBar>
               )}

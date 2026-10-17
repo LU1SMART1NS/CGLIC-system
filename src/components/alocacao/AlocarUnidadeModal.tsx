@@ -73,8 +73,18 @@ export const AlocarUnidadeModal: React.FC<AlocarUnidadeModalProps> = ({ item, ..
 const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: ItemParaAlocar }> = ({ item, onFechar, onAlocado, focoId, removerId }) => {
   const itemKey = normalizeItemKey(item.numeroAta, item.uasg, item.numeroItem);
   const { data: departments = [], isLoading: departmentsLoading } = useDepartments();
-  const { data: estado, isLoading: alocacoesLoading } = useItemAllocations(item.numeroAta, item.uasg, item.numeroItem);
-  const { data: linksState, isLoading: linksLoading } = useItemEmpenhoLinks(item.numeroAta, item.uasg, item.numeroItem);
+  const alocacoesQuery = useItemAllocations(item.numeroAta, item.uasg, item.numeroItem);
+  const linksQuery = useItemEmpenhoLinks(item.numeroAta, item.uasg, item.numeroItem);
+  const { data: estado, isLoading: alocacoesLoading } = alocacoesQuery;
+  const { data: linksState, isLoading: linksLoading } = linksQuery;
+  // Sem as alocações ou os vínculos lidos do banco, a janela não edita: gravar a partir de uma lista que não chegou
+  // apagaria o que está salvo.
+  const naoCarregou = alocacoesQuery.isError || linksQuery.isError;
+  const relendo = alocacoesQuery.isFetching || linksQuery.isFetching;
+  const tentarDeNovo = () => {
+    if (alocacoesQuery.isError) void alocacoesQuery.refetch();
+    if (linksQuery.isError) void linksQuery.refetch();
+  };
   const { data: empenhoDoItem, isLoading: vinculosLoading } = useEmpenhoDoItem(itemKey);
   const { data: contratado, isLoading: contratadoLoading } = useContratadoDoItem(itemKey);
   const salvarAlocacoes = useSaveAllocations();
@@ -84,7 +94,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
 
   // Linhas gravadas (derivadas das alocações e dos empenhos); a primeira edição passa a valer no lugar delas.
   const iniciais = React.useMemo(() => {
-    if (carregando) return null;
+    if (carregando || naoCarregou) return null;
     const gravadas = estado?.allocations ?? [];
     const exec = summarizeAllocationExecution(gravadas, empenhoDoItem, linksState?.links ?? {}, alocacoesPorContrato(contratado.contratos, gravadas));
     const inativas = new Set(departments.filter((d) => !d.ativo).map((d) => normUnidade(d.sigla)));
@@ -92,7 +102,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
       const linha = inativas.has(normUnidade(l.unitName)) ? { ...l, inativa: true } : l;
       return linha.id === removerId && linha.vinculados === 0 && linha.contratado === 0 ? { ...linha, removida: true } : linha;
     });
-  }, [carregando, estado, empenhoDoItem, linksState, removerId, contratado, departments]);
+  }, [carregando, naoCarregou, estado, empenhoDoItem, linksState, removerId, contratado, departments]);
   const [editadas, setEditadas] = React.useState<LinhaAlocacao[] | null>(null);
   const linhas = editadas ?? iniciais;
   const setLinhas = (f: (ls: LinhaAlocacao[]) => LinhaAlocacao[]) => setEditadas((prev) => f(prev ?? iniciais ?? []));
@@ -126,7 +136,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   };
 
   const salvar = async () => {
-    if (!aval.podeSalvar || !linhas) return;
+    if (!aval.podeSalvar || !linhas || naoCarregou) return;
     setErro(null);
     try {
       await salvarAlocacoes.mutateAsync({ itemKey, allocations: listaParaGravar(linhas, estado?.allocations ?? []), expectedVersion: estado?.version });
@@ -183,7 +193,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <ActionButton action={catalogoVazio ? 'fechar' : 'cancelar'} type="button" size="sm" onClick={onFechar} disabled={salvando} />
             {!catalogoVazio && (
-              <AppButton type="button" variant="primary" size="sm" onClick={() => void salvar()} isLoading={salvando} disabled={salvando || carregando || !aval.podeSalvar} data-testid="alocar-unidade-salvar">
+              <AppButton type="button" variant="primary" size="sm" onClick={() => void salvar()} isLoading={salvando} disabled={salvando || carregando || naoCarregou || !aval.podeSalvar} data-testid="alocar-unidade-salvar">
                 Salvar alterações
               </AppButton>
             )}
@@ -193,6 +203,19 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
     >
       {catalogoVazio ? (
         <CatalogoVazioAviso />
+      ) : naoCarregou ? (
+        <NoticeBar
+          tone="danger"
+          testId="alocar-unidade-falha"
+          action={
+            <AppButton type="button" variant="secondary" size="sm" onClick={tentarDeNovo} disabled={relendo}>
+              {relendo ? 'Carregando…' : 'Tentar de novo'}
+            </AppButton>
+          }
+        >
+          Não foi possível carregar {alocacoesQuery.isError ? 'as alocações' : 'os vínculos das notas às unidades'} deste item. Nada pode ser
+          alterado até carregar.
+        </NoticeBar>
       ) : carregando || !linhas ? (
         <p style={{ margin: 0, fontSize: '0.85rem', color: CINZA }}>Carregando as alocações do item…</p>
       ) : (

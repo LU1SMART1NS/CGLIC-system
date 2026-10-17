@@ -11,6 +11,7 @@
  */
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
 import type { RpcContractPaymentCycleRow, RpcPaymentCycleItemRow } from '../types/rpc';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
@@ -18,21 +19,24 @@ import type { FaturaParaAviso } from './avisosPagamentoService';
 
 const PAGINA = 1000;
 
-/** Lê a tabela ou view inteira, de mil em mil linhas (o PostgREST corta em mil). */
-async function lerTudo<T>(tabela: string, colunas: string, ordem: string): Promise<T[]> {
+/**
+ * Lê a tabela ou view inteira, de mil em mil linhas (o PostgREST corta em mil). `ordem` é a coluna única da tabela,
+ * ou as colunas da chave quando ela é composta: com ordem que empata, as páginas repetem ou pulam linhas. Falha em
+ * qualquer página vira erro (nunca lista pela metade).
+ */
+async function lerTudo<T>(tabela: string, colunas: string, ordem: string | readonly string[]): Promise<T[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  const linhas: T[] = [];
-  for (let de = 0; ; de += PAGINA) {
-    const { data, error } = await supabase
-      .from(tabela)
-      .select(colunas)
-      .order(ordem, { ascending: true })
-      .range(de, de + PAGINA - 1);
-    if (error) throw mapPostgresErrorToAppError(error);
-    linhas.push(...((data ?? []) as T[]));
-    if (!data || data.length < PAGINA) break;
+  const db = supabase;
+  const colunasDaOrdem = typeof ordem === 'string' ? [ordem] : ordem;
+  try {
+    return await lerTodasAsPaginas<T>((de, ate) => {
+      let consulta = db.from(tabela).select(colunas);
+      for (const coluna of colunasDaOrdem) consulta = consulta.order(coluna, { ascending: true });
+      return consulta.range(de, ate);
+    });
+  } catch (error) {
+    throw mapPostgresErrorToAppError(error);
   }
-  return linhas;
 }
 
 // -----------------------------------------------------------------------------------------------------
@@ -393,8 +397,10 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
       'empenho_id, canonical_key, numero_oficial, ano_exercicio, uasg_emitente, data_emissao, valor_empenhado, credor_nome, credor_cnpj_cpf, identificador_fonte',
       'empenho_id'
     ),
-    lerTudo<{ empenho_id: string; contract_key: string }>('contrato_empenhos', 'empenho_id, contract_key', 'empenho_id'),
-    lerTudo<FaturaEmpenhoDb>('fatura_empenhos', 'id_fatura, id_empenho_gov, valor', 'id_fatura'),
+    // Ordem pela chave única: por empenho_id (uma NE em vários contratos) ou só por id_fatura (uma fatura com várias
+    // NEs) as páginas empatavam e podiam repetir ou pular linhas.
+    lerTudo<{ empenho_id: string; contract_key: string }>('contrato_empenhos', 'empenho_id, contract_key', 'id'),
+    lerTudo<FaturaEmpenhoDb>('fatura_empenhos', 'id_fatura, id_empenho_gov, valor', ['id_fatura', 'id_empenho_gov']),
     lerTudo<{ contract_key: string }>('contrato_faturas_sincronizacao', 'contract_key', 'contract_key'),
     lerTudo<{ id: string; plano_interno: string | null; natureza_despesa: string | null }>('empenhos', 'id, plano_interno, natureza_despesa', 'id'),
     lerSaldosTesouro()

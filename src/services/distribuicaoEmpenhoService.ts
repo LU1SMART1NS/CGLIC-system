@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { rpcInexistente } from './empenhoSyncService';
 import { ConflitoEdicaoError, comVersao, erroDeConflito, semColunaDeVersao } from '../utils/conflitoEdicao';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 
 /**
  * Vínculo da nota de empenho aos itens do contrato (migrations 94, 104, 118 e 121). Contrato de um item recebe a nota
@@ -195,19 +196,46 @@ async function anexarNotasSiafi(lista: DistribuicaoDoEmpenho[], contractKey?: st
   return lista.map((d) => ({ ...d, notaSiafi: porId.get(d.contratoEmpenhoId) ?? null }));
 }
 
+type FiltroDaView = (consulta: any) => any;
+
+/**
+ * Lê v_contrato_empenho_distribuicao em páginas de mil (o PostgREST corta em mil sem avisar: a view inteira tinha
+ * 2.116 linhas em 17/10/2026), na ordem de contrato_empenho_id. A view tem uma linha por vínculo nota↔contrato
+ * (contrato_empenhos.id), então essa coluna é única e as páginas não repetem nem pulam linhas.
+ */
+function lerPaginasDaView(colunas: string, filtrar: FiltroDaView): Promise<any[]> {
+  const db = supabase!;
+  return lerTodasAsPaginas<any>((de, ate) =>
+    filtrar(db.from('v_contrato_empenho_distribuicao').select(colunas)).order('contrato_empenho_id', { ascending: true }).range(de, ate)
+  );
+}
+
+/**
+ * Todas as linhas da view que passam no filtro. Banco sem a migration 129 lê sem a versão (grava como antes); sem a
+ * migration 94 devolve nulo (a tela segue sem a coluna de itens). Falha em qualquer página vira erro, nunca lista
+ * pela metade.
+ */
+async function lerDistribuicoes(colunas: string, filtrar: FiltroDaView = (q) => q, comVersaoEdicao = false): Promise<any[] | null> {
+  try {
+    if (!comVersaoEdicao) return await lerPaginasDaView(colunas, filtrar);
+    try {
+      return await lerPaginasDaView(`${colunas}, versao_edicao`, filtrar);
+    } catch (error) {
+      if (!semColunaDeVersao(error)) throw error;
+      return await lerPaginasDaView(colunas, filtrar);
+    }
+  } catch (error: any) {
+    if (rpcInexistente(error) || error?.code === '42P01') return null;
+    throw new Error(error?.message ?? String(error));
+  }
+}
+
 /** Uma linha por NE do contrato, com a situação da distribuição, as parcelas, a sugestão e o que a nota diz no SIAFI. */
 export async function fetchDistribuicoesDoContrato(contractKey: string): Promise<DistribuicaoDoEmpenho[]> {
   if (!isSupabaseConfigured || !supabase || !contractKey) return [];
-  const ler = (colunas: string) => supabase!.from('v_contrato_empenho_distribuicao').select(colunas).eq('contract_key', contractKey);
-  let { data, error } = await ler('*, versao_edicao');
-  // Banco sem a migration 129: lê sem a versão (grava como antes).
-  if (error && semColunaDeVersao(error)) ({ data, error } = await ler('*'));
-  if (error) {
-    // Banco sem a migration 94: a tela segue sem a coluna de itens.
-    if (rpcInexistente(error) || error.code === '42P01') return [];
-    throw new Error(error.message);
-  }
-  return anexarNotasSiafi((data ?? []).map(mapDistribuicao), contractKey);
+  const data = await lerDistribuicoes('*', (q) => q.eq('contract_key', contractKey), true);
+  if (!data) return [];
+  return anexarNotasSiafi(data.map(mapDistribuicao), contractKey);
 }
 
 /** Para o cache: dias que uma nota vinculada pela equipe fica em "Vinculadas pela equipe". */
@@ -221,18 +249,13 @@ export const DIAS_VINCULADAS_RECENTES = 30;
 export async function fetchDistribuicoesParaVincular(): Promise<DistribuicaoDoEmpenho[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const desde = new Date(Date.now() - DIAS_VINCULADAS_RECENTES * 86400000).toISOString();
-  const ler = (colunas: string) =>
-    supabase!
-      .from('v_contrato_empenho_distribuicao')
-      .select(colunas)
-      .or(`situacao.in.(A_DISTRIBUIR,REVISAR),origem.eq.VALOR,and(origem.eq.USUARIO,distribuido_em.gte.${desde})`);
-  let { data, error } = await ler('*, versao_edicao');
-  if (error && semColunaDeVersao(error)) ({ data, error } = await ler('*'));
-  if (error) {
-    if (rpcInexistente(error) || error.code === '42P01') return [];
-    throw new Error(error.message);
-  }
-  return anexarNotasSiafi((data ?? []).map(mapDistribuicao));
+  const data = await lerDistribuicoes(
+    '*',
+    (q) => q.or(`situacao.in.(A_DISTRIBUIR,REVISAR),origem.eq.VALOR,and(origem.eq.USUARIO,distribuido_em.gte.${desde})`),
+    true
+  );
+  if (!data) return [];
+  return anexarNotasSiafi(data.map(mapDistribuicao));
 }
 
 export interface SituacaoDistribuicaoEmpenho {
@@ -245,12 +268,9 @@ export interface SituacaoDistribuicaoEmpenho {
 /** Situação da divisão por item de cada NE (coluna "Itens" da carteira de Empenhos). */
 export async function fetchSituacaoDistribuicaoPorEmpenho(): Promise<SituacaoDistribuicaoEmpenho[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase.from('v_contrato_empenho_distribuicao').select('empenho_id, contract_key, situacao, origem');
-  if (error) {
-    if (rpcInexistente(error) || error.code === '42P01') return [];
-    throw new Error(error.message);
-  }
-  return (data ?? []).map((r: any) => ({
+  const data = await lerDistribuicoes('empenho_id, contract_key, situacao, origem');
+  if (!data) return [];
+  return data.map((r: any) => ({
     empenhoId: String(r.empenho_id),
     contractKey: String(r.contract_key),
     situacao: r.situacao as SituacaoDistribuicao,

@@ -84,6 +84,13 @@ export function useCarteiraItens(params?: {
     void relerSaldosB();
   }, [relerSaldosA, relerSaldosB]);
 
+  // Sem as alocações (só do banco), o alocado de cada item e as unidades ficam desconhecidos: a tela avisa.
+  const alocacoesComErro = allocationsQuery.isError;
+  const { refetch: relerAlocacoes } = allocationsQuery;
+  const recarregarAlocacoes = useCallback(() => {
+    void relerAlocacoes();
+  }, [relerAlocacoes]);
+
   return {
     rows,
     resumoPorAta,
@@ -94,6 +101,10 @@ export function useCarteiraItens(params?: {
     /** Saldo sendo lido de novo (depois de "Tentar de novo"). */
     recarregandoSaldos: saldos200330.isFetching || saldos200331.isFetching,
     recarregarSaldos,
+    /** A leitura das alocações às unidades internas falhou: alocado e unidades não são confiáveis. */
+    alocacoesComErro,
+    recarregandoAlocacoes: allocationsQuery.isFetching,
+    recarregarAlocacoes,
     isLoading:
       allocationsQuery.isPending ||
       linksQuery.isPending ||

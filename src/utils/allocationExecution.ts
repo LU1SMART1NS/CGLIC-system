@@ -116,3 +116,21 @@ export function vinculosSemQuantidade(
   }
   return removidos.length > 0 ? { restantes, removidos } : null;
 }
+
+/**
+ * Limpeza automática do Item 360: as ligações nota → unidade que saem por não ter quantidade no item. Só roda com
+ * tudo lido do banco com sucesso (alocações, vínculos e empenho do item), por quem pode mexer e sem outra gravação
+ * em curso: calculada sobre leitura que falhou, a gravação apagaria vínculos que não chegaram à tela.
+ */
+export function limpezaDeVinculosDoItem(p: {
+  alocacoesCarregadas: boolean;
+  vinculosCarregados: boolean;
+  empenhoDoItemPronto: boolean;
+  podeMexer: boolean;
+  gravando: boolean;
+  links: Record<string, string>;
+  parcelas: Array<Pick<ParcelaDoItem, 'numeroOficial' | 'quantidade'>>;
+}): ReturnType<typeof vinculosSemQuantidade> {
+  if (!p.alocacoesCarregadas || !p.vinculosCarregados || !p.empenhoDoItemPronto || !p.podeMexer || p.gravando) return null;
+  return vinculosSemQuantidade(p.links, p.parcelas);
+}

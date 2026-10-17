@@ -5,14 +5,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const { saldos, fetchSaldos } = vi.hoisted(() => ({
+const { saldos, fetchSaldos, consultasDoHook } = vi.hoisted(() => ({
   saldos: { porUasg: {} as Record<string, any> },
-  fetchSaldos: vi.fn()
+  fetchSaldos: vi.fn(),
+  /** Resposta das consultas do próprio hook (alocações, vínculos, empenhos), pela chave. */
+  consultasDoHook: { porChave: {} as Record<string, any> }
 }));
 
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-query')>()),
-  useQuery: vi.fn(() => ({ data: [], isPending: false, isError: false, isFetching: false, refetch: vi.fn() }))
+  useQuery: vi.fn(
+    (opcoes: { queryKey: unknown[] }) =>
+      consultasDoHook.porChave[JSON.stringify(opcoes.queryKey)] ?? { data: [], isPending: false, isError: false, isFetching: false, refetch: vi.fn() }
+  )
 }));
 vi.mock('../../services/dashboardService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../services/dashboardService')>()),
@@ -27,6 +32,8 @@ import { useCarteiraItens } from '../useCarteiraItens';
 import { getCarteiraSaldosQueryOptions } from '../useAta';
 import { COLUNAS_SALDO_CARTEIRA } from '../../services/dashboardService';
 import { SaldoItensFalhaNotice } from '../../components/carteira/SaldoItensFalhaNotice';
+import { AlocacoesFalhaNotice } from '../../components/carteira/AlocacoesFalhaNotice';
+import { CARTEIRA_ALOCACOES_KEY } from '../useCarteiraItens';
 
 function consulta(over: Record<string, unknown> = {}) {
   return { data: [], isPending: false, isError: false, isFetching: false, refetch: vi.fn(), ...over };
@@ -46,6 +53,7 @@ describe('useCarteiraItens — saldo dos itens', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saldos.porUasg = { '200330': consulta(), '200331': consulta() };
+    consultasDoHook.porChave = {};
   });
 
   it('sem erro, saldosComErro é falso', () => {
@@ -93,5 +101,34 @@ describe('SaldoItensFalhaNotice', () => {
     const html = renderToStaticMarkup(<SaldoItensFalhaNotice onRetry={() => {}} isRetrying />);
     expect(html).toContain('Carregando…');
     expect(html).toMatch(/<button[^>]*disabled/);
+  });
+});
+
+describe('useCarteiraItens — alocações às unidades (só do banco)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saldos.porUasg = { '200330': consulta(), '200331': consulta() };
+    consultasDoHook.porChave = {};
+  });
+
+  it('sem erro, alocacoesComErro é falso', () => {
+    expect(rodarHook().alocacoesComErro).toBe(false);
+  });
+
+  it('falha da leitura liga o aviso e "Tentar de novo" relê as alocações', () => {
+    const alocacoes = consulta({ isError: true, data: undefined });
+    consultasDoHook.porChave[JSON.stringify(CARTEIRA_ALOCACOES_KEY)] = alocacoes;
+    const r = rodarHook();
+    expect(r.alocacoesComErro).toBe(true);
+    r.recarregarAlocacoes();
+    expect(alocacoes.refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AlocacoesFalhaNotice', () => {
+  it('explica o problema e oferece "Tentar de novo"', () => {
+    const html = renderToStaticMarkup(<AlocacoesFalhaNotice onRetry={() => {}} />);
+    expect(html).toContain('Não foi possível carregar as alocações às unidades internas');
+    expect(html).toContain('Tentar de novo');
   });
 });
