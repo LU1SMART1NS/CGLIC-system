@@ -6,7 +6,8 @@ import {
   fetchGruposDasUasgs,
   fetchUasgsParticipantesGti
 } from '../services/gruposGtiService';
-import type { FatiasDaAta, GrupoConfirmavel } from '../config/gruposGti';
+import { chaveAtaGti, type FatiasDaAta, type GrupoConfirmavel } from '../config/gruposGti';
+import { sementeDaCarteira } from './sementeDaCarteira';
 
 const FATIAS_KEY = ['gti-fatias'] as const;
 const FATIAS_ITENS_KEY = ['gti-fatias-itens'] as const;
@@ -21,7 +22,30 @@ export const ROTULO_GTI_ITENS = 'participação dos GTIs nos itens';
 
 /** Fatia de cada GTI por ata (chave "{numeroAta}-{uasg}"), com a consulta para a faixa "não carregou". */
 export function useFatiasGtiLeitura() {
-  const consulta = useQuery({ queryKey: FATIAS_KEY, queryFn: fetchFatiasGti, staleTime: 10 * 60 * 1000 });
+  const consulta = useQuery({ queryKey: FATIAS_KEY, queryFn: () => fetchFatiasGti(), staleTime: 10 * 60 * 1000 });
+  return { fatias: consulta.data ?? VAZIO_FATIAS, consulta };
+}
+
+/**
+ * Fatias de GTI de uma ata só (Ata 360), no mesmo formato de useFatiasGtiLeitura. Fica sob o prefixo ['gti-fatias']
+ * (confirmar o grupo de uma UASG invalida as duas). Com as fatias de todas as atas no navegador (Carteira de Atas),
+ * a da ata sai delas, sem pedido.
+ */
+export function useFatiasGtiDaAtaLeitura(numeroAta: string | undefined, uasg: string | undefined, { enabled = true }: { enabled?: boolean } = {}) {
+  const qc = useQueryClient();
+  const numero = (numeroAta || '').trim();
+  const cleanUasg = (uasg || '').trim();
+  const consulta = useQuery({
+    queryKey: [...FATIAS_KEY, 'ata', numero, cleanUasg] as const,
+    queryFn: () => fetchFatiasGti({ numeroAta: numero, uasg: cleanUasg }),
+    enabled: enabled && Boolean(numero && cleanUasg),
+    staleTime: 10 * 60 * 1000,
+    ...sementeDaCarteira<Map<string, FatiasDaAta>, Map<string, FatiasDaAta>>(qc, FATIAS_KEY, (todas) => {
+      const chave = chaveAtaGti(numero, cleanUasg);
+      const daAta = todas.get(chave);
+      return new Map(daAta ? [[chave, daAta]] : []);
+    })
+  });
   return { fatias: consulta.data ?? VAZIO_FATIAS, consulta };
 }
 

@@ -103,6 +103,58 @@ export async function fetchContratosParaTela(uasg: string): Promise<ContractDash
   return lerContratosDoBanco(uasg, 'registro_tela');
 }
 
+/**
+ * Um contrato só, para o Contrato 360 (queryFn de ['contracts-dashboard', uasg, 'contrato', chave]): a mesma coluna
+ * `registro_tela` da lista, pela chave do contrato (ou pelo número de controle do PNCP, que o endereço também aceita).
+ * Usa o índice (uasg, contract_key) em vez de ler a carteira inteira (~4 MB). Devolve 0, 1 ou, se a chave casar com
+ * mais de um registro, todos eles: quem chama escolhe com a mesma regra que usava na lista. Falha vira erro.
+ */
+export async function fetchContratoParaTela(uasg: string, chave: string): Promise<ContractDashboardRecord[]> {
+  if (!supabase) return [];
+  const cleanUasg = (uasg || '').trim();
+  const alvo = (chave || '').trim();
+  if (!cleanUasg || !alvo) return [];
+  // Aspas: a chave e o número do PNCP têm "-" e "/", que o filtro "or" do PostgREST aceita entre aspas.
+  const valores = [...new Set([alvo, alvo.toUpperCase()])].map((v) => `"${v.replace(/"/g, '')}"`);
+  const filtro = valores.flatMap((v) => [`contract_key.eq.${v}`, `numero_controle_pncp.eq.${v}`]).join(',');
+  const { data, error } = await supabase
+    .from('contratos_oficiais')
+    .select('registro:registro_tela')
+    .eq('uasg', cleanUasg)
+    .or(filtro)
+    .order('contract_key', { ascending: true });
+  if (error) {
+    throw new Error(`Não foi possível ler o contrato ${alvo} no banco: ${error.message}`, { cause: error });
+  }
+  return (data ?? []).map((row: { registro: Record<string, any> }) => registroParaContrato(row.registro));
+}
+
+/**
+ * Só os contratos destas chaves (contratos vinculados a uma ata ou a um item), com a mesma coluna `registro_tela` da
+ * lista. Em lotes de 100 chaves, pelo índice (uasg, contract_key). Falha em qualquer lote vira erro.
+ */
+export async function fetchContratosParaTelaPorChaves(uasg: string, chaves: readonly string[]): Promise<ContractDashboardRecord[]> {
+  if (!supabase) return [];
+  const cleanUasg = (uasg || '').trim();
+  const todas = [...new Set(chaves.flatMap((c) => [c.trim(), c.trim().toUpperCase()]).filter(Boolean))].sort();
+  if (!cleanUasg || todas.length === 0) return [];
+  const contratos: ContractDashboardRecord[] = [];
+  for (let i = 0; i < todas.length; i += 100) {
+    const lote = todas.slice(i, i + 100);
+    const { data, error } = await supabase
+      .from('contratos_oficiais')
+      .select('registro:registro_tela')
+      .eq('uasg', cleanUasg)
+      .in('contract_key', lote)
+      .order('contract_key', { ascending: true });
+    if (error) {
+      throw new Error(`Não foi possível ler os contratos vinculados no banco: ${error.message}`, { cause: error });
+    }
+    for (const row of data ?? []) contratos.push(registroParaContrato((row as { registro: Record<string, any> }).registro));
+  }
+  return ordenarContratos(contratos);
+}
+
 // ------------------------------------------------------------------------------
 // Sincronização
 // ------------------------------------------------------------------------------

@@ -5,7 +5,7 @@ import { useExpectativasPagamento } from './useExpectativasPagamento';
 import { FINANCEIRO_QUERY_KEYS } from './useFinanceiroCarteira';
 import { useContratosDoFinanceiro } from '../components/financeiro/useContratosDoFinanceiro';
 import { fetchCiclosEmAberto, fetchFaturasParaAvisos } from '../services/financeiroCarteiraService';
-import { fetchFaturasParaCiclo } from '../services/cicloPagamentoApoioService';
+import { useFaturasDoContrato } from './useFaturasDoContrato';
 import { fetchEnvioPrevisao, mesDaProximaPrevisao, prazoDaPrevisao } from '../services/previsaoMensalService';
 import { calcularAvisosPagamento, type AvisoPagamento, type CicloParaAviso } from '../services/avisosPagamentoService';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
@@ -79,12 +79,10 @@ export function useAvisosPagamentoGerais(opts: { enabled?: boolean } = {}) {
 export function useAvisosPagamentoDoContrato(contractKey: string, cycles: PaymentFollowUpCycle[], vigente: boolean) {
   const { marcas, entregas } = useExpectativasPagamento();
   const marcado = marcas.has(contractKey) || entregas.some((e) => e.contractKey === contractKey);
-  const faturas = useQuery({
-    queryKey: ['ciclo-faturas-disponiveis', contractKey, true],
-    queryFn: () => fetchFaturasParaCiclo(contractKey, { incluirPagas: true }),
-    enabled: Boolean(contractKey) && marcado && vigente,
-    staleTime: 60 * 1000
-  });
+  // As faturas que o Contrato 360 já lê (contador das abas, Empenhos, Pagamentos): uma leitura de v_contrato_faturas
+  // para a tela toda. Antes a fila de ações lia de novo as não canceladas, com os ciclos de cada uma, para usar só a
+  // emissão e a referência. A conta tira as canceladas, e a ordem não importa.
+  const faturas = useFaturasDoContrato(contractKey);
 
   return useMemo(() => {
     if (!marcado || !vigente || !faturas.isSuccess) return SEM_AVISOS;
@@ -92,7 +90,7 @@ export function useAvisosPagamentoDoContrato(contractKey: string, cycles: Paymen
     return calcularAvisosPagamento({
       marcas: marca ? new Map([[contractKey, marca]]) : new Map(),
       entregas: entregas.filter((e) => e.contractKey === contractKey),
-      faturas: faturas.data.map((f) => ({ contractKey, emissao: f.emissao, referencia: f.referencia, cancelada: false })),
+      faturas: faturas.data.faturas.map((f) => ({ contractKey, emissao: f.emissao, referencia: f.referencia, cancelada: f.cancelada })),
       ciclos: cycles.map(paraAviso),
       contratosVigentes: new Set([contractKey])
     });

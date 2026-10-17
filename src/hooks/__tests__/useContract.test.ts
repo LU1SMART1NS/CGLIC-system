@@ -1,24 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useContract } from '../useContract';
-import * as useContractsDashboardModule from '../useContractsDashboard';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { acharContrato, getContratoQueryOptions, useContract } from '../useContract';
 import * as contratoGovModule from '../useContractContratosGov';
 import type { ContractDashboardRecord } from '../../types';
 
-vi.mock('../useContractsDashboard', () => ({
-  useContractsDashboard: vi.fn()
+/**
+ * Contrato 360 lendo um contrato só (passo 3 da auditoria das telas, 6c): com a lista da carteira no navegador o
+ * contrato sai dela (sem pedido); sem a lista, a tela lê só ele, pela chave. Nos dois casos, o mesmo contrato.
+ */
+const { lerContrato } = vi.hoisted(() => ({ lerContrato: vi.fn() }));
+vi.mock('../../services/contratosOficiaisService', async (orig) => ({
+  ...(await orig<typeof import('../../services/contratosOficiaisService')>()),
+  fetchContratoParaTela: lerContrato
 }));
 vi.mock('../useContractContratosGov', () => ({
   useContratoGov: vi.fn()
 }));
 vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ role: 'leitor' })
-}));
-// Os testes chamam o hook direto, fora de um componente: useMemo vira a própria conta, e o efeito
-// (gravar no banco o contrato completado) não roda.
-vi.mock('react', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('react')>()),
-  useMemo: (fn: () => unknown) => fn(),
-  useEffect: () => undefined
 }));
 
 const mockContracts: ContractDashboardRecord[] = [
@@ -55,22 +56,40 @@ const mockContracts: ContractDashboardRecord[] = [
   }
 ];
 
-describe('useContract Hook — Localização Canônica de Contrato na Visão 360°', () => {
+/** Render no servidor: o React Query não busca nada; só vale o que já está no cache (a semente da lista). */
+function rodar(client: QueryClient, contractKey: string) {
+  return renderizar(client, () => useContract(contractKey, '200331'));
+}
+
+function renderizar<T>(client: QueryClient, hook: () => T): T {
+  let r: T | undefined;
+  const Sonda = () => {
+    r = hook();
+    return null;
+  };
+  renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(Sonda)));
+  return r!;
+}
+
+function comLista() {
+  const client = new QueryClient();
+  client.setQueryData(['contracts-dashboard', '200331'], mockContracts);
+  return client;
+}
+
+describe('useContract — um contrato só, com a lista da carteira quando ela já está no navegador', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(contratoGovModule.useContratoGov).mockReturnValue({ data: undefined, isLoading: false } as any);
   });
 
   it('completa o registro do Compras.gov.br com o contrato do Contratos.gov.br, sem mudar o id da tela', () => {
-    vi.mocked(useContractsDashboardModule.useContractsDashboard).mockReturnValue({
-      data: mockContracts, isLoading: false, isError: false, error: null, refetch: vi.fn(), refresh: vi.fn()
-    } as any);
     vi.mocked(contratoGovModule.useContratoGov).mockReturnValue({
       data: { ...mockContracts[1], id: 'OUTRO-ID', contratoId: 670960, dataAssinatura: '2025-10-06', valorInicial: 3800, fonteDados: 'Contratos.gov.br', raw: { categoria: 'Compras' } },
       isLoading: false
     } as any);
 
-    const result = useContract('200331-00020-2025', '200331');
+    const result = rodar(comLista(), '200331-00020-2025');
 
     expect(result.contract?.id).toBe('200331-00020-2025');
     expect(result.contract?.contratoId).toBe(670960);
@@ -81,84 +100,44 @@ describe('useContract Hook — Localização Canônica de Contrato na Visão 360
   });
 
   it('enquanto completa, repassa o registro de base e avisa que está completando', () => {
-    vi.mocked(useContractsDashboardModule.useContractsDashboard).mockReturnValue({
-      data: mockContracts, isLoading: false, isError: false, error: null, refetch: vi.fn(), refresh: vi.fn()
-    } as any);
     vi.mocked(contratoGovModule.useContratoGov).mockReturnValue({ data: undefined, isLoading: true } as any);
-
-    const result = useContract('200331-00020-2025', '200331');
-
+    const result = rodar(comLista(), '200331-00020-2025');
     expect(result.contract?.fonteDados).toBe('Compras.gov.br');
     expect(result.enriching).toBe(true);
   });
 
-  it('deve localizar contrato existente por ID canônico', () => {
-    vi.mocked(useContractsDashboardModule.useContractsDashboard).mockReturnValue({
-      data: mockContracts,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    } as any);
-
-    const result = useContract('200331-00015-2026', '200331');
-
-    expect(result.contract).toBeDefined();
+  it('com a lista no navegador: acha pela chave, sem ler o banco', () => {
+    const result = rodar(comLista(), '200331-00015-2026');
     expect(result.contract?.id).toBe('200331-00015-2026');
-    expect(result.contract?.numero).toBe('15/2026');
     expect(result.contract?.fornecedorNome).toBe('EMPRESA TECH BRASIL LTDA');
     expect(result.isLoading).toBe(false);
+    expect(lerContrato).not.toHaveBeenCalled();
   });
 
-  it('deve localizar contrato por número de controle PNCP', () => {
-    vi.mocked(useContractsDashboardModule.useContractsDashboard).mockReturnValue({
-      data: mockContracts,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    } as any);
-
-    const result = useContract('200331-2-000015/2026', '200331');
-
-    expect(result.contract).toBeDefined();
-    expect(result.contract?.id).toBe('200331-00015-2026');
+  it('com a lista no navegador: acha pelo número de controle do PNCP', () => {
+    expect(rodar(comLista(), '200331-2-000015/2026').contract?.id).toBe('200331-00015-2026');
   });
 
-  it('deve retornar null quando contractKey não for encontrado', () => {
-    vi.mocked(useContractsDashboardModule.useContractsDashboard).mockReturnValue({
-      data: mockContracts,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    } as any);
-
-    const result = useContract('CHAVE-INEXISTENTE-999', '200331');
-
-    expect(result.contract).toBeNull();
-    expect(result.isLoading).toBe(false);
+  it('a lista invalidada (depois de sincronizar) não serve de semente: a tela relê o contrato', async () => {
+    const client = comLista();
+    await client.invalidateQueries({ queryKey: ['contracts-dashboard', '200331'], refetchType: 'none' });
+    expect(rodar(client, '200331-00015-2026').contract).toBeNull();
   });
 
-  it('deve repassar estados de carregamento (isLoading) e erro (isError)', () => {
-    const mockError = new Error('Falha de rede na API oficial');
-    vi.mocked(useContractsDashboardModule.useContractsDashboard).mockReturnValue({
-      data: [],
-      isLoading: true,
-      isError: true,
-      error: mockError,
-      refetch: vi.fn(),
-      refresh: vi.fn()
-    } as any);
+  it('sem a lista: lê só o contrato, pela UASG e pela chave em maiúsculas, sob o prefixo da lista', async () => {
+    lerContrato.mockResolvedValue([mockContracts[0]]);
+    const opcoes = getContratoQueryOptions(' 200331 ', '200331-00015-2026');
+    expect(opcoes.queryKey).toEqual(['contracts-dashboard', '200331', 'contrato', '200331-00015-2026']);
+    await expect(opcoes.queryFn()).resolves.toEqual([mockContracts[0]]);
+    expect(lerContrato).toHaveBeenCalledWith('200331', '200331-00015-2026');
+  });
 
-    const result = useContract('200331-00015-2026', '200331');
-
-    expect(result.contract).toBeNull();
-    expect(result.isLoading).toBe(true);
-    expect(result.isError).toBe(true);
-    expect(result.error).toBe(mockError);
+  it('o contrato achado na lista e o lido pela chave são o mesmo', () => {
+    for (const chave of ['200331-00015-2026', '200331-2-000015/2026', '200331-00020-2025']) {
+      const daLista = acharContrato(mockContracts, chave);
+      const lido = acharContrato(daLista ? [daLista] : [], chave);
+      expect(lido).toBe(daLista);
+    }
+    expect(acharContrato(mockContracts, 'CHAVE-INEXISTENTE-999')).toBeNull();
   });
 });

@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { InstrumentPageState } from '../instrument360/InstrumentPageState';
 import { Ata360Header } from './Ata360Header';
 import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from '../gti/InteresseGti';
-import { ROTULO_GTI_ATAS, useFatiasGtiLeitura } from '../../hooks/useGruposGti';
+import { ROTULO_GTI_ATAS, useFatiasGtiDaAtaLeitura } from '../../hooks/useGruposGti';
 import { useAtaManager } from '../../hooks/useAtaManagers';
 import { ROTULO_AVISOS_RESOLVIDOS, useAvisosResolvidos } from '../../hooks/useAvisosResolvidos';
 import { useVinculosAConferir } from '../../hooks/useVinculosAConferir';
@@ -60,7 +60,10 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   const { arp, itens, isLoading, isError, error, refetch } = useAta(ataKey, uasg);
   // Interesse por GTI da ata (só nas atas da SENASP): a fatia é pelo valor de todos os itens (migration 141).
-  const { fatias: fatiasGtiPorAta, consulta: fatiasGtiQuery } = useFatiasGtiLeitura();
+  // Só as fatias desta ata (antes, as de todas as atas); de outro órgão não tem GTI e nem lê.
+  const { fatias: fatiasGtiPorAta, consulta: fatiasGtiQuery } = useFatiasGtiDaAtaLeitura(arp?.numeroAtaRegistroPreco, arp?.codigoUnidadeGerenciadora, {
+    enabled: Boolean(arp && !ataDeOutroOrgao(arp))
+  });
   const fatiasGti = arp && !ataDeOutroOrgao(arp) ? fatiasGtiPorAta.get(chaveAtaGti(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora)) : undefined;
   const [gtiAberto, setGtiAberto] = React.useState(false);
   const { saldos, isLoading: loadingSaldos, consulta: saldosQuery } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);
