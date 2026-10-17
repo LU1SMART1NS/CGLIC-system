@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchAllAllocationsGlobal } from '../services/allocationService';
 import { fetchCarteiraItemEmpenhos, fetchCarteiraItemLinks } from '../services/carteiraItensService';
 import { UASGS_CGLIC } from '../config/unidadesGestoras';
-import { getArpPrazo } from './useAtasPortfolio';
+import { ROTULO_SALDO_ITENS, getArpPrazo } from './useAtasPortfolio';
+import type { LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
 import { useAllAtaItemSaldos } from './useAta';
 import {
   buildCarteiraItemRows,
@@ -15,6 +16,14 @@ import {
 import type { ArpItemRecord, ArpRecord } from '../types';
 
 const STALE = 2 * 60 * 1000;
+
+/** Rótulos das leituras da execução dos itens na faixa "não carregou". */
+export const ROTULOS_CARTEIRA_ITENS = {
+  alocacoes: 'alocações às unidades internas',
+  vinculos: 'quantidade contratada dos itens',
+  empenhos: 'empenhado dos itens',
+  saldos: ROTULO_SALDO_ITENS
+} as const;
 
 /** Chaves de cache que uma mudança de alocação ou de vínculo precisa invalidar. */
 export const CARTEIRA_ALOCACOES_KEY = ['carteira-alocacoes'] as const;
@@ -91,8 +100,25 @@ export function useCarteiraItens(params?: {
     void relerAlocacoes();
   }, [relerAlocacoes]);
 
+  /**
+   * Leituras da execução dos itens, para a faixa "não carregou": sem elas o alocado, o contratado e o empenhado
+   * apareciam zerados, como se fosse verdade.
+   */
+  const leituras: LeituraDaTela[] = [
+    { rotulo: ROTULOS_CARTEIRA_ITENS.alocacoes, query: allocationsQuery },
+    { rotulo: ROTULOS_CARTEIRA_ITENS.vinculos, query: linksQuery },
+    ...(apenasUnidadesDeContratos
+      ? []
+      : [
+          { rotulo: ROTULOS_CARTEIRA_ITENS.empenhos, query: empenhosQuery },
+          { rotulo: ROTULOS_CARTEIRA_ITENS.saldos, query: saldos200330 },
+          { rotulo: ROTULOS_CARTEIRA_ITENS.saldos, query: saldos200331 }
+        ])
+  ];
+
   return {
     rows,
+    leituras,
     resumoPorAta,
     unidades,
     unidadesDoContrato,

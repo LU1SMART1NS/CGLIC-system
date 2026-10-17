@@ -12,7 +12,7 @@ import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import { buildAtaKey, getAtaSourceQueryOptions, useAllAtaItemSaldos } from './useAta';
 import { useAllAtaManagers } from './useAtaManagers';
 import { ROTULO_GESTORES_ATAS, useAssignedManagementScope } from './useAssignedManagementScope';
-import type { LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
+import { naoCarregou, type LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 import { carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
 
@@ -29,6 +29,10 @@ export async function invalidarDadosDeAtas(queryClient: QueryClient): Promise<vo
 function relerAtas(queryClient: QueryClient) {
   void invalidarDadosDeAtas(queryClient);
 }
+
+/** Rótulo do saldo dos itens na faixa: o mesmo do Início (lerFonte), para juntar numa linha. */
+export const ROTULO_SALDO_ITENS = 'saldo dos itens';
+export const ROTULO_ITENS_NAS_FONTES = 'itens das atas buscados no Compras.gov.br e no PNCP';
 
 export type SyncProgress = { step: string; percent: number; current?: number; total?: number };
 
@@ -92,31 +96,57 @@ export function useAtasPortfolio() {
   // Itens buscados sob demanda na API para atas que vieram do banco sem itens.
   const [apiItemsByAta, setApiItemsByAta] = useState<Record<string, ArpItemRecord[]>>({});
   const [itemsLoadingByAta, setItemsLoadingByAta] = useState<Record<string, boolean>>({});
+  // Atas cujos itens a fonte não devolveu (recusa, tempo esgotado): antes viravam "ata sem itens" até recarregar a
+  // página. Agora ficam à parte, entram na faixa "não carregou" e só são pedidas de novo no "Tentar novamente".
+  const [itensFalharamByAta, setItensFalharamByAta] = useState<Record<string, string>>({});
   const itemsByAta = useMemo(() => ({ ...apiItemsByAta, ...dbItemsByAta }), [apiItemsByAta, dbItemsByAta]);
 
   const loadItemsForArp = useCallback(async (arp: ArpRecord) => {
     const ataKey = buildAtaKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
-    if (itemsByAta[ataKey] || itemsLoadingByAta[ataKey]) return;
+    if (itemsByAta[ataKey] || itemsLoadingByAta[ataKey] || itensFalharamByAta[ataKey]) return;
 
     setItemsLoadingByAta((prev) => ({ ...prev, [ataKey]: true }));
     try {
-      const data = await fetchArpItems(arp.dataVigenciaInicial, arp.codigoUnidadeGerenciadora, arp.numeroAtaRegistroPreco, arp);
+      // estrito: a recusa da fonte vira erro, em vez de uma lista vazia igual à de uma ata que não tem itens.
+      const data = await fetchArpItems(arp.dataVigenciaInicial, arp.codigoUnidadeGerenciadora, arp.numeroAtaRegistroPreco, arp, { estrito: true });
       if (data && data.resultado) {
         setApiItemsByAta((prev) => ({ ...prev, [ataKey]: data.resultado }));
       }
     } catch (err) {
       console.warn(`Erro ao carregar itens da Ata ${arp.numeroAtaRegistroPreco}:`, err);
+      const mensagem = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err);
+      setItensFalharamByAta((prev) => ({ ...prev, [ataKey]: mensagem }));
     } finally {
       setItemsLoadingByAta((prev) => ({ ...prev, [ataKey]: false }));
     }
-  }, [itemsByAta, itemsLoadingByAta]);
+  }, [itemsByAta, itemsLoadingByAta, itensFalharamByAta]);
 
   const loadItemsForArps = useCallback((arpsToLoad: ArpRecord[]) => {
     arpsToLoad.forEach((arp) => {
       const ataKey = buildAtaKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
-      if (!itemsByAta[ataKey] && !itemsLoadingByAta[ataKey]) loadItemsForArp(arp);
+      if (!itemsByAta[ataKey] && !itemsLoadingByAta[ataKey] && !itensFalharamByAta[ataKey]) loadItemsForArp(arp);
     });
-  }, [itemsByAta, itemsLoadingByAta, loadItemsForArp]);
+  }, [itemsByAta, itemsLoadingByAta, itensFalharamByAta, loadItemsForArp]);
+
+  // As atas cujos itens não vieram, como uma leitura da faixa: "Tentar novamente" libera para pedir de novo.
+  const atasSemItensDaFonte = Object.keys(itensFalharamByAta);
+  const leituraDosItensNasFontes: LeituraDaTela | null =
+    atasSemItensDaFonte.length > 0
+      ? {
+          rotulo: ROTULO_ITENS_NAS_FONTES,
+          query: {
+            data: undefined,
+            isError: true,
+            error: new Error(
+              `${atasSemItensDaFonte.length === 1 ? 'a ata' : `${atasSemItensDaFonte.length} atas`} ${atasSemItensDaFonte
+                .map((k) => k.replace(/-\d{6}$/, ''))
+                .slice(0, 5)
+                .join(', ')}${atasSemItensDaFonte.length > 5 ? '…' : ''} sem resposta: ${Object.values(itensFalharamByAta)[0]}`
+            ),
+            refetch: async () => setItensFalharamByAta({})
+          }
+        }
+      : null;
 
   // Gestor por ata (mesma fonte do detalhe da Ata e do Início), indexado pela chave de gestão (chaveGestaoDaArp).
   const ataManagersQuery = useAllAtaManagers();
@@ -131,8 +161,10 @@ export function useAtasPortfolio() {
 
   // Consumo de saldo por item (mesma fonte do detalhe da Ata e do Início).
   // Atas vencidas, canceladas ou sem data não geram alerta de saldo (mesma regra do Início).
-  const { data: saldos200330 } = useAllAtaItemSaldos(UASGS_CGLIC[0]);
-  const { data: saldos200331 } = useAllAtaItemSaldos(UASGS_CGLIC[1]);
+  const saldos200330Query = useAllAtaItemSaldos(UASGS_CGLIC[0]);
+  const saldos200331Query = useAllAtaItemSaldos(UASGS_CGLIC[1]);
+  const { data: saldos200330 } = saldos200330Query;
+  const { data: saldos200331 } = saldos200331Query;
   const saldoStatsByAta = useMemo(() => {
     const encerradas = new Set(
       arps
@@ -196,11 +228,26 @@ export function useAtasPortfolio() {
     ...(scope200330.leituras ?? []),
     ...(scope200331.leituras ?? [])
   ];
+  /** Saldo dos itens (consumo e situação da ata assinada), para a faixa. */
+  const leiturasDosSaldos: LeituraDaTela[] = [
+    { rotulo: ROTULO_SALDO_ITENS, query: saldos200330Query },
+    { rotulo: ROTULO_SALDO_ITENS, query: saldos200331Query }
+  ];
+  /**
+   * As atas de alguma UASG (ou, no perfil gestor, o recorte dele) falharam sem leitura anterior: a lista vazia não é
+   * "nenhuma ata", é "não carregou".
+   */
+  const atasNaoCarregaram =
+    sources.some((q) => naoCarregou(q)) || [...(scope200330.leituras ?? []), ...(scope200331.leituras ?? [])].some((l) => naoCarregou(l.query));
 
   return {
     /** Todas as atas carregadas (sem o escopo do gestor). */
     arps,
     leiturasDasAtas,
+    leiturasDosSaldos,
+    /** Atas cujos itens o Compras.gov.br ou o PNCP não devolveram (só na Carteira de Atas); null quando nenhuma. */
+    leituraDosItensNasFontes,
+    atasNaoCarregaram,
     /** Atas no escopo do usuário. */
     scopedArps,
     isLoading,

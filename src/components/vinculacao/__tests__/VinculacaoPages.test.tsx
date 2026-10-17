@@ -20,7 +20,7 @@ vi.mock('../../financeiro/useContratosDoFinanceiro', async (orig) => ({
   useContratosDoFinanceiro: vi.fn()
 }));
 vi.mock('../../../hooks/useAtasPortfolio', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useAtasPortfolio')>()), useAtasPortfolio: vi.fn() }));
-vi.mock('../../../hooks/useCarteiraItens', () => ({ useCarteiraItens: vi.fn() }));
+vi.mock('../../../hooks/useCarteiraItens', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useCarteiraItens')>()), useCarteiraItens: vi.fn() }));
 vi.mock('../../../hooks/useAvisosResolvidos', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useAvisosResolvidos')>()), useAvisosResolvidos: vi.fn() }));
 // Janelas: não abrem no render estático; os hooks delas não rodam.
 vi.mock('../VincularAosItensDialog', () => ({ VincularAosItensDialog: () => null }));
@@ -370,6 +370,63 @@ describe('Alocação → Itens às unidades', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     expect(render(<ItensUnidadesPage />, '/?ver=ITEM')).not.toContain('vinc-itens-alocar-');
     expect(render(<ItensUnidadesPage />, '/?busca=placa')).not.toContain('vinc-itens-alocar-');
+  });
+  describe('uma leitura falha: a faixa avisa e o resto fica', () => {
+    const falhou = () => ({ data: undefined, isError: true, error: new Error('canceling statement due to statement timeout'), refetch: vi.fn() });
+    const ok = { data: [], isError: false, error: null, refetch: vi.fn() };
+    const comLeituras = (leituras: any[], atas: any = {}) => {
+      vi.mocked(useCarteiraItens).mockReturnValue({ ...vi.mocked(useCarteiraItens)(), leituras } as any);
+      vi.mocked(useAtasPortfolio).mockReturnValue({ ...vi.mocked(useAtasPortfolio)(), ...atas } as any);
+    };
+
+    it('o contratado não carregou: a faixa diz, e os segmentos e os itens ficam', () => {
+      vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
+      comLeituras([
+        { rotulo: 'alocações às unidades internas', query: ok },
+        { rotulo: 'quantidade contratada dos itens', query: falhou() },
+        { rotulo: 'empenhado dos itens', query: falhou() }
+      ]);
+      const html = render(<ItensUnidadesPage />, '/?alocacao=TODOS&ver=ITEM');
+      expect(html).toContain('data-testid="alocacao-fontes-com-falha"');
+      expect(html).toContain('Parte da alocação não carregou');
+      expect(html).toContain('<strong>Quantidade contratada dos itens</strong>');
+      // O empenhado não aparece nesta tela: fica fora da faixa.
+      expect(html).not.toContain('Empenhado dos itens');
+      expect(html).toMatch(/Sem alocação<span class="segment-pill__count">1</);
+      expect(html).toContain('Placa balística');
+    });
+
+    it('as alocações não carregaram: aviso no lugar da lista, sem contar tudo como "Sem alocação" e sem travar a tela', () => {
+      comLeituras([{ rotulo: 'alocações às unidades internas', query: falhou() }]);
+      const html = render(<ItensUnidadesPage />);
+      expect(html).toContain('Itens a alocar às unidades internas');
+      expect(html).toContain('<strong>Alocações às unidades internas</strong>');
+      expect(html).toContain('data-testid="alocacao-nao-carregou"');
+      expect(html).toContain('sem elas, todo item pareceria sem alocação');
+      expect(html).not.toContain('data-testid="vinc-itens-nivel-SEM"');
+      expect(html).not.toContain('Erro ao carregar as alocações');
+    });
+
+    it('o saldo dos itens não carregou: "não carregou", e não "nenhum item com quantitativo SENASP" (3d)', () => {
+      comLeituras([{ rotulo: 'saldo dos itens', query: falhou() }]);
+      const html = render(<ItensUnidadesPage />);
+      expect(html).toContain('<strong>Saldo dos itens</strong>');
+      expect(html).toContain('O saldo dos itens não carregou');
+      expect(html).not.toContain('Nenhum item com quantitativo SENASP');
+    });
+
+    it('perfil gestor de saldos sem o recorte: a faixa e "as atas não carregaram"', () => {
+      vi.mocked(useCarteiraItens).mockReturnValue({ ...vi.mocked(useCarteiraItens)(), rows: [], leituras: [] } as any);
+      comLeituras([], { leiturasDasAtas: [{ rotulo: 'gestores das atas', query: falhou() }], atasNaoCarregaram: true });
+      const html = render(<ItensUnidadesPage />);
+      expect(html).toContain('<strong>Gestores das atas</strong>');
+      expect(html).toContain('As atas não carregaram.');
+      expect(html).not.toContain('Nenhum item com quantitativo SENASP');
+    });
+
+    it('tudo carregou: sem faixa', () => {
+      expect(render(<ItensUnidadesPage />)).not.toContain('alocacao-fontes-com-falha');
+    });
   });
 });
 
