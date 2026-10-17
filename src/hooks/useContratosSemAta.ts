@@ -9,10 +9,11 @@ import {
 export const CONTRATOS_SEM_ATA_KEY = ['contratos-sem-ata'] as const;
 
 /** Contratos que o coordenador confirmou que não têm ata, por chave do contrato. */
-export function useContratosSemAta() {
+export function useContratosSemAta({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery<Record<string, ContratoSemAtaConfirmacao>, Error>({
     queryKey: CONTRATOS_SEM_ATA_KEY,
     queryFn: fetchContratosSemAta,
+    enabled,
     staleTime: 5 * 60 * 1000
   });
 }

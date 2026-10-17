@@ -45,6 +45,7 @@ import {
 import { useDismissContractSuggestion } from '../hooks/useDismissContractSuggestion';
 import { useRestoreContractSuggestion } from '../hooks/useRestoreContractSuggestion';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
+import { useContratosPorChave } from '../hooks/useContratosPorChave';
 import { useItemNosContratos } from '../hooks/useItensDoContrato';
 import { enrichContractLinks } from '../services/arpContractLinkService';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
@@ -225,7 +226,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     canonicalItemKey
   );
   const { data: contractLinks = [] } = contractLinksQuery;
-  const officialContractsQuery = useContractsDashboard(carteiraDaAta(arp));
+  // Contratos dos vínculos deste item: só eles (antes, a carteira inteira de contratos da UASG em qualquer aba).
+  const chavesVinculadas = useMemo(() => (contractLinksQuery.data ? contractLinksQuery.data.map((l) => l.contractKey) : undefined), [contractLinksQuery.data]);
+  const contratosVinculadosQuery = useContratosPorChave(carteiraDaAta(arp), chavesVinculadas);
+  const { data: contratosVinculados = [] } = contratosVinculadosQuery;
+  // A carteira inteira de contratos só serve às sugestões, que ficam na aba Contratos: lida quando a aba abre.
+  const abaContratos = verContratos && activeTab === 'contratos';
+  const officialContractsQuery = useContractsDashboard(carteiraDaAta(arp), { enabled: abaContratos });
   const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = officialContractsQuery;
   const unlinkContractMutation = useUnlinkContractFromItem();
   const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
@@ -279,8 +286,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Vínculos confirmados; a quantidade do item no contrato é a gravada no vínculo (relida pelo servidor a cada 6 horas),
   // a mesma das telas de Ata e dos painéis.
   const enrichedOfficialLinks = useMemo(() => {
-    return enrichContractLinks(contractLinks, officialDashboardContracts);
-  }, [contractLinks, officialDashboardContracts]);
+    return enrichContractLinks(contractLinks, contratosVinculados);
+  }, [contractLinks, contratosVinculados]);
 
   // Empenho do item: as parcelas deste item nas notas vinculadas aos itens dos contratos (migration 94) e as notas que
   // ainda faltam vincular. As notas dos contratos chegam pela sincronização do servidor, de hora em hora.
@@ -346,8 +353,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const { data: dismissedSuggestions = [] } = useDismissedContractSuggestions(canonicalItemKey);
   // Não sugerir: contrato já vinculado a ata de outra compra, ou com este item em outra ata (cada item do contrato
   // pertence a uma só ata, migration 86), ou marcado pelo coordenador como "não pertence a ata".
-  const { data: todosVinculos = [] } = useArpItemContractLinks();
-  const { data: contratosSemAta = {} } = useContratosSemAta();
+  // Vínculos de todas as atas e marcas "não pertence": só para as sugestões (aba Contratos).
+  const { data: todosVinculos = [] } = useArpItemContractLinks(abaContratos);
+  const { data: contratosSemAta = {} } = useContratosSemAta({ enabled: abaContratos });
   const naoSugerir = useMemo(() => {
     const chaveDaAta = arp ? chaveGestaoDaArp(arp) : '';
     const compra = arp ? buildItemSuggestionCriteria(arp, item).compra : undefined;
@@ -653,6 +661,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     ...(verContratos
       ? [
           { rotulo: ROTULO_CONTRATOS_DO_ITEM, query: contractLinksQuery },
+          { rotulo: `contratos da UASG ${carteiraDaAta(arp)}`, query: contratosVinculadosQuery },
           { rotulo: `contratos da UASG ${carteiraDaAta(arp)}`, query: officialContractsQuery },
           ...leiturasDoEmpenho
         ]

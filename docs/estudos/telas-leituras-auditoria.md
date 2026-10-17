@@ -259,6 +259,19 @@ Todos dão para fazer **só no navegador**, sem migration. Cada um cabe num PR p
 - **d. Contrato 360:** uma leitura de `v_contrato_faturas` e uma de `contrato_empenhos`, repartidas entre as seções.
 - **e. Carteira de Atas sem chamadas ao Compras.gov.br/PNCP pelo navegador:** quem preenche os itens é a sincronização do servidor.
 - **Andamento (17/10/2026):** 6a e 6b no PR "passo 3, parte 1". Achado a mais: o menu lateral (contadores de Vínculos, Financeiro e Distribuição) passava pela carteira completa, então **toda tela** lia o painel das duas UASGs, não só as 6. Agora só o Início, a Carteira de Contratos e a Central de Distribuição leem o painel; o "Atribuir gestor" de Contratos à ata o lê quando abre. Os conjuntos `empenhosDbSet`/`allocationsDbSet` de `useAtasPortfolio` já tinham saído.
+- **Andamento (17/10/2026, parte 2):** 6c e 6d. As telas 360 leem o contrato pela chave, a ata pelo número e pela UASG, só os contratos vinculados e só as fatias de GTI da ata. Com a lista da carteira no navegador, tudo sai dela, sem pedido. No Item 360, a carteira de contratos, os vínculos de todas as atas e as marcas "não pertence" só são lidos com a aba Contratos aberta.
+  - **Saldo:** fica como está. Medição de `v_arp_item_saldo_detalhado` com `EXPLAIN ANALYZE` como usuário logado (17/10/2026, 3 rodadas cada):
+
+    | Consulta | Tempo |
+    |---|---|
+    | Carteira 200331, 13 colunas (667 linhas) | 340–358 ms |
+    | Carteira, todas as colunas | 413–420 ms |
+    | Uma ata (116 itens) | ~400 ms |
+    | Uma ata pequena | ~397 ms |
+    | Um item | ~290 ms |
+
+    Os CTEs `MATERIALIZED` da migration 148 (órgãos e quantitativos) são calculados por inteiro com qualquer filtro, então ler por ata não alivia o banco.
+  - **Contrato 360:** a fila de ações usa as faturas da página. A aba Pagamentos usa as notas já lidas, em vez de reler `contrato_empenhos`. A leitura de `v_contrato_faturas` por `id_fatura` da aba Pagamentos fica: cobre faturas de outros contratos que pagam pela mesma nota.
 - **Arquivos:**
   - `src/hooks/useContractsPortfolio.ts`, `src/components/financeiro/useContratosDoFinanceiro.ts`, `src/components/vinculacao/usePendenciasVinculoAta.ts`;
   - `src/hooks/useAtasPortfolio.ts`, `src/hooks/useCarteiraItens.ts`, `src/hooks/useAta.ts`, `src/hooks/useContract.ts`;

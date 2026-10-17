@@ -167,7 +167,38 @@ export async function fetchArpsWithItemsFromDb(uasg?: string): Promise<{
     if (uasg) query = query.eq(colunaDaUasgDaAta(uasg), uasg);
     return query.order('id').range(de, ate);
   });
+  return mapearAtasComItens(data);
+}
 
+/**
+ * Uma ata só (+ itens), para a Ata 360 e o Item 360: pelo número e pela UASG gerenciadora (índice único
+ * uq_ata_uasg), no mesmo formato de fetchArpsWithItemsFromDb. Antes as telas liam todas as atas da UASG com todos
+ * os itens para mostrar uma. Falha de leitura vira erro; ata ausente = lista vazia ("Ata não encontrada").
+ */
+export async function fetchAtaWithItemsFromDb(numeroAta: string, codigoUasg: string): Promise<{
+  arps: ArpRecord[];
+  itemsByAta: Record<string, ArpItemRecord[]>;
+  syncInfo: SyncMetadata;
+}> {
+  if (!isSupabaseConfigured || !supabase || !numeroAta || !codigoUasg) {
+    return { arps: [], itemsByAta: {}, syncInfo: { isCachedInDb: false } };
+  }
+  const { data, error } = await supabase
+    .from('atas_registro_preco')
+    .select('*, itens_ata(*)')
+    .eq('numero_ata', numeroAta)
+    .eq('codigo_uasg', codigoUasg)
+    .order('id');
+  if (error) throw new Error(`Não foi possível ler a ata ${numeroAta} no banco: ${error.message}`, { cause: error });
+  return mapearAtasComItens(data ?? []);
+}
+
+/** Linhas de atas_registro_preco com itens_ata(*) -> atas e itens das telas. */
+function mapearAtasComItens(data: any[]): {
+  arps: ArpRecord[];
+  itemsByAta: Record<string, ArpItemRecord[]>;
+  syncInfo: SyncMetadata;
+} {
   if (data.length > 0) {
     const itemsByAta: Record<string, ArpItemRecord[]> = {};
     const arps: ArpRecord[] = data.map((d: any) => {

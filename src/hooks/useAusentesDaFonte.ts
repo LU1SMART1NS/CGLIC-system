@@ -28,7 +28,7 @@ export function useAusentesDaFonte() {
     retry: 0,
     onSuccess: () => {
       // Mesmas leituras que mudam quando uma nota ou fatura sai do contrato.
-      for (const key of [AUSENTES_DA_FONTE_QUERY_KEY[0], 'management-dashboard', 'contract-empenhos', 'v_contrato_empenhos_lastro', 'v_empenhos_resumo', 'contrato-empenho-distribuicao', 'contract-events', 'empenho-por-numero', 'contratado-do-item', 'ata-item-saldos', 'financeiro-ciclos-em-aberto', 'financeiro-faturas-em-ciclo', 'ciclo-faturas-disponiveis', 'contract-payment-cycles']) {
+      for (const key of [AUSENTES_DA_FONTE_QUERY_KEY[0], 'management-dashboard', 'contract-empenhos', 'v_contrato_empenhos_lastro', 'v_empenhos_resumo', 'contrato-empenho-distribuicao', 'contract-events', 'empenho-por-numero', 'contratado-do-item', 'ata-item-saldos', 'financeiro-ciclos-em-aberto', 'financeiro-faturas-em-ciclo', 'ciclo-faturas-disponiveis', 'contrato-faturas', 'contract-payment-cycles']) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
     }

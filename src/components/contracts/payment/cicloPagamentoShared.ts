@@ -1,5 +1,6 @@
 import React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { getContractEmpenhosQueryOptions } from '../../../hooks/useContractFinancialSummary';
 import {
   buscarFaturasDoContratoAgora,
   fetchEmpenhosDoContratoParaPagamento,
@@ -32,11 +33,24 @@ export const TIPOS_DOCUMENTO_RECEBIDO = [
 export const errorMessage = (err: unknown, fallback: string) => (err as { message?: string } | null)?.message || fallback;
 
 
+const VALIDADE_EMPENHOS_MS = 5 * 60 * 1000;
+
+/**
+ * Notas do contrato que o Contrato 360 já leu (['contract-empenhos']), se a leitura está no navegador, vale (não foi
+ * invalidada) e tem menos de 5 min (a validade desta consulta). O resumo dos empenhos tem uma linha por empenho, então
+ * são as mesmas notas que contrato_empenhos devolveria. Fora disso (outras telas), a consulta lê contrato_empenhos.
+ */
+function idsJaLidos(client: QueryClient, contractKey: string): string[] | undefined {
+  const estado = client.getQueryState<any[]>(getContractEmpenhosQueryOptions(contractKey).queryKey);
+  if (!estado?.data || estado.isInvalidated || Date.now() - estado.dataUpdatedAt > VALIDADE_EMPENHOS_MS) return undefined;
+  return estado.data.map((r: { empenho_id: unknown }) => String(r.empenho_id));
+}
+
 /** Empenhos do contrato com saldo e natureza de despesa (abertura do ciclo, conferência e envio). */
 export function useEmpenhosDoContrato(contractKey: string | undefined) {
   return useQuery({
     queryKey: ['ciclo-empenhos-contrato', contractKey],
-    queryFn: () => fetchEmpenhosDoContratoParaPagamento(contractKey as string),
+    queryFn: ({ client }) => fetchEmpenhosDoContratoParaPagamento(contractKey as string, { idsDoContrato: idsJaLidos(client, contractKey as string) }),
     enabled: Boolean(contractKey),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false

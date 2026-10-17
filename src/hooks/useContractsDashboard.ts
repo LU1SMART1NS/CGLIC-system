@@ -37,13 +37,12 @@ export function getContractsDashboardQueryOptions(uasg?: string) {
  *
  * `refresh` relê o banco. Quem atualiza com as fontes oficiais é useSincronizacaoContratos.
  */
-export function useContractsDashboard(uasg?: string) {
+export function useContractsDashboard(uasg?: string, { enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient();
   const cleanUasg = (uasg || '').trim();
 
-  const query = useQuery<ContractDashboardRecord[], Error>(
-    getContractsDashboardQueryOptions(cleanUasg)
-  );
+  const opcoes = getContractsDashboardQueryOptions(cleanUasg);
+  const query = useQuery<ContractDashboardRecord[], Error>({ ...opcoes, enabled: opcoes.enabled && enabled });
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['contracts-dashboard', cleanUasg] });
