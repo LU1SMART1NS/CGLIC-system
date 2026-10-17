@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   chaveItemGti,
-  contarUasgsAConfirmar,
+  contarUasgsSemGrupo,
   contarPorGti,
   montarFatiasGti,
   montarFatiasItensGti,
@@ -182,9 +182,9 @@ describe('texto da célula GTI (casos reais de 15/10/2026)', () => {
   });
 });
 
-describe('contarUasgsAConfirmar', () => {
+describe('contarUasgsSemGrupo', () => {
   const uasg = (nome: string, grupo: GrupoConfirmavel | null = null) => ({ nome, nomeNaAta: null, siglaOrgao: null, esferaOrgao: null, grupo });
-  it('conta só as com sugestão e sem grupo confirmado', () => {
-    expect(contarUasgsAConfirmar([uasg('POLICIA MILITAR DO PARANA'), uasg('CORPO DE BOMBEIROS MILITAR DE GOIAS', 'LIGABOM'), uasg('XYZ')])).toBe(1);
+  it('separa as sem grupo em com e sem sugestão; confirmadas ficam fora', () => {
+    expect(contarUasgsSemGrupo([uasg('POLICIA MILITAR DO PARANA'), uasg('CORPO DE BOMBEIROS MILITAR DE GOIAS', 'LIGABOM'), uasg('XYZ')])).toEqual({ aConfirmar: 1, semSugestao: 1 });
   });
 });

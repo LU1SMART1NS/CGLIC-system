@@ -77,11 +77,17 @@ export function situacaoGrupoUasg(grupo: GrupoConfirmavel | null, sugestao: Grup
   return grupo ? 'CONFIRMADAS' : sugestao ? 'A_CONFIRMAR' : 'SEM_SUGESTAO';
 }
 
-/** UASGs com grupo sugerido e ainda sem confirmação (número do menu Ajustes, para o coordenador). */
-export function contarUasgsAConfirmar(
+/** UASGs ainda sem grupo confirmado, separadas em com sugestão (a confirmar) e sem sugestão (número do menu Ajustes). */
+export function contarUasgsSemGrupo(
   uasgs: Array<{ nome: string | null; nomeNaAta: string | null; siglaOrgao: string | null; esferaOrgao: string | null; grupo: GrupoConfirmavel | null }>
-): number {
-  return uasgs.filter((u) => situacaoGrupoUasg(u.grupo, sugerirGrupoGti(u.nome ?? u.nomeNaAta, u.siglaOrgao, u.esferaOrgao)) === 'A_CONFIRMAR').length;
+): { aConfirmar: number; semSugestao: number } {
+  const c = { aConfirmar: 0, semSugestao: 0 };
+  for (const u of uasgs) {
+    const situacao = situacaoGrupoUasg(u.grupo, sugerirGrupoGti(u.nome ?? u.nomeNaAta, u.siglaOrgao, u.esferaOrgao));
+    if (situacao === 'A_CONFIRMAR') c.aConfirmar++;
+    else if (situacao === 'SEM_SUGESTAO') c.semSugestao++;
+  }
+  return c;
 }
 
 // ------------------------------------------------------------------------------
