@@ -28,6 +28,7 @@ import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { AvisoCarregando } from '../../design-system';
+import { ConsumoItensCelula, type ConsumoItem } from './ConsumoItensCelula';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
 import { GtiCelulaAta } from '../gti/GtiVisual';
 import { chaveAtaGti, type FatiasDaAta } from '../../config/gruposGti';
@@ -172,7 +173,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               <CarteiraSortHeader label="Ata" sortKey="numero" {...sortProps} />
               <CarteiraSortHeader label="Vigência" sortKey="vigencia" {...sortProps} />
               <CarteiraSortHeader label="Itens" sortKey="itens" {...sortProps} />
-              <CarteiraSortHeader label="Maior consumo" sortKey="consumo" {...sortProps} />
+              <CarteiraSortHeader label="Consumo dos itens" sortKey="consumo" {...sortProps} />
               <th style={carteiraTh} title="Interesse principal e fatia de cada Grupo de Trabalho Integrado no valor registrado dos participantes (quantidade × valor unitário de cada item)">GTI</th>
               {colAlocacao && <th style={carteiraTh}>Alocação interna</th>}
               {colEmpenho && <th style={carteiraTh}>Empenho</th>}
@@ -211,6 +212,10 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                 const bHit = matchedItems.includes(b) ? 1 : 0;
                 if (aHit !== bHit) return bHit - aHit;
                 return (pctOf(b) ?? -1) - (pctOf(a) ?? -1);
+              });
+              const consumoItens: ConsumoItem[] = card.itens.flatMap((item) => {
+                const pct = pctOf(item);
+                return pct === null ? [] : [{ numero: normalizeItemNumber(item.numeroItem), descricao: item.descricaoItem || '', pct }];
               });
               const visibleItems = orderedItems.slice(0, MAX_ITENS_EXPANDIDOS);
               const hiddenCount = orderedItems.length - visibleItems.length;
@@ -273,8 +278,8 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         </div>
                       ) : null}
                     </td>
-                    <td data-label="Maior consumo" style={carteiraTd}>
-                      <SaldoBar pct={stats?.maxPct ?? null} />
+                    <td data-label="Consumo dos itens" style={carteiraTd}>
+                      <ConsumoItensCelula itens={consumoItens} testId={`arp-consumo-${numeroAta}`} />
                     </td>
                     <td data-label="GTI" style={carteiraTd}>
                       {(() => {
