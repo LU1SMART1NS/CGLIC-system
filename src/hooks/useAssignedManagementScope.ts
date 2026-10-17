@@ -38,16 +38,20 @@ export interface AssignedManagementScope {
  */
 export function useAssignedManagementScope(
   uasg?: string,
-  /** Coordenador e consulta: carteira de um gestor escolhido no filtro do Início (o perfil "gestor" ignora). */
-  opts: { gestorUserId?: string } = {}
+  /**
+   * gestorUserId — coordenador e consulta: carteira de um gestor escolhido no filtro do Início (o perfil "gestor" ignora).
+   * enabled — false segura as leituras (os números do menu esperam a tela encher).
+   */
+  opts: { gestorUserId?: string; enabled?: boolean } = {}
 ): AssignedManagementScope {
   const { user, role } = useAuth();
   const isGestor = role === 'gestor';
   const userId = isGestor ? user?.id : opts.gestorUserId;
 
-  const contractManagersQuery = useAllContractManagers(uasg);
-  const ataManagersQuery = useAllAtaManagers();
-  const linksQuery = useArpItemContractLinks(Boolean(userId));
+  const enabled = opts.enabled ?? true;
+  const contractManagersQuery = useAllContractManagers(uasg, { enabled });
+  const ataManagersQuery = useAllAtaManagers({ enabled });
+  const linksQuery = useArpItemContractLinks(enabled && Boolean(userId));
   const { data: contractManagers, isLoading: loadingContractManagers } = contractManagersQuery;
   const { data: ataManagers, isLoading: loadingAtaManagers } = ataManagersQuery;
   const { data: links, isLoading: loadingLinks } = linksQuery;

@@ -28,9 +28,10 @@ const SEM_ALERTAS: DashboardAttentionItem[] = [];
  * saem sem pendências. Serve às telas que só usam número, fornecedor, gestor e vigência (Financeiro, Vínculos e o
  * contador do menu).
  */
-export function useContractsPortfolio({ pendencias: comPendencias = true }: { pendencias?: boolean } = {}) {
-  const dash200330 = useContractsDashboard(UASGS[0]);
-  const dash200331 = useContractsDashboard(UASGS[1]);
+export function useContractsPortfolio({ pendencias: comPendencias = true, enabled = true }: { pendencias?: boolean; enabled?: boolean } = {}) {
+  // enabled: false segura todas as leituras (os números do menu só leem os contratos depois que a tela enche).
+  const dash200330 = useContractsDashboard(UASGS[0], { enabled });
+  const dash200331 = useContractsDashboard(UASGS[1], { enabled });
 
   const allContracts = useMemo(
     () => [...(dash200330.data || []), ...(dash200331.data || [])],
@@ -57,8 +58,8 @@ export function useContractsPortfolio({ pendencias: comPendencias = true }: { pe
   /** Coordenador: atualiza com as fontes oficiais. Demais perfis: relê o banco. */
   const refresh = sincronizacao.atualizar;
 
-  const scope200330 = useAssignedManagementScope(UASGS[0]);
-  const scope200331 = useAssignedManagementScope(UASGS[1]);
+  const scope200330 = useAssignedManagementScope(UASGS[0], { enabled });
+  const scope200331 = useAssignedManagementScope(UASGS[1], { enabled });
   const isLoadingScope = scope200330.isLoading || scope200331.isLoading;
   const assignedContractKeys = useMemo(() => {
     if (!scope200330.contractKeys && !scope200331.contractKeys) return undefined;
@@ -71,16 +72,16 @@ export function useContractsPortfolio({ pendencias: comPendencias = true }: { pe
     return allContracts.filter((contract) => scopedKeys.has(contract.id));
   }, [allContracts, assignedContractKeys]);
 
-  const managers200330 = useAllContractManagers(UASGS[0]);
-  const managers200331 = useAllContractManagers(UASGS[1]);
+  const managers200330 = useAllContractManagers(UASGS[0], { enabled });
+  const managers200331 = useAllContractManagers(UASGS[1], { enabled });
   // Só consulta depois do escopo do gestor: a chave inclui o escopo, e consultar antes carregava tudo duas vezes.
   const mgmt200330 = useManagementDashboard(
     { uasg: UASGS[0], assignedContractKeys: scope200330.contractKeys, assignedAtaKeys: scope200330.ataKeys },
-    { enabled: comPendencias && !scope200330.isLoading }
+    { enabled: enabled && comPendencias && !scope200330.isLoading }
   );
   const mgmt200331 = useManagementDashboard(
     { uasg: UASGS[1], assignedContractKeys: scope200331.contractKeys, assignedAtaKeys: scope200331.ataKeys },
-    { enabled: comPendencias && !scope200331.isLoading }
+    { enabled: enabled && comPendencias && !scope200331.isLoading }
   );
 
   const gestorByContractKey = useMemo(() => {
@@ -129,7 +130,7 @@ export function useContractsPortfolio({ pendencias: comPendencias = true }: { pe
 
   // Atas de origem de cada contrato: o vínculo é por item, então um contrato pode vir de 0, 1 ou várias atas.
   // Mesma consulta (e cache) do escopo do perfil gestor.
-  const ataLinksQuery = useArpItemContractLinks();
+  const ataLinksQuery = useArpItemContractLinks(enabled);
   const { data: ataLinks } = ataLinksQuery;
   const atasByContractKey = useMemo(() => {
     const map = new Map<string, Set<string>>();

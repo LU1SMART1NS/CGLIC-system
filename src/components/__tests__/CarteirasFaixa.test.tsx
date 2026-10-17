@@ -115,16 +115,16 @@ describe('Carteira de Atas: uma leitura falha, a faixa avisa e o resto fica', ()
     expect(html).not.toContain('alocacoes-falha-notice');
   });
 
-  it('itens que o Compras.gov.br não devolveu (3i): a faixa diz quais atas, em vez de "ata sem itens"', () => {
+  it('ata ainda sem itens no banco (3i, passo 3 6e): a faixa diz quais atas, em vez de "ata sem itens" calada', () => {
     portfolio({
       leituraDosItensNasFontes: {
         rotulo: ROTULO_ITENS_NAS_FONTES,
-        query: { data: undefined, isError: true, error: new Error('a ata 00002/2026 sem resposta: HTTP 429'), refetch: vi.fn() }
+        query: { data: undefined, isError: true, error: new Error('a ata 00002/2026 ainda sem itens no banco'), refetch: vi.fn() }
       }
     });
     const html = render(<ArpSearch onSelectArp={vi.fn()} />);
-    expect(html).toContain('<strong>Itens das atas buscados no Compras.gov.br e no PNCP</strong>');
-    expect(html).toContain('a ata 00002/2026 sem resposta: HTTP 429');
+    expect(html).toContain('<strong>Itens das atas</strong>');
+    expect(html).toContain('a ata 00002/2026 ainda sem itens no banco');
   });
 
   it('as atas não carregaram: "as atas não carregaram", e não uma carteira vazia calada', () => {

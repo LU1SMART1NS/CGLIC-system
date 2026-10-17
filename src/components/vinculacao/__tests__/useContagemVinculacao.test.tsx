@@ -58,6 +58,8 @@ describe('número do menu Vínculos (empenhos)', () => {
     expect(render()).toContain('nulo');
     expect(useEmpenhosParaVincularAosItens).toHaveBeenLastCalledWith(false);
     expect(useEmpenhosForaDoContrato).toHaveBeenLastCalledWith(false);
+    // A carteira de contratos também espera (passo 3 da auditoria das telas).
+    expect(useContratosDoFinanceiro).toHaveBeenLastCalledWith({ enabled: false });
   });
 
   it('consulta e gestor de saldo não têm o número', () => {

@@ -17,7 +17,8 @@ export function useContagemFinanceiro(): { total: number; urgente: boolean } | n
   const telaCarregada = useTelaCarregada();
   const ativo = role === 'admin' || role === 'gestor';
   const { rows, isLoading, leituras } = usePagamentosCarteira({ enabled: ativo && telaCarregada });
-  const { escopo, isLoading: carregandoEscopo, contratosNaoCarregaram } = useContratosDoFinanceiro();
+  // Os contratos (recorte do gestor) também esperam a tela encher: eram a carteira inteira lida ao abrir qualquer tela.
+  const { escopo, isLoading: carregandoEscopo, contratosNaoCarregaram } = useContratosDoFinanceiro({ enabled: ativo && telaCarregada });
   // Uma leitura que falhou sem leitura anterior deixaria o número abaixo do real: o menu fica sem número. O aviso do
   // Tesouro não entra na conta, e os contratos só importam para o recorte do gestor.
   const algumaNaoCarregou =

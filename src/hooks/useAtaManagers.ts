@@ -27,10 +27,11 @@ export function useAtaManager(ataKey: string) {
  * indexado por ata_key. Usado tanto pelo escopo do perfil "gestor"
  * (useAssignedManagementScope) quanto pelo seletor de gestor na tela de Atas.
  */
-export function useAllAtaManagers() {
+export function useAllAtaManagers({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery<Record<string, AtaManager>, Error>({
     queryKey: ['all-ata-managers'] as const,
     queryFn: async () => fetchAllAtaManagers(),
+    enabled,
     staleTime: 5 * 60 * 1000
   });
 }
