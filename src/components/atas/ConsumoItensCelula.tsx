@@ -1,7 +1,8 @@
 import React from 'react';
 import { AnchoredPanel } from '../../design-system/components/AnchoredPanel';
 import { saldoBarColor } from './ataSaldoStats';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { LARGURA_BARRA_CARTEIRA } from '../carteira/carteiraStyles';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 
 export interface ConsumoItem {
   numero: string;
@@ -9,22 +10,18 @@ export interface ConsumoItem {
   pct: number;
 }
 
-/** Quadradinhos que cabem numa linha da coluna; acima disso, os mais consumidos e "+N". */
-export const MAX_QUADRADINHOS = 16;
-
 const fmtPct = (pct: number) => `${pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`;
 const rotuloItem = (numero: string) => `Item ${Number(numero) || numero}`;
 
-const Barra: React.FC<{ pct: number; altura: number }> = ({ pct, altura }) => (
-  <span style={{ display: 'block', height: `${altura}px`, background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
+const Barra: React.FC<{ pct: number; altura: number; largura?: string }> = ({ pct, altura, largura }) => (
+  <span style={{ display: 'block', width: largura, maxWidth: '100%', height: `${altura}px`, background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
     <span style={{ display: 'block', width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%', background: saldoBarColor(pct) }} />
   </span>
 );
 
 /**
- * Coluna de consumo da Carteira de Atas: porcentagem e descrição do item mais consumido e, quando a ata tem
- * mais de um item, um quadradinho por item na cor da situação (numa linha só). Passar o mouse (ou tocar)
- * abre a lista de todos os itens com a porcentagem.
+ * Coluna de consumo da Carteira de Atas: porcentagem e descrição do item mais consumido. Passar o mouse (ou
+ * tocar) abre a lista de todos os itens com a porcentagem.
  */
 export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: string }> = ({ itens, testId }) => {
   const ordenados = React.useMemo(() => [...itens].sort((a, b) => b.pct - a.pct), [itens]);
@@ -40,7 +37,6 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
 
   const topo = ordenados[0];
   const total = ordenados.length;
-  const visiveis = total > MAX_QUADRADINHOS ? MAX_QUADRADINHOS - 1 : total;
   const mouse = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches;
 
   const abrir = () => {
@@ -76,27 +72,17 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
         }}
         onMouseEnter={mouse ? abrir : undefined}
         onMouseLeave={mouse ? fecharDepois : undefined}
-        style={{ display: 'block', width: '100%', minWidth: '140px', maxWidth: '240px', background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+        style={{ display: 'block', width: '100%', minWidth: LARGURA_BARRA_CARTEIRA, maxWidth: '240px', background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
       >
         <span style={{ display: 'block', fontWeight: 800 }}>{fmtPct(topo.pct)}</span>
-        <span style={{ display: 'block', marginTop: '0.2rem' }}><Barra pct={topo.pct} altura={4} /></span>
+        <span style={{ display: 'block', marginTop: '0.2rem' }}><Barra pct={topo.pct} altura={4} largura={LARGURA_BARRA_CARTEIRA} /></span>
         <span
           data-testid={testId ? `${testId}-descricao` : undefined}
           style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
         >
           {total > 1 && <strong style={{ color: '#334155' }}>{rotuloItem(topo.numero)} · </strong>}
-          {toSentenceCaseIfAllCaps(topo.descricao)}
+          {descricaoItemEmFrase(topo.descricao)}
         </span>
-        {total > 1 && (
-          <span aria-hidden="true" style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: '2px', marginTop: '0.35rem', height: '9px' }}>
-            {ordenados.slice(0, visiveis).map((item) => (
-              <span key={item.numero} data-quadradinho style={{ width: '7px', height: '7px', borderRadius: '1.5px', flex: 'none', background: saldoBarColor(item.pct) }} />
-            ))}
-            {total > visiveis && (
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', marginLeft: '3px', whiteSpace: 'nowrap' }}>+{total - visiveis}</span>
-            )}
-          </span>
-        )}
       </button>
       {anchor && (
         <AnchoredPanel anchorRect={anchor} onClose={fechar} ariaLabel="Consumo dos itens da ata" testId={testId ? `${testId}-lista` : undefined} width={380}>
@@ -107,7 +93,7 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
             {ordenados.map((item) => (
               <div key={item.numero} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.15rem 0.5rem', fontSize: '0.8rem' }}>
                 <span title={item.descricao} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  <strong>{rotuloItem(item.numero)}</strong> · {toSentenceCaseIfAllCaps(item.descricao)}
+                  <strong>{rotuloItem(item.numero)}</strong> · {descricaoItemEmFrase(item.descricao)}
                 </span>
                 <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{fmtPct(item.pct)}</span>
                 <span style={{ gridColumn: '1 / 3' }}><Barra pct={item.pct} altura={3} /></span>

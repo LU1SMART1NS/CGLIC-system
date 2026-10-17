@@ -18,6 +18,7 @@ import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { ComprasGovReferencia } from './ItemExecutionSummaryStrip';
 import { ataDeOutroOrgao, chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { useEyebrowDaGerenciadora } from '../../hooks/useCadastroUasgs';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 
 export type ItemTab = 'quantitativos' | 'contratos' | 'adesoes';
 
@@ -180,7 +181,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           {item.niFornecedor && <span style={{ color: '#64748b' }}> · CNPJ {formatCnpj(item.niFornecedor)}</span>}
         </>
       }
-      objeto={item.descricaoItem}
+      objeto={descricaoItemEmFrase(item.descricaoItem)}
       origin={{
         label: 'Ata de origem',
         value: onOpenAta ? (

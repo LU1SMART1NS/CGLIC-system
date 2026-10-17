@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toSentenceCaseIfAllCaps } from '../textCase';
+import { descricaoItemEmFrase, toSentenceCaseIfAllCaps } from '../textCase';
 
 describe('toSentenceCaseIfAllCaps', () => {
   it('converte o objeto do contrato que vem todo em maiúsculas', () => {
@@ -37,5 +37,33 @@ describe('toSentenceCaseIfAllCaps', () => {
     expect(toSentenceCaseIfAllCaps('')).toBe('');
     expect(toSentenceCaseIfAllCaps(undefined)).toBe('');
     expect(toSentenceCaseIfAllCaps(null)).toBe('');
+  });
+});
+
+describe('descricaoItemEmFrase', () => {
+  it('todo em maiúsculas: igual ao toSentenceCaseIfAllCaps', () => {
+    expect(descricaoItemEmFrase('LANTERNA ELÉTRICA, MATERIAL ALUMÍNIO, TIPO TÁTICA')).toBe('Lanterna elétrica, material alumínio, tipo tática');
+  });
+
+  it('quase todo em maiúsculas com alguma minúscula também vira frase', () => {
+    expect(descricaoItemEmFrase('ACESSÓRIO / PEÇA MERGULHO, TIPO COLETE C/ LASTRO, 12 mm')).toBe('Acessório / peça mergulho, tipo colete c/ lastro, 12 mm');
+  });
+
+  it('Cada Palavra Maiúscula vira frase, mantendo siglas e números', () => {
+    expect(descricaoItemEmFrase('Projetil E Componentes Munição')).toBe('Projetil e componentes munição');
+    expect(descricaoItemEmFrase('Equipamento Laboratório Tipo: P/ Análise De DNA, Modelo X200')).toBe(
+      'Equipamento laboratório tipo: p/ análise de DNA, modelo X200'
+    );
+  });
+
+  it('frase normal fica como está', () => {
+    const frase = 'Caminhão, tipo pipa, potência motor 230 CV';
+    expect(descricaoItemEmFrase(frase)).toBe(frase);
+    expect(descricaoItemEmFrase('Aeronaves teleguiadas')).toBe('Aeronaves teleguiadas');
+  });
+
+  it('vazio ou ausente vira vazio', () => {
+    expect(descricaoItemEmFrase('')).toBe('');
+    expect(descricaoItemEmFrase(null)).toBe('');
   });
 });
