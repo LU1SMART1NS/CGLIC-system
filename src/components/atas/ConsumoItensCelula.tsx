@@ -9,9 +9,6 @@ export interface ConsumoItem {
   pct: number;
 }
 
-/** Quadradinhos que cabem numa linha da coluna; acima disso, os mais consumidos e "+N". */
-export const MAX_QUADRADINHOS = 16;
-
 const fmtPct = (pct: number) => `${pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`;
 const rotuloItem = (numero: string) => `Item ${Number(numero) || numero}`;
 
@@ -22,9 +19,8 @@ const Barra: React.FC<{ pct: number; altura: number }> = ({ pct, altura }) => (
 );
 
 /**
- * Coluna de consumo da Carteira de Atas: porcentagem e descrição do item mais consumido e, quando a ata tem
- * mais de um item, um quadradinho por item na cor da situação (numa linha só). Passar o mouse (ou tocar)
- * abre a lista de todos os itens com a porcentagem.
+ * Coluna de consumo da Carteira de Atas: porcentagem e descrição do item mais consumido. Passar o mouse (ou
+ * tocar) abre a lista de todos os itens com a porcentagem.
  */
 export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: string }> = ({ itens, testId }) => {
   const ordenados = React.useMemo(() => [...itens].sort((a, b) => b.pct - a.pct), [itens]);
@@ -40,7 +36,6 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
 
   const topo = ordenados[0];
   const total = ordenados.length;
-  const visiveis = total > MAX_QUADRADINHOS ? MAX_QUADRADINHOS - 1 : total;
   const mouse = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches;
 
   const abrir = () => {
@@ -87,16 +82,6 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
           {total > 1 && <strong style={{ color: '#334155' }}>{rotuloItem(topo.numero)} · </strong>}
           {descricaoItemEmFrase(topo.descricao)}
         </span>
-        {total > 1 && (
-          <span aria-hidden="true" style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: '2px', marginTop: '0.35rem', height: '9px' }}>
-            {ordenados.slice(0, visiveis).map((item) => (
-              <span key={item.numero} data-quadradinho style={{ width: '7px', height: '7px', borderRadius: '1.5px', flex: 'none', background: saldoBarColor(item.pct) }} />
-            ))}
-            {total > visiveis && (
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', marginLeft: '3px', whiteSpace: 'nowrap' }}>+{total - visiveis}</span>
-            )}
-          </span>
-        )}
       </button>
       {anchor && (
         <AnchoredPanel anchorRect={anchor} onClose={fechar} ariaLabel="Consumo dos itens da ata" testId={testId ? `${testId}-lista` : undefined} width={380}>
