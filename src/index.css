@@ -1654,6 +1654,11 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
   text-underline-offset: 3px;
   filter: brightness(0.94);
 }
+/* Na célula GTI o sublinhado vai só no nome do principal (é por ele que o clique filtra), não na segunda fatia. */
+.carteira-cell-filter:hover > .gti-celula,
+.carteira-cell-filter:focus-visible > .gti-celula {
+  text-decoration: none;
+}
 .carteira-cell-filter:hover .gti-nome-principal,
 .carteira-cell-filter:focus-visible .gti-nome-principal {
   text-decoration: underline;

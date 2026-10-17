@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnchoredPanel } from '../../design-system/components/AnchoredPanel';
+import { breakpoints } from '../../design-system/tokens';
 import { ESPACO_ATE_A_BARRA, LARGURA_BARRA_CARTEIRA, LINHA_ACIMA_DA_BARRA } from '../carteira/carteiraStyles';
 import { GRUPO_GTI_INFO, resumirCelulaGti, textoDaFatia, type FatiasDaAta, type GrupoDaFatia } from '../../config/gruposGti';
 
@@ -100,8 +101,12 @@ export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string; det
   }
   const ehGti = destaque.grupo !== 'OUTROS' && destaque.grupo !== 'A_CONFIRMAR';
   const unico = fatias.fatias.filter((f) => f.quantidade > 0).length === 1;
-  // O detalhe abre só com mouse: no toque, o clique da célula é o filtro.
-  const comMouse = detalheAoPassar && typeof window !== 'undefined' && Boolean(window.matchMedia?.('(hover: hover)').matches);
+  // O detalhe abre só com mouse e em tela larga: no toque o clique da célula é o filtro, e em tela estreita o quadro
+  // viraria a folha de baixo, com fundo escuro, só por passar o mouse.
+  const comMouse =
+    detalheAoPassar &&
+    typeof window !== 'undefined' &&
+    Boolean(window.matchMedia?.(`(hover: hover) and (min-width: ${breakpoints.md}px)`).matches);
   const abrir = () => {
     if (ancoraRef.current) setAncora(ancoraRef.current.getBoundingClientRect());
   };
@@ -114,16 +119,17 @@ export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string; det
       data-testid={testId}
       onMouseEnter={comMouse ? abrir : undefined}
       onMouseLeave={comMouse ? fechar : undefined}
-      style={{ display: 'flex', flexDirection: 'column', gap: ESPACO_ATE_A_BARRA, minWidth: '150px' }}
+      className="gti-celula"
+      style={{ display: 'flex', flexDirection: 'column', gap: ESPACO_ATE_A_BARRA, width: LARGURA_BARRA_CARTEIRA }}
     >
-      <div style={{ ...LINHA_ACIMA_DA_BARRA, fontSize: '0.8rem' }}>
+      <div style={{ ...LINHA_ACIMA_DA_BARRA, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: ehGti ? 800 : 600, color: ehGti ? '#0f172a' : '#64748b', whiteSpace: 'nowrap' }}>
           {ehGti && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: GRUPO_GTI_INFO[destaque.grupo].cor }} />}
           {/* Só o nome do principal é sublinhado ao passar o mouse: é por ele que o clique filtra. */}
           <span className="gti-nome-principal">{unico && ehGti ? GRUPO_GTI_INFO[destaque.grupo].rotulo : textoDaFatia(destaque)}</span>
         </span>
-        {unico && ehGti && <span style={{ ...pequeno, display: 'inline-block', whiteSpace: 'nowrap' }}>&nbsp;· único grupo</span>}
-        {secundaria && <span style={{ ...pequeno, display: 'inline-block', whiteSpace: 'nowrap' }}>&nbsp;· {textoDaFatia(secundaria)}</span>}
+        {unico && ehGti && <span style={pequeno}> · único grupo</span>}
+        {secundaria && <span style={pequeno}> · {textoDaFatia(secundaria)}</span>}
       </div>
       {!unico && <GtiFatiaBar fatias={fatias} largura={LARGURA_BARRA_CARTEIRA} altura={4} />}
       {ancora && (
