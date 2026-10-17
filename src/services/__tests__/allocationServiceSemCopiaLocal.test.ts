@@ -82,6 +82,14 @@ describe('allocationService com o banco configurado: sem a cópia do navegador',
     expect(await fetchEmpenhoLinksWithState(itemKey)).toEqual({ links: { '2026NE000002': 'a1' }, version: 4 });
   });
 
+  it('ler do banco não grava mais cópia no navegador', async () => {
+    localStorage.clear();
+    await fetchAllocationsWithState(itemKey);
+    await fetchEmpenhoLinksWithState(itemKey);
+    await fetchAllAllocationsGlobal();
+    expect(localStorage.length).toBe(0);
+  });
+
   it('falha ao ler as alocações vira erro, mesmo com a cópia no navegador', async () => {
     banco.erros.arp_allocations = { message: 'tempo esgotado' };
     await expect(fetchAllocationsWithState(itemKey)).rejects.toThrow(/Não foi possível ler as alocações do item: tempo esgotado/);

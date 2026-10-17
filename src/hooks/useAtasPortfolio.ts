@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQueries, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { fetchArpItems } from '../services/api';
-import { fetchAtasWithAllocationsSet, fetchAtasWithEmpenhosSet } from '../services/dbCacheService';
 import { RECURSO_ATAS } from '../services/syncService';
 import { useAtualizacaoNoServidor } from './useAtualizacaoNoServidor';
 import { useAuth } from '../context/AuthContext';
@@ -16,16 +15,11 @@ import { useAssignedManagementScope } from './useAssignedManagementScope';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 import { carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
 
-const EMPENHOS_SET_KEY = ['atas-with-empenhos-set'] as const;
-const ALLOCATIONS_SET_KEY = ['atas-with-allocations-set'] as const;
-
 /** Relê do banco tudo o que a sincronização das atas pode ter mudado (inclusive o cache da Ata 360). */
 export async function invalidarDadosDeAtas(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['ata-detail-source'] }),
     queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] }),
-    queryClient.invalidateQueries({ queryKey: EMPENHOS_SET_KEY }),
-    queryClient.invalidateQueries({ queryKey: ALLOCATIONS_SET_KEY }),
     queryClient.invalidateQueries({ queryKey: ['management-dashboard'] }),
     queryClient.invalidateQueries({ queryKey: chaveStatusSincronizacao(RECURSO_ATAS) })
   ]);
@@ -50,7 +44,7 @@ export function getArpPrazo(arp: ArpRecord) {
 
 /**
  * Carteira de Atas das UASGs da CGLIC, no escopo do usuário: atas e itens (mesmo cache da Ata 360),
- * gestor e consumo de saldo por ata, atas com empenho/alocação e a sincronização com as fontes oficiais.
+ * gestor e consumo de saldo por ata e a sincronização com as fontes oficiais.
  * Fonte única para a Carteira de Atas e para quem precisar dos mesmos números.
  */
 export function useAtasPortfolio() {
@@ -122,13 +116,6 @@ export function useAtasPortfolio() {
       if (!itemsByAta[ataKey] && !itemsLoadingByAta[ataKey]) loadItemsForArp(arp);
     });
   }, [itemsByAta, itemsLoadingByAta, loadItemsForArp]);
-
-  // Atas com empenho / com alocação interna (filtros da carteira).
-  const empenhosQuery = useQuery({ queryKey: EMPENHOS_SET_KEY, queryFn: fetchAtasWithEmpenhosSet, staleTime: 5 * 60 * 1000 });
-  const allocationsQuery = useQuery({ queryKey: ALLOCATIONS_SET_KEY, queryFn: fetchAtasWithAllocationsSet, staleTime: 5 * 60 * 1000 });
-  const emptySet = useMemo(() => new Set<string>(), []);
-  const empenhosDbSet = empenhosQuery.data ?? emptySet;
-  const allocationsDbSet = allocationsQuery.data ?? emptySet;
 
   // Gestor por ata (mesma fonte do detalhe da Ata e do Início), indexado pela chave de gestão (chaveGestaoDaArp).
   const { data: ataManagers } = useAllAtaManagers();
@@ -208,8 +195,6 @@ export function useAtasPortfolio() {
     itemsLoadingByAta,
     loadItemsForArp,
     loadItemsForArps,
-    empenhosDbSet,
-    allocationsDbSet,
     gestorByAta,
     saldoStatsByAta,
     syncInfo,
