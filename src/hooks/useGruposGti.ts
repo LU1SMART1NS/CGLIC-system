@@ -65,8 +65,8 @@ export function useFatiasItensGti(): Map<string, FatiasDaAta> {
   return useFatiasItensGtiLeitura().fatias;
 }
 
-export function useUasgsParticipantesGti() {
-  return useQuery({ queryKey: PARTICIPANTES_KEY, queryFn: fetchUasgsParticipantesGti, staleTime: 60 * 1000 });
+export function useUasgsParticipantesGti({ enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery({ queryKey: PARTICIPANTES_KEY, queryFn: fetchUasgsParticipantesGti, staleTime: 60 * 1000, enabled });
 }
 
 /** Rótulo dos grupos das UASGs na faixa "não carregou" (sem eles, todo órgão aparece "a confirmar"). */

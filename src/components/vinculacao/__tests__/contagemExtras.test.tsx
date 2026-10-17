@@ -6,12 +6,14 @@ import { contarItensAAlocar, definirContagemExtra, useContagensExtras, zerarCont
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'admin' })) }));
 vi.mock('../useContagemVinculacao', () => ({ useContagemVinculacao: vi.fn(() => ({ aosItens: 3, aoContrato: 2 })) }));
 vi.mock('../../financeiro/useContagemFinanceiro', () => ({ useContagemFinanceiro: vi.fn(() => null) }));
+vi.mock('../../admin/useContagemGruposUasgs', () => ({ useContagemGruposUasgs: vi.fn(() => null) }));
 // O espião do cache e os cálculos pesados não rodam no render estático: o que interessa aqui é o número no ícone.
 vi.mock('../ContagensDaCarteira', () => ({ ContagensDaCarteira: () => null }));
 
 import { useAuth } from '../../../context/AuthContext';
 import { useContagemVinculacao } from '../useContagemVinculacao';
 import { useContagemFinanceiro } from '../../financeiro/useContagemFinanceiro';
+import { useContagemGruposUasgs } from '../../admin/useContagemGruposUasgs';
 import { Sidebar } from '../../layout/Sidebar';
 
 const linha = (o: any) => ({ quantitativoSenasp: 100, faixa: 'REGULAR', nivelAlocacao: 'SEM', ...o });
@@ -88,6 +90,14 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
     vi.mocked(useContagemVinculacao).mockReturnValue(null);
     vi.mocked(useContagemFinanceiro).mockReturnValue(null);
+    vi.mocked(useContagemGruposUasgs).mockReturnValue(null);
+  });
+
+  it('Ajustes (coordenador): UASGs a confirmar, e o clique abre Grupos das UASGs em "A confirmar"', () => {
+    vi.mocked(useContagemGruposUasgs).mockReturnValue(12);
+    const html = menu();
+    expect(html).toMatch(/data-testid="rail-count-configuracoes"[^>]*>12</);
+    expect(html).toContain('href="/admin/grupos-uasgs?situacao=A_CONFIRMAR"');
   });
 
   it('Financeiro: "Precisa de ação", vermelho quando urgente, e o clique abre Pagamentos', () => {

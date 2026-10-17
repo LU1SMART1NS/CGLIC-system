@@ -6,6 +6,7 @@ import { useContagemVinculacao } from '../vinculacao/useContagemVinculacao';
 import { useContagensExtras } from '../vinculacao/contagemExtras';
 import { ContagensDaCarteira } from '../vinculacao/ContagensDaCarteira';
 import { useContagemFinanceiro } from '../financeiro/useContagemFinanceiro';
+import { useContagemGruposUasgs } from '../admin/useContagemGruposUasgs';
 import { pendenciasDoMenu, type PendenciaDaArea } from './pendenciasDoMenu';
 
 interface SidebarProps {
@@ -99,7 +100,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
   const empenhos = useContagemVinculacao();
   const financeiro = useContagemFinanceiro();
   const extras = useContagensExtras();
-  const pendencias = useMemo(() => pendenciasDoMenu({ empenhos, financeiro, extras }), [empenhos, financeiro, extras]);
+  const gruposUasgs = useContagemGruposUasgs();
+  const pendencias = useMemo(() => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs }), [empenhos, financeiro, extras, gruposUasgs]);
 
   // Registra antes de montar os links, para o da área atual já apontar para a página aberta (idempotente).
   rememberAreaVisit(areas, pathname, search);
@@ -119,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
       ))}
       <ContagensDaCarteira />
       {mode === 'rail' && <div className="app-rail-spacer" />}
-      {bottom.map((area) => <AreaItem key={area.id} area={area} pathname={pathname} />)}
+      {bottom.map((area) => <AreaItem key={area.id} area={area} pathname={pathname} pendencia={pendencias[area.id]} />)}
     </nav>
   );
 };
