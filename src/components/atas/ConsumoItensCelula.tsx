@@ -96,7 +96,7 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
                   <strong>{rotuloItem(item.numero)}</strong> · {descricaoItemEmFrase(item.descricao)}
                 </span>
                 <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{fmtPct(item.pct)}</span>
-                <span style={{ gridColumn: '1 / 3' }}><Barra pct={item.pct} altura={3} /></span>
+                <span style={{ gridColumn: '1 / 3' }}><Barra pct={item.pct} altura={4} /></span>
               </div>
             ))}
           </div>
