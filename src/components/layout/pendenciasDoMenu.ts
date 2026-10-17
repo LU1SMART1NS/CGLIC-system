@@ -12,13 +12,15 @@ export interface FontesDoMenu {
   empenhos: { aosItens: number; aoContrato: number } | null;
   financeiro: { total: number; urgente: boolean } | null;
   extras: ContagensExtras;
+  /** UASGs com grupo (GTI) a confirmar; só o coordenador recebe número. */
+  gruposUasgs?: number | null;
 }
 
 /**
  * Regras dos números do menu (só pendências que o perfil resolve; quem calcula cada parte já filtra pelo perfil). Com
  * número, a área abre direto na página e no segmento da pendência; sem número, o menu volta à última página usada.
  */
-export function pendenciasDoMenu({ empenhos, financeiro, extras }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
+export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
   const r: Record<string, PendenciaDaArea | undefined> = {};
 
   // Início (coordenador): as filas da Central de Distribuição.
@@ -43,6 +45,9 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras }: FontesDoMenu)
 
   // Financeiro: "Precisa de ação" de Pagamentos (segmento padrão da página); vermelho com erro no SIAFI ou prazo vencido.
   if (financeiro && financeiro.total > 0) r['execucao-financeira'] = { contagem: financeiro.total, vermelho: financeiro.urgente, destino: '/pagamentos' };
+
+  // Ajustes (coordenador): UASGs com grupo sugerido a confirmar, na aba "A confirmar" de Grupos das UASGs.
+  if ((gruposUasgs ?? 0) > 0) r.configuracoes = { contagem: gruposUasgs!, destino: '/admin/grupos-uasgs?situacao=A_CONFIRMAR' };
 
   return r;
 }
