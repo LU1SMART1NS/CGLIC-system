@@ -3,7 +3,15 @@ import type { ContractDashboardRecord } from '../../types';
 
 // Supabase simulado: tabela contratos_oficiais em memória (com paginação) e RPCs observáveis.
 const banco = vi.hoisted(() => ({
-  linhas: [] as Array<{ uasg: string; contract_key: string; registro: Record<string, unknown> }>,
+  linhas: [] as Array<{
+    uasg: string;
+    contract_key: string;
+    registro: Record<string, unknown>;
+    /** Coluna gerada da migration 150: o registro com o `raw` resumido. */
+    registro_tela: Record<string, unknown>;
+  }>,
+  /** Colunas pedidas em cada select. */
+  selects: [] as string[],
   erroLeitura: null as null | { message: string },
   /** Só esta página (1, 2, ...) falha; as outras respondem. */
   erroNaPagina: null as null | number,
@@ -17,8 +25,13 @@ vi.mock('../supabaseClient', () => {
   banco.rpc = vi.fn<(...args: any[]) => Promise<any>>();
   const from = (tabela: string) => {
     const filtros: Record<string, string> = {};
+    let colunas = '';
     const consulta: any = {
-      select: () => consulta,
+      select: (cols: string) => {
+        colunas = cols;
+        banco.selects.push(cols);
+        return consulta;
+      },
       eq: (coluna: string, valor: string) => {
         filtros[coluna] = valor;
         return consulta;
@@ -35,7 +48,11 @@ vi.mock('../supabaseClient', () => {
         const todas = banco.linhas
           .filter((l) => tabela === 'contratos_oficiais' && l.uasg === filtros.uasg)
           .sort((a, b) => a.contract_key.localeCompare(b.contract_key));
-        return { data: todas.slice(de, ate + 1).map((l) => ({ registro: l.registro })), error: null };
+        if (colunas !== 'registro' && colunas !== 'registro:registro_tela') {
+          return { data: null, error: { message: `colunas inesperadas: ${colunas}` } };
+        }
+        const pagina = todas.slice(de, ate + 1);
+        return { data: pagina.map((l) => ({ registro: colunas === 'registro' ? l.registro : l.registro_tela })), error: null };
       }
     };
     return consulta;
@@ -77,10 +94,13 @@ function contrato(n: number, extra: Partial<ContractDashboardRecord> = {}): Cont
   };
 }
 
+const RAW_INTEIRO = { categoria: 'Serviços', prorrogavel: 'Sim', links: { historico: 'http://x' }, contratante: { orgao: { codigo: '30108' } } };
+const RAW_RESUMIDO = { categoria: 'Serviços', prorrogavel: 'Sim', _resumido: true };
+
 function gravarNoBanco(qtd: number) {
   banco.linhas = Array.from({ length: qtd }, (_, i) => {
-    const { statusVigencia: _s, ...registro } = contrato(i + 1);
-    return { uasg: UASG, contract_key: registro.id, registro };
+    const { statusVigencia: _s, ...registro } = contrato(i + 1, { raw: RAW_INTEIRO });
+    return { uasg: UASG, contract_key: registro.id, registro, registro_tela: { ...registro, raw: RAW_RESUMIDO } };
   });
 }
 
@@ -107,6 +127,7 @@ beforeEach(() => {
   banco.paginasLidas = 0;
   banco.faixas = [];
   banco.ordens = [];
+  banco.selects = [];
 });
 
 describe('leitura dos contratos pelo banco', () => {
@@ -188,6 +209,22 @@ describe('as telas só leem o banco (a sincronização com as fontes oficiais é
     naoConsultouAsFontes();
   });
 
+  it('as telas leem o registro leve (raw resumido, migration 150) em todas as páginas', async () => {
+    gravarNoBanco(600);
+    const lista = await fetchContratosParaTela(UASG);
+    expect(banco.selects).toEqual(['registro:registro_tela', 'registro:registro_tela', 'registro:registro_tela']);
+    expect(lista).toHaveLength(600);
+    expect(lista[0].raw).toEqual(RAW_RESUMIDO);
+    expect(lista[0].statusVigencia).toBe('Vigente');
+  });
+
+  it('a leitura do servidor (base da sincronização) continua com o registro completo', async () => {
+    gravarNoBanco(3);
+    const lista = await fetchContratosOficiaisDoBanco(UASG);
+    expect(banco.selects).toEqual(['registro']);
+    expect(lista[0].raw).toEqual(RAW_INTEIRO);
+  });
+
   it('banco ainda sem a carteira (UASG nunca sincronizada): lista vazia, sem as fontes oficiais', async () => {
     expect(await fetchContratosParaTela(UASG)).toEqual([]);
     naoConsultouAsFontes();
@@ -220,6 +257,8 @@ describe('sincronização com as fontes oficiais', () => {
     expect(r).toEqual({ status: 'SUCESSO', total: 250, fontesComFalha: [] });
     const base = vi.mocked(contractService.buscarContratosNasFontes).mock.calls[0][1] ?? [];
     expect(base.map((c) => c.id)).toEqual([contrato(2).id, contrato(1).id]);
+    // A base é o registro completo: o raw resumido das telas nunca vira base da gravação.
+    expect(base.map((c) => c.raw)).toEqual([RAW_INTEIRO, RAW_INTEIRO]);
     const lotes = chamadas('gravar_contratos_oficiais');
     expect(lotes.map((l) => l.p_registros.length)).toEqual([100, 100, 50]);
     expect(lotes[0].p_registros[0]).not.toHaveProperty('statusVigencia');
