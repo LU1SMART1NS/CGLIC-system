@@ -41,37 +41,8 @@ export async function fetchAllAllocationsGlobal(): Promise<GlobalAllocationRecor
     }));
   }
 
-  // Sem banco configurado (desenvolvimento e testes sem Supabase): a cópia do navegador é a única fonte.
-  const records: GlobalAllocationRecord[] = [];
-  if (typeof localStorage !== 'undefined') {
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('saldoarp-allocations-')) {
-          const itemKey = key.replace('saldoarp-allocations-', '');
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            const list = JSON.parse(raw);
-            if (Array.isArray(list)) {
-              list.forEach((a: any) => {
-                records.push({
-                  id: a.id,
-                  itemKey,
-                  unitName: a.unitName,
-                  allocatedQty: Number(a.allocatedQty),
-                  empenhadaQty: Number(a.empenhadaQty) || 0
-                });
-              });
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Erro ao ler alocações do localStorage', e);
-    }
-  }
-
-  return records;
+  // Sem banco configurado (só nos testes): não há de onde ler.
+  return [];
 }
 
 export interface ItemAllocationsState {
@@ -111,32 +82,10 @@ export async function fetchAllocationsWithState(itemKey: string): Promise<ItemAl
       empenhadaQty: Number(d.empenhada_qty) || 0
     }));
 
-    // Cópia no navegador, só de leitura feita no banco: o relatório em Excel ainda lê as alocações dela.
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(`saldoarp-allocations-${canonicalKey}`, JSON.stringify(mapped));
-        if (itemKey !== canonicalKey) {
-          localStorage.setItem(`saldoarp-allocations-${itemKey}`, JSON.stringify(mapped));
-        }
-      } catch {}
-    }
-
     return { allocations: mapped, version };
   }
 
-  // Sem banco configurado (desenvolvimento e testes sem Supabase): a cópia do navegador é a única fonte.
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const key = `saldoarp-allocations-${canonicalKey}`;
-      const stored = localStorage.getItem(key) || localStorage.getItem(`saldoarp-allocations-${itemKey}`);
-      if (stored) {
-        return { allocations: JSON.parse(stored), version: 1 };
-      }
-    } catch (e) {
-      console.error('Erro no fallback do localStorage', e);
-    }
-  }
-
+  // Sem banco configurado (só nos testes): não há de onde ler.
   return { allocations: [], version: 1 };
 }
 
@@ -146,57 +95,28 @@ export async function fetchAllocations(itemKey: string): Promise<InternalAllocat
 }
 
 /**
- * Persiste alocações departamentais via RPC transacional canônica save_allocations_atomic
+ * Persiste alocações departamentais via RPC transacional canônica save_allocations_atomic. Sem banco configurado, a
+ * RPC recusa com erro (não há mais cópia no navegador para gravar).
  */
 export async function saveAllocations(
   itemKey: string,
   allocations: InternalAllocation[],
   expectedVersion?: number | null
-): Promise<RpcAllocationResult | void> {
-  const canonicalKey = getCanonicalKey(itemKey);
-
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const result = await executeSaveAllocationsRpc(
-        canonicalKey,
-        allocations.map(a => ({
-          id: a.id,
-          unit_name: a.unitName,
-          allocated_qty: a.allocatedQty,
-          empenhada_qty: a.empenhadaQty
-        })),
-        expectedVersion
-      );
-
-      // Atualiza cache local após confirmação do servidor
-      if (typeof localStorage !== 'undefined') {
-        try {
-          localStorage.setItem(`saldoarp-allocations-${canonicalKey}`, JSON.stringify(allocations));
-          if (itemKey !== canonicalKey) {
-            localStorage.setItem(`saldoarp-allocations-${itemKey}`, JSON.stringify(allocations));
-          }
-        } catch (e) {
-          console.error('Erro ao salvar no localStorage', e);
-        }
-      }
-
-      return result;
-    } catch (e) {
-      console.warn('Erro ao persistir alocações via RPC no Supabase', e);
-      throw e;
-    }
-  } else {
-    // Fallback offline puro
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(`saldoarp-allocations-${canonicalKey}`, JSON.stringify(allocations));
-        if (itemKey !== canonicalKey) {
-          localStorage.setItem(`saldoarp-allocations-${itemKey}`, JSON.stringify(allocations));
-        }
-      } catch (e) {
-        console.error('Erro ao salvar no localStorage', e);
-      }
-    }
+): Promise<RpcAllocationResult> {
+  try {
+    return await executeSaveAllocationsRpc(
+      getCanonicalKey(itemKey),
+      allocations.map(a => ({
+        id: a.id,
+        unit_name: a.unitName,
+        allocated_qty: a.allocatedQty,
+        empenhada_qty: a.empenhadaQty
+      })),
+      expectedVersion
+    );
+  } catch (e) {
+    console.warn('Erro ao persistir alocações via RPC no Supabase', e);
+    throw e;
   }
 }
 
@@ -230,31 +150,10 @@ export async function fetchEmpenhoLinksWithState(itemKey: string): Promise<ItemE
       map[d.empenho_numero] = d.allocation_id;
     });
 
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(`saldoarp-empenho-links-${canonicalKey}`, JSON.stringify(map));
-        if (itemKey !== canonicalKey) {
-          localStorage.setItem(`saldoarp-empenho-links-${itemKey}`, JSON.stringify(map));
-        }
-      } catch {}
-    }
-
     return { links: map, version };
   }
 
-  // Sem banco configurado (desenvolvimento e testes sem Supabase): a cópia do navegador é a única fonte.
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const key = `saldoarp-empenho-links-${canonicalKey}`;
-      const stored = localStorage.getItem(key) || localStorage.getItem(`saldoarp-empenho-links-${itemKey}`);
-      if (stored) {
-        return { links: JSON.parse(stored), version: 1 };
-      }
-    } catch (e) {
-      console.error('Erro no fallback do localStorage (empenho links)', e);
-    }
-  }
-
+  // Sem banco configurado (só nos testes): não há de onde ler.
   return { links: {}, version: 1 };
 }
 
@@ -263,45 +162,16 @@ export async function fetchEmpenhoLinks(itemKey: string): Promise<Record<string,
   return state.links;
 }
 
+/** Persiste os vínculos nota → unidade via RPC save_empenho_links_atomic. Sem banco configurado, a RPC recusa com erro. */
 export async function saveEmpenhoLinks(
   itemKey: string,
   links: Record<string, string>,
   expectedVersion: number
-): Promise<RpcEmpenhoLinkResult | void> {
-  const canonicalKey = getCanonicalKey(itemKey);
-
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const result = await executeSaveEmpenhoLinksRpc(canonicalKey, links, expectedVersion);
-
-      // Atualiza cache local após confirmação do servidor
-      if (typeof localStorage !== 'undefined') {
-        try {
-          localStorage.setItem(`saldoarp-empenho-links-${canonicalKey}`, JSON.stringify(links));
-          if (itemKey !== canonicalKey) {
-            localStorage.setItem(`saldoarp-empenho-links-${itemKey}`, JSON.stringify(links));
-          }
-        } catch (e) {
-          console.error('Erro ao salvar vínculos no localStorage', e);
-        }
-      }
-
-      return result;
-    } catch (e) {
-      console.warn('Erro ao persistir vínculos via RPC no Supabase', e);
-      throw e;
-    }
-  } else {
-    // Fallback offline puro
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(`saldoarp-empenho-links-${canonicalKey}`, JSON.stringify(links));
-        if (itemKey !== canonicalKey) {
-          localStorage.setItem(`saldoarp-empenho-links-${itemKey}`, JSON.stringify(links));
-        }
-      } catch (e) {
-        console.error('Erro ao salvar vínculos no localStorage', e);
-      }
-    }
+): Promise<RpcEmpenhoLinkResult> {
+  try {
+    return await executeSaveEmpenhoLinksRpc(getCanonicalKey(itemKey), links, expectedVersion);
+  } catch (e) {
+    console.warn('Erro ao persistir vínculos via RPC no Supabase', e);
+    throw e;
   }
 }

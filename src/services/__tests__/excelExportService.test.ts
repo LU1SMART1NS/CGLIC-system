@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const { fetchSaldos } = vi.hoisted(() => ({ fetchSaldos: vi.fn(async (): Promise<any[]> => []) }));
+const { fetchSaldos, fetchAlocacoes } = vi.hoisted(() => ({
+  fetchSaldos: vi.fn(async (): Promise<any[]> => []),
+  fetchAlocacoes: vi.fn(async (): Promise<any[]> => [])
+}));
 vi.mock('../dashboardService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../dashboardService')>()),
   fetchArpItemSaldosFromDb: fetchSaldos
 }));
+vi.mock('../allocationService', () => ({ fetchAllAllocationsGlobal: fetchAlocacoes }));
 
 // Polyfill de localStorage para ambiente Node no vitest
 const createLocalStorageMock = () => {
@@ -137,6 +141,8 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
 
   beforeEach(() => {
     localStorage.clear();
+    fetchAlocacoes.mockReset();
+    fetchAlocacoes.mockResolvedValue([]);
   });
 
   it('1. Deve conter catálogo universal de colunas válido e indexado', () => {
@@ -244,6 +250,41 @@ describe('excelExportService - Módulo de Relatórios Excel Parametrizáveis', (
     expect(rows[0].numeroItem).toBe('Consolidado');
     expect(rows[0].fornecedorRazaoSocial).toBe('DEFENSE MOBILITY LTDA');
     expect(rows[0].fornecedorCnpj).toBe('00.394.494/0001-36');
+  });
+
+  it('5e. Alocações por unidade vêm do banco, pela chave canônica do item, e não da cópia do navegador', async () => {
+    fetchAlocacoes.mockResolvedValueOnce([
+      { id: 'a1', itemKey: '00001/2026-200331-00001', unitName: 'DPRF', allocatedQty: 60, empenhadaQty: 20 },
+      { id: 'a2', itemKey: '00001/2026-200331-00001', unitName: 'DPF', allocatedQty: 40, empenhadaQty: 0 },
+      { id: 'a3', itemKey: '00099/2026-200331-00001', unitName: 'PRF', allocatedQty: 5, empenhadaQty: 0 }
+    ]);
+    // Cópia antiga no navegador: não deve aparecer na planilha.
+    localStorage.setItem('saldoarp-allocations-00001/2026-200331-1', JSON.stringify([{ id: 'velha', unitName: 'VELHA', allocatedQty: 99, empenhadaQty: 0 }]));
+    const payload: ReportDataPayload = { atas: [mockAta], itemsByAta: { '00001/2026-200331': mockItems } };
+
+    const rows = await buildFlattenedReportData(payload, 'BY_ALLOCATION');
+
+    expect(fetchAlocacoes).toHaveBeenCalledTimes(1);
+    const item1 = rows.filter(r => r.numeroItem === '1');
+    expect(item1.map(r => [r.unidadeNome, r.quantidadeAlocada, r.quantidadeEmpenhadaUnidade, r.saldoUnidade])).toEqual([
+      ['DPRF', 60, 20, 40],
+      ['DPF', 40, 0, 40]
+    ]);
+    const item2 = rows.filter(r => r.numeroItem === '2');
+    expect(item2.map(r => r.unidadeNome)).toEqual(['Sem Alocação Definida']);
+    expect(rows.some(r => r.unidadeNome === 'VELHA' || r.unidadeNome === 'PRF')).toBe(false);
+  });
+
+  it('5f. Falha ao ler as alocações do banco faz o relatório não sair; sem alocação na planilha, nem consulta', async () => {
+    fetchAlocacoes.mockRejectedValueOnce(new Error('tempo esgotado'));
+    const payload: ReportDataPayload = { atas: [mockAta], itemsByAta: { '00001/2026-200331': mockItems } };
+
+    await expect(buildFlattenedReportData(payload, 'BY_ALLOCATION')).rejects.toThrow('tempo esgotado');
+
+    fetchAlocacoes.mockClear();
+    await buildFlattenedReportData(payload, 'BY_ITEM');
+    await buildFlattenedReportData(payload, 'BY_ATA');
+    expect(fetchAlocacoes).not.toHaveBeenCalled();
   });
 
   it('5d. Colunas de item, saldo e contrato contam como "só por item"; ata, links, fornecedor e descrição não', () => {
