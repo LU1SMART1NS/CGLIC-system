@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
 import { getAtaSourceQueryOptions } from '../../hooks/useAta';
 import { getContractsDashboardQueryOptions } from '../../hooks/useContractsDashboard';
-import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
+import { ROTULO_SALDO_ITENS, useAtasPortfolio } from '../../hooks/useAtasPortfolio';
 import { useCarteiraItens } from '../../hooks/useCarteiraItens';
 import { usePendenciasVinculoAta } from '../atas/distribuicao/usePendenciasVinculoAta';
 import { useDistribuicaoDaCarteira } from '../atas/distribuicao/useDistribuicaoDaCarteira';
@@ -45,10 +45,12 @@ const CalculoDaCarteira: React.FC<{ contaDistribuicao: boolean }> = ({ contaDist
 
 /** Calcula os itens a alocar (os mesmos da página Alocação) e entrega o número ao menu. */
 const CalculoItensAAlocar: React.FC = () => {
-  const { scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta } = useAtasPortfolio();
-  const { rows, isLoading: carregando, alocacoesComErro } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
-  // Sem as alocações, o menu fica sem número em vez de contar todos os itens como a alocar.
-  const pronto = !isLoading && !scopeLoading && !carregando && !alocacoesComErro;
+  const { scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, atasNaoCarregaram } = useAtasPortfolio();
+  const { rows, isLoading: carregando, alocacoesComErro, leituras } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  // Sem as alocações, o menu fica sem número em vez de contar todos os itens como a alocar; sem o saldo (quantitativo
+  // SENASP) ou as atas, em vez de contar zero.
+  const saldoNaoCarregou = (leituras ?? []).some((l) => l.rotulo === ROTULO_SALDO_ITENS && naoCarregou(l.query));
+  const pronto = !isLoading && !scopeLoading && !carregando && !alocacoesComErro && !saldoNaoCarregou && !atasNaoCarregaram;
   const total = React.useMemo(() => (pronto ? contarItensAAlocar(rows) : null), [pronto, rows]);
   React.useEffect(() => {
     definirContagemExtra('itensAAlocar', total);

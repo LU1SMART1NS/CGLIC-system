@@ -15,16 +15,30 @@ const GRUPOS_KEY = 'gti-grupos-uasgs';
 const VAZIO_FATIAS = new Map<string, FatiasDaAta>();
 const VAZIO_GRUPOS = new Map<string, GrupoConfirmavel>();
 
+/** Rótulos das fatias de GTI na faixa "não carregou" (sem elas a coluna e o filtro GTI somem calados). */
+export const ROTULO_GTI_ATAS = 'participação dos GTIs nas atas';
+export const ROTULO_GTI_ITENS = 'participação dos GTIs nos itens';
+
+/** Fatia de cada GTI por ata (chave "{numeroAta}-{uasg}"), com a consulta para a faixa "não carregou". */
+export function useFatiasGtiLeitura() {
+  const consulta = useQuery({ queryKey: FATIAS_KEY, queryFn: fetchFatiasGti, staleTime: 10 * 60 * 1000 });
+  return { fatias: consulta.data ?? VAZIO_FATIAS, consulta };
+}
+
+/** Fatia de cada GTI por item (chave "{numeroAta}-{uasg}-{00001}"), com a consulta para a faixa "não carregou". */
+export function useFatiasItensGtiLeitura() {
+  const consulta = useQuery({ queryKey: FATIAS_ITENS_KEY, queryFn: fetchFatiasItensGti, staleTime: 10 * 60 * 1000 });
+  return { fatias: consulta.data ?? VAZIO_FATIAS, consulta };
+}
+
 /** Fatia de cada GTI por ata (chave "{numeroAta}-{uasg}"); vazio enquanto carrega ou sem a migration 139. */
 export function useFatiasGti(): Map<string, FatiasDaAta> {
-  const query = useQuery({ queryKey: FATIAS_KEY, queryFn: fetchFatiasGti, staleTime: 10 * 60 * 1000 });
-  return query.data ?? VAZIO_FATIAS;
+  return useFatiasGtiLeitura().fatias;
 }
 
 /** Fatia de cada GTI por item (chave "{numeroAta}-{uasg}-{00001}"); vazio enquanto carrega ou sem a migration 139. */
 export function useFatiasItensGti(): Map<string, FatiasDaAta> {
-  const query = useQuery({ queryKey: FATIAS_ITENS_KEY, queryFn: fetchFatiasItensGti, staleTime: 10 * 60 * 1000 });
-  return query.data ?? VAZIO_FATIAS;
+  return useFatiasItensGtiLeitura().fatias;
 }
 
 export function useUasgsParticipantesGti() {

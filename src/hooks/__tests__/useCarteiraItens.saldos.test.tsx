@@ -31,9 +31,9 @@ vi.mock('../useAta', async (importOriginal) => ({
 import { useCarteiraItens } from '../useCarteiraItens';
 import { getCarteiraSaldosQueryOptions } from '../useAta';
 import { COLUNAS_SALDO_CARTEIRA } from '../../services/dashboardService';
-import { SaldoItensFalhaNotice } from '../../components/carteira/SaldoItensFalhaNotice';
 import { AlocacoesFalhaNotice } from '../../components/carteira/AlocacoesFalhaNotice';
-import { CARTEIRA_ALOCACOES_KEY } from '../useCarteiraItens';
+import { CARTEIRA_ALOCACOES_KEY, ROTULOS_CARTEIRA_ITENS } from '../useCarteiraItens';
+import { falhasDasLeituras } from '../../components/fonte/useLeiturasComFalha';
 
 function consulta(over: Record<string, unknown> = {}) {
   return { data: [], isPending: false, isError: false, isFetching: false, refetch: vi.fn(), ...over };
@@ -90,17 +90,24 @@ describe('getCarteiraSaldosQueryOptions', () => {
   });
 });
 
-describe('SaldoItensFalhaNotice', () => {
-  it('explica o problema e oferece "Tentar de novo"', () => {
-    const html = renderToStaticMarkup(<SaldoItensFalhaNotice onRetry={() => {}} />);
-    expect(html).toContain('Não foi possível carregar a situação dos itens');
-    expect(html).toContain('Tentar de novo');
+describe('useCarteiraItens — leituras para a faixa "não carregou"', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saldos.porUasg = { '200330': consulta(), '200331': consulta() };
+    consultasDoHook.porChave = {};
   });
 
-  it('enquanto relê, o botão fica desativado', () => {
-    const html = renderToStaticMarkup(<SaldoItensFalhaNotice onRetry={() => {}} isRetrying />);
-    expect(html).toContain('Carregando…');
-    expect(html).toMatch(/<button[^>]*disabled/);
+  it('entrega alocações, contratado, empenhado e o saldo das duas UASGs, com o rótulo de cada um', () => {
+    saldos.porUasg['200331'] = consulta({ isError: true, data: undefined });
+    const r = rodarHook();
+    expect(r.leituras.map((l) => l.rotulo)).toEqual([
+      ROTULOS_CARTEIRA_ITENS.alocacoes,
+      ROTULOS_CARTEIRA_ITENS.vinculos,
+      ROTULOS_CARTEIRA_ITENS.empenhos,
+      ROTULOS_CARTEIRA_ITENS.saldos,
+      ROTULOS_CARTEIRA_ITENS.saldos
+    ]);
+    expect(falhasDasLeituras(r.leituras)).toMatchObject([{ rotulo: 'saldo dos itens', situacao: 'NAO_CARREGOU' }]);
   });
 });
 
