@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
  */
 const PERMITIDOS: Record<string, number> = {
   'src/components/UserMenu.tsx': 4, // gatilho do menu, itens de menu e fechar do modal
+  'src/components/atas/ConsumoItensCelula.tsx': 1, // célula de consumo clicável (abre a lista dos itens)
   'src/components/atas/distribuicao/AlterarNivelModal.tsx': 1, // chips de motivo rápido
   'src/components/atas/distribuicao/DistribuicaoItens.tsx': 1, // chip de complexidade
   'src/components/atas/distribuicao/EquipeFila.tsx': 2, // selo do nível e selo "pronto para" (abrem a troca de nível)

@@ -144,7 +144,7 @@ export const AnchoredPanel: React.FC<AnchoredPanelProps> = ({
         zIndex: MODAL_Z_INDEX + 50,
         width: `${panelWidth}px`,
         left,
-        top: placement?.top ?? anchorRect.bottom + GAP,
+        top: placement ? placement.top : anchorRect.bottom + GAP,
         bottom: placement?.bottom,
         maxHeight: placement?.maxHeight,
         overflowY: 'auto',
