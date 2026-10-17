@@ -278,6 +278,25 @@ export async function fetchSituacaoDistribuicaoPorEmpenho(): Promise<SituacaoDis
   }));
 }
 
+/** Quanto a situação pede da equipe: a maior vence quando a nota está em mais de um contrato. */
+const PESO_DA_SITUACAO: Record<SituacaoDistribuicao, number> = { REVISAR: 4, A_DISTRIBUIR: 3, DISTRIBUIDA: 2, SEM_ITENS: 1, SEM_VALOR: 0 };
+
+/**
+ * Uma situação por NE, para a coluna "Itens" (uma linha por nota). Nota em mais de um contrato mostra a que mais
+ * pede trabalho (Revisar, depois A vincular), para não esconder pendência atrás de um contrato já vinculado; no
+ * empate, a do contrato de menor chave, para não mudar de uma leitura para outra.
+ */
+export function situacaoPorEmpenho(lista: SituacaoDistribuicaoEmpenho[]): Map<string, SituacaoDistribuicaoEmpenho> {
+  const mapa = new Map<string, SituacaoDistribuicaoEmpenho>();
+  for (const s of lista) {
+    const atual = mapa.get(s.empenhoId);
+    const peso = PESO_DA_SITUACAO[s.situacao] ?? 0;
+    const pesoAtual = atual ? PESO_DA_SITUACAO[atual.situacao] ?? 0 : -1;
+    if (!atual || peso > pesoAtual || (peso === pesoAtual && s.contractKey < atual.contractKey)) mapa.set(s.empenhoId, s);
+  }
+  return mapa;
+}
+
 function requireSupabase() {
   if (!isSupabaseConfigured || !supabase) throw new Error('Supabase não está configurado.');
   return supabase;
