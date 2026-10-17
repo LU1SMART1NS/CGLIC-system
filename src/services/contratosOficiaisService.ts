@@ -52,18 +52,29 @@ export function registroParaContrato(registro: Record<string, any>): ContractDas
 }
 
 /**
+ * Coluna lida: `registro` é o registro completo (com o `raw` inteiro da fonte); `registro_tela` é o mesmo registro
+ * com só as partes do `raw` que as telas usam (migration 150: ~2/3 menos dados na UASG 200331).
+ */
+type ColunaRegistro = 'registro' | 'registro_tela';
+
+/**
  * Contratos da carteira (UASG) gravados no banco, em páginas. Lista vazia quando nada foi sincronizado.
  * A ordem é fixa (contract_key, único na UASG), para nenhuma linha pular ou repetir entre as páginas. Falha em
  * qualquer página vira erro: nunca devolve a carteira pela metade.
+ * Lê o registro completo: é a base da sincronização do servidor.
  */
 export async function fetchContratosOficiaisDoBanco(uasg: string): Promise<ContractDashboardRecord[]> {
+  return lerContratosDoBanco(uasg, 'registro');
+}
+
+async function lerContratosDoBanco(uasg: string, coluna: ColunaRegistro): Promise<ContractDashboardRecord[]> {
   if (!supabase) return [];
   const cleanUasg = (uasg || '').trim();
   const contratos: ContractDashboardRecord[] = [];
   for (let from = 0, pagina = 1; ; from += PAGINA_LEITURA, pagina++) {
     const { data, error } = await supabase
       .from('contratos_oficiais')
-      .select('registro')
+      .select(coluna === 'registro' ? 'registro' : 'registro:registro_tela')
       .eq('uasg', cleanUasg)
       .order('contract_key', { ascending: true })
       .range(from, from + PAGINA_LEITURA - 1);
@@ -83,9 +94,13 @@ export async function fetchContratosOficiaisDoBanco(uasg: string): Promise<Contr
  * Leitura que falha vira erro, e cada tela o trata: o painel do Início usa a última leitura boa ou avisa que não
  * carregou; a Carteira de Contratos mostra o erro com "tentar novamente". O navegador não consulta as fontes oficiais
  * nem quando o banco falha nem quando ainda não tem a carteira (devolve lista vazia).
+ *
+ * Lê `registro_tela`: o `raw` vem resumido (categoria, prorrogável, valor acumulado, publicação, termos aditivos e
+ * UASG de origem) e marcado com `_resumido`. Quem regrava este registro (Contrato 360, sincronização de empenhos)
+ * pode mandá-lo como está: o banco mantém o `raw` inteiro já gravado e só junta o que mudou (migration 150).
  */
 export async function fetchContratosParaTela(uasg: string): Promise<ContractDashboardRecord[]> {
-  return fetchContratosOficiaisDoBanco(uasg);
+  return lerContratosDoBanco(uasg, 'registro_tela');
 }
 
 // ------------------------------------------------------------------------------
