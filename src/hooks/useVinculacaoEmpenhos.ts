@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   fetchDistribuicoesParaVincular,
   fetchSituacaoDistribuicaoPorEmpenho,
+  situacaoPorEmpenho,
   type DistribuicaoDoEmpenho,
   type SituacaoDistribuicaoEmpenho
 } from '../services/distribuicaoEmpenhoService';
@@ -19,11 +20,11 @@ export function useEmpenhosParaVincularAosItens(enabled = true) {
   return useQuery<DistribuicaoDoEmpenho[], Error>({ queryKey: VINCULACAO_EMPENHOS_ITENS_KEY, queryFn: fetchDistribuicoesParaVincular, enabled, ...OPCOES });
 }
 
-/** Situação da divisão por item de cada NE, por id do empenho (coluna "Itens" da carteira de Empenhos). */
+/** Situação da divisão por item de cada NE, por id do empenho (coluna "Itens" da carteira de Empenhos); nota em vários contratos mostra a que mais pede trabalho. */
 export function useSituacaoDistribuicaoPorEmpenho(enabled = true) {
   return useQuery<Map<string, SituacaoDistribuicaoEmpenho>, Error>({
     queryKey: SITUACAO_DISTRIBUICAO_EMPENHOS_KEY,
-    queryFn: async () => new Map((await fetchSituacaoDistribuicaoPorEmpenho()).map((s) => [s.empenhoId, s])),
+    queryFn: async () => situacaoPorEmpenho(await fetchSituacaoDistribuicaoPorEmpenho()),
     enabled,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false
