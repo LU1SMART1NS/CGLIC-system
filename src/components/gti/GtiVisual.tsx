@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnchoredPanel } from '../../design-system/components/AnchoredPanel';
 import { LARGURA_BARRA_CARTEIRA } from '../carteira/carteiraStyles';
 import { GRUPO_GTI_INFO, resumirCelulaGti, textoDaFatia, type FatiasDaAta, type GrupoDaFatia } from '../../config/gruposGti';
 
@@ -85,8 +86,11 @@ export const GtiFatiaBar: React.FC<{ fatias: FatiasDaAta; legenda?: boolean; lar
  * Célula "GTI" das carteiras: o GTI principal em destaque, a maior outra fatia em cinza (se pesa) e a barra. Com um
  * grupo só não há divisão a mostrar: fica o nome com "único grupo" e sem barra.
  */
-export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string }> = ({ fatias, testId }) => {
+export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string; detalheAoPassar?: boolean }> = ({ fatias, testId, detalheAoPassar = true }) => {
   const { destaque, secundaria } = resumirCelulaGti(fatias);
+  const ancoraRef = React.useRef<HTMLDivElement>(null);
+  const [ancora, setAncora] = React.useState<DOMRect | null>(null);
+
   if (!fatias || !destaque) {
     return (
       <span style={pequeno} title="Os órgãos dos itens ainda não foram copiados do Compras.gov.br" data-testid={testId}>
@@ -96,17 +100,50 @@ export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string }> =
   }
   const ehGti = destaque.grupo !== 'OUTROS' && destaque.grupo !== 'A_CONFIRMAR';
   const unico = fatias.fatias.filter((f) => f.quantidade > 0).length === 1;
+  // O detalhe abre só com mouse: no toque, o clique da célula é o filtro.
+  const comMouse = detalheAoPassar && typeof window !== 'undefined' && Boolean(window.matchMedia?.('(hover: hover)').matches);
+  const abrir = () => {
+    if (ancoraRef.current) setAncora(ancoraRef.current.getBoundingClientRect());
+  };
+  const fechar = () => setAncora(null);
+  const porTamanho = [...fatias.fatias].filter((f) => f.quantidade > 0).sort((x, y) => y.quantidade - x.quantidade);
+
   return (
-    <div data-testid={testId} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '150px' }}>
+    <div
+      ref={ancoraRef}
+      data-testid={testId}
+      onMouseEnter={comMouse ? abrir : undefined}
+      onMouseLeave={comMouse ? fechar : undefined}
+      style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '150px' }}
+    >
       <div style={{ fontSize: '0.8rem', lineHeight: 1.3 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: ehGti ? 800 : 600, color: ehGti ? '#0f172a' : '#64748b', whiteSpace: 'nowrap' }}>
           {ehGti && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: GRUPO_GTI_INFO[destaque.grupo].cor }} />}
-          {unico && ehGti ? GRUPO_GTI_INFO[destaque.grupo].rotulo : textoDaFatia(destaque)}
+          {/* Só o nome do principal é sublinhado ao passar o mouse: é por ele que o clique filtra. */}
+          <span className="gti-nome-principal">{unico && ehGti ? GRUPO_GTI_INFO[destaque.grupo].rotulo : textoDaFatia(destaque)}</span>
         </span>
-        {unico && ehGti && <span style={{ ...pequeno, whiteSpace: 'nowrap' }}> · único grupo</span>}
-        {secundaria && <span style={{ ...pequeno, whiteSpace: 'nowrap' }}> · {textoDaFatia(secundaria)}</span>}
+        {unico && ehGti && <span style={{ ...pequeno, display: 'inline-block', whiteSpace: 'nowrap' }}>&nbsp;· único grupo</span>}
+        {secundaria && <span style={{ ...pequeno, display: 'inline-block', whiteSpace: 'nowrap' }}>&nbsp;· {textoDaFatia(secundaria)}</span>}
       </div>
       {!unico && <GtiFatiaBar fatias={fatias} largura={LARGURA_BARRA_CARTEIRA} altura={4} />}
+      {ancora && (
+        <AnchoredPanel anchorRect={ancora} onClose={() => setAncora(null)} ariaLabel="Interesse por GTI" testId={testId ? `${testId}-detalhe` : undefined} width={300}
+          // Só leitura: o mouse e o clique passam pelo quadro e chegam às linhas de baixo (o clique da célula é o filtro).
+          style={{ pointerEvents: 'none' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Interesse por GTI</div>
+            {porTamanho.map((f) => (
+              <div key={f.grupo} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.2rem 0.5rem', alignItems: 'center', fontSize: '0.8rem' }}>
+                <span style={{ justifySelf: 'start' }}><GtiTag grupo={f.grupo} /></span>
+                <b style={{ fontVariantNumeric: 'tabular-nums' }}>{f.pct}%</b>
+                <span style={{ gridColumn: '1 / 3', display: 'block', height: 4, borderRadius: 2, background: '#f1f5f9', overflow: 'hidden' }}>
+                  <span style={{ display: 'block', height: '100%', width: `${Math.min(100, f.pct)}%`, background: f.grupo === 'A_CONFIRMAR' ? LISTRADO : GRUPO_GTI_INFO[f.grupo].cor }} />
+                </span>
+              </div>
+            ))}
+          </div>
+        </AnchoredPanel>
+      )}
     </div>
   );
 };

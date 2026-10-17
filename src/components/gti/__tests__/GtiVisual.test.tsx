@@ -57,3 +57,16 @@ describe('Barra das fatias', () => {
     expect(h).toContain('flex:80 1 0');
   });
 });
+
+describe('Célula GTI: filtro e detalhe', () => {
+  it('o nome do GTI principal tem a marca que recebe o sublinhado do filtro; a segunda fatia não', () => {
+    const h = renderToStaticMarkup(<GtiCelulaAta fatias={dividida} />);
+    expect(h).toMatch(/class="gti-nome-principal">LIGABOM 92%</);
+    expect(h).not.toMatch(/gti-nome-principal">CONSESP/);
+  });
+
+  it('o quadro de porcentagens só abre ao passar o mouse (fechado de início)', () => {
+    const h = renderToStaticMarkup(<GtiCelulaAta fatias={dividida} testId="c" />);
+    expect(h).not.toContain('c-detalhe');
+  });
+});
