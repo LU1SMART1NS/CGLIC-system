@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnchoredPanel } from '../../design-system/components/AnchoredPanel';
-import { LARGURA_BARRA_CARTEIRA } from '../carteira/carteiraStyles';
+import { ESPACO_ATE_A_BARRA, LARGURA_BARRA_CARTEIRA, LINHA_ACIMA_DA_BARRA } from '../carteira/carteiraStyles';
 import { GRUPO_GTI_INFO, resumirCelulaGti, textoDaFatia, type FatiasDaAta, type GrupoDaFatia } from '../../config/gruposGti';
 
 /** "A confirmar" na barra: listrado, para não se confundir com o cinza de "Outros". */
@@ -114,9 +114,9 @@ export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string; det
       data-testid={testId}
       onMouseEnter={comMouse ? abrir : undefined}
       onMouseLeave={comMouse ? fechar : undefined}
-      style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '150px' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: ESPACO_ATE_A_BARRA, minWidth: '150px' }}
     >
-      <div style={{ fontSize: '0.8rem', lineHeight: 1.3 }}>
+      <div style={{ ...LINHA_ACIMA_DA_BARRA, fontSize: '0.8rem' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: ehGti ? 800 : 600, color: ehGti ? '#0f172a' : '#64748b', whiteSpace: 'nowrap' }}>
           {ehGti && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: GRUPO_GTI_INFO[destaque.grupo].cor }} />}
           {/* Só o nome do principal é sublinhado ao passar o mouse: é por ele que o clique filtra. */}

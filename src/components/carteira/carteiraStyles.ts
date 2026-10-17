@@ -46,3 +46,11 @@ export const carteiraFornecedor: React.CSSProperties = {
 
 /** Largura das barras de consumo e de GTI nas carteiras: as duas iguais, lado a lado na mesma linha. */
 export const LARGURA_BARRA_CARTEIRA = '150px';
+
+/**
+ * Consumo e GTI lado a lado: as duas células alinham pelo topo, com a mesma altura de linha acima da barra e o mesmo
+ * espaço até ela, para que as barras fiquem na mesma altura.
+ */
+export const carteiraTdBarra: React.CSSProperties = { ...carteiraTd, verticalAlign: 'top' };
+export const LINHA_ACIMA_DA_BARRA: React.CSSProperties = { display: 'block', lineHeight: '1.25rem', height: '1.25rem' };
+export const ESPACO_ATE_A_BARRA = '0.3rem';

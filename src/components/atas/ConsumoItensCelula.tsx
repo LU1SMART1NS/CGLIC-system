@@ -1,7 +1,7 @@
 import React from 'react';
 import { AnchoredPanel } from '../../design-system/components/AnchoredPanel';
 import { saldoBarColor } from './ataSaldoStats';
-import { LARGURA_BARRA_CARTEIRA } from '../carteira/carteiraStyles';
+import { ESPACO_ATE_A_BARRA, LARGURA_BARRA_CARTEIRA, LINHA_ACIMA_DA_BARRA } from '../carteira/carteiraStyles';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 
 export interface ConsumoItem {
@@ -74,8 +74,8 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
         onMouseLeave={mouse ? fecharDepois : undefined}
         style={{ display: 'block', width: '100%', minWidth: LARGURA_BARRA_CARTEIRA, maxWidth: '240px', background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
       >
-        <span style={{ display: 'block', fontWeight: 800 }}>{fmtPct(topo.pct)}</span>
-        <span style={{ display: 'block', marginTop: '0.2rem' }}><Barra pct={topo.pct} altura={4} largura={LARGURA_BARRA_CARTEIRA} /></span>
+        <span style={{ ...LINHA_ACIMA_DA_BARRA, fontWeight: 800 }}>{fmtPct(topo.pct)}</span>
+        <span style={{ display: 'block', marginTop: ESPACO_ATE_A_BARRA }}><Barra pct={topo.pct} altura={4} largura={LARGURA_BARRA_CARTEIRA} /></span>
         <span
           data-testid={testId ? `${testId}-descricao` : undefined}
           style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
