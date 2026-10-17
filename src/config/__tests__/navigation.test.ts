@@ -53,6 +53,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const saldos = filterNavigationByRole(navigationConfig, 'gestor_saldos').map((i) => i.id);
       expect(saldos).toContain('alocacao');
       expect(saldos).not.toContain('vinculacao');
+      // O gestor de atas e contratos não vê a Alocação (lá só consultaria); coordenador e consulta veem.
+      expect(filterNavigationByRole(navigationConfig, 'gestor').map((i) => i.id)).not.toContain('alocacao');
+      expect(filterNavigationByRole(navigationConfig, 'leitor').map((i) => i.id)).toContain('alocacao');
       // Página única: a área não mostra abas no topo.
       expect(findAreaForTabs(filterNavigationByRole(navigationConfig, 'admin'), '/alocacao')?.children).toHaveLength(1);
     });
