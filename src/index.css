@@ -1654,6 +1654,12 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
   text-underline-offset: 3px;
   filter: brightness(0.94);
 }
+.carteira-cell-filter:hover .gti-nome-principal,
+.carteira-cell-filter:focus-visible .gti-nome-principal {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
 .carteira-cell-filter:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;

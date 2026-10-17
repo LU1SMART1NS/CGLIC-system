@@ -33,7 +33,7 @@ export const InteresseGtiBotao: React.FC<{ fatias: FatiasDaAta | undefined; aber
         data-testid="interesse-gti-btn"
       >
         <span style={{ display: 'inline-flex', background: '#ffffff', borderRadius: 6, padding: '3px 8px', fontWeight: 400, textAlign: 'left' }}>
-          <GtiCelulaAta fatias={fatias} testId="interesse-gti-resumo" />
+          <GtiCelulaAta fatias={fatias} testId="interesse-gti-resumo" detalheAoPassar={false} />
         </span>
         <ChevronDown size={16} className="pn-gaveta-seta" aria-hidden="true" />
       </button>
