@@ -22,7 +22,7 @@ import type {
 } from '../../types';
 import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 import * as dbCacheService from '../dbCacheService';
-import * as contractService from '../contractService';
+import * as contratosOficiaisService from '../contratosOficiaisService';
 import * as contractManagementService from '../contractManagementService';
 import * as paymentCycleRpcAdapter from '../../adapters/paymentCycleRpcAdapter';
 import * as ataManagementService from '../ataManagementService';
@@ -35,6 +35,11 @@ import type { EmpenhadoAcima } from '../empenhadoAcimaService';
 
 vi.mock('../dbCacheService');
 vi.mock('../contractService');
+// As telas leem os contratos do banco (fetchContratosParaTela); aqui a leitura é simulada.
+vi.mock('../contratosOficiaisService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../contratosOficiaisService')>()),
+  fetchContratosParaTela: vi.fn()
+}));
 vi.mock('../contractManagementService');
 vi.mock('../../adapters/paymentCycleRpcAdapter');
 
@@ -1074,7 +1079,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
 
   describe('fetchManagementDashboardData', () => {
     it('fetches and consolidates data across all data providers', async () => {
-      vi.mocked(contractService.fetchContractsForDashboard).mockResolvedValue([
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockResolvedValue([
         {
           id: 'c1',
           numero: '01/2026',
@@ -1115,7 +1120,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
     });
 
     it('fonte que falha não derruba o painel: sem leitura anterior, avisa que não carregou', async () => {
-      vi.mocked(contractService.fetchContractsForDashboard).mockResolvedValue([]);
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockResolvedValue([]);
       vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
       vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
       vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValue(new Error('canceling statement due to statement timeout'));
@@ -1127,8 +1132,27 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       ]);
     });
 
+    it('contratos que não carregaram do banco: o painel avisa (faixa "não carregou"), sem lista inventada', async () => {
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockRejectedValue(
+        new Error('Não foi possível ler os contratos da UASG 209993 no banco (página 1): canceling statement due to statement timeout')
+      );
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValue({ arps: [], syncInfo: { isCachedInDb: true } as any });
+
+      const result = await fetchManagementDashboardData('209993', referenceDate);
+      expect(result.executive.totalContratos).toBe(0);
+      expect(result.fontesComFalha).toEqual([
+        {
+          rotulo: 'contratos',
+          situacao: 'NAO_CARREGOU',
+          mensagem: 'Não foi possível ler os contratos da UASG 209993 no banco (página 1): canceling statement due to statement timeout'
+        }
+      ]);
+    });
+
     it('fonte que falha depois de uma leitura boa: usa a última leitura e avisa que está desatualizada', async () => {
-      vi.mocked(contractService.fetchContractsForDashboard).mockResolvedValue([]);
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockResolvedValue([]);
       vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
       vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
       vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValueOnce({
@@ -1182,7 +1206,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
     beforeEach(() => {
       bancoFalso.ligado = true;
       bancoFalso.tabelas = [];
-      vi.mocked(contractService.fetchContractsForDashboard).mockImplementation(async (uasg?: string) =>
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockImplementation(async (uasg?: string) =>
         uasg === '200330' ? [contrato('C330', '200330')] : [contrato('C331', '200331')]
       );
       vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValue({ arps: [], syncInfo: { isCachedInDb: true } as any });
@@ -1202,7 +1226,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       for (const fonte of fontesSemUasg()) expect(fonte).toHaveBeenCalledTimes(1);
       expect(leiturasDaAlocacao()).toBe(1);
       // Fontes que dependem da UASG continuam lidas uma vez por UASG.
-      expect(contractService.fetchContractsForDashboard).toHaveBeenCalledTimes(2);
+      expect(contratosOficiaisService.fetchContratosParaTela).toHaveBeenCalledTimes(2);
 
       expect(r330.fontesComFalha).toBeUndefined();
       expect(r331.fontesComFalha).toBeUndefined();
@@ -1248,7 +1272,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       bancoFalso.ligado = true;
       bancoFalso.tabelas = [];
       bancoFalso.chamadas = [];
-      vi.mocked(contractService.fetchContractsForDashboard).mockImplementation(async (uasg?: string) =>
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockImplementation(async (uasg?: string) =>
         uasg === '200330' ? [contrato('C330', '200330')] : [contrato('C331', '200331')]
       );
       vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValue({ arps: [], syncInfo: { isCachedInDb: true } as any });

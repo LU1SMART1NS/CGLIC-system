@@ -7,8 +7,6 @@ import { VIGENCIA_RULES } from '../config/alertRules';
 import { STATUS_A_VENCER } from '../utils/statusVigencia';
 
 const BASE_URL = '/api-arp/modulo-contratos';
-const CONTRATOS_CACHE = new Map<string, { timestamp: number; data: ContractDashboardRecord[] }>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos de cache
 
 /**
  * Limite de espera da lista da UG no Contratos.gov.br. É a única fonte com todos os contratos
@@ -17,55 +15,6 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos de cache
  */
 export const CONTRATOS_GOV_TIMEOUT_MS = 45000;
 const COMPRAS_GOV_TIMEOUT_MS = 8000;
-
-/** Carregamentos em andamento por UASG: telas que pedem a mesma lista ao mesmo tempo dividem uma só consulta. */
-const CONTRATOS_INFLIGHT = new Map<string, Promise<ContractDashboardRecord[]>>();
-
-/**
- * Última lista COMPLETA conhecida por UASG. Se uma consulta seguinte sair incompleta (fonte fora do ar),
- * ela é somada a esta lista em vez de substituí-la: a carteira não encolhe por uma falha momentânea.
- */
-const CONTRATOS_ULTIMA_COMPLETA = new Map<string, ContractDashboardRecord[]>();
-
-/**
- * UASGs cuja última consulta saiu incompleta (alguma fonte falhou). Resultado incompleto não vai
- * para o cache, e as telas podem avisar e tentar de novo (ver useContractsDashboard).
- */
-const CONTRATOS_PARCIAIS = new Map<string, boolean>();
-const parciaisListeners = new Set<() => void>();
-
-function setContractsPartial(uasg: string, partial: boolean): void {
-  if ((CONTRATOS_PARCIAIS.get(uasg) ?? false) === partial) return;
-  CONTRATOS_PARCIAIS.set(uasg, partial);
-  parciaisListeners.forEach((listener) => listener());
-}
-
-/** A última consulta de contratos da UASG ficou incompleta (alguma fonte não respondeu). */
-export function isContractsListPartial(uasg: string): boolean {
-  return CONTRATOS_PARCIAIS.get(uasg.trim()) ?? false;
-}
-
-/** Assina mudanças no estado "lista incompleta" (para useSyncExternalStore). */
-export function subscribeContractsPartial(listener: () => void): () => void {
-  parciaisListeners.add(listener);
-  return () => {
-    parciaisListeners.delete(listener);
-  };
-}
-
-/**
- * Limpa o cache em memória de contratos para forçar recarregamento imediato
- */
-export function clearContractsCache(uasg?: string): void {
-  if (uasg) {
-    CONTRATOS_CACHE.delete(`contracts_${uasg.trim()}`);
-    CONTRATOS_INFLIGHT.delete(`contracts_${uasg.trim()}`);
-  } else {
-    CONTRATOS_CACHE.clear();
-    CONTRATOS_INFLIGHT.clear();
-    CONTRATOS_ULTIMA_COMPLETA.clear();
-  }
-}
 
 async function fetchWithTimeout(url: string, timeoutMs: number = 10000): Promise<Response> {
   const controller = new AbortController();
@@ -399,7 +348,7 @@ function montarContratos(
  * Contratos da UASG direto das fontes oficiais, sem cache. `fontesComFalha` lista as fontes que não
  * responderam. `base`: contratos já conhecidos (por exemplo, os do banco); o que as fontes trazem
  * atualiza a base, e uma fonte fora do ar não apaga nem empobrece o que já se sabia.
- * Usada pela sincronização com o banco (contratosOficiaisService).
+ * Usada só pela sincronização no servidor (contratosOficiaisService): as telas leem a lista do banco.
  */
 export async function buscarContratosNasFontes(
   uasg: string,
@@ -407,52 +356,6 @@ export async function buscarContratosNasFontes(
 ): Promise<{ contracts: ContractDashboardRecord[]; fontesComFalha: string[] }> {
   const cleanUasg = (uasg || '').trim();
   return montarContratos(await consultarFontes(cleanUasg), cleanUasg, base);
-}
-
-async function loadContractsForDashboard(cleanUasg: string, cacheKey: string): Promise<ContractDashboardRecord[]> {
-  const resposta = await consultarFontes(cleanUasg);
-  const partial = !resposta.contratosGov.ok || !resposta.comprasGov.ok;
-
-  // Lista incompleta: parte do que já se sabia (última lista completa), para não encolher a carteira.
-  const base = partial ? CONTRATOS_ULTIMA_COMPLETA.get(cleanUasg) ?? [] : [];
-  const result = montarContratos(resposta, cleanUasg, base).contracts;
-
-  // Só grava no cache a lista completa: uma lista incompleta ficaria 5 minutos valendo como se fosse a carteira inteira.
-  setContractsPartial(cleanUasg, partial);
-  if (!partial && result.length > 0) {
-    CONTRATOS_CACHE.set(cacheKey, { timestamp: Date.now(), data: result });
-    CONTRATOS_ULTIMA_COMPLETA.set(cleanUasg, result);
-  }
-
-  return result;
-}
-
-/**
- * Busca contratos para o Dashboard unificando Compras.gov.br e Contratos.gov.br
- */
-export async function fetchContractsForDashboard(
-  uasg: string = '200331',
-  forceRefresh: boolean = false
-): Promise<ContractDashboardRecord[]> {
-  const cleanUasg = (uasg || '200331').trim();
-  const cacheKey = `contracts_${cleanUasg}`;
-
-  if (forceRefresh) {
-    CONTRATOS_CACHE.delete(cacheKey);
-  } else {
-    const cached = CONTRATOS_CACHE.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return cached.data;
-    }
-    const inflight = CONTRATOS_INFLIGHT.get(cacheKey);
-    if (inflight) return inflight;
-  }
-
-  const promise = loadContractsForDashboard(cleanUasg, cacheKey).finally(() => {
-    if (CONTRATOS_INFLIGHT.get(cacheKey) === promise) CONTRATOS_INFLIGHT.delete(cacheKey);
-  });
-  CONTRATOS_INFLIGHT.set(cacheKey, promise);
-  return promise;
 }
 
 /**

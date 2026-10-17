@@ -27,7 +27,6 @@ export const ContractsRoute: React.FC = () => {
   // Dados da carteira (contratos no escopo do usuário, com prazo, gestor e pendências).
   const {
     rows: allRows,
-    hasAnyData,
     isLoading,
     isLoadingScope: isLoadingManagers,
     isFetching,
@@ -35,6 +34,8 @@ export const ContractsRoute: React.FC = () => {
     fontesComFalha,
     podeForcarAtualizacao,
     error,
+    carteiraIncompleta,
+    tentarDeNovo,
     dataUpdatedAt,
     refresh
   } = useContractsPortfolio();
@@ -120,13 +121,15 @@ export const ContractsRoute: React.FC = () => {
   }, [allRows, filterState, showGestorFilter, unidadesDoContrato]);
 
 
-  if (error && !hasAnyData) {
+  // Uma UASG que não carregou deixaria a carteira pela metade: mostra o erro em vez da lista parcial ou vazia.
+  if (carteiraIncompleta) {
     return (
       <PageContainer style={{ padding: '2rem 0' }}>
         <ErrorState
           title="Erro ao carregar carteira de contratos"
-          message={error.message || 'Não foi possível buscar a lista de contratos administrativos.'}
-          onRetry={() => refresh()}
+          message={error?.message || 'Não foi possível buscar a lista de contratos administrativos.'}
+          onRetry={() => void tentarDeNovo()}
+          retryLabel={isFetching ? 'Tentando…' : undefined}
         />
       </PageContainer>
     );

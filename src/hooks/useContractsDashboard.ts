@@ -32,8 +32,8 @@ export function getContractsDashboardQueryOptions(uasg?: string) {
  *
  * Arquitetura:
  * UI -> useContractsDashboard(uasg) -> fetchContratosParaTela() -> Supabase (contratos_oficiais)
- * As APIs federais só são consultadas pela sincronização (contratosOficiaisService) ou quando o banco
- * ainda não tem a carteira.
+ * As APIs federais só são consultadas pela sincronização no servidor. Leitura do banco que falha chega
+ * como erro da query (nunca como lista vazia ou pela metade).
  *
  * `refresh` relê o banco. Quem atualiza com as fontes oficiais é useSincronizacaoContratos.
  */
