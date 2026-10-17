@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnchoredPanel } from '../../design-system/components/AnchoredPanel';
 import { saldoBarColor } from './ataSaldoStats';
+import { LARGURA_BARRA_CARTEIRA } from '../carteira/carteiraStyles';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 
 export interface ConsumoItem {
@@ -12,8 +13,8 @@ export interface ConsumoItem {
 const fmtPct = (pct: number) => `${pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`;
 const rotuloItem = (numero: string) => `Item ${Number(numero) || numero}`;
 
-const Barra: React.FC<{ pct: number; altura: number }> = ({ pct, altura }) => (
-  <span style={{ display: 'block', height: `${altura}px`, background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
+const Barra: React.FC<{ pct: number; altura: number; largura?: string }> = ({ pct, altura, largura }) => (
+  <span style={{ display: 'block', width: largura, maxWidth: '100%', height: `${altura}px`, background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
     <span style={{ display: 'block', width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%', background: saldoBarColor(pct) }} />
   </span>
 );
@@ -71,10 +72,10 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
         }}
         onMouseEnter={mouse ? abrir : undefined}
         onMouseLeave={mouse ? fecharDepois : undefined}
-        style={{ display: 'block', width: '100%', minWidth: '140px', maxWidth: '240px', background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+        style={{ display: 'block', width: '100%', minWidth: LARGURA_BARRA_CARTEIRA, maxWidth: '240px', background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
       >
         <span style={{ display: 'block', fontWeight: 800 }}>{fmtPct(topo.pct)}</span>
-        <span style={{ display: 'block', marginTop: '0.2rem' }}><Barra pct={topo.pct} altura={4} /></span>
+        <span style={{ display: 'block', marginTop: '0.2rem' }}><Barra pct={topo.pct} altura={4} largura={LARGURA_BARRA_CARTEIRA} /></span>
         <span
           data-testid={testId ? `${testId}-descricao` : undefined}
           style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}

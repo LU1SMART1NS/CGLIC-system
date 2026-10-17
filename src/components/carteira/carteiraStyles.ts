@@ -43,3 +43,6 @@ export const carteiraFornecedor: React.CSSProperties = {
   ...carteiraSubtitle,
   textTransform: 'uppercase'
 };
+
+/** Largura das barras de consumo e de GTI nas carteiras: as duas iguais, lado a lado na mesma linha. */
+export const LARGURA_BARRA_CARTEIRA = '150px';

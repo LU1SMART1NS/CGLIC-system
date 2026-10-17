@@ -1,4 +1,5 @@
 import React from 'react';
+import { LARGURA_BARRA_CARTEIRA } from '../carteira/carteiraStyles';
 import { GRUPO_GTI_INFO, resumirCelulaGti, textoDaFatia, type FatiasDaAta, type GrupoDaFatia } from '../../config/gruposGti';
 
 /** "A confirmar" na barra: listrado, para não se confundir com o cinza de "Outros". */
@@ -105,7 +106,7 @@ export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string }> =
         {unico && ehGti && <span style={{ ...pequeno, whiteSpace: 'nowrap' }}> · único grupo</span>}
         {secundaria && <span style={{ ...pequeno, whiteSpace: 'nowrap' }}> · {textoDaFatia(secundaria)}</span>}
       </div>
-      {!unico && <GtiFatiaBar fatias={fatias} largura="150px" altura={4} />}
+      {!unico && <GtiFatiaBar fatias={fatias} largura={LARGURA_BARRA_CARTEIRA} altura={4} />}
     </div>
   );
 };
