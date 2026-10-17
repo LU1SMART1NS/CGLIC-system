@@ -32,10 +32,10 @@ const SaldoCelula: React.FC<{ linha?: CarteiraItemRow; pct: number | null }> = (
       {saldo === null ? (
         <span style={forte}>{fmtPct(pct)}</span>
       ) : saldo < 0 ? (
-        <span style={{ ...forte, color: 'var(--color-danger-text)' }}>{formatNumber(-saldo)} acima</span>
+        <span style={{ ...forte, color: 'var(--color-danger-text)' }}>{formatNumber(-saldo)} un acima</span>
       ) : (
         <span>
-          <span style={forte}>{formatNumber(saldo)}</span> <span style={pequeno}>{saldo === 1 ? 'resta' : 'restam'}</span>
+          <span style={forte}>{formatNumber(saldo)}</span> <span style={pequeno}>un {saldo === 1 ? 'resta' : 'restam'}</span>
         </span>
       )}
       <Barra pct={pct} />
@@ -137,7 +137,13 @@ export const ItensDaAtaTabela: React.FC<ItensDaAtaTabelaProps> = ({ numeroAta, i
                 </div>
               </td>
               <td data-label="Qtd. SENASP" style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                {linha ? <span style={forte}>{formatNumber(linha.quantitativoSenasp)}</span> : <span style={{ color: '#94a3b8' }}>—</span>}
+                {linha ? (
+                  <span>
+                    <span style={forte}>{formatNumber(linha.quantitativoSenasp)}</span> <span style={pequeno}>un</span>
+                  </span>
+                ) : (
+                  <span style={{ color: '#94a3b8' }}>—</span>
+                )}
                 {item.valorUnitario != null && Number(item.valorUnitario) > 0 && (
                   <div style={{ ...pequeno, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(Number(item.valorUnitario))} un.</div>
                 )}
