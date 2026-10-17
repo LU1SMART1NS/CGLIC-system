@@ -146,7 +146,8 @@ export const navigationConfig: NavItem[] = [
         route: '/alocacao',
         status: 'active',
         matchPrefixes: ['/alocacao'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        // O gestor de atas e contratos só consultaria: o alocado já aparece na Carteira › Itens e no Item 360.
+        allowedRoles: ['admin', 'gestor_saldos', 'leitor']
       }
     ]
   },
