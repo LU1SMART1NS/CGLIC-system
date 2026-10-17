@@ -72,7 +72,7 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
         }}
         onMouseEnter={mouse ? abrir : undefined}
         onMouseLeave={mouse ? fecharDepois : undefined}
-        style={{ display: 'block', width: '100%', minWidth: LARGURA_BARRA_CARTEIRA, maxWidth: '240px', background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+        style={{ display: 'block', width: LARGURA_BARRA_CARTEIRA, background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
       >
         <span style={{ ...LINHA_ACIMA_DA_BARRA, fontWeight: 800 }}>{fmtPct(topo.pct)}</span>
         <span style={{ display: 'block', marginTop: ESPACO_ATE_A_BARRA }}><Barra pct={topo.pct} altura={4} largura={LARGURA_BARRA_CARTEIRA} /></span>
