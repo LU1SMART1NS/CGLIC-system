@@ -59,7 +59,7 @@ const ConsumoBar: React.FC<{ pct: number | null }> = ({ pct }) => {
   return (
     <div style={{ minWidth: '72px' }}>
       <span style={{ fontWeight: 800 }}>{pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%</span>
-      <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', marginTop: '0.2rem', overflow: 'hidden' }}>
+      <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '2px', marginTop: '0.2rem', overflow: 'hidden' }}>
         <div style={{ width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%', background: saldoBarColor(pct) }} />
       </div>
     </div>
