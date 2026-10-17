@@ -63,7 +63,8 @@ export interface QuantitativosOutroOrgaoTabProps {
   adesoes: AdesaoItemRecord[];
   podeInformar: boolean;
   podeRemanejar: boolean;
-  alocado: number;
+  /** Nulo: as alocações não carregaram (o quadro mostra "—" em vez de 0). */
+  alocado: number | null;
   totalUnidadesInternas: number;
   /** Alocação às unidades internas: aparece ao abrir a linha da SENASP. */
   unidadesInternas: React.ReactNode;
@@ -141,7 +142,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
   });
 
   const saldo = p.quantidadeSenasp - p.contratadoSenasp;
-  const livreParaAlocar = p.quantidadeSenasp - p.alocado;
+  const livreParaAlocar = p.quantidadeSenasp - (p.alocado ?? 0);
   const gerenciado = orgaoSenasp?.gerenciado ?? 0;
 
   if (p.error) return <ErrorState title="Não foi possível carregar os órgãos do item" message={p.error} />;
@@ -197,9 +198,9 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
   // ---------------- Cartões ----------------
   const cartaoAlocado: MetricStripItem = {
     label: 'Alocado às unidades',
-    value: formatNumber(p.alocado),
-    hint: livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`,
-    tone: livreParaAlocar < 0 ? 'danger' : 'default',
+    value: p.alocado === null ? '—' : formatNumber(p.alocado),
+    hint: p.alocado === null ? 'não carregou' : livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`,
+    tone: p.alocado !== null && livreParaAlocar < 0 ? 'danger' : 'default',
     testId: 'metrica-alocado'
   };
   const cartaoContratado: MetricStripItem = { label: 'Contratado', value: formatNumber(p.contratadoSenasp), hint: 'contratos vinculados', testId: 'metrica-contratado' };

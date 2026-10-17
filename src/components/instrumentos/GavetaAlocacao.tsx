@@ -4,6 +4,7 @@ import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
 import { useCarteiraItens } from '../../hooks/useCarteiraItens';
 import { ROTA_ALOCACAO } from '../vinculacao/vinculacaoConfig';
 import { FaixasBarra, FaixasLegenda, type FaixaDaBarra } from './GavetaSituacao';
+import { AlocacoesFalhaNotice } from '../carteira/AlocacoesFalhaNotice';
 
 /**
  * Gaveta Alocação (gestor de saldos): os itens com quantitativo SENASP das atas não encerradas, pelo quanto já foi
@@ -12,7 +13,7 @@ import { FaixasBarra, FaixasLegenda, type FaixaDaBarra } from './GavetaSituacao'
  */
 export const GavetaAlocacao: React.FC<{ onAbrir: (destino: string) => void }> = ({ onAbrir }) => {
   const { scopedArps, itemsByAta, gestorByAta, isLoading: atasLoading } = useAtasPortfolio();
-  const { rows, isLoading } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  const { rows, isLoading, alocacoesComErro, recarregandoAlocacoes, recarregarAlocacoes } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
 
   const faixas = useMemo<FaixaDaBarra[]>(() => {
     const conta = { TOTAL: 0, PARCIAL: 0, SEM: 0 };
@@ -27,6 +28,8 @@ export const GavetaAlocacao: React.FC<{ onAbrir: (destino: string) => void }> = 
   }, [rows]);
 
   if (atasLoading || isLoading) return <SkeletonLoader variant="text" count={2} />;
+  // Sem as alocações, todos os itens contariam como "Sem alocação".
+  if (alocacoesComErro) return <AlocacoesFalhaNotice onRetry={recarregarAlocacoes} isRetrying={recarregandoAlocacoes} />;
   return (
     <div className="pn-situacao-bloco">
       <FaixasBarra titulo="Itens" faixas={faixas} onAbrir={onAbrir} testId="painel-alocacao-itens" />

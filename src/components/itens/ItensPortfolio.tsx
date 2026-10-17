@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
 import { useCarteiraItens } from '../../hooks/useCarteiraItens';
 import { SaldoItensFalhaNotice } from '../carteira/SaldoItensFalhaNotice';
+import { AlocacoesFalhaNotice } from '../carteira/AlocacoesFalhaNotice';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { CarteiraSituacaoTabs } from '../carteira/CarteiraSituacaoTabs';
 import { useCarteiraFilters } from '../carteira/carteiraFilters';
@@ -44,7 +45,10 @@ export const ItensPortfolio: React.FC = () => {
     isLoading: loadingExecucao,
     saldosComErro,
     recarregandoSaldos,
-    recarregarSaldos
+    recarregarSaldos,
+    alocacoesComErro,
+    recarregandoAlocacoes,
+    recarregarAlocacoes
   } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
 
   const { filters, setFilter: setFilterUrl, setFilters, resetFilters } = useCarteiraFilters(ITENS_FILTER_SCHEMA);
@@ -206,6 +210,7 @@ export const ItensPortfolio: React.FC = () => {
       ) : (
         <>
           {saldosComErro && <SaldoItensFalhaNotice onRetry={recarregarSaldos} isRetrying={recarregandoSaldos} />}
+          {alocacoesComErro && <AlocacoesFalhaNotice onRetry={recarregarAlocacoes} isRetrying={recarregandoAlocacoes} />}
 
           <CarteiraSituacaoTabs
             testIdPrefix="itens"

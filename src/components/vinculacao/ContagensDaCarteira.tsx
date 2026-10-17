@@ -41,8 +41,9 @@ const CalculoDaCarteira: React.FC<{ contaDistribuicao: boolean }> = ({ contaDist
 /** Calcula os itens a alocar (os mesmos da página Alocação) e entrega o número ao menu. */
 const CalculoItensAAlocar: React.FC = () => {
   const { scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta } = useAtasPortfolio();
-  const { rows, isLoading: carregando } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
-  const pronto = !isLoading && !scopeLoading && !carregando;
+  const { rows, isLoading: carregando, alocacoesComErro } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  // Sem as alocações, o menu fica sem número em vez de contar todos os itens como a alocar.
+  const pronto = !isLoading && !scopeLoading && !carregando && !alocacoesComErro;
   const total = React.useMemo(() => (pronto ? contarItensAAlocar(rows) : null), [pronto, rows]);
   React.useEffect(() => {
     definirContagemExtra('itensAAlocar', total);

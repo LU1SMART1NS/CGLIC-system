@@ -62,6 +62,7 @@ import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractM
 import { chaveAvisoAtaAssinada, chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, chaveAvisoFonte, chaveAvisoEmpenhoAcima, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { classifyArpItemSaldo } from './balanceService';
 import { severityFromReajusteRadarNivel, severityFromPaymentStatusPrazo } from './severityService';
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
@@ -1958,18 +1959,24 @@ export const COLUNAS_SALDO_CARTEIRA = [
 /**
  * Saldo por item da view v_arp_item_saldo_detalhado (todas as colunas, ou só as pedidas).
  * Falha da consulta vira erro: um vazio aqui parecia "nenhum item informado" e zerava os filtros da carteira.
+ * Lê em páginas de mil (o PostgREST corta em mil sem avisar; a 200331 tinha 667 itens em 17/10/2026), na ordem de
+ * item_key (um item por linha); item_ata_id desempata se dois números de item derem a mesma chave. Falha em qualquer
+ * página vira erro, nunca lista pela metade.
  */
 export async function fetchArpItemSaldosFromDb(uasg?: string, colunas?: readonly string[]): Promise<any[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  let query = supabase.from('v_arp_item_saldo_detalhado').select(colunas?.length ? colunas.join(',') : '*');
-  if (uasg) {
-    // Carteira da CGLIC inclui as atas de outros órgãos em que a SENASP participa (migration 106).
-    query = query.eq(colunaDaUasgDaAta(uasg), uasg);
-  }
-  const { data, error } = await query;
-  if (error) {
+  const db = supabase;
+  try {
+    return await lerTodasAsPaginas<any>((de, ate) => {
+      let query = db.from('v_arp_item_saldo_detalhado').select(colunas?.length ? colunas.join(',') : '*');
+      if (uasg) {
+        // Carteira da CGLIC inclui as atas de outros órgãos em que a SENASP participa (migration 106).
+        query = query.eq(colunaDaUasgDaAta(uasg), uasg);
+      }
+      return query.order('item_key', { ascending: true }).order('item_ata_id', { ascending: true }).range(de, ate);
+    });
+  } catch (error: any) {
     console.error('Erro ao consultar v_arp_item_saldo_detalhado:', error);
-    throw new Error(`Não foi possível ler o saldo dos itens: ${error.message}`);
+    throw new Error(`Não foi possível ler o saldo dos itens: ${error?.message ?? error}`);
   }
-  return data ?? [];
 }

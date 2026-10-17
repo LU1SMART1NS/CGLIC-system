@@ -114,7 +114,7 @@ export const ItensUnidadesPage: React.FC = () => {
   const podeAlocar = role === 'admin' || role === 'gestor_saldos';
   const showGestorFilter = canFilterByGestor(role);
   const { arps, scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, syncError, reload } = useAtasPortfolio();
-  const { rows, unidades, isLoading: loadingExecucao } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  const { rows, unidades, isLoading: loadingExecucao, alocacoesComErro, recarregarAlocacoes } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
   const [alocando, setAlocando] = useState<ItemParaAlocar | null>(null);
   const porAta = filters.ver === 'ATA';
@@ -242,6 +242,18 @@ export const ItensUnidadesPage: React.FC = () => {
     return (
       <PageContainer style={{ padding: '2rem 0' }}>
         <ErrorState title="Erro ao carregar os itens" message={syncError} onRetry={() => reload()} />
+      </PageContainer>
+    );
+  }
+  // Sem as alocações, todo item pareceria "Sem alocação": a tela mostra o erro em vez da lista.
+  if (alocacoesComErro) {
+    return (
+      <PageContainer style={{ padding: '2rem 0' }}>
+        <ErrorState
+          title="Erro ao carregar as alocações"
+          message="Não foi possível ler as alocações às unidades internas. Sem elas, o alocado de cada item ficaria zerado."
+          onRetry={recarregarAlocacoes}
+        />
       </PageContainer>
     );
   }
