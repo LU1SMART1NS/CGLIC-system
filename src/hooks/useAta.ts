@@ -110,7 +110,7 @@ export function useAtaItemSaldos(numeroAta?: string, uasg?: string) {
     (i: any) => (i.numero_ata || i.numeroAta) === numeroAta && String(i.codigo_uasg || i.codigoUasg || cleanUasg) === cleanUasg
   );
 
-  return { saldos, isLoading: query.isLoading };
+  return { saldos, isLoading: query.isLoading, /** Para a faixa "não carregou": sem ele, o consumo sai 0% e o saldo cheio. */ consulta: query };
 }
 
 /** Contratos oficiais vinculados a qualquer item de uma Ata (arp_item_contract_links), já enriquecidos. */
@@ -125,9 +125,18 @@ export function useAtaLinkedContracts(numeroAta?: string, uasg?: string, uasgCar
     enabled: Boolean(numeroAta && cleanUasg)
   });
 
-  const { data: contracts = [] } = useContractsDashboard(carteira);
+  const contractsQuery = useContractsDashboard(carteira);
+  const { data: contracts = [] } = contractsQuery;
 
   const linkedContracts: EnrichedArpItemContract[] = enrichContractLinks(linksQuery.data || [], contracts);
 
-  return { linkedContracts, isLoading: linksQuery.isLoading };
+  return {
+    linkedContracts,
+    isLoading: linksQuery.isLoading,
+    /** Os vínculos e os contratos, para a faixa "não carregou" (sem eles, "nenhum contrato vinculado" seria falso). */
+    leituras: [
+      { rotulo: 'contratos vinculados à ata', query: linksQuery },
+      { rotulo: `contratos da UASG ${carteira}`, query: contractsQuery }
+    ]
+  };
 }

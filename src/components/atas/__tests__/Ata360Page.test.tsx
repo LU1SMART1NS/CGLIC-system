@@ -103,6 +103,7 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
       refetch: vi.fn()
     } as any);
     vi.spyOn(useAtaModule, 'useAtaItemSaldos').mockReturnValue({
+      consulta: { data: [], isError: false, error: null, refetch: vi.fn() },
       saldos: [
         {
           numero_item: '1',
@@ -116,6 +117,7 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
       isLoading: false
     } as any);
     vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({
+      leituras: [],
       linkedContracts: [],
       isLoading: false
     } as any);
@@ -245,6 +247,7 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
       isLoading: false
     });
     vi.spyOn(useAtaModule, 'useAtaItemSaldos').mockReturnValue({
+      consulta: { data: [], isError: false, error: null, refetch: vi.fn() },
       saldos: [
         {
           numero_item: '1',
@@ -293,6 +296,89 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
 
     expect(html).toContain('Ata não encontrada');
   });
+
+  describe('uma leitura falha: a faixa avisa e o resto fica', () => {
+    const falhou = () => ({ data: undefined, isError: true, error: new Error('canceling statement due to statement timeout'), refetch: vi.fn() });
+    const comoAdmin = () =>
+      vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+        user: { id: 'admin-user' } as any,
+        session: null,
+        loading: false,
+        role: 'admin',
+        roleStatus: 'ready',
+        signOut: vi.fn()
+      });
+    const comoGestor = () =>
+      vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+        user: { id: 'gestor-joao' } as any,
+        session: null,
+        loading: false,
+        role: 'gestor',
+        roleStatus: 'ready',
+        signOut: vi.fn()
+      });
+
+    it('perfil gestor: as atribuições não carregaram → a faixa, e não "Acesso não autorizado"', () => {
+      comoGestor();
+      vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({
+        contractKeys: [],
+        ataKeys: [],
+        isLoading: false,
+        leituras: [{ rotulo: 'gestores das atas', query: falhou() }]
+      });
+      const html = renderPage();
+      expect(html).toContain('data-testid="instrument-state-escopo-nao-conferido"');
+      expect(html).toContain('<strong>Gestores das atas</strong>');
+      expect(html).toContain('não dá para conferir se esta ata está atribuída a você');
+      expect(html).not.toContain('Acesso não autorizado');
+      expect(html).not.toContain('Colete Balístico Nível III-A');
+    });
+
+    it('perfil gestor: atribuições carregadas e a ata é de outro → continua "Acesso não autorizado"', () => {
+      comoGestor();
+      vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({
+        contractKeys: [],
+        ataKeys: ['00099/2026'],
+        isLoading: false,
+        leituras: [{ rotulo: 'gestores das atas', query: { data: {}, isError: false, error: null, refetch: vi.fn() } }]
+      });
+      expect(renderPage()).toContain('Acesso não autorizado');
+    });
+
+    it('o saldo dos itens não carregou (3d): a faixa diz, e a aba Itens mostra "—" em vez de 0% e saldo cheio', () => {
+      mockSearch = 'aba=itens';
+      comoAdmin();
+      vi.spyOn(useAtaModule, 'useAtaItemSaldos').mockReturnValue({ saldos: [], isLoading: false, consulta: falhou() } as any);
+      vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({ contractKeys: undefined, ataKeys: undefined, isLoading: false });
+      const html = renderPage();
+      expect(html).toContain('data-testid="ata360-fontes-com-falha"');
+      expect(html).toContain('Parte da ata não carregou');
+      expect(html).toContain('<strong>Saldo dos itens</strong>');
+      expect(html).toContain('data-testid="ata-item-saldo-nao-carregou-1"');
+      expect(html).not.toMatch(/>0%</);
+      // Os itens da ata ficam.
+      expect(html).toContain('Colete Balístico Nível III-A');
+    });
+
+    it('os contratos vinculados não carregaram: a faixa diz, e o resto da ata fica', () => {
+      comoAdmin();
+      vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({
+        linkedContracts: [],
+        isLoading: false,
+        leituras: [{ rotulo: 'contratos vinculados à ata', query: falhou() }]
+      } as any);
+      vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({ contractKeys: undefined, ataKeys: undefined, isLoading: false });
+      const html = renderPage();
+      expect(html).toContain('<strong>Contratos vinculados à ata</strong>');
+      expect(html).toContain('Ata nº 00011/2026');
+    });
+
+    it('tudo carregou: sem faixa', () => {
+      comoAdmin();
+      vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({ contractKeys: undefined, ataKeys: undefined, isLoading: false });
+      expect(renderPage()).not.toContain('ata360-fontes-com-falha');
+    });
+  });
 });
 
 describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () => {
@@ -324,12 +410,14 @@ describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () =
       error: null,
       refetch: vi.fn()
     } as any);
-    vi.spyOn(useAtaModule, 'useAtaItemSaldos').mockReturnValue({ saldos: [], isLoading: false } as any);
+    vi.spyOn(useAtaModule, 'useAtaItemSaldos').mockReturnValue({
+      consulta: { data: [], isError: false, error: null, refetch: vi.fn() }, saldos: [], isLoading: false } as any);
   });
 
   it('estado vazio oferece "Vincular Contrato" para admin', () => {
     asRole('admin');
-    vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({ linkedContracts: [], isLoading: false } as any);
+    vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({
+      leituras: [], linkedContracts: [], isLoading: false } as any);
 
     const html = renderPage();
     expect(html).toContain('Nenhum contrato vinculado.');
@@ -339,6 +427,7 @@ describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () =
   it('leitor não vê ações de vincular/desvincular', () => {
     asRole('leitor');
     vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({
+      leituras: [],
       linkedContracts: [
         {
           linkId: 'l1',
@@ -367,6 +456,7 @@ describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () =
   it('admin vê "Desvincular" em cada vínculo e "Vincular Contrato" no cabeçalho da seção', () => {
     asRole('admin');
     vi.spyOn(useAtaModule, 'useAtaLinkedContracts').mockReturnValue({
+      leituras: [],
       linkedContracts: [
         {
           linkId: 'l1',

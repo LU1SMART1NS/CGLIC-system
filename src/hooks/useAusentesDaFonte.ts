@@ -14,11 +14,12 @@ export function useAusentesDaFonte() {
   const queryClient = useQueryClient();
   const { role } = useAuth();
 
-  const { data = [], isLoading } = useQuery<AusenteDaFonte[], Error>({
+  const consulta = useQuery<AusenteDaFonte[], Error>({
     queryKey: AUSENTES_DA_FONTE_QUERY_KEY,
     queryFn: fetchAusentesDaFonte,
     staleTime: 5 * 60 * 1000
   });
+  const { data = [], isLoading } = consulta;
 
   const porChave = useMemo(() => new Map(data.map((a) => [`${a.tipo}|${a.chave}`, a])), [data]);
 
@@ -33,5 +34,5 @@ export function useAusentesDaFonte() {
     }
   });
 
-  return { ausentes: data, porChave, isLoading, decidir, podeDecidir: role === 'admin' };
+  return { ausentes: data, porChave, isLoading, decidir, podeDecidir: role === 'admin', /** Para a faixa "não carregou". */ consulta };
 }

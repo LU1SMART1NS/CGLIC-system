@@ -19,11 +19,12 @@ export function useFornecedorAtaPncp() {
   const queryClient = useQueryClient();
   const { role } = useAuth();
 
-  const { data = [], isLoading } = useQuery<RegistroFornecedorPncp[], Error>({
+  const consulta = useQuery<RegistroFornecedorPncp[], Error>({
     queryKey: FORNECEDOR_ATA_PNCP_QUERY_KEY,
     queryFn: fetchRegistrosFornecedorPncp,
     staleTime: 5 * 60 * 1000
   });
+  const { data = [], isLoading } = consulta;
 
   const porControle = useMemo(() => new Map(data.map((r) => [r.numeroControlePncp, r])), [data]);
 
@@ -44,5 +45,5 @@ export function useFornecedorAtaPncp() {
     onSuccess: invalidate
   });
 
-  return { registros: data, porControle, isLoading, indicar, desfazer, podeIndicar: podeIndicarFornecedor(role) };
+  return { registros: data, porControle, isLoading, indicar, desfazer, podeIndicar: podeIndicarFornecedor(role), /** Para a faixa "não carregou". */ consulta };
 }

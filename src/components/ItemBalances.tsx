@@ -10,6 +10,11 @@ import { useItemUnidades } from '../hooks/useItemUnidades';
 import { useCadastroUasgs } from '../hooks/useCadastroUasgs';
 import { localDaUasg } from '../services/cadastroUasgsSyncService';
 import { escolherAdesoes, useItemAdesoes } from '../hooks/useItemAdesoes';
+import { FontesComFalhaAviso } from './fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha, type LeituraDaTela } from './fonte/useLeiturasComFalha';
+import { ROTULO_SALDO_ITENS } from '../hooks/useAtasPortfolio';
+import { ROTULO_GRUPOS_UASGS } from '../hooks/useGruposGti';
+import { ROTULO_CONTRATOS_DO_ITEM } from '../hooks/useEmpenhoDoItem';
 import { useDepartments } from '../hooks/useDepartments';
 import { useItemAllocations } from '../hooks/useItemAllocations';
 import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
@@ -118,18 +123,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const unidades = unidadesDoItem?.unidades ?? EMPTY_UNIDADES;
   // Nome, cidade e UF dos órgãos no cadastro de UASGs (o nome da ata vem cortado em 45 letras).
   const cadastroUasgs = useCadastroUasgs(unidades.map((u) => String(u.codigoUnidade ?? '').replace(/\D/g, '')));
-  const { saldos: saldosDaAta } = useAtaItemSaldos(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
+  const { saldos: saldosDaAta, consulta: saldosDaAtaQuery } = useAtaItemSaldos(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
   const error = unidadesQueryError ? (unidadesQueryError.message || 'Erro ao buscar saldos por unidade.') : null;
 
-  const {
-    data: leituraAdesoes,
-    isLoading: adesoesLoading,
-    error: adesoesQueryError
-  } = useItemAdesoes(
+  const adesoesQuery = useItemAdesoes(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
     item.numeroItem
   );
+  const { data: leituraAdesoes, isLoading: adesoesLoading, error: adesoesQueryError } = adesoesQuery;
   // A resposta vazia só vale como "nenhuma adesão" quando os órgãos do item vieram da API agora.
   const adesoesDoItem = React.useMemo(
     () => escolherAdesoes(leituraAdesoes, loading ? undefined : unidadesDoItem?.origem),
@@ -206,7 +208,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const canonicalItemKey = normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
 
   // Contratado por unidade (migration 103): quantidade de cada contrato (fonte, ajuste) e a divisão entre as unidades.
-  const { data: contratadoDoItem } = useContratadoDoItem(canonicalItemKey);
+  const { data: contratadoDoItem, consulta: contratadoDoItemQuery } = useContratadoDoItem(canonicalItemKey);
   const quantidadePorContrato = useMemo(
     () => new Map(contratadoDoItem.contratos.map((c) => [c.contractKey, c])),
     [contratadoDoItem.contratos]
@@ -216,13 +218,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const [contratoDividindo, setContratoDividindo] = useState<ContratoParaDividir | null>(null);
 
   // Vínculos Oficiais com Contratos do CGLIC (Fase 6.2)
-  const { data: contractLinks = [] } = useItemContractLinks(
+  const contractLinksQuery = useItemContractLinks(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
     item.numeroItem,
     canonicalItemKey
   );
-  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = useContractsDashboard(carteiraDaAta(arp));
+  const { data: contractLinks = [] } = contractLinksQuery;
+  const officialContractsQuery = useContractsDashboard(carteiraDaAta(arp));
+  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = officialContractsQuery;
   const unlinkContractMutation = useUnlinkContractFromItem();
   const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
@@ -280,7 +284,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   // Empenho do item: as parcelas deste item nas notas vinculadas aos itens dos contratos (migration 94) e as notas que
   // ainda faltam vincular. As notas dos contratos chegam pela sincronização do servidor, de hora em hora.
-  const { data: empenhoDoItem, isLoading: vinculosLoading, isReady: empenhoDoItemPronto } = useEmpenhoDoItem(canonicalItemKey);
+  const { data: empenhoDoItem, isLoading: vinculosLoading, isReady: empenhoDoItemPronto, leituras: leiturasDoEmpenho } = useEmpenhoDoItem(canonicalItemKey);
   const [notaParaVincular, setNotaParaVincular] = useState<DistribuicaoDoEmpenho | null>(null);
   // Quantidade da nota no item (migration 104): gravar, conferir e, se a nova quantidade não cabe na unidade, tirar a
   // nota de lá e avisar.
@@ -438,7 +442,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   );
   // Com a ata assinada informada (migration 109), a base do saldo e o limite da alocação são a cota própria:
   // o registrado da SENASP menos o que ela gerencia para os órgãos participantes.
-  const { data: quantitativos, isLoading: quantitativosLoading } = useQuantitativosDoItem(canonicalItemKey);
+  const { data: quantitativos, isLoading: quantitativosLoading, consulta: quantitativosQuery } = useQuantitativosDoItem(canonicalItemKey);
   // Só na ata da SENASP: na ata de outro órgão (migration 114) a base continua o registrado (ou o aprovado na adesão).
   const cotaPropriaInformada = !ataDeOutroOrgao(arp) && quantitativos.informado;
   const baseSaldo = (cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty) - descontoRegistradoAcima;
@@ -631,8 +635,34 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   });
 
   // Interesse por GTI (só na ata da SENASP): botão no cartão do topo e gaveta entre o cartão e as abas, como no Início.
-  const fatiasGti = useInteresseGti({ unidades, quantitativos, ataDaCglic });
+  const { fatias: fatiasGti, consulta: gruposGtiQuery } = useInteresseGti({ unidades, quantitativos, ataDaCglic });
   const [gtiAberto, setGtiAberto] = React.useState(false);
+
+  // Uma fonte que falha não vira "0% consumido", "nenhuma adesão" ou contratado e empenhado zerados: a faixa diz o
+  // que não carregou. Alocações e vínculos das notas às unidades têm o aviso próprio, dentro da aba.
+  const leiturasDaTela: LeituraDaTela[] = [
+    { rotulo: ROTULO_SALDO_ITENS, query: saldosDaAtaQuery },
+    { rotulo: 'ata assinada e órgãos do item', query: quantitativosQuery },
+    { rotulo: 'quantidade contratada do item', query: contratadoDoItemQuery },
+    { rotulo: 'adesões do item no Compras.gov.br', query: adesoesQuery },
+    // A API falhou e a tela mostra a cópia guardada pelo servidor: "não atualizou — mostrando a última leitura".
+    ...(leituraAdesoes?.falhaAoVivo && leituraAdesoes.copia
+      ? [{ rotulo: 'adesões do item no Compras.gov.br', query: { data: leituraAdesoes, isError: true, error: new Error(leituraAdesoes.falhaAoVivo), refetch: adesoesQuery.refetch } }]
+      : []),
+    ...(ataDaCglic ? [{ rotulo: ROTULO_GRUPOS_UASGS, query: gruposGtiQuery }] : []),
+    ...(verContratos
+      ? [
+          { rotulo: ROTULO_CONTRATOS_DO_ITEM, query: contractLinksQuery },
+          { rotulo: `contratos da UASG ${carteiraDaAta(arp)}`, query: officialContractsQuery },
+          ...leiturasDoEmpenho
+        ]
+      : [])
+  ];
+  const leituras = useLeiturasComFalha(leiturasDaTela);
+  // Nada que grava roda sobre leitura que falhou: sem o saldo ou a ata assinada, o limite da alocação (a cota própria)
+  // ficaria errado; sem a ata assinada, informar ou remanejar partiria de um quadro vazio.
+  const quantitativosNaoCarregaram = naoCarregou(quantitativosQuery);
+  const limiteDaAlocacaoNaoCarregou = naoCarregou(saldosDaAtaQuery) || quantitativosNaoCarregaram;
 
   // Papel da SENASP neste item (ata de outro órgão: participante ou adesão, migration 114).
   const papelDoAItem = papelDoItem(papelSenaspDaAta(arp), unidades, adesoesDaSenasp(adesoes));
@@ -651,6 +681,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     </NoticeBar>
   ) : null;
   const unidadesInternasDoItem = unidadesNaoCarregaram ? avisoUnidadesNaoCarregaram : (
+    <>
+    {limiteDaAlocacaoNaoCarregou && (
+      <NoticeBar tone="warning" testId="item-alocar-fechado">
+        O saldo ou a ata assinada do item não carregou: sem eles o limite da alocação ficaria errado. Dá para ver as
+        alocações, mas alocar fica fechado até carregar (use “Tentar novamente” no aviso acima).
+      </NoticeBar>
+    )}
     <AllocationsTab
       ugUasg={arp.codigoUnidadeGerenciadora}
       item={{
@@ -673,11 +710,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       contratosAConferir={contratosAConferir}
       departments={departments}
       departmentsLoading={departmentsLoading}
-      canManage={canManageAllocations}
-      canInformUnits={canEditData}
+      canManage={canManageAllocations && !limiteDaAlocacaoNaoCarregou}
+      canInformUnits={canEditData && !limiteDaAlocacaoNaoCarregou}
       error={allocationError}
       onGoToContracts={() => setActiveTab('contratos')}
     />
+    </>
   );
 
   const linkedContractsCount = enrichedOfficialLinks.length;
@@ -733,6 +771,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       />
       </Instrument360Head>
 
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="do item" testIdPrefix="item360-fontes" />
+
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'quantitativos' ? (
           ataDaCglic ? (
@@ -753,8 +793,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               registradoAcima={registradoAcima}
               pdfDaAta={formatPncpAtaPdfUrl(arp.numeroControlePncpAta)}
               pregaoItem={`${arp.numeroCompra ? `Pregão ${arp.numeroCompra}${arp.anoCompra ? `/${arp.anoCompra}` : ''} · ` : ''}item ${Number(item.numeroItem) || item.numeroItem}`}
-              podeInformar={canEditData}
-              podeRemanejar={canManageAllocations}
+              podeInformar={canEditData && !quantitativosNaoCarregaram}
+              podeRemanejar={canManageAllocations && !quantitativosNaoCarregaram}
               alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}
@@ -775,8 +815,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               contratadoSenasp={executionSummary.contratado}
               quantitativos={quantitativos}
               adesoes={adesoes}
-              podeInformar={canEditData}
-              podeRemanejar={canManageAllocations}
+              podeInformar={canEditData && !quantitativosNaoCarregaram}
+              podeRemanejar={canManageAllocations && !quantitativosNaoCarregaram}
               alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}

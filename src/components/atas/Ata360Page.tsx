@@ -9,7 +9,14 @@ import { useAuth } from '../../context/AuthContext';
 import { InstrumentPageState } from '../instrument360/InstrumentPageState';
 import { Ata360Header } from './Ata360Header';
 import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from '../gti/InteresseGti';
-import { useFatiasGti } from '../../hooks/useGruposGti';
+import { ROTULO_GTI_ATAS, useFatiasGtiLeitura } from '../../hooks/useGruposGti';
+import { useAtaManager } from '../../hooks/useAtaManagers';
+import { ROTULO_AVISOS_RESOLVIDOS, useAvisosResolvidos } from '../../hooks/useAvisosResolvidos';
+import { useVinculosAConferir } from '../../hooks/useVinculosAConferir';
+import { ROTULO_SALDO_ITENS } from '../../hooks/useAtasPortfolio';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha, type LeituraDaTela } from '../fonte/useLeiturasComFalha';
+import { EscopoNaoConferido, escopoNaoConferido } from '../instrument360/EscopoNaoConferido';
 import { chaveAtaGti } from '../../config/gruposGti';
 import { AtaActionQueue, type Ata360Tab } from './AtaActionQueue';
 import { useAtaActionQueue } from '../../hooks/useAtaActionQueue';
@@ -53,15 +60,21 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   const { arp, itens, isLoading, isError, error, refetch } = useAta(ataKey, uasg);
   // Interesse por GTI da ata (só nas atas da SENASP): a fatia é pelo valor de todos os itens (migration 141).
-  const fatiasGtiPorAta = useFatiasGti();
+  const { fatias: fatiasGtiPorAta, consulta: fatiasGtiQuery } = useFatiasGtiLeitura();
   const fatiasGti = arp && !ataDeOutroOrgao(arp) ? fatiasGtiPorAta.get(chaveAtaGti(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora)) : undefined;
   const [gtiAberto, setGtiAberto] = React.useState(false);
-  const { saldos, isLoading: loadingSaldos } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);
+  const { saldos, isLoading: loadingSaldos, consulta: saldosQuery } = useAtaItemSaldos(arp?.numeroAtaRegistroPreco, uasg);
+  const saldoNaoCarregou = naoCarregou(saldosQuery);
   // Carteira da CGLIC da ata (nas de outros órgãos, a UASG da SENASP): dela vêm contratos, gestores e escopo.
   const carteira = arp ? carteiraDaAta(arp) : uasg;
   const chaveGestao = arp ? chaveGestaoDaArp(arp) : '';
-  const { linkedContracts, isLoading: loadingLinks } = useAtaLinkedContracts(arp?.numeroAtaRegistroPreco, uasg, carteira);
-  const { data: taskPlan = null, isLoading: loadingTaskPlan } = useAtaTaskPlan(chaveGestao, Boolean(arp));
+  const { linkedContracts, isLoading: loadingLinks, leituras: leiturasDosContratos } = useAtaLinkedContracts(arp?.numeroAtaRegistroPreco, uasg, carteira);
+  const taskPlanQuery = useAtaTaskPlan(chaveGestao, Boolean(arp));
+  const { data: taskPlan = null, isLoading: loadingTaskPlan } = taskPlanQuery;
+  // Mesmas consultas (e o mesmo cache) do cabeçalho e da fila de ações: aqui só para a faixa "não carregou".
+  const gestorQuery = useAtaManager(chaveGestao);
+  const { consulta: avisosResolvidosQuery } = useAvisosResolvidos();
+  const { consulta: vinculosAConferirQuery } = useVinculosAConferir();
 
   // Ata publicada no PNCP sem fornecedor (atas_fornecedor_pncp): pendência, indicação do coordenador e conferência.
   const fornecedorPncp = useFornecedorAtaPncp();
@@ -79,12 +92,30 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
     tabs: saldosOnly ? SALDOS_TAB_IDS : TAB_IDS,
     defaultTab: saldosOnly ? 'itens' : 'acoes'
   });
-  const { ataKeys: assignedAtaKeys, isLoading: loadingScope } = useAssignedManagementScope(carteira);
+  const { ataKeys: assignedAtaKeys, isLoading: loadingScope, leituras: leiturasDoEscopo } = useAssignedManagementScope(carteira);
   const isScopedRole = role === 'gestor';
   const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(chaveGestao));
   // Mesma regra das RPCs link/unlink_contract_to_item_atomic (has_role gestor/admin)
   const canEditLinks = role === 'admin' || role === 'gestor';
   // O quantitativo SENASP dos itens é gravado em segundo plano (pelo servidor, de hora em hora); a tela só lê.
+
+  // Uma fonte que falha não vira "0% consumido", "sem plano" ou "nenhum contrato": a faixa diz o que não carregou.
+  // O gestor de saldo vê só os itens: a faixa fica com o saldo e o GTI.
+  const leiturasDaTela: LeituraDaTela[] = [
+    { rotulo: ROTULO_SALDO_ITENS, query: saldosQuery },
+    { rotulo: ROTULO_GTI_ATAS, query: fatiasGtiQuery },
+    ...(saldosOnly
+      ? []
+      : [
+          ...leiturasDosContratos,
+          { rotulo: 'plano de gestão da ata', query: taskPlanQuery },
+          { rotulo: 'gestor da ata', query: gestorQuery },
+          { rotulo: 'atas sem fornecedor no PNCP', query: fornecedorPncp.consulta },
+          { rotulo: ROTULO_AVISOS_RESOLVIDOS, query: avisosResolvidosQuery },
+          { rotulo: 'vínculos a conferir', query: vinculosAConferirQuery }
+        ])
+  ];
+  const leituras = useLeiturasComFalha(leiturasDaTela);
 
   const [isLinkModalOpen, setIsLinkModalOpen] = React.useState(false);
   const unlinkMutation = useUnlinkContractFromItem();
@@ -172,6 +203,11 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
     return <InstrumentPageState kind="loading" title="Verificando permissão de acesso..." />;
   }
 
+  // A leitura das atribuições falhou: não dá para saber se a ata é do gestor. A faixa, e não "Acesso não autorizado".
+  if (!isOwnAta && escopoNaoConferido(isScopedRole, leiturasDoEscopo)) {
+    return <EscopoNaoConferido leituras={leiturasDoEscopo ?? []} oQueConferir="esta ata está atribuída a você" backLabel={back.label} onBack={back.back} />;
+  }
+
   if (isScopedRole && !isOwnAta) {
     return (
       <InstrumentPageState
@@ -256,6 +292,8 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
       />
       </Instrument360Head>
 
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da ata" testIdPrefix="ata360-fontes" />
+
       <Instrument360TabPanel idPrefix="ata" activeTab={activeTab}>
         {activeTab === 'acoes' && (
           <InstrumentSection
@@ -298,6 +336,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
             <AtaItemsTable
               itens={itens}
               saldos={saldos}
+              saldoNaoCarregou={saldoNaoCarregou}
               onSelectItem={(item) =>
                 navigate(buildAtaItemPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem))
               }

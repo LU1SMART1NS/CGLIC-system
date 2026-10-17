@@ -64,3 +64,38 @@ describe('ItemBalancesRoute — endereço próprio do item', () => {
     expect(html).toContain('00059/2025|00003');
   });
 });
+
+describe('ItemBalancesRoute — uma leitura falha: a tela diz o quê', () => {
+  const falhou = () => ({ data: undefined, isError: true, error: new Error('canceling statement due to statement timeout'), refetch: vi.fn() });
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    mockParams = { ataKey: encodeURIComponent('00043/2026-200331'), numeroItem: '3' };
+  });
+
+  it('as atas não carregaram (3a): erro com "Tentar novamente", e não "Ata não encontrada"', () => {
+    setRole('admin');
+    vi.spyOn(useAtaModule, 'useAta').mockReturnValue({ arp: null, itens: [], isLoading: false, isError: true, error: new Error('canceling statement due to statement timeout'), refetch: vi.fn() } as any);
+    const html = renderToStaticMarkup(<ItemBalancesRoute />);
+    expect(html).toContain('Falha ao carregar a ata do item');
+    expect(html).toContain('canceling statement due to statement timeout');
+    expect(html).toContain('Tentar novamente');
+    expect(html).not.toContain('Ata não encontrada');
+  });
+
+  it('perfil gestor: as atribuições não carregaram → a faixa, e não "Acesso não autorizado"', () => {
+    vi.spyOn(useAtaModule, 'useAta').mockReturnValue({ arp: { numeroAtaRegistroPreco: '00043/2026', codigoUnidadeGerenciadora: '200331' }, itens: [{ numeroItem: '00003' }], isLoading: false } as any);
+    vi.spyOn(authModule, 'useAuth').mockReturnValue({ user: { id: 'u' }, role: 'gestor' } as any);
+    vi.spyOn(scopeModule, 'useAssignedManagementScope').mockReturnValue({
+      contractKeys: [],
+      ataKeys: [],
+      isLoading: false,
+      leituras: [{ rotulo: 'vínculos entre itens de ata e contratos', query: falhou() }]
+    });
+    const html = renderToStaticMarkup(<ItemBalancesRoute />);
+    expect(html).toContain('data-testid="instrument-state-escopo-nao-conferido"');
+    expect(html).toContain('<strong>Vínculos entre itens de ata e contratos</strong>');
+    expect(html).not.toContain('Acesso não autorizado');
+    expect(html).not.toContain('item-balances');
+  });
+});

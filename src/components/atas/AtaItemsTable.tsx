@@ -26,6 +26,8 @@ interface AtaItemsTableProps {
   /** Sem itens: explicação e ação (ex.: ata publicada no PNCP sem fornecedor → "Indicar fornecedor"). */
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
+  /** O saldo dos itens não carregou: Qtd. SENASP, consumido, saldo e saldo usado ficam em "—", e não 0% e saldo cheio. */
+  saldoNaoCarregou?: boolean;
 }
 
 
@@ -48,7 +50,7 @@ const SORT_COLUMNS: Record<string, CarteiraSortColumn<ItemRow>> = {
   usado: { value: (r) => r.percentualConsumido, firstDir: 'desc' }
 };
 
-export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onSelectItem, emptyDescription, emptyAction }) => {
+export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onSelectItem, emptyDescription, emptyAction, saldoNaoCarregou = false }) => {
   const rows = useMemo<ItemRow[]>(() => {
     const saldoByItem = new Map(saldos.map((s) => [String(Number(s.numero_item)), s]));
     return itens.map((item) => {
@@ -120,16 +122,20 @@ export const AtaItemsTable: React.FC<AtaItemsTableProps> = ({ itens, saldos, onS
                     </div>
                   </td>
                   <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrencyOrDash(item.valorUnitario)}</td>
-                  <td data-label="Qtd. SENASP" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdHomologada)}</td>
-                  <td data-label="Consumido" style={{ ...carteiraTd, textAlign: 'right' }}>{formatQtd(qtdConsumida)}</td>
-                  <td data-label="Saldo" style={{ ...carteiraTd, textAlign: 'right', fontWeight: 800 }}>{formatQtd(saldoDisponivel)}</td>
+                  <td data-label="Qtd. SENASP" style={{ ...carteiraTd, textAlign: 'right' }}>{saldoNaoCarregou ? '—' : formatQtd(qtdHomologada)}</td>
+                  <td data-label="Consumido" style={{ ...carteiraTd, textAlign: 'right' }}>{saldoNaoCarregou ? '—' : formatQtd(qtdConsumida)}</td>
+                  <td data-label="Saldo" style={{ ...carteiraTd, textAlign: 'right', fontWeight: 800 }}>{saldoNaoCarregou ? '—' : formatQtd(saldoDisponivel)}</td>
                   <td data-label="Saldo usado" style={carteiraTd}>
+                    {saldoNaoCarregou ? (
+                      <span data-testid={`ata-item-saldo-nao-carregou-${item.numeroItem}`} style={{ color: '#94a3b8' }}>—</span>
+                    ) : (
                     <div style={{ minWidth: '84px' }}>
                       <span style={{ fontWeight: 800 }}>{percentualConsumido.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</span>
                       <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', marginTop: '0.2rem', overflow: 'hidden' }}>
                         <div style={{ width: `${Math.min(100, Math.max(0, percentualConsumido))}%`, height: '100%', background: saldoBarColor(percentualConsumido) }} />
                       </div>
                     </div>
+                    )}
                   </td>
                 </tr>
               );

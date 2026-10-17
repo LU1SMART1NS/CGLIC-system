@@ -180,3 +180,54 @@ describe('Contract360Page — organização em abas', () => {
     expect(html).not.toContain('Linha do tempo contratual');
   });
 });
+
+describe('Contract360Page — uma leitura falha: a faixa avisa e o resto fica', () => {
+  const falhou = () => ({ data: undefined, isError: true, error: new Error('canceling statement due to statement timeout'), refetch: vi.fn() });
+  const comPerfil = (role: 'admin' | 'gestor') =>
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: `${role}-user` } as any,
+      session: null,
+      loading: false,
+      role,
+      roleStatus: 'ready',
+      signOut: vi.fn()
+    });
+
+  beforeEach(() => {
+    vi.spyOn(useContractModule, 'useContract').mockReturnValue({ contract: mockContract, isLoading: false, isError: false, error: null, refetch: vi.fn() } as any);
+    vi.spyOn(useContractTaskPlanModule, 'useContractTaskPlan').mockReturnValue({ data: null, isLoading: false, isError: false, refetch: vi.fn() } as any);
+    vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({ contractKeys: undefined, ataKeys: undefined, isLoading: false });
+  });
+
+  it('perfil gestor: as atribuições não carregaram → a faixa, e não "Acesso não autorizado"', () => {
+    comPerfil('gestor');
+    vi.spyOn(useAssignedManagementScopeModule, 'useAssignedManagementScope').mockReturnValue({
+      contractKeys: [],
+      ataKeys: [],
+      isLoading: false,
+      leituras: [{ rotulo: 'gestores dos contratos', query: falhou() }]
+    });
+    const html = renderPage();
+    expect(html).toContain('data-testid="instrument-state-escopo-nao-conferido"');
+    expect(html).toContain('<strong>Gestores dos contratos</strong>');
+    expect(html).toContain('não dá para conferir se este contrato está atribuído a você');
+    expect(html).not.toContain('Acesso não autorizado');
+    expect(html).not.toContain('Beta Tecnologia e Inovação S/A');
+  });
+
+  it('o plano de gestão não carregou (3j): a faixa diz, e não "sem plano" calado; o contrato fica', () => {
+    comPerfil('admin');
+    vi.spyOn(useContractTaskPlanModule, 'useContractTaskPlan').mockReturnValue({ ...falhou(), isLoading: false } as any);
+    const html = renderPage();
+    expect(html).toContain('data-testid="contrato360-fontes-com-falha"');
+    expect(html).toContain('Parte do contrato não carregou');
+    expect(html).toContain('<strong>Plano de gestão do contrato</strong>');
+    expect(html).toContain('Beta Tecnologia e Inovação S/A');
+    expect(html).toContain('data-testid="contract-health-strip"');
+  });
+
+  it('tudo carregou: sem faixa', () => {
+    comPerfil('admin');
+    expect(renderPage()).not.toContain('contrato360-fontes-com-falha');
+  });
+});

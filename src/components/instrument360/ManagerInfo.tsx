@@ -6,12 +6,14 @@ import { UserCheck, UserCircle2 } from 'lucide-react';
  * Gestor titular no topo das telas 360 — só informação. A atribuição fica na
  * Carteira (de Contratos ou de Atas), onde dá para atribuir vários de uma vez.
  */
-export const ManagerInfo: React.FC<{ label: string; gestorNome?: string; isLoading?: boolean; testId: string }> = ({
-  label,
-  gestorNome,
-  isLoading = false,
-  testId
-}) => {
+export const ManagerInfo: React.FC<{
+  label: string;
+  gestorNome?: string;
+  isLoading?: boolean;
+  /** A leitura do gestor falhou sem leitura anterior: "não carregou", e não "Não atribuído". */
+  naoCarregou?: boolean;
+  testId: string;
+}> = ({ label, gestorNome, isLoading = false, naoCarregou = false, testId }) => {
   const assigned = Boolean(gestorNome);
   return (
     <div data-testid={testId} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
@@ -34,7 +36,17 @@ export const ManagerInfo: React.FC<{ label: string; gestorNome?: string; isLoadi
       <div>
         <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>{label}</div>
         <div style={{ fontSize: '0.85rem', fontWeight: assigned ? 700 : 400, color: assigned ? '#0f172a' : '#94a3b8', fontStyle: assigned ? 'normal' : 'italic' }}>
-          {isLoading ? <SkeletonLoader variant="text" width="120px" testId="manager-info-loading" /> : gestorNome || 'Não atribuído'}
+          {isLoading ? (
+            <SkeletonLoader variant="text" width="120px" testId="manager-info-loading" />
+          ) : gestorNome ? (
+            gestorNome
+          ) : naoCarregou ? (
+            <span data-testid={`${testId}-nao-carregou`} style={{ color: 'var(--color-warning-text-strong)' }}>
+              Não carregou
+            </span>
+          ) : (
+            'Não atribuído'
+          )}
         </div>
       </div>
     </div>

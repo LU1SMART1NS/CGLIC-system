@@ -45,16 +45,24 @@ export function useUasgsParticipantesGti() {
   return useQuery({ queryKey: PARTICIPANTES_KEY, queryFn: fetchUasgsParticipantesGti, staleTime: 60 * 1000 });
 }
 
-/** Grupo confirmado das UASGs (aba Órgãos e quantitativos do item). */
-export function useGruposDasUasgs(uasgs: string[]): Map<string, GrupoConfirmavel> {
+/** Rótulo dos grupos das UASGs na faixa "não carregou" (sem eles, todo órgão aparece "a confirmar"). */
+export const ROTULO_GRUPOS_UASGS = 'grupo (GTI) dos órgãos';
+
+/** Grupo confirmado das UASGs, com a consulta para a faixa "não carregou". */
+export function useGruposDasUasgsLeitura(uasgs: string[]) {
   const codigos = [...new Set(uasgs.filter((u) => /^\d{6}$/.test(u)))].sort();
-  const query = useQuery({
+  const consulta = useQuery({
     queryKey: [GRUPOS_KEY, codigos.join(',')],
     queryFn: () => fetchGruposDasUasgs(codigos),
     enabled: codigos.length > 0,
     staleTime: 10 * 60 * 1000
   });
-  return query.data ?? VAZIO_GRUPOS;
+  return { grupos: consulta.data ?? VAZIO_GRUPOS, consulta };
+}
+
+/** Grupo confirmado das UASGs (aba Órgãos e quantitativos do item). */
+export function useGruposDasUasgs(uasgs: string[]): Map<string, GrupoConfirmavel> {
+  return useGruposDasUasgsLeitura(uasgs).grupos;
 }
 
 export function useDefinirGruposUasgs() {
