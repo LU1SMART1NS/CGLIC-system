@@ -93,8 +93,8 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemGruposUasgs).mockReturnValue(null);
   });
 
-  it('Ajustes (coordenador): UASGs a confirmar, e o clique abre Grupos das UASGs em "A confirmar"', () => {
-    vi.mocked(useContagemGruposUasgs).mockReturnValue(12);
+  it('Ajustes (coordenador): UASGs sem grupo confirmado, e o clique abre Grupos das UASGs em "A confirmar"', () => {
+    vi.mocked(useContagemGruposUasgs).mockReturnValue({ aConfirmar: 9, semSugestao: 3 });
     const html = menu();
     expect(html).toMatch(/data-testid="rail-count-configuracoes"[^>]*>12</);
     expect(html).toContain('href="/admin/grupos-uasgs?situacao=A_CONFIRMAR"');

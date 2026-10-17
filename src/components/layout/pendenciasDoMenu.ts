@@ -12,8 +12,8 @@ export interface FontesDoMenu {
   empenhos: { aosItens: number; aoContrato: number } | null;
   financeiro: { total: number; urgente: boolean } | null;
   extras: ContagensExtras;
-  /** UASGs com grupo (GTI) a confirmar; só o coordenador recebe número. */
-  gruposUasgs?: number | null;
+  /** UASGs sem grupo (GTI) confirmado, com e sem sugestão; só o coordenador recebe número. */
+  gruposUasgs?: { aConfirmar: number; semSugestao: number } | null;
 }
 
 /**
@@ -46,8 +46,15 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs }: 
   // Financeiro: "Precisa de ação" de Pagamentos (segmento padrão da página); vermelho com erro no SIAFI ou prazo vencido.
   if (financeiro && financeiro.total > 0) r['execucao-financeira'] = { contagem: financeiro.total, vermelho: financeiro.urgente, destino: '/pagamentos' };
 
-  // Ajustes (coordenador): UASGs com grupo sugerido a confirmar, na aba "A confirmar" de Grupos das UASGs.
-  if ((gruposUasgs ?? 0) > 0) r.configuracoes = { contagem: gruposUasgs!, destino: '/admin/grupos-uasgs?situacao=A_CONFIRMAR' };
+  // Ajustes (coordenador): UASGs sem grupo confirmado; abre em "A confirmar" e, sem nenhuma lá, em "Sem sugestão".
+  const aConfirmar = gruposUasgs?.aConfirmar ?? 0;
+  const semSugestao = gruposUasgs?.semSugestao ?? 0;
+  if (aConfirmar + semSugestao > 0) {
+    r.configuracoes = {
+      contagem: aConfirmar + semSugestao,
+      destino: `/admin/grupos-uasgs?situacao=${aConfirmar > 0 ? 'A_CONFIRMAR' : 'SEM_SUGESTAO'}`
+    };
+  }
 
   return r;
 }
