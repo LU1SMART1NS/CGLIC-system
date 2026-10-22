@@ -76,6 +76,24 @@ describe('ContractTasksSection — plano editável pelo gestor', () => {
     expect(html).toContain('Resp: João Fiscal');
   });
 
+  it('mostra o número SEI ao lado da tarefa concluída, com botão de copiar', () => {
+    const comSei: ContractTaskPlan = {
+      ...plan,
+      macrotarefas: [
+        {
+          ...plan.macrotarefas[0],
+          tarefas: [{ ...plan.macrotarefas[0].tarefas[0], status: 'CONCLUIDA', seiNumero: '28451237' }, plan.macrotarefas[0].tarefas[1]]
+        }
+      ]
+    };
+    const html = renderToStaticMarkup(<ContractTasksSection contract={contract} plan={comSei} />);
+    expect(html.match(/data-testid="numero-sei-tarefa"/g)).toHaveLength(1);
+    expect(html).toContain('>28451237<');
+    expect(html).toContain('aria-label="Copiar número SEI 28451237"');
+    // A pergunta só abre ao clicar em Concluída.
+    expect(html).not.toContain('Esta tarefa tem número SEI?');
+  });
+
   it('marca tarefas criadas pelo gestor como Personalizada', () => {
     const html = renderToStaticMarkup(<ContractTasksSection contract={contract} plan={plan} />);
     expect(html.match(/Personalizada/g)).toHaveLength(1);

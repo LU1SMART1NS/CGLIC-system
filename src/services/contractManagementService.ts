@@ -256,7 +256,8 @@ export async function fetchContractTaskPlan(contractKey: string): Promise<Contra
       criadoEm: t.criado_em,
       atualizadoEm: t.atualizado_em,
       concluidoEm: t.concluido_em || undefined,
-      concluidoPor: t.concluido_por || undefined
+      concluidoPor: t.concluido_por || undefined,
+      seiNumero: t.sei_numero || undefined
     });
     tasksByMacrotask.set(t.macrotask_id, list);
   }
@@ -342,7 +343,8 @@ export async function fetchAllContractTaskPlans(uasg?: string): Promise<Record<s
         criadoEm: t.criado_em,
         atualizadoEm: t.atualizado_em,
         concluidoEm: t.concluido_em || undefined,
-        concluidoPor: t.concluido_por || undefined
+        concluidoPor: t.concluido_por || undefined,
+        seiNumero: t.sei_numero || undefined
       });
       tasksByMacrotask.set(t.macrotask_id, list);
     }
