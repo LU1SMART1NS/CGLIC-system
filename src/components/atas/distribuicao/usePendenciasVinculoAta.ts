@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useAtasPortfolio, getArpPrazo } from '../../../hooks/useAtasPortfolio';
 import { useContractsPortfolio } from '../../../hooks/useContractsPortfolio';
 import { useArpItemContractLinks } from '../../../hooks/useAtaManagers';
-import { useContratosSemAta } from '../../../hooks/useContratosSemAta';
+import { useContratosSemAta, useMarcasSemAtaDesfeitas } from '../../../hooks/useContratosSemAta';
 import { useDescartesAtaContrato } from '../../../hooks/useDescartesAtaContrato';
 import { useMotivosVinculoManual } from '../../../hooks/useVinculoAutomatico';
 import { useNumerosDosItensDosContratos } from '../../../hooks/useItensDoContrato';
@@ -12,7 +12,7 @@ import type { ItemDaAta } from './vinculoEmMassa';
 import { chaveGestaoDaArp } from '../../../utils/ataIdentidade';
 import type { EstadoMotivos } from '../../../utils/vinculoAutomatico';
 import type { ArpItemContractLinkPair } from '../../../services/arpContractLinkService';
-import type { ContratoSemAtaConfirmacao } from '../../../services/contratoSemAtaService';
+import type { ContratoSemAtaConfirmacao, MarcaSemAtaDesfeita } from '../../../services/contratoSemAtaService';
 import type { DescarteAtaContrato } from '../../../services/contratoAtaDescarteService';
 import { ROTULO_VINCULOS_ITEM_CONTRATO } from '../../../hooks/useAssignedManagementScope';
 import { naoCarregou, type LeituraDaTela } from '../../fonte/useLeiturasComFalha';
@@ -25,6 +25,7 @@ import { naoCarregou, type LeituraDaTela } from '../../fonte/useLeiturasComFalha
 const SEM_LINKS: ArpItemContractLinkPair[] = [];
 const SEM_CONFIRMACOES: Record<string, ContratoSemAtaConfirmacao> = {};
 const SEM_DESCARTES: Record<string, DescarteAtaContrato> = {};
+const SEM_DESFEITAS: Record<string, MarcaSemAtaDesfeita> = {};
 
 /**
  * `pendencias: true` lê também o painel do Início (pendências de cada contrato), que só a carga dos gestores usa: a
@@ -37,6 +38,8 @@ export function usePendenciasVinculoAta({ pendencias: comPendencias = false }: {
   const { data: links = SEM_LINKS, isLoading: linksLoading } = linksQuery;
   const semAtaQuery = useContratosSemAta();
   const { data: confirmacoesSemAta = SEM_CONFIRMACOES, isLoading: semAtaLoading } = semAtaQuery;
+  const desfeitasQuery = useMarcasSemAtaDesfeitas();
+  const { data: marcasDesfeitasPorChave = SEM_DESFEITAS } = desfeitasQuery;
   const descartesQuery = useDescartesAtaContrato();
   const { data: descartesAta = SEM_DESCARTES } = descartesQuery;
   const motivosQuery = useMotivosVinculoManual();
@@ -90,6 +93,10 @@ export function usePendenciasVinculoAta({ pendencias: comPendencias = false }: {
   );
   const vinculosDoContrato = useMemo(() => agruparVinculos(links, (n) => atas.gestorByAta[n]), [links, atas.gestorByAta]);
   const descartes = useMemo(() => new Set(Object.keys(descartesAta)), [descartesAta]);
+  const marcasDesfeitas = useMemo(
+    () => new Map(Object.values(marcasDesfeitasPorChave).map((m) => [m.contractKey, { porNome: m.desfeitoPorNome, em: m.desfeitoEm }])),
+    [marcasDesfeitasPorChave]
+  );
   const gestorPorContrato = useMemo(() => new Map(contratos.rows.map((r) => [r.contractKey, r.gestorNome])), [contratos.rows]);
   const gestorDoContrato = React.useCallback((contractKey: string) => gestorPorContrato.get(contractKey), [gestorPorContrato]);
   // Contrato em mais de uma ata (migration 86): os vinculados com outra ata provável podem estar com item faltando.
@@ -106,9 +113,10 @@ export function usePendenciasVinculoAta({ pendencias: comPendencias = false }: {
         vinculosDoContrato,
         itensDoContrato,
         naoPertencemAAta: new Set(Object.keys(confirmacoesSemAta)),
+        marcasDesfeitas,
         descartes
       }),
-    [contratosFila, atasFila, vinculosDoContrato, itensDoContrato, confirmacoesSemAta, descartes]
+    [contratosFila, atasFila, vinculosDoContrato, itensDoContrato, confirmacoesSemAta, marcasDesfeitas, descartes]
   );
   const atasPorChave = useMemo(() => new Map(atasFila.map((a) => [`${a.numeroAta}-${a.uasg}`, a])), [atasFila]);
   const ataDe = React.useCallback((numeroAta: string, uasg: string) => atasPorChave.get(`${numeroAta}-${uasg}`), [atasPorChave]);
@@ -136,6 +144,7 @@ export function usePendenciasVinculoAta({ pendencias: comPendencias = false }: {
     ...(contratos.leiturasDosContratos ?? []),
     { rotulo: ROTULO_VINCULOS_ITEM_CONTRATO, query: linksQuery },
     { rotulo: 'contratos marcados "não pertence a ata"', query: semAtaQuery },
+    { rotulo: 'marcas "não pertence a ata" desfeitas', query: desfeitasQuery },
     { rotulo: 'atas descartadas', query: descartesQuery }
   ];
   /**

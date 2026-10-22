@@ -223,7 +223,8 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
         gestorAta: s?.gestorNome,
         gestorContrato: l.gestorNome,
         vinculoParcial: Boolean(l.atasVinculadas?.length),
-        motivos: motivosEstado
+        motivos: motivosEstado,
+        marcaDesfeita: l.marcaDesfeita
       });
     },
     [motivos, motivosEstado]
@@ -424,9 +425,25 @@ export const ContratosSemVinculoFila: React.FC<ContratosSemVinculoFilaProps> = (
     }
   };
 
+  /** Desfazer o "não pertence": o contrato volta à fila (migration 152), com o gestor atual até a nova decisão. */
   const desfazerMarcacao = async (l: Linha) => {
+    const ok = await confirmDialog({
+      title: `Desfazer a marca do contrato ${l.numero}?`,
+      message: (
+        <>
+          <p style={{ margin: '0 0 0.75rem' }}>
+            Ele volta para a fila de Vínculos para você decidir de novo: vincular a uma ata ou marcar outra vez que não pertence a nenhuma.
+          </p>
+          {l.gestorNome && <p style={{ margin: 0, color: '#64748b' }}>O gestor continua o mesmo ({l.gestorNome}) até você decidir.</p>}
+        </>
+      ),
+      confirmLabel: 'Desfazer a marca'
+    });
+    if (!ok) return;
     try {
       await desfazer.mutateAsync(l.contractKey);
+      const destino = l.fortes.length > 0 ? ROTULO_GRUPO.ATA_PROVAVEL : l.sugestoes.length > 0 ? ROTULO_GRUPO.PARCIAL : ROTULO_GRUPO.SEM_PISTA;
+      toast.success(`Marca desfeita. O contrato ${l.numero} voltou para a fila em "${destino}".`);
     } catch (err: any) {
       toast.error(`Não foi possível desfazer: ${err?.message || 'erro desconhecido'}`);
     }

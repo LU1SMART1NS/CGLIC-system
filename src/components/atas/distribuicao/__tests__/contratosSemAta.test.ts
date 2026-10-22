@@ -110,6 +110,30 @@ describe('buildPendenciasDistribuicao', () => {
     ]);
   });
 
+  it('marca "não pertence" desfeita: o contrato com gestor e sem ata provável volta à decisão; marcado de novo, sai', () => {
+    const marcasDesfeitas = new Map([['desfeito', { porNome: 'Luís', em: '2026-10-22T12:00:00Z' }]]);
+    const p = buildPendenciasDistribuicao({
+      contratos: [contrato('desfeito', { ...SEM_PISTA, gestorNome: 'Maria' }), contrato('so-gestor', { ...SEM_PISTA, gestorNome: 'Bruno' })],
+      atas: [ata('00001/2025')],
+      vinculosDoContrato: new Map(),
+      naoPertencemAAta: new Set(),
+      marcasDesfeitas
+    });
+    expect(p.precisamDecisao.map((i) => [i.contractKey, i.gestorNome, i.marcaDesfeita?.porNome])).toEqual([['desfeito', 'Maria', 'Luís']]);
+    // Contrato com gestor e sem marca desfeita continua fora da fila (como antes).
+    expect(p.aVincular).toEqual([]);
+
+    const remarcado = buildPendenciasDistribuicao({
+      contratos: [contrato('desfeito', { ...SEM_PISTA, gestorNome: 'Maria' })],
+      atas: [ata('00001/2025')],
+      vinculosDoContrato: new Map(),
+      naoPertencemAAta: new Set(['desfeito']),
+      marcasDesfeitas
+    });
+    expect(remarcado.precisamDecisao).toEqual([]);
+    expect(remarcado.naoPertencem.map((i) => i.contractKey)).toEqual(['desfeito']);
+  });
+
   it('conta contratos a vincular por gestor da ata provável', () => {
     const p = base();
     expect(p.aVincularPorGestor.get('Ana')).toEqual([{ contractKey: 'provavel-ana', numero: 'provavel-ana', numeroAta: '00003/2025', uasg: '200331' }]);

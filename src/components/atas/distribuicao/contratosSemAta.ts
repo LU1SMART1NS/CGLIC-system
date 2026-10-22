@@ -79,6 +79,11 @@ export interface ItemFila extends FilaContrato {
   atasVinculadas?: AtaVinculada[];
   /** Itens do contrato ainda sem ata (só no vínculo parcial). */
   itensFaltando?: number[];
+  /**
+   * O coordenador desfez a marca "não pertence a ata" (migration 152): o contrato volta à fila mesmo com gestor, até
+   * ser vinculado ou marcado de novo.
+   */
+  marcaDesfeita?: { porNome?: string; em?: string };
 }
 
 export interface AtaSemGestor {
@@ -243,6 +248,8 @@ export function buildPendenciasDistribuicao(input: {
   itensDoContrato?: Map<string, number[]>;
   /** contract_key marcados "não pertence a ata". */
   naoPertencemAAta: Set<string>;
+  /** contract_key → marca "não pertence a ata" desfeita (quem e quando). */
+  marcasDesfeitas?: ReadonlyMap<string, { porNome?: string; em?: string }>;
   /** "contract_key|NÚMERO-UASG" das atas que o coordenador descartou para o contrato. */
   descartes?: Set<string>;
 }): PendenciasDistribuicao {
@@ -281,7 +288,8 @@ export function buildPendenciasDistribuicao(input: {
       continue;
     }
     // Atas descartadas para o contrato não entram nas sugestões; sobrando outra ata provável, ele segue em "A vincular".
-    const item: ItemFila = { ...contrato, ...sugerirAtas(contrato, input.atas.filter((a) => !descartadaPara(a))) };
+    const desfeita = input.marcasDesfeitas?.get(contrato.contractKey);
+    const item: ItemFila = { ...contrato, ...sugerirAtas(contrato, input.atas.filter((a) => !descartadaPara(a))), ...(desfeita ? { marcaDesfeita: desfeita } : {}) };
     if (input.naoPertencemAAta.has(contrato.contractKey)) {
       naoPertencem.push(item);
       continue;
@@ -307,7 +315,8 @@ export function buildPendenciasDistribuicao(input: {
       }
     }
     if (fortes.length > 0) aVincular.push(item);
-    else if (!contrato.gestorNome) precisamDecisao.push(item);
+    // Com gestor, só volta à decisão quem teve a marca "não pertence" desfeita.
+    else if (!contrato.gestorNome || desfeita) precisamDecisao.push(item);
   }
 
   const atasSemGestor: AtaSemGestor[] = [];
