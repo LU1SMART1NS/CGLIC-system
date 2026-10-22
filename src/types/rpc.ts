@@ -352,6 +352,7 @@ export interface RpcContractTaskItem {
   atualizado_em: string;
   concluido_em?: string | null;
   concluido_por?: string | null;
+  sei_numero?: string | null;
 }
 
 export interface RpcUpdateContractTaskResult {
@@ -452,6 +453,7 @@ export interface RpcAtaTaskItem {
   atualizado_em: string;
   concluido_em?: string | null;
   concluido_por?: string | null;
+  sei_numero?: string | null;
 }
 
 export interface RpcUpdateAtaTaskResult {

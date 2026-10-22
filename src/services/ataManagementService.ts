@@ -170,7 +170,8 @@ export async function fetchAtaTaskPlan(ataKey: string): Promise<AtaTaskPlan | nu
       criadoEm: t.criado_em,
       atualizadoEm: t.atualizado_em,
       concluidoEm: t.concluido_em || undefined,
-      concluidoPor: t.concluido_por || undefined
+      concluidoPor: t.concluido_por || undefined,
+      seiNumero: t.sei_numero || undefined
     });
     tasksByMacrotask.set(t.macrotask_id, list);
   }
@@ -249,7 +250,8 @@ export async function fetchAllAtaTaskPlans(): Promise<Record<string, AtaTaskPlan
         criadoEm: t.criado_em,
         atualizadoEm: t.atualizado_em,
         concluidoEm: t.concluido_em || undefined,
-        concluidoPor: t.concluido_por || undefined
+        concluidoPor: t.concluido_por || undefined,
+        seiNumero: t.sei_numero || undefined
       });
       tasksByMacrotask.set(t.macrotask_id, list);
     }
