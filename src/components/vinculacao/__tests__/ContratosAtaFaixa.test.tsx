@@ -12,7 +12,10 @@ vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: '
 vi.mock('../../../hooks/useAtasPortfolio', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useAtasPortfolio')>()), useAtasPortfolio: vi.fn() }));
 vi.mock('../../../hooks/useContractsPortfolio', () => ({ useContractsPortfolio: vi.fn() }));
 vi.mock('../../../hooks/useAtaManagers', () => ({ useArpItemContractLinks: vi.fn() }));
-vi.mock('../../../hooks/useContratosSemAta', () => ({ useContratosSemAta: vi.fn() }));
+vi.mock('../../../hooks/useContratosSemAta', () => ({
+  useContratosSemAta: vi.fn(),
+  useMarcasSemAtaDesfeitas: vi.fn(() => ({ data: {}, isLoading: false, isError: false, error: null, refetch: vi.fn() }))
+}));
 vi.mock('../../../hooks/useDescartesAtaContrato', () => ({ useDescartesAtaContrato: vi.fn() }));
 vi.mock('../../../hooks/useVinculoAutomatico', () => ({ useMotivosVinculoManual: vi.fn(() => ({ data: new Map(), isError: false, refetch: vi.fn() })) }));
 vi.mock('../../../hooks/useItensDoContrato', () => ({ useNumerosDosItensDosContratos: vi.fn(() => ({ data: undefined })) }));

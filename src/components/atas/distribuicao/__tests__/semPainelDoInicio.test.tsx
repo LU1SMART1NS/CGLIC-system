@@ -19,7 +19,7 @@ vi.mock('../../../../hooks/useContractsPortfolio', () => ({
 }));
 const ok = <T,>(data: T) => ({ data, isLoading: false, isError: false, error: null, refetch: vi.fn() });
 vi.mock('../../../../hooks/useAtaManagers', () => ({ useArpItemContractLinks: vi.fn(() => ok([])) }));
-vi.mock('../../../../hooks/useContratosSemAta', () => ({ useContratosSemAta: vi.fn(() => ok({})) }));
+vi.mock('../../../../hooks/useContratosSemAta', () => ({ useContratosSemAta: vi.fn(() => ok({})), useMarcasSemAtaDesfeitas: vi.fn(() => ok({})) }));
 vi.mock('../../../../hooks/useDescartesAtaContrato', () => ({ useDescartesAtaContrato: vi.fn(() => ok({})) }));
 vi.mock('../../../../hooks/useVinculoAutomatico', () => ({ useMotivosVinculoManual: vi.fn(() => ({ data: new Map(), isError: false, refetch: vi.fn() })) }));
 vi.mock('../../../../hooks/useItensDoContrato', () => ({ useNumerosDosItensDosContratos: vi.fn(() => ({ data: undefined })) }));

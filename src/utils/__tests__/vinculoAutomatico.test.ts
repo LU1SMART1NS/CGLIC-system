@@ -31,6 +31,15 @@ describe('textoMotivoManual', () => {
 });
 
 describe('textoMotivoDaFila', () => {
+  it('marca "não pertence" desfeita: diz quem desfez e o que fazer; com ata provável, vale o motivo de sempre', () => {
+    const marcaDesfeita = { porNome: 'Luís', em: '2026-10-22T12:00:00Z' };
+    const t = textoMotivoDaFila(undefined, 'SEM_PISTA', { marcaDesfeita });
+    expect(t.titulo).toBe('Marca desfeita');
+    expect(t.detalhe).toBe('Luís desfez o "não pertence a ata" em 22/10/2026. Vincule a uma ata ou marque de novo.');
+    expect(textoMotivoDaFila('ITEM_FORA_DA_ATA', 'PARCIAL', { marcaDesfeita }).titulo).toBe('Marca desfeita');
+    expect(textoMotivoDaFila(undefined, 'ATA_PROVAVEL', { marcaDesfeita }).titulo).toBe('Aguardando o sistema');
+    expect(textoMotivoDaFila(undefined, 'SEM_PISTA', { marcaDesfeita: {} }).detalhe).toBe('O coordenador desfez o "não pertence a ata". Vincule a uma ata ou marque de novo.');
+  });
   it('usa o motivo do banco quando existe', () => {
     expect(textoMotivoDaFila('ITEM_FORA_DA_ATA', 'ATA_PROVAVEL').titulo).toBe('Item fora da ata');
   });
