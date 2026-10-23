@@ -6,6 +6,7 @@ import { ArpPortfolioSummary, type ArpVigenciaFilterOption } from './atas/ArpPor
 import { matchesStatusFilter, comparePrazo } from './carteira/carteiraPrazo';
 import { getArpPrazo, useAtasPortfolio } from '../hooks/useAtasPortfolio';
 import { useAuth } from '../context/AuthContext';
+import { semContratos } from '../types/rbac';
 import { useCarteiraItens } from '../hooks/useCarteiraItens';
 import { FontesComFalhaAviso } from './fonte/FontesComFalhaAviso';
 import { useLeiturasComFalha } from './fonte/useLeiturasComFalha';
@@ -318,7 +319,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         saldoStatsByAta={saldoStatsByAta}
         execucaoPorAta={resumoPorAta}
         linhasDosItens={linhasDosItens}
-        mostrarEmpenhoDosItens={role !== 'gestor_saldos'}
+        mostrarEmpenhoDosItens={!semContratos(role)}
         fatiasGti={fatiasGti}
         unidades={unidades}
         filters={filterState}

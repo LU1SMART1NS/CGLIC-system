@@ -74,6 +74,7 @@ import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryS
 import { Instrument360Head } from './instrument360/Instrument360Head';
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
+import { semContratos } from '../types/rbac';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
@@ -145,7 +146,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // 'empenhos' era uma aba própria; os empenhos agora ficam dentro de cada contrato.
   const navigate = useNavigateWithOrigin();
   const { role } = useAuth();
-  const verContratos = role !== 'gestor_saldos';
+  const verContratos = !semContratos(role);
   const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
     tabs: verContratos ? ITEM_TABS : SALDOS_ITEM_TABS,
     defaultTab: 'quantitativos',

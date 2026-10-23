@@ -137,6 +137,7 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 | 123 | `20261014000123_pagamento_a_conferir.sql` | `fatura_pagamento`: OB só confirma se citar a fatura ou pagar o fornecedor certo; job de recálculo. |
 | 124 | `20261014000124_perfil_canonico_e_usuario_desativado.sql` | `has_role` lê `role_id`; `usuario_ativo`; usuário desativado perde o acesso na hora. |
 | 134 | `20261014000134_cron_mais_leve.sql` | Cron mais leve: quatro jobs passam a uma vez por hora, nenhum minuto com dois jobs; `rotinas_controle` e `recalcular_pagamento_faturas()` sai cedo quando nada mudou. |
+| 155 | `20261023000155_emendas_cadastros.sql` | Emendas, entrega 1: perfil `gestor_emendas`, autores (Câmara, Senado, bancadas), beneficiários pelo CNPJ, kits e itens alocados à CAEP; leitura semanal dos autores. |
 
 ## Por tema
 
@@ -171,6 +172,7 @@ Os jobs de sincronização chamam `disparar_sincronizacao(recurso, uasg)`, que a
 | sincronizar-unidades-itens-200330 / -200331 | :40 / :42 | órgãos e adesões dos itens | 91 |
 | sincronizar-empenhos-200330 / -200331 | :45 / :50 | empenhos | 82 |
 | sincronizar-cadastro-uasgs | :48 | cadastro de UASGs | 111 |
+| sincronizar-autores-emendas | segunda-feira 06:40 UTC | deputados e senadores (Câmara e Senado) | 155 |
 | sincronizar-ordens-bancarias-200330 / -200331 | :53 / :57 | ordens bancárias | 83 (134 move a 200330) |
 | vincular-contratos-automaticamente | :55 | `executar_vinculos_automaticos(...,'CRON')` | 95 |
 | limpar-historico-do-cron | domingo 03:00 | apaga o histórico do cron com mais de 7 dias | 77 |
@@ -185,6 +187,7 @@ Nenhum job foi removido: as migrations 87 e 123 usam `cron.unschedule` só para 
 - **Empenhos:** `empenhos`, `contrato_empenhos`, `empenho_eventos_historico`, `contrato_empenhos_sincronizacao`, `contrato_empenho_descartes`, `contrato_empenho_distribuicoes`, `contrato_empenho_itens`, `contrato_empenho_vinculo_recusado`, `contrato_empenho_ausente_da_fonte`, `ausente_da_fonte_decisoes`, `correcoes_empenho_na_fonte`, `empenho_leituras_siafi`, `empenho_itens_siafi`, `correcoes_nota_no_contrato`.
 - **Faturas, OB e pagamento:** `contrato_faturas`, `fatura_empenhos`, `contrato_faturas_sincronizacao`, `fatura_ausente_da_fonte`, `fatura_pagamento`, `ordens_bancarias`, `np_consultas`, `contract_payment_cycles` e tabelas do ciclo (documentos, eventos, checklist, faturas, itens), `contrato_expectativa_pagamento`, `contrato_entregas_previstas`, `previsao_pagamentos`, `previsao_pagamentos_ajustes`, `prazos_emendas`, `limites_lei_14133_art75`, `holidays`, `alert_settings`.
 - **Alocação e unidades:** `internal_departments`, `arp_allocations`, `item_allocation_state`, `empenho_links`, `item_empenho_link_state`, `contrato_item_quantidade_ajustes`, `contrato_item_divisoes`, `contrato_item_divisao_unidades`.
+- **Emendas (155):** `emenda_autores`, `emenda_beneficiarios`, `emenda_kits`, `emenda_kit_itens` e a view `v_emendas_itens_caep`.
 - **Controle e segurança:** `user_roles`, `roles`, `permissions`, `role_permissions`, `role_domain_scopes`, `user_scope_assignments`, `audit_logs`, `sincronizacao_fontes`.
 - **Antigas, ainda no banco sem uso pelas telas:** `processos_sei` (só leitura), `empenhos_manuais`, `empenho_manual_quantidades`, `contratos_manuais`, `contrato_empenho_links`, `item_manual_empenho_state`, `item_manual_quantity_state`, e a cópia fechada `arp_item_empenhos_descartada` (99). A migration 51 previu apagar três delas, mas isso nunca foi feito.
 - **Apagadas:** `arp_item_empenhos` e `arp_item_saldo_oficial` (99), `reminder_dismissals` (101).

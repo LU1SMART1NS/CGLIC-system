@@ -6,6 +6,7 @@ import { buildAtaItemPath, uasgFromAtaKey, useAta, useAtaItemSaldos, useAtaLinke
 import { useAtaTaskPlan } from '../../hooks/useAtaTaskPlan';
 import { useAssignedManagementScope } from '../../hooks/useAssignedManagementScope';
 import { useAuth } from '../../context/AuthContext';
+import { semContratos } from '../../types/rbac';
 import { InstrumentPageState } from '../instrument360/InstrumentPageState';
 import { Ata360Header } from './Ata360Header';
 import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from '../gti/InteresseGti';
@@ -90,7 +91,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const queue = useAtaActionQueue(arp, saldos, taskPlan, { registro: registroFornecedor, itensNoBanco: itens.length });
 
   const { role } = useAuth();
-  const saldosOnly = role === 'gestor_saldos';
+  const saldosOnly = semContratos(role);
   const { activeTab, goToTab, tabsRef } = useInstrumentTab<Ata360Tab>({
     tabs: saldosOnly ? SALDOS_TAB_IDS : TAB_IDS,
     defaultTab: saldosOnly ? 'itens' : 'acoes'

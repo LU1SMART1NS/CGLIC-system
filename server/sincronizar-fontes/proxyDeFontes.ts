@@ -12,7 +12,10 @@ export const DESTINOS_DAS_FONTES: ReadonlyArray<readonly [prefixo: string, desti
   // Tesouro Nacional (STA): ordens bancárias por documento de origem (NP)
   ['/api-sta/', 'https://sta.api.gov.br/'],
   // Portal da Transparência (SIAFI): itens de cada nota de empenho; exige a chave, que só o servidor tem
-  ['/api-transparencia/', 'https://api.portaldatransparencia.gov.br/']
+  ['/api-transparencia/', 'https://api.portaldatransparencia.gov.br/'],
+  // Câmara e Senado: autores das emendas (deputados e senadores); só o servidor lê
+  ['/api-camara/', 'https://dadosabertos.camara.leg.br/'],
+  ['/api-senado/', 'https://legis.senado.leg.br/']
 ];
 
 /** Identificação honesta do robô nas fontes oficiais. */

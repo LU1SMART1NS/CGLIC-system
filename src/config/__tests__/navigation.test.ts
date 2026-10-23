@@ -8,16 +8,17 @@ function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] 
 
 describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', () => {
   describe('Menu chave com 4 áreas e páginas como abas', () => {
-    it('deve conter as 6 áreas do menu chave, com Ajustes no pé', () => {
+    it('deve conter as 7 áreas do menu chave, com Ajustes no pé', () => {
       expect(navigationConfig.map((item) => item.id)).toEqual([
         'visao-geral',
         'carteira',
         'alocacao',
         'vinculacao',
         'execucao-financeira',
+        'emendas',
         'configuracoes'
       ]);
-      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Carteira', 'Alocação', 'Vínculos', 'Financeiro', 'Ajustes']);
+      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Carteira', 'Alocação', 'Vínculos', 'Financeiro', 'Emendas', 'Ajustes']);
       expect(navigationConfig.find((i) => i.id === 'configuracoes')?.placement).toBe('bottom');
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
@@ -319,6 +320,23 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Carteira');
     });
 
+    it('Gestor de Emendas (CAEP) vê Emendas e a Carteira só com Atas e Itens — sem Início, Contratos, Alocação, Vínculos, Financeiro ou Ajustes', () => {
+      const visible = filterNavigationByRole(navigationConfig, 'gestor_emendas');
+      expect(visible.map((i) => i.id)).toEqual(['carteira', 'emendas']);
+      expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
+      expect(visible.find((i) => i.id === 'emendas')?.children?.map((c) => [c.label, c.route])).toEqual([
+        ['Kits', '/emendas/kits'],
+        ['Beneficiários', '/emendas/beneficiarios'],
+        ['Autores', '/emendas/autores']
+      ]);
+    });
+
+    it('Emendas fica fora do menu do gestor de atas e contratos e do gestor de saldo', () => {
+      expect(filterNavigationByRole(navigationConfig, 'gestor').map((i) => i.id)).not.toContain('emendas');
+      expect(filterNavigationByRole(navigationConfig, 'gestor_saldos').map((i) => i.id)).not.toContain('emendas');
+      expect(filterNavigationByRole(navigationConfig, 'admin').map((i) => i.id)).toContain('emendas');
+    });
+
     it('Consulta/Auditoria (leitor) consulta os módulos permitidos, sem Usuários, Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'leitor');
       const labels = flatLabels(visible);
@@ -335,7 +353,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const areas = visible.map((i) => i.id);
       expect(areas).not.toContain('vinculacao');
       expect(areas).not.toContain('alocacao');
-      expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'configuracoes']);
+      expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'emendas', 'configuracoes']);
 
       expect(labels).not.toContain('Modelos de Gestão');
       // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs e das unidades internas

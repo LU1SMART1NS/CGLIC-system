@@ -5,6 +5,7 @@ import { ItemBalances } from '../components/ItemBalances';
 import { InstrumentPageState } from '../components/instrument360/InstrumentPageState';
 import { useSelection } from '../context/SelectionContext';
 import { useAuth } from '../context/AuthContext';
+import { semContratos } from '../types/rbac';
 import { useAssignedManagementScope } from '../hooks/useAssignedManagementScope';
 import { buildAtaPath, uasgFromAtaKey, useAta } from '../hooks/useAta';
 import { UASG_LINK_LEGADO } from '../config/unidadesGestoras';
@@ -37,10 +38,10 @@ export const ItemBalancesRoute: React.FC = () => {
   const { ataKeys: assignedAtaKeys, isLoading: loadingScope, leituras: leiturasDoEscopo } = useAssignedManagementScope(arp ? carteiraDaAta(arp) : uasg);
   const isScopedRole = role === 'gestor';
 
-  // O gestor de saldos chega ao item pela carteira de Itens e volta para lá.
+  // O gestor de saldos (e o de emendas) chega ao item pela carteira de Itens e volta para lá.
   const ataPath = arp ? buildAtaPath(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, 'itens') : '/atas';
   const back = useBackTarget(
-    role === 'gestor_saldos'
+    semContratos(role)
       ? { path: '/itens', label: 'Voltar para Carteira' }
       : arp
         ? { path: ataPath, label: 'Voltar para a ata' }
@@ -100,5 +101,5 @@ export const ItemBalancesRoute: React.FC = () => {
     );
   }
 
-  return <ItemBalances arp={arp} item={item} onBack={back.back} backLabel={back.label} onOpenAta={role === 'gestor_saldos' ? undefined : abrirAta} />;
+  return <ItemBalances arp={arp} item={item} onBack={back.back} backLabel={back.label} onOpenAta={semContratos(role) ? undefined : abrirAta} />;
 };

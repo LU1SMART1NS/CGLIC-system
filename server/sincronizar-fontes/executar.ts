@@ -47,6 +47,7 @@ import {
   ORCAMENTO_SALDO_CONTABIL_MS,
   sincronizarSaldoContabil
 } from '../../src/services/saldoContabilSyncService';
+import { contarAutoresEmendas, sincronizarAutoresEmendas } from '../../src/services/autoresEmendasSyncService';
 import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFontesService';
 import { lerAmbiente } from './ambiente';
 
@@ -56,12 +57,12 @@ import { lerAmbiente } from './ambiente';
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil', 'autores_emendas'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
   recurso: RecursoDoServidor;
-  /** Obrigatória para todos os recursos, exceto saldos_itens e cadastro_uasgs, que valem para todas as carteiras. */
+  /** Obrigatória para todos os recursos, exceto saldos_itens, cadastro_uasgs e autores_emendas, que valem para todas as carteiras. */
   uasg?: string;
   /** Ignora a validade (só o coordenador). */
   forcar?: boolean;
@@ -99,6 +100,9 @@ export interface DependenciasDeExecucao {
   contarItensNotasSiafiPendentes: typeof contarItensNotasSiafiPendentes;
   sincronizarSaldoContabil: typeof sincronizarSaldoContabil;
   contarSaldoContabilPendentes: typeof contarSaldoContabilPendentes;
+  /** Deputados e senadores das emendas (Câmara e Senado), uma vez por semana. */
+  sincronizarAutoresEmendas: typeof sincronizarAutoresEmendas;
+  contarAutoresEmendas: typeof contarAutoresEmendas;
   /** Chave da API do Portal da Transparência (segredo PORTAL_TRANSPARENCIA_CHAVE da Edge Function). */
   chaveDoPortal: () => string | undefined;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
@@ -159,6 +163,8 @@ const PADRAO: DependenciasDeExecucao = {
   contarItensNotasSiafiPendentes,
   sincronizarSaldoContabil,
   contarSaldoContabilPendentes,
+  sincronizarAutoresEmendas,
+  contarAutoresEmendas,
   chaveDoPortal: () => lerAmbiente('PORTAL_TRANSPARENCIA_CHAVE')?.trim() || undefined,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
@@ -172,7 +178,7 @@ export function validarPedido(corpo: unknown): { ok: true; pedido: PedidoDeSincr
   if (typeof recurso !== 'string' || !(RECURSOS_DO_SERVIDOR as readonly string[]).includes(recurso)) {
     return { ok: false, erro: `Recurso inválido. Use: ${RECURSOS_DO_SERVIDOR.join(', ')}.` };
   }
-  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs') {
+  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs' && recurso !== 'autores_emendas') {
     if (typeof uasg !== 'string' || !UASGS_CGLIC.includes(uasg.trim())) {
       return { ok: false, erro: `UASG inválida. Use: ${UASGS_CGLIC.join(', ')}.` };
     }
@@ -218,6 +224,8 @@ export async function executarPedido(
       consulta = { ...(await deps.contarContratosParticipantesPendentes(uasg as string)) };
     } else if (pedido.recurso === 'cadastro_uasgs') {
       consulta = { ...(await deps.contarCadastroUasgsPendentes()) };
+    } else if (pedido.recurso === 'autores_emendas') {
+      consulta = await deps.contarAutoresEmendas();
     } else if (pedido.recurso === 'itens_notas_siafi') {
       consulta = { ...(await deps.contarItensNotasSiafiPendentes(uasg as string, deps.chaveDoPortal())) };
     } else if (pedido.recurso === 'saldo_contabil') {
@@ -243,6 +251,8 @@ export async function executarPedido(
     resultado = await deps.sincronizarAtasParticipacao(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_ATAS_PARTICIPACAO_MS });
   } else if (pedido.recurso === 'contratos_participantes') {
     resultado = await deps.sincronizarContratosParticipantes(uasg as string, { forcar: pedido.forcar, orcamentoMs: ORCAMENTO_CONTRATOS_PARTICIPANTES_MS });
+  } else if (pedido.recurso === 'autores_emendas') {
+    resultado = await deps.sincronizarAutoresEmendas({ forcar: pedido.forcar });
   } else if (pedido.recurso === 'cadastro_uasgs') {
     resultado = await deps.sincronizarCadastroUasgs({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_CADASTRO_UASGS_MS });
   } else if (pedido.recurso === 'itens_notas_siafi') {

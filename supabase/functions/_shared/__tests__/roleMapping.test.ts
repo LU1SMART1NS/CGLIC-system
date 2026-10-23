@@ -18,6 +18,11 @@ describe('mapPerfilToDbRole — Fase 0.1 (fail-closed RBAC)', () => {
     expect(mapPerfilToDbRole('gestor_saldos')).toBe('gestor_saldos');
   });
 
+  it('Emendas: perfil "gestor_emendas" -> "gestor_emendas"', () => {
+    expect(mapPerfilToDbRole('gestor_emendas')).toBe('gestor_emendas');
+    expect(mapPerfilToDbRole('gestor_emenda')).toBeNull();
+  });
+
   it('Caso 3: perfil customizado explicitamente não mapeado -> null (nenhuma role)', () => {
     expect(mapPerfilToDbRole('custom-1700000000-123')).toBeNull();
     expect(mapPerfilToDbRole('gestor_saldo')).toBeNull();
@@ -69,7 +74,7 @@ describe('mapPerfilToDbRole — Fase 0.1 (fail-closed RBAC)', () => {
     const amostras = ['coordenador', 'gestor', 'consulta', 'x', '', undefined, 'admin'];
     for (const input of amostras) {
       const result = mapPerfilToDbRole(input);
-      expect(['admin', 'gestor', 'leitor', 'gestor_saldos', null]).toContain(result);
+      expect(['admin', 'gestor', 'leitor', 'gestor_saldos', 'gestor_emendas', null]).toContain(result);
     }
   });
 });
