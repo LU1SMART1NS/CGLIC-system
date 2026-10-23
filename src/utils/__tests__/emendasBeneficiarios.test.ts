@@ -8,6 +8,7 @@ import {
   chaveDoNome,
   faltasDoBeneficiario,
   linkDoWhatsapp,
+  naturezaNaoPublica,
   orgaoAbaixoDoNome,
   paresParecidos,
   parecidosCom,
@@ -18,8 +19,7 @@ import {
 import { cnpjValido, consultarCep, consultarCnpj, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
 
 const ok: FormularioBeneficiario = {
-  nome: 'Ministério da Justiça e Segurança Pública',
-  nomeCurto: 'MJSP',
+  nome: 'MJSP',
   orgao: 'Polícia Militar',
   entregaCep: '70064-900',
   entregaLogradouro: 'Esplanada dos Ministérios Bloco T',
@@ -47,8 +47,8 @@ describe('pendenciasDoBeneficiario', () => {
 
   it('só o nome é obrigatório', () => {
     expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil' })).toEqual([]);
-    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome do beneficiário']);
-    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ' })).toEqual(['nome do beneficiário']);
+    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome curto']);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ' })).toEqual(['nome curto']);
   });
 
   it('o que vier preenchido vem certo', () => {
@@ -58,6 +58,17 @@ describe('pendenciasDoBeneficiario', () => {
       'telefone com DDD (10 ou 11 números)',
       'e-mail válido'
     ]);
+  });
+});
+
+describe('naturezaNaoPublica', () => {
+  it('avisa associação e empresa, não órgão público', () => {
+    expect(naturezaNaoPublica('Associação Privada')).toBe(true);
+    expect(naturezaNaoPublica('Sociedade Empresária Limitada')).toBe(true);
+    expect(naturezaNaoPublica('Órgão Público do Poder Executivo Estadual ou do Distrito Federal')).toBe(false);
+    expect(naturezaNaoPublica('Município')).toBe(false);
+    expect(naturezaNaoPublica('Autarquia Estadual ou do Distrito Federal')).toBe(false);
+    expect(naturezaNaoPublica(null)).toBe(false);
   });
 });
 
@@ -125,13 +136,12 @@ describe('repetidos e parecidos', () => {
   });
 
   it('órgão só aparece quando não repete o nome', () => {
-    expect(orgaoAbaixoDoNome({ nome: 'Polícia Civil', nomeCurto: null, orgao: 'Polícia Civil' }, 'Polícia Civil')).toBeNull();
-    expect(orgaoAbaixoDoNome({ nome: '10º BPM (PMCE)', nomeCurto: null, orgao: 'Polícia Militar' }, '10º BPM (PMCE)')).toBe('Polícia Militar');
+    expect(orgaoAbaixoDoNome({ orgao: 'Polícia Civil' }, 'Polícia Civil')).toBeNull();
+    expect(orgaoAbaixoDoNome({ orgao: 'Polícia Militar' }, '10º BPM (PMCE)')).toBe('Polícia Militar');
   });
 
   it('rótulo e local', () => {
-    expect(rotuloBeneficiario({ nome: 'Corpo de Bombeiros', nomeCurto: ' ' })).toBe('Corpo de Bombeiros');
-    expect(rotuloBeneficiario({ nome: 'Corpo de Bombeiros', nomeCurto: '14º GB' })).toBe('14º GB');
+    expect(rotuloBeneficiario({ nome: '14º GB Adamantina' })).toBe('14º GB Adamantina');
     expect(localDoBeneficiario({ entregaMunicipio: 'Limeira', entregaUf: 'SP' })).toBe('Limeira - SP');
     expect(localDoBeneficiario({ entregaMunicipio: null, entregaUf: 'RJ' })).toBe('RJ');
     expect(localDoBeneficiario({ entregaMunicipio: null, entregaUf: null })).toBeNull();

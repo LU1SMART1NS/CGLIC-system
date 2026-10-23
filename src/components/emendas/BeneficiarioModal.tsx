@@ -17,7 +17,7 @@ import {
   type BeneficiarioParaSalvar,
   type DadosDaReceita
 } from '../../services/emendasService';
-import { beneficiarioRepetido, linkDoWhatsapp, parecidosCom, pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
+import { beneficiarioRepetido, linkDoWhatsapp, naturezaNaoPublica, parecidosCom, pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
 import { localDoBeneficiario, rotuloBeneficiario } from '../../services/emendasService';
 import { ORGAOS_BENEFICIARIO } from '../../services/emendasQuadroService';
 
@@ -44,7 +44,6 @@ function receitaDoCadastro(b: BeneficiarioEmenda): DadosDaReceita | null {
 function formularioDe(b: BeneficiarioEmenda | null): Formulario {
   return {
     nome: b?.nome ?? '',
-    nomeCurto: b?.nomeCurto ?? '',
     orgao: b?.orgao ?? '',
     entregaCep: formatarCep(b?.entregaCep),
     entregaLogradouro: b?.entregaLogradouro ?? '',
@@ -118,7 +117,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
       setReceita(r);
       setReceitaLidaAgora(true);
       setCnpj(formatarCnpj(r.cnpj));
-      setF((x) => ({ ...x, nome: x.nome || r.razaoSocial.slice(0, 300) }));
+      setF((x) => ({ ...x, nome: x.nome || (r.nomeFantasia ?? r.razaoSocial).slice(0, 300) }));
       if (r.situacaoCadastral && r.situacaoCadastral.toUpperCase() !== 'ATIVA') setErroCnpj(`Na Receita o CNPJ está ${r.situacaoCadastral.toLowerCase()}. Confira antes de salvar.`);
     } catch (err) {
       setErroCnpj((err as Error).message);
@@ -171,7 +170,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
       sedeTelefone: receita?.sedeTelefone ?? null,
       sedeEmail: receita?.sedeEmail ?? null,
       receitaLidaEm: receita ? (receitaLidaAgora ? new Date().toISOString() : beneficiario?.receitaLidaEm ?? null) : null,
-      nomeCurto: f.nomeCurto.trim() || null,
+      nomeCurto: null,
       entregaCep: soDigitos(f.entregaCep) || null,
       entregaLogradouro: f.entregaLogradouro.trim() || null,
       entregaNumero: f.entregaNumero.trim() || null,
@@ -216,64 +215,12 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
       }
     >
       <form id="emendas-beneficiario-form" onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <AppInput
-          label="Nome do beneficiário *"
-          hint="Sem a cidade e a UF: elas ficam no endereço de entrega."
-          value={f.nome}
-          maxLength={300}
-          onChange={(e) => muda('nome', e.target.value)}
-          data-testid="emendas-beneficiario-nome"
-        />
-        {repetido && (
-          <div style={{ ...aviso('erro'), display: 'flex', flexDirection: 'column', gap: '0.45rem' }} role="alert" data-testid="emendas-beneficiario-repetido">
-            <span>Já existe um beneficiário com este nome e local.</span>
-            <div style={sugestao}>
-              <span>
-                <b>{rotuloBeneficiario(repetido)}</b>
-                {localDoBeneficiario(repetido) && ` · ${localDoBeneficiario(repetido)}`}
-              </span>
-              <AppButton type="button" variant="outline" size="sm" onClick={() => onAbrir(repetido)}>
-                Abrir o existente
-              </AppButton>
-            </div>
-          </div>
-        )}
-        {parecidos.length > 0 && (
-          <div style={{ ...aviso('info'), display: 'flex', flexDirection: 'column', gap: '0.45rem' }} data-testid="emendas-beneficiario-parecidos">
-            <span>Parecido com {parecidos.length === 1 ? 'um cadastro' : `${parecidos.length} cadastros`}. É algum destes?</span>
-            {parecidos.map((p) => (
-              <div key={p.id} style={sugestao}>
-                <span>
-                  <b>{rotuloBeneficiario(p)}</b>
-                  {localDoBeneficiario(p) && ` · ${localDoBeneficiario(p)}`}
-                </span>
-                <AppButton type="button" variant="outline" size="sm" onClick={() => onAbrir(p)}>
-                  Usar este
-                </AppButton>
-              </div>
-            ))}
-            <span style={{ fontWeight: 500 }}>Se não for nenhum, salve normalmente.</span>
-          </div>
-        )}
-
-        <div style={grade('repeat(auto-fit, minmax(min(100%, 240px), 1fr))')}>
-          <AppInput label="Nome curto" hint="Como a CAEP chama o órgão nas listas (ex.: 14º GB Adamantina)." value={f.nomeCurto} maxLength={80} onChange={(e) => muda('nomeCurto', e.target.value)} data-testid="emendas-beneficiario-nome-curto" />
-          <AppSelect label="Órgão" hint="Coluna ÓRGÃO do Anexo da reserva." value={f.orgao} onChange={(e) => muda('orgao', e.target.value)} data-testid="emendas-beneficiario-orgao">
-            <option value="">A informar</option>
-            {ORGAOS_BENEFICIARIO.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </AppSelect>
-        </div>
-
         <div style={secao}>
-          <span style={rotulo}>CNPJ · opcional</span>
+          <span style={rotulo}>CNPJ do órgão · opcional</span>
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 220px' }}>
               <AppInput
-                label="CNPJ do órgão"
+                label="CNPJ"
                 value={cnpj}
                 inputMode="numeric"
                 placeholder="00.000.000/0000-00"
@@ -314,11 +261,16 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
               ))}
             </div>
           )}
+          {receita && naturezaNaoPublica(receita.naturezaJuridica) && (
+            <div style={aviso('erro')} role="alert" data-testid="emendas-beneficiario-natureza">
+              Na Receita este CNPJ é de “{receita.naturezaJuridica}”, não de um órgão público. Confira se é o CNPJ certo do beneficiário.
+            </div>
+          )}
           {receita && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }} data-testid="emendas-beneficiario-receita">
               <span style={rotulo}>Da Receita · só leitura{receitaLidaAgora ? ' · lido agora' : beneficiario?.receitaLidaEm ? ` · lido em ${new Date(beneficiario.receitaLidaEm).toLocaleDateString('pt-BR')}` : ''}</span>
               <dl style={{ ...grade('auto 1fr'), margin: 0, gap: '0.3rem 0.9rem', fontSize: '0.84rem' }}>
-                <dt style={{ color: 'var(--color-text-muted)' }}>Razão social</dt>
+                <dt style={{ color: 'var(--color-text-muted)' }}>Nome do beneficiário</dt>
                 <dd style={{ margin: 0, fontWeight: 700 }}>{receita.razaoSocial || '—'}</dd>
                 <dt style={{ color: 'var(--color-text-muted)' }}>Natureza</dt>
                 <dd style={{ margin: 0 }}>{receita.naturezaJuridica ?? '—'}</dd>
@@ -336,6 +288,55 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
             </div>
           )}
         </div>
+
+        <AppInput
+          label="Nome curto *"
+          hint="Como a CAEP chama a unidade nas listas, sem a cidade e a UF (ex.: 10º BPM (PMCE)). Com o município e a UF, não pode repetir."
+          value={f.nome}
+          maxLength={300}
+          onChange={(e) => muda('nome', e.target.value)}
+          data-testid="emendas-beneficiario-nome"
+        />
+        {repetido && (
+          <div style={{ ...aviso('erro'), display: 'flex', flexDirection: 'column', gap: '0.45rem' }} role="alert" data-testid="emendas-beneficiario-repetido">
+            <span>Já existe um beneficiário com este nome e local.</span>
+            <div style={sugestao}>
+              <span>
+                <b>{rotuloBeneficiario(repetido)}</b>
+                {localDoBeneficiario(repetido) && ` · ${localDoBeneficiario(repetido)}`}
+              </span>
+              <AppButton type="button" variant="outline" size="sm" onClick={() => onAbrir(repetido)}>
+                Abrir o existente
+              </AppButton>
+            </div>
+          </div>
+        )}
+        {parecidos.length > 0 && (
+          <div style={{ ...aviso('info'), display: 'flex', flexDirection: 'column', gap: '0.45rem' }} data-testid="emendas-beneficiario-parecidos">
+            <span>Parecido com {parecidos.length === 1 ? 'um cadastro' : `${parecidos.length} cadastros`}. É algum destes?</span>
+            {parecidos.map((p) => (
+              <div key={p.id} style={sugestao}>
+                <span>
+                  <b>{rotuloBeneficiario(p)}</b>
+                  {localDoBeneficiario(p) && ` · ${localDoBeneficiario(p)}`}
+                </span>
+                <AppButton type="button" variant="outline" size="sm" onClick={() => onAbrir(p)}>
+                  Usar este
+                </AppButton>
+              </div>
+            ))}
+            <span style={{ fontWeight: 500 }}>Se não for nenhum, salve normalmente.</span>
+          </div>
+        )}
+
+        <AppSelect label="Órgão" hint="Coluna ÓRGÃO do Anexo da reserva." value={f.orgao} onChange={(e) => muda('orgao', e.target.value)} data-testid="emendas-beneficiario-orgao">
+          <option value="">A informar</option>
+          {ORGAOS_BENEFICIARIO.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </AppSelect>
 
         <div style={secao}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
