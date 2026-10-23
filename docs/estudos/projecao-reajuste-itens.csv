@@ -1,0 +1,485 @@
+﻿ata;item;descricao;origem_data_base;data_base;situacao;homologado;preco_atual;devido_hoje;proximo_reajuste;pct_proximo;meses_estimados;preco_projetado;saldo;impacto_devido;impacto_proximo
+00001/2025;00011;CANTIL, MATERIAL PLÁSTICO, CAPACIDADE 1.000 ML, CARACTERÍSTICAS ADICIO;apostilamento;2024-10-01;emdia;40;42.07;42.07;;;;;2000;0;0
+00001/2026;00001;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção preventiv;;;termo;;2356;;;;;;360;0;0
+00001/2026;00002;Peça Equipamento Laboratório - Peça Equipamento Laboratório Tipo 1: Co;;;termo;;17893.18;;;;;;16;0;0
+00001/2026;00003;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção preventiv;;;termo;;2700;;;;;;24;0;0
+00001/2026;00004;Peça Equipamento Laboratório - Peça Equipamento Laboratório Tipo 1: Co;;;termo;;17893.18;;;;;;1;0;0
+00001/2026;00005;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção preventiv;;;termo;;3209;;;;;;72;0;0
+00001/2026;00006;Peça Equipamento Laboratório - Peça Equipamento Laboratório Tipo 1: Co;;;termo;;90925.1;;;;;;3;0;0
+00002/2025;00012;BARRACA / BARRACA ACAMPAMENTO, MATERIAL LONA PVC, TRATAMENTO SUPERFICI;apostilamento;2024-10-01;emdia;798;839.27;839.26;;;;;10;0;0
+00002/2026;00001;GERADOR ENERGIA;edital;2025-05-21;prorrogar·sugestao;3749.99;3749.99;3749.99;2027-01-23;4.39;0;3914.68;6;0;988
+00003/2025;00015;BARRACA / BARRACA ACAMPAMENTO, MATERIAL LONA PVC, TRATAMENTO SUPERFICI;apostilamento;2024-10-01;emdia;950;999.14;999.12;;;;;54;0;0
+00003/2026;00001;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;edital;2025-10-08;prorrogar·sugestao;46042;46042;46042.00;2027-02-12;4.58;0;48148.94;1;0;2107
+00003/2026;00002;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;edital;2025-10-08;prorrogar·sugestao;34130;34130;34130.00;2027-02-12;4.58;0;35691.83;1;0;1562
+00003/2026;00003;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;edital;2025-10-08;prorrogar·sugestao;20430;20430;20430.00;2027-02-12;4.58;0;21364.90;1;0;935
+00003/2026;00004;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;edital;2025-10-08;prorrogar·sugestao;12840;12840;12840.00;2027-02-12;4.58;0;13427.57;1;0;588
+00003/2026;00005;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;edital;2025-10-08;prorrogar·sugestao;4780;4780;4780.00;2027-02-12;4.58;0;4998.74;1;0;219
+00004/2025;00010;CAPA CHUVA, MATERIAL NÁILON, TRANSMITÂNCIA OPACA, COR PRETO, GELO E CI;apostilamento;2024-10-01;emdia;195;205.09;205.08;;;;;63;0;0
+00005/2025;00001;CROMATÓGRAFO, TIPO LÍQUIDO DE ALTA EFICIÊNCIA, AJUSTE AJUSTE DIGITAL,P;apostilamento;2024-11-01;emdia;1004424;1051438.15;1051431.04;;;;;1;0;0
+00005/2026;00001;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;5040.09;;;;;;96;0;0
+00005/2026;00002;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8791.08;;;;;;168;0;0
+00005/2026;00003;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8359.67;;;;;;192;0;0
+00005/2026;00004;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8330.91;;;;;;48;0;0
+00005/2026;00005;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8481.87;;;;;;168;0;0
+00005/2026;00006;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8632.91;;;;;;72;0;0
+00005/2026;00007;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8179.94;;;;;;216;0;0
+00005/2026;00008;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;13370.62;;;;;;24;0;0
+00005/2026;00009;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;2122.8;;;;;;168;0;0
+00005/2026;00010;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;1691.4;;;;;;336;0;0
+00006/2025;00001;Contratação de Solução para Investigação em Dark Web  com atualização ;apostilamento;2024-10-01;emdia;295200;310902.8983;310902.90;;;;;0;0;0
+00006/2026;00004;ESTETOSCÓPIO USO EM SAÚDE, TIPO BIAURICULAR, ACESSÓRIOS OLIVAS ANATÔMI;apostilamento;2025-02-01;prorrogar;18.8;19.63;19.63;2027-03-18;5.34;5;20.68;15;0;16
+00007/2025;00001;CARTÃO P/ COLETA USO MÉDICO, TIPO PARA COLETA DE AMOSTRAS BIOLÓGICAS, ;apostilamento;2024-10-01;desatualizado;71;71;74.78;;;;;0;0;0
+00007/2026;00005;ACESSÓRIO EQUIPAMENTO SEGURANÇA, TIPO BOLSO MODULAR, MATERIAL NYLON, A;apostilamento;2025-02-01;prorrogar;148.99;155.61;155.61;2027-03-26;5.34;5;163.92;60;0;499
+00007/2026;00006;TESOURA INSTRUMENTAL, MODELO 1 PADRÃO, TIPO PONTA PONTA RETA, CARACTER;apostilamento;2025-02-01;prorrogar;33.96;35.47;35.47;2027-03-26;5.34;5;37.37;60;0;114
+00007/2026;00007;SISTEMA PARA COMPRESSÃO, TIPO TORNIQUETE NÃO PNEUMÁTICO, APLICAÇÃO MEM;apostilamento;2025-02-01;prorrogar;68.5;71.54;71.54;2027-03-26;5.34;5;75.36;60;0;229
+00007/2026;00008;SISTEMA PARA COMPRESSÃO, TIPO TORNIQUETE NÃO PNEUMÁTICO, APLICAÇÃO MEM;apostilamento;2025-02-01;prorrogar;292.43;305.42;305.41;2027-03-26;5.34;5;321.74;60;0;979
+00007/2026;00009;LUVA PARA PROCEDIMENTO NÃO CIRÚRGICO ( VER NOVO PDM 30247 ), MATERIAL ;apostilamento;2025-02-01;prorrogar;20.52;21.43;21.43;2027-03-26;5.34;5;22.58;60;0;69
+00007/2026;00010;PINCEL MARCADOR PERMANENTE CD, MATERIAL PLÁSTICO, TIPO PONTA POLIÉSTER;apostilamento;2025-02-01;prorrogar;1.66;1.73;1.73;2027-03-26;5.34;5;1.83;60;0;6
+00007/2026;00011;COMPRESSA GAZE, MATERIAL 100% ALGODÃO, MODELO HEMOSTÁTICA, DOBRA EM Z,;apostilamento;2025-02-01;prorrogar;485.22;506.77;506.76;2027-03-26;5.34;5;533.84;60;0;1624
+00007/2026;00012;BANDAGEM, TIPO ELÁSTICA, MATERIAL MALHA DE TECIDO SINTÉTICO E ALGODÃO,;apostilamento;2025-02-01;prorrogar;89;92.95;92.95;2027-03-26;5.34;5;97.92;60;0;298
+00007/2026;00013;TUBO SUPRAGLÓTICO, TIPO CÂNULA NASOFARÍNGEA, MATERIAL* PVC FLEXÍVEL, T;apostilamento;2025-02-01;prorrogar;74.18;77.47;77.47;2027-03-26;5.34;5;81.61;60;0;248
+00007/2026;00014;CURATIVO CUTÂNEO, MODELO P/ ATENDIMENTO PRÉ HOSPITALAR APH, SELO DE TÓ;apostilamento;2025-02-01;prorrogar;281.34;293.84;293.83;2027-03-26;5.34;5;309.54;60;0;942
+00007/2026;00015;MANTA TÉRMICA P/ PACIENTE, TIPO DE AQUECIMENTO ISOLANTE TÉRMICO, MATER;apostilamento;2025-02-01;prorrogar;5.55;5.8;5.80;2027-03-26;5.34;5;6.11;60;0;19
+00007/2026;00040;COMPRESSA GAZE, MATERIAL 100% ALGODÃO, MODELO HEMOSTÁTICA, DOBRA EM Z,;apostilamento;2025-02-01;prorrogar;485.22;506.77;506.76;2027-03-26;5.34;5;533.84;2060;0;55774
+00007/2026;00089;BOLSA TÉRMICA USO EM SAÚDE, APLICAÇÃO* P/ CALOR, MATERIAL* BORRACHA NA;apostilamento;2025-02-01;prorrogar;11;11.49;11.49;2027-03-26;5.34;5;12.10;0;0;0
+00008/2025;00002;CONJUNTO PARA ANÁLISE, COMPOSIÇÃO BÁSICA AMPLIFICAÇÃO 24 STR, AMELOGEN;apostilamento;2024-10-01;desatualizado;19;19;20.01;;;;;8500;8591;0
+00008/2025;00003;CONJUNTO PARA ANÁLISE, COMPOSIÇÃO BÁSICA AMPLIFICAÇÃO 23 STR DO CROMOS;apostilamento;2024-10-01;desatualizado;14;14;14.74;;;;;0;0;0
+00008/2026;00034;LANCETA, MATERIAL LÂMINA AÇO INOXIDÁVEL,PONTA AFIADA,TRIFACETADA, USO ;apostilamento;2025-02-01;prorrogar;3.5;3.66;3.66;2027-03-27;5.34;5;3.86;200;0;39
+00009/2025;00004;CONJUNTO PARA ANÁLISE, COMPOSIÇÃO BÁSICA AMPLIFICAÇÃO DNA AUTOSSÔMICO ;apostilamento;2024-10-01;desatualizado;7.31;7.31;7.70;;;;;0;0;0
+00010/2026;00041;COMPRESSA GAZE, MATERIAL 100% ALGODÃO, MODELO HEMOSTÁTICA, DOBRA EM Z,;apostilamento;2025-02-01;prorrogar;48.5;50.65;50.65;2027-03-30;5.34;5;53.36;2000;7;5412
+00010/2026;00042;BANDAGEM, TIPO ELÁSTICA, MATERIAL MALHA DE TECIDO SINTÉTICO E ALGODÃO,;apostilamento;2025-02-01;prorrogar;68.9;71.96;71.96;2027-03-30;5.34;5;75.80;1750;0;6728
+00010/2026;00043;BANDAGEM, TIPO ELÁSTICA, MATERIAL MALHA DE TECIDO SINTÉTICO E ALGODÃO,;apostilamento;2025-02-01;prorrogar;68.9;71.96;71.96;2027-03-30;5.34;5;75.80;1750;0;6728
+00010/2026;00045;TUBO SUPRAGLÓTICO, TIPO CÂNULA NASOFARÍNGEA, MATERIAL* PVC FLEXÍVEL, T;apostilamento;2025-02-01;prorrogar;21;21.93;21.93;2027-03-30;5.34;5;23.10;2000;5;2344
+00010/2026;00075;CURATIVO CUTÂNEO, MODELO P/ ATENDIMENTO PRÉ HOSPITALAR APH, SELO DE TÓ;apostilamento;2025-02-01;prorrogar;179.9;187.89;187.89;2027-03-30;5.34;5;197.93;1800;0;18069
+00010/2026;00076;CURATIVO CUTÂNEO, MODELO P/ ATENDIMENTO PRÉ HOSPITALAR APH, SELO DE TÓ;apostilamento;2025-02-01;prorrogar;109;113.84;113.84;2027-03-30;5.34;5;119.92;1750;0;10643
+00010/2026;00079;SISTEMA PARA COMPRESSÃO, TIPO TORNIQUETE NÃO PNEUMÁTICO, APLICAÇÃO MEM;apostilamento;2025-02-01;prorrogar;139;145.17;145.17;2027-03-30;5.34;5;152.93;1800;3;13961
+00011/2025;00006;BOMBA COSTAL, MATERIAL POLIETILENO, TIPO TANQUE RÍGIDO, CAPACIDADE 20 ;;;termo;;1273.23;;;;;;20;0;0
+00011/2026;00036;IMOBILIZADOR (TALA), MATERIAL PLÁSTICO, TIPO INFLÁVEL, TAMANHO TAMANHO;apostilamento;2025-02-01;prorrogar;161.15;168.31;168.31;2027-04-01;4.85;6;176.48;20;0;163
+00011/2026;00046;MANTA TÉRMICA P/ PACIENTE, TIPO DE AQUECIMENTO ISOLANTE TÉRMICO, MATER;apostilamento;2025-02-01;prorrogar;5.55;5.8;5.80;2027-04-01;4.85;6;6.08;2050;0;577
+00011/2026;00055;IMOBILIZADOR (TALA), MATERIAL METAL REVESTIDO DE E.V.A., TIPO ARAMADO,;apostilamento;2025-02-01;prorrogar;25.75;26.89;26.89;2027-04-01;4.85;6;28.20;360;1;470
+00011/2026;00056;IMOBILIZADOR (TALA), MATERIAL METAL REVESTIDO DE E.V.A., TIPO ARAMADO,;apostilamento;2025-02-01;prorrogar;19.5;20.37;20.37;2027-04-01;4.85;6;21.36;360;0;356
+00011/2026;00057;IMOBILIZADOR (TALA), MATERIAL ALUMÍNIO REVESTIDO C/ ESPUMA, TIPO ARAMA;apostilamento;2025-02-01;prorrogar;39;40.73;40.73;2027-04-01;4.85;6;42.71;2020;3;3994
+00011/2026;00065;MÁSCARA GASOTERAPIA, APLICAÇÃO P/ REANIMAÇÃO CARDIOPULMONAR BOCA A BOC;apostilamento;2025-02-01;prorrogar;11.39;11.9;11.90;2027-04-01;4.85;6;12.48;100;0;58
+00012/2025;00004;SISTEMA COMBATE INCÊNDIO, TIPO CONJUNTO DE COMBATE INCÊNDIO MÓVEL VEÍC;;;termo;;28621.26;;;;;;485;0;0
+00012/2026;00044;BANDAGEM, TIPO ELÁSTICA, MATERIAL MALHA DE TECIDO SINTÉTICO E ALGODÃO,;apostilamento;2025-02-01;prorrogar;44;45.95;45.95;2027-04-01;4.85;6;48.18;2000;7;4461
+00013/2025;00001;CAPACETE POLICIAL, MATERIAL POLIAMIDA, CARACTERÍSTICAS ADICIONAIS CONF;apostilamento;2024-10-01;emdia;496;520.56;520.56;;;;;100;0;0
+00013/2026;00047;OXÍMETRO USO MÉDICO, TIPO PULSO, FAIXA MEDIÇÃO SATURAÇÃO 1 0 A 100%, F;apostilamento;2025-02-01;prorrogar;850;887.75;887.74;2027-03-30;5.34;5;935.18;4;0;190
+00013/2026;00048;OXÍMETRO USO MÉDICO, TIPO PULSO, PARÂMETRO ADICIONAL C/ CURVA PLETISMO;apostilamento;2025-02-01;prorrogar;3600;3759.89;3759.84;2027-03-30;5.34;5;3960.77;4;0;804
+00014/2025;00004;CANELEIRA ANTITUMULTO, MATERIAL TERMOPLÁSTICO, TAMANHO ÚNICO, COR PRET;apostilamento;2024-09-01;emdia;344;361.65;361.65;;;;;500;0;0
+00014/2026;00050;MACA DE RESGATE, MATERIAL POLIETILENO, TIPO FLEXÍVEL, TAMANHO CERCA DE;apostilamento;2025-02-01;prorrogar;200;208.88;208.88;2027-04-17;4.85;6;219.02;400;0;4056
+00014/2026;00080;SISTEMA PARA COMPRESSÃO, TIPO TORNIQUETE NÃO PNEUMÁTICO, APLICAÇÃO MEM;apostilamento;2025-02-01;prorrogar;190;198.44;198.44;2027-04-17;4.85;6;208.07;2000;0;19265
+00014/2026;00081;SISTEMA PARA COMPRESSÃO, TIPO TORNIQUETE NÃO PNEUMÁTICO, APLICAÇÃO TÁT;apostilamento;2025-02-01;prorrogar;65;67.89;67.89;2027-04-17;4.85;6;71.19;1828;0;6024
+00015/2026;00052;MODELO ANATÔMICO PARA FINS DIDÁTICOS, MATERIAL SILICONE, TAMANHO 58 X ;apostilamento;2025-02-01;prorrogar;5850;6109.82;6109.74;2027-05-04;4.61;7;6391.76;20;0;5639
+00016/2025;00002;COFRE, MATERIAL AÇO, TAMANHO GRANDE, TIPO FECHADURA SISTEMA ELETRÔNICO;apostilamento;2024-10-01;emdia;3300;3470.69;3470.69;;;;;0;0;0
+00016/2026;00053;BRAÇO ARTIFICIAL, MATERIAL SILICONE, CARACTERÍSTICAS ADICIONAIS COM CA;apostilamento;2025-02-01;prorrogar;1220.66;1274.87;1274.86;2027-04-17;4.85;6;1336.75;20;0;1238
+00017/2026;00059;HIPOCLORITO DE SÓDIO, ASPECTO FÍSICO SOLUÇÃO AQUOSA, CONCENTRAÇÃO ATÉ ;apostilamento;2025-02-01;prorrogar;6.1;6.37;6.37;2027-04-24;4.85;6;6.68;58;0;18
+00018/2025;00002;AUTOMÓVEL, TIPO MOTOR MÍNIMO 2.5 L, QUANTIDADE PORTAS 4 UN, TIPO COMBU;apostilamento;2024-12-01;emdia;289017;301912.31;301907.16;;;;;1269;0;0
+00018/2026;00082;ACESSÓRIO EQUIPAMENTO SEGURANÇA, TIPO BOLSO MODULAR, MATERIAL NYLON, A;apostilamento;2025-02-01;prorrogar;97;101.31;101.31;2027-04-17;4.85;6;106.23;2000;0;9835
+00019/2025;00004;AMBULÂNCIA, TIPO FURGÃO, CAPACIDADE MÍNIMA CARGA 1.500 KG, COR BRANCA,;apostilamento;2024-11-01;emdia;549790;573234.96;573211.05;;;;;37;0;0
+00019/2026;00049;TESOURA INSTRUMENTAL, MODELO 1 PADRÃO, TIPO PONTA PONTA RETA, CARACTER;apostilamento;2025-02-01;prorrogar;32;33.42;33.42;2027-04-27;4.85;6;35.04;2030;2;3293
+00020/2026;00001;SUPORTE DE MASTRO DE BANDEIRA, MATERIAL MADEIRA, COMPRIMENTO 460 MM, L;edital;2025-10-10;prorrogar·sugestao;212;212;212.00;2027-04-30;4.58;0;221.70;0;0;0
+00021/2025;00005;SISTEMA GLOBAL DE POSICIONAMENTO - GLOBAL, TIPO DIGITAL, DISPLAY 2,2? ;;;termo;;5442.25;;;;;;-81;0;0
+00021/2026;00001;CAMISETA, TIPO UNIFORME, TIPO MANGA CURTA, TIPO GOLA CARECA, COR PRETA;;;semclausula;;47.5;;;;;;100;0;0
+00022/2025;00007;SOPRADOR, TIPO PORTÁTIL, ACIONAMENTO GASOLINA, POTÊNCIA 1.1 HP;;;termo;;3041.01;;;;;;20;0;0
+00022/2026;00001;ARMA DE FOGO - EMPUNHÁVEL - MÉDIO PORTE, TIPO ESPINGARDA, CALIBRE 12, ;edital;2024-07-31;prorrogar·sugestao;3520;3700.59;3708.36;2027-03-26;5.34;5;3906.48;19.0199;148;3768
+00023/2026;00001;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;5040.09;;;;;;96;0;0
+00023/2026;00002;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8791.08;;;;;;168;0;0
+00023/2026;00003;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8359.67;;;;;;192;0;0
+00023/2026;00004;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8330.91;;;;;;48;0;0
+00023/2026;00005;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8481.87;;;;;;168;0;0
+00023/2026;00006;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8632.91;;;;;;72;0;0
+00023/2026;00007;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;8179.94;;;;;;216;0;0
+00023/2026;00008;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;13370.62;;;;;;24;0;0
+00023/2026;00009;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;2122.8;;;;;;168;0;0
+00023/2026;00010;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;1691.4;;;;;;336;0;0
+00023/2026;00011;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;1633.47;;;;;;48;0;0
+00023/2026;00012;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;1813.6;;;;;;144;0;0
+00023/2026;00013;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;1964.63;;;;;;264;0;0
+00023/2026;00014;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;3325.27;;;;;;48;0;0
+00023/2026;00015;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;1511.66;;;;;;264;0;0
+00023/2026;00016;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;4590.41;;;;;;192;0;0
+00023/2026;00017;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;4716.25;;;;;;96;0;0
+00023/2026;00018;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;4712.62;;;;;;120;0;0
+00023/2026;00019;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;4863.65;;;;;;96;0;0
+00023/2026;00020;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;4410.68;;;;;;96;0;0
+00023/2026;00021;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;6034.4;;;;;;24;0;0
+00023/2026;00022;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;5725.24;;;;;;24;0;0
+00023/2026;00023;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;5876.23;;;;;;48;0;0
+00023/2026;00024;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;5603;;;;;;24;0;0
+00023/2026;00025;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;5423.27;;;;;;24;0;0
+00023/2026;00026;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;11224.65;;;;;;120;0;0
+00023/2026;00027;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;10793.24;;;;;;144;0;0
+00023/2026;00028;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;10915.44;;;;;;96;0;0
+00023/2026;00029;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;11066.47;;;;;;72;0;0
+00023/2026;00030;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;10613.5;;;;;;96;0;0
+00023/2026;00031;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;1449.52;;;;;;24;0;0
+00023/2026;00032;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;10707.8;;;;;;72;0;0
+00023/2026;00033;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;11160.76;;;;;;24;0;0
+00023/2026;00034;Manutenção e Reparo em Equipamento - Uso Médico - Manutenção e Reparo ;;;termo;;10887.53;;;;;;24;0;0
+00023/2026;00035;Manutenção e Reparo nos componentes de Equipamento - Uso Médico - Manu;;;termo;;13068.68;;;;;;0;0;0
+00024/2024;00001;Aparelho celular do tipo Smartphone 5G;apostilamento;2024-08-01;emdia;1987.47;2091.32;2091.41;;;;;523;50;0
+00024/2026;00002;COLETOR RESÍDUOS ARMA DE FOGO, MATERIAL ALUMÍNIO E PELÍCULA CARBONO, C;edital;2025-09-26;prorrogar·sugestao;75000;75000;75000.00;2027-04-07;4.22;0;78167.59;6;0;19006
+00024/2026;00003;COLETOR RESÍDUOS ARMA DE FOGO, MATERIAL ALUMÍNIO E PELÍCULA CARBONO, C;edital;2025-09-26;prorrogar·sugestao;65650;65650;65650.00;2027-04-07;4.22;0;68422.70;37;0;102590
+00025/2026;00006;ROSETA DE BANDEIRA, MATERIAL CETIM, LARGURA 0,90 CM, TIPO BORDADA, COR;edital;2025-10-10;previsto·sugestao;65;65;65.00;2027-06-10;4.58;0;67.97;3;0;9
+00026/2026;00011;FARDAMENTO / ACESSÓRIO, TIPO LUVA, MATERIAL TECIDO/COURO;edital;2025-10-10;prorrogar·sugestao;69.9;69.9;69.90;2027-06-22;4.58;0;73.10;0;0;0
+00027/2026;00015;MICROFONE DIRECIONAL, TIPO SHOTGUN, FINALIDADE APOIO AUDIO, VIDEO E FO;edital;2025-10-10;previsto·sugestao;489;489;489.00;2027-06-04;4.58;0;511.38;0;0;0
+00028/2026;00016;MICROFONE, TIPO DE LAPELA, ALIMENTAÇÃO BATERIA, CARACTERÍSTICAS ADICIO;edital;2025-10-10;prorrogar·sugestao;125;125;125.00;2027-06-22;4.58;0;130.72;1;0;6
+00029/2025;00026;BOTA SEGURANÇA, MATERIAL NEOPRENE, MATERIAL SOLA BORRACHA VULCANIZADA,;apostilamento;2024-09-01;desatualizado;279;279;292.82;;;;;0;0;0
+00029/2026;00017;CÂMERA DIGITAL, RESOLUÇÃO 20 MEGAPIXELS, ZOOM ÓPTICO 23 X, ZOOM DIGITA;edital;2025-10-10;prorrogar·sugestao;9200;9200;9200.00;2027-06-22;4.58;0;9621.00;1;0;421
+00030/2026;00024;EQUIPAMENTO / ACESSÓRIOS FOTOGRÁFICOS, TIPO REBATEDOR DE LUZ, MATERIAL;edital;2025-10-10;prorrogar·sugestao;115;115;115.00;2027-06-22;4.58;0;120.26;0;0;0
+00031/2025;00001;ARMA DE FOGO - EMPUNHÁVEL - MÉDIO PORTE, TIPO FUZIL, CALIBRE 5,56, TIP;apostilamento;2024-10-01;emdia;5304.53;5578.9;5578.77;;;;;6915.1307;0;0
+00031/2025;00002;ARMA DE FOGO - EMPUNHÁVEL - MÉDIO PORTE, TIPO FUZIL, CALIBRE 5,56, TIP;apostilamento;2024-10-01;emdia;5057.48;5319.07;5318.95;;;;;609.6391;0;0
+00031/2026;00027;PROJETOR MULTIMÍDIA, VOLTAGEM 100/240 V, QUANTIDADE ENTRADAS VÍDEO 2 U;edital;2025-10-10;prorrogar·sugestao;2964;2964;2964.00;2027-06-22;4.58;0;3099.64;4;0;543
+00032/2025;00001;AUTOMÓVEL, TIPO MOTOR 1.8 L, QUANTIDADE PORTAS 4, TIPO COMBUSTÍVEL BI-;apostilamento;2025-02-01;desatualizado;355230;355230;371002.21;;;;;530;8359272;0
+00032/2026;00028;TELA PROJEÇÃO, TIPO AJUSTE TELA RETRÁTIL AUTOMÁTICO, MATERIAL MATTE WI;edital;2025-10-10;prorrogar·sugestao;480;480;480.00;2027-06-22;4.58;0;501.97;0;0;0
+00033/2025;00003;AUTOMÓVEL, TIPO MOTOR 1.8 L, QUANTIDADE PORTAS 4, TIPO COMBUSTÍVEL BI-;apostilamento;2025-02-01;emdia;183657.24;191811.62;191811.62;;;;;0;0;0
+00033/2026;00030;TOALHA MESA, MATERIAL JACQUARD, FORMATO QUADRADA, COMPRIMENTO 1,60 M, ;edital;2025-10-10;prorrogar·sugestao;36.33;36.33;36.33;2027-07-22;4.58;0;37.99;20;0;33
+00034/2025;00004;VEÍCULO TRANSPORTE PESSOAL, APLICAÇÃO MILITAR, TIPO MOTOCICLETA, CAPAC;apostilamento;2025-02-01;desatualizado;99490;99490;103907.36;;;;;95;419649;0
+00034/2026;00018;CÂMERA FOTOGRÁFICA DIGITAL, TIPO ZOOM ÓPTICO DE 50X, TIPO FOCO AUTOMÁT;edital;2025-10-10;prorrogar·sugestao;5950;5950;5950.00;2027-06-22;4.58;0;6222.28;16;0;4356
+00034/2026;00023;TRIPÉ, MATERIAL ALUMÍNIO, TIPO FIXO, ALTURA MÁXIMA 156,50 CM, CAPACIDA;edital;2025-10-10;prorrogar·sugestao;544;544;544.00;2027-06-22;4.58;0;568.89;0;0;0
+00035/2025;00003;VEÍCULO PICK-UP, TIPO MOTOR TURBO DIESEL, TIPO DIREÇÃO HIDRÁULICA, CAR;apostilamento;2024-12-01;emdia;295700;308893.66;308888.22;;;;;408;0;0
+00035/2026;00012;PULPITO PORTATIL, MATERIAL ACRÍLICO, ESPESSURA DO TAMPO 10 MM, ALTURA ;edital;2025-10-10;previsto·sugestao;1450;1450;1450.00;2027-07-07;4.58;0;1516.35;1;0;66
+00035/2026;00013;CAIXA SOM, POTÊNCIA 500 W, COR PRETA, VOLTAGEM 110/220 V, APLICAÇÃO MI;edital;2025-10-10;previsto·sugestao;1760;1760;1760.00;2027-07-07;4.58;0;1840.54;4;0;322
+00035/2026;00019;BOLSA TRANSPORTE, MODELO CÂMERA FOTOGRÁFICA DIGITAL CANON, REFERÊNCIA ;edital;2025-10-10;previsto·sugestao;145;145;145.00;2027-07-07;4.58;0;151.64;1;0;7
+00035/2026;00021;ESTABILIZADOR - FOTOGRAFICO, MÚMERO DE EIXOS 3 EIXOS (INCLINAÇÃO, ROTA;edital;2025-10-10;previsto·sugestao;3400;3400;3400.00;2027-07-07;4.58;0;3555.59;0;0;0
+00035/2026;00022;ILUMINADOR PARA FILMAGEM, TIPO ILUMINADOR LED, MODELO BASTÃO, ALTURA 5;edital;2025-10-10;previsto·sugestao;465;465;465.00;2027-07-07;4.58;0;486.28;1;0;21
+00036/2025;00001;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BARRA, MATERI;edital;2024-09-30;emdia·sugestao;9845;10749.72;10350.10;;;;;104;0;0
+00036/2025;00002;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO PUXADA ALTA D;edital;2024-09-30;emdia·sugestao;9390;10252.9;9871.75;;;;;104;0;0
+00036/2025;00003;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO CADEIRA EXTEN;edital;2024-09-30;emdia·sugestao;8748;9551.91;9196.82;;;;;104;0;0
+00036/2025;00004;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO CADEIRA FLEXO;edital;2024-09-30;emdia·sugestao;7344;8018.88;7720.78;;;;;104;0;0
+00036/2026;00002;SUPORTE DE MASTRO DE BANDEIRA, MATERIAL MADEIRA, COMPRIMENTO 460 MM, L;edital;2025-10-10;prorrogar·sugestao;247.5;247.5;247.50;2027-06-22;4.58;0;258.83;1;0;11
+00036/2026;00003;SUPORTE DE MASTRO DE BANDEIRA, MATERIAL MADEIRA, COMPRIMENTO 460 MM, L;edital;2025-10-10;prorrogar·sugestao;287;287;287.00;2027-06-22;4.58;0;300.13;1;0;13
+00036/2026;00004;MASTRO BANDEIRA, MATERIAL ALUMÍNIO, ALTURA 2,30 M, DIÂMETRO 28 MM, CAR;edital;2025-10-10;prorrogar·sugestao;111;111;111.00;2027-06-22;4.58;0;116.08;7;0;36
+00036/2026;00005;MASTRO BANDEIRA, MATERIAL MADEIRA, ALTURA 2,20 M, DIÂMETRO 30 MM, ACAB;edital;2025-10-10;prorrogar·sugestao;142;142;142.00;2027-06-22;4.58;0;148.50;3;0;19
+00036/2026;00007;TALABARTE DE BANDEIRA, MODELO COM PONTEIRA NIQUELADA., MATERIAL TERGAL;edital;2025-10-10;prorrogar·sugestao;75;75;75.00;2027-06-22;4.58;0;78.43;3;0;10
+00036/2026;00008;BANDEIRA INSTITUCIONAL, MATERIAL CETIM, COMPRIMENTO 21 CM, LARGURA 14 ;edital;2025-10-10;prorrogar·sugestao;40;40;40.00;2027-06-22;4.58;0;41.83;57;0;104
+00036/2026;00009;BANDEIRA INSTITUCIONAL, MATERIAL POLIÉSTER, COMPRIMENTO 128 CM, LARGUR;edital;2025-10-10;prorrogar·sugestao;50;50;50.00;2027-06-22;4.58;0;52.29;89;0;204
+00036/2026;00010;CACHECOL, MATERIAL ALGODÃO, TIPO DE PARADA, COR AZUL TURQUESA, APLICAÇ;edital;2025-10-10;prorrogar·sugestao;15.2;15.2;15.20;2027-06-22;4.58;0;15.90;0;0;0
+00036/2026;00029;TOALHA MESA, MATERIAL JACQUARD, FORMATO RETANGULAR, COMPRIMENTO 3,70 M;edital;2025-10-10;prorrogar·sugestao;92;92;92.00;2027-06-22;4.58;0;96.21;0;0;0
+00037/2024;00001;Lançador de munição não letal calibre 40mm ou por arma similar no cali;apostilamento;2024-07-01;emdia;7232.32;7619.34;7619.25;;;;;3;0;0
+00037/2026;00001;AUTOMÓVEL, TIPO MOTOR MÍNIMO 2.5 L, QUANTIDADE PORTAS 4 UN, TIPO COMBU;;;semclausula;;1228750;;;;;;17;0;0
+00037/2026;00002;AUTOMÓVEL, TIPO MOTOR MÍNIMO 2.5 L, QUANTIDADE PORTAS 4 UN, TIPO COMBU;;;semclausula;;1211750;;;;;;-4;0;0
+00038/2025;00001;MICROSCÓPIO, TIPO DE ANÁLISE ÓTICO, VERTICAL, TIPO BINOCULAR, AUMENTO ;edital;2025-02-20;devido·sugestao;502978.65;502978.65;525317.70;;;;;5;111695;0
+00038/2026;00001;SONAR, COMPRIMENTO 1,20 M, LARGURA 25,80 CM, FAIXA FREQÜÊNCIA 3 A 15 K;edital;2025-10-15;previsto·sugestao;379418.34;379418.34;379418.34;2027-07-21;4.58;0;396780.98;5;0;86813
+00039/2024;00003;CAMINHÃO, TIPO PIPA, POTÊNCIA MOTOR 230 CV, MOTOR DIESEL, CAPACIDADE V;apostilamento;2024-08-01;emdia;1420000;1494198.62;1494266.00;;;;;79;5323;0
+00039/2025;00002;LAVADORA ULTRASSÔNICA, MODELO HORIZONTAL, DE BANCADA, MATERIAL GABINET;edital;2025-02-20;devido·sugestao;2427.99;2427.99;2535.83;;;;;3;324;0
+00039/2026;00001;Curso / Aperfeiçoamento - Pilotagem de Aeronave;edital;2025-09-16;prorrogar·sugestao;85000;85000;85000.00;2027-07-29;4.22;0;88589.93;102;0;366173
+00039/2026;00002;Curso / Aperfeiçoamento - Pilotagem de Aeronave;edital;2025-09-16;prorrogar·sugestao;135000;135000;135000.00;2027-07-29;4.22;0;140701.66;102;0;581569
+00039/2026;00003;Curso / Aperfeiçoamento - Pilotagem de Aeronave;edital;2025-09-16;prorrogar·sugestao;64989;64989;64989.00;2027-07-29;4.22;0;67733.78;44;0;120770
+00040/2024;00006;CAMINHÃO, TIPO PIPA, POTÊNCIA MOTOR 230 CV, MOTOR DIESEL, CAPACIDADE V;apostilamento;2024-08-01;emdia;1500000;1578378.82;1578450.00;;;;;1;71;0
+00040/2025;00001;ADAPTADOR CONECTOR, TIPO CONECTORES MULTIPORTA COM 4K HDMI USB 3.0, RJ;apostilamento;2025-05-01;icti;;1099;;;;;;130;0;0
+00040/2026;00004;Curso / Aperfeiçoamento - Pilotagem de Aeronave;edital;2025-09-16;prorrogar·sugestao;49740;49740;49740.00;2027-07-30;4.22;0;51840.75;99;0;207974
+00041/2024;00001;QUEROSENE, USO PARA AVIAÇÃO, TIPO QAV-1;edital;2024-07-15;devido·sugestao;9.9661;9.9661;10.50;;;;;0;0;0
+00041/2024;00002;Taxa de Administração para serviço de gerenciamento e controle de forn;edital;2024-07-15;emdia·sugestao;5.5;5.78;5.79;;;;;0;0;0
+00041/2025;00005;CAMA METÁLICA DOBRÁVEL, MATERIAL ESTRUTURA AÇO, TIPO ESTRADO TECIDO PO;apostilamento;2025-04-01;emdia;270;285.17;285.17;;;;;100;0;0
+00041/2025;00006;REDE DE DORMIR, MATERIAL NYLON, TIPO MILITAR, CARACTERÍSTICAS ADICIONA;apostilamento;2025-04-01;emdia;411.84;434.98;434.99;;;;;1400;8;0
+00041/2026;00001;VEÍCULO ESPECIAL, TIPO AUTO RÁPIDO FLORESTAL (ARF), TIPO MOTOR DIESEL,;;;termo;;678800;;;;;;28;0;0
+00042/2026;00002;Touca;edital;2025-10-03;prorrogar·sugestao;647.46;647.46;647.46;2027-09-10;4.58;0;677.09;1694;0;50191
+00043/2026;00003;Vestuário Proteção;edital;2025-10-03;prorrogar·sugestao;1416.97;1416.97;1416.97;2027-09-10;4.58;0;1481.81;939;0;60887
+00044/2024;00003;AERONAVES TELEGUIADAS, TIPO AERONAVE REMOTAMENTE PILOTADA (DRONE), QUA;apostilamento;2024-07-01;emdia;139000;146438.13;146438.13;;;;;0;0;0
+00044/2026;00001;Aeronaves Teleguiadas;edital;2026-06-11;prorrogar·sugestao;45200;45200;45200.00;2027-09-08;4.33;8;47158.83;1838;0;3600332
+00044/2026;00002;Aeronaves Teleguiadas;edital;2026-06-11;prorrogar·sugestao;9671;9671;9671.00;2027-09-08;4.33;8;10090.11;0;0;0
+00045/2025;00001;MOCHILA, MATERIAL POLIAMIDA, QUANTIDADE COMPARTIMENTOS 8 UN, APLICAÇÃO;apostilamento;2025-04-01;emdia;328;346.43;346.43;;;;;2120;8;0
+00046/2025;00002;ACESSÓRIO EQUIPAMENTO SEGURANÇA, TIPO COTOVELEIRA, MATERIAL POLÍMERO/T;apostilamento;2024-09-01;desatualizado;102.8;102.8;112.74;;;;;500;4970;0
+00047/2024;00001;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.29;2.41;2.41;;;;;0;0;0
+00047/2024;00002;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.35;2.47;2.47;;;;;0;0;0
+00047/2024;00003;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.44;2.57;2.57;;;;;0;0;0
+00047/2024;00004;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.5;2.63;2.63;;;;;0;0;0
+00047/2024;00005;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.68;2.82;2.82;;;;;0;0;0
+00047/2024;00006;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.92;3.07;3.07;;;;;49000;0;0
+00047/2024;00007;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.01;3.16;3.16;;;;;0;0;0
+00047/2024;00008;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.06;3.22;3.22;;;;;0;0;0
+00047/2024;00009;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.08;3.24;3.24;;;;;0;0;0
+00047/2024;00010;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.11;3.27;3.27;;;;;0;0;0
+00047/2024;00011;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.16;3.32;3.32;;;;;0;0;0
+00047/2024;00012;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.21;3.37;3.37;;;;;0;0;0
+00047/2024;00013;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.01;2.11;2.11;;;;;0;0;0
+00047/2024;00014;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.06;2.17;2.17;;;;;0;0;0
+00047/2024;00015;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.13;2.24;2.24;;;;;0;0;0
+00047/2024;00016;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.19;2.3;2.30;;;;;0;0;0
+00047/2024;00017;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.34;2.46;2.46;;;;;0;0;0
+00047/2024;00018;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.56;2.69;2.69;;;;;156790;208;0
+00047/2024;00019;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.72;2.86;2.86;;;;;0;0;0
+00047/2024;00020;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.77;2.91;2.91;;;;;0;0;0
+00047/2024;00021;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;2.81;2.95;2.95;;;;;0;0;0
+00047/2024;00022;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.76;3.95;3.95;;;;;0;0;0
+00047/2024;00023;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.85;4.05;4.05;;;;;0;0;0
+00047/2024;00024;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4;4.21;4.21;;;;;0;0;0
+00047/2024;00025;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.1;4.31;4.31;;;;;0;0;0
+00047/2024;00026;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.39;4.62;4.62;;;;;0;0;0
+00047/2024;00027;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.79;5.04;5.04;;;;;198771;0;0
+00047/2024;00028;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.94;5.19;5.19;;;;;0;0;0
+00047/2024;00029;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.02;5.28;5.28;;;;;0;0;0
+00047/2024;00030;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.06;5.32;5.32;;;;;0;0;0
+00047/2024;00031;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.1;5.36;5.36;;;;;0;0;0
+00047/2024;00032;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.19;5.46;5.46;;;;;0;0;0
+00047/2024;00033;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.27;5.54;5.54;;;;;0;0;0
+00047/2024;00034;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;2.57;2.7;2.70;;;;;0;0;0
+00047/2024;00035;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;2.63;2.76;2.76;;;;;0;0;0
+00047/2024;00036;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;2.73;2.87;2.87;;;;;0;0;0
+00047/2024;00037;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;2.8;2.94;2.94;;;;;0;0;0
+00047/2024;00038;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;3;3.15;3.15;;;;;0;0;0
+00047/2024;00039;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;3.27;3.44;3.44;;;;;0;0;0
+00047/2024;00040;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;3.37;3.54;3.54;;;;;0;0;0
+00047/2024;00041;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;3.42;3.6;3.60;;;;;0;0;0
+00047/2024;00042;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;3.45;3.63;3.63;;;;;0;0;0
+00047/2024;00043;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;3.54;3.72;3.72;;;;;0;0;0
+00047/2024;00044;Projétil Munição Arma Fogo Material: Chumbo , Calibre: .40 , Tipo: Ogi;apostilamento;2024-09-01;emdia;3.6;3.78;3.78;;;;;0;0;0
+00047/2024;00045;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.31;4.53;4.53;;;;;0;0;0
+00047/2024;00046;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.42;4.65;4.65;;;;;0;0;0
+00047/2024;00047;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.58;4.81;4.81;;;;;0;0;0
+00047/2024;00048;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.7;4.94;4.94;;;;;0;0;0
+00047/2024;00049;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.03;5.29;5.29;;;;;0;0;0
+00047/2024;00050;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.49;5.77;5.77;;;;;0;0;0
+00047/2024;00051;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.66;5.95;5.95;;;;;0;0;0
+00047/2024;00052;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.75;6.04;6.04;;;;;0;0;0
+00047/2024;00053;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.8;6.1;6.10;;;;;0;0;0
+00047/2024;00054;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.85;6.15;6.15;;;;;0;0;0
+00047/2024;00055;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.94;6.24;6.24;;;;;0;0;0
+00047/2024;00056;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.04;6.35;6.35;;;;;0;0;0
+00047/2024;00057;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;3.07;3.23;3.23;;;;;0;0;0
+00047/2024;00058;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;3.14;3.3;3.30;;;;;0;0;0
+00047/2024;00059;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;3.26;3.43;3.43;;;;;0;0;0
+00047/2024;00060;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;3.52;3.7;3.70;;;;;0;0;0
+00047/2024;00061;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;3.58;3.76;3.76;;;;;0;0;0
+00047/2024;00062;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;3.91;4.11;4.11;;;;;333000;194;0
+00047/2024;00063;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;4.03;4.24;4.24;;;;;0;0;0
+00047/2024;00064;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;4.09;4.3;4.30;;;;;0;0;0
+00047/2024;00065;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;4.13;4.34;4.34;;;;;0;0;0
+00047/2024;00066;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;4.16;4.37;4.37;;;;;0;0;0
+00047/2024;00067;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;4.23;4.45;4.45;;;;;0;0;0
+00047/2024;00068;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 5.56 X 45 MM, T;apostilamento;2024-09-01;emdia;4.3;4.52;4.52;;;;;0;0;0
+00047/2024;00069;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;3.98;4.18;4.18;;;;;0;0;0
+00047/2024;00070;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;4.07;4.28;4.28;;;;;0;0;0
+00047/2024;00071;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;4.23;4.45;4.45;;;;;0;0;0
+00047/2024;00072;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;4.34;4.56;4.56;;;;;0;0;0
+00047/2024;00073;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;4.64;4.88;4.88;;;;;0;0;0
+00047/2024;00074;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;5.06;5.32;5.32;;;;;116700;0;0
+00047/2024;00075;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;5.22;5.49;5.49;;;;;0;0;0
+00047/2024;00076;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;5.3;5.57;5.57;;;;;0;0;0
+00047/2024;00077;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;5.35;5.62;5.62;;;;;0;0;0
+00047/2024;00078;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;5.39;5.67;5.67;;;;;0;0;0
+00047/2024;00079;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;5.48;5.76;5.76;;;;;0;0;0
+00047/2024;00080;Projétil Munição Arma Fogo Material: Chumbo , Calibre: 7,62 X 51 , Tip;apostilamento;2024-09-01;emdia;5.57;5.86;5.86;;;;;0;0;0
+00047/2024;00081;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.56;3.74;3.74;;;;;0;0;0
+00047/2024;00082;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.86;4.06;4.06;;;;;0;0;0
+00047/2024;00083;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;3.95;4.15;4.15;;;;;0;0;0
+00047/2024;00084;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.1;4.31;4.31;;;;;0;0;0
+00047/2024;00085;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.21;4.43;4.43;;;;;0;0;0
+00047/2024;00086;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.5;4.73;4.73;;;;;0;0;0
+00047/2024;00087;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.91;5.16;5.16;;;;;50000;94;0
+00047/2024;00088;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.07;5.33;5.33;;;;;0;0;0
+00047/2024;00089;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.15;5.41;5.41;;;;;0;0;0
+00047/2024;00090;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.19;5.46;5.46;;;;;0;0;0
+00047/2024;00091;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.23;5.5;5.50;;;;;0;0;0
+00047/2024;00092;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.32;5.59;5.59;;;;;0;0;0
+00047/2024;00093;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.41;5.69;5.69;;;;;0;0;0
+00047/2024;00094;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.48;5.76;5.76;;;;;0;0;0
+00047/2024;00095;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.93;6.23;6.23;;;;;0;0;0
+00047/2024;00096;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.08;6.39;6.39;;;;;0;0;0
+00047/2024;00097;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.31;6.63;6.63;;;;;0;0;0
+00047/2024;00098;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.48;6.81;6.81;;;;;0;0;0
+00047/2024;00099;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.93;7.29;7.29;;;;;0;0;0
+00047/2024;00100;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;7.56;7.95;7.95;;;;;50000;0;0
+00047/2024;00101;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;7.8;8.2;8.20;;;;;0;0;0
+00047/2024;00102;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;7.92;8.33;8.33;;;;;0;0;0
+00047/2024;00103;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;7.98;8.39;8.39;;;;;0;0;0
+00047/2024;00104;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;8.05;8.46;8.46;;;;;0;0;0
+00047/2024;00105;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;8.32;8.75;8.75;;;;;0;0;0
+00047/2024;00106;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.85;5.1;5.10;;;;;0;0;0
+00047/2024;00107;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;4.97;5.22;5.22;;;;;0;0;0
+00047/2024;00108;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.16;5.42;5.42;;;;;0;0;0
+00047/2024;00109;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.29;5.56;5.56;;;;;0;0;0
+00047/2024;00110;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;5.66;5.95;5.95;;;;;0;0;0
+00047/2024;00111;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.17;6.49;6.49;;;;;0;0;0
+00047/2024;00112;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.52;6.85;6.85;;;;;0;0;0
+00047/2024;00113;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.57;6.91;6.91;;;;;0;0;0
+00047/2024;00114;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.68;7.02;7.02;;;;;0;0;0
+00047/2024;00115;Projetil E Componentes Munição Até 30mm Nome: Projetil E Componentes M;apostilamento;2024-09-01;emdia;6.79;7.14;7.14;;;;;0;0;0
+00047/2024;00116;material: chumbo, calibre: .40, tipo: ogival, peso: 180;apostilamento;2024-09-01;emdia;3.48;3.66;3.66;;;;;0;0;0
+00047/2025;00003;JOELHEIRA, MATERIAL TERMOPLÁSTICO, TIPO ARTICULADA, TAMANHO VARIADO, C;apostilamento;2024-09-01;desatualizado;91.9;91.9;100.79;;;;;500;4443;0
+00048/2024;00006;AERONAVES TELEGUIADAS, TIPO AERONAVE REMOTAMENTE PILOTADA (DRONE), QUA;apostilamento;2024-07-01;emdia;132000;139063.54;139063.54;;;;;20;0;0
+00048/2025;00001;PEÇAS / ACESSÓRIOS ARMAMENTO, TIPO 3 MIRA, MATERIAL METAL, APLICAÇÃO E;apostilamento;2024-10-01;emdia;686.903;751.19;751.20;;;;;10308.0445;73;0
+00049/2024;00001;CAMINHÃO, TIPO PIPA, POTÊNCIA MOTOR 230 CV, MOTOR DIESEL, CAPACIDADE V;apostilamento;2024-10-01;emdia;2439990;2566192.35;2566137.48;;;;;0;0;0
+00049/2025;00001;ENSAIO DE VERIFICAÇÃO DE CARACTERÍSTICAS GERAIS E METROLOGIA;apostilamento;2024-12-01;emdia;700;758.31;758.31;;;;;0;0;0
+00049/2025;00002;ENSAIO DE EFICIÊNCIA ENERGÉTICA;apostilamento;2024-12-01;emdia;800;866.64;866.64;;;;;0;0;0
+00049/2025;00003;ENSAIO DE RESISTÊNCIA GLOBAL;apostilamento;2024-12-01;emdia;1170;1267.46;1267.46;;;;;0;0;0
+00049/2025;00004;AVALIAÇÃO DE ERGONOMIA;apostilamento;2024-12-01;emdia;415;449.57;449.57;;;;;0;0;0
+00049/2025;00005;ENSAIO DE ACELERAÇÃO;apostilamento;2024-12-01;emdia;1300;1408.29;1408.29;;;;;0;0;0
+00049/2025;00006;ENSAIO DE EFICIÊNCIA DE FRENAGEM E AVALIAÇÃO DE PNEUS;apostilamento;2024-12-01;emdia;1328;1438.62;1438.62;;;;;0;0;0
+00049/2025;00007;ENSAIO/TESTE DO ALCE;apostilamento;2024-12-01;emdia;1152;1247.96;1247.96;;;;;0;0;0
+00049/2025;00008;ENSAIO/TESTE SLALOM;apostilamento;2024-12-01;emdia;1152;1247.96;1247.96;;;;;0;0;0
+00049/2025;00009;ENSAIO DE ALTA VELOCIDADE;apostilamento;2024-12-01;emdia;1422;1540.45;1540.45;;;;;0;0;0
+00049/2025;00010;ENSAIO DE CIRCUITO URBANO;apostilamento;2024-12-01;emdia;1476;1598.95;1598.95;;;;;0;0;0
+00049/2025;00011;ENSAIO  DE  OFFROAD;apostilamento;2024-12-01;emdia;1928;2088.6;2088.60;;;;;0;0;0
+00050/2024;00002;CAMINHÃO, TIPO PIPA, POTÊNCIA MOTOR 230 CV, MOTOR DIESEL, CAPACIDADE V;apostilamento;2024-10-01;emdia;1697800;1785614.44;1785576.26;;;;;0;0;0
+00051/2024;00001;Arma Não Letal Nome: Arma Não Letal;edital;2024-09-23;devido·sugestao;2438.27;2438.27;2563.37;;;;;0;0;0
+00051/2024;00002;PROJÉTIL NÃO LETAL, TIPO CARTUCHO PARA DIPOSITIVO ELÉTRICO INCAPACITAN;edital;2024-09-23;devido·sugestao;113.94;113.94;119.79;;;;;0;0;0
+00051/2024;00003;PROJÉTIL NÃO LETAL, TIPO CARTUCHO DE LANÇAMENTO DE DARDOS (MSK 100), M;edital;2024-09-23;devido·sugestao;28.48;28.48;29.94;;;;;0;0;0
+00051/2024;00004;BATERIA RECARREGÁVEL, TIPO SELADA, MODELO BZ 2.0, APLICAÇÃO 1 ARMA DE ;edital;2024-09-23;devido·sugestao;188;188;197.65;;;;;0;0;0
+00051/2024;00005;Bateria recarregável;edital;2024-09-23;devido·sugestao;0.0001;0.0001;0.00;;;;;39718;0;0
+00051/2024;00006;Arma Não Letal Nome: Arma Não Letal;edital;2024-09-23;devido·sugestao;28.48;28.48;29.94;;;;;2793;4081;0
+00051/2024;00007;Coldre Nome: Coldre;edital;2024-09-23;devido·sugestao;239.27;239.27;251.55;;;;;0;0;0
+00051/2024;00008;Coldre Nome: Coldre;edital;2024-09-23;devido·sugestao;56.97;56.97;59.89;;;;;0;0;0
+00051/2024;00009;MALETA, MATERIAL PLÁSTICO, CARACTERÍSTICAS ADICIONAIS TIPO PESCADOR/PR;edital;2024-09-23;devido·sugestao;85.45;85.45;89.83;;;;;0;0;0
+00052/2024;00001;ESPARGIDOR DEFENSIVO, TIPO JATO DE ESPUMA, MATERIAL EMBALAGEM CILÍNDRI;apostilamento;2024-09-01;emdia;143.2;150.55;150.55;;;;;0;0;0
+00052/2024;00002;ESPARGIDOR DEFENSIVO, TIPO JATO DE ESPUMA, MATERIAL EMBALAGEM CILÍNDRI;apostilamento;2024-09-01;emdia;328.96;345.84;345.84;;;;;0;0;0
+00052/2024;00003;ESPARGIDOR DEFENSIVO, TIPO SPRAY, MATERIAL EMBALAGEM CILÍNDRICO DE ALU;apostilamento;2024-09-01;emdia;690;725.4;725.40;;;;;0;0;0
+00052/2024;00004;ESPARGIDOR DEFENSIVO, TIPO SPRAY, MATERIAL EMBALAGEM CILÍNDRICO DE ALU;apostilamento;2024-09-01;emdia;130.56;137.26;137.26;;;;;0;0;0
+00052/2024;00005;ESPARGIDOR DEFENSIVO, TIPO SPRAY, MATERIAL EMBALAGEM CILÍNDRICO DE ALU;apostilamento;2024-09-01;emdia;609.42;640.68;640.68;;;;;0;0;0
+00052/2024;00006;ESPARGIDOR DEFENSIVO, TIPO SPRAY, MATERIAL EMBALAGEM CILÍNDRICO DE ALU;apostilamento;2024-09-01;emdia;73;76.74;76.74;;;;;0;0;0
+00052/2024;00007;PROJÉTIL NÃO LETAL, TIPO CARGA MÚLTIPLA DE GÁS LACRIMOGÊNEO, MATERIAL ;apostilamento;2024-09-01;emdia;368.42;387.32;387.32;;;;;0;0;0
+00052/2024;00008;PROJÉTIL NÃO LETAL, TIPO PROJÉTIL DE BORRACHA, MATERIAL PLÁSTICO TRANS;apostilamento;2024-09-01;emdia;35;36.8;36.80;;;;;0;0;0
+00052/2024;00009;PROJÉTIL NÃO LETAL, TIPO PROJÉTIL DE BORRACHA, MATERIAL PLÁSTICO TRANS;apostilamento;2024-09-01;emdia;35;36.8;36.80;;;;;0;0;0
+00053/2024;00010;GRANADA, MATERIAL CORPO BORRACHA, TIPO EFEITO MORAL, FORMATO CILÍNDRIC;apostilamento;2024-09-01;emdia;80;84.1;84.10;;;;;0;0;0
+00053/2024;00011;ESPARGIDOR DEFENSIVO, TIPO SPRAY, MATERIAL EMBALAGEM CILÍNDRICO DE ALU;apostilamento;2024-09-01;emdia;98;103.03;103.03;;;;;0;0;0
+00055/2024;00001;LANCHA, MATERIAL CASCO ALUMÍNIO LIGA NAVAL, COMPRIMENTO 8 M, BOCA 2,9 ;apostilamento;2024-06-01;emdia;585000;615012.9;615010.50;;;;;1025;0;0
+00055/2025;00001;LENTE CÂMERA TERMOGRÁFICA, CAMPO VISÃO HORIZONTAL HFOV 10 GRAUS (0,18 ;apostilamento;2025-05-01;desatualizado;17999;17999;18898.44;;;;;79;71056;0
+00056/2024;00001;Equipamento Laboratório Tipo: P/ Purificação De Ácidos Nucleicos E Pro;apostilamento;2024-08-01;emdia;2741000;2898064.78;2898064.78;;;;;1;0;0
+00056/2024;00002;Equipamento Laboratório Tipo: P/ Purificação De Ácidos Nucleicos E Pro;apostilamento;2024-08-01;emdia;2539000;2684489.77;2684489.78;;;;;1;0;0
+00056/2025;00001;AUTOMÓVEL, TIPO MOTOR 1.6 L, QUANTIDADE PORTAS 4 UN, TIPO COMBUSTÍVEL ;;;termo;;273000;;;;;;174.0451;0;0
+00057/2025;00001;Software para localização, rastreamento e análise de transações com cr;edital;2025-05-29;icti;;170000;;;;;;0;0;0
+00058/2024;00003;material: polipropileno, capacidade: até 1025 mcl, acessórios: com fil;apostilamento;2024-10-01;emdia;3899.75;4101.37;4101.37;;;;;0;0;0
+00058/2024;00004;material: polipropileno, capacidade: até 1025 mcl, acessórios: com fil;apostilamento;2024-10-01;emdia;5771.25;6069.62;6069.62;;;;;0;0;0
+00058/2024;00005;material: polipropileno, capacidade: até 50 mcl, acessórios: com filtr;apostilamento;2024-10-01;emdia;5695.25;5989.69;5989.69;;;;;0;0;0
+00058/2024;00006;tipo: placa 96 poços, tipo de análise: para calibração espectral, cara;apostilamento;2024-10-01;emdia;1148.9646;1208.37;1208.37;;;;;0;0;0
+00058/2024;00007;tipo: placa 96 poços, tipo de análise: para calibração espectral, cara;apostilamento;2024-10-01;emdia;2945;3097.26;3097.26;;;;;0;0;0
+00058/2025;00001;VEÍCULO TRANSPORTE PESSOAL, APLICAÇÃO MILITAR, TIPO MOTOCICLETA, CAPAC;;;termo;;49390;;;;;;-721;0;0
+00059/2025;00001;TABLET, TELA SUPERIOR A 10 POL, MEMÓRIA RAM MÍNIMO 8 GB, ARMAZENAMENTO;apostilamento;2024-09-01;devido;1394;1528.8;1598.76;;;;;0;0;0
+00060/2024;00001;Cessão Temporária de Direitos Sobre Programas de Computador Locação de;apostilamento;2024-08-01;emdia;1183333.4;1245165.58;1245221.74;;;;;0;0;0
+00060/2024;00002;Adaptador Conector Tipo Conectores: Interface Usb 3.0, Aplicação: Note;apostilamento;2024-08-01;emdia;37368.6;39321.2;39322.98;;;;;0;0;0
+00060/2024;00003;Cessão Temporária de Direitos Sobre Programas de Computador Locação de;apostilamento;2024-08-01;emdia;1183333.4;1245165.58;1245221.74;;;;;0;0;0
+00060/2025;00002;COTURNO COMBATE INCÊNDIO, MATERIAL COURO, MATERIAL SOLA BORRACHA, ACAB;;;termo;;1561.91;;;;;;16775;0;0
+00061/2024;00003;LANTERNA ELÉTRICA, MATERIAL ALUMÍNIO, TIPO TÁTICA, CARACTERÍSTICAS ADI;apostilamento;2024-10-01;emdia;517.51;544.28;544.27;;;;;12645;0;0
+00061/2025;00002;VEÍCULO TRANSPORTE PESSOAL, APLICAÇÃO MILITAR, TIPO MOTOCICLETA, CAPAC;;;termo;;51900;;;;;;0;0;0
+00062/2024;00003;LANCHA, MATERIAL CASCO ALUMÍNIO LIGA NAVAL, COMPRIMENTO 8 M, BOCA 2,9 ;apostilamento;2024-06-01;emdia;119399;125750.78;125751.03;;;;;67;17;0
+00062/2025;00003;CAPACETE SEGURANÇA, MATERIAL 100% FIBRA ARAMIDA, TIPO ABA TOTAL, TIPO ;;;termo;;1990;;;;;;17179;0;0
+00063/2024;00004;CARRETA, MATERIAL CARROCERIA CHAPA AÇO, CAPACIDADE 6 T, TIPO AGRÍCOLA,;apostilamento;2024-06-01;emdia;9798;10319.23;10319.25;;;;;42;1;0
+00063/2024;00005;CARRETA, MATERIAL CARROCERIA CHAPA AÇO, CAPACIDADE 6 T, TIPO AGRÍCOLA,;apostilamento;2024-06-01;emdia;9798;10319.23;10319.25;;;;;1;0;0
+00063/2025;00005;LUVA SEGURANÇA, MATERIAL COURO, APLICAÇÃO COMBATE A INCÊNDIO, CARACTER;;;termo;;462.37;;;;;;19144;0;0
+00064/2024;00001;TRANSCEPTOR, TIPO TRANSMISSOR-RECEPTOR UHF, FREQÜÊNCIA COMUNICAÇÃO 68 ;apostilamento;2024-09-01;emdia;21500;22603.0575;22603.06;;;;;83;0;0
+00064/2024;00002;FONE OUVIDO, TIPO HEADSET, COR PRETA, APLICAÇÃO TRANSCEPTOR PORTÁTIL, ;apostilamento;2024-09-01;emdia;10000;10513.05;10513.05;;;;;85;0;0
+00064/2024;00003;TRANSCEPTOR, TIPO TRANSMISSOR-RECEPTOR UHF, FREQÜÊNCIA COMUNICAÇÃO 68 ;apostilamento;2024-09-01;emdia;34000;35744.37;35744.37;;;;;86;0;0
+00064/2024;00004;MÁSCARA MERGULHADOR, MATERIAL SILICONE, TIPO FULL FACE, TAMANHO PADRÃO;apostilamento;2024-09-01;emdia;10000;10513.05;10513.05;;;;;49;0;0
+00064/2024;00016;CILINDRO GÁS, MATERIAL ALUMÍNIO, CAPACIDADE ARMAZENAGEM 2 KG, TIPO GÁS;apostilamento;2024-09-01;emdia;2229;2343.3588;2343.36;;;;;42;0;0
+00064/2024;00023;ACESSÓRIO / PEÇA MERGULHO, TIPO COMPUTADOR DE MERGULHO, CARACTERíSTICA;apostilamento;2024-09-01;emdia;7500;7884.7875;7884.79;;;;;61;0;0
+00064/2024;00029;ROUPA MERGULHADOR, TIPO PROFISSIONAL, COR PRETA, TAMANHO G, APLICAÇÃO ;apostilamento;2024-09-01;emdia;26430;27785.9912;27785.99;;;;;7;0;0
+00064/2024;00036;COMPRESSOR DE AR, PRESSÃO MÁXIMA 330 BAR., VAZÃO 100 L/MIN, TENSÃO 220;apostilamento;2024-09-01;emdia;19600;20605.578;20605.58;;;;;0;0;0
+00064/2025;00006;CAPACETE SEGURANÇA, MATERIAL ACRILONITRILA-BUTADIENO-ESTIRENO (ABS), A;;;termo;;1175;;;;;;2335;0;0
+00065/2024;00005;ACESSÓRIO / PEÇA MERGULHO, TIPO CONJUNTO REGULADOR 1º E 2º ESTÁGIOSPAR;apostilamento;2024-09-01;emdia;1977.6;2079.06;2079.06;;;;;12;0;0
+00065/2025;00001;QUADRICICLO, POTÊNCIA MÍNIMA 26 CV, QUANTIDADE MARCHAS 5 MARCHAS Á FRE;apostilamento;2025-07-01;desatualizado;53500;53500;56066.77;;;;;12;30801;0
+00065/2025;00003;VEÍCULO ESPECIAL, TIPO VEÍCULO UTV "VEÍCULO UTILITÁRIO MULTITAREFAS", ;apostilamento;2025-07-01;desatualizado;190000;190000;199115.65;;;;;45;410204;0
+00066/2024;00006;MANGUEIRA AR, COMPRIMENTO 0,70 M, DIÂMETRO EXTERNO 3/8 POL, RAIO CURVA;apostilamento;2024-09-01;emdia;1550;1629.5228;1629.52;;;;;59;0;0
+00066/2024;00007;ACESSÓRIO / PEÇA MERGULHO, TIPO CONSOLE DE MERGULHO, CARACTERíSTICAS A;apostilamento;2024-09-01;emdia;1088;1143.8198;1143.82;;;;;24;0;0
+00066/2024;00009;ACESSÓRIO / PEÇA MERGULHO, TIPO KIT DE MONTAGEM RIGGING, CARACTERíSTIC;apostilamento;2024-09-01;emdia;2880;3027.7584;3027.76;;;;;68;0;0
+00066/2024;00018;BASTÃO SINALIZADOR, TIPO LUMINOSO, COMPRIMENTO 6 POL, COR VERMELHA/VER;apostilamento;2024-09-01;emdia;596;626.5778;626.58;;;;;33;0;0
+00066/2025;00002;CARRETA REBOQUE, MATERIAL CHAPA AÇO, TIPO REBOQUE CARGA, COMPRIMENTO 4;;;termo;;10058.82;;;;;;49;0;0
+00067/2024;00010;MÁSCARA MERGULHADOR, MATERIAL SILICONE, TIPO SEMI-FACIAL, TAMANHO PADR;apostilamento;2024-09-01;emdia;95;99.874;99.87;;;;;0;0;0
+00067/2024;00019;EQUIPAMENTO / ACESSÓRIOS DESPORTO, MATERIAL ELASTÔMERO, TIPO NADADEIRA;apostilamento;2024-09-01;emdia;698;733.8109;733.81;;;;;0;0;0
+00067/2024;00025;BÚSSOLA NAVEGAÇÃO, MATERIAL TERMOPLÁSTICO DE ALTA,MÉDIA E BAIXA DENSID;apostilamento;2024-09-01;emdia;229;240.7488;240.75;;;;;47;0;0
+00067/2025;00004;CARRETA REBOQUE, MATERIAL CHAPA AÇO, TIPO REBOQUE CARGA, COMPRIMENTO 4;apostilamento;2025-07-01;desatualizado;21357.95;21357.95;22382.64;;;;;49;50210;0
+00068/2024;00011;ACESSÓRIO / PEÇA MERGULHO, TIPO BOCAL, MATERIAL SILICONE, CARACTERíSTI;apostilamento;2024-09-01;emdia;38;39.9496;39.95;;;;;0;0;0
+00068/2024;00012;ACESSÓRIO / PEÇA MERGULHO, TIPO CINTO LASTRO, MATERIAL NYLON, COR PRET;apostilamento;2024-09-01;desatualizado;27;27;28.39;;;;;0;0;0
+00068/2025;00001;VEÍCULO PICK-UP, TIPO MOTOR TURBO DIESEL, TIPO DIREÇÃO HIDRÁULICA, CAR;;;termo;;348990;;;;;;895;0;0
+00069/2024;00013;ACESSÓRIO / PEÇA MERGULHO, TIPO LASTRO, MATERIAL CHUMBO REVESTIDO COM ;apostilamento;2024-09-01;emdia;113.262;119.07;119.07;;;;;0;0;0
+00069/2025;00001;ALVO DE TIRO, MATERIAL PAPEL CARTÃO, TIPO SILHUETA, TAMANHO 90 X 60 CM;edital;2025-08-15;prorrogar·sugestao;1.68;1.68;1.68;2026-12-26;4.44;0;1.75;7000;0;522
+00069/2025;00002;ALVO DE TIRO, MATERIAL PAPEL CARTÃO, TIPO SILHUETA, TAMANHO 90 X 60 CM;edital;2025-08-15;prorrogar·sugestao;1.58;1.58;1.58;2026-12-26;4.44;0;1.65;12000;0;842
+00069/2025;00003;ALVO DE TIRO, MATERIAL PAPEL CARTÃO, TIPO SILHUETA, TAMANHO 90 X 60 CM;edital;2025-08-15;prorrogar·sugestao;1.65;1.65;1.65;2026-12-26;4.44;0;1.72;7080;0;519
+00069/2025;00004;ALVO DE TIRO, MATERIAL PAPEL CARTÃO, TIPO SILHUETA, TAMANHO 90 X 60 CM;edital;2025-08-15;prorrogar·sugestao;1.08;1.08;1.08;2026-12-26;4.44;0;1.13;12077;0;580
+00069/2025;00005;OBRÉIA, MATERIAL PAPEL CELULOSE VEGETAL, FORMATO CIRCULAR, APRESENTAÇÃ;edital;2025-08-15;prorrogar·sugestao;4.65;4.65;4.65;2026-12-26;4.44;0;4.86;5;0;1
+00069/2025;00006;OBRÉIA, MATERIAL PAPEL CELULOSE VEGETAL, FORMATO CIRCULAR, APRESENTAÇÃ;edital;2025-08-15;prorrogar·sugestao;4.49;4.49;4.49;2026-12-26;4.44;0;4.69;2;0;0
+00070/2024;00015;CILINDRO GÁS, MATERIAL ALUMÍNIO, CAPACIDADE ARMAZENAGEM 11,1 L, TIPO G;apostilamento;2024-09-01;emdia;1580;1661.06;1661.06;;;;;37;0;0
+00070/2025;00001;PONTEIRA LABORATÓRIO;;;semclausula;;1696;;;;;;0;0;0
+00070/2025;00002;PONTEIRA LABORATÓRIO;;;semclausula;;1682;;;;;;0;0;0
+00070/2025;00003;POTE VIDRO;;;semclausula;;3042;;;;;;0;0;0
+00071/2024;00024;EQUIPAMENTO / ACESSÓRIOS DESPORTO, MATERIAL TERMOPLÁSTICO, TIPO NADADE;apostilamento;2024-09-01;desatualizado;159;159;167.16;;;;;0;0;0
+00071/2024;00027;LUVA SEGURANÇA, MATERIAL NEOPRENE, TAMANHO G, APLICAÇÃO PRÁTICA DE MER;apostilamento;2024-09-01;desatualizado;117;117;123.00;;;;;0;0;0
+00071/2025;00001;MÁSCARA CONTRA GASES, MATERIAL NEOPRENE, TIPO FILTRO REMOVÍVEL/ SUBSTI;edital;2025-08-20;prorrogar·sugestao;4298.95;4298.95;4298.95;2026-12-30;4.44;0;4489.95;600;0;114602
+00072/2025;00002;BOLSA TRANSPORTE, APLICAÇÃO TRANSPORTE MATERIAL EMERGÊNCIA, DIMENSÕES ;edital;2025-08-20;prorrogar·sugestao;95;95;95.00;2027-02-20;4.44;0;99.22;120;0;507
+00073/2024;00030;BOTE INFLÁVEL, MATERIAL TECIDO POLIÉSTER EMBORRACHADO, COMPRIMENTO 4,7;apostilamento;2024-09-01;emdia;40270;42336.05;42336.05;;;;;1;0;0
+00073/2025;00001;CONJUNTO PARA ANÁLISE;;;termo;;1979.5;;;;;;0;0;0
+00073/2025;00002;REAGENTE ANALÍTICO 4;;;termo;;4330;;;;;;0;0;0
+00074/2025;00001;RASTREADOR, TIPO VEICULAR, ALIMENTAÇÃO 5 V, CARACTERÍSTICAS ADICIONAIS;edital;2025-09-25;icti;;1040;;;;;;-216;0;0
+00075/2024;00002;SOPRADOR, TIPO PORTÁTIL, ACIONAMENTO GASOLINA, POTÊNCIA 1.1 HP;;;termo;;3041.01;;;;;;-859;0;0
+00075/2025;00001;Solução para Reconhecimento de Padrões em Bases Abertas Básica, com su;edital;2024-09-25;icti;;160000;;;;;;0;0;0
+00075/2025;00002;Solução para Reconhecimento de Padrões em Bases Abertas Avançada, com ;edital;2024-09-25;icti;;270000;;;;;;7;0;0
+00076/2024;00003;SISTEMA COMBATE INCÊNDIO, TIPO CONJUNTO DE COMBATE INCÊNDIO MÓVEL VEÍC;;;termo;;23675.68;;;;;;-106;0;0
+00077/2025;00001;Solução de Frameworks Osint;;;semclausula;;153000;;;;;;-2;0;0
+00078/2024;00001;DISCO MAGNÉTICO, MEMÓRIA 16 TB., VELOCIDADE TRANSFERÊNCIA 6.0 GB/S, AP;apostilamento;2024-10-01;icti;;13685.25;;;;;;107;0;0
+00078/2024;00002;DISCO MAGNÉTICO, MEMÓRIA 16 TB., VELOCIDADE TRANSFERÊNCIA 6.0 GB/S, AP;apostilamento;2024-10-01;icti;;44661.5;;;;;;-4;0;0
+00079/2024;00001;RESPIRADOR, MATERIAL CILINDRO DE COMPOSITE/SUPORTE EM FIBRA DE CARBONO;apostilamento;2024-09-01;emdia;32400;34062.25;34062.12;;;;;322;0;0
+00081/2024;00006;CINTO SEGURANÇA, MATERIAL NÁILON, REVESTIMENTO INTERNO NÁILON, CARACTE;apostilamento;2024-10-01;emdia;645.7;679.1;679.08;;;;;2000;0;0
+00082/2024;00007;BASTÃO ANTITUMULTO, MATERIAL TERMOPLÁSTICO EXTRUDADO, COMPRIMENTO 60 C;apostilamento;2024-11-01;emdia;28.1;29.42;29.42;;;;;0;0;0
+00083/2024;00008;BASTÃO ANTITUMULTO, MATERIAL AÇO E BORRACHA NATURAL, COMPRIMENTO 90 CM;apostilamento;2024-10-01;emdia;36.99;38.9;38.90;;;;;0;0;0
+00084/2024;00009;ALGEMA, MATERIAL AÇO CARBONO AISI 1020, TRATAMENTO SUPERFICIAL NIQUELA;edital;2024-09-16;emdia·sugestao;79;83.09;83.05;;;;;2000;0;0
+00089/2024;00008;tipo: para dna, revestimento: em matriz de dextrana, granulometria: at;apostilamento;2024-10-01;emdia;26443.25;27810.37;27810.37;;;;;0;0;0
+00089/2024;00009;tipo: p/ purificação de ácidos nucleicos, método: ensaio magnético, aj;apostilamento;2024-10-01;emdia;22977;24164.91;24164.91;;;;;0;0;0
+00089/2024;00010;tipo: p/ purificação de ácidos nucleicos, método: ensaio magnético, aj;apostilamento;2024-10-01;emdia;26473.5;27842.18;27842.18;;;;;0;0;0
+00089/2024;00011;tipo: p/ purificação de ácidos nucleicos, método: ensaio magnético, aj;apostilamento;2024-10-01;emdia;3003.12;3158.38;3158.38;;;;;0;0;0
+00089/2024;00012;tipo: p/ purificação de ácidos nucleicos, método: ensaio magnético, aj;apostilamento;2024-10-01;emdia;3045.8;3203.27;3203.27;;;;;0;0;0
+00089/2024;00013;adicional: adesivo óptico, aplicação: para microplaca 384 poços;apostilamento;2024-10-01;emdia;766.3633;805.98;805.98;;;;;0;0;0
+00089/2024;00014;tipo: placa 96 poços, tipo de análise: para calibração espectral, cara;apostilamento;2024-10-01;emdia;1418.87;1492.23;1492.23;;;;;0;0;0
+00089/2024;00015;tipo: para dna, revestimento: em matriz de dextrana, granulometria: at;apostilamento;2024-10-01;emdia;5669.33;5962.43;5962.43;;;;;0;0;0
+00089/2024;00016;tipo: arranjo de 8 capilares, aplicação: para sequenciador automático,;apostilamento;2024-10-01;emdia;9075.3549;9544.55;9544.55;;;;;0;0;0
+00089/2024;00017;tipo: arranjo de 24 capilares, aplicação: para sequenciador automático;apostilamento;2024-10-01;emdia;12095.1;12720.42;12720.42;;;;;0;0;0
+00089/2024;00018;tipo: solução condicionadora, característica adicional: para sequencia;apostilamento;2024-10-01;emdia;196.91;207.09;207.09;;;;;0;0;0
+00089/2024;00019;aspecto físico: líquido límpido, incolor, odor de amônia, peso molecul;apostilamento;2024-10-01;emdia;254.23;267.37;267.37;;;;;0;0;0
+00089/2024;00020;tipo: polímero, característica adicional: para sequenciador automático;apostilamento;2024-10-01;emdia;1343.2;1412.64;1412.64;;;;;0;0;0
+00089/2024;00021;aplicação: para seqüenciamento automático dna, componentes: reservatór;apostilamento;2024-10-01;emdia;775.38;815.47;815.47;;;;;0;0;0
+00089/2024;00022;aplicação: para seqüenciamento automático dna, componentes: reservatór;apostilamento;2024-10-01;emdia;1032.3365;1085.71;1085.71;;;;;0;0;0
+00090/2024;00007;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO MESA FLEXORA,;apostilamento;2024-10-01;emdia;7000;7361.9;7361.90;;;;;89.0983;0;0
+00090/2024;00008;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO CADEIRA ABDUT;apostilamento;2024-10-01;emdia;7600;7992.92;7992.92;;;;;53.0983;0;0
+00090/2024;00009;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BARRA, MATERI;apostilamento;2024-10-01;emdia;4000;4206.8;4206.80;;;;;34.1967;0;0
+00090/2024;00010;APARELHO GINÁSTICA, ESTRUTURA METÁLICA, FORMATO RETO, BANCO RETANGULAR;apostilamento;2024-10-01;emdia;7690;8087.57;8087.57;;;;;50.1475;0;0
+00090/2024;00011;APARELHO GINÁSTICA, ESTRUTURA METÁLICA, FORMATO RETO, BANCO RETANGULAR;apostilamento;2024-10-01;emdia;8100;8518.77;8518.77;;;;;63.0983;0;0
+00090/2024;00012;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BANCO PANTURR;apostilamento;2024-10-01;emdia;3600;3786.12;3786.12;;;;;51;0;0
+00090/2024;00013;APARELHO GINÁSTICA, ESTRUTURA METÁLICA, FORMATO RETO, BANCO RETANGULAR;apostilamento;2024-10-01;emdia;8000;8413.6;8413.60;;;;;62.0983;0;0
+00090/2024;00014;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO PUXADA ALTA D;apostilamento;2024-10-01;emdia;7800;8203.26;8203.26;;;;;141.0983;0;0
+00090/2024;00015;ESTANTE METÁLICA, MATERIAL AÇO, ALTURA 1,20 M, LARGURA 0,60 M, PROFUND;apostilamento;2024-10-01;emdia;8000;8413.6;8413.60;;;;;151.1475;0;0
+00090/2024;00016;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO ARTICULADO, M;apostilamento;2024-10-01;emdia;8000;8413.6;8413.60;;;;;34.1966;0;0
+00090/2024;00017;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO REMADA SENTAD;apostilamento;2024-10-01;emdia;7900;8308.43;8308.43;;;;;46;0;0
+00090/2024;00018;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BÍCEPS, MATER;apostilamento;2024-10-01;emdia;8100;8518.77;8518.77;;;;;34.0983;0;0
+00090/2024;00019;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BANCO REGULÁV;apostilamento;2024-10-01;emdia;3500;3680.95;3680.95;;;;;41.2458;0;0
+00090/2024;00020;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BANCO REGULÁV;apostilamento;2024-10-01;emdia;3100;3260.27;3260.27;;;;;47.1475;0;0
+00090/2024;00021;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BANCO REGULÁV;apostilamento;2024-10-01;emdia;2980;3134.07;3134.07;;;;;60;0;0
+00090/2024;00022;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO REMADA SENTAD;apostilamento;2024-10-01;emdia;2900;3049.93;3049.93;;;;;57.1475;0;0
+00090/2024;00023;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BANCO ROSCA S;apostilamento;2024-10-01;emdia;2970;3123.55;3123.55;;;;;65.1966;0;0
+00091/2024;00034;EQUIPAMENTO / ACESSÓRIOS DESPORTO, MATERIAL METAL/MADEIRA, TIPO BARRA ;apostilamento;2024-10-01;emdia;445;468.01;468.01;;;;;119.2458;0;0
+00091/2024;00037;APARELHO / ACESSÓRIO - ACONDICIONAMENTO FÍSICO, TIPO PUXADOR, USO EQUI;apostilamento;2024-10-01;emdia;235;247.15;247.15;;;;;115.295;0;0
+00091/2024;00038;APARELHO / ACESSÓRIO - ACONDICIONAMENTO FÍSICO, TIPO PUXADOR, USO EQUI;apostilamento;2024-10-01;emdia;235;247.15;247.15;;;;;124.295;0;0
+00091/2024;00039;APARELHO / ACESSÓRIO - ACONDICIONAMENTO FÍSICO, TIPO PUXADOR, USO EQUI;apostilamento;2024-10-01;emdia;178;187.2;187.20;;;;;166.2948;0;0
+00091/2024;00040;APARELHO / ACESSÓRIO - ACONDICIONAMENTO FÍSICO, TIPO PUXADOR, USO EQUI;apostilamento;2024-10-01;emdia;210;220.86;220.86;;;;;155.2951;0;0
+00091/2024;00041;APARELHO / ACESSÓRIO - ACONDICIONAMENTO FÍSICO, TIPO PUXADOR, USO EQUI;apostilamento;2024-10-01;emdia;195;205.08;205.08;;;;;177.2458;0;0
+00091/2024;00042;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO PUXADOR TRÍCE;apostilamento;2024-10-01;emdia;93;97.81;97.81;;;;;147.2459;0;0
+00091/2024;00049;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;84.5;88.87;88.87;;;;;342;0;0
+00091/2024;00050;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;132;138.82;138.82;;;;;566;2;0
+00091/2024;00052;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;209;219.81;219.81;;;;;314.0984;0;0
+00091/2024;00053;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;256;269.24;269.24;;;;;322.0984;0;0
+00091/2024;00056;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;356.22;374.64;374.64;;;;;136.0983;0;0
+00091/2024;00058;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;435.5;458.02;458.02;;;;;260.0983;0;0
+00092/2024;00024;ANILHA, MATERIAL FERRO, ACABAMENTO SUPERFICIAL EMBORRACHADO, COR PRETA;apostilamento;2024-10-01;emdia;25.9;27.24;27.24;;;;;393.4919;0;0
+00092/2024;00025;ANILHA, MATERIAL FERRO, ACABAMENTO SUPERFICIAL EMBORRACHADO, COR PRETA;apostilamento;2024-10-01;emdia;39.5;41.54;41.54;;;;;395.4911;1;0
+00092/2024;00026;ANILHA, MATERIAL FERRO, ACABAMENTO SUPERFICIAL EMBORRACHADO, COR PRETA;apostilamento;2024-10-01;emdia;65.9;69.31;69.31;;;;;560.492;0;0
+00092/2024;00027;ANILHA, MATERIAL FERRO, ACABAMENTO SUPERFICIAL EMBORRACHADO, COR PRETA;apostilamento;2024-10-01;emdia;130;136.72;136.72;;;;;681.4915;1;0
+00092/2024;00028;ANILHA, MATERIAL FERRO, ACABAMENTO SUPERFICIAL EMBORRACHADO, COR PRETA;apostilamento;2024-10-01;emdia;200;210.34;210.34;;;;;484.4916;0;0
+00092/2024;00029;ANILHA, MATERIAL FERRO, ACABAMENTO SUPERFICIAL EMBORRACHADO, COR PRETA;apostilamento;2024-10-01;emdia;270;283.96;283.96;;;;;404.4916;0;0
+00092/2024;00030;ANILHA, MATERIAL FERRO, ACABAMENTO SUPERFICIAL EMBORRACHADO, COR PRETA;apostilamento;2024-10-01;emdia;365;383.87;383.87;;;;;228.2949;0;0
+00092/2024;00031;ESTANTE ANILHAS, MATERIAL AÇO CARBONO, APLICAÇÃO SUPORTE ANILHAS, CARA;apostilamento;2024-10-01;emdia;1700;1787.89;1787.89;;;;;38;0;0
+00093/2024;00001;ESTEIRA ERGOMÉTRICA PARA EXERCÍCIOS DE REABILITAÇÃO FÍSICA, CAPACIDADE;apostilamento;2024-10-01;emdia;14695;15454.73;15454.73;;;;;199;0;0
+00093/2024;00002;BICICLETA ERGOMÉTRICA, TIPO MECÂNICA, MODELO PROFISSIONAL, CAPACIDADE ;apostilamento;2024-10-01;emdia;6999;7360.85;7360.85;;;;;288;0;0
+00093/2024;00054;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;291.2;306.26;306.26;;;;;354;0;0
+00093/2024;00055;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;332.8;350.01;350.01;;;;;160;0;0
+00093/2024;00057;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;416;437.51;437.51;;;;;142;0;0
+00094/2024;00032;APARELHO / EQUIPAMENTO PARA CONDICIONAMENTO FÍSICO, TIPO BARRA, MATERI;apostilamento;2024-10-01;emdia;1088.91;1145.21;1145.21;;;;;209;0;0
+00094/2024;00047;ESTANTE METÁLICA, MATERIAL AÇO, ALTURA 1,20 M, LARGURA 0,60 M, PROFUND;apostilamento;2024-10-01;emdia;1949.99;2050.8;2050.80;;;;;104.0492;0;0
+00094/2024;00048;HALTERE, MATERIAL FERRO, TIPO MACIÇO, REVESTIMENTO BORRACHA PVC- CLORE;apostilamento;2024-10-01;emdia;44.49;46.79;46.79;;;;;332.0492;0;0
+00094/2024;00051;HALTERE, MATERIAL FERRO, REVESTIMENTO BORRACHA PVC- CLORETO DE POLIVIN;apostilamento;2024-10-01;emdia;171;179.84;179.84;;;;;542;0;0
+00096/2024;00059;ESTANTE MATERIAL ESPORTIVO, MATERIAL METAL REVESTIDO, TIPO MATERIAL ES;apostilamento;2024-10-01;emdia;2630;2765.97;2765.97;;;;;60;0;0
+00096/2024;00061;PROTETOR CONTRA SURTO DE TENSÃO, TENSÃO DISPARO 275 V, CORRENTE MÁXIMA;apostilamento;2024-10-01;emdia;2015;2119.18;2119.18;;;;;54;0;0
+00099/2024;00060;COLCHONETE GINÁSTICA, MATERIAL PLÁSTICO EMBORRACHADO, COMPRIMENTO 0,95;apostilamento;2024-10-01;desatualizado;52;52;54.69;;;;;2912;7829;0
+00100/2024;00062;EQUIPAMENTO / ACESSÓRIOS DESPORTO, MATERIAL AÇO CARBONO, TIPO PRESILHA;apostilamento;2024-10-01;emdia;44.44;46.74;46.74;;;;;595.7381;0;0
+00102/2024;00001;CADEIRA ESCRITÓRIO, MATERIAL ESTRUTURA POLIPROPILENO/ TUBO AÇO, MATERI;apostilamento;2024-10-01;emdia;715;751.98;751.97;;;;;0;0;0
+00103/2024;00002;ESTAÇÃO TRABALHO, TIPO PLATAFORMA, COMPONENTES MESA 4 LUGARES, TAMPO F;apostilamento;2024-10-01;emdia;2400;2524.13;2524.08;;;;;0;0;0
+00104/2024;00003;MESA GINECOLÓGICA, ESTRUTURA TUBO AÇO, ACABAMENTO SUPERFICIAL ESTRUTUR;apostilamento;2024-10-01;emdia;13517;14216.13;14215.83;;;;;142;0;0
+00105/2024;00004;EQUIPAMENTO / MOBILIÁRIO PARA NECRÓPSIA, TIPO MESA DE PROCEDIMENTOS, M;apostilamento;2024-10-01;emdia;68790;72347.99;72346.44;;;;;249;0;0
+00108/2024;00001;ESTABILIZADOR TENSÃO, TENSÃO ALIMENTAÇÃO ENTRADA BIVOLT V, TIPO NOBREA;apostilamento;2024-08-01;emdia;679;699.11;699.11;;;;;302;0;0
