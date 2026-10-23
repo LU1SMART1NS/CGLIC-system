@@ -9,7 +9,7 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
-import { carteiraFornecedor, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import {
@@ -21,11 +21,11 @@ import {
   useSalvarBeneficiario
 } from '../../hooks/useEmendas';
 import { formatarCep, formatarCnpj, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
-import { faltasDoBeneficiario, orgaoAbaixoDoNome, paresParecidos, type FaltaDoBeneficiario } from '../../utils/emendasBeneficiarios';
+import { cnpjProprio, faltasDoBeneficiario, paresParecidos, type FaltaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { BeneficiarioModal } from './BeneficiarioModal';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { JuntarBeneficiariosModal } from './JuntarBeneficiariosModal';
-import { NomeComSigla } from './emendasPartes';
+import { NomeComSigla, OrgaoELocal } from './emendasPartes';
 
 type Segmento = 'completos' | 'faltam' | 'parecidos' | 'inativos' | 'todos';
 
@@ -148,28 +148,21 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       priority: 'primary',
       width: '36%',
       render: (b) => {
-        const local = localDoBeneficiario(b);
-        const orgao = orgaoAbaixoDoNome(b, rotuloBeneficiario(b));
         const parecido = parecidoDe.get(b.id);
+        // CNPJ e razão social ficam na janela de edição: na lista, só o que diferencia (CNPJ próprio ou falta).
         return (
           <>
             <NomeComSigla b={b} destaque />
-            {orgao && <div style={carteiraSubtitle}>{orgao}</div>}
-            {local && <div style={carteiraSubtitle}>{local}</div>}
-            {b.cnpj && (
-              <div style={carteiraFornecedor}>
-                {b.razaoSocial ? `${b.razaoSocial} · ` : ''}CNPJ {formatarCnpj(b.cnpj)}
-              </div>
-            )}
+            <OrgaoELocal b={b} />
             {parecido && (
               <div style={{ ...carteiraSubtitle, color: 'var(--color-info-text, #155bcb)' }}>
                 Parecido com {rotuloBeneficiario(parecido)}
                 {localDoBeneficiario(parecido) ? ` (${localDoBeneficiario(parecido)})` : ''}
               </div>
             )}
-            {!b.cnpj && (
-              <div style={{ marginTop: '0.25rem' }}>
-                <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />
+            {(!b.cnpj || cnpjProprio(b.cnpj)) && (
+              <div style={{ marginTop: '0.25rem' }} title={b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)} · ${b.razaoSocial ?? ''}` : undefined}>
+                <StatusBadge label={b.cnpj ? 'CNPJ próprio' : 'Falta CNPJ'} variant={b.cnpj ? 'info' : 'neutral'} size="sm" dot={false} />
               </div>
             )}
           </>
