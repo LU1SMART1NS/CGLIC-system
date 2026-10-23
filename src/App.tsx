@@ -45,9 +45,8 @@ const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
 const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/EmendasInicioPage').then((m) => ({ default: m.EmendasInicioPage })));
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
-const EmendasPorItemPage = lazyComRecarga(() => import('./components/emendas/EmendasPorItemPage').then((m) => ({ default: m.EmendasPorItemPage })));
+const EmendasItensEKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasItensEKitsPage').then((m) => ({ default: m.EmendasItensEKitsPage })));
 const EmendasPorAutorPage = lazyComRecarga(() => import('./components/emendas/EmendasPorAutorPage').then((m) => ({ default: m.EmendasPorAutorPage })));
-const EmendasKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasKitsPage').then((m) => ({ default: m.EmendasKitsPage })));
 const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasBeneficiariosPage').then((m) => ({ default: m.EmendasBeneficiariosPage })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
 const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
@@ -422,7 +421,7 @@ const AppContent: React.FC = () => {
               path="/emendas/itens"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
-                  <EmendasPorItemPage />
+                  <EmendasItensEKitsPage />
                 </RequireRole>
               }
             />
@@ -434,14 +433,8 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
-            <Route
-              path="/emendas/kits"
-              element={
-                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
-                  <EmendasKitsPage />
-                </RequireRole>
-              }
-            />
+            {/* Kits virou a visão Por kit de Itens e kits */}
+            <Route path="/emendas/kits" element={<Navigate to="/emendas/itens?ver=kit" replace />} />
             <Route
               path="/emendas/beneficiarios"
               element={

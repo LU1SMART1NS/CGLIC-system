@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { PackageOpen } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -6,6 +6,7 @@ import { HeaderRefreshAction } from '../../design-system/components/HeaderRefres
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { ActionButton } from '../../design-system/components/ActionButton';
+import { AppButton } from '../../design-system/components/AppButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
@@ -26,7 +27,7 @@ const pequeno: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-m
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** Composição do kit aberta na linha. */
-const ComposicaoDoKit: React.FC<{ linha: Linha }> = ({ linha }) => {
+const ComposicaoDoKit: React.FC<{ linha: Linha; onAbrirItem?: (itemKey: string) => void }> = ({ linha, onAbrirItem }) => {
   const hoje = hojeEmBrasilia();
   const colunas: Column<ComponenteDoKit>[] = [
     {
@@ -34,7 +35,19 @@ const ComposicaoDoKit: React.FC<{ linha: Linha }> = ({ linha }) => {
       header: 'Item',
       priority: 'primary',
       minWidth: '260px',
-      render: (c) => <ItemDaAta item={c.item} semItem={`${c.itemKey} · sem alocação da CAEP`} />
+      render: (c) => (
+        <ItemDaAta
+          item={c.item}
+          semItem={`${c.itemKey} · sem alocação da CAEP`}
+          extra={
+            c.item && onAbrirItem ? (
+              <AppButton type="button" variant="link" size="sm" onClick={() => onAbrirItem(c.itemKey)} data-testid={`emendas-kit-abrir-item-${c.itemKey}`}>
+                Ver o item
+              </AppButton>
+            ) : undefined
+          }
+        />
+      )
     },
     {
       key: 'vigencia',
@@ -58,11 +71,19 @@ const ComposicaoDoKit: React.FC<{ linha: Linha }> = ({ linha }) => {
   );
 };
 
+interface Props {
+  /** Seletor Por item · Por kit da aba Itens e kits, no cabeçalho. */
+  seletor?: React.ReactNode;
+  /** Kit que já chega aberto (vindo de um item). */
+  abrir?: string | null;
+  onAbrirItem?: (itemKey: string) => void;
+}
+
 /**
- * Kits das emendas (migration 155): conjunto de itens montado pela CAEP com o que ela tem alocado. A situação é
+ * Itens e kits › Por kit (migration 155): conjunto de itens montado pela CAEP com o que ela tem alocado. A situação é
  * calculada todo dia pelas atas e pelo saldo; quem desativa é só a CAEP.
  */
-export const EmendasKitsPage: React.FC = () => {
+export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }) => {
   const { data: kits = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useKitsEmendas();
   const { data: itens = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
   const podeGerir = usePodeGerirEmendas();
@@ -72,6 +93,14 @@ export const EmendasKitsPage: React.FC = () => {
   const [segmento, setSegmento] = useState<Segmento>('todos');
   const [busca, setBusca] = useState('');
   const [editando, setEditando] = useState<KitEmenda | 'novo' | null>(null);
+  const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(abrir ? [abrir] : []));
+  const alternar = (k: string) =>
+    setAbertos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(k)) novo.delete(k);
+      else novo.add(k);
+      return novo;
+    });
 
   const porChave = useMemo(() => new Map(itens.map((i) => [i.itemKey, i])), [itens]);
   const { data: reservado } = useReservadoPorItem();
@@ -91,6 +120,15 @@ export const EmendasKitsPage: React.FC = () => {
       .filter((l) => (segmento === 'todos' ? l.calculo.situacao !== 'desativado' : l.calculo.situacao === segmento))
       .filter((l) => !termo || semAcento(`${l.nome} ${l.descricao ?? ''} ${l.calculo.componentes.map((c) => c.item?.descricao ?? '').join(' ')}`).includes(termo));
   }, [linhas, segmento, busca]);
+
+  // Vindo do item: kit desativado só aparece no seu trilho; a linha aberta entra na tela.
+  const alvo = abrir ? linhas.find((l) => l.id === abrir) : undefined;
+  useEffect(() => {
+    if (!alvo) return;
+    setSegmento(alvo.calculo.situacao === 'desativado' ? 'desativado' : 'todos');
+    requestAnimationFrame(() => document.querySelector(`[data-testid="emendas-kit-detalhe-${CSS.escape(alvo.id)}"]`)?.scrollIntoView({ block: 'center' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alvo?.id]);
 
   const filtrosAtivos = Boolean(busca.trim());
   const totalDoSegmento = segmento === 'todos' ? linhas.length - contagem.desativado : contagem[segmento];
@@ -147,12 +185,13 @@ export const EmendasKitsPage: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title="Kits"
-        subtitle="Conjuntos de itens que a CAEP oferece aos parlamentares."
+        title="Itens e kits"
+        subtitle="Conjuntos de itens que a CAEP oferece aos parlamentares, e quantos ainda cabem no saldo."
         hint={`Só entram itens com alocação para a CAEP (${itens.length} hoje). O kit não guarda quantidade: quando o parlamentar pede N kits, cada item sai do saldo da CAEP N vezes a quantidade por kit. A situação é calculada sozinha: Vence em breve quando alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível com ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim (prazo de indicação, para dar tempo de assinar o contrato) ou sem saldo. Volta sozinho se a ata for prorrogada. Os dois prazos ficam em Ajustes > Regras de Alertas.`}
         icon={<PackageOpen size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
+            {seletor}
             {podeGerir && <ActionButton action="novo" label="Novo kit" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-kits-novo" />}
             <HeaderRefreshAction
               onRefresh={() => Promise.all([refetch(), recarregarItens()])}
@@ -207,7 +246,9 @@ export const EmendasKitsPage: React.FC = () => {
           keyExtractor={(l) => l.id}
           rowStyle={(l) => (l.calculo.situacao === 'desativado' ? { opacity: 0.7 } : undefined)}
           columns={colunas}
-          renderExpanded={(l) => <ComposicaoDoKit linha={l} />}
+          expandedKeys={abertos}
+          onToggleExpand={alternar}
+          renderExpanded={(l) => <ComposicaoDoKit linha={l} onAbrirItem={onAbrirItem} />}
           rowActions={
             podeGerir
               ? (l) => (
