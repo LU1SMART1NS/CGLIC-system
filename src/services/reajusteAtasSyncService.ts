@@ -56,9 +56,19 @@ const URL_PNCP = '/api-pncp/api/pncp/v1/orgaos';
 const dormir = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export interface LeitorDeArquivos {
-  textoDoPdf(bytes: Uint8Array): Promise<string>;
-  arquivosDoZip(bytes: Uint8Array): Promise<Array<{ nome: string; bytes: Uint8Array }>>;
+  /** Texto do PDF, até `maxPaginas` páginas (a cláusula de reajuste fica no começo do TR e da minuta). */
+  textoDoPdf(bytes: Uint8Array, opts?: { maxPaginas?: number }): Promise<string>;
+  /** Arquivos do zip. Com `aceitar`, só os aceitos são descompactados (os outros nem ocupam memória). */
+  arquivosDoZip(bytes: Uint8Array, aceitar?: (nome: string, tamanho: number) => boolean): Promise<Array<{ nome: string; bytes: Uint8Array }>>;
 }
+
+/**
+ * Limites da leitura do edital no servidor. A primeira leitura em produção (23/10/2026) foi derrubada ao abrir o
+ * pacote da compra 275/2026 (zip com 13 PDFs) inteiro: agora só as partes com a cláusula, uma de cada vez, até achar.
+ */
+export const LIMITES_DO_EDITAL = { maxPdfs: 4, maxPaginas: 400, maxBytesPdf: 10 * 1024 * 1024, maxBytesZip: 25 * 1024 * 1024 };
+/** Depois de 2 tentativas que derrubaram a leitura, o edital da compra fica "a conferir" (migration 161). */
+export const TENTATIVAS_DO_EDITAL = 2;
 
 export interface OpcoesReajuste {
   forcar?: boolean;
@@ -198,28 +208,47 @@ const NOME_INUTIL = /especifica|estudo|\betp\b|planilha|mapa|risco|rela[cç][aã
 export async function textosDoArquivo(
   bytes: Uint8Array,
   leitor: LeitorDeArquivos,
-  opts: { soPartesDoEdital?: boolean; profundidade?: number } = {}
+  opts: { soPartesDoEdital?: boolean; profundidade?: number; parar?: (texto: string) => boolean; lidos?: { pdfs: number } } = {}
 ): Promise<string[]> {
-  if (ehPdf(bytes)) return [await leitor.textoDoPdf(bytes)];
+  const lidos = opts.lidos ?? { pdfs: 0 };
+  const maxPdfs = opts.soPartesDoEdital ? LIMITES_DO_EDITAL.maxPdfs : Number.POSITIVE_INFINITY;
+  const maxPaginas = opts.soPartesDoEdital ? LIMITES_DO_EDITAL.maxPaginas : undefined;
+  if (ehPdf(bytes)) {
+    lidos.pdfs++;
+    return [await leitor.textoDoPdf(bytes, { maxPaginas })];
+  }
   if (!ehZip(bytes) || (opts.profundidade ?? 0) > 2) return [];
-  const partes = await leitor.arquivosDoZip(bytes);
+  const util = (nome: string) => NOME_UTIL.test(nome) && !NOME_INUTIL.test(nome);
+  // No edital, só descompacta os PDFs úteis (ou, se nenhum tiver nome útil, os que não são inúteis) e os zips.
+  const aceitar = opts.soPartesDoEdital
+    ? (nome: string, tamanho: number) =>
+        (/\.zip$/i.test(nome) && tamanho <= LIMITES_DO_EDITAL.maxBytesZip) || (/\.pdf$/i.test(nome) && tamanho <= LIMITES_DO_EDITAL.maxBytesPdf && !NOME_INUTIL.test(nome))
+    : undefined;
+  const partes = await leitor.arquivosDoZip(bytes, aceitar);
   const pdfs = partes.filter((p) => /\.pdf$/i.test(p.nome));
   const escolhidos = opts.soPartesDoEdital
     ? (() => {
-        const uteis = pdfs.filter((p) => NOME_UTIL.test(p.nome) && !NOME_INUTIL.test(p.nome));
-        return uteis.length > 0 ? uteis : pdfs.filter((p) => !NOME_INUTIL.test(p.nome));
+        const uteis = pdfs.filter((p) => util(p.nome));
+        // Minuta do contrato e TR primeiro: é onde ficam a data do orçamento e o índice.
+        const peso = (n: string) => (/minuta.*contrato|contrato/i.test(n) ? 0 : /termo.?de.?refer|\bTR\b/i.test(n) ? 1 : 2);
+        return (uteis.length > 0 ? uteis : pdfs.filter((p) => !NOME_INUTIL.test(p.nome))).sort((a, b) => peso(a.nome) - peso(b.nome));
       })()
     : pdfs;
   const textos: string[] = [];
   for (const p of escolhidos) {
+    if (lidos.pdfs >= maxPdfs) break;
     try {
-      textos.push(await leitor.textoDoPdf(p.bytes));
+      lidos.pdfs++;
+      textos.push(await leitor.textoDoPdf(p.bytes, { maxPaginas }));
     } catch (err) {
       console.warn(`[reajuste] PDF ${p.nome} não pôde ser lido:`, mensagemDeErro(err));
     }
+    if (opts.parar?.(textos.join('\n'))) return textos;
   }
   for (const z of partes.filter((p) => /\.zip$/i.test(p.nome))) {
-    textos.push(...(await textosDoArquivo(z.bytes, leitor, { ...opts, profundidade: (opts.profundidade ?? 0) + 1 })));
+    if (lidos.pdfs >= maxPdfs) break;
+    textos.push(...(await textosDoArquivo(z.bytes, leitor, { ...opts, lidos, profundidade: (opts.profundidade ?? 0) + 1 })));
+    if (opts.parar?.(textos.join('\n'))) return textos;
   }
   return textos;
 }
@@ -239,6 +268,8 @@ export interface AtaDaFila {
   documentos_pncp_lidos: number[];
   documentos_lidos_em: string | null;
   itens_sem_homologado: number;
+  /** Tentativas de ler o edital que derrubaram a função (migration 161). */
+  edital_tentativas?: number;
 }
 
 interface ArquivoPncp {
@@ -274,7 +305,11 @@ async function lerEditalDaCompra(
     const bytes = await baixar(a.url, ctx.fetcher, ctx.esperar);
     leuAlgum = true;
     if (!bytes) continue;
-    const textos = await textosDoArquivo(bytes, ctx.leitor, { soPartesDoEdital: true });
+    const achou = (texto: string) => {
+      const c = lerClausulaDoEdital(texto);
+      return c.temClausula && c.dataOrcamento !== null;
+    };
+    const textos = await textosDoArquivo(bytes, ctx.leitor, { soPartesDoEdital: true, parar: achou });
     const c = lerClausulaDoEdital(textos.join('\n'));
     if (c.temClausula && !melhor.temClausula) melhor = { ...c, dataOrcamento: c.dataOrcamento ?? melhor.dataOrcamento };
     else if (!melhor.dataOrcamento && c.dataOrcamento) melhor = { ...melhor, dataOrcamento: c.dataOrcamento };
@@ -498,23 +533,13 @@ export async function sincronizarReajusteAtas(opts: OpcoesReajuste): Promise<Res
       if (!p) continue;
       const chaveCompra = `${p.cnpj}-${p.ano}-${p.sequencial}`;
       try {
+        // Primeiro o que é leve (arquivos da ata e preço homologado), gravado antes do edital: se a leitura do edital
+        // derrubar a função, a ata não perde o resto.
         const payload: Record<string, unknown> = { ata_id: ata.ata_id };
-
-        if (!ata.edital_lido_em) {
-          if (!editais.has(chaveCompra)) editais.set(chaveCompra, await lerEditalDaCompra(p, ctx));
-          const e = editais.get(chaveCompra);
-          if (e?.lido) {
-            payload.clausula = e.temClausula ? 'COM_REAJUSTE' : 'A_CONFERIR';
-            payload.indice = e.indice;
-            payload.data_orcamento_edital = e.dataOrcamento;
-          }
-        }
-
         const docs = await lerDocumentosDaAta(ata, p, ctx);
         payload.documentos_lidos = docs.lidos;
         payload.reajustes = docs.reajustes;
         if (docs.pendentes > 0) pendentes++;
-
         if (ata.itens_sem_homologado > 0 && restaMs() > 15_000) {
           const h = await lerHomologados(ata, p, ctx);
           payload.homologados = h.homologados;
@@ -522,6 +547,25 @@ export async function sincronizarReajusteAtas(opts: OpcoesReajuste): Promise<Res
           payload.homologados_completos = h.completo;
         }
         await gravar({ atas: [payload] });
+
+        if (!ata.edital_lido_em) {
+          if ((ata.edital_tentativas ?? 0) >= TENTATIVAS_DO_EDITAL) {
+            // O edital já derrubou a leitura duas vezes: fica "a conferir" e a ata sai da fila do edital.
+            await gravar({ atas: [{ ata_id: ata.ata_id, clausula: 'A_CONFERIR' }] });
+            problemas.push(`o edital da ata ${ata.numero_ata} ficou a conferir (pesado demais para o servidor)`);
+          } else if (restaMs() > 25_000) {
+            if (!editais.has(chaveCompra)) {
+              await gravar({ atas: fila.filter((x) => !x.edital_lido_em && partesDoControle(x.numero_controle_pncp)?.sequencial === p.sequencial && partesDoControle(x.numero_controle_pncp)?.ano === p.ano).map((x) => ({ ata_id: x.ata_id, edital_tentativa: true })) });
+              editais.set(chaveCompra, await lerEditalDaCompra(p, ctx));
+            }
+            const e = editais.get(chaveCompra);
+            if (e?.lido) {
+              await gravar({ atas: [{ ata_id: ata.ata_id, clausula: e.temClausula ? 'COM_REAJUSTE' : 'A_CONFERIR', indice: e.indice, data_orcamento_edital: e.dataOrcamento }] });
+            }
+          } else {
+            pendentes++;
+          }
+        }
         gravadas++;
         seguidas = 0;
       } catch (err) {
