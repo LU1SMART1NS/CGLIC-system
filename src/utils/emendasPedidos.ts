@@ -4,6 +4,7 @@
  */
 import type { AcaoPedido, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, PedidoEmenda } from '../services/emendasService';
 import { AVISO_VENCIMENTO_DIAS, dataBR, diasEntre } from './emendasKits';
+import { chaveDoContrato } from './contractKeyUtils';
 
 /** Dias de reserva sem ofício até o aviso (decisão de 23/10/2026). */
 export const AVISO_SEM_OFICIO_DIAS = 30;
@@ -73,10 +74,22 @@ export function valorDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>): nu
 
 /**
  * Como a pessoa reconhece o pedido: pelo ofício, quando já chegou; antes disso, pela data da reserva. A reserva é uma
- * conversa com a assessoria, não um documento: o número interno do banco não aparece nas telas.
+ * conversa com a assessoria, não um documento: o número interno do banco não aparece nas telas. Pedido que veio das
+ * planilhas da CAEP (migration 160) não tem o número do ofício: vale o da emenda; a reserva da planilha não tem data.
  */
-export function identificacaoDoPedido(p: Pick<PedidoEmenda, 'oficioNumero' | 'reservadoEm'>): string {
-  return p.oficioNumero ?? `Reserva de ${dataBR(p.reservadoEm)}`;
+export function identificacaoDoPedido(p: Pick<PedidoEmenda, 'oficioNumero' | 'reservadoEm'> & Partial<Pick<PedidoEmenda, 'siopEmenda' | 'origem'>>): string {
+  if (p.oficioNumero) return p.oficioNumero;
+  if (p.siopEmenda) return `Emenda ${p.siopEmenda}`;
+  return p.origem === 'PLANILHA' ? 'Reserva da planilha' : `Reserva de ${dataBR(p.reservadoEm)}`;
+}
+
+/** UASG dos contratos citados na planilha de execução da CAEP (os 130 achados em 23/10/2026 eram todos da 200331). */
+const UASG_DOS_CONTRATOS_DAS_EMENDAS = '200331';
+
+/** Chave do contrato no sistema a partir do número da planilha ('00138/2026' → '200331-00138-2026'). */
+export function chaveDoContratoDaEmenda(numero: string | null): string | null {
+  const m = numero?.match(/^(\d{5})\/(\d{4})$/);
+  return m ? chaveDoContrato({ uasg: UASG_DOS_CONTRATOS_DAS_EMENDAS, numero: m[1], ano: m[2] }) || null : null;
 }
 
 /** Último contato da assessoria usado com cada autor (para sugerir na próxima reserva). */
@@ -88,7 +101,7 @@ export function ultimoContatoPorAutor(pedidos: PedidoEmenda[]): Map<string, Pick
   return m;
 }
 
-export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataVencendo';
+export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataVencendo' | 'aConferir';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -120,6 +133,8 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
     if (dias > AVISO_SEM_OFICIO_DIAS) avisos.push({ tipo: 'semOficio', texto: `${dias} dias sem ofício` });
   }
   if (p.etapa === 'OFICIO' && p.divergencia) avisos.push({ tipo: 'divergencia', texto: 'Divergência com o SIOP' });
+  const aConferir = linhasAtivas(p).filter((l) => l.aConferir).length;
+  if (aConferir) avisos.push({ tipo: 'aConferir', texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir` });
   const atas = linhasAtivas(p)
     .map((l) => ataDaLinha(p, l, itens, hoje))
     .filter((a): a is AvisoPedido => Boolean(a));

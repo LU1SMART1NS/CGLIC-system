@@ -21,7 +21,8 @@ import {
   useItensCaep,
   useKitsEmendas,
   usePedidosEmendas,
-  usePodeGerirEmendas
+  usePodeGerirEmendas,
+  usePodeVerContratos
 } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { curto, dataBR } from '../../utils/emendasKits';
@@ -42,7 +43,7 @@ import {
   type AvisoPedido
 } from '../../utils/emendasPedidos';
 import type { AutorEmenda, BeneficiarioEmenda, EtapaPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
-import { LinhaDoPedido } from './emendasPartes';
+import { AConferirDaLinha, BeneficiarioDaLinha, EmpenhoDaLinha, LinhaDoPedido } from './emendasPartes';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
@@ -70,13 +71,14 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda }> = ({ p }) => {
     <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem' }} data-testid={`emendas-pedido-etapas-${p.id}`}>
       {ETAPAS.map((e, i) => {
         const feita = p.etapa !== 'CANCELADO' && i <= atual;
-        const data = dataDaEtapa(p, e.etapa);
+        // Na carga das planilhas a data da reserva é a da carga, não a da conversa com o gabinete.
+        const data = p.origem === 'PLANILHA' && e.etapa === 'RESERVADO' ? null : dataDaEtapa(p, e.etapa);
         const proxima = p.etapa !== 'CANCELADO' && i === atual + 1;
         const detalhe =
           e.etapa === 'MINUTA' && p.minutaDocumentoSei
             ? `doc. SEI ${p.minutaDocumentoSei}`
-            : e.etapa === 'OFICIO' && p.oficioNumero
-              ? `${p.oficioNumero} · SEI ${p.oficioProcessoSei}`
+            : e.etapa === 'OFICIO' && (p.oficioNumero || p.oficioProcessoSei)
+              ? [p.oficioNumero, p.oficioProcessoSei && `SEI ${p.oficioProcessoSei}`].filter(Boolean).join(' · ')
               : e.etapa === 'CONFERIDO' && p.siopEmenda
                 ? `emenda ${p.siopEmenda}${p.siopGnd ? ` · ${p.siopGnd}` : ''}${p.siopValor != null ? ` · ${formatCurrency(p.siopValor)}` : ''}`
                 : e.etapa === 'AUTORIZADO' && p.autorizadoDocumentoSei
@@ -104,7 +106,7 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda }> = ({ p }) => {
             </span>
             <div>
               <div style={{ fontWeight: feita || proxima ? 700 : 500, color: feita || proxima ? '#0f172a' : '#94a3b8', fontSize: '0.82rem' }}>{e.rotulo}</div>
-              <div style={carteiraSubtitle}>{[feita ? (data ? dataBR(data) : 'não houve') : proxima ? 'próxima etapa' : null, feita ? detalhe : null].filter(Boolean).join(' · ')}</div>
+              <div style={carteiraSubtitle}>{[feita ? (data ? dataBR(data) : p.origem === 'PLANILHA' ? 'sem data na planilha' : 'não houve') : proxima ? 'próxima etapa' : null, feita ? detalhe : null].filter(Boolean).join(' · ')}</div>
               {e.etapa === 'OFICIO' && p.etapa === 'OFICIO' && p.divergencia && (
                 <div style={{ ...carteiraSubtitle, color: 'var(--color-danger, #b11b05)', WebkitLineClamp: 4 }}>Divergência: {p.divergencia}</div>
               )}
@@ -126,12 +128,13 @@ interface DetalheProps {
   itens: Map<string, ItemCaep>;
   beneficiarios: Map<string, BeneficiarioEmenda>;
   podeGerir: boolean;
+  podeVerContratos: boolean;
   hoje: string;
   onAcao: (acao: AcaoDaJanela) => void;
   onAlterar: () => void;
 }
 
-const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, podeGerir, hoje, onAcao, onAlterar }) => {
+const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
   const prox = proximaAcao(p.etapa);
   const colunas: Column<PedidoEmenda['linhas'][number]>[] = [
     {
@@ -144,6 +147,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
         return (
           <>
             <LinhaDoPedido linha={l} itens={itens} />
+            <AConferirDaLinha linha={l} />
             {ata && (
               <div style={{ marginTop: '0.3rem' }}>
                 <StatusBadge label={ata.texto} variant={ata.tipo === 'ataVencida' ? 'danger' : 'warning'} size="sm" dot={false} />
@@ -156,22 +160,10 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
     {
       key: 'ben',
       header: 'Beneficiário',
-      render: (l) => {
-        const b = l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined;
-        return b ? (
-          <>
-            <div style={{ fontWeight: 600 }}>{b.nomeCurto}</div>
-            <div style={carteiraSubtitle}>
-              {b.entregaMunicipio}/{b.entregaUf}
-            </div>
-          </>
-        ) : (
-          <StatusBadge label="A informar" variant="warning" size="sm" dot={false} />
-        );
-      }
+      render: (l) => <BeneficiarioDaLinha linha={l} beneficiarios={beneficiarios} />
     },
     { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => formatCurrency(valorDaLinha(l, itens)) },
-    { key: 'ne', header: 'Nota de empenho', nowrap: true, render: (l) => (l.notaEmpenho ? <span style={{ fontWeight: 700 }}>{l.notaEmpenho}</span> : <span style={carteiraSubtitle}>—</span>) }
+    { key: 'ne', header: 'Empenho e contrato', nowrap: true, render: (l) => <EmpenhoDaLinha linha={l} podeVerContratos={podeVerContratos} /> }
   ];
   const canceladas = p.linhas.filter((l) => l.cancelada);
   return (
@@ -185,7 +177,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
         )}
         {p.etapa === 'EMPENHADO' && (
           <div style={{ fontSize: '0.8rem', color: 'var(--color-info-text, #155bcb)', background: 'var(--color-info-bg, #e6eefb)', borderRadius: 6, padding: '0.5rem 0.7rem', fontWeight: 600 }}>
-            Com a CCGA desde {dataBR(p.empenhadoEm)}. A entrega ao beneficiário será registrada pelo módulo de Fiscalização.
+            {p.empenhadoEm ? `Com a CCGA desde ${dataBR(p.empenhadoEm)}.` : 'Com a CCGA.'} A entrega ao beneficiário será registrada pelo módulo de Fiscalização.
           </div>
         )}
         {p.observacao && <div style={carteiraSubtitle}>Observação: {p.observacao}</div>}
@@ -221,6 +213,7 @@ export const EmendasPedidosPage: React.FC = () => {
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
   const { data: kits = [] } = useKitsEmendas();
   const podeGerir = usePodeGerirEmendas();
+  const podeVerContratos = usePodeVerContratos();
   const hoje = hojeEmBrasilia();
   const [segmento, setSegmento] = useState<Segmento>('todos');
   const [filtroAviso, setFiltroAviso] = useState('');
@@ -251,7 +244,7 @@ export const EmendasPedidosPage: React.FC = () => {
         if (!termo) return true;
         const a = autorPorId.get(l.autorId);
         const textoLinhas = linhasAtivas(l)
-          .map((x) => (x.tipo === 'KIT' ? x.kitNome : itens.get(x.itemKey ?? '')?.descricao) ?? '')
+          .map((x) => `${(x.tipo === 'KIT' ? x.kitNome : itens.get(x.itemKey ?? '')?.descricao) ?? ''} ${x.beneficiarioNome ?? ''} ${x.contratoNumero ?? ''}`)
           .join(' ');
         return semAcento(`${a?.nome ?? ''} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioNumero ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${textoLinhas}`).includes(termo);
       });
@@ -328,7 +321,7 @@ export const EmendasPedidosPage: React.FC = () => {
           {l.avisos
             .filter((a) => a.tipo !== 'divergencia')
             .map((a) => (
-              <StatusBadge key={a.tipo} label={a.texto} variant={a.tipo === 'ataVencendo' ? 'warning' : 'danger'} size="sm" dot={false} />
+              <StatusBadge key={a.tipo} label={a.texto} variant={a.tipo === 'ataVencendo' || a.tipo === 'aConferir' ? 'warning' : 'danger'} size="sm" dot={false} />
             ))}
         </div>
       )
@@ -342,7 +335,7 @@ export const EmendasPedidosPage: React.FC = () => {
       <PageHeader
         title="Pedidos"
         subtitle="Reservas e ofícios dos parlamentares, da reserva ao empenho."
-        hint="A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Avisos: mais de 30 dias sem ofício, divergência com o SIOP e ata vencendo em até 60 dias ou vencida antes do empenho. Cancelar devolve o saldo."
+        hint="A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Avisos: mais de 30 dias sem ofício, divergência com o SIOP ata vencendo em até 60 dias ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o beneficiário pelo nome (a cadastrar com CNPJ), o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo."
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
@@ -385,7 +378,8 @@ export const EmendasPedidosPage: React.FC = () => {
             { value: 'semOficio', label: 'Mais de 30 dias sem ofício', count: contaAviso('semOficio') },
             { value: 'divergencia', label: 'Divergência com o SIOP', count: contaAviso('divergencia') },
             { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
-            { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') }
+            { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
+            { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') }
           ]}
           onChange={setFiltroAviso}
           testId="emendas-pedidos-filtro-aviso"
@@ -416,6 +410,7 @@ export const EmendasPedidosPage: React.FC = () => {
               itens={itens}
               beneficiarios={beneficiarios}
               podeGerir={podeGerir}
+              podeVerContratos={podeVerContratos}
               hoje={hoje}
               onAcao={(acao) => setJanela({ pedido: l, acao })}
               onAlterar={() => setEditando(l)}

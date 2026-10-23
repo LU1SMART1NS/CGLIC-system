@@ -9,7 +9,8 @@ const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
 });
 const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
   id: 'l' + Math.random(), ordem: 1, tipo: 'ITEM', itemKey: 'a', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
-  quantidade: 1, beneficiarioId: null, notaEmpenho: null, cancelada: false, canceladaMotivo: null, ...extra
+  quantidade: 1, beneficiarioId: null, notaEmpenho: null, cancelada: false, canceladaMotivo: null,
+  beneficiarioNome: null, empenhoDocumentoSei: null, contratoNumero: null, aConferir: null, planilhaRef: null, ...extra
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   id: 'p' + Math.random(), numero: 1, autorId: 'C:1', etapa: 'RESERVADO', origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-10-20',
@@ -67,5 +68,25 @@ describe('identificação e contato', () => {
     ]);
     expect(m.get('C:1')).toEqual({ contatoNome: 'Novo', contatoTelefone: '61999990000', contatoEmail: null });
     expect(m.has('C:2')).toBe(false);
+  });
+});
+
+describe('pedidos que vieram das planilhas da CAEP (migration 160)', () => {
+  it('identifica pelo número da emenda; reserva da planilha não tem data', async () => {
+    const { identificacaoDoPedido } = await import('../emendasPedidos');
+    expect(identificacaoDoPedido({ oficioNumero: null, reservadoEm: '2026-10-23', siopEmenda: '37990010', origem: 'PLANILHA' })).toBe('Emenda 37990010');
+    expect(identificacaoDoPedido({ oficioNumero: null, reservadoEm: '2026-10-23', siopEmenda: null, origem: 'PLANILHA' })).toBe('Reserva da planilha');
+  });
+
+  it('avisa as linhas a conferir', () => {
+    const p = pedido({ etapa: 'EMPENHADO', linhas: [linha({ aConferir: 'Planilha de saldo indica 5; a execução soma 4.' }), linha({ aConferir: 'x' }), linha({})] });
+    expect(avisosDoPedido(p, itens, HOJE)).toEqual([{ tipo: 'aConferir', texto: '2 linhas a conferir' }]);
+  });
+
+  it('monta a chave do contrato da planilha', async () => {
+    const { chaveDoContratoDaEmenda } = await import('../emendasPedidos');
+    expect(chaveDoContratoDaEmenda('00138/2026')).toBe('200331-00138-2026');
+    expect(chaveDoContratoDaEmenda('138/2026')).toBeNull();
+    expect(chaveDoContratoDaEmenda(null)).toBeNull();
   });
 });

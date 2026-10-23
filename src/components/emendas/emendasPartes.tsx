@@ -1,10 +1,13 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { carteiraDescricaoItem, carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
+import { chaveDoContratoDaEmenda } from '../../utils/emendasPedidos';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import type { AutorEmenda, ItemCaep, LinhaPedido } from '../../services/emendasService';
+import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, LinhaPedido } from '../../services/emendasService';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
@@ -71,3 +74,71 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
   const i = linha.itemKey ? itens.get(linha.itemKey) : undefined;
   return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} />;
 };
+
+/**
+ * Beneficiário da linha: o cadastrado (com CNPJ) ou, na carga das planilhas (migration 160), o nome como veio, com o
+ * aviso de que falta cadastrar.
+ */
+export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId' | 'beneficiarioNome'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
+  const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
+  if (b) {
+    return (
+      <>
+        <div style={{ fontWeight: 600 }}>{b.nomeCurto}</div>
+        <div style={carteiraSubtitle}>
+          {b.entregaMunicipio}/{b.entregaUf}
+        </div>
+      </>
+    );
+  }
+  if (linha.beneficiarioNome) {
+    return (
+      <>
+        <div style={{ fontWeight: 600 }}>{linha.beneficiarioNome}</div>
+        <StatusBadge label="A cadastrar" variant="warning" size="sm" dot={false} />
+      </>
+    );
+  }
+  return <StatusBadge label="A informar" variant="warning" size="sm" dot={false} />;
+};
+
+/** Empenho da linha: a nota, quando já se sabe; antes, o documento SEI do empenho. Embaixo, o contrato. */
+export const EmpenhoDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'notaEmpenho' | 'empenhoDocumentoSei' | 'contratoNumero'>; podeVerContratos: boolean }> = ({ linha, podeVerContratos }) => {
+  const chave = chaveDoContratoDaEmenda(linha.contratoNumero);
+  if (!linha.notaEmpenho && !linha.empenhoDocumentoSei && !linha.contratoNumero) return <span style={carteiraSubtitle}>—</span>;
+  return (
+    <>
+      {linha.notaEmpenho ? (
+        <div style={{ fontWeight: 700 }}>{linha.notaEmpenho}</div>
+      ) : linha.empenhoDocumentoSei ? (
+        <>
+          <div style={{ fontWeight: 600 }}>doc. SEI {linha.empenhoDocumentoSei}</div>
+          <div style={carteiraSubtitle}>nota a localizar</div>
+        </>
+      ) : null}
+      {linha.contratoNumero && (
+        <div style={carteiraSubtitle}>
+          Contrato{' '}
+          {podeVerContratos && chave ? (
+            <Link to={`/contratos/${encodeURIComponent(chave)}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--primary)', fontWeight: 700 }}>
+              {linha.contratoNumero}
+            </Link>
+          ) : (
+            linha.contratoNumero
+          )}
+        </div>
+      )}
+    </>
+  );
+};
+
+/** O que não bate entre as planilhas da CAEP nesta linha (migration 160). */
+export const AConferirDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'aConferir' | 'planilhaRef'> }> = ({ linha }) =>
+  linha.aConferir ? (
+    <div
+      title={linha.planilhaRef ? `Na planilha: ${linha.planilhaRef}` : undefined}
+      style={{ marginTop: '0.3rem', fontSize: '0.75rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: 4, padding: '0.25rem 0.45rem' }}
+    >
+      A conferir: {linha.aConferir}
+    </div>
+  ) : null;
