@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { semContratos } from '../types/rbac';
 import {
   fetchAutoresEmendas,
   fetchBeneficiariosEmendas,
@@ -21,6 +22,12 @@ import {
 export function usePodeGerirEmendas(): boolean {
   const { role } = useAuth();
   return role === 'admin' || role === 'gestor_emendas';
+}
+
+/** O contrato citado no pedido só vira link para quem consulta contratos (o gestor de emendas não consulta). */
+export function usePodeVerContratos(): boolean {
+  const { role } = useAuth();
+  return Boolean(role) && !semContratos(role);
 }
 
 export const CHAVE_EMENDAS = ['emendas'] as const;

@@ -4,7 +4,6 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
-import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
@@ -14,7 +13,7 @@ import { useAutoresEmendas, useBeneficiariosEmendas, useItensCaep, usePedidosEme
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { identificacaoDoPedido, linhasAtivas, ROTULO_ETAPA, valorDaLinha, valorDoPedido } from '../../utils/emendasPedidos';
 import type { AutorEmenda, PedidoEmenda, TipoAutor } from '../../services/emendasService';
-import { AutorDoPedido, LinhaDoPedido } from './emendasPartes';
+import { AutorDoPedido, BeneficiarioDaLinha, LinhaDoPedido } from './emendasPartes';
 
 type Segmento = 'todos' | TipoAutor;
 interface Linha {
@@ -154,10 +153,7 @@ export const EmendasPorAutorPage: React.FC = () => {
                   {
                     key: 'ben',
                     header: 'Beneficiário',
-                    render: (r) => {
-                      const b = r.x.beneficiarioId ? beneficiarios.get(r.x.beneficiarioId) : undefined;
-                      return b ? `${b.nomeCurto} (${b.entregaUf})` : <StatusBadge label="A informar" variant="warning" size="sm" dot={false} />;
-                    }
+                    render: (r) => <BeneficiarioDaLinha linha={r.x} beneficiarios={beneficiarios} />
                   },
                   { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (r) => formatCurrency(valorDaLinha(r.x, itens)) },
                   { key: 'etapa', header: 'Etapa', nowrap: true, render: (r) => ROTULO_ETAPA[r.p.etapa] }
