@@ -52,6 +52,7 @@ import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type Eta
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, ExecucaoDoPedidoResumo, LinhaDoPedido } from './emendasPartes';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
+import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
 
@@ -258,6 +259,15 @@ export const EmendasPedidosPage: React.FC = () => {
   const [soPedido, setSoPedido] = useState(() => searchParams.get('pedido'));
   const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(soPedido ? [soPedido] : []));
   const [busca, setBusca] = useState('');
+  // Ver por autor e filtro de autor ficam no endereço (?ver=autor, ?autor=), para o Voltar do navegador funcionar.
+  const porAutor = searchParams.get('ver') === 'autor';
+  const filtroAutor = searchParams.get('autor') ?? '';
+  const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
+    setSearchParams((atual) => {
+      const prox = new URLSearchParams(atual);
+      mudar(prox);
+      return prox;
+    });
   const [editando, setEditando] = useState<PedidoEmenda | 'novo' | null>(null);
   const [janela, setJanela] = useState<{ pedido: PedidoEmenda; acao: AcaoDaJanela } | null>(null);
 
@@ -284,6 +294,7 @@ export const EmendasPedidosPage: React.FC = () => {
     const termo = semAcento(busca.trim());
     return doSegmento
       .filter((l) => !soPedido || l.id === soPedido)
+      .filter((l) => !filtroAutor || (filtroAutor === AUTOR_A_DEFINIR_CHAVE ? !l.autorId : l.autorId === filtroAutor))
       .filter((l) => !filtroAviso || temAviso(l, filtroAviso))
       .filter((l) => {
         if (!termo) return true;
@@ -293,10 +304,19 @@ export const EmendasPedidosPage: React.FC = () => {
           .join(' ');
         return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioNumero ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${textoLinhas}`).includes(termo);
       });
-  }, [doSegmento, soPedido, filtroAviso, busca, autorPorId, itens]);
+  }, [doSegmento, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens]);
 
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtradas, chaveDaLinha, POR_PAGINA);
-  const filtrosAtivos = Boolean(busca.trim() || filtroAviso || soPedido);
+  const filtrosAtivos = Boolean(busca.trim() || filtroAviso || soPedido || filtroAutor);
+  // Autores com pedido na etapa escolhida, os que têm mais pedidos primeiro; "Parlamentar a definir" no fim.
+  const opcoesDeAutor = useMemo(() => {
+    const conta = new Map<string, number>();
+    for (const l of doSegmento) conta.set(l.autorId ?? AUTOR_A_DEFINIR_CHAVE, (conta.get(l.autorId ?? AUTOR_A_DEFINIR_CHAVE) ?? 0) + 1);
+    if (filtroAutor && !conta.has(filtroAutor)) conta.set(filtroAutor, 0);
+    return [...conta.entries()]
+      .map(([value, count]) => ({ value, count, label: value === AUTOR_A_DEFINIR_CHAVE ? AUTOR_A_DEFINIR : autorPorId.get(value)?.nome ?? value }))
+      .sort((a, b) => Number(a.value === AUTOR_A_DEFINIR_CHAVE) - Number(b.value === AUTOR_A_DEFINIR_CHAVE) || a.label.localeCompare(b.label, 'pt-BR'));
+  }, [doSegmento, filtroAutor, autorPorId]);
   const contaAviso = (tipo: string) => doSegmento.filter((l) => temAviso(l, tipo)).length;
 
   const colunas: Column<Linha>[] = [
@@ -366,11 +386,26 @@ export const EmendasPedidosPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Pedidos"
-        subtitle="Reservas e ofícios dos parlamentares, da reserva ao empenho."
-        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o beneficiário pelo nome (a cadastrar com CNPJ), o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo.`}
+        subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na etapa escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
+        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o beneficiário pelo nome (a cadastrar com CNPJ), o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da etapa escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
+            <CarteiraSegmentTabs<'pedido' | 'autor'>
+              testIdPrefix="emendas-pedidos-ver"
+              ariaLabel="Ver por"
+              active={porAutor ? 'autor' : 'pedido'}
+              onSelect={(v) =>
+                mudarUrl((p) => {
+                  if (v === 'autor') p.set('ver', 'autor');
+                  else p.delete('ver');
+                })
+              }
+              segments={[
+                { id: 'pedido', label: 'Por pedido', title: 'Uma linha por pedido, com as etapas e os botões' },
+                { id: 'autor', label: 'Por autor', title: 'Uma linha por parlamentar ou bancada, com os totais' }
+              ]}
+            />
             {podeGerir && <ActionButton action="novo" label="Nova reserva" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-pedidos-novo" />}
             <HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-pedidos-atualizar" tooltipTitle="Recarregar os pedidos" />
           </>
@@ -389,83 +424,117 @@ export const EmendasPedidosPage: React.FC = () => {
         ]}
       />
 
-      <CarteiraFilterBar
-        busca={busca}
-        searchPlaceholder="Buscar por autor, contato, ofício, SEI, emenda ou item..."
-        onChangeBusca={setBusca}
-        hasActiveFilters={filtrosAtivos}
-        onResetFilters={() => {
-          setBusca('');
-          setFiltroAviso('');
-          setSoPedido(null);
-          if (searchParams.toString()) setSearchParams({}, { replace: true });
-        }}
-        counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
-        testIdPrefix="emendas-pedidos"
-      >
-        <CarteiraFilterButton
-          label="Aviso"
-          value={filtroAviso}
-          emptyValue=""
-          options={[
-            { value: 'com', label: 'Com algum aviso', count: contaAviso('com') },
-            { value: 'grave', label: 'Pedem ação já (avisos vermelhos)', count: contaAviso('grave') },
-            { value: 'semOficio', label: 'Mais de 30 dias sem ofício ou parlamentar', count: contaAviso('semOficio') },
-            { value: 'divergencia', label: 'Divergência com o SIOP', count: contaAviso('divergencia') },
-            { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
-            { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
-            { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
-            { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') },
-            { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') }
-          ]}
-          onChange={setFiltroAviso}
-          testId="emendas-pedidos-filtro-aviso"
-        />
-      </CarteiraFilterBar>
-
-      <AdminListShell
-        testId="emendas-pedidos-lista"
-        isLoading={isLoading || carregandoItens}
-        isError={isError}
-        errorTitle="Não foi possível carregar os pedidos"
-        errorMessage={(error as Error | null)?.message || 'Falha ao consultar os pedidos.'}
-        onRetry={() => refetch()}
-        isEmpty={!isLoading && !carregandoItens && filtradas.length === 0}
-        emptyTitle={pedidos.length === 0 ? 'Nenhum pedido ainda.' : 'Nenhum pedido nesta situação.'}
-        emptyDescription={pedidos.length === 0 ? (podeGerir ? 'Use "Nova reserva" quando combinar itens ou kits com um parlamentar.' : 'A CAEP registra as reservas dos parlamentares.') : 'Ajuste a busca ou escolha outra etapa.'}
-      >
-        <DataTable<Linha>
-          testId="emendas-pedidos-tabela"
-          className="data-table-container--flush emendas-tabela-topo"
-          data={pageItems}
-          keyExtractor={chaveDaLinha}
-          rowStyle={(l) => (l.etapa === 'CANCELADO' ? { opacity: 0.7 } : undefined)}
-          expandedKeys={abertos}
-          onToggleExpand={(id) =>
-            setAbertos((atual) => {
-              const prox = new Set(atual);
-              if (prox.has(id)) prox.delete(id);
-              else prox.add(id);
-              return prox;
+      {porAutor ? (
+        <PedidosPorAutor
+          pedidos={doSegmento}
+          todasAsEtapas={segmento === 'todos'}
+          autores={autores}
+          itens={itens}
+          isLoading={isLoading || carregandoItens}
+          isError={isError}
+          errorMessage={(error as Error | null)?.message || 'Falha ao consultar os pedidos.'}
+          onRetry={() => refetch()}
+          onAbrirAutor={(chave) =>
+            mudarUrl((p) => {
+              p.delete('ver');
+              p.set('autor', chave);
             })
           }
-          columns={colunas}
-          renderExpanded={(l) => (
-            <DetalheDoPedido
-              p={l}
-              itens={itens}
-              beneficiarios={beneficiarios}
-              notas={notas}
-              podeGerir={podeGerir}
-              podeVerContratos={podeVerContratos}
-              hoje={hoje}
-              onAcao={(acao) => setJanela({ pedido: l, acao })}
-              onAlterar={() => setEditando(l)}
-            />
-          )}
         />
-        <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={filtradas.length} onChange={setPage} testIdPrefix="emendas-pedidos" />
-      </AdminListShell>
+      ) : (
+        <>
+          <CarteiraFilterBar
+            busca={busca}
+            searchPlaceholder="Buscar por autor, contato, ofício, SEI, emenda ou item..."
+            onChangeBusca={setBusca}
+            hasActiveFilters={filtrosAtivos}
+            onResetFilters={() => {
+              setBusca('');
+              setFiltroAviso('');
+              setSoPedido(null);
+              if (searchParams.toString()) setSearchParams({}, { replace: true });
+            }}
+            counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
+            testIdPrefix="emendas-pedidos"
+          >
+            <CarteiraFilterButton
+              label="Autor"
+              value={filtroAutor}
+              emptyValue=""
+              options={opcoesDeAutor}
+              onChange={(v) =>
+                mudarUrl((p) => {
+                  if (v) p.set('autor', v);
+                  else p.delete('autor');
+                })
+              }
+              testId="emendas-pedidos-filtro-autor"
+            />
+            <CarteiraFilterButton
+              label="Aviso"
+              value={filtroAviso}
+              emptyValue=""
+              options={[
+                { value: 'com', label: 'Com algum aviso', count: contaAviso('com') },
+                { value: 'grave', label: 'Pedem ação já (avisos vermelhos)', count: contaAviso('grave') },
+                { value: 'semOficio', label: 'Mais de 30 dias sem ofício ou parlamentar', count: contaAviso('semOficio') },
+                { value: 'divergencia', label: 'Divergência com o SIOP', count: contaAviso('divergencia') },
+                { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
+                { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
+                { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
+                { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') },
+                { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') }
+              ]}
+              onChange={setFiltroAviso}
+              testId="emendas-pedidos-filtro-aviso"
+            />
+          </CarteiraFilterBar>
+
+          <AdminListShell
+            testId="emendas-pedidos-lista"
+            isLoading={isLoading || carregandoItens}
+            isError={isError}
+            errorTitle="Não foi possível carregar os pedidos"
+            errorMessage={(error as Error | null)?.message || 'Falha ao consultar os pedidos.'}
+            onRetry={() => refetch()}
+            isEmpty={!isLoading && !carregandoItens && filtradas.length === 0}
+            emptyTitle={pedidos.length === 0 ? 'Nenhum pedido ainda.' : 'Nenhum pedido nesta situação.'}
+            emptyDescription={pedidos.length === 0 ? (podeGerir ? 'Use "Nova reserva" quando combinar itens ou kits com um parlamentar.' : 'A CAEP registra as reservas dos parlamentares.') : 'Ajuste a busca ou escolha outra etapa.'}
+          >
+            <DataTable<Linha>
+              testId="emendas-pedidos-tabela"
+              className="data-table-container--flush emendas-tabela-topo"
+              data={pageItems}
+              keyExtractor={chaveDaLinha}
+              rowStyle={(l) => (l.etapa === 'CANCELADO' ? { opacity: 0.7 } : undefined)}
+              expandedKeys={abertos}
+              onToggleExpand={(id) =>
+                setAbertos((atual) => {
+                  const prox = new Set(atual);
+                  if (prox.has(id)) prox.delete(id);
+                  else prox.add(id);
+                  return prox;
+                })
+              }
+              columns={colunas}
+              renderExpanded={(l) => (
+                <DetalheDoPedido
+                  p={l}
+                  itens={itens}
+                  beneficiarios={beneficiarios}
+                  notas={notas}
+                  podeGerir={podeGerir}
+                  podeVerContratos={podeVerContratos}
+                  hoje={hoje}
+                  onAcao={(acao) => setJanela({ pedido: l, acao })}
+                  onAlterar={() => setEditando(l)}
+                />
+              )}
+            />
+            <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={filtradas.length} onChange={setPage} testIdPrefix="emendas-pedidos" />
+          </AdminListShell>
+        </>
+      )}
 
       {editando && (
         <PedidoModal
