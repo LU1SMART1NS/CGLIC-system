@@ -2,16 +2,19 @@ import React, { useMemo, useState } from 'react';
 import { PackageOpen } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
-import { DataTable } from '../../design-system/components/DataTable';
+import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
+import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
+import { carteiraDescricaoItem, carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useSalvarKit } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
-import { AVISO_VENCIMENTO_DIAS, calcularKit, dataBR, ROTULO_SITUACAO_KIT, type CalculoDoKit, type SituacaoKit } from '../../utils/emendasKits';
+import { descricaoItemEmFrase } from '../../utils/textCase';
+import { AVISO_VENCIMENTO_DIAS, calcularKit, dataBR, ROTULO_SITUACAO_KIT, type CalculoDoKit, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
 import type { KitEmenda } from '../../services/emendasService';
 import { KitModal } from './KitModal';
 
@@ -19,15 +22,63 @@ type Segmento = 'todos' | SituacaoKit;
 type Linha = KitEmenda & { calculo: CalculoDoKit };
 
 const VARIANTE: Record<SituacaoKit, StatusBadgeVariant> = { disponivel: 'success', vence: 'warning', indisponivel: 'danger', desativado: 'neutral' };
+const pequeno: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)' };
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const ataItem = (c: ComponenteDoKit) => (c.item ? `ata ${c.item.numeroAta} · item ${Number(c.item.numeroItem)}` : c.itemKey);
+
+/** Composição do kit aberta na linha. */
+const ComposicaoDoKit: React.FC<{ linha: Linha }> = ({ linha }) => {
+  const colunas: Column<ComponenteDoKit>[] = [
+    {
+      key: 'item',
+      header: 'Item',
+      priority: 'primary',
+      minWidth: '260px',
+      render: (c) => (
+        <>
+          <div style={carteiraIdentificacao}>{ataItem(c)}</div>
+          <div style={carteiraDescricaoItem}>{c.item ? descricaoItemEmFrase(c.item.descricao) : 'Sem alocação da CAEP'}</div>
+        </>
+      )
+    },
+    {
+      key: 'vigencia',
+      header: 'Vigência da ata',
+      nowrap: true,
+      render: (c) =>
+        !c.item ? (
+          '—'
+        ) : c.item.ataEncerrada ? (
+          <StatusBadge label={`Encerrada em ${dataBR(c.item.vigenciaFinal)}`} variant="danger" size="sm" dot={false} />
+        ) : c.diasParaVencer != null && c.diasParaVencer <= AVISO_VENCIMENTO_DIAS ? (
+          <StatusBadge label={`Vence em ${c.diasParaVencer} dias (${dataBR(c.item.vigenciaFinal)})`} variant="warning" size="sm" dot={false} />
+        ) : (
+          `Até ${dataBR(c.item.vigenciaFinal)}`
+        )
+    },
+    { key: 'qtd', header: 'Por kit', align: 'right', nowrap: true, render: (c) => <b>{formatNumber(c.quantidade)}</b> },
+    { key: 'saldo', header: 'Saldo da CAEP', align: 'right', nowrap: true, render: (c) => (c.item ? formatNumber(c.saldo) : '—') },
+    { key: 'kits', header: 'Dá para', align: 'right', nowrap: true, render: (c) => (c.item && !c.item.ataEncerrada ? `${formatNumber(c.kits)} kits` : '—') }
+  ];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.4rem 0' }} data-testid={`emendas-kit-detalhe-${linha.id}`}>
+      <DataTable<ComponenteDoKit> testId={`emendas-kit-composicao-${linha.id}`} data={linha.calculo.componentes} keyExtractor={(c) => c.itemKey} columns={colunas} />
+      {linha.calculo.motivo && <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{linha.calculo.motivo}</div>}
+      <div style={pequeno}>
+        Mudar a composição cria uma nova versão; os pedidos já feitos guardam a composição do dia.
+        {linha.atualizadoPorNome ? ` Última alteração: ${linha.atualizadoPorNome}${linha.atualizadoEm ? ` em ${new Date(linha.atualizadoEm).toLocaleDateString('pt-BR')}` : ''}.` : ''}
+      </div>
+    </div>
+  );
+};
 
 /**
  * Kits das emendas (migration 155): conjunto de itens montado pela CAEP com o que ela tem alocado. A situação é
  * calculada todo dia pelas atas e pelo saldo; quem desativa é só a CAEP.
  */
 export const EmendasKitsPage: React.FC = () => {
-  const { data: kits = [], isLoading, isError, error, refetch } = useKitsEmendas();
-  const { data: itens = [], isLoading: carregandoItens } = useItensCaep();
+  const { data: kits = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useKitsEmendas();
+  const { data: itens = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
   const podeGerir = usePodeGerirEmendas();
   const salvar = useSalvarKit();
   const toast = useToast();
@@ -48,11 +99,12 @@ export const EmendasKitsPage: React.FC = () => {
   const filtradas = useMemo(() => {
     const termo = semAcento(busca.trim());
     return linhas
-      .filter((l) => segmento === 'todos' || l.calculo.situacao === segmento)
+      .filter((l) => (segmento === 'todos' ? l.calculo.situacao !== 'desativado' : l.calculo.situacao === segmento))
       .filter((l) => !termo || semAcento(`${l.nome} ${l.descricao ?? ''} ${l.calculo.componentes.map((c) => c.item?.descricao ?? '').join(' ')}`).includes(termo));
   }, [linhas, segmento, busca]);
 
-  const filtrosAtivos = Boolean(busca) || segmento !== 'todos';
+  const filtrosAtivos = Boolean(busca.trim());
+  const totalDoSegmento = segmento === 'todos' ? linhas.length - contagem.desativado : contagem[segmento];
 
   const alternarAtivo = async (k: KitEmenda) => {
     try {
@@ -63,14 +115,70 @@ export const EmendasKitsPage: React.FC = () => {
     }
   };
 
+  const colunas: Column<Linha>[] = [
+    {
+      key: 'nome',
+      header: 'Kit',
+      priority: 'primary',
+      minWidth: '220px',
+      render: (l) => (
+        <>
+          <div style={carteiraIdentificacao}>{l.nome}</div>
+          <div style={carteiraSubtitle}>
+            {[`${l.itens.length} ${l.itens.length === 1 ? 'item' : 'itens'}`, l.versao > 1 ? `versão ${l.versao}` : null, l.descricao].filter(Boolean).join(' · ')}
+          </div>
+        </>
+      )
+    },
+    ...(segmento === 'todos'
+      ? [
+          {
+            key: 'situacao',
+            header: 'Situação',
+            nowrap: true,
+            render: (l: Linha) => <StatusBadge label={ROTULO_SITUACAO_KIT[l.calculo.situacao]} variant={VARIANTE[l.calculo.situacao]} size="sm" dot={false} />
+          }
+        ]
+      : []),
+    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, render: (l) => formatCurrency(l.calculo.valorPorKit) },
+    { key: 'possiveis', header: 'Kits possíveis', align: 'right', nowrap: true, render: (l) => <b>{formatNumber(l.calculo.kitsPossiveis)}</b> },
+    {
+      key: 'limite',
+      header: 'Item que limita',
+      mobileLabel: 'Item que limita',
+      minWidth: '220px',
+      render: (l) => {
+        const c = l.calculo.itemLimitante;
+        if (l.calculo.situacao === 'desativado' || !c) return <span style={carteiraSubtitle}>—</span>;
+        return (
+          <>
+            <div style={{ fontWeight: 700 }}>{ataItem(c)}</div>
+            <div style={carteiraDescricaoItem}>{c.item ? descricaoItemEmFrase(c.item.descricao) : 'Item sem alocação da CAEP'}</div>
+          </>
+        );
+      }
+    }
+  ];
+
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Kits"
-        subtitle={`Conjuntos de itens que a CAEP oferece aos parlamentares. ${itens.length ? `${itens.length} itens com alocação para a CAEP.` : ''}`}
-        hint={`O kit não guarda quantidade: quando o parlamentar pede N kits, cada item sai do saldo da CAEP N vezes a quantidade por kit. A situação é calculada sozinha: Vence em breve quando alguma ata do kit acaba em até ${AVISO_VENCIMENTO_DIAS} dias; Indisponível com ata encerrada ou sem saldo (volta sozinho se a ata for prorrogada).`}
+        subtitle="Conjuntos de itens que a CAEP oferece aos parlamentares."
+        hint={`Só entram itens com alocação para a CAEP (${itens.length} hoje). O kit não guarda quantidade: quando o parlamentar pede N kits, cada item sai do saldo da CAEP N vezes a quantidade por kit. A situação é calculada sozinha: Vence em breve quando alguma ata do kit acaba em até ${AVISO_VENCIMENTO_DIAS} dias; Indisponível com ata encerrada ou sem saldo (volta sozinho se a ata for prorrogada).`}
         icon={<PackageOpen size={26} color="var(--primary)" aria-hidden="true" />}
-        actions={podeGerir ? <ActionButton action="novo" label="Novo kit" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-kits-novo" /> : undefined}
+        actions={
+          <>
+            {podeGerir && <ActionButton action="novo" label="Novo kit" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-kits-novo" />}
+            <HeaderRefreshAction
+              onRefresh={() => Promise.all([refetch(), recarregarItens()])}
+              isRefreshing={isFetching}
+              lastUpdated={dataUpdatedAt || null}
+              dataTestId="emendas-kits-atualizar"
+              tooltipTitle="Recarregar os kits e o saldo dos itens da CAEP"
+            />
+          </>
+        }
       />
 
       <CarteiraSegmentTabs<Segmento>
@@ -79,10 +187,10 @@ export const EmendasKitsPage: React.FC = () => {
         active={segmento}
         onSelect={setSegmento}
         segments={[
-          { id: 'todos', label: 'Todos', count: contagem.todos },
-          { id: 'disponivel', label: 'Disponíveis', count: contagem.disponivel },
-          { id: 'vence', label: 'Vence em breve', count: contagem.vence },
-          { id: 'indisponivel', label: 'Indisponíveis', count: contagem.indisponivel },
+          { id: 'disponivel', label: 'Disponíveis', count: contagem.disponivel, dot: 'var(--color-success)' },
+          { id: 'vence', label: 'Vence em breve', count: contagem.vence, dot: 'var(--color-warning-solid)' },
+          { id: 'indisponivel', label: 'Indisponíveis', count: contagem.indisponivel, dot: 'var(--color-danger)' },
+          { id: 'todos', label: 'Todos', count: linhas.length - contagem.desativado },
           { id: 'desativado', label: 'Desativados', count: contagem.desativado }
         ]}
       />
@@ -92,25 +200,21 @@ export const EmendasKitsPage: React.FC = () => {
         searchPlaceholder="Buscar kit ou item..."
         onChangeBusca={setBusca}
         hasActiveFilters={filtrosAtivos}
-        onResetFilters={() => {
-          setBusca('');
-          setSegmento('todos');
-        }}
-        counter={carteiraCounter(filtradas.length, linhas.length, filtrosAtivos, 'kit', 'kits')}
+        onResetFilters={() => setBusca('')}
+        counter={carteiraCounter(filtradas.length, totalDoSegmento, filtrosAtivos, 'kit', 'kits')}
         testIdPrefix="emendas-kits"
       />
 
       <AdminListShell
         testId="emendas-kits-lista"
-        title="Kits da CAEP"
         isLoading={isLoading || carregandoItens}
         isError={isError}
         errorTitle="Não foi possível carregar os kits"
         errorMessage={(error as Error | null)?.message || 'Falha ao consultar os kits.'}
         onRetry={() => refetch()}
-        isEmpty={filtradas.length === 0}
+        isEmpty={!isLoading && !carregandoItens && filtradas.length === 0}
         emptyTitle={linhas.length === 0 ? 'Nenhum kit montado.' : 'Nenhum kit nesta situação.'}
-        emptyDescription={linhas.length === 0 ? (podeGerir ? 'Use "Novo kit" para agrupar itens alocados à CAEP.' : 'A CAEP monta os kits com os itens alocados a ela.') : 'Ajuste a busca ou os filtros.'}
+        emptyDescription={linhas.length === 0 ? (podeGerir ? 'Use "Novo kit" para agrupar itens alocados à CAEP.' : 'A CAEP monta os kits com os itens alocados a ela.') : 'Ajuste a busca ou escolha outra situação.'}
       >
         <DataTable<Linha>
           testId="emendas-kits-tabela"
@@ -118,91 +222,8 @@ export const EmendasKitsPage: React.FC = () => {
           data={filtradas}
           keyExtractor={(l) => l.id}
           rowStyle={(l) => (l.calculo.situacao === 'desativado' ? { opacity: 0.7 } : undefined)}
-          columns={[
-            {
-              key: 'nome',
-              header: 'Kit',
-              priority: 'primary',
-              sortValue: (l) => l.nome,
-              render: (l) => (
-                <div>
-                  <div style={{ fontWeight: 700 }}>{l.nome}</div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                    {[l.descricao, l.versao > 1 ? `versão ${l.versao}` : null].filter(Boolean).join(' · ')}
-                  </div>
-                </div>
-              )
-            },
-            {
-              key: 'situacao',
-              header: 'Situação',
-              width: '150px',
-              sortValue: (l) => l.calculo.situacao,
-              render: (l) => <StatusBadge label={ROTULO_SITUACAO_KIT[l.calculo.situacao]} variant={VARIANTE[l.calculo.situacao]} size="sm" dot={false} />
-            },
-            { key: 'itens', header: 'Itens', width: '70px', sortValue: (l) => l.itens.length, render: (l) => l.itens.length },
-            { key: 'valor', header: 'Valor por kit', width: '140px', sortValue: (l) => l.calculo.valorPorKit, render: (l) => <span style={{ whiteSpace: 'nowrap' }}>{formatCurrency(l.calculo.valorPorKit)}</span> },
-            { key: 'possiveis', header: 'Kits possíveis', width: '120px', sortValue: (l) => l.calculo.kitsPossiveis, render: (l) => <b>{formatNumber(l.calculo.kitsPossiveis)}</b> },
-            {
-              key: 'motivo',
-              header: 'Quem limita',
-              mobileLabel: 'Quem limita',
-              render: (l) => (
-                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                  {l.calculo.situacao === 'desativado'
-                    ? 'Desativado pela CAEP'
-                    : l.calculo.itemLimitante?.item
-                      ? `${l.calculo.itemLimitante.item.descricao.slice(0, 48)} · ata ${l.calculo.itemLimitante.item.numeroAta}`
-                      : '—'}
-                </span>
-              )
-            }
-          ]}
-          renderExpanded={(l) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.4rem 0' }} data-testid={`emendas-kit-detalhe-${l.id}`}>
-              <div className="data-table-container" style={{ overflowX: 'auto' }}>
-                <table className="data-table" style={{ width: '100%' }}>
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Ata · item</th>
-                      <th>Vigência</th>
-                      <th style={{ textAlign: 'right' }}>Por kit</th>
-                      <th style={{ textAlign: 'right' }}>Saldo da CAEP</th>
-                      <th style={{ textAlign: 'right' }}>Dá para</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {l.calculo.componentes.map((c) => (
-                      <tr key={c.itemKey}>
-                        <td>{c.item?.descricao ?? `${c.itemKey} (sem alocação da CAEP)`}</td>
-                        <td style={{ whiteSpace: 'nowrap' }}>{c.item ? `${c.item.numeroAta} · ${Number(c.item.numeroItem)}` : '—'}</td>
-                        <td style={{ whiteSpace: 'nowrap' }}>
-                          {!c.item ? (
-                            '—'
-                          ) : c.item.ataEncerrada ? (
-                            <StatusBadge label={`encerrada ${dataBR(c.item.vigenciaFinal)}`} variant="danger" size="sm" dot={false} />
-                          ) : c.diasParaVencer != null && c.diasParaVencer <= AVISO_VENCIMENTO_DIAS ? (
-                            <StatusBadge label={`vence ${dataBR(c.item.vigenciaFinal)} · ${c.diasParaVencer} dias`} variant="warning" size="sm" dot={false} />
-                          ) : (
-                            `até ${dataBR(c.item.vigenciaFinal)}`
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatNumber(c.quantidade)}</td>
-                        <td style={{ textAlign: 'right' }}>{c.item ? formatNumber(c.saldo) : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{c.item && !c.item.ataEncerrada ? `${formatNumber(c.kits)} kits` : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {l.calculo.motivo && <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{l.calculo.motivo}</div>}
-              <div style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)' }}>
-                Mudar a composição cria uma nova versão; os pedidos já feitos guardam a composição do dia.
-                {l.atualizadoPorNome ? ` Última alteração: ${l.atualizadoPorNome}${l.atualizadoEm ? ` em ${new Date(l.atualizadoEm).toLocaleDateString('pt-BR')}` : ''}.` : ''}
-              </div>
-            </div>
-          )}
+          columns={colunas}
+          renderExpanded={(l) => <ComposicaoDoKit linha={l} />}
           rowActions={
             podeGerir
               ? (l) => (

@@ -334,8 +334,6 @@ export const GruposUasgsPage: React.FC = () => {
           )}
 
           <AdminListShell
-            title="UASGs participantes"
-            icon={<Network size={16} />}
               stripActions={
                 chavesSelecionaveis.length > 0 ? (
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
@@ -365,6 +363,7 @@ export const GruposUasgsPage: React.FC = () => {
               keyExtractor={(l) => l.uasg}
               rowStyle={(l) => (selecao.selecionadas.has(l.uasg) ? { background: SELECIONADA_BG } : undefined)}
               testId="grupos-uasgs-tabela"
+              className="data-table-container--flush"
             />
             <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={visiveis.length} onChange={setPage} testIdPrefix="grupos-uasgs" />
           </AdminListShell>

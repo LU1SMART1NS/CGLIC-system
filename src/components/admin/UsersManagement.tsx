@@ -243,7 +243,6 @@ export const UsersManagement: React.FC = () => {
       {/* 3. Tabela de Usuários */}
       <AdminListShell
         testId="users-table-container"
-        title="Servidores e usuários"
         isLoading={isLoading}
         isError={isError}
         errorTitle="Não foi possível carregar os usuários"

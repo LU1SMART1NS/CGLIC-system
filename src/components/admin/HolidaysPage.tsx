@@ -173,8 +173,6 @@ export const HolidaysPage: React.FC = () => {
 
       <AdminListShell
         testId="holidays-list"
-        title={`Datas cadastradas em ${year}`}
-        countLabel={String(yearRecords.length)}
         stripActions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <ActionButton action="anterior" iconOnly label="Ano anterior" onClick={() => setYear((y) => y - 1)} />
