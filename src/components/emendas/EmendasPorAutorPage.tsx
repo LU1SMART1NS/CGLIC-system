@@ -27,7 +27,10 @@ interface Linha {
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-/** O que cada parlamentar ou bancada tem com a CAEP, somando os pedidos não cancelados (migration 157). */
+/**
+ * O que cada parlamentar ou bancada tem com a CAEP, somando os pedidos não cancelados (migration 157). O filtro
+ * "Mostrar" traz também quem não tem pedido (cadastro da Câmara e do Senado, migration 155): substitui a antiga aba Autores.
+ */
 export const EmendasPorAutorPage: React.FC = () => {
   const { data: pedidos = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = usePedidosEmendas();
   const { data: itensLista = [] } = useItensCaep();
@@ -35,6 +38,7 @@ export const EmendasPorAutorPage: React.FC = () => {
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
   const [segmento, setSegmento] = useState<Segmento>('todos');
   const [uf, setUf] = useState('');
+  const [mostrar, setMostrar] = useState('');
   const [busca, setBusca] = useState('');
 
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
@@ -55,8 +59,16 @@ export const EmendasPorAutorPage: React.FC = () => {
       l.kits += linhasAtivas(p).filter((x) => x.tipo === 'KIT').reduce((s, x) => s + x.quantidade, 0);
       m.set(chave, l);
     }
-    return [...m.values()].sort((a, b) => b.valor - a.valor);
-  }, [pedidos, autorPorId, itens]);
+    if (mostrar === 'todos') {
+      for (const a of autores) if (!m.has(a.id)) m.set(a.id, { autorId: a.id, autor: a, pedidos: [], kits: 0, valor: 0, empenhado: 0 });
+    }
+    // Sem pedido vem depois, em ordem alfabética.
+    return [...m.values()].sort((a, b) => b.valor - a.valor || (a.autor?.nome ?? '').localeCompare(b.autor?.nome ?? '', 'pt-BR'));
+  }, [pedidos, autorPorId, itens, autores, mostrar]);
+  const semPedido = useMemo(() => {
+    const com = new Set(pedidos.filter((p) => p.etapa !== 'CANCELADO' && p.autorId).map((p) => p.autorId));
+    return autores.filter((a) => !com.has(a.id)).length;
+  }, [pedidos, autores]);
 
   const contagem = useMemo(() => {
     const c: Record<Segmento, number> = { todos: linhas.length, DEPUTADO: 0, SENADOR: 0, BANCADA: 0 };
@@ -67,7 +79,7 @@ export const EmendasPorAutorPage: React.FC = () => {
   const termo = semAcento(busca.trim());
   const filtradas = doSegmento.filter((l) => (!uf || l.autor?.uf === uf) && (!termo || semAcento(`${l.autorId ? l.autor?.nome ?? '' : AUTOR_A_DEFINIR} ${l.autor?.partido ?? ''}`).includes(termo)));
   const ufs = [...new Set(doSegmento.map((l) => l.autor?.uf).filter((x): x is string => Boolean(x)))].sort().map((v) => ({ value: v, label: v, count: doSegmento.filter((l) => l.autor?.uf === v).length }));
-  const filtrosAtivos = Boolean(termo || uf);
+  const filtrosAtivos = Boolean(termo || uf || mostrar);
 
   const colunas: Column<Linha>[] = [
     { key: 'autor', header: 'Autor', priority: 'primary', minWidth: '220px', render: (l) => <AutorDoPedido autor={l.autor} autorId={l.autorId} /> },
@@ -108,11 +120,20 @@ export const EmendasPorAutorPage: React.FC = () => {
         onResetFilters={() => {
           setBusca('');
           setUf('');
+          setMostrar('');
         }}
         counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'autor', 'autores')}
         testIdPrefix="emendas-por-autor"
       >
         <CarteiraFilterButton label="UF" value={uf} emptyValue="" options={ufs} onChange={setUf} testId="emendas-por-autor-filtro-uf" />
+        <CarteiraFilterButton
+          label="Mostrar"
+          value={mostrar}
+          emptyValue=""
+          options={[{ value: 'todos', label: 'Também quem não tem pedido', count: semPedido }]}
+          onChange={setMostrar}
+          testId="emendas-por-autor-filtro-mostrar"
+        />
       </CarteiraFilterBar>
 
       <AdminListShell
@@ -132,6 +153,7 @@ export const EmendasPorAutorPage: React.FC = () => {
           data={filtradas}
           keyExtractor={(l) => l.autorId ?? 'a-definir'}
           columns={colunas}
+          canExpand={(l) => l.pedidos.length > 0}
           renderExpanded={(l) => (
             <div style={{ padding: '0.4rem 0' }} data-testid={`emendas-por-autor-detalhe-${l.autorId ?? 'a-definir'}`}>
               <DataTable

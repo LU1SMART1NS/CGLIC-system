@@ -22,8 +22,7 @@ import {
   ScrollText,
   ClipboardList,
   PackageOpen,
-  Building,
-  UserSquare
+  Building
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -69,7 +68,7 @@ export interface NavItem {
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Emendas: Pedidos · Itens da CAEP · Por autor · Kits · Beneficiários · Autores (CAEP reparte a sua alocação entre parlamentares; migration 155)
+ * - Emendas: Pedidos · Itens da CAEP · Por autor · Kits · Beneficiários (CAEP reparte a sua alocação entre parlamentares; migration 155)
  * - Ajustes (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
@@ -271,15 +270,6 @@ export const navigationConfig: NavItem[] = [
         route: '/emendas/beneficiarios',
         status: 'active',
         matchPrefixes: ['/emendas/beneficiarios'],
-        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
-      },
-      {
-        id: 'emendas-autores',
-        label: 'Autores',
-        icon: UserSquare,
-        route: '/emendas/autores',
-        status: 'active',
-        matchPrefixes: ['/emendas/autores'],
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       }
     ]

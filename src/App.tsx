@@ -47,7 +47,6 @@ const EmendasPorItemPage = lazyComRecarga(() => import('./components/emendas/Eme
 const EmendasPorAutorPage = lazyComRecarga(() => import('./components/emendas/EmendasPorAutorPage').then((m) => ({ default: m.EmendasPorAutorPage })));
 const EmendasKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasKitsPage').then((m) => ({ default: m.EmendasKitsPage })));
 const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasBeneficiariosPage').then((m) => ({ default: m.EmendasBeneficiariosPage })));
-const EmendasAutoresPage = lazyComRecarga(() => import('./components/emendas/EmendasAutoresPage').then((m) => ({ default: m.EmendasAutoresPage })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
 const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
@@ -430,14 +429,8 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
-            <Route
-              path="/emendas/autores"
-              element={
-                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
-                  <EmendasAutoresPage />
-                </RequireRole>
-              }
-            />
+            {/* A aba Autores saiu do menu: a consulta de quem não tem pedido ficou em Por autor. */}
+            <Route path="/emendas/autores" element={<LegacyRouteRedirect to="/emendas/por-autor" />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
