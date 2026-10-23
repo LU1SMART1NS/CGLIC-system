@@ -586,3 +586,49 @@ export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
   const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('v_emendas_reservado_por_item').select('item_key, reservado').order('item_key').range(de, ate));
   return new Map(linhas.map((r) => [r.item_key as string, num(r.reservado)]));
 }
+
+/** Como a nota da linha foi achada pelo plano interno da nota (migration 164). */
+export type RegraDaNota = 'CONTRATO' | 'ITEM' | 'AUTOR';
+/** Por que a linha empenhada ainda não tem nota. */
+export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA';
+
+export interface NotaDaLinha {
+  linhaId: string;
+  nota: string | null;
+  regra: RegraDaNota | null;
+  motivo: MotivoSemNota | null;
+  contractKey: string | null;
+  empenhoId: string | null;
+  valorEmpenhado: number | null;
+  valorLiquidado: number | null;
+  valorPago: number | null;
+  entregaPrevista: string | null;
+  entregaPrevistaValor: number | null;
+  atualizadoEm: string | null;
+}
+
+const numOuNulo = (v: unknown) => (v == null ? null : num(v));
+
+/** Nota de empenho e execução de cada linha empenhada, refeitas de hora em hora (migration 164). */
+export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_linha_notas').select('*').order('linha_id').range(de, ate));
+  return new Map(
+    linhas.map((r) => [
+      r.linha_id as string,
+      {
+        linhaId: r.linha_id,
+        nota: r.nota ?? null,
+        regra: r.regra ?? null,
+        motivo: r.motivo ?? null,
+        contractKey: r.contract_key ?? null,
+        empenhoId: r.empenho_id ?? null,
+        valorEmpenhado: numOuNulo(r.valor_empenhado),
+        valorLiquidado: numOuNulo(r.valor_liquidado),
+        valorPago: numOuNulo(r.valor_pago),
+        entregaPrevista: r.entrega_prevista ?? null,
+        entregaPrevistaValor: numOuNulo(r.entrega_prevista_valor),
+        atualizadoEm: r.atualizado_em ?? null
+      }
+    ])
+  );
+}

@@ -22,7 +22,8 @@ import {
   useKitsEmendas,
   usePedidosEmendas,
   usePodeGerirEmendas,
-  usePodeVerContratos
+  usePodeVerContratos,
+  useNotasDasLinhas
 } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
@@ -42,10 +43,13 @@ import {
   ultimoContatoPorAutor,
   valorDaLinha,
   valorDoPedido,
+  execucaoDoPedido,
   type AvisoPedido
 } from '../../utils/emendasPedidos';
-import type { AutorEmenda, BeneficiarioEmenda, EtapaPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
-import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, LinhaDoPedido } from './emendasPartes';
+import type { AutorEmenda, BeneficiarioEmenda, EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
+
+const SEM_NOTAS = new Map<string, NotaDaLinha>();
+import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, ExecucaoDoPedidoResumo, LinhaDoPedido } from './emendasPartes';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
@@ -129,6 +133,7 @@ interface DetalheProps {
   p: Linha;
   itens: Map<string, ItemCaep>;
   beneficiarios: Map<string, BeneficiarioEmenda>;
+  notas: Map<string, NotaDaLinha>;
   podeGerir: boolean;
   podeVerContratos: boolean;
   hoje: string;
@@ -136,7 +141,7 @@ interface DetalheProps {
   onAlterar: () => void;
 }
 
-const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
+const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
   // Reserva para um órgão (migration 163): antes da minuta, a CAEP indica o parlamentar que assumiu.
   const semAutor = !p.autorId;
   const prox = semAutor ? null : proximaAcao(p.etapa);
@@ -167,7 +172,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
       render: (l) => <BeneficiarioDaLinha linha={l} beneficiarios={beneficiarios} />
     },
     { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => formatCurrency(valorDaLinha(l, itens)) },
-    { key: 'ne', header: 'Empenho e contrato', nowrap: true, render: (l) => <EmpenhoDaLinha linha={l} podeVerContratos={podeVerContratos} /> }
+    { key: 'ne', header: 'Empenho e contrato', nowrap: true, render: (l) => <EmpenhoDaLinha linha={l} achada={notas.get(l.id)} podeVerContratos={podeVerContratos} /> }
   ];
   const canceladas = p.linhas.filter((l) => l.cancelada);
   return (
@@ -179,11 +184,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
             {canceladas.length} {canceladas.length === 1 ? 'linha tirada' : 'linhas tiradas'} do pedido: {canceladas.map((l) => l.canceladaMotivo).filter(Boolean).join('; ')}
           </div>
         )}
-        {p.etapa === 'EMPENHADO' && (
-          <div style={{ fontSize: '0.8rem', color: 'var(--color-info-text, #155bcb)', background: 'var(--color-info-bg, #e6eefb)', borderRadius: 6, padding: '0.5rem 0.7rem', fontWeight: 600 }}>
-            {p.empenhadoEm ? `Com a CCGA desde ${dataBR(p.empenhadoEm)}.` : 'Com a CCGA.'} A entrega ao beneficiário será registrada pelo módulo de Fiscalização.
-          </div>
-        )}
+        {p.etapa === 'EMPENHADO' && <ExecucaoDoPedidoResumo execucao={execucaoDoPedido(p, notas)} />}
         {semAutor && (
           <div style={{ fontSize: '0.8rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: 6, padding: '0.5rem 0.7rem', fontWeight: 600 }}>
             Reserva feita a pedido do órgão, ainda sem parlamentar. Quando um parlamentar ou bancada assumir, use "Indicar o parlamentar" para seguir com a minuta.
@@ -222,6 +223,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
  */
 export const EmendasPedidosPage: React.FC = () => {
   const { data: pedidos = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = usePedidosEmendas();
+  const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
   const { data: itensLista = [], isLoading: carregandoItens } = useItensCaep();
   const { data: autores = [] } = useAutoresEmendas();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
@@ -239,7 +241,7 @@ export const EmendasPedidosPage: React.FC = () => {
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
   const beneficiarios = useMemo(() => new Map(beneficiariosLista.map((b) => [b.id, b])), [beneficiariosLista]);
   const nomeDoBeneficiario = (id: string) => beneficiarios.get(id)?.nomeCurto;
-  const linhas: Linha[] = useMemo(() => pedidos.map((p) => ({ ...p, valor: valorDoPedido(p, itens), avisos: avisosDoPedido(p, itens, hoje) })), [pedidos, itens, hoje]);
+  const linhas: Linha[] = useMemo(() => pedidos.map((p) => ({ ...p, valor: valorDoPedido(p, itens), avisos: avisosDoPedido(p, itens, hoje, notas) })), [pedidos, itens, hoje, notas]);
 
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todos: 0, CANCELADO: 0 };
@@ -387,7 +389,8 @@ export const EmendasPedidosPage: React.FC = () => {
             { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
             { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
             { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
-            { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') }
+            { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') },
+            { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') }
           ]}
           onChange={setFiltroAviso}
           testId="emendas-pedidos-filtro-aviso"
@@ -417,6 +420,7 @@ export const EmendasPedidosPage: React.FC = () => {
               p={l}
               itens={itens}
               beneficiarios={beneficiarios}
+              notas={notas}
               podeGerir={podeGerir}
               podeVerContratos={podeVerContratos}
               hoje={hoje}
