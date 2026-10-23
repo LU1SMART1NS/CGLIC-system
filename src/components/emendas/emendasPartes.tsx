@@ -5,19 +5,32 @@ import { carteiraDescricaoItem, carteiraIdentificacao, carteiraSubtitle } from '
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
-import { chaveDoContratoDaEmenda } from '../../utils/emendasPedidos';
+import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda } from '../../utils/emendasPedidos';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, LinhaPedido } from '../../services/emendasService';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
-/** Autor em duas linhas: nome e "Deputado · PL · RJ". */
-export const AutorDoPedido: React.FC<{ autor: AutorEmenda | undefined; autorId: string }> = ({ autor, autorId }) => (
-  <>
-    <div style={{ fontWeight: 600 }}>{autor?.nome ?? autorId}</div>
-    {autor && <div style={carteiraSubtitle}>{[TIPO[autor.tipo], autor.partido, autor.uf].filter(Boolean).join(' · ')}</div>}
-  </>
-);
+/**
+ * Autor em duas linhas: nome e "Deputado · PL · RJ". Sem autor (reserva para um órgão, migration 163): "Parlamentar a
+ * definir" e, embaixo, para qual órgão a CAEP separou.
+ */
+export const AutorDoPedido: React.FC<{ autor: AutorEmenda | undefined; autorId: string | null; orgao?: string | null; destaque?: boolean }> = ({ autor, autorId, orgao, destaque }) => {
+  const nome: React.CSSProperties = destaque ? carteiraIdentificacao : { fontWeight: 600 };
+  if (!autorId)
+    return (
+      <>
+        <div style={{ ...nome, color: 'var(--color-warning-text)' }}>{AUTOR_A_DEFINIR}</div>
+        <div style={carteiraSubtitle}>{orgao ? `Reserva para ${orgao}` : 'Reserva para um órgão'}</div>
+      </>
+    );
+  return (
+    <>
+      <div style={nome}>{autor?.nome ?? autorId}</div>
+      {autor && <div style={carteiraSubtitle}>{[TIPO[autor.tipo], autor.partido, autor.uf].filter(Boolean).join(' · ')}</div>}
+    </>
+  );
+};
 
 const ataEmCinza: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 700 };
 

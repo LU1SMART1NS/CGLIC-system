@@ -96,9 +96,22 @@ export function chaveDoContratoDaEmenda(numero: string | null): string | null {
 export function ultimoContatoPorAutor(pedidos: PedidoEmenda[]): Map<string, Pick<PedidoEmenda, 'contatoNome' | 'contatoTelefone' | 'contatoEmail'>> {
   const m = new Map<string, Pick<PedidoEmenda, 'contatoNome' | 'contatoTelefone' | 'contatoEmail'>>();
   for (const p of [...pedidos].sort((a, b) => (a.atualizadoEm ?? a.reservadoEm).localeCompare(b.atualizadoEm ?? b.reservadoEm))) {
-    if (p.contatoNome || p.contatoTelefone || p.contatoEmail) m.set(p.autorId, { contatoNome: p.contatoNome, contatoTelefone: p.contatoTelefone, contatoEmail: p.contatoEmail });
+    if (p.autorId && (p.contatoNome || p.contatoTelefone || p.contatoEmail)) m.set(p.autorId, { contatoNome: p.contatoNome, contatoTelefone: p.contatoTelefone, contatoEmail: p.contatoEmail });
   }
   return m;
+}
+
+/** Nome mostrado no lugar do autor na reserva para um órgão (migration 163). */
+export const AUTOR_A_DEFINIR = 'Parlamentar a definir';
+
+/** Reserva feita a pedido de um órgão (o beneficiário final), ainda sem parlamentar. */
+export const eReservaParaOrgao = (p: Pick<PedidoEmenda, 'autorId'>): boolean => !p.autorId;
+
+/** Órgão(s) para quem a reserva sem autor foi feita: os beneficiários das linhas (cadastro ou nome da planilha). */
+export function orgaoDoPedido(p: PedidoEmenda, nomeDoBeneficiario: (id: string) => string | undefined): string | null {
+  const nomes = [...new Set(linhasAtivas(p).map((l) => (l.beneficiarioId ? nomeDoBeneficiario(l.beneficiarioId) : null) ?? l.beneficiarioNome).filter((n): n is string => Boolean(n)))];
+  if (nomes.length === 0) return null;
+  return nomes.length === 1 ? nomes[0] : `${nomes[0]} e mais ${nomes.length - 1}`;
 }
 
 export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'aConferir';
@@ -137,7 +150,7 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
   const avisos: AvisoPedido[] = [];
   if (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA') {
     const dias = diasEntre(p.reservadoEm, hoje);
-    if (dias > AVISO_SEM_OFICIO_DIAS) avisos.push({ tipo: 'semOficio', texto: `${dias} dias sem ofício` });
+    if (dias > AVISO_SEM_OFICIO_DIAS) avisos.push({ tipo: 'semOficio', texto: p.autorId ? `${dias} dias sem ofício` : `${dias} dias sem parlamentar` });
   }
   if (p.etapa === 'OFICIO' && p.divergencia) avisos.push({ tipo: 'divergencia', texto: 'Divergência com o SIOP' });
   const aConferir = linhasAtivas(p).filter((l) => l.aConferir).length;
