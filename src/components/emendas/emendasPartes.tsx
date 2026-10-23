@@ -7,9 +7,10 @@ import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
 import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ROTULO_MOTIVO_SEM_NOTA, ROTULO_REGRA_DA_NOTA, type ExecucaoDoPedido } from '../../utils/emendasPedidos';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
+import { orgaoAbaixoDoNome } from '../../utils/emendasBeneficiarios';
 import { formatCurrency } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, LinhaPedido, NotaDaLinha } from '../../services/emendasService';
+import { localDoBeneficiario, rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
@@ -91,18 +92,20 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
 };
 
 /**
- * Beneficiário da linha: o cadastrado (com CNPJ) ou, na carga das planilhas (migration 160), o nome como veio, com o
- * aviso de que falta cadastrar.
+ * Beneficiário da linha: o nome, embaixo o órgão e embaixo Cidade - UF (migration 166). Linha só com o nome da
+ * planilha (antes do cadastro) mostra o nome e "A cadastrar".
  */
 export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId' | 'beneficiarioNome'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
   const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
   if (b) {
+    const local = localDoBeneficiario(b);
+    const orgao = orgaoAbaixoDoNome(b, rotuloBeneficiario(b));
     return (
       <>
-        <div style={{ fontWeight: 600 }}>{b.nomeCurto}</div>
-        <div style={carteiraSubtitle}>
-          {b.entregaMunicipio}/{b.entregaUf}
-        </div>
+        <div style={{ fontWeight: 600 }}>{rotuloBeneficiario(b)}</div>
+        {orgao && <div style={carteiraSubtitle}>{orgao}</div>}
+        {local && <div style={carteiraSubtitle}>{local}</div>}
+        {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
       </>
     );
   }

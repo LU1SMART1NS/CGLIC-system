@@ -2,11 +2,23 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../services/supabaseClient', () => ({ supabase: null }));
 
-import { linkDoWhatsapp, pendenciasDoBeneficiario, type FormularioBeneficiario } from '../emendasBeneficiarios';
-import { cnpjValido, consultarCep, consultarCnpj } from '../../services/emendasService';
+import {
+  beneficiarioRepetido,
+  chaveDaIdentidade,
+  chaveDoNome,
+  faltasDoBeneficiario,
+  linkDoWhatsapp,
+  orgaoAbaixoDoNome,
+  paresParecidos,
+  parecidosCom,
+  pendenciasDoBeneficiario,
+  saoParecidos,
+  type FormularioBeneficiario
+} from '../emendasBeneficiarios';
+import { cnpjValido, consultarCep, consultarCnpj, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
 
-const receita = { cnpj: '00394494000136', razaoSocial: 'MJSP' } as any;
 const ok: FormularioBeneficiario = {
+  nome: 'Ministério da Justiça e Segurança Pública',
   nomeCurto: 'MJSP',
   orgao: 'Polícia Militar',
   entregaCep: '70064-900',
@@ -21,26 +33,108 @@ const ok: FormularioBeneficiario = {
   responsavelTelefone: '(61) 99999-0000',
   responsavelEmail: 'fulano@mj.gov.br'
 };
+const vazio: FormularioBeneficiario = Object.fromEntries(Object.keys(ok).map((k) => [k, ''])) as unknown as FormularioBeneficiario;
+
+const ben = (id: string, nome: string, municipio: string | null, uf: string | null, extra: Partial<BeneficiarioEmenda> = {}): BeneficiarioEmenda =>
+  ({ id, nome, nomeCurto: null, entregaMunicipio: municipio, entregaUf: uf, outrosNomes: [], ativo: true, cnpj: null, entregaCep: null, entregaLogradouro: null, responsavelNome: null, ...extra }) as BeneficiarioEmenda;
 
 const json = (corpo: unknown, status = 200) => new Response(JSON.stringify(corpo), { status });
 
 describe('pendenciasDoBeneficiario', () => {
   it('completo não tem pendência', () => {
-    expect(pendenciasDoBeneficiario(receita, ok)).toEqual([]);
+    expect(pendenciasDoBeneficiario(ok)).toEqual([]);
   });
 
-  it('aponta o que falta, inclusive a busca na Receita', () => {
-    expect(pendenciasDoBeneficiario(null, { ...ok, entregaNumero: '', entregaUf: 'XX', responsavelTelefone: '9999', responsavelEmail: 'fulano' })).toEqual([
-      'busque o CNPJ na Receita',
-      'número (use S/N se não houver)',
-      'UF',
+  it('só o nome é obrigatório', () => {
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil' })).toEqual([]);
+    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome do beneficiário']);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ' })).toEqual(['nome do beneficiário']);
+  });
+
+  it('o que vier preenchido vem certo', () => {
+    expect(pendenciasDoBeneficiario({ ...ok, entregaCep: '7006', entregaUf: 'XX', responsavelTelefone: '9999', responsavelEmail: 'fulano' })).toEqual([
+      'CEP com 8 números',
+      'UF válida',
       'telefone com DDD (10 ou 11 números)',
       'e-mail válido'
     ]);
   });
+});
 
-  it('pede o órgão do Anexo', () => {
-    expect(pendenciasDoBeneficiario(receita, { ...ok, orgao: '' })).toEqual(['órgão']);
+describe('faltasDoBeneficiario', () => {
+  it('aponta CNPJ, endereço e contato que faltam', () => {
+    expect(faltasDoBeneficiario(ben('1', 'X', 'Limeira', 'SP'))).toEqual(['CNPJ', 'endereço', 'contato']);
+    expect(faltasDoBeneficiario(ben('1', 'X', null, null, { cnpj: '00394494000136', entregaCep: '70064900', entregaLogradouro: 'Rua', responsavelNome: 'Fulano' }))).toEqual([]);
+  });
+});
+
+describe('chave do nome', () => {
+  it('é a mesma conta do banco (chave_nome_beneficiario)', () => {
+    // Saída do banco no ensaio: 'policia militar estado sao paulo 4o batalhao policiamento choque 4o bpchq'
+    expect(chaveDoNome('Polícia Militar do Estado de São Paulo 4º Batalhão de Policiamento de Choque - 4ºBPChq')).toBe('policia militar estado sao paulo 4o batalhao policiamento choque 4o bpchq');
+    expect(chaveDoNome('Secretaria de Estado da Polícia Militar-RJ')).toBe(chaveDoNome('Secretaria de Estado de Polícia Militar - RJ'));
+    expect(chaveDoNome('13° Grupamento')).toBe(chaveDoNome('13º Grupamento'));
+  });
+
+  it('identidade = nome + cidade + UF, igual à grafia da planilha', () => {
+    expect(chaveDaIdentidade('Corpo de Bombeiros Militar do Estado de São Paulo 16° Grupamento', 'Limeira', 'SP')).toBe(
+      chaveDoNome('Corpo de Bombeiros Militar do Estado de São Paulo 16º Grupamento (Cidade de Limeira - SP)')
+    );
+  });
+});
+
+describe('repetidos e parecidos', () => {
+  const lista = [
+    ben('a', 'Polícia Militar do Estado de São Paulo BPM', 'Mairinque', 'SP'),
+    ben('b', 'Polícia Militar do Estado de São Paulo BPM', 'Colômbia', 'SP'),
+    ben('c', 'Polícia Militar do Estado de São Paulo', 'Mairinque', 'SP'),
+    ben('d', 'Polícia Militar - SP 5º Batalhão de Polícia Militar Metropolitano', 'São Paulo', 'SP'),
+    ben('e', 'Polícia Militar - SP 9º Batalhão de Polícia Militar Metropolitano', 'São Paulo', 'SP'),
+    ben('f', 'Corpo de Bombeiros Militar', null, 'BA'),
+    ben('g', 'Corpo de Bombeiros Militar', null, 'PA'),
+    ben('h', 'Guarda Municipal de Teste', null, 'SP', { outrosNomes: ['Guarda Municipal de Teste (Cidade de Itu - SP)'] })
+  ];
+
+  it('mesmo nome na mesma cidade é repetido; em outra cidade, não', () => {
+    expect(beneficiarioRepetido(lista, 'POLICIA MILITAR DO ESTADO DE SAO PAULO - BPM', 'Mairinque', 'sp')?.id).toBe('a');
+    expect(beneficiarioRepetido(lista, 'Polícia Militar do Estado de São Paulo BPM', 'Itu', 'SP')).toBeUndefined();
+    expect(beneficiarioRepetido(lista, 'Polícia Militar do Estado de São Paulo BPM', 'Mairinque', 'SP', 'a')).toBeUndefined();
+  });
+
+  it('grafia guardada também conta como repetido', () => {
+    expect(beneficiarioRepetido(lista, 'Guarda Municipal de Teste', 'Itu', 'SP')?.id).toBe('h');
+  });
+
+  it('parecido: mesmos números, mesmo lugar, mais de 3/4 das palavras', () => {
+    expect(saoParecidos(lista[0], lista[2])).toBe(true);
+    expect(saoParecidos(lista[0], lista[1])).toBe(false); // cidades diferentes
+    expect(saoParecidos(lista[3], lista[4])).toBe(false); // 5º e 9º
+    expect(saoParecidos(lista[5], lista[6])).toBe(false); // UFs diferentes
+    expect(saoParecidos(lista[5], ben('z', 'Corpo de Bombeiros Militar de Alagoas', null, null))).toBe(false); // 3 de 4 palavras não basta
+  });
+
+  it('pares sem os marcados como diferentes', () => {
+    expect(paresParecidos(lista, []).map(([x, y]) => x.id + y.id)).toEqual(['ac']);
+    expect(paresParecidos(lista, [{ aId: 'a', bId: 'c' }])).toEqual([]);
+    expect(paresParecidos(lista.map((b) => (b.id === 'c' ? { ...b, ativo: false } : b)), [])).toEqual([]);
+  });
+
+  it('parecidos com o nome digitado', () => {
+    expect(parecidosCom(lista, 'Polícia Militar do Estado de São Paulo BPM', 'Mairinque', 'SP').map((b) => b.id)).toEqual(['a', 'c']);
+    expect(parecidosCom(lista, 'PM', '', '')).toEqual([]);
+  });
+
+  it('órgão só aparece quando não repete o nome', () => {
+    expect(orgaoAbaixoDoNome({ nome: 'Polícia Civil', nomeCurto: null, orgao: 'Polícia Civil' }, 'Polícia Civil')).toBeNull();
+    expect(orgaoAbaixoDoNome({ nome: '10º BPM (PMCE)', nomeCurto: null, orgao: 'Polícia Militar' }, '10º BPM (PMCE)')).toBe('Polícia Militar');
+  });
+
+  it('rótulo e local', () => {
+    expect(rotuloBeneficiario({ nome: 'Corpo de Bombeiros', nomeCurto: ' ' })).toBe('Corpo de Bombeiros');
+    expect(rotuloBeneficiario({ nome: 'Corpo de Bombeiros', nomeCurto: '14º GB' })).toBe('14º GB');
+    expect(localDoBeneficiario({ entregaMunicipio: 'Limeira', entregaUf: 'SP' })).toBe('Limeira - SP');
+    expect(localDoBeneficiario({ entregaMunicipio: null, entregaUf: 'RJ' })).toBe('RJ');
+    expect(localDoBeneficiario({ entregaMunicipio: null, entregaUf: null })).toBeNull();
   });
 });
 

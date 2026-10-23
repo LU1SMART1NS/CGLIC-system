@@ -7,7 +7,7 @@
  * preço que não é o de hoje ganha uma nota (¹, ², ...). Quando o pedido mistura investimento e custeio, sai o total de
  * cada GND antes do TOTAL A EMPENHAR (no SIOP cada emenda tem um só GND).
  */
-import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, LinhaPedido } from '../services/emendasService';
+import { localDoBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido } from '../services/emendasService';
 import type { GndItem, PrecoPrevisto } from '../services/emendasQuadroService';
 import { descricaoItemEmFrase } from './textCase';
 import { dataBR } from './emendasKits';
@@ -151,8 +151,8 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
         descricao: nomeDoItem(item, p.itemKey),
         kit: p.kit,
         orgao: ben?.orgao ?? null,
-        beneficiario: ben?.razaoSocial ?? l.beneficiarioNome ?? null,
-        municipio: ben ? `${ben.entregaMunicipio} - ${ben.entregaUf}` : null,
+        beneficiario: ben ? ben.razaoSocial ?? ben.nome : l.beneficiarioNome ?? null,
+        municipio: ben ? localDoBeneficiario(ben) : null,
         quantidade: p.quantidade,
         unitario,
         hoje,
