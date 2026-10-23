@@ -7,7 +7,7 @@ import { useToast } from '../../design-system/components/Toast';
 import { useSalvarKit } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { AVISO_VENCIMENTO_DIAS, buscarItensCaep, calcularKit, dataBR, rotuloItemDaAta, sugestoesDeTroca } from '../../utils/emendasKits';
+import { avisoIndicacaoDias, buscarItensCaep, calcularKit, dataBR, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta, sugestoesDeTroca } from '../../utils/emendasKits';
 import type { ItemCaep, ItemDoKit, KitEmenda } from '../../services/emendasService';
 
 interface Props {
@@ -119,8 +119,19 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, s
                         ? [ataItem(item), `saldo ${formatNumber(c?.saldo ?? 0)}`, item.ataEncerrada ? null : `dá para ${formatNumber(c?.kits ?? 0)} kits`, formatCurrency(item.valorUnitario)].filter(Boolean).join(' · ')
                         : l.itemKey}
                     </div>
-                    {item && !item.ataEncerrada && c?.diasParaVencer != null && c.diasParaVencer <= AVISO_VENCIMENTO_DIAS && (
-                      <div style={{ ...aviso('atencao'), marginTop: '0.35rem' }}>A ata vence em {dataBR(item.vigenciaFinal)} ({c.diasParaVencer} dias).</div>
+                    {item && !item.ataEncerrada && passouDoCorte(c?.diasParaVencer ?? null) ? (
+                      <div style={{ ...aviso('atencao'), marginTop: '0.35rem' }}>
+                        A ata termina em {dataBR(item.vigenciaFinal)} ({c?.diasParaVencer} dias): passou do prazo de indicação. Troque este item.
+                      </div>
+                    ) : (
+                      item &&
+                      !item.ataEncerrada &&
+                      c?.diasParaVencer != null &&
+                      c.diasParaVencer <= avisoIndicacaoDias() && (
+                        <div style={{ ...aviso('atencao'), marginTop: '0.35rem' }}>
+                          A ata vence em {dataBR(item.vigenciaFinal)} ({c.diasParaVencer} dias): indicação só até {dataBR(limiteDaIndicacao(item.vigenciaFinal!))}.
+                        </div>
+                      )
                     )}
                     {(!item || item.ataEncerrada) && (
                       <div style={{ ...aviso('atencao'), marginTop: '0.35rem' }}>

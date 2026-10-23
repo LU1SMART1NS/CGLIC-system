@@ -90,3 +90,15 @@ describe('pedidos que vieram das planilhas da CAEP (migration 160)', () => {
     expect(chaveDoContratoDaEmenda(null)).toBeNull();
   });
 });
+
+describe('prazo de indicação nos pedidos (migration 162)', () => {
+  it('antes do empenho, ata a menos de 35 dias pede confirmação com a CCGA; o aviso de 60 dias fala do contrato', () => {
+    const its = new Map([item('t', { numeroAta: '00003/2026', vigenciaFinal: '2026-11-22' }), item('q', { numeroAta: '00002/2026', vigenciaFinal: '2026-12-02' })].map((i) => [i.itemKey, i]));
+    const p = pedido({ etapa: 'OFICIO', linhas: [linha({ itemKey: 'q' }), linha({ itemKey: 't' })] });
+    const a = avisosDoPedido(p, its, HOJE);
+    expect(a[0].tipo).toBe('ataNoCorte');
+    expect(a[0].texto).toContain('passou do prazo de indicação (35 dias); confirmar com a CCGA');
+    expect(avisosDoPedido(pedido({ etapa: 'OFICIO', linhas: [linha({ itemKey: 'q' })] }), its, HOJE)[0].texto).toBe('Ata 00002/2026 vence em 40 dias (02/12/2026): contrato assinado até lá');
+    expect(avisosDoPedido(pedido({ etapa: 'EMPENHADO', linhas: [linha({ itemKey: 't' })] }), its, HOJE)).toEqual([]);
+  });
+});

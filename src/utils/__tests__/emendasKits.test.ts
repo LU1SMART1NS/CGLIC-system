@@ -90,3 +90,20 @@ describe('buscarItensCaep', () => {
     expect(buscarItensCaep(lista, '  ')).toHaveLength(3);
   });
 });
+
+describe('prazo de indicação (migration 162)', () => {
+  it('a menos de 35 dias do fim da ata o kit fica indisponível; entre 35 e 60, vence em breve com a data limite', async () => {
+    const { EMENDAS_RULES } = await import('../../config/alertRules');
+    const kit = { ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }] };
+    const r30 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2026-11-22' })), HOJE);
+    expect(r30).toMatchObject({ situacao: 'indisponivel', kitsPossiveis: 0 });
+    expect(r30.motivo).toContain('passou do prazo de indicação (35 dias');
+    const r40 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2026-12-02' })), HOJE);
+    expect(r40.situacao).toBe('vence');
+    expect(r40.motivo).toContain('Indicação só até 28/10/2026');
+    // Ajustes muda o corte na hora
+    EMENDAS_RULES.corteIndicacaoAntesDias = 45;
+    expect(calcularKit(kit, mapa(item('a', { vigenciaFinal: '2026-12-02' })), HOJE).situacao).toBe('indisponivel');
+    EMENDAS_RULES.corteIndicacaoAntesDias = 35;
+  });
+});

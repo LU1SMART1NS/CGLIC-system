@@ -3,7 +3,7 @@
  * linha ocupa e avisos (30 dias sem ofício, divergência com o SIOP, ata vencendo ou vencida antes do empenho).
  */
 import type { AcaoPedido, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, PedidoEmenda } from '../services/emendasService';
-import { AVISO_VENCIMENTO_DIAS, dataBR, diasEntre } from './emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from './emendasKits';
 import { chaveDoContrato } from './contractKeyUtils';
 
 /** Dias de reserva sem ofício até o aviso (decisão de 23/10/2026). */
@@ -101,7 +101,7 @@ export function ultimoContatoPorAutor(pedidos: PedidoEmenda[]): Map<string, Pick
   return m;
 }
 
-export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataVencendo' | 'aConferir';
+export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'aConferir';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -118,11 +118,18 @@ export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, I
     .filter((i): i is ItemCaep => Boolean(i?.vigenciaFinal));
   const vencida = doItem.find((i) => i.ataEncerrada);
   if (vencida) return { tipo: 'ataVencida', texto: `Ata ${vencida.numeroAta} encerrada em ${dataBR(vencida.vigenciaFinal)}: não dá para empenhar`, linhaId: l.id };
-  const vencendo = doItem
-    .map((i) => ({ i, d: diasEntre(hoje, i.vigenciaFinal!) }))
-    .filter((x) => x.d <= AVISO_VENCIMENTO_DIAS)
-    .sort((a, b) => a.d - b.d)[0];
-  if (vencendo) return { tipo: 'ataVencendo', texto: `Ata ${vencendo.i.numeroAta} vence em ${vencendo.d} dias (${dataBR(vencendo.i.vigenciaFinal)}): empenhar até lá`, linhaId: l.id };
+  const prazos = doItem.map((i) => ({ i, d: diasEntre(hoje, i.vigenciaFinal!) })).sort((a, b) => a.d - b.d);
+  // O limite é o contrato assinado antes do fim da ata (decisão de 23/10/2026), não o empenho.
+  const noCorte = prazos.find((x) => passouDoCorte(x.d));
+  if (noCorte) {
+    return {
+      tipo: 'ataNoCorte',
+      texto: `Ata ${noCorte.i.numeroAta} termina em ${noCorte.d} dias (${dataBR(noCorte.i.vigenciaFinal)}): passou do prazo de indicação (${corteIndicacaoDias()} dias); confirmar com a CCGA se ainda dá para contratar`,
+      linhaId: l.id
+    };
+  }
+  const vencendo = prazos.find((x) => x.d <= avisoIndicacaoDias());
+  if (vencendo) return { tipo: 'ataVencendo', texto: `Ata ${vencendo.i.numeroAta} vence em ${vencendo.d} dias (${dataBR(vencendo.i.vigenciaFinal)}): contrato assinado até lá`, linhaId: l.id };
   return null;
 }
 
@@ -140,7 +147,10 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
     .filter((a): a is AvisoPedido => Boolean(a));
   const vencida = atas.find((a) => a.tipo === 'ataVencida');
   if (vencida) avisos.push({ ...vencida, texto: `${vencida.texto.split(':')[0]}: trocar o item ou tirar a linha` });
-  else if (atas.length) avisos.push(atas.sort((a, b) => a.texto.localeCompare(b.texto))[0]);
+  else if (atas.length) {
+    const prioridade = (a: AvisoPedido) => (a.tipo === 'ataNoCorte' ? 0 : 1);
+    avisos.push(atas.sort((a, b) => prioridade(a) - prioridade(b) || a.texto.localeCompare(b.texto))[0]);
+  }
   return avisos;
 }
 

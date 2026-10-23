@@ -115,6 +115,16 @@ describe('parametrização das regras', () => {
     expect(errors['pagamento.criticoAteDiasUteis']).toMatch(/entre/);
     expect(errors['vigencia.faixaCriticoAteDias']).toMatch(/inteiro/);
   });
+
+  it('emendas: padrão 60/35, o corte vem antes do aviso e Ajustes sobrepõe', () => {
+    const base = getAlertRuleValues();
+    expect(base['emendas.avisoIndicacaoAntesDias']).toBe(60);
+    expect(base['emendas.corteIndicacaoAntesDias']).toBe(35);
+    expect(validateAlertRuleValues({ ...base, 'emendas.corteIndicacaoAntesDias': 60 })['emendas.avisoIndicacaoAntesDias']).toMatch(/antes do corte/);
+    applyAlertRuleOverrides({ 'emendas.corteIndicacaoAntesDias': 40 });
+    expect(getAlertRuleValues()['emendas.corteIndicacaoAntesDias']).toBe(40);
+    applyAlertRuleOverrides({});
+  });
 });
 
 import { formatStatusVigencia } from '../../utils/statusVigencia';
