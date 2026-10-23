@@ -6,11 +6,9 @@ import {
   beneficiarioRepetido,
   chaveDaIdentidade,
   chaveDoNome,
-  cnpjProprio,
   faltasDoBeneficiario,
   linkDoWhatsapp,
   naturezaNaoPublica,
-  orgaoAbaixoDoNome,
   paresParecidos,
   parecidosCom,
   pendenciasDoBeneficiario,
@@ -22,7 +20,6 @@ import { cnpjValido, consultarCep, consultarCnpj, localDoBeneficiario, rotuloBen
 const ok: FormularioBeneficiario = {
   nome: 'MJSP',
   sigla: '',
-  orgao: 'Polícia Militar',
   entregaCep: '70064-900',
   entregaLogradouro: 'Esplanada dos Ministérios Bloco T',
   entregaNumero: 'S/N',
@@ -71,14 +68,6 @@ describe('naturezaNaoPublica', () => {
     expect(naturezaNaoPublica('Município')).toBe(false);
     expect(naturezaNaoPublica('Autarquia Estadual ou do Distrito Federal')).toBe(false);
     expect(naturezaNaoPublica(null)).toBe(false);
-  });
-});
-
-describe('cnpjProprio', () => {
-  it('filial da unidade é CNPJ próprio; matriz do órgão não', () => {
-    expect(cnpjProprio('04198514000235')).toBe(true);
-    expect(cnpjProprio('04198514000154')).toBe(false);
-    expect(cnpjProprio(null)).toBe(false);
   });
 });
 
@@ -143,11 +132,6 @@ describe('repetidos e parecidos', () => {
   it('parecidos com o nome digitado', () => {
     expect(parecidosCom(lista, 'Polícia Militar do Estado de São Paulo BPM', 'Mairinque', 'SP').map((b) => b.id)).toEqual(['a', 'c']);
     expect(parecidosCom(lista, 'PM', '', '')).toEqual([]);
-  });
-
-  it('órgão só aparece quando não repete o nome', () => {
-    expect(orgaoAbaixoDoNome({ orgao: 'Polícia Civil' }, 'Polícia Civil')).toBeNull();
-    expect(orgaoAbaixoDoNome({ orgao: 'Polícia Militar' }, '10º BPM (PMCE)')).toBe('Polícia Militar');
   });
 
   it('rótulo e local', () => {

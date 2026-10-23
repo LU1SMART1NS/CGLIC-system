@@ -1,25 +1,12 @@
 /**
  * Quadro da reserva para o gabinete (migration 165): o que a CAEP copia para o SEI ou para o WhatsApp no formato do
- * Anexo (DESCRIÇÃO ITEM · ÓRGÃO · BENEFICIÁRIO FINAL · MUNICÍPIO · QTD · VR UNITÁRIO · VR TOTAL · TOTAL A EMPENHAR).
+ * Anexo (DESCRIÇÃO ITEM · BENEFICIÁRIO FINAL · MUNICÍPIO · QTD · VR UNITÁRIO · VR TOTAL · TOTAL A EMPENHAR).
  *
  * Lê o preço previsto de cada item pela projeção do reajuste da ata (emendas_precos_previstos) e grava o nome curto e
  * o GND do item (salvar_dados_item_emenda, emendas.manage, com conferência de versão).
  */
 import { supabase } from './supabaseClient';
 import { mensagemDoBanco } from './emendasService';
-
-/** Coluna ÓRGÃO do Anexo: a mesma lista da conferência do banco (emenda_beneficiarios_orgao). */
-export const ORGAOS_BENEFICIARIO = [
-  'Polícia Militar',
-  'Corpo de Bombeiros Militar',
-  'Polícia Civil',
-  'Polícia Científica',
-  'Polícia Penal',
-  'Guarda Municipal',
-  'Secretaria de Segurança Pública',
-  'Defesa Civil',
-  'Outro'
-] as const;
 
 export type GndItem = 'GND-3' | 'GND-4';
 

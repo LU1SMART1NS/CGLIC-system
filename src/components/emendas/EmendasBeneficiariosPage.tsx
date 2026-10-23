@@ -9,7 +9,7 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
-import { carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import {
@@ -20,12 +20,12 @@ import {
   usePodeGerirEmendas,
   useSalvarBeneficiario
 } from '../../hooks/useEmendas';
-import { formatarCep, formatarCnpj, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
-import { cnpjProprio, faltasDoBeneficiario, paresParecidos, type FaltaDoBeneficiario } from '../../utils/emendasBeneficiarios';
+import { formatarCep, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
+import { faltasDoBeneficiario, paresParecidos, type FaltaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { BeneficiarioModal } from './BeneficiarioModal';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { JuntarBeneficiariosModal } from './JuntarBeneficiariosModal';
-import { NomeComSigla, OrgaoELocal } from './emendasPartes';
+import { NomeComSigla } from './emendasPartes';
 
 type Segmento = 'completos' | 'faltam' | 'parecidos' | 'inativos' | 'todos';
 
@@ -100,7 +100,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       .filter(
         (b) =>
           !termo ||
-          semAcento([b.nome, b.sigla, b.nomeCurto, b.razaoSocial, b.orgao, b.entregaMunicipio, b.responsavelNome, ...b.outrosNomes].filter(Boolean).join(' ')).includes(termo) ||
+          semAcento([b.nome, b.sigla, b.nomeCurto, b.razaoSocial, b.entregaMunicipio, b.responsavelNome, ...b.outrosNomes].filter(Boolean).join(' ')).includes(termo) ||
           (digitos.length >= 4 && (b.cnpj ?? '').includes(digitos))
       );
   }, [doSegmento, uf, oQueFalta, busca, faltas]);
@@ -149,20 +149,21 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       width: '36%',
       render: (b) => {
         const parecido = parecidoDe.get(b.id);
-        // CNPJ e razão social ficam na janela de edição: na lista, só o que diferencia (CNPJ próprio ou falta).
+        // Quem é: nome · sigla e, embaixo, a razão social do CNPJ vinculado (como o fornecedor nas carteiras). A cidade
+        // fica só na coluna Entrega; o CNPJ aparece ao passar o mouse e na edição.
         return (
           <>
             <NomeComSigla b={b} destaque />
-            <OrgaoELocal b={b} />
+            {b.razaoSocial && <div style={carteiraFornecedor}>{b.razaoSocial}</div>}
             {parecido && (
               <div style={{ ...carteiraSubtitle, color: 'var(--color-info-text, #155bcb)' }}>
                 Parecido com {rotuloBeneficiario(parecido)}
                 {localDoBeneficiario(parecido) ? ` (${localDoBeneficiario(parecido)})` : ''}
               </div>
             )}
-            {(!b.cnpj || cnpjProprio(b.cnpj)) && (
-              <div style={{ marginTop: '0.25rem' }} title={b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)} · ${b.razaoSocial ?? ''}` : undefined}>
-                <StatusBadge label={b.cnpj ? 'CNPJ próprio' : 'Falta CNPJ'} variant={b.cnpj ? 'info' : 'neutral'} size="sm" dot={false} />
+            {!b.cnpj && (
+              <div style={{ marginTop: '0.25rem' }}>
+                <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />
               </div>
             )}
           </>
@@ -173,16 +174,28 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       key: 'entrega',
       header: 'Entrega',
       width: '34%',
-      render: (b) =>
-        b.entregaCep && b.entregaLogradouro ? (
+      // Onde entrega: a cidade sempre em destaque (é o mesmo campo do endereço) e, embaixo, o endereço ou o que falta.
+      render: (b) => {
+        const local = localDoBeneficiario(b);
+        const temEndereco = Boolean(b.entregaCep && b.entregaLogradouro);
+        return (
           <>
-            <div style={{ fontWeight: 600 }}>{localDoBeneficiario(b)}</div>
-            <div style={carteiraSubtitle}>{[`${b.entregaLogradouro}${b.entregaNumero ? `, ${b.entregaNumero}` : ''}`, b.entregaComplemento].filter(Boolean).join(' · ')}</div>
-            <div style={carteiraSubtitle}>{[b.entregaBairro, `CEP ${formatarCep(b.entregaCep)}`].filter(Boolean).join(' · ')}</div>
+            {local ? <div style={{ fontWeight: 600 }}>{local}</div> : <div style={falta}>Falta cidade</div>}
+            {temEndereco ? (
+              <>
+                <div style={carteiraSubtitle}>{[`${b.entregaLogradouro}${b.entregaNumero ? `, ${b.entregaNumero}` : ''}`, b.entregaComplemento].filter(Boolean).join(' · ')}</div>
+                <div style={carteiraSubtitle}>{[b.entregaBairro, b.entregaCep && `CEP ${formatarCep(b.entregaCep)}`].filter(Boolean).join(' · ')}</div>
+              </>
+            ) : (
+              // Bairro sem o resto do endereço (veio do nome da planilha): com o rótulo, para não parecer outra coisa.
+              <div style={carteiraSubtitle}>
+                {b.entregaBairro && <>Bairro {b.entregaBairro} · </>}
+                <span style={falta}>{b.entregaBairro ? 'falta o endereço de entrega' : 'Falta endereço de entrega'}</span>
+              </div>
+            )}
           </>
-        ) : (
-          <span style={falta}>Falta endereço de entrega</span>
-        )
+        );
+      }
     },
     {
       key: 'contato',

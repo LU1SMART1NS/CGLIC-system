@@ -1,16 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
-import { carteiraDescricaoItem, carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDescricaoItem, carteiraFornecedor, carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
 import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ROTULO_MOTIVO_SEM_NOTA, ROTULO_REGRA_DA_NOTA, type ExecucaoDoPedido } from '../../utils/emendasPedidos';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
-import { orgaoAbaixoDoNome } from '../../utils/emendasBeneficiarios';
 import { formatCurrency } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { formatarCnpj, localDoBeneficiario, rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
+import { formatarCnpj, localDoBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
@@ -103,10 +102,15 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
   </div>
 );
 
-/** "Polícia Militar · Santa Fé do Sul - SP" numa linha só (o órgão some quando repete o nome). */
-export const OrgaoELocal: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'orgao' | 'entregaMunicipio' | 'entregaUf'> }> = ({ b }) => {
-  const texto = [orgaoAbaixoDoNome(b, rotuloBeneficiario(b)), localDoBeneficiario(b)].filter(Boolean).join(' · ');
-  return texto ? <div style={carteiraSubtitle}>{texto}</div> : null;
+/** Embaixo do nome, na linha da emenda: a razão social do CNPJ vinculado e a cidade - UF (aqui não há coluna de entrega). */
+export const RazaoELocal: React.FC<{ b: Pick<BeneficiarioEmenda, 'razaoSocial' | 'entregaMunicipio' | 'entregaUf'> }> = ({ b }) => {
+  const local = localDoBeneficiario(b);
+  return (
+    <>
+      {b.razaoSocial && <div style={carteiraFornecedor}>{b.razaoSocial}</div>}
+      {local && <div style={carteiraSubtitle}>{local}</div>}
+    </>
+  );
 };
 
 /**
@@ -119,7 +123,7 @@ export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficia
     return (
       <>
         <NomeComSigla b={b} />
-        <OrgaoELocal b={b} />
+        <RazaoELocal b={b} />
         {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
       </>
     );

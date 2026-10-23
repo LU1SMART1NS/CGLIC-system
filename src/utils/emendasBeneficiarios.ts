@@ -8,8 +8,6 @@ export interface FormularioBeneficiario {
   /** Nome da unidade por extenso (coluna nome). */
   nome: string;
   sigla: string;
-  /** Coluna ÓRGÃO do Anexo da reserva (lista fixa de ORGAOS_BENEFICIARIO). */
-  orgao: string;
   entregaCep: string;
   entregaLogradouro: string;
   entregaNumero: string;
@@ -42,9 +40,6 @@ export function naturezaNaoPublica(natureza: string | null | undefined): boolean
   return !/p[úu]blic|munic[íi]pio|estado|estadual|distrito federal|autarquia|uni[ãa]o/i.test(natureza);
 }
 
-/** CNPJ próprio = filial da unidade na Receita (a ordem não é a 0001 da matriz do órgão). */
-export const cnpjProprio = (cnpj: string | null | undefined): boolean => Boolean(cnpj && cnpj.length === 14 && cnpj.slice(8, 12) !== '0001');
-
 export type FaltaDoBeneficiario = 'CNPJ' | 'endereço' | 'contato';
 
 /** O que falta completar no cadastro. Não trava nada: a lista mostra e filtra. */
@@ -71,10 +66,6 @@ function palavras(s: string | null | undefined): string[] {
 }
 
 export const chaveDoNome = (s: string | null | undefined): string => palavras(s).join(' ');
-
-/** Órgão a mostrar embaixo do nome; nada quando repete o nome ("Polícia Civil" / "Polícia Civil"). */
-export const orgaoAbaixoDoNome = (b: Pick<BeneficiarioEmenda, 'orgao'>, rotulo: string): string | null =>
-  b.orgao && chaveDoNome(b.orgao) !== chaveDoNome(rotulo) ? b.orgao : null;
 
 /** Nome + município + UF: o que não pode repetir (chave_identidade do banco). */
 export const chaveDaIdentidade = (nome: string, municipio: string | null | undefined, uf: string | null | undefined): string =>

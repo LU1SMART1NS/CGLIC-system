@@ -75,7 +75,7 @@ export const JuntarBeneficiariosModal: React.FC<Props> = ({ base, outro, lista, 
         {ficaId === b.id ? 'Fica' : 'Sai'}
       </span>
       <b style={{ lineHeight: 1.35 }}>{nomeESigla(b)}</b>
-      <span style={pequeno}>{[b.orgao, localDoBeneficiario(b)].filter(Boolean).join(' · ') || 'Sem órgão e local'}</span>
+      <span style={pequeno}>{[b.razaoSocial, localDoBeneficiario(b)].filter(Boolean).join(' · ') || 'Sem CNPJ e local'}</span>
       <span style={pequeno}>
         {plural(linhasPorBeneficiario.get(b.id) ?? 0, 'indicação', 'indicações')} · {b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)}` : 'Falta CNPJ'}
       </span>

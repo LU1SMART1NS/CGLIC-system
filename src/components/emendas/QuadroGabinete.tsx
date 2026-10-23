@@ -138,11 +138,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
           {quadro.semBeneficiario === 1 ? '1 linha sai' : `${quadro.semBeneficiario} linhas saem`} com o beneficiário “a definir”.
         </div>
       )}
-      {quadro.semOrgao > 0 && (
-        <div style={aviso} role="status" data-testid={`${testId}-sem-orgao`}>
-          {quadro.semOrgao === 1 ? '1 linha tem' : `${quadro.semOrgao} linhas têm`} beneficiário sem o órgão cadastrado: informe em Beneficiários para preencher a coluna ÓRGÃO.
-        </div>
-      )}
       {quadro.semNomeCurto > 0 && (
         <div style={aviso} role="status" data-testid={`${testId}-sem-nome`}>
           {quadro.semNomeCurto === 1 ? '1 item está' : `${quadro.semNomeCurto} itens estão`} sem nome curto e sai com o começo da descrição do catálogo: informe em Itens e kits.
@@ -176,7 +171,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
                     {l.descricao}
                     {l.kit && <div style={{ fontWeight: 400 }}>({l.kit})</div>}
                   </td>
-                  <td style={{ ...celula, ...(l.orgao ? null : aDefinir) }}>{l.orgao ?? 'a definir'}</td>
                   <td style={{ ...celula, ...(l.beneficiario ? null : aDefinir) }}>{l.beneficiario ?? 'a definir'}</td>
                   <td style={{ ...celula, ...(l.municipio ? null : aDefinir) }}>{l.municipio ?? 'a definir'}</td>
                   <td style={celula}>{l.quantidade}</td>

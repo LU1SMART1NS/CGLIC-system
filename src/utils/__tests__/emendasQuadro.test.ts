@@ -10,7 +10,7 @@ const item = (k: string, extra: Partial<ItemCaep>): ItemCaep => ({
 const preco = (k: string, extra: Partial<PrecoPrevisto>): PrecoPrevisto => ({
   itemKey: k, precoAtual: 100, precoPrevisto: 100, motivo: 'EM_DIA', devido: false, efeito: null, percentual: null, mesesEstimados: null, ...extra
 });
-const pm = { id: 'b1', razaoSocial: 'Secretaria de Estado de Polícia Militar do Rio de Janeiro', orgao: 'Polícia Militar', entregaMunicipio: 'Rio de Janeiro', entregaUf: 'RJ' } as BeneficiarioEmenda;
+const pm = { id: 'b1', razaoSocial: 'Secretaria de Estado de Polícia Militar do Rio de Janeiro', entregaMunicipio: 'Rio de Janeiro', entregaUf: 'RJ' } as BeneficiarioEmenda;
 const autor = { id: 'S:1', tipo: 'SENADOR', nome: 'Romário', uf: 'RJ' } as AutorEmenda;
 
 const itens = new Map([
@@ -49,11 +49,10 @@ describe('quadro da reserva (Anexo)', () => {
   });
 
   it('beneficiário do cadastro, da planilha ou a definir', () => {
-    expect(q.linhas[0]).toMatchObject({ orgao: 'Polícia Militar', beneficiario: pm.razaoSocial, municipio: 'Rio de Janeiro - RJ' });
-    expect(q.linhas[2]).toMatchObject({ orgao: null, beneficiario: 'CBMERJ (da planilha)', municipio: null });
+    expect(q.linhas[0]).toMatchObject({ beneficiario: pm.razaoSocial, municipio: 'Rio de Janeiro - RJ' });
+    expect(q.linhas[0]).not.toHaveProperty('orgao');
+    expect(q.linhas[2]).toMatchObject({ beneficiario: 'CBMERJ (da planilha)', municipio: null });
     expect(q.semBeneficiario).toBe(3);
-    const semOrgao = montarQuadro({ autor, linhas: [linhas[0]], itens, beneficiarios: new Map([['b1', { ...pm, orgao: null }]]), precos, data: '2026-10-23' });
-    expect(semOrgao.semOrgao).toBe(1);
     expect(q.semNomeCurto).toBe(0);
   });
 
@@ -83,13 +82,14 @@ describe('quadro da reserva (Anexo)', () => {
     expect(so4.porGnd).toEqual([]);
   });
 
-  it('SEI: ata, item e as 7 colunas do Anexo e a linha TOTAL A EMPENHAR', () => {
+  it('SEI: ata, item e as 6 colunas do Anexo (sem ÓRGÃO) e a linha TOTAL A EMPENHAR', () => {
     const html = htmlParaSei(q);
-    for (const h of ['ATA', 'ITEM', 'DESCRIÇÃO ITEM', 'ÓRGÃO', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
+    for (const h of ['ATA', 'ITEM', 'DESCRIÇÃO ITEM', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
     expect(html).toContain('R$ 1.598,76<sup>¹</sup>');
     expect(html).toContain('(Kit Academia)');
     expect(html).toContain('>00043/2026</td><td style="border:1px solid #000;padding:4px 6px;text-align:center;">00005</td>');
-    expect(html.match(/colspan="8"/g)).toHaveLength(3);
+    expect(html).not.toContain('ÓRGÃO');
+    expect(html.match(/colspan="7"/g)).toHaveLength(3);
     expect(htmlParaSei(montarQuadro({ autor, linhas: [{ ...linhas[2], beneficiarioNome: '<b>x</b>' }], itens, beneficiarios: new Map(), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
