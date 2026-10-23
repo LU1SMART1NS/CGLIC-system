@@ -13,7 +13,7 @@ import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
-import { AVISO_VENCIMENTO_DIAS, calcularKit, ROTULO_SITUACAO_KIT, type CalculoDoKit, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
+import { avisoIndicacaoDias, calcularKit, corteIndicacaoDias, ROTULO_SITUACAO_KIT, type CalculoDoKit, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
 import type { KitEmenda } from '../../services/emendasService';
 import { KitModal } from './KitModal';
 import { ItemDaAta, VigenciaDaAta } from './emendasPartes';
@@ -149,7 +149,7 @@ export const EmendasKitsPage: React.FC = () => {
       <PageHeader
         title="Kits"
         subtitle="Conjuntos de itens que a CAEP oferece aos parlamentares."
-        hint={`Só entram itens com alocação para a CAEP (${itens.length} hoje). O kit não guarda quantidade: quando o parlamentar pede N kits, cada item sai do saldo da CAEP N vezes a quantidade por kit. A situação é calculada sozinha: Vence em breve quando alguma ata do kit acaba em até ${AVISO_VENCIMENTO_DIAS} dias; Indisponível com ata encerrada ou sem saldo (volta sozinho se a ata for prorrogada).`}
+        hint={`Só entram itens com alocação para a CAEP (${itens.length} hoje). O kit não guarda quantidade: quando o parlamentar pede N kits, cada item sai do saldo da CAEP N vezes a quantidade por kit. A situação é calculada sozinha: Vence em breve quando alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível com ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim (prazo de indicação, para dar tempo de assinar o contrato) ou sem saldo. Volta sozinho se a ata for prorrogada. Os dois prazos ficam em Ajustes > Regras de Alertas.`}
         icon={<PackageOpen size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>

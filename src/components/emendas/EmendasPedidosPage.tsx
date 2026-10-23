@@ -25,7 +25,7 @@ import {
   usePodeVerContratos
 } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
-import { curto, dataBR } from '../../utils/emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import {
   ataDaLinha,
   avisosDoPedido,
@@ -335,7 +335,7 @@ export const EmendasPedidosPage: React.FC = () => {
       <PageHeader
         title="Pedidos"
         subtitle="Reservas e ofícios dos parlamentares, da reserva ao empenho."
-        hint="A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Avisos: mais de 30 dias sem ofício, divergência com o SIOP ata vencendo em até 60 dias ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o beneficiário pelo nome (a cadastrar com CNPJ), o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo."
+        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). Avisos: mais de 30 dias sem ofício, divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o beneficiário pelo nome (a cadastrar com CNPJ), o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo.`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
@@ -377,6 +377,7 @@ export const EmendasPedidosPage: React.FC = () => {
             { value: 'com', label: 'Com algum aviso', count: contaAviso('com') },
             { value: 'semOficio', label: 'Mais de 30 dias sem ofício', count: contaAviso('semOficio') },
             { value: 'divergencia', label: 'Divergência com o SIOP', count: contaAviso('divergencia') },
+            { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
             { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
             { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
             { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') }

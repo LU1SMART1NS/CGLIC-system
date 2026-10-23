@@ -6,9 +6,20 @@
  */
 import type { ItemCaep, KitEmenda } from '../services/emendasService';
 import { descricaoItemEmFrase } from './textCase';
+import { EMENDAS_RULES } from '../config/alertRules';
 
-/** Dias antes do fim da ata em que o kit passa a "Vence em breve" (decisão de 23/10/2026). */
-export const AVISO_VENCIMENTO_DIAS = 60;
+/** Dias antes do fim da ata em que o kit e o pedido avisam (Ajustes; padrão 60). Lido na hora, nunca copiado. */
+export const avisoIndicacaoDias = (): number => EMENDAS_RULES.avisoIndicacaoAntesDias;
+/** A menos destes dias do fim da ata não se recebe indicação (Ajustes; padrão 35; o banco confere, migration 162). */
+export const corteIndicacaoDias = (): number => EMENDAS_RULES.corteIndicacaoAntesDias;
+
+/** Último dia para receber indicação com itens da ata: fim da vigência menos o corte. */
+export function limiteDaIndicacao(vigenciaFinal: string): string {
+  return new Date(Date.parse(`${vigenciaFinal}T00:00:00Z`) - corteIndicacaoDias() * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** A ata já passou do corte: o sistema não aceita nova reserva nem ofício com o item. */
+export const passouDoCorte = (diasParaVencer: number | null): boolean => diasParaVencer != null && diasParaVencer < corteIndicacaoDias();
 
 export type SituacaoKit = 'disponivel' | 'vence' | 'indisponivel' | 'desativado';
 
@@ -96,18 +107,28 @@ export function calcularKit(
       itemLimitante: encerrado
     };
   }
+  const noCorte = componentes.filter((c) => passouDoCorte(c.diasParaVencer)).sort((a, b) => (a.diasParaVencer ?? 0) - (b.diasParaVencer ?? 0))[0];
+  if (noCorte) {
+    return {
+      ...base,
+      kitsPossiveis: 0,
+      situacao: 'indisponivel',
+      motivo: `A ata ${noCorte.item!.numeroAta} (${curto(noCorte.item!.descricao)}) termina em ${dataBR(noCorte.item!.vigenciaFinal)}: passou do prazo de indicação (${corteIndicacaoDias()} dias antes do fim). Troque o item ou espere a prorrogação.`,
+      itemLimitante: noCorte
+    };
+  }
   const limitante = componentes.reduce<ComponenteDoKit | null>((m, c) => (m == null || c.kits < m.kits ? c : m), null);
   if (kitsPossiveis === 0 && limitante) {
     return { ...base, situacao: 'indisponivel', motivo: `Sem saldo de ${curto(limitante.item!.descricao)} para um kit.`, itemLimitante: limitante };
   }
   const vencendo = componentes
-    .filter((c) => c.diasParaVencer != null && c.diasParaVencer <= AVISO_VENCIMENTO_DIAS)
+    .filter((c) => c.diasParaVencer != null && c.diasParaVencer <= avisoIndicacaoDias())
     .sort((a, b) => (a.diasParaVencer ?? 0) - (b.diasParaVencer ?? 0))[0];
   if (vencendo) {
     return {
       ...base,
       situacao: 'vence',
-      motivo: `A ata ${vencendo.item!.numeroAta} (${curto(vencendo.item!.descricao)}) vence em ${dataBR(vencendo.item!.vigenciaFinal)}, daqui a ${vencendo.diasParaVencer} dias. Pedidos novos precisam ser empenhados até lá.`,
+      motivo: `A ata ${vencendo.item!.numeroAta} (${curto(vencendo.item!.descricao)}) vence em ${dataBR(vencendo.item!.vigenciaFinal)}, daqui a ${vencendo.diasParaVencer} dias. Indicação só até ${dataBR(limiteDaIndicacao(vencendo.item!.vigenciaFinal!))}: o contrato precisa ser assinado antes do fim da ata.`,
       itemLimitante: vencendo
     };
   }

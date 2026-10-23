@@ -144,6 +144,20 @@ export const SINCRONIZACAO_RULES = {
 // Funções de classificação (única implementação de cada régua)
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Emendas parlamentares: prazo para receber a indicação (decisão de 23/10/2026)
+// -----------------------------------------------------------------------------
+export const EMENDAS_RULES = {
+  /** A partir de N dias antes do fim da ata, o pedido e o kit avisam que o contrato precisa ser assinado até lá. */
+  avisoIndicacaoAntesDias: 60,
+  /**
+   * A menos de N dias do fim da ata não se recebe indicação (nova reserva nem ofício): depois do empenho a CCGA ainda
+   * minuta e assina o contrato. Medição de 23/10/2026: mediana de 35 dias do despacho à assinatura. O banco lê o
+   * mesmo valor (alert_settings, migration 162).
+   */
+  corteIndicacaoAntesDias: 35
+};
+
 export type TarefaPrazoNivel = 'VENCIDA' | 'URGENTE' | 'PROXIMA' | 'DISTANTE';
 
 /** Nível de uma tarefa pelos dias até o prazo (negativo = vencida). */
@@ -167,7 +181,7 @@ export function isLembreteNaJanela(params: { diasRestantes: number; atrasado: bo
 
 export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'dia do mês' | 'horas';
 
-export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'sincronizacao';
+export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'emendas' | 'sincronizacao';
 
 export interface AlertRuleDefinition {
   /** Chave estável gravada em alert_settings.key (caminho no objeto de regras). */
@@ -188,6 +202,7 @@ export const ALERT_RULE_GROUPS: Array<{ id: AlertRuleGroupId; label: string; des
   { id: 'reajuste', label: 'Radar de reajuste e repactuação', description: 'Janela em que o marco anual aparece no radar.' },
   { id: 'prorrogacao', label: 'Prorrogação contratual', description: 'Faixas usadas nas orientações de prorrogação.' },
   { id: 'pagamentos', label: 'Acompanhamento de pagamentos', description: 'Prazos em dias úteis das faturas e do processo na CGOFI.' },
+  { id: 'emendas', label: 'Emendas parlamentares', description: 'Prazo para receber a indicação do parlamentar antes do fim da ata: depois do empenho ainda é preciso assinar o contrato, e isso tem de acontecer antes do vencimento.' },
   { id: 'sincronizacao', label: 'Atualização dos dados da API', description: 'Quando a quantidade contratada lida da API é relida.' }
 ];
 
@@ -237,6 +252,9 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'pagamento.notaMensalAteDia', group: 'pagamentos', label: 'Nota de contrato mensal chega até o dia', hint: 'Depois desse dia, o contrato marcado como mensal sem nota do mês anterior vira aviso.', unit: 'dia do mês', min: 1, max: 28 },
   { key: 'pagamento.entregaToleranciaDiasUteis', group: 'pagamentos', label: 'Tolerância da entrega prevista', hint: 'Dias úteis depois da data prevista sem nota até virar aviso.', unit: 'dias úteis', min: 0, max: 30 },
 
+  { key: 'emendas.avisoIndicacaoAntesDias', group: 'emendas', label: 'Avisar a ata da emenda a partir de', hint: 'Dias antes do fim da ata: pedidos e kits avisam que o contrato precisa ser assinado até lá.', unit: 'dias', min: 1, max: 365 },
+  { key: 'emendas.corteIndicacaoAntesDias', group: 'emendas', label: 'Não receber indicação a menos de', hint: 'Dias antes do fim da ata. O sistema recusa nova reserva e novo ofício com itens da ata.', unit: 'dias', min: 0, max: 365 },
+
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }
 ];
 
@@ -249,6 +267,7 @@ const RULE_TARGETS: Record<string, Record<string, any>> = {
   reajuste: REAJUSTE_RULES,
   prorrogacao: PRORROGACAO_RULES,
   pagamento: PAGAMENTO_RULES,
+  emendas: EMENDAS_RULES,
   sincronizacao: SINCRONIZACAO_RULES
 };
 
@@ -310,6 +329,7 @@ export function validateAlertRuleValues(values: Record<string, number>): Record<
   order('vigencia.faixaIntermediariaDias', 'vigencia.faixaAtencaoAteDias', 'A faixa de atenção deve ser maior que a intermediária.');
   order('atencaoNivel.criticoAteDias', 'atencaoNivel.atencaoAteDias', 'O prazo de atenção deve ser maior que o crítico.');
   order('pagamento.criticoAteDiasUteis', 'pagamento.atencaoAteDiasUteis', 'O prazo de atenção deve ser maior que o crítico.');
+  order('emendas.corteIndicacaoAntesDias', 'emendas.avisoIndicacaoAntesDias', 'O aviso deve começar antes do corte da indicação.');
   order('prorrogacao.prazoCriticoAteDias', 'prorrogacao.marcoProximoAteDias', 'O marco próximo deve ser maior que o prazo crítico.');
   if (!errors['reajuste.urgenteAteDias'] && !errors['reajuste.janelaAntesDias'] && values['reajuste.urgenteAteDias'] >= values['reajuste.janelaAntesDias']) {
     errors['reajuste.urgenteAteDias'] = 'O limite urgente deve ser menor que a janela antes do marco.';

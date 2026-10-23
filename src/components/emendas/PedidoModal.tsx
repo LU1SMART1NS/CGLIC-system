@@ -7,7 +7,7 @@ import { useToast } from '../../design-system/components/Toast';
 import { useSalvarPedido } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { buscarItensCaep, calcularKit, rotuloItemDaAta, ROTULO_SITUACAO_KIT } from '../../utils/emendasKits';
+import { buscarItensCaep, calcularKit, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta, ROTULO_SITUACAO_KIT } from '../../utils/emendasKits';
 import { identificacaoDoPedido, itensDaLinha, valorDaLinha } from '../../utils/emendasPedidos';
 import { formatarTelefone, soDigitos } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
@@ -104,6 +104,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     itens.filter((i) => !i.ataEncerrada),
     busca
   );
+  // Ata a menos do corte do fim (migration 162): aparece na busca, mas não pode ser escolhida.
+  const foraDoPrazo = (i: ItemCaep) => Boolean(i.vigenciaFinal) && passouDoCorte(diasEntre(hoje, i.vigenciaFinal!));
 
   // Consumo do saldo por item com as linhas desta tela.
   const consumo = useMemo(() => {
@@ -270,8 +272,20 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   <div style={pequeno}>
                     {rotuloItemDaAta(i)} · saldo {formatNumber(saldoAntes(i.itemKey))} · {formatCurrency(i.valorUnitario)}
                   </div>
+                  {foraDoPrazo(i) && (
+                    <div style={{ ...pequeno, color: 'var(--color-danger-text)', fontWeight: 600 }}>
+                      Indicação encerrada em {dataBR(limiteDaIndicacao(i.vigenciaFinal!))}: a ata termina em {dataBR(i.vigenciaFinal)}.
+                    </div>
+                  )}
                 </div>
-                <ActionButton action="adicionar" size="sm" type="button" onClick={() => adicionarItem(i)} disabled={saldoAntes(i.itemKey) <= 0} data-testid={`emendas-pedido-item-${i.itemKey}`} />
+                <ActionButton
+                  action="adicionar"
+                  size="sm"
+                  type="button"
+                  onClick={() => adicionarItem(i)}
+                  disabled={saldoAntes(i.itemKey) <= 0 || foraDoPrazo(i)}
+                  data-testid={`emendas-pedido-item-${i.itemKey}`}
+                />
               </div>
             ))}
             {kitsEncontrados.length === 0 && itensEncontrados.length === 0 && <div style={{ ...pequeno, padding: '0.75rem' }}>Nada encontrado.</div>}

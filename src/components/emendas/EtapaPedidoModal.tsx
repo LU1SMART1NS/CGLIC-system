@@ -6,7 +6,8 @@ import { AppInput, AppSelect, AppTextarea } from '../../design-system/components
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useAvancarPedido, useCancelarPedido } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
-import { identificacaoDoPedido, linhasAtivas, valorDoPedido } from '../../utils/emendasPedidos';
+import { identificacaoDoPedido, itensDaLinha, linhasAtivas, valorDoPedido } from '../../utils/emendasPedidos';
+import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
 import { LinhaDoPedido } from './emendasPartes';
 import type { AcaoPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
 
@@ -77,6 +78,15 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
   const todosPontos = PONTOS_SIOP.every(([k]) => pontos[k]);
   const ocupado = avancar.isPending || cancelar.isPending;
 
+  // Ofício de reserva com item em ata a menos do corte do fim: o banco recusa (migration 162).
+  const ataForaDoPrazo =
+    modo === 'OFICIO' && (pedido.etapa === 'RESERVADO' || pedido.etapa === 'MINUTA')
+      ? linhas
+          .flatMap((l) => itensDaLinha(l))
+          .map((x) => itens.get(x.itemKey))
+          .find((i): i is ItemCaep => Boolean(i?.vigenciaFinal) && passouDoCorte(diasEntre(hojeEmBrasilia(), i!.vigenciaFinal!)))
+      : undefined;
+
   const pendencias: string[] = [];
   if (modo === 'OFICIO' && (!oficio.trim() || oficio.trim() === 'Ofício nº' || !processoSei.trim())) pendencias.push('número do ofício e processo SEI');
   if (modo === 'CONFERIDO') {
@@ -91,7 +101,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
   const enviar = async (ev: React.FormEvent) => {
     ev.preventDefault();
     setTentou(true);
-    if (pendencias.length) return;
+    if (pendencias.length || ataForaDoPrazo) return;
     try {
       if (modo === 'CANCELAR') {
         await cancelar.mutateAsync({ id: pedido.id, versao: pedido.versao, motivo: motivo === 'Outro' ? outroMotivo.trim() : motivo });
@@ -143,6 +153,13 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
           {nomeDoAutor} · {identificacaoDoPedido(pedido)}
           {pedido.oficioProcessoSei ? ` · SEI ${pedido.oficioProcessoSei}` : ''}
         </div>
+
+        {ataForaDoPrazo && (
+          <div style={aviso('erro')} role="alert" data-testid="emendas-etapa-fora-do-prazo">
+            A ata {ataForaDoPrazo.numeroAta} termina em {dataBR(ataForaDoPrazo.vigenciaFinal)} e passou do prazo de indicação ({corteIndicacaoDias()} dias antes do fim), para dar tempo
+            de empenhar e assinar o contrato. Troque o item em "Alterar linhas" ou cancele o pedido.
+          </div>
+        )}
 
         {(modo === 'MINUTA' || modo === 'AUTORIZADO') && (
           <div style={grade}>
