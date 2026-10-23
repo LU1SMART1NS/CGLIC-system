@@ -22,12 +22,14 @@ import {
   useKitsEmendas,
   usePedidosEmendas,
   usePodeGerirEmendas,
-  usePodeVerContratos
+  usePodeVerContratos,
+  useNotasDasLinhas
 } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import {
   ataDaLinha,
+  avisoGrave,
   AUTOR_A_DEFINIR,
   avisosDoPedido,
   dataDaEtapa,
@@ -42,10 +44,13 @@ import {
   ultimoContatoPorAutor,
   valorDaLinha,
   valorDoPedido,
+  execucaoDoPedido,
   type AvisoPedido
 } from '../../utils/emendasPedidos';
-import type { AutorEmenda, BeneficiarioEmenda, EtapaPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
-import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, LinhaDoPedido } from './emendasPartes';
+import type { AutorEmenda, BeneficiarioEmenda, EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
+
+const SEM_NOTAS = new Map<string, NotaDaLinha>();
+import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, ExecucaoDoPedidoResumo, LinhaDoPedido } from './emendasPartes';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
@@ -129,6 +134,7 @@ interface DetalheProps {
   p: Linha;
   itens: Map<string, ItemCaep>;
   beneficiarios: Map<string, BeneficiarioEmenda>;
+  notas: Map<string, NotaDaLinha>;
   podeGerir: boolean;
   podeVerContratos: boolean;
   hoje: string;
@@ -136,7 +142,7 @@ interface DetalheProps {
   onAlterar: () => void;
 }
 
-const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
+const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
   // Reserva para um órgão (migration 163): antes da minuta, a CAEP indica o parlamentar que assumiu.
   const semAutor = !p.autorId;
   const prox = semAutor ? null : proximaAcao(p.etapa);
@@ -154,7 +160,9 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
             <AConferirDaLinha linha={l} />
             {ata && (
               <div style={{ marginTop: '0.3rem' }}>
-                <StatusBadge label={ata.texto} variant={ata.tipo === 'ataVencida' ? 'danger' : 'warning'} size="sm" dot={false} />
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, borderRadius: 4, padding: '0.25rem 0.45rem', display: 'inline-block', color: avisoGrave(ata) ? 'var(--color-danger-text)' : 'var(--color-warning-text)', background: avisoGrave(ata) ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)' }}>
+                  {ata.texto}
+                </span>
               </div>
             )}
           </>
@@ -167,23 +175,26 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
       render: (l) => <BeneficiarioDaLinha linha={l} beneficiarios={beneficiarios} />
     },
     { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => formatCurrency(valorDaLinha(l, itens)) },
-    { key: 'ne', header: 'Empenho e contrato', nowrap: true, render: (l) => <EmpenhoDaLinha linha={l} podeVerContratos={podeVerContratos} /> }
+    { key: 'ne', header: 'Empenho e contrato', nowrap: true, render: (l) => <EmpenhoDaLinha linha={l} achada={notas.get(l.id)} podeVerContratos={podeVerContratos} /> }
   ];
   const canceladas = p.linhas.filter((l) => l.cancelada);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(240px, 1fr)', gap: '1rem', padding: '0.4rem 0' }} className="emendas-detalhe-pedido" data-testid={`emendas-pedido-detalhe-${p.id}`}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0 }}>
+        {p.avisos
+          .filter((a) => a.tipo === 'semOficio' || a.tipo === 'divergencia')
+          .map((a) => (
+            <div key={a.tipo} style={{ fontSize: '0.8rem', fontWeight: 600, borderRadius: 6, padding: '0.5rem 0.7rem', color: avisoGrave(a) ? 'var(--color-danger-text)' : 'var(--color-warning-text)', background: avisoGrave(a) ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)' }}>
+              {a.texto}
+            </div>
+          ))}
         <DataTable testId={`emendas-pedido-linhas-${p.id}`} data={linhasAtivas(p)} keyExtractor={(l) => l.id} columns={colunas} className="emendas-tabela-topo" />
         {canceladas.length > 0 && (
           <div style={carteiraSubtitle}>
             {canceladas.length} {canceladas.length === 1 ? 'linha tirada' : 'linhas tiradas'} do pedido: {canceladas.map((l) => l.canceladaMotivo).filter(Boolean).join('; ')}
           </div>
         )}
-        {p.etapa === 'EMPENHADO' && (
-          <div style={{ fontSize: '0.8rem', color: 'var(--color-info-text, #155bcb)', background: 'var(--color-info-bg, #e6eefb)', borderRadius: 6, padding: '0.5rem 0.7rem', fontWeight: 600 }}>
-            {p.empenhadoEm ? `Com a CCGA desde ${dataBR(p.empenhadoEm)}.` : 'Com a CCGA.'} A entrega ao beneficiário será registrada pelo módulo de Fiscalização.
-          </div>
-        )}
+        {p.etapa === 'EMPENHADO' && <ExecucaoDoPedidoResumo execucao={execucaoDoPedido(p, notas)} />}
         {semAutor && (
           <div style={{ fontSize: '0.8rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: 6, padding: '0.5rem 0.7rem', fontWeight: 600 }}>
             Reserva feita a pedido do órgão, ainda sem parlamentar. Quando um parlamentar ou bancada assumir, use "Indicar o parlamentar" para seguir com a minuta.
@@ -222,6 +233,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
  */
 export const EmendasPedidosPage: React.FC = () => {
   const { data: pedidos = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = usePedidosEmendas();
+  const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
   const { data: itensLista = [], isLoading: carregandoItens } = useItensCaep();
   const { data: autores = [] } = useAutoresEmendas();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
@@ -239,7 +251,7 @@ export const EmendasPedidosPage: React.FC = () => {
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
   const beneficiarios = useMemo(() => new Map(beneficiariosLista.map((b) => [b.id, b])), [beneficiariosLista]);
   const nomeDoBeneficiario = (id: string) => beneficiarios.get(id)?.nomeCurto;
-  const linhas: Linha[] = useMemo(() => pedidos.map((p) => ({ ...p, valor: valorDoPedido(p, itens), avisos: avisosDoPedido(p, itens, hoje) })), [pedidos, itens, hoje]);
+  const linhas: Linha[] = useMemo(() => pedidos.map((p) => ({ ...p, valor: valorDoPedido(p, itens), avisos: avisosDoPedido(p, itens, hoje, notas) })), [pedidos, itens, hoje, notas]);
 
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todos: 0, CANCELADO: 0 };
@@ -290,7 +302,12 @@ export const EmendasPedidosPage: React.FC = () => {
           </>
         ) : (
           <>
-            <div style={{ fontWeight: 600 }}>{identificacaoDoPedido(l)}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {/* "Reserva da planilha" se repetia em quase toda linha: a origem vira uma etiqueta discreta. */}
+              <span style={{ fontWeight: 600 }}>{l.origem === 'PLANILHA' && !l.siopEmenda ? 'Reserva' : identificacaoDoPedido(l)}</span>
+              {l.origem === 'PLANILHA' && <StatusBadge label="Planilha" variant="neutral" size="sm" dot={false} />}
+            </div>
+            {l.oficioProcessoSei && <div style={carteiraSubtitle}>SEI {l.oficioProcessoSei}</div>}
             {(l.contatoNome || l.contatoTelefone || l.contatoEmail) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <span style={carteiraSubtitle}>{l.contatoNome ? `com ${l.contatoNome}` : 'contato'}</span>
@@ -322,16 +339,24 @@ export const EmendasPedidosPage: React.FC = () => {
     {
       key: 'etapa',
       header: 'Etapa',
-      render: (l) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-          <StatusBadge label={l.etapa === 'OFICIO' && l.divergencia ? 'Ofício com divergência' : ROTULO_ETAPA[l.etapa]} variant={l.etapa === 'OFICIO' && l.divergencia ? 'danger' : VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
-          {l.avisos
-            .filter((a) => a.tipo !== 'divergencia')
-            .map((a) => (
-              <StatusBadge key={a.tipo} label={a.texto} variant={a.tipo === 'ataVencendo' || a.tipo === 'aConferir' ? 'warning' : 'danger'} size="sm" dot={false} />
-            ))}
-        </div>
-      )
+      nowrap: true,
+      render: (l) => <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
+    },
+    {
+      // Etiqueta curta: o aviso mais grave e "+N"; a frase completa aparece ao parar o mouse e no detalhe da linha.
+      key: 'aviso',
+      header: 'Aviso',
+      nowrap: true,
+      render: (l) => {
+        const [primeiro, ...outros] = l.avisos;
+        if (!primeiro) return <span style={carteiraSubtitle}>—</span>;
+        return (
+          <span title={l.avisos.map((a) => a.texto).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} data-testid={`emendas-pedido-aviso-${l.id}`}>
+            <StatusBadge label={primeiro.curto} variant={avisoGrave(primeiro) ? 'danger' : 'warning'} size="sm" dot={false} />
+            {outros.length > 0 && <span style={{ ...carteiraSubtitle, fontWeight: 700 }}>+{outros.length}</span>}
+          </span>
+        );
+      }
     }
   ];
 
@@ -387,7 +412,8 @@ export const EmendasPedidosPage: React.FC = () => {
             { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
             { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
             { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
-            { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') }
+            { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') },
+            { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') }
           ]}
           onChange={setFiltroAviso}
           testId="emendas-pedidos-filtro-aviso"
@@ -417,6 +443,7 @@ export const EmendasPedidosPage: React.FC = () => {
               p={l}
               itens={itens}
               beneficiarios={beneficiarios}
+              notas={notas}
               podeGerir={podeGerir}
               podeVerContratos={podeVerContratos}
               hoje={hoje}
