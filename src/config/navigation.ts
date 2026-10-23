@@ -21,7 +21,6 @@ import {
   Network,
   ScrollText,
   ClipboardList,
-  PackageOpen,
   Building
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -69,7 +68,7 @@ export interface NavItem {
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Emendas: Pedidos · Itens da CAEP · Por autor · Kits (CAEP reparte a sua alocação entre parlamentares; migration 155)
+ * - Emendas: Pedidos · Itens e kits (Por item · Por kit) · Por autor (CAEP reparte a sua alocação entre parlamentares; migration 155)
  * - Ajustes (no pé do menu), em três grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas), Emendas (Beneficiários) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
@@ -259,7 +258,7 @@ export const navigationConfig: NavItem[] = [
       },
       {
         id: 'emendas-itens',
-        label: 'Itens da CAEP',
+        label: 'Itens e kits',
         icon: Boxes,
         route: '/emendas/itens',
         status: 'active',
@@ -273,15 +272,6 @@ export const navigationConfig: NavItem[] = [
         route: '/emendas/por-autor',
         status: 'active',
         matchPrefixes: ['/emendas/por-autor'],
-        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
-      },
-      {
-        id: 'emendas-kits',
-        label: 'Kits',
-        icon: PackageOpen,
-        route: '/emendas/kits',
-        status: 'active',
-        matchPrefixes: ['/emendas/kits'],
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       }
     ]

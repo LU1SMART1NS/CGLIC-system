@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Boxes } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
@@ -6,6 +6,7 @@ import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { ActionButton } from '../../design-system/components/ActionButton';
+import { AppButton } from '../../design-system/components/AppButton';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
@@ -31,11 +32,19 @@ interface Uso {
 }
 type Linha = ItemCaep & { reservado: number; saldo: number; usos: Uso[] };
 
+interface Props {
+  /** Seletor Por item · Por kit da aba Itens e kits, no cabeçalho. */
+  seletor?: React.ReactNode;
+  /** Item que já chega aberto (vindo da composição de um kit). */
+  abrir?: string | null;
+  onAbrirKit?: (kitId: string) => void;
+}
+
 /**
- * Itens da CAEP (migration 157): todos os itens com alocação para a CAEP, quanto já está reservado nos pedidos (kits
- * abertos) e o saldo a oferecer.
+ * Itens e kits › Por item (migration 157): todos os itens com alocação para a CAEP, quanto já está reservado nos pedidos
+ * (kits abertos) e o saldo a oferecer.
  */
-export const EmendasPorItemPage: React.FC = () => {
+export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit }) => {
   const { data: itens = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useItensCaep();
   const { data: pedidos = [], refetch: recarregarPedidos } = usePedidosEmendas();
   const { data: autores = [] } = useAutoresEmendas();
@@ -47,6 +56,7 @@ export const EmendasPorItemPage: React.FC = () => {
   const [busca, setBusca] = useState(() => searchParams.get('busca') ?? '');
   const podeGerir = usePodeGerirEmendas();
   const [editando, setEditando] = useState<ItemCaep | null>(null);
+  const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(abrir ? [abrir] : []));
 
   const nomeAutor = useMemo(() => new Map(autores.map((a) => [a.id, a.nome])), [autores]);
   const linhas: Linha[] = useMemo(() => {
@@ -80,7 +90,23 @@ export const EmendasPorItemPage: React.FC = () => {
   const vigentes = linhas.filter((l) => !l.ataEncerrada);
   const valorAlocado = vigentes.reduce((s, l) => s + l.alocado * l.valorUnitario, 0);
   const valorReservado = vigentes.reduce((s, l) => s + Math.min(l.reservado, l.alocado) * l.valorUnitario, 0);
-  const kitsDoItem = (k: string) => kits.filter((x) => x.ativo && x.itens.some((i) => i.itemKey === k)).map((x) => x.nome);
+  const kitsDoItem = (k: string) => kits.filter((x) => x.ativo && x.itens.some((i) => i.itemKey === k));
+
+  // Vindo do kit: o trilho vai para a situação do item e a linha aberta entra na tela.
+  const alvo = abrir ? linhas.find((l) => l.itemKey === abrir) : undefined;
+  useEffect(() => {
+    if (!alvo) return;
+    setSegmento(situacao(alvo));
+    requestAnimationFrame(() => document.querySelector(`[data-testid="emendas-item-detalhe-${CSS.escape(alvo.itemKey)}"]`)?.scrollIntoView({ block: 'center' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alvo?.itemKey]);
+  const alternar = (k: string) =>
+    setAbertos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(k)) novo.delete(k);
+      else novo.add(k);
+      return novo;
+    });
 
   const colunas: Column<Linha>[] = [
     {
@@ -131,11 +157,16 @@ export const EmendasPorItemPage: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title="Itens da CAEP"
+        title="Itens e kits"
         subtitle="Quanto de cada item alocado à CAEP já foi reservado a parlamentares."
-        hint="Reservado soma os pedidos que não foram cancelados, em qualquer etapa, com os kits abertos nos seus itens. Saldo = alocado à CAEP − reservado. Para ter mais de um item, peça a alocação ao gestor de saldo."
+        hint="Reservado soma os pedidos que não foram cancelados, em qualquer etapa, com os kits abertos nos seus itens. Saldo = alocado à CAEP − reservado. Para ter mais de um item, peça a alocação ao gestor de saldo. Clique na linha para ver quem reservou e em quais kits o item entra."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}
-        actions={<HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />}
+        actions={
+          <>
+            {seletor}
+            <HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />
+          </>
+        }
       />
 
       <CarteiraSegmentTabs<Segmento>
@@ -180,6 +211,8 @@ export const EmendasPorItemPage: React.FC = () => {
           keyExtractor={(l) => l.itemKey}
           rowStyle={(l) => (l.ataEncerrada ? { opacity: 0.7 } : undefined)}
           columns={colunas}
+          expandedKeys={abertos}
+          onToggleExpand={alternar}
           rowActions={
             podeGerir
               ? (l) => <ActionButton action="editar" iconOnly label={`Nome curto e GND de ${l.nomeCurto ?? rotuloItemDaAta(l)}`} onClick={() => setEditando(l)} data-testid={`emendas-itens-dados-${l.itemKey}`} />
@@ -203,7 +236,22 @@ export const EmendasPorItemPage: React.FC = () => {
                   ]}
                 />
               )}
-              {kitsDoItem(l.itemKey).length > 0 && <div style={carteiraSubtitle}>Entra nos kits: {kitsDoItem(l.itemKey).join(', ')}.</div>}
+              {kitsDoItem(l.itemKey).length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={carteiraSubtitle}>Entra nos kits:</span>
+                  {kitsDoItem(l.itemKey).map((k) =>
+                    onAbrirKit ? (
+                      <AppButton key={k.id} type="button" variant="link" size="sm" onClick={() => onAbrirKit(k.id)} data-testid={`emendas-item-abrir-kit-${k.id}`}>
+                        {k.nome}
+                      </AppButton>
+                    ) : (
+                      <span key={k.id} style={{ fontWeight: 600 }}>
+                        {k.nome}
+                      </span>
+                    )
+                  )}
+                </div>
+              )}
             </div>
           )}
         />

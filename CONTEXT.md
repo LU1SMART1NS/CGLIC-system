@@ -38,7 +38,7 @@ Perfis: **A** = Coordenador (`admin`), **G** = Gestor de atas e contratos (`gest
 | Alocação | Itens às unidades | `/alocacao` | A G GS L |
 | Vínculos | Contratos à ata · Empenhos ao contrato · Empenhos aos itens | `/vinculacao/contratos` · `/vinculacao/empenhos-contrato` · `/vinculacao/empenhos-itens` | A G L |
 | Financeiro | Empenhos · Pagamentos · Previsão | `/empenhos` · `/pagamentos` · `/pagamentos/previsao` | A G L |
-| Emendas | Pedidos · Itens da CAEP · Por autor · Kits · Beneficiários | `/emendas/pedidos` · `/emendas/itens` · `/emendas/por-autor` · `/emendas/kits` · `/emendas/beneficiarios` | A GE L (edita: A GE) |
+| Emendas | Pedidos · Itens e kits (Por item · Por kit) · Por autor | `/emendas/pedidos` · `/emendas/itens` (`?ver=kit`; `/emendas/kits` redireciona) · `/emendas/por-autor` | A GE L (edita: A GE) |
 | Ajustes | Modelos de Gestão | `/configuracoes/modelos` | A G |
 | | Regras de Alertas · Feriados | `/admin/regras-alertas` · `/admin/feriados` | A |
 | | Unidades Internas | `/admin/departamentos` | A G GS L (edita: A GS) |
