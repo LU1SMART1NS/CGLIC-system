@@ -20,6 +20,7 @@ import { cnpjValido, consultarCep, consultarCnpj, localDoBeneficiario, rotuloBen
 
 const ok: FormularioBeneficiario = {
   nome: 'MJSP',
+  sigla: '',
   orgao: 'Polícia Militar',
   entregaCep: '70064-900',
   entregaLogradouro: 'Esplanada dos Ministérios Bloco T',
@@ -47,8 +48,8 @@ describe('pendenciasDoBeneficiario', () => {
 
   it('só o nome é obrigatório', () => {
     expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil' })).toEqual([]);
-    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome curto']);
-    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ' })).toEqual(['nome curto']);
+    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome da unidade']);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ' })).toEqual(['nome da unidade']);
   });
 
   it('o que vier preenchido vem certo', () => {

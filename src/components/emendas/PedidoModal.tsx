@@ -9,7 +9,7 @@ import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta, ROTULO_SITUACAO_KIT } from '../../utils/emendasKits';
 import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, valorDaLinha } from '../../utils/emendasPedidos';
-import { formatarTelefone, localDoBeneficiario, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
+import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
 import { QuadroGabinete } from './QuadroGabinete';
@@ -276,7 +276,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   <option value="">{l.beneficiarioNome ? `${l.beneficiarioNome} (a cadastrar)` : exigeBeneficiario ? 'Escolha o órgão' : 'A informar'}</option>
                   {ativosBen.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {[rotuloBeneficiario(b), localDoBeneficiario(b)].filter(Boolean).join(' · ')}
+                      {[nomeESigla(b), localDoBeneficiario(b)].filter(Boolean).join(' · ')}
                     </option>
                   ))}
                 </AppSelect>

@@ -32,6 +32,8 @@ export interface BeneficiarioEmenda {
   /** Nome curto do beneficiário, sem a cidade e a UF (ficam no endereço de entrega). Nome curto + município + UF não
    *  repetem (migrations 166 e 167). O nome do beneficiário é a razão social, da Receita. */
   nome: string;
+  /** Sigla da unidade ("27º BPM/M"), opcional (migration 168); aparece ao lado do nome. Não entra na identidade. */
+  sigla: string | null;
   /** Outras grafias do mesmo beneficiário (planilhas da CAEP e cadastros juntados). */
   outrosNomes: string[];
   /** PLANILHA = criado pela carga das planilhas da CAEP (migration 166). */
@@ -70,8 +72,11 @@ export interface BeneficiarioEmenda {
   atualizadoEm: string | null;
 }
 
-/** Como o beneficiário aparece nas listas: o nome curto (coluna nome desde a migration 167). */
+/** Nome da unidade por extenso (coluna nome). Nas listas a sigla vem ao lado, mais clara (NomeComSigla). */
 export const rotuloBeneficiario = (b: Pick<BeneficiarioEmenda, 'nome'>): string => b.nome;
+
+/** "27º Batalhão de Polícia Militar Metropolitano · 27º BPM/M" em texto corrido (opções de seleção, avisos). */
+export const nomeESigla = (b: Pick<BeneficiarioEmenda, 'nome' | 'sigla'>): string => (b.sigla ? `${b.nome} · ${b.sigla}` : b.nome);
 
 /** "Limeira - SP", só "SP" ou nada. */
 export function localDoBeneficiario(b: Pick<BeneficiarioEmenda, 'entregaMunicipio' | 'entregaUf'>): string | null {
@@ -147,6 +152,7 @@ function beneficiarioDoBanco(r: Record<string, any>): BeneficiarioEmenda {
     versao: r.versao,
     ativo: r.ativo,
     nome: r.nome,
+    sigla: r.sigla ?? null,
     outrosNomes: r.outros_nomes ?? [],
     origem: r.origem === 'PLANILHA' ? 'PLANILHA' : 'CADASTRO',
     cnpj: r.cnpj ?? null,
@@ -196,6 +202,7 @@ export async function salvarBeneficiarioEmenda(b: BeneficiarioParaSalvar): Promi
       versao: b.versao ?? null,
       ativo: b.ativo,
       nome: b.nome,
+      sigla: b.sigla,
       cnpj: b.cnpj,
       razao_social: b.razaoSocial,
       natureza_juridica: b.naturezaJuridica,

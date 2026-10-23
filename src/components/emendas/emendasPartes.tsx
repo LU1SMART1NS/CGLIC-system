@@ -91,6 +91,19 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
   return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} />;
 };
 
+/** Nome da unidade e, ao lado, a sigla mais clara (padrão "00001 · Ata 00055/2025" das carteiras). */
+export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigla'>; destaque?: boolean }> = ({ b, destaque }) => (
+  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
+    <span style={destaque ? carteiraIdentificacao : { fontWeight: 600 }}>{b.nome}</span>
+    {b.sigla && (
+      <>
+        <span style={ataEmCinza}>·</span>
+        <span style={ataEmCinza}>{b.sigla}</span>
+      </>
+    )}
+  </div>
+);
+
 /**
  * Beneficiário da linha: o nome, embaixo o órgão e embaixo Cidade - UF (migration 166). Linha só com o nome da
  * planilha (antes do cadastro) mostra o nome e "A cadastrar".
@@ -102,7 +115,7 @@ export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficia
     const orgao = orgaoAbaixoDoNome(b, rotuloBeneficiario(b));
     return (
       <>
-        <div style={{ fontWeight: 600 }}>{rotuloBeneficiario(b)}</div>
+        <NomeComSigla b={b} />
         {orgao && <div style={carteiraSubtitle}>{orgao}</div>}
         {local && <div style={carteiraSubtitle}>{local}</div>}
         {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}

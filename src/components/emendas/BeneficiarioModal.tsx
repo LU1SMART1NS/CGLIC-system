@@ -44,6 +44,7 @@ function receitaDoCadastro(b: BeneficiarioEmenda): DadosDaReceita | null {
 function formularioDe(b: BeneficiarioEmenda | null): Formulario {
   return {
     nome: b?.nome ?? '',
+    sigla: b?.sigla ?? '',
     orgao: b?.orgao ?? '',
     entregaCep: formatarCep(b?.entregaCep),
     entregaLogradouro: b?.entregaLogradouro ?? '',
@@ -158,6 +159,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
       versao: beneficiario?.versao,
       ativo: beneficiario?.ativo ?? true,
       nome: f.nome.trim(),
+      sigla: f.sigla.trim() || null,
       cnpj: receita?.cnpj ?? null,
       razaoSocial: receita?.razaoSocial || null,
       naturezaJuridica: receita?.naturezaJuridica ?? null,
@@ -290,8 +292,8 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
         </div>
 
         <AppInput
-          label="Nome curto *"
-          hint="Como a CAEP chama a unidade nas listas, sem a cidade e a UF (ex.: 10º BPM (PMCE)). Com o município e a UF, não pode repetir."
+          label="Nome da unidade *"
+          hint="Por extenso, só a unidade (ex.: 27º Batalhão de Polícia Militar Metropolitano). O órgão, a cidade e a UF ficam nos campos próprios. Com o município e a UF, não pode repetir."
           value={f.nome}
           maxLength={300}
           onChange={(e) => muda('nome', e.target.value)}
@@ -329,14 +331,17 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
           </div>
         )}
 
-        <AppSelect label="Órgão" hint="Coluna ÓRGÃO do Anexo da reserva." value={f.orgao} onChange={(e) => muda('orgao', e.target.value)} data-testid="emendas-beneficiario-orgao">
-          <option value="">A informar</option>
-          {ORGAOS_BENEFICIARIO.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </AppSelect>
+        <div style={grade('repeat(auto-fit, minmax(min(100%, 220px), 1fr))')}>
+          <AppInput label="Sigla" hint="Como a unidade é chamada (ex.: 27º BPM/M, 16º GBM). Aparece ao lado do nome." value={f.sigla} maxLength={40} onChange={(e) => muda('sigla', e.target.value)} data-testid="emendas-beneficiario-sigla" />
+          <AppSelect label="Órgão" hint="Coluna ÓRGÃO do Anexo da reserva." value={f.orgao} onChange={(e) => muda('orgao', e.target.value)} data-testid="emendas-beneficiario-orgao">
+            <option value="">A informar</option>
+            {ORGAOS_BENEFICIARIO.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </AppSelect>
+        </div>
 
         <div style={secao}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
