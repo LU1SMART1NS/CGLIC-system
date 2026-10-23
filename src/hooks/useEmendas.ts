@@ -10,6 +10,7 @@ import {
   salvarKitEmenda,
   fetchPedidosEmendas,
   fetchReservadoPorItem,
+  fetchNotasDasLinhas,
   salvarPedidoEmenda,
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
@@ -72,6 +73,11 @@ export function usePedidosEmendas() {
 
 export function useReservadoPorItem() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'reservado'], queryFn: fetchReservadoPorItem });
+}
+
+/** Nota de empenho e execução de cada linha empenhada (migration 164; o banco refaz de hora em hora). */
+export function useNotasDasLinhas() {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'notas'], queryFn: fetchNotasDasLinhas, staleTime: 5 * 60_000 });
 }
 
 /** Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). */

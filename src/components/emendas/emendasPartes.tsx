@@ -5,9 +5,11 @@ import { carteiraDescricaoItem, carteiraIdentificacao, carteiraSubtitle } from '
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
-import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda } from '../../utils/emendasPedidos';
+import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ROTULO_MOTIVO_SEM_NOTA, ROTULO_REGRA_DA_NOTA, type ExecucaoDoPedido } from '../../utils/emendasPedidos';
+import { numeroDaChave } from '../../utils/contractKeyUtils';
+import { formatCurrency } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, LinhaPedido } from '../../services/emendasService';
+import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, LinhaPedido, NotaDaLinha } from '../../services/emendasService';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
@@ -116,34 +118,66 @@ export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficia
 };
 
 /** Empenho da linha: a nota, quando já se sabe; antes, o documento SEI do empenho. Embaixo, o contrato. */
-export const EmpenhoDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'notaEmpenho' | 'empenhoDocumentoSei' | 'contratoNumero'>; podeVerContratos: boolean }> = ({ linha, podeVerContratos }) => {
-  const chave = chaveDoContratoDaEmenda(linha.contratoNumero);
-  if (!linha.notaEmpenho && !linha.empenhoDocumentoSei && !linha.contratoNumero) return <span style={carteiraSubtitle}>—</span>;
+export const EmpenhoDaLinha: React.FC<{
+  linha: Pick<LinhaPedido, 'notaEmpenho' | 'empenhoDocumentoSei' | 'contratoNumero'>;
+  /** Nota achada pelo plano interno (migration 164); a digitada pela CAEP vale mais. */
+  achada?: NotaDaLinha;
+  podeVerContratos: boolean;
+}> = ({ linha, achada, podeVerContratos }) => {
+  const chave = achada?.contractKey ?? chaveDoContratoDaEmenda(linha.contratoNumero);
+  const contrato = achada?.contractKey ? numeroDaChave(achada.contractKey) : linha.contratoNumero;
+  if (!linha.notaEmpenho && !achada?.nota && !linha.empenhoDocumentoSei && !contrato) return <span style={carteiraSubtitle}>—</span>;
   return (
     <>
       {linha.notaEmpenho ? (
         <div style={{ fontWeight: 700 }}>{linha.notaEmpenho}</div>
+      ) : achada?.nota ? (
+        <>
+          <div style={{ fontWeight: 700 }}>{achada.nota}</div>
+          {achada.regra && <div style={carteiraSubtitle}>{ROTULO_REGRA_DA_NOTA[achada.regra]}</div>}
+        </>
       ) : linha.empenhoDocumentoSei ? (
         <>
           <div style={{ fontWeight: 600 }}>doc. SEI {linha.empenhoDocumentoSei}</div>
-          <div style={carteiraSubtitle}>nota a localizar</div>
+          <div style={carteiraSubtitle}>{achada?.motivo ? `nota não achada: ${ROTULO_MOTIVO_SEM_NOTA[achada.motivo]}` : 'nota a localizar'}</div>
         </>
       ) : null}
-      {linha.contratoNumero && (
+      {contrato && (
         <div style={carteiraSubtitle}>
           Contrato{' '}
           {podeVerContratos && chave ? (
             <Link to={`/contratos/${encodeURIComponent(chave)}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--primary)', fontWeight: 700 }}>
-              {linha.contratoNumero}
+              {contrato}
             </Link>
           ) : (
-            linha.contratoNumero
+            contrato
           )}
         </div>
       )}
     </>
   );
 };
+
+/** Execução do pedido empenhado pelas notas achadas: empenhado, liquidado, pago e a próxima entrega prevista. */
+export const ExecucaoDoPedidoResumo: React.FC<{ execucao: ExecucaoDoPedido }> = ({ execucao: e }) => (
+  <div
+    data-testid="emendas-pedido-execucao"
+    style={{ fontSize: '0.8rem', color: 'var(--color-info-text, #155bcb)', background: 'var(--color-info-bg, #e6eefb)', borderRadius: 6, padding: '0.5rem 0.7rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+  >
+    <div style={{ fontWeight: 700 }}>
+      {e.notas
+        ? `${e.notas} ${e.notas === 1 ? 'nota' : 'notas'}: empenhado ${formatCurrency(e.empenhado)} · liquidado ${formatCurrency(e.liquidado)} · pago ${formatCurrency(e.pago)}`
+        : 'Nenhuma nota achada ainda.'}
+    </div>
+    <div>
+      {e.proximaEntrega
+        ? `Próxima entrega prevista: ${dataBR(e.proximaEntrega.data)}${e.proximaEntrega.valor != null ? ` (${formatCurrency(e.proximaEntrega.valor)})` : ''}, informada pelo gestor do contrato.`
+        : 'Entrega prevista: o gestor do contrato ainda não informou.'}
+      {e.linhasSemNota > 0 && ` ${e.linhasSemNota} ${e.linhasSemNota === 1 ? 'linha' : 'linhas'} sem nota.`}
+    </div>
+    <div style={{ fontWeight: 400 }}>Os valores são das notas inteiras, que podem ter outros itens da mesma emenda no contrato. A entrega ao beneficiário será registrada pelo módulo de Fiscalização.</div>
+  </div>
+);
 
 /** O que não bate entre as planilhas da CAEP nesta linha (migration 160). */
 export const AConferirDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'aConferir' | 'planilhaRef'> }> = ({ linha }) =>
