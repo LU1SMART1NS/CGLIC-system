@@ -26,6 +26,7 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarSaldoContabilPendentes: vi.fn(async () => ({ leituras: 10, anosFechados: 0, amostraPagoNoAno: 22 })),
     sincronizarAutoresEmendas: vi.fn(async () => sucesso(27)),
     contarAutoresEmendas: vi.fn(async () => ({ legislatura: 57, deputados: 648, deputadosNoCargo: 513, senadores: 126, senadoresNoCargo: 81 })),
+    medirEmendasDoPortal: vi.fn(async () => ({ ano2026: { emendas: 12 } })),
     chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
@@ -262,5 +263,19 @@ describe('autores das emendas', () => {
     const r = await executarPedido({ recurso: 'autores_emendas', forcar: false, dry: true }, d);
     expect(d.sincronizarAutoresEmendas).not.toHaveBeenCalled();
     expect(r).toMatchObject({ dry: true, consulta: { deputados: 648, senadores: 126 } });
+  });
+});
+
+describe('medição das emendas do Portal', () => {
+  it('só em modo de teste: mede com a chave do servidor e não grava', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'emendas_portal', forcar: false, dry: true }, d);
+    expect(d.medirEmendasDoPortal).toHaveBeenCalledWith(expect.objectContaining({ chave: 'chave-de-teste' }));
+    expect(r).toMatchObject({ dry: true, consulta: { ano2026: { emendas: 12 } } });
+  });
+
+  it('fora do modo de teste recusa', async () => {
+    const r = await executarPedido({ recurso: 'emendas_portal', forcar: false, dry: false }, deps());
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'ERRO' } });
   });
 });
