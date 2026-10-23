@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
-import { carteiraDescricaoItem, carteiraFornecedor, carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDescricaoItem, carteiraDetalhe, carteiraFornecedor, carteiraIdentificacao, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
@@ -18,18 +18,20 @@ const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADO
  * definir" e, embaixo, para qual órgão a CAEP separou.
  */
 export const AutorDoPedido: React.FC<{ autor: AutorEmenda | undefined; autorId: string | null; orgao?: string | null; destaque?: boolean }> = ({ autor, autorId, orgao, destaque }) => {
-  const nome: React.CSSProperties = destaque ? carteiraIdentificacao : { fontWeight: 600 };
+  // Como coluna de identificação (destaque): nome forte e azul e a 2ª linha da Ata; nas outras colunas, valor e detalhe.
+  const nome: React.CSSProperties = destaque ? carteiraIdentificacao : carteiraValor;
+  const segunda: React.CSSProperties = destaque ? { ...carteiraSubtitle, marginTop: '0.15rem' } : carteiraDetalhe;
   if (!autorId)
     return (
       <>
         <div style={{ ...nome, color: 'var(--color-warning-text)' }}>{AUTOR_A_DEFINIR}</div>
-        <div style={carteiraSubtitle}>{orgao ? `Reserva para ${orgao}` : 'Reserva para um órgão'}</div>
+        <div style={segunda}>{orgao ? `Reserva para ${orgao}` : 'Reserva para um órgão'}</div>
       </>
     );
   return (
     <>
       <div style={nome}>{autor?.nome ?? autorId}</div>
-      {autor && <div style={carteiraSubtitle}>{[TIPO[autor.tipo], autor.partido, autor.uf].filter(Boolean).join(' · ')}</div>}
+      {autor && <div style={segunda}>{[TIPO[autor.tipo], autor.partido, autor.uf].filter(Boolean).join(' · ')}</div>}
     </>
   );
 };
@@ -57,12 +59,12 @@ export const ItemDaAta: React.FC<{ item: Pick<ItemCaep, 'numeroAta' | 'numeroIte
 
 /** Vigência igual à Carteira de Itens: a pílula do prazo e "até dd/mm/aaaa" embaixo. */
 export const VigenciaDaAta: React.FC<{ item: Pick<ItemCaep, 'vigenciaFinal' | 'ataEncerrada'> | null | undefined; hoje: string }> = ({ item, hoje }) => {
-  if (!item) return <span style={carteiraSubtitle}>—</span>;
+  if (!item) return <span style={carteiraDetalhe}>—</span>;
   const dias = item.vigenciaFinal ? diasEntre(hoje, item.vigenciaFinal) : null;
   return (
     <>
       <CarteiraPrazoPill faixa={classifyPrazo(dias, item.ataEncerrada)} diasRestantes={dias} />
-      {item.vigenciaFinal && <div style={{ ...ataEmCinza, fontWeight: 600, marginTop: '0.2rem' }}>até {dataBR(item.vigenciaFinal)}</div>}
+      {item.vigenciaFinal && <div style={carteiraDetalhe}>até {dataBR(item.vigenciaFinal)}</div>}
     </>
   );
 };
@@ -95,9 +97,9 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
   // Até duas linhas: nome longo termina em "…". Ao passar o mouse: nome inteiro e, se houver, CNPJ e razão social.
   <div
     title={[b.sigla ? `${b.nome} · ${b.sigla}` : b.nome, b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)}${b.razaoSocial ? ` · ${b.razaoSocial}` : ''}` : null].filter(Boolean).join('\n')}
-    style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.35 }}
+    style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: destaque ? undefined : 1.35 }}
   >
-    <span style={destaque ? carteiraIdentificacao : { fontWeight: 600 }}>{b.nome}</span>
+    <span style={destaque ? carteiraIdentificacao : carteiraValor}>{b.nome}</span>
     {b.sigla && <span style={{ ...ataEmCinza, marginLeft: '0.4rem' }}>· {b.sigla}</span>}
   </div>
 );
@@ -108,7 +110,7 @@ export const RazaoELocal: React.FC<{ b: Pick<BeneficiarioEmenda, 'razaoSocial' |
   return (
     <>
       {b.razaoSocial && <div style={carteiraFornecedor}>{b.razaoSocial}</div>}
-      {local && <div style={carteiraSubtitle}>{local}</div>}
+      {local && <div style={carteiraDetalhe}>{local}</div>}
     </>
   );
 };
@@ -131,7 +133,7 @@ export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficia
   if (linha.beneficiarioNome) {
     return (
       <>
-        <div style={{ fontWeight: 600 }}>{linha.beneficiarioNome}</div>
+        <div style={carteiraValor}>{linha.beneficiarioNome}</div>
         <StatusBadge label="A cadastrar" variant="warning" size="sm" dot={false} />
       </>
     );
@@ -148,7 +150,7 @@ export const EmpenhoDaLinha: React.FC<{
 }> = ({ linha, achada, podeVerContratos }) => {
   const chave = achada?.contractKey ?? chaveDoContratoDaEmenda(linha.contratoNumero);
   const contrato = achada?.contractKey ? numeroDaChave(achada.contractKey) : linha.contratoNumero;
-  if (!linha.notaEmpenho && !achada?.nota && !linha.empenhoDocumentoSei && !contrato) return <span style={carteiraSubtitle}>—</span>;
+  if (!linha.notaEmpenho && !achada?.nota && !linha.empenhoDocumentoSei && !contrato) return <span style={carteiraDetalhe}>—</span>;
   return (
     <>
       {linha.notaEmpenho ? (
@@ -156,16 +158,16 @@ export const EmpenhoDaLinha: React.FC<{
       ) : achada?.nota ? (
         <>
           <div style={{ fontWeight: 700 }}>{achada.nota}</div>
-          {achada.regra && <div style={carteiraSubtitle}>{ROTULO_REGRA_DA_NOTA[achada.regra]}</div>}
+          {achada.regra && <div style={carteiraDetalhe}>{ROTULO_REGRA_DA_NOTA[achada.regra]}</div>}
         </>
       ) : linha.empenhoDocumentoSei ? (
         <>
-          <div style={{ fontWeight: 600 }}>doc. SEI {linha.empenhoDocumentoSei}</div>
-          <div style={carteiraSubtitle}>{achada?.motivo ? `nota não achada: ${ROTULO_MOTIVO_SEM_NOTA[achada.motivo]}` : 'nota a localizar'}</div>
+          <div style={carteiraValor}>doc. SEI {linha.empenhoDocumentoSei}</div>
+          <div style={carteiraDetalhe}>{achada?.motivo ? `nota não achada: ${ROTULO_MOTIVO_SEM_NOTA[achada.motivo]}` : 'nota a localizar'}</div>
         </>
       ) : null}
       {contrato && (
-        <div style={carteiraSubtitle}>
+        <div style={carteiraDetalhe}>
           Contrato{' '}
           {podeVerContratos && chave ? (
             <Link to={`/contratos/${encodeURIComponent(chave)}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--primary)', fontWeight: 700 }}>

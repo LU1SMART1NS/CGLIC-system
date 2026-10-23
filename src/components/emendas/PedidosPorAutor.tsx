@@ -2,7 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
-import { carteiraSubtitle } from '../carteira/carteiraStyles';
+import { CarteiraPagination } from '../carteira/CarteiraPagination';
+import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
+import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { AUTOR_A_DEFINIR, linhasAtivas, valorDoPedido } from '../../utils/emendasPedidos';
@@ -26,6 +29,18 @@ const TIPOS: Array<{ value: TipoAutor; label: string }> = [
   { value: 'SENADOR', label: 'Senadores' },
   { value: 'BANCADA', label: 'Bancadas' }
 ];
+
+const POR_PAGINA = 25;
+const chaveDaLinha = (l: Linha) => l.autorId ?? AUTOR_A_DEFINIR_CHAVE;
+// Ordenação pelo cabeçalho, como nas carteiras (?ordem=); sem escolha, quem tem mais valor primeiro.
+const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
+  autor: { value: (l) => (l.autorId ? l.autor?.nome ?? l.autorId : null) },
+  pedidos: { value: (l) => l.pedidos, firstDir: 'desc' },
+  kits: { value: (l) => l.kits, firstDir: 'desc' },
+  valor: { value: (l) => l.valor, firstDir: 'desc' },
+  empenhado: { value: (l) => l.empenhado, firstDir: 'desc' }
+};
+const vazio = <span style={{ ...carteiraDetalhe, marginTop: 0 }}>—</span>;
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -85,14 +100,34 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
   const filtradas = doTipo.filter((l) => (!uf || l.autor?.uf === uf) && (!termo || semAcento(`${l.autorId ? l.autor?.nome ?? '' : AUTOR_A_DEFINIR} ${l.autor?.partido ?? ''}`).includes(termo)));
   const ufs = [...new Set(doTipo.map((l) => l.autor?.uf).filter((x): x is string => Boolean(x)))].sort().map((v) => ({ value: v, label: v, count: doTipo.filter((l) => l.autor?.uf === v).length }));
   const filtrosAtivos = Boolean(termo || tipo || uf || mostrar);
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ORDEM);
+  const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
 
   const colunas: Column<Linha>[] = [
-    { key: 'autor', header: 'Autor', priority: 'primary', minWidth: '220px', render: (l) => <AutorDoPedido autor={l.autor} autorId={l.autorId} /> },
-    { key: 'pedidos', header: 'Pedidos', align: 'right', nowrap: true, render: (l) => formatNumber(l.pedidos) },
-    { key: 'kits', header: 'Kits', align: 'right', nowrap: true, render: (l) => (l.kits ? formatNumber(l.kits) : <span style={carteiraSubtitle}>—</span>) },
-    { key: 'valor', header: todasAsEtapas ? 'Valor reservado' : 'Valor nesta etapa', align: 'right', nowrap: true, render: (l) => <b>{formatCurrency(l.valor)}</b> },
+    { key: 'autor', header: 'Autor', priority: 'primary', minWidth: '220px', sortValue: ORDEM.autor.value, render: (l) => <AutorDoPedido autor={l.autor} autorId={l.autorId} destaque /> },
+    { key: 'pedidos', header: 'Pedidos', align: 'right', nowrap: true, sortValue: ORDEM.pedidos.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatNumber(l.pedidos)}</span> },
+    { key: 'kits', header: 'Kits', align: 'right', nowrap: true, sortValue: ORDEM.kits.value, sortFirstDir: 'desc', render: (l) => (l.kits ? <span style={carteiraNumero}>{formatNumber(l.kits)}</span> : vazio) },
+    {
+      key: 'valor',
+      header: todasAsEtapas ? 'Valor reservado' : 'Valor nesta etapa',
+      align: 'right',
+      nowrap: true,
+      sortValue: ORDEM.valor.value,
+      sortFirstDir: 'desc',
+      render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(l.valor)}</span>
+    },
     ...(todasAsEtapas
-      ? [{ key: 'empenhado', header: 'Já empenhado', align: 'right', nowrap: true, render: (l: Linha) => (l.empenhado ? formatCurrency(l.empenhado) : <span style={carteiraSubtitle}>—</span>) } satisfies Column<Linha>]
+      ? [
+          {
+            key: 'empenhado',
+            header: 'Já empenhado',
+            align: 'right',
+            nowrap: true,
+            sortValue: ORDEM.empenhado.value,
+            sortFirstDir: 'desc',
+            render: (l: Linha) => (l.empenhado ? <span style={carteiraNumero}>{formatCurrency(l.empenhado)}</span> : vazio)
+          } satisfies Column<Linha>
+        ]
       : [])
   ];
 
@@ -145,11 +180,14 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
         <DataTable<Linha>
           testId="emendas-por-autor-tabela"
           className="data-table-container--flush"
-          data={filtradas}
-          keyExtractor={(l) => l.autorId ?? AUTOR_A_DEFINIR_CHAVE}
+          data={pageItems}
+          keyExtractor={chaveDaLinha}
+          sort={{ key: sortKey, dir: sortDir }}
+          onSort={toggle}
           columns={colunas}
           rowOpen={(l) => (l.pedidos > 0 ? () => onAbrirAutor(l.autorId ?? AUTOR_A_DEFINIR_CHAVE) : null)}
         />
+        <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={sorted.length} onChange={setPage} testIdPrefix="emendas-por-autor" />
       </AdminListShell>
     </>
   );

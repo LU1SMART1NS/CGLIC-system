@@ -12,13 +12,14 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { PainelBotoesGavetas, PainelGaveta } from '../instrumentos/PainelGavetas';
 import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useNotasDasLinhas, usePedidosEmendas } from '../../hooks/useEmendas';
 import { formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
-import { AVISO_SEM_OFICIO_DIAS, avisoGrave, identificacaoDoPedido, itensDaLinha, linhasAtivas, ROTULO_ETAPA, type TipoAviso } from '../../utils/emendasPedidos';
+import { AVISO_SEM_OFICIO_DIAS, avisoGrave, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_ETAPA, ROTULO_ETAPA, type TipoAviso } from '../../utils/emendasPedidos';
 import { prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
 import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha } from '../../services/emendasService';
 import { AutorDoPedido, ItemDaAta } from './emendasPartes';
@@ -103,7 +104,21 @@ export const EmendasInicioPage: React.FC = () => {
     () => (abaAtiva === 'todas' ? r.pedidosComAviso : r.pedidosComAviso.filter((p) => p.avisos.some((a) => a.tipo === abaAtiva))),
     [r.pedidosComAviso, abaAtiva]
   );
-  const { currentPage, setPage, pageItems } = useCarteiraPagination(lista, chave, POR_PAGINA);
+  // Item do aviso ou o primeiro item do pedido: o mesmo que a coluna Item · ata mostra.
+  const itemDaLinha = (x: PedidoComAviso): ItemCaep | undefined =>
+    x.itemDoAviso ?? linhasAtivas(x.pedido).flatMap((l) => itensDaLinha(l)).map((i) => itens.get(i.itemKey)).find((i): i is ItemCaep => Boolean(i));
+  // Como nas carteiras: ordena pelo cabeçalho (?ordem=) antes de paginar; sem escolha, do mais urgente ao menos urgente.
+  const ordem = useMemo<Record<string, CarteiraSortColumn<PedidoComAviso>>>(
+    () => ({
+      autor: { value: (x) => (x.pedido.autorId ? autorPorId.get(x.pedido.autorId)?.nome ?? x.pedido.autorId : null) },
+      etapa: { value: (x) => ORDEM_ETAPA[x.pedido.etapa] },
+      item: { value: (x) => itemDaLinha(x)?.descricao }
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [autorPorId, itens]
+  );
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(lista, ordem);
+  const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chave, POR_PAGINA);
 
   const vermelhos = (Object.keys(NO_CARTAO_GRAVE) as TipoAviso[])
     .filter((t) => r.porTipo[t] > 0)
@@ -128,10 +143,11 @@ export const EmendasInicioPage: React.FC = () => {
       header: 'Parlamentar',
       priority: 'primary',
       minWidth: '200px',
+      sortValue: ordem.autor.value,
       render: ({ pedido: p }) => (
         <>
           <AutorDoPedido autor={p.autorId ? autorPorId.get(p.autorId) : undefined} autorId={p.autorId} destaque />
-          <div style={carteiraSubtitle}>{identificacaoDoPedido(p)}</div>
+          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>{identificacaoDoPedido(p)}</div>
         </>
       )
     },
@@ -139,6 +155,7 @@ export const EmendasInicioPage: React.FC = () => {
       key: 'etapa',
       header: 'Etapa',
       nowrap: true,
+      sortValue: ordem.etapa.value,
       render: ({ pedido: p }) => <StatusBadge label={ROTULO_ETAPA[p.etapa]} variant={VARIANTE_ETAPA[p.etapa]} size="sm" dot={false} />
     },
     {
@@ -150,7 +167,7 @@ export const EmendasInicioPage: React.FC = () => {
         return (
           <span title={avisos.map((a) => a.texto).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} data-testid={`emendas-inicio-aviso-${p.id}`}>
             <StatusBadge label={primeiro.curto} variant={avisoGrave(primeiro) ? 'danger' : 'warning'} size="sm" dot={false} />
-            {outros.length > 0 && <span style={{ ...carteiraSubtitle, fontWeight: 700 }}>+{outros.length}</span>}
+            {outros.length > 0 && <span style={{ ...carteiraDetalhe, fontWeight: 700 }}>+{outros.length}</span>}
           </span>
         );
       }
@@ -159,14 +176,15 @@ export const EmendasInicioPage: React.FC = () => {
       key: 'item',
       header: 'Item · ata',
       minWidth: '240px',
-      render: ({ pedido: p, itemDoAviso }) => {
-        if (itemDoAviso) return <ItemDaAta item={itemDoAviso} />;
-        const ativas = linhasAtivas(p);
-        const primeiro = ativas.flatMap((l) => itensDaLinha(l)).map((x) => itens.get(x.itemKey)).find((i): i is ItemCaep => Boolean(i));
+      sortValue: ordem.item.value,
+      render: (x) => {
+        if (x.itemDoAviso) return <ItemDaAta item={x.itemDoAviso} />;
+        const ativas = linhasAtivas(x.pedido);
+        const primeiro = itemDaLinha(x);
         return (
           <>
-            {primeiro ? <div style={{ fontWeight: 600 }}>{curto(primeiro.descricao, 48)}</div> : <span style={carteiraSubtitle}>—</span>}
-            {ativas.length > 1 && <div style={carteiraSubtitle}>{plural(ativas.length, 'linha', 'linhas')} no pedido</div>}
+            {primeiro ? <div style={carteiraValor}>{curto(primeiro.descricao, 48)}</div> : <span style={carteiraDetalhe}>—</span>}
+            {ativas.length > 1 && <div style={carteiraDetalhe}>{plural(ativas.length, 'linha', 'linhas')} no pedido</div>}
           </>
         );
       }
@@ -175,22 +193,23 @@ export const EmendasInicioPage: React.FC = () => {
       key: 'prazo',
       header: 'Prazo',
       minWidth: '160px',
-      render: ({ avisos, itemDoAviso }) => <span style={{ ...carteiraSubtitle, fontWeight: 600 }}>{prazoDoAviso(avisos[0], itemDoAviso, hoje)}</span>
+      render: ({ avisos, itemDoAviso }) => <span style={carteiraValor}>{prazoDoAviso(avisos[0], itemDoAviso, hoje)}</span>
     }
   ];
 
   const colunasLivre: Column<ItemLivrePertoDoFim>[] = [
-    { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', render: (x) => <ItemDaAta item={x.item} /> },
-    { key: 'livre', header: 'Livre', align: 'right', nowrap: true, render: (x) => <b>{formatNumber(x.livre)}</b> },
-    { key: 'alocado', header: 'Alocado', align: 'right', nowrap: true, render: (x) => formatNumber(x.item.alocado) },
+    { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (x) => x.item.descricao, render: (x) => <ItemDaAta item={x.item} /> },
+    { key: 'livre', header: 'Livre', align: 'right', nowrap: true, sortValue: (x) => x.livre, sortFirstDir: 'desc', render: (x) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(x.livre)}</span> },
+    { key: 'alocado', header: 'Alocado', align: 'right', nowrap: true, sortValue: (x) => x.item.alocado, sortFirstDir: 'desc', render: (x) => <span style={carteiraNumero}>{formatNumber(x.item.alocado)}</span> },
     {
       key: 'fim',
       header: 'Fim da ata',
       nowrap: true,
+      sortValue: (x) => x.item.vigenciaFinal,
       render: (x) => (
         <>
-          <div>{dataBR(x.item.vigenciaFinal)}</div>
-          <div style={carteiraSubtitle}>em {plural(x.diasParaVencer, 'dia', 'dias')}</div>
+          <div style={carteiraValor}>{dataBR(x.item.vigenciaFinal)}</div>
+          <div style={carteiraDetalhe}>em {plural(x.diasParaVencer, 'dia', 'dias')}</div>
         </>
       )
     },
@@ -204,7 +223,7 @@ export const EmendasInicioPage: React.FC = () => {
         ) : (
           <>
             <StatusBadge label={dataBR(x.indicarAte)} variant="warning" size="sm" dot={false} />
-            <div style={carteiraSubtitle}>faltam {plural(x.diasParaVencer - corteIndicacaoDias(), 'dia', 'dias')}</div>
+            <div style={carteiraDetalhe}>faltam {plural(x.diasParaVencer - corteIndicacaoDias(), 'dia', 'dias')}</div>
           </>
         )
     }
@@ -331,6 +350,8 @@ export const EmendasInicioPage: React.FC = () => {
           className="data-table-container--flush emendas-tabela-topo"
           data={pageItems}
           keyExtractor={chave}
+          sort={{ key: sortKey, dir: sortDir }}
+          onSort={toggle}
           columns={colunas}
           rowOpen={(l) => () => navigate(`/emendas/pedidos?pedido=${l.pedido.id}`)}
         />
