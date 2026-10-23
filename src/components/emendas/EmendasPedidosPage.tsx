@@ -13,7 +13,8 @@ import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import {
   hojeEmBrasilia,
@@ -178,7 +179,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
       header: 'Beneficiário',
       render: (l) => <BeneficiarioDaLinha linha={l} beneficiarios={beneficiarios} />
     },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => formatCurrency(valorDaLinha(l, itens)) },
+    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <span style={carteiraNumero}>{formatCurrency(valorDaLinha(l, itens))}</span> },
     { key: 'ne', header: 'Empenho e contrato', nowrap: true, render: (l) => <EmpenhoDaLinha linha={l} achada={notas.get(l.id)} podeVerContratos={podeVerContratos} /> }
   ];
   const canceladas = p.linhas.filter((l) => l.cancelada);
@@ -310,7 +311,18 @@ export const EmendasPedidosPage: React.FC = () => {
       });
   }, [doSegmento, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios]);
 
-  const { currentPage, setPage, pageItems } = useCarteiraPagination(filtradas, chaveDaLinha, POR_PAGINA);
+  // Como nas carteiras: ordena pelo cabeçalho (?ordem=) antes de paginar.
+  const ordem = useMemo<Record<string, CarteiraSortColumn<Linha>>>(
+    () => ({
+      autor: { value: (l) => (l.autorId ? autorPorId.get(l.autorId)?.nome ?? l.autorId : null) },
+      valor: { value: (l) => l.valor, firstDir: 'desc' },
+      etapa: { value: (l) => ORDEM_ETAPA[l.etapa] },
+      aviso: { value: (l) => (l.avisos.length ? l.avisos.length + (l.avisos.some(avisoGrave) ? 100 : 0) : null), firstDir: 'desc' }
+    }),
+    [autorPorId]
+  );
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ordem);
+  const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
   const filtrosAtivos = Boolean(busca.trim() || filtroAviso || soPedido || filtroAutor);
   // Autores com pedido na etapa escolhida, os que têm mais pedidos primeiro; "Parlamentar a definir" no fim.
   const opcoesDeAutor = useMemo(() => {
@@ -329,6 +341,7 @@ export const EmendasPedidosPage: React.FC = () => {
       header: 'Autor',
       priority: 'primary',
       minWidth: '200px',
+      sortValue: ordem.autor.value,
       render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} orgao={orgaoDoPedido(l, nomeDoBeneficiario)} destaque />
     },
     {
@@ -343,25 +356,26 @@ export const EmendasPedidosPage: React.FC = () => {
           .join(' · ');
         return (
           <>
-            <div style={{ fontWeight: 600 }}>{resumo}</div>
-            {ativas.length > 2 && <div style={carteiraSubtitle}>+{ativas.length - 2} {ativas.length - 2 === 1 ? 'linha' : 'linhas'}</div>}
+            <div style={carteiraValor}>{resumo}</div>
+            {ativas.length > 2 && <div style={carteiraDetalhe}>+{ativas.length - 2} {ativas.length - 2 === 1 ? 'linha' : 'linhas'}</div>}
           </>
         );
       }
     },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => formatCurrency(l.valor) },
+    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, sortValue: ordem.valor.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatCurrency(l.valor)}</span> },
     {
       key: 'etapa',
       header: 'Etapa',
       nowrap: true,
+      sortValue: ordem.etapa.value,
       // Sem coluna própria para a reserva (repetia a etapa): o documento que marca a etapa fica embaixo dela.
       render: (l) => {
         const documento = l.oficioNumero ?? (l.siopEmenda ? `Emenda ${l.siopEmenda}` : null);
         return (
           <>
             <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
-            {documento && <div style={{ ...carteiraSubtitle, marginTop: '0.25rem' }}>{documento}</div>}
-            {l.oficioProcessoSei && <div style={carteiraSubtitle}>SEI {l.oficioProcessoSei}</div>}
+            {documento && <div style={carteiraDetalhe}>{documento}</div>}
+            {l.oficioProcessoSei && <div style={{ ...carteiraDetalhe, marginTop: documento ? 0 : carteiraDetalhe.marginTop }}>SEI {l.oficioProcessoSei}</div>}
           </>
         );
       }
@@ -371,13 +385,15 @@ export const EmendasPedidosPage: React.FC = () => {
       key: 'aviso',
       header: 'Aviso',
       nowrap: true,
+      sortValue: ordem.aviso.value,
+      sortFirstDir: 'desc',
       render: (l) => {
         const [primeiro, ...outros] = l.avisos;
-        if (!primeiro) return <span style={carteiraSubtitle}>—</span>;
+        if (!primeiro) return <span style={carteiraDetalhe}>—</span>;
         return (
           <span title={l.avisos.map((a) => a.texto).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} data-testid={`emendas-pedido-aviso-${l.id}`}>
             <StatusBadge label={primeiro.curto} variant={avisoGrave(primeiro) ? 'danger' : 'warning'} size="sm" dot={false} />
-            {outros.length > 0 && <span style={{ ...carteiraSubtitle, fontWeight: 700 }}>+{outros.length}</span>}
+            {outros.length > 0 && <span style={{ ...carteiraDetalhe, fontWeight: 700 }}>+{outros.length}</span>}
           </span>
         );
       }
@@ -510,6 +526,8 @@ export const EmendasPedidosPage: React.FC = () => {
               className="data-table-container--flush emendas-tabela-topo"
               data={pageItems}
               keyExtractor={chaveDaLinha}
+              sort={{ key: sortKey, dir: sortDir }}
+              onSort={toggle}
               rowStyle={(l) => (l.etapa === 'CANCELADO' ? { opacity: 0.7 } : undefined)}
               expandedKeys={abertos}
               onToggleExpand={(id) =>
@@ -535,7 +553,7 @@ export const EmendasPedidosPage: React.FC = () => {
                 />
               )}
             />
-            <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={filtradas.length} onChange={setPage} testIdPrefix="emendas-pedidos" />
+            <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={sorted.length} onChange={setPage} testIdPrefix="emendas-pedidos" />
           </AdminListShell>
         </>
       )}
