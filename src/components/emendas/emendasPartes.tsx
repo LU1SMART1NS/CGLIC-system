@@ -113,11 +113,8 @@ export const RazaoELocal: React.FC<{ b: Pick<BeneficiarioEmenda, 'razaoSocial' |
   );
 };
 
-/**
- * Beneficiário da linha: o nome, embaixo o órgão e embaixo Cidade - UF (migration 166). Linha só com o nome da
- * planilha (antes do cadastro) mostra o nome e "A cadastrar".
- */
-export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId' | 'beneficiarioNome'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
+/** Beneficiário da linha: o nome com a sigla e embaixo a razão social (migration 166). */
+export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
   const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
   if (b) {
     return (
@@ -125,14 +122,6 @@ export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficia
         <NomeComSigla b={b} />
         <RazaoELocal b={b} />
         {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
-      </>
-    );
-  }
-  if (linha.beneficiarioNome) {
-    return (
-      <>
-        <div style={{ fontWeight: 600 }}>{linha.beneficiarioNome}</div>
-        <StatusBadge label="A cadastrar" variant="warning" size="sm" dot={false} />
       </>
     );
   }

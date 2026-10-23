@@ -25,9 +25,7 @@ const ESTADO: Record<string, string> = {
   SP: 'do Estado de São Paulo', SE: 'do Estado de Sergipe', TO: 'do Estado do Tocantins'
 };
 
-export type LinhaDoPedidoNoQuadro = Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade' | 'beneficiarioId'> & {
-  beneficiarioNome?: string | null;
-};
+export type LinhaDoPedidoNoQuadro = Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade' | 'beneficiarioId'>;
 
 export interface EntradaQuadro {
   autor: AutorEmenda | null | undefined;
@@ -152,7 +150,7 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
         item: item ? String(item.numeroItem).padStart(5, '0') : null,
         descricao: nomeDoItem(item, p.itemKey),
         kit: p.kit,
-        beneficiario: ben ? ben.razaoSocial ?? ben.nome : l.beneficiarioNome ?? null,
+        beneficiario: ben ? ben.razaoSocial ?? ben.nome : null,
         municipio: ben ? localDoBeneficiario(ben) : null,
         quantidade: p.quantidade,
         unitario,

@@ -38,8 +38,6 @@ interface LinhaEdicao {
   kitComposicao: ItemDoKit[] | null;
   quantidade: number;
   beneficiarioId: string | null;
-  /** Nome do beneficiário vindo das planilhas da CAEP (sem cadastro). */
-  beneficiarioNome?: string | null;
 }
 
 const MAX_RESULTADOS = 30;
@@ -78,7 +76,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     () =>
       pedido?.linhas
         .filter((l) => !l.cancelada)
-        .map((l) => ({ chave: l.id, id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, kitNome: l.kitNome, kitComposicao: l.kitComposicao, quantidade: l.quantidade, beneficiarioId: l.beneficiarioId, beneficiarioNome: l.beneficiarioNome })) ?? []
+        .map((l) => ({ chave: l.id, id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, kitNome: l.kitNome, kitComposicao: l.kitComposicao, quantidade: l.quantidade, beneficiarioId: l.beneficiarioId })) ?? []
   );
 
   const porChave = useMemo(() => new Map(itens.map((i) => [i.itemKey, i])), [itens]);
@@ -131,7 +129,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const pendencias: string[] = [];
   const exigeBeneficiario = (paraOrgao && !pedido) || (semAutorGravado && !autorId);
   if (!autorId && !pedido && !paraOrgao) pendencias.push('o autor (ou marque reserva para um órgão)');
-  if (exigeBeneficiario && linhas.some((l) => !l.beneficiarioId && !l.beneficiarioNome)) pendencias.push('o beneficiário em todas as linhas (é o órgão para quem a reserva foi feita)');
+  if (exigeBeneficiario && linhas.some((l) => !l.beneficiarioId)) pendencias.push('o beneficiário em todas as linhas (é o órgão para quem a reserva foi feita)');
   if (linhas.length === 0) pendencias.push('pelo menos uma linha');
   if (linhas.some((l) => !(Number.isInteger(l.quantidade) && l.quantidade > 0))) pendencias.push('quantidade inteira maior que zero em cada linha');
   if (negativo) pendencias.push('saldo da CAEP em todos os itens');
@@ -273,7 +271,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 </div>
                 <AppInput label={l.tipo === 'KIT' ? 'Kits' : 'Quantidade'} type="number" min={1} step={1} value={String(l.quantidade || '')} onChange={(e) => muda(l.chave, { quantidade: Number(e.target.value) })} data-testid={`emendas-pedido-qtd-${l.chave}`} />
                 <AppSelect label="Beneficiário" value={l.beneficiarioId ?? ''} onChange={(e) => muda(l.chave, { beneficiarioId: e.target.value || null })}>
-                  <option value="">{l.beneficiarioNome ? `${l.beneficiarioNome} (a cadastrar)` : exigeBeneficiario ? 'Escolha o órgão' : 'A informar'}</option>
+                  <option value="">{exigeBeneficiario ? 'Escolha o órgão' : 'A informar'}</option>
                   {ativosBen.map((b) => (
                     <option key={b.id} value={b.id}>
                       {[nomeESigla(b), localDoBeneficiario(b)].filter(Boolean).join(' · ')}

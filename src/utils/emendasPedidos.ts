@@ -107,9 +107,9 @@ export const AUTOR_A_DEFINIR = 'Parlamentar a definir';
 /** Reserva feita a pedido de um órgão (o beneficiário final), ainda sem parlamentar. */
 export const eReservaParaOrgao = (p: Pick<PedidoEmenda, 'autorId'>): boolean => !p.autorId;
 
-/** Órgão(s) para quem a reserva sem autor foi feita: os beneficiários das linhas (cadastro ou nome da planilha). */
+/** Órgão(s) para quem a reserva sem autor foi feita: os beneficiários das linhas. */
 export function orgaoDoPedido(p: PedidoEmenda, nomeDoBeneficiario: (id: string) => string | undefined): string | null {
-  const nomes = [...new Set(linhasAtivas(p).map((l) => (l.beneficiarioId ? nomeDoBeneficiario(l.beneficiarioId) : null) ?? l.beneficiarioNome).filter((n): n is string => Boolean(n)))];
+  const nomes = [...new Set(linhasAtivas(p).map((l) => (l.beneficiarioId ? nomeDoBeneficiario(l.beneficiarioId) : null)).filter((n): n is string => Boolean(n)))];
   if (nomes.length === 0) return null;
   return nomes.length === 1 ? nomes[0] : `${nomes[0]} e mais ${nomes.length - 1}`;
 }
