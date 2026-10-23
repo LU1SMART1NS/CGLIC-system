@@ -87,6 +87,37 @@ describe('textosDoArquivo', () => {
   });
 });
 
+describe('limites da leitura do edital', () => {
+  it('para no primeiro PDF que tem a cláusula com a data e lê no máximo 4 PDFs', async () => {
+    const lidos: string[] = [];
+    const leitor: LeitorDeArquivos = {
+      textoDoPdf: async (b, o) => {
+        const t = new TextDecoder().decode(b).slice(9);
+        lidos.push(`${t}|${o?.maxPaginas}`);
+        return t;
+      },
+      arquivosDoZip: async (_b, aceitar) =>
+        [
+          { nome: 'Edital.pdf', bytes: PDF('edital sem cláusula') },
+          { nome: 'Anexo II - Minuta de Contrato.pdf', bytes: PDF('fixos e irreajustáveis IPCA data do orçamento estimado, em 30/09/2024') },
+          { nome: 'Anexo I - Termo de Referência.pdf', bytes: PDF('TR') },
+          { nome: 'Planilha.pdf', bytes: PDF('planilha') }
+        ].filter((p) => !aceitar || aceitar(p.nome, p.bytes.length))
+    };
+    const achou = (t: string) => /irreajust/.test(t) && /30\/09\/2024/.test(t);
+    const textos = await textosDoArquivo(ZIP('x'), leitor, { soPartesDoEdital: true, parar: achou });
+    expect(lidos).toEqual(['fixos e irreajustáveis IPCA data do orçamento estimado, em 30/09/2024|400']);
+    expect(textos).toHaveLength(1);
+    const todos: string[] = [];
+    const muitos: LeitorDeArquivos = {
+      textoDoPdf: async (b) => { todos.push('x'); return new TextDecoder().decode(b); },
+      arquivosDoZip: async () => Array.from({ length: 7 }, (_, k) => ({ nome: `Edital parte ${k}.pdf`, bytes: PDF(String(k)) }))
+    };
+    await textosDoArquivo(ZIP('y'), muitos, { soPartesDoEdital: true });
+    expect(todos).toHaveLength(4);
+  });
+});
+
 describe('partesDoControle', () => {
   it('controle do PNCP da ata', () => {
     expect(partesDoControle('00394494000136-1-001132/2024-000003')).toEqual({ cnpj: '00394494000136', ano: '2024', sequencial: 1132, sequencialAta: 3 });
@@ -135,12 +166,12 @@ describe('sincronizarReajusteAtas', () => {
     const r = await sincronizarReajusteAtas({ leitor: leitorFalso({}), fetcher: fetcher as unknown as typeof fetch, esperar: sem, hoje: () => new Date('2026-10-23T12:00:00Z') });
     expect(r).toEqual({ status: 'SUCESSO', total: 1, fontesComFalha: [] });
     expect(banco.gravacoes[0]).toMatchObject({ projetados_substituir: ['IPCA'] });
+    // Primeiro o leve (arquivos da ata e preço homologado); depois a tentativa do edital; por fim o edital.
+    expect(banco.gravacoes[2]).toEqual({ atas: [{ ata_id: 'ata-1', edital_tentativa: true }] });
+    expect(banco.gravacoes[3]).toEqual({ atas: [{ ata_id: 'ata-1', clausula: 'COM_REAJUSTE', indice: 'IPCA', data_orcamento_edital: '2024-09-30' }] });
     expect(banco.gravacoes[1]).toEqual({
       atas: [{
         ata_id: 'ata-1',
-        clausula: 'COM_REAJUSTE',
-        indice: 'IPCA',
-        data_orcamento_edital: '2024-09-30',
         documentos_lidos: [1, 3],
         reajustes: [{
           documento_pncp_sequencial: 3,
@@ -180,6 +211,16 @@ describe('sincronizarReajusteAtas', () => {
     expect(ata.reajustes).toEqual([expect.objectContaining({ documento_pncp_sequencial: 2, percentual: 5.17 })]);
   });
 
+  it('edital que já derrubou a leitura duas vezes fica a conferir, sem baixar', async () => {
+    (banco.fila[0] as Record<string, unknown>).edital_tentativas = 2;
+    const fetcher = fontes();
+    const r = await sincronizarReajusteAtas({ leitor: leitorFalso({}), fetcher: fetcher as unknown as typeof fetch, esperar: sem });
+    expect(fetcher.mock.calls.some(([u]) => u === 'https://pncp.gov.br/edital' || String(u).endsWith('/compras/2024/1132/arquivos'))).toBe(false);
+    expect(banco.gravacoes[2]).toEqual({ atas: [{ ata_id: 'ata-1', clausula: 'A_CONFERIR' }] });
+    expect(r).toMatchObject({ status: 'PARCIAL', total: 1 });
+    expect((r as { mensagem: string }).mensagem).toMatch(/o edital da ata 00093\/2024 ficou a conferir/);
+  });
+
   it('documento já lido não é baixado de novo', async () => {
     (banco.fila[0] as Record<string, unknown>).documentos_pncp_lidos = [1, 3];
     (banco.fila[0] as Record<string, unknown>).edital_lido_em = '2026-10-22T00:00:00Z';
@@ -201,7 +242,9 @@ describe('sincronizarReajusteAtas', () => {
     const fetcher = fontes((url) => (url.includes('sgs.433') ? new Response('', { status: 503 }) : undefined));
     const r = await sincronizarReajusteAtas({ leitor: leitorFalso({}), fetcher: fetcher as unknown as typeof fetch, esperar: sem });
     expect(r).toMatchObject({ status: 'PARCIAL', total: 1, fontesComFalha: ['Banco Central (IPCA e Focus)'] });
-    expect(banco.gravacoes).toHaveLength(1);
+    // Sem índices: só as gravações da ata (arquivos e homologado, tentativa do edital, edital).
+    expect(banco.gravacoes).toHaveLength(3);
+    expect(banco.gravacoes.some((g) => 'indices' in g)).toBe(false);
   });
 
   it('sem tempo, a ata fica para a próxima execução', async () => {
