@@ -4,15 +4,18 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
+import { ActionButton } from '../../design-system/components/ActionButton';
+import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
-import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useKitsEmendas, usePedidosEmendas } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useKitsEmendas, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { buscarItensCaep } from '../../utils/emendasKits';
+import { buscarItensCaep, rotuloItemDaAta } from '../../utils/emendasKits';
 import { ItemDaAta, VigenciaDaAta } from './emendasPartes';
+import { DadosItemModal } from './DadosItemModal';
 import { AUTOR_A_DEFINIR, identificacaoDoPedido, itensDaLinha, linhasAtivas, ROTULO_ETAPA } from '../../utils/emendasPedidos';
 import type { EtapaPedido, ItemCaep } from '../../services/emendasService';
 
@@ -39,6 +42,8 @@ export const EmendasPorItemPage: React.FC = () => {
   const hoje = hojeEmBrasilia();
   const [segmento, setSegmento] = useState<Segmento>('com');
   const [busca, setBusca] = useState('');
+  const podeGerir = usePodeGerirEmendas();
+  const [editando, setEditando] = useState<ItemCaep | null>(null);
 
   const nomeAutor = useMemo(() => new Map(autores.map((a) => [a.id, a.nome])), [autores]);
   const linhas: Linha[] = useMemo(() => {
@@ -81,6 +86,19 @@ export const EmendasPorItemPage: React.FC = () => {
       priority: 'primary',
       minWidth: '280px',
       render: (l) => <ItemDaAta item={l} />
+    },
+    {
+      key: 'quadro',
+      header: 'No quadro',
+      minWidth: '160px',
+      render: (l) => (
+        <>
+          <div style={{ fontWeight: 600 }}>{l.nomeCurto ?? <span style={carteiraSubtitle}>sem nome curto</span>}</div>
+          <div style={{ marginTop: 4 }}>
+            {l.gnd ? <StatusBadge label={l.gnd === 'GND-4' ? 'GND-4 · Investimento' : 'GND-3 · Custeio'} variant="neutral" size="sm" dot={false} /> : <StatusBadge label="GND a informar" variant="warning" size="sm" dot={false} />}
+          </div>
+        </>
+      )
     },
     {
       key: 'vigencia',
@@ -159,6 +177,11 @@ export const EmendasPorItemPage: React.FC = () => {
           keyExtractor={(l) => l.itemKey}
           rowStyle={(l) => (l.ataEncerrada ? { opacity: 0.7 } : undefined)}
           columns={colunas}
+          rowActions={
+            podeGerir
+              ? (l) => <ActionButton action="editar" iconOnly label={`Nome curto e GND de ${l.nomeCurto ?? rotuloItemDaAta(l)}`} onClick={() => setEditando(l)} data-testid={`emendas-itens-dados-${l.itemKey}`} />
+              : undefined
+          }
           renderExpanded={(l) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.4rem 0' }} data-testid={`emendas-item-detalhe-${l.itemKey}`}>
               {l.usos.length === 0 ? (
@@ -182,6 +205,8 @@ export const EmendasPorItemPage: React.FC = () => {
           )}
         />
       </AdminListShell>
+
+      {editando && <DadosItemModal item={editando} onClose={() => setEditando(null)} />}
     </PageContainer>
   );
 };

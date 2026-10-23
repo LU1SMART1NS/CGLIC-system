@@ -8,6 +8,7 @@ import { cnpjValido, consultarCep, consultarCnpj } from '../../services/emendasS
 const receita = { cnpj: '00394494000136', razaoSocial: 'MJSP' } as any;
 const ok: FormularioBeneficiario = {
   nomeCurto: 'MJSP',
+  orgao: 'Polícia Militar',
   entregaCep: '70064-900',
   entregaLogradouro: 'Esplanada dos Ministérios Bloco T',
   entregaNumero: 'S/N',
@@ -36,6 +37,10 @@ describe('pendenciasDoBeneficiario', () => {
       'telefone com DDD (10 ou 11 números)',
       'e-mail válido'
     ]);
+  });
+
+  it('pede o órgão do Anexo', () => {
+    expect(pendenciasDoBeneficiario(receita, { ...ok, orgao: '' })).toEqual(['órgão']);
   });
 });
 

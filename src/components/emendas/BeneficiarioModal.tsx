@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppInput } from '../../design-system/components/FormFields';
+import { AppInput, AppSelect } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useSalvarBeneficiario } from '../../hooks/useEmendas';
 import {
@@ -18,6 +18,7 @@ import {
   type DadosDaReceita
 } from '../../services/emendasService';
 import { linkDoWhatsapp, pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
+import { ORGAOS_BENEFICIARIO } from '../../services/emendasQuadroService';
 
 const EMAIL_PESSOAL = /@(gmail|hotmail|outlook|yahoo|bol|uol|live|icloud)\./i;
 
@@ -41,6 +42,7 @@ function receitaDoCadastro(b: BeneficiarioEmenda): DadosDaReceita {
 function formularioDe(b: BeneficiarioEmenda | null): Formulario {
   return {
     nomeCurto: b?.nomeCurto ?? '',
+    orgao: b?.orgao ?? '',
     entregaCep: b ? formatarCep(b.entregaCep) : '',
     entregaLogradouro: b?.entregaLogradouro ?? '',
     entregaNumero: b?.entregaNumero ?? '',
@@ -159,7 +161,8 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, cnpjsExistent
       responsavelTelefone: soDigitos(f.responsavelTelefone) || null,
       // Celular (11 números, 9 depois do DDD) é o que tem WhatsApp; a coluna guarda o mesmo que a tela mostra.
       responsavelWhatsapp: Boolean(linkDoWhatsapp(f.responsavelTelefone)),
-      responsavelEmail: f.responsavelEmail.trim() || null
+      responsavelEmail: f.responsavelEmail.trim() || null,
+      orgao: f.orgao || null
     };
     try {
       await salvar.mutateAsync(dados);
@@ -238,7 +241,17 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, cnpjsExistent
 
         {receita && (
           <>
-            <AppInput label="Nome curto *" hint="Como a CAEP chama o órgão nas listas (ex.: PMERJ)." value={f.nomeCurto} maxLength={80} onChange={(e) => muda('nomeCurto', e.target.value)} data-testid="emendas-beneficiario-nome-curto" />
+            <div style={grade('repeat(auto-fit, minmax(min(100%, 240px), 1fr))')}>
+              <AppInput label="Nome curto *" hint="Como a CAEP chama o órgão nas listas (ex.: PMERJ)." value={f.nomeCurto} maxLength={80} onChange={(e) => muda('nomeCurto', e.target.value)} data-testid="emendas-beneficiario-nome-curto" />
+              <AppSelect label="Órgão *" hint="Coluna ÓRGÃO do Anexo da reserva." value={f.orgao} onChange={(e) => muda('orgao', e.target.value)} data-testid="emendas-beneficiario-orgao">
+                <option value="">Escolha</option>
+                {ORGAOS_BENEFICIARIO.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </AppSelect>
+            </div>
 
             <div style={secao}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
