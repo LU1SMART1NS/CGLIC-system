@@ -187,12 +187,8 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
         subtitle="Quanto de cada item alocado à CAEP já foi reservado a parlamentares."
         hint="Reservado soma os pedidos que não foram cancelados, em qualquer etapa, com os kits abertos nos seus itens. Saldo = alocado à CAEP − reservado. Para ter mais de um item, peça a alocação ao gestor de saldo. Clique na linha para ver quem reservou e em quais kits o item entra."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}
-        actions={
-          <>
-            {seletor}
-            <HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />
-          </>
-        }
+        viewToggle={seletor}
+        actions={<HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />}
       />
 
       <CarteiraSegmentTabs<Segmento>

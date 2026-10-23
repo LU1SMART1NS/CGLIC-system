@@ -405,23 +405,25 @@ export const EmendasPedidosPage: React.FC = () => {
         subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na etapa escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
         hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o beneficiário pelo nome (a cadastrar com CNPJ), o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da etapa escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
+        viewToggle={
+          <CarteiraSegmentTabs<'pedido' | 'autor'>
+            testIdPrefix="emendas-pedidos-ver"
+            ariaLabel="Ver por"
+            active={porAutor ? 'autor' : 'pedido'}
+            onSelect={(v) =>
+              mudarUrl((p) => {
+                if (v === 'autor') p.set('ver', 'autor');
+                else p.delete('ver');
+              })
+            }
+            segments={[
+              { id: 'pedido', label: 'Por pedido', title: 'Uma linha por pedido, com as etapas e os botões' },
+              { id: 'autor', label: 'Por autor', title: 'Uma linha por parlamentar ou bancada, com os totais' }
+            ]}
+          />
+        }
         actions={
           <>
-            <CarteiraSegmentTabs<'pedido' | 'autor'>
-              testIdPrefix="emendas-pedidos-ver"
-              ariaLabel="Ver por"
-              active={porAutor ? 'autor' : 'pedido'}
-              onSelect={(v) =>
-                mudarUrl((p) => {
-                  if (v === 'autor') p.set('ver', 'autor');
-                  else p.delete('ver');
-                })
-              }
-              segments={[
-                { id: 'pedido', label: 'Por pedido', title: 'Uma linha por pedido, com as etapas e os botões' },
-                { id: 'autor', label: 'Por autor', title: 'Uma linha por parlamentar ou bancada, com os totais' }
-              ]}
-            />
             {podeGerir && <ActionButton action="novo" label="Nova reserva" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-pedidos-novo" />}
             <HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-pedidos-atualizar" tooltipTitle="Recarregar os pedidos" />
           </>
