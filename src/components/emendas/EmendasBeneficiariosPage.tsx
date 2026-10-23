@@ -9,6 +9,9 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
+import { CarteiraPagination } from '../carteira/CarteiraPagination';
+import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { carteiraFornecedor, carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
@@ -31,6 +34,8 @@ type Segmento = 'completos' | 'faltam' | 'parecidos' | 'inativos' | 'todos';
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const falta: React.CSSProperties = { ...carteiraSubtitle, fontStyle: 'italic' };
+const POR_PAGINA = 25;
+const chaveDoBeneficiario = (b: BeneficiarioEmenda) => b.id;
 const ROTULO_FALTA: Record<FaltaDoBeneficiario, string> = { CNPJ: 'Falta CNPJ', endereço: 'Falta endereço', contato: 'Falta contato' };
 
 /**
@@ -120,6 +125,19 @@ export const EmendasBeneficiariosPage: React.FC = () => {
     count: doSegmento.filter((b) => (faltas.get(b.id) ?? []).includes(f)).length
   }));
 
+  // Como nas carteiras: ordena pelo cabeçalho (guardado em ?ordem=) antes de paginar, para valer na lista toda.
+  const ordem = useMemo<Record<string, CarteiraSortColumn<BeneficiarioEmenda>>>(
+    () => ({
+      nome: { value: (b) => b.nome },
+      entrega: { value: (b) => localDoBeneficiario(b) },
+      contato: { value: (b) => b.responsavelNome },
+      indicacoes: { value: (b) => linhasPorBeneficiario.get(b.id) ?? 0, firstDir: 'desc' }
+    }),
+    [linhasPorBeneficiario]
+  );
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtrados, ordem);
+  const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDoBeneficiario, POR_PAGINA);
+
   const filtrosAtivos = Boolean(busca.trim() || uf || oQueFalta);
 
   const alternarAtivo = async (b: BeneficiarioEmenda) => {
@@ -147,6 +165,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       header: 'Beneficiário',
       priority: 'primary',
       width: '36%',
+      sortValue: ordem.nome.value,
       render: (b) => {
         const parecido = parecidoDe.get(b.id);
         // Quem é: nome · sigla e, embaixo, a razão social do CNPJ vinculado (como o fornecedor nas carteiras). A cidade
@@ -174,6 +193,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       key: 'entrega',
       header: 'Entrega',
       width: '34%',
+      sortValue: ordem.entrega.value,
       // Onde entrega: a cidade sempre em destaque (é o mesmo campo do endereço) e, embaixo, o endereço ou o que falta.
       render: (b) => {
         const local = localDoBeneficiario(b);
@@ -201,6 +221,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       key: 'contato',
       header: 'Contato',
       width: '22%',
+      sortValue: ordem.contato.value,
       render: (b) =>
         b.responsavelNome ? (
           <>
@@ -218,6 +239,8 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       key: 'indicacoes',
       header: 'Indicações',
       align: 'right',
+      sortValue: ordem.indicacoes.value,
+      sortFirstDir: 'desc',
       nowrap: true,
       render: (b) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{linhasPorBeneficiario.get(b.id) ?? 0}</span>
     },
@@ -295,8 +318,10 @@ export const EmendasBeneficiariosPage: React.FC = () => {
         <DataTable<BeneficiarioEmenda>
           testId="emendas-beneficiarios-tabela"
           className="data-table-container--flush emendas-tabela-topo"
-          data={filtrados}
+          data={pageItems}
           keyExtractor={(b) => b.id}
+          sort={{ key: sortKey, dir: sortDir }}
+          onSort={toggle}
           rowStyle={(b) => (b.ativo ? undefined : { opacity: 0.7 })}
           rowOpen={podeGerir ? (b) => () => setEditando(b) : undefined}
           columns={colunas}
@@ -330,6 +355,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
               : undefined
           }
         />
+        <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={sorted.length} onChange={setPage} testIdPrefix="emendas-beneficiarios" />
       </AdminListShell>
 
       {editando && <BeneficiarioModal key={editando === 'novo' ? 'novo' : editando.id} beneficiario={editando === 'novo' ? null : editando} lista={lista} onAbrir={(b) => setEditando(b)} onClose={() => setEditando(null)} />}
