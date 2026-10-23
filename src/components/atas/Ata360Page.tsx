@@ -41,8 +41,12 @@ import { mensagemDesvincular } from '../../utils/vinculoAutomatico';
 import { ataDeOutroOrgao, carteiraDaAta, chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { useFornecedorAtaPncp } from '../../hooks/useFornecedorAtaPncp';
 import { IndicarFornecedorModal } from './IndicarFornecedorModal';
+import { AtaReajusteTab } from './reajuste/AtaReajusteTab';
+import { contarComAcao, quadroDoCartao, type SaldoDoItem } from './reajuste/reajusteRotulos';
+import { ROTULO_REAJUSTE_ATAS, useReajusteDaAta } from '../../hooks/useReajusteAtas';
+import { TrendingUp } from 'lucide-react';
 
-const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos'];
+const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos', 'reajuste'];
 // Gestor de Saldo (domínio de alocações) só precisa chegar aos itens da ata.
 const SALDOS_TAB_IDS: Ata360Tab[] = ['itens'];
 
@@ -92,6 +96,13 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   const { role } = useAuth();
   const saldosOnly = semContratos(role);
+  // Reajuste dos preços registrados (migrations 158 e 159): só nas atas gerenciadas pela SENASP, fora do gestor de saldo.
+  const comReajuste = Boolean(arp && !ataDeOutroOrgao(arp)) && !saldosOnly;
+  const reajusteQuery = useReajusteDaAta(arp?.numeroAtaRegistroPreco, arp?.codigoUnidadeGerenciadora, { enabled: comReajuste });
+  const saldosDoReajuste: SaldoDoItem[] = React.useMemo(
+    () => (saldos as any[]).map((s) => ({ numeroItem: String(s.numero_item ?? s.numeroItem ?? ''), saldo: Number(s.saldo_disponivel) || 0 })),
+    [saldos]
+  );
   const { activeTab, goToTab, tabsRef } = useInstrumentTab<Ata360Tab>({
     tabs: saldosOnly ? SALDOS_TAB_IDS : TAB_IDS,
     defaultTab: saldosOnly ? 'itens' : 'acoes'
@@ -116,7 +127,8 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
           { rotulo: 'gestor da ata', query: gestorQuery },
           { rotulo: 'atas sem fornecedor no PNCP', query: fornecedorPncp.consulta },
           { rotulo: ROTULO_AVISOS_RESOLVIDOS, query: avisosResolvidosQuery },
-          { rotulo: 'vínculos a conferir', query: vinculosAConferirQuery }
+          { rotulo: 'vínculos a conferir', query: vinculosAConferirQuery },
+          ...(comReajuste ? [{ rotulo: ROTULO_REAJUSTE_ATAS, query: reajusteQuery.consulta }] : [])
         ])
   ];
   const leituras = useLeiturasComFalha(leiturasDaTela);
@@ -261,7 +273,10 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
     { id: 'acoes', label: queue.items.length > 0 ? `Ações (${queue.items.length})` : 'Ações' },
     { id: 'plano', label: 'Plano de gestão' },
     { id: 'itens', label: `Itens (${itens.length})` },
-    { id: 'contratos', label: linkedContracts.length > 0 ? `Contratos vinculados (${linkedContracts.length})` : 'Contratos vinculados' }
+    { id: 'contratos', label: linkedContracts.length > 0 ? `Contratos vinculados (${linkedContracts.length})` : 'Contratos vinculados' },
+    ...(comReajuste && reajusteQuery.data.parametros
+      ? [{ id: 'reajuste' as const, label: contarComAcao(reajusteQuery.data.itens) > 0 ? `Reajuste (${contarComAcao(reajusteQuery.data.itens)})` : 'Reajuste' }]
+      : [])
   ];
   const tabs = saldosOnly ? allTabs.filter((t) => SALDOS_TAB_IDS.includes(t.id)) : allTabs;
 
@@ -281,6 +296,11 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         fornecedorPncp={registroFornecedor}
         onIndicarFornecedor={abrirIndicar}
         verMais={<InteresseGtiBotao fatias={fatiasGti} aberto={gtiAberto} onToggle={() => setGtiAberto((v) => !v)} />}
+        reajuste={comReajuste && reajusteQuery.data.parametros ? (() => {
+          const q = quadroDoCartao(reajusteQuery.data, saldosDoReajuste);
+          return q ? { ...q, indice: reajusteQuery.data.parametros?.indice } : null;
+        })() : null}
+        onOpenReajuste={() => goToTab('reajuste')}
       />
 
       {/* Gaveta entre o cartão e as abas; some junto com o cartão quando ele encolhe ao rolar. */}
@@ -374,6 +394,26 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
               emptyAction={linkButton}
               onUnlink={canEditLinks ? handleUnlink : undefined}
               unlinkingId={unlinkingId}
+            />
+          </InstrumentSection>
+        )}
+        {activeTab === 'reajuste' && comReajuste && (
+          <InstrumentSection
+            id="ata-reajuste-section"
+            title="Reajuste dos preços registrados"
+            subtitle="Reajuste de ofício pelo índice do edital, a cada 12 meses, por apostilamento (ON AGU nº 100/2025)"
+            icon={TrendingUp}
+          >
+            <AtaReajusteTab
+              dados={reajusteQuery.data}
+              isLoading={reajusteQuery.isLoading}
+              numeroAta={arp.numeroAtaRegistroPreco}
+              uasg={arp.codigoUnidadeGerenciadora}
+              inicioVigencia={String(arp.dataVigenciaInicial ?? '').slice(0, 10)}
+              fimVigencia={String(arp.dataVigenciaFinal ?? '').slice(0, 10)}
+              itensDaAta={itens}
+              saldos={saldosDoReajuste}
+              podeEditar={role === 'admin' || (role === 'gestor' && isOwnAta)}
             />
           </InstrumentSection>
         )}

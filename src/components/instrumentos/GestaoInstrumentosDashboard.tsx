@@ -50,7 +50,7 @@ const UASGS = UASGS_CGLIC;
 
 const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, DashboardAttentionCategory[]> = {
   SALDOS: ['ATA_CRITICA', 'QUANTITATIVOS', 'REGISTRADO_ACIMA', 'ATA_ASSINADA', 'UNIDADE_PENDENTE', 'FORNECEDOR_PNCP', 'VINCULO_A_CONFERIR'],
-  REAJUSTES: ['REAJUSTE_RADAR'],
+  REAJUSTES: ['REAJUSTE_RADAR', 'REAJUSTE_ATA'],
   PAGAMENTOS: ['PAGAMENTO_CRITICO', 'PAGAMENTO_PREVISTO', 'FONTE_A_CONFERIR', 'EMPENHO_ACIMA'],
   TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA'],
   LEMBRETES: ['LEMBRETE']
@@ -63,7 +63,8 @@ function matchesTab(item: AttentionItemWithUasg, tab: GestaoInstrumentosCategory
 
 /** Motivo do aviso no filtro, conforme a aba (detalhado nas abas de uma categoria só). */
 function motivoNaAba(item: AttentionItemWithUasg, tab: GestaoInstrumentosCategoryTab): { value: string; label: string } {
-  return motivoNoFiltro(item, tab !== 'TODAS' && TAB_CATEGORY_MAP[tab].length === 1);
+  // Reajustes junta contratos e atas: o motivo detalhado (situação da data-base) continua separando os avisos.
+  return motivoNoFiltro(item, tab !== 'TODAS' && (TAB_CATEGORY_MAP[tab].length === 1 || tab === 'REAJUSTES'));
 }
 
 /**
