@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppInput, AppSelect } from '../../design-system/components/FormFields';
+import { AppInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useSalvarBeneficiario } from '../../hooks/useEmendas';
 import {
@@ -19,7 +19,6 @@ import {
 } from '../../services/emendasService';
 import { beneficiarioRepetido, linkDoWhatsapp, naturezaNaoPublica, parecidosCom, pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
 import { localDoBeneficiario, rotuloBeneficiario } from '../../services/emendasService';
-import { ORGAOS_BENEFICIARIO } from '../../services/emendasQuadroService';
 
 const EMAIL_PESSOAL = /@(gmail|hotmail|outlook|yahoo|bol|uol|live|icloud)\./i;
 
@@ -45,7 +44,6 @@ function formularioDe(b: BeneficiarioEmenda | null): Formulario {
   return {
     nome: b?.nome ?? '',
     sigla: b?.sigla ?? '',
-    orgao: b?.orgao ?? '',
     entregaCep: formatarCep(b?.entregaCep),
     entregaLogradouro: b?.entregaLogradouro ?? '',
     entregaNumero: b?.entregaNumero ?? '',
@@ -185,8 +183,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
       responsavelTelefone: soDigitos(f.responsavelTelefone) || null,
       // Celular (11 números, 9 depois do DDD) é o que tem WhatsApp; a coluna guarda o mesmo que a tela mostra.
       responsavelWhatsapp: Boolean(linkDoWhatsapp(f.responsavelTelefone)),
-      responsavelEmail: f.responsavelEmail.trim() || null,
-      orgao: f.orgao || null
+      responsavelEmail: f.responsavelEmail.trim() || null
     };
     try {
       await salvar.mutateAsync(dados);
@@ -333,14 +330,6 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
 
         <div style={grade('repeat(auto-fit, minmax(min(100%, 220px), 1fr))')}>
           <AppInput label="Sigla" hint="Como a unidade é chamada (ex.: 27º BPM/M, 16º GBM). Aparece ao lado do nome." value={f.sigla} maxLength={40} onChange={(e) => muda('sigla', e.target.value)} data-testid="emendas-beneficiario-sigla" />
-          <AppSelect label="Órgão" hint="Coluna ÓRGÃO do Anexo da reserva." value={f.orgao} onChange={(e) => muda('orgao', e.target.value)} data-testid="emendas-beneficiario-orgao">
-            <option value="">A informar</option>
-            {ORGAOS_BENEFICIARIO.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </AppSelect>
         </div>
 
         <div style={secao}>

@@ -66,8 +66,6 @@ export interface BeneficiarioEmenda {
   responsavelTelefone: string | null;
   responsavelWhatsapp: boolean;
   responsavelEmail: string | null;
-  /** Coluna ÓRGÃO do Anexo da reserva (migration 165), de uma lista fixa; vazio nos cadastros de antes. */
-  orgao: string | null;
   atualizadoPorNome: string | null;
   atualizadoEm: string | null;
 }
@@ -180,7 +178,6 @@ function beneficiarioDoBanco(r: Record<string, any>): BeneficiarioEmenda {
     responsavelTelefone: r.responsavel_telefone ?? null,
     responsavelWhatsapp: Boolean(r.responsavel_whatsapp),
     responsavelEmail: r.responsavel_email ?? null,
-    orgao: r.orgao ?? null,
     atualizadoPorNome: r.atualizado_por_nome ?? null,
     atualizadoEm: r.atualizado_em ?? null
   };
@@ -227,8 +224,7 @@ export async function salvarBeneficiarioEmenda(b: BeneficiarioParaSalvar): Promi
       responsavel_cargo: b.responsavelCargo,
       responsavel_telefone: b.responsavelTelefone,
       responsavel_whatsapp: b.responsavelWhatsapp,
-      responsavel_email: b.responsavelEmail,
-      orgao: b.orgao
+      responsavel_email: b.responsavelEmail
     }
   });
   if (error) throw new Error(mensagemDoBanco(error));

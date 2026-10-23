@@ -1,7 +1,7 @@
 /**
  * Quadro da reserva para o gabinete (migration 165), fora da tela para poder testar.
  *
- * Formato do Anexo que a CAEP já usa, com a ata e o item na frente: ATA · ITEM · DESCRIÇÃO ITEM · ÓRGÃO · BENEFICIÁRIO FINAL · MUNICÍPIO · QTD · VR UNITÁRIO ·
+ * Formato do Anexo que a CAEP já usa, com a ata e o item na frente: ATA · ITEM · DESCRIÇÃO ITEM · BENEFICIÁRIO FINAL · MUNICÍPIO · QTD · VR UNITÁRIO ·
  * VR TOTAL, uma linha por item e beneficiário, kit aberto nos seus itens, fechando com TOTAL A EMPENHAR. O valor
  * unitário é o preço previsto pelo reajuste da ata (emendas_precos_previstos), para a emenda nascer com folga; cada
  * preço que não é o de hoje ganha uma nota (¹, ², ...). Quando o pedido mistura investimento e custeio, sai o total de
@@ -46,7 +46,6 @@ export interface LinhaQuadro {
   descricao: string;
   /** Kit de onde o item veio, quando veio de um. */
   kit: string | null;
-  orgao: string | null;
   beneficiario: string | null;
   municipio: string | null;
   quantidade: number;
@@ -73,8 +72,6 @@ export interface Quadro {
   semGnd: number;
   /** Linhas sem beneficiário escolhido. */
   semBeneficiario: number;
-  /** Linhas com beneficiário cadastrado que ainda não tem o órgão (coluna ÓRGÃO sai "a definir"). */
-  semOrgao: number;
   /** Itens sem nome curto da CAEP (sai o começo da descrição do catálogo). */
   semNomeCurto: number;
 }
@@ -155,7 +152,6 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
         item: item ? String(item.numeroItem).padStart(5, '0') : null,
         descricao: nomeDoItem(item, p.itemKey),
         kit: p.kit,
-        orgao: ben?.orgao ?? null,
         beneficiario: ben ? ben.razaoSocial ?? ben.nome : l.beneficiarioNome ?? null,
         municipio: ben ? localDoBeneficiario(ben) : null,
         quantidade: p.quantidade,
@@ -198,14 +194,13 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
     porGnd,
     semGnd: semGnd.length,
     semBeneficiario: linhas.filter((l) => !l.beneficiario).length,
-    semOrgao: linhas.filter((l) => l.municipio && !l.orgao).length,
     semNomeCurto: new Set(linhas.filter((l) => l.semNomeCurto).map((l) => l.descricao)).size
   };
 }
 
 const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const A_DEFINIR = 'a definir';
-export const COLUNAS = ['ATA', 'ITEM', 'DESCRIÇÃO ITEM', 'ÓRGÃO', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL'];
+export const COLUNAS = ['ATA', 'ITEM', 'DESCRIÇÃO ITEM', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL'];
 
 /** Tabela para colar no editor do SEI (HTML com bordas e estilos na própria célula). */
 export function htmlParaSei(q: Quadro): string {
@@ -216,14 +211,13 @@ export function htmlParaSei(q: Quadro): string {
     `<td style="${td}">${escapar(l.ata ?? '—')}</td>` +
     `<td style="${td}">${escapar(l.item ?? '—')}</td>` +
     `<td style="${td}"><b>${escapar(l.descricao)}</b>${l.kit ? `<br>(${escapar(l.kit)})` : ''}</td>` +
-    `<td style="${td}">${escapar(l.orgao ?? A_DEFINIR)}</td>` +
     `<td style="${td}">${escapar(l.beneficiario ?? A_DEFINIR)}</td>` +
     `<td style="${td}">${escapar(l.municipio ?? A_DEFINIR)}</td>` +
     `<td style="${td}">${l.quantidade}</td>` +
     `<td style="${td}">${brl(l.unitario)}${l.marca ? `<sup>${l.marca}</sup>` : ''}</td>` +
     `<td style="${td}">${brl(l.total)}</td>` +
     '</tr>';
-  const subtotal = (rotulo: string, v: number) => `<tr><td colspan="8" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${td}"><b>${brl(v)}</b></td></tr>`;
+  const subtotal = (rotulo: string, v: number) => `<tr><td colspan="${COLUNAS.length - 1}" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${td}"><b>${brl(v)}</b></td></tr>`;
   return (
     `<p style="text-align:center"><b>${escapar(q.titulo)}</b></p>` +
     '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
@@ -231,7 +225,7 @@ export function htmlParaSei(q: Quadro): string {
     '</tr></thead><tbody>' +
     q.linhas.map(linha).join('') +
     q.porGnd.map((g) => subtotal(g.rotulo, g.total)).join('') +
-    `<tr><td colspan="8" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${td}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
+    `<tr><td colspan="${COLUNAS.length - 1}" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${td}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
     '</tbody></table>' +
     (q.notas.length ? `<p style="font-size:9pt">${q.notas.map(escapar).join('<br>')}</p>` : '')
   );
