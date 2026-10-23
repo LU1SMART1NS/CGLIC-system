@@ -7,7 +7,7 @@ import { useToast } from '../../design-system/components/Toast';
 import { useSalvarKit } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { AVISO_VENCIMENTO_DIAS, buscarItensCaep, calcularKit, dataBR, sugestoesDeTroca } from '../../utils/emendasKits';
+import { AVISO_VENCIMENTO_DIAS, buscarItensCaep, calcularKit, dataBR, rotuloItemDaAta, sugestoesDeTroca } from '../../utils/emendasKits';
 import type { ItemCaep, ItemDoKit, KitEmenda } from '../../services/emendasService';
 
 interface Props {
@@ -15,6 +15,8 @@ interface Props {
   itens: ItemCaep[];
   nomesExistentes: string[];
   hoje: string;
+  /** Saldo do item para o kit (alocado − reservado nos pedidos). */
+  saldoDoItem?: (i: ItemCaep) => number;
   onClose: () => void;
 }
 
@@ -32,10 +34,10 @@ const aviso = (tom: 'erro' | 'info' | 'atencao'): React.CSSProperties => ({
   color: tom === 'erro' ? 'var(--color-danger, #b11b05)' : tom === 'atencao' ? 'var(--color-warning-text-strong, #854d0e)' : 'var(--color-info-text, #155bcb)'
 });
 
-const ataItem = (i: ItemCaep) => `ata ${i.numeroAta} · item ${Number(i.numeroItem)}`;
+const ataItem = (i: ItemCaep) => rotuloItemDaAta(i);
 
 /** Monta ou altera um kit. Item novo só de ata vigente com alocação da CAEP (o banco confere de novo). */
-export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, onClose }) => {
+export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, saldoDoItem, onClose }) => {
   const salvar = useSalvarKit();
   const toast = useToast();
   const [nome, setNome] = useState(kit?.nome ?? '');
@@ -52,7 +54,7 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, o
   );
   const encontrados = buscarItensCaep(disponiveis, busca).filter((i) => !noKit.has(i.itemKey));
   const originais = new Set(kit?.itens.map((i) => i.itemKey) ?? []);
-  const calculo = calcularKit({ ativo: true, itens: linhas }, porChave, hoje);
+  const calculo = calcularKit({ ativo: true, itens: linhas }, porChave, hoje, saldoDoItem);
 
   const pendencias: string[] = [];
   if (!nome.trim()) pendencias.push('nome do kit');

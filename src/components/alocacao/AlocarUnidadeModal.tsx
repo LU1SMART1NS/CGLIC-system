@@ -148,7 +148,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
       } else if (err?.code === 'UNAUTHORIZED' || err?.sqlState === '42501') {
         setErro('Só o coordenador e o gestor de saldos alocam quantitativo.');
       } else {
-        setErro(String(err?.message || 'Não foi possível gravar as alocações.').replace(/^ACIMA_DA_COTA:\s*/, ''));
+        setErro(String(err?.message || 'Não foi possível gravar as alocações.').replace(/^(ACIMA_DA_COTA|EMENDAS_RESERVADAS):\s*/, ''));
       }
       return;
     }

@@ -13,7 +13,7 @@ Os dados vêm das fontes oficiais abertas (Compras.gov.br, PNCP, Contratos.gov.b
 | **Alocação** | Quantitativo de cada item para as unidades internas |
 | **Vínculos** | Contratos à ata · Empenhos ao contrato · Empenhos aos itens |
 | **Financeiro** | Empenhos · Pagamentos (ciclo da Portaria 50) · Previsão mensal |
-| **Emendas** | Kits · Beneficiários · Autores das emendas parlamentares (CAEP) |
+| **Emendas** | Pedidos dos parlamentares (da reserva ao empenho) · Itens da CAEP · Por autor · Kits · Beneficiários · Autores (CAEP) |
 | **Ajustes** | Modelos de gestão, regras de alertas, feriados, unidades internas, usuários e perfis |
 
 Perfis: **Coordenador** (`admin`), **Gestor de atas e contratos** (`gestor`), **Gestor de saldos** (`gestor_saldos`), **Gestor de emendas** (`gestor_emendas`, da CAEP) e **Consulta** (`leitor`). O detalhe de quem vê e faz o quê está em [CONTEXT.md](CONTEXT.md).

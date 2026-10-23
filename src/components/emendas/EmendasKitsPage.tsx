@@ -8,15 +8,15 @@ import { StatusBadge, type StatusBadgeVariant } from '../../design-system/compon
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
-import { carteiraDescricaoItem, carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useSalvarKit } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
-import { descricaoItemEmFrase } from '../../utils/textCase';
-import { AVISO_VENCIMENTO_DIAS, calcularKit, dataBR, ROTULO_SITUACAO_KIT, type CalculoDoKit, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
+import { AVISO_VENCIMENTO_DIAS, calcularKit, ROTULO_SITUACAO_KIT, type CalculoDoKit, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
 import type { KitEmenda } from '../../services/emendasService';
 import { KitModal } from './KitModal';
+import { ItemDaAta, VigenciaDaAta } from './emendasPartes';
 
 type Segmento = 'todos' | SituacaoKit;
 type Linha = KitEmenda & { calculo: CalculoDoKit };
@@ -24,37 +24,23 @@ type Linha = KitEmenda & { calculo: CalculoDoKit };
 const VARIANTE: Record<SituacaoKit, StatusBadgeVariant> = { disponivel: 'success', vence: 'warning', indisponivel: 'danger', desativado: 'neutral' };
 const pequeno: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)' };
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const ataItem = (c: ComponenteDoKit) => (c.item ? `ata ${c.item.numeroAta} · item ${Number(c.item.numeroItem)}` : c.itemKey);
 
 /** Composição do kit aberta na linha. */
 const ComposicaoDoKit: React.FC<{ linha: Linha }> = ({ linha }) => {
+  const hoje = hojeEmBrasilia();
   const colunas: Column<ComponenteDoKit>[] = [
     {
       key: 'item',
       header: 'Item',
       priority: 'primary',
       minWidth: '260px',
-      render: (c) => (
-        <>
-          <div style={carteiraIdentificacao}>{ataItem(c)}</div>
-          <div style={carteiraDescricaoItem}>{c.item ? descricaoItemEmFrase(c.item.descricao) : 'Sem alocação da CAEP'}</div>
-        </>
-      )
+      render: (c) => <ItemDaAta item={c.item} semItem={`${c.itemKey} · sem alocação da CAEP`} />
     },
     {
       key: 'vigencia',
-      header: 'Vigência da ata',
+      header: 'Vigência',
       nowrap: true,
-      render: (c) =>
-        !c.item ? (
-          '—'
-        ) : c.item.ataEncerrada ? (
-          <StatusBadge label={`Encerrada em ${dataBR(c.item.vigenciaFinal)}`} variant="danger" size="sm" dot={false} />
-        ) : c.diasParaVencer != null && c.diasParaVencer <= AVISO_VENCIMENTO_DIAS ? (
-          <StatusBadge label={`Vence em ${c.diasParaVencer} dias (${dataBR(c.item.vigenciaFinal)})`} variant="warning" size="sm" dot={false} />
-        ) : (
-          `Até ${dataBR(c.item.vigenciaFinal)}`
-        )
+      render: (c) => <VigenciaDaAta item={c.item} hoje={hoje} />
     },
     { key: 'qtd', header: 'Por kit', align: 'right', nowrap: true, render: (c) => <b>{formatNumber(c.quantidade)}</b> },
     { key: 'saldo', header: 'Saldo da CAEP', align: 'right', nowrap: true, render: (c) => (c.item ? formatNumber(c.saldo) : '—') },
@@ -88,7 +74,10 @@ export const EmendasKitsPage: React.FC = () => {
   const [editando, setEditando] = useState<KitEmenda | 'novo' | null>(null);
 
   const porChave = useMemo(() => new Map(itens.map((i) => [i.itemKey, i])), [itens]);
-  const linhas: Linha[] = useMemo(() => kits.map((k) => ({ ...k, calculo: calcularKit(k, porChave, hoje) })), [kits, porChave, hoje]);
+  const { data: reservado } = useReservadoPorItem();
+  // Saldo do item para os kits = alocado à CAEP − reservado nos pedidos.
+  const saldoDoItem = useMemo(() => (i: { itemKey: string; alocado: number }) => i.alocado - (reservado?.get(i.itemKey) ?? 0), [reservado]);
+  const linhas: Linha[] = useMemo(() => kits.map((k) => ({ ...k, calculo: calcularKit(k, porChave, hoje, saldoDoItem) })), [kits, porChave, hoje, saldoDoItem]);
 
   const contagem = useMemo(() => {
     const c: Record<Segmento, number> = { todos: linhas.length, disponivel: 0, vence: 0, indisponivel: 0, desativado: 0 };
@@ -150,12 +139,7 @@ export const EmendasKitsPage: React.FC = () => {
       render: (l) => {
         const c = l.calculo.itemLimitante;
         if (l.calculo.situacao === 'desativado' || !c) return <span style={carteiraSubtitle}>—</span>;
-        return (
-          <>
-            <div style={{ fontWeight: 700 }}>{ataItem(c)}</div>
-            <div style={carteiraDescricaoItem}>{c.item ? descricaoItemEmFrase(c.item.descricao) : 'Item sem alocação da CAEP'}</div>
-          </>
-        );
+        return <ItemDaAta item={c.item} semItem={`${c.itemKey} · sem alocação da CAEP`} />;
       }
     }
   ];
@@ -250,6 +234,7 @@ export const EmendasKitsPage: React.FC = () => {
           itens={itens}
           nomesExistentes={kits.filter((k) => editando === 'novo' || k.id !== editando.id).map((k) => k.nome)}
           hoje={hoje}
+          saldoDoItem={saldoDoItem}
           onClose={() => setEditando(null)}
         />
       )}

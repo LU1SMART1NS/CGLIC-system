@@ -7,6 +7,12 @@ import {
   fetchKitsEmendas,
   salvarBeneficiarioEmenda,
   salvarKitEmenda,
+  fetchPedidosEmendas,
+  fetchReservadoPorItem,
+  salvarPedidoEmenda,
+  avancarPedidoEmenda,
+  cancelarPedidoEmenda,
+  type AcaoPedido,
   type BeneficiarioParaSalvar,
   type KitParaSalvar
 } from '../services/emendasService';
@@ -51,6 +57,39 @@ export function useSalvarKit() {
     retry: 0,
     onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'kits'] })
   });
+}
+
+export function usePedidosEmendas() {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'pedidos'], queryFn: fetchPedidosEmendas });
+}
+
+export function useReservadoPorItem() {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'reservado'], queryFn: fetchReservadoPorItem });
+}
+
+/** Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). */
+function useInvalidarPedidos() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] });
+}
+
+export function useSalvarPedido() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: salvarPedidoEmenda, retry: 0, onSettled: invalidar });
+}
+
+export function useAvancarPedido() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({
+    mutationFn: (v: { id: string; versao: number; acao: AcaoPedido; dados: Record<string, unknown> }) => avancarPedidoEmenda(v.id, v.versao, v.acao, v.dados),
+    retry: 0,
+    onSettled: invalidar
+  });
+}
+
+export function useCancelarPedido() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: (v: { id: string; versao: number; motivo: string }) => cancelarPedidoEmenda(v.id, v.versao, v.motivo), retry: 0, onSettled: invalidar });
 }
 
 /** Hoje no horário de Brasília (AAAA-MM-DD). */

@@ -20,6 +20,7 @@ import {
   Boxes,
   Network,
   ScrollText,
+  ClipboardList,
   PackageOpen,
   Building,
   UserSquare
@@ -68,7 +69,7 @@ export interface NavItem {
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Emendas: Kits · Beneficiários · Autores (CAEP reparte a sua alocação entre parlamentares; migration 155)
+ * - Emendas: Pedidos · Itens da CAEP · Por autor · Kits · Beneficiários · Autores (CAEP reparte a sua alocação entre parlamentares; migration 155)
  * - Ajustes (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
@@ -227,6 +228,33 @@ export const navigationConfig: NavItem[] = [
     icon: ScrollText,
     status: 'active',
     children: [
+      {
+        id: 'emendas-pedidos',
+        label: 'Pedidos',
+        icon: ClipboardList,
+        route: '/emendas/pedidos',
+        status: 'active',
+        matchPrefixes: ['/emendas/pedidos'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
+        id: 'emendas-itens',
+        label: 'Itens da CAEP',
+        icon: Boxes,
+        route: '/emendas/itens',
+        status: 'active',
+        matchPrefixes: ['/emendas/itens'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
+        id: 'emendas-por-autor',
+        label: 'Por autor',
+        icon: UsersRound,
+        route: '/emendas/por-autor',
+        status: 'active',
+        matchPrefixes: ['/emendas/por-autor'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
       {
         id: 'emendas-kits',
         label: 'Kits',

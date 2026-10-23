@@ -1840,3 +1840,5 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .contato-icone:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 /* Tabela de Beneficiários (Emendas): células de várias linhas alinhadas pelo topo */
 .emendas-tabela-topo .ds-table td { vertical-align: top; }
+/* Detalhe do pedido (Emendas › Pedidos): linhas e etapas lado a lado; em tela estreita, uma embaixo da outra */
+@media (max-width: 1100px) { .emendas-detalhe-pedido { grid-template-columns: 1fr !important; } }

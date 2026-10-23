@@ -325,6 +325,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(visible.map((i) => i.id)).toEqual(['carteira', 'emendas']);
       expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
       expect(visible.find((i) => i.id === 'emendas')?.children?.map((c) => [c.label, c.route])).toEqual([
+        ['Pedidos', '/emendas/pedidos'],
+        ['Itens da CAEP', '/emendas/itens'],
+        ['Por autor', '/emendas/por-autor'],
         ['Kits', '/emendas/kits'],
         ['Beneficiários', '/emendas/beneficiarios'],
         ['Autores', '/emendas/autores']
