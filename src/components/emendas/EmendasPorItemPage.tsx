@@ -10,7 +10,8 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
-import { carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useKitsEmendas, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
@@ -31,6 +32,17 @@ interface Uso {
   quantidade: number;
 }
 type Linha = ItemCaep & { reservado: number; saldo: number; usos: Uso[] };
+
+// Ordenação pelo cabeçalho, como nas carteiras (?ordem=); sem escolha, pela descrição do item.
+const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
+  item: { value: (l) => descricaoItemEmFrase(l.descricao) },
+  quadro: { value: (l) => l.nomeCurto },
+  vigencia: { value: (l) => l.vigenciaFinal },
+  alocado: { value: (l) => l.alocado, firstDir: 'desc' },
+  reservado: { value: (l) => l.reservado, firstDir: 'desc' },
+  saldo: { value: (l) => l.saldo, firstDir: 'desc' },
+  valor: { value: (l) => l.valorUnitario, firstDir: 'desc' }
+};
 
 interface Props {
   /** Seletor Por item · Por kit da aba Itens e kits, no cabeçalho. */
@@ -87,6 +99,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
 
   const doSegmento = linhas.filter((l) => segmento === 'todos' || situacao(l) === segmento);
   const filtradas = (buscarItensCaep(doSegmento, busca) as Linha[]).sort((a, b) => descricaoItemEmFrase(a.descricao).localeCompare(descricaoItemEmFrase(b.descricao), 'pt-BR'));
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ORDEM);
   const vigentes = linhas.filter((l) => !l.ataEncerrada);
   const valorAlocado = vigentes.reduce((s, l) => s + l.alocado * l.valorUnitario, 0);
   const valorReservado = vigentes.reduce((s, l) => s + Math.min(l.reservado, l.alocado) * l.valorUnitario, 0);
@@ -114,16 +127,18 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
       header: 'Item',
       priority: 'primary',
       minWidth: '280px',
+      sortValue: ORDEM.item.value,
       render: (l) => <ItemDaAta item={l} />
     },
     {
       key: 'quadro',
       header: 'No quadro',
       minWidth: '160px',
+      sortValue: ORDEM.quadro.value,
       render: (l) => (
         <>
-          <div style={{ fontWeight: 600 }}>{l.nomeCurto ?? <span style={carteiraSubtitle}>sem nome curto</span>}</div>
-          <div style={{ marginTop: 4 }}>
+          {l.nomeCurto ? <div style={carteiraValor}>{l.nomeCurto}</div> : <div style={{ ...carteiraDetalhe, marginTop: 0 }}>sem nome curto</div>}
+          <div style={{ marginTop: '0.2rem' }}>
             {l.gnd ? <StatusBadge label={l.gnd === 'GND-4' ? 'GND-4 · Investimento' : 'GND-3 · Custeio'} variant="neutral" size="sm" dot={false} /> : <StatusBadge label="GND a informar" variant="warning" size="sm" dot={false} />}
           </div>
         </>
@@ -133,25 +148,36 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
       key: 'vigencia',
       header: 'Vigência',
       nowrap: true,
+      sortValue: ORDEM.vigencia.value,
       render: (l) => <VigenciaDaAta item={l} hoje={hoje} />
     },
-    { key: 'alocado', header: 'Alocado à CAEP', align: 'right', nowrap: true, render: (l) => <b>{formatNumber(l.alocado)}</b> },
+    { key: 'alocado', header: 'Alocado à CAEP', align: 'right', nowrap: true, sortValue: ORDEM.alocado.value, sortFirstDir: 'desc', render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(l.alocado)}</span> },
     {
       key: 'reservado',
       header: 'Reservado',
       align: 'right',
       nowrap: true,
+      sortValue: ORDEM.reservado.value,
+      sortFirstDir: 'desc',
       render: (l) => (
         <>
-          <div>{formatNumber(l.reservado)}</div>
+          <div style={carteiraNumero}>{formatNumber(l.reservado)}</div>
           <div style={{ height: 6, borderRadius: 3, background: '#f1f5f9', marginTop: 4, overflow: 'hidden', minWidth: 80 }} aria-hidden="true">
             <div style={{ height: '100%', width: `${l.alocado > 0 ? Math.min(100, (l.reservado / l.alocado) * 100) : 0}%`, background: 'var(--primary)' }} />
           </div>
         </>
       )
     },
-    { key: 'saldo', header: 'Saldo', align: 'right', nowrap: true, render: (l) => <b style={{ color: l.saldo <= 0 ? 'var(--text-muted)' : undefined }}>{formatNumber(l.saldo)}</b> },
-    { key: 'valor', header: 'Valor unitário', align: 'right', nowrap: true, render: (l) => formatCurrency(l.valorUnitario) }
+    {
+      key: 'saldo',
+      header: 'Saldo',
+      align: 'right',
+      nowrap: true,
+      sortValue: ORDEM.saldo.value,
+      sortFirstDir: 'desc',
+      render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero, color: l.saldo <= 0 ? 'var(--text-muted)' : undefined }}>{formatNumber(l.saldo)}</span>
+    },
+    { key: 'valor', header: 'Valor unitário', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatCurrency(l.valorUnitario)}</span> }
   ];
 
   return (
@@ -207,8 +233,10 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
         <DataTable<Linha>
           testId="emendas-itens-tabela"
           className="data-table-container--flush"
-          data={filtradas}
+          data={sorted}
           keyExtractor={(l) => l.itemKey}
+          sort={{ key: sortKey, dir: sortDir }}
+          onSort={toggle}
           rowStyle={(l) => (l.ataEncerrada ? { opacity: 0.7 } : undefined)}
           columns={colunas}
           expandedKeys={abertos}
@@ -232,7 +260,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
                     { key: 'pedido', header: 'Reserva / ofício', nowrap: true, render: (u) => u.identificacao },
                     { key: 'origem', header: 'Origem', render: (u) => (u.origem === 'avulso' ? 'Avulso' : /^kit\b/i.test(u.origem) ? u.origem : `Kit ${u.origem}`) },
                     { key: 'etapa', header: 'Etapa', nowrap: true, render: (u) => ROTULO_ETAPA[u.etapa] },
-                    { key: 'qtd', header: 'Quantidade', align: 'right', nowrap: true, render: (u) => <b>{formatNumber(u.quantidade)}</b> }
+                    { key: 'qtd', header: 'Quantidade', align: 'right', nowrap: true, render: (u) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(u.quantidade)}</span> }
                   ]}
                 />
               )}
@@ -245,7 +273,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
                         {k.nome}
                       </AppButton>
                     ) : (
-                      <span key={k.id} style={{ fontWeight: 600 }}>
+                      <span key={k.id} style={carteiraValor}>
                         {k.nome}
                       </span>
                     )

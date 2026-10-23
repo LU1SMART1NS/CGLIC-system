@@ -12,7 +12,7 @@ import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
-import { carteiraFornecedor, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraFornecedor, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import {
@@ -33,11 +33,8 @@ import { NomeComSigla } from './emendasPartes';
 type Segmento = 'completos' | 'faltam' | 'parecidos' | 'inativos' | 'todos';
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-// Colunas além do nome no padrão das carteiras (como Itens e Vigência na Carteira de Atas): valor em negrito e, embaixo,
-// o detalhe menor em cinza.
-const principal: React.CSSProperties = { fontWeight: 700 };
-const detalhe: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b' };
-const falta: React.CSSProperties = { ...detalhe, fontStyle: 'italic' };
+// Colunas além do nome no padrão das carteiras: carteiraValor e, embaixo, carteiraDetalhe; o que falta em itálico.
+const falta: React.CSSProperties = { ...carteiraDetalhe, marginTop: 0, fontStyle: 'italic' };
 const POR_PAGINA = 25;
 const chaveDoBeneficiario = (b: BeneficiarioEmenda) => b.id;
 const ROTULO_FALTA: Record<FaltaDoBeneficiario, string> = { CNPJ: 'Falta CNPJ', endereço: 'Falta endereço', contato: 'Falta contato' };
@@ -207,15 +204,15 @@ export const EmendasBeneficiariosPage: React.FC = () => {
         const temEndereco = Boolean(b.entregaCep && b.entregaLogradouro);
         return (
           <>
-            {local ? <div style={principal}>{local}</div> : <div style={falta}>Falta cidade</div>}
+            {local ? <div style={carteiraValor}>{local}</div> : <div style={falta}>Falta cidade</div>}
             {temEndereco ? (
-              <div style={{ ...detalhe, marginTop: '0.2rem' }}>
+              <div style={carteiraDetalhe}>
                 <div>{[`${b.entregaLogradouro}${b.entregaNumero ? `, ${b.entregaNumero}` : ''}`, b.entregaComplemento].filter(Boolean).join(' · ')}</div>
                 <div>{[b.entregaBairro, b.entregaCep && `CEP ${formatarCep(b.entregaCep)}`].filter(Boolean).join(' · ')}</div>
               </div>
             ) : (
               // Bairro sem o resto do endereço (veio do nome da planilha): com o rótulo, para não parecer outra coisa.
-              <div style={{ ...detalhe, marginTop: '0.2rem' }}>
+              <div style={carteiraDetalhe}>
                 {b.entregaBairro && <>Bairro {b.entregaBairro} · </>}
                 <span style={falta}>{b.entregaBairro ? 'falta o endereço de entrega' : 'Falta endereço de entrega'}</span>
               </div>
@@ -233,10 +230,10 @@ export const EmendasBeneficiariosPage: React.FC = () => {
         b.responsavelNome ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span style={principal}>{b.responsavelNome}</span>
+              <span style={carteiraValor}>{b.responsavelNome}</span>
               <ContatoDoResponsavel nome={b.responsavelNome} telefone={b.responsavelTelefone} email={b.responsavelEmail} />
             </div>
-            {b.responsavelCargo && <div style={{ ...detalhe, marginTop: '0.2rem' }}>{b.responsavelCargo}</div>}
+            {b.responsavelCargo && <div style={carteiraDetalhe}>{b.responsavelCargo}</div>}
           </>
         ) : (
           <span style={falta}>Falta contato</span>
@@ -249,7 +246,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       sortValue: ordem.indicacoes.value,
       sortFirstDir: 'desc',
       nowrap: true,
-      render: (b) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{linhasPorBeneficiario.get(b.id) ?? 0}</span>
+      render: (b) => <span style={carteiraNumero}>{linhasPorBeneficiario.get(b.id) ?? 0}</span>
     },
     ...(ativo === 'todos'
       ? [

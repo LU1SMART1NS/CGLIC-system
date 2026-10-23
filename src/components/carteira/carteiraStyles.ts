@@ -58,6 +58,15 @@ export const carteiraFornecedor: React.CSSProperties = {
   textTransform: 'uppercase'
 };
 
+/** Valor principal das colunas além da identificação (ex.: "12 itens" na Carteira de Atas). */
+export const carteiraValor: React.CSSProperties = { fontWeight: 700 };
+
+/** Detalhe embaixo do valor nas colunas além da identificação (ex.: "até 31/12/2026" sob a vigência). */
+export const carteiraDetalhe: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' };
+
+/** Números alinhados à direita: algarismos da mesma largura, para as colunas se alinharem. */
+export const carteiraNumero: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
+
 /** Largura das barras de consumo e de GTI nas carteiras: as duas iguais, lado a lado na mesma linha. */
 export const LARGURA_BARRA_CARTEIRA = '150px';
 

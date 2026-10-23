@@ -9,7 +9,8 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppButton } from '../../design-system/components/AppButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
-import { carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
@@ -23,7 +24,16 @@ type Segmento = 'todos' | SituacaoKit;
 type Linha = KitEmenda & { calculo: CalculoDoKit };
 
 const VARIANTE: Record<SituacaoKit, StatusBadgeVariant> = { disponivel: 'success', vence: 'warning', indisponivel: 'danger', desativado: 'neutral' };
+const vazio = <span style={{ ...carteiraDetalhe, marginTop: 0 }}>—</span>;
 const pequeno: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)' };
+// Ordenação pelo cabeçalho, como nas carteiras (?ordem=).
+const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
+  nome: { value: (l) => l.nome },
+  valor: { value: (l) => l.calculo.valorPorKit, firstDir: 'desc' },
+  possiveis: { value: (l) => l.calculo.kitsPossiveis, firstDir: 'desc' },
+  limite: { value: (l) => l.calculo.itemLimitante?.item?.descricao }
+};
+
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** Composição do kit aberta na linha. */
@@ -55,9 +65,9 @@ const ComposicaoDoKit: React.FC<{ linha: Linha; onAbrirItem?: (itemKey: string) 
       nowrap: true,
       render: (c) => <VigenciaDaAta item={c.item} hoje={hoje} />
     },
-    { key: 'qtd', header: 'Por kit', align: 'right', nowrap: true, render: (c) => <b>{formatNumber(c.quantidade)}</b> },
-    { key: 'saldo', header: 'Saldo da CAEP', align: 'right', nowrap: true, render: (c) => (c.item ? formatNumber(c.saldo) : '—') },
-    { key: 'kits', header: 'Dá para', align: 'right', nowrap: true, render: (c) => (c.item && !c.item.ataEncerrada ? `${formatNumber(c.kits)} kits` : '—') }
+    { key: 'qtd', header: 'Por kit', align: 'right', nowrap: true, render: (c) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(c.quantidade)}</span> },
+    { key: 'saldo', header: 'Saldo da CAEP', align: 'right', nowrap: true, render: (c) => (c.item ? <span style={carteiraNumero}>{formatNumber(c.saldo)}</span> : vazio) },
+    { key: 'kits', header: 'Dá para', align: 'right', nowrap: true, render: (c) => (c.item && !c.item.ataEncerrada ? <span style={carteiraNumero}>{formatNumber(c.kits)} kits</span> : vazio) }
   ];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.4rem 0' }} data-testid={`emendas-kit-detalhe-${linha.id}`}>
@@ -120,6 +130,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
       .filter((l) => (segmento === 'todos' ? l.calculo.situacao !== 'desativado' : l.calculo.situacao === segmento))
       .filter((l) => !termo || semAcento(`${l.nome} ${l.descricao ?? ''} ${l.calculo.componentes.map((c) => c.item?.descricao ?? '').join(' ')}`).includes(termo));
   }, [linhas, segmento, busca]);
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ORDEM);
 
   // Vindo do item: kit desativado só aparece no seu trilho; a linha aberta entra na tela.
   const alvo = abrir ? linhas.find((l) => l.id === abrir) : undefined;
@@ -148,10 +159,11 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
       header: 'Kit',
       priority: 'primary',
       minWidth: '220px',
+      sortValue: ORDEM.nome.value,
       render: (l) => (
         <>
           <div style={carteiraIdentificacao}>{l.nome}</div>
-          <div style={carteiraSubtitle}>
+          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>
             {[`${l.itens.length} ${l.itens.length === 1 ? 'item' : 'itens'}`, l.versao > 1 ? `versão ${l.versao}` : null, l.descricao].filter(Boolean).join(' · ')}
           </div>
         </>
@@ -167,16 +179,25 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
           }
         ]
       : []),
-    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, render: (l) => formatCurrency(l.calculo.valorPorKit) },
-    { key: 'possiveis', header: 'Kits possíveis', align: 'right', nowrap: true, render: (l) => <b>{formatNumber(l.calculo.kitsPossiveis)}</b> },
+    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatCurrency(l.calculo.valorPorKit)}</span> },
+    {
+      key: 'possiveis',
+      header: 'Kits possíveis',
+      align: 'right',
+      nowrap: true,
+      sortValue: ORDEM.possiveis.value,
+      sortFirstDir: 'desc',
+      render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(l.calculo.kitsPossiveis)}</span>
+    },
     {
       key: 'limite',
       header: 'Item que limita',
       mobileLabel: 'Item que limita',
       minWidth: '220px',
+      sortValue: ORDEM.limite.value,
       render: (l) => {
         const c = l.calculo.itemLimitante;
-        if (l.calculo.situacao === 'desativado' || !c) return <span style={carteiraSubtitle}>—</span>;
+        if (l.calculo.situacao === 'desativado' || !c) return vazio;
         return <ItemDaAta item={c.item} semItem={`${c.itemKey} · sem alocação da CAEP`} />;
       }
     }
@@ -242,8 +263,10 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
         <DataTable<Linha>
           testId="emendas-kits-tabela"
           className="data-table-container--flush"
-          data={filtradas}
+          data={sorted}
           keyExtractor={(l) => l.id}
+          sort={{ key: sortKey, dir: sortDir }}
+          onSort={toggle}
           rowStyle={(l) => (l.calculo.situacao === 'desativado' ? { opacity: 0.7 } : undefined)}
           columns={colunas}
           expandedKeys={abertos}
