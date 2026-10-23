@@ -46,7 +46,6 @@ const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then
 const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/EmendasInicioPage').then((m) => ({ default: m.EmendasInicioPage })));
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
 const EmendasPorItemPage = lazyComRecarga(() => import('./components/emendas/EmendasPorItemPage').then((m) => ({ default: m.EmendasPorItemPage })));
-const EmendasPorAutorPage = lazyComRecarga(() => import('./components/emendas/EmendasPorAutorPage').then((m) => ({ default: m.EmendasPorAutorPage })));
 const EmendasKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasKitsPage').then((m) => ({ default: m.EmendasKitsPage })));
 const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasBeneficiariosPage').then((m) => ({ default: m.EmendasBeneficiariosPage })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
@@ -427,14 +426,6 @@ const AppContent: React.FC = () => {
               }
             />
             <Route
-              path="/emendas/por-autor"
-              element={
-                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
-                  <EmendasPorAutorPage />
-                </RequireRole>
-              }
-            />
-            <Route
               path="/emendas/kits"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
@@ -450,8 +441,9 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
-            {/* A aba Autores saiu do menu: a consulta de quem não tem pedido ficou em Por autor. */}
-            <Route path="/emendas/autores" element={<LegacyRouteRedirect to="/emendas/por-autor" />} />
+            {/* As abas Autores e Por autor saíram do menu: viraram Pedidos › Ver por autor (com "Mostrar" para quem não tem pedido). */}
+            <Route path="/emendas/autores" element={<Navigate to="/emendas/pedidos?ver=autor" replace />} />
+            <Route path="/emendas/por-autor" element={<Navigate to="/emendas/pedidos?ver=autor" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
