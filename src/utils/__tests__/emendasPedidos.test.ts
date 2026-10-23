@@ -102,3 +102,21 @@ describe('prazo de indicação nos pedidos (migration 162)', () => {
     expect(avisosDoPedido(pedido({ etapa: 'EMPENHADO', linhas: [linha({ itemKey: 't' })] }), its, HOJE)).toEqual([]);
   });
 });
+
+describe('reserva para um órgão (parlamentar a definir)', () => {
+  it('aviso conta dias sem parlamentar e o contato não vira sugestão de autor', async () => {
+    const { avisosDoPedido, ultimoContatoPorAutor, eReservaParaOrgao } = await import('../emendasPedidos');
+    const p = pedido({ autorId: null, reservadoEm: '2026-09-01', contatoNome: 'Major X', linhas: [linha({ beneficiarioNome: 'CBMERJ' })] });
+    expect(eReservaParaOrgao(p)).toBe(true);
+    expect(avisosDoPedido(p, itens, HOJE)[0].texto).toBe('52 dias sem parlamentar');
+    expect(ultimoContatoPorAutor([p]).size).toBe(0);
+  });
+
+  it('o órgão é o beneficiário das linhas (cadastro ou nome da planilha)', async () => {
+    const { orgaoDoPedido } = await import('../emendasPedidos');
+    const nome = (id: string) => ({ b1: 'CBMDF' })[id];
+    expect(orgaoDoPedido(pedido({ autorId: null, linhas: [linha({ beneficiarioNome: 'CBMERJ' })] }), nome)).toBe('CBMERJ');
+    expect(orgaoDoPedido(pedido({ autorId: null, linhas: [linha({ beneficiarioId: 'b1' }), linha({ beneficiarioNome: 'CBMERJ' })] }), nome)).toBe('CBMDF e mais 1');
+    expect(orgaoDoPedido(pedido({ autorId: null, linhas: [linha({})] }), nome)).toBeNull();
+  });
+});

@@ -8,7 +8,7 @@ import { useSalvarPedido } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta, ROTULO_SITUACAO_KIT } from '../../utils/emendasKits';
-import { identificacaoDoPedido, itensDaLinha, valorDaLinha } from '../../utils/emendasPedidos';
+import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, valorDaLinha } from '../../utils/emendasPedidos';
 import { formatarTelefone, soDigitos } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
@@ -38,6 +38,8 @@ interface LinhaEdicao {
   kitComposicao: ItemDoKit[] | null;
   quantidade: number;
   beneficiarioId: string | null;
+  /** Nome do beneficiário vindo das planilhas da CAEP (sem cadastro). */
+  beneficiarioNome?: string | null;
 }
 
 const MAX_RESULTADOS = 30;
@@ -60,6 +62,9 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const salvar = useSalvarPedido();
   const toast = useToast();
   const [autorId, setAutorId] = useState(pedido?.autorId ?? '');
+  // Reserva para um órgão (migration 163): nova reserva sem parlamentar, ou reserva que ainda está sem.
+  const [paraOrgao, setParaOrgao] = useState(false);
+  const semAutorGravado = Boolean(pedido && !pedido.autorId);
   const [buscaAutor, setBuscaAutor] = useState('');
   const [observacao, setObservacao] = useState(pedido?.observacao ?? '');
   const [contatoNome, setContatoNome] = useState(pedido?.contatoNome ?? '');
@@ -73,13 +78,15 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     () =>
       pedido?.linhas
         .filter((l) => !l.cancelada)
-        .map((l) => ({ chave: l.id, id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, kitNome: l.kitNome, kitComposicao: l.kitComposicao, quantidade: l.quantidade, beneficiarioId: l.beneficiarioId })) ?? []
+        .map((l) => ({ chave: l.id, id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, kitNome: l.kitNome, kitComposicao: l.kitComposicao, quantidade: l.quantidade, beneficiarioId: l.beneficiarioId, beneficiarioNome: l.beneficiarioNome })) ?? []
   );
 
   const porChave = useMemo(() => new Map(itens.map((i) => [i.itemKey, i])), [itens]);
   const autor = autores.find((a) => a.id === autorId);
   const saldoAntes = useCallback((k: string) => (porChave.get(k)?.alocado ?? 0) - (reservadoFora.get(k) ?? 0), [porChave, reservadoFora]);
   const ativosBen = beneficiarios.filter((b) => b.ativo).sort((a, b) => a.nomeCurto.localeCompare(b.nomeCurto, 'pt-BR'));
+  const nomeDoBeneficiario = (id: string) => beneficiarios.find((b) => b.id === id)?.nomeCurto;
+  const tituloDoPedido = pedido ? (pedido.autorId ? autor?.nome ?? '' : orgaoDoPedido(pedido, nomeDoBeneficiario) ?? 'órgão') : '';
 
   const autoresEncontrados = useMemo(() => {
     const t = semAcento(buscaAutor.trim());
@@ -119,7 +126,9 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const tirou = pedido ? pedido.linhas.filter((l) => !l.cancelada && !linhas.some((x) => x.id === l.id)).length : 0;
 
   const pendencias: string[] = [];
-  if (!autorId) pendencias.push('o autor');
+  const exigeBeneficiario = (paraOrgao && !pedido) || (semAutorGravado && !autorId);
+  if (!autorId && !pedido && !paraOrgao) pendencias.push('o autor (ou marque reserva para um órgão)');
+  if (exigeBeneficiario && linhas.some((l) => !l.beneficiarioId && !l.beneficiarioNome)) pendencias.push('o beneficiário em todas as linhas (é o órgão para quem a reserva foi feita)');
   if (linhas.length === 0) pendencias.push('pelo menos uma linha');
   if (linhas.some((l) => !(Number.isInteger(l.quantidade) && l.quantidade > 0))) pendencias.push('quantidade inteira maior que zero em cada linha');
   if (negativo) pendencias.push('saldo da CAEP em todos os itens');
@@ -152,7 +161,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
       await salvar.mutateAsync({
         id: pedido?.id,
         versao: pedido?.versao,
-        autorId,
+        autorId: autorId || null,
+        paraOrgao: !pedido && paraOrgao,
         observacao: observacao.trim() || null,
         contatoNome: contatoNome.trim() || null,
         contatoTelefone: tel || null,
@@ -160,7 +170,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         motivo: motivo.trim() || null,
         linhas: linhas.map((l) => ({ id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, quantidade: l.quantidade, beneficiarioId: l.beneficiarioId }))
       });
-      toast.success(pedido ? `Pedido de ${autor?.nome ?? ''} atualizado.` : `Reserva de ${autor?.nome ?? ''} registrada.`);
+      const para = autor?.nome ?? (pedido ? orgaoDoPedido(pedido, nomeDoBeneficiario) : null) ?? 'o órgão';
+      toast.success(semAutorGravado && autorId ? `Parlamentar indicado: ${autor?.nome ?? ''}.` : pedido ? `Pedido de ${para} atualizado.` : `Reserva para ${para} registrada.`);
       onClose();
     } catch (err) {
       toast.error((err as Error).message);
@@ -174,7 +185,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
       dismissible={!salvar.isPending}
       size="xl"
       testId="emendas-pedido-modal"
-      title={pedido ? `Alterar o pedido de ${autor?.nome ?? ''} · ${identificacaoDoPedido(pedido)}` : 'Nova reserva'}
+      title={pedido ? `${semAutorGravado ? 'Reserva para' : 'Alterar o pedido de'} ${tituloDoPedido} · ${identificacaoDoPedido(pedido)}` : 'Nova reserva'}
       footer={
         <>
           <ActionButton action="cancelar" type="button" onClick={onClose} disabled={salvar.isPending} />
@@ -186,14 +197,35 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     >
       <form id="emendas-pedido-form" onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <span style={rotulo}>Autor</span>
-          {autor ? (
+          <span style={rotulo}>{semAutorGravado ? 'Parlamentar que assumiu a reserva (quando houver)' : 'Autor'}</span>
+          {!pedido && (
+            <label htmlFor="emendas-pedido-para-orgao" style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.6rem 0.75rem', borderRadius: '8px', background: 'var(--color-info-bg)', fontSize: '0.85rem' }}>
+              <input
+                id="emendas-pedido-para-orgao"
+                type="checkbox"
+                checked={paraOrgao}
+                onChange={(e) => {
+                  setParaOrgao(e.target.checked);
+                  if (e.target.checked) setAutorId('');
+                }}
+                style={{ marginTop: '0.2rem' }}
+                data-testid="emendas-pedido-para-orgao"
+              />
+              <span>
+                <strong>Reserva para um órgão (parlamentar a definir)</strong>
+                <span style={{ display: 'block', fontSize: '0.75rem', color: '#475569' }}>
+                  O órgão pediu e a CAEP separa os itens enquanto procura o parlamentar. Informe o órgão como beneficiário de cada linha; o parlamentar é indicado depois, antes da minuta.
+                </span>
+              </span>
+            </label>
+          )}
+          {paraOrgao ? null : autor ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 8, padding: '0.55rem 0.75rem' }} data-testid="emendas-pedido-autor">
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700 }}>{autor.nome}</div>
                 <div style={pequeno}>{[TIPO_AUTOR[autor.tipo], autor.partido, autor.uf, autor.emExercicio === false ? 'fora do cargo' : null].filter(Boolean).join(' · ')}</div>
               </div>
-              {!pedido && <ActionButton action="editar" size="sm" label="Trocar" type="button" onClick={() => setAutorId('')} />}
+              {(!pedido || semAutorGravado) && <ActionButton action="editar" size="sm" label="Trocar" type="button" onClick={() => setAutorId('')} />}
             </div>
           ) : (
             <>
@@ -216,7 +248,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <span style={rotulo}>Contato na assessoria</span>
+          <span style={rotulo}>{paraOrgao || (semAutorGravado && !autorId) ? 'Contato no órgão' : 'Contato na assessoria'}</span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
             <AppInput label="Nome" placeholder="Com quem a CAEP combinou" value={contatoNome} onChange={(e) => setContatoNome(e.target.value)} data-testid="emendas-pedido-contato-nome" />
             <AppInput label="Telefone" inputMode="tel" placeholder="(00) 00000-0000" value={contatoTelefone} onChange={(e) => setContatoTelefone(e.target.value)} onBlur={() => setContatoTelefone(formatarTelefone(contatoTelefone))} data-testid="emendas-pedido-contato-telefone" />
@@ -238,7 +270,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 </div>
                 <AppInput label={l.tipo === 'KIT' ? 'Kits' : 'Quantidade'} type="number" min={1} step={1} value={String(l.quantidade || '')} onChange={(e) => muda(l.chave, { quantidade: Number(e.target.value) })} data-testid={`emendas-pedido-qtd-${l.chave}`} />
                 <AppSelect label="Beneficiário" value={l.beneficiarioId ?? ''} onChange={(e) => muda(l.chave, { beneficiarioId: e.target.value || null })}>
-                  <option value="">A informar</option>
+                  <option value="">{l.beneficiarioNome ? `${l.beneficiarioNome} (a cadastrar)` : exigeBeneficiario ? 'Escolha o órgão' : 'A informar'}</option>
                   {ativosBen.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.nomeCurto} ({b.entregaUf})

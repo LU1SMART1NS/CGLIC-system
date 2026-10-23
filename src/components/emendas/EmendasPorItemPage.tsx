@@ -16,14 +16,14 @@ import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, rotuloItemDaAta } from '../../utils/emendasKits';
 import { ItemDaAta, VigenciaDaAta } from './emendasPartes';
 import { DadosItemModal } from './DadosItemModal';
-import { identificacaoDoPedido, itensDaLinha, linhasAtivas, ROTULO_ETAPA } from '../../utils/emendasPedidos';
+import { AUTOR_A_DEFINIR, identificacaoDoPedido, itensDaLinha, linhasAtivas, ROTULO_ETAPA } from '../../utils/emendasPedidos';
 import type { EtapaPedido, ItemCaep } from '../../services/emendasService';
 
 type Segmento = 'com' | 'sem' | 'encerrada' | 'todos';
 interface Uso {
   pedidoId: string;
   identificacao: string;
-  autorId: string;
+  autorId: string | null;
   etapa: EtapaPedido;
   origem: string;
   quantidade: number;
@@ -192,7 +192,7 @@ export const EmendasPorItemPage: React.FC = () => {
                   data={l.usos}
                   keyExtractor={(u) => `${u.pedidoId}-${u.origem}`}
                   columns={[
-                    { key: 'autor', header: 'Autor', priority: 'primary', render: (u) => <span style={carteiraIdentificacao}>{nomeAutor.get(u.autorId) ?? u.autorId}</span> },
+                    { key: 'autor', header: 'Autor', priority: 'primary', render: (u) => <span style={carteiraIdentificacao}>{u.autorId ? nomeAutor.get(u.autorId) ?? u.autorId : AUTOR_A_DEFINIR}</span> },
                     { key: 'pedido', header: 'Reserva / ofício', nowrap: true, render: (u) => u.identificacao },
                     { key: 'origem', header: 'Origem', render: (u) => (u.origem === 'avulso' ? 'Avulso' : /^kit\b/i.test(u.origem) ? u.origem : `Kit ${u.origem}`) },
                     { key: 'etapa', header: 'Etapa', nowrap: true, render: (u) => ROTULO_ETAPA[u.etapa] },

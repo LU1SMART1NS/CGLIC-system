@@ -11,13 +11,13 @@ import { carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useAutoresEmendas, useBeneficiariosEmendas, useItensCaep, usePedidosEmendas } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
-import { identificacaoDoPedido, linhasAtivas, ROTULO_ETAPA, valorDaLinha, valorDoPedido } from '../../utils/emendasPedidos';
+import { AUTOR_A_DEFINIR, identificacaoDoPedido, linhasAtivas, ROTULO_ETAPA, valorDaLinha, valorDoPedido } from '../../utils/emendasPedidos';
 import type { AutorEmenda, PedidoEmenda, TipoAutor } from '../../services/emendasService';
 import { AutorDoPedido, BeneficiarioDaLinha, LinhaDoPedido } from './emendasPartes';
 
 type Segmento = 'todos' | TipoAutor;
 interface Linha {
-  autorId: string;
+  autorId: string | null;
   autor: AutorEmenda | undefined;
   pedidos: PedidoEmenda[];
   kits: number;
@@ -45,13 +45,15 @@ export const EmendasPorAutorPage: React.FC = () => {
     const m = new Map<string, Linha>();
     for (const p of pedidos) {
       if (p.etapa === 'CANCELADO') continue;
-      const l = m.get(p.autorId) ?? { autorId: p.autorId, autor: autorPorId.get(p.autorId), pedidos: [], kits: 0, valor: 0, empenhado: 0 };
+      // Reservas para órgãos (sem parlamentar ainda, migration 163) ficam juntas numa linha "Parlamentar a definir".
+      const chave = p.autorId ?? '';
+      const l = m.get(chave) ?? { autorId: p.autorId, autor: p.autorId ? autorPorId.get(p.autorId) : undefined, pedidos: [], kits: 0, valor: 0, empenhado: 0 };
       const v = valorDoPedido(p, itens);
       l.pedidos.push(p);
       l.valor += v;
       if (p.etapa === 'EMPENHADO') l.empenhado += v;
       l.kits += linhasAtivas(p).filter((x) => x.tipo === 'KIT').reduce((s, x) => s + x.quantidade, 0);
-      m.set(p.autorId, l);
+      m.set(chave, l);
     }
     return [...m.values()].sort((a, b) => b.valor - a.valor);
   }, [pedidos, autorPorId, itens]);
@@ -63,7 +65,7 @@ export const EmendasPorAutorPage: React.FC = () => {
   }, [linhas]);
   const doSegmento = linhas.filter((l) => segmento === 'todos' || l.autor?.tipo === segmento);
   const termo = semAcento(busca.trim());
-  const filtradas = doSegmento.filter((l) => (!uf || l.autor?.uf === uf) && (!termo || semAcento(`${l.autor?.nome ?? ''} ${l.autor?.partido ?? ''}`).includes(termo)));
+  const filtradas = doSegmento.filter((l) => (!uf || l.autor?.uf === uf) && (!termo || semAcento(`${l.autorId ? l.autor?.nome ?? '' : AUTOR_A_DEFINIR} ${l.autor?.partido ?? ''}`).includes(termo)));
   const ufs = [...new Set(doSegmento.map((l) => l.autor?.uf).filter((x): x is string => Boolean(x)))].sort().map((v) => ({ value: v, label: v, count: doSegmento.filter((l) => l.autor?.uf === v).length }));
   const filtrosAtivos = Boolean(termo || uf);
 
@@ -128,12 +130,12 @@ export const EmendasPorAutorPage: React.FC = () => {
           testId="emendas-por-autor-tabela"
           className="data-table-container--flush"
           data={filtradas}
-          keyExtractor={(l) => l.autorId}
+          keyExtractor={(l) => l.autorId ?? 'a-definir'}
           columns={colunas}
           renderExpanded={(l) => (
-            <div style={{ padding: '0.4rem 0' }} data-testid={`emendas-por-autor-detalhe-${l.autorId}`}>
+            <div style={{ padding: '0.4rem 0' }} data-testid={`emendas-por-autor-detalhe-${l.autorId ?? 'a-definir'}`}>
               <DataTable
-                testId={`emendas-por-autor-linhas-${l.autorId}`}
+                testId={`emendas-por-autor-linhas-${l.autorId ?? 'a-definir'}`}
                 className="emendas-tabela-topo"
                 data={l.pedidos.flatMap((p) => linhasAtivas(p).map((x) => ({ p, x })))}
                 keyExtractor={(r) => r.x.id}

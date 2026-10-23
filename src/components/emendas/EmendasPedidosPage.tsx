@@ -12,7 +12,7 @@ import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import {
   hojeEmBrasilia,
@@ -28,10 +28,12 @@ import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import {
   ataDaLinha,
+  AUTOR_A_DEFINIR,
   avisosDoPedido,
   dataDaEtapa,
   ETAPAS,
   linhasAtivas,
+  orgaoDoPedido,
   ORDEM_ETAPA,
   proximaAcao,
   reservadoPorItem,
@@ -43,7 +45,7 @@ import {
   type AvisoPedido
 } from '../../utils/emendasPedidos';
 import type { AutorEmenda, BeneficiarioEmenda, EtapaPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
-import { AConferirDaLinha, BeneficiarioDaLinha, EmpenhoDaLinha, LinhaDoPedido } from './emendasPartes';
+import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, LinhaDoPedido } from './emendasPartes';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
@@ -135,7 +137,9 @@ interface DetalheProps {
 }
 
 const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
-  const prox = proximaAcao(p.etapa);
+  // Reserva para um órgão (migration 163): antes da minuta, a CAEP indica o parlamentar que assumiu.
+  const semAutor = !p.autorId;
+  const prox = semAutor ? null : proximaAcao(p.etapa);
   const colunas: Column<PedidoEmenda['linhas'][number]>[] = [
     {
       key: 'linha',
@@ -180,19 +184,29 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
             {p.empenhadoEm ? `Com a CCGA desde ${dataBR(p.empenhadoEm)}.` : 'Com a CCGA.'} A entrega ao beneficiário será registrada pelo módulo de Fiscalização.
           </div>
         )}
+        {semAutor && (
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: 6, padding: '0.5rem 0.7rem', fontWeight: 600 }}>
+            Reserva feita a pedido do órgão, ainda sem parlamentar. Quando um parlamentar ou bancada assumir, use "Indicar o parlamentar" para seguir com a minuta.
+          </div>
+        )}
         {p.observacao && <div style={carteiraSubtitle}>Observação: {p.observacao}</div>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
         <EtapasDoPedido p={p} />
         {podeGerir && p.etapa !== 'EMPENHADO' && p.etapa !== 'CANCELADO' && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {semAutor && (
+              <AppButton size="sm" onClick={onAlterar} data-testid={`emendas-pedido-indicar-autor-${p.id}`}>
+                Indicar o parlamentar
+              </AppButton>
+            )}
             {prox && (
               <AppButton size="sm" onClick={() => onAcao(prox.acao)} data-testid={`emendas-pedido-proximo-${p.id}`}>
                 {prox.rotulo}
               </AppButton>
             )}
             {/* Às vezes o gabinete manda o ofício sem minuta da CAEP. */}
-            {p.etapa === 'RESERVADO' && <ActionButton action="avancarEtapa" size="sm" label="Já chegou o ofício" onClick={() => onAcao('OFICIO')} />}
+            {p.etapa === 'RESERVADO' && !semAutor && <ActionButton action="avancarEtapa" size="sm" label="Já chegou o ofício" onClick={() => onAcao('OFICIO')} />}
             <ActionButton action="editar" size="sm" label="Alterar linhas" onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
             <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={() => onAcao('CANCELAR')} data-testid={`emendas-pedido-cancelar-${p.id}`} />
           </div>
@@ -224,6 +238,7 @@ export const EmendasPedidosPage: React.FC = () => {
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
   const beneficiarios = useMemo(() => new Map(beneficiariosLista.map((b) => [b.id, b])), [beneficiariosLista]);
+  const nomeDoBeneficiario = (id: string) => beneficiarios.get(id)?.nomeCurto;
   const linhas: Linha[] = useMemo(() => pedidos.map((p) => ({ ...p, valor: valorDoPedido(p, itens), avisos: avisosDoPedido(p, itens, hoje) })), [pedidos, itens, hoje]);
 
   const contagem = useMemo(() => {
@@ -242,11 +257,11 @@ export const EmendasPedidosPage: React.FC = () => {
       .filter((l) => !filtroAviso || (filtroAviso === 'com' ? l.avisos.length > 0 : l.avisos.some((a) => a.tipo === filtroAviso)))
       .filter((l) => {
         if (!termo) return true;
-        const a = autorPorId.get(l.autorId);
+        const a = l.autorId ? autorPorId.get(l.autorId) : undefined;
         const textoLinhas = linhasAtivas(l)
           .map((x) => `${(x.tipo === 'KIT' ? x.kitNome : itens.get(x.itemKey ?? '')?.descricao) ?? ''} ${x.beneficiarioNome ?? ''} ${x.contratoNumero ?? ''}`)
           .join(' ');
-        return semAcento(`${a?.nome ?? ''} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioNumero ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${textoLinhas}`).includes(termo);
+        return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioNumero ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${textoLinhas}`).includes(termo);
       });
   }, [doSegmento, filtroAviso, busca, autorPorId, itens]);
 
@@ -260,15 +275,7 @@ export const EmendasPedidosPage: React.FC = () => {
       header: 'Autor',
       priority: 'primary',
       minWidth: '200px',
-      render: (l) => {
-        const a = autorPorId.get(l.autorId);
-        return (
-          <>
-            <div style={carteiraIdentificacao}>{a?.nome ?? l.autorId}</div>
-            {a && <div style={carteiraSubtitle}>{[{ DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' }[a.tipo], a.partido, a.uf].filter(Boolean).join(' · ')}</div>}
-          </>
-        );
-      }
+      render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} orgao={orgaoDoPedido(l, nomeDoBeneficiario)} destaque />
     },
     {
       // A reserva não é documento: até o ofício chegar, o que identifica o pedido é a data e o contato na assessoria.
@@ -328,14 +335,14 @@ export const EmendasPedidosPage: React.FC = () => {
     }
   ];
 
-  const nomeDoAutor = (id: string) => autorPorId.get(id)?.nome ?? id;
+  const nomeDoAutor = (id: string | null) => (id ? autorPorId.get(id)?.nome ?? id : AUTOR_A_DEFINIR);
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Pedidos"
         subtitle="Reservas e ofícios dos parlamentares, da reserva ao empenho."
-        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). Avisos: mais de 30 dias sem ofício, divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o beneficiário pelo nome (a cadastrar com CNPJ), o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo.`}
+        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o beneficiário pelo nome (a cadastrar com CNPJ), o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo.`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
@@ -375,7 +382,7 @@ export const EmendasPedidosPage: React.FC = () => {
           emptyValue=""
           options={[
             { value: 'com', label: 'Com algum aviso', count: contaAviso('com') },
-            { value: 'semOficio', label: 'Mais de 30 dias sem ofício', count: contaAviso('semOficio') },
+            { value: 'semOficio', label: 'Mais de 30 dias sem ofício ou parlamentar', count: contaAviso('semOficio') },
             { value: 'divergencia', label: 'Divergência com o SIOP', count: contaAviso('divergencia') },
             { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
             { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },

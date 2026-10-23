@@ -441,7 +441,8 @@ export interface LinhaPedido {
 export interface PedidoEmenda {
   id: string;
   numero: number;
-  autorId: string;
+  /** Vazio = reserva para um órgão (o beneficiário final), com o parlamentar a definir (migration 163). */
+  autorId: string | null;
   etapa: EtapaPedido;
   origem: 'SISTEMA' | 'PLANILHA';
   observacao: string | null;
@@ -505,7 +506,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     .map((p) => ({
       id: p.id,
       numero: p.numero,
-      autorId: p.autor_id,
+      autorId: p.autor_id ?? null,
       etapa: p.etapa,
       origem: p.origem,
       observacao: p.observacao ?? null,
@@ -548,7 +549,10 @@ export interface LinhaParaSalvar {
 export async function salvarPedidoEmenda(p: {
   id?: string;
   versao?: number;
-  autorId: string;
+  /** Vazio na reserva para um órgão; numa reserva sem autor, informar o autor o indica (uma vez só). */
+  autorId: string | null;
+  /** Reserva nova para um órgão, sem parlamentar (toda linha com beneficiário). */
+  paraOrgao?: boolean;
   observacao: string | null;
   contatoNome: string | null;
   contatoTelefone: string | null;
@@ -561,6 +565,7 @@ export async function salvarPedidoEmenda(p: {
       id: p.id ?? null,
       versao: p.versao ?? null,
       autor_id: p.autorId,
+      para_orgao: p.paraOrgao ?? false,
       observacao: p.observacao,
       contato_nome: p.contatoNome,
       contato_telefone: p.contatoTelefone,
