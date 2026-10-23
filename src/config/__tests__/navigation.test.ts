@@ -72,7 +72,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(area.children!.every((c) => c.status === 'active')).toBe(true);
     });
 
-    it('Ajustes tem os Modelos de Gestão e a administração do sistema', () => {
+    it('Ajustes tem os Modelos de Gestão, o cadastro de beneficiários das emendas e a administração do sistema', () => {
       const area = navigationConfig.find((i) => i.id === 'configuracoes')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Modelos de Gestão', '/configuracoes/modelos'],
@@ -80,10 +80,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Feriados', '/admin/feriados'],
         ['Grupos das UASGs', '/admin/grupos-uasgs'],
         ['Unidades Internas', '/admin/departamentos'],
+        ['Beneficiários', '/emendas/beneficiarios'],
         ['Usuários e Servidores', '/admin/usuarios'],
         ['Perfis e Permissões', '/admin/perfis']
       ]);
-      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Acesso', 'Acesso']);
+      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Emendas', 'Acesso', 'Acesso']);
     });
 
     it('não deve conter itens legados isolados no menu (SEI, Exportar Excel, Prorrogações soltas)', () => {
@@ -322,18 +323,22 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Carteira');
     });
 
-    it('Gestor de Emendas (CAEP) vê o Início dele, Emendas e a Carteira só com Atas e Itens — sem Contratos, Alocação, Vínculos, Financeiro ou Ajustes', () => {
+    it('Gestor de Emendas (CAEP) vê o Início dele, Emendas, a Carteira só com Atas e Itens e Ajustes só com Beneficiários — sem Contratos, Alocação, Vínculos ou Financeiro', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor_emendas');
-      expect(visible.map((i) => i.id)).toEqual(['visao-geral', 'carteira', 'emendas']);
+      expect(visible.map((i) => i.id)).toEqual(['visao-geral', 'carteira', 'emendas', 'configuracoes']);
       expect(visible.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route])).toEqual([['Painel', '/emendas/inicio']]);
       expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
       expect(visible.find((i) => i.id === 'emendas')?.children?.map((c) => [c.label, c.route])).toEqual([
         ['Pedidos', '/emendas/pedidos'],
         ['Itens da CAEP', '/emendas/itens'],
         ['Por autor', '/emendas/por-autor'],
-        ['Kits', '/emendas/kits'],
-        ['Beneficiários', '/emendas/beneficiarios']
+        ['Kits', '/emendas/kits']
       ]);
+      // Beneficiários é cadastro de apoio: fica em Ajustes, no grupo Emendas
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([
+        ['Beneficiários', '/emendas/beneficiarios', 'Emendas']
+      ]);
+      expect(findAreaForTabs(visible, '/emendas/beneficiarios')?.id).toBe('configuracoes');
     });
 
     it('ao entrar, o gestor de emendas vai ao Início dele e os demais ao Painel', () => {
@@ -379,8 +384,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'emendas', 'configuracoes']);
 
       expect(labels).not.toContain('Modelos de Gestão');
-      // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs e das unidades internas
-      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Grupos das UASGs', 'Unidades Internas']);
+      // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs, das unidades internas e dos beneficiários
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Grupos das UASGs', 'Unidades Internas', 'Beneficiários']);
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
     });

@@ -52,7 +52,7 @@ export interface NavItem {
    * filtro — ver `filterNavigationByRole`.
    */
   allowedRoles?: AppRole[];
-  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Acesso). */
+  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Emendas · Acesso). */
   group?: string;
   /** 'bottom' = área fica no pé do menu chave (ex.: Ajustes). */
   placement?: 'bottom';
@@ -69,9 +69,9 @@ export interface NavItem {
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Emendas: Pedidos · Itens da CAEP · Por autor · Kits · Beneficiários (CAEP reparte a sua alocação entre parlamentares; migration 155)
- * - Ajustes (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
- *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
+ * - Emendas: Pedidos · Itens da CAEP · Por autor · Kits (CAEP reparte a sua alocação entre parlamentares; migration 155)
+ * - Ajustes (no pé do menu), em três grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
+ *   Feriados · Unidades Internas), Emendas (Beneficiários) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
 export const navigationConfig: NavItem[] = [
   {
@@ -283,15 +283,6 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/emendas/kits'],
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
-      },
-      {
-        id: 'emendas-beneficiarios',
-        label: 'Beneficiários',
-        icon: Building,
-        route: '/emendas/beneficiarios',
-        status: 'active',
-        matchPrefixes: ['/emendas/beneficiarios'],
-        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       }
     ]
   },
@@ -353,6 +344,17 @@ export const navigationConfig: NavItem[] = [
         group: 'Gestão',
         matchPrefixes: ['/admin/departamentos'],
         allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+      },
+      {
+        // Cadastro de apoio das emendas: fica em Ajustes, longe do trabalho do dia (Pedidos, Itens, Kits).
+        id: 'emendas-beneficiarios',
+        label: 'Beneficiários',
+        icon: Building,
+        route: '/emendas/beneficiarios',
+        status: 'active',
+        group: 'Emendas',
+        matchPrefixes: ['/emendas/beneficiarios'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       },
       {
         id: 'admin-usuarios',
