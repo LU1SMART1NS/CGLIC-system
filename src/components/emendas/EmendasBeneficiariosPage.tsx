@@ -208,8 +208,8 @@ export const EmendasBeneficiariosPage: React.FC = () => {
         )
     },
     {
-      key: 'linhas',
-      header: 'Linhas',
+      key: 'indicacoes',
+      header: 'Indicações',
       align: 'right',
       nowrap: true,
       render: (b) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{linhasPorBeneficiario.get(b.id) ?? 0}</span>
@@ -231,7 +231,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       <PageHeader
         title="Beneficiários"
         subtitle="Órgãos que recebem o material das emendas."
-        hint="Só o nome é obrigatório; o CNPJ, o endereço de entrega e o contato podem ser completados depois. O mesmo nome na mesma cidade não se repete. Nomes parecidos no mesmo lugar aparecem em Parecidos, para juntar ou marcar como diferentes. Cada alteração fica no histórico."
+        hint="Só o nome curto é obrigatório; o CNPJ (que traz o nome do beneficiário pela Receita), o endereço de entrega e o contato podem ser completados depois. O mesmo nome curto na mesma cidade não se repete. Nomes parecidos no mesmo lugar aparecem em Parecidos, para juntar ou marcar como diferentes. Cada alteração fica no histórico."
         icon={<Building size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>

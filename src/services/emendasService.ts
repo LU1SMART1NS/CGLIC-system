@@ -29,7 +29,8 @@ export interface BeneficiarioEmenda {
   id: string;
   versao: number;
   ativo: boolean;
-  /** Nome do beneficiário, sem a cidade e a UF (ficam no endereço de entrega). Nome + município + UF não repetem (migration 166). */
+  /** Nome curto do beneficiário, sem a cidade e a UF (ficam no endereço de entrega). Nome curto + município + UF não
+   *  repetem (migrations 166 e 167). O nome do beneficiário é a razão social, da Receita. */
   nome: string;
   /** Outras grafias do mesmo beneficiário (planilhas da CAEP e cadastros juntados). */
   outrosNomes: string[];
@@ -48,6 +49,7 @@ export interface BeneficiarioEmenda {
   sedeTelefone: string | null;
   sedeEmail: string | null;
   receitaLidaEm: string | null;
+  /** Sem uso desde a migration 167 (o nome curto é `nome`). */
   nomeCurto: string | null;
   entregaCep: string | null;
   entregaLogradouro: string | null;
@@ -68,8 +70,8 @@ export interface BeneficiarioEmenda {
   atualizadoEm: string | null;
 }
 
-/** Como o beneficiário aparece nas listas: o nome curto, se a CAEP deu um; senão o nome. */
-export const rotuloBeneficiario = (b: Pick<BeneficiarioEmenda, 'nome' | 'nomeCurto'>): string => b.nomeCurto?.trim() || b.nome;
+/** Como o beneficiário aparece nas listas: o nome curto (coluna nome desde a migration 167). */
+export const rotuloBeneficiario = (b: Pick<BeneficiarioEmenda, 'nome'>): string => b.nome;
 
 /** "Limeira - SP", só "SP" ou nada. */
 export function localDoBeneficiario(b: Pick<BeneficiarioEmenda, 'entregaMunicipio' | 'entregaUf'>): string | null {
