@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { AppShell } from './components/layout/AppShell';
 import { SelectionProvider, useSelection } from './context/SelectionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { rotaInicialDoPerfil } from './config/navigation';
 import { ToastProvider, ConfirmProvider } from './design-system';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import fnspLogo from './assets/fnsp-logo.png';
@@ -42,6 +43,7 @@ const DefinirSenhaRoute = lazyComRecarga(() => import('./routes/DefinirSenhaRout
 const RedefinirSenhaRoute = lazyComRecarga(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
 const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
+const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/EmendasInicioPage').then((m) => ({ default: m.EmendasInicioPage })));
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
 const EmendasPorItemPage = lazyComRecarga(() => import('./components/emendas/EmendasPorItemPage').then((m) => ({ default: m.EmendasPorItemPage })));
 const EmendasPorAutorPage = lazyComRecarga(() => import('./components/emendas/EmendasPorAutorPage').then((m) => ({ default: m.EmendasPorAutorPage })));
@@ -131,6 +133,17 @@ const LegacyRouteRedirect: React.FC<{ to: string }> = ({ to }) => {
   return <Navigate to={`${to}${location.search}`} replace />;
 };
 
+/**
+ * Entrada do sistema ("/"): o Início de cada perfil. O gestor de emendas tem o seu em /emendas/inicio; os demais,
+ * o Painel. Espera o perfil ser lido para não mostrar "Acesso não autorizado" no caminho.
+ */
+const InicioDoPerfil: React.FC = () => {
+  const { role, roleStatus } = useAuth();
+  const location = useLocation();
+  if (roleStatus === 'loading') return null;
+  return <Navigate to={`${rotaInicialDoPerfil(role)}${location.search}`} replace />;
+};
+
 const ProtectedLayout: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
@@ -201,7 +214,7 @@ const AppContent: React.FC = () => {
               </ProtectedLayout>
             }
           >
-            <Route path="/" element={<LegacyRouteRedirect to="/instrumentos" />} />
+            <Route path="/" element={<InicioDoPerfil />} />
             <Route
               path="/instrumentos"
               element={
@@ -390,6 +403,14 @@ const AppContent: React.FC = () => {
             />
             {/* Emendas parlamentares (migration 155): gestor de emendas (CAEP) e coordenador alteram; consulta lê. */}
             <Route path="/emendas" element={<Navigate to="/emendas/pedidos" replace />} />
+            <Route
+              path="/emendas/inicio"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasInicioPage />
+                </RequireRole>
+              }
+            />
             <Route
               path="/emendas/pedidos"
               element={

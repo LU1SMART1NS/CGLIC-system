@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { navigationConfig, getBreadcrumbs, filterNavigationByRole, findAreaForTabs } from '../navigation';
+import { navigationConfig, getBreadcrumbs, filterNavigationByRole, findAreaForTabs, rotaInicialDoPerfil } from '../navigation';
 import { isExactChildActive, isItemActive } from '../../components/layout/Sidebar';
 
 function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] {
@@ -23,10 +23,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
 
-    it('Início tem as abas Painel (/instrumentos) e Distribuição (/atas/distribuicao)', () => {
+    it('Início tem as abas Painel (/instrumentos), Painel das emendas (/emendas/inicio) e Distribuição (/atas/distribuicao)', () => {
       const area = navigationConfig.find((i) => i.id === 'visao-geral')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Painel', '/instrumentos'],
+        ['Painel', '/emendas/inicio'],
         ['Distribuição', '/atas/distribuicao']
       ]);
       expect(area.children![0].matchPrefixes).toContain('/prazos');
@@ -320,9 +321,10 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Carteira');
     });
 
-    it('Gestor de Emendas (CAEP) vê Emendas e a Carteira só com Atas e Itens — sem Início, Contratos, Alocação, Vínculos, Financeiro ou Ajustes', () => {
+    it('Gestor de Emendas (CAEP) vê o Início dele, Emendas e a Carteira só com Atas e Itens — sem Contratos, Alocação, Vínculos, Financeiro ou Ajustes', () => {
       const visible = filterNavigationByRole(navigationConfig, 'gestor_emendas');
-      expect(visible.map((i) => i.id)).toEqual(['carteira', 'emendas']);
+      expect(visible.map((i) => i.id)).toEqual(['visao-geral', 'carteira', 'emendas']);
+      expect(visible.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route])).toEqual([['Painel', '/emendas/inicio']]);
       expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
       expect(visible.find((i) => i.id === 'emendas')?.children?.map((c) => [c.label, c.route])).toEqual([
         ['Pedidos', '/emendas/pedidos'],
@@ -332,6 +334,18 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Beneficiários', '/emendas/beneficiarios'],
         ['Autores', '/emendas/autores']
       ]);
+    });
+
+    it('ao entrar, o gestor de emendas vai ao Início dele e os demais ao Painel', () => {
+      expect(rotaInicialDoPerfil('gestor_emendas')).toBe('/emendas/inicio');
+      for (const role of ['admin', 'gestor', 'gestor_saldos', 'leitor', null] as const) expect(rotaInicialDoPerfil(role)).toBe('/instrumentos');
+    });
+
+    it('o Painel das emendas só aparece no Início do gestor de emendas', () => {
+      for (const role of ['admin', 'gestor', 'gestor_saldos', 'leitor'] as const) {
+        const inicio = filterNavigationByRole(navigationConfig, role).find((i) => i.id === 'visao-geral');
+        expect(inicio?.children?.map((c) => c.route)).not.toContain('/emendas/inicio');
+      }
     });
 
     it('Emendas fica fora do menu do gestor de atas e contratos e do gestor de saldo', () => {

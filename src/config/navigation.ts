@@ -63,7 +63,7 @@ export interface NavItem {
  * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
- * - Início: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
+ * - Início: Painel (/instrumentos; o gestor de emendas tem o seu em /emendas/inicio) · Distribuição (/atas/distribuicao)
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
@@ -88,6 +88,16 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/instrumentos', '/prazos'],
         allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+      },
+      {
+        // Início do gestor de emendas: avisos dos pedidos e saldo livre da CAEP (protótipo aprovado em 23/10/2026).
+        id: 'emendas-inicio',
+        label: 'Painel',
+        icon: LayoutDashboard,
+        route: '/emendas/inicio',
+        status: 'active',
+        matchPrefixes: ['/emendas/inicio'],
+        allowedRoles: ['gestor_emendas']
       },
       {
         // Atas e contratos por gestor: visão de coordenação (contratos vinculados herdam o gestor da ata).
@@ -366,6 +376,11 @@ export const navigationConfig: NavItem[] = [
     ]
   }
 ];
+
+/** Primeira tela do perfil ao entrar no sistema: o gestor de emendas tem o próprio Início. */
+export function rotaInicialDoPerfil(role: AppRole | null): string {
+  return role === 'gestor_emendas' ? '/emendas/inicio' : '/instrumentos';
+}
 
 /**
  * Área cujas abas aparecem no topo da página: só nas páginas de lista (rota igual

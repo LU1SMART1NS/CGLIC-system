@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Boxes } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -41,7 +42,9 @@ export const EmendasPorItemPage: React.FC = () => {
   const { data: kits = [] } = useKitsEmendas();
   const hoje = hojeEmBrasilia();
   const [segmento, setSegmento] = useState<Segmento>('com');
-  const [busca, setBusca] = useState('');
+  // Vindo do Início (saldo livre perto do fim): ?busca= já filtra o item.
+  const [searchParams] = useSearchParams();
+  const [busca, setBusca] = useState(() => searchParams.get('busca') ?? '');
   const podeGerir = usePodeGerirEmendas();
   const [editando, setEditando] = useState<ItemCaep | null>(null);
 

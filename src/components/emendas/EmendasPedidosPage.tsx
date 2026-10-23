@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ClipboardList } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -59,6 +60,9 @@ type Segmento = 'todos' | EtapaPedido;
 type Linha = PedidoEmenda & { valor: number; avisos: AvisoPedido[] };
 
 const POR_PAGINA = 25;
+/** Filtro de aviso da lista: um tipo, 'com' (qualquer aviso) ou 'grave' (só os vermelhos, como no cartão do Início). */
+const temAviso = (l: { avisos: AvisoPedido[] }, filtro: string) =>
+  filtro === 'com' ? l.avisos.length > 0 : filtro === 'grave' ? l.avisos.some(avisoGrave) : l.avisos.some((a) => a.tipo === filtro);
 const chaveDaLinha = (p: { id: string }) => p.id;
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const VARIANTE_ETAPA: Record<EtapaPedido, StatusBadgeVariant> = {
@@ -241,8 +245,13 @@ export const EmendasPedidosPage: React.FC = () => {
   const podeGerir = usePodeGerirEmendas();
   const podeVerContratos = usePodeVerContratos();
   const hoje = hojeEmBrasilia();
-  const [segmento, setSegmento] = useState<Segmento>('todos');
-  const [filtroAviso, setFiltroAviso] = useState('');
+  // Vindo do Início: ?aviso= (tipo, 'com' ou 'grave'), ?etapa= e ?pedido= (só aquele pedido, já aberto).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const etapaDaUrl = searchParams.get('etapa');
+  const [segmento, setSegmento] = useState<Segmento>(() => (etapaDaUrl && etapaDaUrl in ORDEM_ETAPA ? (etapaDaUrl as Segmento) : 'todos'));
+  const [filtroAviso, setFiltroAviso] = useState(() => searchParams.get('aviso') ?? '');
+  const [soPedido, setSoPedido] = useState(() => searchParams.get('pedido'));
+  const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(soPedido ? [soPedido] : []));
   const [busca, setBusca] = useState('');
   const [editando, setEditando] = useState<PedidoEmenda | 'novo' | null>(null);
   const [janela, setJanela] = useState<{ pedido: PedidoEmenda; acao: AcaoDaJanela } | null>(null);
@@ -269,7 +278,8 @@ export const EmendasPedidosPage: React.FC = () => {
   const filtradas = useMemo(() => {
     const termo = semAcento(busca.trim());
     return doSegmento
-      .filter((l) => !filtroAviso || (filtroAviso === 'com' ? l.avisos.length > 0 : l.avisos.some((a) => a.tipo === filtroAviso)))
+      .filter((l) => !soPedido || l.id === soPedido)
+      .filter((l) => !filtroAviso || temAviso(l, filtroAviso))
       .filter((l) => {
         if (!termo) return true;
         const a = l.autorId ? autorPorId.get(l.autorId) : undefined;
@@ -278,11 +288,11 @@ export const EmendasPedidosPage: React.FC = () => {
           .join(' ');
         return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioNumero ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${textoLinhas}`).includes(termo);
       });
-  }, [doSegmento, filtroAviso, busca, autorPorId, itens]);
+  }, [doSegmento, soPedido, filtroAviso, busca, autorPorId, itens]);
 
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtradas, chaveDaLinha, POR_PAGINA);
-  const filtrosAtivos = Boolean(busca.trim() || filtroAviso);
-  const contaAviso = (tipo: string) => doSegmento.filter((l) => (tipo === 'com' ? l.avisos.length > 0 : l.avisos.some((a) => a.tipo === tipo))).length;
+  const filtrosAtivos = Boolean(busca.trim() || filtroAviso || soPedido);
+  const contaAviso = (tipo: string) => doSegmento.filter((l) => temAviso(l, tipo)).length;
 
   const colunas: Column<Linha>[] = [
     {
@@ -400,6 +410,8 @@ export const EmendasPedidosPage: React.FC = () => {
         onResetFilters={() => {
           setBusca('');
           setFiltroAviso('');
+          setSoPedido(null);
+          if (searchParams.toString()) setSearchParams({}, { replace: true });
         }}
         counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
         testIdPrefix="emendas-pedidos"
@@ -410,6 +422,7 @@ export const EmendasPedidosPage: React.FC = () => {
           emptyValue=""
           options={[
             { value: 'com', label: 'Com algum aviso', count: contaAviso('com') },
+            { value: 'grave', label: 'Pedem ação já (avisos vermelhos)', count: contaAviso('grave') },
             { value: 'semOficio', label: 'Mais de 30 dias sem ofício ou parlamentar', count: contaAviso('semOficio') },
             { value: 'divergencia', label: 'Divergência com o SIOP', count: contaAviso('divergencia') },
             { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
@@ -440,6 +453,15 @@ export const EmendasPedidosPage: React.FC = () => {
           data={pageItems}
           keyExtractor={chaveDaLinha}
           rowStyle={(l) => (l.etapa === 'CANCELADO' ? { opacity: 0.7 } : undefined)}
+          expandedKeys={abertos}
+          onToggleExpand={(id) =>
+            setAbertos((atual) => {
+              const prox = new Set(atual);
+              if (prox.has(id)) prox.delete(id);
+              else prox.add(id);
+              return prox;
+            })
+          }
           columns={colunas}
           renderExpanded={(l) => (
             <DetalheDoPedido
