@@ -5,7 +5,7 @@ import { Tabs } from '../../design-system/components/Tabs';
 import { useToast } from '../../design-system/components/Toast';
 import { useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
 import { usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
-import { brl, htmlParaSei, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
+import { brl, COLUNAS, htmlParaSei, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AutorEmenda } from '../../services/emendasService';
 
 const borda = '1px solid #000';
@@ -157,10 +157,10 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
       {aba === 'sei' ? (
         <div style={{ background: '#fff', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 8, padding: '0.9rem', overflowX: 'auto', fontFamily: 'Arial, Helvetica, sans-serif' }} data-testid={`${testId}-sei`}>
           <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.6rem' }}>{quadro.titulo}</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: 720 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: 860 }}>
             <thead>
               <tr>
-                {['DESCRIÇÃO ITEM', 'ÓRGÃO', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL'].map((h) => (
+                {COLUNAS.map((h) => (
                   <th key={h} style={{ ...celula, fontWeight: 700 }}>
                     {h}
                   </th>
@@ -170,6 +170,8 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
             <tbody>
               {quadro.linhas.map((l, i) => (
                 <tr key={i}>
+                  <td style={{ ...celula, whiteSpace: 'nowrap' }}>{l.ata ?? '—'}</td>
+                  <td style={celula}>{l.item ?? '—'}</td>
                   <td style={{ ...celula, fontWeight: 700 }}>
                     {l.descricao}
                     {l.kit && <div style={{ fontWeight: 400 }}>({l.kit})</div>}
@@ -188,14 +190,14 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
               ))}
               {quadro.porGnd.map((g) => (
                 <tr key={g.rotulo}>
-                  <td colSpan={6} style={{ ...celula, textAlign: 'right', fontWeight: 700 }}>
+                  <td colSpan={8} style={{ ...celula, textAlign: 'right', fontWeight: 700 }}>
                     {g.rotulo}
                   </td>
                   <td style={{ ...celula, fontWeight: 700 }}>{brl(g.total)}</td>
                 </tr>
               ))}
               <tr style={{ background: '#d9d9d9' }}>
-                <td colSpan={6} style={{ ...celula, fontWeight: 700, padding: '0.7rem 0.4rem' }}>
+                <td colSpan={8} style={{ ...celula, fontWeight: 700, padding: '0.7rem 0.4rem' }}>
                   TOTAL A EMPENHAR
                 </td>
                 <td style={{ ...celula, fontWeight: 700 }}>{brl(quadro.total)}</td>

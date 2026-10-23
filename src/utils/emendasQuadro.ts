@@ -1,7 +1,7 @@
 /**
  * Quadro da reserva para o gabinete (migration 165), fora da tela para poder testar.
  *
- * Formato do Anexo que a CAEP já usa: DESCRIÇÃO ITEM · ÓRGÃO · BENEFICIÁRIO FINAL · MUNICÍPIO · QTD · VR UNITÁRIO ·
+ * Formato do Anexo que a CAEP já usa, com a ata e o item na frente: ATA · ITEM · DESCRIÇÃO ITEM · ÓRGÃO · BENEFICIÁRIO FINAL · MUNICÍPIO · QTD · VR UNITÁRIO ·
  * VR TOTAL, uma linha por item e beneficiário, kit aberto nos seus itens, fechando com TOTAL A EMPENHAR. O valor
  * unitário é o preço previsto pelo reajuste da ata (emendas_precos_previstos), para a emenda nascer com folga; cada
  * preço que não é o de hoje ganha uma nota (¹, ², ...). Quando o pedido mistura investimento e custeio, sai o total de
@@ -40,6 +40,9 @@ export interface EntradaQuadro {
 }
 
 export interface LinhaQuadro {
+  /** Número da ata e do item na ata ("00043/2026", "00005"); null quando o item não está no catálogo da CAEP. */
+  ata: string | null;
+  item: string | null;
   descricao: string;
   /** Kit de onde o item veio, quando veio de um. */
   kit: string | null;
@@ -148,6 +151,8 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
       const hoje = preco?.precoAtual ?? item?.valorUnitario ?? 0;
       const unitario = preco?.precoPrevisto ?? hoje;
       linhas.push({
+        ata: item?.numeroAta ?? null,
+        item: item ? String(item.numeroItem).padStart(5, '0') : null,
         descricao: nomeDoItem(item, p.itemKey),
         kit: p.kit,
         orgao: ben?.orgao ?? null,
@@ -200,6 +205,7 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
 
 const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const A_DEFINIR = 'a definir';
+export const COLUNAS = ['ATA', 'ITEM', 'DESCRIÇÃO ITEM', 'ÓRGÃO', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL'];
 
 /** Tabela para colar no editor do SEI (HTML com bordas e estilos na própria célula). */
 export function htmlParaSei(q: Quadro): string {
@@ -207,6 +213,8 @@ export function htmlParaSei(q: Quadro): string {
   const th = td + 'font-weight:bold;';
   const linha = (l: LinhaQuadro) =>
     '<tr>' +
+    `<td style="${td}">${escapar(l.ata ?? '—')}</td>` +
+    `<td style="${td}">${escapar(l.item ?? '—')}</td>` +
     `<td style="${td}"><b>${escapar(l.descricao)}</b>${l.kit ? `<br>(${escapar(l.kit)})` : ''}</td>` +
     `<td style="${td}">${escapar(l.orgao ?? A_DEFINIR)}</td>` +
     `<td style="${td}">${escapar(l.beneficiario ?? A_DEFINIR)}</td>` +
@@ -215,15 +223,15 @@ export function htmlParaSei(q: Quadro): string {
     `<td style="${td}">${brl(l.unitario)}${l.marca ? `<sup>${l.marca}</sup>` : ''}</td>` +
     `<td style="${td}">${brl(l.total)}</td>` +
     '</tr>';
-  const subtotal = (rotulo: string, v: number) => `<tr><td colspan="6" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${td}"><b>${brl(v)}</b></td></tr>`;
+  const subtotal = (rotulo: string, v: number) => `<tr><td colspan="8" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${td}"><b>${brl(v)}</b></td></tr>`;
   return (
     `<p style="text-align:center"><b>${escapar(q.titulo)}</b></p>` +
     '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
-    ['DESCRIÇÃO ITEM', 'ÓRGÃO', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL'].map((h) => `<th style="${th}">${h}</th>`).join('') +
+    COLUNAS.map((h) => `<th style="${th}">${h}</th>`).join('') +
     '</tr></thead><tbody>' +
     q.linhas.map(linha).join('') +
     q.porGnd.map((g) => subtotal(g.rotulo, g.total)).join('') +
-    `<tr><td colspan="6" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${td}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
+    `<tr><td colspan="8" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${td}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
     '</tbody></table>' +
     (q.notas.length ? `<p style="font-size:9pt">${q.notas.map(escapar).join('<br>')}</p>` : '')
   );
@@ -234,6 +242,7 @@ export function textoParaWhatsapp(q: Quadro): string {
   const linhas = q.linhas.map(
     (l) =>
       `• ${l.quantidade} × ${l.descricao}${l.kit ? ` (${l.kit})` : ''}\n` +
+      (l.ata ? `  Ata ${l.ata} · item ${l.item}\n` : '') +
       `  ${l.beneficiario ? `${l.beneficiario}${l.municipio ? ` — ${l.municipio}` : ''}` : 'beneficiário a definir'}\n` +
       `  ${brl(l.unitario)}${l.marca ? ` ${l.marca}` : ''} = *${brl(l.total)}*`
   );
