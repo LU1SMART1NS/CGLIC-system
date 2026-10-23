@@ -5,8 +5,9 @@ const EMAIL_VALIDO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const UFS = new Set('AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' '));
 
 export interface FormularioBeneficiario {
-  /** Nome curto (coluna nome desde a migration 167). */
+  /** Nome da unidade por extenso (coluna nome). */
   nome: string;
+  sigla: string;
   /** Coluna ÓRGÃO do Anexo da reserva (lista fixa de ORGAOS_BENEFICIARIO). */
   orgao: string;
   entregaCep: string;
@@ -25,7 +26,7 @@ export interface FormularioBeneficiario {
 /** O que impede salvar; vazio = pode salvar. Só o nome é obrigatório (migration 166); o resto, se vier, vem certo. */
 export function pendenciasDoBeneficiario(f: FormularioBeneficiario): string[] {
   const p: string[] = [];
-  if (!chaveDoNome(f.nome)) p.push('nome curto');
+  if (!chaveDoNome(f.nome)) p.push('nome da unidade');
   const cep = soDigitos(f.entregaCep);
   if (cep && cep.length !== 8) p.push('CEP com 8 números');
   if (f.entregaUf.trim() && !UFS.has(f.entregaUf.trim().toUpperCase())) p.push('UF válida');

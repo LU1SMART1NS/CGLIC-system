@@ -9,7 +9,7 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
-import { carteiraFornecedor, carteiraIdentificacao, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraSubtitle } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import {
@@ -25,6 +25,7 @@ import { faltasDoBeneficiario, orgaoAbaixoDoNome, paresParecidos, type FaltaDoBe
 import { BeneficiarioModal } from './BeneficiarioModal';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { JuntarBeneficiariosModal } from './JuntarBeneficiariosModal';
+import { NomeComSigla } from './emendasPartes';
 
 type Segmento = 'completos' | 'faltam' | 'parecidos' | 'inativos' | 'todos';
 
@@ -99,7 +100,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       .filter(
         (b) =>
           !termo ||
-          semAcento([b.nome, b.nomeCurto, b.razaoSocial, b.orgao, b.entregaMunicipio, b.responsavelNome, ...b.outrosNomes].filter(Boolean).join(' ')).includes(termo) ||
+          semAcento([b.nome, b.sigla, b.nomeCurto, b.razaoSocial, b.orgao, b.entregaMunicipio, b.responsavelNome, ...b.outrosNomes].filter(Boolean).join(' ')).includes(termo) ||
           (digitos.length >= 4 && (b.cnpj ?? '').includes(digitos))
       );
   }, [doSegmento, uf, oQueFalta, busca, faltas]);
@@ -152,7 +153,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
         const parecido = parecidoDe.get(b.id);
         return (
           <>
-            <div style={carteiraIdentificacao}>{rotuloBeneficiario(b)}</div>
+            <NomeComSigla b={b} destaque />
             {orgao && <div style={carteiraSubtitle}>{orgao}</div>}
             {local && <div style={carteiraSubtitle}>{local}</div>}
             {b.cnpj && (
@@ -231,7 +232,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       <PageHeader
         title="Beneficiários"
         subtitle="Órgãos que recebem o material das emendas."
-        hint="Só o nome curto é obrigatório; o CNPJ (que traz o nome do beneficiário pela Receita), o endereço de entrega e o contato podem ser completados depois. O mesmo nome curto na mesma cidade não se repete. Nomes parecidos no mesmo lugar aparecem em Parecidos, para juntar ou marcar como diferentes. Cada alteração fica no histórico."
+        hint="Só o nome da unidade é obrigatório; a sigla, o CNPJ (que traz o nome do beneficiário pela Receita), o endereço de entrega e o contato podem ser completados depois. O mesmo nome na mesma cidade não se repete. Nomes parecidos no mesmo lugar aparecem em Parecidos, para juntar ou marcar como diferentes. Cada alteração fica no histórico."
         icon={<Building size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
@@ -257,7 +258,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
 
       <CarteiraFilterBar
         busca={busca}
-        searchPlaceholder="Buscar por nome, cidade, CNPJ ou contato..."
+        searchPlaceholder="Buscar por nome, sigla, cidade, CNPJ ou contato..."
         onChangeBusca={setBusca}
         hasActiveFilters={filtrosAtivos}
         onResetFilters={() => {

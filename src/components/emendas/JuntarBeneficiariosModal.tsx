@@ -5,7 +5,7 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppSelect, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useJuntarBeneficiarios } from '../../hooks/useEmendas';
-import { formatarCnpj, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
+import { formatarCnpj, localDoBeneficiario, nomeESigla, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
 import { saoParecidos } from '../../utils/emendasBeneficiarios';
 
 const plural = (n: number, um: string, varios: string) => (n === 1 ? `1 ${um}` : `${n} ${varios}`);
@@ -74,7 +74,7 @@ export const JuntarBeneficiariosModal: React.FC<Props> = ({ base, outro, lista, 
         <input type="radio" name="emendas-juntar-fica" checked={ficaId === b.id} onChange={() => setFicaId(b.id)} />
         {ficaId === b.id ? 'Fica' : 'Sai'}
       </span>
-      <b style={{ lineHeight: 1.35 }}>{rotuloBeneficiario(b)}</b>
+      <b style={{ lineHeight: 1.35 }}>{nomeESigla(b)}</b>
       <span style={pequeno}>{[b.orgao, localDoBeneficiario(b)].filter(Boolean).join(' · ') || 'Sem órgão e local'}</span>
       <span style={pequeno}>
         {plural(linhasPorBeneficiario.get(b.id) ?? 0, 'indicação', 'indicações')} · {b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)}` : 'Falta CNPJ'}
@@ -106,7 +106,7 @@ export const JuntarBeneficiariosModal: React.FC<Props> = ({ base, outro, lista, 
             <option value="">Escolha o outro cadastro</option>
             {candidatos.map((b) => (
               <option key={b.id} value={b.id}>
-                {[rotuloBeneficiario(b), localDoBeneficiario(b)].filter(Boolean).join(' · ')}
+                {[nomeESigla(b), localDoBeneficiario(b)].filter(Boolean).join(' · ')}
               </option>
             ))}
           </AppSelect>
