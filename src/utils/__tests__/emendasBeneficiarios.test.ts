@@ -6,6 +6,7 @@ import {
   beneficiarioRepetido,
   chaveDaIdentidade,
   chaveDoNome,
+  cnpjProprio,
   faltasDoBeneficiario,
   linkDoWhatsapp,
   naturezaNaoPublica,
@@ -70,6 +71,14 @@ describe('naturezaNaoPublica', () => {
     expect(naturezaNaoPublica('Município')).toBe(false);
     expect(naturezaNaoPublica('Autarquia Estadual ou do Distrito Federal')).toBe(false);
     expect(naturezaNaoPublica(null)).toBe(false);
+  });
+});
+
+describe('cnpjProprio', () => {
+  it('filial da unidade é CNPJ próprio; matriz do órgão não', () => {
+    expect(cnpjProprio('04198514000235')).toBe(true);
+    expect(cnpjProprio('04198514000154')).toBe(false);
+    expect(cnpjProprio(null)).toBe(false);
   });
 });
 

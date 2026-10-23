@@ -10,7 +10,7 @@ import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { orgaoAbaixoDoNome } from '../../utils/emendasBeneficiarios';
 import { formatCurrency } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { localDoBeneficiario, rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
+import { formatarCnpj, localDoBeneficiario, rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
@@ -92,17 +92,22 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
 };
 
 /** Nome da unidade e, ao lado, a sigla mais clara (padrão "00001 · Ata 00055/2025" das carteiras). */
-export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigla'>; destaque?: boolean }> = ({ b, destaque }) => (
-  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
+export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigla'> & Partial<Pick<BeneficiarioEmenda, 'cnpj' | 'razaoSocial'>>; destaque?: boolean }> = ({ b, destaque }) => (
+  // Até duas linhas: nome longo termina em "…". Ao passar o mouse: nome inteiro e, se houver, CNPJ e razão social.
+  <div
+    title={[b.sigla ? `${b.nome} · ${b.sigla}` : b.nome, b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)}${b.razaoSocial ? ` · ${b.razaoSocial}` : ''}` : null].filter(Boolean).join('\n')}
+    style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.35 }}
+  >
     <span style={destaque ? carteiraIdentificacao : { fontWeight: 600 }}>{b.nome}</span>
-    {b.sigla && (
-      <>
-        <span style={ataEmCinza}>·</span>
-        <span style={ataEmCinza}>{b.sigla}</span>
-      </>
-    )}
+    {b.sigla && <span style={{ ...ataEmCinza, marginLeft: '0.4rem' }}>· {b.sigla}</span>}
   </div>
 );
+
+/** "Polícia Militar · Santa Fé do Sul - SP" numa linha só (o órgão some quando repete o nome). */
+export const OrgaoELocal: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'orgao' | 'entregaMunicipio' | 'entregaUf'> }> = ({ b }) => {
+  const texto = [orgaoAbaixoDoNome(b, rotuloBeneficiario(b)), localDoBeneficiario(b)].filter(Boolean).join(' · ');
+  return texto ? <div style={carteiraSubtitle}>{texto}</div> : null;
+};
 
 /**
  * Beneficiário da linha: o nome, embaixo o órgão e embaixo Cidade - UF (migration 166). Linha só com o nome da
@@ -111,13 +116,10 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
 export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId' | 'beneficiarioNome'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
   const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
   if (b) {
-    const local = localDoBeneficiario(b);
-    const orgao = orgaoAbaixoDoNome(b, rotuloBeneficiario(b));
     return (
       <>
         <NomeComSigla b={b} />
-        {orgao && <div style={carteiraSubtitle}>{orgao}</div>}
-        {local && <div style={carteiraSubtitle}>{local}</div>}
+        <OrgaoELocal b={b} />
         {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
       </>
     );
