@@ -42,6 +42,9 @@ const DefinirSenhaRoute = lazyComRecarga(() => import('./routes/DefinirSenhaRout
 const RedefinirSenhaRoute = lazyComRecarga(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
 const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
+const EmendasKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasKitsPage').then((m) => ({ default: m.EmendasKitsPage })));
+const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasBeneficiariosPage').then((m) => ({ default: m.EmendasBeneficiariosPage })));
+const EmendasAutoresPage = lazyComRecarga(() => import('./components/emendas/EmendasAutoresPage').then((m) => ({ default: m.EmendasAutoresPage })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
 const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
@@ -207,7 +210,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/atas"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']}>
                   <ArpSearchRoute />
                 </RequireRole>
               }
@@ -215,7 +218,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/itens"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']}>
                   <ItensRoute />
                 </RequireRole>
               }
@@ -278,7 +281,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/atas/detalhe/:ataKey"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']}>
                   <Ata360Route />
                 </RequireRole>
               }
@@ -286,7 +289,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/atas/detalhe/:ataKey/itens/:numeroItem"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']}>
                   <ItemBalancesRoute />
                 </RequireRole>
               }
@@ -379,6 +382,32 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin']}>
                   <HolidaysRoute />
+                </RequireRole>
+              }
+            />
+            {/* Emendas parlamentares (migration 155): gestor de emendas (CAEP) e coordenador alteram; consulta lê. */}
+            <Route path="/emendas" element={<Navigate to="/emendas/kits" replace />} />
+            <Route
+              path="/emendas/kits"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasKitsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/beneficiarios"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasBeneficiariosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/autores"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasAutoresPage />
                 </RequireRole>
               }
             />

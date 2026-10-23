@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
-import { KeyRound, Shield, UserCheck, Coins, Eye } from 'lucide-react';
+import { KeyRound, Shield, UserCheck, Coins, Eye, ScrollText } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppCard } from '../../design-system/components/AppCard';
@@ -55,6 +55,7 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
       { label: 'Execução financeira', description: 'Gestão completa de pagamentos e empenhos, inclusive excluir ciclos de pagamento' },
       { label: 'Alocações', description: 'Gestão completa' },
       { label: 'Unidades internas', description: 'Gestão' },
+      { label: 'Emendas', description: 'Gestão completa' },
       { label: 'Modelos de gestão, alertas e feriados', description: 'Gestão' },
       { label: 'Usuários e servidores', description: 'Gestão' },
       { label: 'Perfis', description: 'Gestão, inclusive renomear os perfis' }
@@ -91,6 +92,17 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     scope: 'Todas as Atas'
   },
   {
+    id: 'gestor_emendas',
+    label: 'Gestor de Emendas',
+    description: 'Servidor da CAEP: reparte entre parlamentares a quantidade alocada à CAEP.',
+    icon: ScrollText,
+    areas: [
+      { label: 'Emendas', description: 'Gestão de kits, beneficiários e pedidos dos parlamentares' },
+      { label: 'Atas e Itens', description: 'Consulta, sem contratos' }
+    ],
+    scope: 'Itens alocados à CAEP'
+  },
+  {
     id: 'leitor',
     label: 'Consulta / Auditoria',
     description: 'Consulta das informações do sistema, sem funções de administração.',
@@ -101,7 +113,8 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
       { label: 'Contratos', description: 'Consulta' },
       { label: 'Execução financeira', description: 'Consulta de pagamentos e empenhos' },
       { label: 'Alocações', description: 'Consulta' },
-      { label: 'Unidades internas', description: 'Consulta' }
+      { label: 'Unidades internas', description: 'Consulta' },
+      { label: 'Emendas', description: 'Consulta' }
     ],
     scope: 'Todas as atas e todos os contratos, somente leitura'
   }

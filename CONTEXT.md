@@ -27,17 +27,18 @@ Site React (Vercel)
 
 Navegação em dois níveis (`src/config/navigation.ts`): o menu chave lista as áreas (trilho lateral no computador, barra inferior no celular) e as páginas da área aparecem como abas no topo (`AreaTabs`). Cada rota é protegida por `<RequireRole>` em `src/App.tsx`.
 
-Perfis: **A** = Coordenador (`admin`), **G** = Gestor de atas e contratos (`gestor`), **GS** = Gestor de saldos (`gestor_saldos`), **L** = Consulta (`leitor`).
+Perfis: **A** = Coordenador (`admin`), **G** = Gestor de atas e contratos (`gestor`), **GS** = Gestor de saldos (`gestor_saldos`), **GE** = Gestor de emendas da CAEP (`gestor_emendas`), **L** = Consulta (`leitor`).
 
 | Área | Página | Rota | Quem vê |
 | --- | --- | --- | --- |
 | Início | Painel | `/instrumentos` | A G GS L |
 | | Distribuição | `/atas/distribuicao` | A L |
-| Carteira | Atas · Contratos · Itens | `/atas` · `/contratos` · `/itens` | A G GS L |
+| Carteira | Atas · Contratos · Itens | `/atas` · `/contratos` · `/itens` | A G GS L (GE: Atas e Itens) |
 | | Ata 360 · Item · Contrato 360 | `/atas/detalhe/:ataKey` · `…/itens/:numeroItem` · `/contratos/:contractKey` | A G GS L |
 | Alocação | Itens às unidades | `/alocacao` | A G GS L |
 | Vínculos | Contratos à ata · Empenhos ao contrato · Empenhos aos itens | `/vinculacao/contratos` · `/vinculacao/empenhos-contrato` · `/vinculacao/empenhos-itens` | A G L |
 | Financeiro | Empenhos · Pagamentos · Previsão | `/empenhos` · `/pagamentos` · `/pagamentos/previsao` | A G L |
+| Emendas | Kits · Beneficiários · Autores | `/emendas/kits` · `/emendas/beneficiarios` · `/emendas/autores` | A GE L (edita: A GE) |
 | Ajustes | Modelos de Gestão | `/configuracoes/modelos` | A G |
 | | Regras de Alertas · Feriados | `/admin/regras-alertas` · `/admin/feriados` | A |
 | | Unidades Internas | `/admin/departamentos` | A G GS L (edita: A GS) |
@@ -50,9 +51,10 @@ O que cada perfil pode fazer (`role_permissions`, migrations 23, 30, 33 e 55):
 - **Coordenador:** tudo. É o único que gerencia usuários, perfis, regras de alertas e feriados, decide conflitos de gestor, marca avisos como resolvidos e força a sincronização ("Atualizar").
 - **Gestor:** contratos atribuídos a ele (escopo ASSIGNED), vincular contrato à ata, vincular nota aos itens e à unidade interna, informar a quantidade da ata assinada, exportar.
 - **Gestor de saldos:** alocações (ver, gerenciar, ligar nota à unidade), unidades internas, remanejamentos de quantitativos. Não vê Financeiro nem Vínculos.
+- **Gestor de emendas (CAEP):** menu Emendas (`emendas.view`/`emendas.manage`, migration 155): kits com os itens alocados à CAEP, beneficiários pelo CNPJ e consulta dos autores (Câmara e Senado, lidos pelo servidor toda segunda-feira). Na Carteira, só Atas e Itens.
 - **Consulta:** só leitura e exportação.
 
-Os nomes exibidos dos perfis são editáveis pelo coordenador (migration 68). As Edge Functions `invite-user` e `manage-user` convertem os nomes da tela (coordenador, gestor, consulta, gestor_saldos) nos perfis do banco (`supabase/functions/_shared/roleMapping.ts`).
+Os nomes exibidos dos perfis são editáveis pelo coordenador (migration 68). As Edge Functions `invite-user` e `manage-user` convertem os nomes da tela (coordenador, gestor, consulta, gestor_saldos, gestor_emendas) nos perfis do banco (`supabase/functions/_shared/roleMapping.ts`).
 
 ## 3. Sincronização com as fontes
 

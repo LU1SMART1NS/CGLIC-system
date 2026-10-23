@@ -24,6 +24,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarItensNotasSiafiPendentes: vi.fn(async () => ({ pendentes: 416, amostra: null })),
     sincronizarSaldoContabil: vi.fn(async (): Promise<ResultadoSincronizacao> => ({ status: 'SUCESSO', total: 10, fontesComFalha: [], mensagem: '10 de 10 conta(s) lida(s)' })),
     contarSaldoContabilPendentes: vi.fn(async () => ({ leituras: 10, anosFechados: 0, amostraPagoNoAno: 22 })),
+    sincronizarAutoresEmendas: vi.fn(async () => sucesso(27)),
+    contarAutoresEmendas: vi.fn(async () => ({ legislatura: 57, deputados: 648, deputadosNoCargo: 513, senadores: 126, senadoresNoCargo: 81 })),
     chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
@@ -242,5 +244,23 @@ describe('executarPedido', () => {
     const dry = await executarPedido({ recurso: 'cadastro_uasgs', dry: true }, d);
     expect(dry).toMatchObject({ dry: true, consulta: { pendentes: 260 } });
     expect(d.sincronizarCadastroUasgs).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('autores das emendas', () => {
+  it('vale para todas as carteiras (sem UASG) e executa a leitura de Câmara e Senado', async () => {
+    const v = validarPedido({ recurso: 'autores_emendas' });
+    expect(v).toMatchObject({ ok: true, pedido: { recurso: 'autores_emendas' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'autores_emendas', forcar: true, dry: false }, d);
+    expect(d.sincronizarAutoresEmendas).toHaveBeenCalledWith({ forcar: true });
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 27 } });
+  });
+
+  it('no teste (dry) só conta, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'autores_emendas', forcar: false, dry: true }, d);
+    expect(d.sincronizarAutoresEmendas).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { deputados: 648, senadores: 126 } });
   });
 });

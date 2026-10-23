@@ -1,3 +1,4 @@
+import type { AppRole } from '../../../types/rbac';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { RequireRole } from '../RequireRole';
@@ -10,7 +11,7 @@ vi.mock('react-router-dom', () => ({
 
 const PROTECTED_CONTENT = 'Conteúdo Administrativo Protegido';
 
-function renderRequireRole(allowedRoles: Array<'admin' | 'gestor' | 'gestor_saldos' | 'leitor'>) {
+function renderRequireRole(allowedRoles: AppRole[]) {
   return renderToStaticMarkup(
     <RequireRole allowedRoles={allowedRoles}>
       <div>{PROTECTED_CONTENT}</div>
@@ -133,6 +134,20 @@ describe('RequireRole — Autorização Central de Rotas (Fase Frontend RBAC)', 
     const html = renderRequireRole(['admin', 'gestor_saldos']);
 
     expect(html).toContain(PROTECTED_CONTENT);
+  });
+
+  it('libera gestor_emendas no menu Emendas e não na Alocação', () => {
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: 'u7' } as any,
+      session: {} as any,
+      loading: false,
+      role: 'gestor_emendas',
+      roleStatus: 'ready',
+      signOut: vi.fn()
+    });
+
+    expect(renderRequireRole(['admin', 'gestor_emendas', 'leitor'])).toContain(PROTECTED_CONTENT);
+    expect(renderRequireRole(['admin', 'gestor_saldos'])).not.toContain(PROTECTED_CONTENT);
   });
 
   it('ignora a checagem de role quando o Supabase não está configurado (mesmo bypass já usado por ProtectedLayout)', () => {
