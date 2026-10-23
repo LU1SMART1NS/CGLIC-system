@@ -10,7 +10,7 @@ const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
 const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
   id: 'l' + Math.random(), ordem: 1, tipo: 'ITEM', itemKey: 'a', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
   quantidade: 1, beneficiarioId: null, notaEmpenho: null, cancelada: false, canceladaMotivo: null,
-  beneficiarioNome: null, empenhoDocumentoSei: null, contratoNumero: null, aConferir: null, planilhaRef: null, ...extra
+  empenhoDocumentoSei: null, contratoNumero: null, aConferir: null, planilhaRef: null, ...extra
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   id: 'p' + Math.random(), numero: 1, autorId: 'C:1', etapa: 'RESERVADO', origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-10-20',
@@ -106,17 +106,17 @@ describe('prazo de indicação nos pedidos (migration 162)', () => {
 describe('reserva para um órgão (parlamentar a definir)', () => {
   it('aviso conta dias sem parlamentar e o contato não vira sugestão de autor', async () => {
     const { avisosDoPedido, ultimoContatoPorAutor, eReservaParaOrgao } = await import('../emendasPedidos');
-    const p = pedido({ autorId: null, reservadoEm: '2026-09-01', contatoNome: 'Major X', linhas: [linha({ beneficiarioNome: 'CBMERJ' })] });
+    const p = pedido({ autorId: null, reservadoEm: '2026-09-01', contatoNome: 'Major X', linhas: [linha({ beneficiarioId: 'b2' })] });
     expect(eReservaParaOrgao(p)).toBe(true);
     expect(avisosDoPedido(p, itens, HOJE)[0].curto).toBe('52 dias sem parlamentar');
     expect(ultimoContatoPorAutor([p]).size).toBe(0);
   });
 
-  it('o órgão é o beneficiário das linhas (cadastro ou nome da planilha)', async () => {
+  it('o órgão é o beneficiário das linhas', async () => {
     const { orgaoDoPedido } = await import('../emendasPedidos');
-    const nome = (id: string) => ({ b1: 'CBMDF' })[id];
-    expect(orgaoDoPedido(pedido({ autorId: null, linhas: [linha({ beneficiarioNome: 'CBMERJ' })] }), nome)).toBe('CBMERJ');
-    expect(orgaoDoPedido(pedido({ autorId: null, linhas: [linha({ beneficiarioId: 'b1' }), linha({ beneficiarioNome: 'CBMERJ' })] }), nome)).toBe('CBMDF e mais 1');
+    const nome = (id: string) => ({ b1: 'CBMDF', b2: 'CBMERJ' } as Record<string, string>)[id];
+    expect(orgaoDoPedido(pedido({ autorId: null, linhas: [linha({ beneficiarioId: 'b2' })] }), nome)).toBe('CBMERJ');
+    expect(orgaoDoPedido(pedido({ autorId: null, linhas: [linha({ beneficiarioId: 'b1' }), linha({ beneficiarioId: 'b2' })] }), nome)).toBe('CBMDF e mais 1');
     expect(orgaoDoPedido(pedido({ autorId: null, linhas: [linha({})] }), nome)).toBeNull();
   });
 });

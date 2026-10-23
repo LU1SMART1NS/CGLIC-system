@@ -11,6 +11,7 @@ const preco = (k: string, extra: Partial<PrecoPrevisto>): PrecoPrevisto => ({
   itemKey: k, precoAtual: 100, precoPrevisto: 100, motivo: 'EM_DIA', devido: false, efeito: null, percentual: null, mesesEstimados: null, ...extra
 });
 const pm = { id: 'b1', razaoSocial: 'Secretaria de Estado de Polícia Militar do Rio de Janeiro', entregaMunicipio: 'Rio de Janeiro', entregaUf: 'RJ' } as BeneficiarioEmenda;
+const cbm = { id: 'b2', nome: 'Corpo de Bombeiros Militar', sigla: 'CBMERJ', razaoSocial: null, entregaMunicipio: null, entregaUf: 'RJ' } as BeneficiarioEmenda;
 const autor = { id: 'S:1', tipo: 'SENADOR', nome: 'Romário', uf: 'RJ' } as AutorEmenda;
 
 const itens = new Map([
@@ -30,11 +31,11 @@ const precos = new Map([
 const linhas: LinhaDoPedidoNoQuadro[] = [
   { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 5, beneficiarioId: 'b1' },
   { tipo: 'ITEM', itemKey: 'tablet', kitNome: null, kitComposicao: null, quantidade: 10, beneficiarioId: 'b1' },
-  { tipo: 'ITEM', itemKey: 'drone', kitNome: null, kitComposicao: null, quantidade: 2, beneficiarioId: null, beneficiarioNome: 'CBMERJ (da planilha)' },
+  { tipo: 'ITEM', itemKey: 'drone', kitNome: null, kitComposicao: null, quantidade: 2, beneficiarioId: 'b2' },
   { tipo: 'KIT', itemKey: null, kitNome: 'Kit Academia', kitComposicao: [{ itemKey: 'mesa', quantidade: 1 }, { itemKey: 'leg', quantidade: 2 }], quantidade: 2, beneficiarioId: null },
   { tipo: 'ITEM', itemKey: 'colchonete', kitNome: null, kitComposicao: null, quantidade: 100, beneficiarioId: null }
 ];
-const q = montarQuadro({ autor, linhas, itens, beneficiarios: new Map([['b1', pm]]), precos, data: '2026-10-23' });
+const q = montarQuadro({ autor, linhas, itens, beneficiarios: new Map([['b1', pm], ['b2', cbm]]), precos, data: '2026-10-23' });
 
 describe('quadro da reserva (Anexo)', () => {
   it('uma linha por item, kit aberto nos seus itens com a quantidade de kits', () => {
@@ -48,10 +49,10 @@ describe('quadro da reserva (Anexo)', () => {
     ]);
   });
 
-  it('beneficiário do cadastro, da planilha ou a definir', () => {
+  it('beneficiário do cadastro (razão social ou nome) ou a definir', () => {
     expect(q.linhas[0]).toMatchObject({ beneficiario: pm.razaoSocial, municipio: 'Rio de Janeiro - RJ' });
     expect(q.linhas[0]).not.toHaveProperty('orgao');
-    expect(q.linhas[2]).toMatchObject({ beneficiario: 'CBMERJ (da planilha)', municipio: null });
+    expect(q.linhas[2]).toMatchObject({ beneficiario: 'Corpo de Bombeiros Militar', municipio: 'RJ' });
     expect(q.semBeneficiario).toBe(3);
     expect(q.semNomeCurto).toBe(0);
   });
@@ -90,7 +91,7 @@ describe('quadro da reserva (Anexo)', () => {
     expect(html).toContain('>00043/2026</td><td style="border:1px solid #000;padding:4px 6px;text-align:center;">00005</td>');
     expect(html).not.toContain('ÓRGÃO');
     expect(html.match(/colspan="7"/g)).toHaveLength(3);
-    expect(htmlParaSei(montarQuadro({ autor, linhas: [{ ...linhas[2], beneficiarioNome: '<b>x</b>' }], itens, beneficiarios: new Map(), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
+    expect(htmlParaSei(montarQuadro({ autor, linhas: [linhas[2]], itens, beneficiarios: new Map([['b2', { ...cbm, nome: '<b>x</b>' }]]), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
   it('WhatsApp: lista com negrito no total', () => {

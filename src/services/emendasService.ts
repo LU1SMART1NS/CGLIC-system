@@ -485,8 +485,6 @@ export interface LinhaPedido {
   notaEmpenho: string | null;
   cancelada: boolean;
   canceladaMotivo: string | null;
-  /** Carga das planilhas da CAEP (migration 160): beneficiário pelo nome até o cadastro com CNPJ. */
-  beneficiarioNome: string | null;
   /** Documento SEI do empenho; a nota (notaEmpenho) é achada pelo contrato ou pelo Portal. */
   empenhoDocumentoSei: string | null;
   /** Contrato citado na planilha, como 00138/2026. */
@@ -552,7 +550,6 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       notaEmpenho: l.nota_empenho ?? null,
       cancelada: Boolean(l.cancelada),
       canceladaMotivo: l.cancelada_motivo ?? null,
-      beneficiarioNome: l.beneficiario_nome ?? null,
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
       contratoNumero: l.contrato_numero ?? null,
       aConferir: l.a_conferir ?? null,
