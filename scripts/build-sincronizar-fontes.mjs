@@ -39,6 +39,8 @@ const plugins = [
       // O cliente do navegador (qualquer import terminado em supabaseClient) vira o cliente do servidor.
       if (/(^|\/)supabaseClient$/.test(origem) && importador && !importador.includes('/server/')) return clienteDoServidor;
       if (!local && origem === '@supabase/supabase-js') return { id: `npm:@supabase/supabase-js@${versaoSupabase}`, external: true };
+      // Bibliotecas que o Deno baixa na implantação (leitor de PDF e zip do reajuste das atas).
+      if (origem.startsWith('npm:')) return { id: origem, external: true };
       return null;
     }
   }
