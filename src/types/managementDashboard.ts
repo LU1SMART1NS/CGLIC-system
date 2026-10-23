@@ -53,6 +53,10 @@ export type DashboardAttentionCategory =
   /** Expectativa de pagamento: previsão mensal a enviar, nota mensal que não chegou, entrega prevista sem nota. */
   | 'PAGAMENTO_PREVISTO'
   | 'REAJUSTE_RADAR'
+  /** Reajuste dos preços registrados de uma ata da SENASP (migrations 158 e 159): percentual a informar, reajuste
+   *  devido, preço da ata sem o reajuste publicado, Termo de Conformidade a informar ou reajuste próximo. Pendência do
+   *  gestor da ata e do coordenador, na aba Reajustes. */
+  | 'REAJUSTE_ATA'
   | 'ATA_CRITICA'
   /** Contratado do item ainda sem unidade interna, ou divisão entre unidades a conferir (migration 103). */
   | 'UNIDADE_PENDENTE'

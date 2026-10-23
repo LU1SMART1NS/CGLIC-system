@@ -45,6 +45,9 @@ interface Ata360HeaderProps {
   onIndicarFornecedor?: () => void;
   /** Botões abaixo dos indicadores (ex.: Interesse por GTI); encolhem junto com o cartão. */
   verMais?: React.ReactNode;
+  /** Quadro do reajuste (migrations 158 e 159): só nas atas da SENASP com o reajuste lido. */
+  reajuste?: { valor: string; hint: string; tone?: 'danger' | 'warning'; indice?: string | null } | null;
+  onOpenReajuste?: () => void;
 }
 
 export const pncpLinkStyle: React.CSSProperties = {
@@ -92,7 +95,9 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   onBack,
   fornecedorPncp = null,
   onIndicarFornecedor,
-  verMais
+  verMais,
+  reajuste = null,
+  onOpenReajuste
 }) => {
   const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
@@ -226,7 +231,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       ]}
     >
       <div data-testid="ata-health-strip">
-        <HealthTileGrid columns={5}>
+        <HealthTileGrid columns={reajuste ? 6 : 5}>
           <HealthTile
             wide
             label="Vigência"
@@ -275,6 +280,17 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
             />
           ) : (
             <HealthTile label="Ações" value="Nenhuma" hint="tudo em dia" positive onClick={onOpenActions} testId="ata-health-acoes" />
+          )}
+          {reajuste && (
+            <HealthTile
+              label={reajuste.indice ? `Reajuste · ${reajuste.indice}` : 'Reajuste'}
+              value={reajuste.valor}
+              hint={reajuste.hint}
+              compact={reajuste.valor.length > 12}
+              tone={reajuste.tone === 'danger' ? 'CRITICA' : reajuste.tone === 'warning' ? 'ATENCAO' : undefined}
+              onClick={onOpenReajuste}
+              testId="ata-health-reajuste"
+            />
           )}
         </HealthTileGrid>
         {verMais}

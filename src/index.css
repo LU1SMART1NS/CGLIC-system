@@ -879,6 +879,8 @@ h1, h2, h3, h4 {
 .health-tile-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
 .health-tile-grid[data-columns='4'] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .health-tile-grid[data-columns='5'] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* Ata 360 com o quadro de Reajuste: Vigência (dupla) + 4 quadros. */
+.health-tile-grid[data-columns='6'] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .health-tile--wide { grid-column: span 2; }
 /* Nos cabeçalhos 360 todos os cartões têm exatamente 128px (a altura do cartão do Item), com ou sem a régua e qualquer que seja o texto. */
 .health-tile-grid[data-columns] .health-tile { height: 128px; }
@@ -1842,3 +1844,37 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-tabela-topo .ds-table td { vertical-align: top; }
 /* Detalhe do pedido (Emendas › Pedidos): linhas e etapas lado a lado; em tela estreita, uma embaixo da outra */
 @media (max-width: 1100px) { .emendas-detalhe-pedido { grid-template-columns: 1fr !important; } }
+
+/* Aba Reajuste da Ata 360: linha do tempo do Termo de Conformidade ao limite de 2 anos da ata. Rola no celular. */
+.reaj-tempo-caixa { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); overflow-x: auto; }
+.reaj-tempo { position: relative; min-width: 760px; height: 150px; margin: 0 64px; }
+.reaj-tempo__trilho { position: absolute; left: 0; right: 0; top: 74px; height: 4px; background: var(--border); border-radius: 2px; }
+.reaj-tempo__vig { position: absolute; top: 72px; height: 8px; background: var(--primary); opacity: 0.35; border-radius: 4px; }
+.reaj-tempo__vig--prorr { background: repeating-linear-gradient(90deg, var(--primary) 0 6px, transparent 6px 10px); opacity: 0.45; }
+.reaj-tempo__marco { position: absolute; top: 0; height: 150px; width: 112px; transform: translateX(-50%); }
+.reaj-tempo__pino { position: absolute; top: 68px; left: 48px; width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--bg-card); background: var(--text-muted); box-shadow: 0 0 0 1px var(--border); }
+.reaj-tempo__rotulo { position: absolute; width: 112px; font-size: 0.75rem; line-height: 1.3; text-align: center; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.reaj-tempo__rotulo strong { display: block; color: var(--text-main); font-size: 0.75rem; }
+.reaj-tempo__marco--cima .reaj-tempo__rotulo { bottom: 92px; }
+.reaj-tempo__marco--baixo .reaj-tempo__rotulo { top: 92px; }
+.reaj-tempo__marco--termo .reaj-tempo__pino { background: var(--primary); border-radius: 3px; }
+.reaj-tempo__marco--hoje .reaj-tempo__pino { background: var(--text-main); width: 4px; height: 40px; top: 56px; left: 54px; border: 0; border-radius: 2px; box-shadow: none; }
+.reaj-tempo__marco--aplicado .reaj-tempo__pino { background: var(--color-success-text); }
+.reaj-tempo__marco--devido .reaj-tempo__pino { background: var(--color-danger-solid); }
+.reaj-tempo__marco--publicado_sem_percentual .reaj-tempo__pino { background: var(--color-warning-solid); }
+.reaj-tempo__marco--previsto .reaj-tempo__pino { background: var(--color-info-text); }
+.reaj-tempo__marco--se_prorrogar .reaj-tempo__pino { background: var(--bg-card); box-shadow: 0 0 0 2px var(--text-muted); }
+.reaj-tempo__legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 14px 12px; border-top: 1px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); }
+.reaj-tempo__cor { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.reaj-tempo__cor--termo { background: var(--primary); border-radius: 2px; }
+.reaj-tempo__cor--aplicado { background: var(--color-success-text); }
+.reaj-tempo__cor--devido { background: var(--color-danger-solid); }
+.reaj-tempo__cor--publicado_sem_percentual { background: var(--color-warning-solid); }
+.reaj-tempo__cor--previsto { background: var(--color-info-text); }
+.reaj-tempo__cor--se_prorrogar { border: 2px solid var(--text-muted); }
+/* "Ver os 12 meses" de um ciclo: oficial com borda cheia, Focus tracejado. */
+.reaj-meses { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; padding: 10px 12px 12px; background: var(--bg-card-hover); }
+.reaj-mes { display: grid; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.reaj-mes span { color: var(--text-muted); font-size: 0.75rem; }
+.reaj-mes--focus { border-style: dashed; border-color: var(--color-warning); }
+.reaj-mes--focus b { color: var(--color-warning-text); }

@@ -77,6 +77,7 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
   PAGAMENTO_PREVISTO: { label: 'Pagamento previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  REAJUSTE_ATA: { label: 'Reajuste da ata', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   TAREFA_ATRASADA: { label: 'Tarefa atrasada', color: 'var(--color-danger-text-strong)', bg: 'var(--color-danger-bg)' },
   TAREFA_PROXIMA: { label: 'Tarefa próxima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   LEMBRETE: { label: 'Planejamento da vigência', color: '#475569', bg: '#f1f5f9' }
@@ -184,6 +185,11 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
       return { label: 'Informar qtd. da ata assinada', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'REGISTRADO_ACIMA':
       return { label: 'Conferir quantitativos', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'REAJUSTE_ATA':
+      return {
+        label: item.motivoDetalhe?.chave === 'percentual-a-informar' ? 'Informar percentual' : item.motivoDetalhe?.chave === 'termo-a-informar' ? 'Informar termo' : 'Ver reajuste',
+        targetUrl: item.targetUrl || ataItemUrl(item)
+      };
     case 'FORNECEDOR_PNCP':
       return { label: item.badgeLabel === 'conferir itens' ? 'Conferir Fornecedor' : 'Indicar Fornecedor', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'FONTE_A_CONFERIR':

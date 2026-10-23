@@ -14,6 +14,8 @@
  */
 
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
+import { fetchResumoReajusteAtas, type ResumoReajusteAta } from './reajusteAtasService';
+import { avisosDoReajusteDasAtas } from './reajusteAtasAvisos';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
 import { fetchAusentesDaFonte, rotuloAusente, trabalhoNaFonte, type AusenteDaFonte } from './ausentesDaFonteService';
 import { fetchEmpenhadoAcima, textoDaOrigem, type EmpenhadoAcima } from './empenhadoAcimaService';
@@ -308,6 +310,8 @@ function naGerenciadoraTexto(aItem: any): string {
 }
 
 export function calculateAttentionSummary(params: {
+  /** Resumo do reajuste das atas (v_ata_reajuste_resumo, migrations 158 e 159). */
+  reajustesAtas?: ResumoReajusteAta[];
   contracts?: ContractDashboardRecord[];
   arps?: ArpRecord[];
   managers?: Record<string, ContractManager>;
@@ -343,6 +347,7 @@ export function calculateAttentionSummary(params: {
     vinculosAConferir = [],
     ausentesDaFonte = [],
     empenhadoAcima = [],
+    reajustesAtas = [],
     currentDate
   } = params;
 
@@ -903,6 +908,9 @@ export function calculateAttentionSummary(params: {
     });
   }
 
+  // Reajuste dos preços registrados das atas (migrations 158 e 159): só as atas que estão no painel (escopo do perfil).
+  items.push(...avisosDoReajusteDasAtas(reajustesAtas, arps, currentDate));
+
   // 6. Tarefas do plano de gestão das Atas — mesma regra das tarefas de contrato
   // (vencida = crítica, vence hoje ou em até 7 dias = urgente). Sem isso, o que a
   // Ata 360 mostra na aba "Ações" nunca chegava à visão global.
@@ -1392,6 +1400,7 @@ export function buildManagementDashboardReadModel(params: {
   vinculosAConferir?: VinculoAConferir[];
   ausentesDaFonte?: AusenteDaFonte[];
   empenhadoAcima?: EmpenhadoAcima[];
+  reajustesAtas?: ResumoReajusteAta[];
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1652,6 +1661,7 @@ export function buildManagementDashboardReadModel(params: {
     vinculosAConferir: params.vinculosAConferir,
     ausentesDaFonte: params.ausentesDaFonte,
     empenhadoAcima: params.empenhadoAcima,
+    reajustesAtas: params.reajustesAtas,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1725,7 +1735,8 @@ export async function fetchManagementDashboardData(
     fornecedoresPncp,
     vinculosAConferir,
     ausentesDaFonte,
-    empenhadoAcima
+    empenhadoAcima,
+    reajustesAtas
   ] = await Promise.all([
     ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
     ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
@@ -1740,7 +1751,8 @@ export async function fetchManagementDashboardData(
     lerSemUasg('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp, [] as RegistroFornecedorPncp[]),
     lerSemUasg('vinculos', 'vínculos a conferir', fetchVinculosAConferir, [] as VinculoAConferir[]),
     lerSemUasg('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte, [] as AusenteDaFonte[]),
-    lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[])
+    lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[]),
+    lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[])
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
@@ -1762,6 +1774,7 @@ export async function fetchManagementDashboardData(
     vinculosAConferir,
     ausentesDaFonte,
     empenhadoAcima,
+    reajustesAtas,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate
