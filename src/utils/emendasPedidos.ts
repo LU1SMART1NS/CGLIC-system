@@ -118,10 +118,19 @@ export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte
 
 export interface AvisoPedido {
   tipo: TipoAviso;
+  /** Frase completa: no detalhe da linha e ao parar o mouse na etiqueta. */
   texto: string;
+  /** Etiqueta da lista, de até 3 palavras, para a coluna não crescer. */
+  curto: string;
   /** Linha a que o aviso se refere (ata), quando houver. */
   linhaId?: string;
 }
+
+/** Do mais grave ao mais leve: na lista aparece só o primeiro, com "+N" para os outros. */
+export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, divergencia: 2, semOficio: 3, ataVencendo: 4, aConferir: 5 };
+
+/** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
+export const avisoGrave = (a: Pick<AvisoPedido, 'tipo'>) => GRAVIDADE_DO_AVISO[a.tipo] <= GRAVIDADE_DO_AVISO.semOficio;
 
 /** Situação da ata de cada item da linha, só antes do empenho: vencida ou vencendo em até 60 dias. */
 export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, ItemCaep>, hoje: string): AvisoPedido | null {
@@ -130,19 +139,20 @@ export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, I
     .map((x) => itens.get(x.itemKey))
     .filter((i): i is ItemCaep => Boolean(i?.vigenciaFinal));
   const vencida = doItem.find((i) => i.ataEncerrada);
-  if (vencida) return { tipo: 'ataVencida', texto: `Ata ${vencida.numeroAta} encerrada em ${dataBR(vencida.vigenciaFinal)}: não dá para empenhar`, linhaId: l.id };
+  if (vencida) return { tipo: 'ataVencida', curto: 'Ata encerrada', texto: `Ata ${vencida.numeroAta} encerrada em ${dataBR(vencida.vigenciaFinal)}: não dá para empenhar`, linhaId: l.id };
   const prazos = doItem.map((i) => ({ i, d: diasEntre(hoje, i.vigenciaFinal!) })).sort((a, b) => a.d - b.d);
   // O limite é o contrato assinado antes do fim da ata (decisão de 23/10/2026), não o empenho.
   const noCorte = prazos.find((x) => passouDoCorte(x.d));
   if (noCorte) {
     return {
       tipo: 'ataNoCorte',
+      curto: 'Prazo de indicação vencido',
       texto: `Ata ${noCorte.i.numeroAta} termina em ${noCorte.d} dias (${dataBR(noCorte.i.vigenciaFinal)}): passou do prazo de indicação (${corteIndicacaoDias()} dias); confirmar com a CCGA se ainda dá para contratar`,
       linhaId: l.id
     };
   }
   const vencendo = prazos.find((x) => x.d <= avisoIndicacaoDias());
-  if (vencendo) return { tipo: 'ataVencendo', texto: `Ata ${vencendo.i.numeroAta} vence em ${vencendo.d} dias (${dataBR(vencendo.i.vigenciaFinal)}): contrato assinado até lá`, linhaId: l.id };
+  if (vencendo) return { tipo: 'ataVencendo', curto: `Ata vence em ${vencendo.d} dias`, texto: `Ata ${vencendo.i.numeroAta} vence em ${vencendo.d} dias (${dataBR(vencendo.i.vigenciaFinal)}): contrato assinado até lá`, linhaId: l.id };
   return null;
 }
 
@@ -150,11 +160,16 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
   const avisos: AvisoPedido[] = [];
   if (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA') {
     const dias = diasEntre(p.reservadoEm, hoje);
-    if (dias > AVISO_SEM_OFICIO_DIAS) avisos.push({ tipo: 'semOficio', texto: p.autorId ? `${dias} dias sem ofício` : `${dias} dias sem parlamentar` });
+    if (dias > AVISO_SEM_OFICIO_DIAS) {
+      const texto = p.autorId ? `${dias} dias sem ofício` : `${dias} dias sem parlamentar`;
+      avisos.push({ tipo: 'semOficio', curto: texto, texto: `${texto} desde a reserva (${dataBR(p.reservadoEm)})` });
+    }
   }
-  if (p.etapa === 'OFICIO' && p.divergencia) avisos.push({ tipo: 'divergencia', texto: 'Divergência com o SIOP' });
+  if (p.etapa === 'OFICIO' && p.divergencia) avisos.push({ tipo: 'divergencia', curto: 'Divergência no SIOP', texto: `Divergência com o SIOP: ${p.divergencia}` });
   const aConferir = linhasAtivas(p).filter((l) => l.aConferir).length;
-  if (aConferir) avisos.push({ tipo: 'aConferir', texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir` });
+  if (aConferir) {
+    avisos.push({ tipo: 'aConferir', curto: `${aConferir} a conferir`, texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir entre as planilhas da CAEP` });
+  }
   const atas = linhasAtivas(p)
     .map((l) => ataDaLinha(p, l, itens, hoje))
     .filter((a): a is AvisoPedido => Boolean(a));
@@ -164,7 +179,7 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
     const prioridade = (a: AvisoPedido) => (a.tipo === 'ataNoCorte' ? 0 : 1);
     avisos.push(atas.sort((a, b) => prioridade(a) - prioridade(b) || a.texto.localeCompare(b.texto))[0]);
   }
-  return avisos;
+  return avisos.sort((a, b) => GRAVIDADE_DO_AVISO[a.tipo] - GRAVIDADE_DO_AVISO[b.tipo]);
 }
 
 /** Data em que o pedido entrou em cada etapa (para a linha do tempo). */

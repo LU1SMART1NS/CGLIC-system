@@ -28,6 +28,7 @@ import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import {
   ataDaLinha,
+  avisoGrave,
   AUTOR_A_DEFINIR,
   avisosDoPedido,
   dataDaEtapa,
@@ -154,7 +155,9 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
             <AConferirDaLinha linha={l} />
             {ata && (
               <div style={{ marginTop: '0.3rem' }}>
-                <StatusBadge label={ata.texto} variant={ata.tipo === 'ataVencida' ? 'danger' : 'warning'} size="sm" dot={false} />
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, borderRadius: 4, padding: '0.25rem 0.45rem', display: 'inline-block', color: avisoGrave(ata) ? 'var(--color-danger-text)' : 'var(--color-warning-text)', background: avisoGrave(ata) ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)' }}>
+                  {ata.texto}
+                </span>
               </div>
             )}
           </>
@@ -173,6 +176,13 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, pode
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(240px, 1fr)', gap: '1rem', padding: '0.4rem 0' }} className="emendas-detalhe-pedido" data-testid={`emendas-pedido-detalhe-${p.id}`}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0 }}>
+        {p.avisos
+          .filter((a) => a.tipo === 'semOficio' || a.tipo === 'divergencia')
+          .map((a) => (
+            <div key={a.tipo} style={{ fontSize: '0.8rem', fontWeight: 600, borderRadius: 6, padding: '0.5rem 0.7rem', color: avisoGrave(a) ? 'var(--color-danger-text)' : 'var(--color-warning-text)', background: avisoGrave(a) ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)' }}>
+              {a.texto}
+            </div>
+          ))}
         <DataTable testId={`emendas-pedido-linhas-${p.id}`} data={linhasAtivas(p)} keyExtractor={(l) => l.id} columns={colunas} className="emendas-tabela-topo" />
         {canceladas.length > 0 && (
           <div style={carteiraSubtitle}>
@@ -290,7 +300,12 @@ export const EmendasPedidosPage: React.FC = () => {
           </>
         ) : (
           <>
-            <div style={{ fontWeight: 600 }}>{identificacaoDoPedido(l)}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {/* "Reserva da planilha" se repetia em quase toda linha: a origem vira uma etiqueta discreta. */}
+              <span style={{ fontWeight: 600 }}>{l.origem === 'PLANILHA' && !l.siopEmenda ? 'Reserva' : identificacaoDoPedido(l)}</span>
+              {l.origem === 'PLANILHA' && <StatusBadge label="Planilha" variant="neutral" size="sm" dot={false} />}
+            </div>
+            {l.oficioProcessoSei && <div style={carteiraSubtitle}>SEI {l.oficioProcessoSei}</div>}
             {(l.contatoNome || l.contatoTelefone || l.contatoEmail) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <span style={carteiraSubtitle}>{l.contatoNome ? `com ${l.contatoNome}` : 'contato'}</span>
@@ -322,16 +337,24 @@ export const EmendasPedidosPage: React.FC = () => {
     {
       key: 'etapa',
       header: 'Etapa',
-      render: (l) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-          <StatusBadge label={l.etapa === 'OFICIO' && l.divergencia ? 'Ofício com divergência' : ROTULO_ETAPA[l.etapa]} variant={l.etapa === 'OFICIO' && l.divergencia ? 'danger' : VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
-          {l.avisos
-            .filter((a) => a.tipo !== 'divergencia')
-            .map((a) => (
-              <StatusBadge key={a.tipo} label={a.texto} variant={a.tipo === 'ataVencendo' || a.tipo === 'aConferir' ? 'warning' : 'danger'} size="sm" dot={false} />
-            ))}
-        </div>
-      )
+      nowrap: true,
+      render: (l) => <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
+    },
+    {
+      // Etiqueta curta: o aviso mais grave e "+N"; a frase completa aparece ao parar o mouse e no detalhe da linha.
+      key: 'aviso',
+      header: 'Aviso',
+      nowrap: true,
+      render: (l) => {
+        const [primeiro, ...outros] = l.avisos;
+        if (!primeiro) return <span style={carteiraSubtitle}>—</span>;
+        return (
+          <span title={l.avisos.map((a) => a.texto).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} data-testid={`emendas-pedido-aviso-${l.id}`}>
+            <StatusBadge label={primeiro.curto} variant={avisoGrave(primeiro) ? 'danger' : 'warning'} size="sm" dot={false} />
+            {outros.length > 0 && <span style={{ ...carteiraSubtitle, fontWeight: 700 }}>+{outros.length}</span>}
+          </span>
+        );
+      }
     }
   ];
 
