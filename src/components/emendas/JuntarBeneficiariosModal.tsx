@@ -16,7 +16,7 @@ interface Props {
   /** O outro, quando a janela vem de um par parecido. */
   outro?: BeneficiarioEmenda;
   lista: BeneficiarioEmenda[];
-  /** Linhas das emendas de cada beneficiário, para dizer quantas passam. */
+  /** Indicações (linhas das emendas) de cada beneficiário, para dizer quantas passam. */
   linhasPorBeneficiario: Map<string, number>;
   onClose: () => void;
 }
@@ -61,7 +61,7 @@ export const JuntarBeneficiariosModal: React.FC<Props> = ({ base, outro, lista, 
     if (!fica || !sai || !motivo.trim() || cnpjDiferente) return;
     try {
       const r = await juntar.mutateAsync({ fica, sai, motivo: motivo.trim() });
-      toast.success(`${rotuloBeneficiario(sai)} juntado a ${rotuloBeneficiario(fica)} (${plural(r.linhas, 'linha passou', 'linhas passaram')}).`);
+      toast.success(`${rotuloBeneficiario(sai)} juntado a ${rotuloBeneficiario(fica)} (${plural(r.linhas, 'indicação passou', 'indicações passaram')}).`);
       onClose();
     } catch (err) {
       toast.error((err as Error).message);
@@ -77,7 +77,7 @@ export const JuntarBeneficiariosModal: React.FC<Props> = ({ base, outro, lista, 
       <b style={{ lineHeight: 1.35 }}>{rotuloBeneficiario(b)}</b>
       <span style={pequeno}>{[b.orgao, localDoBeneficiario(b)].filter(Boolean).join(' · ') || 'Sem órgão e local'}</span>
       <span style={pequeno}>
-        {plural(linhasPorBeneficiario.get(b.id) ?? 0, 'linha', 'linhas')} · {b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)}` : 'Falta CNPJ'}
+        {plural(linhasPorBeneficiario.get(b.id) ?? 0, 'indicação', 'indicações')} · {b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)}` : 'Falta CNPJ'}
       </span>
     </label>
   );
@@ -100,7 +100,7 @@ export const JuntarBeneficiariosModal: React.FC<Props> = ({ base, outro, lista, 
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted, #64748b)' }}>Escolha qual cadastro fica. As linhas das emendas do outro passam para ele e o outro deixa de existir.</span>
+        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted, #64748b)' }}>Escolha qual cadastro fica. As indicações das emendas do outro passam para ele e o outro deixa de existir.</span>
         {!outro && (
           <AppSelect label="Juntar com" value={outroId} onChange={(e) => setOutroId(e.target.value)} data-testid="emendas-juntar-outro">
             <option value="">Escolha o outro cadastro</option>
@@ -121,7 +121,7 @@ export const JuntarBeneficiariosModal: React.FC<Props> = ({ base, outro, lista, 
           <div style={{ background: 'var(--color-surface-2, #f8fafc)', borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: '0.84rem', lineHeight: 1.5 }} data-testid="emendas-juntar-resumo">
             {linhasQueSaem > 0 ? (
               <>
-                {plural(linhasQueSaem, 'linha passa', 'linhas passam')} para <b>{rotuloBeneficiario(fica)}</b>.{' '}
+                {plural(linhasQueSaem, 'indicação passa', 'indicações passam')} para <b>{rotuloBeneficiario(fica)}</b>.{' '}
               </>
             ) : null}
             O nome do outro fica guardado como outra grafia, para a busca achar pelos dois. O que só o outro tem preenchido (CNPJ, endereço, contato) passa para o que fica.

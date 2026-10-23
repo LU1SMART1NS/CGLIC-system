@@ -5,8 +5,8 @@ const EMAIL_VALIDO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const UFS = new Set('AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' '));
 
 export interface FormularioBeneficiario {
+  /** Nome curto (coluna nome desde a migration 167). */
   nome: string;
-  nomeCurto: string;
   /** Coluna ÓRGÃO do Anexo da reserva (lista fixa de ORGAOS_BENEFICIARIO). */
   orgao: string;
   entregaCep: string;
@@ -25,7 +25,7 @@ export interface FormularioBeneficiario {
 /** O que impede salvar; vazio = pode salvar. Só o nome é obrigatório (migration 166); o resto, se vier, vem certo. */
 export function pendenciasDoBeneficiario(f: FormularioBeneficiario): string[] {
   const p: string[] = [];
-  if (!chaveDoNome(f.nome)) p.push('nome do beneficiário');
+  if (!chaveDoNome(f.nome)) p.push('nome curto');
   const cep = soDigitos(f.entregaCep);
   if (cep && cep.length !== 8) p.push('CEP com 8 números');
   if (f.entregaUf.trim() && !UFS.has(f.entregaUf.trim().toUpperCase())) p.push('UF válida');
@@ -33,6 +33,12 @@ export function pendenciasDoBeneficiario(f: FormularioBeneficiario): string[] {
   if (tel && (tel.length < 10 || tel.length > 11)) p.push('telefone com DDD (10 ou 11 números)');
   if (f.responsavelEmail.trim() && !EMAIL_VALIDO.test(f.responsavelEmail.trim())) p.push('e-mail válido');
   return p;
+}
+
+/** Natureza jurídica da Receita que não é de órgão público (associação, empresa...): o CNPJ provavelmente está errado. */
+export function naturezaNaoPublica(natureza: string | null | undefined): boolean {
+  if (!natureza?.trim()) return false;
+  return !/p[úu]blic|munic[íi]pio|estado|estadual|distrito federal|autarquia|uni[ãa]o/i.test(natureza);
 }
 
 export type FaltaDoBeneficiario = 'CNPJ' | 'endereço' | 'contato';
@@ -63,7 +69,7 @@ function palavras(s: string | null | undefined): string[] {
 export const chaveDoNome = (s: string | null | undefined): string => palavras(s).join(' ');
 
 /** Órgão a mostrar embaixo do nome; nada quando repete o nome ("Polícia Civil" / "Polícia Civil"). */
-export const orgaoAbaixoDoNome = (b: Pick<BeneficiarioEmenda, 'nome' | 'nomeCurto' | 'orgao'>, rotulo: string): string | null =>
+export const orgaoAbaixoDoNome = (b: Pick<BeneficiarioEmenda, 'orgao'>, rotulo: string): string | null =>
   b.orgao && chaveDoNome(b.orgao) !== chaveDoNome(rotulo) ? b.orgao : null;
 
 /** Nome + município + UF: o que não pode repetir (chave_identidade do banco). */

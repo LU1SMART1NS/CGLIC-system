@@ -41,7 +41,6 @@ import {
   proximaAcao,
   reservadoPorItem,
   ROTULO_ETAPA,
-  identificacaoDoPedido,
   ultimoContatoPorAutor,
   valorDaLinha,
   valorDoPedido,
@@ -207,6 +206,12 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
         {p.observacao && <div style={carteiraSubtitle}>Observação: {p.observacao}</div>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+        {(p.contatoNome || p.contatoTelefone || p.contatoEmail) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }} data-testid={`emendas-pedido-contato-${p.id}`}>
+            <span style={carteiraSubtitle}>Contato na assessoria{p.contatoNome ? `: ${p.contatoNome}` : ''}</span>
+            <ContatoDoResponsavel nome={p.contatoNome ?? 'assessoria'} telefone={p.contatoTelefone} email={p.contatoEmail} />
+          </div>
+        )}
         <EtapasDoPedido p={p} />
         {podeGerir && p.etapa !== 'EMPENHADO' && p.etapa !== 'CANCELADO' && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -303,34 +308,6 @@ export const EmendasPedidosPage: React.FC = () => {
       render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} orgao={orgaoDoPedido(l, nomeDoBeneficiario)} destaque />
     },
     {
-      // A reserva não é documento: até o ofício chegar, o que identifica o pedido é a data e o contato na assessoria.
-      key: 'reserva',
-      header: 'Reserva / ofício',
-      minWidth: '200px',
-      render: (l) =>
-        l.oficioNumero ? (
-          <>
-            <div style={{ fontWeight: 600 }}>{l.oficioNumero}</div>
-            {l.oficioProcessoSei && <div style={carteiraSubtitle}>SEI {l.oficioProcessoSei}</div>}
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {/* "Reserva da planilha" se repetia em quase toda linha: a origem vira uma etiqueta discreta. */}
-              <span style={{ fontWeight: 600 }}>{l.origem === 'PLANILHA' && !l.siopEmenda ? 'Reserva' : identificacaoDoPedido(l)}</span>
-              {l.origem === 'PLANILHA' && <StatusBadge label="Planilha" variant="neutral" size="sm" dot={false} />}
-            </div>
-            {l.oficioProcessoSei && <div style={carteiraSubtitle}>SEI {l.oficioProcessoSei}</div>}
-            {(l.contatoNome || l.contatoTelefone || l.contatoEmail) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span style={carteiraSubtitle}>{l.contatoNome ? `com ${l.contatoNome}` : 'contato'}</span>
-                <ContatoDoResponsavel nome={l.contatoNome ?? 'assessoria'} telefone={l.contatoTelefone} email={l.contatoEmail} />
-              </div>
-            )}
-          </>
-        )
-    },
-    {
       key: 'linhas',
       header: 'Itens e kits',
       minWidth: '240px',
@@ -353,7 +330,17 @@ export const EmendasPedidosPage: React.FC = () => {
       key: 'etapa',
       header: 'Etapa',
       nowrap: true,
-      render: (l) => <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
+      // Sem coluna própria para a reserva (repetia a etapa): o documento que marca a etapa fica embaixo dela.
+      render: (l) => {
+        const documento = l.oficioNumero ?? (l.siopEmenda ? `Emenda ${l.siopEmenda}` : null);
+        return (
+          <>
+            <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
+            {documento && <div style={{ ...carteiraSubtitle, marginTop: '0.25rem' }}>{documento}</div>}
+            {l.oficioProcessoSei && <div style={carteiraSubtitle}>SEI {l.oficioProcessoSei}</div>}
+          </>
+        );
+      }
     },
     {
       // Etiqueta curta: o aviso mais grave e "+N"; a frase completa aparece ao parar o mouse e no detalhe da linha.
