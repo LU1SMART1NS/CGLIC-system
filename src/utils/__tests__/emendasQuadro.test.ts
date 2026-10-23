@@ -15,7 +15,7 @@ const autor = { id: 'S:1', tipo: 'SENADOR', nome: 'Romário', uf: 'RJ' } as Auto
 
 const itens = new Map([
   item('suv', { nomeCurto: 'Camioneta/SUV médio', valorUnitario: 191811.62 }),
-  item('tablet', { nomeCurto: 'Tablet', valorUnitario: 1528.8 }),
+  item('tablet', { nomeCurto: 'Tablet', valorUnitario: 1528.8, numeroAta: '00043/2026', numeroItem: '5' }),
   item('drone', { nomeCurto: 'Drone', valorUnitario: 45200 }),
   item('mesa', { nomeCurto: 'Mesa flexora', valorUnitario: 7361.9 }),
   item('leg', { nomeCurto: 'Leg press 45°', valorUnitario: 8087.57 }),
@@ -83,19 +83,21 @@ describe('quadro da reserva (Anexo)', () => {
     expect(so4.porGnd).toEqual([]);
   });
 
-  it('SEI: as 7 colunas do Anexo e a linha TOTAL A EMPENHAR', () => {
+  it('SEI: ata, item e as 7 colunas do Anexo e a linha TOTAL A EMPENHAR', () => {
     const html = htmlParaSei(q);
-    for (const h of ['DESCRIÇÃO ITEM', 'ÓRGÃO', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
+    for (const h of ['ATA', 'ITEM', 'DESCRIÇÃO ITEM', 'ÓRGÃO', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
     expect(html).toContain('R$ 1.598,76<sup>¹</sup>');
     expect(html).toContain('(Kit Academia)');
+    expect(html).toContain('>00043/2026</td><td style="border:1px solid #000;padding:4px 6px;text-align:center;">00005</td>');
+    expect(html.match(/colspan="8"/g)).toHaveLength(3);
     expect(htmlParaSei(montarQuadro({ autor, linhas: [{ ...linhas[2], beneficiarioNome: '<b>x</b>' }], itens, beneficiarios: new Map(), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
   it('WhatsApp: lista com negrito no total', () => {
     const t = textoParaWhatsapp(q);
     expect(t.split('\n')[0]).toBe('*Anexo I – Indicação de Romário (Senado Federal · RJ)*');
-    expect(t).toContain('• 10 × Tablet\n  Secretaria de Estado de Polícia Militar do Rio de Janeiro — Rio de Janeiro - RJ\n  R$ 1.598,76 ¹ = *R$ 15.987,60*');
-    expect(t).toContain('• 100 × Colchonete\n  beneficiário a definir');
+    expect(t).toContain('• 10 × Tablet\n  Ata 00043/2026 · item 00005\n  Secretaria de Estado de Polícia Militar do Rio de Janeiro — Rio de Janeiro - RJ\n  R$ 1.598,76 ¹ = *R$ 15.987,60*');
+    expect(t).toContain('• 100 × Colchonete\n  Ata 00031/2025 · item 00001\n  beneficiário a definir');
     expect(t).toContain(`*TOTAL A EMPENHAR: R$ `);
   });
 });
