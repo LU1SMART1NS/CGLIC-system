@@ -22,6 +22,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/carteira/CarteiraSegmentTabs.tsx': 1, // abas
   'src/components/carteira/CarteiraSortHeader.tsx': 1, // cabeçalho de ordenação
   'src/components/contracts/planTaskEditing.tsx': 1, // cabeçalho recolhível
+  'src/components/emendas/EmendasInicioPage.tsx': 1, // cartões do Início do gestor de emendas (abrem a lista certa)
   'src/components/instrument360/HealthStripParts.tsx': 1, // tile clicável
   'src/components/instrument360/Instrument360Hero.tsx': 1, // nome que volta ao resumo (barra encolhida)
   'src/components/instrument360/Instrument360HeroResumo.tsx': 1, // nome que volta ao cartão (barra azul do celular)
