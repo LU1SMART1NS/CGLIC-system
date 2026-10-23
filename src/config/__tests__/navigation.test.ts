@@ -329,8 +329,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Itens da CAEP', '/emendas/itens'],
         ['Por autor', '/emendas/por-autor'],
         ['Kits', '/emendas/kits'],
-        ['Beneficiários', '/emendas/beneficiarios'],
-        ['Autores', '/emendas/autores']
+        ['Beneficiários', '/emendas/beneficiarios']
       ]);
     });
 
