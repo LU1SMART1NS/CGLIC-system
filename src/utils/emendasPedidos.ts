@@ -2,7 +2,7 @@
  * Regras dos pedidos das emendas (migration 157), fora das telas para poder testar: etapas, valor, itens que cada
  * linha ocupa e avisos (30 dias sem ofício, divergência com o SIOP, ata vencendo ou vencida antes do empenho).
  */
-import type { AcaoPedido, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, PedidoEmenda } from '../services/emendasService';
+import type { AcaoPedido, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
 import { avisoIndicacaoDias, corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from './emendasKits';
 import { chaveDoContrato } from './contractKeyUtils';
 
@@ -114,14 +114,23 @@ export function orgaoDoPedido(p: PedidoEmenda, nomeDoBeneficiario: (id: string) 
   return nomes.length === 1 ? nomes[0] : `${nomes[0]} e mais ${nomes.length - 1}`;
 }
 
-export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'aConferir';
+export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'aConferir' | 'semNota';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
+  /** Frase completa: no detalhe da linha e ao parar o mouse na etiqueta. */
   texto: string;
+  /** Etiqueta da lista, de até 3 palavras, para a coluna não crescer. */
+  curto: string;
   /** Linha a que o aviso se refere (ata), quando houver. */
   linhaId?: string;
 }
+
+/** Do mais grave ao mais leve: na lista aparece só o primeiro, com "+N" para os outros. */
+export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, divergencia: 2, semOficio: 3, ataVencendo: 4, semNota: 5, aConferir: 6 };
+
+/** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
+export const avisoGrave = (a: Pick<AvisoPedido, 'tipo'>) => GRAVIDADE_DO_AVISO[a.tipo] <= GRAVIDADE_DO_AVISO.semOficio;
 
 /** Situação da ata de cada item da linha, só antes do empenho: vencida ou vencendo em até 60 dias. */
 export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, ItemCaep>, hoje: string): AvisoPedido | null {
@@ -130,31 +139,41 @@ export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, I
     .map((x) => itens.get(x.itemKey))
     .filter((i): i is ItemCaep => Boolean(i?.vigenciaFinal));
   const vencida = doItem.find((i) => i.ataEncerrada);
-  if (vencida) return { tipo: 'ataVencida', texto: `Ata ${vencida.numeroAta} encerrada em ${dataBR(vencida.vigenciaFinal)}: não dá para empenhar`, linhaId: l.id };
+  if (vencida) return { tipo: 'ataVencida', curto: 'Ata encerrada', texto: `Ata ${vencida.numeroAta} encerrada em ${dataBR(vencida.vigenciaFinal)}: não dá para empenhar`, linhaId: l.id };
   const prazos = doItem.map((i) => ({ i, d: diasEntre(hoje, i.vigenciaFinal!) })).sort((a, b) => a.d - b.d);
   // O limite é o contrato assinado antes do fim da ata (decisão de 23/10/2026), não o empenho.
   const noCorte = prazos.find((x) => passouDoCorte(x.d));
   if (noCorte) {
     return {
       tipo: 'ataNoCorte',
+      curto: 'Prazo de indicação vencido',
       texto: `Ata ${noCorte.i.numeroAta} termina em ${noCorte.d} dias (${dataBR(noCorte.i.vigenciaFinal)}): passou do prazo de indicação (${corteIndicacaoDias()} dias); confirmar com a CCGA se ainda dá para contratar`,
       linhaId: l.id
     };
   }
   const vencendo = prazos.find((x) => x.d <= avisoIndicacaoDias());
-  if (vencendo) return { tipo: 'ataVencendo', texto: `Ata ${vencendo.i.numeroAta} vence em ${vencendo.d} dias (${dataBR(vencendo.i.vigenciaFinal)}): contrato assinado até lá`, linhaId: l.id };
+  if (vencendo) return { tipo: 'ataVencendo', curto: `Ata vence em ${vencendo.d} dias`, texto: `Ata ${vencendo.i.numeroAta} vence em ${vencendo.d} dias (${dataBR(vencendo.i.vigenciaFinal)}): contrato assinado até lá`, linhaId: l.id };
   return null;
 }
 
-export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, hoje: string): AvisoPedido[] {
+export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, hoje: string, notas?: Map<string, NotaDaLinha>): AvisoPedido[] {
   const avisos: AvisoPedido[] = [];
   if (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA') {
     const dias = diasEntre(p.reservadoEm, hoje);
-    if (dias > AVISO_SEM_OFICIO_DIAS) avisos.push({ tipo: 'semOficio', texto: p.autorId ? `${dias} dias sem ofício` : `${dias} dias sem parlamentar` });
+    if (dias > AVISO_SEM_OFICIO_DIAS) {
+      const texto = p.autorId ? `${dias} dias sem ofício` : `${dias} dias sem parlamentar`;
+      avisos.push({ tipo: 'semOficio', curto: texto, texto: `${texto} desde a reserva (${dataBR(p.reservadoEm)})` });
+    }
   }
-  if (p.etapa === 'OFICIO' && p.divergencia) avisos.push({ tipo: 'divergencia', texto: 'Divergência com o SIOP' });
+  if (p.etapa === 'OFICIO' && p.divergencia) avisos.push({ tipo: 'divergencia', curto: 'Divergência no SIOP', texto: `Divergência com o SIOP: ${p.divergencia}` });
+  if (notas && p.etapa === 'EMPENHADO') {
+    const semNota = linhasSemNota(p, notas).length;
+    if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });
+  }
   const aConferir = linhasAtivas(p).filter((l) => l.aConferir).length;
-  if (aConferir) avisos.push({ tipo: 'aConferir', texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir` });
+  if (aConferir) {
+    avisos.push({ tipo: 'aConferir', curto: `${aConferir} a conferir`, texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir entre as planilhas da CAEP` });
+  }
   const atas = linhasAtivas(p)
     .map((l) => ataDaLinha(p, l, itens, hoje))
     .filter((a): a is AvisoPedido => Boolean(a));
@@ -164,7 +183,7 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
     const prioridade = (a: AvisoPedido) => (a.tipo === 'ataNoCorte' ? 0 : 1);
     avisos.push(atas.sort((a, b) => prioridade(a) - prioridade(b) || a.texto.localeCompare(b.texto))[0]);
   }
-  return avisos;
+  return avisos.sort((a, b) => GRAVIDADE_DO_AVISO[a.tipo] - GRAVIDADE_DO_AVISO[b.tipo]);
 }
 
 /** Data em que o pedido entrou em cada etapa (para a linha do tempo). */
@@ -185,4 +204,62 @@ export function dataDaEtapa(p: PedidoEmenda, etapa: EtapaPedido): string | null 
     default:
       return p.canceladoEm;
   }
+}
+
+/** Como a nota foi achada (migration 164), para mostrar embaixo do número. */
+export const ROTULO_REGRA_DA_NOTA: Record<RegraDaNota, string> = {
+  CONTRATO: 'achada pelo contrato',
+  ITEM: 'achada pelo item da ata',
+  AUTOR: 'achada pelo autor'
+};
+
+/** Por que a linha empenhada ainda não tem nota. */
+export const ROTULO_MOTIVO_SEM_NOTA: Record<MotivoSemNota, string> = {
+  SEM_CONTRATO: 'a planilha não traz o contrato',
+  CONTRATO_FORA: 'o contrato não está no sistema',
+  CONTRATO_SEM_NOTA: 'o contrato ainda não tem nota no sistema',
+  OUTRAS_EMENDAS: 'o contrato só tem notas de outras emendas',
+  VARIAS: 'há mais de uma nota possível',
+  SEM_EMENDA: 'o pedido não tem o número da emenda'
+};
+
+/** Nota da linha: a digitada pela CAEP no empenho vale mais que a achada pelo sistema. */
+export function notaDaLinha(l: Pick<LinhaPedido, 'id' | 'notaEmpenho'>, notas: Map<string, NotaDaLinha>): string | null {
+  return l.notaEmpenho ?? notas.get(l.id)?.nota ?? null;
+}
+
+export const linhasSemNota = (p: PedidoEmenda, notas: Map<string, NotaDaLinha>): LinhaPedido[] => linhasAtivas(p).filter((l) => !notaDaLinha(l, notas));
+
+export interface ExecucaoDoPedido {
+  notas: number;
+  empenhado: number;
+  liquidado: number;
+  pago: number;
+  /** Próxima entrega prevista nos contratos das notas (informada pelo gestor do contrato). */
+  proximaEntrega: { data: string; valor: number | null } | null;
+  linhasSemNota: number;
+}
+
+/**
+ * Execução do pedido pelas notas achadas: cada nota conta uma vez (várias linhas podem estar na mesma nota). Os valores
+ * são os da nota inteira, que pode ter também outros itens da mesma emenda no contrato.
+ */
+export function execucaoDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): ExecucaoDoPedido {
+  const porNota = new Map<string, NotaDaLinha>();
+  let proximaEntrega: ExecucaoDoPedido['proximaEntrega'] = null;
+  for (const l of linhasAtivas(p)) {
+    const n = notas.get(l.id);
+    if (!n) continue;
+    if (n.empenhoId) porNota.set(n.empenhoId, n);
+    if (n.entregaPrevista && (!proximaEntrega || n.entregaPrevista < proximaEntrega.data)) proximaEntrega = { data: n.entregaPrevista, valor: n.entregaPrevistaValor };
+  }
+  const soma = (f: (n: NotaDaLinha) => number | null) => [...porNota.values()].reduce((s, n) => s + (f(n) ?? 0), 0);
+  return {
+    notas: porNota.size,
+    empenhado: soma((n) => n.valorEmpenhado),
+    liquidado: soma((n) => n.valorLiquidado),
+    pago: soma((n) => n.valorPago),
+    proximaEntrega,
+    linhasSemNota: linhasSemNota(p, notas).length
+  };
 }
