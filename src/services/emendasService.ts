@@ -394,3 +394,176 @@ export async function consultarCep(cep: string, fetcher: typeof fetch = fetch): 
   if (j.erro) throw new Error('CEP não encontrado. Confira o número ou preencha o endereço à mão.');
   return { cep: d, logradouro: j.logradouro ?? '', bairro: j.bairro ?? '', municipio: j.localidade ?? '', uf: (j.uf ?? '').toUpperCase() };
 }
+
+// ------------------------------------------------------------------------------
+// Pedidos dos parlamentares (migration 157)
+// ------------------------------------------------------------------------------
+
+export type EtapaPedido = 'RESERVADO' | 'MINUTA' | 'OFICIO' | 'CONFERIDO' | 'AUTORIZADO' | 'EMPENHADO' | 'CANCELADO';
+
+export interface LinhaPedido {
+  id: string;
+  ordem: number;
+  tipo: 'ITEM' | 'KIT';
+  itemKey: string | null;
+  kitId: string | null;
+  kitNome: string | null;
+  kitVersao: number | null;
+  /** Composição do kit no dia do pedido. */
+  kitComposicao: ItemDoKit[] | null;
+  quantidade: number;
+  beneficiarioId: string | null;
+  notaEmpenho: string | null;
+  cancelada: boolean;
+  canceladaMotivo: string | null;
+}
+
+export interface PedidoEmenda {
+  id: string;
+  numero: number;
+  autorId: string;
+  etapa: EtapaPedido;
+  origem: 'SISTEMA' | 'PLANILHA';
+  observacao: string | null;
+  /** Contato da assessoria com quem a CAEP combinou a reserva (a reserva não é documento). */
+  contatoNome: string | null;
+  contatoTelefone: string | null;
+  contatoEmail: string | null;
+  reservadoEm: string;
+  minutaEm: string | null;
+  minutaDocumentoSei: string | null;
+  oficioNumero: string | null;
+  oficioProcessoSei: string | null;
+  oficioEm: string | null;
+  divergencia: string | null;
+  siopEmenda: string | null;
+  siopValor: number | null;
+  siopGnd: string | null;
+  conferidoEm: string | null;
+  autorizadoEm: string | null;
+  autorizadoDocumentoSei: string | null;
+  empenhadoEm: string | null;
+  canceladoEm: string | null;
+  canceladoMotivo: string | null;
+  versao: number;
+  atualizadoPorNome: string | null;
+  atualizadoEm: string | null;
+  linhas: LinhaPedido[];
+}
+
+export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
+  const [pedidos, linhas] = await Promise.all([
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate))
+  ]);
+  const porPedido = new Map<string, LinhaPedido[]>();
+  for (const l of linhas) {
+    const lista = porPedido.get(l.pedido_id) ?? [];
+    lista.push({
+      id: l.id,
+      ordem: l.ordem,
+      tipo: l.tipo,
+      itemKey: l.item_key ?? null,
+      kitId: l.kit_id ?? null,
+      kitNome: l.kit_nome ?? null,
+      kitVersao: l.kit_versao ?? null,
+      kitComposicao: Array.isArray(l.kit_composicao) ? l.kit_composicao.map((c: any) => ({ itemKey: c.item_key, quantidade: num(c.quantidade) })) : null,
+      quantidade: num(l.quantidade),
+      beneficiarioId: l.beneficiario_id ?? null,
+      notaEmpenho: l.nota_empenho ?? null,
+      cancelada: Boolean(l.cancelada),
+      canceladaMotivo: l.cancelada_motivo ?? null
+    });
+    porPedido.set(l.pedido_id, lista);
+  }
+  return pedidos
+    .map((p) => ({
+      id: p.id,
+      numero: p.numero,
+      autorId: p.autor_id,
+      etapa: p.etapa,
+      origem: p.origem,
+      observacao: p.observacao ?? null,
+      contatoNome: p.contato_nome ?? null,
+      contatoTelefone: p.contato_telefone ?? null,
+      contatoEmail: p.contato_email ?? null,
+      reservadoEm: p.reservado_em,
+      minutaEm: p.minuta_em ?? null,
+      minutaDocumentoSei: p.minuta_documento_sei ?? null,
+      oficioNumero: p.oficio_numero ?? null,
+      oficioProcessoSei: p.oficio_processo_sei ?? null,
+      oficioEm: p.oficio_em ?? null,
+      divergencia: p.divergencia ?? null,
+      siopEmenda: p.siop_emenda ?? null,
+      siopValor: p.siop_valor == null ? null : num(p.siop_valor),
+      siopGnd: p.siop_gnd ?? null,
+      conferidoEm: p.conferido_em ?? null,
+      autorizadoEm: p.autorizado_em ?? null,
+      autorizadoDocumentoSei: p.autorizado_documento_sei ?? null,
+      empenhadoEm: p.empenhado_em ?? null,
+      canceladoEm: p.cancelado_em ?? null,
+      canceladoMotivo: p.cancelado_motivo ?? null,
+      versao: p.versao,
+      atualizadoPorNome: p.atualizado_por_nome ?? null,
+      atualizadoEm: p.atualizado_em ?? null,
+      linhas: (porPedido.get(p.id) ?? []).sort((a, b) => a.ordem - b.ordem)
+    }))
+    .sort((a, b) => b.numero - a.numero);
+}
+
+export interface LinhaParaSalvar {
+  id?: string;
+  tipo: 'ITEM' | 'KIT';
+  itemKey?: string | null;
+  kitId?: string | null;
+  quantidade: number;
+  beneficiarioId: string | null;
+}
+
+export async function salvarPedidoEmenda(p: {
+  id?: string;
+  versao?: number;
+  autorId: string;
+  observacao: string | null;
+  contatoNome: string | null;
+  contatoTelefone: string | null;
+  contatoEmail: string | null;
+  motivo?: string | null;
+  linhas: LinhaParaSalvar[];
+}): Promise<{ id: string; versao: number; numero: number }> {
+  const { data, error } = await db().rpc('salvar_pedido_emenda', {
+    p_pedido: {
+      id: p.id ?? null,
+      versao: p.versao ?? null,
+      autor_id: p.autorId,
+      observacao: p.observacao,
+      contato_nome: p.contatoNome,
+      contato_telefone: p.contatoTelefone,
+      contato_email: p.contatoEmail,
+      motivo: p.motivo ?? null,
+      linhas: p.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
+    }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number; numero: number };
+}
+
+export type AcaoPedido = 'MINUTA' | 'OFICIO' | 'DIVERGENCIA' | 'CONFERIDO' | 'AUTORIZADO' | 'EMPENHADO';
+
+export async function avancarPedidoEmenda(id: string, versao: number, acao: AcaoPedido, dados: Record<string, unknown>): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('avancar_pedido_emenda', { p_id: id, p_versao: versao, p_acao: acao, p_dados: dados });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+export async function cancelarPedidoEmenda(id: string, versao: number, motivo: string): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('cancelar_pedido_emenda', { p_id: id, p_versao: versao, p_motivo: motivo });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** Reservado a parlamentares por item (pedidos não cancelados, kits abertos). */
+export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('v_emendas_reservado_por_item').select('item_key, reservado').order('item_key').range(de, ate));
+  return new Map(linhas.map((r) => [r.item_key as string, num(r.reservado)]));
+}

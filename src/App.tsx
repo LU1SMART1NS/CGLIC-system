@@ -42,6 +42,9 @@ const DefinirSenhaRoute = lazyComRecarga(() => import('./routes/DefinirSenhaRout
 const RedefinirSenhaRoute = lazyComRecarga(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
 const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
+const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
+const EmendasPorItemPage = lazyComRecarga(() => import('./components/emendas/EmendasPorItemPage').then((m) => ({ default: m.EmendasPorItemPage })));
+const EmendasPorAutorPage = lazyComRecarga(() => import('./components/emendas/EmendasPorAutorPage').then((m) => ({ default: m.EmendasPorAutorPage })));
 const EmendasKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasKitsPage').then((m) => ({ default: m.EmendasKitsPage })));
 const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasBeneficiariosPage').then((m) => ({ default: m.EmendasBeneficiariosPage })));
 const EmendasAutoresPage = lazyComRecarga(() => import('./components/emendas/EmendasAutoresPage').then((m) => ({ default: m.EmendasAutoresPage })));
@@ -386,7 +389,31 @@ const AppContent: React.FC = () => {
               }
             />
             {/* Emendas parlamentares (migration 155): gestor de emendas (CAEP) e coordenador alteram; consulta lê. */}
-            <Route path="/emendas" element={<Navigate to="/emendas/kits" replace />} />
+            <Route path="/emendas" element={<Navigate to="/emendas/pedidos" replace />} />
+            <Route
+              path="/emendas/pedidos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasPedidosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/itens"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasPorItemPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/por-autor"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasPorAutorPage />
+                </RequireRole>
+              }
+            />
             <Route
               path="/emendas/kits"
               element={

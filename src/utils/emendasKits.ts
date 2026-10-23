@@ -44,6 +44,11 @@ export function diasEntre(hoje: string, fim: string): number {
   return Math.round((Date.parse(`${fim}T00:00:00Z`) - Date.parse(`${hoje}T00:00:00Z`)) / UM_DIA);
 }
 
+/** Item como na Carteira de Itens: "00001 · Ata 00031/2025". */
+export function rotuloItemDaAta(i: { numeroAta: string; numeroItem: string }): string {
+  return `${String(i.numeroItem).padStart(5, '0')} · Ata ${i.numeroAta}`;
+}
+
 export function dataBR(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—';
 }
