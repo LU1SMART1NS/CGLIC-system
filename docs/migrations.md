@@ -138,6 +138,7 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 | 124 | `20261014000124_perfil_canonico_e_usuario_desativado.sql` | `has_role` lê `role_id`; `usuario_ativo`; usuário desativado perde o acesso na hora. |
 | 134 | `20261014000134_cron_mais_leve.sql` | Cron mais leve: quatro jobs passam a uma vez por hora, nenhum minuto com dois jobs; `rotinas_controle` e `recalcular_pagamento_faturas()` sai cedo quando nada mudou. |
 | 155 | `20261023000155_emendas_cadastros.sql` | Emendas, entrega 1: perfil `gestor_emendas`, autores (Câmara, Senado, bancadas), beneficiários pelo CNPJ, kits e itens alocados à CAEP; leitura semanal dos autores. |
+| 156 | `20261023000156_autores_emendas_em_sao_paulo.sql` | A leitura semanal dos autores chama a função na região de São Paulo (`x-region: sa-east-1`): a Câmara recusa conexão de fora do Brasil. |
 
 ## Por tema
 
@@ -172,7 +173,7 @@ Os jobs de sincronização chamam `disparar_sincronizacao(recurso, uasg)`, que a
 | sincronizar-unidades-itens-200330 / -200331 | :40 / :42 | órgãos e adesões dos itens | 91 |
 | sincronizar-empenhos-200330 / -200331 | :45 / :50 | empenhos | 82 |
 | sincronizar-cadastro-uasgs | :48 | cadastro de UASGs | 111 |
-| sincronizar-autores-emendas | segunda-feira 06:40 UTC | deputados e senadores (Câmara e Senado) | 155 |
+| sincronizar-autores-emendas | segunda-feira 06:40 UTC | deputados e senadores (Câmara e Senado), na região de São Paulo | 155, 156 |
 | sincronizar-ordens-bancarias-200330 / -200331 | :53 / :57 | ordens bancárias | 83 (134 move a 200330) |
 | vincular-contratos-automaticamente | :55 | `executar_vinculos_automaticos(...,'CRON')` | 95 |
 | limpar-historico-do-cron | domingo 03:00 | apaga o histórico do cron com mais de 7 dias | 77 |
