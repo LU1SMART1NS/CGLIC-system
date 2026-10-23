@@ -5,7 +5,9 @@ describe('resolverUrlDaFonte — mesmos destinos do vite.config.ts e do vercel.j
   it.each([
     ['/api-arp/modulo-arp/1_consultarARP?pagina=1', 'https://dadosabertos.compras.gov.br/modulo-arp/1_consultarARP?pagina=1'],
     ['/api-pncp/api/pncp/v1/orgaos/1/compras/2025/1', 'https://pncp.gov.br/api/pncp/v1/orgaos/1/compras/2025/1'],
-    ['/api-contratos-gov/api/contrato/ug/200331', 'https://contratos.comprasnet.gov.br/api/contrato/ug/200331']
+    ['/api-contratos-gov/api/contrato/ug/200331', 'https://contratos.comprasnet.gov.br/api/contrato/ug/200331'],
+    ['/api-bcb/dados/serie/bcdata.sgs.433/dados?formato=json', 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json'],
+    ['/api-bcb-olinda/olinda/servico/Expectativas/versao/v1/odata/ExpectativaMercadoMensais', 'https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativaMercadoMensais']
   ])('%s', (entrada, esperado) => {
     expect(resolverUrlDaFonte(entrada)).toBe(esperado);
   });

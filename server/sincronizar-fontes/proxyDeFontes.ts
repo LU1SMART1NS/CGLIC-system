@@ -15,7 +15,10 @@ export const DESTINOS_DAS_FONTES: ReadonlyArray<readonly [prefixo: string, desti
   ['/api-transparencia/', 'https://api.portaldatransparencia.gov.br/'],
   // Câmara e Senado: autores das emendas (deputados e senadores); só o servidor lê
   ['/api-camara/', 'https://dadosabertos.camara.leg.br/'],
-  ['/api-senado/', 'https://legis.senado.leg.br/']
+  ['/api-senado/', 'https://legis.senado.leg.br/'],
+  // Banco Central: IPCA oficial (SGS) e projeções do Focus, para o reajuste das atas; só o servidor lê
+  ['/api-bcb/', 'https://api.bcb.gov.br/'],
+  ['/api-bcb-olinda/', 'https://olinda.bcb.gov.br/']
 ];
 
 /** Identificação honesta do robô nas fontes oficiais. */

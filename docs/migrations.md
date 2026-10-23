@@ -141,6 +141,7 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 | 156 | `20261023000156_autores_emendas_em_sao_paulo.sql` | A leitura semanal dos autores chama a função na região de São Paulo (`x-region: sa-east-1`): a Câmara recusa conexão de fora do Brasil. |
 | 157 | `20261023000157_emendas_pedidos.sql` | Emendas, entrega 2: pedidos dos parlamentares com etapas (reserva → minuta → ofício → conferência SIOP → autorização → empenho), linhas de item ou kit com beneficiário, trava de saldo adiada nos dois lados (pedido ≤ alocado à CAEP; alocação da CAEP ≥ reservado). |
 | 158 | `20261023000158_reajuste_das_atas.sql` | Reajuste dos preços registrados (ON AGU 100/2025): índices mensais (IPCA oficial e Focus), base por ata (Termo de Conformidade informado pelo gestor, mês pelo apostilamento ou data do edital como sugestão), reajustes publicados no PNCP ou informados, preço homologado do item; conta dos ciclos (`reajuste_ciclos_ata`) e dos itens (`reajuste_itens_ata`), resumo `v_ata_reajuste_resumo`; RPCs `informar_termo_conformidade`, `informar_reajuste_ata` e `gravar_reajuste_fontes` (só servidor). Reajuste vale na assinatura, se o aniversário já passou, ou na prorrogação. |
+| 159 | `20261023000159_reajuste_atas_leitura_servidor.sql` | Reajuste das atas, leitura pelo servidor (recurso `reajuste_atas`): documentos da ata no PNCP já lidos, fila `atas_para_reajuste` (só servidor), `gravar_reajuste_fontes` com documentos lidos, preço homologado completo e mês/SEI do Termo de Conformidade deduzidos do primeiro reajuste publicado; o mesmo reajuste em dois documentos conta uma vez (gravação e `reajuste_ciclos_ata`); agendamento de 3 em 3 horas no minuto 44. |
 
 ## Por tema
 
@@ -173,6 +174,7 @@ Os jobs de sincronização chamam `disparar_sincronizacao(recurso, uasg)`, que a
 | sincronizar-contratos-participantes-200330 / -200331 | :32 / :34 | contratos dos órgãos participantes | 109 |
 | sincronizar-saldos-itens | :35 | saldos dos itens | 77 |
 | sincronizar-unidades-itens-200330 / -200331 | :40 / :42 | órgãos e adesões dos itens | 91 |
+| sincronizar-reajuste-atas | :44, de 3 em 3 h | reajuste das atas: IPCA e Focus (Banco Central), editais, apostilamentos e preço homologado (PNCP) | 159 |
 | sincronizar-empenhos-200330 / -200331 | :45 / :50 | empenhos | 82 |
 | sincronizar-cadastro-uasgs | :48 | cadastro de UASGs | 111 |
 | sincronizar-autores-emendas | segunda-feira 06:40 UTC | deputados e senadores (Câmara e Senado), na região de São Paulo | 155, 156 |

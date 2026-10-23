@@ -26,6 +26,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarSaldoContabilPendentes: vi.fn(async () => ({ leituras: 10, anosFechados: 0, amostraPagoNoAno: 22 })),
     sincronizarAutoresEmendas: vi.fn(async () => sucesso(27)),
     contarAutoresEmendas: vi.fn(async () => ({ legislatura: 57, deputados: 648, deputadosNoCargo: 513, senadores: 126, senadoresNoCargo: 81 })),
+    sincronizarReajusteAtas: vi.fn(async () => sucesso(29)),
+    contarReajusteAtasPendentes: vi.fn(async () => ({ pendentes: 149, semEdital: 64, mesesProjetados: 25 })),
     medirEmendasDoPortal: vi.fn(async () => ({ ano2026: { emendas: 12 } })),
     chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
@@ -263,6 +265,23 @@ describe('autores das emendas', () => {
     const r = await executarPedido({ recurso: 'autores_emendas', forcar: false, dry: true }, d);
     expect(d.sincronizarAutoresEmendas).not.toHaveBeenCalled();
     expect(r).toMatchObject({ dry: true, consulta: { deputados: 648, senadores: 126 } });
+  });
+});
+
+describe('reajuste das atas', () => {
+  it('vale para as duas carteiras (sem UASG) e lê com o leitor de PDF do servidor', async () => {
+    expect(validarPedido({ recurso: 'reajuste_atas' })).toMatchObject({ ok: true, pedido: { recurso: 'reajuste_atas' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'reajuste_atas', forcar: true, dry: false }, d);
+    expect(d.sincronizarReajusteAtas).toHaveBeenCalledWith(expect.objectContaining({ forcar: true, orcamentoMs: expect.any(Number), leitor: expect.objectContaining({ textoDoPdf: expect.any(Function), arquivosDoZip: expect.any(Function) }) }));
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 29 } });
+  });
+
+  it('no teste (dry) só conta a fila e lê os índices, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'reajuste_atas', forcar: false, dry: true }, d);
+    expect(d.sincronizarReajusteAtas).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { pendentes: 149 } });
   });
 });
 
