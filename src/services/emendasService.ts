@@ -54,6 +54,8 @@ export interface BeneficiarioEmenda {
   responsavelTelefone: string | null;
   responsavelWhatsapp: boolean;
   responsavelEmail: string | null;
+  /** Coluna ÓRGÃO do Anexo da reserva (migration 165), de uma lista fixa; vazio nos cadastros de antes. */
+  orgao: string | null;
   atualizadoPorNome: string | null;
   atualizadoEm: string | null;
 }
@@ -69,6 +71,10 @@ export interface ItemCaep {
   vigenciaFinal: string | null;
   ataEncerrada: boolean;
   alocado: number;
+  /** Informados pela CAEP para o quadro da reserva (migration 165): nome curto, GND e versão desses dados. */
+  nomeCurto?: string | null;
+  gnd?: 'GND-3' | 'GND-4' | null;
+  dadosVersao?: number | null;
 }
 
 export interface ItemDoKit {
@@ -141,6 +147,7 @@ function beneficiarioDoBanco(r: Record<string, any>): BeneficiarioEmenda {
     responsavelTelefone: r.responsavel_telefone ?? null,
     responsavelWhatsapp: Boolean(r.responsavel_whatsapp),
     responsavelEmail: r.responsavel_email ?? null,
+    orgao: r.orgao ?? null,
     atualizadoPorNome: r.atualizado_por_nome ?? null,
     atualizadoEm: r.atualizado_em ?? null
   };
@@ -185,7 +192,8 @@ export async function salvarBeneficiarioEmenda(b: BeneficiarioParaSalvar): Promi
       responsavel_cargo: b.responsavelCargo,
       responsavel_telefone: b.responsavelTelefone,
       responsavel_whatsapp: b.responsavelWhatsapp,
-      responsavel_email: b.responsavelEmail
+      responsavel_email: b.responsavelEmail,
+      orgao: b.orgao
     }
   });
   if (error) throw new Error(mensagemDoBanco(error));
@@ -206,7 +214,10 @@ export async function fetchItensCaep(): Promise<ItemCaep[]> {
     valorUnitario: num(r.valor_unitario),
     vigenciaFinal: r.data_vigencia_final ?? null,
     ataEncerrada: Boolean(r.ata_encerrada),
-    alocado: num(r.alocado)
+    alocado: num(r.alocado),
+    nomeCurto: r.nome_curto ?? null,
+    gnd: r.gnd ?? null,
+    dadosVersao: r.dados_versao ?? null
   }));
 }
 

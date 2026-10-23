@@ -6,6 +6,8 @@ const UFS = new Set('AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN
 
 export interface FormularioBeneficiario {
   nomeCurto: string;
+  /** Coluna ÓRGÃO do Anexo da reserva (lista fixa de ORGAOS_BENEFICIARIO). */
+  orgao: string;
   entregaCep: string;
   entregaLogradouro: string;
   entregaNumero: string;
@@ -24,6 +26,7 @@ export function pendenciasDoBeneficiario(receita: DadosDaReceita | null, f: Form
   const p: string[] = [];
   if (!receita) p.push('busque o CNPJ na Receita');
   if (!f.nomeCurto.trim()) p.push('nome curto');
+  if (!f.orgao) p.push('órgão');
   if (soDigitos(f.entregaCep).length !== 8) p.push('CEP de entrega');
   if (!f.entregaLogradouro.trim()) p.push('logradouro');
   if (!f.entregaNumero.trim()) p.push('número (use S/N se não houver)');

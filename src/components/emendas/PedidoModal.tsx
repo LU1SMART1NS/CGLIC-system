@@ -12,6 +12,7 @@ import { identificacaoDoPedido, itensDaLinha, valorDaLinha } from '../../utils/e
 import { formatarTelefone, soDigitos } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
+import { QuadroGabinete } from './QuadroGabinete';
 
 interface Props {
   pedido: PedidoEmenda | null;
@@ -321,6 +322,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             {negativo && <div style={aviso('erro')}>Algum item fica negativo. Diminua a quantidade ou peça mais alocação ao gestor de saldo.</div>}
           </div>
         )}
+
+        {linhas.length > 0 && <QuadroGabinete autor={autor} linhas={linhas} data={pedido?.reservadoEm ?? hoje} />}
 
         {tirou > 0 && (
           <AppInput label="Por que as linhas foram tiradas?" placeholder="Ex.: parlamentar desistiu do item; ata vencida sem substituto" value={motivo} onChange={(e) => setMotivo(e.target.value)} />

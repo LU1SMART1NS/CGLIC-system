@@ -4,11 +4,12 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAvancarPedido, useCancelarPedido } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { identificacaoDoPedido, itensDaLinha, linhasAtivas, valorDoPedido } from '../../utils/emendasPedidos';
 import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
 import { LinhaDoPedido } from './emendasPartes';
+import { QuadroGabinete } from './QuadroGabinete';
 import type { AcaoPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
 
 export type AcaoDaJanela = AcaoPedido | 'CANCELAR';
@@ -58,6 +59,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
   const avancar = useAvancarPedido();
   const cancelar = useCancelarPedido();
   const toast = useToast();
+  const { data: autores = [] } = useAutoresEmendas();
   const [modo, setModo] = useState<AcaoDaJanela>(acao);
   const [data, setData] = useState(hojeEmBrasilia());
   const [documentoSei, setDocumentoSei] = useState('');
@@ -166,6 +168,10 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
             <AppInput label="Data" type="date" value={data} onChange={(e) => setData(e.target.value)} />
             <AppInput label={modo === 'MINUTA' ? 'Documento SEI da minuta' : 'Documento SEI da autorização'} placeholder="Opcional" value={documentoSei} onChange={(e) => setDocumentoSei(e.target.value)} />
           </div>
+        )}
+
+        {modo === 'MINUTA' && (
+          <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} testId="emendas-etapa-quadro" />
         )}
 
         {modo === 'OFICIO' && (
