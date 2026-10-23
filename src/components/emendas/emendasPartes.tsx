@@ -95,7 +95,7 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
   // Até duas linhas: nome longo termina em "…". Ao passar o mouse: nome inteiro e, se houver, CNPJ e razão social.
   <div
     title={[b.sigla ? `${b.nome} · ${b.sigla}` : b.nome, b.cnpj ? `CNPJ ${formatarCnpj(b.cnpj)}${b.razaoSocial ? ` · ${b.razaoSocial}` : ''}` : null].filter(Boolean).join('\n')}
-    style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.35 }}
+    style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: destaque ? undefined : 1.35 }}
   >
     <span style={destaque ? carteiraIdentificacao : { fontWeight: 600 }}>{b.nome}</span>
     {b.sigla && <span style={{ ...ataEmCinza, marginLeft: '0.4rem' }}>· {b.sigla}</span>}
