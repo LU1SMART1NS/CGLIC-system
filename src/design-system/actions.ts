@@ -1,6 +1,6 @@
 import {
   Archive, ArrowLeft, ArrowLeftRight, ArrowRight, Ban, Check, FlaskConical, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, FileSearch, FileX, Link2, Pencil, Plus,
-  RefreshCw, RotateCcw, Search, Trash2, Unlink, UserCheck, UserPlus, UserX, X, XCircle,
+  Merge, RefreshCw, RotateCcw, Search, SplitSquareHorizontal, Trash2, Unlink, UserCheck, UserPlus, UserX, X, XCircle,
   type LucideIcon
 } from 'lucide-react';
 import type { AppButtonVariant } from './components/AppButton';
@@ -68,6 +68,8 @@ export const ACTIONS = {
   reativarCadastro: { label: 'Reativar', icon: RotateCcw, variant: 'outline' },
   atribuir: { label: 'Atribuir', icon: UserPlus, variant: 'outline' },
   alinharGestor: { label: 'Alinhar gestor', icon: UserCheck, variant: 'outline' },
+  juntar: { label: 'Juntar', icon: Merge, variant: 'outline' },
+  saoDiferentes: { label: 'São diferentes', icon: SplitSquareHorizontal, variant: 'outline' },
   transferir: { label: 'Transferir', icon: ArrowLeftRight, variant: 'outline' },
   anterior: { label: 'Anterior', icon: ChevronLeft, variant: 'outline' },
   proximo: { label: 'Próximo', icon: ChevronRight, variant: 'outline' },

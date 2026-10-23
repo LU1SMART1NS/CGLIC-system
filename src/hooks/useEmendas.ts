@@ -4,6 +4,9 @@ import { semContratos } from '../types/rbac';
 import {
   fetchAutoresEmendas,
   fetchBeneficiariosEmendas,
+  fetchBeneficiariosDiferentes,
+  juntarBeneficiariosEmenda,
+  marcarBeneficiariosDiferentes,
   fetchItensCaep,
   fetchKitsEmendas,
   salvarBeneficiarioEmenda,
@@ -15,6 +18,7 @@ import {
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
   type AcaoPedido,
+  type BeneficiarioEmenda,
   type BeneficiarioParaSalvar,
   type KitParaSalvar
 } from '../services/emendasService';
@@ -39,6 +43,29 @@ export function useAutoresEmendas() {
 
 export function useBeneficiariosEmendas() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'beneficiarios'], queryFn: fetchBeneficiariosEmendas });
+}
+
+export function useBeneficiariosDiferentes() {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'beneficiarios-diferentes'], queryFn: fetchBeneficiariosDiferentes });
+}
+
+/** Juntar mexe nas linhas dos pedidos também: recarrega os dois. */
+export function useJuntarBeneficiarios() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { fica: BeneficiarioEmenda; sai: BeneficiarioEmenda; motivo: string }) => juntarBeneficiariosEmenda(p),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] })
+  });
+}
+
+export function useMarcarBeneficiariosDiferentes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { aId: string; bId: string; diferentes?: boolean }) => marcarBeneficiariosDiferentes(p.aId, p.bId, p.diferentes ?? true),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'beneficiarios-diferentes'] })
+  });
 }
 
 export function useItensCaep() {

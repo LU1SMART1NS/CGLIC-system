@@ -29,8 +29,15 @@ export interface BeneficiarioEmenda {
   id: string;
   versao: number;
   ativo: boolean;
-  cnpj: string;
-  razaoSocial: string;
+  /** Nome do beneficiário, sem a cidade e a UF (ficam no endereço de entrega). Nome + município + UF não repetem (migration 166). */
+  nome: string;
+  /** Outras grafias do mesmo beneficiário (planilhas da CAEP e cadastros juntados). */
+  outrosNomes: string[];
+  /** PLANILHA = criado pela carga das planilhas da CAEP (migration 166). */
+  origem: 'CADASTRO' | 'PLANILHA';
+  /** Opcional desde a migration 166, e não único: unidades do mesmo órgão usam o CNPJ dele. */
+  cnpj: string | null;
+  razaoSocial: string | null;
   naturezaJuridica: string | null;
   enteFederativo: string | null;
   situacaoCadastral: string | null;
@@ -41,15 +48,16 @@ export interface BeneficiarioEmenda {
   sedeTelefone: string | null;
   sedeEmail: string | null;
   receitaLidaEm: string | null;
-  nomeCurto: string;
-  entregaCep: string;
-  entregaLogradouro: string;
-  entregaNumero: string;
+  nomeCurto: string | null;
+  entregaCep: string | null;
+  entregaLogradouro: string | null;
+  entregaNumero: string | null;
   entregaComplemento: string | null;
   entregaBairro: string | null;
-  entregaMunicipio: string;
-  entregaUf: string;
-  responsavelNome: string;
+  entregaMunicipio: string | null;
+  entregaUf: string | null;
+  /** Contato do beneficiário final (o responsável pelo recebimento é uma comissão definida depois). */
+  responsavelNome: string | null;
   responsavelCargo: string | null;
   responsavelTelefone: string | null;
   responsavelWhatsapp: boolean;
@@ -58,6 +66,20 @@ export interface BeneficiarioEmenda {
   orgao: string | null;
   atualizadoPorNome: string | null;
   atualizadoEm: string | null;
+}
+
+/** Como o beneficiário aparece nas listas: o nome curto, se a CAEP deu um; senão o nome. */
+export const rotuloBeneficiario = (b: Pick<BeneficiarioEmenda, 'nome' | 'nomeCurto'>): string => b.nomeCurto?.trim() || b.nome;
+
+/** "Limeira - SP", só "SP" ou nada. */
+export function localDoBeneficiario(b: Pick<BeneficiarioEmenda, 'entregaMunicipio' | 'entregaUf'>): string | null {
+  return [b.entregaMunicipio, b.entregaUf].filter(Boolean).join(' - ') || null;
+}
+
+/** Par de beneficiários parecidos que a CAEP confirmou serem unidades diferentes (migration 166). */
+export interface ParDiferente {
+  aId: string;
+  bId: string;
 }
 
 export interface ItemCaep {
@@ -122,8 +144,11 @@ function beneficiarioDoBanco(r: Record<string, any>): BeneficiarioEmenda {
     id: r.id,
     versao: r.versao,
     ativo: r.ativo,
-    cnpj: r.cnpj,
-    razaoSocial: r.razao_social,
+    nome: r.nome,
+    outrosNomes: r.outros_nomes ?? [],
+    origem: r.origem === 'PLANILHA' ? 'PLANILHA' : 'CADASTRO',
+    cnpj: r.cnpj ?? null,
+    razaoSocial: r.razao_social ?? null,
     naturezaJuridica: r.natureza_juridica ?? null,
     enteFederativo: r.ente_federativo ?? null,
     situacaoCadastral: r.situacao_cadastral ?? null,
@@ -134,15 +159,15 @@ function beneficiarioDoBanco(r: Record<string, any>): BeneficiarioEmenda {
     sedeTelefone: r.sede_telefone ?? null,
     sedeEmail: r.sede_email ?? null,
     receitaLidaEm: r.receita_lida_em ?? null,
-    nomeCurto: r.nome_curto,
-    entregaCep: r.entrega_cep,
-    entregaLogradouro: r.entrega_logradouro,
-    entregaNumero: r.entrega_numero,
+    nomeCurto: r.nome_curto ?? null,
+    entregaCep: r.entrega_cep ?? null,
+    entregaLogradouro: r.entrega_logradouro ?? null,
+    entregaNumero: r.entrega_numero ?? null,
     entregaComplemento: r.entrega_complemento ?? null,
     entregaBairro: r.entrega_bairro ?? null,
-    entregaMunicipio: r.entrega_municipio,
-    entregaUf: r.entrega_uf,
-    responsavelNome: r.responsavel_nome,
+    entregaMunicipio: r.entrega_municipio ?? null,
+    entregaUf: r.entrega_uf ?? null,
+    responsavelNome: r.responsavel_nome ?? null,
     responsavelCargo: r.responsavel_cargo ?? null,
     responsavelTelefone: r.responsavel_telefone ?? null,
     responsavelWhatsapp: Boolean(r.responsavel_whatsapp),
@@ -157,10 +182,10 @@ export async function fetchBeneficiariosEmendas(): Promise<BeneficiarioEmenda[]>
   const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
     db().from('emenda_beneficiarios').select('*').order('id').range(de, ate)
   );
-  return linhas.map(beneficiarioDoBanco).sort((a, b) => a.nomeCurto.localeCompare(b.nomeCurto, 'pt-BR'));
+  return linhas.map(beneficiarioDoBanco).sort((a, b) => rotuloBeneficiario(a).localeCompare(rotuloBeneficiario(b), 'pt-BR'));
 }
 
-export type BeneficiarioParaSalvar = Omit<BeneficiarioEmenda, 'id' | 'versao' | 'atualizadoPorNome' | 'atualizadoEm'> & { id?: string; versao?: number };
+export type BeneficiarioParaSalvar = Omit<BeneficiarioEmenda, 'id' | 'versao' | 'atualizadoPorNome' | 'atualizadoEm' | 'outrosNomes' | 'origem'> & { id?: string; versao?: number };
 
 export async function salvarBeneficiarioEmenda(b: BeneficiarioParaSalvar): Promise<{ id: string; versao: number }> {
   const { data, error } = await db().rpc('salvar_beneficiario_emenda', {
@@ -168,6 +193,7 @@ export async function salvarBeneficiarioEmenda(b: BeneficiarioParaSalvar): Promi
       id: b.id ?? null,
       versao: b.versao ?? null,
       ativo: b.ativo,
+      nome: b.nome,
       cnpj: b.cnpj,
       razao_social: b.razaoSocial,
       natureza_juridica: b.naturezaJuridica,
@@ -198,6 +224,32 @@ export async function salvarBeneficiarioEmenda(b: BeneficiarioParaSalvar): Promi
   });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
+}
+
+export async function fetchBeneficiariosDiferentes(): Promise<ParDiferente[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('emenda_beneficiarios_diferentes').select('a_id, b_id').order('a_id').range(de, ate)
+  );
+  return linhas.map((r) => ({ aId: r.a_id, bId: r.b_id }));
+}
+
+/** Junta dois cadastros do mesmo beneficiário: as linhas das emendas passam para o que fica e o outro é apagado. */
+export async function juntarBeneficiariosEmenda(p: { fica: BeneficiarioEmenda; sai: BeneficiarioEmenda; motivo: string }): Promise<{ linhas: number }> {
+  const { data, error } = await db().rpc('juntar_beneficiarios_emenda', {
+    p_fica: p.fica.id,
+    p_fica_versao: p.fica.versao,
+    p_sai: p.sai.id,
+    p_sai_versao: p.sai.versao,
+    p_motivo: p.motivo
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return { linhas: Number((data as { linhas?: number } | null)?.linhas ?? 0) };
+}
+
+/** Marca (ou desmarca) dois beneficiários parecidos como unidades diferentes. */
+export async function marcarBeneficiariosDiferentes(aId: string, bId: string, diferentes = true): Promise<void> {
+  const { error } = await db().rpc('marcar_beneficiarios_diferentes', { p_a: aId, p_b: bId, p_diferentes: diferentes });
+  if (error) throw new Error(mensagemDoBanco(error));
 }
 
 export async function fetchItensCaep(): Promise<ItemCaep[]> {
@@ -295,7 +347,8 @@ export function cnpjValido(valor: string): boolean {
   return d1 === Number(v[12]) && d2 === Number(v[13]);
 }
 
-export function formatarCnpj(v: string): string {
+export function formatarCnpj(v: string | null | undefined): string {
+  if (!v) return '';
   const d = soDigitos(v);
   return d.length === 14 ? d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : v;
 }

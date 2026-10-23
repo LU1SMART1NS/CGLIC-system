@@ -9,7 +9,7 @@ import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta, ROTULO_SITUACAO_KIT } from '../../utils/emendasKits';
 import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, valorDaLinha } from '../../utils/emendasPedidos';
-import { formatarTelefone, soDigitos } from '../../services/emendasService';
+import { formatarTelefone, localDoBeneficiario, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
 import { QuadroGabinete } from './QuadroGabinete';
@@ -84,8 +84,11 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const porChave = useMemo(() => new Map(itens.map((i) => [i.itemKey, i])), [itens]);
   const autor = autores.find((a) => a.id === autorId);
   const saldoAntes = useCallback((k: string) => (porChave.get(k)?.alocado ?? 0) - (reservadoFora.get(k) ?? 0), [porChave, reservadoFora]);
-  const ativosBen = beneficiarios.filter((b) => b.ativo).sort((a, b) => a.nomeCurto.localeCompare(b.nomeCurto, 'pt-BR'));
-  const nomeDoBeneficiario = (id: string) => beneficiarios.find((b) => b.id === id)?.nomeCurto;
+  const ativosBen = beneficiarios.filter((b) => b.ativo).sort((a, b) => rotuloBeneficiario(a).localeCompare(rotuloBeneficiario(b), 'pt-BR'));
+  const nomeDoBeneficiario = (id: string) => {
+    const b = beneficiarios.find((x) => x.id === id);
+    return b ? rotuloBeneficiario(b) : undefined;
+  };
   const tituloDoPedido = pedido ? (pedido.autorId ? autor?.nome ?? '' : orgaoDoPedido(pedido, nomeDoBeneficiario) ?? 'órgão') : '';
 
   const autoresEncontrados = useMemo(() => {
@@ -273,7 +276,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   <option value="">{l.beneficiarioNome ? `${l.beneficiarioNome} (a cadastrar)` : exigeBeneficiario ? 'Escolha o órgão' : 'A informar'}</option>
                   {ativosBen.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.nomeCurto} ({b.entregaUf})
+                      {[rotuloBeneficiario(b), localDoBeneficiario(b)].filter(Boolean).join(' · ')}
                     </option>
                   ))}
                 </AppSelect>

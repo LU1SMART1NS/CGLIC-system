@@ -47,7 +47,7 @@ import {
   execucaoDoPedido,
   type AvisoPedido
 } from '../../utils/emendasPedidos';
-import type { AutorEmenda, BeneficiarioEmenda, EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
+import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, ExecucaoDoPedidoResumo, LinhaDoPedido } from './emendasPartes';
@@ -250,7 +250,10 @@ export const EmendasPedidosPage: React.FC = () => {
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
   const beneficiarios = useMemo(() => new Map(beneficiariosLista.map((b) => [b.id, b])), [beneficiariosLista]);
-  const nomeDoBeneficiario = (id: string) => beneficiarios.get(id)?.nomeCurto;
+  const nomeDoBeneficiario = (id: string) => {
+    const b = beneficiarios.get(id);
+    return b ? rotuloBeneficiario(b) : undefined;
+  };
   const linhas: Linha[] = useMemo(() => pedidos.map((p) => ({ ...p, valor: valorDoPedido(p, itens), avisos: avisosDoPedido(p, itens, hoje, notas) })), [pedidos, itens, hoje, notas]);
 
   const contagem = useMemo(() => {
