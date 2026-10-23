@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularKit, sugestoesDeTroca, diasEntre } from '../emendasKits';
+import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep } from '../emendasKits';
 import type { ItemCaep } from '../../services/emendasService';
 
 const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
@@ -64,5 +64,29 @@ describe('sugestoesDeTroca', () => {
 describe('diasEntre', () => {
   it('conta dias de calendário', () => {
     expect(diasEntre('2026-10-23', '2026-12-19')).toBe(57);
+  });
+});
+
+describe('buscarItensCaep', () => {
+  const lista = [
+    item('00031/2025-200331-00001', { numeroAta: '00031/2025', numeroItem: '00001', descricao: 'ARMA DE FOGO - FUZIL, CALIBRE 5,56' }),
+    item('00031/2025-200331-00002', { numeroAta: '00031/2025', numeroItem: '00002', descricao: 'ARMA DE FOGO - FUZIL, CANO 11,5' }),
+    item('00108/2024-200331-00001', { numeroAta: '00108/2024', numeroItem: '00001', descricao: 'ESTABILIZADOR TENSÃO, NOBREAK' })
+  ];
+  const chaves = (t: string) => buscarItensCaep(lista, t).map((i) => i.itemKey.slice(-1) + '@' + i.numeroAta);
+
+  it('acha pela descrição sem acento e sem maiúscula, com todas as palavras', () => {
+    expect(chaves('tensao')).toEqual(['1@00108/2024']);
+    expect(chaves('fuzil cano')).toEqual(['2@00031/2025']);
+  });
+
+  it('acha pela ata com ou sem zeros e pelo item', () => {
+    expect(chaves('31/2025')).toHaveLength(2);
+    expect(chaves('00031')).toHaveLength(2);
+    expect(chaves('31/2025 item 2')).toEqual(['2@00031/2025']);
+  });
+
+  it('busca vazia devolve todos', () => {
+    expect(buscarItensCaep(lista, '  ')).toHaveLength(3);
   });
 });

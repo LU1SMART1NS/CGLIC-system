@@ -1833,3 +1833,10 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
     width: max(100%, 44px); height: max(100%, 44px);
   }
 }
+
+/* Ícones de contato do responsável (Emendas › Beneficiários): WhatsApp, telefone e e-mail */
+.contato-icone { transition: background-color 0.15s, border-color 0.15s; }
+.contato-icone:hover { background: #f1f5f9 !important; border-color: currentColor !important; }
+.contato-icone:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Tabela de Beneficiários (Emendas): células de várias linhas alinhadas pelo topo */
+.emendas-tabela-topo .ds-table td { vertical-align: top; }

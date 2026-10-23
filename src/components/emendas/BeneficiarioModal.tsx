@@ -17,7 +17,7 @@ import {
   type BeneficiarioParaSalvar,
   type DadosDaReceita
 } from '../../services/emendasService';
-import { pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
+import { linkDoWhatsapp, pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
 
 const EMAIL_PESSOAL = /@(gmail|hotmail|outlook|yahoo|bol|uol|live|icloud)\./i;
 
@@ -51,7 +51,6 @@ function formularioDe(b: BeneficiarioEmenda | null): Formulario {
     responsavelNome: b?.responsavelNome ?? '',
     responsavelCargo: b?.responsavelCargo ?? '',
     responsavelTelefone: b?.responsavelTelefone ? formatarTelefone(b.responsavelTelefone) : '',
-    responsavelWhatsapp: b?.responsavelWhatsapp ?? false,
     responsavelEmail: b?.responsavelEmail ?? ''
   };
 }
@@ -158,7 +157,8 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, cnpjsExistent
       responsavelNome: f.responsavelNome.trim(),
       responsavelCargo: f.responsavelCargo.trim() || null,
       responsavelTelefone: soDigitos(f.responsavelTelefone) || null,
-      responsavelWhatsapp: f.responsavelWhatsapp && Boolean(soDigitos(f.responsavelTelefone)),
+      // Celular (11 números, 9 depois do DDD) é o que tem WhatsApp; a coluna guarda o mesmo que a tela mostra.
+      responsavelWhatsapp: Boolean(linkDoWhatsapp(f.responsavelTelefone)),
       responsavelEmail: f.responsavelEmail.trim() || null
     };
     try {
@@ -289,13 +289,15 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, cnpjsExistent
               <div style={grade('repeat(auto-fit, minmax(min(100%, 220px), 1fr))')}>
                 <AppInput label="Nome *" value={f.responsavelNome} onChange={(e) => muda('responsavelNome', e.target.value)} data-testid="emendas-beneficiario-responsavel" />
                 <AppInput label="Cargo" value={f.responsavelCargo} onChange={(e) => muda('responsavelCargo', e.target.value)} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <AppInput label="Telefone / WhatsApp" inputMode="tel" placeholder="(00) 00000-0000" value={f.responsavelTelefone} onChange={(e) => muda('responsavelTelefone', e.target.value)} onBlur={() => muda('responsavelTelefone', formatarTelefone(f.responsavelTelefone))} />
-                  <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.82rem', fontWeight: 600 }}>
-                    <input type="checkbox" checked={f.responsavelWhatsapp} onChange={(e) => muda('responsavelWhatsapp', e.target.checked)} disabled={!soDigitos(f.responsavelTelefone)} />
-                    Este número tem WhatsApp
-                  </label>
-                </div>
+                <AppInput
+                  label="Telefone"
+                  hint="Celular abre o WhatsApp na lista."
+                  inputMode="tel"
+                  placeholder="(00) 00000-0000"
+                  value={f.responsavelTelefone}
+                  onChange={(e) => muda('responsavelTelefone', e.target.value)}
+                  onBlur={() => muda('responsavelTelefone', formatarTelefone(f.responsavelTelefone))}
+                />
                 <AppInput
                   label="E-mail institucional"
                   type="email"

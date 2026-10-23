@@ -5,6 +5,7 @@
  * Entrega 1: saldo do item = alocado à CAEP. Na entrega 2 os pedidos dos parlamentares saem desse saldo.
  */
 import type { ItemCaep, KitEmenda } from '../services/emendasService';
+import { descricaoItemEmFrase } from './textCase';
 
 /** Dias antes do fim da ata em que o kit passa a "Vence em breve" (decisão de 23/10/2026). */
 export const AVISO_VENCIMENTO_DIAS = 60;
@@ -35,7 +36,8 @@ const UM_DIA = 86_400_000;
 
 /** Descrição curta para frases: corta em n letras sem deixar vírgula ou espaço no fim. */
 export function curto(texto: string, n = 40): string {
-  return texto.length <= n ? texto : texto.slice(0, n).replace(/[\s,;.:-]+$/, '') + '…';
+  const t = descricaoItemEmFrase(texto);
+  return t.length <= n ? t : t.slice(0, n).replace(/[\s,;.:-]+$/, '') + '…';
 }
 
 export function diasEntre(hoje: string, fim: string): number {
@@ -119,3 +121,21 @@ export const ROTULO_SITUACAO_KIT: Record<SituacaoKit, string> = {
   indisponivel: 'Indisponível',
   desativado: 'Desativado'
 };
+
+const semAcento = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Busca pela descrição, pelo número da ata ("31/2025", "00031") ou do item ("item 2"). Todas as palavras precisam aparecer. */
+export function buscarItensCaep(itens: ItemCaep[], texto: string): ItemCaep[] {
+  let t = semAcento(texto.trim());
+  // "item 2" vale como número exato do item, não como as palavras "item" e "2".
+  const numeroItem = t.match(/\bitem\s*(\d+)\b/);
+  if (numeroItem) t = t.replace(numeroItem[0], ' ');
+  const palavras = t.split(/\s+/).filter(Boolean);
+  if (palavras.length === 0 && !numeroItem) return itens;
+  return itens.filter((i) => {
+    if (numeroItem && Number(i.numeroItem) !== Number(numeroItem[1])) return false;
+    const [num, ano] = i.numeroAta.split('/');
+    const alvo = semAcento(`${i.descricao} ${i.numeroAta} ${Number(num)}/${ano ?? ''}`);
+    return palavras.every((p) => alvo.includes(p));
+  });
+}

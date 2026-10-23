@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../services/supabaseClient', () => ({ supabase: null }));
 
-import { pendenciasDoBeneficiario, type FormularioBeneficiario } from '../emendasBeneficiarios';
+import { linkDoWhatsapp, pendenciasDoBeneficiario, type FormularioBeneficiario } from '../emendasBeneficiarios';
 import { cnpjValido, consultarCep, consultarCnpj } from '../../services/emendasService';
 
 const receita = { cnpj: '00394494000136', razaoSocial: 'MJSP' } as any;
@@ -18,7 +18,6 @@ const ok: FormularioBeneficiario = {
   responsavelNome: 'Fulano',
   responsavelCargo: '',
   responsavelTelefone: '(61) 99999-0000',
-  responsavelWhatsapp: true,
   responsavelEmail: 'fulano@mj.gov.br'
 };
 
@@ -66,5 +65,14 @@ describe('CNPJ e CEP', () => {
       url.includes('brasilapi') ? json({}, 500) : json({ logradouro: 'Rua Frei Caneca', bairro: 'Centro', localidade: 'Rio de Janeiro', uf: 'RJ' })
     ) as unknown as typeof fetch;
     expect(await consultarCep('20211-030', fetcher)).toEqual({ cep: '20211030', logradouro: 'Rua Frei Caneca', bairro: 'Centro', municipio: 'Rio de Janeiro', uf: 'RJ' });
+  });
+});
+
+describe('linkDoWhatsapp', () => {
+  it('celular vira link do wa.me com o 55; fixo e número incompleto não', () => {
+    expect(linkDoWhatsapp('(61) 99999-0000')).toBe('https://wa.me/5561999990000');
+    expect(linkDoWhatsapp('(61) 2025-3069')).toBeNull();
+    expect(linkDoWhatsapp('99999-0000')).toBeNull();
+    expect(linkDoWhatsapp(null)).toBeNull();
   });
 });

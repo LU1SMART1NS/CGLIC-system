@@ -296,7 +296,6 @@ export const DepartmentsManagementPage: React.FC = () => {
 
       <AdminListShell
         testId="departments-table-container"
-        title="Unidades e departamentos oficiais"
         isLoading={isDepartmentsLoading}
         isError={isDepartmentsError}
         errorTitle="Não foi possível carregar as unidades internas"

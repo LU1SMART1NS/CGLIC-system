@@ -1,5 +1,5 @@
 /** Regras do cadastro de beneficiários das emendas (migration 155), fora das telas para poder testar. */
-import { formatarCep, soDigitos, type BeneficiarioEmenda, type DadosDaReceita } from '../services/emendasService';
+import { soDigitos, type DadosDaReceita } from '../services/emendasService';
 
 const EMAIL_VALIDO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const UFS = new Set('AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' '));
@@ -16,7 +16,6 @@ export interface FormularioBeneficiario {
   responsavelNome: string;
   responsavelCargo: string;
   responsavelTelefone: string;
-  responsavelWhatsapp: boolean;
   responsavelEmail: string;
 }
 
@@ -37,15 +36,11 @@ export function pendenciasDoBeneficiario(receita: DadosDaReceita | null, f: Form
   return p;
 }
 
-
-export function enderecoDeEntrega(b: BeneficiarioEmenda): string {
-  return [
-    [b.entregaLogradouro, b.entregaNumero].filter(Boolean).join(', '),
-    b.entregaComplemento,
-    b.entregaBairro,
-    `${b.entregaMunicipio}/${b.entregaUf}`,
-    `CEP ${formatarCep(b.entregaCep)}`
-  ]
-    .filter(Boolean)
-    .join(' · ');
+/**
+ * Link do WhatsApp do responsável: só celular brasileiro (DDD + 9 + 8 números) tem WhatsApp; fixo não ganha link.
+ * Abre a conversa no WhatsApp Web ou no aplicativo (wa.me).
+ */
+export function linkDoWhatsapp(telefone: string | null | undefined): string | null {
+  const d = soDigitos(telefone);
+  return /^[1-9]{2}9\d{8}$/.test(d) ? `https://wa.me/55${d}` : null;
 }

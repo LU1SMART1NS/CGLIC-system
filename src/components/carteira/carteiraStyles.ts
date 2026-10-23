@@ -27,6 +27,20 @@ export const carteiraTableShell: React.CSSProperties = {
   overflow: 'hidden'
 };
 
+/** Primeira linha da célula de identificação (número da ata, do contrato, nome do kit...): forte e azul, igual em todas as carteiras. */
+export const carteiraIdentificacao: React.CSSProperties = { fontWeight: 800, color: 'var(--primary)' };
+
+/** Descrição do item sob a identificação (ata · item), como na lista de itens da ata: até 2 linhas. */
+export const carteiraDescricaoItem: React.CSSProperties = {
+  fontSize: '0.8rem',
+  color: '#0f172a',
+  marginTop: '0.15rem',
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden'
+};
+
 /** Segunda linha da célula de identificação (fornecedor/objeto), limitada a 2 linhas: igual em todas as carteiras. */
 export const carteiraSubtitle: React.CSSProperties = {
   fontSize: '0.78rem',

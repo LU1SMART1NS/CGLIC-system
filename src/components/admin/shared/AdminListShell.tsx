@@ -5,8 +5,11 @@ import { SkeletonLoader } from '../../../design-system/components/SkeletonLoader
 import { carteiraTableShell } from '../../carteira/carteiraStyles';
 
 export interface AdminListShellProps {
-  /** Título da faixa superior, ex.: "Unidades cadastradas". */
-  title: string;
+  /**
+   * Título da faixa superior, ex.: "Unidades cadastradas" (telas de Ajustes). Sem título e sem `stripActions` não há
+   * faixa: a tabela vem logo abaixo dos filtros, como nas carteiras (telas de trabalho, ex.: Emendas).
+   */
+  title?: string;
   /** Contagem exibida ao lado do título, ex.: "3 de 12". */
   countLabel?: string;
   /** Texto de apoio sob o título. */
@@ -50,30 +53,32 @@ export const AdminListShell: React.FC<AdminListShellProps> = ({
   children
 }) => (
   <div data-testid={testId} style={carteiraTableShell}>
-    <div
-      style={{
-        padding: '0.6rem 1rem',
-        background: '#f8fafc',
-        borderBottom: '1px solid #e2e8f0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '0.75rem',
-        flexWrap: 'wrap'
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        {icon}
-        <div>
-          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-            {title}
-            {countLabel ? ` (${countLabel})` : ''}
+    {(title || stripActions) && (
+      <div
+        style={{
+          padding: '0.6rem 1rem',
+          background: '#f8fafc',
+          borderBottom: '1px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          flexWrap: 'wrap'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {icon}
+          <div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
+              {title}
+              {countLabel ? ` (${countLabel})` : ''}
+            </div>
+            {description && <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{description}</div>}
           </div>
-          {description && <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{description}</div>}
         </div>
+        {stripActions}
       </div>
-      {stripActions}
-    </div>
+    )}
     {isError ? (
       <ErrorState title={errorTitle} message={errorMessage ?? 'Tente novamente em instantes.'} onRetry={onRetry} />
     ) : isLoading ? (
