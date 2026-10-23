@@ -28,6 +28,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Painel', '/instrumentos'],
         ['Painel', '/emendas/inicio'],
+        ['Emendas', '/emendas/inicio'],
         ['Distribuição', '/atas/distribuicao']
       ]);
       expect(area.children![0].matchPrefixes).toContain('/prazos');
@@ -341,8 +342,14 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       for (const role of ['admin', 'gestor', 'gestor_saldos', 'leitor', null] as const) expect(rotaInicialDoPerfil(role)).toBe('/instrumentos');
     });
 
-    it('o Painel das emendas só aparece no Início do gestor de emendas', () => {
-      for (const role of ['admin', 'gestor', 'gestor_saldos', 'leitor'] as const) {
+    it('o resumo das emendas aparece no Início do gestor de emendas (Painel) e do coordenador (Emendas), e de mais ninguém', () => {
+      const inicioDoCoordenador = filterNavigationByRole(navigationConfig, 'admin').find((i) => i.id === 'visao-geral');
+      expect(inicioDoCoordenador?.children?.map((c) => [c.label, c.route])).toEqual([
+        ['Painel', '/instrumentos'],
+        ['Emendas', '/emendas/inicio'],
+        ['Distribuição', '/atas/distribuicao']
+      ]);
+      for (const role of ['gestor', 'gestor_saldos', 'leitor'] as const) {
         const inicio = filterNavigationByRole(navigationConfig, role).find((i) => i.id === 'visao-geral');
         expect(inicio?.children?.map((c) => c.route)).not.toContain('/emendas/inicio');
       }

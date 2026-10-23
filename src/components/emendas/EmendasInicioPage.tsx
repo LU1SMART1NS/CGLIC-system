@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { LayoutDashboard } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -80,6 +81,8 @@ const Cartao: React.FC<{ rotulo: string; valor: React.ReactNode; grave?: boolean
  */
 export const EmendasInicioPage: React.FC = () => {
   const navigate = useNavigate();
+  // Para o gestor de emendas esta é o Início; o coordenador a abre na aba Emendas do Início dele.
+  const { role } = useAuth();
   const { data: pedidos = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = usePedidosEmendas();
   const { data: notas = SEM_NOTAS, refetch: recarregarNotas } = useNotasDasLinhas();
   const { data: itensLista = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
@@ -212,7 +215,7 @@ export const EmendasInicioPage: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title="Início"
+        title={role === 'gestor_emendas' ? 'Início' : 'Emendas'}
         subtitle="Pedidos dos parlamentares e saldo da CAEP que pedem atenção."
         hint={`Os avisos são os mesmos da lista de Pedidos: ata encerrada antes do empenho, prazo de indicação vencido (a menos de ${corteIndicacaoDias()} dias do fim da ata), divergência com o SIOP, mais de ${AVISO_SEM_OFICIO_DIAS} dias sem ofício, ata vencendo em até ${avisoIndicacaoDias()} dias, linhas empenhadas sem nota e linhas a conferir das planilhas da CAEP. Os dois prazos ficam em Ajustes > Regras de Alertas. Saldo livre = alocado à CAEP − reservado nos pedidos, só nas atas vigentes.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
