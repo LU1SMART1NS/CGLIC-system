@@ -344,7 +344,7 @@ export function htmlDaTabela(q: Quadro): string {
     `<tr><td colspan="${COLUNAS.length - 1}" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${tdValor}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
     '</tbody></table>' +
     // O título vai embaixo da tabela.
-    `<p style="text-align:center"><b>${escapar(q.titulo)}</b></p>`
+    `<p style="text-align:center;font-size:9pt;margin:2px 0 0">${escapar(q.titulo)}</p>`
   );
 }
 

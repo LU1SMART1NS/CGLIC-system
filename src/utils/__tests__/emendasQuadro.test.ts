@@ -98,7 +98,7 @@ describe('quadro da reserva (Anexo)', () => {
     expect(html.match(/<th /g)).toHaveLength(6);
     // Título embaixo da tabela; sem fonte, notas nem a marca da nota no preço.
     expect(html.startsWith('<table')).toBe(true);
-    expect(html.endsWith('</tbody></table><p style="text-align:center"><b>Tabela 1 – Indicação de Romário (Senado Federal · RJ)</b></p>')).toBe(true);
+    expect(html.endsWith('</tbody></table><p style="text-align:center;font-size:9pt;margin:2px 0 0">Tabela 1 – Indicação de Romário (Senado Federal · RJ)</p>')).toBe(true);
     expect(html).toContain('R$ 1.598,76</td>');
     expect(html).not.toContain('Kit Academia');
     expect(html).toContain('<b>Tablet</b><br><span style="font-size:8pt">Ata 00043/2026 · item 00005</span>');
