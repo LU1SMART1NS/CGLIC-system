@@ -109,7 +109,7 @@ describe('quadro da reserva (Anexo)', () => {
 
   it('WhatsApp: numerado por beneficiário com o valor dele; sem título, ata, endereço nem notas; a definir no fim', () => {
     const t = textoParaWhatsapp(q);
-    expect(t.startsWith('📋 *Reserva CAEP/SENASP · 23/10/2026*\n⏳ *Enviar o ofício até 22/11/2026*\n\n1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
+    expect(t.startsWith('📋 *Reserva de itens · ComprasSusp/Senasp/MJSP · 23/10/2026*\n⏳ *Enviar o ofício até 22/11/2026*\n\n1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
     expect(t).toContain('2️⃣ *Corpo de Bombeiros Militar · CBMERJ* · RJ: *R$ 94.317,66*\n• 2 Drone\n\n');
     expect(t).toContain('3️⃣ *Beneficiário a definir*');
     for (const fora of ['Anexo I', 'Ata ', 'Rua X', 'IPCA', '¹']) expect(t).not.toContain(fora);
