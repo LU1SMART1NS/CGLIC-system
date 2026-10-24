@@ -310,11 +310,14 @@ export function htmlDaTabela(q: Quadro): string {
   );
 }
 
+/** Número em emoji (1️⃣, 1️⃣2️⃣): cada algarismo vira a tecla do WhatsApp. */
+export const numeroEmEmoji = (n: number): string => [...String(n)].map((d) => `${d}\uFE0F\u20E3`).join('');
+
 /**
- * Texto para o WhatsApp do parlamentar, organizado por beneficiário: nome e cidade, os itens com quantidade e valor,
- * o subtotal quando há mais de um item e, no fim, o total (por GND quando mistura investimento e custeio). Fica de fora
- * o que só serve à CAEP (ata, item, endereço, notas de cada preço): uma linha avisa que os valores têm a folga do
- * reajuste.
+ * Texto para o WhatsApp do parlamentar, organizado por beneficiário: número, nome, cidade e o valor do beneficiário
+ * (soma dos itens) na primeira linha; os itens embaixo, com o valor de cada um só quando há mais de um. No fim, o
+ * total (por GND quando mistura investimento e custeio). Fica de fora o que só serve à CAEP: título do Anexo, ata,
+ * item, endereço e notas de preço.
  */
 export function textoParaWhatsapp(q: Quadro): string {
   const porBeneficiario = new Map<string, LinhaQuadro[]>();
@@ -325,23 +328,18 @@ export function textoParaWhatsapp(q: Quadro): string {
   }
   // Quem ainda não tem beneficiário vai por último.
   const grupos = [...porBeneficiario.entries()].sort(([a], [b]) => Number(a === '') - Number(b === ''));
-  const blocos = grupos.map(([chave, ls]) => {
+  const blocos = grupos.map(([chave, ls], i) => {
     const l0 = ls[0];
+    const total = brl(centavos(ls.reduce((s, l) => s + l.total, 0)));
     // Nome e cidade na mesma linha: vários beneficiários têm o mesmo nome (Guarda Municipal) e só a cidade separa.
-    const cabecalho = chave ? `*${nomeComSigla(l0)}* · ${l0.entrega ?? 'entrega a definir'}` : '*Beneficiário a definir*';
-    const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}${l.kit ? ` (${l.kit})` : ''}: ${brl(l.total)}${l.quantidade > 1 ? ` (${brl(l.unitario)} cada)` : ''}`);
-    const subtotal = ls.length > 1 ? [`Subtotal: ${brl(centavos(ls.reduce((s, l) => s + l.total, 0)))}`] : [];
-    return [cabecalho, ...itens, ...subtotal].join('\n');
+    const quem = chave ? `*${nomeComSigla(l0)}* · ${l0.entrega ?? 'entrega a definir'}` : '*Beneficiário a definir*';
+    const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}${l.kit ? ` (${l.kit})` : ''}${ls.length > 1 ? `: ${brl(l.total)}` : ''}`);
+    return [`${numeroEmEmoji(i + 1)} ${quem}: *${total}*`, ...itens].join('\n');
   });
-  const comFolga = q.total !== q.totalHoje;
   return [
-    `*${q.titulo}*`,
-    q.subtitulo,
-    '',
     blocos.join('\n\n'),
     '',
     ...q.porGnd.map((g) => `${g.rotulo}: ${brl(g.total)}`),
-    `*Total a empenhar: ${brl(q.total)}*`,
-    ...(comFolga ? ['', '_Valores com a previsão de reajuste das atas (IPCA), para não faltar recurso no empenho._'] : [])
+    `💰 *Total: ${brl(q.total)}*`
   ].join('\n');
 }
