@@ -5,12 +5,14 @@ import { Tabs } from '../../design-system/components/Tabs';
 import { useToast } from '../../design-system/components/Toast';
 import { useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
 import { usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
-import { brl, COLUNAS, htmlParaSei, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
+import { ataEItem, brl, COLUNAS, htmlParaSei, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AutorEmenda } from '../../services/emendasService';
 
 const borda = '1px solid #000';
 const celula: React.CSSProperties = { border: borda, padding: '0.35rem 0.4rem', textAlign: 'center', verticalAlign: 'middle' };
+const celulaValor: React.CSSProperties = { ...celula, whiteSpace: 'nowrap' };
 const aDefinir: React.CSSProperties = { color: 'var(--color-text-muted, #64748b)' };
+const abaixo: React.CSSProperties = { fontWeight: 400, fontSize: '0.7rem', color: 'var(--color-text-secondary, #334155)' };
 const aviso: React.CSSProperties = {
   fontSize: '0.8rem',
   fontWeight: 600,
@@ -138,6 +140,11 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
           {quadro.semBeneficiario === 1 ? '1 linha sai' : `${quadro.semBeneficiario} linhas saem`} com o beneficiário “a definir”.
         </div>
       )}
+      {quadro.semEndereco > 0 && (
+        <div style={aviso} role="status" data-testid={`${testId}-sem-endereco`}>
+          {quadro.semEndereco === 1 ? '1 beneficiário está' : `${quadro.semEndereco} beneficiários estão`} sem endereço de entrega e sai só com a cidade: complete em Ajustes &gt; Beneficiários.
+        </div>
+      )}
       {quadro.semNomeCurto > 0 && (
         <div style={aviso} role="status" data-testid={`${testId}-sem-nome`}>
           {quadro.semNomeCurto === 1 ? '1 item está' : `${quadro.semNomeCurto} itens estão`} sem nome curto e sai com o começo da descrição do catálogo: informe em Itens e kits.
@@ -152,7 +159,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
       {aba === 'sei' ? (
         <div style={{ background: '#fff', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 8, padding: '0.9rem', overflowX: 'auto', fontFamily: 'Arial, Helvetica, sans-serif' }} data-testid={`${testId}-sei`}>
           <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.6rem' }}>{quadro.titulo}</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: 860 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: 760 }}>
             <thead>
               <tr>
                 {COLUNAS.map((h) => (
@@ -165,36 +172,48 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
             <tbody>
               {quadro.linhas.map((l, i) => (
                 <tr key={i}>
-                  <td style={{ ...celula, whiteSpace: 'nowrap' }}>{l.ata ?? '—'}</td>
-                  <td style={celula}>{l.item ?? '—'}</td>
-                  <td style={{ ...celula, fontWeight: 700 }}>
-                    {l.descricao}
-                    {l.kit && <div style={{ fontWeight: 400 }}>({l.kit})</div>}
-                  </td>
-                  <td style={{ ...celula, ...(l.beneficiario ? null : aDefinir) }}>{l.beneficiario ?? 'a definir'}</td>
-                  <td style={{ ...celula, ...(l.municipio ? null : aDefinir) }}>{l.municipio ?? 'a definir'}</td>
-                  <td style={celula}>{l.quantidade}</td>
                   <td style={celula}>
+                    <b>{l.descricao}</b>
+                    {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
+                    {l.kit && <div style={abaixo}>({l.kit})</div>}
+                  </td>
+                  <td style={celula}>
+                    {l.beneficiario ? (
+                      <>
+                        <b>{l.beneficiario}</b>
+                        {l.sigla && <> · <span style={{ whiteSpace: 'nowrap' }}>{l.sigla}</span></>}
+                        {l.razaoSocial && <div style={abaixo}>{l.razaoSocial}</div>}
+                      </>
+                    ) : (
+                      <span style={aDefinir}>a definir</span>
+                    )}
+                  </td>
+                  <td style={celula}>
+                    {l.entrega ? <b>{l.entrega}</b> : <span style={aDefinir}>a definir</span>}
+                    {l.endereco && <div style={abaixo}>{l.endereco}</div>}
+                  </td>
+                  <td style={celula}>{l.quantidade}</td>
+                  <td style={celulaValor}>
                     {brl(l.unitario)}
                     {l.marca && <sup>{l.marca}</sup>}
                     {l.unitario !== l.hoje && <div style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.75rem' }}>hoje {brl(l.hoje)}</div>}
                   </td>
-                  <td style={celula}>{brl(l.total)}</td>
+                  <td style={celulaValor}>{brl(l.total)}</td>
                 </tr>
               ))}
               {quadro.porGnd.map((g) => (
                 <tr key={g.rotulo}>
-                  <td colSpan={8} style={{ ...celula, textAlign: 'right', fontWeight: 700 }}>
+                  <td colSpan={COLUNAS.length - 1} style={{ ...celula, textAlign: 'right', fontWeight: 700 }}>
                     {g.rotulo}
                   </td>
-                  <td style={{ ...celula, fontWeight: 700 }}>{brl(g.total)}</td>
+                  <td style={{ ...celulaValor, fontWeight: 700 }}>{brl(g.total)}</td>
                 </tr>
               ))}
               <tr style={{ background: '#d9d9d9' }}>
-                <td colSpan={8} style={{ ...celula, fontWeight: 700, padding: '0.7rem 0.4rem' }}>
+                <td colSpan={COLUNAS.length - 1} style={{ ...celula, fontWeight: 700, padding: '0.7rem 0.4rem' }}>
                   TOTAL A EMPENHAR
                 </td>
-                <td style={{ ...celula, fontWeight: 700 }}>{brl(quadro.total)}</td>
+                <td style={{ ...celulaValor, fontWeight: 700 }}>{brl(quadro.total)}</td>
               </tr>
             </tbody>
           </table>
