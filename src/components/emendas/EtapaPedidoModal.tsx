@@ -7,10 +7,11 @@ import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
-import { atasDoPedido, documentoSeiDaEtapaValido, identificacaoDoPedido, itensDaLinha, linhasAtivas, numerosSei, ORDEM_ETAPA, rodadaDoPedido, valorDoPedido, type AtaDoPedido } from '../../utils/emendasPedidos';
+import { ataDoItem, atasDoPedido, documentoSeiDaEtapaValido, identificacaoDoPedido, itensDaLinha, linhasAtivas, numerosSei, ORDEM_ETAPA, rodadaDoPedido, solicitacaoDaLinha, valorDoPedido, type AtaDoPedido } from '../../utils/emendasPedidos';
 import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
 import { QuadroGabinete } from './QuadroGabinete';
-import type { AcaoPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
+import type { AcaoPedido, ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
+import { curto } from '../../utils/emendasKits';
 
 /**
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
@@ -133,6 +134,29 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const trocando = Boolean(contexto?.troca && contexto.numero);
   const ataDaJanela = atas.find((a) => a.ataKey === ataEscolhida);
   const [assinadaEm, setAssinadaEm] = useState('');
+  // Linhas que a solicitação cobre (migration 180): as da ata escolhida. Começam marcadas as que o documento já
+  // cobre (troca), todas (primeira solicitação da ata) ou as que ainda não têm solicitação (nova rodada).
+  const linhasDaAta = (ataKey: string): LinhaPedido[] => linhasAtivas(pedido).filter((l) => itensDaLinha(l).some((x) => ataDoItem(x.itemKey) === ataKey));
+  const marcadasIniciais = (ataKey: string): Set<string> => {
+    const da = linhasDaAta(ataKey);
+    const documento = contexto?.numero ? pedido.documentos.find((d) => d.etapa === 'AUTORIZACAO' && d.numero === contexto.numero) : undefined;
+    if (trocando && documento) {
+      const cobertas = da.filter((l) => solicitacaoDaLinha(pedido, l)?.numero === documento.numero);
+      return new Set((cobertas.length ? cobertas : da).map((l) => l.id));
+    }
+    const semSolicitacao = da.filter((l) => !solicitacaoDaLinha(pedido, l));
+    return new Set((semSolicitacao.length ? semSolicitacao : da).map((l) => l.id));
+  };
+  const [marcadas, setMarcadas] = useState<Set<string>>(() => marcadasIniciais(ataEscolhida));
+  const escolherAta = (ataKey: string) => {
+    setAtaEscolhida(ataKey);
+    setMarcadas(marcadasIniciais(ataKey));
+  };
+  const nomeDaLinha = (l: LinhaPedido): string => {
+    const i = l.itemKey ? itens.get(l.itemKey) : undefined;
+    const nome = l.tipo === 'KIT' ? `${l.kitNome ?? 'kit'} (kit)` : i?.nomeCurto?.trim() || curto(i?.descricao ?? l.itemKey ?? '', 48);
+    return `${l.quantidade} × ${nome}`;
+  };
   // Solicitação com várias atas: um número para cada uma.
   const [porAta, setPorAta] = useState<Record<string, string>>({});
   const toast = useToast();
@@ -184,6 +208,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   } else if (modo === 'SOLICITACAO_ATA') {
     if (!ataEscolhida) pendencias.push('a ata');
     if (!documentoSeiDaEtapaValido(numeroDaAta)) pendencias.push('documento SEI (um número, só números, 7 a 10 dígitos)');
+    if (marcadas.size === 0) pendencias.push('marcar pelo menos uma linha que a solicitação cobre');
   } else if (pedeSei && (numeros.length === 0 || numeros.some((n) => !documentoSeiDaEtapaValido(n)) || (!VARIOS.has(modo) && numeros.length > 1))) {
     pendencias.push(VARIOS.has(modo) ? 'documento SEI (só números, 7 a 10 dígitos; vários: separe por vírgula)' : 'documento SEI (um número, só números, 7 a 10 dígitos)');
   }
@@ -207,7 +232,8 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
           ataKey: ataEscolhida,
           documentoSei: numeroDaAta.replace(/\D/g, ''),
           assinadaEm: autorizado && assinadaEm ? assinadaEm : null,
-          substitui: trocando ? contexto!.numero! : null
+          substitui: trocando ? contexto!.numero! : null,
+          linhas: [...marcadas].map((linhaId) => ({ linhaId }))
         });
         toast.success(`Solicitação da ata ${ataEscolhida.split('-')[0]} registrada.`);
       } else if (variasAtas) {
@@ -313,7 +339,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 onChange={(e) => setNumeroDaAta(e.target.value)}
                 data-testid="emendas-etapa-sei-ata"
               />
-              <AppSelect label="Ata que ela cobre *" value={ataEscolhida} onChange={(e) => setAtaEscolhida(e.target.value)} disabled={trocando} data-testid="emendas-etapa-ata">
+              <AppSelect label="Ata que ela cobre *" value={ataEscolhida} onChange={(e) => escolherAta(e.target.value)} disabled={trocando} data-testid="emendas-etapa-ata">
                 {atas.map((a) => (
                   <option key={a.ataKey} value={a.ataKey}>
                     {rotuloDaAta(a)}
@@ -332,6 +358,36 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 />
               )}
             </div>
+            {ataDaJanela && (
+              <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }} data-testid="emendas-etapa-linhas-cobertas">
+                <legend style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                  Linhas que esta solicitação cobre * <span style={{ fontWeight: 500 }}>(a autorização de empenho lista os itens e as quantidades)</span>
+                </legend>
+                {linhasDaAta(ataDaJanela.ataKey).map((l) => {
+                  const outra = solicitacaoDaLinha(pedido, l);
+                  const deOutra = outra && outra.numero !== contexto?.numero ? outra.numero : null;
+                  return (
+                    <label key={l.id} style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', fontSize: '0.85rem', fontWeight: 600, padding: '0.35rem 0.6rem', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 6, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={marcadas.has(l.id)}
+                        onChange={(e) =>
+                          setMarcadas((m) => {
+                            const prox = new Set(m);
+                            if (e.target.checked) prox.add(l.id);
+                            else prox.delete(l.id);
+                            return prox;
+                          })
+                        }
+                        data-testid={`emendas-etapa-linha-${l.id}`}
+                      />
+                      <span style={{ flex: 1 }}>{nomeDaLinha(l)}</span>
+                      {deOutra && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>hoje na solicitação {deOutra}</span>}
+                    </label>
+                  );
+                })}
+              </fieldset>
+            )}
           </>
         )}
 

@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
+import { buildAtaItemPath } from '../../hooks/useAta';
 import { useSearchParams } from 'react-router-dom';
 import { Boxes } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
@@ -6,14 +8,13 @@ import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppButton } from '../../design-system/components/AppButton';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
-import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
-import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useKitsEmendas, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useItensCaep, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, rotuloItemDaAta } from '../../utils/emendasKits';
@@ -21,20 +22,12 @@ import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { notaDoPreco } from '../../utils/emendasQuadro';
 import { DadosItemModal } from './DadosItemModal';
-import { AUTOR_A_DEFINIR, identificacaoDoPedido, itensDaLinha, linhasAtivas, precoParaEmenda, ROTULO_ETAPA } from '../../utils/emendasPedidos';
-import type { EtapaPedido, ItemCaep } from '../../services/emendasService';
+import { itensDaLinha, linhasAtivas, precoParaEmenda } from '../../utils/emendasPedidos';
+import type { ItemCaep } from '../../services/emendasService';
 
 type Segmento = 'com' | 'sem' | 'encerrada' | 'todos';
-interface Uso {
-  pedidoId: string;
-  identificacao: string;
-  autorId: string | null;
-  etapa: EtapaPedido;
-  origem: string;
-  quantidade: number;
-}
-/** previsto/hoje: preço unitário para a emenda (o do quadro do parlamentar) e o de hoje; nota: por que mudou. */
-type Linha = ItemCaep & { reservado: number; saldo: number; usos: Uso[]; previsto: number; hoje: number; nota: string | null };
+/** previsto/hoje: preço unitário para a emenda (o do quadro do parlamentar) e o de hoje; nota: por que mudou. pedidos: quantos pedidos reservam o item. */
+type Linha = ItemCaep & { reservado: number; saldo: number; pedidos: number; previsto: number; hoje: number; nota: string | null };
 
 // Ordenação pelo cabeçalho, como nas carteiras (?ordem=); sem escolha, pela descrição do item.
 const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
@@ -50,20 +43,18 @@ const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
 interface Props {
   /** Seletor Por item · Por kit da aba Itens e kits, no cabeçalho. */
   seletor?: React.ReactNode;
-  /** Item que já chega aberto (vindo da composição de um kit). */
+  /** Item que chega filtrado (vindo da composição de um kit). */
   abrir?: string | null;
-  onAbrirKit?: (kitId: string) => void;
 }
 
 /**
  * Itens e kits › Por item (migration 157): todos os itens com alocação para a CAEP, quanto já está reservado nos pedidos
- * (kits abertos) e o saldo a oferecer.
+ * (kits abertos) e o saldo a oferecer. A linha inteira abre o Item 360 na aba Emendas, que mostra quem reservou, em que
+ * fase está cada pedido e em quais kits o item entra (decisão de 24/10/2026: a lista é só o saldo).
  */
-export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit }) => {
+export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
   const { data: itens = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useItensCaep();
   const { data: pedidos = [], refetch: recarregarPedidos } = usePedidosEmendas();
-  const { data: autores = [] } = useAutoresEmendas();
-  const { data: kits = [] } = useKitsEmendas();
   const hoje = hojeEmBrasilia();
   const { precos, ipca } = usePrecosParaEmenda();
   const [segmento, setSegmento] = useState<Segmento>('com');
@@ -72,27 +63,25 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
   const [busca, setBusca] = useState(() => searchParams.get('busca') ?? '');
   const podeGerir = usePodeGerirEmendas();
   const [editando, setEditando] = useState<ItemCaep | null>(null);
-  const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(abrir ? [abrir] : []));
+  const navigate = useNavigateWithOrigin();
 
-  const nomeAutor = useMemo(() => new Map(autores.map((a) => [a.id, a.nome])), [autores]);
   const linhas: Linha[] = useMemo(() => {
-    const usos = new Map<string, Uso[]>();
+    const reservado = new Map<string, number>();
+    const pedidosDoItem = new Map<string, Set<string>>();
     for (const p of pedidos) {
       if (p.etapa === 'CANCELADO') continue;
       for (const l of linhasAtivas(p)) {
         for (const x of itensDaLinha(l)) {
-          const lista = usos.get(x.itemKey) ?? [];
-          lista.push({ pedidoId: p.id, identificacao: identificacaoDoPedido(p), autorId: p.autorId, etapa: p.etapa, origem: l.tipo === 'KIT' ? `${l.kitNome} × ${l.quantidade}` : 'avulso', quantidade: x.quantidade });
-          usos.set(x.itemKey, lista);
+          reservado.set(x.itemKey, (reservado.get(x.itemKey) ?? 0) + x.quantidade);
+          pedidosDoItem.set(x.itemKey, (pedidosDoItem.get(x.itemKey) ?? new Set()).add(p.id));
         }
       }
     }
     const porChave = new Map(itens.map((i) => [i.itemKey, i]));
     return itens.map((i) => {
-      const u = (usos.get(i.itemKey) ?? []).sort((a, b) => b.quantidade - a.quantidade);
-      const reservado = u.reduce((s, x) => s + x.quantidade, 0);
+      const r = reservado.get(i.itemKey) ?? 0;
       const preco = precoParaEmenda(i.itemKey, porChave, precos);
-      return { ...i, reservado, saldo: i.alocado - reservado, usos: u, previsto: preco.previsto, hoje: preco.hoje, nota: notaDoPreco(preco.preco, ipca) };
+      return { ...i, reservado: r, saldo: i.alocado - r, pedidos: pedidosDoItem.get(i.itemKey)?.size ?? 0, previsto: preco.previsto, hoje: preco.hoje, nota: notaDoPreco(preco.preco, ipca) };
     });
   }, [itens, pedidos, precos, ipca]);
 
@@ -110,23 +99,15 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
   // O alocado é o que a CAEP tem hoje (preço de hoje); o reservado vai para as emendas (preço previsto, o do quadro).
   const valorAlocado = vigentes.reduce((s, l) => s + l.alocado * l.hoje, 0);
   const valorReservado = vigentes.reduce((s, l) => s + Math.min(l.reservado, l.alocado) * l.previsto, 0);
-  const kitsDoItem = (k: string) => kits.filter((x) => x.ativo && x.itens.some((i) => i.itemKey === k));
 
-  // Vindo do kit: o trilho vai para a situação do item e a linha aberta entra na tela.
+  // Vindo do kit: o trilho vai para a situação do item e a busca deixa só ele.
   const alvo = abrir ? linhas.find((l) => l.itemKey === abrir) : undefined;
   useEffect(() => {
     if (!alvo) return;
     setSegmento(situacao(alvo));
-    requestAnimationFrame(() => document.querySelector(`[data-testid="emendas-item-detalhe-${CSS.escape(alvo.itemKey)}"]`)?.scrollIntoView({ block: 'center' }));
+    setBusca(`${alvo.numeroAta} item ${Number(alvo.numeroItem)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvo?.itemKey]);
-  const alternar = (k: string) =>
-    setAbertos((atual) => {
-      const novo = new Set(atual);
-      if (novo.has(k)) novo.delete(k);
-      else novo.add(k);
-      return novo;
-    });
 
   const colunas: Column<Linha>[] = [
     {
@@ -169,6 +150,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
       render: (l) => (
         <>
           <div style={carteiraNumero}>{formatNumber(l.reservado)}</div>
+          {l.pedidos > 0 && <div style={carteiraDetalhe}>{l.pedidos === 1 ? '1 pedido' : `${l.pedidos} pedidos`}</div>}
           <div style={{ height: 6, borderRadius: 3, background: '#f1f5f9', marginTop: 4, overflow: 'hidden', minWidth: 80 }} aria-hidden="true">
             <div style={{ height: '100%', width: `${l.alocado > 0 ? Math.min(100, (l.reservado / l.alocado) * 100) : 0}%`, background: 'var(--primary)' }} />
           </div>
@@ -192,7 +174,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
       <PageHeader
         title="Itens e kits"
         subtitle="Quanto de cada item alocado à CAEP já foi reservado a parlamentares."
-        hint="Reservado soma os pedidos que não foram cancelados, em qualquer etapa, com os kits abertos nos seus itens. Saldo = alocado à CAEP − reservado. O valor unitário é o previsto para a emenda, com o reajuste da ata (o mesmo do quadro do parlamentar); embaixo, o preço de hoje. Para ter mais de um item, peça a alocação ao gestor de saldo. Clique na linha para ver quem reservou e em quais kits o item entra."
+        hint="Reservado soma os pedidos que não foram cancelados, em qualquer etapa, com os kits abertos nos seus itens. Saldo = alocado à CAEP − reservado. O valor unitário é o previsto para a emenda, com o reajuste da ata (o mesmo do quadro do parlamentar); embaixo, o preço de hoje. Para ter mais de um item, peça a alocação ao gestor de saldo. Clique na linha para abrir o item na aba Emendas: quem reservou, em que fase está cada pedido e em quais kits o item entra."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={seletor}
         actions={<HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />}
@@ -242,49 +224,12 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
           onSort={toggle}
           rowStyle={(l) => (l.ataEncerrada ? { opacity: 0.7 } : undefined)}
           columns={colunas}
-          expandedKeys={abertos}
-          onToggleExpand={alternar}
+          rowOpen={(l) => () => navigate(`${buildAtaItemPath(l.numeroAta, l.codigoUasg, l.numeroItem)}?aba=emendas`)}
           rowActions={
             podeGerir
               ? (l) => <ActionButton action="editar" iconOnly label={`Nome curto e GND de ${l.nomeCurto ?? rotuloItemDaAta(l)}`} onClick={() => setEditando(l)} data-testid={`emendas-itens-dados-${l.itemKey}`} />
               : undefined
           }
-          renderExpanded={(l) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.4rem 0' }} data-testid={`emendas-item-detalhe-${l.itemKey}`}>
-              {l.usos.length === 0 ? (
-                <div style={carteiraSubtitle}>Ninguém reservou este item ainda.</div>
-              ) : (
-                <DataTable<Uso>
-                  testId={`emendas-item-usos-${l.itemKey}`}
-                  data={l.usos}
-                  keyExtractor={(u) => `${u.pedidoId}-${u.origem}`}
-                  columns={[
-                    { key: 'autor', header: 'Autor', priority: 'primary', render: (u) => <span style={carteiraIdentificacao}>{u.autorId ? nomeAutor.get(u.autorId) ?? u.autorId : AUTOR_A_DEFINIR}</span> },
-                    { key: 'pedido', header: 'Reserva / ofício', nowrap: true, render: (u) => u.identificacao },
-                    { key: 'origem', header: 'Origem', render: (u) => (u.origem === 'avulso' ? 'Avulso' : /^kit\b/i.test(u.origem) ? u.origem : `Kit ${u.origem}`) },
-                    { key: 'etapa', header: 'Etapa', nowrap: true, render: (u) => ROTULO_ETAPA[u.etapa] },
-                    { key: 'qtd', header: 'Quantidade', align: 'right', nowrap: true, render: (u) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(u.quantidade)}</span> }
-                  ]}
-                />
-              )}
-              {kitsDoItem(l.itemKey).length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={carteiraSubtitle}>Entra nos kits:</span>
-                  {kitsDoItem(l.itemKey).map((k) =>
-                    onAbrirKit ? (
-                      <AppButton key={k.id} type="button" variant="link" size="sm" onClick={() => onAbrirKit(k.id)} data-testid={`emendas-item-abrir-kit-${k.id}`}>
-                        {k.nome}
-                      </AppButton>
-                    ) : (
-                      <span key={k.id} style={carteiraValor}>
-                        {k.nome}
-                      </span>
-                    )
-                  )}
-                </div>
-              )}
-            </div>
-          )}
         />
       </AdminListShell>
 

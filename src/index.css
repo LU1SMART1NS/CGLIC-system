@@ -1921,6 +1921,30 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-etapa__devolucoes summary { cursor: pointer; color: var(--primary); font-weight: 700; }
 .emendas-etapa__devolucoes ul { list-style: none; margin: 0.35rem 0 0; padding: 0 0 0 0.6rem; border-left: 2px solid #e2e8f0; display: flex; flex-direction: column; gap: 0.45rem; color: #475569; }
 
+/* Pedido aberto (migration 180): blocos por ata que recolhem, a lista "O que falta" e a etiqueta "Só este pedido" */
+.emendas-bloco-ata { border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; overflow: hidden; }
+.emendas-bloco-ata--pend { border-color: var(--color-warning-text); }
+.emendas-bloco-ata__cab { all: unset; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.7rem; width: 100%; padding: 0.5rem 0.7rem; background: #f8fafc; font-size: 0.82rem; color: #334155; cursor: pointer; }
+.emendas-bloco-ata__cab:hover { background: #f1f5f9; }
+.emendas-bloco-ata__cab:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; }
+.emendas-bloco-ata__nome { flex: 1 1 240px; min-width: 0; }
+.emendas-bloco-ata__ata { font-weight: 800; color: var(--primary); text-decoration: none; }
+.emendas-bloco-ata__ata:hover { text-decoration: underline; }
+.emendas-bloco-ata__forn { color: #64748b; }
+.emendas-bloco-ata__num { font-size: 0.78rem; color: #64748b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.emendas-bloco-ata__sit { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
+.emendas-bloco-ata__corpo { display: flex; flex-direction: column; }
+.emendas-bloco-ata__sols { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; padding: 0.4rem 0.7rem; border-top: 1px solid #e2e8f0; font-size: 0.78rem; color: #475569; }
+.emendas-bloco-ata__sol { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.4rem; }
+.emendas-falta { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
+.emendas-falta__topo { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.emendas-falta__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.emendas-falta__item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem 0.6rem; padding: 0.2rem 0 0.2rem 0.6rem; border-left: 3px solid #e2e8f0; }
+.emendas-falta__item--acao { border-color: var(--primary); }
+.emendas-falta__item--atencao { border-color: var(--color-warning-text); }
+.emendas-falta__item--espera { border-color: #94a3b8; }
+.emendas-falta__titulo { font-size: 0.84rem; font-weight: 700; color: #0f172a; }
+
 /* Aba Reajuste da Ata 360: linha do tempo do Termo de Conformidade ao limite de 2 anos da ata. Rola no celular. */
 .reaj-tempo-caixa { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); overflow-x: auto; }
 .reaj-tempo { position: relative; min-width: 760px; height: 150px; margin: 0 64px; }

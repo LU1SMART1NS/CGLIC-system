@@ -88,6 +88,7 @@ import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOr
 import { adesoesDaSenasp, papelDoItem } from '../utils/quantitativosOutroOrgao';
 import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
 import { AdesoesTab } from './item-balances/AdesoesTab';
+import { EmendasDoItemTab } from './item-balances/EmendasDoItemTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract, UnidadeItemRecord } from '../types';
@@ -107,6 +108,10 @@ interface ItemBalancesProps {
 const ITEM_TABS: ItemTab[] = ['quantitativos', 'contratos', 'adesoes'];
 // Gestor de saldo não vê contratos: fica com os quantitativos (empenhado por unidade incluído) e as adesões.
 const SALDOS_ITEM_TABS: ItemTab[] = ['quantitativos', 'adesoes'];
+/** Unidade interna das emendas (unidade_das_emendas() no banco): com alocação a ela, o item ganha a aba Emendas. */
+const UNIDADE_DAS_EMENDAS = 'CAEP';
+/** Perfis que leem as emendas (emendas.view: migrations 155 e 180). */
+const LEEM_EMENDAS = new Set(['admin', 'gestor_emendas', 'gestor_saldos', 'leitor']);
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 const EMPTY_UNIDADES: UnidadeItemRecord[] = [];
@@ -147,8 +152,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const navigate = useNavigateWithOrigin();
   const { role } = useAuth();
   const verContratos = !semContratos(role);
+  // Aba Emendas (decisão de 24/10/2026): só em item com alocação à CAEP, para quem lê as emendas.
+  const alocacoesParaAba = useItemAllocations(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
+  const temCaep = Boolean(alocacoesParaAba.data?.allocations.some((a) => a.unitName === UNIDADE_DAS_EMENDAS && a.allocatedQty > 0));
+  const comEmendas = temCaep && Boolean(role) && LEEM_EMENDAS.has(role as string);
+  const abasDoItem = useMemo<ItemTab[]>(() => [...(verContratos ? ITEM_TABS : SALDOS_ITEM_TABS), ...(comEmendas ? (['emendas'] as ItemTab[]) : [])], [verContratos, comEmendas]);
   const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
-    tabs: verContratos ? ITEM_TABS : SALDOS_ITEM_TABS,
+    tabs: abasDoItem,
     defaultTab: 'quantitativos',
     // Órgãos participantes e Alocação interna viraram a aba Órgãos e quantitativos (migration 109).
     aliases: { empenhos: 'contratos', unidades: 'quantitativos', alocacao: 'quantitativos' }
@@ -772,7 +782,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         tabs={[
           { id: 'quantitativos', label: 'Órgãos e quantitativos' },
           ...(verContratos ? [{ id: 'contratos' as const, label: `Contratos e empenhos (${contractsCount})` }] : []),
-          { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` }
+          { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` },
+          ...(comEmendas ? [{ id: 'emendas' as const, label: 'Emendas' }] : [])
         ]}
         active={activeTab}
         onSelect={(tab) => setActiveTab(tab)}
@@ -1209,6 +1220,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                 </div>
               )}
           </div>
+        ) : activeTab === 'emendas' ? (
+          <EmendasDoItemTab itemKey={canonicalItemKey} podeVerContratos={verContratos} />
         ) : (
           <AdesoesTab
             adesoesLoading={adesoesLoading || loading}

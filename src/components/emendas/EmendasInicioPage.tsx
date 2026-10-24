@@ -189,7 +189,7 @@ export const EmendasInicioPage: React.FC = () => {
       minWidth: '240px',
       sortValue: ordem.item.value,
       render: (x) => {
-        if (x.itemDoAviso) return <ItemDaAta item={x.itemDoAviso} />;
+        if (x.itemDoAviso) return <ItemDaAta item={x.itemDoAviso} comLinks />;
         const ativas = linhasAtivas(x.pedido);
         const primeiro = itemDaLinha(x);
         return (
@@ -209,7 +209,7 @@ export const EmendasInicioPage: React.FC = () => {
   ];
 
   const colunasLivre: Column<ItemLivrePertoDoFim>[] = [
-    { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (x) => x.item.descricao, render: (x) => <ItemDaAta item={x.item} /> },
+    { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (x) => x.item.descricao, render: (x) => <ItemDaAta item={x.item} comLinks /> },
     { key: 'livre', header: 'Livre', align: 'right', nowrap: true, sortValue: (x) => x.livre, sortFirstDir: 'desc', render: (x) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(x.livre)}</span> },
     { key: 'alocado', header: 'Alocado', align: 'right', nowrap: true, sortValue: (x) => x.item.alocado, sortFirstDir: 'desc', render: (x) => <span style={carteiraNumero}>{formatNumber(x.item.alocado)}</span> },
     {
@@ -241,7 +241,7 @@ export const EmendasInicioPage: React.FC = () => {
   ];
 
   const colunasSemNome: Column<ItemCaep>[] = [
-    { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (i) => i.descricao, render: (i) => <ItemDaAta item={i} /> },
+    { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (i) => i.descricao, render: (i) => <ItemDaAta item={i} comLinks /> },
     {
       key: 'quadro',
       header: 'Sai no quadro hoje',

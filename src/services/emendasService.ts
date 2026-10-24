@@ -504,14 +504,23 @@ export interface LinhaPedido {
 /** Etapa dos documentos SEI do pedido (migration 177): AUTORIZACAO é a solicitação de empenho, que a DGFNSP assina. */
 export type EtapaDoDocumento = 'OFICIO' | 'AUTORIZACAO' | 'CGOFI' | 'EMPENHO' | 'CONTRATACAO';
 
+/** Linha do pedido que uma solicitação de empenho cobre, com a quantidade (migration 180). */
+export interface LinhaDaSolicitacao {
+  linhaId: string;
+  quantidade: number;
+}
+
 /** Um documento SEI de uma etapa do pedido: o número e a data que o gestor informa (migrations 177 e 178). */
 export interface DocumentoSeiDoPedido {
+  id: string;
   etapa: EtapaDoDocumento;
   numero: string;
   data: string | null;
   /** Só na solicitação: a ata que ela cobre e o dia em que a Diretora do FNSP assinou. */
   ataKey: string | null;
   assinadaEm: string | null;
+  /** Só na solicitação: as linhas do pedido que ela cobre (migration 180). */
+  linhas: LinhaDaSolicitacao[];
 }
 
 /** Tentativa devolvida: a minuta e o ofício com divergência (migration 174). */
@@ -584,24 +593,34 @@ export interface PedidoEmenda {
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes, documentos] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
     // Só o que o gestor informa: a hora e quem assinou, lidos no SEI uma vez, não aparecem nas telas.
     lerTodasAsPaginas<Record<string, any>>((de, ate) =>
       db().from('emenda_pedido_documentos_sei').select('id, pedido_id, etapa, documento_sei, data_documento, ata_key, assinado_em').order('id').range(de, ate)
-    )
+    ),
+    // Linhas que cada solicitação cobre (migration 180). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_solicitacao_linhas').select('documento_id, linha_id, quantidade').order('linha_id').range(de, ate)).catch(() => [])
   ]);
+  const linhasPorDocumento = new Map<string, LinhaDaSolicitacao[]>();
+  for (const s of solicitacaoLinhas) {
+    const lista = linhasPorDocumento.get(s.documento_id) ?? [];
+    lista.push({ linhaId: s.linha_id, quantidade: num(s.quantidade) });
+    linhasPorDocumento.set(s.documento_id, lista);
+  }
   const documentosPorPedido = new Map<string, DocumentoSeiDoPedido[]>();
   for (const d of documentos) {
     const lista = documentosPorPedido.get(d.pedido_id) ?? [];
     lista.push({
+      id: d.id,
       etapa: d.etapa,
       numero: d.documento_sei,
       data: d.data_documento ?? null,
       ataKey: d.ata_key ?? null,
-      assinadaEm: d.assinado_em ? diaEmBrasilia(d.assinado_em) : null
+      assinadaEm: d.assinado_em ? diaEmBrasilia(d.assinado_em) : null,
+      linhas: linhasPorDocumento.get(d.id) ?? []
     });
     documentosPorPedido.set(d.pedido_id, lista);
   }
@@ -743,17 +762,26 @@ export async function avancarPedidoEmenda(id: string, versao: number, acao: Acao
 const diaEmBrasilia = (instante: string): string => new Date(instante).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
 /**
- * Solicitação de autorização de empenho de uma ata do pedido (migrations 178 e 179): o número SEI e, se a Diretora do
- * FNSP já assinou, o dia. Com `substitui`, troca essa solicitação da ata; sem ele, entra a mais (nova rodada). O banco
- * recusa número já ligado a outra ata.
+ * Solicitação de autorização de empenho de uma ata do pedido (migrations 178 a 180): o número SEI, se a Diretora do
+ * FNSP já assinou, o dia, e as linhas do pedido que ela cobre. Com `substitui`, troca essa solicitação da ata (a nova
+ * herda as linhas); sem ele, entra a mais (nova rodada). Sem `linhas`, a solicitação única da ata cobre todas as
+ * linhas da ata. O banco recusa número já ligado a outra ata e linha de outra ata.
  */
-export async function informarSolicitacaoDaAta(v: { pedidoId: string; ataKey: string; documentoSei: string; assinadaEm: string | null; substitui?: string | null }): Promise<void> {
+export async function informarSolicitacaoDaAta(v: {
+  pedidoId: string;
+  ataKey: string;
+  documentoSei: string;
+  assinadaEm: string | null;
+  substitui?: string | null;
+  linhas?: Array<{ linhaId: string; quantidade?: number }> | null;
+}): Promise<void> {
   const { error } = await db().rpc('informar_solicitacao_da_ata', {
     p_id: v.pedidoId,
     p_ata: v.ataKey,
     p_documento_sei: v.documentoSei,
     p_assinada_em: v.assinadaEm,
-    p_substitui: v.substitui ?? null
+    p_substitui: v.substitui ?? null,
+    p_linhas: v.linhas ? v.linhas.map((l) => ({ linha_id: l.linhaId, quantidade: l.quantidade ?? null })) : null
   });
   if (error) throw new Error(mensagemDoBanco(error));
 }

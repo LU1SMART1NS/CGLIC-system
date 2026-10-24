@@ -20,7 +20,7 @@ import { ataDeOutroOrgao, chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { useEyebrowDaGerenciadora } from '../../hooks/useCadastroUasgs';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 
-export type ItemTab = 'quantitativos' | 'contratos' | 'adesoes';
+export type ItemTab = 'quantitativos' | 'contratos' | 'adesoes' | 'emendas';
 
 export interface ItemHeroMetrics {
   officialSaldo: number;

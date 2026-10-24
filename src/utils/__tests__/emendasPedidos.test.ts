@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, documentosDaEtapa, intervaloDeDatas, itensDaLinha, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, rodadaDoPedido, seiDaEtapa, solicitacoesSemAta, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import type { NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
@@ -242,7 +243,7 @@ describe('uma solicitação de empenho para cada ata (migration 178)', () => {
     linha({ tipo: 'KIT', itemKey: null, kitId: 'k', kitComposicao: [{ itemKey: `${A}-00002`, quantidade: 1 }, { itemKey: `${B}-00001`, quantidade: 1 }], quantidade: 3 }),
     linha({ itemKey: '00018/2025-200331-00002', quantidade: 1, cancelada: true })
   ];
-  const doc = (numero: string, ataKey: string | null, assinadaEm: string | null = null) => ({ etapa: 'AUTORIZACAO' as const, numero, data: '2026-09-23', ataKey, assinadaEm });
+  const doc = (numero: string, ataKey: string | null, assinadaEm: string | null = null) => ({ id: numero, linhas: [], etapa: 'AUTORIZACAO' as const, numero, data: '2026-09-23', ataKey, assinadaEm });
 
   it('as atas vêm das linhas ativas e dos kits, com fornecedor, itens somados e a situação de cada solicitação', () => {
     const p = pedido({ etapa: 'AUTORIZADO', linhas, documentos: [doc('37098929', A, '2026-09-24')] });
@@ -290,8 +291,8 @@ describe('uma solicitação de empenho para cada ata (migration 178)', () => {
       contratacaoEm: '2026-10-20',
       contratacaoDocumentosSei: ['37262327'],
       documentos: [
-        { etapa: 'CONTRATACAO', numero: '37262155', data: '2026-10-15', ataKey: null, assinadaEm: null },
-        { etapa: 'CONTRATACAO', numero: '37262327', data: '2026-10-20', ataKey: null, assinadaEm: null }
+        { id: '37262155', linhas: [], etapa: 'CONTRATACAO', numero: '37262155', data: '2026-10-15', ataKey: null, assinadaEm: null },
+        { id: '37262327', linhas: [], etapa: 'CONTRATACAO', numero: '37262327', data: '2026-10-20', ataKey: null, assinadaEm: null }
       ],
       linhas: [linha({ despachoDocumentoSei: '36000001' })]
     });
@@ -308,5 +309,73 @@ describe('uma solicitação de empenho para cada ata (migration 178)', () => {
     expect(intervaloDeDatas(['2025-12-30', '2026-01-02'])).toBe('30/12/2025 a 02/01/2026');
     expect(intervaloDeDatas(['2026-09-24'])).toBe('24/09/2026');
     expect(intervaloDeDatas([null])).toBeNull();
+  });
+});
+
+describe('situação por linha (migration 180): a solicitação cobre itens de uma ata e cada linha anda no seu ritmo', () => {
+  const A = '00031/2025-200331';
+  const B = '00048/2025-200331';
+  const l1 = linha({ id: 'l1', itemKey: `${A}-00001`, quantidade: 8 });
+  const l2 = linha({ id: 'l2', itemKey: `${A}-00001`, quantidade: 3 });
+  const l3 = linha({ id: 'l3', itemKey: `${B}-00001`, quantidade: 5 });
+  const doc = (id: string, numero: string, ataKey: string, assinadaEm: string | null, linhas: string[]) => ({ id, etapa: 'AUTORIZACAO' as const, numero, data: '2026-09-23', ataKey, assinadaEm, linhas: linhas.map((linhaId) => ({ linhaId, quantidade: 1 })) });
+  const semNotas = new Map<string, NotaDaLinha>();
+  const nota = (linhaId: string, n: string | null, contractKey: string | null): NotaDaLinha => ({ linhaId, nota: n, regra: n ? 'SEI' : null, motivo: n ? null : 'CONTRATO_SEM_NOTA', contractKey, empenhoId: n ? 'e' : null, valorEmpenhado: null, valorLiquidado: null, valorPago: null, entregaPrevista: null, entregaPrevistaValor: null, atualizadoEm: null });
+
+  it('antes da solicitação, a situação é a etapa do pedido', () => {
+    expect(situacaoDaLinha(pedido({ etapa: 'OFICIO', linhas: [l1] }), l1, semNotas)).toMatchObject({ situacao: 'ANTES', rotulo: 'Ofício recebido' });
+  });
+
+  it('a linha sabe qual solicitação a cobre: pela ligação gravada ou pela solicitação única da ata', () => {
+    const p = pedido({ etapa: 'AUTORIZADO', linhas: [l1, l2, l3], documentos: [doc('d1', '37098929', A, '2026-09-24', ['l1']), doc('d2', '37099000', A, null, []), doc('d3', '37104393', B, '2026-09-24', [])] });
+    expect(situacaoDaLinha(p, l1, semNotas)).toMatchObject({ situacao: 'AUTORIZADO', solicitacao: { numero: '37098929' } });
+    // l2: a ata tem duas solicitações e nenhuma a cobre → a informar.
+    expect(situacaoDaLinha(p, l2, semNotas)).toMatchObject({ situacao: 'SOLICITACAO_A_INFORMAR', pendente: true });
+    // l3: a ata B tem uma solicitação só → ela cobre a linha mesmo sem ligação gravada.
+    expect(situacaoDaLinha(p, l3, semNotas)).toMatchObject({ situacao: 'AUTORIZADO', solicitacao: { numero: '37104393' } });
+    const comL2 = pedido({ ...p, documentos: [doc('d1', '37098929', A, '2026-09-24', ['l1']), doc('d2', '37099000', A, null, ['l2']), doc('d3', '37104393', B, '2026-09-24', [])] });
+    expect(situacaoDaLinha(comL2, l2, semNotas)).toMatchObject({ situacao: 'AGUARDANDO_ASSINATURA', detalhe: 'solicitação 37099000 na DGFNSP' });
+  });
+
+  it('depois do empenho: na CGOFI, empenhada (com ou sem nota ligada), na CCGA e contratada', () => {
+    const docs = [doc('d1', '37098929', A, '2026-09-24', []), doc('d3', '37104393', B, '2026-09-24', [])];
+    expect(situacaoDaLinha(pedido({ etapa: 'CGOFI', linhas: [l1, l3], documentos: docs }), l1, semNotas).situacao).toBe('NA_CGOFI');
+    const emp = pedido({ etapa: 'EMPENHADO', linhas: [l1, l3], documentos: docs });
+    expect(situacaoDaLinha(emp, l1, semNotas)).toMatchObject({ situacao: 'EMPENHADO', pendente: true });
+    expect(situacaoDaLinha(emp, l1, new Map([['l1', nota('l1', '2026NE000115', null)]]))).toMatchObject({ situacao: 'EMPENHADO', pendente: false, detalhe: 'NE 2026NE000115 ligada · aguarda o envio à CCGA' });
+    const ccga = pedido({ etapa: 'CONTRATACAO', linhas: [l1, l3], documentos: docs });
+    const notas = new Map([['l1', nota('l1', '2026NE000115', '200331-00138-2026')], ['l3', nota('l3', null, null)]]);
+    expect(situacaoDaLinha(ccga, l1, notas)).toMatchObject({ situacao: 'CONTRATADO', rotulo: 'Contratado · 00138/2026', pendente: false });
+    expect(situacaoDaLinha(ccga, l3, notas)).toMatchObject({ situacao: 'NA_CCGA', pendente: true });
+    const r = resumoDasLinhas(ccga, notas);
+    expect(r.texto).toBe('1 na CCGA · 1 contratada');
+    expect([r.divergem, r.maisAtrasada]).toEqual([true, 'NA_CCGA']);
+  });
+
+  it('as linhas se agrupam por ata, com o fornecedor e as solicitações da ata; kits ficam à parte', () => {
+    const kit = linha({ id: 'k', tipo: 'KIT', itemKey: null, kitId: 'kit', kitNome: 'Kit', kitComposicao: [{ itemKey: `${A}-00001`, quantidade: 1 }], quantidade: 2 });
+    const catalogo = new Map([item(`${A}-00001`, { fornecedor: 'FORNECEDOR A' }), item(`${B}-00001`, { numeroAta: '00048/2025', fornecedor: 'FORNECEDOR B' })].map((i) => [i.itemKey, i]));
+    const g = linhasPorAta(pedido({ etapa: 'AUTORIZADO', linhas: [l3, l1, kit], documentos: [doc('d1', '37098929', A, '2026-09-24', [])] }), catalogo);
+    expect(g.map((x) => [x.chave, x.linhas.map((l) => l.id), x.fornecedor, x.solicitacoes.length])).toEqual([
+      [A, ['l1'], 'FORNECEDOR A', 1],
+      [B, ['l3'], 'FORNECEDOR B', 0],
+      ['KITS', ['k'], null, 0]
+    ]);
+  });
+
+  it('O que falta: o próximo passo, a solicitação que falta, a assinatura, as linhas a marcar, o beneficiário e a nota a ligar', () => {
+    const catalogo = new Map([item(`${A}-00001`), item(`${B}-00001`, { numeroAta: '00048/2025' })].map((i) => [i.itemKey, i]));
+    const p = pedido({ etapa: 'AUTORIZADO', linhas: [l1, l2, l3], documentos: [doc('d1', '37098929', A, '2026-09-24', ['l1']), doc('d2', '37099000', A, null, [])] });
+    const t = tarefasDoPedido(p, catalogo, semNotas, HOJE, true);
+    expect(t.map((x) => x.chave)).toEqual(['proxima', `sol-${B}`, 'ass-37099000', `marcar-${A}`, 'beneficiario']);
+    expect(t[0]).toMatchObject({ titulo: 'Registrar o envio à CGOFI', tom: 'acao', botao: { tipo: 'proxima' } });
+    expect(t[1].botao).toMatchObject({ tipo: 'solicitacao', ataKey: B });
+    expect(t[2].botao).toMatchObject({ tipo: 'solicitacao', ataKey: A, numero: '37099000', troca: true });
+    expect(t[4].botao).toMatchObject({ tipo: 'alterar' });
+    const emp = pedido({ etapa: 'EMPENHADO', linhas: [l1], documentos: [doc('d1', '37098929', A, '2026-09-24', ['l1'])] });
+    const te = tarefasDoPedido(emp, catalogo, semNotas, HOJE, true);
+    expect(te.map((x) => [x.chave, x.tom])).toEqual([['proxima', 'acao'], ['beneficiario', 'atencao'], ['semNota', 'espera']]);
+    // Quem não gere não tem os botões, mas vê as tarefas.
+    expect(tarefasDoPedido(p, catalogo, semNotas, HOJE, false).find((x) => x.chave === 'beneficiario')?.botao).toBeUndefined();
   });
 });

@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { buildAtaItemPath, buildAtaPath } from '../../hooks/useAta';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { carteiraDescricaoItem, carteiraDetalhe, carteiraFornecedor, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
-import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ROTULO_MOTIVO_SEM_NOTA, ROTULO_REGRA_DA_NOTA, type ExecucaoDoPedido } from '../../utils/emendasPedidos';
+import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ORDEM_SITUACAO_LINHA, ROTULO_MOTIVO_SEM_NOTA, ROTULO_REGRA_DA_NOTA, type ExecucaoDoPedido, type SituacaoDaLinha } from '../../utils/emendasPedidos';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { formatCurrency } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
@@ -39,24 +40,53 @@ export const AutorDoPedido: React.FC<{ autor: AutorEmenda | undefined; autorId: 
 
 const ataEmCinza: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 700 };
 
-/** Célula do item igual à Carteira de Itens: "00001 · Ata 00031/2025" e a descrição em até 2 linhas. */
-export const ItemDaAta: React.FC<{ item: Pick<ItemCaep, 'numeroAta' | 'numeroItem' | 'descricao' | 'codigoUasg'> | null | undefined; semItem?: string; extra?: React.ReactNode }> = ({ item, semItem, extra }) => (
-  <>
-    {item && (
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
-        <span style={carteiraIdentificacao}>{String(item.numeroItem).padStart(5, '0')}</span>
-        <span style={ataEmCinza}>·</span>
-        <span style={ataEmCinza} title={`UASG ${item.codigoUasg}`}>
-          Ata {item.numeroAta}
-        </span>
-        {extra}
+/**
+ * Célula do item igual à Carteira de Itens: "00001 · Ata 00031/2025" e a descrição em até 2 linhas. Com `comLinks`, o
+ * número do item abre o Item 360 na aba Emendas e o da ata abre a Ata 360 (o clique não abre a linha da tabela).
+ */
+export const ItemDaAta: React.FC<{
+  item: Pick<ItemCaep, 'numeroAta' | 'numeroItem' | 'descricao' | 'codigoUasg'> | null | undefined;
+  semItem?: string;
+  extra?: React.ReactNode;
+  comLinks?: boolean;
+}> = ({ item, semItem, extra, comLinks }) => {
+  const parar = (e: React.MouseEvent) => e.stopPropagation();
+  return (
+    <>
+      {item && (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
+          {comLinks ? (
+            <Link
+              to={`${buildAtaItemPath(item.numeroAta, item.codigoUasg, item.numeroItem)}?aba=emendas`}
+              onClick={parar}
+              style={{ ...carteiraIdentificacao, textDecoration: 'none' }}
+              title="Abrir o item na aba Emendas"
+              data-testid="emendas-item-link"
+            >
+              {String(item.numeroItem).padStart(5, '0')}
+            </Link>
+          ) : (
+            <span style={carteiraIdentificacao}>{String(item.numeroItem).padStart(5, '0')}</span>
+          )}
+          <span style={ataEmCinza}>·</span>
+          {comLinks ? (
+            <Link to={buildAtaPath(item.numeroAta, item.codigoUasg)} onClick={parar} style={{ ...ataEmCinza, textDecoration: 'none' }} title={`Abrir a Ata 360 (UASG ${item.codigoUasg})`} data-testid="emendas-ata-link">
+              Ata {item.numeroAta}
+            </Link>
+          ) : (
+            <span style={ataEmCinza} title={`UASG ${item.codigoUasg}`}>
+              Ata {item.numeroAta}
+            </span>
+          )}
+          {extra}
+        </div>
+      )}
+      <div title={item?.descricao} style={carteiraDescricaoItem}>
+        {item ? descricaoItemEmFrase(item.descricao) : semItem}
       </div>
-    )}
-    <div title={item?.descricao} style={carteiraDescricaoItem}>
-      {item ? descricaoItemEmFrase(item.descricao) : semItem}
-    </div>
-  </>
-);
+    </>
+  );
+};
 
 /** Vigência igual à Carteira de Itens: a pílula do prazo e "até dd/mm/aaaa" embaixo. */
 export const VigenciaDaAta: React.FC<{ item: Pick<ItemCaep, 'vigenciaFinal' | 'ataEncerrada'> | null | undefined; hoje: string }> = ({ item, hoje }) => {
@@ -71,7 +101,7 @@ export const VigenciaDaAta: React.FC<{ item: Pick<ItemCaep, 'vigenciaFinal' | 'a
 };
 
 /** Linha do pedido: kit (nome e composição) ou item (ata · item e descrição). */
-export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade'>; itens: Map<string, ItemCaep> }> = ({ linha, itens }) => {
+export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade'>; itens: Map<string, ItemCaep>; comLinks?: boolean }> = ({ linha, itens, comLinks }) => {
   if (linha.tipo === 'KIT') {
     return (
       <>
@@ -90,7 +120,7 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
     );
   }
   const i = linha.itemKey ? itens.get(linha.itemKey) : undefined;
-  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} />;
+  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} />;
 };
 
 /** Nome da unidade e, ao lado, a sigla mais clara (padrão "00001 · Ata 00055/2025" das carteiras). */
@@ -169,6 +199,18 @@ export const EmpenhoDaLinha: React.FC<{
     </>
   );
 };
+
+/** Cor da etiqueta de situação da linha: pendência em amarelo, antes do empenho em azul, empenhada e contratada em verde. */
+const varianteDaSituacao = (s: SituacaoDaLinha): 'warning' | 'info' | 'success' | 'neutral' =>
+  s.situacao === 'CANCELADO' ? 'neutral' : s.pendente || s.situacao === 'SOLICITACAO_A_INFORMAR' || s.situacao === 'AGUARDANDO_ASSINATURA' ? 'warning' : ORDEM_SITUACAO_LINHA[s.situacao] >= ORDEM_SITUACAO_LINHA.EMPENHADO ? 'success' : 'info';
+
+/** Situação da linha do pedido (migration 180): a etiqueta e, embaixo, a solicitação, a nota ligada ou o que falta. */
+export const SituacaoDaLinhaEtiqueta: React.FC<{ s: SituacaoDaLinha; testId?: string }> = ({ s, testId }) => (
+  <div data-testid={testId} data-situacao={s.situacao}>
+    <StatusBadge label={s.rotulo} variant={varianteDaSituacao(s)} size="sm" dot={false} />
+    {s.detalhe && <div style={{ ...carteiraDetalhe, marginTop: '0.2rem' }}>{s.detalhe}</div>}
+  </div>
+);
 
 /** Execução do pedido empenhado pelas notas achadas: empenhado, liquidado, pago e a próxima entrega prevista. */
 export const ExecucaoDoPedidoResumo: React.FC<{ execucao: ExecucaoDoPedido }> = ({ execucao: e }) => (

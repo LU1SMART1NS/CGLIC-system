@@ -33,7 +33,6 @@ import {
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import {
-  ataDaLinha,
   atasDoPedido,
   avisoGrave,
   AUTOR_A_DEFINIR,
@@ -52,14 +51,14 @@ import {
   linhasAtivas,
   orgaoDoPedido,
   ORDEM_ETAPA,
-  proximaAcao,
   rodadaDoPedido,
   reservadoPorItem,
+  resumoDasLinhas,
   ROTULO_ETAPA,
   seiDaEtapa,
   solicitacoesSemAta,
+  tarefasDoPedido,
   ultimoContatoPorAutor,
-  valorDaLinha,
   valorDoPedidoNaEtapa,
   execucaoDoPedido,
   type AvisoPedido
@@ -67,7 +66,8 @@ import {
 import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
-import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, ExecucaoDoPedidoResumo, LinhaDoPedido, ValorDoPedido, ValorPrevisto } from './emendasPartes';
+import { AutorDoPedido, ExecucaoDoPedidoResumo, ValorDoPedido } from './emendasPartes';
+import { LinhasPorAta, OQueFalta, type AoAgir } from './PedidoAberto';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
@@ -107,8 +107,6 @@ const SeiDaEtapa: React.FC<{ rotulo: string; numero: string; testId: string }> =
   </div>
 );
 
-type AoAgir = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => void;
-
 /** Lista que mostra os dois primeiros e "mais N" (a etapa em que o pedido está começa aberta). */
 const ListaRecolhivel: React.FC<{ itens: React.ReactNode[]; aberta: boolean; nome: string; testId: string }> = ({ itens, aberta, nome, testId }) => {
   const [toda, setToda] = useState(aberta);
@@ -134,88 +132,6 @@ const DocumentoDaEtapa: React.FC<{ numero: string; data: string | null; testId: 
 );
 
 /**
- * Solicitações de autorização de empenho de cada ata do pedido, uma por rodada (migrations 178 e 179): o número SEI, o
- * dia em que a Diretora do FNSP assinou e os itens. A ata que falta vem primeiro, com o botão para informar.
- */
-const AtasDaSolicitacao: React.FC<{ p: PedidoEmenda; itens: Map<string, ItemCaep>; podeGerir: boolean; aberta: boolean; onAcao: AoAgir }> = ({ p, itens, podeGerir, aberta, onAcao }) => {
-  const atas = atasDoPedido(p, itens);
-  const soltas = solicitacoesSemAta(p);
-  const autorizado = ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.AUTORIZADO;
-  // Pedido do controle anterior sem nenhuma solicitação informada: mostra as atas sem cor de aviso.
-  const nenhuma = !p.documentos.some((d) => d.etapa === 'AUTORIZACAO');
-  const linhas = atas.map((a) => {
-    const falta = a.situacao === 'falta';
-    return (
-      <div key={a.ataKey} className={falta && !nenhuma ? 'emendas-ata emendas-ata--falta' : 'emendas-ata'} data-testid={`emendas-pedido-ata-${a.numeroAta}`}>
-        <strong>
-          Ata {a.numeroAta}
-          {a.fornecedor ? ` · ${a.fornecedor}` : ''}
-        </strong>
-        {a.itens.map((i) => (
-          <span key={i.itemKey}>
-            item {i.numeroItem} · {i.nome} · <strong>{i.quantidade} un.</strong>
-          </span>
-        ))}
-        {a.solicitacoes.map((x) => (
-          <div key={x.numero} className="emendas-ata__sol">
-            <NumeroSeiEtiqueta numero={x.numero} testId="emendas-pedido-sei-AUTORIZACAO" />
-            {x.assinadaEm ? (
-              <span>
-                assinada pela Diretora do FNSP em <strong>{dataBR(x.assinadaEm)}</strong>
-              </span>
-            ) : (
-              <span className="emendas-ata__aviso">aguardando a assinatura da Diretora do FNSP</span>
-            )}
-            {podeGerir && (
-              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: a.ataKey, numero: x.numero, troca: true })} data-testid={`emendas-pedido-ata-alterar-${x.numero}`}>
-                {!x.assinadaEm && autorizado ? 'Informar a assinatura' : 'Alterar'}
-              </AppButton>
-            )}
-          </div>
-        ))}
-        {falta && (
-          <div className="emendas-ata__sol">
-            <span className="emendas-ata__falta">falta</span>
-            {!nenhuma && <span className="emendas-ata__aviso">Esta ata ainda não tem solicitação de empenho.</span>}
-            {podeGerir && (
-              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: a.ataKey })} data-testid={`emendas-pedido-ata-informar-${a.numeroAta}`}>
-                Informar a solicitação desta ata
-              </AppButton>
-            )}
-          </div>
-        )}
-        {podeGerir && !falta && (
-          <span>
-            <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: a.ataKey })} data-testid={`emendas-pedido-ata-mais-${a.numeroAta}`}>
-              + solicitação desta ata (nova rodada)
-            </AppButton>
-          </span>
-        )}
-      </div>
-    );
-  });
-  return (
-    <div className="emendas-atas" data-testid={`emendas-pedido-atas-${p.id}`}>
-      {nenhuma && autorizado && <div className="emendas-etapa__nota" style={{ margin: 0 }}>Nenhuma solicitação informada neste pedido.</div>}
-      <ListaRecolhivel itens={linhas} aberta={aberta || atas.some((a) => a.situacao !== 'assinada')} nome="atas" testId={`emendas-pedido-atas-mais-${p.id}`} />
-      {soltas.map((n) => (
-        <div key={n} className="emendas-ata" data-testid="emendas-pedido-solicitacao-sem-ata">
-          <div className="emendas-ata__sol">
-            <NumeroSeiEtiqueta numero={n} testId="emendas-pedido-sei-AUTORIZACAO" />
-            <span className="emendas-ata__aviso">Solicitação sem ata</span>
-            {podeGerir && (
-              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { numero: n })}>
-                Ligar a uma ata
-              </AppButton>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-/**
  * Linha do tempo do pedido em três fases (Interlocução · Empenho · Contratação), com os documentos SEI de cada etapa e
  * a data de cada um, e as tentativas devolvidas (migration 174). Na autorização, uma solicitação para cada ata
  * (migration 178). A última etapa, Contratado, vem dos contratos das notas no Contratos.gov.br. Fase concluída começa
@@ -223,12 +139,11 @@ const AtasDaSolicitacao: React.FC<{ p: PedidoEmenda; itens: Map<string, ItemCaep
  */
 const EtapasDoPedido: React.FC<{
   p: PedidoEmenda;
-  itens: Map<string, ItemCaep>;
   notas: Map<string, NotaDaLinha>;
   podeGerir: boolean;
   podeVerContratos: boolean;
   onAcao: AoAgir;
-}> = ({ p, itens, notas, podeGerir, podeVerContratos, onAcao }) => {
+}> = ({ p, notas, podeGerir, podeVerContratos, onAcao }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const atual = ORDEM_ETAPA[p.etapa];
   const rodada = rodadaDoPedido(p);
@@ -239,6 +154,7 @@ const EtapasDoPedido: React.FC<{
   // As atas ficam na solicitação enquanto o pedido espera a assinatura; depois, na autorização.
   const etapaDasAtas: EtapaPedido | null = cancelado ? null : atual >= ORDEM_ETAPA.AUTORIZADO ? 'AUTORIZADO' : p.etapa === 'SOLICITADO' ? 'SOLICITADO' : null;
   const atas = etapaDasAtas ? atasDoPedido(p) : [];
+  const soltas = solicitacoesSemAta(p);
   const nenhumaSolicitacao = !p.documentos.some((d) => d.etapa === 'AUTORIZACAO');
   const atasProntas = atas.filter((a) => (etapaDasAtas === 'AUTORIZADO' ? a.situacao === 'assinada' : a.situacao !== 'falta')).length;
   const faltamAtas = atas.length > 0 && atasProntas < atas.length && !nenhumaSolicitacao;
@@ -330,10 +246,22 @@ const EtapasDoPedido: React.FC<{
                           {p.siopValor != null ? ` · ${formatCurrency(p.siopValor)}` : ''}
                         </div>
                       )}
-                      {solicitacaoNasAtas && mostraDados && atas.length > 0 && (
-                        <div className="emendas-etapa__nota">Uma solicitação para cada ata, no passo seguinte (é o documento que a Diretora do FNSP assina).</div>
+                      {(solicitacaoNasAtas || comAtas) && mostraDados && atas.length > 0 && (
+                        <div className="emendas-etapa__nota">Uma solicitação para cada ata, nos blocos das atas ao lado (é o documento que a Diretora do FNSP assina).</div>
                       )}
-                      {comAtas && <AtasDaSolicitacao p={p} itens={itens} podeGerir={podeGerir} aberta={atualAqui} onAcao={onAcao} />}
+                      {comAtas && soltas.length > 0 && (
+                        <div className="emendas-etapa__nota emendas-etapa__nota--aviso">
+                          {soltas.length === 1 ? 'Solicitação sem ata' : `${soltas.length} solicitações sem ata`}: {soltas.join(', ')}
+                          {podeGerir && (
+                            <>
+                              {' '}
+                              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { numero: soltas[0] })}>
+                                Ligar a uma ata
+                              </AppButton>
+                            </>
+                          )}
+                        </div>
+                      )}
                       {docs.length > 0 && (
                         <ListaRecolhivel
                           itens={docs.map((d) => (
@@ -424,6 +352,7 @@ const OndeEstaOPedido: React.FC<{
   onAcao: (acao: AcaoDaJanela) => void;
   onAlterar: () => void;
 }> = ({ p, notas, podeGerir, onAcao, onAlterar }) => {
+  const resumo = resumoDasLinhas(p, notas);
   if (p.etapa === 'CANCELADO') {
     return (
       <div className="emendas-onde emendas-onde--cancelado" data-testid={`emendas-pedido-onde-${p.id}`}>
@@ -433,7 +362,6 @@ const OndeEstaOPedido: React.FC<{
   }
   // Reserva para um órgão (migration 163): antes da minuta, a CAEP indica o parlamentar que assumiu.
   const semAutor = !p.autorId;
-  const prox = semAutor ? null : proximaAcao(p.etapa, rodadaDoPedido(p));
   const contratado = p.etapa === 'CONTRATACAO' && contratosDoPedido(p, notas).contratado;
   const posicao = contratado ? TOTAL_ETAPAS_PEDIDO : ORDEM_ETAPA[p.etapa] + 1;
   const semData = p.origem === 'PLANILHA' && ETAPAS.some((e) => e.etapa !== 'RESERVADO' && ORDEM_ETAPA[e.etapa] <= ORDEM_ETAPA[p.etapa] && !dataDaEtapa(p, e.etapa));
@@ -446,6 +374,12 @@ const OndeEstaOPedido: React.FC<{
         </span>
       </div>
       <ProgressBar value={posicao} max={TOTAL_ETAPAS_PEDIDO} showPercent={false} height="4px" colorScheme={contratado ? 'success' : 'primary'} testId={`emendas-pedido-progresso-${p.id}`} />
+      {resumo.texto && (
+        <div style={carteiraDetalhe} data-testid={`emendas-pedido-resumo-linhas-${p.id}`}>
+          {resumo.divergem ? 'Linhas: ' : ''}
+          {resumo.texto}
+        </div>
+      )}
       {p.etapa === 'CONTRATACAO' && (
         <div style={carteiraDetalhe}>
           {contratado ? 'A CAEP acompanha a execução.' : 'Aguardando a CCGA gerar o contrato no Contratos.gov.br. Atualiza sozinho de hora em hora.'}
@@ -456,11 +390,6 @@ const OndeEstaOPedido: React.FC<{
           {semAutor && (
             <AppButton size="sm" fullWidth onClick={onAlterar} data-testid={`emendas-pedido-indicar-autor-${p.id}`}>
               Indicar o parlamentar
-            </AppButton>
-          )}
-          {prox && (
-            <AppButton size="sm" fullWidth onClick={() => onAcao(prox.acao)} data-testid={`emendas-pedido-proximo-${p.id}`}>
-              {prox.rotulo}
             </AppButton>
           )}
           <div style={{ display: 'flex', gap: '0.25rem 0.5rem', flexWrap: 'wrap' }}>
@@ -494,47 +423,23 @@ interface DetalheProps {
   podeGerir: boolean;
   podeVerContratos: boolean;
   hoje: string;
+  /** Item de onde o gestor veio (Item 360 › Emendas, ?item=): as linhas dele ficam em destaque. */
+  itemDeOrigem: string | null;
   onAcao: AoAgir;
   onAlterar: () => void;
 }
 
-const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
+/**
+ * Pedido aberto (migration 180): à esquerda, as linhas em blocos por ata, cada uma com a sua situação; à direita, onde
+ * o pedido está, a lista "O que falta" com os botões das janelas, e as fases com datas e SEI como histórico.
+ */
+const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, onAlterar }) => {
   const { precos } = usePrecosParaEmenda();
   const semAutor = !p.autorId;
-  const colunas: Column<PedidoEmenda['linhas'][number]>[] = [
-    {
-      key: 'linha',
-      header: 'Item ou kit',
-      priority: 'primary',
-      width: '42%',
-      render: (l) => {
-        const ata = ataDaLinha(p, l, itens, hoje);
-        return (
-          <>
-            <LinhaDoPedido linha={l} itens={itens} />
-            <AConferirDaLinha linha={l} />
-            {ata && (
-              <div style={{ marginTop: '0.3rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, borderRadius: 4, padding: '0.25rem 0.45rem', display: 'inline-block', color: avisoGrave(ata) ? 'var(--color-danger-text)' : 'var(--color-warning-text)', background: avisoGrave(ata) ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)' }}>
-                  {ata.texto}
-                </span>
-              </div>
-            )}
-          </>
-        );
-      }
-    },
-    {
-      key: 'ben',
-      header: 'Beneficiário',
-      render: (l) => <BeneficiarioDaLinha linha={l} beneficiarios={beneficiarios} />
-    },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <ValorPrevisto previsto={valorDaLinha(l, itens, precos)} hoje={valorDaLinha(l, itens)} nota="Previsto para a emenda, com o reajuste das atas (o mesmo do quadro do parlamentar)" /> },
-    { key: 'ne', header: 'Empenho e contrato', nowrap: true, render: (l) => <EmpenhoDaLinha linha={l} achada={notas.get(l.id)} podeVerContratos={podeVerContratos} /> }
-  ];
   const canceladas = p.linhas.filter((l) => l.cancelada);
+  const tarefas = tarefasDoPedido(p, itens, notas, hoje, podeGerir);
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(240px, 1fr)', gap: '1rem', padding: '0.4rem 0' }} className="emendas-detalhe-pedido" data-testid={`emendas-pedido-detalhe-${p.id}`}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(260px, 1fr)', gap: '1rem', padding: '0.4rem 0' }} className="emendas-detalhe-pedido" data-testid={`emendas-pedido-detalhe-${p.id}`}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0 }}>
         {p.avisos
           .filter((a) => a.tipo === 'semOficio' || a.tipo === 'divergencia')
@@ -543,7 +448,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
               {a.texto}
             </div>
           ))}
-        <DataTable testId={`emendas-pedido-linhas-${p.id}`} data={linhasAtivas(p)} keyExtractor={(l) => l.id} columns={colunas} className="emendas-tabela-topo" />
+        <LinhasPorAta p={p} itens={itens} beneficiarios={beneficiarios} notas={notas} precos={precos} podeGerir={podeGerir} podeVerContratos={podeVerContratos} hoje={hoje} itemDeOrigem={itemDeOrigem} onAcao={onAcao} />
         {canceladas.length > 0 && (
           <div style={carteiraSubtitle}>
             {canceladas.length} {canceladas.length === 1 ? 'linha tirada' : 'linhas tiradas'} do pedido: {[...new Set(canceladas.map((l) => l.canceladaMotivo).filter(Boolean))].join(' ')}
@@ -565,7 +470,8 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
           </div>
         )}
         <OndeEstaOPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} onAlterar={onAlterar} />
-        <EtapasDoPedido p={p} itens={itens} notas={notas} podeGerir={podeGerir} podeVerContratos={podeVerContratos} onAcao={onAcao} />
+        {podeGerir && <OQueFalta p={p} tarefas={tarefas} onAcao={onAcao} onAlterar={onAlterar} />}
+        <EtapasDoPedido p={p} notas={notas} podeGerir={podeGerir} podeVerContratos={podeVerContratos} onAcao={onAcao} />
       </div>
     </div>
   );
@@ -600,6 +506,8 @@ export const EmendasPedidosPage: React.FC = () => {
   };
   const [filtroAviso, setFiltroAviso] = useState(() => searchParams.get('aviso') ?? '');
   const [soPedido, setSoPedido] = useState(() => searchParams.get('pedido'));
+  // Vindo do Item 360 › Emendas: ?item= deixa em destaque as linhas daquele item no pedido aberto.
+  const itemDeOrigem = searchParams.get('item');
   const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(soPedido ? [soPedido] : []));
   const [busca, setBusca] = useState('');
   // Ver por autor e filtro de autor ficam no endereço (?ver=autor, ?autor=), para o Voltar do navegador funcionar.
@@ -753,6 +661,10 @@ export const EmendasPedidosPage: React.FC = () => {
               <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
             )}
             {documento && <div style={carteiraDetalhe}>{documento}</div>}
+            {(() => {
+              const r = resumoDasLinhas(l, notas);
+              return r.divergem ? <div style={{ ...carteiraDetalhe, whiteSpace: 'normal' }}>{r.texto}</div> : null;
+            })()}
           </>
         );
       }
@@ -857,6 +769,23 @@ export const EmendasPedidosPage: React.FC = () => {
             counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
             testIdPrefix="emendas-pedidos"
           >
+            {soPedido && (
+              <AppButton
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSoPedido(null);
+                  mudarUrl((q) => {
+                    q.delete('pedido');
+                    q.delete('item');
+                  });
+                }}
+                title="Mostrar todos os pedidos"
+                data-testid="emendas-pedidos-so-este"
+              >
+                Só este pedido <span aria-hidden="true">×</span>
+              </AppButton>
+            )}
             {opcoesDeEtapa.length > 0 && (
               <CarteiraFilterButton
                 label="Etapa"
@@ -939,6 +868,7 @@ export const EmendasPedidosPage: React.FC = () => {
                   podeGerir={podeGerir}
                   podeVerContratos={podeVerContratos}
                   hoje={hoje}
+                  itemDeOrigem={itemDeOrigem}
                   onAcao={(acao, contexto) => setJanela({ pedido: l, acao, contexto })}
                   onAlterar={() => setEditando(l)}
                 />

@@ -2,9 +2,9 @@
  * Regras dos pedidos das emendas (migration 157), fora das telas para poder testar: etapas, valor, itens que cada
  * linha ocupa e avisos (30 dias sem ofício, divergência com o SIOP, ata vencendo ou vencida antes do empenho).
  */
-import type { AcaoPedido, EtapaDoDocumento, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
+import type { AcaoPedido, DocumentoSeiDoPedido, EtapaDoDocumento, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, passouDoCorte } from './emendasKits';
-import { chaveDoContrato } from './contractKeyUtils';
+import { chaveDoContrato, numeroDaChave } from './contractKeyUtils';
 import { formatCurrency } from './format';
 import type { PrecoPrevisto } from '../services/emendasQuadroService';
 
@@ -514,4 +514,304 @@ export function intervaloDeDatas(datas: Array<string | null>): string | null {
   if (dias.length === 1) return dataBR(dias[0]);
   const [ini, fim] = [dias[0], dias[dias.length - 1]];
   return `${ini.slice(0, 4) === fim.slice(0, 4) ? dataBR(ini).slice(0, 5) : dataBR(ini)} a ${dataBR(fim)}`;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Situação de cada linha do pedido (migration 180): a solicitação de autorização de empenho cobre um ou mais itens
+// de uma ata, e os itens do mesmo pedido andam em ritmos diferentes. A linha sabe qual solicitação a cobre; a nota
+// (emenda_linha_notas), o despacho à CCGA e o contrato já são por linha. Na tela só entra o que o gestor informa
+// (número SEI, data, ata, linhas cobertas) e o que o sistema acha no Contratos.gov.br.
+// ---------------------------------------------------------------------------------------------------------------
+
+export type SituacaoLinha = 'CANCELADO' | 'ANTES' | 'SOLICITACAO_A_INFORMAR' | 'AGUARDANDO_ASSINATURA' | 'AUTORIZADO' | 'NA_CGOFI' | 'EMPENHADO' | 'NA_CCGA' | 'CONTRATADO';
+
+export const ORDEM_SITUACAO_LINHA: Record<SituacaoLinha, number> = {
+  CANCELADO: -1,
+  ANTES: 0,
+  SOLICITACAO_A_INFORMAR: 1,
+  AGUARDANDO_ASSINATURA: 2,
+  AUTORIZADO: 3,
+  NA_CGOFI: 4,
+  EMPENHADO: 5,
+  NA_CCGA: 6,
+  CONTRATADO: 7
+};
+
+/** Etiqueta da linha e a forma em texto corrido, no singular e no plural ("3 na CCGA · 6 contratadas"). */
+export const ROTULO_SITUACAO_LINHA: Record<Exclude<SituacaoLinha, 'ANTES' | 'CANCELADO'>, { etiqueta: string; uma: string; varias: string }> = {
+  SOLICITACAO_A_INFORMAR: { etiqueta: 'Solicitação a informar', uma: 'com solicitação a informar', varias: 'com solicitação a informar' },
+  AGUARDANDO_ASSINATURA: { etiqueta: 'Aguardando a assinatura', uma: 'aguardando a assinatura', varias: 'aguardando a assinatura' },
+  AUTORIZADO: { etiqueta: 'Autorizado', uma: 'autorizada', varias: 'autorizadas' },
+  NA_CGOFI: { etiqueta: 'Na CGOFI', uma: 'na CGOFI', varias: 'na CGOFI' },
+  EMPENHADO: { etiqueta: 'Empenhado', uma: 'empenhada', varias: 'empenhadas' },
+  NA_CCGA: { etiqueta: 'Na CCGA', uma: 'na CCGA', varias: 'na CCGA' },
+  CONTRATADO: { etiqueta: 'Contratado', uma: 'contratada', varias: 'contratadas' }
+};
+
+export interface SituacaoDaLinha {
+  situacao: SituacaoLinha;
+  /** Texto da etiqueta: nas etapas antes da solicitação, a etapa do pedido. */
+  rotulo: string;
+  /** Linha embaixo da etiqueta: a solicitação, a nota ligada, o contrato ou o que falta. */
+  detalhe: string | null;
+  /** Pede atenção: sem solicitação, aguardando a assinatura, ou empenhada sem nota ligada no sistema. */
+  pendente: boolean;
+  /** A solicitação de autorização de empenho que cobre a linha, quando há. */
+  solicitacao: DocumentoSeiDoPedido | null;
+}
+
+/** Solicitações do pedido que já dizem qual ata cobrem. */
+const solicitacoesComAta = (p: PedidoEmenda): DocumentoSeiDoPedido[] => p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && Boolean(d.ataKey));
+
+/**
+ * A solicitação de autorização de empenho que cobre a linha: a que a tem nas suas linhas (migration 180) ou, sem
+ * ligação gravada (pedidos de antes da migration, ou a segunda solicitação da ata ainda sem linhas marcadas), a
+ * solicitação única da ata do item. Ata com mais de uma solicitação e linha sem ligação: nenhuma.
+ */
+export function solicitacaoDaLinha(p: PedidoEmenda, l: LinhaPedido): DocumentoSeiDoPedido | null {
+  const sols = solicitacoesComAta(p);
+  const direta = sols.find((d) => d.linhas.some((x) => x.linhaId === l.id));
+  if (direta) return direta;
+  for (const ata of [...new Set(itensDaLinha(l).map((x) => ataDoItem(x.itemKey)))]) {
+    const daAta = sols.filter((d) => d.ataKey === ata);
+    if (daAta.length === 1) return daAta[0];
+  }
+  return null;
+}
+
+/** Onde cada linha do pedido está, da solicitação de empenho ao contrato. Antes da solicitação, a etapa do pedido. */
+export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<string, NotaDaLinha>): SituacaoDaLinha {
+  if (l.cancelada || p.etapa === 'CANCELADO') return { situacao: 'CANCELADO', rotulo: 'Cancelado', detalhe: l.canceladaMotivo ?? p.canceladoMotivo, pendente: false, solicitacao: null };
+  if (ORDEM_ETAPA[p.etapa] < ORDEM_ETAPA.SOLICITADO) return { situacao: 'ANTES', rotulo: ROTULO_ETAPA[p.etapa], detalhe: null, pendente: false, solicitacao: null };
+  const nota = notas.get(l.id);
+  const temNota = Boolean(nota?.nota);
+  const notaLigada = temNota ? `NE ${nota!.nota} ligada` : 'sem nota ligada no sistema';
+  const solicitacao = solicitacaoDaLinha(p, l);
+  if (!solicitacao) {
+    return { situacao: 'SOLICITACAO_A_INFORMAR', rotulo: ROTULO_SITUACAO_LINHA.SOLICITACAO_A_INFORMAR.etiqueta, detalhe: 'nenhuma solicitação de empenho cobre esta linha', pendente: true, solicitacao: null };
+  }
+  if (!solicitacao.assinadaEm) {
+    return { situacao: 'AGUARDANDO_ASSINATURA', rotulo: ROTULO_SITUACAO_LINHA.AGUARDANDO_ASSINATURA.etiqueta, detalhe: `solicitação ${solicitacao.numero} na DGFNSP`, pendente: true, solicitacao };
+  }
+  if (p.etapa === 'CONTRATACAO') {
+    if (nota?.contractKey) {
+      return { situacao: 'CONTRATADO', rotulo: `Contratado · ${numeroDaChave(nota.contractKey)}`, detalhe: notaLigada, pendente: !temNota, solicitacao };
+    }
+    return { situacao: 'NA_CCGA', rotulo: ROTULO_SITUACAO_LINHA.NA_CCGA.etiqueta, detalhe: `aguarda o contrato no Contratos.gov.br${temNota ? '' : ' · sem nota ligada'}`, pendente: !temNota, solicitacao };
+  }
+  if (p.etapa === 'EMPENHADO' || temNota || l.empenhoDocumentoSei) {
+    return { situacao: 'EMPENHADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHADO.etiqueta, detalhe: temNota ? `${notaLigada} · aguarda o envio à CCGA` : 'sem nota ligada · o sistema procura de hora em hora', pendente: !temNota, solicitacao };
+  }
+  if (p.etapa === 'CGOFI') return { situacao: 'NA_CGOFI', rotulo: ROTULO_SITUACAO_LINHA.NA_CGOFI.etiqueta, detalhe: 'aguarda a nota de empenho', pendente: false, solicitacao };
+  return { situacao: 'AUTORIZADO', rotulo: `Autorizado · ${dataBR(solicitacao.assinadaEm)}`, detalhe: 'aguarda o envio à CGOFI', pendente: false, solicitacao };
+}
+
+export interface ResumoDasLinhas {
+  /** Quantas linhas em cada situação, da mais atrasada à mais adiantada. */
+  porSituacao: Array<{ situacao: SituacaoLinha; quantidade: number }>;
+  /** Em texto: "3 na CCGA · 6 contratadas". Vazio antes da solicitação (todas iguais à etapa do pedido). */
+  texto: string;
+  /** A situação da linha mais atrasada (a que segura o pedido). */
+  maisAtrasada: SituacaoLinha | null;
+  /** As linhas estão em mais de uma situação. */
+  divergem: boolean;
+}
+
+/** As linhas ativas do pedido contadas por situação. */
+export function resumoDasLinhas(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): ResumoDasLinhas {
+  const conta = new Map<SituacaoLinha, number>();
+  for (const l of linhasAtivas(p)) {
+    const s = situacaoDaLinha(p, l, notas).situacao;
+    conta.set(s, (conta.get(s) ?? 0) + 1);
+  }
+  const porSituacao = [...conta.entries()].map(([situacao, quantidade]) => ({ situacao, quantidade })).sort((a, b) => ORDEM_SITUACAO_LINHA[a.situacao] - ORDEM_SITUACAO_LINHA[b.situacao]);
+  const texto = porSituacao
+    .filter((x) => x.situacao !== 'ANTES' && x.situacao !== 'CANCELADO')
+    .map((x) => `${x.quantidade} ${x.quantidade === 1 ? ROTULO_SITUACAO_LINHA[x.situacao as keyof typeof ROTULO_SITUACAO_LINHA].uma : ROTULO_SITUACAO_LINHA[x.situacao as keyof typeof ROTULO_SITUACAO_LINHA].varias}`)
+    .join(' · ');
+  return { porSituacao, texto, maisAtrasada: porSituacao[0]?.situacao ?? null, divergem: porSituacao.length > 1 };
+}
+
+/** Linhas ativas do pedido agrupadas por ata (os kits, que podem ter itens de mais de uma ata, ficam num grupo à parte). */
+export interface GrupoDeLinhas {
+  /** Chave da ata (numero_ata-uasg) ou 'KITS'. */
+  chave: string;
+  numeroAta: string | null;
+  codigoUasg: string | null;
+  fornecedor: string | null;
+  vigenciaFinal: string | null;
+  ataEncerrada: boolean;
+  linhas: LinhaPedido[];
+  /** Solicitações de empenho da ata, uma por rodada (vazio nos kits). */
+  solicitacoes: AtaDoPedido['solicitacoes'];
+  situacao: SituacaoDaSolicitacao | null;
+}
+
+export function linhasPorAta(p: PedidoEmenda, itens: Map<string, ItemCaep>): GrupoDeLinhas[] {
+  const atas = new Map(atasDoPedido(p, itens).map((a) => [a.ataKey, a]));
+  const grupos = new Map<string, GrupoDeLinhas>();
+  for (const l of linhasAtivas(p)) {
+    const chave = l.tipo === 'ITEM' && l.itemKey ? ataDoItem(l.itemKey) : 'KITS';
+    const ata = atas.get(chave);
+    const item = l.itemKey ? itens.get(l.itemKey) : undefined;
+    const g = grupos.get(chave) ?? {
+      chave,
+      numeroAta: ata?.numeroAta ?? (chave === 'KITS' ? null : chave.split('-')[0]),
+      codigoUasg: chave === 'KITS' ? null : chave.split('-')[1] ?? null,
+      fornecedor: ata?.fornecedor ?? null,
+      vigenciaFinal: item?.vigenciaFinal ?? null,
+      ataEncerrada: Boolean(item?.ataEncerrada),
+      linhas: [],
+      solicitacoes: ata?.solicitacoes ?? [],
+      situacao: ata?.situacao ?? null
+    };
+    if (!g.vigenciaFinal && item?.vigenciaFinal) g.vigenciaFinal = item.vigenciaFinal;
+    g.linhas.push(l);
+    grupos.set(chave, g);
+  }
+  return [...grupos.values()].sort((a, b) => Number(a.chave === 'KITS') - Number(b.chave === 'KITS') || (a.numeroAta ?? '').localeCompare(b.numeroAta ?? ''));
+}
+
+/** Tarefa da lista "O que falta" do pedido: com botão (a janela de hoje) ou só aviso. */
+export interface TarefaDoPedido {
+  chave: string;
+  titulo: string;
+  detalhe: string;
+  /** acao: pede um botão; atencao: aviso que o gestor resolve de outro jeito; espera: depende de outro setor ou do sistema. */
+  tom: 'acao' | 'atencao' | 'espera';
+  /** O botão: o próximo passo do pedido, a solicitação de uma ata (informar, assinatura ou linhas) ou alterar as linhas. */
+  botao?: { tipo: 'proxima'; rotulo: string } | { tipo: 'solicitacao'; rotulo: string; ataKey: string; numero?: string; troca?: boolean } | { tipo: 'alterar'; rotulo: string };
+}
+
+const nomeDaLinha = (l: LinhaPedido, itens: Map<string, ItemCaep>): string =>
+  l.tipo === 'KIT' ? `${l.quantidade} ${l.kitNome ?? 'kit'}` : `${l.quantidade} ${itens.get(l.itemKey ?? '')?.nomeCurto?.trim() || curto(itens.get(l.itemKey ?? '')?.descricao ?? l.itemKey ?? '', 28)}`;
+const plural = (n: number, uma: string, varias: string) => `${n} ${n === 1 ? uma : varias}`;
+
+/**
+ * O que falta no pedido, do que o gestor faz agora ao que só depende de outros: o próximo passo do pedido, a
+ * solicitação e a assinatura de cada ata, as linhas sem solicitação marcada, os beneficiários a informar, as notas
+ * que o sistema ainda não ligou, os contratos que a CCGA ainda não gerou e os avisos das atas.
+ */
+export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, notas: Map<string, NotaDaLinha>, hoje: string, podeGerir: boolean): TarefaDoPedido[] {
+  const t: TarefaDoPedido[] = [];
+  if (p.etapa === 'CANCELADO') return t;
+  const linhas = linhasAtivas(p);
+  const situacoes = new Map(linhas.map((l) => [l.id, situacaoDaLinha(p, l, notas)]));
+  const das = (s: SituacaoLinha) => linhas.filter((l) => situacoes.get(l.id)!.situacao === s);
+  const nomes = (ls: LinhaPedido[]) => ls.map((l) => nomeDaLinha(l, itens)).join(', ');
+  const semAutor = !p.autorId;
+  const depoisDaSolicitacao = ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.SOLICITADO;
+  const autorizado = ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.AUTORIZADO;
+
+  // 1) O próximo passo do pedido (o mesmo botão de sempre).
+  if (semAutor && (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA')) {
+    t.push({ chave: 'autor', titulo: 'Indicar o parlamentar', detalhe: 'Reserva feita a pedido do órgão. Quando um parlamentar ou bancada assumir, indique para seguir com a minuta.', tom: 'acao', botao: { tipo: 'alterar', rotulo: 'Indicar o parlamentar' } });
+  } else {
+    const prox = proximaAcao(p.etapa, rodadaDoPedido(p));
+    if (prox) {
+      const detalhe =
+        p.etapa === 'AUTORIZADO'
+          ? `${plural(das('AUTORIZADO').length, 'linha autorizada', 'linhas autorizadas')} ${das('AUTORIZADO').length === 1 ? 'pode' : 'podem'} ir${das('AUTORIZADO').length < linhas.length ? '; as outras ficam para o próximo lote' : ''}.`
+          : p.etapa === 'CGOFI'
+            ? 'A CGOFI emite uma nota por fornecedor.'
+            : p.etapa === 'EMPENHADO'
+              ? 'Despacho para contratação, um por nota.'
+              : p.etapa === 'CONFERIDO'
+                ? 'Uma solicitação para cada ata do pedido.'
+                : p.etapa === 'OFICIO'
+                  ? 'Nº da emenda, autor, valor, GND, beneficiário e objeto.'
+                  : 'Próximo passo do pedido.';
+      t.push({ chave: 'proxima', titulo: prox.rotulo, detalhe, tom: 'acao', botao: { tipo: 'proxima', rotulo: prox.rotulo } });
+    }
+  }
+
+  // 2) As solicitações de cada ata: a que falta, a que aguarda a assinatura e as linhas sem solicitação marcada.
+  if (depoisDaSolicitacao) {
+    const nenhumaInformada = !p.documentos.some((d) => d.etapa === 'AUTORIZACAO');
+    for (const a of atasDoPedido(p, itens)) {
+      const daAta = linhas.filter((l) => itensDaLinha(l).some((x) => ataDoItem(x.itemKey) === a.ataKey));
+      if (a.situacao === 'falta' && !nenhumaInformada) {
+        t.push({
+          chave: `sol-${a.ataKey}`,
+          titulo: `Informar a solicitação de empenho da ata ${a.numeroAta}`,
+          detalhe: `${nomes(daAta)}. Ao informar, marque as linhas que o documento cobre.`,
+          tom: 'acao',
+          botao: { tipo: 'solicitacao', rotulo: 'Informar a solicitação', ataKey: a.ataKey }
+        });
+      }
+      for (const s of a.solicitacoes) {
+        if (s.assinadaEm) continue;
+        const cobre = daAta.filter((l) => situacoes.get(l.id)!.solicitacao?.numero === s.numero);
+        t.push({
+          chave: `ass-${s.numero}`,
+          titulo: `Informar a assinatura da solicitação ${s.numero} · ata ${a.numeroAta}`,
+          detalhe: `${cobre.length ? `Cobre ${nomes(cobre)}. ` : ''}A Diretora do FNSP assina; sem isso a CGOFI não empenha esses itens.`,
+          tom: autorizado ? 'acao' : 'espera',
+          botao: autorizado ? { tipo: 'solicitacao', rotulo: 'Informar a assinatura', ataKey: a.ataKey, numero: s.numero, troca: true } : undefined
+        });
+      }
+      const semSolicitacao = daAta.filter((l) => situacoes.get(l.id)!.situacao === 'SOLICITACAO_A_INFORMAR');
+      if (semSolicitacao.length && a.solicitacoes.length > 1) {
+        const ultima = a.solicitacoes[a.solicitacoes.length - 1];
+        t.push({
+          chave: `marcar-${a.ataKey}`,
+          titulo: `Marcar as linhas que cada solicitação da ata ${a.numeroAta} cobre`,
+          detalhe: `${nomes(semSolicitacao)} sem solicitação marcada. A ata tem ${a.solicitacoes.length} solicitações: abra uma delas e marque as linhas.`,
+          tom: 'acao',
+          botao: { tipo: 'solicitacao', rotulo: 'Marcar as linhas', ataKey: a.ataKey, numero: ultima.numero, troca: true }
+        });
+      }
+    }
+  }
+
+  // 3) Beneficiário a informar (sem ele o quadro e o ofício saem incompletos).
+  const semBeneficiario = linhas.filter((l) => !l.beneficiarioId);
+  if (semBeneficiario.length) {
+    const podeAlterar = podeGerir && !jaEmpenhado(p.etapa);
+    t.push({
+      chave: 'beneficiario',
+      titulo: `Informar o beneficiário de ${plural(semBeneficiario.length, 'linha', 'linhas')}`,
+      detalhe: `${nomes(semBeneficiario)}. Sem isso o quadro e o ofício saem incompletos.`,
+      tom: podeAlterar ? 'acao' : 'atencao',
+      botao: podeAlterar ? { tipo: 'alterar', rotulo: 'Alterar linhas' } : undefined
+    });
+  }
+
+  // 4) Depende do sistema ou de outro setor: nota a ligar e contrato na CCGA.
+  const semNota = linhas.filter((l) => ['EMPENHADO', 'NA_CCGA', 'CONTRATADO'].includes(situacoes.get(l.id)!.situacao) && !notas.get(l.id)?.nota);
+  if (semNota.length) {
+    t.push({
+      chave: 'semNota',
+      titulo: `${plural(semNota.length, 'linha empenhada', 'linhas empenhadas')} sem nota ligada no sistema`,
+      detalhe: `${nomes(semNota)}. O sistema procura a nota de hora em hora pelo contrato e pelo plano interno; se o contrato não tem a nota, o gestor do contrato vincula em Vínculos.`,
+      tom: 'espera'
+    });
+  }
+  const naCcga = das('NA_CCGA');
+  if (naCcga.length) {
+    t.push({ chave: 'ccga', titulo: `${plural(naCcga.length, 'linha aguarda', 'linhas aguardam')} o contrato na CCGA`, detalhe: `${nomes(naCcga)}. Atualiza sozinho quando o contrato entra no Contratos.gov.br.`, tom: 'espera' });
+  }
+
+  // 5) Avisos das atas e do pedido (os mesmos da lista), menos os que já viraram tarefa acima.
+  for (const a of avisosDoPedido(p, itens, hoje, notas)) {
+    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao') continue;
+    t.push({ chave: `aviso-${a.tipo}`, titulo: a.curto, detalhe: a.texto, tom: 'atencao' });
+  }
+  // Depois do empenho a ata ainda importa: o contrato precisa estar assinado antes do fim.
+  if (jaEmpenhado(p.etapa)) {
+    for (const g of linhasPorAta(p, itens)) {
+      if (!g.vigenciaFinal || g.chave === 'KITS') continue;
+      const semContrato = g.linhas.filter((l) => situacoes.get(l.id)!.situacao !== 'CONTRATADO');
+      const dias = diasEntre(hoje, g.vigenciaFinal);
+      if (!semContrato.length || dias > avisoIndicacaoDias()) continue;
+      t.push({
+        chave: `vence-${g.chave}`,
+        titulo: dias < 0 ? `Ata ${g.numeroAta} encerrada com ${plural(semContrato.length, 'linha sem contrato', 'linhas sem contrato')}` : `Ata ${g.numeroAta} vence em ${plural(dias, 'dia', 'dias')} e ${plural(semContrato.length, 'linha ainda não tem', 'linhas ainda não têm')} contrato`,
+        detalhe: `${nomes(semContrato)}. O contrato precisa estar assinado antes do fim da ata (${dataBR(g.vigenciaFinal)}).`,
+        tom: 'atencao'
+      });
+    }
+  }
+  const ordem: Record<TarefaDoPedido['tom'], number> = { acao: 0, atencao: 1, espera: 2 };
+  return t.sort((a, b) => ordem[a.tom] - ordem[b.tom]);
 }
