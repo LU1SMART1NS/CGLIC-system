@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { Check, ChevronDown, ChevronRight, ClipboardList, RotateCcw } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Circle, ClipboardList, Clock, RotateCcw } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -169,7 +169,7 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha
                     <li key={etapa}>
                       <div className={linhaDaEtapa(mostraDados, atualAqui, voltou)}>
                         <span className="emendas-etapa__icone" aria-hidden="true">
-                          {mostraDados ? <Check size={14} /> : voltou ? <RotateCcw size={13} /> : i + 1}
+                          {mostraDados ? <Check size={14} /> : voltou ? <RotateCcw size={13} /> : <Circle size={10} />}
                         </span>
                         <span className="emendas-etapa__nome">
                           {e.rotulo}
@@ -226,7 +226,7 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha
                   <li data-testid={`emendas-pedido-contratado-${p.id}`}>
                     <div className={linhaDaEtapa(contratado, false, false)}>
                       <span className="emendas-etapa__icone" aria-hidden="true">
-                        {contratado ? <Check size={14} /> : TOTAL_ETAPAS_PEDIDO}
+                        {contratado ? <Check size={14} /> : contratos ? <Clock size={13} /> : <Circle size={10} />}
                       </span>
                       <span className="emendas-etapa__nome">Contratado</span>
                       <span className="emendas-etapa__data" />
