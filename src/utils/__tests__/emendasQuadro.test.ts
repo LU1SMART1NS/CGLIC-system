@@ -109,7 +109,7 @@ describe('quadro da reserva (Anexo)', () => {
 
   it('WhatsApp: numerado por beneficiário com o valor dele; sem título, ata, endereço nem notas; a definir no fim', () => {
     const t = textoParaWhatsapp(q);
-    expect(t.startsWith('1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
+    expect(t.startsWith('📋 *Reserva CAEP/SENASP · 23/10/2026*\n⏳ *Enviar o ofício até 22/11/2026*\n\n1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
     expect(t).toContain('2️⃣ *Corpo de Bombeiros Militar · CBMERJ* · RJ: *R$ 94.317,66*\n• 2 Drone\n\n');
     expect(t).toContain('3️⃣ *Beneficiário a definir*');
     for (const fora of ['Anexo I', 'Ata ', 'Rua X', 'IPCA', '¹']) expect(t).not.toContain(fora);
@@ -200,5 +200,16 @@ describe('preço pelo empenho provável (90 dias)', () => {
     expect(notaDoPreco(m.get('longe'))).toBeNull();
     // Sem o IPCA, o item sem base fica como estava (preço de hoje com o aviso).
     expect(aplicarPrazoDoEmpenho(new Map([['sembase', preco('sembase', { precoAtual: 200, precoPrevisto: 200, motivo: 'SEM_PREVISAO' })]]), '2026-10-24', null).get('sembase')?.motivo).toBe('SEM_PREVISAO');
+  });
+});
+
+describe('prazo do ofício', () => {
+  it('reserva + 30 dias, ou antes, o prazo de indicação da ata que termina primeiro', () => {
+    expect(q.prazoDoOficio).toEqual({ data: '2026-11-22', pela: 'RESERVA', ata: null });
+    const perto = new Map(itens).set('drone', item('drone', { nomeCurto: 'Drone', valorUnitario: 45200, numeroAta: '00099/2024', vigenciaFinal: '2026-12-10' }));
+    const q2 = montarQuadro({ autor, linhas, itens: perto, beneficiarios: new Map(), precos, data: '2026-10-23' });
+    // 10/12/2026 − 35 dias = 05/11/2026, antes de 22/11.
+    expect(q2.prazoDoOficio).toEqual({ data: '2026-11-05', pela: 'ATA', ata: '00099/2024' });
+    expect(textoParaWhatsapp(q2)).toContain('⏳ *Enviar o ofício até 05/11/2026*');
   });
 });

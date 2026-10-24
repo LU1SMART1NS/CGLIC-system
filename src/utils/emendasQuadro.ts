@@ -12,7 +12,8 @@
 import { formatarCep, localDoBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido } from '../services/emendasService';
 import type { GndItem, IpcaDozeMeses, PrecoPrevisto } from '../services/emendasQuadroService';
 import { descricaoItemEmFrase } from './textCase';
-import { dataBR } from './emendasKits';
+import { dataBR, limiteDaIndicacao } from './emendasKits';
+import { AVISO_SEM_OFICIO_DIAS } from './emendasPedidos';
 
 const MARCAS = ['¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
@@ -74,6 +75,13 @@ export interface LinhaQuadro {
 export interface Quadro {
   titulo: string;
   subtitulo: string;
+  /** Data da reserva (AAAA-MM-DD). */
+  data: string;
+  /**
+   * Até quando o ofício deve chegar: o que vier primeiro entre a reserva + 30 dias (depois disso o pedido entra no aviso
+   * "sem ofício") e o prazo de indicação da ata que termina antes (fim da ata − corte de Ajustes; o banco recusa depois).
+   */
+  prazoDoOficio: { data: string; pela: 'RESERVA' | 'ATA'; ata: string | null } | null;
   linhas: LinhaQuadro[];
   notas: string[];
   total: number;
@@ -180,6 +188,22 @@ export function notaDoPreco(p: PrecoPrevisto | undefined, ipca?: IpcaDozeMeses |
   }
 }
 
+/** Prazo do ofício do quadro (ver Quadro.prazoDoOficio). */
+function prazoDoOficio(e: EntradaQuadro): Quadro['prazoDoOficio'] {
+  if (!e.data) return null;
+  let prazo: NonNullable<Quadro['prazoDoOficio']> = { data: somarDias(e.data, AVISO_SEM_OFICIO_DIAS), pela: 'RESERVA', ata: null };
+  for (const l of e.linhas) {
+    const chaves = l.tipo === 'KIT' ? (l.kitComposicao ?? []).map((c) => c.itemKey) : l.itemKey ? [l.itemKey] : [];
+    for (const k of chaves) {
+      const item = e.itens.get(k);
+      if (!item?.vigenciaFinal) continue;
+      const limite = limiteDaIndicacao(item.vigenciaFinal);
+      if (limite < prazo.data) prazo = { data: limite, pela: 'ATA', ata: item.numeroAta };
+    }
+  }
+  return prazo;
+}
+
 export function montarQuadro(e: EntradaQuadro): Quadro {
   const notas: string[] = [];
   const marcaDe = (texto: string | null): string => {
@@ -255,6 +279,8 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
   return {
     titulo: tituloDoAnexo(e.autor),
     subtitulo: `CAEP/SENASP · reserva de ${dataBR(e.data)}`,
+    data: e.data,
+    prazoDoOficio: prazoDoOficio(e),
     linhas,
     notas: [...notas.map((n, i) => `${MARCAS[i] ?? `(${i + 1})`} ${n}`), ...rodape],
     total,
@@ -336,7 +362,10 @@ export function textoParaWhatsapp(q: Quadro): string {
     const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}${l.kit ? ` (${l.kit})` : ''}${ls.length > 1 ? `: ${brl(l.total)}` : ''}`);
     return [`${numeroEmEmoji(i + 1)} ${quem}: *${total}*`, ...itens].join('\n');
   });
+  const cabecalho = [`📋 *Reserva CAEP/SENASP · ${dataBR(q.data)}*`, ...(q.prazoDoOficio ? [`⏳ *Enviar o ofício até ${dataBR(q.prazoDoOficio.data)}*`] : [])];
   return [
+    ...cabecalho,
+    '',
     blocos.join('\n\n'),
     '',
     ...q.porGnd.map((g) => `${g.rotulo}: ${brl(g.total)}`),
