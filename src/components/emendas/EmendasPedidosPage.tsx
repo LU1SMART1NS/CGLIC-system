@@ -546,16 +546,12 @@ export const EmendasPedidosPage: React.FC = () => {
       sortValue: ordem.etapa.value,
       // Sem coluna própria para a reserva (repetia a etapa): o documento que marca a etapa fica embaixo dela.
       render: (l) => {
-        const documento = l.siopEmenda ? `Emenda ${l.siopEmenda}` : null;
+        // Uma linha só, em texto: a emenda quando já há; antes dela, o processo. O SEI para copiar fica no detalhe.
+        const documento = l.siopEmenda ? `Emenda ${l.siopEmenda}` : l.oficioProcessoSei ? `Processo ${l.oficioProcessoSei}` : null;
         return (
           <>
             <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
             {documento && <div style={carteiraDetalhe}>{documento}</div>}
-            {l.oficioProcessoSei && (
-              <div style={{ marginTop: '0.25rem' }}>
-                <NumeroSeiEtiqueta numero={l.oficioProcessoSei} testId="emendas-pedido-lista-processo-sei" />
-              </div>
-            )}
           </>
         );
       }
