@@ -11,7 +11,7 @@ const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
 });
 const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
   id: 'l' + Math.random(), ordem: 1, tipo: 'ITEM', itemKey: 'a', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
-  quantidade: 1, beneficiarioId: null, notaEmpenho: null, cancelada: false, canceladaMotivo: null,
+  quantidade: 1, beneficiarioId: null, cancelada: false, canceladaMotivo: null,
   empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, aConferir: null, planilhaRef: null, ...extra
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
@@ -185,16 +185,16 @@ describe('nota e execução das linhas empenhadas (migration 164)', () => {
     entregaPrevista: null, entregaPrevistaValor: null, atualizadoEm: null, ...extra
   });
 
-  it('a nota digitada vale mais que a achada; a execução conta cada nota uma vez', async () => {
+  it('a nota da linha é a achada pelo sistema; a execução conta cada nota uma vez', async () => {
     const { execucaoDoPedido, notaDaLinha } = await import('../emendasPedidos');
-    const l1 = linha({ id: 'l1' }), l2 = linha({ id: 'l2' }), l3 = linha({ id: 'l3', notaEmpenho: '2026NE000999' }), l4 = linha({ id: 'l4' });
+    const l1 = linha({ id: 'l1' }), l2 = linha({ id: 'l2' }), l3 = linha({ id: 'l3' }), l4 = linha({ id: 'l4' });
     const notas = new Map([
       ['l1', nota('l1', { nota: '2026NE000100', regra: 'CONTRATO', empenhoId: 'e1', valorEmpenhado: 1000, valorLiquidado: 400, valorPago: 300, entregaPrevista: '2026-12-01', entregaPrevistaValor: 500 })],
       ['l2', nota('l2', { nota: '2026NE000100', regra: 'CONTRATO', empenhoId: 'e1', valorEmpenhado: 1000, valorLiquidado: 400, valorPago: 300, entregaPrevista: '2026-11-15', entregaPrevistaValor: 200 })],
-      ['l3', nota('l3', { nota: '2026NE000101', regra: 'ITEM', empenhoId: 'e2', valorEmpenhado: 50 })],
+      ['l3', nota('l3', { nota: '2026NE000101', regra: 'SEI', empenhoId: 'e2', valorEmpenhado: 50 })],
       ['l4', nota('l4', { motivo: 'CONTRATO_SEM_NOTA' })]
     ]);
-    expect(notaDaLinha(l3, notas)).toBe('2026NE000999');
+    expect(notaDaLinha(l3, notas)).toBe('2026NE000101');
     expect(notaDaLinha(l1, notas)).toBe('2026NE000100');
     const p = pedido({ etapa: 'EMPENHADO', linhas: [l1, l2, l3, l4] });
     expect(execucaoDoPedido(p, notas)).toEqual({ notas: 2, empenhado: 1050, liquidado: 400, pago: 300, proximaEntrega: { data: '2026-11-15', valor: 200 }, linhasSemNota: 1 });

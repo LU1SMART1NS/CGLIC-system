@@ -485,10 +485,9 @@ export interface LinhaPedido {
   kitComposicao: ItemDoKit[] | null;
   quantidade: number;
   beneficiarioId: string | null;
-  notaEmpenho: string | null;
   cancelada: boolean;
   canceladaMotivo: string | null;
-  /** Documento SEI do empenho; a nota (notaEmpenho) é achada pelo contrato ou pelo Portal. */
+  /** Documento SEI do empenho; a nota é achada pelo sistema (emenda_linha_notas: pelo SEI, pelo contrato ou pelo plano interno). */
   empenhoDocumentoSei: string | null;
   /** Contrato citado na planilha, como 00138/2026. */
   contratoNumero: string | null;
@@ -601,7 +600,6 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       kitComposicao: Array.isArray(l.kit_composicao) ? l.kit_composicao.map((c: any) => ({ itemKey: c.item_key, quantidade: num(c.quantidade) })) : null,
       quantidade: num(l.quantidade),
       beneficiarioId: l.beneficiario_id ?? null,
-      notaEmpenho: l.nota_empenho ?? null,
       cancelada: Boolean(l.cancelada),
       canceladaMotivo: l.cancelada_motivo ?? null,
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
@@ -718,8 +716,8 @@ export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
   return new Map(linhas.map((r) => [r.item_key as string, num(r.reservado)]));
 }
 
-/** Como a nota da linha foi achada pelo plano interno da nota (migration 164). */
-export type RegraDaNota = 'CONTRATO' | 'ITEM' | 'AUTOR';
+/** Como a nota da linha foi achada: pelo documento SEI da nota no pedido (migration 177) ou pelo plano interno da nota (migration 164). */
+export type RegraDaNota = 'SEI' | 'CONTRATO' | 'ITEM' | 'AUTOR';
 /** Por que a linha empenhada ainda não tem nota. */
 export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA';
 
