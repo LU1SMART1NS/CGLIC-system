@@ -177,3 +177,19 @@ describe('Pedidos: uma solicitação de empenho para cada ata (migration 178)', 
     expect(html).toContain('29/09 a 30/09/2026');
   });
 });
+
+describe('Pedidos: linhas tiradas', () => {
+  beforeAll(() => {
+    const motivo = 'Passou para o pedido 567 (reserva para o CBMERJ).';
+    PEDIDOS.push({
+      ...pedido('tiradas', 'A1', 'AUTORIZADO', 1),
+      linhas: [linha('t-1', 1), { ...linha('t-2', 2), cancelada: true, canceladaMotivo: motivo }, { ...linha('t-3', 3), cancelada: true, canceladaMotivo: motivo }]
+    });
+  });
+
+  it('o mesmo motivo de várias linhas aparece uma vez só', () => {
+    const html = render('/?pedido=tiradas');
+    expect(html).toContain('2 linhas tiradas do pedido');
+    expect(html.split('Passou para o pedido 567').length - 1).toBe(1);
+  });
+});

@@ -534,7 +534,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
         <DataTable testId={`emendas-pedido-linhas-${p.id}`} data={linhasAtivas(p)} keyExtractor={(l) => l.id} columns={colunas} className="emendas-tabela-topo" />
         {canceladas.length > 0 && (
           <div style={carteiraSubtitle}>
-            {canceladas.length} {canceladas.length === 1 ? 'linha tirada' : 'linhas tiradas'} do pedido: {canceladas.map((l) => l.canceladaMotivo).filter(Boolean).join('; ')}
+            {canceladas.length} {canceladas.length === 1 ? 'linha tirada' : 'linhas tiradas'} do pedido: {[...new Set(canceladas.map((l) => l.canceladaMotivo).filter(Boolean))].join(' ')}
           </div>
         )}
         {jaEmpenhado(p.etapa) && <ExecucaoDoPedidoResumo execucao={execucaoDoPedido(p, notas)} />}
