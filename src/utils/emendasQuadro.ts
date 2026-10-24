@@ -81,7 +81,8 @@ export interface Quadro {
   data: string;
   /**
    * Até quando o ofício deve chegar: o que vier primeiro entre a reserva (ou a devolução do ofício) + 30 dias (depois
-   * disso o pedido entra no aviso "sem ofício") e o prazo de indicação da ata que termina antes (fim da ata − corte de Ajustes; o banco recusa depois).
+   * disso o pedido entra no aviso "sem ofício") e o prazo de indicação da ata que termina antes (fim da ata − corte de
+   * Ajustes, quando o banco passa a recusar), menos 5 dias para a CAEP registrar o ofício.
    */
   prazoDoOficio: { data: string; pela: 'RESERVA' | 'ATA'; ata: string | null } | null;
   linhas: LinhaQuadro[];
@@ -190,6 +191,9 @@ export function notaDoPreco(p: PrecoPrevisto | undefined, ipca?: IpcaDozeMeses |
   }
 }
 
+/** Dias a menos no prazo da ata da mensagem: a CAEP precisa de tempo para registrar o ofício antes de o banco recusar. */
+export const FOLGA_PARA_REGISTRAR_OFICIO_DIAS = 5;
+
 /** Prazo do ofício do quadro (ver Quadro.prazoDoOficio). */
 function prazoDoOficio(e: EntradaQuadro): Quadro['prazoDoOficio'] {
   if (!e.data) return null;
@@ -199,7 +203,7 @@ function prazoDoOficio(e: EntradaQuadro): Quadro['prazoDoOficio'] {
     for (const k of chaves) {
       const item = e.itens.get(k);
       if (!item?.vigenciaFinal) continue;
-      const limite = limiteDaIndicacao(item.vigenciaFinal);
+      const limite = somarDias(limiteDaIndicacao(item.vigenciaFinal), -FOLGA_PARA_REGISTRAR_OFICIO_DIAS);
       if (limite < prazo.data) prazo = { data: limite, pela: 'ATA', ata: item.numeroAta };
     }
   }

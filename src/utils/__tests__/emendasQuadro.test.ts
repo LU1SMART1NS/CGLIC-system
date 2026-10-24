@@ -208,9 +208,9 @@ describe('prazo do ofício', () => {
     expect(q.prazoDoOficio).toEqual({ data: '2026-11-22', pela: 'RESERVA', ata: null });
     const perto = new Map(itens).set('drone', item('drone', { nomeCurto: 'Drone', valorUnitario: 45200, numeroAta: '00099/2024', vigenciaFinal: '2026-12-10' }));
     const q2 = montarQuadro({ autor, linhas, itens: perto, beneficiarios: new Map(), precos, data: '2026-10-23' });
-    // 10/12/2026 − 35 dias = 05/11/2026, antes de 22/11.
-    expect(q2.prazoDoOficio).toEqual({ data: '2026-11-05', pela: 'ATA', ata: '00099/2024' });
-    expect(textoParaWhatsapp(q2)).toContain('⏳ *Enviar o ofício até 05/11/2026*');
+    // 10/12/2026 − 35 dias = 05/11/2026, menos 5 dias para a CAEP registrar = 31/10/2026, antes de 22/11.
+    expect(q2.prazoDoOficio).toEqual({ data: '2026-10-31', pela: 'ATA', ata: '00099/2024' });
+    expect(textoParaWhatsapp(q2)).toContain('⏳ *Enviar o ofício até 31/10/2026*');
     // Ofício devolvido: os 30 dias contam da devolução.
     expect(montarQuadro({ autor, linhas, itens, beneficiarios: new Map(), precos, data: '2026-09-01', devolvidoEm: '2026-10-20' }).prazoDoOficio?.data).toBe('2026-11-19');
   });
