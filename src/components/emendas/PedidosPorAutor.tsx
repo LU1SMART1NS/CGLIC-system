@@ -45,7 +45,7 @@ const vazio = <span style={{ ...carteiraDetalhe, marginTop: 0 }}>—</span>;
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 interface Props {
-  /** Pedidos da etapa escolhida no trilho de Pedidos ("Todos" já vem sem os cancelados). */
+  /** Pedidos da fase escolhida no trilho de Pedidos ("Todos" já vem sem os cancelados). */
   pedidos: PedidoEmenda[];
   /** Etapa escolhida: fora de "Todos" a coluna "Já empenhado" não faz sentido. */
   todasAsEtapas: boolean;
@@ -60,7 +60,7 @@ interface Props {
 }
 
 /**
- * Pedidos › Ver por autor: o que cada parlamentar ou bancada tem com a CAEP na etapa escolhida (substitui a antiga aba
+ * Pedidos › Ver por autor: o que cada parlamentar ou bancada tem com a CAEP na fase escolhida (substitui a antiga aba
  * Por autor). O filtro "Mostrar" traz também quem não tem pedido (cadastro da Câmara e do Senado, migration 155).
  */
 export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autores, itens, isLoading, isError, errorMessage, onRetry, onAbrirAutor }) => {
@@ -109,7 +109,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
     { key: 'kits', header: 'Kits', align: 'right', nowrap: true, sortValue: ORDEM.kits.value, sortFirstDir: 'desc', render: (l) => (l.kits ? <span style={carteiraNumero}>{formatNumber(l.kits)}</span> : vazio) },
     {
       key: 'valor',
-      header: todasAsEtapas ? 'Valor reservado' : 'Valor nesta etapa',
+      header: todasAsEtapas ? 'Valor reservado' : 'Valor nesta fase',
       align: 'right',
       nowrap: true,
       sortValue: ORDEM.valor.value,
@@ -174,8 +174,8 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
         errorMessage={errorMessage}
         onRetry={onRetry}
         isEmpty={!isLoading && filtradas.length === 0}
-        emptyTitle={linhas.length === 0 ? 'Nenhum autor com pedido nesta etapa.' : 'Nenhum autor encontrado.'}
-        emptyDescription={linhas.length === 0 ? 'Escolha outra etapa ou use "Mostrar" para ver também quem não tem pedido.' : 'Ajuste a busca ou os filtros.'}
+        emptyTitle={linhas.length === 0 ? 'Nenhum autor com pedido nesta fase.' : 'Nenhum autor encontrado.'}
+        emptyDescription={linhas.length === 0 ? 'Escolha outra fase ou use "Mostrar" para ver também quem não tem pedido.' : 'Ajuste a busca ou os filtros.'}
       >
         <DataTable<Linha>
           testId="emendas-por-autor-tabela"

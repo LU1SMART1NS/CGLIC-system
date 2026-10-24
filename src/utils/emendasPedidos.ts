@@ -25,11 +25,15 @@ export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; r
  * Fases da linha do tempo do pedido. A última etapa, Contratado, não é gravada: vem do contrato das notas no
  * Contratos.gov.br (ver contratosDoPedido).
  */
-export const FASES_PEDIDO: ReadonlyArray<{ nome: string; etapas: ReadonlyArray<Exclude<EtapaPedido, 'CANCELADO'>> }> = [
-  { nome: 'Interlocução', etapas: ['RESERVADO', 'MINUTA', 'OFICIO'] },
-  { nome: 'Empenho', etapas: ['CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI', 'EMPENHADO'] },
-  { nome: 'Contratação', etapas: ['CONTRATACAO'] }
+export type FasePedido = 'INTERLOCUCAO' | 'EMPENHO' | 'CONTRATACAO';
+export const FASES_PEDIDO: ReadonlyArray<{ id: FasePedido; nome: string; etapas: ReadonlyArray<Exclude<EtapaPedido, 'CANCELADO'>> }> = [
+  { id: 'INTERLOCUCAO', nome: 'Interlocução', etapas: ['RESERVADO', 'MINUTA', 'OFICIO'] },
+  { id: 'EMPENHO', nome: 'Empenho', etapas: ['CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI', 'EMPENHADO'] },
+  { id: 'CONTRATACAO', nome: 'Contratação', etapas: ['CONTRATACAO'] }
 ];
+
+/** Fase de uma etapa (o cancelado não tem fase). */
+export const faseDaEtapa = (etapa: EtapaPedido): FasePedido | null => FASES_PEDIDO.find((f) => (f.etapas as readonly EtapaPedido[]).includes(etapa))?.id ?? null;
 
 /** Etapas da linha do tempo: as 9 gravadas e Contratado. */
 export const TOTAL_ETAPAS_PEDIDO = ETAPAS.length + 1;

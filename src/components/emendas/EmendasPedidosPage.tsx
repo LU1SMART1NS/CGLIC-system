@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Check, ChevronDown, ChevronRight, Circle, ClipboardList, Clock, RotateCcw } from 'lucide-react';
@@ -41,6 +41,8 @@ import {
   ETAPAS,
   ETAPAS_COM_VARIOS_SEI,
   FASES_PEDIDO,
+  faseDaEtapa,
+  type FasePedido,
   TOTAL_ETAPAS_PEDIDO,
   contratosDoPedido,
   jaEmpenhado,
@@ -68,7 +70,9 @@ import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
-type Segmento = 'todos' | EtapaPedido;
+type Segmento = 'todos' | FasePedido | 'CANCELADO';
+/** Filtro de etapa dentro da fase; na Contratação separa quem aguarda o contrato de quem já está contratado. */
+type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | 'AGUARDANDO_CONTRATO' | 'CONTRATADO';
 type Linha = PedidoEmenda & { valor: number; avisos: AvisoPedido[] };
 
 const POR_PAGINA = 25;
@@ -430,8 +434,17 @@ export const EmendasPedidosPage: React.FC = () => {
   const hoje = hojeEmBrasilia();
   // Vindo do Início: ?aviso= (tipo, 'com' ou 'grave'), ?etapa= e ?pedido= (só aquele pedido, já aberto).
   const [searchParams, setSearchParams] = useSearchParams();
+  // ?etapa= abre a aba da fase com o filtro daquela etapa (a etapa de contratação abre a fase inteira).
   const etapaDaUrl = searchParams.get('etapa');
-  const [segmento, setSegmento] = useState<Segmento>(() => (etapaDaUrl && etapaDaUrl in ORDEM_ETAPA ? (etapaDaUrl as Segmento) : 'todos'));
+  const etapaValida = etapaDaUrl && etapaDaUrl in ORDEM_ETAPA ? (etapaDaUrl as EtapaPedido) : null;
+  const [segmento, setSegmentoBruto] = useState<Segmento>(() => (etapaValida === 'CANCELADO' ? 'CANCELADO' : etapaValida ? faseDaEtapa(etapaValida) ?? 'todos' : 'todos'));
+  const [filtroEtapa, setFiltroEtapa] = useState<FiltroEtapa>(() =>
+    etapaValida && etapaValida !== 'CANCELADO' && etapaValida !== 'CONTRATACAO' ? etapaValida : ''
+  );
+  const setSegmento = (s: Segmento) => {
+    setSegmentoBruto(s);
+    setFiltroEtapa('');
+  };
   const [filtroAviso, setFiltroAviso] = useState(() => searchParams.get('aviso') ?? '');
   const [soPedido, setSoPedido] = useState(() => searchParams.get('pedido'));
   const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(soPedido ? [soPedido] : []));
@@ -460,13 +473,35 @@ export const EmendasPedidosPage: React.FC = () => {
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todos: 0, CANCELADO: 0 };
     for (const l of linhas) {
-      c[l.etapa] = (c[l.etapa] ?? 0) + 1;
+      const fase = faseDaEtapa(l.etapa);
+      if (fase) c[fase] = (c[fase] ?? 0) + 1;
+      else c.CANCELADO++;
       if (l.etapa !== 'CANCELADO') c.todos++;
     }
     return c;
   }, [linhas]);
 
-  const doSegmento = useMemo(() => linhas.filter((l) => (segmento === 'todos' ? l.etapa !== 'CANCELADO' : l.etapa === segmento)), [linhas, segmento]);
+  const doSegmento = useMemo(
+    () => linhas.filter((l) => (segmento === 'todos' ? l.etapa !== 'CANCELADO' : segmento === 'CANCELADO' ? l.etapa === 'CANCELADO' : faseDaEtapa(l.etapa) === segmento)),
+    [linhas, segmento]
+  );
+  const etapaDoFiltro = useCallback(
+    (l: Linha): FiltroEtapa => (l.etapa === 'CONTRATACAO' ? (contratosDoPedido(l, notas).contratado ? 'CONTRATADO' : 'AGUARDANDO_CONTRATO') : (l.etapa as FiltroEtapa)),
+    [notas]
+  );
+  // Opções do filtro de etapa: as etapas da fase da aba, com a contagem.
+  const opcoesDeEtapa = useMemo(() => {
+    const fase = FASES_PEDIDO.find((f) => f.id === segmento);
+    if (!fase) return [];
+    const valores: { value: FiltroEtapa; label: string }[] =
+      fase.id === 'CONTRATACAO'
+        ? [
+            { value: 'AGUARDANDO_CONTRATO', label: 'Aguardando contrato' },
+            { value: 'CONTRATADO', label: 'Contratado' }
+          ]
+        : fase.etapas.map((e) => ({ value: e as FiltroEtapa, label: ROTULO_ETAPA[e] }));
+    return valores.map((v) => ({ ...v, count: doSegmento.filter((l) => etapaDoFiltro(l) === v.value).length }));
+  }, [segmento, doSegmento, etapaDoFiltro]);
   const filtradas = useMemo(() => {
     const termo = semAcento(busca.trim());
     const textoDoBeneficiario = (id: string | null) => {
@@ -474,6 +509,7 @@ export const EmendasPedidosPage: React.FC = () => {
       return b ? [b.nome, b.sigla, b.razaoSocial, b.entregaMunicipio, ...b.outrosNomes].filter(Boolean).join(' ') : '';
     };
     return doSegmento
+      .filter((l) => !filtroEtapa || etapaDoFiltro(l) === filtroEtapa)
       .filter((l) => !soPedido || l.id === soPedido)
       .filter((l) => !filtroAutor || (filtroAutor === AUTOR_A_DEFINIR_CHAVE ? !l.autorId : l.autorId === filtroAutor))
       .filter((l) => !filtroAviso || temAviso(l, filtroAviso))
@@ -485,7 +521,7 @@ export const EmendasPedidosPage: React.FC = () => {
           .join(' ');
         return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`).includes(termo);
       });
-  }, [doSegmento, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios]);
+  }, [doSegmento, filtroEtapa, etapaDoFiltro, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios]);
 
   // Como nas carteiras: ordena pelo cabeçalho (?ordem=) antes de paginar.
   const ordem = useMemo<Record<string, CarteiraSortColumn<Linha>>>(
@@ -499,7 +535,7 @@ export const EmendasPedidosPage: React.FC = () => {
   );
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ordem);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
-  const filtrosAtivos = Boolean(busca.trim() || filtroAviso || soPedido || filtroAutor);
+  const filtrosAtivos = Boolean(busca.trim() || filtroEtapa || filtroAviso || soPedido || filtroAutor);
   // Autores com pedido na etapa escolhida, os que têm mais pedidos primeiro; "Parlamentar a definir" no fim.
   const opcoesDeAutor = useMemo(() => {
     const conta = new Map<string, number>();
@@ -550,7 +586,11 @@ export const EmendasPedidosPage: React.FC = () => {
         const documento = l.siopEmenda ? `Emenda ${l.siopEmenda}` : l.oficioProcessoSei ? `Processo ${l.oficioProcessoSei}` : null;
         return (
           <>
-            <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
+            {etapaDoFiltro(l) === 'CONTRATADO' ? (
+              <StatusBadge label="Contratado" variant="success" size="sm" dot={false} />
+            ) : (
+              <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
+            )}
             {documento && <div style={carteiraDetalhe}>{documento}</div>}
           </>
         );
@@ -582,8 +622,8 @@ export const EmendasPedidosPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Pedidos"
-        subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na etapa escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
-        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas em três fases: Interlocução (itens reservados → minuta enviada ao gabinete → ofício recebido), Empenho (emenda conferida no SIOP → empenho solicitado → empenho autorizado → processo enviado à CGOFI → nota de empenho emitida) e Contratação (processo enviado à CCGA → contratado, quando o contrato de cada nota aparece no Contratos.gov.br). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da etapa escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
+        subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na fase escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
+        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas em três fases: Interlocução (itens reservados → minuta enviada ao gabinete → ofício recebido), Empenho (emenda conferida no SIOP → empenho solicitado → empenho autorizado → processo enviado à CGOFI → nota de empenho emitida) e Contratação (processo enviado à CCGA → contratado, quando o contrato de cada nota aparece no Contratos.gov.br). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da fase escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={
           <CarteiraSegmentTabs<'pedido' | 'autor'>
@@ -612,11 +652,11 @@ export const EmendasPedidosPage: React.FC = () => {
 
       <CarteiraSegmentTabs<Segmento>
         testIdPrefix="emendas-pedidos-etapa"
-        ariaLabel="Etapa dos pedidos"
+        ariaLabel="Fase dos pedidos"
         active={segmento}
         onSelect={setSegmento}
         segments={[
-          ...ETAPAS.map((e) => ({ id: e.etapa as Segmento, label: e.curto, count: contagem[e.etapa] ?? 0, dot: jaEmpenhado(e.etapa) ? 'var(--color-success)' : undefined })),
+          ...FASES_PEDIDO.map((f) => ({ id: f.id as Segmento, label: f.nome, count: contagem[f.id] ?? 0 })),
           { id: 'todos', label: 'Todos', count: contagem.todos },
           { id: 'CANCELADO', label: 'Cancelados', count: contagem.CANCELADO ?? 0 }
         ]}
@@ -648,6 +688,7 @@ export const EmendasPedidosPage: React.FC = () => {
             hasActiveFilters={filtrosAtivos}
             onResetFilters={() => {
               setBusca('');
+              setFiltroEtapa('');
               setFiltroAviso('');
               setSoPedido(null);
               if (searchParams.toString()) setSearchParams({}, { replace: true });
@@ -655,6 +696,16 @@ export const EmendasPedidosPage: React.FC = () => {
             counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
             testIdPrefix="emendas-pedidos"
           >
+            {opcoesDeEtapa.length > 0 && (
+              <CarteiraFilterButton
+                label="Etapa"
+                value={filtroEtapa}
+                emptyValue=""
+                options={opcoesDeEtapa}
+                onChange={(v) => setFiltroEtapa(v as FiltroEtapa)}
+                testId="emendas-pedidos-filtro-etapa"
+              />
+            )}
             <CarteiraFilterButton
               label="Autor"
               value={filtroAutor}

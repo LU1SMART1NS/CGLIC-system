@@ -67,12 +67,23 @@ describe('Pedidos: ver por pedido ou por autor', () => {
     expect(html).not.toContain('Bancada Três');
   });
 
-  it('por autor respeita a etapa escolhida e tira Já empenhado', () => {
+  it('por autor respeita a fase escolhida e tira Já empenhado', () => {
+    // ?etapa=RESERVADO abre a fase Interlocução (Reservado, Minuta e Ofício).
     const html = render('/?ver=autor&etapa=RESERVADO');
-    expect(html).toContain('Valor nesta etapa');
+    expect(html).toContain('Valor nesta fase');
     expect(html).not.toContain('Já empenhado');
     expect(html).toContain('Senadora Dois');
-    expect(html).not.toContain('Deputado Um');
+    expect(html).toContain('Deputado Um');
+  });
+
+  it('abas por fase; ?etapa= abre a fase com o filtro da etapa', () => {
+    const html = render('/?etapa=RESERVADO');
+    for (const fase of ['Interlocução', 'Empenho', 'Contratação', 'Todos', 'Cancelados']) expect(html).toContain(`>${fase}<`);
+    expect(html).not.toContain('>Minuta<');
+    expect(html).toContain('emendas-pedidos-filtro-etapa');
+    // Itens reservados: p3 e p4 (p1 está no ofício).
+    expect(html).toContain('2 de 3 pedidos');
+    expect(render('/')).not.toContain('emendas-pedidos-filtro-etapa');
   });
 });
 
