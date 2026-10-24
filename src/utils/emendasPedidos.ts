@@ -15,7 +15,7 @@ export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; r
   { etapa: 'OFICIO', rotulo: 'Ofício recebido', curto: 'Ofício', descricao: 'O ofício chegou ao MJSP e virou processo SEI na CAEP.' },
   { etapa: 'CONFERIDO', rotulo: 'Conferido no SIOP', curto: 'Conferidos', descricao: 'Nº da emenda, autor, valor, GND, beneficiário e objeto batem.' },
   { etapa: 'SOLICITADO', rotulo: 'Solicitação de empenho', curto: 'Solicitados', descricao: 'A CAEP elaborou a solicitação de empenho e enviou à DGFNSP.' },
-  { etapa: 'AUTORIZADO', rotulo: 'Empenho autorizado', curto: 'Autorizados', descricao: 'A DGFNSP autorizou o empenho.' },
+  { etapa: 'AUTORIZADO', rotulo: 'Empenho autorizado', curto: 'Autorizados', descricao: 'A DGFNSP assinou a solicitação de empenho.' },
   { etapa: 'CGOFI', rotulo: 'Enviado à CGOFI', curto: 'Na CGOFI', descricao: 'A CAEP enviou à CGOFI para fazer o empenho.' },
   { etapa: 'EMPENHADO', rotulo: 'Empenhado', curto: 'Empenhados', descricao: 'A CGOFI emitiu as notas de empenho (uma por fornecedor).' },
   { etapa: 'CONTRATACAO', rotulo: 'Enviado para contratação · CCGA', curto: 'Na CCGA', descricao: 'Despacho para contratação à CCGA; a CAEP acompanha a execução.' }
@@ -315,8 +315,6 @@ export function seiDaEtapa(p: PedidoEmenda, etapa: EtapaPedido): string[] {
       return p.oficioDocumentoSei ? [p.oficioDocumentoSei] : [];
     case 'SOLICITADO':
       return p.solicitadoDocumentoSei ? [p.solicitadoDocumentoSei] : [];
-    case 'AUTORIZADO':
-      return p.autorizadoDocumentoSei ? [p.autorizadoDocumentoSei] : [];
     case 'CGOFI':
       return p.cgofiDocumentoSei ? [p.cgofiDocumentoSei] : [];
     case 'EMPENHADO':

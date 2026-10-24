@@ -74,6 +74,8 @@ describe('pedidos das emendas', () => {
     expect(seiDaEtapa(p, 'CONTRATACAO')).toEqual(['35408653', '35430673']);
     expect(seiDaEtapa(pedido({ oficioDocumentoSei: '41234567' }), 'OFICIO')).toEqual(['41234567']);
     expect(seiDaEtapa(p, 'CONFERIDO')).toEqual([]);
+    // A autorização é o documento da solicitação, assinado pela DGFNSP: o número aparece só na solicitação.
+    expect(seiDaEtapa(pedido({ solicitadoDocumentoSei: '41000001', autorizadoDocumentoSei: '41000001' }), 'AUTORIZADO')).toEqual([]);
   });
 });
 
