@@ -113,7 +113,7 @@ describe('quadro da reserva (Anexo)', () => {
   it('WhatsApp: numerado por beneficiário com o valor dele; sem título, ata, endereço nem notas; a definir no fim', () => {
     const t = textoParaWhatsapp(q);
     expect(t.startsWith('📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · 23/10/2026*\n⏳ *Enviar o ofício até 22/11/2026*\n\n1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
-    expect(t).toContain('2️⃣ *Corpo de Bombeiros Militar · CBMERJ* · RJ: *R$ 94.317,66*\n• 2 Drone\n\n');
+    expect(t).toContain('2️⃣ *Corpo de Bombeiros Militar · CBMERJ* · RJ: *R$ 94.317,66*\n• 2 Drone: R$ 94.317,66\n\n');
     expect(t).toContain('3️⃣ *Beneficiário a definir*');
     for (const fora of ['Tabela 1', 'Ata ', 'Rua X', 'IPCA', '¹']) expect(t).not.toContain(fora);
     expect(t).toContain('• 2 Mesa flexora:');
@@ -179,7 +179,7 @@ describe('mesmo item para vários beneficiários', () => {
   it('WhatsApp: o mesmo item aparece em cada beneficiário', () => {
     const t = textoParaWhatsapp(qv);
     expect(t).toContain('*10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 399.610,84*\n• 2 Camioneta/SUV médio: R$ 383.623,24\n• 10 Tablet');
-    expect(t).toContain('*Beneficiário a definir*: *R$ 575.434,86*\n• 3 Camioneta/SUV médio');
+    expect(t).toContain('*Beneficiário a definir*: *R$ 575.434,86*\n• 3 Camioneta/SUV médio: R$ 575.434,86');
   });
 });
 
