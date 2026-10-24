@@ -134,8 +134,8 @@ const DocumentoDaEtapa: React.FC<{ numero: string; data: string | null; testId: 
 );
 
 /**
- * Uma solicitação de autorização de empenho para cada ata do pedido (migration 178): o número SEI, os itens e o dia
- * em que a Diretora do FNSP assinou. A que falta vem primeiro, com o botão para informar.
+ * Solicitações de autorização de empenho de cada ata do pedido, uma por rodada (migrations 178 e 179): o número SEI, o
+ * dia em que a Diretora do FNSP assinou e os itens. A ata que falta vem primeiro, com o botão para informar.
  */
 const AtasDaSolicitacao: React.FC<{ p: PedidoEmenda; itens: Map<string, ItemCaep>; podeGerir: boolean; aberta: boolean; onAcao: AoAgir }> = ({ p, itens, podeGerir, aberta, onAcao }) => {
   const atas = atasDoPedido(p, itens);
@@ -145,39 +145,52 @@ const AtasDaSolicitacao: React.FC<{ p: PedidoEmenda; itens: Map<string, ItemCaep
   const nenhuma = !p.documentos.some((d) => d.etapa === 'AUTORIZACAO');
   const linhas = atas.map((a) => {
     const falta = a.situacao === 'falta';
-    const botao = falta
-      ? 'Informar a solicitação desta ata'
-      : a.situacao === 'aguardando' && autorizado
-        ? 'Informar a assinatura'
-        : 'Alterar';
     return (
       <div key={a.ataKey} className={falta && !nenhuma ? 'emendas-ata emendas-ata--falta' : 'emendas-ata'} data-testid={`emendas-pedido-ata-${a.numeroAta}`}>
-        {a.solicitacao ? <NumeroSeiEtiqueta numero={a.solicitacao} testId="emendas-pedido-sei-AUTORIZACAO" /> : <span className="emendas-ata__falta">falta</span>}
-        <div className="emendas-ata__det">
-          <strong>
-            Ata {a.numeroAta}
-            {a.fornecedor ? ` · ${a.fornecedor}` : ''}
-          </strong>
-          {a.itens.map((i) => (
-            <span key={i.itemKey}>
-              item {i.numeroItem} · {i.nome} · <strong>{i.quantidade} un.</strong>
-            </span>
-          ))}
-          {a.situacao === 'assinada' && (
-            <span>
-              Assinada pela Diretora do FNSP em <strong>{dataBR(a.assinadaEm)}</strong>
-            </span>
-          )}
-          {a.situacao === 'aguardando' && <span className="emendas-ata__aviso">aguardando a assinatura da Diretora do FNSP</span>}
-          {falta && !nenhuma && <span className="emendas-ata__aviso">Esta ata ainda não tem solicitação de empenho.</span>}
-          {podeGerir && (
-            <span>
-              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: a.ataKey, numero: a.solicitacao ?? undefined })} data-testid={`emendas-pedido-ata-informar-${a.numeroAta}`}>
-                {botao}
+        <strong>
+          Ata {a.numeroAta}
+          {a.fornecedor ? ` · ${a.fornecedor}` : ''}
+        </strong>
+        {a.itens.map((i) => (
+          <span key={i.itemKey}>
+            item {i.numeroItem} · {i.nome} · <strong>{i.quantidade} un.</strong>
+          </span>
+        ))}
+        {a.solicitacoes.map((x) => (
+          <div key={x.numero} className="emendas-ata__sol">
+            <NumeroSeiEtiqueta numero={x.numero} testId="emendas-pedido-sei-AUTORIZACAO" />
+            {x.assinadaEm ? (
+              <span>
+                assinada pela Diretora do FNSP em <strong>{dataBR(x.assinadaEm)}</strong>
+              </span>
+            ) : (
+              <span className="emendas-ata__aviso">aguardando a assinatura da Diretora do FNSP</span>
+            )}
+            {podeGerir && (
+              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: a.ataKey, numero: x.numero, troca: true })} data-testid={`emendas-pedido-ata-alterar-${x.numero}`}>
+                {!x.assinadaEm && autorizado ? 'Informar a assinatura' : 'Alterar'}
               </AppButton>
-            </span>
-          )}
-        </div>
+            )}
+          </div>
+        ))}
+        {falta && (
+          <div className="emendas-ata__sol">
+            <span className="emendas-ata__falta">falta</span>
+            {!nenhuma && <span className="emendas-ata__aviso">Esta ata ainda não tem solicitação de empenho.</span>}
+            {podeGerir && (
+              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: a.ataKey })} data-testid={`emendas-pedido-ata-informar-${a.numeroAta}`}>
+                Informar a solicitação desta ata
+              </AppButton>
+            )}
+          </div>
+        )}
+        {podeGerir && !falta && (
+          <span>
+            <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: a.ataKey })} data-testid={`emendas-pedido-ata-mais-${a.numeroAta}`}>
+              + solicitação desta ata (nova rodada)
+            </AppButton>
+          </span>
+        )}
       </div>
     );
   });
@@ -187,15 +200,13 @@ const AtasDaSolicitacao: React.FC<{ p: PedidoEmenda; itens: Map<string, ItemCaep
       <ListaRecolhivel itens={linhas} aberta={aberta || atas.some((a) => a.situacao !== 'assinada')} nome="atas" testId={`emendas-pedido-atas-mais-${p.id}`} />
       {soltas.map((n) => (
         <div key={n} className="emendas-ata" data-testid="emendas-pedido-solicitacao-sem-ata">
-          <NumeroSeiEtiqueta numero={n} testId="emendas-pedido-sei-AUTORIZACAO" />
-          <div className="emendas-ata__det">
+          <div className="emendas-ata__sol">
+            <NumeroSeiEtiqueta numero={n} testId="emendas-pedido-sei-AUTORIZACAO" />
             <span className="emendas-ata__aviso">Solicitação sem ata</span>
             {podeGerir && (
-              <span>
-                <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { numero: n })}>
-                  Ligar a uma ata
-                </AppButton>
-              </span>
+              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { numero: n })}>
+                Ligar a uma ata
+              </AppButton>
             )}
           </div>
         </div>
@@ -279,7 +290,8 @@ const EtapasDoPedido: React.FC<{
                   // A solicitação e a autorização são o mesmo documento: com as atas numa etapa, a outra não repete.
                   const solicitacaoNasAtas = etapa === 'SOLICITADO' && etapaDasAtas === 'AUTORIZADO';
                   const docs = mostraDados && !comAtas && !solicitacaoNasAtas && etapa !== 'AUTORIZADO' ? documentosDaEtapa(p, etapa) : [];
-                  const intervalo = comAtas && etapa === 'AUTORIZADO' ? intervaloDeDatas(atas.map((a) => a.assinadaEm)) : intervaloDeDatas(docs.map((d) => d.data));
+                  const intervalo =
+                    comAtas && etapa === 'AUTORIZADO' ? intervaloDeDatas(atas.flatMap((a) => a.solicitacoes.map((x) => x.assinadaEm))) : intervaloDeDatas(docs.map((d) => d.data));
                   const textoData = mostraDados ? (intervalo ?? (data ? dataBR(data) : null)) : null;
                   // Nota nova (outro fornecedor): mais um número no empenho ou no envio para contratação.
                   const acrescentar =

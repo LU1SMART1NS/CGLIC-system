@@ -247,9 +247,9 @@ describe('uma solicitação de empenho para cada ata (migration 178)', () => {
   it('as atas vêm das linhas ativas e dos kits, com fornecedor, itens somados e a situação de cada solicitação', () => {
     const p = pedido({ etapa: 'AUTORIZADO', linhas, documentos: [doc('37098929', A, '2026-09-24')] });
     const atas = atasDoPedido(p, catalogo);
-    expect(atas.map((a) => [a.numeroAta, a.situacao, a.solicitacao])).toEqual([
-      ['00048/2025', 'falta', null],
-      ['00031/2025', 'assinada', '37098929']
+    expect(atas.map((a) => [a.numeroAta, a.situacao, a.solicitacoes.map((x) => x.numero)])).toEqual([
+      ['00048/2025', 'falta', []],
+      ['00031/2025', 'assinada', ['37098929']]
     ]);
     expect(atas[1].fornecedor).toBe('FORNECEDOR A');
     expect(atas[1].itens).toEqual([
@@ -266,6 +266,18 @@ describe('uma solicitação de empenho para cada ata (migration 178)', () => {
     expect(atasSemAutorizacao(pedido({ etapa: 'SOLICITADO', linhas, documentos: [doc('37098929', A)] }))).toBeNull();
     const completo = pedido({ etapa: 'CONTRATACAO', linhas, documentos: [doc('37098929', A, '2026-09-24'), doc('37104393', B, '2026-09-25')] });
     expect(atasSemAutorizacao(completo)).toBeNull();
+  });
+
+  it('a ata aceita uma solicitação por rodada: assinada só quando todas estão (migration 179)', () => {
+    const duas = pedido({ etapa: 'CONTRATACAO', linhas, documentos: [doc('35673658', A, '2026-05-27'), doc('36536429', A, null), doc('37104393', B, '2026-09-24')] });
+    const a = atasDoPedido(duas).find((x) => x.numeroAta === '00031/2025')!;
+    expect(a.solicitacoes.map((x) => x.numero)).toEqual(['35673658', '36536429']);
+    expect([a.situacao, a.assinadaEm]).toEqual(['aguardando', null]);
+    expect(atasSemAutorizacao(duas)?.curto).toBe('1 ata sem autorização');
+    const assinadas = pedido({ ...duas, documentos: [doc('35673658', A, '2026-05-27'), doc('36536429', A, '2026-08-11'), doc('37104393', B, '2026-09-24')] });
+    const b = atasDoPedido(assinadas).find((x) => x.numeroAta === '00031/2025')!;
+    expect([b.situacao, b.assinadaEm]).toEqual(['assinada', '2026-08-11']);
+    expect(atasSemAutorizacao(assinadas)).toBeNull();
   });
 
   it('solicitação sem ata aparece para o gestor ligar', () => {

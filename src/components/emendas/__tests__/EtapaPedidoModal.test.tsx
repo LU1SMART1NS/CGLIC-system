@@ -65,6 +65,15 @@ describe('janela das etapas: uma solicitação de empenho para cada ata (migrati
     expect(html).toContain('emendas-etapa-assinada-em');
   });
 
+  it('trocar uma solicitação trava a ata e explica que a anterior fica no pedido; sem troca, entra a mais', () => {
+    const p = pedido('CONTRATACAO', [{ etapa: 'AUTORIZACAO', numero: '35673658', data: null, ataKey: A, assinadaEm: '2026-05-27' }]);
+    const troca = renderToStaticMarkup(<EtapaPedidoModal pedido={p} acao="SOLICITACAO_ATA" contexto={{ ataKey: A, numero: '35673658', troca: true }} itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
+    expect(troca).toContain('Um número diferente troca essa solicitação');
+    expect(troca).toMatch(/data-testid="emendas-etapa-ata"[^>]*disabled|disabled[^>]*data-testid="emendas-etapa-ata"/);
+    const mais = renderToStaticMarkup(<EtapaPedidoModal pedido={p} acao="SOLICITACAO_ATA" contexto={{ ataKey: A }} itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
+    expect(mais).toContain('Solicitação a mais desta ata (nova rodada): as que ela já tem (35673658) continuam.');
+  });
+
   it('antes da autorização não pede a data da assinatura', () => {
     const html = renderToStaticMarkup(<EtapaPedidoModal pedido={pedido('SOLICITADO')} acao="SOLICITACAO_ATA" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
     expect(html).not.toContain('emendas-etapa-assinada-em');
