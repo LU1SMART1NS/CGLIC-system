@@ -3,6 +3,8 @@ import { ChevronDown, Search } from 'lucide-react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
+import { InfoHint } from '../../design-system/components/InfoHint';
+import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useSalvarPedido } from '../../hooks/useEmendas';
@@ -11,7 +13,7 @@ import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, curto, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta } from '../../utils/emendasKits';
 import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
-import { notaDoPreco } from '../../utils/emendasQuadro';
+import { nomeDoItem, notaDoPreco } from '../../utils/emendasQuadro';
 import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
 import { QuadroGabinete } from './QuadroGabinete';
@@ -72,6 +74,42 @@ const iniciais = (nome: string) =>
 const metaDoAutor = (a: AutorEmenda) => [TIPO_AUTOR[a.tipo], a.partido, a.uf, a.emExercicio === false ? 'fora do cargo' : null].filter(Boolean).join(' · ');
 const doisPrecos = (previsto: number, hoje: number) => Math.abs(previsto - hoje) > 0.004;
 let seq = 0;
+
+/** Cartão de item ou kit na busca da reserva: nome do quadro (descrição no ⓘ), preço numa coluna fixa e saldo no pé. */
+function CartaoResultado(props: {
+  nome: React.ReactNode;
+  descricao: string;
+  rotuloDescricao: string;
+  meta: React.ReactNode;
+  previsto: number;
+  hoje: number;
+  unidade: string;
+  notaPreco?: string | null;
+  saldo: React.ReactNode;
+  noPedido: number;
+  pode: boolean;
+  acao: React.ReactNode;
+}) {
+  const { nome, descricao, rotuloDescricao, meta, previsto, hoje, unidade, notaPreco, saldo, noPedido, pode, acao } = props;
+  return (
+    <div className={`reserva-resultado${pode ? '' : ' reserva-resultado--off'}${noPedido ? ' reserva-resultado--no-pedido' : ''}`}>
+      <div className="reserva-resultado__nome">
+        <span className="reserva-resultado__titulo">{nome}</span>
+        <InfoHint content={descricao} label={rotuloDescricao} testId="emendas-pedido-descricao" />
+      </div>
+      <div className="reserva-resultado__meta reserva-mudo">{meta}</div>
+      <div className="reserva-resultado__preco" title={notaPreco ?? undefined}>
+        <span className="reserva-resultado__valor">{formatCurrency(previsto)}</span>
+        <span className="reserva-mudo">{unidade} · previsto</span>
+        {doisPrecos(previsto, hoje) && <span className="reserva-mudo">hoje {formatCurrency(hoje)}</span>}
+      </div>
+      <div className="reserva-resultado__acao">{acao}</div>
+      <div className="reserva-resultado__saldo">{saldo}</div>
+    </div>
+  );
+}
+
+const Etiqueta = ({ texto, variante }: { texto: string; variante: 'danger' | 'info' }) => <StatusBadge label={texto} variant={variante} size="sm" dot={false} testId="emendas-pedido-etiqueta" />;
 
 function lerRascunho(): Rascunho | null {
   try {
@@ -555,26 +593,41 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             {kitsEncontrados.map(({ k, c }) => {
               const noPedido = linhas.filter((l) => l.kitId === k.id).reduce((s, l) => s + l.quantidade, 0);
               const pode = c.kitsPossiveis > 0;
+              const nomeDe = (x: ItemDoKit) => porChave.get(x.itemKey);
               return (
-                <div key={k.id} className={`reserva-resultado${pode ? '' : ' reserva-resultado--off'}${noPedido ? ' reserva-resultado--no-pedido' : ''}`}>
-                  <div className="reserva-resultado__texto">
-                    <div className="reserva-resultado__titulo">
+                <CartaoResultado
+                  key={k.id}
+                  nome={
+                    <>
                       <span className="reserva-kit">KIT</span>
                       {k.nome}
-                    </div>
-                    <div className="reserva-mudo">
-                      {k.itens.map((x) => `${x.quantidade} ${curto(porChave.get(x.itemKey)?.nomeCurto || porChave.get(x.itemKey)?.descricao || x.itemKey, 28).toLowerCase()}`).join(' · ')}
-                    </div>
-                    <div className="reserva-mudo">
-                      <b className="reserva-forte">{formatCurrency(c.valorPorKit)}</b> por kit{doisPrecos(c.valorPorKit, c.valorPorKitHoje) ? ` previsto · hoje ${formatCurrency(c.valorPorKitHoje)}` : ''}
-                    </div>
-                    <div className={pode ? 'reserva-mudo' : 'reserva-alerta'}>{pode ? `Dá para mais ${formatNumber(c.kitsPossiveis)} ${c.kitsPossiveis === 1 ? 'kit' : 'kits'}` : c.motivo || 'Algum item do kit está sem saldo livre.'}</div>
-                  </div>
-                  <div className="reserva-resultado__lado">
-                    {noPedido > 0 && <span className="reserva-no-pedido">No pedido · {formatNumber(noPedido)}</span>}
-                    <ActionButton action="adicionar" type="button" size="sm" label={noPedido ? 'Mais um' : undefined} onClick={() => adicionarKit(k)} disabled={!pode} data-testid={`emendas-pedido-kit-${k.id}`} />
-                  </div>
-                </div>
+                    </>
+                  }
+                  descricao={k.itens.map((x) => `${formatNumber(x.quantidade)} × ${nomeDe(x) ? descricaoItemEmFrase(nomeDe(x)!.descricao) : x.itemKey}`).join('; ')}
+                  rotuloDescricao={`Itens do kit ${k.nome}`}
+                  meta={k.itens.map((x) => `${x.quantidade} ${curto(nomeDoItem(nomeDe(x), x.itemKey), 28).toLowerCase()}`).join(' · ')}
+                  previsto={c.valorPorKit}
+                  hoje={c.valorPorKitHoje}
+                  unidade="por kit"
+                  saldo={
+                    <>
+                      {pode ? (
+                        <span className="reserva-mudo">
+                          Dá para mais {formatNumber(c.kitsPossiveis)} {c.kitsPossiveis === 1 ? 'kit' : 'kits'}
+                        </span>
+                      ) : (
+                        <>
+                          <Etiqueta texto="Indisponível" variante="danger" />
+                          <span className="reserva-mudo">{c.motivo || 'Algum item do kit está sem saldo livre.'}</span>
+                        </>
+                      )}
+                      {noPedido > 0 && <Etiqueta texto={`${formatNumber(noPedido)} no pedido`} variante="info" />}
+                    </>
+                  }
+                  noPedido={noPedido}
+                  pode={pode}
+                  acao={<ActionButton action="adicionar" type="button" size="sm" label={noPedido ? 'Mais um' : undefined} onClick={() => adicionarKit(k)} disabled={!pode} data-testid={`emendas-pedido-kit-${k.id}`} />}
+                />
               );
             })}
             {itensEncontrados.slice(0, MAX_RESULTADOS).map((i) => {
@@ -584,43 +637,46 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               const p = preco(i.itemKey);
               const fora = foraDoPrazo(i);
               const pode = podeItem(i);
-              const nota = notaDoPreco(p.preco, ipca);
               return (
-                <div key={i.itemKey} className={`reserva-resultado${pode ? '' : ' reserva-resultado--off'}${noPedido ? ' reserva-resultado--no-pedido' : ''}`}>
-                  <div className="reserva-resultado__texto">
-                    <div className="reserva-resultado__titulo reserva-duas-linhas" title={i.descricao}>
-                      {descricaoItemEmFrase(i.descricao)}
-                    </div>
-                    <div className="reserva-mudo">
-                      Item <b className="reserva-forte">{rotuloItemDaAta(i)}</b>
-                      {' · '}
-                      <span title={nota ?? undefined}>
-                        <b className="reserva-forte">{formatCurrency(p.previsto)}</b> un.{doisPrecos(p.previsto, p.hoje) ? ` previsto · hoje ${formatCurrency(p.hoje)}` : ''}
-                      </span>
-                    </div>
-                    {fora ? (
-                      <div className="reserva-alerta">
-                        Indicação encerrada em {dataBR(limiteDaIndicacao(i.vigenciaFinal!))}: a ata termina em {dataBR(i.vigenciaFinal)}.
-                      </div>
+                <CartaoResultado
+                  key={i.itemKey}
+                  nome={nomeDoItem(i, i.itemKey)}
+                  descricao={descricaoItemEmFrase(i.descricao)}
+                  rotuloDescricao="Descrição completa na ata"
+                  meta={`Ata ${i.numeroAta} · Item ${String(i.numeroItem).padStart(5, '0')}`}
+                  previsto={p.previsto}
+                  hoje={p.hoje}
+                  unidade="por unidade"
+                  notaPreco={notaDoPreco(p.preco, ipca)}
+                  saldo={
+                    fora ? (
+                      <>
+                        <Etiqueta texto="Indicação encerrada" variante="danger" />
+                        <span className="reserva-mudo">
+                          Em {dataBR(limiteDaIndicacao(i.vigenciaFinal!))}: a ata termina em {dataBR(i.vigenciaFinal)}.
+                        </span>
+                      </>
                     ) : saldo <= 0 ? (
-                      <div className="reserva-alerta">Sem saldo da CAEP neste item. Peça alocação ao gestor de saldo.</div>
+                      <>
+                        <Etiqueta texto="Sem saldo da CAEP" variante="danger" />
+                        <span className="reserva-mudo">Peça alocação ao gestor de saldo.</span>
+                      </>
                     ) : (
-                      <div className="reserva-medidor">
+                      <>
                         <span className="reserva-medidor__barra">
                           <i style={{ width: `${Math.max(0, Math.min(100, (fica / saldo) * 100))}%` }} className={fica / saldo < 0.2 ? 'reserva-pouco' : undefined} />
                         </span>
                         <span className="reserva-mudo">
                           {fica <= 0 ? `Todo o saldo livre já está neste pedido (${formatNumber(saldo)})` : `${formatNumber(fica)} ${fica === 1 ? 'livre' : 'livres'} de ${formatNumber(saldo)}`}
-                          {noPedido > 0 && fica > 0 ? ` · ${formatNumber(noPedido)} neste pedido` : ''}
                         </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="reserva-resultado__lado">
-                    {noPedido > 0 && <span className="reserva-no-pedido">No pedido · {formatNumber(noPedido)}</span>}
-                    <ActionButton action="adicionar" type="button" size="sm" label={noPedido ? 'Mais um' : undefined} onClick={() => adicionarItem(i)} disabled={!pode} data-testid={`emendas-pedido-item-${i.itemKey}`} />
-                  </div>
-                </div>
+                        {noPedido > 0 && <Etiqueta texto={`${formatNumber(noPedido)} no pedido`} variante="info" />}
+                      </>
+                    )
+                  }
+                  noPedido={noPedido}
+                  pode={pode}
+                  acao={<ActionButton action="adicionar" type="button" size="sm" label={noPedido ? 'Mais um' : undefined} onClick={() => adicionarItem(i)} disabled={!pode} data-testid={`emendas-pedido-item-${i.itemKey}`} />}
+                />
               );
             })}
             {kitsEncontrados.length === 0 && itensEncontrados.length === 0 && (
