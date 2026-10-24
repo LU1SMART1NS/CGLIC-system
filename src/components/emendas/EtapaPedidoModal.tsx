@@ -52,7 +52,6 @@ const TITULO: Record<AcaoDaJanela, string> = {
 const ROTULO_SEI: Partial<Record<AcaoDaJanela, string>> = {
   OFICIO: 'Documento SEI do ofício *',
   SOLICITADO: 'Documento SEI da solicitação de empenho *',
-  AUTORIZADO: 'Documento SEI da autorização *',
   CGOFI: 'Documento SEI do envio à CGOFI *',
   EMPENHADO: 'Documento(s) SEI do empenho *',
   CONTRATACAO: 'Documento(s) SEI do despacho para contratação *',
@@ -68,7 +67,7 @@ const ROTULO_DATA: Partial<Record<AcaoDaJanela, string>> = {
   DIVERGENCIA: 'Devolvido em',
   CONFERIDO: 'Conferido em',
   SOLICITADO: 'Enviada à DGFNSP em',
-  AUTORIZADO: 'Autorizado em',
+  AUTORIZADO: 'Assinado pela DGFNSP em',
   CGOFI: 'Enviado em',
   EMPENHADO: 'Empenhado em',
   CONTRATACAO: 'Enviado em'
@@ -238,6 +237,11 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
           <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} testId="emendas-etapa-quadro" />
         )}
 
+        {modo === 'AUTORIZADO' && (
+          <div style={aviso('info')}>
+            A autorização é o mesmo documento da solicitação{pedido.solicitadoDocumentoSei ? ` (SEI ${pedido.solicitadoDocumentoSei})` : ''}, assinado pela DGFNSP.
+          </div>
+        )}
         {modo === 'EMPENHADO' && <div style={aviso('info')}>As notas de empenho não são digitadas: o sistema acha cada nota pelo contrato e pela emenda.</div>}
         {modo === 'CONTRATACAO' && <div style={aviso('info')}>Ao registrar, o processo segue com a CCGA para a contratação e a CAEP passa a só acompanhar.</div>}
 

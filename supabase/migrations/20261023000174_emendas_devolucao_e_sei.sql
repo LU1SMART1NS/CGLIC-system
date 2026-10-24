@@ -11,8 +11,9 @@
 --      Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Solicitação de empenho (CAEP → DGFNSP)
 --      → Empenho autorizado (DGFNSP) → Enviado à CGOFI → Empenhado (CGOFI) → Enviado para contratação (CAEP → CCGA).
 --    Antes eram 6: "Empenhado" juntava o empenho e o envio à CCGA.
--- 3) SEI obrigatório nas etapas com documento (só números, 7 a 10 dígitos): ofício (documento + processo), solicitação,
---    autorização e envio à CGOFI (um número cada); empenho e envio para contratação (um ou mais: sai um por nota, e uma
+-- 3) SEI obrigatório nas etapas com documento (só números, 7 a 10 dígitos): ofício (documento + processo), solicitação
+--    de empenho e envio à CGOFI (um número cada); a autorização é o mesmo documento da solicitação (a CAEP elabora, a
+--    DGFNSP assina), então pede só a data; empenho e envio para contratação (um ou mais: sai um por nota, e uma
 --    emenda tem uma nota por fornecedor). Número a mais depois: ação ACRESCENTAR_SEI. Reservado, minuta e
 --    conferência no SIOP ficam só com a data.
 -- 4) Sai o número do ofício (o pedido é identificado pelo processo SEI) e sai a nota de empenho do registro do
@@ -46,7 +47,8 @@ COMMENT ON COLUMN public.emenda_pedidos.devolvido_em IS
 COMMENT ON COLUMN public.emenda_pedidos.divergencia IS
   'O que não bateu no último ofício devolvido; some quando chega o novo ofício.';
 COMMENT ON COLUMN public.emenda_pedidos.solicitado_documento_sei IS 'Documento SEI da solicitação de empenho (CAEP → DGFNSP).';
-COMMENT ON COLUMN public.emenda_pedidos.autorizado_documento_sei IS 'Documento SEI da autorização de empenho (DGFNSP).';
+COMMENT ON COLUMN public.emenda_pedidos.autorizado_documento_sei IS
+  'Documento SEI assinado pela DGFNSP: o mesmo da solicitação de empenho (cópia de solicitado_documento_sei).';
 COMMENT ON COLUMN public.emenda_pedidos.cgofi_documento_sei IS 'Documento SEI do envio à CGOFI para o empenho.';
 COMMENT ON COLUMN public.emenda_pedidos.empenhado_documentos_sei IS 'Documentos SEI do empenho (CGOFI): um por nota.';
 COMMENT ON COLUMN public.emenda_pedidos.contratacao_documentos_sei IS 'Documentos SEI do despacho para contratação (CAEP → CCGA): um por nota.';
@@ -100,7 +102,7 @@ END $$;
 --   DIVERGENCIA    { texto, data }                       (de Ofício recebido: volta para a minuta)
 --   CONFERIDO      { emenda, valor, gnd, data, conferencia: {numero_emenda, autor, valor, gnd, beneficiario, objeto} } (de Ofício)
 --   SOLICITADO     { documento_sei, data }               (de Conferido: solicitação de empenho à DGFNSP)
---   AUTORIZADO     { documento_sei, data }               (de Solicitado: autorização da DGFNSP)
+--   AUTORIZADO     { data }                              (de Solicitado: a DGFNSP assina o documento da solicitação)
 --   CGOFI          { documento_sei, data }               (de Autorizado: envio à CGOFI)
 --   EMPENHADO      { documentos_sei, data }              (de Enviado à CGOFI)
 --   CONTRATACAO    { documentos_sei, data }              (de Empenhado: despacho para contratação à CCGA)
@@ -136,7 +138,7 @@ BEGIN
   v_nome := left(public.nome_do_usuario_logado(), 200);
   v_data := COALESCE(NULLIF(v_d->>'data', '')::DATE, (NOW() AT TIME ZONE 'America/Sao_Paulo')::DATE);
 
-  IF v_acao IN ('OFICIO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI') THEN
+  IF v_acao IN ('OFICIO', 'SOLICITADO', 'CGOFI') THEN
     v_sei := regexp_replace(COALESCE(v_d->>'documento_sei', ''), '\D', '', 'g');
     IF v_sei !~ '^[0-9]{7,10}$' THEN
       RAISE EXCEPTION 'INVALID_PAYLOAD: informe o documento SEI (só números, 7 a 10 dígitos).' USING ERRCODE = '22023';
@@ -218,7 +220,7 @@ BEGIN
     IF v_p.etapa <> 'SOLICITADO' THEN
       RAISE EXCEPTION 'ETAPA_INVALIDA: A autorização de empenho vem depois da solicitação.' USING ERRCODE = '22023';
     END IF;
-    UPDATE public.emenda_pedidos SET etapa = 'AUTORIZADO', autorizado_em = v_data, autorizado_documento_sei = v_sei WHERE id = p_id;
+    UPDATE public.emenda_pedidos SET etapa = 'AUTORIZADO', autorizado_em = v_data, autorizado_documento_sei = solicitado_documento_sei WHERE id = p_id;
 
   ELSIF v_acao = 'CGOFI' THEN
     IF v_p.etapa <> 'AUTORIZADO' THEN
