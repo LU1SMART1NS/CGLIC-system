@@ -96,10 +96,9 @@ describe('quadro da reserva (Anexo)', () => {
     const html = htmlDaTabela(q);
     for (const h of ['ITEM', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
     expect(html.match(/<th /g)).toHaveLength(6);
-    // Título em cima da tabela.
-    expect(html.indexOf('Tabela 1 – Indicação de Romário')).toBeLessThan(html.indexOf('<table'));
-    // Sem fonte nem notas embaixo, e sem a marca da nota no preço.
-    expect(html.endsWith('</tbody></table>')).toBe(true);
+    // Título embaixo da tabela; sem fonte, notas nem a marca da nota no preço.
+    expect(html.startsWith('<table')).toBe(true);
+    expect(html.endsWith('</tbody></table><p style="text-align:center"><b>Tabela 1 – Indicação de Romário (Senado Federal · RJ)</b></p>')).toBe(true);
     expect(html).toContain('R$ 1.598,76</td>');
     expect(html).not.toContain('Kit Academia');
     expect(html).toContain('<b>Tablet</b><br><span style="font-size:8pt">Ata 00043/2026 · item 00005</span>');

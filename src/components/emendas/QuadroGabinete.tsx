@@ -170,7 +170,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
 
       {aba === 'sei' ? (
         <div style={{ background: '#fff', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 8, padding: '0.9rem', overflowX: 'auto', fontFamily: 'Arial, Helvetica, sans-serif' }} data-testid={`${testId}-sei`}>
-          <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.6rem' }}>{quadro.titulo}</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: 760 }}>
             <thead>
               <tr>
@@ -230,6 +229,8 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
               </tr>
             </tbody>
           </table>
+          {/* O título vai embaixo da tabela. */}
+          <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', marginTop: '0.6rem' }}>{quadro.titulo}</div>
         </div>
       ) : (
         <div style={{ background: '#efeae2', borderRadius: 8, padding: '0.9rem', display: 'flex' }} data-testid={`${testId}-whatsapp`}>

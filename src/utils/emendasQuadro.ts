@@ -336,14 +336,15 @@ export function htmlDaTabela(q: Quadro): string {
     '</tr>';
   const subtotal = (rotulo: string, v: number) => `<tr><td colspan="${COLUNAS.length - 1}" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${tdValor}"><b>${brl(v)}</b></td></tr>`;
   return (
-    `<p style="text-align:center"><b>${escapar(q.titulo)}</b></p>` +
     '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
     COLUNAS.map((h) => `<th style="${th}">${h}</th>`).join('') +
     '</tr></thead><tbody>' +
     q.linhas.map(linha).join('') +
     q.porGnd.map((g) => subtotal(g.rotulo, g.total)).join('') +
     `<tr><td colspan="${COLUNAS.length - 1}" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${tdValor}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
-    '</tbody></table>'
+    '</tbody></table>' +
+    // O título vai embaixo da tabela.
+    `<p style="text-align:center"><b>${escapar(q.titulo)}</b></p>`
   );
 }
 
