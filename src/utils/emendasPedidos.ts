@@ -14,8 +14,11 @@ export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; r
   { etapa: 'MINUTA', rotulo: 'Minuta enviada', curto: 'Minuta', descricao: 'A CAEP mandou a minuta do ofício ao gabinete.' },
   { etapa: 'OFICIO', rotulo: 'Ofício recebido', curto: 'Ofício', descricao: 'O ofício chegou ao MJSP e virou processo SEI na CAEP.' },
   { etapa: 'CONFERIDO', rotulo: 'Conferido no SIOP', curto: 'Conferidos', descricao: 'Nº da emenda, autor, valor, GND, beneficiário e objeto batem.' },
-  { etapa: 'AUTORIZADO', rotulo: 'Empenho autorizado', curto: 'Autorizados', descricao: 'Autorização de empenho assinada.' },
-  { etapa: 'EMPENHADO', rotulo: 'Empenhado · com a CCGA', curto: 'Empenhados', descricao: 'Nota emitida e processo com a CCGA; a CAEP acompanha a execução.' }
+  { etapa: 'SOLICITADO', rotulo: 'Solicitação de empenho', curto: 'Solicitados', descricao: 'A CAEP elaborou a solicitação de empenho e enviou à DGFNSP.' },
+  { etapa: 'AUTORIZADO', rotulo: 'Empenho autorizado', curto: 'Autorizados', descricao: 'A DGFNSP autorizou o empenho.' },
+  { etapa: 'CGOFI', rotulo: 'Enviado à CGOFI', curto: 'Na CGOFI', descricao: 'A CAEP enviou à CGOFI para fazer o empenho.' },
+  { etapa: 'EMPENHADO', rotulo: 'Empenhado', curto: 'Empenhados', descricao: 'A CGOFI emitiu as notas de empenho (uma por fornecedor).' },
+  { etapa: 'CONTRATACAO', rotulo: 'Enviado para contratação · CCGA', curto: 'Na CCGA', descricao: 'Despacho para contratação à CCGA; a CAEP acompanha a execução.' }
 ];
 
 export const ROTULO_ETAPA: Record<EtapaPedido, string> = {
@@ -23,28 +26,54 @@ export const ROTULO_ETAPA: Record<EtapaPedido, string> = {
   CANCELADO: 'Cancelado'
 };
 
-export const ORDEM_ETAPA: Record<EtapaPedido, number> = { RESERVADO: 0, MINUTA: 1, OFICIO: 2, CONFERIDO: 3, AUTORIZADO: 4, EMPENHADO: 5, CANCELADO: -1 };
+export const ORDEM_ETAPA: Record<EtapaPedido, number> = {
+  RESERVADO: 0, MINUTA: 1, OFICIO: 2, CONFERIDO: 3, SOLICITADO: 4, AUTORIZADO: 5, CGOFI: 6, EMPENHADO: 7, CONTRATACAO: 8, CANCELADO: -1
+};
 
 /** Etapas em que ainda dá para empenhar (e por isso a ata vencendo importa). */
-export const ANTES_DO_EMPENHO: ReadonlySet<EtapaPedido> = new Set(['RESERVADO', 'MINUTA', 'OFICIO', 'CONFERIDO', 'AUTORIZADO']);
+export const ANTES_DO_EMPENHO: ReadonlySet<EtapaPedido> = new Set(['RESERVADO', 'MINUTA', 'OFICIO', 'CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI']);
 
-/** Próximo passo do pedido: a ação e o rótulo do botão. */
-export function proximaAcao(etapa: EtapaPedido): { acao: AcaoPedido; rotulo: string } | null {
+/** Pedido já empenhado (com ou sem o envio para contratação): tem notas e execução. */
+export const jaEmpenhado = (etapa: EtapaPedido): boolean => etapa === 'EMPENHADO' || etapa === 'CONTRATACAO';
+
+/** Etapas em que alterar itens ou quantidades volta o pedido para "Ofício recebido" (migration 174). */
+export const VOLTA_AO_OFICIO: ReadonlySet<EtapaPedido> = new Set(['CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI']);
+
+/** Etapas cujo SEI aceita vários números, um por nota (o empenho sai por fornecedor). */
+export const ETAPAS_COM_VARIOS_SEI: ReadonlySet<EtapaPedido> = new Set(['EMPENHADO', 'CONTRATACAO']);
+
+/** Próximo passo do pedido: a ação e o rótulo do botão. Depois de uma devolução, a minuta e o ofício são da nova rodada. */
+export function proximaAcao(etapa: EtapaPedido, rodada = 1): { acao: Exclude<AcaoPedido, 'ACRESCENTAR_SEI' | 'DIVERGENCIA'>; rotulo: string } | null {
   switch (etapa) {
     case 'RESERVADO':
-      return { acao: 'MINUTA', rotulo: 'Registrar a minuta' };
+      return { acao: 'MINUTA', rotulo: rodada > 1 ? `Registrar a ${rodada}ª minuta` : 'Registrar a minuta' };
     case 'MINUTA':
-      return { acao: 'OFICIO', rotulo: 'Registrar o ofício' };
+      return { acao: 'OFICIO', rotulo: rodada > 1 ? `Registrar o ${rodada}º ofício` : 'Registrar o ofício' };
     case 'OFICIO':
       return { acao: 'CONFERIDO', rotulo: 'Conferir com o SIOP' };
     case 'CONFERIDO':
+      return { acao: 'SOLICITADO', rotulo: 'Registrar a solicitação de empenho' };
+    case 'SOLICITADO':
       return { acao: 'AUTORIZADO', rotulo: 'Registrar a autorização' };
     case 'AUTORIZADO':
+      return { acao: 'CGOFI', rotulo: 'Registrar o envio à CGOFI' };
+    case 'CGOFI':
       return { acao: 'EMPENHADO', rotulo: 'Registrar o empenho' };
+    case 'EMPENHADO':
+      return { acao: 'CONTRATACAO', rotulo: 'Registrar o envio para contratação' };
     default:
       return null;
   }
 }
+
+/** Rodada da minuta e do ofício: 1 + o número de ofícios devolvidos (migration 174). */
+export const rodadaDoPedido = (p: Pick<PedidoEmenda, 'devolucoes'>): number => (p.devolucoes?.length ?? 0) + 1;
+
+/** Documento SEI: só números, 7 a 10 dígitos (a mesma regra das tarefas do plano). */
+export const documentoSeiDaEtapaValido = (v: string): boolean => /^\d{7,10}$/.test(v.replace(/\D/g, ''));
+
+/** Números SEI digitados num campo, separados por vírgula, ponto e vírgula ou espaço; sem repetir. */
+export const numerosSei = (texto: string): string[] => [...new Set(texto.split(/[,;\s]+/).map((x) => x.replace(/\D/g, '')).filter(Boolean))];
 
 /** Itens e quantidades que a linha ocupa (kit aberto pela composição do dia do pedido). */
 export function itensDaLinha(l: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitComposicao' | 'quantidade'>): ItemDoKit[] {
@@ -73,12 +102,12 @@ export function valorDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>): nu
 }
 
 /**
- * Como a pessoa reconhece o pedido: pelo ofício, quando já chegou; antes disso, pela data da reserva. A reserva é uma
- * conversa com a assessoria, não um documento: o número interno do banco não aparece nas telas. Pedido que veio das
- * planilhas da CAEP (migration 160) não tem o número do ofício: vale o da emenda; a reserva da planilha não tem data.
+ * Como a pessoa reconhece o pedido: pelo processo SEI, quando o ofício já chegou (o número do ofício saiu na migration
+ * 174); senão, pelo número da emenda; antes disso, pela data da reserva. A reserva é uma conversa com a assessoria, não
+ * um documento: o número interno do banco não aparece nas telas. A reserva da planilha não tem data.
  */
-export function identificacaoDoPedido(p: Pick<PedidoEmenda, 'oficioNumero' | 'reservadoEm'> & Partial<Pick<PedidoEmenda, 'siopEmenda' | 'origem'>>): string {
-  if (p.oficioNumero) return p.oficioNumero;
+export function identificacaoDoPedido(p: Pick<PedidoEmenda, 'reservadoEm'> & Partial<Pick<PedidoEmenda, 'oficioProcessoSei' | 'siopEmenda' | 'origem'>>): string {
+  if (p.oficioProcessoSei) return `Processo ${p.oficioProcessoSei}`;
   if (p.siopEmenda) return `Emenda ${p.siopEmenda}`;
   return p.origem === 'PLANILHA' ? 'Reserva da planilha' : `Reserva de ${dataBR(p.reservadoEm)}`;
 }
@@ -159,14 +188,18 @@ export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, I
 export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, hoje: string, notas?: Map<string, NotaDaLinha>): AvisoPedido[] {
   const avisos: AvisoPedido[] = [];
   if (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA') {
-    const dias = diasEntre(p.reservadoEm, hoje);
+    // Depois de uma devolução, conta da devolução: contar da reserva faria o pedido devolvido já nascer atrasado.
+    const desde = p.devolvidoEm ?? p.reservadoEm;
+    const dias = diasEntre(desde, hoje);
     if (dias > AVISO_SEM_OFICIO_DIAS) {
       const texto = p.autorId ? `${dias} dias sem ofício` : `${dias} dias sem parlamentar`;
-      avisos.push({ tipo: 'semOficio', curto: texto, texto: `${texto} desde a reserva (${dataBR(p.reservadoEm)})` });
+      avisos.push({ tipo: 'semOficio', curto: texto, texto: `${texto} desde ${p.devolvidoEm ? 'a devolução' : 'a reserva'} (${dataBR(desde)})` });
+    }
+    if (p.divergencia && p.devolvidoEm) {
+      avisos.push({ tipo: 'divergencia', curto: 'Ofício devolvido', texto: `Ofício devolvido em ${dataBR(p.devolvidoEm)}: ${p.divergencia}` });
     }
   }
-  if (p.etapa === 'OFICIO' && p.divergencia) avisos.push({ tipo: 'divergencia', curto: 'Divergência no SIOP', texto: `Divergência com o SIOP: ${p.divergencia}` });
-  if (notas && p.etapa === 'EMPENHADO') {
+  if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
     if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });
   }
@@ -197,10 +230,16 @@ export function dataDaEtapa(p: PedidoEmenda, etapa: EtapaPedido): string | null 
       return p.oficioEm;
     case 'CONFERIDO':
       return p.conferidoEm;
+    case 'SOLICITADO':
+      return p.solicitadoEm;
     case 'AUTORIZADO':
       return p.autorizadoEm;
+    case 'CGOFI':
+      return p.cgofiEm;
     case 'EMPENHADO':
       return p.empenhadoEm;
+    case 'CONTRATACAO':
+      return p.contratacaoEm;
     default:
       return p.canceladoEm;
   }
@@ -262,4 +301,29 @@ export function execucaoDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha
     proximaEntrega,
     linhasSemNota: linhasSemNota(p, notas).length
   };
+}
+
+/**
+ * Documentos SEI da etapa, para o controle. No empenho e no envio para contratação junta os do pedido com os das
+ * linhas (a planilha da CAEP traz um documento por nota, linha a linha).
+ */
+export function seiDaEtapa(p: PedidoEmenda, etapa: EtapaPedido): string[] {
+  const dasLinhas = (f: (l: LinhaPedido) => string | null) => linhasAtivas(p).map(f).filter((x): x is string => Boolean(x));
+  const unicos = (xs: string[]) => [...new Set(xs)].sort();
+  switch (etapa) {
+    case 'OFICIO':
+      return p.oficioDocumentoSei ? [p.oficioDocumentoSei] : [];
+    case 'SOLICITADO':
+      return p.solicitadoDocumentoSei ? [p.solicitadoDocumentoSei] : [];
+    case 'AUTORIZADO':
+      return p.autorizadoDocumentoSei ? [p.autorizadoDocumentoSei] : [];
+    case 'CGOFI':
+      return p.cgofiDocumentoSei ? [p.cgofiDocumentoSei] : [];
+    case 'EMPENHADO':
+      return unicos([...p.empenhadoDocumentosSei, ...dasLinhas((l) => l.empenhoDocumentoSei)]);
+    case 'CONTRATACAO':
+      return unicos([...p.contratacaoDocumentosSei, ...dasLinhas((l) => l.despachoDocumentoSei)]);
+    default:
+      return [];
+  }
 }

@@ -34,7 +34,7 @@ const chave = (l: PedidoComAviso) => l.pedido.id;
 const ABAS: ReadonlyArray<{ id: TipoAviso; rotulo: string }> = [
   { id: 'ataVencida', rotulo: 'Ata encerrada' },
   { id: 'ataNoCorte', rotulo: 'Prazo de indicação vencido' },
-  { id: 'divergencia', rotulo: 'Divergência no SIOP' },
+  { id: 'divergencia', rotulo: 'Ofício devolvido' },
   { id: 'semOficio', rotulo: `Sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias` },
   { id: 'ataVencendo', rotulo: 'Ata vence em breve' },
   { id: 'semNota', rotulo: 'Sem nota de empenho' },
@@ -46,8 +46,11 @@ const VARIANTE_ETAPA: Record<EtapaPedido, StatusBadgeVariant> = {
   MINUTA: 'info',
   OFICIO: 'info',
   CONFERIDO: 'info',
+  SOLICITADO: 'info',
   AUTORIZADO: 'info',
+  CGOFI: 'info',
   EMPENHADO: 'success',
+  CONTRATACAO: 'success',
   CANCELADO: 'neutral'
 };
 
@@ -57,7 +60,7 @@ const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${
 const NO_CARTAO_GRAVE: Partial<Record<TipoAviso, [string, string]>> = {
   ataVencida: ['com ata encerrada', 'com ata encerrada'],
   ataNoCorte: ['passou do prazo de indicação', 'passaram do prazo de indicação'],
-  divergencia: ['com divergência no SIOP', 'com divergência no SIOP'],
+  divergencia: ['com ofício devolvido', 'com ofício devolvido'],
   semOficio: [`sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias`, `sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias`]
 };
 const NO_CARTAO_ETAPA: Partial<Record<EtapaPedido, [string, string]>> = {
@@ -65,7 +68,9 @@ const NO_CARTAO_ETAPA: Partial<Record<EtapaPedido, [string, string]>> = {
   MINUTA: ['com minuta enviada', 'com minuta enviada'],
   OFICIO: ['com ofício recebido', 'com ofício recebido'],
   CONFERIDO: ['conferido no SIOP', 'conferidos no SIOP'],
-  AUTORIZADO: ['com empenho autorizado', 'com empenho autorizado']
+  SOLICITADO: ['com solicitação de empenho', 'com solicitação de empenho'],
+  AUTORIZADO: ['com empenho autorizado', 'com empenho autorizado'],
+  CGOFI: ['na CGOFI para empenhar', 'na CGOFI para empenhar']
 };
 
 const Cartao: React.FC<{ rotulo: string; valor: React.ReactNode; grave?: boolean; onClick: () => void; testId: string; children: React.ReactNode }> = ({ rotulo, valor, grave, onClick, testId, children }) => (
@@ -248,7 +253,7 @@ export const EmendasInicioPage: React.FC = () => {
         <Cartao rotulo="Pedidos antes do empenho" valor={valor(r.antesDoEmpenho)} onClick={() => navigate('/emendas/pedidos')} testId="emendas-inicio-cartao-antes">
           <span className="em-inicio-cartao-texto">{porEtapaAntes || 'Nenhum pedido em andamento'}</span>
         </Cartao>
-        <Cartao rotulo="Empenhados" valor={valor(r.empenhados)} onClick={() => navigate('/emendas/pedidos?etapa=EMPENHADO')} testId="emendas-inicio-cartao-empenhados">
+        <Cartao rotulo="Empenhados" valor={valor(r.empenhados)} onClick={() => navigate(`/emendas/pedidos?etapa=${r.porEtapa.EMPENHADO ? 'EMPENHADO' : 'CONTRATACAO'}`)} testId="emendas-inicio-cartao-empenhados">
           <span className="em-inicio-cartao-texto">
             {formatNumber(r.linhasComNota)} de {plural(r.linhasEmpenhadas, 'linha', 'linhas')} já com a nota de empenho
           </span>

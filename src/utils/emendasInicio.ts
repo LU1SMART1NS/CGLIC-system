@@ -6,6 +6,7 @@ import type { EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../servic
 import { avisoIndicacaoDias, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from './emendasKits';
 import {
   ANTES_DO_EMPENHO,
+  jaEmpenhado,
   avisoGrave,
   avisosDoPedido,
   GRAVIDADE_DO_AVISO,
@@ -94,7 +95,7 @@ export function resumoInicioEmendas(pedidos: PedidoEmenda[], itensLista: ItemCae
     if (p.etapa === 'CANCELADO') continue;
     porEtapa[p.etapa] = (porEtapa[p.etapa] ?? 0) + 1;
     if (ANTES_DO_EMPENHO.has(p.etapa)) antesDoEmpenho++;
-    if (p.etapa === 'EMPENHADO') {
+    if (jaEmpenhado(p.etapa)) {
       empenhados++;
       for (const l of linhasAtivas(p)) {
         linhasEmpenhadas++;
@@ -159,7 +160,7 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
     case 'semOficio':
       return 'cobrar o ofício do gabinete';
     case 'divergencia':
-      return 'acertar com o SIOP';
+      return 'fazer a nova minuta';
     case 'semNota':
       return 'procurar a nota pelo contrato';
     default:

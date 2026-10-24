@@ -8,7 +8,7 @@ import { useSalvarPedido } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta, ROTULO_SITUACAO_KIT } from '../../utils/emendasKits';
-import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, valorDaLinha } from '../../utils/emendasPedidos';
+import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
 import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
@@ -361,7 +361,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         {tirou > 0 && (
           <AppInput label="Por que as linhas foram tiradas?" placeholder="Ex.: parlamentar desistiu do item; ata vencida sem substituto" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         )}
-        {pedido && (pedido.etapa === 'CONFERIDO' || pedido.etapa === 'AUTORIZADO') && (
+        {pedido && VOLTA_AO_OFICIO.has(pedido.etapa) && (
           <div style={aviso('info')}>Mudar itens ou quantidades volta o pedido para "Ofício recebido": o ofício e a emenda citam os itens antigos e precisam ser conferidos de novo. Só trocar o beneficiário não volta.</div>
         )}
         <AppTextarea label="Observação" rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Opcional" />
