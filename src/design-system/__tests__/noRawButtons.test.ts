@@ -23,6 +23,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/carteira/CarteiraSortHeader.tsx': 1, // cabeçalho de ordenação
   'src/components/contracts/planTaskEditing.tsx': 1, // cabeçalho recolhível
   'src/components/emendas/EmendasPedidosPage.tsx': 1, // cabeçalho recolhível das fases do pedido
+  'src/components/emendas/PedidoModal.tsx': 13, // abas do celular, chips de filtro, segmentos Parlamentar/Órgão, seletor e opções de beneficiário e autor, descrição que abre e o − e + da quantidade
   'src/components/emendas/EmendasInicioPage.tsx': 1, // cartões do Início do gestor de emendas (abrem a lista certa)
   'src/components/instrument360/HealthStripParts.tsx': 1, // tile clicável
   'src/components/instrument360/Instrument360Hero.tsx': 1, // nome que volta ao resumo (barra encolhida)

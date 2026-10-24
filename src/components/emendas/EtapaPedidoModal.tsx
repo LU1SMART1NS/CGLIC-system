@@ -6,6 +6,7 @@ import { AppInput, AppSelect, AppTextarea } from '../../design-system/components
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { documentoSeiDaEtapaValido, identificacaoDoPedido, itensDaLinha, linhasAtivas, numerosSei, rodadaDoPedido, valorDoPedido } from '../../utils/emendasPedidos';
 import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
 import { QuadroGabinete } from './QuadroGabinete';
@@ -74,13 +75,13 @@ const ROTULO_DATA: Partial<Record<AcaoDaJanela, string>> = {
 };
 
 const grade: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.8rem' };
-const aviso = (tom: 'erro' | 'info'): React.CSSProperties => ({
+const aviso = (tom: 'erro' | 'info' | 'atencao'): React.CSSProperties => ({
   fontSize: '0.8rem',
   fontWeight: 600,
   padding: '0.5rem 0.7rem',
   borderRadius: 6,
-  background: tom === 'erro' ? 'var(--color-danger-bg, #fdecea)' : 'var(--color-info-bg, #e6eefb)',
-  color: tom === 'erro' ? 'var(--color-danger, #b11b05)' : 'var(--color-info-text, #155bcb)'
+  background: tom === 'erro' ? 'var(--color-danger-bg, #fdecea)' : tom === 'atencao' ? 'var(--color-warning-bg)' : 'var(--color-info-bg, #e6eefb)',
+  color: tom === 'erro' ? 'var(--color-danger, #b11b05)' : tom === 'atencao' ? 'var(--color-warning-text)' : 'var(--color-info-text, #155bcb)'
 });
 
 /** Uma janela para cada passo do pedido, da minuta ao envio para contratação, e para o cancelamento. */
@@ -94,7 +95,9 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
   const [documentoSei, setDocumentoSei] = useState('');
   const [processoSei, setProcessoSei] = useState(pedido.oficioProcessoSei ?? '');
   const [emenda, setEmenda] = useState(pedido.siopEmenda ?? '');
-  const [valor, setValor] = useState(pedido.siopValor != null ? String(pedido.siopValor) : '');
+  // No formato brasileiro (1.234,56): a leitura abaixo tira os pontos de milhar.
+  const [valor, setValor] = useState(pedido.siopValor != null ? pedido.siopValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
+  const { precos } = usePrecosParaEmenda();
   const [gnd, setGnd] = useState(pedido.siopGnd ?? 'GND-4');
   const [pontos, setPontos] = useState<Record<string, boolean>>({});
   const [divergencia, setDivergencia] = useState(pedido.divergencia ?? '');
@@ -103,6 +106,9 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
   const [tentou, setTentou] = useState(false);
 
   const linhas = linhasAtivas(pedido);
+  const valorDigitado = valor.trim() ? Number(valor.replace(/\./g, '').replace(',', '.')) : null;
+  const previsto = valorDoPedido(pedido, itens, precos);
+  const deHoje = valorDoPedido(pedido, itens);
   const rodada = rodadaDoPedido(pedido);
   const numeros = numerosSei(documentoSei);
   const pedeSei = Boolean(ROTULO_SEI[modo]);
@@ -153,7 +159,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
                 : modo === 'DIVERGENCIA'
                   ? { data, texto: divergencia.trim() }
                   : modo === 'CONFERIDO'
-                    ? { data, emenda: emenda.trim(), valor: valor ? Number(valor.replace(/\./g, '').replace(',', '.')) : null, gnd, conferencia: pontos }
+                    ? { data, emenda: emenda.trim(), valor: valorDigitado, gnd, conferencia: pontos }
                     : VARIOS.has(modo)
                       ? { data, documentos_sei: numeros }
                       : { data, documento_sei: numeros[0] };
@@ -256,7 +262,15 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
               </AppSelect>
               <AppInput label="Conferido em" type="date" value={data} onChange={(e) => setData(e.target.value)} />
             </div>
-            <div style={aviso('info')}>Valor dos itens do pedido pelo preço das atas: {formatCurrency(valorDoPedido(pedido, itens))}.</div>
+            <div style={aviso('info')} data-testid="emendas-etapa-previsto">
+              Valor previsto dos itens, com o reajuste das atas (o mesmo do quadro do parlamentar): {formatCurrency(previsto)}
+              {Math.abs(previsto - deHoje) > 0.004 ? `; pelo preço de hoje, ${formatCurrency(deHoje)}` : ''}.
+            </div>
+            {valorDigitado != null && Number.isFinite(valorDigitado) && valorDigitado + 0.004 < previsto && (
+              <div style={aviso('atencao')} role="status" data-testid="emendas-etapa-abaixo">
+                O valor no SIOP fica {formatCurrency(previsto - valorDigitado)} abaixo do previsto: pode faltar dinheiro para empenhar todos os itens.
+              </div>
+            )}
             <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <legend style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>O que bate entre o ofício e o SIOP</legend>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.45rem' }}>

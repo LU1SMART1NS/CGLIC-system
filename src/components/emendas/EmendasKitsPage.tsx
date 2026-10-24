@@ -14,11 +14,12 @@ import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteir
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
-import { formatCurrency, formatNumber } from '../../utils/format';
+import { formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, calcularKit, corteIndicacaoDias, ROTULO_SITUACAO_KIT, type CalculoDoKit, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
 import type { KitEmenda } from '../../services/emendasService';
 import { KitModal } from './KitModal';
-import { ItemDaAta, VigenciaDaAta } from './emendasPartes';
+import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 
 type Segmento = 'todos' | SituacaoKit;
 type Linha = KitEmenda & { calculo: CalculoDoKit };
@@ -116,7 +117,8 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
   const { data: reservado } = useReservadoPorItem();
   // Saldo do item para os kits = alocado à CAEP − reservado nos pedidos.
   const saldoDoItem = useMemo(() => (i: { itemKey: string; alocado: number }) => i.alocado - (reservado?.get(i.itemKey) ?? 0), [reservado]);
-  const linhas: Linha[] = useMemo(() => kits.map((k) => ({ ...k, calculo: calcularKit(k, porChave, hoje, saldoDoItem) })), [kits, porChave, hoje, saldoDoItem]);
+  const { precos } = usePrecosParaEmenda();
+  const linhas: Linha[] = useMemo(() => kits.map((k) => ({ ...k, calculo: calcularKit(k, porChave, hoje, saldoDoItem, precos) })), [kits, porChave, hoje, saldoDoItem, precos]);
 
   const contagem = useMemo(() => {
     const c: Record<Segmento, number> = { todos: linhas.length, disponivel: 0, vence: 0, indisponivel: 0, desativado: 0 };
@@ -179,7 +181,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
           }
         ]
       : []),
-    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatCurrency(l.calculo.valorPorKit)}</span> },
+    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <ValorPrevisto previsto={l.calculo.valorPorKit} hoje={l.calculo.valorPorKitHoje} nota="Previsto para a emenda, com o reajuste das atas (o mesmo do quadro do parlamentar)" /> },
     {
       key: 'possiveis',
       header: 'Kits possíveis',

@@ -5,7 +5,9 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useSalvarKit } from '../../hooks/useEmendas';
-import { formatCurrency, formatNumber } from '../../utils/format';
+import { formatNumber } from '../../utils/format';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
+import { precoParaEmenda, textoDoPreco } from '../../utils/emendasPedidos';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { avisoIndicacaoDias, buscarItensCaep, calcularKit, dataBR, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta, sugestoesDeTroca } from '../../utils/emendasKits';
 import type { ItemCaep, ItemDoKit, KitEmenda } from '../../services/emendasService';
@@ -54,7 +56,9 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, s
   );
   const encontrados = buscarItensCaep(disponiveis, busca).filter((i) => !noKit.has(i.itemKey));
   const originais = new Set(kit?.itens.map((i) => i.itemKey) ?? []);
-  const calculo = calcularKit({ ativo: true, itens: linhas }, porChave, hoje, saldoDoItem);
+  const { precos } = usePrecosParaEmenda();
+  const preco = (i: ItemCaep) => { const p = precoParaEmenda(i.itemKey, porChave, precos); return textoDoPreco(p.previsto, p.hoje, ' un.'); };
+  const calculo = calcularKit({ ativo: true, itens: linhas }, porChave, hoje, saldoDoItem, precos);
 
   const pendencias: string[] = [];
   if (!nome.trim()) pendencias.push('nome do kit');
@@ -116,7 +120,7 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, s
                     <div style={{ fontWeight: 600 }}>{item ? descricaoItemEmFrase(item.descricao) : 'Item sem alocação da CAEP'}</div>
                     <div style={pequeno}>
                       {item
-                        ? [ataItem(item), `saldo ${formatNumber(c?.saldo ?? 0)}`, item.ataEncerrada ? null : `dá para ${formatNumber(c?.kits ?? 0)} kits`, formatCurrency(item.valorUnitario)].filter(Boolean).join(' · ')
+                        ? [ataItem(item), `saldo ${formatNumber(c?.saldo ?? 0)}`, item.ataEncerrada ? null : `dá para ${formatNumber(c?.kits ?? 0)} kits`, preco(item)].filter(Boolean).join(' · ')
                         : l.itemKey}
                     </div>
                     {item && !item.ataEncerrada && passouDoCorte(c?.diasParaVencer ?? null) ? (
@@ -186,7 +190,7 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, s
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{descricaoItemEmFrase(i.descricao)}</div>
                     <div style={pequeno}>
-                      {ataItem(i)} · alocado {formatNumber(i.alocado)} · {formatCurrency(i.valorUnitario)} · ata até {dataBR(i.vigenciaFinal)}
+                      {ataItem(i)} · alocado {formatNumber(i.alocado)} · {preco(i)} · ata até {dataBR(i.vigenciaFinal)}
                     </div>
                   </div>
                   <ActionButton action="adicionar" size="sm" type="button" onClick={() => adicionar(i)} data-testid={`emendas-kit-adicionar-${i.itemKey}`} />
@@ -198,7 +202,7 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, s
 
         {linhas.length > 0 && (
           <div style={aviso(calculo.situacao === 'indisponivel' ? 'erro' : calculo.situacao === 'vence' ? 'atencao' : 'info')} data-testid="emendas-kit-resumo">
-            Com o saldo de hoje dá para oferecer <b>{formatNumber(calculo.kitsPossiveis)}</b> kits. Valor por kit: {formatCurrency(calculo.valorPorKit)}.
+            Com o saldo de hoje dá para oferecer <b>{formatNumber(calculo.kitsPossiveis)}</b> kits. Valor por kit: {textoDoPreco(calculo.valorPorKit, calculo.valorPorKitHoje)}.
             {calculo.motivo ? ` ${calculo.motivo}` : ''}
           </div>
         )}

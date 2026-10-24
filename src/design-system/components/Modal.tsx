@@ -10,14 +10,16 @@ export interface ModalProps {
   subtitle?: React.ReactNode;
   /** Botões do rodapé (alinhados à direita). */
   footer?: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
+  /** Classe a mais no painel, para janelas com layout próprio (ex.: duas colunas com rolagem em cada uma). */
+  className?: string;
   /** Impede fechar por Esc/clique fora (ex.: durante gravação). */
   dismissible?: boolean;
   testId?: string;
   children: React.ReactNode;
 }
 
-const WIDTHS = { sm: '420px', md: '560px', lg: '760px', xl: '1040px' } as const;
+const WIDTHS = { sm: '420px', md: '560px', lg: '760px', xl: '1040px', xxl: '1240px' } as const;
 
 /**
  * Camada única de modais. Layout e responsividade em index.css (.ds-modal*): em ≤480px o painel
@@ -36,6 +38,7 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
   dismissible = true,
   testId = 'modal',
+  className,
   children
 }) => {
   const panelRef = React.useRef<HTMLDivElement>(null);
@@ -85,7 +88,7 @@ export const Modal: React.FC<ModalProps> = ({
         aria-labelledby={titleId}
         tabIndex={-1}
         data-testid={testId}
-        className="ds-modal"
+        className={className ? `ds-modal ${className}` : 'ds-modal'}
         style={{
           maxWidth: WIDTHS[size],
           background: colors.background.surface,

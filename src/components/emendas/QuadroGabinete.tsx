@@ -4,9 +4,9 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { Tabs } from '../../design-system/components/Tabs';
 import { InfoHint } from '../../design-system/components/InfoHint';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
-import { useIpcaDozeMeses, usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
-import { aplicarPrazoDoEmpenho, ataEItem, brl, COLUNAS, htmlDaTabela, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
+import { useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
+import { ataEItem, brl, COLUNAS, htmlDaTabela, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AutorEmenda } from '../../services/emendasService';
 
 const borda = '1px solid #000';
@@ -87,9 +87,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
   const toast = useToast();
   const { data: itensLista = [] } = useItensCaep();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
-  const { data: precos, isError: semPrecos } = usePrecosPrevistos();
-  const { data: ipca } = useIpcaDozeMeses();
-  const hoje = hojeEmBrasilia();
+  const { precos, ipca, semPrevisao: semPrecos } = usePrecosParaEmenda();
   const [aba, setAba] = useState<'sei' | 'whatsapp'>('sei');
 
   const quadro = useMemo(
@@ -101,10 +99,10 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
         devolvidoEm,
         itens: new Map(itensLista.map((i) => [i.itemKey, i])),
         beneficiarios: new Map(beneficiariosLista.map((b) => [b.id, b])),
-        precos: aplicarPrazoDoEmpenho(precos ?? new Map(), hoje, ipca),
+        precos: precos ?? new Map(),
         ipca
       }),
-    [autor, linhas, data, devolvidoEm, itensLista, beneficiariosLista, precos, hoje, ipca]
+    [autor, linhas, data, devolvidoEm, itensLista, beneficiariosLista, precos, ipca]
   );
   const texto = useMemo(() => textoParaWhatsapp(quadro), [quadro]);
   const html = useMemo(() => htmlDaTabela(quadro), [quadro]);
