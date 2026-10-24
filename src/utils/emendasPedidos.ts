@@ -412,14 +412,17 @@ export interface AtaDoPedido {
   /** Fornecedores dos itens do pedido nesta ata (normalmente um). */
   fornecedor: string | null;
   itens: Array<{ itemKey: string; numeroItem: number; nome: string; quantidade: number }>;
-  solicitacao: string | null;
+  /** Solicitações da ata, uma por rodada (migration 179), da mais antiga à mais nova. */
+  solicitacoes: Array<{ numero: string; assinadaEm: string | null }>;
+  /** Dia da última assinatura, quando todas estão assinadas. */
   assinadaEm: string | null;
   situacao: SituacaoDaSolicitacao;
 }
 
 /**
- * Atas das linhas ativas do pedido (itens e itens dos kits), cada uma com a sua solicitação de autorização de empenho
- * (uma por ata, migration 178). Na ordem: as que faltam, as que aguardam a assinatura, as assinadas.
+ * Atas das linhas ativas do pedido (itens e itens dos kits), cada uma com as suas solicitações de autorização de
+ * empenho (uma por rodada, migrations 178 e 179). A ata está assinada quando todas as suas solicitações estão.
+ * Na ordem: as que faltam, as que aguardam a assinatura, as assinadas.
  */
 export function atasDoPedido(p: PedidoEmenda, itens?: Map<string, ItemCaep>): AtaDoPedido[] {
   const porAta = new Map<string, AtaDoPedido>();
@@ -432,7 +435,7 @@ export function atasDoPedido(p: PedidoEmenda, itens?: Map<string, ItemCaep>): At
         numeroAta: chave.split('-')[0],
         fornecedor: null,
         itens: [],
-        solicitacao: null,
+        solicitacoes: [],
         assinadaEm: null,
         situacao: 'falta' as SituacaoDaSolicitacao
       };
@@ -446,10 +449,14 @@ export function atasDoPedido(p: PedidoEmenda, itens?: Map<string, ItemCaep>): At
   }
   for (const d of p.documentos) {
     const ata = d.etapa === 'AUTORIZACAO' && d.ataKey ? porAta.get(d.ataKey) : undefined;
-    if (!ata) continue;
-    ata.solicitacao = d.numero;
-    ata.assinadaEm = d.assinadaEm;
-    ata.situacao = d.assinadaEm ? 'assinada' : 'aguardando';
+    if (ata) ata.solicitacoes.push({ numero: d.numero, assinadaEm: d.assinadaEm });
+  }
+  for (const ata of porAta.values()) {
+    if (!ata.solicitacoes.length) continue;
+    ata.solicitacoes.sort((a, b) => (a.assinadaEm ?? '9999').localeCompare(b.assinadaEm ?? '9999') || a.numero.localeCompare(b.numero));
+    const todas = ata.solicitacoes.every((x) => x.assinadaEm);
+    ata.situacao = todas ? 'assinada' : 'aguardando';
+    ata.assinadaEm = todas ? ata.solicitacoes[ata.solicitacoes.length - 1].assinadaEm : null;
   }
   const ordem: Record<SituacaoDaSolicitacao, number> = { falta: 0, aguardando: 1, assinada: 2 };
   return [...porAta.values()]

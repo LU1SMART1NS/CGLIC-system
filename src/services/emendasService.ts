@@ -743,15 +743,17 @@ export async function avancarPedidoEmenda(id: string, versao: number, acao: Acao
 const diaEmBrasilia = (instante: string): string => new Date(instante).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
 /**
- * Solicitação de autorização de empenho de uma ata do pedido (migration 178): o número SEI e, se a Diretora do FNSP
- * já assinou, o dia. Troca a solicitação que a ata tinha; o banco recusa número já ligado a outra ata.
+ * Solicitação de autorização de empenho de uma ata do pedido (migrations 178 e 179): o número SEI e, se a Diretora do
+ * FNSP já assinou, o dia. Com `substitui`, troca essa solicitação da ata; sem ele, entra a mais (nova rodada). O banco
+ * recusa número já ligado a outra ata.
  */
-export async function informarSolicitacaoDaAta(v: { pedidoId: string; ataKey: string; documentoSei: string; assinadaEm: string | null }): Promise<void> {
+export async function informarSolicitacaoDaAta(v: { pedidoId: string; ataKey: string; documentoSei: string; assinadaEm: string | null; substitui?: string | null }): Promise<void> {
   const { error } = await db().rpc('informar_solicitacao_da_ata', {
     p_id: v.pedidoId,
     p_ata: v.ataKey,
     p_documento_sei: v.documentoSei,
-    p_assinada_em: v.assinadaEm
+    p_assinada_em: v.assinadaEm,
+    p_substitui: v.substitui ?? null
   });
   if (error) throw new Error(mensagemDoBanco(error));
 }

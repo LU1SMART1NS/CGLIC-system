@@ -22,6 +22,8 @@ export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENH
 export interface ContextoDaJanela {
   ataKey?: string;
   numero?: string;
+  /** O número é uma solicitação da ata que o gestor vai trocar ou completar (a assinatura). */
+  troca?: boolean;
 }
 
 interface Props {
@@ -96,7 +98,7 @@ const aviso = (tom: 'erro' | 'info' | 'atencao'): React.CSSProperties => ({
 });
 
 const rotuloDaAta = (a: AtaDoPedido): string =>
-  `Ata ${a.numeroAta}${a.fornecedor ? ` · ${a.fornecedor}` : ''}${a.situacao === 'falta' ? ' (falta)' : a.solicitacao ? ` (SEI ${a.solicitacao})` : ''}`;
+  `Ata ${a.numeroAta}${a.fornecedor ? ` · ${a.fornecedor}` : ''}${a.situacao === 'falta' ? ' (falta)' : ` (SEI ${a.solicitacoes.map((x) => x.numero).join(', ')})`}`;
 
 /** Um campo de número SEI para cada ata do pedido, com os itens embaixo para conferir com a solicitação. */
 const SolicitacoesPorAta: React.FC<{ atas: AtaDoPedido[]; valores: Record<string, string>; onChange: (ataKey: string, valor: string) => void }> = ({ atas, valores, onChange }) => (
@@ -127,6 +129,9 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const autorizado = ORDEM_ETAPA[pedido.etapa] >= ORDEM_ETAPA.AUTORIZADO;
   const [ataEscolhida, setAtaEscolhida] = useState(contexto?.ataKey ?? atas.find((a) => a.situacao === 'falta')?.ataKey ?? atas[0]?.ataKey ?? '');
   const [numeroDaAta, setNumeroDaAta] = useState(contexto?.numero ?? '');
+  // Trocando uma solicitação da ata: a anterior sai da ata (migration 179); sem troca, entra a mais (nova rodada).
+  const trocando = Boolean(contexto?.troca && contexto.numero);
+  const ataDaJanela = atas.find((a) => a.ataKey === ataEscolhida);
   const [assinadaEm, setAssinadaEm] = useState('');
   // Solicitação com várias atas: um número para cada uma.
   const [porAta, setPorAta] = useState<Record<string, string>>({});
@@ -197,7 +202,13 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
     if (pendencias.length || ataForaDoPrazo) return;
     try {
       if (modo === 'SOLICITACAO_ATA') {
-        await informar.mutateAsync({ pedidoId: pedido.id, ataKey: ataEscolhida, documentoSei: numeroDaAta.replace(/\D/g, ''), assinadaEm: autorizado && assinadaEm ? assinadaEm : null });
+        await informar.mutateAsync({
+          pedidoId: pedido.id,
+          ataKey: ataEscolhida,
+          documentoSei: numeroDaAta.replace(/\D/g, ''),
+          assinadaEm: autorizado && assinadaEm ? assinadaEm : null,
+          substitui: trocando ? contexto!.numero! : null
+        });
         toast.success(`Solicitação da ata ${ataEscolhida.split('-')[0]} registrada.`);
       } else if (variasAtas) {
         // A etapa guarda o primeiro número; cada ata recebe o seu logo depois (migration 178).
@@ -286,7 +297,13 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
 
         {modo === 'SOLICITACAO_ATA' && (
           <>
-            <div style={aviso('info')}>Uma solicitação de autorização de empenho para cada ata do pedido. Trocar o número de uma ata deixa o anterior no pedido, sem ata.</div>
+            <div style={aviso('info')} data-testid="emendas-etapa-ata-explica">
+              {trocando
+                ? `Solicitação SEI ${contexto!.numero} da ata. Um número diferente troca essa solicitação: a anterior fica no pedido, sem ata. Para só informar a assinatura, mantenha o número.`
+                : ataDaJanela && ataDaJanela.solicitacoes.length > 0
+                  ? `Solicitação a mais desta ata (nova rodada): as que ela já tem (${ataDaJanela.solicitacoes.map((x) => x.numero).join(', ')}) continuam.`
+                  : 'Uma solicitação de autorização de empenho para cada ata do pedido, em cada rodada.'}
+            </div>
             <div style={grade}>
               <AppInput
                 label="Documento SEI da solicitação *"
@@ -296,7 +313,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 onChange={(e) => setNumeroDaAta(e.target.value)}
                 data-testid="emendas-etapa-sei-ata"
               />
-              <AppSelect label="Ata que ela cobre *" value={ataEscolhida} onChange={(e) => setAtaEscolhida(e.target.value)} data-testid="emendas-etapa-ata">
+              <AppSelect label="Ata que ela cobre *" value={ataEscolhida} onChange={(e) => setAtaEscolhida(e.target.value)} disabled={trocando} data-testid="emendas-etapa-ata">
                 {atas.map((a) => (
                   <option key={a.ataKey} value={a.ataKey}>
                     {rotuloDaAta(a)}

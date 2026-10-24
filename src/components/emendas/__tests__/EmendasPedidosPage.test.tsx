@@ -162,7 +162,9 @@ describe('Pedidos: uma solicitação de empenho para cada ata (migration 178)', 
     expect(html).toContain('1 de 2 atas');
     expect(html).toContain('emendas-etapa__contaatas--falta');
     expect(html).toContain('Ata 00031/2025');
-    expect(html).toContain('Assinada pela Diretora do FNSP em <strong>24/09/2026</strong>');
+    expect(html).toContain('assinada pela Diretora do FNSP em <strong>24/09/2026</strong>');
+    expect(html).toContain('emendas-pedido-ata-mais-00031/2025');
+    expect(html).toContain('emendas-pedido-ata-alterar-37098929');
     expect(html).toContain('Esta ata ainda não tem solicitação de empenho.');
     expect(html).toContain('emendas-pedido-ata-informar-00048/2025');
     expect(html).toContain('Informar a solicitação desta ata');

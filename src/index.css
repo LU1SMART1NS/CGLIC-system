@@ -1911,10 +1911,10 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-etapa__contaatas--falta { color: var(--color-warning-text); background: var(--color-warning-bg); }
 .emendas-atas { margin: 0.25rem 0 0.2rem 1.6rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .emendas-atas .emendas-etapa__recolher { margin-left: 0; }
-.emendas-ata { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.15rem 0.55rem; align-items: start; padding: 0.4rem 0.5rem; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; font-size: 0.75rem; color: #475569; }
+.emendas-ata { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.4rem 0.5rem; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; font-size: 0.75rem; color: #475569; min-width: 0; }
+.emendas-ata > strong { color: #0f172a; }
+.emendas-ata__sol { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.5rem; margin-top: 0.15rem; }
 .emendas-ata--falta { border-style: dashed; border-color: var(--color-warning-text); background: var(--color-warning-bg); }
-.emendas-ata__det { display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; }
-.emendas-ata__det strong { color: #0f172a; }
 .emendas-ata__falta { font-size: 0.72rem; font-weight: 700; border-radius: 99px; padding: 0.1rem 0.55rem; color: var(--color-warning-text); background: #fff; border: 1px dashed var(--color-warning-text); white-space: nowrap; }
 .emendas-ata__aviso { color: var(--color-warning-text); font-weight: 600; }
 .emendas-etapa__devolucoes { margin: 0.3rem 0 0 1.6rem; font-size: 0.78rem; }
