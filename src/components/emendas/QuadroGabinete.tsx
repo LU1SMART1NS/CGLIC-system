@@ -230,7 +230,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
             </tbody>
           </table>
           {/* O título vai embaixo da tabela. */}
-          <div style={{ textAlign: 'center', fontSize: '0.75rem', marginTop: '0.25rem' }}>{quadro.titulo}</div>
+          <div style={{ textAlign: 'left', fontSize: '0.75rem', marginTop: '0.25rem' }}>{quadro.titulo}</div>
         </div>
       ) : (
         <div style={{ background: '#efeae2', borderRadius: 8, padding: '0.9rem', display: 'flex' }} data-testid={`${testId}-whatsapp`}>

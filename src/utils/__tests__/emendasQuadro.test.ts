@@ -98,7 +98,7 @@ describe('quadro da reserva (Anexo)', () => {
     expect(html.match(/<th /g)).toHaveLength(6);
     // Título embaixo da tabela; sem fonte, notas nem a marca da nota no preço.
     expect(html.startsWith('<table')).toBe(true);
-    expect(html.endsWith('</tbody></table><p style="text-align:center;font-size:9pt;margin:2px 0 0">Tabela 1 – Indicação de Romário (Senado Federal · RJ)</p>')).toBe(true);
+    expect(html.endsWith('</tbody></table><p style="text-align:left;font-size:9pt;margin:2px 0 0">Tabela 1 – Indicação do(a) Senador(a) Romário (RJ)</p>')).toBe(true);
     expect(html).toContain('R$ 1.598,76</td>');
     expect(html).not.toContain('Kit Academia');
     expect(html).toContain('<b>Tablet</b><br><span style="font-size:8pt">Ata 00043/2026 · item 00005</span>');
@@ -126,7 +126,7 @@ describe('títulos, nomes e notas', () => {
   it('título por tipo de autor', () => {
     expect(tituloDoAnexo({ tipo: 'BANCADA', uf: 'SP' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Bancada do Estado de São Paulo');
     expect(tituloDoAnexo({ tipo: 'BANCADA', uf: 'DF' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Bancada do Distrito Federal');
-    expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulano', uf: 'PR' } as AutorEmenda)).toBe('Tabela 1 – Indicação de Fulano (Câmara dos Deputados · PR)');
+    expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulano', uf: 'PR' } as AutorEmenda)).toBe('Tabela 1 – Indicação do(a) Deputado(a) Fulano (PR)');
     expect(tituloDoAnexo(null)).toBe('Tabela 1 – Reserva de itens (parlamentar a definir)');
   });
 
