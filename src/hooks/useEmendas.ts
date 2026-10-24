@@ -17,6 +17,7 @@ import {
   salvarPedidoEmenda,
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
+  informarSolicitacaoDaAta,
   type AcaoPedido,
   type BeneficiarioEmenda,
   type BeneficiarioParaSalvar,
@@ -125,6 +126,11 @@ export function useAvancarPedido() {
     retry: 0,
     onSettled: invalidar
   });
+}
+
+export function useInformarSolicitacaoDaAta() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: informarSolicitacaoDaAta, retry: 0, onSettled: invalidar });
 }
 
 export function useCancelarPedido() {

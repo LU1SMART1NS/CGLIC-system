@@ -1904,6 +1904,19 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-etapa__sei { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); gap: 0.4rem; align-items: center; margin: 0.2rem 0 0 1.6rem; }
 .emendas-etapa__contrato { font-size: 0.78rem; font-weight: 700; color: var(--primary); }
 .emendas-etapa__mais { margin: 0.15rem 0 0 calc(1.6rem + 4.6rem); }
+.emendas-etapa__doc { display: flex; align-items: center; gap: 0.5rem; margin: 0.2rem 0 0 1.6rem; }
+.emendas-etapa__doc-data { font-size: 0.72rem; color: #64748b; font-variant-numeric: tabular-nums; }
+.emendas-etapa__recolher { margin: 0.1rem 0 0 1.6rem; }
+.emendas-etapa__contaatas { margin-left: 0.4rem; font-size: 0.68rem; font-weight: 700; border-radius: 99px; padding: 0.05rem 0.45rem; color: var(--color-success-text); background: var(--color-success-bg); white-space: nowrap; }
+.emendas-etapa__contaatas--falta { color: var(--color-warning-text); background: var(--color-warning-bg); }
+.emendas-atas { margin: 0.25rem 0 0.2rem 1.6rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.emendas-atas .emendas-etapa__recolher { margin-left: 0; }
+.emendas-ata { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.15rem 0.55rem; align-items: start; padding: 0.4rem 0.5rem; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; font-size: 0.75rem; color: #475569; }
+.emendas-ata--falta { border-style: dashed; border-color: var(--color-warning-text); background: var(--color-warning-bg); }
+.emendas-ata__det { display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; }
+.emendas-ata__det strong { color: #0f172a; }
+.emendas-ata__falta { font-size: 0.72rem; font-weight: 700; border-radius: 99px; padding: 0.1rem 0.55rem; color: var(--color-warning-text); background: #fff; border: 1px dashed var(--color-warning-text); white-space: nowrap; }
+.emendas-ata__aviso { color: var(--color-warning-text); font-weight: 600; }
 .emendas-etapa__devolucoes { margin: 0.3rem 0 0 1.6rem; font-size: 0.78rem; }
 .emendas-etapa__devolucoes summary { cursor: pointer; color: var(--primary); font-weight: 700; }
 .emendas-etapa__devolucoes ul { list-style: none; margin: 0.35rem 0 0; padding: 0 0 0 0.6rem; border-left: 2px solid #e2e8f0; display: flex; flex-direction: column; gap: 0.45rem; color: #475569; }

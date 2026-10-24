@@ -4,20 +4,30 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
-import { documentoSeiDaEtapaValido, identificacaoDoPedido, itensDaLinha, linhasAtivas, numerosSei, rodadaDoPedido, valorDoPedido } from '../../utils/emendasPedidos';
+import { atasDoPedido, documentoSeiDaEtapaValido, identificacaoDoPedido, itensDaLinha, linhasAtivas, numerosSei, ORDEM_ETAPA, rodadaDoPedido, valorDoPedido, type AtaDoPedido } from '../../utils/emendasPedidos';
 import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
 import { QuadroGabinete } from './QuadroGabinete';
 import type { AcaoPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
 
-/** MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa. */
-export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'CANCELAR';
+/**
+ * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
+ * SOLICITACAO_ATA: a solicitação de empenho de uma ata (migration 178), sem mudar de etapa.
+ */
+export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'CANCELAR';
+
+/** De onde a janela foi aberta: a ata e o número que já estão na linha do tempo. */
+export interface ContextoDaJanela {
+  ataKey?: string;
+  numero?: string;
+}
 
 interface Props {
   pedido: PedidoEmenda;
   acao: AcaoDaJanela;
+  contexto?: ContextoDaJanela;
   itens: Map<string, ItemCaep>;
   nomeDoAutor: string;
   onClose: () => void;
@@ -46,6 +56,7 @@ const TITULO: Record<AcaoDaJanela, string> = {
   CONTRATACAO: 'Registrar o envio para contratação',
   MAIS_EMPENHADO: 'Acrescentar número SEI do empenho',
   MAIS_CONTRATACAO: 'Acrescentar número SEI do despacho para contratação',
+  SOLICITACAO_ATA: 'Solicitação de empenho de uma ata',
   CANCELAR: 'Cancelar o pedido'
 };
 
@@ -84,10 +95,41 @@ const aviso = (tom: 'erro' | 'info' | 'atencao'): React.CSSProperties => ({
   color: tom === 'erro' ? 'var(--color-danger, #b11b05)' : tom === 'atencao' ? 'var(--color-warning-text)' : 'var(--color-info-text, #155bcb)'
 });
 
+const rotuloDaAta = (a: AtaDoPedido): string =>
+  `Ata ${a.numeroAta}${a.fornecedor ? ` · ${a.fornecedor}` : ''}${a.situacao === 'falta' ? ' (falta)' : a.solicitacao ? ` (SEI ${a.solicitacao})` : ''}`;
+
+/** Um campo de número SEI para cada ata do pedido, com os itens embaixo para conferir com a solicitação. */
+const SolicitacoesPorAta: React.FC<{ atas: AtaDoPedido[]; valores: Record<string, string>; onChange: (ataKey: string, valor: string) => void }> = ({ atas, valores, onChange }) => (
+  <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }} data-testid="emendas-etapa-sei-por-ata">
+    <legend style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
+      Documento SEI da solicitação de cada ata (uma por ata; a que ainda não foi feita fica em branco)
+    </legend>
+    {atas.map((a) => (
+      <AppInput
+        key={a.ataKey}
+        label={`Ata ${a.numeroAta}${a.fornecedor ? ` · ${a.fornecedor}` : ''}`}
+        placeholder="Ex.: 41234567"
+        hint={a.itens.map((i) => `item ${i.numeroItem} · ${i.nome} · ${i.quantidade} un.`).join('; ')}
+        value={valores[a.ataKey] ?? ''}
+        onChange={(e) => onChange(a.ataKey, e.target.value)}
+        data-testid={`emendas-etapa-sei-ata-${a.numeroAta}`}
+      />
+    ))}
+  </fieldset>
+);
+
 /** Uma janela para cada passo do pedido, da minuta ao envio para contratação, e para o cancelamento. */
-export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoAutor, onClose }) => {
+export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, itens, nomeDoAutor, onClose }) => {
   const avancar = useAvancarPedido();
   const cancelar = useCancelarPedido();
+  const informar = useInformarSolicitacaoDaAta();
+  const atas = atasDoPedido(pedido, itens);
+  const autorizado = ORDEM_ETAPA[pedido.etapa] >= ORDEM_ETAPA.AUTORIZADO;
+  const [ataEscolhida, setAtaEscolhida] = useState(contexto?.ataKey ?? atas.find((a) => a.situacao === 'falta')?.ataKey ?? atas[0]?.ataKey ?? '');
+  const [numeroDaAta, setNumeroDaAta] = useState(contexto?.numero ?? '');
+  const [assinadaEm, setAssinadaEm] = useState('');
+  // Solicitação com várias atas: um número para cada uma.
+  const [porAta, setPorAta] = useState<Record<string, string>>({});
   const toast = useToast();
   const { data: autores = [] } = useAutoresEmendas();
   const [modo, setModo] = useState<AcaoDaJanela>(acao);
@@ -114,7 +156,11 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
   const pedeSei = Boolean(ROTULO_SEI[modo]);
   const semBeneficiario = linhas.filter((l) => !l.beneficiarioId).length;
   const todosPontos = PONTOS_SIOP.every(([k]) => pontos[k]);
-  const ocupado = avancar.isPending || cancelar.isPending;
+  const ocupado = avancar.isPending || cancelar.isPending || informar.isPending;
+  const variasAtas = modo === 'SOLICITADO' && atas.length > 1;
+  const numerosPorAta = atas
+    .map((a) => ({ ata: a, numero: (porAta[a.ataKey] ?? '').replace(/\D/g, '') }))
+    .filter((x) => x.numero);
 
   // Ofício de reserva com item em ata a menos do corte do fim: o banco recusa (migration 162).
   const ataForaDoPrazo =
@@ -126,7 +172,14 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
       : undefined;
 
   const pendencias: string[] = [];
-  if (pedeSei && (numeros.length === 0 || numeros.some((n) => !documentoSeiDaEtapaValido(n)) || (!VARIOS.has(modo) && numeros.length > 1))) {
+  if (variasAtas) {
+    if (numerosPorAta.length === 0) pendencias.push('o documento SEI da solicitação de pelo menos uma ata');
+    if (numerosPorAta.some((x) => !documentoSeiDaEtapaValido(x.numero))) pendencias.push('documento SEI (só números, 7 a 10 dígitos)');
+    if (new Set(numerosPorAta.map((x) => x.numero)).size < numerosPorAta.length) pendencias.push('um número diferente para cada ata');
+  } else if (modo === 'SOLICITACAO_ATA') {
+    if (!ataEscolhida) pendencias.push('a ata');
+    if (!documentoSeiDaEtapaValido(numeroDaAta)) pendencias.push('documento SEI (um número, só números, 7 a 10 dígitos)');
+  } else if (pedeSei && (numeros.length === 0 || numeros.some((n) => !documentoSeiDaEtapaValido(n)) || (!VARIOS.has(modo) && numeros.length > 1))) {
     pendencias.push(VARIOS.has(modo) ? 'documento SEI (só números, 7 a 10 dígitos; vários: separe por vírgula)' : 'documento SEI (um número, só números, 7 a 10 dígitos)');
   }
   if (modo === 'OFICIO' && !processoSei.trim()) pendencias.push('processo SEI');
@@ -143,7 +196,23 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
     setTentou(true);
     if (pendencias.length || ataForaDoPrazo) return;
     try {
-      if (modo === 'CANCELAR') {
+      if (modo === 'SOLICITACAO_ATA') {
+        await informar.mutateAsync({ pedidoId: pedido.id, ataKey: ataEscolhida, documentoSei: numeroDaAta.replace(/\D/g, ''), assinadaEm: autorizado && assinadaEm ? assinadaEm : null });
+        toast.success(`Solicitação da ata ${ataEscolhida.split('-')[0]} registrada.`);
+      } else if (variasAtas) {
+        // A etapa guarda o primeiro número; cada ata recebe o seu logo depois (migration 178).
+        await avancar.mutateAsync({ id: pedido.id, versao: pedido.versao, acao: 'SOLICITADO', dados: { data, documento_sei: numerosPorAta[0].numero } });
+        const falharam: string[] = [];
+        for (const x of numerosPorAta) {
+          try {
+            await informar.mutateAsync({ pedidoId: pedido.id, ataKey: x.ata.ataKey, documentoSei: x.numero, assinadaEm: null });
+          } catch (err) {
+            falharam.push(`ata ${x.ata.numeroAta}: ${(err as Error).message}`);
+          }
+        }
+        if (falharam.length) toast.error(`Solicitação registrada, mas faltou ligar: ${falharam.join('; ')}. Informe na linha do tempo do pedido.`);
+        else toast.success(`${nomeDoAutor}: solicitação de empenho registrada (${numerosPorAta.length} de ${atas.length} atas).`);
+      } else if (modo === 'CANCELAR') {
         await cancelar.mutateAsync({ id: pedido.id, versao: pedido.versao, motivo: motivo === 'Outro' ? outroMotivo.trim() : motivo });
         toast.success(`Pedido de ${nomeDoAutor} cancelado. A quantidade voltou ao saldo da CAEP.`);
       } else {
@@ -195,7 +264,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
             </AppButton>
           )}
           <AppButton type="submit" form="emendas-etapa-form" variant={modo === 'CANCELAR' || modo === 'DIVERGENCIA' ? 'danger' : 'primary'} disabled={ocupado} isLoading={ocupado} data-testid="emendas-etapa-salvar">
-            {modo === 'CANCELAR' ? 'Cancelar o pedido' : modo === 'CONFERIDO' ? 'Tudo confere' : modo === 'DIVERGENCIA' ? 'Devolver para a minuta' : modo.startsWith('MAIS_') ? 'Acrescentar' : 'Registrar'}
+            {modo === 'CANCELAR' ? 'Cancelar o pedido' : modo === 'CONFERIDO' ? 'Tudo confere' : modo === 'DIVERGENCIA' ? 'Devolver para a minuta' : modo.startsWith('MAIS_') ? 'Acrescentar' : modo === 'SOLICITACAO_ATA' ? 'Salvar' : 'Registrar'}
           </AppButton>
         </>
       }
@@ -213,9 +282,45 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
           </div>
         )}
 
+        {variasAtas && <SolicitacoesPorAta atas={atas} valores={porAta} onChange={(k, v) => setPorAta((x) => ({ ...x, [k]: v }))} />}
+
+        {modo === 'SOLICITACAO_ATA' && (
+          <>
+            <div style={aviso('info')}>Uma solicitação de autorização de empenho para cada ata do pedido. Trocar o número de uma ata deixa o anterior no pedido, sem ata.</div>
+            <div style={grade}>
+              <AppInput
+                label="Documento SEI da solicitação *"
+                placeholder="Ex.: 41234567"
+                hint="Só números, 7 a 10 dígitos."
+                value={numeroDaAta}
+                onChange={(e) => setNumeroDaAta(e.target.value)}
+                data-testid="emendas-etapa-sei-ata"
+              />
+              <AppSelect label="Ata que ela cobre *" value={ataEscolhida} onChange={(e) => setAtaEscolhida(e.target.value)} data-testid="emendas-etapa-ata">
+                {atas.map((a) => (
+                  <option key={a.ataKey} value={a.ataKey}>
+                    {rotuloDaAta(a)}
+                  </option>
+                ))}
+              </AppSelect>
+              {autorizado && (
+                <AppInput
+                  label="Assinada pela Diretora do FNSP em"
+                  type="date"
+                  hint="Em branco se ainda não assinou."
+                  value={assinadaEm}
+                  max={hojeEmBrasilia()}
+                  onChange={(e) => setAssinadaEm(e.target.value)}
+                  data-testid="emendas-etapa-assinada-em"
+                />
+              )}
+            </div>
+          </>
+        )}
+
         {(pedeSei || ROTULO_DATA[modo]) && modo !== 'CONFERIDO' && modo !== 'DIVERGENCIA' && (
           <div style={grade}>
-            {pedeSei && (
+            {pedeSei && !variasAtas && (
               <AppInput
                 label={ROTULO_SEI[modo]}
                 placeholder={VARIOS.has(modo) ? 'Ex.: 41234567, 41234568' : 'Ex.: 41234567'}
@@ -245,7 +350,12 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
 
         {modo === 'AUTORIZADO' && (
           <div style={aviso('info')}>
-            A autorização é o mesmo documento da solicitação{pedido.solicitadoDocumentoSei ? ` (SEI ${pedido.solicitadoDocumentoSei})` : ''}, assinado pela DGFNSP.
+            A autorização é o mesmo documento da solicitação, assinado pela DGFNSP.
+            {atas.length > 1
+              ? ' As solicitações das atas que ainda não têm data ficam assinadas nesta data; a de outro dia, ajuste depois na linha do tempo.'
+              : pedido.solicitadoDocumentoSei
+                ? ` (SEI ${pedido.solicitadoDocumentoSei})`
+                : ''}
           </div>
         )}
         {modo === 'EMPENHADO' && <div style={aviso('info')}>As notas de empenho não são digitadas: o sistema acha cada nota pelo contrato e pela emenda.</div>}

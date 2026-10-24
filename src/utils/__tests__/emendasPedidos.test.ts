@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avisosDoPedido, itensDaLinha, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, rodadaDoPedido, seiDaEtapa, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, documentosDaEtapa, intervaloDeDatas, itensDaLinha, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, rodadaDoPedido, seiDaEtapa, solicitacoesSemAta, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
@@ -19,7 +19,7 @@ const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], ...extra
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], ...extra
 });
 const itens = new Map([item('a'), item('b', { valorUnitario: 10, numeroAta: '00061/2024', vigenciaFinal: '2026-12-19' }), item('v', { ataEncerrada: true, numeroAta: '00020/2025', vigenciaFinal: '2026-05-28' })].map((i) => [i.itemKey, i]));
 const kit = linha({ tipo: 'KIT', itemKey: null, kitId: 'k', kitComposicao: [{ itemKey: 'a', quantidade: 1 }, { itemKey: 'b', quantidade: 2 }], quantidade: 10 });
@@ -223,5 +223,78 @@ describe('etapa Contratado pelo Contratos.gov.br', () => {
     expect(contratosDoPedido(p, completo).contratado).toBe(true);
     expect(contratosDoPedido({ ...p, etapa: 'EMPENHADO' }, completo).contratado).toBe(false);
     expect(contratosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [] }), completo).contratado).toBe(false);
+  });
+});
+
+describe('uma solicitação de empenho para cada ata (migration 178)', () => {
+  const A = '00031/2025-200331';
+  const B = '00048/2025-200331';
+  const catalogo = new Map(
+    [
+      item(`${A}-00001`, { numeroAta: '00031/2025', nomeCurto: 'Carabina', fornecedor: 'FORNECEDOR A' }),
+      item(`${A}-00002`, { numeroAta: '00031/2025', descricao: 'Coldre de cintura', fornecedor: 'FORNECEDOR A' }),
+      item(`${B}-00001`, { numeroAta: '00048/2025', nomeCurto: 'Mira optrônica', fornecedor: 'FORNECEDOR B' })
+    ].map((i) => [i.itemKey, i])
+  );
+  const linhas = [
+    linha({ itemKey: `${A}-00001`, quantidade: 4 }),
+    linha({ itemKey: `${A}-00001`, quantidade: 4 }),
+    linha({ tipo: 'KIT', itemKey: null, kitId: 'k', kitComposicao: [{ itemKey: `${A}-00002`, quantidade: 1 }, { itemKey: `${B}-00001`, quantidade: 1 }], quantidade: 3 }),
+    linha({ itemKey: '00018/2025-200331-00002', quantidade: 1, cancelada: true })
+  ];
+  const doc = (numero: string, ataKey: string | null, assinadaEm: string | null = null) => ({ etapa: 'AUTORIZACAO' as const, numero, data: '2026-09-23', ataKey, assinadaEm });
+
+  it('as atas vêm das linhas ativas e dos kits, com fornecedor, itens somados e a situação de cada solicitação', () => {
+    const p = pedido({ etapa: 'AUTORIZADO', linhas, documentos: [doc('37098929', A, '2026-09-24')] });
+    const atas = atasDoPedido(p, catalogo);
+    expect(atas.map((a) => [a.numeroAta, a.situacao, a.solicitacao])).toEqual([
+      ['00048/2025', 'falta', null],
+      ['00031/2025', 'assinada', '37098929']
+    ]);
+    expect(atas[1].fornecedor).toBe('FORNECEDOR A');
+    expect(atas[1].itens).toEqual([
+      { itemKey: `${A}-00001`, numeroItem: 1, nome: 'Carabina', quantidade: 8 },
+      { itemKey: `${A}-00002`, numeroItem: 2, nome: 'Coldre de cintura', quantidade: 3 }
+    ]);
+  });
+
+  it('avisa a ata sem solicitação assinada depois da autorização; pedido sem nenhuma solicitação não avisa', () => {
+    const comFalta = pedido({ etapa: 'CGOFI', linhas, documentos: [doc('37098929', A, '2026-09-24'), doc('37104393', B)] });
+    expect(atasSemAutorizacao(comFalta)?.curto).toBe('1 ata sem autorização');
+    expect(avisosDoPedido(comFalta, catalogo, HOJE).map((a) => a.tipo)).toContain('semAutorizacao');
+    expect(atasSemAutorizacao(pedido({ etapa: 'CGOFI', linhas }))).toBeNull();
+    expect(atasSemAutorizacao(pedido({ etapa: 'SOLICITADO', linhas, documentos: [doc('37098929', A)] }))).toBeNull();
+    const completo = pedido({ etapa: 'CONTRATACAO', linhas, documentos: [doc('37098929', A, '2026-09-24'), doc('37104393', B, '2026-09-25')] });
+    expect(atasSemAutorizacao(completo)).toBeNull();
+  });
+
+  it('solicitação sem ata aparece para o gestor ligar', () => {
+    expect(solicitacoesSemAta(pedido({ documentos: [doc('35938854', null), doc('37098929', A)] }))).toEqual(['35938854']);
+  });
+
+  it('documentos da etapa trazem a data de cada um e os números das colunas que ainda não estão na tabela', () => {
+    const p = pedido({
+      etapa: 'CONTRATACAO',
+      contratacaoEm: '2026-10-20',
+      contratacaoDocumentosSei: ['37262327'],
+      documentos: [
+        { etapa: 'CONTRATACAO', numero: '37262155', data: '2026-10-15', ataKey: null, assinadaEm: null },
+        { etapa: 'CONTRATACAO', numero: '37262327', data: '2026-10-20', ataKey: null, assinadaEm: null }
+      ],
+      linhas: [linha({ despachoDocumentoSei: '36000001' })]
+    });
+    expect(documentosDaEtapa(p, 'CONTRATACAO')).toEqual([
+      { numero: '37262155', data: '2026-10-15' },
+      { numero: '37262327', data: '2026-10-20' },
+      { numero: '36000001', data: '2026-10-20' }
+    ]);
+    expect(documentosDaEtapa(p, 'CONFERIDO')).toEqual([]);
+  });
+
+  it('etapa com documentos de dias diferentes mostra o intervalo', () => {
+    expect(intervaloDeDatas(['2026-10-15', '2026-10-15', '2026-10-20', null])).toBe('15/10 a 20/10/2026');
+    expect(intervaloDeDatas(['2025-12-30', '2026-01-02'])).toBe('30/12/2025 a 02/01/2026');
+    expect(intervaloDeDatas(['2026-09-24'])).toBe('24/09/2026');
+    expect(intervaloDeDatas([null])).toBeNull();
   });
 });

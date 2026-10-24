@@ -17,7 +17,7 @@ const pedido = (id: string, autorId: string | null, etapa: PedidoEmenda['etapa']
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: []
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: []
 });
 const autor = (id: string, nome: string, tipo: AutorEmenda['tipo']): AutorEmenda => ({ id, nome, tipo, nomeCivil: null, partido: 'PX', uf: 'SP', emExercicio: true, legislatura: 57, lidoEm: null });
 
@@ -133,5 +133,63 @@ describe('Pedidos: linha do tempo com o SEI de cada etapa (migration 174)', () =
     expect(html).toContain('Conferir com o SIOP');
     expect(html).toContain('emendas-etapa--atual');
     expect(html).not.toContain('sem data na planilha');
+  });
+});
+
+describe('Pedidos: uma solicitação de empenho para cada ata (migration 178)', () => {
+  beforeAll(() => {
+    const A = '00031/2025-200331';
+    const B = '00048/2025-200331';
+    PEDIDOS.push({
+      ...pedido('aut', 'A1', 'CGOFI', 1),
+      solicitadoEm: '2026-09-23',
+      autorizadoEm: '2026-09-24',
+      cgofiEm: '2026-09-30',
+      linhas: [
+        { ...linha('aut-1', 8), itemKey: `${A}-00001` },
+        { ...linha('aut-2', 3), itemKey: `${B}-00001` }
+      ],
+      documentos: [
+        { etapa: 'AUTORIZACAO', numero: '37098929', data: '2026-09-23', ataKey: A, assinadaEm: '2026-09-24' },
+        { etapa: 'CGOFI', numero: '37162877', data: '2026-09-29', ataKey: null, assinadaEm: null },
+        { etapa: 'CGOFI', numero: '37162892', data: '2026-09-30', ataKey: null, assinadaEm: null }
+      ]
+    });
+  });
+
+  it('a autorização lista as atas: a assinada com a data e a que falta com o botão para informar', () => {
+    const html = render('/?pedido=aut');
+    expect(html).toContain('1 de 2 atas');
+    expect(html).toContain('emendas-etapa__contaatas--falta');
+    expect(html).toContain('Ata 00031/2025');
+    expect(html).toContain('Assinada pela Diretora do FNSP em <strong>24/09/2026</strong>');
+    expect(html).toContain('Esta ata ainda não tem solicitação de empenho.');
+    expect(html).toContain('emendas-pedido-ata-informar-00048/2025');
+    expect(html).toContain('Informar a solicitação desta ata');
+    // A solicitação é o mesmo documento: não se repete no passo "Empenho solicitado".
+    expect(html).toContain('Uma solicitação para cada ata, no passo seguinte');
+  });
+
+  it('cada documento da etapa traz a sua data; dias diferentes viram intervalo', () => {
+    const html = render('/?pedido=aut');
+    expect(html).toContain('37162877');
+    expect(html).toContain('29/09/2026');
+    expect(html).toContain('29/09 a 30/09/2026');
+  });
+});
+
+describe('Pedidos: linhas tiradas', () => {
+  beforeAll(() => {
+    const motivo = 'Passou para o pedido 567 (reserva para o CBMERJ).';
+    PEDIDOS.push({
+      ...pedido('tiradas', 'A1', 'AUTORIZADO', 1),
+      linhas: [linha('t-1', 1), { ...linha('t-2', 2), cancelada: true, canceladaMotivo: motivo }, { ...linha('t-3', 3), cancelada: true, canceladaMotivo: motivo }]
+    });
+  });
+
+  it('o mesmo motivo de várias linhas aparece uma vez só', () => {
+    const html = render('/?pedido=tiradas');
+    expect(html).toContain('2 linhas tiradas do pedido');
+    expect(html.split('Passou para o pedido 567').length - 1).toBe(1);
   });
 });
