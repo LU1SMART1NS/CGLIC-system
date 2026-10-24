@@ -33,6 +33,7 @@ import {
 export const RECURSO_REAJUSTE_ATAS = 'reajuste_atas' as const;
 export const FONTE_PNCP_REAJUSTE = 'PNCP (editais e apostilamentos)';
 export const FONTE_BCB = 'Banco Central (IPCA e Focus)';
+export const FONTE_COMPRAS_RESULTADOS = 'Compras.gov.br (resultado dos itens)';
 
 /** Tempo máximo lendo as fontes numa execução (a Edge Function tem 150 s). */
 export const ORCAMENTO_REAJUSTE_ATAS_MS = 95_000;
@@ -87,9 +88,9 @@ export interface OpcoesReajuste {
 class FonteBloqueada extends Error {}
 class NaoEncontrado extends Error {}
 
-async function pedir(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>, init?: RequestInit): Promise<Response> {
+async function pedir(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>, init?: RequestInit, tentativas = TENTATIVAS): Promise<Response> {
   let ultimoErro: unknown = null;
-  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+  for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
     if (tentativa > 1) await esperar(ESPERA_POR_TENTATIVA_MS * (tentativa - 1));
     try {
       const resposta = await fetcher(url, init);
@@ -105,16 +106,31 @@ async function pedir(url: string, fetcher: typeof fetch, esperar: (ms: number) =
   throw ultimoErro;
 }
 
-async function pedirJson<T>(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>): Promise<T> {
-  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
-    const texto = await (await pedir(url, fetcher, esperar)).text();
-    // Bloqueio do PNCP: HTML com status 200.
-    if (texto.trim().startsWith('<')) {
-      if (tentativa < TENTATIVAS) {
+interface OpcoesDoPedido {
+  /** Tentativas (padrão 3). A leitura rápida dos índices usa 1: falha cedo e não come o tempo das atas. */
+  tentativas?: number;
+  /** Tempo máximo da resposta; sem ele, vale o do proxy (30 s). */
+  tempoMs?: number;
+}
+
+async function pedirJson<T>(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>, opts: OpcoesDoPedido = {}): Promise<T> {
+  const tentativas = opts.tentativas ?? TENTATIVAS;
+  for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
+    const controle = opts.tempoMs ? new AbortController() : null;
+    const relogio = controle ? setTimeout(() => controle.abort(), opts.tempoMs) : null;
+    let texto: string;
+    try {
+      texto = await (await pedir(url, fetcher, esperar, controle ? { signal: controle.signal } : undefined, tentativas)).text();
+    } finally {
+      if (relogio) clearTimeout(relogio);
+    }
+    // Bloqueio: o PNCP e o Banco Central devolvem HTML com status 200; o Compras.gov.br, corpo vazio.
+    if (texto.trim() === '' || texto.trim().startsWith('<')) {
+      if (tentativa < tentativas) {
         await esperar(ESPERA_POR_TENTATIVA_MS * tentativa);
         continue;
       }
-      throw new FonteBloqueada(`${url.split('?')[0]} devolveu uma página de bloqueio.`);
+      throw new FonteBloqueada(`${url.split('?')[0]} devolveu uma página de bloqueio ou uma resposta vazia.`);
     }
     return JSON.parse(texto) as T;
   }
@@ -161,10 +177,19 @@ export interface IndiceMensal {
 
 const dd = (n: number) => String(n).padStart(2, '0');
 
+/**
+ * Leitura rápida dos índices: uma tentativa e 15 s por consulta. Em 24/10/2026 o Banco Central devolveu uma página
+ * de bloqueio e as novas tentativas comeram a execução inteira (nenhuma ata lida). Os índices mudam uma vez por mês
+ * (IPCA) e por semana (Focus): falhar hoje não atrapalha, a leitura seguinte pega.
+ */
+export const LEITURA_RAPIDA_DOS_INDICES: OpcoesDoPedido = { tentativas: 1, tempoMs: 15_000 };
+/** Os índices são lidos de novo só depois disso (o agendamento roda de 3 em 3 horas). */
+export const VALIDADE_DOS_INDICES_MS = 20 * 60 * 60 * 1000;
+
 /** IPCA oficial dos últimos 4 anos e a mediana mensal do Focus mais recente para os meses seguintes. */
-export async function lerIndicesIpca(fetcher: typeof fetch, esperar: (ms: number) => Promise<void>, hoje: Date): Promise<IndiceMensal[]> {
+export async function lerIndicesIpca(fetcher: typeof fetch, esperar: (ms: number) => Promise<void>, hoje: Date, opts: OpcoesDoPedido = LEITURA_RAPIDA_DOS_INDICES): Promise<IndiceMensal[]> {
   const inicio = `01/${dd(hoje.getUTCMonth() + 1)}/${hoje.getUTCFullYear() - 4}`;
-  const sgs = await pedirJson<Array<{ data: string; valor: string }>>(`${URL_SGS_IPCA}?formato=json&dataInicial=${inicio}`, fetcher, esperar);
+  const sgs = await pedirJson<Array<{ data: string; valor: string }>>(`${URL_SGS_IPCA}?formato=json&dataInicial=${inicio}`, fetcher, esperar, opts);
   const oficiais: IndiceMensal[] = [];
   for (const r of sgs) {
     const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(r.data ?? '');
@@ -176,7 +201,8 @@ export async function lerIndicesIpca(fetcher: typeof fetch, esperar: (ms: number
   const focus = await pedirJson<{ value?: Array<{ Data: string; DataReferencia: string; Mediana: number }> }>(
     `${URL_FOCUS_MENSAL}?$top=120&$filter=${filtro}&$orderby=Data%20desc&$format=json&$select=Data,DataReferencia,Mediana`,
     fetcher,
-    esperar
+    esperar,
+    opts
   );
   const linhas = focus.value ?? [];
   const maisRecente = linhas.reduce((max, l) => (l.Data > max ? l.Data : max), '');
@@ -423,10 +449,93 @@ async function lerDocumentosDaAta(
 
 const digitos = (s: unknown) => String(s ?? '').replace(/\D/g, '');
 
+// ------------------------------------------------------------------------------
+// Preço homologado em lote (Compras.gov.br)
+// ------------------------------------------------------------------------------
+
+/**
+ * Resultado dos itens de todas as compras de uma UASG (módulo de contratações do Compras.gov.br, Lei 14.133): uma
+ * linha por item e fornecedor, com o preço homologado. A consulta aceita até 365 dias por vez (23/10/2026: 377
+ * resultados da 200331 de nov/2024 a out/2025, numa página de 500). Substitui a consulta item por item no PNCP, que
+ * tomava quase toda a execução nas atas com muitos itens.
+ */
+const URL_RESULTADOS_UASG = '/api-arp/modulo-contratacoes/3_consultarResultadoItensContratacoes_PNCP_14133';
+const PAGINA_RESULTADOS = 500;
+const PAUSA_ENTRE_PAGINAS_MS = 1_000;
+
+export interface ResultadoDoItem {
+  niFornecedor: string;
+  valor: number;
+  ordem: number | null;
+}
+
+/** Chave: compra no PNCP ("00394494000136-1-001132/2024") e número do item. */
+export type ResultadosDaUasg = Map<string, ResultadoDoItem[]>;
+
+export const chaveDoResultado = (compraPncp: string, numeroItem: number) => `${compraPncp}|${numeroItem}`;
+
+const isoDia = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Janelas de até 365 dias, de 1º de janeiro de `desdeAno` até hoje. */
+export function janelasDeUmAno(desdeAno: number, hoje: Date): Array<[string, string]> {
+  const janelas: Array<[string, string]> = [];
+  let inicio = new Date(Date.UTC(desdeAno, 0, 1));
+  const fim = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()));
+  while (inicio <= fim) {
+    const ate = new Date(Math.min(inicio.getTime() + 364 * 86_400_000, fim.getTime()));
+    janelas.push([isoDia(inicio), isoDia(ate)]);
+    inicio = new Date(ate.getTime() + 86_400_000);
+  }
+  return janelas;
+}
+
+export async function lerResultadosDaUasg(
+  uasg: string,
+  desdeAno: number,
+  ctx: { fetcher: typeof fetch; esperar: (ms: number) => Promise<void>; hoje: Date }
+): Promise<ResultadosDaUasg> {
+  const mapa: ResultadosDaUasg = new Map();
+  let primeiro = true;
+  for (const [de, ate] of janelasDeUmAno(desdeAno, ctx.hoje)) {
+    for (let pagina = 1; ; pagina++) {
+      if (!primeiro) await ctx.esperar(PAUSA_ENTRE_PAGINAS_MS);
+      primeiro = false;
+      const dados = await pedirJson<{ resultado?: Array<Record<string, unknown>>; totalPaginas?: number }>(
+        `${URL_RESULTADOS_UASG}?pagina=${pagina}&tamanhoPagina=${PAGINA_RESULTADOS}&unidadeOrgaoCodigoUnidade=${uasg}&dataResultadoPncpInicial=${de}&dataResultadoPncpFinal=${ate}`,
+        ctx.fetcher,
+        ctx.esperar
+      );
+      for (const r of dados.resultado ?? []) {
+        const compra = String(r.idContratacaoPNCP ?? '');
+        const item = Number(r.numeroItemPncp);
+        const valor = Number(r.valorUnitarioHomologado);
+        // Resultado cancelado não vale como preço homologado.
+        if (/cancel/i.test(String(r.situacaoCompraItemResultadoNome ?? ''))) continue;
+        if (!compra || !Number.isInteger(item) || !Number.isFinite(valor)) continue;
+        const chave = chaveDoResultado(compra, item);
+        const lista = mapa.get(chave) ?? [];
+        lista.push({ niFornecedor: digitos(r.niFornecedor), valor, ordem: r.ordemClassificacaoSrp == null ? null : Number(r.ordemClassificacaoSrp) });
+        mapa.set(chave, lista);
+      }
+      if (!dados.totalPaginas || pagina >= dados.totalPaginas) break;
+    }
+  }
+  return mapa;
+}
+
+/** Preço homologado do item da ata: o do fornecedor da ata; sem ele, o único resultado do item. */
+export function escolherHomologado(resultados: ResultadoDoItem[] | undefined, fornecedorDaAta: string | null): number | null {
+  if (!resultados || resultados.length === 0) return null;
+  const doFornecedor = resultados.find((r) => r.niFornecedor && r.niFornecedor === digitos(fornecedorDaAta));
+  if (doFornecedor) return doFornecedor.valor;
+  return resultados.length === 1 ? resultados[0].valor : null;
+}
+
 async function lerHomologados(
   ata: AtaDaFila,
   p: { cnpj: string; ano: string; sequencial: number },
-  ctx: { fetcher: typeof fetch; esperar: (ms: number) => Promise<void>; restaMs: () => number }
+  ctx: { fetcher: typeof fetch; esperar: (ms: number) => Promise<void>; restaMs: () => number },
+  lote: ResultadosDaUasg | null
 ): Promise<{ homologados: Array<{ numero_item: string; valor: number }>; completo: boolean }> {
   if (!supabase) return { homologados: [], completo: false };
   const [{ data: itens, error: e1 }, { data: ja, error: e2 }] = await Promise.all([
@@ -438,6 +547,18 @@ async function lerHomologados(
   const tem = new Set((ja ?? []).map((r: { numero_item: string }) => r.numero_item));
   const faltam = (itens ?? []).filter((i: { numero_item: string }) => !tem.has(i.numero_item));
   const homologados: Array<{ numero_item: string; valor: number }> = [];
+  if (lote) {
+    // Lote do Compras.gov.br: nenhum pedido por item. Item sem resultado no lote fica sem preço homologado
+    // (a conta usa o preço atual) e não é consultado de novo antes de 7 dias.
+    const compra = `${p.cnpj}-1-${String(p.sequencial).padStart(6, '0')}/${p.ano}`;
+    for (const it of faltam as Array<{ numero_item: string; fornecedor_cnpj_cpf: string | null }>) {
+      const n = Number(it.numero_item);
+      if (!Number.isInteger(n) || n <= 0) continue;
+      const valor = escolherHomologado(lote.get(chaveDoResultado(compra, n)), it.fornecedor_cnpj_cpf);
+      if (valor !== null) homologados.push({ numero_item: it.numero_item, valor });
+    }
+    return { homologados, completo: true };
+  }
   for (const it of faltam as Array<{ numero_item: string; fornecedor_cnpj_cpf: string | null }>) {
     if (ctx.restaMs() < 8_000) return { homologados, completo: false };
     const n = Number(it.numero_item);
@@ -461,6 +582,20 @@ async function lerHomologados(
 // ------------------------------------------------------------------------------
 // Banco
 // ------------------------------------------------------------------------------
+
+/** Os índices foram lidos há menos de 20 horas: não precisa ler de novo nesta execução. */
+async function indicesLidosHaPouco(hoje: Date): Promise<boolean> {
+  if (!supabase) return false;
+  const { data, error } = await supabase
+    .from('indices_precos_mensais')
+    .select('lido_em')
+    .eq('tipo', 'OFICIAL')
+    .order('lido_em', { ascending: false })
+    .limit(1);
+  if (error) return false;
+  const lidoEm = (data as Array<{ lido_em: string }> | null)?.[0]?.lido_em;
+  return Boolean(lidoEm) && hoje.getTime() - Date.parse(lidoEm as string) < VALIDADE_DOS_INDICES_MS;
+}
 
 async function filaDoBanco(): Promise<AtaDaFila[]> {
   if (!supabase) return [];
@@ -507,15 +642,35 @@ export async function sincronizarReajusteAtas(opts: OpcoesReajuste): Promise<Res
     const fontesComFalha = new Set<string>();
     const problemas: string[] = [];
 
-    try {
-      const indices = await lerIndicesIpca(fetcher, esperar, (opts.hoje ?? (() => new Date()))());
-      if (indices.length > 0) await gravar({ indices, projetados_substituir: ['IPCA'] });
-    } catch (err) {
-      fontesComFalha.add(FONTE_BCB);
-      problemas.push(`os índices não puderam ser lidos (${mensagemDeErro(err)})`);
+    const hoje = (opts.hoje ?? (() => new Date()))();
+    if (!(await indicesLidosHaPouco(hoje))) {
+      try {
+        const indices = await lerIndicesIpca(fetcher, esperar, hoje);
+        if (indices.length > 0) await gravar({ indices, projetados_substituir: ['IPCA'] });
+      } catch (err) {
+        fontesComFalha.add(FONTE_BCB);
+        problemas.push(`os índices não puderam ser lidos (${mensagemDeErro(err)}); valem os da última leitura`);
+      }
     }
 
     const fila = await filaDoBanco();
+    // Preço homologado em lote, uma leitura por UASG na execução (só se alguma ata da fila precisar).
+    const lotes = new Map<string, ResultadosDaUasg | null>();
+    const loteDaUasg = async (uasg: string): Promise<ResultadosDaUasg | null> => {
+      if (!lotes.has(uasg)) {
+        const anos = fila.filter((a) => a.codigo_uasg === uasg).map((a) => Number(partesDoControle(a.numero_controle_pncp)?.ano)).filter((n) => Number.isInteger(n));
+        try {
+          lotes.set(uasg, await lerResultadosDaUasg(uasg, Math.min(...anos, hoje.getUTCFullYear()), { fetcher, esperar, hoje }));
+        } catch (err) {
+          // Sem o lote, a ata segue pela consulta item por item no PNCP.
+          console.warn(`[reajuste] resultados da UASG ${uasg} não puderam ser lidos no Compras.gov.br:`, mensagemDeErro(err));
+          fontesComFalha.add(FONTE_COMPRAS_RESULTADOS);
+          problemas.push(`o resultado dos itens da UASG ${uasg} no Compras.gov.br não pôde ser lido (o preço homologado veio item por item do PNCP)`);
+          lotes.set(uasg, null);
+        }
+      }
+      return lotes.get(uasg) ?? null;
+    };
     const editais = new Map<string, (ClausulaDoEdital & { lido: boolean }) | null>();
     let gravadas = 0;
     let falhas = 0;
@@ -541,7 +696,7 @@ export async function sincronizarReajusteAtas(opts: OpcoesReajuste): Promise<Res
         payload.reajustes = docs.reajustes;
         if (docs.pendentes > 0) pendentes++;
         if (ata.itens_sem_homologado > 0 && restaMs() > 15_000) {
-          const h = await lerHomologados(ata, p, ctx);
+          const h = await lerHomologados(ata, p, ctx, await loteDaUasg(ata.codigo_uasg));
           payload.homologados = h.homologados;
           // Lidos só em parte (faltou tempo): grava o que veio e a ata volta para a fila.
           payload.homologados_completos = h.completo;
