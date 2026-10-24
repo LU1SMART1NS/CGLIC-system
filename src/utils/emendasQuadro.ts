@@ -310,41 +310,38 @@ export function htmlDaTabela(q: Quadro): string {
   );
 }
 
-/** Mesmo conteúdo em texto (WhatsApp não tem tabela): *negrito* no total de cada linha e no TOTAL A EMPENHAR. */
+/**
+ * Texto para o WhatsApp do parlamentar, organizado por beneficiário: nome e cidade, os itens com quantidade e valor,
+ * o subtotal quando há mais de um item e, no fim, o total (por GND quando mistura investimento e custeio). Fica de fora
+ * o que só serve à CAEP (ata, item, endereço, notas de cada preço): uma linha avisa que os valores têm a folga do
+ * reajuste.
+ */
 export function textoParaWhatsapp(q: Quadro): string {
-  const entrega = (l: LinhaQuadro) => [l.entrega ?? 'a definir', l.endereco].filter(Boolean).join(' · ');
-  const linhas: string[] = [];
-  q.linhas.forEach((l, i) => {
-    if (l.linhasDoItem === 1) {
-      linhas.push(
-        `• ${l.quantidade} × ${l.descricao}${l.kit ? ` (${l.kit})` : ''}\n` +
-          (l.ata ? `  ${ataEItem(l)}\n` : '') +
-          `  ${nomeComSigla(l) ?? 'beneficiário a definir'}\n` +
-          (l.beneficiario ? `  Entrega: ${entrega(l)}\n` : '') +
-          `  ${brl(l.unitario)}${l.marca ? ` ${l.marca}` : ''} = *${brl(l.total)}*`
-      );
-      return;
-    }
-    if (l.linhasDoItem === 0) return;
-    // Mesmo item para vários beneficiários: o item e o preço uma vez, cada beneficiário embaixo.
-    const grupo = q.linhas.slice(i, i + l.linhasDoItem);
-    linhas.push(
-      `• ${grupo.reduce((s, x) => s + x.quantidade, 0)} × ${l.descricao}${l.kit ? ` (${l.kit})` : ''}\n` +
-        (l.ata ? `  ${ataEItem(l)}\n` : '') +
-        `  ${brl(l.unitario)}${l.marca ? ` ${l.marca}` : ''} cada\n` +
-        grupo
-          .map((x) => `  ◦ ${x.quantidade} para ${nomeComSigla(x) ?? 'beneficiário a definir'}\n` + (x.beneficiario ? `    Entrega: ${entrega(x)}\n` : '') + `    = *${brl(x.total)}*`)
-          .join('\n')
-    );
+  const porBeneficiario = new Map<string, LinhaQuadro[]>();
+  for (const l of q.linhas) {
+    const chave = l.beneficiario ? `${l.beneficiario}|${l.sigla ?? ''}|${l.entrega ?? ''}` : '';
+    if (!porBeneficiario.has(chave)) porBeneficiario.set(chave, []);
+    porBeneficiario.get(chave)!.push(l);
+  }
+  // Quem ainda não tem beneficiário vai por último.
+  const grupos = [...porBeneficiario.entries()].sort(([a], [b]) => Number(a === '') - Number(b === ''));
+  const blocos = grupos.map(([chave, ls]) => {
+    const l0 = ls[0];
+    // Nome e cidade na mesma linha: vários beneficiários têm o mesmo nome (Guarda Municipal) e só a cidade separa.
+    const cabecalho = chave ? `*${nomeComSigla(l0)}* · ${l0.entrega ?? 'entrega a definir'}` : '*Beneficiário a definir*';
+    const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}${l.kit ? ` (${l.kit})` : ''}: ${brl(l.total)}${l.quantidade > 1 ? ` (${brl(l.unitario)} cada)` : ''}`);
+    const subtotal = ls.length > 1 ? [`Subtotal: ${brl(centavos(ls.reduce((s, l) => s + l.total, 0)))}`] : [];
+    return [cabecalho, ...itens, ...subtotal].join('\n');
   });
+  const comFolga = q.total !== q.totalHoje;
   return [
     `*${q.titulo}*`,
     q.subtitulo,
     '',
-    ...linhas,
+    blocos.join('\n\n'),
     '',
     ...q.porGnd.map((g) => `${g.rotulo}: ${brl(g.total)}`),
-    `*TOTAL A EMPENHAR: ${brl(q.total)}*`,
-    ...(q.notas.length ? ['', ...q.notas] : [])
+    `*Total a empenhar: ${brl(q.total)}*`,
+    ...(comFolga ? ['', '_Valores com a previsão de reajuste das atas (IPCA), para não faltar recurso no empenho._'] : [])
   ].join('\n');
 }

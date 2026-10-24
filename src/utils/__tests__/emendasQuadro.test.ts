@@ -107,13 +107,19 @@ describe('quadro da reserva (Anexo)', () => {
     expect(htmlDaTabela(montarQuadro({ autor, linhas: [linhas[2]], itens, beneficiarios: new Map([['b2', { ...cbm, nome: '<b>x</b>' }]]), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
-  it('WhatsApp: lista com negrito no total', () => {
+  it('WhatsApp: por beneficiário, sem ata nem endereço; subtotal com mais de um item; a definir no fim', () => {
     const t = textoParaWhatsapp(q);
     expect(t.split('\n')[0]).toBe('*Anexo I – Indicação de Romário (Senado Federal · RJ)*');
-    expect(t).toContain('• 10 × Tablet\n  Ata 00043/2026 · item 00005\n  10º Batalhão de Polícia Militar · 10º BPM\n  Entrega: Rio de Janeiro - RJ · Rua X, 100 · Centro · CEP 20000-000\n  R$ 1.598,76 ¹ = *R$ 15.987,60*');
-    expect(t).toContain('• 2 × Drone\n  Ata 00031/2025 · item 00001\n  Corpo de Bombeiros Militar · CBMERJ\n  Entrega: RJ\n');
-    expect(t).toContain('• 100 × Colchonete\n  Ata 00031/2025 · item 00001\n  beneficiário a definir');
-    expect(t).toContain(`*TOTAL A EMPENHAR: R$ `);
+    expect(t).toContain(
+      '*10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ\n• 5 Camioneta/SUV médio: R$ 959.058,10 (R$ 191.811,62 cada)\n• 10 Tablet: R$ 15.987,60 (R$ 1.598,76 cada)\nSubtotal: R$ 975.045,70'
+    );
+    expect(t).toContain('*Corpo de Bombeiros Militar · CBMERJ* · RJ\n• 2 Drone: R$ 94.317,66 (R$ 47.158,83 cada)\n\n');
+    expect(t).not.toContain('Ata ');
+    expect(t).not.toContain('Rua X');
+    expect(t.indexOf('*Beneficiário a definir*')).toBeGreaterThan(t.indexOf('CBMERJ'));
+    expect(t).toContain('• 2 Mesa flexora (Kit Academia):');
+    expect(t).toContain('*Total a empenhar: R$ ');
+    expect(t).toContain('_Valores com a previsão de reajuste das atas (IPCA), para não faltar recurso no empenho._');
   });
 });
 
@@ -167,12 +173,10 @@ describe('mesmo item para vários beneficiários', () => {
     expect(h.match(/Camioneta\/SUV médio/g)).toHaveLength(2);
   });
 
-  it('WhatsApp: o item e o preço uma vez, cada beneficiário embaixo', () => {
+  it('WhatsApp: o mesmo item aparece em cada beneficiário', () => {
     const t = textoParaWhatsapp(qv);
-    expect(t).toContain('• 6 × Camioneta/SUV médio\n');
-    expect(t).toContain('R$ 191.811,62 cada');
-    expect(t).toContain('  ◦ 2 para 10º Batalhão de Polícia Militar · 10º BPM\n    Entrega: Rio de Janeiro - RJ · Rua X, 100 · Centro · CEP 20000-000\n    = *R$ 383.623,24*');
-    expect(t).toContain('  ◦ 3 para beneficiário a definir\n    = *R$ 575.434,86*');
+    expect(t).toContain('*10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ\n• 2 Camioneta/SUV médio: R$ 383.623,24 (R$ 191.811,62 cada)');
+    expect(t).toContain('*Beneficiário a definir*\n• 3 Camioneta/SUV médio: R$ 575.434,86 (R$ 191.811,62 cada)');
   });
 });
 
