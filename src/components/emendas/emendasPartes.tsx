@@ -133,19 +133,17 @@ export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficia
 
 /** Empenho da linha: a nota, quando já se sabe; antes, o documento SEI do empenho. Embaixo, o contrato. */
 export const EmpenhoDaLinha: React.FC<{
-  linha: Pick<LinhaPedido, 'notaEmpenho' | 'empenhoDocumentoSei' | 'contratoNumero'>;
-  /** Nota achada pelo plano interno (migration 164); a digitada pela CAEP vale mais. */
+  linha: Pick<LinhaPedido, 'empenhoDocumentoSei' | 'contratoNumero'>;
+  /** Nota achada pelo sistema: pelo documento SEI da nota (migration 177) ou pelo plano interno (migration 164). */
   achada?: NotaDaLinha;
   podeVerContratos: boolean;
 }> = ({ linha, achada, podeVerContratos }) => {
   const chave = achada?.contractKey ?? chaveDoContratoDaEmenda(linha.contratoNumero);
   const contrato = achada?.contractKey ? numeroDaChave(achada.contractKey) : linha.contratoNumero;
-  if (!linha.notaEmpenho && !achada?.nota && !linha.empenhoDocumentoSei && !contrato) return <span style={carteiraDetalhe}>—</span>;
+  if (!achada?.nota && !linha.empenhoDocumentoSei && !contrato) return <span style={carteiraDetalhe}>—</span>;
   return (
     <>
-      {linha.notaEmpenho ? (
-        <div style={{ fontWeight: 700 }}>{linha.notaEmpenho}</div>
-      ) : achada?.nota ? (
+      {achada?.nota ? (
         <>
           <div style={{ fontWeight: 700 }}>{achada.nota}</div>
           {achada.regra && <div style={carteiraDetalhe}>{ROTULO_REGRA_DA_NOTA[achada.regra]}</div>}

@@ -290,8 +290,9 @@ export function dataDaEtapa(p: PedidoEmenda, etapa: EtapaPedido): string | null 
   }
 }
 
-/** Como a nota foi achada (migration 164), para mostrar embaixo do número. */
+/** Como a nota foi achada (migrations 164 e 177), para mostrar embaixo do número. */
 export const ROTULO_REGRA_DA_NOTA: Record<RegraDaNota, string> = {
+  SEI: 'achada pelo SEI',
   CONTRATO: 'achada pelo contrato',
   ITEM: 'achada pelo item da ata',
   AUTOR: 'achada pelo autor'
@@ -307,9 +308,9 @@ export const ROTULO_MOTIVO_SEM_NOTA: Record<MotivoSemNota, string> = {
   SEM_EMENDA: 'o pedido não tem o número da emenda'
 };
 
-/** Nota da linha: a digitada pela CAEP no empenho vale mais que a achada pelo sistema. */
-export function notaDaLinha(l: Pick<LinhaPedido, 'id' | 'notaEmpenho'>, notas: Map<string, NotaDaLinha>): string | null {
-  return l.notaEmpenho ?? notas.get(l.id)?.nota ?? null;
+/** Nota da linha: a achada pelo sistema (a nota não é mais digitada; migrations 174 e 177). */
+export function notaDaLinha(l: Pick<LinhaPedido, 'id'>, notas: Map<string, NotaDaLinha>): string | null {
+  return notas.get(l.id)?.nota ?? null;
 }
 
 export const linhasSemNota = (p: PedidoEmenda, notas: Map<string, NotaDaLinha>): LinhaPedido[] => linhasAtivas(p).filter((l) => !notaDaLinha(l, notas));
