@@ -5,7 +5,8 @@ const banco = vi.hoisted(() => ({
   fila: [] as unknown[],
   gravacoes: [] as Array<Record<string, unknown>>,
   itens: [] as Array<{ numero_item: string; fornecedor_cnpj_cpf: string | null }>,
-  homologados: [] as Array<{ numero_item: string }>
+  homologados: [] as Array<{ numero_item: string }>,
+  indices: [] as Array<{ lido_em: string }>
 }));
 
 vi.mock('../supabaseClient', () => ({
@@ -19,9 +20,16 @@ vi.mock('../supabaseClient', () => ({
       return { data: null, error: { message: `rpc inesperada ${nome}` } };
     }),
     from: vi.fn((tabela: string) => ({
-      select: () => ({
-        eq: async () => ({ data: tabela === 'itens_ata' ? banco.itens : banco.homologados, error: null })
-      })
+      select: () => {
+        const dados = () => Promise.resolve({ data: tabela === 'itens_ata' ? banco.itens : tabela === 'indices_precos_mensais' ? banco.indices : banco.homologados, error: null });
+        const consulta: Record<string, unknown> = {
+          eq: () => consulta,
+          order: () => consulta,
+          limit: () => dados(),
+          then: (ok: (v: unknown) => unknown, falha: (e: unknown) => unknown) => dados().then(ok, falha)
+        };
+        return consulta;
+      }
     }))
   }
 }));
@@ -31,7 +39,16 @@ vi.mock('../sincronizacaoFontesService', async (original) => ({
   executarComReserva: vi.fn(async (_r: string, _u: string, _o: unknown, tarefa: () => Promise<unknown>) => tarefa())
 }));
 
-import { lerIndicesIpca, partesDoControle, sincronizarReajusteAtas, textosDoArquivo, type LeitorDeArquivos } from '../reajusteAtasSyncService';
+import {
+  escolherHomologado,
+  janelasDeUmAno,
+  lerIndicesIpca,
+  lerResultadosDaUasg,
+  partesDoControle,
+  sincronizarReajusteAtas,
+  textosDoArquivo,
+  type LeitorDeArquivos
+} from '../reajusteAtasSyncService';
 
 const json = (dados: unknown, status = 200) => new Response(JSON.stringify(dados), { status, headers: { 'content-type': 'application/json' } });
 const PDF = (texto: string) => new TextEncoder().encode(`%PDF-1.4 ${texto}`);
@@ -118,6 +135,35 @@ describe('limites da leitura do edital', () => {
   });
 });
 
+describe('resultado dos itens em lote', () => {
+  it('janelas de até 365 dias até hoje', () => {
+    expect(janelasDeUmAno(2024, new Date('2026-10-24T12:00:00Z'))).toEqual([
+      ['2024-01-01', '2024-12-30'],
+      ['2024-12-31', '2025-12-30'],
+      ['2025-12-31', '2026-10-24']
+    ]);
+  });
+
+  it('lê todas as páginas, ignora resultado cancelado e trata resposta vazia como bloqueio', async () => {
+    const pagina = (n: number, linhas: unknown[]) => json({ totalPaginas: 2, resultado: linhas.map((l) => ({ ...(l as object), pagina: n })) });
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(''))
+      .mockResolvedValueOnce(pagina(1, [{ idContratacaoPNCP: 'C', numeroItemPncp: 1, niFornecedor: '11.222.333/0001-44', valorUnitarioHomologado: 10, ordemClassificacaoSrp: 1 }]))
+      .mockResolvedValueOnce(pagina(2, [{ idContratacaoPNCP: 'C', numeroItemPncp: 2, niFornecedor: '1', valorUnitarioHomologado: 5, situacaoCompraItemResultadoNome: 'Cancelado' }]));
+    const mapa = await lerResultadosDaUasg('200331', 2026, { fetcher: fetcher as unknown as typeof fetch, esperar: sem, hoje: new Date('2026-10-24T12:00:00Z') });
+    expect([...mapa.entries()]).toEqual([['C|1', [{ niFornecedor: '11222333000144', valor: 10, ordem: 1 }]]]);
+    expect(String(fetcher.mock.calls[1][0])).toContain('unidadeOrgaoCodigoUnidade=200331&dataResultadoPncpInicial=2026-01-01&dataResultadoPncpFinal=2026-10-24');
+  });
+
+  it('escolhe o preço do fornecedor da ata; sem ele, só quando há um resultado', () => {
+    const dois = [{ niFornecedor: '1', valor: 10, ordem: 1 }, { niFornecedor: '2', valor: 12, ordem: 2 }];
+    expect(escolherHomologado(dois, '00.000.000/0000-02'.replace(/\D/g, '').replace(/^0+/, ''))).toBe(12);
+    expect(escolherHomologado(dois, '9')).toBeNull();
+    expect(escolherHomologado([{ niFornecedor: '1', valor: 10, ordem: 1 }], null)).toBe(10);
+    expect(escolherHomologado(undefined, '1')).toBeNull();
+  });
+});
+
 describe('partesDoControle', () => {
   it('controle do PNCP da ata', () => {
     expect(partesDoControle('00394494000136-1-001132/2024-000003')).toEqual({ cnpj: '00394494000136', ano: '2024', sequencial: 1132, sequencialAta: 3 });
@@ -154,6 +200,15 @@ describe('sincronizarReajusteAtas', () => {
       if (url === 'https://pncp.gov.br/ata3') {
         return new Response(PDF('reajustados pelo IPCA de 5,17% (34108953), considerando o período do orçamento estimado de 10/2024 a 09/2025 (29255776), para aplicação no novo ciclo de vigência da Ata 09/01/2026 a 08/01/2027.'));
       }
+      if (url.includes('3_consultarResultadoItensContratacoes_PNCP_14133')) {
+        return json({
+          totalPaginas: 1,
+          resultado: [
+            { idContratacaoPNCP: '00394494000136-1-001132/2024', numeroItemPncp: 1, niFornecedor: '99999999000199', valorUnitarioHomologado: 99, ordemClassificacaoSrp: 2, situacaoCompraItemResultadoNome: 'Informado' },
+            { idContratacaoPNCP: '00394494000136-1-001132/2024', numeroItemPncp: 1, niFornecedor: '11222333000144', valorUnitarioHomologado: 14695, ordemClassificacaoSrp: 1, situacaoCompraItemResultadoNome: 'Informado' }
+          ]
+        });
+      }
       if (url.endsWith('/itens/1/resultados')) {
         return json([{ valorUnitarioHomologado: 99, niFornecedor: '99999999000199' }, { valorUnitarioHomologado: 14695, niFornecedor: '11222333000144' }]);
       }
@@ -189,6 +244,9 @@ describe('sincronizarReajusteAtas', () => {
         homologados_completos: true
       }]
     });
+    // Preço homologado pelo lote do Compras.gov.br: nenhuma consulta item por item no PNCP.
+    expect(fetcher.mock.calls.some(([u]) => String(u).endsWith('/itens/1/resultados'))).toBe(false);
+    expect(fetcher.mock.calls.some(([u]) => String(u).includes('unidadeOrgaoCodigoUnidade=200331'))).toBe(true);
     // A própria ata (arquivo 1) não é baixada.
     expect(fetcher.mock.calls.some(([u]) => u === 'https://pncp.gov.br/ata1')).toBe(false);
   });
@@ -221,6 +279,23 @@ describe('sincronizarReajusteAtas', () => {
     expect((r as { mensagem: string }).mensagem).toMatch(/o edital da ata 00093\/2024 ficou a conferir/);
   });
 
+  it('índices lidos há menos de 20 horas não são lidos de novo', async () => {
+    banco.indices = [{ lido_em: '2026-10-23T09:00:00Z' }];
+    const fetcher = fontes();
+    await sincronizarReajusteAtas({ leitor: leitorFalso({}), fetcher: fetcher as unknown as typeof fetch, esperar: sem, hoje: () => new Date('2026-10-23T12:00:00Z') });
+    expect(fetcher.mock.calls.some(([u]) => String(u).includes('sgs.433') || String(u).includes('olinda'))).toBe(false);
+    expect(banco.gravacoes.some((g) => 'indices' in g)).toBe(false);
+    banco.indices = [];
+  });
+
+  it('sem o lote do Compras.gov.br, o preço homologado vem item por item do PNCP', async () => {
+    const fetcher = fontes((url) => (url.includes('3_consultarResultadoItensContratacoes') ? new Response('', { status: 503 }) : undefined));
+    const r = await sincronizarReajusteAtas({ leitor: leitorFalso({}), fetcher: fetcher as unknown as typeof fetch, esperar: sem });
+    expect(fetcher.mock.calls.some(([u]) => String(u).endsWith('/itens/1/resultados'))).toBe(true);
+    expect((banco.gravacoes[1].atas as Array<Record<string, unknown>>)[0].homologados).toEqual([{ numero_item: '00001', valor: 14695 }]);
+    expect(r).toMatchObject({ status: 'PARCIAL', fontesComFalha: ['Compras.gov.br (resultado dos itens)'] });
+  });
+
   it('documento já lido não é baixado de novo', async () => {
     (banco.fila[0] as Record<string, unknown>).documentos_pncp_lidos = [1, 3];
     (banco.fila[0] as Record<string, unknown>).edital_lido_em = '2026-10-22T00:00:00Z';
@@ -238,13 +313,23 @@ describe('sincronizarReajusteAtas', () => {
     expect((r as { mensagem: string }).mensagem).toMatch(/1 ata não pôde ser lida .*bloqueio.* e 1 ata ficou para a próxima execução/);
   });
 
-  it('falha do Banco Central não impede a leitura das atas', async () => {
+  it('falha do Banco Central não impede a leitura das atas e não tenta de novo', async () => {
     const fetcher = fontes((url) => (url.includes('sgs.433') ? new Response('', { status: 503 }) : undefined));
     const r = await sincronizarReajusteAtas({ leitor: leitorFalso({}), fetcher: fetcher as unknown as typeof fetch, esperar: sem });
     expect(r).toMatchObject({ status: 'PARCIAL', total: 1, fontesComFalha: ['Banco Central (IPCA e Focus)'] });
     // Sem índices: só as gravações da ata (arquivos e homologado, tentativa do edital, edital).
     expect(banco.gravacoes).toHaveLength(3);
     expect(banco.gravacoes.some((g) => 'indices' in g)).toBe(false);
+    // Leitura rápida: uma tentativa só no Banco Central.
+    expect(fetcher.mock.calls.filter(([u]) => String(u).includes('sgs.433'))).toHaveLength(1);
+  });
+
+  it('página de bloqueio do Banco Central: uma tentativa e segue', async () => {
+    const fetcher = fontes((url) => (url.includes('sgs.433') ? new Response('<html>bloqueado</html>') : undefined));
+    const r = await sincronizarReajusteAtas({ leitor: leitorFalso({}), fetcher: fetcher as unknown as typeof fetch, esperar: sem });
+    expect(fetcher.mock.calls.filter(([u]) => String(u).includes('sgs.433'))).toHaveLength(1);
+    expect(r).toMatchObject({ status: 'PARCIAL', total: 1 });
+    expect((r as { mensagem: string }).mensagem).toMatch(/valem os da última leitura/);
   });
 
   it('sem tempo, a ata fica para a próxima execução', async () => {
