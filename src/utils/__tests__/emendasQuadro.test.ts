@@ -211,5 +211,7 @@ describe('prazo do ofício', () => {
     // 10/12/2026 − 35 dias = 05/11/2026, antes de 22/11.
     expect(q2.prazoDoOficio).toEqual({ data: '2026-11-05', pela: 'ATA', ata: '00099/2024' });
     expect(textoParaWhatsapp(q2)).toContain('⏳ *Enviar o ofício até 05/11/2026*');
+    // Ofício devolvido: os 30 dias contam da devolução.
+    expect(montarQuadro({ autor, linhas, itens, beneficiarios: new Map(), precos, data: '2026-09-01', devolvidoEm: '2026-10-20' }).prazoDoOficio?.data).toBe('2026-11-19');
   });
 });

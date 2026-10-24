@@ -66,6 +66,8 @@ interface Props {
   linhas: LinhaDoPedidoNoQuadro[];
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
+  /** Ofício devolvido: o prazo do novo ofício conta daqui. */
+  devolvidoEm?: string | null;
   testId?: string;
 }
 
@@ -73,7 +75,7 @@ interface Props {
  * Quadro da reserva para o parlamentar (migration 165): o Anexo que a CAEP manda ao parlamentar, pronto para colar no
  * Word ou no SEI (tabela) ou no WhatsApp (texto). O valor unitário já vem com o reajuste previsto da ata.
  */
-export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 'emendas-quadro' }) => {
+export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvidoEm, testId = 'emendas-quadro' }) => {
   const toast = useToast();
   const { data: itensLista = [] } = useItensCaep();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
@@ -88,12 +90,13 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
         autor,
         linhas,
         data,
+        devolvidoEm,
         itens: new Map(itensLista.map((i) => [i.itemKey, i])),
         beneficiarios: new Map(beneficiariosLista.map((b) => [b.id, b])),
         precos: aplicarPrazoDoEmpenho(precos ?? new Map(), hoje, ipca),
         ipca
       }),
-    [autor, linhas, data, itensLista, beneficiariosLista, precos, hoje, ipca]
+    [autor, linhas, data, devolvidoEm, itensLista, beneficiariosLista, precos, hoje, ipca]
   );
   const texto = useMemo(() => textoParaWhatsapp(quadro), [quadro]);
   const html = useMemo(() => htmlDaTabela(quadro), [quadro]);

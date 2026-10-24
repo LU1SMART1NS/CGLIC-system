@@ -38,6 +38,8 @@ export interface EntradaQuadro {
   precos: Map<string, PrecoPrevisto>;
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
+  /** Ofício devolvido: o prazo do novo ofício conta da devolução, como o aviso "sem ofício". */
+  devolvidoEm?: string | null;
   /** IPCA dos 12 últimos meses, só para o texto da nota da folga. */
   ipca?: IpcaDozeMeses | null;
 }
@@ -78,8 +80,8 @@ export interface Quadro {
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
   /**
-   * Até quando o ofício deve chegar: o que vier primeiro entre a reserva + 30 dias (depois disso o pedido entra no aviso
-   * "sem ofício") e o prazo de indicação da ata que termina antes (fim da ata − corte de Ajustes; o banco recusa depois).
+   * Até quando o ofício deve chegar: o que vier primeiro entre a reserva (ou a devolução do ofício) + 30 dias (depois
+   * disso o pedido entra no aviso "sem ofício") e o prazo de indicação da ata que termina antes (fim da ata − corte de Ajustes; o banco recusa depois).
    */
   prazoDoOficio: { data: string; pela: 'RESERVA' | 'ATA'; ata: string | null } | null;
   linhas: LinhaQuadro[];
@@ -191,7 +193,7 @@ export function notaDoPreco(p: PrecoPrevisto | undefined, ipca?: IpcaDozeMeses |
 /** Prazo do ofício do quadro (ver Quadro.prazoDoOficio). */
 function prazoDoOficio(e: EntradaQuadro): Quadro['prazoDoOficio'] {
   if (!e.data) return null;
-  let prazo: NonNullable<Quadro['prazoDoOficio']> = { data: somarDias(e.data, AVISO_SEM_OFICIO_DIAS), pela: 'RESERVA', ata: null };
+  let prazo: NonNullable<Quadro['prazoDoOficio']> = { data: somarDias(e.devolvidoEm ?? e.data, AVISO_SEM_OFICIO_DIAS), pela: 'RESERVA', ata: null };
   for (const l of e.linhas) {
     const chaves = l.tipo === 'KIT' ? (l.kitComposicao ?? []).map((c) => c.itemKey) : l.itemKey ? [l.itemKey] : [];
     for (const k of chaves) {
