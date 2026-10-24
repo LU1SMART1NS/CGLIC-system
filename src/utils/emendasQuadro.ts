@@ -84,7 +84,7 @@ export interface Quadro {
 
 const centavos = (v: number) => Math.round(v * 100) / 100;
 
-/** "R$ 1.234,56" com espaço comum, para colar no SEI e no WhatsApp. */
+/** "R$ 1.234,56" com espaço comum, para colar no Word, no SEI e no WhatsApp. */
 export function brl(v: number): string {
   return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -227,8 +227,8 @@ export const ataEItem = (l: Pick<LinhaQuadro, 'ata' | 'item'>): string | null =>
 /** "10º Batalhão de Polícia Militar · 10º BPM" em texto corrido (WhatsApp). */
 const nomeComSigla = (l: Pick<LinhaQuadro, 'beneficiario' | 'sigla'>): string | null => (l.beneficiario ? (l.sigla ? `${l.beneficiario} · ${l.sigla}` : l.beneficiario) : null);
 
-/** Tabela para colar no editor do SEI (HTML com bordas e estilos na própria célula). */
-export function htmlParaSei(q: Quadro): string {
+/** Tabela para colar no Word ou no editor do SEI (HTML com bordas e estilos na própria célula). */
+export function htmlDaTabela(q: Quadro): string {
   const td = 'border:1px solid #000;padding:4px 6px;text-align:center;';
   const th = td + 'font-weight:bold;';
   // Valores em reais numa linha só ("R$" não fica sozinho em cima).

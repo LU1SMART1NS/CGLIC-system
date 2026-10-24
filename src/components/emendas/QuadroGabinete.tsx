@@ -5,7 +5,7 @@ import { Tabs } from '../../design-system/components/Tabs';
 import { useToast } from '../../design-system/components/Toast';
 import { useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
 import { usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
-import { ataEItem, brl, COLUNAS, htmlParaSei, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
+import { ataEItem, brl, COLUNAS, htmlDaTabela, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AutorEmenda } from '../../services/emendasService';
 
 const borda = '1px solid #000';
@@ -23,7 +23,7 @@ const aviso: React.CSSProperties = {
 };
 
 /**
- * Copia a tabela como HTML (o SEI cola com linhas e colunas) e o texto como reserva; o WhatsApp leva só o texto.
+ * Copia a tabela como HTML (o Word e o SEI colam com linhas e colunas) e o texto como reserva; o WhatsApp leva só o texto.
  * Sem a área de transferência moderna (navegador antigo ou bloqueado), copia pela seleção da página.
  */
 async function copiar(html: string | null, texto: string): Promise<void> {
@@ -71,7 +71,7 @@ interface Props {
 
 /**
  * Quadro da reserva para o gabinete (migration 165): o Anexo que a CAEP manda ao parlamentar, pronto para colar no
- * SEI (tabela) ou no WhatsApp (texto). O valor unitário já vem com o reajuste previsto da ata.
+ * Word ou no SEI (tabela) ou no WhatsApp (texto). O valor unitário já vem com o reajuste previsto da ata.
  */
 export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 'emendas-quadro' }) => {
   const toast = useToast();
@@ -93,14 +93,14 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
     [autor, linhas, data, itensLista, beneficiariosLista, precos]
   );
   const texto = useMemo(() => textoParaWhatsapp(quadro), [quadro]);
-  const html = useMemo(() => htmlParaSei(quadro), [quadro]);
+  const html = useMemo(() => htmlDaTabela(quadro), [quadro]);
 
   if (!quadro.linhas.length) return null;
 
   const copiarPara = async (destino: 'sei' | 'whatsapp') => {
     try {
       await copiar(destino === 'sei' ? html : null, texto);
-      toast.success(destino === 'sei' ? 'Tabela copiada: cole no SEI.' : 'Texto copiado: cole no WhatsApp.');
+      toast.success(destino === 'sei' ? 'Tabela copiada: cole no Word ou no SEI.' : 'Texto copiado: cole no WhatsApp.');
     } catch (err) {
       toast.error((err as Error).message || 'Não foi possível copiar.');
     }
@@ -128,7 +128,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
           activeTabId={aba}
           onTabChange={(id) => setAba(id as 'sei' | 'whatsapp')}
           tabs={[
-            { id: 'sei', label: 'Tabela para o SEI' },
+            { id: 'sei', label: 'Tabela' },
             { id: 'whatsapp', label: 'Texto para o WhatsApp' }
           ]}
         />
@@ -239,7 +239,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
         </span>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <AppButton type="button" icon={<Copy size={16} aria-hidden="true" />} onClick={() => void copiarPara('sei')} data-testid={`${testId}-copiar-sei`}>
-            Copiar para o SEI
+            Copiar tabela
           </AppButton>
           <AppButton type="button" variant="outline" icon={<MessageCircle size={16} aria-hidden="true" />} onClick={() => void copiarPara('whatsapp')} data-testid={`${testId}-copiar-whatsapp`}>
             Copiar para o WhatsApp
