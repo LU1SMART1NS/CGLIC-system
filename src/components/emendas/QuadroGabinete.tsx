@@ -65,8 +65,8 @@ function copiarPelaSelecao(html: string | null, texto: string): void {
 
 /** Explicação do ⓘ ao lado do título (o corte da ata vem de Ajustes). */
 const AJUDA_DO_QUADRO = () =>
-  'Tabela: o Anexo I para colar no Word ou no SEI, uma linha por beneficiário; o mesmo item aparece uma vez só e o kit vem ' +
-  'aberto nos seus itens. Texto: a versão curta para o WhatsApp do parlamentar, por beneficiário, com o prazo do ofício. ' +
+  'Tabela: o Anexo I para colar no Word ou no SEI, uma linha por beneficiário; o mesmo item aparece uma vez só, e o kit vem ' +
+  'aberto nos seus itens, somados ao mesmo item avulso. Texto: a versão curta para o WhatsApp do parlamentar, por beneficiário, com o prazo do ofício. ' +
   'Valor unitário: inclui o reajuste da ata que pode valer até o empenho provável (90 dias); se a ata ainda não tem a ' +
   'data-base do reajuste, leva a folga do IPCA dos últimos 12 meses, para não faltar recurso no empenho. Prazo do ofício: ' +
   `30 dias da reserva (ou da devolução do ofício) ou, se vier antes, o fim da ata menos ${corteIndicacaoDias()} dias e menos ` +
@@ -191,7 +191,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
                     <td style={celula} rowSpan={l.linhasDoItem}>
                       <b>{l.descricao}</b>
                       {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
-                      {l.kit && <div style={abaixo}>({l.kit})</div>}
                     </td>
                   )}
                   <td style={celula}>

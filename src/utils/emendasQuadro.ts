@@ -3,7 +3,7 @@
  *
  * Formato do Anexo que a CAEP já usa, em 6 colunas: ITEM (nome, e embaixo a ata e o item) · BENEFICIÁRIO FINAL (nome e
  * sigla, e embaixo a razão social) · LOCAL DE ENTREGA (cidade, e embaixo o endereço) · QTD · VR UNITÁRIO · VR TOTAL, uma
- * linha por item e beneficiário, kit aberto nos seus itens, fechando com TOTAL A EMPENHAR. O mesmo item para vários
+ * linha por item e beneficiário, kit aberto nos seus itens e somado ao mesmo item avulso, fechando com TOTAL A EMPENHAR. O mesmo item para vários
  * beneficiários sai junto, com o nome e o valor unitário uma vez só (células juntadas na tabela). O valor
  * unitário é o preço previsto pelo reajuste da ata (emendas_precos_previstos), para a emenda nascer com folga; cada
  * preço que não é o de hoje ganha uma nota (¹, ², ...). Quando o pedido mistura investimento e custeio, sai o total de
@@ -49,8 +49,6 @@ export interface LinhaQuadro {
   ata: string | null;
   item: string | null;
   descricao: string;
-  /** Kit de onde o item veio, quando veio de um. */
-  kit: string | null;
   /** Nome da unidade por extenso, sigla e razão social da Receita (só quando difere do nome). */
   beneficiario: string | null;
   sigla: string | null;
@@ -222,14 +220,15 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
     return MARCAS[i] ?? `(${i + 1})`;
   };
 
-  // Linhas por grupo (item, kit e preço), na ordem em que o item aparece pela primeira vez no pedido.
-  const grupos = new Map<string, LinhaQuadro[]>();
+  // Um grupo por item (e preço), na ordem em que o item aparece pela primeira vez no pedido; dentro dele, uma linha por
+  // beneficiário. O item que vem de kit soma com o mesmo item avulso: o Anexo e o empenho são por item da ata.
+  const grupos = new Map<string, Map<string, LinhaQuadro>>();
   for (const l of e.linhas) {
     const partes =
       l.tipo === 'KIT'
-        ? (l.kitComposicao ?? []).map((c) => ({ itemKey: c.itemKey, quantidade: c.quantidade * l.quantidade, kit: l.kitNome ?? 'Kit' }))
+        ? (l.kitComposicao ?? []).map((c) => ({ itemKey: c.itemKey, quantidade: c.quantidade * l.quantidade }))
         : l.itemKey
-          ? [{ itemKey: l.itemKey, quantidade: l.quantidade, kit: null }]
+          ? [{ itemKey: l.itemKey, quantidade: l.quantidade }]
           : [];
     const ben = l.beneficiarioId ? e.beneficiarios.get(l.beneficiarioId) : undefined;
     for (const p of partes) {
@@ -238,13 +237,20 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
       const hoje = preco?.precoAtual ?? item?.valorUnitario ?? 0;
       const unitario = preco?.precoPrevisto ?? hoje;
       const marca = marcaDe(notaDoPreco(preco, e.ipca));
-      const chave = [p.itemKey, p.kit ?? '', unitario, hoje, marca].join('|');
-      if (!grupos.has(chave)) grupos.set(chave, []);
-      grupos.get(chave)!.push({
+      const chave = [p.itemKey, unitario, hoje, marca].join('|');
+      if (!grupos.has(chave)) grupos.set(chave, new Map());
+      const doItem = grupos.get(chave)!;
+      const jaTem = doItem.get(l.beneficiarioId ?? '');
+      if (jaTem) {
+        jaTem.quantidade += p.quantidade;
+        jaTem.total = centavos(jaTem.quantidade * unitario);
+        jaTem.totalHoje = centavos(jaTem.quantidade * hoje);
+        continue;
+      }
+      doItem.set(l.beneficiarioId ?? '', {
         ata: item?.numeroAta ?? null,
         item: item ? String(item.numeroItem).padStart(5, '0') : null,
         descricao: nomeDoItem(item, p.itemKey),
-        kit: p.kit,
         beneficiario: ben ? ben.nome || ben.razaoSocial : null,
         sigla: ben?.sigla?.trim() || null,
         razaoSocial: ben?.nome && ben.razaoSocial && !mesmoNome(ben.nome, ben.razaoSocial) ? ben.razaoSocial : null,
@@ -262,7 +268,7 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
       });
     }
   }
-  const linhas: LinhaQuadro[] = [...grupos.values()].flatMap((g) => g.map((l, i) => ({ ...l, linhasDoItem: i === 0 ? g.length : 0 })));
+  const linhas: LinhaQuadro[] = [...grupos.values()].flatMap((g) => [...g.values()].map((l, i, todos) => ({ ...l, linhasDoItem: i === 0 ? todos.length : 0 })));
 
   const soma = (xs: LinhaQuadro[], k: 'total' | 'totalHoje') => centavos(xs.reduce((s, x) => s + x[k], 0));
   const total = soma(linhas, 'total');
@@ -321,7 +327,7 @@ export function htmlDaTabela(q: Quadro): string {
   const juntar = (l: LinhaQuadro) => (l.linhasDoItem > 1 ? ` rowspan="${l.linhasDoItem}"` : '');
   const linha = (l: LinhaQuadro) =>
     '<tr>' +
-    (l.linhasDoItem ? `<td${juntar(l)} style="${td}"><b>${escapar(l.descricao)}</b>${abaixo(ataEItem(l))}${abaixo(l.kit && `(${l.kit})`)}</td>` : '') +
+    (l.linhasDoItem ? `<td${juntar(l)} style="${td}"><b>${escapar(l.descricao)}</b>${abaixo(ataEItem(l))}</td>` : '') +
     `<td style="${td}">${l.beneficiario ? `<b>${escapar(l.beneficiario)}</b>${l.sigla ? ` · <span style="white-space:nowrap">${escapar(l.sigla)}</span>` : ''}${abaixo(l.razaoSocial)}` : A_DEFINIR}</td>` +
     `<td style="${td}">${l.entrega ? `<b>${escapar(l.entrega)}</b>` : A_DEFINIR}${abaixo(l.endereco)}</td>` +
     `<td style="${td}">${l.quantidade}</td>` +
@@ -365,7 +371,7 @@ export function textoParaWhatsapp(q: Quadro): string {
     const total = brl(centavos(ls.reduce((s, l) => s + l.total, 0)));
     // Nome e cidade na mesma linha: vários beneficiários têm o mesmo nome (Guarda Municipal) e só a cidade separa.
     const quem = chave ? `*${nomeComSigla(l0)}* · ${l0.entrega ?? 'entrega a definir'}` : '*Beneficiário a definir*';
-    const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}${l.kit ? ` (${l.kit})` : ''}${ls.length > 1 ? `: ${brl(l.total)}` : ''}`);
+    const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}${ls.length > 1 ? `: ${brl(l.total)}` : ''}`);
     return [`${numeroEmEmoji(i + 1)} ${quem}: *${total}*`, ...itens].join('\n');
   });
   const cabecalho = [`📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · ${dataBR(q.data)}*`, ...(q.prazoDoOficio ? [`⏳ *Enviar o ofício até ${dataBR(q.prazoDoOficio.data)}*`] : [])];
