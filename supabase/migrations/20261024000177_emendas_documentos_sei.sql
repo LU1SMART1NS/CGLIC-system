@@ -15,8 +15,9 @@
 -- 3) emenda_pedido_linhas.autorizacao_documento_sei: a autorização de DDO e NE que cobre a linha (ata e item).
 -- 4) emendas_ligar_notas(): regra nova SEI, antes das outras. Vale a nota cujo documento SEI está no pedido
 --    (etapa EMPENHO, com o número da nota): a que está num contrato do item da linha ou, se o pedido tem uma nota só,
---    essa. O número da nota se repete nas UGs 200330 e 200331: vale a de plano interno com a emenda do pedido, depois
---    a de plano interno de emenda (SP999), depois a da UG 200330.
+--    essa. Só nota do ano do pedido (como nas outras regras) e sem outra emenda no plano interno. O número da nota se
+--    repete nas UGs 200330 e 200331: vale a de plano interno com a emenda do pedido, depois a de plano interno de
+--    emenda (SP999), depois a da UG 200330.
 -- 5) Sai emenda_pedido_linhas.nota_empenho: a nota não é mais digitada (migration 174) e nenhuma linha tem nota
 --    (conferido em 24/10/2026). A nota da linha vem só do sistema (emenda_linha_notas).
 --
@@ -197,6 +198,9 @@ BEGIN
       JOIN public.emenda_pedidos p ON p.id = d.pedido_id
       JOIN public.empenhos e ON e.numero_oficial = d.nota_empenho AND e.uasg_emitente IN ('200330', '200331')
      WHERE d.etapa = 'EMPENHO' AND d.nota_empenho IS NOT NULL
+       -- nota do ano do pedido (como nas outras regras) e sem outra emenda no plano interno
+       AND e.ano_exercicio = EXTRACT(YEAR FROM COALESCE(p.empenhado_em, (p.criado_em AT TIME ZONE 'America/Sao_Paulo')::DATE))::INTEGER
+       AND (substring(e.plano_interno from '20[0-9]{2}([0-9]{8})') IS NULL OR substring(e.plano_interno from '20[0-9]{2}([0-9]{8})') = p.siop_emenda)
      ORDER BY d.pedido_id, d.nota_empenho,
               (substring(e.plano_interno from '20[0-9]{2}([0-9]{8})') = p.siop_emenda) DESC NULLS LAST,
               (e.plano_interno LIKE 'SP999%') DESC NULLS LAST,
