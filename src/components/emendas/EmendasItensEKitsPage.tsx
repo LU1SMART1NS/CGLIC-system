@@ -10,7 +10,7 @@ type Ver = 'item' | 'kit';
 /**
  * Itens e kits: as antigas abas Itens da CAEP e Kits numa só, com Por item · Por kit no cabeçalho (como Por ata · Por item
  * da Alocação). A visão fica em ?ver=kit e a linha que chega aberta em ?abrir=; o item dentro do kit leva ao item e o
- * kit dentro do item leva ao kit.
+ * item abre o Item 360 na aba Emendas (que lista os kits em que ele entra).
  */
 export const EmendasItensEKitsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,6 +44,6 @@ export const EmendasItensEKitsPage: React.FC = () => {
   return ver === 'kit' ? (
     <EmendasKitsPage key={`kit-${abrir ?? ''}`} seletor={seletor} abrir={abrir} onAbrirItem={(k) => ir('item', k)} />
   ) : (
-    <EmendasPorItemPage key={`item-${abrir ?? ''}`} seletor={seletor} abrir={abrir} onAbrirKit={(id) => ir('kit', id)} />
+    <EmendasPorItemPage key={`item-${abrir ?? ''}`} seletor={seletor} abrir={abrir} />
   );
 };

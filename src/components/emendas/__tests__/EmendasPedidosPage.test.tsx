@@ -22,13 +22,14 @@ const pedido = (id: string, autorId: string | null, etapa: PedidoEmenda['etapa']
 const autor = (id: string, nome: string, tipo: AutorEmenda['tipo']): AutorEmenda => ({ id, nome, tipo, nomeCivil: null, partido: 'PX', uf: 'SP', emExercicio: true, legislatura: 57, lidoEm: null });
 
 const PEDIDOS = [pedido('p1', 'A1', 'OFICIO', 3), pedido('p2', 'A1', 'EMPENHADO', 2), pedido('p3', 'A2', 'RESERVADO', 1), pedido('p4', null, 'RESERVADO', 4)];
+const ITENS: ItemCaep[] = [item];
 const AUTORES = [autor('A1', 'Deputado Um', 'DEPUTADO'), autor('A2', 'Senadora Dois', 'SENADOR'), autor('A3', 'Bancada Três', 'BANCADA')];
 
 vi.mock('../../../hooks/useEmendas', () => ({
   hojeEmBrasilia: () => '2026-10-23',
   usePedidosEmendas: () => ({ data: PEDIDOS, isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn(), dataUpdatedAt: 0 }),
   useNotasDasLinhas: () => ({ data: new Map() }),
-  useItensCaep: () => ({ data: [item], isLoading: false }),
+  useItensCaep: () => ({ data: ITENS, isLoading: false }),
   useAutoresEmendas: () => ({ data: AUTORES }),
   useBeneficiariosEmendas: () => ({ data: [] }),
   useKitsEmendas: () => ({ data: [] }),
@@ -150,9 +151,9 @@ describe('Pedidos: uma solicitação de empenho para cada ata (migration 178)', 
         { ...linha('aut-2', 3), itemKey: `${B}-00001` }
       ],
       documentos: [
-        { etapa: 'AUTORIZACAO', numero: '37098929', data: '2026-09-23', ataKey: A, assinadaEm: '2026-09-24' },
-        { etapa: 'CGOFI', numero: '37162877', data: '2026-09-29', ataKey: null, assinadaEm: null },
-        { etapa: 'CGOFI', numero: '37162892', data: '2026-09-30', ataKey: null, assinadaEm: null }
+        { id: '37098929', linhas: [], etapa: 'AUTORIZACAO', numero: '37098929', data: '2026-09-23', ataKey: A, assinadaEm: '2026-09-24' },
+        { id: '37162877', linhas: [], etapa: 'CGOFI', numero: '37162877', data: '2026-09-29', ataKey: null, assinadaEm: null },
+        { id: '37162892', linhas: [], etapa: 'CGOFI', numero: '37162892', data: '2026-09-30', ataKey: null, assinadaEm: null }
       ]
     });
   });
@@ -169,7 +170,7 @@ describe('Pedidos: uma solicitação de empenho para cada ata (migration 178)', 
     expect(html).toContain('emendas-pedido-ata-informar-00048/2025');
     expect(html).toContain('Informar a solicitação desta ata');
     // A solicitação é o mesmo documento: não se repete no passo "Empenho solicitado".
-    expect(html).toContain('Uma solicitação para cada ata, no passo seguinte');
+    expect(html).toContain('Uma solicitação para cada ata, nos blocos das atas ao lado');
   });
 
   it('cada documento da etapa traz a sua data; dias diferentes viram intervalo', () => {
@@ -193,5 +194,64 @@ describe('Pedidos: linhas tiradas', () => {
     const html = render('/?pedido=tiradas');
     expect(html).toContain('2 linhas tiradas do pedido');
     expect(html.split('Passou para o pedido 567').length - 1).toBe(1);
+  });
+});
+
+describe('Pedidos: situação por linha, blocos por ata e O que falta (migration 180)', () => {
+  const A = '00031/2025-200331';
+  const B = '00048/2025-200331';
+  beforeAll(() => {
+    ITENS.push({ ...item, itemKey: `${A}-00001`, nomeCurto: 'Carabina', fornecedor: 'FORNECEDOR A' }, { ...item, itemKey: `${B}-00001`, numeroAta: '00048/2025', nomeCurto: 'Mira', fornecedor: 'FORNECEDOR B' });
+    PEDIDOS.push({
+      ...pedido('blocos', 'A1', 'AUTORIZADO', 1),
+      oficioProcessoSei: '08027.000215/2026-81',
+      solicitadoEm: '2026-09-23',
+      autorizadoEm: '2026-09-24',
+      linhas: [
+        { ...linha('b-1', 8), itemKey: `${A}-00001` },
+        { ...linha('b-2', 3), itemKey: `${A}-00001` },
+        { ...linha('b-3', 5), itemKey: `${B}-00001` }
+      ],
+      documentos: [
+        { id: 'd1', etapa: 'AUTORIZACAO', numero: '37098929', data: '2026-09-23', ataKey: A, assinadaEm: '2026-09-24', linhas: [{ linhaId: 'b-1', quantidade: 8 }] },
+        { id: 'd2', etapa: 'AUTORIZACAO', numero: '37099000', data: '2026-10-01', ataKey: A, assinadaEm: null, linhas: [{ linhaId: 'b-2', quantidade: 3 }] },
+        { id: 'd3', etapa: 'AUTORIZACAO', numero: '37104393', data: '2026-09-23', ataKey: B, assinadaEm: '2026-09-24', linhas: [] }
+      ]
+    });
+  });
+
+  it('as linhas ficam em blocos por ata, cada uma com a sua situação; com duas solicitações na ata, a linha diz qual a cobre', () => {
+    const html = render('/?pedido=blocos');
+    expect(html).toContain('emendas-pedido-ata-00031/2025');
+    expect(html).toContain('emendas-pedido-ata-00048/2025');
+    expect(html).toContain('emendas-pedido-abrir-atas-blocos');
+    // b-1 autorizada, b-2 aguardando a assinatura (2ª rodada), b-3 autorizada pela solicitação única da ata B.
+    expect(html).toMatch(/emendas-linha-situacao-b-1" data-situacao="AUTORIZADO"/);
+    expect(html).toMatch(/emendas-linha-situacao-b-2" data-situacao="AGUARDANDO_ASSINATURA"/);
+    expect(html).toMatch(/emendas-linha-situacao-b-3" data-situacao="AUTORIZADO"/);
+    expect(html).toContain('solicitação 37099000');
+    expect(html).toContain('2ª rodada');
+    expect(html).toContain('cobre 1 de 2 linhas');
+    // O resumo das linhas no quadro "onde está" e na lista.
+    expect(html).toContain('emendas-pedido-resumo-linhas-blocos');
+    expect(html).toContain('1 aguardando a assinatura · 2 autorizadas');
+  });
+
+  it('O que falta: a assinatura da solicitação com botão, o próximo passo e o beneficiário a informar', () => {
+    const html = render('/?pedido=blocos');
+    expect(html).toContain('emendas-pedido-falta-blocos');
+    expect(html).toContain('Informar a assinatura da solicitação 37099000 · ata 00031/2025');
+    expect(html).toContain('emendas-pedido-tarefa-ass-37099000');
+    expect(html).toContain('Registrar o envio à CGOFI');
+    expect(html).toContain('emendas-pedido-proximo-blocos');
+    expect(html).toContain('Informar o beneficiário de 3 linhas');
+    expect(html).toContain('emendas-pedidos-so-este');
+  });
+
+  it('vindo do Item 360 (?item=), as linhas daquele item ficam em destaque e o número do item é link para o Item 360', () => {
+    const html = render(`/?pedido=blocos&item=${encodeURIComponent(`${A}-00001`)}`);
+    expect(html.split('item de onde você veio').length - 1).toBeGreaterThanOrEqual(2);
+    expect(html).toContain('emendas-item-link');
+    expect(html).toContain('/atas/detalhe/00031%2F2025-200331/itens/00001?aba=emendas');
   });
 });
