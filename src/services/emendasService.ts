@@ -23,6 +23,8 @@ export interface AutorEmenda {
   emExercicio: boolean | null;
   legislatura: number | null;
   lidoEm: string | null;
+  /** M ou F, das fontes (migration 176); null enquanto não lido. */
+  sexo?: 'M' | 'F' | null;
 }
 
 export interface BeneficiarioEmenda {
@@ -129,13 +131,14 @@ const num = (v: unknown): number => (v == null ? 0 : Number(v));
 
 export async function fetchAutoresEmendas(): Promise<AutorEmenda[]> {
   const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
-    db().from('emenda_autores').select('id, tipo, nome, nome_civil, partido, uf, em_exercicio, legislatura, lido_em').order('id').range(de, ate)
+    db().from('emenda_autores').select('id, tipo, nome, nome_civil, partido, uf, em_exercicio, legislatura, lido_em, sexo').order('id').range(de, ate)
   );
   return linhas.map((r) => ({
     id: r.id,
     tipo: r.tipo,
     nome: r.nome,
     nomeCivil: r.nome_civil ?? null,
+    sexo: r.sexo === 'M' || r.sexo === 'F' ? r.sexo : null,
     partido: r.partido ?? null,
     uf: r.uf ?? null,
     emExercicio: r.em_exercicio ?? null,

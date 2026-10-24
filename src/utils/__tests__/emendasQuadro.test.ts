@@ -96,7 +96,10 @@ describe('quadro da reserva (Anexo)', () => {
     const html = htmlDaTabela(q);
     for (const h of ['ITEM', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
     expect(html.match(/<th /g)).toHaveLength(6);
-    expect(html).toContain('R$ 1.598,76<sup>¹</sup>');
+    // Título embaixo da tabela; sem fonte, notas nem a marca da nota no preço.
+    expect(html.startsWith('<table')).toBe(true);
+    expect(html.endsWith('</tbody></table><p style="text-align:left;font-size:9pt;margin:2px 0 0">Tabela 1 – Indicação do(a) Senador(a) Romário (RJ)</p>')).toBe(true);
+    expect(html).toContain('R$ 1.598,76</td>');
     expect(html).not.toContain('Kit Academia');
     expect(html).toContain('<b>Tablet</b><br><span style="font-size:8pt">Ata 00043/2026 · item 00005</span>');
     expect(html).toContain('<b>10º Batalhão de Polícia Militar</b> · <span style="white-space:nowrap">10º BPM</span><br><span style="font-size:8pt">RJ GOV POLICIA MILITAR</span>');
@@ -112,7 +115,7 @@ describe('quadro da reserva (Anexo)', () => {
     expect(t.startsWith('📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · 23/10/2026*\n⏳ *Enviar o ofício até 22/11/2026*\n\n1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
     expect(t).toContain('2️⃣ *Corpo de Bombeiros Militar · CBMERJ* · RJ: *R$ 94.317,66*\n• 2 Drone\n\n');
     expect(t).toContain('3️⃣ *Beneficiário a definir*');
-    for (const fora of ['Anexo I', 'Ata ', 'Rua X', 'IPCA', '¹']) expect(t).not.toContain(fora);
+    for (const fora of ['Tabela 1', 'Ata ', 'Rua X', 'IPCA', '¹']) expect(t).not.toContain(fora);
     expect(t).toContain('• 2 Mesa flexora:');
     expect(t.endsWith(`💰 *Total: ${brl(q.total)}*`)).toBe(true);
     expect(numeroEmEmoji(12)).toBe('1️⃣2️⃣');
@@ -121,10 +124,14 @@ describe('quadro da reserva (Anexo)', () => {
 
 describe('títulos, nomes e notas', () => {
   it('título por tipo de autor', () => {
-    expect(tituloDoAnexo({ tipo: 'BANCADA', uf: 'SP' } as AutorEmenda)).toBe('Anexo I – Indicação da Bancada do Estado de São Paulo');
-    expect(tituloDoAnexo({ tipo: 'BANCADA', uf: 'DF' } as AutorEmenda)).toBe('Anexo I – Indicação da Bancada do Distrito Federal');
-    expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulano', uf: 'PR' } as AutorEmenda)).toBe('Anexo I – Indicação de Fulano (Câmara dos Deputados · PR)');
-    expect(tituloDoAnexo(null)).toBe('Anexo I – Reserva de itens (parlamentar a definir)');
+    expect(tituloDoAnexo({ tipo: 'BANCADA', uf: 'SP' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Bancada do Estado de São Paulo');
+    expect(tituloDoAnexo({ tipo: 'BANCADA', uf: 'DF' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Bancada do Distrito Federal');
+    expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulano', uf: 'PR' } as AutorEmenda)).toBe('Tabela 1 – Indicação do(a) Deputado(a) Fulano (PR)');
+    expect(tituloDoAnexo(null)).toBe('Tabela 1 – Reserva de itens (parlamentar a definir)');
+    expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulana', uf: 'SP', sexo: 'F' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Deputada Fulana (SP)');
+    expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulano', uf: 'PR', sexo: 'M' } as AutorEmenda)).toBe('Tabela 1 – Indicação do Deputado Fulano (PR)');
+    expect(tituloDoAnexo({ tipo: 'SENADOR', nome: 'Beltrana', uf: 'MS', sexo: 'F' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Senadora Beltrana (MS)');
+    expect(tituloDoAnexo({ tipo: 'SENADOR', nome: 'Romário', uf: 'RJ', sexo: 'M' } as AutorEmenda)).toBe('Tabela 1 – Indicação do Senador Romário (RJ)');
   });
 
   it('nome do item: nome curto, ou o começo da descrição', () => {

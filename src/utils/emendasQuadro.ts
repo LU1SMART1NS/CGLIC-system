@@ -128,10 +128,13 @@ export function nomeDoItem(item: ItemCaep | undefined, itemKey: string): string 
 }
 
 export function tituloDoAnexo(autor: AutorEmenda | null | undefined): string {
-  if (!autor) return 'Anexo I – Reserva de itens (parlamentar a definir)';
-  if (autor.tipo === 'BANCADA') return `Anexo I – Indicação da Bancada ${ESTADO[autor.uf ?? ''] ?? autor.uf ?? ''}`.trim();
-  const casa = autor.tipo === 'SENADOR' ? 'Senado Federal' : 'Câmara dos Deputados';
-  return `Anexo I – Indicação de ${autor.nome} (${casa}${autor.uf ? ` · ${autor.uf}` : ''})`;
+  if (!autor) return 'Tabela 1 – Reserva de itens (parlamentar a definir)';
+  if (autor.tipo === 'BANCADA') return `Tabela 1 – Indicação da Bancada ${ESTADO[autor.uf ?? ''] ?? autor.uf ?? ''}`.trim();
+  // Sexo das fontes (Câmara e Senado, migration 176); sem ele, "do(a) Deputado(a)".
+  const senador = autor.tipo === 'SENADOR';
+  const cargo =
+    autor.sexo === 'F' ? `da ${senador ? 'Senadora' : 'Deputada'}` : autor.sexo === 'M' ? `do ${senador ? 'Senador' : 'Deputado'}` : `do(a) ${senador ? 'Senador(a)' : 'Deputado(a)'}`;
+  return `Tabela 1 – Indicação ${cargo} ${autor.nome}${autor.uf ? ` (${autor.uf})` : ''}`;
 }
 
 /** Dias entre o quadro e o empenho provável (estimativa da CAEP): reajuste depois disso não entra no preço. */
@@ -331,12 +334,11 @@ export function htmlDaTabela(q: Quadro): string {
     `<td style="${td}">${l.beneficiario ? `<b>${escapar(l.beneficiario)}</b>${l.sigla ? ` · <span style="white-space:nowrap">${escapar(l.sigla)}</span>` : ''}${abaixo(l.razaoSocial)}` : A_DEFINIR}</td>` +
     `<td style="${td}">${l.entrega ? `<b>${escapar(l.entrega)}</b>` : A_DEFINIR}${abaixo(l.endereco)}</td>` +
     `<td style="${td}">${l.quantidade}</td>` +
-    (l.linhasDoItem ? `<td${juntar(l)} style="${tdValor}">${brl(l.unitario)}${l.marca ? `<sup>${l.marca}</sup>` : ''}</td>` : '') +
+    (l.linhasDoItem ? `<td${juntar(l)} style="${tdValor}">${brl(l.unitario)}</td>` : '') +
     `<td style="${tdValor}">${brl(l.total)}</td>` +
     '</tr>';
   const subtotal = (rotulo: string, v: number) => `<tr><td colspan="${COLUNAS.length - 1}" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${tdValor}"><b>${brl(v)}</b></td></tr>`;
   return (
-    `<p style="text-align:center"><b>${escapar(q.titulo)}</b></p>` +
     '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
     COLUNAS.map((h) => `<th style="${th}">${h}</th>`).join('') +
     '</tr></thead><tbody>' +
@@ -344,7 +346,8 @@ export function htmlDaTabela(q: Quadro): string {
     q.porGnd.map((g) => subtotal(g.rotulo, g.total)).join('') +
     `<tr><td colspan="${COLUNAS.length - 1}" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${tdValor}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
     '</tbody></table>' +
-    (q.notas.length ? `<p style="font-size:9pt">${q.notas.map(escapar).join('<br>')}</p>` : '')
+    // O título vai embaixo da tabela.
+    `<p style="text-align:left;font-size:9pt;margin:2px 0 0">${escapar(q.titulo)}</p>`
   );
 }
 
