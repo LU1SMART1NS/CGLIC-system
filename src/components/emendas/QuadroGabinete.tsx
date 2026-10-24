@@ -144,7 +144,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
           onTabChange={(id) => setAba(id as 'sei' | 'whatsapp')}
           tabs={[
             { id: 'sei', label: 'Tabela' },
-            { id: 'whatsapp', label: 'Texto para o WhatsApp' }
+            { id: 'whatsapp', label: 'Texto' }
           ]}
         />
       </div>
