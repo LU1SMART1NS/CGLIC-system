@@ -362,7 +362,7 @@ export function textoParaWhatsapp(q: Quadro): string {
     const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}${l.kit ? ` (${l.kit})` : ''}${ls.length > 1 ? `: ${brl(l.total)}` : ''}`);
     return [`${numeroEmEmoji(i + 1)} ${quem}: *${total}*`, ...itens].join('\n');
   });
-  const cabecalho = [`📋 *Reserva de itens · ComprasSusp/Senasp/MJSP · ${dataBR(q.data)}*`, ...(q.prazoDoOficio ? [`⏳ *Enviar o ofício até ${dataBR(q.prazoDoOficio.data)}*`] : [])];
+  const cabecalho = [`📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · ${dataBR(q.data)}*`, ...(q.prazoDoOficio ? [`⏳ *Enviar o ofício até ${dataBR(q.prazoDoOficio.data)}*`] : [])];
   return [
     ...cabecalho,
     '',
