@@ -1984,6 +1984,7 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .reserva-resultado__preco .reserva-mudo { font-size: 0.72rem; }
 .reserva-resultado__valor { font-size: 0.92rem; font-weight: 700; color: var(--text-primary, #1e293b); white-space: nowrap; }
 .reserva-resultado__acao { grid-area: acao; }
+.reserva-sem-nome-curto { color: var(--color-warning-text); font-weight: 600; white-space: nowrap; }
 .reserva-resultado__saldo { grid-area: saldo; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.35rem; padding-top: 0.4rem; border-top: 1px dashed var(--color-border, #e2e8f0); }
 @container (max-width: 440px) {
   .reserva-resultado { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nome nome" "meta meta" "preco acao" "saldo saldo"; }

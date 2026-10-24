@@ -7,7 +7,7 @@ import { InfoHint } from '../../design-system/components/InfoHint';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { useSalvarPedido } from '../../hooks/useEmendas';
+import { usePodeGerirEmendas, useSalvarPedido } from '../../hooks/useEmendas';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
@@ -243,6 +243,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const itensEncontrados = filtro === 'kits' ? [] : buscarItensCaep(itens.filter((i) => !i.ataEncerrada), busca);
   // Ata a menos do corte do fim (migration 162): aparece na busca, mas não pode ser escolhida.
   const foraDoPrazo = (i: ItemCaep) => Boolean(i.vigenciaFinal) && passouDoCorte(diasEntre(hoje, i.vigenciaFinal!));
+  // Quem cadastra o nome curto (Emendas › Itens) vê quais itens ainda saem no quadro pelo começo da descrição.
+  const avisarSemNomeCurto = usePodeGerirEmendas();
   const podeItem = (i: ItemCaep) => !foraDoPrazo(i) && livre(i.itemKey) > 0;
 
   const ativosBen = useMemo(() => beneficiarios.filter((b) => b.ativo).sort((a, b) => rotuloBeneficiario(a).localeCompare(rotuloBeneficiario(b), 'pt-BR')), [beneficiarios]);
@@ -643,7 +645,19 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   nome={nomeDoItem(i, i.itemKey)}
                   descricao={descricaoItemEmFrase(i.descricao)}
                   rotuloDescricao="Descrição completa na ata"
-                  meta={`Ata ${i.numeroAta} · Item ${String(i.numeroItem).padStart(5, '0')}`}
+                  meta={
+                    <>
+                      Ata {i.numeroAta} · Item {String(i.numeroItem).padStart(5, '0')}
+                      {avisarSemNomeCurto && !i.nomeCurto?.trim() && (
+                        <>
+                          {' · '}
+                          <span className="reserva-sem-nome-curto" title="Cadastre o nome curto em Emendas › Itens. Sem ele, o quadro do parlamentar usa o começo da descrição.">
+                            sem nome curto
+                          </span>
+                        </>
+                      )}
+                    </>
+                  }
                   previsto={p.previsto}
                   hoje={p.hoje}
                   unidade="por unidade"
