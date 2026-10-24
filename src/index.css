@@ -1876,7 +1876,7 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 /* Etapas do pedido de emenda: onde está, fases recolhíveis e a linha de cada etapa (nome · data, SEI alinhados) */
 .emendas-onde { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
 .emendas-onde__topo { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
-.emendas-onde__planilha { font-size: 0.75rem; color: #64748b; background: #f8fafc; border-radius: 6px; padding: 0.35rem 0.55rem; }
+.emendas-onde__anterior { font-size: 0.75rem; color: #64748b; background: #f8fafc; border-radius: 6px; padding: 0.35rem 0.55rem; }
 .emendas-onde--cancelado { border-color: var(--color-danger-border, #f5c2c0); background: var(--color-danger-bg); color: var(--color-danger-text); font-size: 0.82rem; font-weight: 600; }
 .emendas-fase { border-top: 1px solid #e2e8f0; padding: 0.45rem 0 0.25rem; }
 .emendas-fase:first-child { border-top: 0; padding-top: 0; }

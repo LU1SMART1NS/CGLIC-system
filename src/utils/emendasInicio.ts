@@ -164,6 +164,6 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
     case 'semNota':
       return 'procurar a nota pelo contrato';
     default:
-      return 'conferir com as planilhas da CAEP';
+      return 'conferir com o controle anterior da CAEP';
   }
 }

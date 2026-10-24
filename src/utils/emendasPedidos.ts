@@ -222,7 +222,7 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
   }
   const aConferir = linhasAtivas(p).filter((l) => l.aConferir).length;
   if (aConferir) {
-    avisos.push({ tipo: 'aConferir', curto: `${aConferir} a conferir`, texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir entre as planilhas da CAEP` });
+    avisos.push({ tipo: 'aConferir', curto: `${aConferir} a conferir`, texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir com o controle anterior da CAEP` });
   }
   const atas = linhasAtivas(p)
     .map((l) => ataDaLinha(p, l, itens, hoje))
@@ -271,7 +271,7 @@ export const ROTULO_REGRA_DA_NOTA: Record<RegraDaNota, string> = {
 
 /** Por que a linha empenhada ainda não tem nota. */
 export const ROTULO_MOTIVO_SEM_NOTA: Record<MotivoSemNota, string> = {
-  SEM_CONTRATO: 'a planilha não traz o contrato',
+  SEM_CONTRATO: 'falta o número do contrato',
   CONTRATO_FORA: 'o contrato não está no sistema',
   CONTRATO_SEM_NOTA: 'o contrato ainda não tem nota no sistema',
   OUTRAS_EMENDAS: 'o contrato só tem notas de outras emendas',

@@ -107,7 +107,7 @@ describe('pedidos que vieram das planilhas da CAEP (migration 160)', () => {
 
   it('avisa as linhas a conferir', () => {
     const p = pedido({ etapa: 'EMPENHADO', linhas: [linha({ aConferir: 'Planilha de saldo indica 5; a execução soma 4.' }), linha({ aConferir: 'x' }), linha({})] });
-    expect(avisosDoPedido(p, itens, HOJE)).toEqual([{ tipo: 'aConferir', curto: '2 a conferir', texto: '2 linhas a conferir entre as planilhas da CAEP' }]);
+    expect(avisosDoPedido(p, itens, HOJE)).toEqual([{ tipo: 'aConferir', curto: '2 a conferir', texto: '2 linhas a conferir com o controle anterior da CAEP' }]);
   });
 
   it('monta a chave do contrato da planilha', async () => {
