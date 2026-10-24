@@ -31,6 +31,7 @@ import type { AdesaoItemRecord, UnidadeItemRecord } from '../../types';
 import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 /**
  * Aba Órgãos e quantitativos nas atas de OUTROS órgãos (migration 114): a SENASP participante ou em adesão.
@@ -169,7 +170,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
         action={p.podeInformar ? <AppButton variant="outline" size="sm" onClick={() => setInformando(true)} data-testid="corrigir-ata-assinada">Corrigir qtd. da ata assinada</AppButton> : undefined}
       >
         <StatusBadge label="Informado" variant="success" size="sm" dot={false} />{' '}
-        Quantidade da SENASP na ata assinada informada por <b>{q.informadoPorNome}</b> em {q.informadoEm ? formatDataHoraBR(q.informadoEm) : '—'}. Documento SEI nº <b>{q.documentoSei}</b>.{' '}
+        Quantidade da SENASP na ata assinada informada por <b>{q.informadoPorNome}</b> em {q.informadoEm ? formatDataHoraBR(q.informadoEm) : '—'}. {q.documentoSei && <>Documento <NumeroSeiEtiqueta numero={q.documentoSei} testId="ata-assinada-sei" /></>}{' '}
         <AppButton variant="ghost" size="xs" onClick={() => setVerRegistros((v) => !v)} data-testid="ver-alteracoes-ata-assinada">
           {verRegistros ? 'Fechar alterações' : `Ver alterações (${q.registros.length})`}
         </AppButton>
@@ -384,7 +385,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
                     {a.quantidadeFonte != null
                       ? 'Compras.gov.br'
                       : a.informada
-                        ? <span>Informada por <b>{a.informada.informadoPorNome}</b> em {formatDataHoraBR(a.informada.informadoEm)} · SEI nº {a.informada.documentoSei}</span>
+                        ? <span>Informada por <b>{a.informada.informadoPorNome}</b> em {formatDataHoraBR(a.informada.informadoEm)} · <NumeroSeiEtiqueta numero={a.informada.documentoSei} testId="adesao-sei" /></span>
                         : <StatusBadge label="Sem quantidade na fonte" variant="warning" size="sm" dot={false} />}
                   </td>
                   {p.podeInformar && (
@@ -435,7 +436,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }} data-testid="alteracoes-ata-assinada">
           {q.registros.map((r) => (
             <div key={r.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 0.65rem', background: 'var(--surface)' }}>
-              <b>{formatDataHoraBR(r.informadoEm)}</b> · {r.informadoPorNome} · documento SEI nº {r.documentoSei} · SENASP {formatNumber(r.total)} · {r.justificativa ? `“${r.justificativa}”` : 'primeiro registro'}
+              <b>{formatDataHoraBR(r.informadoEm)}</b> · {r.informadoPorNome} · documento <NumeroSeiEtiqueta numero={r.documentoSei} testId="ata-assinada-registro-sei" /> · SENASP {formatNumber(r.total)} · {r.justificativa ? `“${r.justificativa}”` : 'primeiro registro'}
             </div>
           ))}
         </div>

@@ -10,6 +10,7 @@ import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { formatCurrency } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { formatarCnpj, localDoBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
@@ -151,7 +152,7 @@ export const EmpenhoDaLinha: React.FC<{
         </>
       ) : linha.empenhoDocumentoSei ? (
         <>
-          <div style={carteiraValor}>doc. SEI {linha.empenhoDocumentoSei}</div>
+          <NumeroSeiEtiqueta numero={linha.empenhoDocumentoSei} testId="emendas-linha-empenho-sei" />
           <div style={carteiraDetalhe}>{achada?.motivo ? `nota não achada: ${ROTULO_MOTIVO_SEM_NOTA[achada.motivo]}` : 'nota a localizar'}</div>
         </>
       ) : null}

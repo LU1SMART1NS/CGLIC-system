@@ -1,5 +1,5 @@
 /**
- * Quadro da reserva para o gabinete (migration 165): o que a CAEP copia para o SEI ou para o WhatsApp no formato do
+ * Quadro da reserva para o parlamentar (migration 165): o que a CAEP copia para o SEI ou para o WhatsApp no formato do
  * Anexo (DESCRIÇÃO ITEM · BENEFICIÁRIO FINAL · MUNICÍPIO · QTD · VR UNITÁRIO · VR TOTAL · TOTAL A EMPENHAR).
  *
  * Lê o preço previsto de cada item pela projeção do reajuste da ata (emendas_precos_previstos) e grava o nome curto e

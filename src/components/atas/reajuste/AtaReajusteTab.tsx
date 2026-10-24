@@ -25,6 +25,7 @@ import {
   VARIANTE_SITUACAO_ITEM,
   type SaldoDoItem
 } from './reajusteRotulos';
+import { NumeroSeiEtiqueta } from '../../../design-system/components/NumeroSeiEtiqueta';
 
 interface Props {
   dados: ReajusteDaAta;
@@ -321,7 +322,12 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
                               {pub.documentoTitulo ? (pub.documentoTitulo.length > 70 ? `${pub.documentoTitulo.slice(0, 70)}…` : pub.documentoTitulo) : pub.origem === 'INFORMADO' ? 'Informado pelo gestor' : 'Documento do PNCP'}
                               <div style={sub}>
                                 {pub.documentoPublicadoEm ? `publicado em ${formatDateBR(pub.documentoPublicadoEm)}` : ''}
-                                {pub.seiApostilamento ? `${pub.documentoPublicadoEm ? ' · ' : ''}SEI ${pub.seiApostilamento}` : ''}
+                                {pub.seiApostilamento && (
+                                  <>
+                                    {pub.documentoPublicadoEm ? ' · ' : ''}
+                                    <NumeroSeiEtiqueta numero={pub.seiApostilamento} testId="reajuste-apostilamento-sei" />
+                                  </>
+                                )}
                               </div>
                               {podeEditar && (
                                 <AppButton variant="outline" size="xs" onClick={() => abrirPercentual(c)} data-testid={`reajuste-corrigir-${c.ciclo}`}>

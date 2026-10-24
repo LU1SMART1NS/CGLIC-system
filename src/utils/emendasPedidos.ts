@@ -10,16 +10,33 @@ import { chaveDoContrato } from './contractKeyUtils';
 export const AVISO_SEM_OFICIO_DIAS = 30;
 
 export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; rotulo: string; curto: string; descricao: string }> = [
-  { etapa: 'RESERVADO', rotulo: 'Reservado', curto: 'Reservados', descricao: 'A CAEP combinou com o parlamentar e separou a quantidade.' },
-  { etapa: 'MINUTA', rotulo: 'Minuta enviada', curto: 'Minuta', descricao: 'A CAEP mandou a minuta do ofício ao gabinete.' },
+  { etapa: 'RESERVADO', rotulo: 'Itens reservados', curto: 'Reservados', descricao: 'A CAEP combinou com o parlamentar e separou a quantidade.' },
+  { etapa: 'MINUTA', rotulo: 'Minuta enviada ao parlamentar', curto: 'Minuta', descricao: 'A CAEP mandou a minuta do ofício ao parlamentar.' },
   { etapa: 'OFICIO', rotulo: 'Ofício recebido', curto: 'Ofício', descricao: 'O ofício chegou ao MJSP e virou processo SEI na CAEP.' },
-  { etapa: 'CONFERIDO', rotulo: 'Conferido no SIOP', curto: 'Conferidos', descricao: 'Nº da emenda, autor, valor, GND, beneficiário e objeto batem.' },
-  { etapa: 'SOLICITADO', rotulo: 'Solicitação de empenho', curto: 'Solicitados', descricao: 'A CAEP elaborou a solicitação de empenho e enviou à DGFNSP.' },
+  { etapa: 'CONFERIDO', rotulo: 'Emenda conferida no SIOP', curto: 'Conferidos', descricao: 'Nº da emenda, autor, valor, GND, beneficiário e objeto batem.' },
+  { etapa: 'SOLICITADO', rotulo: 'Empenho solicitado', curto: 'Solicitados', descricao: 'A CAEP elaborou a solicitação de empenho e enviou à DGFNSP.' },
   { etapa: 'AUTORIZADO', rotulo: 'Empenho autorizado', curto: 'Autorizados', descricao: 'A DGFNSP assinou a solicitação de empenho.' },
-  { etapa: 'CGOFI', rotulo: 'Enviado à CGOFI', curto: 'Na CGOFI', descricao: 'A CAEP enviou à CGOFI para fazer o empenho.' },
-  { etapa: 'EMPENHADO', rotulo: 'Empenhado', curto: 'Empenhados', descricao: 'A CGOFI emitiu as notas de empenho (uma por fornecedor).' },
-  { etapa: 'CONTRATACAO', rotulo: 'Enviado para contratação · CCGA', curto: 'Na CCGA', descricao: 'Despacho para contratação à CCGA; a CAEP acompanha a execução.' }
+  { etapa: 'CGOFI', rotulo: 'Processo enviado à CGOFI', curto: 'Na CGOFI', descricao: 'A CAEP enviou à CGOFI para fazer o empenho.' },
+  { etapa: 'EMPENHADO', rotulo: 'Nota de empenho emitida', curto: 'Empenhados', descricao: 'A CGOFI emitiu as notas de empenho (uma por fornecedor).' },
+  { etapa: 'CONTRATACAO', rotulo: 'Processo enviado à CCGA', curto: 'Na CCGA', descricao: 'Despacho para contratação à CCGA; a CAEP acompanha a execução.' }
 ];
+
+/**
+ * Fases da linha do tempo do pedido. A última etapa, Contratado, não é gravada: vem do contrato das notas no
+ * Contratos.gov.br (ver contratosDoPedido).
+ */
+export type FasePedido = 'INTERLOCUCAO' | 'EMPENHO' | 'CONTRATACAO';
+export const FASES_PEDIDO: ReadonlyArray<{ id: FasePedido; nome: string; etapas: ReadonlyArray<Exclude<EtapaPedido, 'CANCELADO'>> }> = [
+  { id: 'INTERLOCUCAO', nome: 'Interlocução', etapas: ['RESERVADO', 'MINUTA', 'OFICIO'] },
+  { id: 'EMPENHO', nome: 'Empenho', etapas: ['CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI', 'EMPENHADO'] },
+  { id: 'CONTRATACAO', nome: 'Contratação', etapas: ['CONTRATACAO'] }
+];
+
+/** Fase de uma etapa (o cancelado não tem fase). */
+export const faseDaEtapa = (etapa: EtapaPedido): FasePedido | null => FASES_PEDIDO.find((f) => (f.etapas as readonly EtapaPedido[]).includes(etapa))?.id ?? null;
+
+/** Etapas da linha do tempo: as 9 gravadas e Contratado. */
+export const TOTAL_ETAPAS_PEDIDO = ETAPAS.length + 1;
 
 export const ROTULO_ETAPA: Record<EtapaPedido, string> = {
   ...(Object.fromEntries(ETAPAS.map((e) => [e.etapa, e.rotulo])) as Record<Exclude<EtapaPedido, 'CANCELADO'>, string>),
@@ -60,7 +77,7 @@ export function proximaAcao(etapa: EtapaPedido, rodada = 1): { acao: Exclude<Aca
     case 'CGOFI':
       return { acao: 'EMPENHADO', rotulo: 'Registrar o empenho' };
     case 'EMPENHADO':
-      return { acao: 'CONTRATACAO', rotulo: 'Registrar o envio para contratação' };
+      return { acao: 'CONTRATACAO', rotulo: 'Registrar o envio à CCGA' };
     default:
       return null;
   }
@@ -205,7 +222,7 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
   }
   const aConferir = linhasAtivas(p).filter((l) => l.aConferir).length;
   if (aConferir) {
-    avisos.push({ tipo: 'aConferir', curto: `${aConferir} a conferir`, texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir entre as planilhas da CAEP` });
+    avisos.push({ tipo: 'aConferir', curto: `${aConferir} a conferir`, texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir com o controle anterior da CAEP` });
   }
   const atas = linhasAtivas(p)
     .map((l) => ataDaLinha(p, l, itens, hoje))
@@ -254,7 +271,7 @@ export const ROTULO_REGRA_DA_NOTA: Record<RegraDaNota, string> = {
 
 /** Por que a linha empenhada ainda não tem nota. */
 export const ROTULO_MOTIVO_SEM_NOTA: Record<MotivoSemNota, string> = {
-  SEM_CONTRATO: 'a planilha não traz o contrato',
+  SEM_CONTRATO: 'falta o número do contrato',
   CONTRATO_FORA: 'o contrato não está no sistema',
   CONTRATO_SEM_NOTA: 'o contrato ainda não tem nota no sistema',
   OUTRAS_EMENDAS: 'o contrato só tem notas de outras emendas',
@@ -268,6 +285,32 @@ export function notaDaLinha(l: Pick<LinhaPedido, 'id' | 'notaEmpenho'>, notas: M
 }
 
 export const linhasSemNota = (p: PedidoEmenda, notas: Map<string, NotaDaLinha>): LinhaPedido[] => linhasAtivas(p).filter((l) => !notaDaLinha(l, notas));
+
+export interface ContratosDoPedido {
+  /** Notas do pedido (sem nota ainda, conta o documento SEI do empenho ou a linha). */
+  notas: number;
+  comContrato: number;
+  /** Chaves dos contratos achados no sistema, sem repetir. */
+  contratos: string[];
+  /** Todas as notas já têm contrato no Contratos.gov.br. */
+  contratado: boolean;
+}
+
+/**
+ * Contratos das notas do pedido, pelo contrato achado no sistema (Contratos.gov.br, refeito de hora em hora). O pedido
+ * está Contratado quando foi enviado à CCGA e toda nota tem contrato; o número da planilha sem contrato no sistema não conta.
+ */
+export function contratosDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): ContratosDoPedido {
+  const porNota = new Map<string, string | null>();
+  for (const l of linhasAtivas(p)) {
+    const chaveNota = notaDaLinha(l, notas) ?? l.empenhoDocumentoSei ?? l.id;
+    const contrato = notas.get(l.id)?.contractKey ?? null;
+    if (!porNota.has(chaveNota) || contrato) porNota.set(chaveNota, contrato ?? porNota.get(chaveNota) ?? null);
+  }
+  const contratos = [...new Set([...porNota.values()].filter((c): c is string => Boolean(c)))].sort();
+  const comContrato = [...porNota.values()].filter(Boolean).length;
+  return { notas: porNota.size, comContrato, contratos, contratado: p.etapa === 'CONTRATACAO' && porNota.size > 0 && comContrato === porNota.size };
+}
 
 export interface ExecucaoDoPedido {
   notas: number;

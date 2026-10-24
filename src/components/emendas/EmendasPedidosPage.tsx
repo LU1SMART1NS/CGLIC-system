@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Check, ChevronDown, ChevronRight, Circle, ClipboardList, Clock, RotateCcw } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -8,6 +9,8 @@ import { DataTable, type Column } from '../../design-system/components/DataTable
 import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ProgressBar } from '../../design-system/components/ProgressBar';
+import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
@@ -37,6 +40,11 @@ import {
   dataDaEtapa,
   ETAPAS,
   ETAPAS_COM_VARIOS_SEI,
+  FASES_PEDIDO,
+  faseDaEtapa,
+  type FasePedido,
+  TOTAL_ETAPAS_PEDIDO,
+  contratosDoPedido,
   jaEmpenhado,
   linhasAtivas,
   orgaoDoPedido,
@@ -62,7 +70,9 @@ import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
-type Segmento = 'todos' | EtapaPedido;
+type Segmento = 'todos' | FasePedido | 'CANCELADO';
+/** Filtro de etapa dentro da fase; na Contratação separa quem aguarda o contrato de quem já está contratado. */
+type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | 'AGUARDANDO_CONTRATO' | 'CONTRATADO';
 type Linha = PedidoEmenda & { valor: number; avisos: AvisoPedido[] };
 
 const POR_PAGINA = 25;
@@ -84,120 +94,243 @@ const VARIANTE_ETAPA: Record<EtapaPedido, StatusBadgeVariant> = {
   CANCELADO: 'neutral'
 };
 
-/** Linha do tempo das etapas do pedido, com o SEI de cada etapa e as tentativas devolvidas (migration 174). */
-const EtapasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean; onAcao: (acao: AcaoDaJanela) => void }> = ({ p, podeGerir, onAcao }) => {
+/** Número SEI com o rótulo à esquerda, para todos os números da etapa começarem na mesma coluna. */
+const SeiDaEtapa: React.FC<{ rotulo: string; numero: string; testId: string }> = ({ rotulo, numero, testId }) => (
+  <div className="emendas-etapa__sei">
+    <span style={carteiraDetalhe}>{rotulo}</span>
+    <NumeroSeiEtiqueta numero={numero} testId={testId} />
+  </div>
+);
+
+/**
+ * Linha do tempo do pedido em três fases (Interlocução · Empenho · Contratação), com o SEI de cada etapa e as
+ * tentativas devolvidas (migration 174). A última etapa, Contratado, vem dos contratos das notas no Contratos.gov.br.
+ * Fase concluída começa recolhida; a fase em que o pedido está fica sempre aberta.
+ */
+const EtapasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha>; podeGerir: boolean; podeVerContratos: boolean; onAcao: (acao: AcaoDaJanela) => void }> = ({
+  p,
+  notas,
+  podeGerir,
+  podeVerContratos,
+  onAcao
+}) => {
+  const cancelado = p.etapa === 'CANCELADO';
   const atual = ORDEM_ETAPA[p.etapa];
   const rodada = rodadaDoPedido(p);
-  const seiEmLinha: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.25rem' };
+  const contratos = p.etapa === 'CONTRATACAO' ? contratosDoPedido(p, notas) : null;
+  const contratado = Boolean(contratos?.contratado);
+  const [abertas, setAbertas] = useState<Record<string, boolean>>({});
+  const doPlanilha = p.origem === 'PLANILHA';
+  const linhaDaEtapa = (feita: boolean, atualAqui: boolean, voltou: boolean): string =>
+    ['emendas-etapa', feita ? 'emendas-etapa--feita' : '', atualAqui ? 'emendas-etapa--atual' : '', voltou ? 'emendas-etapa--voltou' : '', cancelado ? 'emendas-etapa--cancelada' : '']
+      .filter(Boolean)
+      .join(' ');
   return (
-    <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem' }} data-testid={`emendas-pedido-etapas-${p.id}`}>
-      {ETAPAS.map((e, i) => {
-        const feita = p.etapa !== 'CANCELADO' && i <= atual;
-        // Na carga das planilhas a data da reserva é a da carga, não a da conversa com o gabinete.
-        const data = p.origem === 'PLANILHA' && e.etapa === 'RESERVADO' ? null : dataDaEtapa(p, e.etapa);
-        const proxima = p.etapa !== 'CANCELADO' && i === atual + 1;
-        // Ofício devolvido: a próxima etapa é a nova minuta.
-        const voltou = proxima && e.etapa === 'MINUTA' && p.devolucoes.length > 0;
-        const comRodada = rodada > 1 && (e.etapa === 'MINUTA' || e.etapa === 'OFICIO') && (feita || proxima);
-        const seis = feita ? seiDaEtapa(p, e.etapa) : [];
-        const detalhe =
-          feita && e.etapa === 'CONFERIDO' && p.siopEmenda
-            ? `emenda ${p.siopEmenda}${p.siopGnd ? ` · ${p.siopGnd}` : ''}${p.siopValor != null ? ` · ${formatCurrency(p.siopValor)}` : ''}`
-            : null;
-        // Nota nova (outro fornecedor): mais um número no empenho ou no envio para contratação.
-        const acrescentar =
-          podeGerir && feita && ETAPAS_COM_VARIOS_SEI.has(e.etapa) && (e.etapa === 'EMPENHADO' ? jaEmpenhado(p.etapa) : p.etapa === 'CONTRATACAO');
-        const texto = feita
-          ? data
-            ? dataBR(data)
-            : p.origem === 'PLANILHA'
-              ? 'sem data na planilha'
-              : 'não houve'
-          : voltou
-            ? null
-            : proxima
-              ? 'próxima etapa'
-              : null;
+    <div style={{ display: 'flex', flexDirection: 'column' }} data-testid={`emendas-pedido-etapas-${p.id}`}>
+      {FASES_PEDIDO.map((fase) => {
+        const indices = fase.etapas.map((e) => ORDEM_ETAPA[e]);
+        const ultimaFase = fase.etapas.includes('CONTRATACAO');
+        const total = fase.etapas.length + (ultimaFase ? 1 : 0);
+        const feitas = cancelado ? 0 : indices.filter((i) => i <= atual).length + (ultimaFase && contratado ? 1 : 0);
+        const completa = !cancelado && feitas === total;
+        const temAtual = !cancelado && (indices.includes(atual) || (ultimaFase && p.etapa === 'CONTRATACAO'));
+        const aberta = abertas[fase.nome] ?? (cancelado ? indices.some((i) => i <= atual) || indices[0] === 0 : !completa || (temAtual && !contratado));
         return (
-          <li key={e.etapa} style={{ display: 'grid', gridTemplateColumns: '20px 1fr', gap: '0.5rem', alignItems: 'start' }}>
-            <span
-              aria-hidden="true"
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: '50%',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.7rem',
-                fontWeight: 800,
-                background: feita ? 'var(--primary)' : voltou ? 'var(--color-warning-bg)' : '#ffffff',
-                color: feita ? '#ffffff' : voltou ? 'var(--color-warning-text)' : proxima ? 'var(--primary)' : '#94a3b8',
-                border: `2px solid ${feita || proxima ? (voltou ? 'var(--color-warning-text)' : 'var(--primary)') : '#e2e8f0'}`
-              }}
+          <section key={fase.nome} className="emendas-fase" data-testid={`emendas-pedido-fase-${fase.nome}`}>
+            <button
+              type="button"
+              className="emendas-fase__cabecalho"
+              aria-expanded={aberta}
+              onClick={() => setAbertas((a) => ({ ...a, [fase.nome]: !aberta }))}
             >
-              {feita ? '✓' : voltou ? '↺' : i + 1}
-            </span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: feita || proxima ? 700 : 500, color: feita || proxima ? '#0f172a' : '#94a3b8', fontSize: '0.82rem' }}>
-                {e.rotulo}
-                {comRodada && (
-                  <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', fontWeight: 800, borderRadius: 99, padding: '0.05rem 0.45rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)' }}>
-                    {e.etapa === 'MINUTA' ? `${rodada}ª minuta` : `${rodada}º ofício`}
-                  </span>
-                )}
-              </div>
-              {voltou && (
-                <div style={{ ...carteiraSubtitle, color: 'var(--color-warning-text)', fontWeight: 700 }}>fazer a nova minuta · ofício devolvido</div>
-              )}
-              {(texto || detalhe) && <div style={carteiraSubtitle}>{[texto, detalhe].filter(Boolean).join(' · ')}</div>}
-              {(seis.length > 0 || (feita && e.etapa === 'OFICIO' && p.oficioProcessoSei) || acrescentar) && (
-                <div style={seiEmLinha}>
-                  {seis.map((n) => (
-                    <NumeroSeiEtiqueta key={n} numero={n} testId={`emendas-pedido-sei-${e.etapa}`} />
-                  ))}
-                  {feita && e.etapa === 'OFICIO' && p.oficioProcessoSei && <span style={{ ...carteiraSubtitle, alignSelf: 'center' }}>processo</span>}
-                  {feita && e.etapa === 'OFICIO' && p.oficioProcessoSei && <NumeroSeiEtiqueta numero={p.oficioProcessoSei} testId="emendas-pedido-sei-processo" />}
-                  {acrescentar && (
-                    <AppButton size="sm" variant="ghost" onClick={() => onAcao(`MAIS_${e.etapa}` as AcaoDaJanela)} data-testid={`emendas-pedido-mais-sei-${e.etapa}`}>
-                      + número SEI
-                    </AppButton>
-                  )}
-                </div>
-              )}
-              {e.etapa === 'MINUTA' && p.devolucoes.length > 0 && (
-                <details style={{ marginTop: '0.3rem', fontSize: '0.78rem' }} open={voltou} data-testid={`emendas-pedido-devolucoes-${p.id}`}>
-                  <summary style={{ cursor: 'pointer', color: 'var(--primary)', fontWeight: 700 }}>
-                    {p.devolucoes.length === 1 ? 'Tentativa anterior' : `${p.devolucoes.length} tentativas anteriores`}
-                  </summary>
-                  <ul style={{ listStyle: 'none', margin: '0.35rem 0 0', padding: '0 0 0 0.6rem', borderLeft: '2px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-                    {p.devolucoes.map((d) => (
-                      <li key={d.rodada} style={{ color: '#475569' }}>
-                        <div>
-                          <strong>{d.rodada}ª minuta</strong> {d.minutaEm ? `enviada em ${dataBR(d.minutaEm)}` : 'sem data'}
+              {aberta ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+              <span className="emendas-fase__nome">{fase.nome}</span>
+              <span className={completa ? 'emendas-fase__conta emendas-fase__conta--completa' : 'emendas-fase__conta'}>
+                {feitas}/{total}
+                {completa && <Check size={12} aria-hidden="true" />}
+              </span>
+            </button>
+            {aberta && (
+              <ol className="emendas-fase__etapas">
+                {fase.etapas.map((etapa) => {
+                  const e = ETAPAS[ORDEM_ETAPA[etapa]];
+                  const i = ORDEM_ETAPA[etapa];
+                  const feita = !cancelado && i <= atual;
+                  const feitaAntes = cancelado && Boolean(dataDaEtapa(p, etapa) || seiDaEtapa(p, etapa).length);
+                  const atualAqui = !cancelado && i === atual;
+                  const proxima = !cancelado && i === atual + 1;
+                  // Ofício devolvido: a próxima etapa é a nova minuta.
+                  const voltou = proxima && etapa === 'MINUTA' && p.devolucoes.length > 0;
+                  const comRodada = rodada > 1 && (etapa === 'MINUTA' || etapa === 'OFICIO') && (feita || proxima);
+                  // Na carga das planilhas a data da reserva é a da carga, não a da conversa com o parlamentar.
+                  const data = doPlanilha && etapa === 'RESERVADO' ? null : dataDaEtapa(p, etapa);
+                  const mostraDados = feita || feitaAntes;
+                  const seis = mostraDados ? seiDaEtapa(p, etapa) : [];
+                  // Nota nova (outro fornecedor): mais um número no empenho ou no envio para contratação.
+                  const acrescentar =
+                    podeGerir && feita && ETAPAS_COM_VARIOS_SEI.has(etapa) && (etapa === 'EMPENHADO' ? jaEmpenhado(p.etapa) : p.etapa === 'CONTRATACAO');
+                  return (
+                    <li key={etapa}>
+                      <div className={linhaDaEtapa(mostraDados, atualAqui, voltou)}>
+                        <span className="emendas-etapa__icone" aria-hidden="true">
+                          {mostraDados ? <Check size={14} /> : voltou ? <RotateCcw size={13} /> : <Circle size={10} />}
+                        </span>
+                        <span className="emendas-etapa__nome">
+                          {e.rotulo}
+                          {comRodada && <span className="emendas-etapa__rodada">{etapa === 'MINUTA' ? `${rodada}ª minuta` : `${rodada}º ofício`}</span>}
+                        </span>
+                        <span className="emendas-etapa__data">{mostraDados && data ? dataBR(data) : feita && !doPlanilha && !data ? 'não houve' : ''}</span>
+                      </div>
+                      {voltou && <div className="emendas-etapa__nota emendas-etapa__nota--aviso">fazer a nova minuta · ofício devolvido</div>}
+                      {mostraDados && etapa === 'CONFERIDO' && p.siopEmenda && (
+                        <div className="emendas-etapa__nota">
+                          emenda {p.siopEmenda}
+                          {p.siopGnd ? ` · ${p.siopGnd}` : ''}
+                          {p.siopValor != null ? ` · ${formatCurrency(p.siopValor)}` : ''}
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
-                          <strong>{d.rodada}º ofício</strong> {d.oficioEm ? dataBR(d.oficioEm) : ''}
-                          {d.oficioDocumentoSei && <NumeroSeiEtiqueta numero={d.oficioDocumentoSei} testId="emendas-pedido-sei-devolvido" />}
+                      )}
+                      {seis.map((n) => (
+                        <SeiDaEtapa key={n} rotulo="Doc." numero={n} testId={`emendas-pedido-sei-${etapa}`} />
+                      ))}
+                      {mostraDados && etapa === 'OFICIO' && p.oficioProcessoSei && (
+                        <SeiDaEtapa rotulo="Processo" numero={p.oficioProcessoSei} testId="emendas-pedido-sei-processo" />
+                      )}
+                      {acrescentar && (
+                        <div className="emendas-etapa__mais">
+                          <AppButton size="xs" variant="link" onClick={() => onAcao(`MAIS_${etapa}` as AcaoDaJanela)} data-testid={`emendas-pedido-mais-sei-${etapa}`}>
+                            + número SEI
+                          </AppButton>
                         </div>
-                        <div style={{ color: 'var(--color-danger-text)' }}>
-                          Devolvido em {dataBR(d.devolvidoEm)}: {d.motivo}
-                        </div>
-                      </li>
+                      )}
+                      {etapa === 'MINUTA' && p.devolucoes.length > 0 && (
+                        <details className="emendas-etapa__devolucoes" open={voltou} data-testid={`emendas-pedido-devolucoes-${p.id}`}>
+                          <summary>{p.devolucoes.length === 1 ? 'Tentativa anterior' : `${p.devolucoes.length} tentativas anteriores`}</summary>
+                          <ul>
+                            {p.devolucoes.map((d) => (
+                              <li key={d.rodada}>
+                                <div>
+                                  <strong>{d.rodada}ª minuta</strong> {d.minutaEm ? `enviada em ${dataBR(d.minutaEm)}` : 'sem data'}
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
+                                  <strong>{d.rodada}º ofício</strong> {d.oficioEm ? dataBR(d.oficioEm) : ''}
+                                  {d.oficioDocumentoSei && <NumeroSeiEtiqueta numero={d.oficioDocumentoSei} testId="emendas-pedido-sei-devolvido" />}
+                                </div>
+                                <div style={{ color: 'var(--color-danger-text)' }}>
+                                  Devolvido em {dataBR(d.devolvidoEm)}: {d.motivo}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </li>
+                  );
+                })}
+                {ultimaFase && (
+                  <li data-testid={`emendas-pedido-contratado-${p.id}`}>
+                    <div className={linhaDaEtapa(contratado, false, false)}>
+                      <span className="emendas-etapa__icone" aria-hidden="true">
+                        {contratado ? <Check size={14} /> : contratos ? <Clock size={13} /> : <Circle size={10} />}
+                      </span>
+                      <span className="emendas-etapa__nome">Contratado</span>
+                      <span className="emendas-etapa__data" />
+                    </div>
+                    {contratos && (
+                      <div className="emendas-etapa__nota">
+                        pelo Contratos.gov.br
+                        {!contratado && ` · ${contratos.comContrato} de ${contratos.notas} ${contratos.notas === 1 ? 'nota' : 'notas'} com contrato`}
+                      </div>
+                    )}
+                    {contratos?.contratos.map((chave) => (
+                      <div key={chave} className="emendas-etapa__sei">
+                        <span style={carteiraDetalhe}>Contrato</span>
+                        {podeVerContratos ? (
+                          <Link to={`/contratos/${encodeURIComponent(chave)}`} className="emendas-etapa__contrato">
+                            {numeroDaChave(chave)}
+                          </Link>
+                        ) : (
+                          <span className="emendas-etapa__contrato">{numeroDaChave(chave)}</span>
+                        )}
+                      </div>
                     ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          </li>
+                  </li>
+                )}
+              </ol>
+            )}
+          </section>
         );
       })}
-      {p.etapa === 'CANCELADO' && (
-        <li style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-danger, #b11b05)' }}>
-          Cancelado em {dataBR(p.canceladoEm)}: {p.canceladoMotivo}. A quantidade voltou ao saldo da CAEP.
-        </li>
+    </div>
+  );
+};
+
+/** Onde o pedido está: a etapa, o progresso e as ações. Fica no topo da coluna das etapas. */
+const OndeEstaOPedido: React.FC<{
+  p: PedidoEmenda;
+  notas: Map<string, NotaDaLinha>;
+  podeGerir: boolean;
+  onAcao: (acao: AcaoDaJanela) => void;
+  onAlterar: () => void;
+}> = ({ p, notas, podeGerir, onAcao, onAlterar }) => {
+  if (p.etapa === 'CANCELADO') {
+    return (
+      <div className="emendas-onde emendas-onde--cancelado" data-testid={`emendas-pedido-onde-${p.id}`}>
+        Cancelado em {dataBR(p.canceladoEm)}: {p.canceladoMotivo}. A quantidade voltou ao saldo da CAEP.
+      </div>
+    );
+  }
+  // Reserva para um órgão (migration 163): antes da minuta, a CAEP indica o parlamentar que assumiu.
+  const semAutor = !p.autorId;
+  const prox = semAutor ? null : proximaAcao(p.etapa, rodadaDoPedido(p));
+  const contratado = p.etapa === 'CONTRATACAO' && contratosDoPedido(p, notas).contratado;
+  const posicao = contratado ? TOTAL_ETAPAS_PEDIDO : ORDEM_ETAPA[p.etapa] + 1;
+  const semData = p.origem === 'PLANILHA' && ETAPAS.some((e) => e.etapa !== 'RESERVADO' && ORDEM_ETAPA[e.etapa] <= ORDEM_ETAPA[p.etapa] && !dataDaEtapa(p, e.etapa));
+  return (
+    <div className="emendas-onde" data-testid={`emendas-pedido-onde-${p.id}`}>
+      <div className="emendas-onde__topo">
+        <StatusBadge label={contratado ? 'Contratado' : ROTULO_ETAPA[p.etapa]} variant={contratado ? 'success' : 'info'} size="sm" dot={false} />
+        <span style={carteiraDetalhe}>
+          etapa {posicao} de {TOTAL_ETAPAS_PEDIDO}
+        </span>
+      </div>
+      <ProgressBar value={posicao} max={TOTAL_ETAPAS_PEDIDO} showPercent={false} height="4px" colorScheme={contratado ? 'success' : 'primary'} testId={`emendas-pedido-progresso-${p.id}`} />
+      {p.etapa === 'CONTRATACAO' && (
+        <div style={carteiraDetalhe}>
+          {contratado ? 'A CAEP acompanha a execução.' : 'Aguardando a CCGA gerar o contrato no Contratos.gov.br. Atualiza sozinho de hora em hora.'}
+        </div>
       )}
-    </ol>
+      {podeGerir && p.etapa !== 'CONTRATACAO' && (
+        <>
+          {semAutor && (
+            <AppButton size="sm" fullWidth onClick={onAlterar} data-testid={`emendas-pedido-indicar-autor-${p.id}`}>
+              Indicar o parlamentar
+            </AppButton>
+          )}
+          {prox && (
+            <AppButton size="sm" fullWidth onClick={() => onAcao(prox.acao)} data-testid={`emendas-pedido-proximo-${p.id}`}>
+              {prox.rotulo}
+            </AppButton>
+          )}
+          <div style={{ display: 'flex', gap: '0.25rem 0.5rem', flexWrap: 'wrap' }}>
+            {/* Às vezes o parlamentar manda o ofício sem minuta da CAEP. */}
+            {p.etapa === 'RESERVADO' && !semAutor && <ActionButton action="avancarEtapa" size="xs" label="Já chegou o ofício" onClick={() => onAcao('OFICIO')} />}
+            {/* O ofício com divergência volta para a minuta (migration 174). */}
+            {p.etapa === 'OFICIO' && (
+              <AppButton size="xs" variant="ghostDanger" onClick={() => onAcao('DIVERGENCIA')} data-testid={`emendas-pedido-divergencia-${p.id}`}>
+                Ofício com divergência
+              </AppButton>
+            )}
+            {!jaEmpenhado(p.etapa) && (
+              <>
+                <ActionButton action="editar" size="xs" label="Alterar linhas" onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
+                <ActionButton action="cancelarCiclo" size="xs" label="Cancelar pedido" onClick={() => onAcao('CANCELAR')} data-testid={`emendas-pedido-cancelar-${p.id}`} />
+              </>
+            )}
+          </div>
+        </>
+      )}
+      {semData && <div className="emendas-onde__anterior">Pedido trazido do controle anterior da CAEP: as etapas sem data não tinham data registrada lá.</div>}
+    </div>
   );
 };
 
@@ -214,9 +347,7 @@ interface DetalheProps {
 }
 
 const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
-  // Reserva para um órgão (migration 163): antes da minuta, a CAEP indica o parlamentar que assumiu.
   const semAutor = !p.autorId;
-  const prox = semAutor ? null : proximaAcao(p.etapa, rodadaDoPedido(p));
   const colunas: Column<PedidoEmenda['linhas'][number]>[] = [
     {
       key: 'linha',
@@ -273,42 +404,15 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
         )}
         {p.observacao && <div style={carteiraSubtitle}>Observação: {p.observacao}</div>}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }} className="emendas-detalhe-pedido__etapas">
         {(p.contatoNome || p.contatoTelefone || p.contatoEmail) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }} data-testid={`emendas-pedido-contato-${p.id}`}>
             <span style={carteiraSubtitle}>Contato na assessoria{p.contatoNome ? `: ${p.contatoNome}` : ''}</span>
             <ContatoDoResponsavel nome={p.contatoNome ?? 'assessoria'} telefone={p.contatoTelefone} email={p.contatoEmail} />
           </div>
         )}
-        <EtapasDoPedido p={p} podeGerir={podeGerir} onAcao={onAcao} />
-        {podeGerir && p.etapa !== 'CONTRATACAO' && p.etapa !== 'CANCELADO' && (
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {semAutor && (
-              <AppButton size="sm" onClick={onAlterar} data-testid={`emendas-pedido-indicar-autor-${p.id}`}>
-                Indicar o parlamentar
-              </AppButton>
-            )}
-            {prox && (
-              <AppButton size="sm" onClick={() => onAcao(prox.acao)} data-testid={`emendas-pedido-proximo-${p.id}`}>
-                {prox.rotulo}
-              </AppButton>
-            )}
-            {/* Às vezes o gabinete manda o ofício sem minuta da CAEP. */}
-            {p.etapa === 'RESERVADO' && !semAutor && <ActionButton action="avancarEtapa" size="sm" label="Já chegou o ofício" onClick={() => onAcao('OFICIO')} />}
-            {/* O ofício com divergência volta para a minuta (migration 174). */}
-            {p.etapa === 'OFICIO' && (
-              <AppButton size="sm" variant="ghostDanger" onClick={() => onAcao('DIVERGENCIA')} data-testid={`emendas-pedido-divergencia-${p.id}`}>
-                Ofício com divergência
-              </AppButton>
-            )}
-            {!jaEmpenhado(p.etapa) && (
-              <>
-                <ActionButton action="editar" size="sm" label="Alterar linhas" onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
-                <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={() => onAcao('CANCELAR')} data-testid={`emendas-pedido-cancelar-${p.id}`} />
-              </>
-            )}
-          </div>
-        )}
+        <OndeEstaOPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} onAlterar={onAlterar} />
+        <EtapasDoPedido p={p} notas={notas} podeGerir={podeGerir} podeVerContratos={podeVerContratos} onAcao={onAcao} />
       </div>
     </div>
   );
@@ -330,8 +434,17 @@ export const EmendasPedidosPage: React.FC = () => {
   const hoje = hojeEmBrasilia();
   // Vindo do Início: ?aviso= (tipo, 'com' ou 'grave'), ?etapa= e ?pedido= (só aquele pedido, já aberto).
   const [searchParams, setSearchParams] = useSearchParams();
+  // ?etapa= abre a aba da fase com o filtro daquela etapa (a etapa de contratação abre a fase inteira).
   const etapaDaUrl = searchParams.get('etapa');
-  const [segmento, setSegmento] = useState<Segmento>(() => (etapaDaUrl && etapaDaUrl in ORDEM_ETAPA ? (etapaDaUrl as Segmento) : 'todos'));
+  const etapaValida = etapaDaUrl && etapaDaUrl in ORDEM_ETAPA ? (etapaDaUrl as EtapaPedido) : null;
+  const [segmento, setSegmentoBruto] = useState<Segmento>(() => (etapaValida === 'CANCELADO' ? 'CANCELADO' : etapaValida ? faseDaEtapa(etapaValida) ?? 'todos' : 'todos'));
+  const [filtroEtapa, setFiltroEtapa] = useState<FiltroEtapa>(() =>
+    etapaValida && etapaValida !== 'CANCELADO' && etapaValida !== 'CONTRATACAO' ? etapaValida : ''
+  );
+  const setSegmento = (s: Segmento) => {
+    setSegmentoBruto(s);
+    setFiltroEtapa('');
+  };
   const [filtroAviso, setFiltroAviso] = useState(() => searchParams.get('aviso') ?? '');
   const [soPedido, setSoPedido] = useState(() => searchParams.get('pedido'));
   const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(soPedido ? [soPedido] : []));
@@ -360,13 +473,35 @@ export const EmendasPedidosPage: React.FC = () => {
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todos: 0, CANCELADO: 0 };
     for (const l of linhas) {
-      c[l.etapa] = (c[l.etapa] ?? 0) + 1;
+      const fase = faseDaEtapa(l.etapa);
+      if (fase) c[fase] = (c[fase] ?? 0) + 1;
+      else c.CANCELADO++;
       if (l.etapa !== 'CANCELADO') c.todos++;
     }
     return c;
   }, [linhas]);
 
-  const doSegmento = useMemo(() => linhas.filter((l) => (segmento === 'todos' ? l.etapa !== 'CANCELADO' : l.etapa === segmento)), [linhas, segmento]);
+  const doSegmento = useMemo(
+    () => linhas.filter((l) => (segmento === 'todos' ? l.etapa !== 'CANCELADO' : segmento === 'CANCELADO' ? l.etapa === 'CANCELADO' : faseDaEtapa(l.etapa) === segmento)),
+    [linhas, segmento]
+  );
+  const etapaDoFiltro = useCallback(
+    (l: Linha): FiltroEtapa => (l.etapa === 'CONTRATACAO' ? (contratosDoPedido(l, notas).contratado ? 'CONTRATADO' : 'AGUARDANDO_CONTRATO') : (l.etapa as FiltroEtapa)),
+    [notas]
+  );
+  // Opções do filtro de etapa: as etapas da fase da aba, com a contagem.
+  const opcoesDeEtapa = useMemo(() => {
+    const fase = FASES_PEDIDO.find((f) => f.id === segmento);
+    if (!fase) return [];
+    const valores: { value: FiltroEtapa; label: string }[] =
+      fase.id === 'CONTRATACAO'
+        ? [
+            { value: 'AGUARDANDO_CONTRATO', label: 'Aguardando contrato' },
+            { value: 'CONTRATADO', label: 'Contratado' }
+          ]
+        : fase.etapas.map((e) => ({ value: e as FiltroEtapa, label: ROTULO_ETAPA[e] }));
+    return valores.map((v) => ({ ...v, count: doSegmento.filter((l) => etapaDoFiltro(l) === v.value).length }));
+  }, [segmento, doSegmento, etapaDoFiltro]);
   const filtradas = useMemo(() => {
     const termo = semAcento(busca.trim());
     const textoDoBeneficiario = (id: string | null) => {
@@ -374,6 +509,7 @@ export const EmendasPedidosPage: React.FC = () => {
       return b ? [b.nome, b.sigla, b.razaoSocial, b.entregaMunicipio, ...b.outrosNomes].filter(Boolean).join(' ') : '';
     };
     return doSegmento
+      .filter((l) => !filtroEtapa || etapaDoFiltro(l) === filtroEtapa)
       .filter((l) => !soPedido || l.id === soPedido)
       .filter((l) => !filtroAutor || (filtroAutor === AUTOR_A_DEFINIR_CHAVE ? !l.autorId : l.autorId === filtroAutor))
       .filter((l) => !filtroAviso || temAviso(l, filtroAviso))
@@ -385,7 +521,7 @@ export const EmendasPedidosPage: React.FC = () => {
           .join(' ');
         return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`).includes(termo);
       });
-  }, [doSegmento, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios]);
+  }, [doSegmento, filtroEtapa, etapaDoFiltro, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios]);
 
   // Como nas carteiras: ordena pelo cabeçalho (?ordem=) antes de paginar.
   const ordem = useMemo<Record<string, CarteiraSortColumn<Linha>>>(
@@ -399,7 +535,7 @@ export const EmendasPedidosPage: React.FC = () => {
   );
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ordem);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
-  const filtrosAtivos = Boolean(busca.trim() || filtroAviso || soPedido || filtroAutor);
+  const filtrosAtivos = Boolean(busca.trim() || filtroEtapa || filtroAviso || soPedido || filtroAutor);
   // Autores com pedido na etapa escolhida, os que têm mais pedidos primeiro; "Parlamentar a definir" no fim.
   const opcoesDeAutor = useMemo(() => {
     const conta = new Map<string, number>();
@@ -446,12 +582,16 @@ export const EmendasPedidosPage: React.FC = () => {
       sortValue: ordem.etapa.value,
       // Sem coluna própria para a reserva (repetia a etapa): o documento que marca a etapa fica embaixo dela.
       render: (l) => {
-        const documento = l.siopEmenda ? `Emenda ${l.siopEmenda}` : null;
+        // Uma linha só, em texto: a emenda quando já há; antes dela, o processo. O SEI para copiar fica no detalhe.
+        const documento = l.siopEmenda ? `Emenda ${l.siopEmenda}` : l.oficioProcessoSei ? `Processo ${l.oficioProcessoSei}` : null;
         return (
           <>
-            <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
+            {etapaDoFiltro(l) === 'CONTRATADO' ? (
+              <StatusBadge label="Contratado" variant="success" size="sm" dot={false} />
+            ) : (
+              <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
+            )}
             {documento && <div style={carteiraDetalhe}>{documento}</div>}
-            {l.oficioProcessoSei && <div style={{ ...carteiraDetalhe, marginTop: documento ? 0 : carteiraDetalhe.marginTop }}>SEI {l.oficioProcessoSei}</div>}
           </>
         );
       }
@@ -482,8 +622,8 @@ export const EmendasPedidosPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Pedidos"
-        subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na etapa escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
-        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas: Reservado → Minuta enviada → Ofício recebido → Conferido no SIOP → Empenho autorizado → Empenhado (com a CCGA). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da etapa escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
+        subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na fase escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
+        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas em três fases: Interlocução (itens reservados → minuta enviada ao parlamentar → ofício recebido), Empenho (emenda conferida no SIOP → empenho solicitado → empenho autorizado → processo enviado à CGOFI → nota de empenho emitida) e Contratação (processo enviado à CCGA → contratado, quando o contrato de cada nota aparece no Contratos.gov.br). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir com o controle anterior da CAEP. Pedidos trazidos do controle anterior da CAEP (antes do sistema) trazem o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da fase escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={
           <CarteiraSegmentTabs<'pedido' | 'autor'>
@@ -512,11 +652,11 @@ export const EmendasPedidosPage: React.FC = () => {
 
       <CarteiraSegmentTabs<Segmento>
         testIdPrefix="emendas-pedidos-etapa"
-        ariaLabel="Etapa dos pedidos"
+        ariaLabel="Fase dos pedidos"
         active={segmento}
         onSelect={setSegmento}
         segments={[
-          ...ETAPAS.map((e) => ({ id: e.etapa as Segmento, label: e.curto, count: contagem[e.etapa] ?? 0, dot: jaEmpenhado(e.etapa) ? 'var(--color-success)' : undefined })),
+          ...FASES_PEDIDO.map((f) => ({ id: f.id as Segmento, label: f.nome, count: contagem[f.id] ?? 0 })),
           { id: 'todos', label: 'Todos', count: contagem.todos },
           { id: 'CANCELADO', label: 'Cancelados', count: contagem.CANCELADO ?? 0 }
         ]}
@@ -548,6 +688,7 @@ export const EmendasPedidosPage: React.FC = () => {
             hasActiveFilters={filtrosAtivos}
             onResetFilters={() => {
               setBusca('');
+              setFiltroEtapa('');
               setFiltroAviso('');
               setSoPedido(null);
               if (searchParams.toString()) setSearchParams({}, { replace: true });
@@ -555,6 +696,16 @@ export const EmendasPedidosPage: React.FC = () => {
             counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
             testIdPrefix="emendas-pedidos"
           >
+            {opcoesDeEtapa.length > 0 && (
+              <CarteiraFilterButton
+                label="Etapa"
+                value={filtroEtapa}
+                emptyValue=""
+                options={opcoesDeEtapa}
+                onChange={(v) => setFiltroEtapa(v as FiltroEtapa)}
+                testId="emendas-pedidos-filtro-etapa"
+              />
+            )}
             <CarteiraFilterButton
               label="Autor"
               value={filtroAutor}
@@ -580,7 +731,7 @@ export const EmendasPedidosPage: React.FC = () => {
                 { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
                 { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
                 { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
-                { value: 'aConferir', label: 'Linhas a conferir (planilhas da CAEP)', count: contaAviso('aConferir') },
+                { value: 'aConferir', label: 'Linhas a conferir (controle anterior da CAEP)', count: contaAviso('aConferir') },
                 { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') }
               ]}
               onChange={setFiltroAviso}

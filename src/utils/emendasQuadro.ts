@@ -1,5 +1,5 @@
 /**
- * Quadro da reserva para o gabinete (migration 165), fora da tela para poder testar.
+ * Quadro da reserva para o parlamentar (migration 165), fora da tela para poder testar.
  *
  * Formato do Anexo que a CAEP já usa, em 6 colunas: ITEM (nome, e embaixo a ata e o item) · BENEFICIÁRIO FINAL (nome e
  * sigla, e embaixo a razão social) · LOCAL DE ENTREGA (cidade, e embaixo o endereço) · QTD · VR UNITÁRIO · VR TOTAL, uma
