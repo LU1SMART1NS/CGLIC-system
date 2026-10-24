@@ -100,12 +100,26 @@ describe('Pedidos: linha do tempo com o SEI de cada etapa (migration 174)', () =
     expect(html).toContain('Ofício devolvido em 20/10/2026: valor diferente');
   });
 
-  it('enviado para contratação: SEI de cada etapa, vários no empenho, sem alterar nem cancelar', () => {
+  it('enviado à CCGA sem contrato: Interlocução e Empenho recolhidas, Contratação aberta aguardando o contrato', () => {
     const html = render('/?pedido=ccga');
-    for (const n of ['41000001', '41000003', '41000004', '41000005', '41000006']) expect(html).toContain(n);
+    expect(html).toContain('etapa 9 de 10');
+    expect(html).toContain('Aguardando a CCGA gerar o contrato');
+    // Fases concluídas começam recolhidas: os SEI delas só aparecem ao abrir.
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('41000004');
+    expect(html).toContain('41000006');
     expect(html).toContain('emendas-pedido-mais-sei-CONTRATACAO');
-    expect(html).toContain('emendas-pedido-mais-sei-EMPENHADO');
+    expect(html).toContain('0 de 1 nota com contrato');
     expect(html).not.toContain('emendas-pedido-cancelar-ccga');
     expect(html).not.toContain('emendas-pedido-alterar-ccga');
+  });
+
+  it('em andamento: a fase atual aberta, com o botão da próxima ação no topo e o SEI com rótulo', () => {
+    const html = render('/?pedido=p1');
+    expect(html).toContain('etapa 3 de 10');
+    expect(html).toContain('emendas-pedido-proximo-p1');
+    expect(html).toContain('Conferir com o SIOP');
+    expect(html).toContain('emendas-etapa--atual');
+    expect(html).not.toContain('sem data na planilha');
   });
 });

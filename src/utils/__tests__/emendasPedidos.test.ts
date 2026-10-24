@@ -180,3 +180,27 @@ describe('nota e execução das linhas empenhadas (migration 164)', () => {
     expect(avisosDoPedido(p, itens, HOJE, notas).find((a) => a.tipo === 'semNota')?.texto).toBe('1 linha sem nota de empenho');
   });
 });
+
+describe('etapa Contratado pelo Contratos.gov.br', () => {
+  const nota = (linhaId: string, extra: Partial<import('../../services/emendasService').NotaDaLinha> = {}) => ({
+    linhaId, nota: null, regra: null, motivo: null, contractKey: null, empenhoId: null, valorEmpenhado: null, valorLiquidado: null, valorPago: null,
+    entregaPrevista: null, entregaPrevistaValor: null, atualizadoEm: null, ...extra
+  });
+
+  it('conta por nota: contratado só quando toda nota tem contrato no sistema e o pedido foi à CCGA', async () => {
+    const { contratosDoPedido } = await import('../emendasPedidos');
+    const l1 = linha({ id: 'l1' }), l2 = linha({ id: 'l2' }), l3 = linha({ id: 'l3', contratoNumero: '00138/2026' });
+    const parcial = new Map([
+      ['l1', nota('l1', { nota: '2026NE000100', contractKey: '200331-00045-2026' })],
+      ['l2', nota('l2', { nota: '2026NE000100' })],
+      // Número da planilha sem contrato no sistema não conta.
+      ['l3', nota('l3', { nota: '2026NE000101', motivo: 'CONTRATO_FORA' })]
+    ]);
+    const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1, l2, l3] });
+    expect(contratosDoPedido(p, parcial)).toEqual({ notas: 2, comContrato: 1, contratos: ['200331-00045-2026'], contratado: false });
+    const completo = new Map(parcial).set('l3', nota('l3', { nota: '2026NE000101', contractKey: '200331-00138-2026' }));
+    expect(contratosDoPedido(p, completo).contratado).toBe(true);
+    expect(contratosDoPedido({ ...p, etapa: 'EMPENHADO' }, completo).contratado).toBe(false);
+    expect(contratosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [] }), completo).contratado).toBe(false);
+  });
+});
