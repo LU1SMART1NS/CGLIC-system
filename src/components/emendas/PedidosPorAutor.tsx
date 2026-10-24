@@ -8,7 +8,8 @@ import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteir
 import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { formatCurrency, formatNumber } from '../../utils/format';
-import { AUTOR_A_DEFINIR, jaEmpenhado, linhasAtivas, valorDoPedido } from '../../utils/emendasPedidos';
+import { AUTOR_A_DEFINIR, jaEmpenhado, linhasAtivas, valorDoPedidoNaEtapa } from '../../utils/emendasPedidos';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import type { AutorEmenda, ItemCaep, PedidoEmenda, TipoAutor } from '../../services/emendasService';
 import { AutorDoPedido } from './emendasPartes';
 
@@ -70,6 +71,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
   const [busca, setBusca] = useState('');
 
   const autorPorId = useMemo(() => new Map(autores.map((a) => [a.id, a])), [autores]);
+  const { precos } = usePrecosParaEmenda();
 
   const linhas: Linha[] = useMemo(() => {
     const m = new Map<string, Linha>();
@@ -77,7 +79,8 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
       // Reservas para órgãos (sem parlamentar ainda, migration 163) ficam juntas numa linha "Parlamentar a definir".
       const chave = p.autorId ?? '';
       const l = m.get(chave) ?? { autorId: p.autorId, autor: p.autorId ? autorPorId.get(p.autorId) : undefined, pedidos: 0, kits: 0, valor: 0, empenhado: 0 };
-      const v = valorDoPedido(p, itens);
+      // O da emenda depois da conferência; antes, o previsto pelos itens (o mesmo da lista de pedidos).
+      const v = valorDoPedidoNaEtapa(p, itens, precos).valor;
       l.pedidos++;
       l.valor += v;
       if (jaEmpenhado(p.etapa)) l.empenhado += v;
@@ -89,7 +92,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
     }
     // Sem pedido vem depois, em ordem alfabética.
     return [...m.values()].sort((a, b) => b.valor - a.valor || (a.autor?.nome ?? '').localeCompare(b.autor?.nome ?? '', 'pt-BR'));
-  }, [pedidos, autorPorId, itens, autores, mostrar]);
+  }, [pedidos, autorPorId, itens, autores, mostrar, precos]);
   const semPedido = useMemo(() => {
     const com = new Set(pedidos.map((p) => p.autorId));
     return autores.filter((a) => !com.has(a.id)).length;

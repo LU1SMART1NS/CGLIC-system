@@ -1941,3 +1941,127 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .reaj-mes span { color: var(--text-muted); font-size: 0.75rem; }
 .reaj-mes--focus { border-style: dashed; border-color: var(--color-warning); }
 .reaj-mes--focus b { color: var(--color-warning-text); }
+
+/* ===== Nova reserva das emendas (PedidoModal, protótipo aprovado em 24/10/2026) =====
+   Duas colunas com rolagem própria: à esquerda os itens e kits da CAEP, à direita o pedido; total no rodapé.
+   Abaixo de 860px as colunas viram abas (Itens da CAEP · Pedido). */
+.reserva-modal { height: min(92vh, 92dvh); max-height: min(92vh, 92dvh); }
+.reserva-modal .ds-modal__body { padding: 0; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+.reserva-colunas { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+.reserva-catalogo { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--bg-page, #f8fafc); border-right: 1px solid var(--color-border, #e2e8f0); }
+.reserva-catalogo__topo { padding: 0.9rem 1rem 0.6rem; display: flex; flex-direction: column; gap: 0.55rem; border-bottom: 1px solid var(--color-border, #e2e8f0); }
+.reserva-resultados { flex: 1; overflow-y: auto; padding: 0.6rem 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; overscroll-behavior: contain; }
+.reserva-pedido { min-height: 0; min-width: 0; overflow-y: auto; padding: 1rem 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.1rem; overscroll-behavior: contain; }
+.reserva-rotulo { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.reserva-opcional { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.reserva-mudo { font-size: 0.78rem; color: var(--text-muted); }
+.reserva-forte { color: var(--text-primary, #1e293b); font-weight: 700; }
+.reserva-texto { margin: 0; }
+.reserva-alerta { font-size: 0.78rem; color: var(--color-danger-text); font-weight: 600; }
+.reserva-ok { font-size: 0.78rem; color: var(--color-success-text); }
+.reserva-espaco { flex: 1; }
+.reserva-secao { display: flex; flex-direction: column; gap: 0.5rem; }
+.reserva-campo { width: 100%; box-sizing: border-box; padding: 0.55rem 0.75rem; border: 1px solid var(--color-border, #cbd5e1); border-radius: 8px; background: var(--surface, #fff); font: inherit; font-size: 0.85rem; }
+.reserva-campo:focus { outline: 2px solid var(--primary-light); border-color: var(--primary); }
+.reserva-erro { border-color: var(--color-danger) !important; }
+.reserva-busca { position: relative; }
+.reserva-busca svg { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.reserva-busca .reserva-campo { padding-left: 2.1rem; padding-right: 2.4rem; }
+.reserva-busca .reserva-tecla { position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); }
+.reserva-tecla { font: inherit; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); border: 1px solid var(--color-border, #cbd5e1); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.3rem; background: var(--surface, #fff); }
+.reserva-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.reserva-filtros__conta { margin-left: auto; }
+.reserva-chip { border: 1px solid var(--color-border, #cbd5e1); background: var(--surface, #fff); border-radius: 999px; padding: 0.2rem 0.75rem; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.reserva-chip[aria-pressed='true'] { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+.reserva-resultado { background: var(--surface, #fff); border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.6rem 0.75rem; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.6rem; align-items: center; }
+.reserva-resultado--off { opacity: 0.72; }
+.reserva-resultado--no-pedido { border-color: var(--primary); box-shadow: inset 3px 0 0 var(--primary); }
+.reserva-resultado__texto { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.reserva-resultado__titulo { font-weight: 600; font-size: 0.85rem; }
+.reserva-resultado__lado { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; }
+.reserva-duas-linhas { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.reserva-no-pedido { font-size: 0.72rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+.reserva-kit { display: inline-block; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.06em; background: var(--primary-light); color: var(--primary); border-radius: 4px; padding: 0 0.35rem; margin-right: 0.4rem; vertical-align: 1px; }
+.reserva-medidor { display: flex; align-items: center; gap: 0.5rem; }
+.reserva-medidor__barra { flex: 0 0 110px; height: 5px; background: var(--color-border, #e2e8f0); border-radius: 999px; overflow: hidden; }
+.reserva-medidor__barra i { display: block; height: 100%; background: var(--color-success); border-radius: 999px; }
+.reserva-medidor__barra i.reserva-pouco { background: var(--color-warning-solid); }
+.reserva-vazio { border: 1.5px dashed var(--color-border, #cbd5e1); border-radius: 10px; padding: 1rem; text-align: center; font-size: 0.82rem; color: var(--text-muted); }
+.reserva-segmentos { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; background: var(--bg-page, #f8fafc); }
+.reserva-segmentos button { border: 0; border-radius: 8px; padding: 0.5rem; background: none; font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--text-muted); cursor: pointer; }
+.reserva-segmentos button[aria-pressed='true'] { background: var(--surface, #fff); color: var(--text-primary, #1e293b); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15); }
+.reserva-autor { display: flex; align-items: center; gap: 0.75rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.55rem 0.75rem; }
+.reserva-avatar { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--primary-light); color: var(--primary); font-weight: 800; font-size: 0.78rem; }
+.reserva-autor__nome { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.reserva-autor__nome small, .reserva-lista small, .reserva-seletor__texto small { font-size: 0.75rem; color: var(--text-muted); }
+.reserva-lista { display: flex; flex-direction: column; }
+.reserva-lista--borda { border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; overflow: hidden; }
+.reserva-lista button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.05rem; text-align: left; border: 0; border-top: 1px solid var(--color-border, #f1f5f9); background: var(--surface, #fff); padding: 0.45rem 0.75rem; font: inherit; font-size: 0.85rem; cursor: pointer; }
+.reserva-lista button:first-child { border-top: 0; }
+.reserva-lista button:hover, .reserva-lista button:focus-visible, .reserva-lista button[aria-selected='true'] { background: var(--primary-light); }
+.reserva-lista__vazia { padding: 0.6rem 0.75rem; }
+.reserva-contato { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+.reserva-grade3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 0.6rem; }
+.reserva-seletor { position: relative; }
+.reserva-seletor__botao { width: 100%; display: flex; align-items: center; gap: 0.6rem; text-align: left; border: 1px solid var(--color-border, #cbd5e1); border-radius: 10px; padding: 0.5rem 0.75rem; background: var(--surface, #fff); font: inherit; font-size: 0.85rem; cursor: pointer; }
+.reserva-seletor__texto { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.reserva-seletor__lista { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface, #fff); border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18); padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.reserva-seletor__lista .reserva-lista { max-height: 240px; overflow-y: auto; border: 1px solid var(--color-border, #e2e8f0); border-radius: 8px; }
+.reserva-linha { border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.6rem 0.75rem; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.35rem 0.9rem; align-items: center; }
+.reserva-linha--erro { border-color: var(--color-danger-border); background: var(--color-danger-bg); }
+.reserva-linha--nova { animation: reserva-piscar 1.2s ease; }
+@keyframes reserva-piscar { from { background: var(--primary-light); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .reserva-linha--nova { animation: none; } }
+.reserva-linha__item { min-width: 0; }
+.reserva-linha__codigo { font-weight: 800; font-size: 0.82rem; color: var(--primary); }
+.reserva-linha__descricao { display: block; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; text-align: left; font: inherit; font-size: 0.82rem; color: var(--text-primary, #1e293b); cursor: pointer; }
+.reserva-linha__descricao--aberta { white-space: normal; }
+.reserva-linha__valor { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 120px; }
+.reserva-linha__valor small { display: block; font-weight: 500; font-size: 0.72rem; color: var(--text-muted); }
+.reserva-linha__pe { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.85rem; }
+.reserva-linha__seletor { grid-column: 1 / -1; }
+.reserva-passo { display: inline-flex; align-items: center; border: 1px solid var(--color-border, #cbd5e1); border-radius: 8px; overflow: hidden; background: var(--surface, #fff); }
+.reserva-passo button { width: 32px; height: 34px; border: 0; background: none; font-size: 1.05rem; font-weight: 600; color: var(--primary); cursor: pointer; }
+.reserva-passo button:disabled { color: var(--text-muted); opacity: 0.4; cursor: not-allowed; }
+.reserva-passo input { width: 52px; height: 34px; border: 0; border-inline: 1px solid var(--color-border, #cbd5e1); text-align: center; font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; background: none; }
+.reserva-etiqueta { display: inline-flex; align-items: center; border: 1px solid var(--color-border, #e2e8f0); background: var(--bg-page, #f8fafc); border-radius: 999px; padding: 0.05rem 0.6rem; font-size: 0.75rem; }
+.reserva-etiqueta--propria { background: var(--primary-light); border-color: transparent; color: var(--primary); font-weight: 600; }
+.reserva-sozinho { align-self: flex-start; }
+.reserva-notas { font-size: 0.75rem; color: var(--text-muted); background: var(--bg-page, #f8fafc); border-radius: 8px; padding: 0.5rem 0.75rem; }
+.reserva-notas ol { list-style: none; margin: 0.25rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.reserva-notas li span { display: inline-block; width: 0.9rem; font-weight: 800; color: var(--primary); }
+.reserva-aviso { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-weight: 600; padding: 0.5rem 0.7rem; border-radius: 6px; background: var(--color-info-bg); color: var(--color-info-text); }
+.reserva-aviso > span { flex: 1; min-width: 200px; }
+.reserva-quadro summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; color: var(--primary); margin-bottom: 0.5rem; }
+.reserva-recado { position: absolute; left: 50%; bottom: 0.75rem; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 0.75rem; max-width: calc(100% - 2rem); background: var(--surface, #fff); border: 1px solid var(--color-info-border); border-radius: 10px; padding: 0.45rem 0.6rem 0.45rem 0.9rem; font-size: 0.82rem; font-weight: 600; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22); }
+.reserva-recado__celular { display: none; }
+.reserva-abas { display: none; }
+.reserva-modal .ds-modal__footer { display: block; }
+.reserva-rodape { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; }
+.reserva-total { flex: 1; min-width: 220px; font-variant-numeric: tabular-nums; }
+.reserva-total b { font-size: 1.1rem; font-weight: 800; }
+.reserva-total__rotulo { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-right: 0.2rem; }
+.reserva-botoes { display: flex; gap: 0.5rem; }
+.reserva-falta { flex-basis: 100%; background: var(--color-danger-bg); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.82rem; font-weight: 600; }
+.reserva-falta .reserva-link--falta { color: var(--color-danger-text); font-size: inherit; padding: 0; min-height: 0; height: auto; }
+.reserva-confirmar { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; background: var(--color-warning-bg); border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem; }
+.reserva-confirmar > span { flex: 1; min-width: 200px; font-weight: 600; color: var(--color-warning-text); }
+@media (max-width: 860px) {
+  .reserva-abas { display: flex; gap: 0.4rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--color-border, #e2e8f0); }
+  .reserva-abas button { flex: 1; min-height: 40px; border: 1px solid var(--color-border, #cbd5e1); border-radius: 8px; background: var(--surface, #fff); font: inherit; font-weight: 700; cursor: pointer; }
+  .reserva-abas button[aria-selected='true'] { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .reserva-colunas { grid-template-columns: minmax(0, 1fr); }
+  .reserva-colunas[data-lado='itens'] .reserva-pedido, .reserva-colunas[data-lado='pedido'] .reserva-catalogo { display: none; }
+  .reserva-catalogo { border-right: 0; }
+  .reserva-pedido { padding: 0.9rem 0.85rem 1.25rem; }
+  .reserva-busca .reserva-tecla { display: none; }
+  .reserva-linha { grid-template-columns: minmax(0, 1fr) auto; }
+  .reserva-linha__valor { grid-column: 1 / -1; text-align: left; display: flex; gap: 0.5rem; align-items: baseline; }
+  .reserva-recado__celular { display: inline; }
+}
+@media (max-width: 480px) {
+  .reserva-modal { height: calc(100dvh - 12px); max-height: calc(100dvh - 12px); }
+  .reserva-modal .ds-modal__footer > * { width: auto; min-height: 0; }
+  .reserva-botoes { width: 100%; }
+  .reserva-botoes > * { flex: 1; min-height: 44px; justify-content: center; }
+}

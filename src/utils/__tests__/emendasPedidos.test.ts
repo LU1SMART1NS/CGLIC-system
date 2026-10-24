@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { avisosDoPedido, itensDaLinha, numerosSei, proximaAcao, reservadoPorItem, rodadaDoPedido, seiDaEtapa, valorDoPedido } from '../emendasPedidos';
+import { avisosDoPedido, itensDaLinha, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, rodadaDoPedido, seiDaEtapa, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { calcularKit } from '../emendasKits';
+import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
 
 const HOJE = '2026-10-23';
@@ -32,6 +34,25 @@ describe('pedidos das emendas', () => {
     const p2 = pedido({ etapa: 'CANCELADO', linhas: [linha({ itemKey: 'a', quantidade: 50 })] });
     expect(Object.fromEntries(reservadoPorItem([p1, p2]))).toEqual({ a: 15, b: 20 });
     expect(reservadoPorItem([p1, p2], p1.id).size).toBe(0);
+  });
+
+  it('valor pelo preço previsto para a emenda quando vêm os preços (o mesmo do quadro), e pelo de hoje sem eles', () => {
+    const precos = new Map<string, PrecoPrevisto>([
+      ['a', { itemKey: 'a', precoAtual: 100, precoPrevisto: 104.02, motivo: 'PREVISTO', devido: false, efeito: '2026-12-01', percentual: 4.02, mesesEstimados: null }]
+    ]);
+    expect(precoParaEmenda('a', itens, precos)).toMatchObject({ previsto: 104.02, hoje: 100 });
+    // Item sem preço previsto: vale o de hoje.
+    expect(precoParaEmenda('b', itens, precos)).toMatchObject({ previsto: 10, hoje: 10 });
+    expect(valorDaLinha(kit, itens, precos)).toBe(10 * 104.02 + 20 * 10);
+    expect(valorDaLinha(kit, itens)).toBe(10 * 100 + 20 * 10);
+    expect(calcularKit({ ativo: true, itens: kit.kitComposicao! }, itens, HOJE, (i) => i.alocado, precos)).toMatchObject({ valorPorKit: 124.02, valorPorKitHoje: 120 });
+  });
+
+  it('valor do pedido nas telas: o da emenda depois da conferência; antes, o previsto', () => {
+    const precos = new Map<string, PrecoPrevisto>([['a', { itemKey: 'a', precoAtual: 100, precoPrevisto: 110, motivo: 'DEVIDO', devido: true, efeito: null, percentual: 10, mesesEstimados: null }]]);
+    const p = pedido({ linhas: [linha({ itemKey: 'a', quantidade: 3 })] });
+    expect(valorDoPedidoNaEtapa(p, itens, precos)).toEqual({ valor: 330, fonte: 'PREVISTO' });
+    expect(valorDoPedidoNaEtapa({ ...p, etapa: 'CONFERIDO', siopValor: 320 }, itens, precos)).toEqual({ valor: 320, fonte: 'EMENDA' });
   });
 
   it('valor pelo preço da ata', () => {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
-import { carteiraDescricaoItem, carteiraDetalhe, carteiraFornecedor, carteiraIdentificacao, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDescricaoItem, carteiraDetalhe, carteiraFornecedor, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
@@ -203,3 +203,26 @@ export const AConferirDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'aConferir' |
       A conferir: {linha.aConferir}
     </div>
   ) : null;
+
+/**
+ * Valor pelo preço previsto para a emenda (o mesmo do quadro do parlamentar), com o de hoje embaixo quando muda e o
+ * motivo ao passar o mouse.
+ */
+export const ValorPrevisto: React.FC<{ previsto: number; hoje: number; nota?: string | null; marca?: string; testId?: string }> = ({ previsto, hoje, nota, marca, testId }) => (
+  <span title={nota ?? undefined} data-testid={testId} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+    <span style={carteiraNumero}>
+      {formatCurrency(previsto)}
+      {marca}
+    </span>
+    {Math.abs(previsto - hoje) > 0.004 && <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>hoje {formatCurrency(hoje)}</span>}
+  </span>
+);
+
+/** Valor do pedido: o da emenda no SIOP depois da conferência; antes, o previsto pelos itens (ver valorDoPedidoNaEtapa). */
+export const ValorDoPedido: React.FC<{ valor: number; fonte: 'EMENDA' | 'PREVISTO' }> = ({ valor, fonte }) => (
+  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }} title={fonte === 'EMENDA' ? 'Valor da emenda no SIOP' : 'Previsto pelos itens, com o reajuste das atas (o mesmo do quadro do parlamentar)'}>
+    <span style={carteiraNumero}>{formatCurrency(valor)}</span>
+    <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{fonte === 'EMENDA' ? 'da emenda' : 'previsto'}</span>
+  </span>
+);
+

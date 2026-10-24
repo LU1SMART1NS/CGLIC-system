@@ -17,9 +17,11 @@ import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useKitsEmendas, usePed
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, rotuloItemDaAta } from '../../utils/emendasKits';
-import { ItemDaAta, VigenciaDaAta } from './emendasPartes';
+import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
+import { notaDoPreco } from '../../utils/emendasQuadro';
 import { DadosItemModal } from './DadosItemModal';
-import { AUTOR_A_DEFINIR, identificacaoDoPedido, itensDaLinha, linhasAtivas, ROTULO_ETAPA } from '../../utils/emendasPedidos';
+import { AUTOR_A_DEFINIR, identificacaoDoPedido, itensDaLinha, linhasAtivas, precoParaEmenda, ROTULO_ETAPA } from '../../utils/emendasPedidos';
 import type { EtapaPedido, ItemCaep } from '../../services/emendasService';
 
 type Segmento = 'com' | 'sem' | 'encerrada' | 'todos';
@@ -31,7 +33,8 @@ interface Uso {
   origem: string;
   quantidade: number;
 }
-type Linha = ItemCaep & { reservado: number; saldo: number; usos: Uso[] };
+/** previsto/hoje: preço unitário para a emenda (o do quadro do parlamentar) e o de hoje; nota: por que mudou. */
+type Linha = ItemCaep & { reservado: number; saldo: number; usos: Uso[]; previsto: number; hoje: number; nota: string | null };
 
 // Ordenação pelo cabeçalho, como nas carteiras (?ordem=); sem escolha, pela descrição do item.
 const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
@@ -41,7 +44,7 @@ const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
   alocado: { value: (l) => l.alocado, firstDir: 'desc' },
   reservado: { value: (l) => l.reservado, firstDir: 'desc' },
   saldo: { value: (l) => l.saldo, firstDir: 'desc' },
-  valor: { value: (l) => l.valorUnitario, firstDir: 'desc' }
+  valor: { value: (l) => l.previsto, firstDir: 'desc' }
 };
 
 interface Props {
@@ -62,6 +65,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
   const { data: autores = [] } = useAutoresEmendas();
   const { data: kits = [] } = useKitsEmendas();
   const hoje = hojeEmBrasilia();
+  const { precos, ipca } = usePrecosParaEmenda();
   const [segmento, setSegmento] = useState<Segmento>('com');
   // Vindo do Início (saldo livre perto do fim): ?busca= já filtra o item.
   const [searchParams] = useSearchParams();
@@ -83,12 +87,14 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
         }
       }
     }
+    const porChave = new Map(itens.map((i) => [i.itemKey, i]));
     return itens.map((i) => {
       const u = (usos.get(i.itemKey) ?? []).sort((a, b) => b.quantidade - a.quantidade);
       const reservado = u.reduce((s, x) => s + x.quantidade, 0);
-      return { ...i, reservado, saldo: i.alocado - reservado, usos: u };
+      const preco = precoParaEmenda(i.itemKey, porChave, precos);
+      return { ...i, reservado, saldo: i.alocado - reservado, usos: u, previsto: preco.previsto, hoje: preco.hoje, nota: notaDoPreco(preco.preco, ipca) };
     });
-  }, [itens, pedidos]);
+  }, [itens, pedidos, precos, ipca]);
 
   const situacao = (l: Linha): Segmento => (l.ataEncerrada ? 'encerrada' : l.saldo > 0 ? 'com' : 'sem');
   const contagem = useMemo(() => {
@@ -101,8 +107,9 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
   const filtradas = (buscarItensCaep(doSegmento, busca) as Linha[]).sort((a, b) => descricaoItemEmFrase(a.descricao).localeCompare(descricaoItemEmFrase(b.descricao), 'pt-BR'));
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ORDEM);
   const vigentes = linhas.filter((l) => !l.ataEncerrada);
-  const valorAlocado = vigentes.reduce((s, l) => s + l.alocado * l.valorUnitario, 0);
-  const valorReservado = vigentes.reduce((s, l) => s + Math.min(l.reservado, l.alocado) * l.valorUnitario, 0);
+  // O alocado é o que a CAEP tem hoje (preço de hoje); o reservado vai para as emendas (preço previsto, o do quadro).
+  const valorAlocado = vigentes.reduce((s, l) => s + l.alocado * l.hoje, 0);
+  const valorReservado = vigentes.reduce((s, l) => s + Math.min(l.reservado, l.alocado) * l.previsto, 0);
   const kitsDoItem = (k: string) => kits.filter((x) => x.ativo && x.itens.some((i) => i.itemKey === k));
 
   // Vindo do kit: o trilho vai para a situação do item e a linha aberta entra na tela.
@@ -177,7 +184,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
       sortFirstDir: 'desc',
       render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero, color: l.saldo <= 0 ? 'var(--text-muted)' : undefined }}>{formatNumber(l.saldo)}</span>
     },
-    { key: 'valor', header: 'Valor unitário', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatCurrency(l.valorUnitario)}</span> }
+    { key: 'valor', header: 'Valor previsto', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <ValorPrevisto previsto={l.previsto} hoje={l.hoje} nota={l.nota} /> }
   ];
 
   return (
@@ -185,7 +192,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
       <PageHeader
         title="Itens e kits"
         subtitle="Quanto de cada item alocado à CAEP já foi reservado a parlamentares."
-        hint="Reservado soma os pedidos que não foram cancelados, em qualquer etapa, com os kits abertos nos seus itens. Saldo = alocado à CAEP − reservado. Para ter mais de um item, peça a alocação ao gestor de saldo. Clique na linha para ver quem reservou e em quais kits o item entra."
+        hint="Reservado soma os pedidos que não foram cancelados, em qualquer etapa, com os kits abertos nos seus itens. Saldo = alocado à CAEP − reservado. O valor unitário é o previsto para a emenda, com o reajuste da ata (o mesmo do quadro do parlamentar); embaixo, o preço de hoje. Para ter mais de um item, peça a alocação ao gestor de saldo. Clique na linha para ver quem reservou e em quais kits o item entra."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={seletor}
         actions={<HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />}
@@ -196,7 +203,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, onAbrirKit
         ariaLabel="Saldo dos itens"
         active={segmento}
         onSelect={setSegmento}
-        meta={valorAlocado > 0 ? `${formatCurrency(valorReservado)} reservados de ${formatCurrency(valorAlocado)} alocados (atas vigentes)` : undefined}
+        meta={valorAlocado > 0 ? `${formatCurrency(valorReservado)} reservados pelo preço previsto · ${formatCurrency(valorAlocado)} alocados pelo preço de hoje (atas vigentes)` : undefined}
         segments={[
           { id: 'com', label: 'Com saldo', count: contagem.com, dot: 'var(--color-success)' },
           { id: 'sem', label: 'Sem saldo', count: contagem.sem, dot: 'var(--color-warning-solid)' },
