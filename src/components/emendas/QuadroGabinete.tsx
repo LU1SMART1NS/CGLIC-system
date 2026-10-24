@@ -3,9 +3,9 @@ import { Copy, MessageCircle } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
 import { Tabs } from '../../design-system/components/Tabs';
 import { useToast } from '../../design-system/components/Toast';
-import { useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
-import { usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
-import { ataEItem, brl, COLUNAS, htmlDaTabela, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
+import { hojeEmBrasilia, useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
+import { useIpcaDozeMeses, usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
+import { aplicarPrazoDoEmpenho, ataEItem, brl, COLUNAS, htmlDaTabela, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AutorEmenda } from '../../services/emendasService';
 
 const borda = '1px solid #000';
@@ -66,6 +66,8 @@ interface Props {
   linhas: LinhaDoPedidoNoQuadro[];
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
+  /** Ofício devolvido: o prazo do novo ofício conta daqui. */
+  devolvidoEm?: string | null;
   testId?: string;
 }
 
@@ -73,11 +75,13 @@ interface Props {
  * Quadro da reserva para o parlamentar (migration 165): o Anexo que a CAEP manda ao parlamentar, pronto para colar no
  * Word ou no SEI (tabela) ou no WhatsApp (texto). O valor unitário já vem com o reajuste previsto da ata.
  */
-export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 'emendas-quadro' }) => {
+export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvidoEm, testId = 'emendas-quadro' }) => {
   const toast = useToast();
   const { data: itensLista = [] } = useItensCaep();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
   const { data: precos, isError: semPrecos } = usePrecosPrevistos();
+  const { data: ipca } = useIpcaDozeMeses();
+  const hoje = hojeEmBrasilia();
   const [aba, setAba] = useState<'sei' | 'whatsapp'>('sei');
 
   const quadro = useMemo(
@@ -86,11 +90,13 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
         autor,
         linhas,
         data,
+        devolvidoEm,
         itens: new Map(itensLista.map((i) => [i.itemKey, i])),
         beneficiarios: new Map(beneficiariosLista.map((b) => [b.id, b])),
-        precos: precos ?? new Map()
+        precos: aplicarPrazoDoEmpenho(precos ?? new Map(), hoje, ipca),
+        ipca
       }),
-    [autor, linhas, data, itensLista, beneficiariosLista, precos]
+    [autor, linhas, data, devolvidoEm, itensLista, beneficiariosLista, precos, hoje, ipca]
   );
   const texto = useMemo(() => textoParaWhatsapp(quadro), [quadro]);
   const html = useMemo(() => htmlDaTabela(quadro), [quadro]);
@@ -119,7 +125,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxWidth: 560 }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary)' }}>Quadro para o parlamentar</span>
           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary, #334155)' }}>
-            No formato do Anexo: uma linha por item e beneficiário, kit aberto nos seus itens. O valor unitário já vem com o reajuste previsto da ata.
+            No formato do Anexo: uma linha por item e beneficiário, kit aberto nos seus itens; o mesmo item para vários beneficiários aparece uma vez só. O valor unitário já inclui o reajuste da ata que pode valer até o empenho provável (90 dias); ata sem data-base leva a folga do IPCA de 12 meses.
           </span>
         </div>
         <Tabs
@@ -172,11 +178,13 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
             <tbody>
               {quadro.linhas.map((l, i) => (
                 <tr key={i}>
-                  <td style={celula}>
-                    <b>{l.descricao}</b>
-                    {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
-                    {l.kit && <div style={abaixo}>({l.kit})</div>}
-                  </td>
+                  {l.linhasDoItem > 0 && (
+                    <td style={celula} rowSpan={l.linhasDoItem}>
+                      <b>{l.descricao}</b>
+                      {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
+                      {l.kit && <div style={abaixo}>({l.kit})</div>}
+                    </td>
+                  )}
                   <td style={celula}>
                     {l.beneficiario ? (
                       <>
@@ -193,11 +201,12 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
                     {l.endereco && <div style={abaixo}>{l.endereco}</div>}
                   </td>
                   <td style={celula}>{l.quantidade}</td>
-                  <td style={celulaValor}>
-                    {brl(l.unitario)}
-                    {l.marca && <sup>{l.marca}</sup>}
-                    {l.unitario !== l.hoje && <div style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.75rem' }}>hoje {brl(l.hoje)}</div>}
-                  </td>
+                  {l.linhasDoItem > 0 && (
+                    <td style={celulaValor} rowSpan={l.linhasDoItem}>
+                      {brl(l.unitario)}
+                      {l.marca && <sup>{l.marca}</sup>}
+                    </td>
+                  )}
                   <td style={celulaValor}>{brl(l.total)}</td>
                 </tr>
               ))}

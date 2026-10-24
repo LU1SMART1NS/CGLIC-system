@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlDaTabela, montarQuadro, nomeDoItem, notaDoPreco, textoParaWhatsapp, tituloDoAnexo, type LinhaDoPedidoNoQuadro } from '../emendasQuadro';
+import { brl, htmlDaTabela, montarQuadro, nomeDoItem, notaDoPreco, numeroEmEmoji, textoParaWhatsapp, tituloDoAnexo, type LinhaDoPedidoNoQuadro } from '../emendasQuadro';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep } from '../../services/emendasService';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 
@@ -107,13 +107,15 @@ describe('quadro da reserva (Anexo)', () => {
     expect(htmlDaTabela(montarQuadro({ autor, linhas: [linhas[2]], itens, beneficiarios: new Map([['b2', { ...cbm, nome: '<b>x</b>' }]]), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
-  it('WhatsApp: lista com negrito no total', () => {
+  it('WhatsApp: numerado por beneficiário com o valor dele; sem título, ata, endereço nem notas; a definir no fim', () => {
     const t = textoParaWhatsapp(q);
-    expect(t.split('\n')[0]).toBe('*Anexo I – Indicação de Romário (Senado Federal · RJ)*');
-    expect(t).toContain('• 10 × Tablet\n  Ata 00043/2026 · item 00005\n  10º Batalhão de Polícia Militar · 10º BPM\n  Entrega: Rio de Janeiro - RJ · Rua X, 100 · Centro · CEP 20000-000\n  R$ 1.598,76 ¹ = *R$ 15.987,60*');
-    expect(t).toContain('• 2 × Drone\n  Ata 00031/2025 · item 00001\n  Corpo de Bombeiros Militar · CBMERJ\n  Entrega: RJ\n');
-    expect(t).toContain('• 100 × Colchonete\n  Ata 00031/2025 · item 00001\n  beneficiário a definir');
-    expect(t).toContain(`*TOTAL A EMPENHAR: R$ `);
+    expect(t.startsWith('📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · 23/10/2026*\n⏳ *Enviar o ofício até 22/11/2026*\n\n1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
+    expect(t).toContain('2️⃣ *Corpo de Bombeiros Militar · CBMERJ* · RJ: *R$ 94.317,66*\n• 2 Drone\n\n');
+    expect(t).toContain('3️⃣ *Beneficiário a definir*');
+    for (const fora of ['Anexo I', 'Ata ', 'Rua X', 'IPCA', '¹']) expect(t).not.toContain(fora);
+    expect(t).toContain('• 2 Mesa flexora (Kit Academia):');
+    expect(t.endsWith(`💰 *Total: ${brl(q.total)}*`)).toBe(true);
+    expect(numeroEmEmoji(12)).toBe('1️⃣2️⃣');
   });
 });
 
@@ -136,5 +138,80 @@ describe('títulos, nomes e notas', () => {
     expect(notaDoPreco(preco('x', { motivo: 'SEM_PREVISAO' }))).toContain('considerar folga');
     expect(notaDoPreco(preco('x', { motivo: 'EM_DIA' }))).toBeNull();
     expect(notaDoPreco(undefined)).toBeNull();
+  });
+});
+
+describe('mesmo item para vários beneficiários', () => {
+  const varios: LinhaDoPedidoNoQuadro[] = [
+    { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 2, beneficiarioId: 'b1' },
+    { tipo: 'ITEM', itemKey: 'tablet', kitNome: null, kitComposicao: null, quantidade: 10, beneficiarioId: 'b1' },
+    { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 1, beneficiarioId: 'b2' },
+    { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 3, beneficiarioId: null },
+    // No kit o mesmo item fica à parte (outra origem).
+    { tipo: 'KIT', itemKey: null, kitNome: 'Kit Patrulha', kitComposicao: [{ itemKey: 'suv', quantidade: 1 }], quantidade: 1, beneficiarioId: 'b2' }
+  ];
+  const qv = montarQuadro({ autor, linhas: varios, itens, beneficiarios: new Map([['b1', pm], ['b2', cbm]]), precos, data: '2026-10-23' });
+
+  it('junta as linhas do item na ordem em que ele aparece; a primeira diz quantas são', () => {
+    expect(qv.linhas.map((l) => [l.descricao, l.beneficiario, l.quantidade, l.linhasDoItem])).toEqual([
+      ['Camioneta/SUV médio', '10º Batalhão de Polícia Militar', 2, 3],
+      ['Camioneta/SUV médio', 'Corpo de Bombeiros Militar', 1, 0],
+      ['Camioneta/SUV médio', null, 3, 0],
+      ['Tablet', '10º Batalhão de Polícia Militar', 10, 1],
+      ['Camioneta/SUV médio', 'Corpo de Bombeiros Militar', 1, 1]
+    ]);
+    expect(qv.total).toBe(Math.round((7 * 191811.62 + 10 * 1598.76) * 100) / 100);
+  });
+
+  it('Tabela: item e valor unitário com rowspan, uma vez só', () => {
+    const h = htmlDaTabela(qv);
+    expect(h).toContain('rowspan="3"');
+    expect(h.match(/Camioneta\/SUV médio/g)).toHaveLength(2);
+  });
+
+  it('WhatsApp: o mesmo item aparece em cada beneficiário', () => {
+    const t = textoParaWhatsapp(qv);
+    expect(t).toContain('*10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 399.610,84*\n• 2 Camioneta/SUV médio: R$ 383.623,24\n• 10 Tablet');
+    expect(t).toContain('*Beneficiário a definir*: *R$ 575.434,86*\n• 3 Camioneta/SUV médio');
+  });
+});
+
+describe('preço pelo empenho provável (90 dias)', () => {
+  it('reajuste até o empenho entra; depois dele, preço de hoje; sem base, folga do IPCA; devido sempre', async () => {
+    const { aplicarPrazoDoEmpenho } = await import('../emendasQuadro');
+    const ipca = { percentual: 4.5, de: '2025-10-01', ate: '2026-09-01' };
+    const m = aplicarPrazoDoEmpenho(
+      new Map([
+        ['perto', preco('perto', { precoAtual: 100, precoPrevisto: 104, motivo: 'PREVISTO', efeito: '2027-01-01', percentual: 4 })],
+        ['longe', preco('longe', { precoAtual: 100, precoPrevisto: 104, motivo: 'SE_PRORROGAR', efeito: '2027-03-01', percentual: 4 })],
+        ['devido', preco('devido', { precoAtual: 100, precoPrevisto: 110, motivo: 'PREVISTO', devido: true, efeito: '2027-06-01', percentual: 5 })],
+        ['sembase', preco('sembase', { precoAtual: 200, precoPrevisto: 200, motivo: 'SEM_PREVISAO' })],
+        ['emdia', preco('emdia', { precoAtual: 50, precoPrevisto: 50, motivo: 'EM_DIA' })]
+      ]),
+      '2026-10-24',
+      ipca
+    );
+    expect(m.get('perto')).toMatchObject({ precoPrevisto: 104, motivo: 'PREVISTO' });
+    expect(m.get('longe')).toMatchObject({ precoPrevisto: 100, motivo: 'FORA_DO_PRAZO' });
+    expect(m.get('devido')).toMatchObject({ precoPrevisto: 110 });
+    expect(m.get('sembase')).toMatchObject({ precoPrevisto: 209, motivo: 'FOLGA_IPCA', percentual: 4.5 });
+    expect(m.get('emdia')).toMatchObject({ precoPrevisto: 50 });
+    expect(notaDoPreco(m.get('sembase'), ipca)).toBe('Ata sem data-base de reajuste informada: folga do IPCA dos últimos 12 meses (4,50%, 10/2025 a 09/2026).');
+    expect(notaDoPreco(m.get('longe'))).toBeNull();
+    // Sem o IPCA, o item sem base fica como estava (preço de hoje com o aviso).
+    expect(aplicarPrazoDoEmpenho(new Map([['sembase', preco('sembase', { precoAtual: 200, precoPrevisto: 200, motivo: 'SEM_PREVISAO' })]]), '2026-10-24', null).get('sembase')?.motivo).toBe('SEM_PREVISAO');
+  });
+});
+
+describe('prazo do ofício', () => {
+  it('reserva + 30 dias, ou antes, o prazo de indicação da ata que termina primeiro', () => {
+    expect(q.prazoDoOficio).toEqual({ data: '2026-11-22', pela: 'RESERVA', ata: null });
+    const perto = new Map(itens).set('drone', item('drone', { nomeCurto: 'Drone', valorUnitario: 45200, numeroAta: '00099/2024', vigenciaFinal: '2026-12-10' }));
+    const q2 = montarQuadro({ autor, linhas, itens: perto, beneficiarios: new Map(), precos, data: '2026-10-23' });
+    // 10/12/2026 − 35 dias = 05/11/2026, menos 5 dias para a CAEP registrar = 31/10/2026, antes de 22/11.
+    expect(q2.prazoDoOficio).toEqual({ data: '2026-10-31', pela: 'ATA', ata: '00099/2024' });
+    expect(textoParaWhatsapp(q2)).toContain('⏳ *Enviar o ofício até 31/10/2026*');
+    // Ofício devolvido: os 30 dias contam da devolução.
+    expect(montarQuadro({ autor, linhas, itens, beneficiarios: new Map(), precos, data: '2026-09-01', devolvidoEm: '2026-10-20' }).prazoDoOficio?.data).toBe('2026-11-19');
   });
 });

@@ -356,7 +356,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           </div>
         )}
 
-        {linhas.length > 0 && <QuadroGabinete autor={autor} linhas={linhas} data={pedido?.reservadoEm ?? hoje} />}
+        {linhas.length > 0 && <QuadroGabinete autor={autor} linhas={linhas} data={pedido?.reservadoEm ?? hoje} devolvidoEm={pedido?.devolvidoEm} />}
 
         {tirou > 0 && (
           <AppInput label="Por que as linhas foram tiradas?" placeholder="Ex.: parlamentar desistiu do item; ata vencida sem substituto" value={motivo} onChange={(e) => setMotivo(e.target.value)} />

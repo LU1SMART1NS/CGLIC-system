@@ -234,7 +234,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
         )}
 
         {modo === 'MINUTA' && (
-          <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} testId="emendas-etapa-quadro" />
+          <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} devolvidoEm={pedido.devolvidoEm} testId="emendas-etapa-quadro" />
         )}
 
         {modo === 'AUTORIZADO' && (
