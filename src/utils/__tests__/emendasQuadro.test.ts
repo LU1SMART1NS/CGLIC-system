@@ -128,6 +128,10 @@ describe('títulos, nomes e notas', () => {
     expect(tituloDoAnexo({ tipo: 'BANCADA', uf: 'DF' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Bancada do Distrito Federal');
     expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulano', uf: 'PR' } as AutorEmenda)).toBe('Tabela 1 – Indicação do(a) Deputado(a) Fulano (PR)');
     expect(tituloDoAnexo(null)).toBe('Tabela 1 – Reserva de itens (parlamentar a definir)');
+    expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulana', uf: 'SP', sexo: 'F' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Deputada Fulana (SP)');
+    expect(tituloDoAnexo({ tipo: 'DEPUTADO', nome: 'Fulano', uf: 'PR', sexo: 'M' } as AutorEmenda)).toBe('Tabela 1 – Indicação do Deputado Fulano (PR)');
+    expect(tituloDoAnexo({ tipo: 'SENADOR', nome: 'Beltrana', uf: 'MS', sexo: 'F' } as AutorEmenda)).toBe('Tabela 1 – Indicação da Senadora Beltrana (MS)');
+    expect(tituloDoAnexo({ tipo: 'SENADOR', nome: 'Romário', uf: 'RJ', sexo: 'M' } as AutorEmenda)).toBe('Tabela 1 – Indicação do Senador Romário (RJ)');
   });
 
   it('nome do item: nome curto, ou o começo da descrição', () => {

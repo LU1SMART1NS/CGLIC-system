@@ -7,6 +7,10 @@
  * Senado: /senador/lista/atual = os 81 no cargo; /senador/lista/legislatura/{n} = 245 nomes, com suplentes que
  * nunca assumiram. Só entram os que têm exercício no mandato (126 de 245 em 23/10/2026).
  *
+ * Sexo (migration 176, título "do Deputado"/"da Deputada"): a Câmara não o traz na lista; vem de duas leituras com
+ * siglaSexo=F e =M desde o início da legislatura (com idLegislatura a API esgota o tempo). Falha dessas leituras deixa
+ * o sexo vazio, e o banco mantém o que já tinha. O Senado traz SexoParlamentar na própria lista.
+ *
  * Quem sai do cargo continua no cadastro (em_exercicio = falso), porque as indicações dele não somem.
  * Nada é apagado; falha de qualquer das fontes não grava aquela casa.
  */
@@ -35,6 +39,7 @@ export interface AutorDaFonte {
   legislatura: number;
   url_foto: string | null;
   email: string | null;
+  sexo: 'M' | 'F' | null;
 }
 
 type Json = Record<string, unknown>;
@@ -59,6 +64,27 @@ async function deputadosDaPagina(base: string, fetcher: typeof fetch): Promise<J
   return todos;
 }
 
+/** 1º de fevereiro do ano em que a legislatura começa (a 57ª em 2023). */
+export const inicioDaLegislatura = (legislatura: number): string => `${1995 + 4 * (legislatura - 50)}-02-01`;
+
+/** Sexo dos deputados que passaram pela legislatura; vazio se a Câmara não responder. */
+async function sexoDosDeputados(legislatura: number, fetcher: typeof fetch): Promise<Map<string, 'M' | 'F'>> {
+  const m = new Map<string, 'M' | 'F'>();
+  try {
+    for (const sexo of ['F', 'M'] as const) {
+      for (const d of await deputadosDaPagina(`${URL_CAMARA}?siglaSexo=${sexo}&dataInicio=${inicioDaLegislatura(legislatura)}`, fetcher)) {
+        m.set(String(d.id), sexo);
+      }
+    }
+  } catch (err) {
+    console.warn('[autoresEmendas] sexo dos deputados:', mensagemDeErro(err));
+    return new Map();
+  }
+  return m;
+}
+
+const sexoDoSenado = (v: unknown): 'M' | 'F' | null => (v === 'Feminino' ? 'F' : v === 'Masculino' ? 'M' : null);
+
 /** Deputados da legislatura atual, marcando quem está no cargo hoje. */
 export async function lerDeputados(fetcher: typeof fetch = fetch): Promise<{ legislatura: number; autores: AutorDaFonte[] }> {
   const noCargo = await deputadosDaPagina(URL_CAMARA, fetcher);
@@ -68,6 +94,7 @@ export async function lerDeputados(fetcher: typeof fetch = fetch): Promise<{ leg
   const daLegislatura = await deputadosDaPagina(`${URL_CAMARA}?idLegislatura=${legislatura}`, fetcher);
   const porId = new Map<string, Json>();
   for (const d of [...daLegislatura, ...noCargo]) porId.set(String(d.id), d);
+  const sexos = await sexoDosDeputados(legislatura, fetcher);
   const autores: AutorDaFonte[] = [];
   for (const [id, d] of porId) {
     const nome = texto(d.nome);
@@ -83,7 +110,8 @@ export async function lerDeputados(fetcher: typeof fetch = fetch): Promise<{ leg
       em_exercicio: idsNoCargo.has(id),
       legislatura,
       url_foto: texto(d.urlFoto),
-      email: texto(d.email)
+      email: texto(d.email),
+      sexo: sexos.get(id) ?? null
     });
   }
   return { legislatura, autores };
@@ -119,7 +147,8 @@ export async function lerSenadores(legislatura: number, fetcher: typeof fetch = 
       em_exercicio: false,
       legislatura,
       url_foto: null,
-      email: null
+      email: null,
+      sexo: sexoDoSenado(i.SexoParlamentar)
     });
   }
   for (const p of noCargo) {
@@ -135,7 +164,8 @@ export async function lerSenadores(legislatura: number, fetcher: typeof fetch = 
       uf: texto(i.UfParlamentar)?.toUpperCase() ?? null,
       em_exercicio: true,
       url_foto: texto(i.UrlFotoParlamentar),
-      email: texto(i.EmailParlamentar)
+      email: texto(i.EmailParlamentar),
+      sexo: sexoDoSenado(i.SexoParlamentar) ?? autores.get(codigo)?.sexo ?? null
     } as AutorDaFonte);
   }
   return [...autores.values()];
@@ -156,8 +186,10 @@ export async function contarAutoresEmendas(fetcher: typeof fetch = fetch): Promi
     legislatura,
     deputados: autores.length,
     deputadosNoCargo: autores.filter((a) => a.em_exercicio).length,
+    deputadosComSexo: autores.filter((a) => a.sexo).length,
     senadores: senadores.length,
-    senadoresNoCargo: senadores.filter((a) => a.em_exercicio).length
+    senadoresNoCargo: senadores.filter((a) => a.em_exercicio).length,
+    senadoresComSexo: senadores.filter((a) => a.sexo).length
   };
 }
 

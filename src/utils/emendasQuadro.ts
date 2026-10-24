@@ -130,9 +130,11 @@ export function nomeDoItem(item: ItemCaep | undefined, itemKey: string): string 
 export function tituloDoAnexo(autor: AutorEmenda | null | undefined): string {
   if (!autor) return 'Tabela 1 – Reserva de itens (parlamentar a definir)';
   if (autor.tipo === 'BANCADA') return `Tabela 1 – Indicação da Bancada ${ESTADO[autor.uf ?? ''] ?? autor.uf ?? ''}`.trim();
-  // O cadastro não traz o sexo do parlamentar: "do(a) Deputado(a)" até a fonte trazer.
-  const cargo = autor.tipo === 'SENADOR' ? 'Senador(a)' : 'Deputado(a)';
-  return `Tabela 1 – Indicação do(a) ${cargo} ${autor.nome}${autor.uf ? ` (${autor.uf})` : ''}`;
+  // Sexo das fontes (Câmara e Senado, migration 176); sem ele, "do(a) Deputado(a)".
+  const senador = autor.tipo === 'SENADOR';
+  const cargo =
+    autor.sexo === 'F' ? `da ${senador ? 'Senadora' : 'Deputada'}` : autor.sexo === 'M' ? `do ${senador ? 'Senador' : 'Deputado'}` : `do(a) ${senador ? 'Senador(a)' : 'Deputado(a)'}`;
+  return `Tabela 1 – Indicação ${cargo} ${autor.nome}${autor.uf ? ` (${autor.uf})` : ''}`;
 }
 
 /** Dias entre o quadro e o empenho provável (estimativa da CAEP): reajuste depois disso não entra no preço. */
