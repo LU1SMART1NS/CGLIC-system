@@ -72,4 +72,15 @@ describe('Início do gestor de emendas', () => {
     expect(prazoDoAviso(vencendo.avisos[0], vencendo.itemDoAviso, HOJE)).toBe('indicar até 05/11/2026');
     expect(prazoDoAviso(empenhado.avisos[0], null, HOJE)).toBe('procurar a nota pelo contrato');
   });
+
+  it('itens sem nome curto: só os alocados à CAEP em ata vigente, da ata que acaba antes', () => {
+    const lista = [
+      item('com', { nomeCurto: 'Pistola' }),
+      item('branco', { nomeCurto: '  ', vigenciaFinal: '2027-01-10' }),
+      item('novo', { nomeCurto: null }),
+      item('zerado', { alocado: 0 }),
+      item('encerrado', { ataEncerrada: true })
+    ];
+    expect(resumoInicioEmendas([], lista, new Map(), HOJE).semNomeCurto.map((i) => i.itemKey)).toEqual(['branco', 'novo']);
+  });
 });

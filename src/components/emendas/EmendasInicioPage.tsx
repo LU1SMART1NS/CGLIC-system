@@ -9,20 +9,23 @@ import { DataTable, type Column } from '../../design-system/components/DataTable
 import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { SectionHeader } from '../../design-system/components/SectionHeader';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
-import { PainelBotoesGavetas, PainelGaveta } from '../instrumentos/PainelGavetas';
-import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useNotasDasLinhas, usePedidosEmendas } from '../../hooks/useEmendas';
+import { PainelBotoesGavetas, PainelGaveta, type PainelGavetaId } from '../instrumentos/PainelGavetas';
+import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useNotasDasLinhas, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
 import { formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import { AVISO_SEM_OFICIO_DIAS, avisoGrave, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_ETAPA, ROTULO_ETAPA, type TipoAviso } from '../../utils/emendasPedidos';
+import { nomeDoItem } from '../../utils/emendasQuadro';
 import { prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
 import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha } from '../../services/emendasService';
 import { AutorDoPedido, ItemDaAta } from './emendasPartes';
+import { DadosItemModal } from './DadosItemModal';
 
 type Aba = 'todas' | TipoAviso;
 
@@ -95,7 +98,9 @@ export const EmendasInicioPage: React.FC = () => {
   const { data: autores = [] } = useAutoresEmendas();
   const hoje = hojeEmBrasilia();
   const [aba, setAba] = useState<Aba>('todas');
-  const [gavetaAberta, setGavetaAberta] = useState(true);
+  const [gavetaAberta, setGavetaAberta] = useState<PainelGavetaId | null>('saldoLivre');
+  const podeGerir = usePodeGerirEmendas();
+  const [editando, setEditando] = useState<ItemCaep | null>(null);
 
   const carregando = isLoading || carregandoItens;
   const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje), [pedidos, itensLista, notas, hoje]);
@@ -234,6 +239,18 @@ export const EmendasInicioPage: React.FC = () => {
     }
   ];
 
+  const colunasSemNome: Column<ItemCaep>[] = [
+    { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (i) => i.descricao, render: (i) => <ItemDaAta item={i} /> },
+    {
+      key: 'quadro',
+      header: 'Sai no quadro hoje',
+      minWidth: '200px',
+      render: (i) => <span style={carteiraValor}>{nomeDoItem(i, i.itemKey)}</span>
+    },
+    { key: 'alocado', header: 'Alocado', align: 'right', nowrap: true, sortValue: (i) => i.alocado, sortFirstDir: 'desc', render: (i) => <span style={carteiraNumero}>{formatNumber(i.alocado)}</span> },
+    { key: 'fim', header: 'Fim da ata', nowrap: true, sortValue: (i) => i.vigenciaFinal, render: (i) => <span style={carteiraValor}>{dataBR(i.vigenciaFinal)}</span> }
+  ];
+
   const valor = (n: number) => (carregando ? '—' : formatNumber(n));
 
   return (
@@ -241,7 +258,7 @@ export const EmendasInicioPage: React.FC = () => {
       <PageHeader
         title={role === 'gestor_emendas' ? 'Início' : 'Emendas'}
         subtitle="Pedidos dos parlamentares e saldo da CAEP que pedem atenção."
-        hint={`Os avisos são os mesmos da lista de Pedidos: ata encerrada antes do empenho, prazo de indicação vencido (a menos de ${corteIndicacaoDias()} dias do fim da ata), divergência com o SIOP, mais de ${AVISO_SEM_OFICIO_DIAS} dias sem ofício, ata vencendo em até ${avisoIndicacaoDias()} dias, linhas empenhadas sem nota e linhas a conferir com o controle anterior da CAEP. Os dois prazos ficam em Ajustes > Regras de Alertas. Saldo livre = alocado à CAEP − reservado nos pedidos, só nas atas vigentes.`}
+        hint={`Os avisos são os mesmos da lista de Pedidos: ata encerrada antes do empenho, prazo de indicação vencido (a menos de ${corteIndicacaoDias()} dias do fim da ata), divergência com o SIOP, mais de ${AVISO_SEM_OFICIO_DIAS} dias sem ofício, ata vencendo em até ${avisoIndicacaoDias()} dias, linhas empenhadas sem nota e linhas a conferir com o controle anterior da CAEP. Os dois prazos ficam em Ajustes > Regras de Alertas. Saldo livre = alocado à CAEP − reservado nos pedidos, só nas atas vigentes. Item sem nome curto: alocado à CAEP em ata vigente e ainda sem o nome que sai no quadro do parlamentar.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={recarregar} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-inicio-atualizar" tooltipTitle="Recarregar pedidos, notas e saldo" />}
       />
@@ -288,16 +305,21 @@ export const EmendasInicioPage: React.FC = () => {
                 ? `nenhum item com ata vencendo em até ${avisoIndicacaoDias()} dias`
                 : `${plural(r.livrePertoDoFim.length, 'item', 'itens')} com ata vencendo em até ${avisoIndicacaoDias()} dias${passaramDoCorte ? ` · ${formatNumber(passaramDoCorte)} já passaram do prazo de indicação` : ''}`,
             atencao: r.livrePertoDoFim.length > 0
+          },
+          {
+            id: 'semNomeCurto',
+            resumo: carregando ? undefined : r.semNomeCurto.length === 0 ? 'todos com nome curto' : `${plural(r.semNomeCurto.length, 'item', 'itens')} sem o nome do quadro`,
+            atencao: r.semNomeCurto.length > 0
           }
         ]}
-        aberta={gavetaAberta ? 'saldoLivre' : null}
-        onToggle={() => setGavetaAberta((v) => !v)}
+        aberta={gavetaAberta}
+        onToggle={(id) => setGavetaAberta((v) => (v === id ? null : id))}
       />
-      {gavetaAberta && (
+      {gavetaAberta === 'saldoLivre' && (
         <PainelGaveta
           id="saldoLivre"
           subtitulo={`Saldo da CAEP que ainda não foi reservado a nenhum parlamentar. Depois do prazo de indicação (${corteIndicacaoDias()} dias antes do fim da ata) não dá mais para reservar; o gestor de saldo pode remanejar.`}
-          onFechar={() => setGavetaAberta(false)}
+          onFechar={() => setGavetaAberta(null)}
         >
           {r.livrePertoDoFim.length === 0 ? (
             <div style={carteiraSubtitle}>{carregando ? 'Carregando…' : 'Nenhum item com saldo livre perto do fim da ata.'}</div>
@@ -313,6 +335,32 @@ export const EmendasInicioPage: React.FC = () => {
           )}
         </PainelGaveta>
       )}
+      {gavetaAberta === 'semNomeCurto' && (
+        <PainelGaveta
+          id="semNomeCurto"
+          subtitulo="Itens que chegaram à CAEP em atas vigentes sem o nome curto. Sem ele, o quadro do parlamentar mostra o começo da descrição do catálogo."
+          onFechar={() => setGavetaAberta(null)}
+        >
+          {r.semNomeCurto.length === 0 ? (
+            <div style={carteiraSubtitle}>{carregando ? 'Carregando…' : 'Todos os itens das atas vigentes já têm nome curto.'}</div>
+          ) : (
+            <DataTable<ItemCaep>
+              testId="emendas-inicio-sem-nome"
+              className="data-table-container--flush"
+              data={r.semNomeCurto}
+              keyExtractor={(i) => i.itemKey}
+              columns={colunasSemNome}
+              rowOpen={(i) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${i.numeroAta} item ${Number(i.numeroItem)}`)}`)}
+              rowActions={
+                podeGerir
+                  ? (i) => <ActionButton action="editar" iconOnly label={`Nome curto e GND de ${nomeDoItem(i, i.itemKey)}`} onClick={() => setEditando(i)} data-testid={`emendas-inicio-nome-${i.itemKey}`} />
+                  : undefined
+              }
+            />
+          )}
+        </PainelGaveta>
+      )}
+      {editando && <DadosItemModal item={editando} onClose={() => setEditando(null)} />}
 
       <SectionHeader
         title="Pendências dos pedidos"
