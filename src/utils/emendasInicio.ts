@@ -1,6 +1,7 @@
 /**
  * Início do gestor de emendas (protótipo aprovado em 23/10/2026): o que pede atenção nos pedidos e no saldo da CAEP.
- * Usa os mesmos avisos da lista de Pedidos (avisosDoPedido); a única conta nova é o saldo livre perto do fim da ata.
+ * Usa os mesmos avisos da lista de Pedidos (avisosDoPedido); as contas novas são o saldo livre perto do fim da ata e os
+ * itens que chegaram à CAEP sem nome curto (no quadro do parlamentar sai o começo da descrição do catálogo).
  */
 import type { EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
 import { avisoIndicacaoDias, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from './emendasKits';
@@ -51,6 +52,8 @@ export interface ResumoInicioEmendas {
   reservado: number;
   livre: number;
   livrePertoDoFim: ItemLivrePertoDoFim[];
+  /** Itens com alocação para a CAEP em ata vigente e sem nome curto: a CAEP cadastra antes de oferecer ao parlamentar. */
+  semNomeCurto: ItemCaep[];
 }
 
 const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'divergencia', 'semOficio', 'ataVencendo', 'semNota', 'aConferir'];
@@ -129,6 +132,9 @@ export function resumoInicioEmendas(pedidos: PedidoEmenda[], itensLista: ItemCae
     livrePertoDoFim.push({ item: i, livre: sobra, diasParaVencer: dias, indicarAte: limiteDaIndicacao(i.vigenciaFinal), passouDoCorte: passouDoCorte(dias) });
   }
   livrePertoDoFim.sort((a, b) => a.diasParaVencer - b.diasParaVencer || b.livre - a.livre);
+  const semNomeCurto = vigentes
+    .filter((i) => i.alocado > 0 && !i.nomeCurto?.trim())
+    .sort((a, b) => (a.vigenciaFinal ?? '9999-12-31').localeCompare(b.vigenciaFinal ?? '9999-12-31') || a.descricao.localeCompare(b.descricao, 'pt-BR'));
 
   return {
     pedidosComAviso,
@@ -143,7 +149,8 @@ export function resumoInicioEmendas(pedidos: PedidoEmenda[], itensLista: ItemCae
     alocado,
     reservado,
     livre,
-    livrePertoDoFim
+    livrePertoDoFim,
+    semNomeCurto
   };
 }
 
