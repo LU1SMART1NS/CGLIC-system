@@ -10,7 +10,10 @@ const item = (k: string, extra: Partial<ItemCaep>): ItemCaep => ({
 const preco = (k: string, extra: Partial<PrecoPrevisto>): PrecoPrevisto => ({
   itemKey: k, precoAtual: 100, precoPrevisto: 100, motivo: 'EM_DIA', devido: false, efeito: null, percentual: null, mesesEstimados: null, ...extra
 });
-const pm = { id: 'b1', razaoSocial: 'Secretaria de Estado de Polícia Militar do Rio de Janeiro', entregaMunicipio: 'Rio de Janeiro', entregaUf: 'RJ' } as BeneficiarioEmenda;
+const pm = {
+  id: 'b1', nome: '10º Batalhão de Polícia Militar', sigla: '10º BPM', razaoSocial: 'RJ GOV POLICIA MILITAR', entregaMunicipio: 'Rio de Janeiro', entregaUf: 'RJ',
+  entregaLogradouro: 'Rua X', entregaNumero: '100', entregaComplemento: null, entregaBairro: 'Centro', entregaCep: '20000000'
+} as BeneficiarioEmenda;
 const cbm = { id: 'b2', nome: 'Corpo de Bombeiros Militar', sigla: 'CBMERJ', razaoSocial: null, entregaMunicipio: null, entregaUf: 'RJ' } as BeneficiarioEmenda;
 const autor = { id: 'S:1', tipo: 'SENADOR', nome: 'Romário', uf: 'RJ' } as AutorEmenda;
 
@@ -49,10 +52,16 @@ describe('quadro da reserva (Anexo)', () => {
     ]);
   });
 
-  it('beneficiário do cadastro (razão social ou nome) ou a definir', () => {
-    expect(q.linhas[0]).toMatchObject({ beneficiario: pm.razaoSocial, municipio: 'Rio de Janeiro - RJ' });
+  it('beneficiário: nome, sigla e razão social; entrega: cidade e endereço; ou a definir', () => {
+    expect(q.linhas[0]).toMatchObject({
+      beneficiario: '10º Batalhão de Polícia Militar', sigla: '10º BPM', razaoSocial: 'RJ GOV POLICIA MILITAR',
+      entrega: 'Rio de Janeiro - RJ', endereco: 'Rua X, 100 · Centro · CEP 20000-000'
+    });
     expect(q.linhas[0]).not.toHaveProperty('orgao');
-    expect(q.linhas[2]).toMatchObject({ beneficiario: 'Corpo de Bombeiros Militar', municipio: 'RJ' });
+    expect(q.linhas[2]).toMatchObject({ beneficiario: 'Corpo de Bombeiros Militar', sigla: 'CBMERJ', razaoSocial: null, entrega: 'RJ', endereco: null });
+    const igual = montarQuadro({ autor, linhas: [linhas[0]], itens, beneficiarios: new Map([['b1', { ...pm, razaoSocial: '10º BATALHÃO DE POLÍCIA MILITAR', entregaLogradouro: null }]]), precos, data: '2026-10-23' });
+    expect(igual.linhas[0]).toMatchObject({ razaoSocial: null, endereco: null });
+    expect(q.semEndereco).toBe(1);
     expect(q.semBeneficiario).toBe(3);
     expect(q.semNomeCurto).toBe(0);
   });
@@ -83,21 +92,26 @@ describe('quadro da reserva (Anexo)', () => {
     expect(so4.porGnd).toEqual([]);
   });
 
-  it('SEI: ata, item e as 6 colunas do Anexo (sem ÓRGÃO) e a linha TOTAL A EMPENHAR', () => {
+  it('SEI: 6 colunas, item com ata embaixo, beneficiário com sigla e razão social, entrega com endereço e TOTAL A EMPENHAR', () => {
     const html = htmlParaSei(q);
-    for (const h of ['ATA', 'ITEM', 'DESCRIÇÃO ITEM', 'BENEFICIÁRIO FINAL', 'MUNICÍPIO', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
+    for (const h of ['ITEM', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
+    expect(html.match(/<th /g)).toHaveLength(6);
     expect(html).toContain('R$ 1.598,76<sup>¹</sup>');
     expect(html).toContain('(Kit Academia)');
-    expect(html).toContain('>00043/2026</td><td style="border:1px solid #000;padding:4px 6px;text-align:center;">00005</td>');
+    expect(html).toContain('<b>Tablet</b><br><span style="font-size:8pt">Ata 00043/2026 · item 00005</span>');
+    expect(html).toContain('<b>10º Batalhão de Polícia Militar</b> · <span style="white-space:nowrap">10º BPM</span><br><span style="font-size:8pt">RJ GOV POLICIA MILITAR</span>');
+    expect(html).toContain('<b>Rio de Janeiro - RJ</b><br><span style="font-size:8pt">Rua X, 100 · Centro · CEP 20000-000</span>');
+    expect(html).not.toContain('MUNICÍPIO');
     expect(html).not.toContain('ÓRGÃO');
-    expect(html.match(/colspan="7"/g)).toHaveLength(3);
+    expect(html.match(/colspan="5"/g)).toHaveLength(3);
     expect(htmlParaSei(montarQuadro({ autor, linhas: [linhas[2]], itens, beneficiarios: new Map([['b2', { ...cbm, nome: '<b>x</b>' }]]), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
   it('WhatsApp: lista com negrito no total', () => {
     const t = textoParaWhatsapp(q);
     expect(t.split('\n')[0]).toBe('*Anexo I – Indicação de Romário (Senado Federal · RJ)*');
-    expect(t).toContain('• 10 × Tablet\n  Ata 00043/2026 · item 00005\n  Secretaria de Estado de Polícia Militar do Rio de Janeiro — Rio de Janeiro - RJ\n  R$ 1.598,76 ¹ = *R$ 15.987,60*');
+    expect(t).toContain('• 10 × Tablet\n  Ata 00043/2026 · item 00005\n  10º Batalhão de Polícia Militar · 10º BPM\n  Entrega: Rio de Janeiro - RJ · Rua X, 100 · Centro · CEP 20000-000\n  R$ 1.598,76 ¹ = *R$ 15.987,60*');
+    expect(t).toContain('• 2 × Drone\n  Ata 00031/2025 · item 00001\n  Corpo de Bombeiros Militar · CBMERJ\n  Entrega: RJ\n');
     expect(t).toContain('• 100 × Colchonete\n  Ata 00031/2025 · item 00001\n  beneficiário a definir');
     expect(t).toContain(`*TOTAL A EMPENHAR: R$ `);
   });
