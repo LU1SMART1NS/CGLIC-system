@@ -75,6 +75,8 @@ export interface LinhaQuadro {
 export interface Quadro {
   titulo: string;
   subtitulo: string;
+  /** Linha "Fonte:" embaixo da tabela, como em documento oficial. */
+  fonte: string;
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
   /**
@@ -128,10 +130,10 @@ export function nomeDoItem(item: ItemCaep | undefined, itemKey: string): string 
 }
 
 export function tituloDoAnexo(autor: AutorEmenda | null | undefined): string {
-  if (!autor) return 'Anexo I – Reserva de itens (parlamentar a definir)';
-  if (autor.tipo === 'BANCADA') return `Anexo I – Indicação da Bancada ${ESTADO[autor.uf ?? ''] ?? autor.uf ?? ''}`.trim();
+  if (!autor) return 'Tabela 1 – Reserva de itens (parlamentar a definir)';
+  if (autor.tipo === 'BANCADA') return `Tabela 1 – Indicação da Bancada ${ESTADO[autor.uf ?? ''] ?? autor.uf ?? ''}`.trim();
   const casa = autor.tipo === 'SENADOR' ? 'Senado Federal' : 'Câmara dos Deputados';
-  return `Anexo I – Indicação de ${autor.nome} (${casa}${autor.uf ? ` · ${autor.uf}` : ''})`;
+  return `Tabela 1 – Indicação de ${autor.nome} (${casa}${autor.uf ? ` · ${autor.uf}` : ''})`;
 }
 
 /** Dias entre o quadro e o empenho provável (estimativa da CAEP): reajuste depois disso não entra no preço. */
@@ -291,6 +293,7 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
   return {
     titulo: tituloDoAnexo(e.autor),
     subtitulo: `CAEP/SENASP · reserva de ${dataBR(e.data)}`,
+    fonte: `Fonte: ComprasSUSP/SENASP/MJSP, reserva de itens de ${dataBR(e.data)}.`,
     data: e.data,
     prazoDoOficio: prazoDoOficio(e),
     linhas,
@@ -344,7 +347,10 @@ export function htmlDaTabela(q: Quadro): string {
     q.porGnd.map((g) => subtotal(g.rotulo, g.total)).join('') +
     `<tr><td colspan="${COLUNAS.length - 1}" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${tdValor}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
     '</tbody></table>' +
-    (q.notas.length ? `<p style="font-size:9pt">${q.notas.map(escapar).join('<br>')}</p>` : '')
+    // Embaixo da tabela, como em documento oficial: a fonte e, depois, as notas.
+    `<p style="font-size:9pt;margin:4px 0 0">${escapar(q.fonte)}` +
+    (q.notas.length ? `<br>${q.notas.length === 1 ? 'Nota' : 'Notas'}:<br>${q.notas.map(escapar).join('<br>')}` : '') +
+    '</p>'
   );
 }
 
