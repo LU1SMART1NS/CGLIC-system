@@ -75,8 +75,6 @@ export interface LinhaQuadro {
 export interface Quadro {
   titulo: string;
   subtitulo: string;
-  /** Linha "Fonte:" embaixo da tabela, como em documento oficial. */
-  fonte: string;
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
   /**
@@ -293,7 +291,6 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
   return {
     titulo: tituloDoAnexo(e.autor),
     subtitulo: `CAEP/SENASP · reserva de ${dataBR(e.data)}`,
-    fonte: `Fonte: ComprasSUSP/SENASP/MJSP, reserva de itens de ${dataBR(e.data)}.`,
     data: e.data,
     prazoDoOficio: prazoDoOficio(e),
     linhas,
@@ -334,7 +331,7 @@ export function htmlDaTabela(q: Quadro): string {
     `<td style="${td}">${l.beneficiario ? `<b>${escapar(l.beneficiario)}</b>${l.sigla ? ` · <span style="white-space:nowrap">${escapar(l.sigla)}</span>` : ''}${abaixo(l.razaoSocial)}` : A_DEFINIR}</td>` +
     `<td style="${td}">${l.entrega ? `<b>${escapar(l.entrega)}</b>` : A_DEFINIR}${abaixo(l.endereco)}</td>` +
     `<td style="${td}">${l.quantidade}</td>` +
-    (l.linhasDoItem ? `<td${juntar(l)} style="${tdValor}">${brl(l.unitario)}${l.marca ? `<sup>${l.marca}</sup>` : ''}</td>` : '') +
+    (l.linhasDoItem ? `<td${juntar(l)} style="${tdValor}">${brl(l.unitario)}</td>` : '') +
     `<td style="${tdValor}">${brl(l.total)}</td>` +
     '</tr>';
   const subtotal = (rotulo: string, v: number) => `<tr><td colspan="${COLUNAS.length - 1}" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${tdValor}"><b>${brl(v)}</b></td></tr>`;
@@ -346,11 +343,7 @@ export function htmlDaTabela(q: Quadro): string {
     q.linhas.map(linha).join('') +
     q.porGnd.map((g) => subtotal(g.rotulo, g.total)).join('') +
     `<tr><td colspan="${COLUNAS.length - 1}" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${tdValor}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
-    '</tbody></table>' +
-    // Embaixo da tabela, como em documento oficial: a fonte e, depois, as notas.
-    `<p style="font-size:9pt;margin:4px 0 0">${escapar(q.fonte)}` +
-    (q.notas.length ? `<br>${q.notas.length === 1 ? 'Nota' : 'Notas'}:<br>${q.notas.map(escapar).join('<br>')}` : '') +
-    '</p>'
+    '</tbody></table>'
   );
 }
 

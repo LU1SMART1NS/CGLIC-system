@@ -64,7 +64,7 @@ function copiarPelaSelecao(html: string | null, texto: string): void {
 
 /** Explicação do ⓘ ao lado do título. */
 const AJUDA_DO_QUADRO =
-  'A Tabela 1 é para colar no Word ou no SEI, com a fonte e as notas embaixo: cada item aparece uma vez, com uma linha para cada beneficiário, e os kits ' +
+  'A Tabela 1 é para colar no Word ou no SEI: cada item aparece uma vez, com uma linha para cada beneficiário, e os kits ' +
   'já vêm abertos nos seus itens. O texto é a versão curta para mandar ao parlamentar pelo WhatsApp. Os valores já incluem o ' +
   'reajuste que a ata pode ter até o empenho, para não faltar recurso. O prazo do ofício é de 30 dias, ou menos quando alguma ' +
   'ata está perto de vencer.';
@@ -209,7 +209,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
                   {l.linhasDoItem > 0 && (
                     <td style={celulaValor} rowSpan={l.linhasDoItem}>
                       {brl(l.unitario)}
-                      {l.marca && <sup>{l.marca}</sup>}
                     </td>
                   )}
                   <td style={celulaValor}>{brl(l.total)}</td>
@@ -231,14 +230,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
               </tr>
             </tbody>
           </table>
-          {/* Embaixo da tabela, como em documento oficial: a fonte e, depois, as notas. */}
-          <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--color-text-secondary, #334155)', display: 'flex', flexDirection: 'column', gap: '0.15rem' }} data-testid={`${testId}-fonte`}>
-            <span>{quadro.fonte}</span>
-            {quadro.notas.length > 0 && <span>{quadro.notas.length === 1 ? 'Nota' : 'Notas'}:</span>}
-            {quadro.notas.map((n) => (
-              <span key={n}>{n}</span>
-            ))}
-          </div>
         </div>
       ) : (
         <div style={{ background: '#efeae2', borderRadius: 8, padding: '0.9rem', display: 'flex' }} data-testid={`${testId}-whatsapp`}>

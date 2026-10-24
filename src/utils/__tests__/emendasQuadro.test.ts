@@ -96,11 +96,11 @@ describe('quadro da reserva (Anexo)', () => {
     const html = htmlDaTabela(q);
     for (const h of ['ITEM', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
     expect(html.match(/<th /g)).toHaveLength(6);
-    // Documento oficial: título em cima, fonte e notas embaixo.
+    // Título em cima da tabela.
     expect(html.indexOf('Tabela 1 – Indicação de Romário')).toBeLessThan(html.indexOf('<table'));
-    expect(html.indexOf('Fonte: ComprasSUSP/SENASP/MJSP, reserva de itens de 23/10/2026.')).toBeGreaterThan(html.indexOf('</table>'));
-    expect(html).toContain('Notas:<br>¹ ');
-    expect(html).toContain('R$ 1.598,76<sup>¹</sup>');
+    // Sem fonte nem notas embaixo, e sem a marca da nota no preço.
+    expect(html.endsWith('</tbody></table>')).toBe(true);
+    expect(html).toContain('R$ 1.598,76</td>');
     expect(html).not.toContain('Kit Academia');
     expect(html).toContain('<b>Tablet</b><br><span style="font-size:8pt">Ata 00043/2026 · item 00005</span>');
     expect(html).toContain('<b>10º Batalhão de Polícia Militar</b> · <span style="white-space:nowrap">10º BPM</span><br><span style="font-size:8pt">RJ GOV POLICIA MILITAR</span>');
