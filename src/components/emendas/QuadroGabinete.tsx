@@ -3,7 +3,6 @@ import { Copy, MessageCircle } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
 import { Tabs } from '../../design-system/components/Tabs';
 import { InfoHint } from '../../design-system/components/InfoHint';
-import { corteIndicacaoDias } from '../../utils/emendasKits';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
 import { useIpcaDozeMeses, usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
@@ -63,14 +62,12 @@ function copiarPelaSelecao(html: string | null, texto: string): void {
   if (!ok) throw new Error('O navegador não deixou copiar. Selecione o quadro e use Ctrl+C.');
 }
 
-/** Explicação do ⓘ ao lado do título (o corte da ata vem de Ajustes). */
-const AJUDA_DO_QUADRO = () =>
-  'Tabela: o Anexo I para colar no Word ou no SEI, uma linha por beneficiário; o mesmo item aparece uma vez só, e o kit vem ' +
-  'aberto nos seus itens, somados ao mesmo item avulso. Texto: a versão curta para o WhatsApp do parlamentar, por beneficiário, com o prazo do ofício. ' +
-  'Valor unitário: inclui o reajuste da ata que pode valer até o empenho provável (90 dias); se a ata ainda não tem a ' +
-  'data-base do reajuste, leva a folga do IPCA dos últimos 12 meses, para não faltar recurso no empenho. Prazo do ofício: ' +
-  `30 dias da reserva (ou da devolução do ofício) ou, se vier antes, o fim da ata menos ${corteIndicacaoDias()} dias e menos ` +
-  '5 para a CAEP registrar o ofício.';
+/** Explicação do ⓘ ao lado do título. */
+const AJUDA_DO_QUADRO =
+  'A tabela é o Anexo I para colar no Word ou no SEI: cada item aparece uma vez, com uma linha para cada beneficiário, e os kits ' +
+  'já vêm abertos nos seus itens. O texto é a versão curta para mandar ao parlamentar pelo WhatsApp. Os valores já incluem o ' +
+  'reajuste que a ata pode ter até o empenho, para não faltar recurso. O prazo do ofício é de 30 dias, ou menos quando alguma ' +
+  'ata está perto de vencer.';
 
 interface Props {
   autor: AutorEmenda | null | undefined;
@@ -135,7 +132,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary)' }}>Quadro para o parlamentar</span>
-          <InfoHint label="Como o quadro é montado" testId={`${testId}-ajuda`} content={AJUDA_DO_QUADRO()} />
+          <InfoHint label="Como o quadro é montado" testId={`${testId}-ajuda`} content={AJUDA_DO_QUADRO} />
         </div>
         <Tabs
           ariaLabel="Formato do quadro"
