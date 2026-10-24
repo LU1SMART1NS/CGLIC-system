@@ -18,6 +18,7 @@ import { AjustarLinhaModal, IncluirLinhaModal, RegistrarEnvioModal } from './Pre
 import { PrevistoPagoMes } from './PrevistoPagoMes';
 import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 import { useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 
 interface FiltrosPrevisaoMes {
@@ -154,7 +155,7 @@ export const PrevisaoMes: React.FC = () => {
 
       {envio ? (
         <NoticeBar tone="success" testId="previsao-enviada">
-          Previsão de {rotuloDoMes(mes)} enviada em {dataBR(envio.enviadoEm)} (SEI {envio.sei}
+          Previsão de {rotuloDoMes(mes)} enviada em {dataBR(envio.enviadoEm)} (<NumeroSeiEtiqueta numero={envio.sei} testId="previsao-envio-sei" />
           {envio.enviadoPorNome ? `, por ${envio.enviadoPorNome}` : ''}) · {envio.linhas.length} linhas · {formatCurrency(envio.total)}. Se mudar algo,
           {podeRegistrarEnvio ? 'registre o envio de novo.' : 'avise o coordenador para registrar o envio de novo.'}
         </NoticeBar>

@@ -41,6 +41,7 @@ import { useOrgaosRecolhidos } from './useOrgaosRecolhidos';
 import { useGruposDasUasgs } from '../../hooks/useGruposGti';
 import { GtiTag } from '../gti/GtiVisual';
 import type { GrupoDaFatia } from '../../config/gruposGti';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 export interface QuantitativosTabProps {
   itemKey: string;
@@ -372,7 +373,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       action={p.podeInformar ? <AppButton variant="outline" size="sm" onClick={() => setInformando(true)} data-testid="corrigir-ata-assinada">Corrigir qtd. da ata assinada</AppButton> : undefined}
     >
       <StatusBadge label="Informado" variant="success" size="sm" dot={false} />{' '}
-      Quantidades da ata assinada informadas por <b>{q.informadoPorNome}</b> em {q.informadoEm ? formatDataHoraBR(q.informadoEm) : '—'}. Documento SEI nº <b>{q.documentoSei}</b>.{' '}
+      Quantidades da ata assinada informadas por <b>{q.informadoPorNome}</b> em {q.informadoEm ? formatDataHoraBR(q.informadoEm) : '—'}. {q.documentoSei && <>Documento <NumeroSeiEtiqueta numero={q.documentoSei} testId="ata-assinada-sei" /></>}{' '}
       <AppButton variant="ghost" size="xs" onClick={() => setVerRegistros((v) => !v)} data-testid="ver-alteracoes-ata-assinada">
         {verRegistros ? 'Fechar alterações' : `Ver alterações (${q.registros.length})`}
       </AppButton>
@@ -436,7 +437,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }} data-testid="alteracoes-ata-assinada">
           {q.registros.map((r) => (
             <div key={r.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 0.65rem', background: 'var(--surface)' }}>
-              <b>{formatDataHoraBR(r.informadoEm)}</b> · {r.informadoPorNome} · documento SEI nº {r.documentoSei} · total {formatNumber(r.total)} · {r.justificativa ? `“${r.justificativa}”` : 'primeiro registro'}
+              <b>{formatDataHoraBR(r.informadoEm)}</b> · {r.informadoPorNome} · documento <NumeroSeiEtiqueta numero={r.documentoSei} testId="ata-assinada-registro-sei" /> · total {formatNumber(r.total)} · {r.justificativa ? `“${r.justificativa}”` : 'primeiro registro'}
             </div>
           ))}
         </div>

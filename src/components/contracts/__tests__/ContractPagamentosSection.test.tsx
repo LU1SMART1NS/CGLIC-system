@@ -332,7 +332,7 @@ describe('PaymentCyclePanel', () => {
   it('mostra os documentos recebidos e o Id. SEI do atesto', () => {
     const html = renderPanel(baseCycle);
     expect(html).toContain('Termo de Atesto · Nota Fiscal Eletrônica nº 1234');
-    expect(html).toContain('Id. SEI:');
+    expect(html).toContain('data-testid="payment-atesto-sei"');
     expect(html).toContain('12345678');
     expect(html).toContain('chegou em');
     expect(html).not.toContain('Competência');

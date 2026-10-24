@@ -76,7 +76,8 @@ describe('QuantitativosTab', () => {
     expect(h).toContain('livre para alocar 45');
     expect(h).toContain('Saldo da cota própria');
     expect(h).toContain('registrado − contratado: 111');
-    expect(h).toContain('Documento SEI nº <b>12345678</b>');
+    expect(h).toContain('data-testid="ata-assinada-sei"');
+    expect(h).toContain('12345678');
   });
 
   it('a linha da SENASP já vem aberta com as unidades internas', () => {

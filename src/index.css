@@ -1302,6 +1302,17 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
   }
 }
 
+/* Número SEI (NumeroSeiEtiqueta): pílula clara, sem borda, com o copiar discreto */
+.sei-pilula {
+  display: inline-flex; align-items: center; gap: 0.35rem; width: max-content; max-width: 100%;
+  padding: 0.1rem 0.15rem 0.1rem 0.55rem; border-radius: 999px; background: var(--primary-light);
+  font-size: 0.75rem; line-height: 1.4; vertical-align: middle;
+}
+.sei-pilula__rotulo { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.04em; color: var(--primary); }
+.sei-pilula__numero { color: #0f172a; font-weight: 500; font-variant-numeric: tabular-nums; user-select: all; }
+.sei-pilula .sei-pilula__copiar { --btn-h: 20px; --btn-fg: #64748b; --btn-hover: rgba(var(--primary-rgb), 0.12); border-radius: 999px; min-height: 20px; min-width: 0; }
+@media (hover: hover) { .sei-pilula:hover .sei-pilula__copiar { --btn-fg: var(--primary); } }
+
 /* Alvos de toque em telas estreitas */
 @media (max-width: 767px) {
   button { min-height: 44px; }
@@ -1859,7 +1870,43 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 /* Tabela de Beneficiários (Emendas): células de várias linhas alinhadas pelo topo */
 .emendas-tabela-topo .ds-table td { vertical-align: top; }
 /* Detalhe do pedido (Emendas › Pedidos): linhas e etapas lado a lado; em tela estreita, uma embaixo da outra */
-@media (max-width: 1100px) { .emendas-detalhe-pedido { grid-template-columns: 1fr !important; } }
+@media (max-width: 1100px) { .emendas-detalhe-pedido { grid-template-columns: 1fr !important; }
+  .emendas-detalhe-pedido__etapas { order: -1; } }
+
+/* Etapas do pedido de emenda: onde está, fases recolhíveis e a linha de cada etapa (nome · data, SEI alinhados) */
+.emendas-onde { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
+.emendas-onde__topo { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.emendas-onde__planilha { font-size: 0.75rem; color: #64748b; background: #f8fafc; border-radius: 6px; padding: 0.35rem 0.55rem; }
+.emendas-onde--cancelado { border-color: var(--color-danger-border, #f5c2c0); background: var(--color-danger-bg); color: var(--color-danger-text); font-size: 0.82rem; font-weight: 600; }
+.emendas-fase { border-top: 1px solid #e2e8f0; padding: 0.45rem 0 0.25rem; }
+.emendas-fase:first-child { border-top: 0; padding-top: 0; }
+.emendas-fase__cabecalho {
+  display: flex; align-items: center; gap: 0.35rem; width: 100%; padding: 0.2rem 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 0.75rem; color: #64748b; text-align: left;
+}
+.emendas-fase__cabecalho:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.emendas-fase__nome { font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.7rem; }
+.emendas-fase__conta { margin-left: auto; display: inline-flex; align-items: center; gap: 0.2rem; font-variant-numeric: tabular-nums; }
+.emendas-fase__conta--completa { color: var(--color-success-text); font-weight: 600; }
+.emendas-fase__etapas { list-style: none; margin: 0.15rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.emendas-etapa { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; padding: 0.3rem 0.4rem; margin: 0 -0.4rem; font-size: 0.82rem; color: #94a3b8; }
+.emendas-etapa__icone { display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; }
+.emendas-etapa--feita { color: #1e293b; }
+.emendas-etapa--feita .emendas-etapa__icone { color: var(--primary); }
+.emendas-etapa--atual { background: var(--primary-light); box-shadow: inset 3px 0 0 var(--primary); }
+.emendas-etapa--atual .emendas-etapa__nome { font-weight: 700; color: #0f172a; }
+.emendas-etapa--voltou { color: var(--color-warning-text); background: var(--color-warning-bg); box-shadow: inset 3px 0 0 var(--color-warning-text); }
+.emendas-etapa--cancelada, .emendas-etapa--cancelada .emendas-etapa__icone { color: #94a3b8; }
+.emendas-etapa__rodada { margin-left: 0.4rem; font-size: 0.68rem; font-weight: 700; border-radius: 99px; padding: 0.05rem 0.45rem; color: var(--color-warning-text); background: var(--color-warning-bg); }
+.emendas-etapa__data { font-size: 0.75rem; color: #64748b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.emendas-etapa__nota { margin: 0.05rem 0 0.1rem 1.6rem; font-size: 0.75rem; color: #64748b; }
+.emendas-etapa__nota--aviso { color: var(--color-warning-text); font-weight: 600; }
+.emendas-etapa__sei { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); gap: 0.4rem; align-items: center; margin: 0.2rem 0 0 1.6rem; }
+.emendas-etapa__contrato { font-size: 0.78rem; font-weight: 700; color: var(--primary); }
+.emendas-etapa__mais { margin: 0.15rem 0 0 calc(1.6rem + 4.6rem); }
+.emendas-etapa__devolucoes { margin: 0.3rem 0 0 1.6rem; font-size: 0.78rem; }
+.emendas-etapa__devolucoes summary { cursor: pointer; color: var(--primary); font-weight: 700; }
+.emendas-etapa__devolucoes ul { list-style: none; margin: 0.35rem 0 0; padding: 0 0 0 0.6rem; border-left: 2px solid #e2e8f0; display: flex; flex-direction: column; gap: 0.45rem; color: #475569; }
 
 /* Aba Reajuste da Ata 360: linha do tempo do Termo de Conformidade ao limite de 2 anos da ata. Rola no celular. */
 .reaj-tempo-caixa { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); overflow-x: auto; }

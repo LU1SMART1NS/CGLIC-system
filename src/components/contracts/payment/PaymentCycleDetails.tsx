@@ -8,6 +8,7 @@ import { numeroDoEmpenho, textoDoPagamento } from './cicloPagamentoShared';
 import { TIPOS_DOCUMENTO_RECEBIDO } from './cicloPagamentoShared';
 import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR } from './paymentFormUtils';
 import { formatCurrencyOrDash, formatCurrency } from '../../../utils/format';
+import { NumeroSeiEtiqueta } from '../../../design-system/components/NumeroSeiEtiqueta';
 
 
 /** Documentos ainda podem entrar ou sair enquanto o ciclo está com a CGLIC. */
@@ -46,7 +47,7 @@ export const PaymentCycleDocuments: React.FC<{
   const columns: Column<PaymentCycleDocument>[] = [
     { key: 'tipo', header: 'Documento', sortValue: (d) => d.tipo, render: (d) => d.tipo },
     { key: 'numero', header: 'Nº', sortValue: (d) => d.numero, render: (d) => d.numero || '—' },
-    { key: 'sei', header: 'Id. SEI', sortValue: (d) => d.sei, render: (d) => <strong>{d.sei}</strong> },
+    { key: 'sei', header: 'Id. SEI', sortValue: (d) => d.sei, render: (d) => (d.sei ? <NumeroSeiEtiqueta numero={d.sei} testId="payment-doc-sei" /> : '—') },
     { key: 'valor', header: 'Valor', align: 'right', sortValue: (d) => d.valor, sortFirstDir: 'desc', render: (d) => formatCurrencyOrDash(d.valor) },
     {
       key: 'acao',
@@ -147,8 +148,8 @@ export const PaymentCycleItens: React.FC<{ cycle: PaymentFollowUpCycle }> = ({ c
   if (itens.length === 0) return null;
   const columns: Column<PaymentCycleItem>[] = [
     { key: 'nf', header: 'Nota fiscal', priority: 'primary', render: (i) => <strong>{i.notaFiscal}</strong> },
-    { key: 'sei', header: 'SEI', render: (i) => i.notaFiscalSei || '—' },
-    { key: 'atesto', header: 'Atesto (SEI)', render: (i) => i.atestoSei },
+    { key: 'sei', header: 'SEI', render: (i) => (i.notaFiscalSei ? <NumeroSeiEtiqueta numero={i.notaFiscalSei} testId="payment-nf-sei" /> : '—') },
+    { key: 'atesto', header: 'Atesto (SEI)', render: (i) => (i.atestoSei ? <NumeroSeiEtiqueta numero={i.atestoSei} testId="payment-atesto-sei" /> : '—') },
     { key: 'empenho', header: 'Empenho', render: (i) => numeroDoEmpenho(i.empenhoCanonicalKey) },
     { key: 'sub', header: 'Subelemento', render: (i) => i.subelemento || '—' },
     { key: 'bruto', header: 'Bruto', align: 'right', render: (i) => formatCurrencyOrDash(i.valorBruto) },
@@ -173,7 +174,9 @@ export const PaymentCycleItens: React.FC<{ cycle: PaymentFollowUpCycle }> = ({ c
       </div>
       <DataTable columns={columns} data={itens} keyExtractor={(i) => i.id} testId={`payment-itens-table-${cycle.cycleKey}`} />
       {cycle.input.numeroProcessoPagamentoSei && (
-        <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Processo SEI de pagamento: <strong>{cycle.input.numeroProcessoPagamentoSei}</strong></div>
+        <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          Processo de pagamento <NumeroSeiEtiqueta numero={cycle.input.numeroProcessoPagamentoSei} testId="payment-processo-sei" />
+        </div>
       )}
     </div>
   );
@@ -201,7 +204,8 @@ export const PaymentCycleChecklist: React.FC<{ cycle: PaymentFollowUpCycle }> = 
           <div key={c.item} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', borderBottom: '1px solid #f1f5f9', padding: '0.25rem 0' }}>
             <span style={{ color: '#334155' }}>{rotuloDoItem(c.item)}</span>
             <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: c.resposta === 'NAO' ? 'var(--color-danger-text)' : '#0f172a' }}>
-              {RESPOSTA_LABEL[c.resposta]}{c.sei ? ` · ${c.sei}` : ''}
+              {RESPOSTA_LABEL[c.resposta]}
+              {c.sei && <> · <NumeroSeiEtiqueta numero={c.sei} testId="payment-checklist-sei" /></>}
             </span>
           </div>
         ))}

@@ -41,6 +41,7 @@ import {
 } from './payment/PaymentCyclePanel';
 import { useLinhasAbertas } from './useLinhasAbertas';
 import { formatCurrency } from '../../utils/format';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 interface ContractPagamentosSectionProps {
   contract: ContractDashboardRecord;
@@ -204,7 +205,7 @@ export const ContractPagamentosSection: React.FC<ContractPagamentosSectionProps>
       sortValue: (c) => c.input.documentoAtestoSei,
       render: (c) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-          <strong>{c.input.documentoAtestoSei}</strong>
+          <NumeroSeiEtiqueta numero={c.input.documentoAtestoSei} testId="payment-atesto-sei" />
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{describeDocuments(c)}</span>
         </div>
       )
