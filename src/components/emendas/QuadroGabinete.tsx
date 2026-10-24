@@ -199,7 +199,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
                     <td style={celulaValor} rowSpan={l.linhasDoItem}>
                       {brl(l.unitario)}
                       {l.marca && <sup>{l.marca}</sup>}
-                      {l.unitario !== l.hoje && <div style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.75rem' }}>hoje {brl(l.hoje)}</div>}
                     </td>
                   )}
                   <td style={celulaValor}>{brl(l.total)}</td>
