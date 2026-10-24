@@ -119,7 +119,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxWidth: 560 }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary)' }}>Quadro para o parlamentar</span>
           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary, #334155)' }}>
-            No formato do Anexo: uma linha por item e beneficiário, kit aberto nos seus itens. O valor unitário já vem com o reajuste previsto da ata.
+            No formato do Anexo: uma linha por item e beneficiário, kit aberto nos seus itens; o mesmo item para vários beneficiários aparece uma vez só. O valor unitário já vem com o reajuste previsto da ata.
           </span>
         </div>
         <Tabs
@@ -172,11 +172,13 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
             <tbody>
               {quadro.linhas.map((l, i) => (
                 <tr key={i}>
-                  <td style={celula}>
-                    <b>{l.descricao}</b>
-                    {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
-                    {l.kit && <div style={abaixo}>({l.kit})</div>}
-                  </td>
+                  {l.linhasDoItem > 0 && (
+                    <td style={celula} rowSpan={l.linhasDoItem}>
+                      <b>{l.descricao}</b>
+                      {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
+                      {l.kit && <div style={abaixo}>({l.kit})</div>}
+                    </td>
+                  )}
                   <td style={celula}>
                     {l.beneficiario ? (
                       <>
@@ -193,11 +195,13 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
                     {l.endereco && <div style={abaixo}>{l.endereco}</div>}
                   </td>
                   <td style={celula}>{l.quantidade}</td>
-                  <td style={celulaValor}>
-                    {brl(l.unitario)}
-                    {l.marca && <sup>{l.marca}</sup>}
-                    {l.unitario !== l.hoje && <div style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.75rem' }}>hoje {brl(l.hoje)}</div>}
-                  </td>
+                  {l.linhasDoItem > 0 && (
+                    <td style={celulaValor} rowSpan={l.linhasDoItem}>
+                      {brl(l.unitario)}
+                      {l.marca && <sup>{l.marca}</sup>}
+                      {l.unitario !== l.hoje && <div style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.75rem' }}>hoje {brl(l.hoje)}</div>}
+                    </td>
+                  )}
                   <td style={celulaValor}>{brl(l.total)}</td>
                 </tr>
               ))}

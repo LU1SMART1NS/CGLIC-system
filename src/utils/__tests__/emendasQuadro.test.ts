@@ -138,3 +138,40 @@ describe('títulos, nomes e notas', () => {
     expect(notaDoPreco(undefined)).toBeNull();
   });
 });
+
+describe('mesmo item para vários beneficiários', () => {
+  const varios: LinhaDoPedidoNoQuadro[] = [
+    { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 2, beneficiarioId: 'b1' },
+    { tipo: 'ITEM', itemKey: 'tablet', kitNome: null, kitComposicao: null, quantidade: 10, beneficiarioId: 'b1' },
+    { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 1, beneficiarioId: 'b2' },
+    { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 3, beneficiarioId: null },
+    // No kit o mesmo item fica à parte (outra origem).
+    { tipo: 'KIT', itemKey: null, kitNome: 'Kit Patrulha', kitComposicao: [{ itemKey: 'suv', quantidade: 1 }], quantidade: 1, beneficiarioId: 'b2' }
+  ];
+  const qv = montarQuadro({ autor, linhas: varios, itens, beneficiarios: new Map([['b1', pm], ['b2', cbm]]), precos, data: '2026-10-23' });
+
+  it('junta as linhas do item na ordem em que ele aparece; a primeira diz quantas são', () => {
+    expect(qv.linhas.map((l) => [l.descricao, l.beneficiario, l.quantidade, l.linhasDoItem])).toEqual([
+      ['Camioneta/SUV médio', '10º Batalhão de Polícia Militar', 2, 3],
+      ['Camioneta/SUV médio', 'Corpo de Bombeiros Militar', 1, 0],
+      ['Camioneta/SUV médio', null, 3, 0],
+      ['Tablet', '10º Batalhão de Polícia Militar', 10, 1],
+      ['Camioneta/SUV médio', 'Corpo de Bombeiros Militar', 1, 1]
+    ]);
+    expect(qv.total).toBe(Math.round((7 * 191811.62 + 10 * 1598.76) * 100) / 100);
+  });
+
+  it('Tabela: item e valor unitário com rowspan, uma vez só', () => {
+    const h = htmlDaTabela(qv);
+    expect(h).toContain('rowspan="3"');
+    expect(h.match(/Camioneta\/SUV médio/g)).toHaveLength(2);
+  });
+
+  it('WhatsApp: o item e o preço uma vez, cada beneficiário embaixo', () => {
+    const t = textoParaWhatsapp(qv);
+    expect(t).toContain('• 6 × Camioneta/SUV médio\n');
+    expect(t).toContain('R$ 191.811,62 cada');
+    expect(t).toContain('  ◦ 2 para 10º Batalhão de Polícia Militar · 10º BPM\n    Entrega: Rio de Janeiro - RJ · Rua X, 100 · Centro · CEP 20000-000\n    = *R$ 383.623,24*');
+    expect(t).toContain('  ◦ 3 para beneficiário a definir\n    = *R$ 575.434,86*');
+  });
+});
