@@ -8,7 +8,7 @@ import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteir
 import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { formatCurrency, formatNumber } from '../../utils/format';
-import { AUTOR_A_DEFINIR, linhasAtivas, valorDoPedido } from '../../utils/emendasPedidos';
+import { AUTOR_A_DEFINIR, jaEmpenhado, linhasAtivas, valorDoPedido } from '../../utils/emendasPedidos';
 import type { AutorEmenda, ItemCaep, PedidoEmenda, TipoAutor } from '../../services/emendasService';
 import { AutorDoPedido } from './emendasPartes';
 
@@ -80,7 +80,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
       const v = valorDoPedido(p, itens);
       l.pedidos++;
       l.valor += v;
-      if (p.etapa === 'EMPENHADO') l.empenhado += v;
+      if (jaEmpenhado(p.etapa)) l.empenhado += v;
       l.kits += linhasAtivas(p).filter((x) => x.tipo === 'KIT').reduce((s, x) => s + x.quantidade, 0);
       m.set(chave, l);
     }

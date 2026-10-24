@@ -6,13 +6,13 @@ import { AppInput, AppSelect, AppTextarea } from '../../design-system/components
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
-import { identificacaoDoPedido, itensDaLinha, linhasAtivas, valorDoPedido } from '../../utils/emendasPedidos';
+import { documentoSeiDaEtapaValido, identificacaoDoPedido, itensDaLinha, linhasAtivas, numerosSei, rodadaDoPedido, valorDoPedido } from '../../utils/emendasPedidos';
 import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
-import { LinhaDoPedido } from './emendasPartes';
 import { QuadroGabinete } from './QuadroGabinete';
 import type { AcaoPedido, ItemCaep, PedidoEmenda } from '../../services/emendasService';
 
-export type AcaoDaJanela = AcaoPedido | 'CANCELAR';
+/** MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa. */
+export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'CANCELAR';
 
 interface Props {
   pedido: PedidoEmenda;
@@ -36,11 +36,42 @@ const MOTIVOS_CANCELAMENTO = ['Parlamentar desistiu', 'Divergência não resolvi
 const TITULO: Record<AcaoDaJanela, string> = {
   MINUTA: 'Registrar a minuta',
   OFICIO: 'Registrar o ofício',
-  DIVERGENCIA: 'Registrar divergência',
+  DIVERGENCIA: 'Ofício com divergência',
   CONFERIDO: 'Conferir com o SIOP',
+  SOLICITADO: 'Registrar a solicitação de empenho',
   AUTORIZADO: 'Registrar a autorização de empenho',
+  CGOFI: 'Registrar o envio à CGOFI',
   EMPENHADO: 'Registrar o empenho',
+  CONTRATACAO: 'Registrar o envio para contratação',
+  MAIS_EMPENHADO: 'Acrescentar número SEI do empenho',
+  MAIS_CONTRATACAO: 'Acrescentar número SEI do despacho para contratação',
   CANCELAR: 'Cancelar o pedido'
+};
+
+/** Rótulo do campo SEI de cada etapa com documento (migration 174). */
+const ROTULO_SEI: Partial<Record<AcaoDaJanela, string>> = {
+  OFICIO: 'Documento SEI do ofício *',
+  SOLICITADO: 'Documento SEI da solicitação de empenho *',
+  AUTORIZADO: 'Documento SEI da autorização *',
+  CGOFI: 'Documento SEI do envio à CGOFI *',
+  EMPENHADO: 'Documento(s) SEI do empenho *',
+  CONTRATACAO: 'Documento(s) SEI do despacho para contratação *',
+  MAIS_EMPENHADO: 'Documento(s) SEI do empenho *',
+  MAIS_CONTRATACAO: 'Documento(s) SEI do despacho para contratação *'
+};
+/** Etapas com vários números: um por nota (uma emenda tem uma nota por fornecedor). */
+const VARIOS: ReadonlySet<AcaoDaJanela> = new Set(['EMPENHADO', 'CONTRATACAO', 'MAIS_EMPENHADO', 'MAIS_CONTRATACAO']);
+
+const ROTULO_DATA: Partial<Record<AcaoDaJanela, string>> = {
+  MINUTA: 'Enviada em',
+  OFICIO: 'Chegou em',
+  DIVERGENCIA: 'Devolvido em',
+  CONFERIDO: 'Conferido em',
+  SOLICITADO: 'Enviada à DGFNSP em',
+  AUTORIZADO: 'Autorizado em',
+  CGOFI: 'Enviado em',
+  EMPENHADO: 'Empenhado em',
+  CONTRATACAO: 'Enviado em'
 };
 
 const grade: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.8rem' };
@@ -52,9 +83,8 @@ const aviso = (tom: 'erro' | 'info'): React.CSSProperties => ({
   background: tom === 'erro' ? 'var(--color-danger-bg, #fdecea)' : 'var(--color-info-bg, #e6eefb)',
   color: tom === 'erro' ? 'var(--color-danger, #b11b05)' : 'var(--color-info-text, #155bcb)'
 });
-const NE = /^\d{4}NE\d{6}$/;
 
-/** Uma janela para cada passo do pedido: minuta, ofício, conferência com o SIOP, autorização, empenho e cancelamento. */
+/** Uma janela para cada passo do pedido, da minuta ao envio para contratação, e para o cancelamento. */
 export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoAutor, onClose }) => {
   const avancar = useAvancarPedido();
   const cancelar = useCancelarPedido();
@@ -63,19 +93,20 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
   const [modo, setModo] = useState<AcaoDaJanela>(acao);
   const [data, setData] = useState(hojeEmBrasilia());
   const [documentoSei, setDocumentoSei] = useState('');
-  const [oficio, setOficio] = useState(pedido.oficioNumero ?? 'Ofício nº ');
   const [processoSei, setProcessoSei] = useState(pedido.oficioProcessoSei ?? '');
   const [emenda, setEmenda] = useState(pedido.siopEmenda ?? '');
   const [valor, setValor] = useState(pedido.siopValor != null ? String(pedido.siopValor) : '');
   const [gnd, setGnd] = useState(pedido.siopGnd ?? 'GND-4');
   const [pontos, setPontos] = useState<Record<string, boolean>>({});
   const [divergencia, setDivergencia] = useState(pedido.divergencia ?? '');
-  const [notas, setNotas] = useState<Record<string, string>>(() => Object.fromEntries(linhasAtivas(pedido).map((l) => [l.id, l.notaEmpenho ?? ''])));
   const [motivo, setMotivo] = useState(MOTIVOS_CANCELAMENTO[0]);
   const [outroMotivo, setOutroMotivo] = useState('');
   const [tentou, setTentou] = useState(false);
 
   const linhas = linhasAtivas(pedido);
+  const rodada = rodadaDoPedido(pedido);
+  const numeros = numerosSei(documentoSei);
+  const pedeSei = Boolean(ROTULO_SEI[modo]);
   const semBeneficiario = linhas.filter((l) => !l.beneficiarioId).length;
   const todosPontos = PONTOS_SIOP.every(([k]) => pontos[k]);
   const ocupado = avancar.isPending || cancelar.isPending;
@@ -90,14 +121,16 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
       : undefined;
 
   const pendencias: string[] = [];
-  if (modo === 'OFICIO' && (!oficio.trim() || oficio.trim() === 'Ofício nº' || !processoSei.trim())) pendencias.push('número do ofício e processo SEI');
+  if (pedeSei && (numeros.length === 0 || numeros.some((n) => !documentoSeiDaEtapaValido(n)) || (!VARIOS.has(modo) && numeros.length > 1))) {
+    pendencias.push(VARIOS.has(modo) ? 'documento SEI (só números, 7 a 10 dígitos; vários: separe por vírgula)' : 'documento SEI (um número, só números, 7 a 10 dígitos)');
+  }
+  if (modo === 'OFICIO' && !processoSei.trim()) pendencias.push('processo SEI');
   if (modo === 'CONFERIDO') {
     if (!emenda.trim()) pendencias.push('número da emenda');
-    if (!todosPontos) pendencias.push('marcar os 6 pontos que batem (se algo não bate, registre a divergência)');
+    if (!todosPontos) pendencias.push('marcar os 6 pontos que batem (se algo não bate, use "Ofício com divergência")');
     if (semBeneficiario) pendencias.push(`beneficiário em ${semBeneficiario === 1 ? 'uma linha' : `${semBeneficiario} linhas`} (use "Alterar linhas")`);
   }
   if (modo === 'DIVERGENCIA' && !divergencia.trim()) pendencias.push('o que não bate');
-  if (modo === 'EMPENHADO' && linhas.some((l) => !NE.test((notas[l.id] ?? '').trim().toUpperCase()))) pendencias.push('nota de empenho de cada linha no formato 2026NE000123');
   if (modo === 'CANCELAR' && motivo === 'Outro' && !outroMotivo.trim()) pendencias.push('o motivo');
 
   const enviar = async (ev: React.FormEvent) => {
@@ -109,18 +142,30 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
         await cancelar.mutateAsync({ id: pedido.id, versao: pedido.versao, motivo: motivo === 'Outro' ? outroMotivo.trim() : motivo });
         toast.success(`Pedido de ${nomeDoAutor} cancelado. A quantidade voltou ao saldo da CAEP.`);
       } else {
+        const mais = modo === 'MAIS_EMPENHADO' || modo === 'MAIS_CONTRATACAO';
+        const acao: AcaoPedido = mais ? 'ACRESCENTAR_SEI' : (modo as AcaoPedido);
         const dados: Record<string, unknown> =
-          modo === 'MINUTA' || modo === 'AUTORIZADO'
-            ? { data, documento_sei: documentoSei.trim() || null }
-            : modo === 'OFICIO'
-              ? { data, numero: oficio.trim(), processo_sei: processoSei.trim() }
-              : modo === 'DIVERGENCIA'
-                ? { texto: divergencia.trim() }
-                : modo === 'CONFERIDO'
-                  ? { data, emenda: emenda.trim(), valor: valor ? Number(valor.replace(/\./g, '').replace(',', '.')) : null, gnd, conferencia: pontos }
-                  : { data, notas: linhas.map((l) => ({ linha_id: l.id, nota_empenho: (notas[l.id] ?? '').trim().toUpperCase() })) };
-        await avancar.mutateAsync({ id: pedido.id, versao: pedido.versao, acao: modo, dados });
-        toast.success(modo === 'DIVERGENCIA' ? 'Divergência registrada. O ofício volta ao gabinete; a reserva continua.' : `${nomeDoAutor}: ${TITULO[modo].replace('Registrar ', '').replace('Conferir com o SIOP', 'conferido no SIOP')}.`);
+          mais
+            ? { etapa: modo === 'MAIS_EMPENHADO' ? 'EMPENHADO' : 'CONTRATACAO', documentos_sei: numeros }
+            : modo === 'MINUTA'
+              ? { data }
+              : modo === 'OFICIO'
+                ? { data, documento_sei: numeros[0], processo_sei: processoSei.trim() }
+                : modo === 'DIVERGENCIA'
+                  ? { data, texto: divergencia.trim() }
+                  : modo === 'CONFERIDO'
+                    ? { data, emenda: emenda.trim(), valor: valor ? Number(valor.replace(/\./g, '').replace(',', '.')) : null, gnd, conferencia: pontos }
+                    : VARIOS.has(modo)
+                      ? { data, documentos_sei: numeros }
+                      : { data, documento_sei: numeros[0] };
+        await avancar.mutateAsync({ id: pedido.id, versao: pedido.versao, acao, dados });
+        toast.success(
+          modo === 'DIVERGENCIA'
+            ? `Ofício devolvido. O pedido voltou para a minuta (${rodada + 1}ª). A reserva continua.`
+            : mais
+              ? 'Número SEI acrescentado.'
+              : `${nomeDoAutor}: ${TITULO[modo].replace('Registrar ', '').replace('Conferir com o SIOP', 'conferido no SIOP')}.`
+        );
       }
       onClose();
     } catch (err) {
@@ -133,19 +178,19 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
       isOpen
       onClose={onClose}
       dismissible={!ocupado}
-      size={modo === 'CONFERIDO' || modo === 'EMPENHADO' ? 'lg' : 'md'}
+      size={modo === 'CONFERIDO' ? 'lg' : 'md'}
       testId="emendas-etapa-modal"
-      title={TITULO[modo]}
+      title={TITULO[modo] + (rodada > 1 && (modo === 'MINUTA' || modo === 'OFICIO') ? ` (${rodada}ª rodada)` : '')}
       footer={
         <>
           <ActionButton action="cancelar" label={modo === 'CANCELAR' ? 'Voltar' : 'Cancelar'} type="button" onClick={onClose} disabled={ocupado} />
           {modo === 'CONFERIDO' && (
             <AppButton type="button" variant="ghostDanger" onClick={() => setModo('DIVERGENCIA')} disabled={ocupado}>
-              Algo não bate
+              Ofício com divergência
             </AppButton>
           )}
-          <AppButton type="submit" form="emendas-etapa-form" variant={modo === 'CANCELAR' ? 'danger' : 'primary'} disabled={ocupado} isLoading={ocupado} data-testid="emendas-etapa-salvar">
-            {modo === 'CANCELAR' ? 'Cancelar o pedido' : modo === 'CONFERIDO' ? 'Tudo confere' : modo === 'DIVERGENCIA' ? 'Registrar divergência' : 'Registrar'}
+          <AppButton type="submit" form="emendas-etapa-form" variant={modo === 'CANCELAR' || modo === 'DIVERGENCIA' ? 'danger' : 'primary'} disabled={ocupado} isLoading={ocupado} data-testid="emendas-etapa-salvar">
+            {modo === 'CANCELAR' ? 'Cancelar o pedido' : modo === 'CONFERIDO' ? 'Tudo confere' : modo === 'DIVERGENCIA' ? 'Devolver para a minuta' : modo.startsWith('MAIS_') ? 'Acrescentar' : 'Registrar'}
           </AppButton>
         </>
       }
@@ -163,10 +208,29 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
           </div>
         )}
 
-        {(modo === 'MINUTA' || modo === 'AUTORIZADO') && (
+        {(pedeSei || ROTULO_DATA[modo]) && modo !== 'CONFERIDO' && modo !== 'DIVERGENCIA' && (
           <div style={grade}>
-            <AppInput label="Data" type="date" value={data} onChange={(e) => setData(e.target.value)} />
-            <AppInput label={modo === 'MINUTA' ? 'Documento SEI da minuta' : 'Documento SEI da autorização'} placeholder="Opcional" value={documentoSei} onChange={(e) => setDocumentoSei(e.target.value)} />
+            {pedeSei && (
+              <AppInput
+                label={ROTULO_SEI[modo]}
+                placeholder={VARIOS.has(modo) ? 'Ex.: 41234567, 41234568' : 'Ex.: 41234567'}
+                hint={VARIOS.has(modo) ? 'Um por nota. Vários números: separe por vírgula.' : 'Só números, 7 a 10 dígitos.'}
+                value={documentoSei}
+                onChange={(e) => setDocumentoSei(e.target.value)}
+                data-testid="emendas-etapa-sei"
+              />
+            )}
+            {modo === 'OFICIO' && (
+              <AppInput
+                label="Processo SEI *"
+                placeholder="08020.000000/2026-00"
+                hint={rodada > 1 ? 'Mesmo processo do ofício devolvido; troque se mudou.' : undefined}
+                value={processoSei}
+                onChange={(e) => setProcessoSei(e.target.value)}
+                data-testid="emendas-etapa-processo"
+              />
+            )}
+            {ROTULO_DATA[modo] && <AppInput label={ROTULO_DATA[modo]!} type="date" value={data} onChange={(e) => setData(e.target.value)} />}
           </div>
         )}
 
@@ -174,13 +238,8 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
           <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} testId="emendas-etapa-quadro" />
         )}
 
-        {modo === 'OFICIO' && (
-          <div style={grade}>
-            <AppInput label="Nº do ofício *" value={oficio} onChange={(e) => setOficio(e.target.value)} data-testid="emendas-etapa-oficio" />
-            <AppInput label="Processo SEI *" placeholder="08020.000000/2026-00" value={processoSei} onChange={(e) => setProcessoSei(e.target.value)} data-testid="emendas-etapa-processo" />
-            <AppInput label="Chegou em" type="date" value={data} onChange={(e) => setData(e.target.value)} />
-          </div>
-        )}
+        {modo === 'EMPENHADO' && <div style={aviso('info')}>As notas de empenho não são digitadas: o sistema acha cada nota pelo contrato e pela emenda.</div>}
+        {modo === 'CONTRATACAO' && <div style={aviso('info')}>Ao registrar, o processo segue com a CCGA para a contratação e a CAEP passa a só acompanhar.</div>}
 
         {modo === 'CONFERIDO' && (
           <>
@@ -211,22 +270,11 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
         {modo === 'DIVERGENCIA' && (
           <>
             <AppTextarea label="O que não bate *" rows={3} value={divergencia} onChange={(e) => setDivergencia(e.target.value)} placeholder="Ex.: valor do ofício (R$ 120.000) diferente do SIOP (R$ 98.000)" data-testid="emendas-etapa-divergencia" />
-            <div style={aviso('info')}>O pedido fica em "Ofício recebido" com o aviso de divergência e a reserva continua. Quando o gabinete mandar o ofício corrigido, registre-o de novo e confira.</div>
-          </>
-        )}
-
-        {modo === 'EMPENHADO' && (
-          <>
-            <AppInput label="Empenhado em" type="date" value={data} onChange={(e) => setData(e.target.value)} />
-            {linhas.map((l) => (
-              <div key={l.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 190px', gap: '0.75rem', alignItems: 'end' }}>
-                <div style={{ minWidth: 0 }}>
-                  <LinhaDoPedido linha={l} itens={itens} />
-                </div>
-                <AppInput label="Nota de empenho" placeholder="2026NE000000" value={notas[l.id] ?? ''} onChange={(e) => setNotas((n) => ({ ...n, [l.id]: e.target.value }))} data-testid={`emendas-etapa-ne-${l.id}`} />
-              </div>
-            ))}
-            <div style={aviso('info')}>Ao registrar, o processo segue para a CCGA e a CAEP passa a só acompanhar.</div>
+            <AppInput label="Devolvido em" type="date" value={data} onChange={(e) => setData(e.target.value)} />
+            <div style={aviso('info')}>
+              O pedido volta para "Minuta": a CAEP faz a {rodada + 1}ª minuta e manda ao gabinete. A minuta e o ofício devolvidos ficam no histórico do pedido.
+              A reserva continua.
+            </div>
           </>
         )}
 

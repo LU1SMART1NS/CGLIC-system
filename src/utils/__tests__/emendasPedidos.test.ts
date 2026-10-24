@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avisosDoPedido, itensDaLinha, proximaAcao, reservadoPorItem, valorDoPedido } from '../emendasPedidos';
+import { avisosDoPedido, itensDaLinha, numerosSei, proximaAcao, reservadoPorItem, rodadaDoPedido, seiDaEtapa, valorDoPedido } from '../emendasPedidos';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
 
 const HOJE = '2026-10-23';
@@ -10,13 +10,14 @@ const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
 const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
   id: 'l' + Math.random(), ordem: 1, tipo: 'ITEM', itemKey: 'a', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
   quantidade: 1, beneficiarioId: null, notaEmpenho: null, cancelada: false, canceladaMotivo: null,
-  empenhoDocumentoSei: null, contratoNumero: null, aConferir: null, planilhaRef: null, ...extra
+  empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, aConferir: null, planilhaRef: null, ...extra
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   id: 'p' + Math.random(), numero: 1, autorId: 'C:1', etapa: 'RESERVADO', origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-10-20',
-  minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, siopEmenda: null,
-  siopValor: null, siopGnd: null, conferidoEm: null, autorizadoEm: null, autorizadoDocumentoSei: null, empenhadoEm: null, canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], ...extra
+  minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null,
+  siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
+  empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], ...extra
 });
 const itens = new Map([item('a'), item('b', { valorUnitario: 10, numeroAta: '00061/2024', vigenciaFinal: '2026-12-19' }), item('v', { ataEncerrada: true, numeroAta: '00020/2025', vigenciaFinal: '2026-05-28' })].map((i) => [i.itemKey, i]));
 const kit = linha({ tipo: 'KIT', itemKey: null, kitId: 'k', kitComposicao: [{ itemKey: 'a', quantidade: 1 }, { itemKey: 'b', quantidade: 2 }], quantidade: 10 });
@@ -37,26 +38,50 @@ describe('pedidos das emendas', () => {
     expect(valorDoPedido(pedido({ linhas: [kit] }), itens)).toBe(10 * 100 + 20 * 10);
   });
 
-  it('avisos: 30 dias sem ofício, divergência e ata vencendo ou vencida antes do empenho', () => {
+  it('avisos: 30 dias sem ofício, ofício devolvido e ata vencendo ou vencida antes do empenho', () => {
     expect(avisosDoPedido(pedido({ reservadoEm: '2026-09-01', linhas: [linha({})] }), itens, HOJE).map((a) => a.curto)).toEqual(['52 dias sem ofício']);
-    expect(avisosDoPedido(pedido({ etapa: 'OFICIO', divergencia: 'x', linhas: [linha({})] }), itens, HOJE)[0].tipo).toBe('divergencia');
+    // Devolvido: o pedido volta para a minuta, com o aviso; os 30 dias contam da devolução, não da reserva.
+    const devolvido = pedido({ reservadoEm: '2026-09-01', divergencia: 'valor diferente', devolvidoEm: '2026-10-20', linhas: [linha({})] });
+    expect(avisosDoPedido(devolvido, itens, HOJE).map((a) => [a.tipo, a.texto])).toEqual([['divergencia', 'Ofício devolvido em 20/10/2026: valor diferente']]);
+    expect(avisosDoPedido({ ...devolvido, devolvidoEm: '2026-09-10' }, itens, HOJE).map((a) => a.curto)).toEqual(['Ofício devolvido', '43 dias sem ofício']);
+    expect(avisosDoPedido(pedido({ etapa: 'CGOFI', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].tipo).toBe('ataVencida');
     expect(avisosDoPedido(pedido({ linhas: [kit] }), itens, HOJE)[0].texto).toContain('Ata 00061/2024 vence em 57 dias');
     expect(avisosDoPedido(pedido({ etapa: 'CONFERIDO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].texto).toBe('Ata 00020/2025 encerrada em 28/05/2026: trocar o item ou tirar a linha');
     expect(avisosDoPedido(pedido({ etapa: 'EMPENHADO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)).toEqual([]);
+    expect(avisosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)).toEqual([]);
   });
 
-  it('próximo passo de cada etapa', () => {
-    expect(proximaAcao('RESERVADO')?.acao).toBe('MINUTA');
-    expect(proximaAcao('OFICIO')?.acao).toBe('CONFERIDO');
-    expect(proximaAcao('EMPENHADO')).toBeNull();
+  it('próximo passo de cada etapa, da reserva ao envio para contratação', () => {
+    const ordem = ['RESERVADO', 'MINUTA', 'OFICIO', 'CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI', 'EMPENHADO', 'CONTRATACAO'] as const;
+    for (let i = 0; i < ordem.length - 1; i++) expect(proximaAcao(ordem[i])?.acao).toBe(ordem[i + 1]);
+    expect(proximaAcao('CONTRATACAO')).toBeNull();
+    expect(proximaAcao('RESERVADO', 2)?.rotulo).toBe('Registrar a 2ª minuta');
+    expect(proximaAcao('MINUTA', 2)?.rotulo).toBe('Registrar o 2º ofício');
+  });
+
+  it('rodada e números SEI de cada etapa', () => {
+    const devolucao = { rodada: 1, minutaEm: null, oficioEm: null, oficioDocumentoSei: '40555666', oficioProcessoSei: null, motivo: 'x', devolvidoEm: '2026-10-01', criadoPorNome: null };
+    expect(rodadaDoPedido(pedido({}))).toBe(1);
+    expect(rodadaDoPedido(pedido({ devolucoes: [devolucao] }))).toBe(2);
+    expect(numerosSei('41234567, 41234568; 41234567 41.234.569')).toEqual(['41234567', '41234568', '41234569']);
+    // Empenho e despacho: os do pedido e os das linhas da planilha, sem repetir.
+    const p = pedido({
+      etapa: 'CONTRATACAO',
+      contratacaoDocumentosSei: ['35408653'],
+      linhas: [linha({ empenhoDocumentoSei: '35378789', despachoDocumentoSei: '35408653' }), linha({ empenhoDocumentoSei: '35381459', despachoDocumentoSei: '35430673' })]
+    });
+    expect(seiDaEtapa(p, 'EMPENHADO')).toEqual(['35378789', '35381459']);
+    expect(seiDaEtapa(p, 'CONTRATACAO')).toEqual(['35408653', '35430673']);
+    expect(seiDaEtapa(pedido({ oficioDocumentoSei: '41234567' }), 'OFICIO')).toEqual(['41234567']);
+    expect(seiDaEtapa(p, 'CONFERIDO')).toEqual([]);
   });
 });
 
 describe('identificação e contato', () => {
-  it('sem ofício, a reserva é identificada pela data; com ofício, pelo ofício', async () => {
+  it('sem ofício, a reserva é identificada pela data; com ofício, pelo processo SEI', async () => {
     const { identificacaoDoPedido } = await import('../emendasPedidos');
-    expect(identificacaoDoPedido({ oficioNumero: null, reservadoEm: '2026-10-03' })).toBe('Reserva de 03/10/2026');
-    expect(identificacaoDoPedido({ oficioNumero: 'Ofício nº 45/2026', reservadoEm: '2026-10-03' })).toBe('Ofício nº 45/2026');
+    expect(identificacaoDoPedido({ oficioProcessoSei: null, reservadoEm: '2026-10-03' })).toBe('Reserva de 03/10/2026');
+    expect(identificacaoDoPedido({ oficioProcessoSei: '08027.000226/2026-61', siopEmenda: '37990010', reservadoEm: '2026-10-03' })).toBe('Processo 08027.000226/2026-61');
   });
 
   it('sugere o último contato da assessoria usado com cada autor', async () => {
@@ -74,8 +99,8 @@ describe('identificação e contato', () => {
 describe('pedidos que vieram das planilhas da CAEP (migration 160)', () => {
   it('identifica pelo número da emenda; reserva da planilha não tem data', async () => {
     const { identificacaoDoPedido } = await import('../emendasPedidos');
-    expect(identificacaoDoPedido({ oficioNumero: null, reservadoEm: '2026-10-23', siopEmenda: '37990010', origem: 'PLANILHA' })).toBe('Emenda 37990010');
-    expect(identificacaoDoPedido({ oficioNumero: null, reservadoEm: '2026-10-23', siopEmenda: null, origem: 'PLANILHA' })).toBe('Reserva da planilha');
+    expect(identificacaoDoPedido({ reservadoEm: '2026-10-23', siopEmenda: '37990010', origem: 'PLANILHA' })).toBe('Emenda 37990010');
+    expect(identificacaoDoPedido({ reservadoEm: '2026-10-23', siopEmenda: null, origem: 'PLANILHA' })).toBe('Reserva da planilha');
   });
 
   it('avisa as linhas a conferir', () => {

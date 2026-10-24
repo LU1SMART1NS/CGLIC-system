@@ -36,12 +36,16 @@ import {
   avisosDoPedido,
   dataDaEtapa,
   ETAPAS,
+  ETAPAS_COM_VARIOS_SEI,
+  jaEmpenhado,
   linhasAtivas,
   orgaoDoPedido,
   ORDEM_ETAPA,
   proximaAcao,
+  rodadaDoPedido,
   reservadoPorItem,
   ROTULO_ETAPA,
+  seiDaEtapa,
   ultimoContatoPorAutor,
   valorDaLinha,
   valorDoPedido,
@@ -56,6 +60,7 @@ import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 type Segmento = 'todos' | EtapaPedido;
 type Linha = PedidoEmenda & { valor: number; avisos: AvisoPedido[] };
@@ -71,14 +76,19 @@ const VARIANTE_ETAPA: Record<EtapaPedido, StatusBadgeVariant> = {
   MINUTA: 'info',
   OFICIO: 'info',
   CONFERIDO: 'info',
+  SOLICITADO: 'info',
   AUTORIZADO: 'info',
+  CGOFI: 'info',
   EMPENHADO: 'success',
+  CONTRATACAO: 'success',
   CANCELADO: 'neutral'
 };
 
-/** Linha do tempo das etapas do pedido. */
-const EtapasDoPedido: React.FC<{ p: PedidoEmenda }> = ({ p }) => {
+/** Linha do tempo das etapas do pedido, com o SEI de cada etapa e as tentativas devolvidas (migration 174). */
+const EtapasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean; onAcao: (acao: AcaoDaJanela) => void }> = ({ p, podeGerir, onAcao }) => {
   const atual = ORDEM_ETAPA[p.etapa];
+  const rodada = rodadaDoPedido(p);
+  const seiEmLinha: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.25rem' };
   return (
     <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem' }} data-testid={`emendas-pedido-etapas-${p.id}`}>
       {ETAPAS.map((e, i) => {
@@ -86,16 +96,28 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda }> = ({ p }) => {
         // Na carga das planilhas a data da reserva é a da carga, não a da conversa com o gabinete.
         const data = p.origem === 'PLANILHA' && e.etapa === 'RESERVADO' ? null : dataDaEtapa(p, e.etapa);
         const proxima = p.etapa !== 'CANCELADO' && i === atual + 1;
+        // Ofício devolvido: a próxima etapa é a nova minuta.
+        const voltou = proxima && e.etapa === 'MINUTA' && p.devolucoes.length > 0;
+        const comRodada = rodada > 1 && (e.etapa === 'MINUTA' || e.etapa === 'OFICIO') && (feita || proxima);
+        const seis = feita ? seiDaEtapa(p, e.etapa) : [];
         const detalhe =
-          e.etapa === 'MINUTA' && p.minutaDocumentoSei
-            ? `doc. SEI ${p.minutaDocumentoSei}`
-            : e.etapa === 'OFICIO' && (p.oficioNumero || p.oficioProcessoSei)
-              ? [p.oficioNumero, p.oficioProcessoSei && `SEI ${p.oficioProcessoSei}`].filter(Boolean).join(' · ')
-              : e.etapa === 'CONFERIDO' && p.siopEmenda
-                ? `emenda ${p.siopEmenda}${p.siopGnd ? ` · ${p.siopGnd}` : ''}${p.siopValor != null ? ` · ${formatCurrency(p.siopValor)}` : ''}`
-                : e.etapa === 'AUTORIZADO' && p.autorizadoDocumentoSei
-                  ? `doc. SEI ${p.autorizadoDocumentoSei}`
-                  : null;
+          feita && e.etapa === 'CONFERIDO' && p.siopEmenda
+            ? `emenda ${p.siopEmenda}${p.siopGnd ? ` · ${p.siopGnd}` : ''}${p.siopValor != null ? ` · ${formatCurrency(p.siopValor)}` : ''}`
+            : null;
+        // Nota nova (outro fornecedor): mais um número no empenho ou no envio para contratação.
+        const acrescentar =
+          podeGerir && feita && ETAPAS_COM_VARIOS_SEI.has(e.etapa) && (e.etapa === 'EMPENHADO' ? jaEmpenhado(p.etapa) : p.etapa === 'CONTRATACAO');
+        const texto = feita
+          ? data
+            ? dataBR(data)
+            : p.origem === 'PLANILHA'
+              ? 'sem data na planilha'
+              : 'não houve'
+          : voltou
+            ? null
+            : proxima
+              ? 'próxima etapa'
+              : null;
         return (
           <li key={e.etapa} style={{ display: 'grid', gridTemplateColumns: '20px 1fr', gap: '0.5rem', alignItems: 'start' }}>
             <span
@@ -109,18 +131,62 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda }> = ({ p }) => {
                 justifyContent: 'center',
                 fontSize: '0.7rem',
                 fontWeight: 800,
-                background: feita ? 'var(--primary)' : '#ffffff',
-                color: feita ? '#ffffff' : proxima ? 'var(--primary)' : '#94a3b8',
-                border: `2px solid ${feita || proxima ? 'var(--primary)' : '#e2e8f0'}`
+                background: feita ? 'var(--primary)' : voltou ? 'var(--color-warning-bg)' : '#ffffff',
+                color: feita ? '#ffffff' : voltou ? 'var(--color-warning-text)' : proxima ? 'var(--primary)' : '#94a3b8',
+                border: `2px solid ${feita || proxima ? (voltou ? 'var(--color-warning-text)' : 'var(--primary)') : '#e2e8f0'}`
               }}
             >
-              {feita ? '✓' : i + 1}
+              {feita ? '✓' : voltou ? '↺' : i + 1}
             </span>
-            <div>
-              <div style={{ fontWeight: feita || proxima ? 700 : 500, color: feita || proxima ? '#0f172a' : '#94a3b8', fontSize: '0.82rem' }}>{e.rotulo}</div>
-              <div style={carteiraSubtitle}>{[feita ? (data ? dataBR(data) : p.origem === 'PLANILHA' ? 'sem data na planilha' : 'não houve') : proxima ? 'próxima etapa' : null, feita ? detalhe : null].filter(Boolean).join(' · ')}</div>
-              {e.etapa === 'OFICIO' && p.etapa === 'OFICIO' && p.divergencia && (
-                <div style={{ ...carteiraSubtitle, color: 'var(--color-danger, #b11b05)', WebkitLineClamp: 4 }}>Divergência: {p.divergencia}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: feita || proxima ? 700 : 500, color: feita || proxima ? '#0f172a' : '#94a3b8', fontSize: '0.82rem' }}>
+                {e.rotulo}
+                {comRodada && (
+                  <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', fontWeight: 800, borderRadius: 99, padding: '0.05rem 0.45rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)' }}>
+                    {e.etapa === 'MINUTA' ? `${rodada}ª minuta` : `${rodada}º ofício`}
+                  </span>
+                )}
+              </div>
+              {voltou && (
+                <div style={{ ...carteiraSubtitle, color: 'var(--color-warning-text)', fontWeight: 700 }}>fazer a nova minuta · ofício devolvido</div>
+              )}
+              {(texto || detalhe) && <div style={carteiraSubtitle}>{[texto, detalhe].filter(Boolean).join(' · ')}</div>}
+              {(seis.length > 0 || (feita && e.etapa === 'OFICIO' && p.oficioProcessoSei) || acrescentar) && (
+                <div style={seiEmLinha}>
+                  {seis.map((n) => (
+                    <NumeroSeiEtiqueta key={n} numero={n} testId={`emendas-pedido-sei-${e.etapa}`} />
+                  ))}
+                  {feita && e.etapa === 'OFICIO' && p.oficioProcessoSei && <span style={{ ...carteiraSubtitle, alignSelf: 'center' }}>processo</span>}
+                  {feita && e.etapa === 'OFICIO' && p.oficioProcessoSei && <NumeroSeiEtiqueta numero={p.oficioProcessoSei} testId="emendas-pedido-sei-processo" />}
+                  {acrescentar && (
+                    <AppButton size="sm" variant="ghost" onClick={() => onAcao(`MAIS_${e.etapa}` as AcaoDaJanela)} data-testid={`emendas-pedido-mais-sei-${e.etapa}`}>
+                      + número SEI
+                    </AppButton>
+                  )}
+                </div>
+              )}
+              {e.etapa === 'MINUTA' && p.devolucoes.length > 0 && (
+                <details style={{ marginTop: '0.3rem', fontSize: '0.78rem' }} open={voltou} data-testid={`emendas-pedido-devolucoes-${p.id}`}>
+                  <summary style={{ cursor: 'pointer', color: 'var(--primary)', fontWeight: 700 }}>
+                    {p.devolucoes.length === 1 ? 'Tentativa anterior' : `${p.devolucoes.length} tentativas anteriores`}
+                  </summary>
+                  <ul style={{ listStyle: 'none', margin: '0.35rem 0 0', padding: '0 0 0 0.6rem', borderLeft: '2px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {p.devolucoes.map((d) => (
+                      <li key={d.rodada} style={{ color: '#475569' }}>
+                        <div>
+                          <strong>{d.rodada}ª minuta</strong> {d.minutaEm ? `enviada em ${dataBR(d.minutaEm)}` : 'sem data'}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
+                          <strong>{d.rodada}º ofício</strong> {d.oficioEm ? dataBR(d.oficioEm) : ''}
+                          {d.oficioDocumentoSei && <NumeroSeiEtiqueta numero={d.oficioDocumentoSei} testId="emendas-pedido-sei-devolvido" />}
+                        </div>
+                        <div style={{ color: 'var(--color-danger-text)' }}>
+                          Devolvido em {dataBR(d.devolvidoEm)}: {d.motivo}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
             </div>
           </li>
@@ -150,7 +216,7 @@ interface DetalheProps {
 const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
   // Reserva para um órgão (migration 163): antes da minuta, a CAEP indica o parlamentar que assumiu.
   const semAutor = !p.autorId;
-  const prox = semAutor ? null : proximaAcao(p.etapa);
+  const prox = semAutor ? null : proximaAcao(p.etapa, rodadaDoPedido(p));
   const colunas: Column<PedidoEmenda['linhas'][number]>[] = [
     {
       key: 'linha',
@@ -199,7 +265,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
             {canceladas.length} {canceladas.length === 1 ? 'linha tirada' : 'linhas tiradas'} do pedido: {canceladas.map((l) => l.canceladaMotivo).filter(Boolean).join('; ')}
           </div>
         )}
-        {p.etapa === 'EMPENHADO' && <ExecucaoDoPedidoResumo execucao={execucaoDoPedido(p, notas)} />}
+        {jaEmpenhado(p.etapa) && <ExecucaoDoPedidoResumo execucao={execucaoDoPedido(p, notas)} />}
         {semAutor && (
           <div style={{ fontSize: '0.8rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: 6, padding: '0.5rem 0.7rem', fontWeight: 600 }}>
             Reserva feita a pedido do órgão, ainda sem parlamentar. Quando um parlamentar ou bancada assumir, use "Indicar o parlamentar" para seguir com a minuta.
@@ -214,8 +280,8 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
             <ContatoDoResponsavel nome={p.contatoNome ?? 'assessoria'} telefone={p.contatoTelefone} email={p.contatoEmail} />
           </div>
         )}
-        <EtapasDoPedido p={p} />
-        {podeGerir && p.etapa !== 'EMPENHADO' && p.etapa !== 'CANCELADO' && (
+        <EtapasDoPedido p={p} podeGerir={podeGerir} onAcao={onAcao} />
+        {podeGerir && p.etapa !== 'CONTRATACAO' && p.etapa !== 'CANCELADO' && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {semAutor && (
               <AppButton size="sm" onClick={onAlterar} data-testid={`emendas-pedido-indicar-autor-${p.id}`}>
@@ -229,8 +295,18 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
             )}
             {/* Às vezes o gabinete manda o ofício sem minuta da CAEP. */}
             {p.etapa === 'RESERVADO' && !semAutor && <ActionButton action="avancarEtapa" size="sm" label="Já chegou o ofício" onClick={() => onAcao('OFICIO')} />}
-            <ActionButton action="editar" size="sm" label="Alterar linhas" onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
-            <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={() => onAcao('CANCELAR')} data-testid={`emendas-pedido-cancelar-${p.id}`} />
+            {/* O ofício com divergência volta para a minuta (migration 174). */}
+            {p.etapa === 'OFICIO' && (
+              <AppButton size="sm" variant="ghostDanger" onClick={() => onAcao('DIVERGENCIA')} data-testid={`emendas-pedido-divergencia-${p.id}`}>
+                Ofício com divergência
+              </AppButton>
+            )}
+            {!jaEmpenhado(p.etapa) && (
+              <>
+                <ActionButton action="editar" size="sm" label="Alterar linhas" onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
+                <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={() => onAcao('CANCELAR')} data-testid={`emendas-pedido-cancelar-${p.id}`} />
+              </>
+            )}
           </div>
         )}
       </div>
@@ -307,7 +383,7 @@ export const EmendasPedidosPage: React.FC = () => {
         const textoLinhas = linhasAtivas(l)
           .map((x) => `${(x.tipo === 'KIT' ? x.kitNome : itens.get(x.itemKey ?? '')?.descricao) ?? ''} ${textoDoBeneficiario(x.beneficiarioId)} ${x.contratoNumero ?? ''}`)
           .join(' ');
-        return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioNumero ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${textoLinhas}`).includes(termo);
+        return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`).includes(termo);
       });
   }, [doSegmento, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios]);
 
@@ -370,7 +446,7 @@ export const EmendasPedidosPage: React.FC = () => {
       sortValue: ordem.etapa.value,
       // Sem coluna própria para a reserva (repetia a etapa): o documento que marca a etapa fica embaixo dela.
       render: (l) => {
-        const documento = l.oficioNumero ?? (l.siopEmenda ? `Emenda ${l.siopEmenda}` : null);
+        const documento = l.siopEmenda ? `Emenda ${l.siopEmenda}` : null;
         return (
           <>
             <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
@@ -440,7 +516,7 @@ export const EmendasPedidosPage: React.FC = () => {
         active={segmento}
         onSelect={setSegmento}
         segments={[
-          ...ETAPAS.map((e) => ({ id: e.etapa as Segmento, label: e.curto, count: contagem[e.etapa] ?? 0, dot: e.etapa === 'EMPENHADO' ? 'var(--color-success)' : undefined })),
+          ...ETAPAS.map((e) => ({ id: e.etapa as Segmento, label: e.curto, count: contagem[e.etapa] ?? 0, dot: jaEmpenhado(e.etapa) ? 'var(--color-success)' : undefined })),
           { id: 'todos', label: 'Todos', count: contagem.todos },
           { id: 'CANCELADO', label: 'Cancelados', count: contagem.CANCELADO ?? 0 }
         ]}
@@ -500,7 +576,7 @@ export const EmendasPedidosPage: React.FC = () => {
                 { value: 'com', label: 'Com algum aviso', count: contaAviso('com') },
                 { value: 'grave', label: 'Pedem ação já (avisos vermelhos)', count: contaAviso('grave') },
                 { value: 'semOficio', label: 'Mais de 30 dias sem ofício ou parlamentar', count: contaAviso('semOficio') },
-                { value: 'divergencia', label: 'Divergência com o SIOP', count: contaAviso('divergencia') },
+                { value: 'divergencia', label: 'Ofício devolvido (nova minuta)', count: contaAviso('divergencia') },
                 { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
                 { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
                 { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },

@@ -468,7 +468,7 @@ export async function consultarCep(cep: string, fetcher: typeof fetch = fetch): 
 // Pedidos dos parlamentares (migration 157)
 // ------------------------------------------------------------------------------
 
-export type EtapaPedido = 'RESERVADO' | 'MINUTA' | 'OFICIO' | 'CONFERIDO' | 'AUTORIZADO' | 'EMPENHADO' | 'CANCELADO';
+export type EtapaPedido = 'RESERVADO' | 'MINUTA' | 'OFICIO' | 'CONFERIDO' | 'SOLICITADO' | 'AUTORIZADO' | 'CGOFI' | 'EMPENHADO' | 'CONTRATACAO' | 'CANCELADO';
 
 export interface LinhaPedido {
   id: string;
@@ -489,9 +489,23 @@ export interface LinhaPedido {
   empenhoDocumentoSei: string | null;
   /** Contrato citado na planilha, como 00138/2026. */
   contratoNumero: string | null;
+  /** Documento SEI do despacho para contratação da nota desta linha (planilha de execução). */
+  despachoDocumentoSei: string | null;
   /** O que não bate entre as planilhas da CAEP nesta linha. */
   aConferir: string | null;
   planilhaRef: string | null;
+}
+
+/** Tentativa devolvida: a minuta e o ofício com divergência (migration 174). */
+export interface DevolucaoPedido {
+  rodada: number;
+  minutaEm: string | null;
+  oficioEm: string | null;
+  oficioDocumentoSei: string | null;
+  oficioProcessoSei: string | null;
+  motivo: string;
+  devolvidoEm: string;
+  criadoPorNome: string | null;
 }
 
 export interface PedidoEmenda {
@@ -508,31 +522,68 @@ export interface PedidoEmenda {
   contatoEmail: string | null;
   reservadoEm: string;
   minutaEm: string | null;
+  /** Sem uso desde a migration 174 (a minuta não tem documento SEI). */
   minutaDocumentoSei: string | null;
+  /** Sem uso desde a migration 174 (o pedido é identificado pelo processo SEI). */
   oficioNumero: string | null;
+  oficioDocumentoSei: string | null;
   oficioProcessoSei: string | null;
   oficioEm: string | null;
+  /** O que não bateu no último ofício devolvido; some quando chega o novo ofício. */
   divergencia: string | null;
+  /** Data da última devolução do ofício (o aviso "sem ofício" conta daqui). */
+  devolvidoEm: string | null;
   siopEmenda: string | null;
   siopValor: number | null;
   siopGnd: string | null;
   conferidoEm: string | null;
+  /** Solicitação de empenho (CAEP → DGFNSP). */
+  solicitadoEm: string | null;
+  solicitadoDocumentoSei: string | null;
+  /** Autorização de empenho (DGFNSP). */
   autorizadoEm: string | null;
   autorizadoDocumentoSei: string | null;
+  /** Envio à CGOFI para o empenho. */
+  cgofiEm: string | null;
+  cgofiDocumentoSei: string | null;
   empenhadoEm: string | null;
+  /** Documentos SEI do empenho: um por nota. */
+  empenhadoDocumentosSei: string[];
+  /** Envio para contratação (CAEP → CCGA). */
+  contratacaoEm: string | null;
+  /** Documentos SEI do despacho para contratação: um por nota. */
+  contratacaoDocumentosSei: string[];
   canceladoEm: string | null;
   canceladoMotivo: string | null;
   versao: number;
   atualizadoPorNome: string | null;
   atualizadoEm: string | null;
   linhas: LinhaPedido[];
+  /** Tentativas devolvidas, da primeira à última. */
+  devolucoes: DevolucaoPedido[];
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas] = await Promise.all([
+  const [pedidos, linhas, devolucoes] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
-    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate))
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate))
   ]);
+  const devolucoesPorPedido = new Map<string, DevolucaoPedido[]>();
+  for (const d of devolucoes) {
+    const lista = devolucoesPorPedido.get(d.pedido_id) ?? [];
+    lista.push({
+      rodada: d.rodada,
+      minutaEm: d.minuta_em ?? null,
+      oficioEm: d.oficio_em ?? null,
+      oficioDocumentoSei: d.oficio_documento_sei ?? null,
+      oficioProcessoSei: d.oficio_processo_sei ?? null,
+      motivo: d.motivo,
+      devolvidoEm: d.devolvido_em,
+      criadoPorNome: d.criado_por_nome ?? null
+    });
+    devolucoesPorPedido.set(d.pedido_id, lista);
+  }
   const porPedido = new Map<string, LinhaPedido[]>();
   for (const l of linhas) {
     const lista = porPedido.get(l.pedido_id) ?? [];
@@ -552,6 +603,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       canceladaMotivo: l.cancelada_motivo ?? null,
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
       contratoNumero: l.contrato_numero ?? null,
+      despachoDocumentoSei: l.despacho_documento_sei ?? null,
       aConferir: l.a_conferir ?? null,
       planilhaRef: l.planilha_ref ?? null
     });
@@ -572,22 +624,32 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       minutaEm: p.minuta_em ?? null,
       minutaDocumentoSei: p.minuta_documento_sei ?? null,
       oficioNumero: p.oficio_numero ?? null,
+      oficioDocumentoSei: p.oficio_documento_sei ?? null,
       oficioProcessoSei: p.oficio_processo_sei ?? null,
       oficioEm: p.oficio_em ?? null,
       divergencia: p.divergencia ?? null,
+      devolvidoEm: p.devolvido_em ?? null,
       siopEmenda: p.siop_emenda ?? null,
       siopValor: p.siop_valor == null ? null : num(p.siop_valor),
       siopGnd: p.siop_gnd ?? null,
       conferidoEm: p.conferido_em ?? null,
+      solicitadoEm: p.solicitado_em ?? null,
+      solicitadoDocumentoSei: p.solicitado_documento_sei ?? null,
       autorizadoEm: p.autorizado_em ?? null,
       autorizadoDocumentoSei: p.autorizado_documento_sei ?? null,
+      cgofiEm: p.cgofi_em ?? null,
+      cgofiDocumentoSei: p.cgofi_documento_sei ?? null,
       empenhadoEm: p.empenhado_em ?? null,
+      empenhadoDocumentosSei: Array.isArray(p.empenhado_documentos_sei) ? p.empenhado_documentos_sei : [],
+      contratacaoEm: p.contratacao_em ?? null,
+      contratacaoDocumentosSei: Array.isArray(p.contratacao_documentos_sei) ? p.contratacao_documentos_sei : [],
       canceladoEm: p.cancelado_em ?? null,
       canceladoMotivo: p.cancelado_motivo ?? null,
       versao: p.versao,
       atualizadoPorNome: p.atualizado_por_nome ?? null,
       atualizadoEm: p.atualizado_em ?? null,
-      linhas: (porPedido.get(p.id) ?? []).sort((a, b) => a.ordem - b.ordem)
+      linhas: (porPedido.get(p.id) ?? []).sort((a, b) => a.ordem - b.ordem),
+      devolucoes: (devolucoesPorPedido.get(p.id) ?? []).sort((a, b) => a.rodada - b.rodada)
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -633,7 +695,7 @@ export async function salvarPedidoEmenda(p: {
   return data as { id: string; versao: number; numero: number };
 }
 
-export type AcaoPedido = 'MINUTA' | 'OFICIO' | 'DIVERGENCIA' | 'CONFERIDO' | 'AUTORIZADO' | 'EMPENHADO';
+export type AcaoPedido = 'MINUTA' | 'OFICIO' | 'DIVERGENCIA' | 'CONFERIDO' | 'SOLICITADO' | 'AUTORIZADO' | 'CGOFI' | 'EMPENHADO' | 'CONTRATACAO' | 'ACRESCENTAR_SEI';
 
 export async function avancarPedidoEmenda(id: string, versao: number, acao: AcaoPedido, dados: Record<string, unknown>): Promise<{ id: string; versao: number }> {
   const { data, error } = await db().rpc('avancar_pedido_emenda', { p_id: id, p_versao: versao, p_acao: acao, p_dados: dados });

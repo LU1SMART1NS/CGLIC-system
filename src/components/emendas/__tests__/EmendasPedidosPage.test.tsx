@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import type { AutorEmenda, ItemCaep, LinhaPedido, PedidoEmenda } from '../../../services/emendasService';
@@ -10,13 +10,14 @@ const item: ItemCaep = {
 const linha = (id: string, quantidade: number): LinhaPedido => ({
   id, ordem: 1, tipo: 'ITEM', itemKey: 'a', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
   quantidade, beneficiarioId: null, notaEmpenho: null, cancelada: false, canceladaMotivo: null,
-  empenhoDocumentoSei: null, contratoNumero: null, aConferir: null, planilhaRef: null
+  empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, aConferir: null, planilhaRef: null
 });
 const pedido = (id: string, autorId: string | null, etapa: PedidoEmenda['etapa'], quantidade: number): PedidoEmenda => ({
   id, numero: 1, autorId, etapa, origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-10-20',
-  minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, siopEmenda: null,
-  siopValor: null, siopGnd: null, conferidoEm: null, autorizadoEm: null, autorizadoDocumentoSei: null, empenhadoEm: null, canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)]
+  minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null,
+  siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
+  empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: []
 });
 const autor = (id: string, nome: string, tipo: AutorEmenda['tipo']): AutorEmenda => ({ id, nome, tipo, nomeCivil: null, partido: 'PX', uf: 'SP', emExercicio: true, legislatura: 57, lidoEm: null });
 
@@ -72,5 +73,39 @@ describe('Pedidos: ver por pedido ou por autor', () => {
     expect(html).not.toContain('Já empenhado');
     expect(html).toContain('Senadora Dois');
     expect(html).not.toContain('Deputado Um');
+  });
+});
+
+describe('Pedidos: linha do tempo com o SEI de cada etapa (migration 174)', () => {
+  beforeAll(() => {
+    PEDIDOS.push(
+      {
+        ...pedido('dev', 'A1', 'RESERVADO', 1),
+        oficioProcessoSei: '08027.000226/2026-61',
+        divergencia: 'valor diferente',
+        devolvidoEm: '2026-10-20',
+        devolucoes: [{ rodada: 1, minutaEm: '2026-09-10', oficioEm: '2026-09-25', oficioDocumentoSei: '40555666', oficioProcessoSei: '08027.000226/2026-61', motivo: 'valor diferente', devolvidoEm: '2026-10-20', criadoPorNome: null }]
+      },
+      { ...pedido('ccga', 'A2', 'CONTRATACAO', 1), solicitadoDocumentoSei: '41000001', cgofiDocumentoSei: '41000003', empenhadoDocumentosSei: ['41000004', '41000005'], contratacaoDocumentosSei: ['41000006'] }
+    );
+  });
+
+  it('ofício devolvido: a próxima etapa é a 2ª minuta, com a tentativa anterior e o aviso', () => {
+    const html = render('/?pedido=dev');
+    expect(html).toContain('emendas-pedido-devolucoes-dev');
+    expect(html).toContain('fazer a nova minuta');
+    expect(html).toContain('2ª minuta');
+    expect(html).toContain('Registrar a 2ª minuta');
+    expect(html).toContain('40555666');
+    expect(html).toContain('Ofício devolvido em 20/10/2026: valor diferente');
+  });
+
+  it('enviado para contratação: SEI de cada etapa, vários no empenho, sem alterar nem cancelar', () => {
+    const html = render('/?pedido=ccga');
+    for (const n of ['41000001', '41000003', '41000004', '41000005', '41000006']) expect(html).toContain(n);
+    expect(html).toContain('emendas-pedido-mais-sei-CONTRATACAO');
+    expect(html).toContain('emendas-pedido-mais-sei-EMPENHADO');
+    expect(html).not.toContain('emendas-pedido-cancelar-ccga');
+    expect(html).not.toContain('emendas-pedido-alterar-ccga');
   });
 });
