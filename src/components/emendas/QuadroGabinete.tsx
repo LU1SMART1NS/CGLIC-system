@@ -232,7 +232,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
             </tbody>
           </table>
           {/* Embaixo da tabela, como em documento oficial: a fonte e, depois, as notas. */}
-          <div style={{ marginTop: '0.35rem', fontSize: '0.72rem', color: 'var(--color-text-secondary, #334155)', display: 'flex', flexDirection: 'column', gap: '0.15rem' }} data-testid={`${testId}-fonte`}>
+          <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--color-text-secondary, #334155)', display: 'flex', flexDirection: 'column', gap: '0.15rem' }} data-testid={`${testId}-fonte`}>
             <span>{quadro.fonte}</span>
             {quadro.notas.length > 0 && <span>{quadro.notas.length === 1 ? 'Nota' : 'Notas'}:</span>}
             {quadro.notas.map((n) => (
