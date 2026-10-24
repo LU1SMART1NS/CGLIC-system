@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlParaSei, montarQuadro, nomeDoItem, notaDoPreco, textoParaWhatsapp, tituloDoAnexo, type LinhaDoPedidoNoQuadro } from '../emendasQuadro';
+import { htmlDaTabela, montarQuadro, nomeDoItem, notaDoPreco, textoParaWhatsapp, tituloDoAnexo, type LinhaDoPedidoNoQuadro } from '../emendasQuadro';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep } from '../../services/emendasService';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 
@@ -92,8 +92,8 @@ describe('quadro da reserva (Anexo)', () => {
     expect(so4.porGnd).toEqual([]);
   });
 
-  it('SEI: 6 colunas, item com ata embaixo, beneficiário com sigla e razão social, entrega com endereço e TOTAL A EMPENHAR', () => {
-    const html = htmlParaSei(q);
+  it('Tabela (Word e SEI): 6 colunas, item com ata embaixo, beneficiário com sigla e razão social, entrega com endereço e TOTAL A EMPENHAR', () => {
+    const html = htmlDaTabela(q);
     for (const h of ['ITEM', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
     expect(html.match(/<th /g)).toHaveLength(6);
     expect(html).toContain('R$ 1.598,76<sup>¹</sup>');
@@ -104,7 +104,7 @@ describe('quadro da reserva (Anexo)', () => {
     expect(html).not.toContain('MUNICÍPIO');
     expect(html).not.toContain('ÓRGÃO');
     expect(html.match(/colspan="5"/g)).toHaveLength(3);
-    expect(htmlParaSei(montarQuadro({ autor, linhas: [linhas[2]], itens, beneficiarios: new Map([['b2', { ...cbm, nome: '<b>x</b>' }]]), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
+    expect(htmlDaTabela(montarQuadro({ autor, linhas: [linhas[2]], itens, beneficiarios: new Map([['b2', { ...cbm, nome: '<b>x</b>' }]]), precos, data: '2026-10-23' }))).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
   it('WhatsApp: lista com negrito no total', () => {
