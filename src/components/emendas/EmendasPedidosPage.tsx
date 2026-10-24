@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { Check, ChevronDown, ChevronRight, Circle, ClipboardList, Clock, RotateCcw } from 'lucide-react';
+import { AlertCircle, Check, ChevronDown, ChevronRight, Circle, ClipboardList, Clock, RotateCcw } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -34,15 +34,18 @@ import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import {
   ataDaLinha,
+  atasDoPedido,
   avisoGrave,
   AUTOR_A_DEFINIR,
   avisosDoPedido,
   dataDaEtapa,
+  documentosDaEtapa,
   ETAPAS,
   ETAPAS_COM_VARIOS_SEI,
   FASES_PEDIDO,
   faseDaEtapa,
   type FasePedido,
+  intervaloDeDatas,
   TOTAL_ETAPAS_PEDIDO,
   contratosDoPedido,
   jaEmpenhado,
@@ -54,6 +57,7 @@ import {
   reservadoPorItem,
   ROTULO_ETAPA,
   seiDaEtapa,
+  solicitacoesSemAta,
   ultimoContatoPorAutor,
   valorDaLinha,
   valorDoPedidoNaEtapa,
@@ -68,7 +72,7 @@ import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
-import { EtapaPedidoModal, type AcaoDaJanela } from './EtapaPedidoModal';
+import { EtapaPedidoModal, type AcaoDaJanela, type ContextoDaJanela } from './EtapaPedidoModal';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 type Segmento = 'todos' | FasePedido | 'CANCELADO';
@@ -103,18 +107,117 @@ const SeiDaEtapa: React.FC<{ rotulo: string; numero: string; testId: string }> =
   </div>
 );
 
+type AoAgir = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => void;
+
+/** Lista que mostra os dois primeiros e "mais N" (a etapa em que o pedido está começa aberta). */
+const ListaRecolhivel: React.FC<{ itens: React.ReactNode[]; aberta: boolean; nome: string; testId: string }> = ({ itens, aberta, nome, testId }) => {
+  const [toda, setToda] = useState(aberta);
+  if (itens.length <= 2) return <>{itens}</>;
+  return (
+    <>
+      {toda ? itens : itens.slice(0, 2)}
+      <div className="emendas-etapa__recolher">
+        <AppButton size="xs" variant="link" onClick={() => setToda(!toda)} aria-expanded={toda} data-testid={testId}>
+          {toda ? 'mostrar menos' : `mais ${itens.length - 2} ${nome}`}
+        </AppButton>
+      </div>
+    </>
+  );
+};
+
+/** Documento SEI da etapa com a data informada. */
+const DocumentoDaEtapa: React.FC<{ numero: string; data: string | null; testId: string }> = ({ numero, data, testId }) => (
+  <div className="emendas-etapa__doc">
+    <NumeroSeiEtiqueta numero={numero} testId={testId} />
+    <span className="emendas-etapa__doc-data">{data ? dataBR(data) : 'sem data'}</span>
+  </div>
+);
+
 /**
- * Linha do tempo do pedido em três fases (Interlocução · Empenho · Contratação), com o SEI de cada etapa e as
- * tentativas devolvidas (migration 174). A última etapa, Contratado, vem dos contratos das notas no Contratos.gov.br.
- * Fase concluída começa recolhida; a fase em que o pedido está fica sempre aberta.
+ * Uma solicitação de autorização de empenho para cada ata do pedido (migration 178): o número SEI, os itens e o dia
+ * em que a Diretora do FNSP assinou. A que falta vem primeiro, com o botão para informar.
  */
-const EtapasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha>; podeGerir: boolean; podeVerContratos: boolean; onAcao: (acao: AcaoDaJanela) => void }> = ({
-  p,
-  notas,
-  podeGerir,
-  podeVerContratos,
-  onAcao
-}) => {
+const AtasDaSolicitacao: React.FC<{ p: PedidoEmenda; itens: Map<string, ItemCaep>; podeGerir: boolean; aberta: boolean; onAcao: AoAgir }> = ({ p, itens, podeGerir, aberta, onAcao }) => {
+  const atas = atasDoPedido(p, itens);
+  const soltas = solicitacoesSemAta(p);
+  const autorizado = ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.AUTORIZADO;
+  // Pedido do controle anterior sem nenhuma solicitação informada: mostra as atas sem cor de aviso.
+  const nenhuma = !p.documentos.some((d) => d.etapa === 'AUTORIZACAO');
+  const linhas = atas.map((a) => {
+    const falta = a.situacao === 'falta';
+    const botao = falta
+      ? 'Informar a solicitação desta ata'
+      : a.situacao === 'aguardando' && autorizado
+        ? 'Informar a assinatura'
+        : 'Alterar';
+    return (
+      <div key={a.ataKey} className={falta && !nenhuma ? 'emendas-ata emendas-ata--falta' : 'emendas-ata'} data-testid={`emendas-pedido-ata-${a.numeroAta}`}>
+        {a.solicitacao ? <NumeroSeiEtiqueta numero={a.solicitacao} testId="emendas-pedido-sei-AUTORIZACAO" /> : <span className="emendas-ata__falta">falta</span>}
+        <div className="emendas-ata__det">
+          <strong>
+            Ata {a.numeroAta}
+            {a.fornecedor ? ` · ${a.fornecedor}` : ''}
+          </strong>
+          {a.itens.map((i) => (
+            <span key={i.itemKey}>
+              item {i.numeroItem} · {i.nome} · <strong>{i.quantidade} un.</strong>
+            </span>
+          ))}
+          {a.situacao === 'assinada' && (
+            <span>
+              Assinada pela Diretora do FNSP em <strong>{dataBR(a.assinadaEm)}</strong>
+            </span>
+          )}
+          {a.situacao === 'aguardando' && <span className="emendas-ata__aviso">aguardando a assinatura da Diretora do FNSP</span>}
+          {falta && !nenhuma && <span className="emendas-ata__aviso">Esta ata ainda não tem solicitação de empenho.</span>}
+          {podeGerir && (
+            <span>
+              <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: a.ataKey, numero: a.solicitacao ?? undefined })} data-testid={`emendas-pedido-ata-informar-${a.numeroAta}`}>
+                {botao}
+              </AppButton>
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  });
+  return (
+    <div className="emendas-atas" data-testid={`emendas-pedido-atas-${p.id}`}>
+      {nenhuma && autorizado && <div className="emendas-etapa__nota" style={{ margin: 0 }}>Nenhuma solicitação informada neste pedido.</div>}
+      <ListaRecolhivel itens={linhas} aberta={aberta || atas.some((a) => a.situacao !== 'assinada')} nome="atas" testId={`emendas-pedido-atas-mais-${p.id}`} />
+      {soltas.map((n) => (
+        <div key={n} className="emendas-ata" data-testid="emendas-pedido-solicitacao-sem-ata">
+          <NumeroSeiEtiqueta numero={n} testId="emendas-pedido-sei-AUTORIZACAO" />
+          <div className="emendas-ata__det">
+            <span className="emendas-ata__aviso">Solicitação sem ata</span>
+            {podeGerir && (
+              <span>
+                <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { numero: n })}>
+                  Ligar a uma ata
+                </AppButton>
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Linha do tempo do pedido em três fases (Interlocução · Empenho · Contratação), com os documentos SEI de cada etapa e
+ * a data de cada um, e as tentativas devolvidas (migration 174). Na autorização, uma solicitação para cada ata
+ * (migration 178). A última etapa, Contratado, vem dos contratos das notas no Contratos.gov.br. Fase concluída começa
+ * recolhida; a fase em que o pedido está fica sempre aberta.
+ */
+const EtapasDoPedido: React.FC<{
+  p: PedidoEmenda;
+  itens: Map<string, ItemCaep>;
+  notas: Map<string, NotaDaLinha>;
+  podeGerir: boolean;
+  podeVerContratos: boolean;
+  onAcao: AoAgir;
+}> = ({ p, itens, notas, podeGerir, podeVerContratos, onAcao }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const atual = ORDEM_ETAPA[p.etapa];
   const rodada = rodadaDoPedido(p);
@@ -122,6 +225,12 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha
   const contratado = Boolean(contratos?.contratado);
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   const doPlanilha = p.origem === 'PLANILHA';
+  // As atas ficam na solicitação enquanto o pedido espera a assinatura; depois, na autorização.
+  const etapaDasAtas: EtapaPedido | null = cancelado ? null : atual >= ORDEM_ETAPA.AUTORIZADO ? 'AUTORIZADO' : p.etapa === 'SOLICITADO' ? 'SOLICITADO' : null;
+  const atas = etapaDasAtas ? atasDoPedido(p) : [];
+  const nenhumaSolicitacao = !p.documentos.some((d) => d.etapa === 'AUTORIZACAO');
+  const atasProntas = atas.filter((a) => (etapaDasAtas === 'AUTORIZADO' ? a.situacao === 'assinada' : a.situacao !== 'falta')).length;
+  const faltamAtas = atas.length > 0 && atasProntas < atas.length && !nenhumaSolicitacao;
   const linhaDaEtapa = (feita: boolean, atualAqui: boolean, voltou: boolean): string =>
     ['emendas-etapa', feita ? 'emendas-etapa--feita' : '', atualAqui ? 'emendas-etapa--atual' : '', voltou ? 'emendas-etapa--voltou' : '', cancelado ? 'emendas-etapa--cancelada' : '']
       .filter(Boolean)
@@ -166,21 +275,40 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha
                   // Na carga das planilhas a data da reserva é a da carga, não a da conversa com o parlamentar.
                   const data = doPlanilha && etapa === 'RESERVADO' ? null : dataDaEtapa(p, etapa);
                   const mostraDados = feita || feitaAntes;
-                  const seis = mostraDados ? seiDaEtapa(p, etapa) : [];
+                  const comAtas = etapa === etapaDasAtas;
+                  // A solicitação e a autorização são o mesmo documento: com as atas numa etapa, a outra não repete.
+                  const solicitacaoNasAtas = etapa === 'SOLICITADO' && etapaDasAtas === 'AUTORIZADO';
+                  const docs = mostraDados && !comAtas && !solicitacaoNasAtas && etapa !== 'AUTORIZADO' ? documentosDaEtapa(p, etapa) : [];
+                  const intervalo = comAtas && etapa === 'AUTORIZADO' ? intervaloDeDatas(atas.map((a) => a.assinadaEm)) : intervaloDeDatas(docs.map((d) => d.data));
+                  const textoData = mostraDados ? (intervalo ?? (data ? dataBR(data) : null)) : null;
                   // Nota nova (outro fornecedor): mais um número no empenho ou no envio para contratação.
                   const acrescentar =
                     podeGerir && feita && ETAPAS_COM_VARIOS_SEI.has(etapa) && (etapa === 'EMPENHADO' ? jaEmpenhado(p.etapa) : p.etapa === 'CONTRATACAO');
+                  const avisoAtas = comAtas && faltamAtas && etapa === 'AUTORIZADO';
                   return (
                     <li key={etapa}>
                       <div className={linhaDaEtapa(mostraDados, atualAqui, voltou)}>
                         <span className="emendas-etapa__icone" aria-hidden="true">
-                          {mostraDados ? <Check size={14} /> : voltou ? <RotateCcw size={13} /> : <Circle size={10} />}
+                          {avisoAtas ? (
+                            <AlertCircle size={13} style={{ color: 'var(--color-warning-text)' }} />
+                          ) : mostraDados ? (
+                            <Check size={14} />
+                          ) : voltou ? (
+                            <RotateCcw size={13} />
+                          ) : (
+                            <Circle size={10} />
+                          )}
                         </span>
                         <span className="emendas-etapa__nome">
                           {e.rotulo}
                           {comRodada && <span className="emendas-etapa__rodada">{etapa === 'MINUTA' ? `${rodada}ª minuta` : `${rodada}º ofício`}</span>}
+                          {comAtas && atas.length > 0 && (
+                            <span className={faltamAtas ? 'emendas-etapa__contaatas emendas-etapa__contaatas--falta' : 'emendas-etapa__contaatas'} data-testid={`emendas-pedido-conta-atas-${p.id}`}>
+                              {atasProntas} de {atas.length} {atas.length === 1 ? 'ata' : 'atas'}
+                            </span>
+                          )}
                         </span>
-                        <span className="emendas-etapa__data">{mostraDados && data ? dataBR(data) : feita && !doPlanilha && !data ? 'não houve' : ''}</span>
+                        <span className="emendas-etapa__data">{textoData ?? (feita && !doPlanilha && !data ? 'não houve' : '')}</span>
                       </div>
                       {voltou && <div className="emendas-etapa__nota emendas-etapa__nota--aviso">fazer a nova minuta · ofício devolvido</div>}
                       {mostraDados && etapa === 'CONFERIDO' && p.siopEmenda && (
@@ -190,9 +318,20 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha
                           {p.siopValor != null ? ` · ${formatCurrency(p.siopValor)}` : ''}
                         </div>
                       )}
-                      {seis.map((n) => (
-                        <SeiDaEtapa key={n} rotulo="Doc." numero={n} testId={`emendas-pedido-sei-${etapa}`} />
-                      ))}
+                      {solicitacaoNasAtas && mostraDados && atas.length > 0 && (
+                        <div className="emendas-etapa__nota">Uma solicitação para cada ata, no passo seguinte (é o documento que a Diretora do FNSP assina).</div>
+                      )}
+                      {comAtas && <AtasDaSolicitacao p={p} itens={itens} podeGerir={podeGerir} aberta={atualAqui} onAcao={onAcao} />}
+                      {docs.length > 0 && (
+                        <ListaRecolhivel
+                          itens={docs.map((d) => (
+                            <DocumentoDaEtapa key={d.numero} numero={d.numero} data={d.data} testId={`emendas-pedido-sei-${etapa}`} />
+                          ))}
+                          aberta={atualAqui}
+                          nome="documentos"
+                          testId={`emendas-pedido-docs-mais-${etapa}`}
+                        />
+                      )}
                       {mostraDados && etapa === 'OFICIO' && p.oficioProcessoSei && (
                         <SeiDaEtapa rotulo="Processo" numero={p.oficioProcessoSei} testId="emendas-pedido-sei-processo" />
                       )}
@@ -343,7 +482,7 @@ interface DetalheProps {
   podeGerir: boolean;
   podeVerContratos: boolean;
   hoje: string;
-  onAcao: (acao: AcaoDaJanela) => void;
+  onAcao: AoAgir;
   onAlterar: () => void;
 }
 
@@ -414,7 +553,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
           </div>
         )}
         <OndeEstaOPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} onAlterar={onAlterar} />
-        <EtapasDoPedido p={p} notas={notas} podeGerir={podeGerir} podeVerContratos={podeVerContratos} onAcao={onAcao} />
+        <EtapasDoPedido p={p} itens={itens} notas={notas} podeGerir={podeGerir} podeVerContratos={podeVerContratos} onAcao={onAcao} />
       </div>
     </div>
   );
@@ -461,7 +600,7 @@ export const EmendasPedidosPage: React.FC = () => {
       return prox;
     });
   const [editando, setEditando] = useState<PedidoEmenda | 'novo' | null>(null);
-  const [janela, setJanela] = useState<{ pedido: PedidoEmenda; acao: AcaoDaJanela } | null>(null);
+  const [janela, setJanela] = useState<{ pedido: PedidoEmenda; acao: AcaoDaJanela; contexto?: ContextoDaJanela } | null>(null);
 
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
@@ -742,6 +881,7 @@ export const EmendasPedidosPage: React.FC = () => {
                 { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
                 { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
                 { value: 'aConferir', label: 'Linhas a conferir (controle anterior da CAEP)', count: contaAviso('aConferir') },
+                { value: 'semAutorizacao', label: 'Ata sem autorização de empenho', count: contaAviso('semAutorizacao') },
                 { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') }
               ]}
               onChange={setFiltroAviso}
@@ -787,7 +927,7 @@ export const EmendasPedidosPage: React.FC = () => {
                   podeGerir={podeGerir}
                   podeVerContratos={podeVerContratos}
                   hoje={hoje}
-                  onAcao={(acao) => setJanela({ pedido: l, acao })}
+                  onAcao={(acao, contexto) => setJanela({ pedido: l, acao, contexto })}
                   onAlterar={() => setEditando(l)}
                 />
               )}
@@ -810,7 +950,9 @@ export const EmendasPedidosPage: React.FC = () => {
           onClose={() => setEditando(null)}
         />
       )}
-      {janela && <EtapaPedidoModal pedido={janela.pedido} acao={janela.acao} itens={itens} nomeDoAutor={nomeDoAutor(janela.pedido.autorId)} onClose={() => setJanela(null)} />}
+      {janela && (
+        <EtapaPedidoModal pedido={janela.pedido} acao={janela.acao} contexto={janela.contexto} itens={itens} nomeDoAutor={nomeDoAutor(janela.pedido.autorId)} onClose={() => setJanela(null)} />
+      )}
     </PageContainer>
   );
 };

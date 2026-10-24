@@ -40,6 +40,7 @@ const ABAS: ReadonlyArray<{ id: TipoAviso; rotulo: string }> = [
   { id: 'divergencia', rotulo: 'Ofício devolvido' },
   { id: 'semOficio', rotulo: `Sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias` },
   { id: 'ataVencendo', rotulo: 'Ata vence em breve' },
+  { id: 'semAutorizacao', rotulo: 'Ata sem autorização de empenho' },
   { id: 'semNota', rotulo: 'Sem nota de empenho' },
   { id: 'aConferir', rotulo: 'A conferir' }
 ];

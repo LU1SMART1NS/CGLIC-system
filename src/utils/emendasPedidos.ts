@@ -2,8 +2,8 @@
  * Regras dos pedidos das emendas (migration 157), fora das telas para poder testar: etapas, valor, itens que cada
  * linha ocupa e avisos (30 dias sem ofício, divergência com o SIOP, ata vencendo ou vencida antes do empenho).
  */
-import type { AcaoPedido, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
-import { avisoIndicacaoDias, corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from './emendasKits';
+import type { AcaoPedido, EtapaDoDocumento, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
+import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, passouDoCorte } from './emendasKits';
 import { chaveDoContrato } from './contractKeyUtils';
 import { formatCurrency } from './format';
 import type { PrecoPrevisto } from '../services/emendasQuadroService';
@@ -188,7 +188,7 @@ export function orgaoDoPedido(p: PedidoEmenda, nomeDoBeneficiario: (id: string) 
   return nomes.length === 1 ? nomes[0] : `${nomes[0]} e mais ${nomes.length - 1}`;
 }
 
-export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'aConferir' | 'semNota';
+export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'aConferir' | 'semNota' | 'semAutorizacao';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -201,7 +201,7 @@ export interface AvisoPedido {
 }
 
 /** Do mais grave ao mais leve: na lista aparece só o primeiro, com "+N" para os outros. */
-export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, divergencia: 2, semOficio: 3, ataVencendo: 4, semNota: 5, aConferir: 6 };
+export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, divergencia: 2, semOficio: 3, ataVencendo: 4, semAutorizacao: 5, semNota: 6, aConferir: 7 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
 export const avisoGrave = (a: Pick<AvisoPedido, 'tipo'>) => GRAVIDADE_DO_AVISO[a.tipo] <= GRAVIDADE_DO_AVISO.semOficio;
@@ -244,6 +244,8 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
       avisos.push({ tipo: 'divergencia', curto: 'Ofício devolvido', texto: `Ofício devolvido em ${dataBR(p.devolvidoEm)}: ${p.divergencia}` });
     }
   }
+  const semAutorizacao = atasSemAutorizacao(p);
+  if (semAutorizacao) avisos.push(semAutorizacao);
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
     if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });
@@ -396,4 +398,113 @@ export function seiDaEtapa(p: PedidoEmenda, etapa: EtapaPedido): string[] {
     default:
       return [];
   }
+}
+
+/** Ata da chave do item (numero_ata-uasg-item → numero_ata-uasg), como no banco (migration 178). */
+export const ataDoItem = (itemKey: string): string => itemKey.split('-').slice(0, 2).join('-');
+
+/** Solicitação de autorização de empenho da ata: falta o número, aguarda a assinatura da Diretora do FNSP ou assinada. */
+export type SituacaoDaSolicitacao = 'falta' | 'aguardando' | 'assinada';
+
+export interface AtaDoPedido {
+  ataKey: string;
+  numeroAta: string;
+  /** Fornecedores dos itens do pedido nesta ata (normalmente um). */
+  fornecedor: string | null;
+  itens: Array<{ itemKey: string; numeroItem: number; nome: string; quantidade: number }>;
+  solicitacao: string | null;
+  assinadaEm: string | null;
+  situacao: SituacaoDaSolicitacao;
+}
+
+/**
+ * Atas das linhas ativas do pedido (itens e itens dos kits), cada uma com a sua solicitação de autorização de empenho
+ * (uma por ata, migration 178). Na ordem: as que faltam, as que aguardam a assinatura, as assinadas.
+ */
+export function atasDoPedido(p: PedidoEmenda, itens?: Map<string, ItemCaep>): AtaDoPedido[] {
+  const porAta = new Map<string, AtaDoPedido>();
+  for (const l of linhasAtivas(p)) {
+    for (const x of itensDaLinha(l)) {
+      const chave = ataDoItem(x.itemKey);
+      const item = itens?.get(x.itemKey);
+      const ata = porAta.get(chave) ?? {
+        ataKey: chave,
+        numeroAta: chave.split('-')[0],
+        fornecedor: null,
+        itens: [],
+        solicitacao: null,
+        assinadaEm: null,
+        situacao: 'falta' as SituacaoDaSolicitacao
+      };
+      const doItem = ata.itens.find((i) => i.itemKey === x.itemKey);
+      if (doItem) doItem.quantidade += x.quantidade;
+      else ata.itens.push({ itemKey: x.itemKey, numeroItem: Number(x.itemKey.split('-')[2]), nome: item ? item.nomeCurto?.trim() || curto(item.descricao) : `item ${x.itemKey}`, quantidade: x.quantidade });
+      const fornecedor = item?.fornecedor?.trim();
+      if (fornecedor && !(ata.fornecedor ?? '').split(' · ').includes(fornecedor)) ata.fornecedor = ata.fornecedor ? `${ata.fornecedor} · ${fornecedor}` : fornecedor;
+      porAta.set(chave, ata);
+    }
+  }
+  for (const d of p.documentos) {
+    const ata = d.etapa === 'AUTORIZACAO' && d.ataKey ? porAta.get(d.ataKey) : undefined;
+    if (!ata) continue;
+    ata.solicitacao = d.numero;
+    ata.assinadaEm = d.assinadaEm;
+    ata.situacao = d.assinadaEm ? 'assinada' : 'aguardando';
+  }
+  const ordem: Record<SituacaoDaSolicitacao, number> = { falta: 0, aguardando: 1, assinada: 2 };
+  return [...porAta.values()]
+    .map((a) => ({ ...a, itens: a.itens.sort((x, y) => x.numeroItem - y.numeroItem) }))
+    .sort((a, b) => ordem[a.situacao] - ordem[b.situacao] || a.numeroAta.localeCompare(b.numeroAta));
+}
+
+/** Solicitações do pedido que ainda não dizem qual ata cobrem (o gestor liga cada uma à sua ata). */
+export const solicitacoesSemAta = (p: PedidoEmenda): string[] =>
+  p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && !d.ataKey).map((d) => d.numero);
+
+/**
+ * Aviso de ata sem solicitação assinada, depois da autorização. Pedido sem nenhuma solicitação informada não avisa:
+ * são os do controle anterior da CAEP, que ainda não têm as solicitações (decisão de 24/10/2026).
+ */
+export function atasSemAutorizacao(p: PedidoEmenda): AvisoPedido | null {
+  if (ORDEM_ETAPA[p.etapa] < ORDEM_ETAPA.AUTORIZADO || !p.documentos.some((d) => d.etapa === 'AUTORIZACAO')) return null;
+  const atas = atasDoPedido(p);
+  const n = atas.filter((a) => a.situacao !== 'assinada').length;
+  if (!n) return null;
+  return {
+    tipo: 'semAutorizacao',
+    curto: n === 1 ? '1 ata sem autorização' : `${n} atas sem autorização`,
+    texto: `${n} de ${atas.length} ${atas.length === 1 ? 'ata' : 'atas'} sem solicitação de empenho assinada pela Diretora do FNSP`
+  };
+}
+
+/** Etapa dos documentos SEI de cada etapa do pedido (a solicitação e a autorização são o mesmo documento). */
+const DOCUMENTO_DA_ETAPA: Partial<Record<EtapaPedido, EtapaDoDocumento>> = {
+  OFICIO: 'OFICIO',
+  SOLICITADO: 'AUTORIZACAO',
+  AUTORIZADO: 'AUTORIZACAO',
+  CGOFI: 'CGOFI',
+  EMPENHADO: 'EMPENHO',
+  CONTRATACAO: 'CONTRATACAO'
+};
+
+/**
+ * Documentos SEI da etapa com a data de cada um: os da tabela de documentos (migration 177) e os das colunas que
+ * ainda não estão nela (os das linhas da planilha, sem data própria).
+ */
+export function documentosDaEtapa(p: PedidoEmenda, etapa: EtapaPedido): Array<{ numero: string; data: string | null }> {
+  const tipo = DOCUMENTO_DA_ETAPA[etapa];
+  if (!tipo) return [];
+  const docs = p.documentos.filter((d) => d.etapa === tipo).map((d) => ({ numero: d.numero, data: d.data }));
+  const tem = new Set(docs.map((d) => d.numero));
+  for (const n of seiDaEtapa(p, etapa === 'AUTORIZADO' ? 'SOLICITADO' : etapa)) if (!tem.has(n)) docs.push({ numero: n, data: dataDaEtapa(p, etapa) });
+  return docs;
+}
+
+/** Data de uma etapa com vários documentos: o intervalo quando os dias são diferentes ("15/10 a 20/10/2026"). */
+export function intervaloDeDatas(datas: Array<string | null>): string | null {
+  const dias = [...new Set(datas.filter((d): d is string => Boolean(d)).map((d) => d.slice(0, 10)))].sort();
+  if (dias.length === 0) return null;
+  if (dias.length === 1) return dataBR(dias[0]);
+  const [ini, fim] = [dias[0], dias[dias.length - 1]];
+  return `${ini.slice(0, 4) === fim.slice(0, 4) ? dataBR(ini).slice(0, 5) : dataBR(ini)} a ${dataBR(fim)}`;
 }

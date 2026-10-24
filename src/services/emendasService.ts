@@ -104,6 +104,8 @@ export interface ItemCaep {
   nomeCurto?: string | null;
   gnd?: 'GND-3' | 'GND-4' | null;
   dadosVersao?: number | null;
+  /** Fornecedor do item na ata (migration 178), para a lista das atas do pedido. */
+  fornecedor?: string | null;
 }
 
 export interface ItemDoKit {
@@ -277,7 +279,8 @@ export async function fetchItensCaep(): Promise<ItemCaep[]> {
     alocado: num(r.alocado),
     nomeCurto: r.nome_curto ?? null,
     gnd: r.gnd ?? null,
-    dadosVersao: r.dados_versao ?? null
+    dadosVersao: r.dados_versao ?? null,
+    fornecedor: r.fornecedor ?? null
   }));
 }
 
@@ -498,6 +501,19 @@ export interface LinhaPedido {
   planilhaRef: string | null;
 }
 
+/** Etapa dos documentos SEI do pedido (migration 177): AUTORIZACAO é a solicitação de empenho, que a DGFNSP assina. */
+export type EtapaDoDocumento = 'OFICIO' | 'AUTORIZACAO' | 'CGOFI' | 'EMPENHO' | 'CONTRATACAO';
+
+/** Um documento SEI de uma etapa do pedido: o número e a data que o gestor informa (migrations 177 e 178). */
+export interface DocumentoSeiDoPedido {
+  etapa: EtapaDoDocumento;
+  numero: string;
+  data: string | null;
+  /** Só na solicitação: a ata que ela cobre e o dia em que a Diretora do FNSP assinou. */
+  ataKey: string | null;
+  assinadaEm: string | null;
+}
+
 /** Tentativa devolvida: a minuta e o ofício com divergência (migration 174). */
 export interface DevolucaoPedido {
   rodada: number;
@@ -563,14 +579,32 @@ export interface PedidoEmenda {
   linhas: LinhaPedido[];
   /** Tentativas devolvidas, da primeira à última. */
   devolucoes: DevolucaoPedido[];
+  /** Todos os documentos SEI das etapas (migration 177), com a ata de cada solicitação (migration 178). */
+  documentos: DocumentoSeiDoPedido[];
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
-    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate))
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
+    // Só o que o gestor informa: a hora e quem assinou, lidos no SEI uma vez, não aparecem nas telas.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('emenda_pedido_documentos_sei').select('id, pedido_id, etapa, documento_sei, data_documento, ata_key, assinado_em').order('id').range(de, ate)
+    )
   ]);
+  const documentosPorPedido = new Map<string, DocumentoSeiDoPedido[]>();
+  for (const d of documentos) {
+    const lista = documentosPorPedido.get(d.pedido_id) ?? [];
+    lista.push({
+      etapa: d.etapa,
+      numero: d.documento_sei,
+      data: d.data_documento ?? null,
+      ataKey: d.ata_key ?? null,
+      assinadaEm: d.assinado_em ? diaEmBrasilia(d.assinado_em) : null
+    });
+    documentosPorPedido.set(d.pedido_id, lista);
+  }
   const devolucoesPorPedido = new Map<string, DevolucaoPedido[]>();
   for (const d of devolucoes) {
     const lista = devolucoesPorPedido.get(d.pedido_id) ?? [];
@@ -650,7 +684,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       atualizadoPorNome: p.atualizado_por_nome ?? null,
       atualizadoEm: p.atualizado_em ?? null,
       linhas: (porPedido.get(p.id) ?? []).sort((a, b) => a.ordem - b.ordem),
-      devolucoes: (devolucoesPorPedido.get(p.id) ?? []).sort((a, b) => a.rodada - b.rodada)
+      devolucoes: (devolucoesPorPedido.get(p.id) ?? []).sort((a, b) => a.rodada - b.rodada),
+      documentos: (documentosPorPedido.get(p.id) ?? []).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? '') || a.numero.localeCompare(b.numero))
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -702,6 +737,23 @@ export async function avancarPedidoEmenda(id: string, versao: number, acao: Acao
   const { data, error } = await db().rpc('avancar_pedido_emenda', { p_id: id, p_versao: versao, p_acao: acao, p_dados: dados });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
+}
+
+/** Dia (AAAA-MM-DD) de um instante no horário de Brasília. */
+const diaEmBrasilia = (instante: string): string => new Date(instante).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+
+/**
+ * Solicitação de autorização de empenho de uma ata do pedido (migration 178): o número SEI e, se a Diretora do FNSP
+ * já assinou, o dia. Troca a solicitação que a ata tinha; o banco recusa número já ligado a outra ata.
+ */
+export async function informarSolicitacaoDaAta(v: { pedidoId: string; ataKey: string; documentoSei: string; assinadaEm: string | null }): Promise<void> {
+  const { error } = await db().rpc('informar_solicitacao_da_ata', {
+    p_id: v.pedidoId,
+    p_ata: v.ataKey,
+    p_documento_sei: v.documentoSei,
+    p_assinada_em: v.assinadaEm
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
 }
 
 export async function cancelarPedidoEmenda(id: string, versao: number, motivo: string): Promise<{ id: string; versao: number }> {

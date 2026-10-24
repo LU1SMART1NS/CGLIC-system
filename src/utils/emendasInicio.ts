@@ -56,7 +56,7 @@ export interface ResumoInicioEmendas {
   semNomeCurto: ItemCaep[];
 }
 
-const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'divergencia', 'semOficio', 'ataVencendo', 'semNota', 'aConferir'];
+const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'divergencia', 'semOficio', 'ataVencendo', 'semAutorizacao', 'semNota', 'aConferir'];
 
 /** Item da linha a que o aviso de ata se refere: o que tem a ata mais perto do fim. */
 function itemDoAviso(p: PedidoEmenda, aviso: AvisoPedido | undefined, itens: Map<string, ItemCaep>): ItemCaep | null {
@@ -168,6 +168,8 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
       return 'cobrar o ofício do parlamentar';
     case 'divergencia':
       return 'fazer a nova minuta';
+    case 'semAutorizacao':
+      return 'informar a solicitação de cada ata';
     case 'semNota':
       return 'procurar a nota pelo contrato';
     default:
