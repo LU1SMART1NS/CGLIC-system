@@ -11,7 +11,7 @@ export const AVISO_SEM_OFICIO_DIAS = 30;
 
 export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; rotulo: string; curto: string; descricao: string }> = [
   { etapa: 'RESERVADO', rotulo: 'Itens reservados', curto: 'Reservados', descricao: 'A CAEP combinou com o parlamentar e separou a quantidade.' },
-  { etapa: 'MINUTA', rotulo: 'Minuta enviada ao gabinete', curto: 'Minuta', descricao: 'A CAEP mandou a minuta do ofício ao gabinete.' },
+  { etapa: 'MINUTA', rotulo: 'Minuta enviada ao parlamentar', curto: 'Minuta', descricao: 'A CAEP mandou a minuta do ofício ao parlamentar.' },
   { etapa: 'OFICIO', rotulo: 'Ofício recebido', curto: 'Ofício', descricao: 'O ofício chegou ao MJSP e virou processo SEI na CAEP.' },
   { etapa: 'CONFERIDO', rotulo: 'Emenda conferida no SIOP', curto: 'Conferidos', descricao: 'Nº da emenda, autor, valor, GND, beneficiário e objeto batem.' },
   { etapa: 'SOLICITADO', rotulo: 'Empenho solicitado', curto: 'Solicitados', descricao: 'A CAEP elaborou a solicitação de empenho e enviou à DGFNSP.' },

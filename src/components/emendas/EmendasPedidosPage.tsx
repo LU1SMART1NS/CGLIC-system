@@ -162,7 +162,7 @@ const EtapasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha
                   // Ofício devolvido: a próxima etapa é a nova minuta.
                   const voltou = proxima && etapa === 'MINUTA' && p.devolucoes.length > 0;
                   const comRodada = rodada > 1 && (etapa === 'MINUTA' || etapa === 'OFICIO') && (feita || proxima);
-                  // Na carga das planilhas a data da reserva é a da carga, não a da conversa com o gabinete.
+                  // Na carga das planilhas a data da reserva é a da carga, não a da conversa com o parlamentar.
                   const data = doPlanilha && etapa === 'RESERVADO' ? null : dataDaEtapa(p, etapa);
                   const mostraDados = feita || feitaAntes;
                   const seis = mostraDados ? seiDaEtapa(p, etapa) : [];
@@ -312,7 +312,7 @@ const OndeEstaOPedido: React.FC<{
             </AppButton>
           )}
           <div style={{ display: 'flex', gap: '0.25rem 0.5rem', flexWrap: 'wrap' }}>
-            {/* Às vezes o gabinete manda o ofício sem minuta da CAEP. */}
+            {/* Às vezes o parlamentar manda o ofício sem minuta da CAEP. */}
             {p.etapa === 'RESERVADO' && !semAutor && <ActionButton action="avancarEtapa" size="xs" label="Já chegou o ofício" onClick={() => onAcao('OFICIO')} />}
             {/* O ofício com divergência volta para a minuta (migration 174). */}
             {p.etapa === 'OFICIO' && (
@@ -623,7 +623,7 @@ export const EmendasPedidosPage: React.FC = () => {
       <PageHeader
         title="Pedidos"
         subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na fase escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
-        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas em três fases: Interlocução (itens reservados → minuta enviada ao gabinete → ofício recebido), Empenho (emenda conferida no SIOP → empenho solicitado → empenho autorizado → processo enviado à CGOFI → nota de empenho emitida) e Contratação (processo enviado à CCGA → contratado, quando o contrato de cada nota aparece no Contratos.gov.br). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da fase escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
+        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas em três fases: Interlocução (itens reservados → minuta enviada ao parlamentar → ofício recebido), Empenho (emenda conferida no SIOP → empenho solicitado → empenho autorizado → processo enviado à CGOFI → nota de empenho emitida) e Contratação (processo enviado à CCGA → contratado, quando o contrato de cada nota aparece no Contratos.gov.br). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir das planilhas da CAEP. Pedidos que vieram das planilhas trazem o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da fase escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={
           <CarteiraSegmentTabs<'pedido' | 'autor'>

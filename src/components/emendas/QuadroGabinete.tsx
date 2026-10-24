@@ -70,7 +70,7 @@ interface Props {
 }
 
 /**
- * Quadro da reserva para o gabinete (migration 165): o Anexo que a CAEP manda ao parlamentar, pronto para colar no
+ * Quadro da reserva para o parlamentar (migration 165): o Anexo que a CAEP manda ao parlamentar, pronto para colar no
  * Word ou no SEI (tabela) ou no WhatsApp (texto). O valor unitário já vem com o reajuste previsto da ata.
  */
 export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 'emendas-quadro' }) => {
@@ -111,13 +111,13 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
 
   return (
     <section
-      aria-label="Quadro para o gabinete"
+      aria-label="Quadro para o parlamentar"
       data-testid={testId}
       style={{ border: '1px solid #c7d7f0', background: '#f5f8fd', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxWidth: 560 }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary)' }}>Quadro para o gabinete</span>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary)' }}>Quadro para o parlamentar</span>
           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary, #334155)' }}>
             No formato do Anexo: uma linha por item e beneficiário, kit aberto nos seus itens. O valor unitário já vem com o reajuste previsto da ata.
           </span>

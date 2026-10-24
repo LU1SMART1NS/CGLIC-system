@@ -276,7 +276,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, itens, nomeDoA
             <AppTextarea label="O que não bate *" rows={3} value={divergencia} onChange={(e) => setDivergencia(e.target.value)} placeholder="Ex.: valor do ofício (R$ 120.000) diferente do SIOP (R$ 98.000)" data-testid="emendas-etapa-divergencia" />
             <AppInput label="Devolvido em" type="date" value={data} onChange={(e) => setData(e.target.value)} />
             <div style={aviso('info')}>
-              O pedido volta para "Minuta": a CAEP faz a {rodada + 1}ª minuta e manda ao gabinete. A minuta e o ofício devolvidos ficam no histórico do pedido.
+              O pedido volta para "Minuta": a CAEP faz a {rodada + 1}ª minuta e manda ao parlamentar. A minuta e o ofício devolvidos ficam no histórico do pedido.
               A reserva continua.
             </div>
           </>

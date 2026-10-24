@@ -158,7 +158,7 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
     case 'ataVencendo':
       return fim ? `indicar até ${dataBR(limiteDaIndicacao(fim))}` : 'ata perto do fim';
     case 'semOficio':
-      return 'cobrar o ofício do gabinete';
+      return 'cobrar o ofício do parlamentar';
     case 'divergencia':
       return 'fazer a nova minuta';
     case 'semNota':
