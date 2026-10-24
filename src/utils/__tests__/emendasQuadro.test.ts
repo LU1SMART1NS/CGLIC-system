@@ -175,3 +175,30 @@ describe('mesmo item para vários beneficiários', () => {
     expect(t).toContain('  ◦ 3 para beneficiário a definir\n    = *R$ 575.434,86*');
   });
 });
+
+describe('preço pelo empenho provável (90 dias)', () => {
+  it('reajuste até o empenho entra; depois dele, preço de hoje; sem base, folga do IPCA; devido sempre', async () => {
+    const { aplicarPrazoDoEmpenho } = await import('../emendasQuadro');
+    const ipca = { percentual: 4.5, de: '2025-10-01', ate: '2026-09-01' };
+    const m = aplicarPrazoDoEmpenho(
+      new Map([
+        ['perto', preco('perto', { precoAtual: 100, precoPrevisto: 104, motivo: 'PREVISTO', efeito: '2027-01-01', percentual: 4 })],
+        ['longe', preco('longe', { precoAtual: 100, precoPrevisto: 104, motivo: 'SE_PRORROGAR', efeito: '2027-03-01', percentual: 4 })],
+        ['devido', preco('devido', { precoAtual: 100, precoPrevisto: 110, motivo: 'PREVISTO', devido: true, efeito: '2027-06-01', percentual: 5 })],
+        ['sembase', preco('sembase', { precoAtual: 200, precoPrevisto: 200, motivo: 'SEM_PREVISAO' })],
+        ['emdia', preco('emdia', { precoAtual: 50, precoPrevisto: 50, motivo: 'EM_DIA' })]
+      ]),
+      '2026-10-24',
+      ipca
+    );
+    expect(m.get('perto')).toMatchObject({ precoPrevisto: 104, motivo: 'PREVISTO' });
+    expect(m.get('longe')).toMatchObject({ precoPrevisto: 100, motivo: 'FORA_DO_PRAZO' });
+    expect(m.get('devido')).toMatchObject({ precoPrevisto: 110 });
+    expect(m.get('sembase')).toMatchObject({ precoPrevisto: 209, motivo: 'FOLGA_IPCA', percentual: 4.5 });
+    expect(m.get('emdia')).toMatchObject({ precoPrevisto: 50 });
+    expect(notaDoPreco(m.get('sembase'), ipca)).toBe('Ata sem data-base de reajuste informada: folga do IPCA dos últimos 12 meses (4,50%, 10/2025 a 09/2026).');
+    expect(notaDoPreco(m.get('longe'))).toBeNull();
+    // Sem o IPCA, o item sem base fica como estava (preço de hoje com o aviso).
+    expect(aplicarPrazoDoEmpenho(new Map([['sembase', preco('sembase', { precoAtual: 200, precoPrevisto: 200, motivo: 'SEM_PREVISAO' })]]), '2026-10-24', null).get('sembase')?.motivo).toBe('SEM_PREVISAO');
+  });
+});

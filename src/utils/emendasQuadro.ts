@@ -10,7 +10,7 @@
  * cada GND antes do TOTAL A EMPENHAR (no SIOP cada emenda tem um só GND).
  */
 import { formatarCep, localDoBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido } from '../services/emendasService';
-import type { GndItem, PrecoPrevisto } from '../services/emendasQuadroService';
+import type { GndItem, IpcaDozeMeses, PrecoPrevisto } from '../services/emendasQuadroService';
 import { descricaoItemEmFrase } from './textCase';
 import { dataBR } from './emendasKits';
 
@@ -37,6 +37,8 @@ export interface EntradaQuadro {
   precos: Map<string, PrecoPrevisto>;
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
+  /** IPCA dos 12 últimos meses, só para o texto da nota da folga. */
+  ipca?: IpcaDozeMeses | null;
 }
 
 export interface LinhaQuadro {
@@ -123,8 +125,42 @@ export function tituloDoAnexo(autor: AutorEmenda | null | undefined): string {
   return `Anexo I – Indicação de ${autor.nome} (${casa}${autor.uf ? ` · ${autor.uf}` : ''})`;
 }
 
+/** Dias entre o quadro e o empenho provável (estimativa da CAEP): reajuste depois disso não entra no preço. */
+export const PRAZO_ATE_O_EMPENHO_DIAS = 90;
+
+const somarDias = (iso: string, dias: number): string => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * Preço do quadro pelo empenho provável (hoje + prazo), para a emenda não ficar abaixo do preço do dia do empenho:
+ * - reajuste devido: sempre o preço reajustado;
+ * - próximo reajuste até o empenho provável: o preço projetado; depois dele: o preço de hoje (FORA_DO_PRAZO);
+ * - sem base para calcular: preço de hoje mais o IPCA dos últimos 12 meses (FOLGA_IPCA), porque o reajuste pode cair
+ *   antes do empenho.
+ */
+export function aplicarPrazoDoEmpenho(
+  precos: Map<string, PrecoPrevisto>,
+  hoje: string,
+  ipca: IpcaDozeMeses | null | undefined,
+  prazoDias = PRAZO_ATE_O_EMPENHO_DIAS
+): Map<string, PrecoPrevisto> {
+  const limite = somarDias(hoje, prazoDias);
+  const m = new Map<string, PrecoPrevisto>();
+  for (const [k, p] of precos) {
+    if ((p.motivo === 'PREVISTO' || p.motivo === 'SE_PRORROGAR') && p.efeito && p.efeito > limite && !p.devido) {
+      m.set(k, { ...p, precoPrevisto: p.precoAtual, motivo: 'FORA_DO_PRAZO' });
+    } else if (p.motivo === 'SEM_PREVISAO' && ipca) {
+      m.set(k, { ...p, precoPrevisto: centavos(p.precoAtual * (1 + ipca.percentual / 100)), motivo: 'FOLGA_IPCA', percentual: ipca.percentual, efeito: null, mesesEstimados: null });
+    } else m.set(k, p);
+  }
+  return m;
+}
+
 /** Texto da nota de um preço que não é o de hoje; null quando vale o preço de hoje. */
-export function notaDoPreco(p: PrecoPrevisto | undefined): string | null {
+export function notaDoPreco(p: PrecoPrevisto | undefined, ipca?: IpcaDozeMeses | null): string | null {
   if (!p) return null;
   const focus = p.mesesEstimados ? `, ${p.mesesEstimados} ${p.mesesEstimados === 1 ? 'mês' : 'meses'} pela projeção do Focus` : '';
   const junto = p.devido ? '; inclui o reajuste já devido' : '';
@@ -137,6 +173,8 @@ export function notaDoPreco(p: PrecoPrevisto | undefined): string | null {
       return `Se a ata for prorrogada em ${p.efeito ? mesAno(p.efeito) : 'seu vencimento'} (IPCA previsto de ${pct(p.percentual ?? 0)}${focus})${junto}.`;
     case 'SEM_PREVISAO':
       return 'Sem previsão de reajuste (falta base para o cálculo): considerar folga.';
+    case 'FOLGA_IPCA':
+      return `Ata sem data-base de reajuste informada: folga do IPCA dos últimos 12 meses (${pct(p.percentual ?? 0)}${ipca ? `, ${mesAno(ipca.de)} a ${mesAno(ipca.ate)}` : ''}).`;
     default:
       return null;
   }
@@ -169,7 +207,7 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
       const preco = e.precos.get(p.itemKey);
       const hoje = preco?.precoAtual ?? item?.valorUnitario ?? 0;
       const unitario = preco?.precoPrevisto ?? hoje;
-      const marca = marcaDe(notaDoPreco(preco));
+      const marca = marcaDe(notaDoPreco(preco, e.ipca));
       const chave = [p.itemKey, p.kit ?? '', unitario, hoje, marca].join('|');
       if (!grupos.has(chave)) grupos.set(chave, []);
       grupos.get(chave)!.push({

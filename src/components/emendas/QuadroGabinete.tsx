@@ -3,9 +3,9 @@ import { Copy, MessageCircle } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
 import { Tabs } from '../../design-system/components/Tabs';
 import { useToast } from '../../design-system/components/Toast';
-import { useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
-import { usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
-import { ataEItem, brl, COLUNAS, htmlDaTabela, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
+import { hojeEmBrasilia, useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
+import { useIpcaDozeMeses, usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
+import { aplicarPrazoDoEmpenho, ataEItem, brl, COLUNAS, htmlDaTabela, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AutorEmenda } from '../../services/emendasService';
 
 const borda = '1px solid #000';
@@ -78,6 +78,8 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
   const { data: itensLista = [] } = useItensCaep();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
   const { data: precos, isError: semPrecos } = usePrecosPrevistos();
+  const { data: ipca } = useIpcaDozeMeses();
+  const hoje = hojeEmBrasilia();
   const [aba, setAba] = useState<'sei' | 'whatsapp'>('sei');
 
   const quadro = useMemo(
@@ -88,9 +90,10 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
         data,
         itens: new Map(itensLista.map((i) => [i.itemKey, i])),
         beneficiarios: new Map(beneficiariosLista.map((b) => [b.id, b])),
-        precos: precos ?? new Map()
+        precos: aplicarPrazoDoEmpenho(precos ?? new Map(), hoje, ipca),
+        ipca
       }),
-    [autor, linhas, data, itensLista, beneficiariosLista, precos]
+    [autor, linhas, data, itensLista, beneficiariosLista, precos, hoje, ipca]
   );
   const texto = useMemo(() => textoParaWhatsapp(quadro), [quadro]);
   const html = useMemo(() => htmlDaTabela(quadro), [quadro]);
@@ -119,7 +122,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, testId = 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxWidth: 560 }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary)' }}>Quadro para o parlamentar</span>
           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary, #334155)' }}>
-            No formato do Anexo: uma linha por item e beneficiário, kit aberto nos seus itens; o mesmo item para vários beneficiários aparece uma vez só. O valor unitário já vem com o reajuste previsto da ata.
+            No formato do Anexo: uma linha por item e beneficiário, kit aberto nos seus itens; o mesmo item para vários beneficiários aparece uma vez só. O valor unitário já inclui o reajuste da ata que pode valer até o empenho provável (90 dias); ata sem data-base leva a folga do IPCA de 12 meses.
           </span>
         </div>
         <Tabs
