@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Copy, MessageCircle } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
 import { Tabs } from '../../design-system/components/Tabs';
+import { InfoHint } from '../../design-system/components/InfoHint';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
 import { useIpcaDozeMeses, usePrecosPrevistos } from '../../hooks/useEmendasQuadro';
@@ -60,6 +61,13 @@ function copiarPelaSelecao(html: string | null, texto: string): void {
   caixa.remove();
   if (!ok) throw new Error('O navegador não deixou copiar. Selecione o quadro e use Ctrl+C.');
 }
+
+/** Explicação do ⓘ ao lado do título. */
+const AJUDA_DO_QUADRO =
+  'A tabela é o Anexo I para colar no Word ou no SEI: cada item aparece uma vez, com uma linha para cada beneficiário, e os kits ' +
+  'já vêm abertos nos seus itens. O texto é a versão curta para mandar ao parlamentar pelo WhatsApp. Os valores já incluem o ' +
+  'reajuste que a ata pode ter até o empenho, para não faltar recurso. O prazo do ofício é de 30 dias, ou menos quando alguma ' +
+  'ata está perto de vencer.';
 
 interface Props {
   autor: AutorEmenda | null | undefined;
@@ -122,11 +130,9 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
       style={{ border: '1px solid #c7d7f0', background: '#f5f8fd', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxWidth: 560 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary)' }}>Quadro para o parlamentar</span>
-          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary, #334155)' }}>
-            No formato do Anexo: uma linha por item e beneficiário, kit aberto nos seus itens; o mesmo item para vários beneficiários aparece uma vez só. O valor unitário já inclui o reajuste da ata que pode valer até o empenho provável (90 dias); ata sem data-base leva a folga do IPCA de 12 meses.
-          </span>
+          <InfoHint label="Como o quadro é montado" testId={`${testId}-ajuda`} content={AJUDA_DO_QUADRO} />
         </div>
         <Tabs
           ariaLabel="Formato do quadro"
@@ -135,7 +141,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
           onTabChange={(id) => setAba(id as 'sei' | 'whatsapp')}
           tabs={[
             { id: 'sei', label: 'Tabela' },
-            { id: 'whatsapp', label: 'Texto para o WhatsApp' }
+            { id: 'whatsapp', label: 'Texto' }
           ]}
         />
       </div>
@@ -182,7 +188,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
                     <td style={celula} rowSpan={l.linhasDoItem}>
                       <b>{l.descricao}</b>
                       {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
-                      {l.kit && <div style={abaixo}>({l.kit})</div>}
                     </td>
                   )}
                   <td style={celula}>
@@ -251,7 +256,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
             Copiar tabela
           </AppButton>
           <AppButton type="button" variant="outline" icon={<MessageCircle size={16} aria-hidden="true" />} onClick={() => void copiarPara('whatsapp')} data-testid={`${testId}-copiar-whatsapp`}>
-            Copiar para o WhatsApp
+            Copiar texto
           </AppButton>
         </div>
       </div>

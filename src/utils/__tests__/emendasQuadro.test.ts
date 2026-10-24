@@ -42,13 +42,13 @@ const q = montarQuadro({ autor, linhas, itens, beneficiarios: new Map([['b1', pm
 
 describe('quadro da reserva (Anexo)', () => {
   it('uma linha por item, kit aberto nos seus itens com a quantidade de kits', () => {
-    expect(q.linhas.map((l) => [l.descricao, l.quantidade, l.kit])).toEqual([
-      ['Camioneta/SUV médio', 5, null],
-      ['Tablet', 10, null],
-      ['Drone', 2, null],
-      ['Mesa flexora', 2, 'Kit Academia'],
-      ['Leg press 45°', 4, 'Kit Academia'],
-      ['Colchonete', 100, null]
+    expect(q.linhas.map((l) => [l.descricao, l.quantidade])).toEqual([
+      ['Camioneta/SUV médio', 5],
+      ['Tablet', 10],
+      ['Drone', 2],
+      ['Mesa flexora', 2],
+      ['Leg press 45°', 4],
+      ['Colchonete', 100]
     ]);
   });
 
@@ -97,7 +97,7 @@ describe('quadro da reserva (Anexo)', () => {
     for (const h of ['ITEM', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
     expect(html.match(/<th /g)).toHaveLength(6);
     expect(html).toContain('R$ 1.598,76<sup>¹</sup>');
-    expect(html).toContain('(Kit Academia)');
+    expect(html).not.toContain('Kit Academia');
     expect(html).toContain('<b>Tablet</b><br><span style="font-size:8pt">Ata 00043/2026 · item 00005</span>');
     expect(html).toContain('<b>10º Batalhão de Polícia Militar</b> · <span style="white-space:nowrap">10º BPM</span><br><span style="font-size:8pt">RJ GOV POLICIA MILITAR</span>');
     expect(html).toContain('<b>Rio de Janeiro - RJ</b><br><span style="font-size:8pt">Rua X, 100 · Centro · CEP 20000-000</span>');
@@ -113,7 +113,7 @@ describe('quadro da reserva (Anexo)', () => {
     expect(t).toContain('2️⃣ *Corpo de Bombeiros Militar · CBMERJ* · RJ: *R$ 94.317,66*\n• 2 Drone\n\n');
     expect(t).toContain('3️⃣ *Beneficiário a definir*');
     for (const fora of ['Anexo I', 'Ata ', 'Rua X', 'IPCA', '¹']) expect(t).not.toContain(fora);
-    expect(t).toContain('• 2 Mesa flexora (Kit Academia):');
+    expect(t).toContain('• 2 Mesa flexora:');
     expect(t.endsWith(`💰 *Total: ${brl(q.total)}*`)).toBe(true);
     expect(numeroEmEmoji(12)).toBe('1️⃣2️⃣');
   });
@@ -147,7 +147,7 @@ describe('mesmo item para vários beneficiários', () => {
     { tipo: 'ITEM', itemKey: 'tablet', kitNome: null, kitComposicao: null, quantidade: 10, beneficiarioId: 'b1' },
     { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 1, beneficiarioId: 'b2' },
     { tipo: 'ITEM', itemKey: 'suv', kitNome: null, kitComposicao: null, quantidade: 3, beneficiarioId: null },
-    // No kit o mesmo item fica à parte (outra origem).
+    // O mesmo item vindo de kit soma com o avulso do mesmo beneficiário.
     { tipo: 'KIT', itemKey: null, kitNome: 'Kit Patrulha', kitComposicao: [{ itemKey: 'suv', quantidade: 1 }], quantidade: 1, beneficiarioId: 'b2' }
   ];
   const qv = montarQuadro({ autor, linhas: varios, itens, beneficiarios: new Map([['b1', pm], ['b2', cbm]]), precos, data: '2026-10-23' });
@@ -155,18 +155,18 @@ describe('mesmo item para vários beneficiários', () => {
   it('junta as linhas do item na ordem em que ele aparece; a primeira diz quantas são', () => {
     expect(qv.linhas.map((l) => [l.descricao, l.beneficiario, l.quantidade, l.linhasDoItem])).toEqual([
       ['Camioneta/SUV médio', '10º Batalhão de Polícia Militar', 2, 3],
-      ['Camioneta/SUV médio', 'Corpo de Bombeiros Militar', 1, 0],
+      ['Camioneta/SUV médio', 'Corpo de Bombeiros Militar', 2, 0],
       ['Camioneta/SUV médio', null, 3, 0],
-      ['Tablet', '10º Batalhão de Polícia Militar', 10, 1],
-      ['Camioneta/SUV médio', 'Corpo de Bombeiros Militar', 1, 1]
+      ['Tablet', '10º Batalhão de Polícia Militar', 10, 1]
     ]);
+    expect(qv.linhas[1].total).toBe(Math.round(2 * 191811.62 * 100) / 100);
     expect(qv.total).toBe(Math.round((7 * 191811.62 + 10 * 1598.76) * 100) / 100);
   });
 
   it('Tabela: item e valor unitário com rowspan, uma vez só', () => {
     const h = htmlDaTabela(qv);
     expect(h).toContain('rowspan="3"');
-    expect(h.match(/Camioneta\/SUV médio/g)).toHaveLength(2);
+    expect(h.match(/Camioneta\/SUV médio/g)).toHaveLength(1);
   });
 
   it('WhatsApp: o mesmo item aparece em cada beneficiário', () => {
