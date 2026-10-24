@@ -356,7 +356,7 @@ export const numeroEmEmoji = (n: number): string => [...String(n)].map((d) => `$
 
 /**
  * Texto para o WhatsApp do parlamentar, organizado por beneficiário: número, nome, cidade e o valor do beneficiário
- * (soma dos itens) na primeira linha; os itens embaixo, com o valor de cada um só quando há mais de um. No fim, o
+ * (soma dos itens) na primeira linha; os itens embaixo, cada um com o seu valor total. No fim, o
  * total (por GND quando mistura investimento e custeio). Fica de fora o que só serve à CAEP: título do Anexo, ata,
  * item, endereço e notas de preço.
  */
@@ -374,7 +374,7 @@ export function textoParaWhatsapp(q: Quadro): string {
     const total = brl(centavos(ls.reduce((s, l) => s + l.total, 0)));
     // Nome e cidade na mesma linha: vários beneficiários têm o mesmo nome (Guarda Municipal) e só a cidade separa.
     const quem = chave ? `*${nomeComSigla(l0)}* · ${l0.entrega ?? 'entrega a definir'}` : '*Beneficiário a definir*';
-    const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}${ls.length > 1 ? `: ${brl(l.total)}` : ''}`);
+    const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}: ${brl(l.total)}`);
     return [`${numeroEmEmoji(i + 1)} ${quem}: *${total}*`, ...itens].join('\n');
   });
   const cabecalho = [`📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · ${dataBR(q.data)}*`, ...(q.prazoDoOficio ? [`⏳ *Enviar o ofício até ${dataBR(q.prazoDoOficio.data)}*`] : [])];
