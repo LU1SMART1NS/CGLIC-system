@@ -5,6 +5,8 @@
 import type { AcaoPedido, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
 import { avisoIndicacaoDias, corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from './emendasKits';
 import { chaveDoContrato } from './contractKeyUtils';
+import { formatCurrency } from './format';
+import type { PrecoPrevisto } from '../services/emendasQuadroService';
 
 /** Dias de reserva sem ofício até o aviso (decisão de 23/10/2026). */
 export const AVISO_SEM_OFICIO_DIAS = 30;
@@ -110,12 +112,38 @@ export function reservadoPorItem(pedidos: PedidoEmenda[], excluirPedidoId?: stri
   return m;
 }
 
-export function valorDaLinha(l: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitComposicao' | 'quantidade'>, itens: Map<string, ItemCaep>): number {
-  return itensDaLinha(l).reduce((s, x) => s + x.quantidade * (itens.get(x.itemKey)?.valorUnitario ?? 0), 0);
+const centavos = (v: number): number => Math.round(v * 100) / 100;
+
+/**
+ * Preço unitário de hoje e o previsto para a emenda (o mesmo do quadro do parlamentar: reajuste da ata pelo empenho
+ * provável, ver aplicarPrazoDoEmpenho). Sem os preços previstos, vale o de hoje.
+ */
+export function precoParaEmenda(itemKey: string, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): { previsto: number; hoje: number; preco: PrecoPrevisto | undefined } {
+  const preco = precos?.get(itemKey);
+  const hoje = preco?.precoAtual ?? itens.get(itemKey)?.valorUnitario ?? 0;
+  return { previsto: preco?.precoPrevisto ?? hoje, hoje, preco };
 }
 
-export function valorDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>): number {
-  return linhasAtivas(p).reduce((s, l) => s + valorDaLinha(l, itens), 0);
+/** Valor da linha: pelo preço previsto para a emenda quando vêm os preços; sem eles, pelo preço de hoje. */
+export function valorDaLinha(l: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitComposicao' | 'quantidade'>, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): number {
+  return centavos(itensDaLinha(l).reduce((s, x) => s + centavos(x.quantidade * precoParaEmenda(x.itemKey, itens, precos).previsto), 0));
+}
+
+export function valorDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): number {
+  return centavos(linhasAtivas(p).reduce((s, l) => s + valorDaLinha(l, itens, precos), 0));
+}
+
+/** O preço em texto corrido: "R$ 1.093.706,02 previsto (hoje R$ 1.051.438,15)", ou só o valor quando não muda. */
+export const textoDoPreco = (previsto: number, hoje: number, unidade = ''): string =>
+  Math.abs(previsto - hoje) > 0.004 ? `${formatCurrency(previsto)}${unidade} previsto (hoje ${formatCurrency(hoje)})` : `${formatCurrency(previsto)}${unidade}`;
+
+/**
+ * O valor que as telas mostram do pedido: o da emenda no SIOP, quando já foi conferida; antes disso, o previsto pelos
+ * itens. O empenhado das notas não entra: a nota inteira pode ter outros itens da mesma emenda.
+ */
+export function valorDoPedidoNaEtapa(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): { valor: number; fonte: 'EMENDA' | 'PREVISTO' } {
+  if (p.siopValor != null && p.etapa !== 'CANCELADO') return { valor: p.siopValor, fonte: 'EMENDA' };
+  return { valor: valorDoPedido(p, itens, precos), fonte: 'PREVISTO' };
 }
 
 /**

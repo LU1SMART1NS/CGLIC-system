@@ -36,6 +36,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   usePodeVerContratos: () => false
 }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));
+vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined, ipca: null, semPrevisao: false }) }));
 vi.mock('../EtapaPedidoModal', () => ({ EtapaPedidoModal: () => null }));
 
 import { EmendasPedidosPage } from '../EmendasPedidosPage';

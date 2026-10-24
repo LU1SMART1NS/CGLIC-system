@@ -16,7 +16,7 @@ import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import {
@@ -56,14 +56,15 @@ import {
   seiDaEtapa,
   ultimoContatoPorAutor,
   valorDaLinha,
-  valorDoPedido,
+  valorDoPedidoNaEtapa,
   execucaoDoPedido,
   type AvisoPedido
 } from '../../utils/emendasPedidos';
 import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
-import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, ExecucaoDoPedidoResumo, LinhaDoPedido } from './emendasPartes';
+import { AConferirDaLinha, AutorDoPedido, BeneficiarioDaLinha, EmpenhoDaLinha, ExecucaoDoPedidoResumo, LinhaDoPedido, ValorDoPedido, ValorPrevisto } from './emendasPartes';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
@@ -73,7 +74,7 @@ import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqu
 type Segmento = 'todos' | FasePedido | 'CANCELADO';
 /** Filtro de etapa dentro da fase; na Contratação separa quem aguarda o contrato de quem já está contratado. */
 type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | 'AGUARDANDO_CONTRATO' | 'CONTRATADO';
-type Linha = PedidoEmenda & { valor: number; avisos: AvisoPedido[] };
+type Linha = PedidoEmenda & { valor: number; fonteDoValor: 'EMENDA' | 'PREVISTO'; avisos: AvisoPedido[] };
 
 const POR_PAGINA = 25;
 /** Filtro de aviso da lista: um tipo, 'com' (qualquer aviso) ou 'grave' (só os vermelhos, como no cartão do Início). */
@@ -347,6 +348,7 @@ interface DetalheProps {
 }
 
 const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, onAcao, onAlterar }) => {
+  const { precos } = usePrecosParaEmenda();
   const semAutor = !p.autorId;
   const colunas: Column<PedidoEmenda['linhas'][number]>[] = [
     {
@@ -376,7 +378,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
       header: 'Beneficiário',
       render: (l) => <BeneficiarioDaLinha linha={l} beneficiarios={beneficiarios} />
     },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <span style={carteiraNumero}>{formatCurrency(valorDaLinha(l, itens))}</span> },
+    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <ValorPrevisto previsto={valorDaLinha(l, itens, precos)} hoje={valorDaLinha(l, itens)} nota="Previsto para a emenda, com o reajuste das atas (o mesmo do quadro do parlamentar)" /> },
     { key: 'ne', header: 'Empenho e contrato', nowrap: true, render: (l) => <EmpenhoDaLinha linha={l} achada={notas.get(l.id)} podeVerContratos={podeVerContratos} /> }
   ];
   const canceladas = p.linhas.filter((l) => l.cancelada);
@@ -468,7 +470,15 @@ export const EmendasPedidosPage: React.FC = () => {
     const b = beneficiarios.get(id);
     return b ? rotuloBeneficiario(b) : undefined;
   };
-  const linhas: Linha[] = useMemo(() => pedidos.map((p) => ({ ...p, valor: valorDoPedido(p, itens), avisos: avisosDoPedido(p, itens, hoje, notas) })), [pedidos, itens, hoje, notas]);
+  const { precos } = usePrecosParaEmenda();
+  const linhas: Linha[] = useMemo(
+    () =>
+      pedidos.map((p) => {
+        const v = valorDoPedidoNaEtapa(p, itens, precos);
+        return { ...p, valor: v.valor, fonteDoValor: v.fonte, avisos: avisosDoPedido(p, itens, hoje, notas) };
+      }),
+    [pedidos, itens, hoje, notas, precos]
+  );
 
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todos: 0, CANCELADO: 0 };
@@ -574,7 +584,7 @@ export const EmendasPedidosPage: React.FC = () => {
         );
       }
     },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, sortValue: ordem.valor.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatCurrency(l.valor)}</span> },
+    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, sortValue: ordem.valor.value, sortFirstDir: 'desc', render: (l) => <ValorDoPedido valor={l.valor} fonte={l.fonteDoValor} /> },
     {
       key: 'etapa',
       header: 'Etapa',

@@ -5,6 +5,7 @@
  * Entrega 1: saldo do item = alocado à CAEP. Na entrega 2 os pedidos dos parlamentares saem desse saldo.
  */
 import type { ItemCaep, KitEmenda } from '../services/emendasService';
+import type { PrecoPrevisto } from '../services/emendasQuadroService';
 import { descricaoItemEmFrase } from './textCase';
 import { EMENDAS_RULES } from '../config/alertRules';
 
@@ -37,7 +38,10 @@ export interface CalculoDoKit {
   situacao: SituacaoKit;
   motivo: string;
   kitsPossiveis: number;
+  /** Valor de um kit pelo preço previsto para a emenda (sem os preços previstos, o de hoje). */
   valorPorKit: number;
+  /** Valor de um kit pelo preço de hoje das atas. */
+  valorPorKitHoje: number;
   componentes: ComponenteDoKit[];
   /** Item que trava ou vai travar o kit (ata encerrada, sem saldo ou ata vencendo). */
   itemLimitante: ComponenteDoKit | null;
@@ -73,7 +77,8 @@ export function calcularKit(
   kit: Pick<KitEmenda, 'ativo' | 'itens'>,
   itens: Map<string, ItemCaep>,
   hoje: string,
-  saldoDoItem: (item: ItemCaep) => number = (i) => i.alocado
+  saldoDoItem: (item: ItemCaep) => number = (i) => i.alocado,
+  precos?: Map<string, PrecoPrevisto>
 ): CalculoDoKit {
   const componentes: ComponenteDoKit[] = kit.itens.map((c) => {
     const item = itens.get(c.itemKey) ?? null;
@@ -87,9 +92,12 @@ export function calcularKit(
       diasParaVencer: item?.vigenciaFinal ? diasEntre(hoje, item.vigenciaFinal) : null
     };
   });
-  const valorPorKit = componentes.reduce((s, c) => s + (c.item ? c.item.valorUnitario * c.quantidade : 0), 0);
+  const soma = (preco: (k: string) => number) => Math.round(componentes.reduce((s, c) => s + (c.item ? preco(c.itemKey) * c.quantidade : 0), 0) * 100) / 100;
+  // A mesma regra de precoParaEmenda (emendasPedidos, que importa daqui).
+  const valorPorKitHoje = soma((k) => precos?.get(k)?.precoAtual ?? itens.get(k)?.valorUnitario ?? 0);
+  const valorPorKit = soma((k) => precos?.get(k)?.precoPrevisto ?? precos?.get(k)?.precoAtual ?? itens.get(k)?.valorUnitario ?? 0);
   const kitsPossiveis = componentes.length ? Math.min(...componentes.map((c) => c.kits)) : 0;
-  const base = { kitsPossiveis, valorPorKit, componentes };
+  const base = { kitsPossiveis, valorPorKit, valorPorKitHoje, componentes };
 
   if (!kit.ativo) return { ...base, situacao: 'desativado', motivo: 'Desativado pela CAEP.', itemLimitante: null };
 
