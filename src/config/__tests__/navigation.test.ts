@@ -23,13 +23,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
 
-    it('Início tem as abas Atas e Contratos (/instrumentos), Painel das emendas (/emendas/inicio) e Distribuição (/atas/distribuicao)', () => {
+    it('Início tem os grupos Atas e Contratos (Painel · Distribuição) e Emendas, como Ajustes; o Painel das emendas fica sem grupo', () => {
       const area = navigationConfig.find((i) => i.id === 'visao-geral')!;
-      expect(area.children!.map((c) => [c.label, c.route])).toEqual([
-        ['Atas e Contratos', '/instrumentos'],
-        ['Painel', '/emendas/inicio'],
-        ['Emendas', '/emendas/inicio'],
-        ['Distribuição', '/atas/distribuicao']
+      expect(area.children!.map((c) => [c.label, c.route, c.group])).toEqual([
+        ['Painel', '/instrumentos', 'Atas e Contratos'],
+        ['Distribuição', '/atas/distribuicao', 'Atas e Contratos'],
+        ['Painel', '/emendas/inicio', undefined],
+        ['Emendas', '/emendas/inicio', 'Emendas']
       ]);
       expect(area.children![0].matchPrefixes).toContain('/prazos');
     });
@@ -115,7 +115,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
     it('o gestor vê o Início com uma aba só (sem Distribuição)', () => {
       const gestor = filterNavigationByRole(navigationConfig, 'gestor');
-      expect(findAreaForTabs(gestor, '/instrumentos')?.children?.map((c) => c.label)).toEqual(['Atas e Contratos']);
+      expect(findAreaForTabs(gestor, '/instrumentos')?.children?.map((c) => c.label)).toEqual(['Painel']);
     });
   });
 
@@ -347,13 +347,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('o resumo das emendas aparece no Início do gestor de emendas (Painel), do coordenador e da consulta (Emendas), e de mais ninguém', () => {
       const inicioDoCoordenador = filterNavigationByRole(navigationConfig, 'admin').find((i) => i.id === 'visao-geral');
       expect(inicioDoCoordenador?.children?.map((c) => [c.label, c.route])).toEqual([
-        ['Atas e Contratos', '/instrumentos'],
-        ['Emendas', '/emendas/inicio'],
-        ['Distribuição', '/atas/distribuicao']
+        ['Painel', '/instrumentos'],
+        ['Distribuição', '/atas/distribuicao'],
+        ['Emendas', '/emendas/inicio']
       ]);
       const inicioDaConsulta = filterNavigationByRole(navigationConfig, 'leitor').find((i) => i.id === 'visao-geral');
       expect(inicioDaConsulta?.children?.map((c) => [c.label, c.route])).toEqual([
-        ['Atas e Contratos', '/instrumentos'],
+        ['Painel', '/instrumentos'],
         ['Emendas', '/emendas/inicio']
       ]);
       for (const role of ['gestor', 'gestor_saldos'] as const) {
