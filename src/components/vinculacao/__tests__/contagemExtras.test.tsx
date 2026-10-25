@@ -7,6 +7,7 @@ vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: '
 vi.mock('../useContagemVinculacao', () => ({ useContagemVinculacao: vi.fn(() => ({ aosItens: 3, aoContrato: 2 })) }));
 vi.mock('../../financeiro/useContagemFinanceiro', () => ({ useContagemFinanceiro: vi.fn(() => null) }));
 vi.mock('../../admin/useContagemGruposUasgs', () => ({ useContagemGruposUasgs: vi.fn(() => null) }));
+vi.mock('../../emendas/useContagemEmendas', () => ({ useContagemEmendas: vi.fn(() => null) }));
 // O espião do cache e os cálculos pesados não rodam no render estático: o que interessa aqui é o número no ícone.
 vi.mock('../ContagensDaCarteira', () => ({ ContagensDaCarteira: () => null }));
 
@@ -14,6 +15,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useContagemVinculacao } from '../useContagemVinculacao';
 import { useContagemFinanceiro } from '../../financeiro/useContagemFinanceiro';
 import { useContagemGruposUasgs } from '../../admin/useContagemGruposUasgs';
+import { useContagemEmendas } from '../../emendas/useContagemEmendas';
 import { Sidebar } from '../../layout/Sidebar';
 
 const linha = (o: any) => ({ quantitativoSenasp: 100, faixa: 'REGULAR', nivelAlocacao: 'SEM', ...o });
@@ -91,6 +93,16 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemVinculacao).mockReturnValue(null);
     vi.mocked(useContagemFinanceiro).mockReturnValue(null);
     vi.mocked(useContagemGruposUasgs).mockReturnValue(null);
+    vi.mocked(useContagemEmendas).mockReturnValue(null);
+  });
+
+  it('Emendas: pedidos com aviso, vermelho quando há urgente, e o clique abre Pedidos em "Com algum aviso"', () => {
+    vi.mocked(useContagemEmendas).mockReturnValue({ total: 67, urgentes: 8 });
+    const html = menu();
+    expect(html).toMatch(/class="app-rail-count app-rail-count--urgente"[^>]*data-testid="rail-count-emendas"[^>]*>67</);
+    expect(html).toContain('href="/emendas/pedidos?aviso=com"');
+    vi.mocked(useContagemEmendas).mockReturnValue({ total: 59, urgentes: 0 });
+    expect(menu()).toMatch(/class="app-rail-count"[^>]*data-testid="rail-count-emendas"[^>]*>59</);
   });
 
   it('Ajustes (coordenador): UASGs sem grupo confirmado, e o clique abre Grupos das UASGs em "A confirmar"', () => {
