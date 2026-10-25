@@ -61,6 +61,8 @@ export interface TaskTemplatesCopy {
 export interface TaskTemplatesKit {
   hooks: TaskTemplatesHooks;
   copy: TaskTemplatesCopy;
+  /** Só o coordenador altera os modelos (migration 199); o gestor só vê. Preenchido pela tela. */
+  somenteLeitura?: boolean;
 }
 
 export const TaskTemplatesKitContext = React.createContext<TaskTemplatesKit | null>(null);
