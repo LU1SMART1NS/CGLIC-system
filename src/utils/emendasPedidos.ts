@@ -220,7 +220,17 @@ export function orgaoDoPedido(p: PedidoEmenda, nomeDoBeneficiario: (id: string) 
   return nomes.length === 1 ? nomes[0] : `${nomes[0]} e mais ${nomes.length - 1}`;
 }
 
-export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'semNota' | 'semAutorizacao' | 'empenhoAMais' | 'empenhoAMenos';
+export type TipoAviso =
+  | 'semOficio'
+  | 'divergencia'
+  | 'ataVencida'
+  | 'ataNoCorte'
+  | 'ataVencendo'
+  | 'semNota'
+  | 'semAutorizacao'
+  | 'empenhoAMais'
+  | 'empenhoAMenos'
+  | 'notaEmitida';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -233,7 +243,18 @@ export interface AvisoPedido {
 }
 
 /** Do mais grave ao mais leve: na lista aparece só o primeiro, com "+N" para os outros. */
-export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, empenhoAMais: 2, divergencia: 3, semOficio: 4, ataVencendo: 5, empenhoAMenos: 6, semAutorizacao: 7, semNota: 8 };
+export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
+  ataVencida: 0,
+  ataNoCorte: 1,
+  empenhoAMais: 2,
+  divergencia: 3,
+  semOficio: 4,
+  ataVencendo: 5,
+  notaEmitida: 6,
+  empenhoAMenos: 7,
+  semAutorizacao: 8,
+  semNota: 9
+};
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
 export const avisoGrave = (a: Pick<AvisoPedido, 'tipo'>) => GRAVIDADE_DO_AVISO[a.tipo] <= GRAVIDADE_DO_AVISO.semOficio;
@@ -262,6 +283,25 @@ export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, I
   return null;
 }
 
+/**
+ * A CGOFI já emitiu nota para linhas do pedido, mas a CAEP ainda não registrou o empenho (migration 189: o sistema liga
+ * a nota pela emenda e pelo fornecedor, emitida depois da assinatura da solicitação da linha).
+ */
+export function notaEmitidaSemRegistro(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): AvisoPedido | null {
+  if (jaEmpenhado(p.etapa) || p.etapa === 'CANCELADO') return null;
+  const comNota = linhasAtivas(p).filter((l) => notas.get(l.id)?.nota);
+  if (!comNota.length) return null;
+  const datas = comNota.map((l) => notas.get(l.id)!.emitidaEm).filter((d): d is string => Boolean(d)).sort();
+  const desde = datas.length ? ` em ${dataBR(datas[0])}` : '';
+  const falta = p.etapa === 'CGOFI' ? 'o empenho' : p.etapa === 'AUTORIZADO' ? 'o envio à CGOFI e o empenho' : 'as etapas até o empenho';
+  return {
+    tipo: 'notaEmitida',
+    curto: 'Nota já emitida',
+    texto: `Nota de empenho emitida${desde} para ${comNota.length === 1 ? '1 linha' : `${comNota.length} linhas`}: registre ${falta}`,
+    linhaId: comNota[0].id
+  };
+}
+
 /** `empenho`: diferenças entre o pedido e as notas ainda não resolvidas (migration 187), de diferencasPorPedido. */
 export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, hoje: string, notas?: Map<string, NotaDaLinha>, empenho?: ConferenciaEmpenho[]): AvisoPedido[] {
   const avisos: AvisoPedido[] = [];
@@ -279,6 +319,8 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
   }
   const semAutorizacao = atasSemAutorizacao(p);
   if (semAutorizacao) avisos.push(semAutorizacao);
+  const emitida = notas ? notaEmitidaSemRegistro(p, notas) : null;
+  if (emitida) avisos.push(emitida);
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
     if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });
@@ -638,7 +680,13 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
     return { situacao: 'NA_CCGA', rotulo: ROTULO_SITUACAO_LINHA.NA_CCGA.etiqueta, detalhe: `aguarda o contrato no Contratos.gov.br${temNota ? '' : ' · sem nota ligada'}`, pendente: !temNota, solicitacao };
   }
   if (p.etapa === 'EMPENHADO' || temNota || l.empenhoDocumentoSei) {
-    return { situacao: 'EMPENHADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHADO.etiqueta, detalhe: temNota ? `${notaLigada} · aguarda o envio à CCGA` : 'sem nota ligada · o sistema procura de hora em hora', pendente: !temNota, solicitacao };
+    // Antes do empenho registrado, a nota ligada é a que a CGOFI já emitiu (migration 189).
+    const detalhe = !temNota
+      ? 'sem nota ligada · o sistema procura de hora em hora'
+      : jaEmpenhado(p.etapa)
+        ? `${notaLigada} · aguarda o envio à CCGA`
+        : `NE ${nota!.nota} emitida${nota!.emitidaEm ? ` em ${dataBR(nota!.emitidaEm)}` : ''} · registre o empenho`;
+    return { situacao: 'EMPENHADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHADO.etiqueta, detalhe, pendente: !temNota, solicitacao };
   }
   if (p.etapa === 'CGOFI') return { situacao: 'NA_CGOFI', rotulo: ROTULO_SITUACAO_LINHA.NA_CGOFI.etiqueta, detalhe: 'aguarda a nota de empenho', pendente: false, solicitacao };
   return { situacao: 'AUTORIZADO', rotulo: `Autorizado · ${dataBR(solicitacao.assinadaEm)}`, detalhe: 'aguarda o envio à CGOFI', pendente: false, solicitacao };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -178,7 +178,7 @@ describe('etiqueta curta dos avisos na lista', () => {
 describe('nota e execução das linhas empenhadas (migration 164)', () => {
   const nota = (linhaId: string, extra: Partial<import('../../services/emendasService').NotaDaLinha> = {}) => ({
     linhaId, nota: null, regra: null, motivo: null, contractKey: null, empenhoId: null, valorEmpenhado: null, valorLiquidado: null, valorPago: null,
-    entregaPrevista: null, entregaPrevistaValor: null, atualizadoEm: null, ...extra
+    entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: null, atualizadoEm: null, ...extra
   });
 
   it('a nota da linha é a achada pelo sistema; a execução conta cada nota uma vez', async () => {
@@ -201,7 +201,7 @@ describe('nota e execução das linhas empenhadas (migration 164)', () => {
 describe('etapa Contratado pelo Contratos.gov.br', () => {
   const nota = (linhaId: string, extra: Partial<import('../../services/emendasService').NotaDaLinha> = {}) => ({
     linhaId, nota: null, regra: null, motivo: null, contractKey: null, empenhoId: null, valorEmpenhado: null, valorLiquidado: null, valorPago: null,
-    entregaPrevista: null, entregaPrevistaValor: null, atualizadoEm: null, ...extra
+    entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: null, atualizadoEm: null, ...extra
   });
 
   it('conta por nota: contratado só quando toda nota tem contrato no sistema e o pedido foi à CCGA', async () => {
@@ -315,10 +315,22 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
   const l3 = linha({ id: 'l3', itemKey: `${B}-00001`, quantidade: 5 });
   const doc = (id: string, numero: string, ataKey: string, assinadaEm: string | null, linhas: string[]) => ({ id, etapa: 'AUTORIZACAO' as const, numero, data: '2026-09-23', ataKey, assinadaEm, linhas: linhas.map((linhaId) => ({ linhaId, quantidade: 1 })) });
   const semNotas = new Map<string, NotaDaLinha>();
-  const nota = (linhaId: string, n: string | null, contractKey: string | null): NotaDaLinha => ({ linhaId, nota: n, regra: n ? 'SEI' : null, motivo: n ? null : 'CONTRATO_SEM_NOTA', contractKey, empenhoId: n ? 'e' : null, valorEmpenhado: null, valorLiquidado: null, valorPago: null, entregaPrevista: null, entregaPrevistaValor: null, atualizadoEm: null });
+  const nota = (linhaId: string, n: string | null, contractKey: string | null): NotaDaLinha => ({ linhaId, nota: n, regra: n ? 'SEI' : null, motivo: n ? null : 'CONTRATO_SEM_NOTA', contractKey, empenhoId: n ? 'e' : null, valorEmpenhado: null, valorLiquidado: null, valorPago: null, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: null, atualizadoEm: null });
 
   it('antes da solicitação, a situação é a etapa do pedido', () => {
     expect(situacaoDaLinha(pedido({ etapa: 'OFICIO', linhas: [l1] }), l1, semNotas)).toMatchObject({ situacao: 'ANTES', rotulo: 'Ofício recebido' });
+  });
+
+  it('nota já emitida antes de a CAEP registrar o empenho (migration 189): a linha fica empenhada e o pedido avisa', () => {
+    const p = pedido({ etapa: 'CGOFI', linhas: [l1, l2, l3], documentos: [doc('d1', '37098929', A, '2026-06-01', ['l1', 'l2']), doc('d3', '37104393', B, '2026-06-01', ['l3'])] });
+    const notas = new Map<string, NotaDaLinha>([['l1', { ...nota('l1', '2026NE000230', null), regra: 'FORNECEDOR', emitidaEm: '2026-06-16' }]]);
+    expect(situacaoDaLinha(p, l1, notas)).toMatchObject({ situacao: 'EMPENHADO', detalhe: 'NE 2026NE000230 emitida em 16/06/2026 · registre o empenho', pendente: false });
+    expect(situacaoDaLinha(p, l3, notas)).toMatchObject({ situacao: 'NA_CGOFI' });
+    expect(notaEmitidaSemRegistro(p, notas)).toMatchObject({ tipo: 'notaEmitida', curto: 'Nota já emitida', texto: 'Nota de empenho emitida em 16/06/2026 para 1 linha: registre o empenho', linhaId: 'l1' });
+    expect(avisosDoPedido(p, itens, HOJE, notas).some((a) => a.tipo === 'notaEmitida')).toBe(true);
+    expect(notaEmitidaSemRegistro({ ...p, etapa: 'AUTORIZADO' }, notas)?.texto).toContain('registre o envio à CGOFI e o empenho');
+    expect(notaEmitidaSemRegistro({ ...p, etapa: 'EMPENHADO' }, notas)).toBeNull();
+    expect(notaEmitidaSemRegistro(p, semNotas)).toBeNull();
   });
 
   it('a linha sabe qual solicitação a cobre: pela ligação gravada ou pela solicitação única da ata', () => {

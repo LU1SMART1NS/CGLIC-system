@@ -21,7 +21,7 @@ const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
 });
 const nota = (linhaId: string): NotaDaLinha => ({
   linhaId, nota: '2026NE000001', regra: 'CONTRATO', motivo: null, contractKey: null, empenhoId: 'e1',
-  valorEmpenhado: 1, valorLiquidado: 0, valorPago: 0, entregaPrevista: null, entregaPrevistaValor: null, atualizadoEm: null
+  valorEmpenhado: 1, valorLiquidado: 0, valorPago: 0, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: null, atualizadoEm: null
 });
 
 const ITENS = [
