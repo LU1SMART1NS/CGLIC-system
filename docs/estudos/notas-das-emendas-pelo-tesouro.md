@@ -18,7 +18,8 @@ número da emenda na descrição). Nas 71 "homônimas", a nota que o sistema tem
 viagens, outros contratos). A conta de 127 notas faltando escondia essas 71: na verdade faltavam 198.
 
 Efeito colateral: a regra da migration 177 (nota do SEI → linha do pedido) aceitava nota sem número de emenda no plano
-interno quando a certa não existia, e 41 linhas de pedidos ficaram ligadas a 15 dessas notas da 200331.
+interno quando a certa não existia, e 41 linhas de pedidos ficaram ligadas a 15 dessas notas da 200331. A migration
+183 (PR #332) corrigiu a regra: essas linhas ficaram sem nota até a nota certa da 200330 entrar em `empenhos`.
 
 ## A causa
 
@@ -68,19 +69,22 @@ contrato.
 
 ### Ensaio no banco (25/10/2026, desfeito)
 
+Com as migrations 182 e 183 já em produção:
+
 | Medida | Antes | Depois |
 |---|---|---|
 | Notas em `empenhos` | 2.076 | 2.257 (181 `TESOURO`, R$ 133,4 mi pelo Tesouro, nenhuma com valor zero) |
-| Fila do Portal, UG 200330 | 0 | 182 (as 181 novas + 1) |
+| Fila do Portal, UG 200330 | 1 | 182 (+ as 181 novas) |
 | Fila do Portal, UG 200331 | 0 | 0 |
-| Linhas dos pedidos com nota (`emendas_ligar_notas`) | 1.478 | 1.549 (115 com nota do Tesouro) |
-| Linhas ligadas a nota que não é de emenda | 41 | 6 |
+| Linhas dos pedidos com nota (`emendas_ligar_notas`) | 1.427 | 1.623 (197 com nota do Tesouro) |
+| Linhas ligadas a nota que não é de emenda | 0 | 0 |
 
-Tempo: gravação 1,2 s; religação das linhas 2,8 s.
+Tempo: gravação 1,2 s; religação das linhas 1,0 s.
 
 ### Próximos passos
 
-1. Aplicar a migration 184 depois do PR da 182 (#331) e da 183 (outra sessão, branch fix/emendas-nota-da-emenda) (ela redefine `notas_para_ler_no_siafi`).
+1. Aplicar a migration 184 (a 182 e a 183 já estão na main e em produção; a 184 redefine `notas_para_ler_no_siafi`
+   da 182).
 2. Carga inicial das 181 pela própria `gravar_notas_do_tesouro`, com as respostas do STA já lidas (como na carga do
    saldo contábil).
 3. Recurso no servidor para as notas citadas depois: perguntar ao STA as de `notas_das_emendas_a_trazer()` nas duas
