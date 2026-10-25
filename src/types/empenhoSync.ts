@@ -3,7 +3,8 @@
  * Conforme especificado nas FASES 7.2-F, 7.2-G, 7.2-H e implementado na FASE 7.2-I (CGLIC 3.0).
  */
 
-export type EmpenhoFonteOrigem = 'COMPRASNET' | 'CONTRATOSNET' | 'PNCP' | 'MANUAL' | 'SINCRONIZADO';
+/** TESOURO: nota das emendas trazida pelo STA, sem contrato no Contratos.gov.br (migration 183). */
+export type EmpenhoFonteOrigem = 'COMPRASNET' | 'CONTRATOSNET' | 'PNCP' | 'MANUAL' | 'SINCRONIZADO' | 'TESOURO';
 
 export type TipoConflitoReconciliacao =
   | 'IDENTIDADE'
