@@ -232,7 +232,8 @@ export type TipoAviso =
   | 'empenhoAMais'
   | 'empenhoAMenos'
   | 'notaEmitida'
-  | 'credorDiferente';
+  | 'credorDiferente'
+  | 'semEnvioCgofi';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -252,11 +253,12 @@ export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
   divergencia: 3,
   semOficio: 4,
   ataVencendo: 5,
-  credorDiferente: 6,
-  notaEmitida: 7,
-  empenhoAMenos: 8,
-  semAutorizacao: 9,
-  semNota: 10
+  semEnvioCgofi: 6,
+  credorDiferente: 7,
+  notaEmitida: 8,
+  empenhoAMenos: 9,
+  semAutorizacao: 10,
+  semNota: 11
 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
@@ -336,6 +338,15 @@ export function avisosDoPedido(
   if (emitida) avisos.push(emitida);
   const deOutroFornecedor = p.etapa === 'CANCELADO' ? null : avisoDeCredor(credor);
   if (deOutroFornecedor) avisos.push(deOutroFornecedor);
+  // Rodada nova assinada e não enviada com o pedido já adiante (migration 193); em "Autorizado" é o próximo passo.
+  const semEnvio = p.etapa === 'AUTORIZADO' ? [] : faltaEnvioCgofi(p, notas);
+  if (semEnvio.length) {
+    avisos.push({
+      tipo: 'semEnvioCgofi',
+      curto: 'Sem envio à CGOFI',
+      texto: `${semEnvio.length === 1 ? 'Solicitação assinada e ainda não enviada à CGOFI' : `${semEnvio.length} solicitações assinadas e ainda não enviadas à CGOFI`}: ${semEnvio.map(textoDaSolicitacao).join('; ')}`
+    });
+  }
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
     if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });
@@ -658,6 +669,31 @@ export interface SituacaoDaLinha {
 /** Solicitações do pedido que já dizem qual ata cobrem. */
 const solicitacoesComAta = (p: PedidoEmenda): DocumentoSeiDoPedido[] => p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && Boolean(d.ataKey));
 
+/** Solicitações assinadas que nenhum envio à CGOFI leva ainda (migration 193): as que a janela do envio oferece. */
+export const solicitacoesAssinadasSemEnvio = (p: PedidoEmenda): DocumentoSeiDoPedido[] =>
+  solicitacoesComAta(p).filter((d) => d.assinadaEm && !d.enviosCgofi?.length);
+
+/**
+ * Solicitações assinadas cujo envio à CGOFI falta registrar. Só nos pedidos que registram o envio por solicitação: em
+ * "Autorizado" (o próximo envio já será assim) ou com algum envio ligado às solicitações. Pedido antigo, com o envio
+ * gravado sem a lista do que levava, não acende nada (decisão de 25/10/2026).
+ */
+export function faltaEnvioCgofi(p: PedidoEmenda, notas?: Map<string, NotaDaLinha>): DocumentoSeiDoPedido[] {
+  if (p.etapa === 'CANCELADO' || ORDEM_ETAPA[p.etapa] < ORDEM_ETAPA.AUTORIZADO) return [];
+  const porRodada = p.etapa === 'AUTORIZADO' || p.documentos.some((d) => d.etapa === 'AUTORIZACAO' && d.enviosCgofi?.length);
+  if (!porRodada) return [];
+  // Com nota em todas as linhas da solicitação, a CGOFI já empenhou: o envio aconteceu, só não foi ligado.
+  const empenhada = (d: DocumentoSeiDoPedido) => {
+    const ls = linhasAtivas(p).filter((l) => solicitacaoDaLinha(p, l)?.id === d.id);
+    return Boolean(notas) && ls.length > 0 && ls.every((l) => notas!.get(l.id)?.nota);
+  };
+  return solicitacoesAssinadasSemEnvio(p).filter((d) => !empenhada(d));
+}
+
+/** "37082291 (ata 00024/2024, assinada em 23/09/2026)": a solicitação em texto, para avisos e tarefas. */
+export const textoDaSolicitacao = (d: Pick<DocumentoSeiDoPedido, 'numero' | 'ataKey' | 'assinadaEm'>): string =>
+  `${d.numero} (ata ${d.ataKey?.split('-')[0] ?? '?'}${d.assinadaEm ? `, assinada em ${dataBR(d.assinadaEm)}` : ''})`;
+
 /**
  * A solicitação de autorização de empenho que cobre a linha: a que a tem nas suas linhas (migration 180) ou, sem
  * ligação gravada (pedidos de antes da migration, ou a segunda solicitação da ata ainda sem linhas marcadas), a
@@ -688,6 +724,11 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
   if (!solicitacao.assinadaEm) {
     return { situacao: 'AGUARDANDO_ASSINATURA', rotulo: ROTULO_SITUACAO_LINHA.AGUARDANDO_ASSINATURA.etiqueta, detalhe: `solicitação ${solicitacao.numero} na DGFNSP`, pendente: true, solicitacao };
   }
+  // Rodada nova com o pedido já adiante: assinada e ainda não enviada à CGOFI (migration 193). Com a nota, segue a nota.
+  if (!temNota && faltaEnvioCgofi(p).some((d) => d.id === solicitacao.id) && p.etapa !== 'AUTORIZADO') {
+    return { situacao: 'AUTORIZADO', rotulo: `Autorizado · ${dataBR(solicitacao.assinadaEm)}`, detalhe: 'falta o envio à CGOFI', pendente: true, solicitacao };
+  }
+  const envio = solicitacao.enviosCgofi?.[0];
   if (p.etapa === 'CONTRATACAO') {
     if (nota?.contractKey) {
       return { situacao: 'CONTRATADO', rotulo: `Contratado · ${numeroDaChave(nota.contractKey)}`, detalhe: notaLigada, pendente: !temNota, solicitacao };
@@ -703,7 +744,9 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
         : `NE ${nota!.nota} emitida${nota!.emitidaEm ? ` em ${dataBR(nota!.emitidaEm)}` : ''} · registre o empenho`;
     return { situacao: 'EMPENHADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHADO.etiqueta, detalhe, pendente: !temNota, solicitacao };
   }
-  if (p.etapa === 'CGOFI') return { situacao: 'NA_CGOFI', rotulo: ROTULO_SITUACAO_LINHA.NA_CGOFI.etiqueta, detalhe: 'aguarda a nota de empenho', pendente: false, solicitacao };
+  if (p.etapa === 'CGOFI') {
+    return { situacao: 'NA_CGOFI', rotulo: ROTULO_SITUACAO_LINHA.NA_CGOFI.etiqueta, detalhe: `${envio?.data ? `enviada em ${dataBR(envio.data)} · ` : ''}aguarda a nota de empenho`, pendente: false, solicitacao };
+  }
   return { situacao: 'AUTORIZADO', rotulo: `Autorizado · ${dataBR(solicitacao.assinadaEm)}`, detalhe: 'aguarda o envio à CGOFI', pendente: false, solicitacao };
 }
 
@@ -731,6 +774,54 @@ export function resumoDasLinhas(p: PedidoEmenda, notas: Map<string, NotaDaLinha>
     .map((x) => `${x.quantidade} ${x.quantidade === 1 ? ROTULO_SITUACAO_LINHA[x.situacao as keyof typeof ROTULO_SITUACAO_LINHA].uma : ROTULO_SITUACAO_LINHA[x.situacao as keyof typeof ROTULO_SITUACAO_LINHA].varias}`)
     .join(' · ');
   return { porSituacao, texto, maisAtrasada: porSituacao[0]?.situacao ?? null, divergem: porSituacao.length > 1 };
+}
+
+/** Uma rodada de empenho: as solicitações assinadas no mesmo dia, os envios à CGOFI que as levaram e as linhas delas. */
+export interface RodadaDoPedido {
+  /** Dia da assinatura; null para as que aguardam a assinatura. */
+  assinadaEm: string | null;
+  solicitacoes: DocumentoSeiDoPedido[];
+  /** Envios à CGOFI das solicitações da rodada (migration 193), sem repetir, do mais antigo ao mais novo. */
+  envios: Array<{ numero: string; data: string | null }>;
+  /** Solicitações da rodada cujo envio falta registrar (faltaEnvioCgofi). */
+  faltaEnvio: number;
+  /** Solicitações assinadas sem envio ligado num pedido antigo (envio gravado sem a lista do que levava). */
+  semRegistro: number;
+  /** As linhas da rodada por situação: "6 contratadas · 1 na CCGA". */
+  linhas: string;
+}
+
+/**
+ * Rodadas de empenho do pedido (protótipo M6 aprovado em 25/10/2026): as solicitações com ata agrupadas pelo dia da
+ * assinatura, cada uma com os envios à CGOFI que a levaram e a situação das suas linhas.
+ */
+export function rodadasDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): RodadaDoPedido[] {
+  const falta = new Set(faltaEnvioCgofi(p, notas).map((d) => d.id));
+  const porDia = new Map<string, DocumentoSeiDoPedido[]>();
+  for (const d of solicitacoesComAta(p)) porDia.set(d.assinadaEm ?? '', [...(porDia.get(d.assinadaEm ?? '') ?? []), d]);
+  const situacoes = linhasAtivas(p).map((l) => ({ l, s: situacaoDaLinha(p, l, notas) }));
+  return [...porDia.entries()]
+    .sort(([a], [b]) => (a || '9999').localeCompare(b || '9999'))
+    .map(([dia, sols]) => {
+      const ids = new Set(sols.map((d) => d.id));
+      const envios = new Map<string, { numero: string; data: string | null }>();
+      for (const d of sols) for (const e of d.enviosCgofi ?? []) if (!envios.has(e.numero)) envios.set(e.numero, e);
+      const conta = new Map<SituacaoLinha, number>();
+      for (const { s } of situacoes) if (s.solicitacao && ids.has(s.solicitacao.id)) conta.set(s.situacao, (conta.get(s.situacao) ?? 0) + 1);
+      const linhas = [...conta.entries()]
+        .filter(([s]) => s !== 'ANTES' && s !== 'CANCELADO')
+        .sort(([a], [b]) => ORDEM_SITUACAO_LINHA[a] - ORDEM_SITUACAO_LINHA[b])
+        .map(([s, n]) => `${n} ${n === 1 ? ROTULO_SITUACAO_LINHA[s as keyof typeof ROTULO_SITUACAO_LINHA].uma : ROTULO_SITUACAO_LINHA[s as keyof typeof ROTULO_SITUACAO_LINHA].varias}`)
+        .join(' · ');
+      return {
+        assinadaEm: dia || null,
+        solicitacoes: sols,
+        envios: [...envios.values()].sort((a, b) => (a.data ?? '9999').localeCompare(b.data ?? '9999')),
+        faltaEnvio: sols.filter((d) => falta.has(d.id)).length,
+        semRegistro: sols.filter((d) => d.assinadaEm && !d.enviosCgofi?.length && !falta.has(d.id)).length,
+        linhas
+      };
+    });
 }
 
 /** Linhas ativas do pedido agrupadas por ata (os kits, que podem ter itens de mais de uma ata, ficam num grupo à parte). */
@@ -781,7 +872,11 @@ export interface TarefaDoPedido {
   /** acao: pede um botão; atencao: aviso que o gestor resolve de outro jeito; espera: depende de outro setor ou do sistema. */
   tom: 'acao' | 'atencao' | 'espera';
   /** O botão: o próximo passo do pedido, a solicitação de uma ata (informar, assinatura ou linhas) ou alterar as linhas. */
-  botao?: { tipo: 'proxima'; rotulo: string } | { tipo: 'solicitacao'; rotulo: string; ataKey: string; numero?: string; troca?: boolean } | { tipo: 'alterar'; rotulo: string };
+  botao?:
+    | { tipo: 'proxima'; rotulo: string }
+    | { tipo: 'solicitacao'; rotulo: string; ataKey: string; numero?: string; troca?: boolean }
+    | { tipo: 'alterar'; rotulo: string }
+    | { tipo: 'envio'; rotulo: string };
 }
 
 const nomeDaLinha = (l: LinhaPedido, itens: Map<string, ItemCaep>): string =>
@@ -865,6 +960,18 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
     }
   }
 
+  // 2b) Rodada nova assinada com o pedido já adiante: o envio à CGOFI (migration 193). Em "Autorizado", é o próximo passo.
+  const semEnvio = p.etapa === 'AUTORIZADO' ? [] : faltaEnvioCgofi(p, notas);
+  if (semEnvio.length) {
+    t.push({
+      chave: 'envio-cgofi',
+      titulo: `Registrar o envio à CGOFI de ${semEnvio.length === 1 ? 'uma solicitação assinada' : `${semEnvio.length} solicitações assinadas`}`,
+      detalhe: `${semEnvio.map(textoDaSolicitacao).join('; ')}. Sem o envio, a CGOFI não emite a nota.`,
+      tom: 'acao',
+      botao: { tipo: 'envio', rotulo: 'Registrar envio à CGOFI' }
+    });
+  }
+
   // 3) Beneficiário a informar (sem ele o quadro e o ofício saem incompletos).
   const semBeneficiario = linhas.filter((l) => !l.beneficiarioId);
   if (semBeneficiario.length) {
@@ -895,7 +1002,7 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
 
   // 5) Avisos das atas e do pedido (os mesmos da lista), menos os que já viraram tarefa acima.
   for (const a of avisosDoPedido(p, itens, hoje, notas)) {
-    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao') continue;
+    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao' || a.tipo === 'semEnvioCgofi') continue;
     t.push({ chave: `aviso-${a.tipo}`, titulo: a.curto, detalhe: a.texto, tom: 'atencao' });
   }
   // Depois do empenho a ata ainda importa: o contrato precisa estar assinado antes do fim.

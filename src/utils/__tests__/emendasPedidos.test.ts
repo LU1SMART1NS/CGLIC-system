@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -331,6 +331,30 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     expect(notaEmitidaSemRegistro({ ...p, etapa: 'AUTORIZADO' }, notas)?.texto).toContain('registre o envio à CGOFI e o empenho');
     expect(notaEmitidaSemRegistro({ ...p, etapa: 'EMPENHADO' }, notas)).toBeNull();
     expect(notaEmitidaSemRegistro(p, semNotas)).toBeNull();
+  });
+
+  it('envio à CGOFI por rodada (migration 193): a rodada nova assinada e não enviada pede o envio; pedido antigo não', () => {
+    const enviada = { ...doc('d1', '35272441', A, '2026-04-17', ['l1']), enviosCgofi: [{ numero: '35294101', data: '2026-04-17' }] };
+    const nova = doc('d3', '37082291', B, '2026-09-23', ['l3']);
+    const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1, l3], documentos: [enviada, nova] });
+    expect(faltaEnvioCgofi(p).map((d) => d.numero)).toEqual(['37082291']);
+    expect(situacaoDaLinha(p, l3, semNotas)).toMatchObject({ situacao: 'AUTORIZADO', detalhe: 'falta o envio à CGOFI', pendente: true });
+    expect(avisosDoPedido(p, itens, HOJE, semNotas).find((a) => a.tipo === 'semEnvioCgofi')?.texto).toContain('37082291 (ata 00048/2025, assinada em 23/09/2026)');
+    expect(tarefasDoPedido(p, itens, semNotas, HOJE, true).find((t) => t.chave === 'envio-cgofi')?.botao).toMatchObject({ tipo: 'envio' });
+    const r = rodadasDoPedido(p, semNotas);
+    expect(r.map((x) => [x.assinadaEm, x.envios.map((e) => e.numero), x.faltaEnvio])).toEqual([['2026-04-17', ['35294101'], 0], ['2026-09-23', [], 1]]);
+    // Com a nota já ligada, a linha segue a nota.
+    const comNota = new Map<string, NotaDaLinha>([['l3', nota('l3', '2026NE000423', null)]]);
+    expect(situacaoDaLinha(p, l3, comNota).situacao).not.toBe('AUTORIZADO');
+    // Pedido antigo: nenhum envio ligado às solicitações → nada falta.
+    const antigo = pedido({ etapa: 'CONTRATACAO', linhas: [l1, l3], documentos: [doc('d1', '35272441', A, '2026-04-17', ['l1']), nova] });
+    expect(faltaEnvioCgofi(antigo)).toEqual([]);
+    expect(rodadasDoPedido(antigo, semNotas)[1]).toMatchObject({ faltaEnvio: 0, semRegistro: 1 });
+    // Em "Autorizado", as assinadas são o próximo passo: faltam, mas sem aviso nem tarefa à parte.
+    const autorizado = pedido({ etapa: 'AUTORIZADO', linhas: [l3], documentos: [nova] });
+    expect(faltaEnvioCgofi(autorizado)).toHaveLength(1);
+    expect(avisosDoPedido(autorizado, itens, HOJE, semNotas).some((a) => a.tipo === 'semEnvioCgofi')).toBe(false);
+    expect(tarefasDoPedido(autorizado, itens, semNotas, HOJE, true).some((t) => t.chave === 'envio-cgofi')).toBe(false);
   });
 
   it('a linha sabe qual solicitação a cobre: pela ligação gravada ou pela solicitação única da ata', () => {

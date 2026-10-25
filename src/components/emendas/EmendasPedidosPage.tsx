@@ -70,7 +70,7 @@ import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type Con
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 const SEM_CREDOR: CredorNoPedido[] = [];
 import { AutorDoPedido, ExecucaoDoPedidoResumo, ValorDoPedido } from './emendasPartes';
-import { LinhasPorAta, OQueFalta, type AoAgir } from './PedidoAberto';
+import { LinhasPorAta, OQueFalta, RodadasDoPedido, type AoAgir } from './PedidoAberto';
 import { EmpenhoDoPedido } from './EmpenhoDoPedido';
 import { CredorDoPedido } from './CredorDoPedido';
 import type { CredorNoPedido } from '../../utils/emendasConferenciaNota';
@@ -462,6 +462,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
           ))}
         {jaEmpenhado(p.etapa) && <EmpenhoDoPedido pedidoId={p.id} conferencia={conferencia} itens={itens} podeGerir={podeGerir} />}
         <CredorDoPedido pedidoId={p.id} grupos={credor} itens={itens} podeGerir={podeGerir} />
+        <RodadasDoPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} />
         <LinhasPorAta
           p={p}
           itens={itens}
@@ -854,6 +855,7 @@ export const EmendasPedidosPage: React.FC = () => {
                 { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') },
                 { value: 'empenhoAMais', label: 'Empenhado a mais que o pedido', count: contaAviso('empenhoAMais') },
                 { value: 'empenhoAMenos', label: 'Empenhado a menos que o pedido', count: contaAviso('empenhoAMenos') },
+                { value: 'semEnvioCgofi', label: 'Solicitação assinada sem envio à CGOFI', count: contaAviso('semEnvioCgofi') },
                 { value: 'notaEmitida', label: 'Nota emitida, empenho a registrar', count: contaAviso('notaEmitida') },
                 { value: 'credorDiferente', label: 'Nota de outro fornecedor', count: contaAviso('credorDiferente') }
               ]}

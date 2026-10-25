@@ -19,9 +19,12 @@ import {
   jaEmpenhado,
   linhasPorAta,
   ORDEM_ETAPA,
+  rodadasDoPedido,
   situacaoDaLinha,
+  solicitacoesAssinadasSemEnvio,
   valorDaLinha,
   type GrupoDeLinhas,
+  type RodadaDoPedido,
   type TarefaDoPedido
 } from '../../utils/emendasPedidos';
 import type { BeneficiarioEmenda, ConferenciaEmpenho, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
@@ -302,6 +305,13 @@ export const OQueFalta: React.FC<{ p: PedidoEmenda; tarefas: TarefaDoPedido[]; o
         </AppButton>
       );
     }
+    if (b.tipo === 'envio') {
+      return (
+        <AppButton size="sm" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
+          {b.rotulo}
+        </AppButton>
+      );
+    }
     return <ActionButton action="editar" size="sm" label={b.rotulo} onClick={onAlterar} data-testid={`emendas-pedido-tarefa-${t.chave}`} />;
   };
   return (
@@ -323,6 +333,88 @@ export const OQueFalta: React.FC<{ p: PedidoEmenda; tarefas: TarefaDoPedido[]; o
           </li>
         ))}
       </ol>
+    </div>
+  );
+};
+
+/**
+ * Rodadas de empenho do pedido (protótipo M6 aprovado em 25/10/2026): as solicitações assinadas no mesmo dia, os
+ * envios à CGOFI que as levaram e a situação das suas linhas, com o botão para registrar um envio novo.
+ */
+export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha>; podeGerir: boolean; onAcao: AoAgir }> = ({ p, notas, podeGerir, onAcao }) => {
+  if (p.etapa === 'CANCELADO' || ORDEM_ETAPA[p.etapa] < ORDEM_ETAPA.SOLICITADO) return null;
+  const rodadas = rodadasDoPedido(p, notas);
+  if (!rodadas.some((r) => r.assinadaEm)) return null;
+  const podeEnviar = podeGerir && ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.AUTORIZADO && solicitacoesAssinadasSemEnvio(p).length > 0;
+  const datas = (xs: Array<{ data: string | null }>) => [...new Set(xs.map((x) => (x.data ? dataBR(x.data) : null)).filter(Boolean))].join(', ');
+  const colunas: Column<RodadaDoPedido>[] = [
+    {
+      key: 'rodada',
+      header: 'Rodada',
+      priority: 'primary',
+      render: (r, i) => (
+        <>
+          <div style={{ fontWeight: 700 }}>{r.assinadaEm ? `${i + 1}ª rodada` : 'Aguardando a assinatura'}</div>
+          {r.assinadaEm && <div style={carteiraDetalhe}>assinada em {dataBR(r.assinadaEm)}</div>}
+        </>
+      )
+    },
+    {
+      key: 'solicitacoes',
+      header: 'Solicitações',
+      minWidth: '200px',
+      render: (r) => (
+        <>
+          <div>
+            {r.solicitacoes.length === 1 ? '1 solicitação' : `${r.solicitacoes.length} solicitações`} · {r.solicitacoes.length === 1 ? 'ata' : 'atas'}{' '}
+            {[...new Set(r.solicitacoes.map((d) => d.ataKey?.split('-')[0]))].join(', ')}
+          </div>
+          <div style={carteiraDetalhe}>SEI {r.solicitacoes.map((d) => d.numero).join(', ')}</div>
+        </>
+      )
+    },
+    {
+      key: 'envio',
+      header: 'Envio à CGOFI',
+      minWidth: '180px',
+      render: (r) =>
+        r.faltaEnvio > 0 ? (
+          <span style={{ fontWeight: 700, color: 'var(--color-warning-text)' }}>Falta o envio à CGOFI</span>
+        ) : r.envios.length > 0 ? (
+          <>
+            <div>
+              {r.envios.length === 1 ? '1 envio' : `${r.envios.length} envios`} em {datas(r.envios)}
+            </div>
+            <div style={carteiraDetalhe}>SEI {r.envios.map((e) => e.numero).join(', ')}</div>
+          </>
+        ) : r.semRegistro > 0 ? (
+          <span style={carteiraDetalhe}>envio não registrado por solicitação</span>
+        ) : (
+          <span style={carteiraDetalhe}>—</span>
+        )
+    },
+    { key: 'linhas', header: 'Linhas', minWidth: '140px', render: (r) => <span style={{ fontWeight: 600 }}>{r.linhas || '—'}</span> }
+  ];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} data-testid={`emendas-pedido-rodadas-${p.id}`}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 700, color: 'var(--color-primary, #0c326f)' }}>Rodadas de empenho</div>
+          <div style={carteiraDetalhe}>Cada envio à CGOFI leva uma ou mais solicitações assinadas.</div>
+        </div>
+        {podeEnviar && (
+          <AppButton size="sm" variant="secondary" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-registrar-envio-${p.id}`}>
+            Registrar envio à CGOFI
+          </AppButton>
+        )}
+      </div>
+      <DataTable<RodadaDoPedido>
+        testId={`emendas-pedido-rodadas-tabela-${p.id}`}
+        className="data-table-container--flush"
+        data={rodadas}
+        keyExtractor={(r) => r.assinadaEm ?? 'aguardando'}
+        columns={colunas}
+      />
     </div>
   );
 };
