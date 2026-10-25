@@ -203,7 +203,7 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
     case 'divergencia':
       return 'fazer a nova minuta';
     case 'semAutorizacao':
-      return 'informar a solicitação de cada ata';
+      return 'informar a solicitação ou a assinatura de cada item';
     case 'empenhoAMais':
       return 'corrigir o pedido ou a reserva';
     case 'empenhoAMenos':

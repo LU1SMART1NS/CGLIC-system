@@ -180,7 +180,7 @@ describe('Pedidos: uma solicitação de empenho para cada ata (migration 178)', 
 
   it('a autorização lista as atas: a assinada com a data e a que falta com o botão para informar', () => {
     const html = render('/?pedido=aut');
-    expect(html).toContain('1 de 2 atas');
+    expect(html).toContain('1 de 2 itens autorizados');
     expect(html).toContain('emendas-etapa__contaatas--falta');
     expect(html).toContain('Ata 00031/2025');
     expect(html).toContain('assinada pela Diretora do FNSP em <strong>24/09/2026</strong>');

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { avisosDeEmpenho } from '../emendasEmpenho';
-import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, atasSemAutorizacao, avisosDoPedido, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -255,14 +255,17 @@ describe('uma solicitação de empenho para cada ata (migration 178)', () => {
     ]);
   });
 
-  it('avisa a ata sem solicitação assinada depois da autorização; pedido sem nenhuma solicitação não avisa', () => {
+  it('avisa o item sem empenho autorizado depois da autorização; pedido sem nenhuma solicitação não avisa', () => {
     const comFalta = pedido({ etapa: 'CGOFI', linhas, documentos: [doc('37098929', A, '2026-09-24'), doc('37104393', B)] });
-    expect(atasSemAutorizacao(comFalta)?.curto).toBe('1 ata sem autorização');
+    // O kit leva um item de cada ata: sem a assinatura da ata B, ele não está autorizado.
+    expect(contaDosItens(comFalta)).toEqual({ total: 3, solicitados: 3, autorizados: 2 });
+    expect(itensSemEmpenhoAutorizado(comFalta)?.curto).toBe('1 item sem autorização');
+    expect(itensSemEmpenhoAutorizado(comFalta)?.texto).toContain('1 de 3 itens sem empenho autorizado');
     expect(avisosDoPedido(comFalta, catalogo, HOJE).map((a) => a.tipo)).toContain('semAutorizacao');
-    expect(atasSemAutorizacao(pedido({ etapa: 'CGOFI', linhas }))).toBeNull();
-    expect(atasSemAutorizacao(pedido({ etapa: 'SOLICITADO', linhas, documentos: [doc('37098929', A)] }))).toBeNull();
+    expect(itensSemEmpenhoAutorizado(pedido({ etapa: 'CGOFI', linhas }))).toBeNull();
+    expect(itensSemEmpenhoAutorizado(pedido({ etapa: 'SOLICITADO', linhas, documentos: [doc('37098929', A)] }))).toBeNull();
     const completo = pedido({ etapa: 'CONTRATACAO', linhas, documentos: [doc('37098929', A, '2026-09-24'), doc('37104393', B, '2026-09-25')] });
-    expect(atasSemAutorizacao(completo)).toBeNull();
+    expect(itensSemEmpenhoAutorizado(completo)).toBeNull();
   });
 
   it('a ata aceita uma solicitação por rodada: assinada só quando todas estão (migration 179)', () => {
@@ -270,11 +273,21 @@ describe('uma solicitação de empenho para cada ata (migration 178)', () => {
     const a = atasDoPedido(duas).find((x) => x.numeroAta === '00031/2025')!;
     expect(a.solicitacoes.map((x) => x.numero)).toEqual(['35673658', '36536429']);
     expect([a.situacao, a.assinadaEm]).toEqual(['aguardando', null]);
-    expect(atasSemAutorizacao(duas)?.curto).toBe('1 ata sem autorização');
+    // A ata A tem duas solicitações e as linhas não estão marcadas: os dois itens de A ficam sem solicitação.
+    expect(contaDosItens(duas)).toEqual({ total: 3, solicitados: 0, autorizados: 0 });
+    expect(itensSemEmpenhoAutorizado(duas)?.curto).toBe('3 itens sem autorização');
     const assinadas = pedido({ ...duas, documentos: [doc('35673658', A, '2026-05-27'), doc('36536429', A, '2026-08-11'), doc('37104393', B, '2026-09-24')] });
     const b = atasDoPedido(assinadas).find((x) => x.numeroAta === '00031/2025')!;
     expect([b.situacao, b.assinadaEm]).toEqual(['assinada', '2026-08-11']);
-    expect(atasSemAutorizacao(assinadas)).toBeNull();
+    // A ata está assinada, mas cada item precisa estar marcado numa das solicitações para ter o empenho autorizado.
+    expect(itensSemEmpenhoAutorizado(assinadas)?.curto).toBe('3 itens sem autorização');
+    const marca = (d: ReturnType<typeof doc>, ls: typeof linhas) => ({ ...d, linhas: ls.map((l) => ({ linhaId: l.id, quantidade: l.quantidade })) });
+    const marcadas = pedido({
+      ...duas,
+      documentos: [marca(doc('35673658', A, '2026-05-27'), [linhas[0], linhas[2]]), marca(doc('36536429', A, '2026-08-11'), [linhas[1]]), doc('37104393', B, '2026-09-24')]
+    });
+    expect(contaDosItens(marcadas)).toEqual({ total: 3, solicitados: 3, autorizados: 3 });
+    expect(itensSemEmpenhoAutorizado(marcadas)).toBeNull();
   });
 
   it('solicitação sem ata aparece para o gestor ligar', () => {
