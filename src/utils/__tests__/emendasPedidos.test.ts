@@ -340,9 +340,11 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     expect(faltaEnvioCgofi(p).map((d) => d.numero)).toEqual(['37082291']);
     expect(situacaoDaLinha(p, l3, semNotas)).toMatchObject({ situacao: 'AUTORIZADO', detalhe: 'falta o envio à CGOFI', pendente: true });
     expect(avisosDoPedido(p, itens, HOJE, semNotas).find((a) => a.tipo === 'semEnvioCgofi')?.texto).toContain('37082291 (ata 00048/2025, assinada em 23/09/2026)');
+    expect(avisosDoPedido(p, itens, HOJE, semNotas).find((a) => a.tipo === 'semEnvioCgofi')?.linhaId).toBe('l3');
     expect(tarefasDoPedido(p, itens, semNotas, HOJE, true).find((t) => t.chave === 'envio-cgofi')?.botao).toMatchObject({ tipo: 'envio' });
     const r = rodadasDoPedido(p, semNotas);
     expect(r.map((x) => [x.assinadaEm, x.envios.map((e) => e.numero), x.faltaEnvio])).toEqual([['2026-04-17', ['35294101'], 0], ['2026-09-23', [], 1]]);
+    expect(r[1].atasSemEnvio).toEqual(['00048/2025']);
     // Com a nota já ligada, a linha segue a nota.
     const comNota = new Map<string, NotaDaLinha>([['l3', nota('l3', '2026NE000423', null)]]);
     expect(situacaoDaLinha(p, l3, comNota).situacao).not.toBe('AUTORIZADO');

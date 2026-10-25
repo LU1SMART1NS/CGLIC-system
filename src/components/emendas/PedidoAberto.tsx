@@ -378,14 +378,21 @@ export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, Not
       header: 'Envio à CGOFI',
       minWidth: '180px',
       render: (r) =>
-        r.faltaEnvio > 0 ? (
-          <span style={{ fontWeight: 700, color: 'var(--color-warning-text)' }}>Falta o envio à CGOFI</span>
-        ) : r.envios.length > 0 ? (
+        r.envios.length > 0 || r.faltaEnvio > 0 ? (
           <>
-            <div>
-              {r.envios.length === 1 ? '1 envio' : `${r.envios.length} envios`} em {datas(r.envios)}
-            </div>
-            <div style={carteiraDetalhe}>SEI {r.envios.map((e) => e.numero).join(', ')}</div>
+            {r.envios.length > 0 && (
+              <>
+                <div>
+                  {r.envios.length === 1 ? '1 envio' : `${r.envios.length} envios`} em {datas(r.envios)}
+                </div>
+                <div style={carteiraDetalhe}>SEI {r.envios.map((e) => e.numero).join(', ')}</div>
+              </>
+            )}
+            {r.faltaEnvio > 0 && (
+              <div style={{ fontWeight: 700, color: 'var(--color-warning-text)' }}>
+                {r.envios.length > 0 ? `Falta o envio ${r.atasSemEnvio.length === 1 ? 'da ata' : 'das atas'} ${r.atasSemEnvio.join(', ')}` : 'Falta o envio à CGOFI'}
+              </div>
+            )}
           </>
         ) : r.semRegistro > 0 ? (
           <span style={carteiraDetalhe}>envio não registrado por solicitação</span>

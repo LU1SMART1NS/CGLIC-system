@@ -113,24 +113,31 @@ describe('janela das etapas: as linhas que a solicitação cobre (migration 180)
   });
 
   it('conferência: a mesma emenda em outro pedido do mesmo parlamentar só informa', () => {
-    naLista.pedidos = [{ ...pedido('CONTRATACAO'), id: 'outro', siopEmenda: '28630004', oficioProcessoSei: '08027.000001/2026-01' }];
+    naLista.pedidos = [
+      { ...pedido('CONTRATACAO'), id: 'outro', siopEmenda: '28630004', oficioProcessoSei: '08027.000001/2026-01' },
+      { ...pedido('CONTRATACAO'), id: 'outro2', siopEmenda: '28630004', oficioProcessoSei: '08027.000001/2026-01' }
+    ];
     const html = renderToStaticMarkup(<EtapaPedidoModal pedido={pedido('OFICIO')} acao="CONFERIDO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
     naLista.pedidos = [];
     expect(html).toContain('emendas-etapa-emenda-outro-pedido');
-    expect(html).toContain('Processo 08027.000001/2026-01');
+    expect(html).toContain('2 outros pedidos');
+    expect(html).toContain('todos do Processo 08027.000001/2026-01');
+    expect(html.split('Processo 08027.000001/2026-01').length - 1).toBe(1);
     expect(html).not.toContain('emendas-etapa-emenda-outro-autor');
   });
 
   it('envio à CGOFI: lista as solicitações assinadas sem envio, todas marcadas; as já enviadas ficam de fora', () => {
     const p = pedido('CONTRATACAO', [
       { id: 'd1', linhas: [{ linhaId: 'l1', quantidade: 8 }], etapa: 'AUTORIZACAO', numero: '35272441', data: null, ataKey: A, assinadaEm: '2026-04-17', enviosCgofi: [{ numero: '35294101', data: '2026-04-17' }] },
-      { id: 'd2', linhas: [{ linhaId: 'l2', quantidade: 2 }], etapa: 'AUTORIZACAO', numero: '37082291', data: null, ataKey: B, assinadaEm: '2026-09-23' },
-      { id: 'd3', linhas: [], etapa: 'AUTORIZACAO', numero: '37082300', data: null, ataKey: B, assinadaEm: null }
+      { id: 'd2', linhas: [], etapa: 'AUTORIZACAO', numero: '37082291', data: null, ataKey: B, assinadaEm: '2026-09-23' },
+      { id: 'd3', linhas: [], etapa: 'AUTORIZACAO', numero: '37082300', data: null, ataKey: A, assinadaEm: null }
     ]);
     const html = renderToStaticMarkup(<EtapaPedidoModal pedido={p} acao="CGOFI" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
     expect(html).toContain('emendas-etapa-envio-solicitacoes');
     expect(html).toMatch(/data-testid="emendas-etapa-envio-37082291"[^>]*checked|checked[^>]*data-testid="emendas-etapa-envio-37082291"/);
     expect(html).not.toContain('emendas-etapa-envio-35272441');
+    // Sem ligação gravada, os itens vêm da solicitação única da ata.
+    expect(html).toMatch(/Ata 00048\/2025[^]*Mira/);
     expect(html).not.toContain('emendas-etapa-envio-37082300');
   });
 });

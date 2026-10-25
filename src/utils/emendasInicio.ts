@@ -183,6 +183,13 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
       return 'corrigir o pedido ou a reserva';
     case 'empenhoAMenos':
       return 'conferir as notas no SEI';
+    case 'semEnvioCgofi':
+      return 'registrar o envio à CGOFI';
+    case 'notaEmitida':
+      return 'registrar o empenho';
+    case 'credorDiferente':
+      return 'conferir a nota e o item da linha';
+    case 'semNota':
     default:
       return 'procurar a nota pelo contrato';
   }
