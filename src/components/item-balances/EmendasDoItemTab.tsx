@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SummaryBar } from '../../design-system/components/SummaryBar';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { EmptyState } from '../../design-system/components/EmptyState';
+import { ErrorState } from '../../design-system/components/ErrorState';
 import { InstrumentSection } from '../instrument360/InstrumentSection';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
@@ -13,7 +14,7 @@ import { hojeEmBrasilia, useAutoresEmendas, useBeneficiariosEmendas, useItensCae
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from '../../utils/emendasKits';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
-import { FASES_PEDIDO, faseDaEtapa, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_SITUACAO_LINHA, situacaoDaLinha, type FasePedido, type SituacaoDaLinha } from '../../utils/emendasPedidos';
+import { FASES_PEDIDO, faseDaEtapa, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_SITUACAO_LINHA, ROTULO_AVISO, situacaoDaLinha, type FasePedido, type SituacaoDaLinha } from '../../utils/emendasPedidos';
 import { rotuloBeneficiario, type LinhaPedido, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 import { AutorDoPedido, SituacaoDaLinhaEtiqueta } from '../emendas/emendasPartes';
 import { ClipboardList } from 'lucide-react';
@@ -53,6 +54,15 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
   const item = itens.find((i) => i.itemKey === itemKey);
   const autorPorId = useMemo(() => new Map(autores.map((a) => [a.id, a])), [autores]);
   const beneficiarioPorId = useMemo(() => new Map(beneficiarios.map((b) => [b.id, b])), [beneficiarios]);
+  // Beneficiário ainda não carregado (ou cadastro juntado a outro): sem o "!" que derrubava a tela inteira.
+  const nomeDoBeneficiario = useCallback(
+    (id: string | null): string | null => {
+      if (!id) return null;
+      const b = beneficiarioPorId.get(id);
+      return b ? rotuloBeneficiario(b) : '…';
+    },
+    [beneficiarioPorId]
+  );
 
   const usos: UsoDoItem[] = useMemo(() => {
     const lista: UsoDoItem[] = [];
@@ -82,19 +92,21 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
     if (!termo) return doSegmento;
     return doSegmento.filter((u) => {
       const a = u.pedido.autorId ? autorPorId.get(u.pedido.autorId) : undefined;
-      const ben = u.linhas.map((x) => (x.linha.beneficiarioId ? rotuloBeneficiario(beneficiarioPorId.get(x.linha.beneficiarioId)!) : '')).join(' ');
+      const ben = u.linhas.map((x) => nomeDoBeneficiario(x.linha.beneficiarioId) ?? '').join(' ');
       return semAcento(`${a?.nome ?? 'Parlamentar a definir'} ${a?.uf ?? ''} ${u.pedido.oficioProcessoSei ?? ''} ${u.pedido.siopEmenda ?? ''} ${ben}`).includes(termo);
     });
-  }, [doSegmento, busca, autorPorId, beneficiarioPorId]);
+  }, [doSegmento, busca, autorPorId, nomeDoBeneficiario]);
   const unidadesDoSegmento = doSegmento.reduce((s, u) => s + u.quantidade, 0);
   const kitsDoItem = kits.filter((k) => k.ativo && k.itens.some((i) => i.itemKey === itemKey));
 
   const dias = item?.vigenciaFinal ? diasEntre(hoje, item.vigenciaFinal) : null;
+  // Mesmos nomes dos avisos (ROTULO_AVISO) e da gaveta do Início; com a data, para dizer por quê.
+  const semPrazo = Boolean(item?.vigenciaFinal) && (item!.ataEncerrada || passouDoCorte(dias));
   const prazo =
     !item?.vigenciaFinal ? null
-    : item.ataEncerrada ? { label: 'Ata encerrada', variant: 'neutral' as const }
-    : passouDoCorte(dias) ? { label: 'Indicação encerrada', variant: 'danger' as const }
-    : { label: `Indicação até ${dataBR(limiteDaIndicacao(item.vigenciaFinal))} · ${diasEntre(hoje, limiteDaIndicacao(item.vigenciaFinal))} dias`, variant: 'warning' as const };
+    : item.ataEncerrada ? { label: `${ROTULO_AVISO.ataVencida} · ${dataBR(item.vigenciaFinal)}`, variant: 'neutral' as const }
+    : passouDoCorte(dias) ? { label: `${ROTULO_AVISO.ataNoCorte} · ata vence em ${dataBR(item.vigenciaFinal)}`, variant: 'danger' as const }
+    : { label: `Indicar até ${dataBR(limiteDaIndicacao(item.vigenciaFinal))} · ${diasEntre(hoje, limiteDaIndicacao(item.vigenciaFinal))} dias`, variant: 'warning' as const };
 
   const colunas: Column<UsoDoItem>[] = [
     {
@@ -112,7 +124,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
       render: (u) => (
         <>
           <SituacaoDaLinhaEtiqueta s={u.situacao} testId={`item360-emenda-situacao-${u.pedido.id}`} />
-          {u.linhas.length > 1 && <div style={carteiraDetalhe}>{u.linhas.length} linhas deste item no pedido</div>}
+          {u.linhas.length > 1 && <div style={carteiraDetalhe}>aparece {u.linhas.length} vezes no pedido (um por beneficiário)</div>}
         </>
       )
     },
@@ -121,7 +133,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
       key: 'beneficiarios',
       header: 'Beneficiários',
       render: (u) => {
-        const nomes = [...new Set(u.linhas.map((x) => (x.linha.beneficiarioId ? rotuloBeneficiario(beneficiarioPorId.get(x.linha.beneficiarioId)!) : null)))];
+        const nomes = [...new Set(u.linhas.map((x) => nomeDoBeneficiario(x.linha.beneficiarioId)))];
         const informados = nomes.filter((n): n is string => Boolean(n));
         if (!informados.length) return <StatusBadge label="A informar" variant="warning" size="sm" dot={false} />;
         return (
@@ -174,7 +186,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
     <InstrumentSection id="item-emendas-section" title="Emendas parlamentares" subtitle="Quanto do alocado à CAEP já está reservado a parlamentares e em que situação está cada pedido." icon={ClipboardList}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} data-testid="item360-emendas">
         {isError ? (
-          <div style={{ color: 'var(--color-danger-text)', fontSize: '0.85rem' }}>Não foi possível carregar as emendas: {(error as Error | null)?.message || 'falha ao consultar os itens da CAEP.'}</div>
+          <ErrorState title="Não foi possível carregar as emendas" message={(error as Error | null)?.message || 'Falha ao consultar os itens da CAEP.'} testId="item360-emendas-erro" />
         ) : (
           <SummaryBar
             testId="item360-emendas-resumo"
@@ -183,7 +195,8 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
             items={[
               { label: 'Alocado à CAEP', value: formatNumber(alocado) },
               { label: 'Reservado a parlamentares', value: formatNumber(reservado) },
-              { label: 'Saldo a oferecer', value: formatNumber(saldo), tone: saldo <= 0 ? 'warning' : 'success' }
+              // Sem prazo para indicar, o saldo que sobrou não é mais "a oferecer": fica sem cor.
+              { label: 'Saldo a oferecer', value: formatNumber(saldo), tone: semPrazo ? 'default' : saldo <= 0 ? 'warning' : 'success' }
             ]}
             progress={{ value: Math.min(reservado, alocado), max: alocado }}
             extra={prazo ? <StatusBadge label={prazo.label} variant={prazo.variant} size="sm" dot={false} /> : null}
@@ -216,13 +229,13 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
           <DataTable<UsoDoItem>
             testId="item360-emendas-tabela"
             className="data-table-container--flush emendas-tabela-topo"
+            isLoading={isLoading || carregandoPedidos}
             data={filtrados}
             keyExtractor={(u) => u.pedido.id}
             columns={colunas}
             rowOpen={(u) => () => navigate(`/emendas/pedidos?pedido=${u.pedido.id}&item=${encodeURIComponent(itemKey)}`)}
           />
         )}
-        <div style={carteiraSubtitle}>Clique na linha para abrir o pedido em Emendas › Pedidos, já aberto, onde ficam os botões de etapa.</div>
         {kitsDoItem.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }} data-testid="item360-emendas-kits">
             <span style={carteiraSubtitle}>Entra nos kits:</span>

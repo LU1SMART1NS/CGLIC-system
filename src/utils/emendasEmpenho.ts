@@ -52,14 +52,14 @@ export function avisosDeEmpenho(diferencas: ConferenciaEmpenho[] | undefined, it
   if (mais.length) {
     out.push({
       tipo: 'empenhoAMais',
-      curto: 'Nota com mais',
+      curto: 'Empenhado a mais',
       texto: `Empenhado a mais que o pedido: ${mais.map((c) => fraseDaDiferenca(c, itens)).join('; ')}. Corrija o pedido ou a reserva, ou marque como resolvido.`
     });
   }
   if (menos.length) {
     out.push({
       tipo: 'empenhoAMenos',
-      curto: 'Falta na nota',
+      curto: 'Empenhado a menos',
       texto: `Empenhado a menos que o pedido, com todas as notas do SEI lidas: ${menos.map((c) => fraseDaDiferenca(c, itens)).join('; ')}. Confira se falta nota no SEI, mande a diferença para a reserva ou marque como resolvido.`
     });
   }

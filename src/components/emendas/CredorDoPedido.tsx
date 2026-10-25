@@ -1,6 +1,7 @@
 import React from 'react';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import { AvisosResolvidosLista, BotaoResolvido, useResolverAviso } from '../avisos/ResolverAviso';
+import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { chaveAvisoCredor, contextoCredor, tituloCredor, type CredorNoPedido } from '../../utils/emendasConferenciaNota';
 import type { ItemCaep } from '../../services/emendasService';
 
@@ -28,19 +29,17 @@ const Notas: React.FC<Props> = ({ pedidoId, grupos, itens, podeGerir }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} data-testid={`emendas-pedido-credor-${pedidoId}`}>
       {pendentes.map((g) => (
-        <div
+        <NoticeBar
           key={chaveAvisoCredor(g)}
-          style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', fontSize: '0.8rem', borderRadius: 6, padding: '0.45rem 0.7rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)' }}
-          data-testid={`emendas-pedido-credor-${g.nota}`}
+          tone="warning"
+          testId={`emendas-pedido-credor-${g.nota}`}
+          action={podeGerir ? <BotaoResolvido onClick={() => abrir({ tipo: 'AVISO', chave: chaveAvisoCredor(g), titulo: titulo(g), contexto: contextoCredor(g, itens) })} testId={`emendas-pedido-credor-resolver-${g.nota}`} /> : undefined}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700 }}>{titulo(g)}</div>
-            <div style={{ ...carteiraDetalhe, color: 'inherit', opacity: 0.85 }}>
-              {contextoCredor(g, itens)}. A nota pode estar ligada à linha errada, ou o item ou a ata do pedido estão trocados. Confira; se estiver certo, marque como resolvido.
-            </div>
-          </div>
-          {podeGerir && <BotaoResolvido onClick={() => abrir({ tipo: 'AVISO', chave: chaveAvisoCredor(g), titulo: titulo(g), contexto: contextoCredor(g, itens) })} testId={`emendas-pedido-credor-resolver-${g.nota}`} />}
-        </div>
+          <span style={{ fontWeight: 700 }}>{titulo(g)}</span>
+          <span style={{ ...carteiraDetalhe, color: 'inherit', opacity: 0.85, display: 'block' }}>
+            {contextoCredor(g, itens)}. Confira o item, a ata ou a nota ligada a ele.
+          </span>
+        </NoticeBar>
       ))}
       <AvisosResolvidosLista
         itens={resolvidas.map((g) => ({ chave: chaveAvisoCredor(g), titulo: titulo(g), contexto: contextoCredor(g, itens) }))}

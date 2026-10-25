@@ -1,6 +1,7 @@
 import React from 'react';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import { AvisosResolvidosLista, BotaoResolvido, useResolverAviso } from '../avisos/ResolverAviso';
+import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { chaveAvisoEmpenho, ehDiferenca, fraseDaDiferenca } from '../../utils/emendasEmpenho';
 import type { ConferenciaEmpenho, ItemCaep } from '../../services/emendasService';
 
@@ -34,30 +35,19 @@ const Diferencas: React.FC<{ pedidoId: string; doPedido: ConferenciaEmpenho[]; i
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} data-testid={`emendas-pedido-empenho-${pedidoId}`}>
       {pendentes.map((c) => {
         const mais = c.situacao === 'A_MAIS';
+        // Faixa de aviso padrão (NoticeBar): título curto, um detalhe de uma linha e o ✓ Resolvido ao lado.
         return (
-          <div
+          <NoticeBar
             key={chaveAvisoEmpenho(c)}
-            style={{
-              display: 'flex',
-              gap: '0.6rem',
-              alignItems: 'center',
-              fontSize: '0.8rem',
-              borderRadius: 6,
-              padding: '0.45rem 0.7rem',
-              color: mais ? 'var(--color-danger-text)' : 'var(--color-warning-text)',
-              background: mais ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)'
-            }}
-            data-testid={`emendas-pedido-empenho-${c.itemKey}`}
+            tone={mais ? 'danger' : 'warning'}
+            testId={`emendas-pedido-empenho-${c.itemKey}`}
+            action={podeGerir ? <BotaoResolvido onClick={() => abrir({ tipo: 'AVISO', chave: chaveAvisoEmpenho(c), titulo: titulo(c), contexto: contexto(c) })} testId={`emendas-pedido-empenho-resolver-${c.itemKey}`} /> : undefined}
           >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700 }}>{titulo(c)}</div>
-              <div style={{ ...carteiraDetalhe, color: 'inherit', opacity: 0.85 }}>
-                {contexto(c)}.{' '}
-                {mais ? 'Corrija o pedido ou a reserva, ou marque como resolvido.' : 'Confira se falta nota no SEI, mande a diferença para a reserva ou marque como resolvido.'}
-              </div>
-            </div>
-            {podeGerir && <BotaoResolvido onClick={() => abrir({ tipo: 'AVISO', chave: chaveAvisoEmpenho(c), titulo: titulo(c), contexto: contexto(c) })} testId={`emendas-pedido-empenho-resolver-${c.itemKey}`} />}
-          </div>
+            <span style={{ fontWeight: 700 }}>{titulo(c)}</span>
+            <span style={{ ...carteiraDetalhe, color: 'inherit', opacity: 0.85, display: 'block' }}>
+              {contexto(c)}. {mais ? 'Corrija o pedido ou a reserva.' : 'Confira se falta nota no SEI ou mande a diferença para a reserva.'}
+            </span>
+          </NoticeBar>
         );
       })}
       <AvisosResolvidosLista

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
-import type { NotaDaLinha } from '../../services/emendasService';
+import { avisosDeEmpenho } from '../emendasEmpenho';
+import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, atasSemAutorizacao, avisosDoPedido, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
@@ -68,7 +69,7 @@ describe('pedidos das emendas', () => {
     expect(avisosDoPedido({ ...devolvido, devolvidoEm: '2026-09-10' }, itens, HOJE).map((a) => a.curto)).toEqual(['Ofício devolvido', '43 dias sem ofício']);
     expect(avisosDoPedido(pedido({ etapa: 'CGOFI', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].tipo).toBe('ataVencida');
     expect(avisosDoPedido(pedido({ linhas: [kit] }), itens, HOJE)[0].texto).toContain('Ata 00061/2024 vence em 57 dias');
-    expect(avisosDoPedido(pedido({ etapa: 'CONFERIDO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].texto).toBe('Ata 00020/2025 encerrada em 28/05/2026: trocar o item ou tirar a linha');
+    expect(avisosDoPedido(pedido({ etapa: 'CONFERIDO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].texto).toBe('Ata 00020/2025 encerrada em 28/05/2026: trocar o item ou tirá-lo do pedido');
     expect(avisosDoPedido(pedido({ etapa: 'EMPENHADO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)).toEqual([]);
     expect(avisosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)).toEqual([]);
   });
@@ -194,7 +195,7 @@ describe('nota e execução das linhas empenhadas (migration 164)', () => {
     expect(notaDaLinha(l1, notas)).toBe('2026NE000100');
     const p = pedido({ etapa: 'EMPENHADO', linhas: [l1, l2, l3, l4] });
     expect(execucaoDoPedido(p, notas)).toEqual({ notas: 2, empenhado: 1050, liquidado: 400, pago: 300, proximaEntrega: { data: '2026-11-15', valor: 200 }, linhasSemNota: 1 });
-    expect(avisosDoPedido(p, itens, HOJE, notas).find((a) => a.tipo === 'semNota')?.texto).toBe('1 linha sem nota de empenho');
+    expect(avisosDoPedido(p, itens, HOJE, notas).find((a) => a.tipo === 'semNota')?.texto).toBe('1 item sem nota de empenho');
   });
 });
 
@@ -326,7 +327,7 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     const notas = new Map<string, NotaDaLinha>([['l1', { ...nota('l1', '2026NE000230', null), regra: 'FORNECEDOR', emitidaEm: '2026-06-16' }]]);
     expect(situacaoDaLinha(p, l1, notas)).toMatchObject({ situacao: 'EMPENHADO', detalhe: 'NE 2026NE000230 emitida em 16/06/2026 · registre o empenho', pendente: false });
     expect(situacaoDaLinha(p, l3, notas)).toMatchObject({ situacao: 'NA_CGOFI' });
-    expect(notaEmitidaSemRegistro(p, notas)).toMatchObject({ tipo: 'notaEmitida', curto: 'Nota já emitida', texto: 'Nota de empenho emitida em 16/06/2026 para 1 linha: registre o empenho', linhaId: 'l1' });
+    expect(notaEmitidaSemRegistro(p, notas)).toMatchObject({ tipo: 'notaEmitida', curto: 'Nota já emitida', texto: 'Nota de empenho emitida em 16/06/2026 para 1 item: registre o empenho', linhaId: 'l1' });
     expect(avisosDoPedido(p, itens, HOJE, notas).some((a) => a.tipo === 'notaEmitida')).toBe(true);
     expect(notaEmitidaSemRegistro({ ...p, etapa: 'AUTORIZADO' }, notas)?.texto).toContain('registre o envio à CGOFI e o empenho');
     expect(notaEmitidaSemRegistro({ ...p, etapa: 'EMPENHADO' }, notas)).toBeNull();
@@ -381,7 +382,7 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     expect(situacaoDaLinha(ccga, l1, notas)).toMatchObject({ situacao: 'CONTRATADO', rotulo: 'Contratado · 00138/2026', pendente: false });
     expect(situacaoDaLinha(ccga, l3, notas)).toMatchObject({ situacao: 'NA_CCGA', pendente: true });
     const r = resumoDasLinhas(ccga, notas);
-    expect(r.texto).toBe('1 na CCGA · 1 contratada');
+    expect(r.texto).toBe('1 na CCGA · 1 contratado');
     expect([r.divergem, r.maisAtrasada]).toEqual([true, 'NA_CCGA']);
   });
 
@@ -436,5 +437,23 @@ describe('nº da emenda (migration 186)', () => {
     const r = conferirNumeroDaEmenda(meu, '40950004', 2026, lista);
     expect(r.outroAutor.map((x) => x.id)).toEqual(['p2']);
     expect(r.mesmaEmenda.map((x) => x.id)).toEqual(['p3']);
+  });
+});
+
+describe('ROTULO_AVISO — um nome por aviso em todas as telas', () => {
+  it('todo tipo de aviso tem rótulo curto e a lista vai do mais grave ao mais leve', () => {
+    for (const t of TIPOS_AVISO) {
+      expect(ROTULO_AVISO[t]).toBeTruthy();
+      expect(ROTULO_AVISO[t].split(' ').length).toBeLessThanOrEqual(7);
+    }
+    expect([...TIPOS_AVISO]).toEqual([...TIPOS_AVISO].sort((a, b) => GRAVIDADE_DO_AVISO[a] - GRAVIDADE_DO_AVISO[b]));
+    expect(TIPOS_AVISO[0]).toBe('ataVencida');
+  });
+  it('a etiqueta curta dos avisos de empenho é o mesmo nome do filtro', () => {
+    const c: ConferenciaEmpenho = { emenda: '202612340001', itemKey: '00033/2025-200331-00003', qtdPedido: 38, qtdNasNotas: 41, notas: ['2026NE000456'], pedidoIds: ['p1'], pedidos: [1], situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [] };
+    const [mais] = avisosDeEmpenho([c], new Map());
+    const [menos] = avisosDeEmpenho([{ ...c, situacao: 'A_MENOS', qtdNasNotas: 30 }], new Map());
+    expect(mais.curto).toBe(ROTULO_AVISO.empenhoAMais);
+    expect(menos.curto).toBe(ROTULO_AVISO.empenhoAMenos);
   });
 });

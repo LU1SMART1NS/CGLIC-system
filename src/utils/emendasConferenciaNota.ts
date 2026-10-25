@@ -41,7 +41,7 @@ export function credorPorPedido(lista: CredorDiferente[], resolvidas?: { has: (c
 
 /** "Nota 2026NE000189 (3M GLOBAL CHANNEL SERVICES) em 57 linhas": título de cada nota de outro fornecedor. */
 export const tituloCredor = (g: CredorNoPedido): string =>
-  `Nota ${g.nota}${g.credorNome ? ` (${g.credorNome})` : ''} ${g.linhas.length === 1 ? 'em 1 linha' : `em ${g.linhas.length} linhas`}`;
+  `Nota ${g.nota}${g.credorNome ? ` (${g.credorNome})` : ''} ${g.linhas.length === 1 ? 'em 1 item' : `em ${g.linhas.length} itens`}`;
 
 /** Os itens e os fornecedores das atas, até 3, e "e mais N". */
 export function contextoCredor(g: CredorNoPedido, itens: Map<string, ItemCaep>): string {
@@ -57,7 +57,7 @@ export function avisoDeCredor(grupos: CredorNoPedido[] | undefined): AvisoPedido
   return {
     tipo: 'credorDiferente',
     curto: 'Nota de outro fornecedor',
-    texto: `${grupos.map((g) => `${g.nota}${g.credorNome ? ` (${g.credorNome})` : ''}`).join(', ')}: credor diferente do fornecedor da ata em ${linhas === 1 ? '1 linha' : `${linhas} linhas`}. A nota pode estar ligada à linha errada, ou o item ou a ata do pedido estão trocados. Confira; se estiver certo, marque como resolvido.`,
+    texto: `${grupos.map((g) => `${g.nota}${g.credorNome ? ` (${g.credorNome})` : ''}`).join(', ')}: credor diferente do fornecedor da ata em ${linhas === 1 ? '1 item' : `${linhas} itens`}. A nota pode estar ligada ao item errado, ou o item ou a ata do pedido estão trocados. Confira; se estiver certo, marque como resolvido.`,
     linhaId: grupos[0].linhas[0].linhaId
   };
 }

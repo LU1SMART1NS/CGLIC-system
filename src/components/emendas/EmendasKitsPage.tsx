@@ -210,7 +210,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
       <PageHeader
         title="Itens e kits"
         subtitle="Conjuntos de itens que a CAEP oferece aos parlamentares, e quantos ainda cabem no saldo."
-        hint={`Só entram itens com alocação para a CAEP (${itens.length} hoje). O kit não guarda quantidade: quando o parlamentar pede N kits, cada item sai do saldo da CAEP N vezes a quantidade por kit. A situação é calculada sozinha: Vence em breve quando alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível com ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim (prazo de indicação, para dar tempo de assinar o contrato) ou sem saldo. Volta sozinho se a ata for prorrogada. Os dois prazos ficam em Ajustes > Regras de Alertas.`}
+        hint={`O kit não guarda quantidade: pedir N kits tira de cada item N vezes a quantidade por kit. Vence em breve = alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível = ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim ou sem saldo (prazos em Ajustes › Regras de Alertas).`}
         icon={<PackageOpen size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={seletor}
         actions={

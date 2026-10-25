@@ -265,7 +265,7 @@ export const EmendasBeneficiariosPage: React.FC = () => {
       <PageHeader
         title="Beneficiários"
         subtitle="Órgãos que recebem o material das emendas."
-        hint="Só o nome da unidade é obrigatório; a sigla, o CNPJ (que traz o nome do beneficiário pela Receita), o endereço de entrega e o contato podem ser completados depois. O mesmo nome na mesma cidade não se repete. Nomes parecidos no mesmo lugar aparecem em Parecidos, para juntar ou marcar como diferentes. Cada alteração fica no histórico."
+        hint="Só o nome é obrigatório; sigla, CNPJ (traz o nome pela Receita), endereço de entrega e contato podem vir depois. Nomes parecidos no mesmo lugar aparecem em Parecidos, para juntar ou marcar como diferentes."
         icon={<Building size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
@@ -282,8 +282,8 @@ export const EmendasBeneficiariosPage: React.FC = () => {
         onSelect={setSegmento}
         segments={[
           { id: 'completos', label: 'Completos', count: contagem.completos, dot: 'var(--color-success)' },
-          { id: 'faltam', label: 'Faltam dados', count: contagem.faltam, dot: 'var(--color-warning)' },
-          { id: 'parecidos', label: 'Parecidos', count: contagem.parecidos, dot: 'var(--color-info, #155bcb)' },
+          { id: 'faltam', label: 'Faltam dados', count: contagem.faltam, dot: 'var(--color-warning-solid)' },
+          { id: 'parecidos', label: 'Parecidos', count: contagem.parecidos, dot: 'var(--color-info-solid)' },
           { id: 'inativos', label: 'Desativados', count: lista.length - ativos.length },
           { id: 'todos', label: 'Todos', count: lista.length }
         ]}
@@ -327,7 +327,6 @@ export const EmendasBeneficiariosPage: React.FC = () => {
           sort={{ key: sortKey, dir: sortDir }}
           onSort={toggle}
           rowStyle={(b) => (b.ativo ? undefined : { opacity: 0.7 })}
-          rowOpen={podeGerir ? (b) => () => setEditando(b) : undefined}
           columns={colunas}
           rowActions={
             podeGerir

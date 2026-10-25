@@ -6,7 +6,8 @@ import { StatusBadge, type StatusBadgeVariant } from '../../design-system/compon
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
-import { carteiraDetalhe, carteiraNumero, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraNumero } from '../carteira/carteiraStyles';
+import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
 import { buildAtaPath } from '../../hooks/useAta';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, dataBR, diasEntre } from '../../utils/emendasKits';
@@ -134,11 +135,6 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
         return (
           <>
             <LinhaDoPedido linha={l} itens={itens} comLinks />
-            {temItem(l) && (
-              <div style={{ marginTop: '0.2rem' }}>
-                <StatusBadge label="item de onde você veio" variant="info" size="sm" dot={false} />
-              </div>
-            )}
             {s.solicitacao && (p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && d.ataKey && itensDaLinha(l).some((x) => d.ataKey === x.itemKey.split('-').slice(0, 2).join('-'))).length > 1) && (
               <div style={carteiraDetalhe}>solicitação {s.solicitacao.numero}</div>
             )}
@@ -173,10 +169,9 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }} data-testid={`emendas-pedido-atas-${p.id}`}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <span style={carteiraSubtitle}>
+        <CarteiraDetailLabel>
           {grupos.length === 1 ? 'Itens do pedido' : `Itens por ata · ${grupos.length} ${grupos.some((g) => g.chave === 'KITS') ? 'grupos' : 'atas'}`}
-          {depoisDaSolicitacao && ' · a solicitação e a autorização de empenho são uma por ata'}
-        </span>
+        </CarteiraDetailLabel>
         {grupos.length > 1 && (
           <span style={{ ...carteiraDetalhe, display: 'inline-flex', gap: '0.4rem' }}>
             <AppButton size="xs" variant="link" onClick={() => todos(true)} data-testid={`emendas-pedido-abrir-atas-${p.id}`}>
@@ -194,7 +189,6 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
         const estaAberto = aberto(g);
         const un = g.linhas.reduce((s, l) => s + l.quantidade, 0);
         const valor = g.linhas.reduce((s, l) => s + valorDaLinha(l, itens, precos), 0);
-        const comOrigem = g.linhas.some(temItem);
         const falta = g.chave !== 'KITS' && depoisDaSolicitacao && g.situacao === 'falta';
         return (
           <section key={g.chave} className={`emendas-bloco-ata${pend.length ? ' emendas-bloco-ata--pend' : ''}`} data-testid={`emendas-pedido-ata-${g.numeroAta ?? 'kits'}`}>
@@ -212,13 +206,12 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                 {g.vigenciaFinal && <span className="emendas-bloco-ata__forn"> · até {dataBR(g.vigenciaFinal)}</span>}
               </span>
               <span className="emendas-bloco-ata__num">
-                {g.linhas.length} {g.linhas.length === 1 ? 'linha' : 'linhas'} · {formatNumber(un)} un · {formatCurrency(valor)}
+                {g.linhas.length} {g.linhas.length === 1 ? 'item' : 'itens'} · {formatNumber(un)} un · {formatCurrency(valor)}
               </span>
               <span className="emendas-bloco-ata__sit">
                 {pend.map((x) => (
                   <StatusBadge key={x} label={x} variant="warning" size="sm" dot={false} />
                 ))}
-                {comOrigem && <StatusBadge label="item de onde você veio" variant="info" size="sm" dot={false} />}
               </span>
             </button>
             {estaAberto && (
@@ -240,7 +233,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                           )}
                           {g.solicitacoes.length > 1 && <span style={carteiraDetalhe}>· {i + 1}ª rodada</span>}
                           <span style={carteiraDetalhe}>
-                            · cobre {cobre} de {g.linhas.length} {g.linhas.length === 1 ? 'linha' : 'linhas'}
+                            · cobre {cobre} de {g.linhas.length} {g.linhas.length === 1 ? 'item' : 'itens'}
                           </span>
                           {podeGerir && (
                             <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: g.chave, numero: x.numero, troca: true })} data-testid={`emendas-pedido-ata-alterar-${x.numero}`}>
@@ -274,7 +267,8 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                   keyExtractor={(l) => l.id}
                   columns={colunas}
                   className="emendas-tabela-topo"
-                  rowStyle={(l) => (temItem(l) ? { background: 'var(--color-warning-bg)' } : undefined)}
+                  // Vindo do Item 360: a linha do item fica com o azul claro de seleção (não é aviso, então não é amarelo).
+                  rowStyle={(l) => (temItem(l) ? { background: 'var(--primary-light)' } : undefined)}
                 />
               </div>
             )}
@@ -300,7 +294,7 @@ export const OQueFalta: React.FC<{ p: PedidoEmenda; tarefas: TarefaDoPedido[]; o
     }
     if (b.tipo === 'solicitacao') {
       return (
-        <AppButton size="sm" variant="secondary" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: b.ataKey, numero: b.numero, troca: b.troca })} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
+        <AppButton size="sm" variant="outline" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: b.ataKey, numero: b.numero, troca: b.troca })} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
           {b.rotulo}
         </AppButton>
       );
@@ -317,7 +311,7 @@ export const OQueFalta: React.FC<{ p: PedidoEmenda; tarefas: TarefaDoPedido[]; o
   return (
     <div className="emendas-falta" data-testid={`emendas-pedido-falta-${p.id}`}>
       <div className="emendas-falta__topo">
-        <span className="emendas-fase__nome">O que falta</span>
+        <CarteiraDetailLabel>O que falta</CarteiraDetailLabel>
         <span style={carteiraDetalhe}>
           {tarefas.length} {tarefas.length === 1 ? 'tarefa' : 'tarefas'}
         </span>
@@ -400,17 +394,14 @@ export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, Not
           <span style={carteiraDetalhe}>—</span>
         )
     },
-    { key: 'linhas', header: 'Linhas', minWidth: '140px', render: (r) => <span style={{ fontWeight: 600 }}>{r.linhas || '—'}</span> }
+    { key: 'linhas', header: 'Itens', minWidth: '140px', render: (r) => <span style={{ fontWeight: 600 }}>{r.linhas || '—'}</span> }
   ];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} data-testid={`emendas-pedido-rodadas-${p.id}`}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontWeight: 700, color: 'var(--color-primary, #0c326f)' }}>Rodadas de empenho</div>
-          <div style={carteiraDetalhe}>Cada envio à CGOFI leva uma ou mais solicitações assinadas.</div>
-        </div>
+        <CarteiraDetailLabel>Rodadas de empenho</CarteiraDetailLabel>
         {podeEnviar && (
-          <AppButton size="sm" variant="secondary" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-registrar-envio-${p.id}`}>
+          <AppButton size="sm" variant="outline" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-registrar-envio-${p.id}`}>
             Registrar envio à CGOFI
           </AppButton>
         )}

@@ -147,7 +147,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
       {semPrecos && <div style={aviso} role="status">Não foi possível ler o reajuste previsto: o quadro usa o preço de hoje das atas.</div>}
       {quadro.semBeneficiario > 0 && (
         <div style={aviso} role="status">
-          {quadro.semBeneficiario === 1 ? '1 linha sai' : `${quadro.semBeneficiario} linhas saem`} com o beneficiário “a definir”.
+          {quadro.semBeneficiario === 1 ? '1 item sai' : `${quadro.semBeneficiario} itens saem`} com o beneficiário “a definir”.
         </div>
       )}
       {quadro.semEndereco > 0 && (

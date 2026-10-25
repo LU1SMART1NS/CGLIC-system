@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { ActionButton } from '../../design-system/components/ActionButton';
+import { InfoHint } from '../../design-system/components/InfoHint';
 
 import { PAINEL_GAVETA_NOMES, type PainelGavetaId } from './painelGavetasConfig';
 
@@ -46,16 +47,21 @@ export const PainelBotoesGavetas: React.FC<{
   );
 };
 
-/** Moldura da gaveta aberta: fica fora do bloco que encolhe, logo acima da lista, para continuar visível ao rolar. */
+/**
+ * Moldura da gaveta aberta: fica fora do bloco que encolhe, logo acima da lista, para continuar visível ao rolar.
+ * `subtitulo` é uma frase de ação ("Clique na linha para abrir o item."); a regra fixa vai em `hint`, no ⓘ ao lado do nome.
+ */
 export const PainelGaveta: React.FC<{
   id: PainelGavetaId;
   subtitulo?: React.ReactNode;
+  hint?: string;
   onFechar: () => void;
   children: React.ReactNode;
-}> = ({ id, subtitulo, onFechar, children }) => (
+}> = ({ id, subtitulo, hint, onFechar, children }) => (
   <section id={`painel-gaveta-${id}`} className="pn-gaveta" aria-labelledby={`painel-gaveta-${id}-titulo`} data-testid={`painel-gaveta-${id}`}>
     <div className="pn-gaveta-head">
       <h2 id={`painel-gaveta-${id}-titulo`}>{PAINEL_GAVETA_NOMES[id]}</h2>
+      {hint && <InfoHint content={hint} label={`Sobre ${PAINEL_GAVETA_NOMES[id]}`} testId={`painel-gaveta-hint-${id}`} />}
       {subtitulo && <span className="pn-gaveta-sub">{subtitulo}</span>}
       <ActionButton action="fechar" size="sm" onClick={onFechar} data-testid={`painel-gaveta-fechar-${id}`} />
     </div>

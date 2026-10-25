@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { buildAtaItemPath, buildAtaPath } from '../../hooks/useAta';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
+import { SummaryBar } from '../../design-system/components/SummaryBar';
+import { InfoHint } from '../../design-system/components/InfoHint';
 import { carteiraDescricaoItem, carteiraDetalhe, carteiraFornecedor, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
@@ -212,25 +214,37 @@ export const SituacaoDaLinhaEtiqueta: React.FC<{ s: SituacaoDaLinha; testId?: st
   </div>
 );
 
-/** Execução do pedido empenhado pelas notas achadas: empenhado, liquidado, pago e a próxima entrega prevista. */
+/**
+ * Execução do pedido empenhado pelas notas achadas, no resumo de uma linha das abas do Contrato 360 (SummaryBar):
+ * notas, empenhado, liquidado e pago, a barra do pago e a próxima entrega prevista; a ressalva fica no ⓘ.
+ */
 export const ExecucaoDoPedidoResumo: React.FC<{ execucao: ExecucaoDoPedido }> = ({ execucao: e }) => (
-  <div
-    data-testid="emendas-pedido-execucao"
-    style={{ fontSize: '0.8rem', color: 'var(--color-info-text, #155bcb)', background: 'var(--color-info-bg, #e6eefb)', borderRadius: 6, padding: '0.5rem 0.7rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+  <SummaryBar
+    testId="emendas-pedido-execucao"
+    items={
+      e.notas
+        ? [
+            { label: 'Notas', value: String(e.notas), unit: '' },
+            { label: 'Empenhado', value: formatCurrency(e.empenhado), unit: '' },
+            { label: 'Liquidado', value: formatCurrency(e.liquidado), unit: '' },
+            { label: 'Pago', value: formatCurrency(e.pago), unit: '', tone: e.pago > 0 ? 'success' : 'default' }
+          ]
+        : [{ label: 'Notas', value: 'nenhuma achada ainda', unit: '' }]
+    }
+    progress={e.notas && e.empenhado > 0 ? { value: e.pago, max: e.empenhado } : undefined}
+    extra={e.linhasSemNota > 0 ? <StatusBadge label={`${e.linhasSemNota} sem nota`} variant="warning" size="sm" dot={false} /> : null}
   >
-    <div style={{ fontWeight: 700 }}>
-      {e.notas
-        ? `${e.notas} ${e.notas === 1 ? 'nota' : 'notas'}: empenhado ${formatCurrency(e.empenhado)} · liquidado ${formatCurrency(e.liquidado)} · pago ${formatCurrency(e.pago)}`
-        : 'Nenhuma nota achada ainda.'}
-    </div>
-    <div>
+    <div style={{ ...carteiraDetalhe, marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
       {e.proximaEntrega
         ? `Próxima entrega prevista: ${dataBR(e.proximaEntrega.data)}${e.proximaEntrega.valor != null ? ` (${formatCurrency(e.proximaEntrega.valor)})` : ''}, informada pelo gestor do contrato.`
         : 'Entrega prevista: o gestor do contrato ainda não informou.'}
-      {e.linhasSemNota > 0 && ` ${e.linhasSemNota} ${e.linhasSemNota === 1 ? 'linha' : 'linhas'} sem nota.`}
+      <InfoHint
+        content="Os valores são das notas inteiras, que podem ter outros itens da mesma emenda no contrato. A entrega ao beneficiário será registrada pelo módulo de Fiscalização."
+        label="Sobre os valores da execução"
+        testId="emendas-pedido-execucao-hint"
+      />
     </div>
-    <div style={{ fontWeight: 400 }}>Os valores são das notas inteiras, que podem ter outros itens da mesma emenda no contrato. A entrega ao beneficiário será registrada pelo módulo de Fiscalização.</div>
-  </div>
+  </SummaryBar>
 );
 
 /**

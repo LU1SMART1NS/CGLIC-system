@@ -15,6 +15,7 @@ import {
   linhasAtivas,
   notaDaLinha,
   reservadoPorItem,
+  TIPOS_AVISO,
   type AvisoPedido,
   type TipoAviso
 } from './emendasPedidos';
@@ -57,8 +58,6 @@ export interface ResumoInicioEmendas {
   semNomeCurto: ItemCaep[];
 }
 
-const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'empenhoAMais', 'divergencia', 'semOficio', 'ataVencendo', 'semEnvioCgofi', 'credorDiferente', 'notaEmitida', 'empenhoAMenos', 'semAutorizacao', 'semNota'];
-
 /** Item da linha a que o aviso de ata se refere: o que tem a ata mais perto do fim. */
 function itemDoAviso(p: PedidoEmenda, aviso: AvisoPedido | undefined, itens: Map<string, ItemCaep>): ItemCaep | null {
   if (!aviso?.linhaId) return null;
@@ -94,7 +93,7 @@ export function resumoInicioEmendas(
   credor?: Map<string, CredorNoPedido[]>
 ): ResumoInicioEmendas {
   const itens = new Map(itensLista.map((i) => [i.itemKey, i]));
-  const porTipo = Object.fromEntries(TIPOS.map((t) => [t, 0])) as Record<TipoAviso, number>;
+  const porTipo = Object.fromEntries(TIPOS_AVISO.map((t) => [t, 0])) as Record<TipoAviso, number>;
   const porEtapa: Partial<Record<EtapaPedido, number>> = {};
   const pedidosComAviso: PedidoComAviso[] = [];
   let graves = 0;
@@ -168,7 +167,7 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
   const fim = item?.vigenciaFinal;
   switch (a.tipo) {
     case 'ataVencida':
-      return fim ? `encerrou em ${dataBR(fim)}` : 'trocar o item ou tirar a linha';
+      return fim ? `encerrou em ${dataBR(fim)}` : 'trocar o item ou tirá-lo do pedido';
     case 'ataNoCorte':
       return fim ? `ata termina em ${diasEntre(hoje, fim)} dias` : 'confirmar com a CCGA';
     case 'ataVencendo':
@@ -188,7 +187,7 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
     case 'notaEmitida':
       return 'registrar o empenho';
     case 'credorDiferente':
-      return 'conferir a nota e o item da linha';
+      return 'conferir a nota e o item';
     case 'semNota':
     default:
       return 'procurar a nota pelo contrato';
