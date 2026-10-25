@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { prazoDoAviso, resumoInicioEmendas } from '../emendasInicio';
-import type { ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
+import { avisosDosPedidosParaOMenu, prazoDoAviso, resumoInicioEmendas } from '../emendasInicio';
+import type { ConferenciaEmpenho, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 
 const HOJE = '2026-10-23';
 const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
@@ -51,6 +51,24 @@ describe('Início do gestor de emendas', () => {
     expect(r.porEtapa).toEqual({ RESERVADO: 3, OFICIO: 1, EMPENHADO: 1 });
     expect(r.empenhados).toBe(1);
     expect([r.linhasEmpenhadas, r.linhasComNota]).toEqual([3, 1]);
+  });
+
+  it('número do menu: os mesmos pedidos com aviso e os mesmos vermelhos das pendências do Início', () => {
+    const notas = new Map([[comNota.id, nota(comNota.id)]]);
+    expect(avisosDosPedidosParaOMenu(pedidos, ITENS, HOJE, notas)).toEqual({ comAviso: r.pedidosComAviso.length, urgentes: r.graves });
+  });
+
+  it('número do menu fica vermelho com empenhado a mais ainda não resolvido', () => {
+    const empenhado = pedidos.find((p) => p.id === 'empenhado')!;
+    const diferenca: ConferenciaEmpenho = {
+      emenda: '202630840008', itemKey: 'longe', qtdPedido: 3, qtdNasNotas: 5, notas: ['2026NE000001'], pedidos: [1], pedidoIds: [empenhado.id],
+      situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: []
+    };
+    const notas = new Map([[comNota.id, nota(comNota.id)]]);
+    expect(avisosDosPedidosParaOMenu(pedidos, ITENS, HOJE, notas, new Map([[empenhado.id, [diferenca]]]))).toEqual({
+      comAviso: r.pedidosComAviso.length,
+      urgentes: r.graves + 1
+    });
   });
 
   it('lista do mais grave ao menos grave, com o item da ata do aviso', () => {

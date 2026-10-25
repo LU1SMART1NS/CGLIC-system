@@ -83,6 +83,32 @@ function comparar(a: PedidoComAviso, b: PedidoComAviso): number {
   return linhasDoAviso(b.avisos[0]) - linhasDoAviso(a.avisos[0]);
 }
 
+/**
+ * Número do menu Emendas, no padrão do Financeiro: os pedidos com algum aviso (o "Com algum aviso" de Pedidos e o "Todas"
+ * das pendências do Início), vermelho quando algum tem aviso vermelho (o "Pedem ação já" do Início). Mesmos dados da lista
+ * de Pedidos: notas das linhas, empenhado × pedido e credor diferente ainda não resolvidos.
+ */
+export function avisosDosPedidosParaOMenu(
+  pedidos: PedidoEmenda[],
+  itensLista: ItemCaep[],
+  hoje: string,
+  notas: Map<string, NotaDaLinha>,
+  empenho?: Map<string, ConferenciaEmpenho[]>,
+  credor?: Map<string, CredorNoPedido[]>
+): { comAviso: number; urgentes: number } {
+  const itens = new Map(itensLista.map((i) => [i.itemKey, i]));
+  let comAviso = 0;
+  let urgentes = 0;
+  for (const p of pedidos) {
+    if (p.etapa === 'CANCELADO') continue;
+    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id), credor?.get(p.id));
+    if (avisos.length === 0) continue;
+    comAviso++;
+    if (avisos.some(avisoGrave)) urgentes++;
+  }
+  return { comAviso, urgentes };
+}
+
 /** `empenho`: diferenças entre pedido e notas ainda não resolvidas, por pedido (diferencasPorPedido, migration 187). */
 export function resumoInicioEmendas(
   pedidos: PedidoEmenda[],

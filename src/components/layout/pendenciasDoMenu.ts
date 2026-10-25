@@ -14,13 +14,15 @@ export interface FontesDoMenu {
   extras: ContagensExtras;
   /** UASGs sem grupo (GTI) confirmado, com e sem sugestão; só o coordenador recebe número. */
   gruposUasgs?: { aConfirmar: number; semSugestao: number } | null;
+  /** Pedidos de emenda com algum aviso e, deles, os com aviso vermelho; só o coordenador e o gestor de emendas recebem número. */
+  emendas?: { total: number; urgentes: number } | null;
 }
 
 /**
  * Regras dos números do menu (só pendências que o perfil resolve; quem calcula cada parte já filtra pelo perfil). Com
  * número, a área abre direto na página e no segmento da pendência; sem número, o menu volta à última página usada.
  */
-export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
+export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, emendas }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
   const r: Record<string, PendenciaDaArea | undefined> = {};
 
   // Início (coordenador): as filas da Central de Distribuição.
@@ -45,6 +47,10 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs }: 
 
   // Financeiro: "Precisa de ação" de Pagamentos (segmento padrão da página); vermelho com erro no SIAFI ou prazo vencido.
   if (financeiro && financeiro.total > 0) r['execucao-financeira'] = { contagem: financeiro.total, vermelho: financeiro.urgente, destino: '/pagamentos' };
+
+  // Emendas (padrão do Financeiro): pedidos com algum aviso; vermelho com aviso vermelho (prazo de indicação vencido, ata
+  // encerrada…). Abre Pedidos em "Com algum aviso".
+  if (emendas && emendas.total > 0) r.emendas = { contagem: emendas.total, vermelho: emendas.urgentes > 0, destino: '/emendas/pedidos?aviso=com' };
 
   // Ajustes (coordenador): UASGs sem grupo confirmado; abre em "A confirmar" e, sem nenhuma lá, em "Sem sugestão".
   const aConfirmar = gruposUasgs?.aConfirmar ?? 0;

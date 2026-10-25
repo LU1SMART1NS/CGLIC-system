@@ -92,8 +92,13 @@ export function useMarcarBeneficiariosDiferentes() {
   });
 }
 
-export function useItensCaep() {
-  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'itens-caep'], queryFn: fetchItensCaep, staleTime: 5 * 60_000 });
+/** `enabled`: o número do menu Emendas só lê depois que a tela aberta enche (useTelaCarregada). */
+interface LeituraOpcional {
+  enabled?: boolean;
+}
+
+export function useItensCaep({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'itens-caep'], queryFn: fetchItensCaep, staleTime: 5 * 60_000, enabled });
 }
 
 export function useKitsEmendas() {
@@ -118,8 +123,8 @@ export function useSalvarKit() {
   });
 }
 
-export function usePedidosEmendas() {
-  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'pedidos'], queryFn: fetchPedidosEmendas });
+export function usePedidosEmendas({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'pedidos'], queryFn: fetchPedidosEmendas, enabled });
 }
 
 export function useReservadoPorItem() {
@@ -127,21 +132,21 @@ export function useReservadoPorItem() {
 }
 
 /** Nota de empenho e execução de cada linha empenhada (migration 164; o banco refaz de hora em hora). */
-export function useNotasDasLinhas() {
-  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'notas'], queryFn: fetchNotasDasLinhas, staleTime: 5 * 60_000 });
+export function useNotasDasLinhas({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'notas'], queryFn: fetchNotasDasLinhas, staleTime: 5 * 60_000, enabled });
 }
 
 /** Empenhado × pedido por emenda e item (migration 187; acompanha as notas, refeitas de hora em hora). */
-export function useConferenciaEmpenho() {
-  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'conferencia-empenho'], queryFn: fetchConferenciaEmpenho, staleTime: 5 * 60_000 });
+export function useConferenciaEmpenho({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'conferencia-empenho'], queryFn: fetchConferenciaEmpenho, staleTime: 5 * 60_000, enabled });
 }
 
 const SEM_CONFERENCIA: ConferenciaEmpenho[] = [];
 const SEM_CREDOR: CredorDiferente[] = [];
 
 /** Conferência com as diferenças ainda não resolvidas por pedido e a conferência de cada item (etiqueta da linha). */
-export function useDiferencasDeEmpenho() {
-  const consulta = useConferenciaEmpenho();
+export function useDiferencasDeEmpenho({ enabled = true }: LeituraOpcional = {}) {
+  const consulta = useConferenciaEmpenho({ enabled });
   const { porChave } = useAvisosResolvidos();
   const conferencia = consulta.data ?? SEM_CONFERENCIA;
   const diferencas = useMemo(() => diferencasPorPedido(conferencia, porChave), [conferencia, porChave]);
@@ -150,8 +155,8 @@ export function useDiferencasDeEmpenho() {
 }
 
 /** Notas ligadas com credor diferente do fornecedor da ata (migration 190), por pedido, sem as já resolvidas. */
-export function useCredorDiferente() {
-  const consulta = useQuery({ queryKey: [...CHAVE_EMENDAS, 'credor-diferente'], queryFn: fetchCredorDiferente, staleTime: 5 * 60_000 });
+export function useCredorDiferente({ enabled = true }: LeituraOpcional = {}) {
+  const consulta = useQuery({ queryKey: [...CHAVE_EMENDAS, 'credor-diferente'], queryFn: fetchCredorDiferente, staleTime: 5 * 60_000, enabled });
   const { porChave } = useAvisosResolvidos();
   const lista = consulta.data ?? SEM_CREDOR;
   const porPedido = useMemo(() => credorPorPedido(lista, porChave), [lista, porChave]);
