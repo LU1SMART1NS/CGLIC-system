@@ -124,7 +124,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
       render: (u) => (
         <>
           <SituacaoDaLinhaEtiqueta s={u.situacao} testId={`item360-emenda-situacao-${u.pedido.id}`} />
-          {u.linhas.length > 1 && <div style={carteiraDetalhe}>{u.linhas.length} linhas deste item no pedido</div>}
+          {u.linhas.length > 1 && <div style={carteiraDetalhe}>aparece {u.linhas.length} vezes no pedido (um por beneficiário)</div>}
         </>
       )
     },

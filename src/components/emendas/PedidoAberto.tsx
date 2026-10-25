@@ -135,11 +135,6 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
         return (
           <>
             <LinhaDoPedido linha={l} itens={itens} comLinks />
-            {temItem(l) && (
-              <div style={{ marginTop: '0.2rem' }}>
-                <StatusBadge label="Item de onde você veio" variant="info" size="sm" dot={false} />
-              </div>
-            )}
             {s.solicitacao && (p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && d.ataKey && itensDaLinha(l).some((x) => d.ataKey === x.itemKey.split('-').slice(0, 2).join('-'))).length > 1) && (
               <div style={carteiraDetalhe}>solicitação {s.solicitacao.numero}</div>
             )}
@@ -194,7 +189,6 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
         const estaAberto = aberto(g);
         const un = g.linhas.reduce((s, l) => s + l.quantidade, 0);
         const valor = g.linhas.reduce((s, l) => s + valorDaLinha(l, itens, precos), 0);
-        const comOrigem = g.linhas.some(temItem);
         const falta = g.chave !== 'KITS' && depoisDaSolicitacao && g.situacao === 'falta';
         return (
           <section key={g.chave} className={`emendas-bloco-ata${pend.length ? ' emendas-bloco-ata--pend' : ''}`} data-testid={`emendas-pedido-ata-${g.numeroAta ?? 'kits'}`}>
@@ -212,13 +206,12 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                 {g.vigenciaFinal && <span className="emendas-bloco-ata__forn"> · até {dataBR(g.vigenciaFinal)}</span>}
               </span>
               <span className="emendas-bloco-ata__num">
-                {g.linhas.length} {g.linhas.length === 1 ? 'linha' : 'linhas'} · {formatNumber(un)} un · {formatCurrency(valor)}
+                {g.linhas.length} {g.linhas.length === 1 ? 'item' : 'itens'} · {formatNumber(un)} un · {formatCurrency(valor)}
               </span>
               <span className="emendas-bloco-ata__sit">
                 {pend.map((x) => (
                   <StatusBadge key={x} label={x} variant="warning" size="sm" dot={false} />
                 ))}
-                {comOrigem && <StatusBadge label="Item de onde você veio" variant="info" size="sm" dot={false} />}
               </span>
             </button>
             {estaAberto && (
@@ -240,7 +233,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                           )}
                           {g.solicitacoes.length > 1 && <span style={carteiraDetalhe}>· {i + 1}ª rodada</span>}
                           <span style={carteiraDetalhe}>
-                            · cobre {cobre} de {g.linhas.length} {g.linhas.length === 1 ? 'linha' : 'linhas'}
+                            · cobre {cobre} de {g.linhas.length} {g.linhas.length === 1 ? 'item' : 'itens'}
                           </span>
                           {podeGerir && (
                             <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: g.chave, numero: x.numero, troca: true })} data-testid={`emendas-pedido-ata-alterar-${x.numero}`}>
@@ -274,7 +267,8 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                   keyExtractor={(l) => l.id}
                   columns={colunas}
                   className="emendas-tabela-topo"
-                  rowStyle={(l) => (temItem(l) ? { background: 'var(--color-warning-bg)' } : undefined)}
+                  // Vindo do Item 360: a linha do item fica com o azul claro de seleção (não é aviso, então não é amarelo).
+                  rowStyle={(l) => (temItem(l) ? { background: 'var(--primary-light)' } : undefined)}
                 />
               </div>
             )}
@@ -400,7 +394,7 @@ export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, Not
           <span style={carteiraDetalhe}>—</span>
         )
     },
-    { key: 'linhas', header: 'Linhas', minWidth: '140px', render: (r) => <span style={{ fontWeight: 600 }}>{r.linhas || '—'}</span> }
+    { key: 'linhas', header: 'Itens', minWidth: '140px', render: (r) => <span style={{ fontWeight: 600 }}>{r.linhas || '—'}</span> }
   ];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} data-testid={`emendas-pedido-rodadas-${p.id}`}>

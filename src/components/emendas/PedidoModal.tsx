@@ -256,7 +256,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   if (!autorId && !pedido && !paraOrgao) pendencias.push({ texto: 'o parlamentar', alvo: 'emendas-pedido-busca-autor', lado: 'pedido' });
   if (orgaoNaFrente && (!beneficiarioDoPedido && linhas.some((l) => !l.beneficiarioId))) pendencias.push({ texto: 'o órgão que pediu', alvo: 'emendas-pedido-beneficiario-pedido', lado: 'pedido' });
   if (linhas.length === 0) pendencias.push({ texto: 'pelo menos um item', alvo: 'emendas-pedido-busca', lado: 'itens' });
-  if (linhas.some((l) => !(Number.isInteger(l.quantidade) && l.quantidade > 0))) pendencias.push({ texto: 'quantidade inteira maior que zero em cada linha', alvo: 'emendas-pedido-linhas', lado: 'pedido' });
+  if (linhas.some((l) => !(Number.isInteger(l.quantidade) && l.quantidade > 0))) pendencias.push({ texto: 'quantidade inteira maior que zero em cada item', alvo: 'emendas-pedido-linhas', lado: 'pedido' });
   if (linhas.some(passaDoSaldo)) pendencias.push({ texto: 'quantidade dentro do saldo livre da CAEP', alvo: 'emendas-pedido-linhas', lado: 'pedido' });
   if (tel && (tel.length < 10 || tel.length > 11)) pendencias.push({ texto: 'telefone do contato com DDD (10 ou 11 números)', alvo: 'emendas-pedido-contato-telefone', lado: 'pedido' });
   if (contatoEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contatoEmail.trim())) pendencias.push({ texto: 'e-mail do contato válido', alvo: 'emendas-pedido-contato-email', lado: 'pedido' });
@@ -521,7 +521,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           )}
           {confirmarSaida && (
             <div className="reserva-confirmar" role="alertdialog" aria-label="Descartar a reserva" data-testid="emendas-pedido-confirmar-saida">
-              <span>{pedido ? 'Sair sem salvar? As mudanças neste pedido se perdem.' : `Descartar esta reserva? ${linhas.length ? `${linhas.length === 1 ? 'A linha some' : `As ${linhas.length} linhas somem`} e nada fica reservado.` : ''}`}</span>
+              <span>{pedido ? 'Sair sem salvar? As mudanças neste pedido se perdem.' : `Descartar esta reserva? ${linhas.length ? `${linhas.length === 1 ? 'O item some' : `Os ${linhas.length} itens somem`} e nada fica reservado.` : ''}`}</span>
               <AppButton type="button" variant="outline" size="sm" onClick={() => setConfirmarSaida(false)}>
                 Continuar editando
               </AppButton>
@@ -531,7 +531,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           <div className="reserva-total" data-testid="emendas-pedido-total">
             <span className="reserva-total__rotulo">Total previsto para a emenda</span> <b>{formatCurrency(total)}</b>
             <div className="reserva-mudo">
-              {linhas.length} {linhas.length === 1 ? 'linha' : 'linhas'} · {formatNumber(unidades)} {unidades === 1 ? 'unidade' : 'unidades'}
+              {linhas.length} {linhas.length === 1 ? 'item' : 'itens'} · {formatNumber(unidades)} {unidades === 1 ? 'unidade' : 'unidades'}
               {doisPrecos(total, totalHoje) && ` · pelo preço de hoje ${formatCurrency(totalHoje)} (+${formatCurrency(total - totalHoje)})`}
               {rascunhoEm && !pedido && ` · rascunho guardado às ${rascunhoEm}`}
             </div>
@@ -539,7 +539,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           <div className="reserva-botoes">
             <ActionButton action="cancelar" type="button" onClick={pedirParaFechar} disabled={salvar.isPending} />
             <AppButton type="submit" form="emendas-pedido-form" disabled={salvar.isPending} isLoading={salvar.isPending} data-testid="emendas-pedido-salvar">
-              {pedido ? 'Salvar pedido' : linhas.length ? `Reservar ${linhas.length} ${linhas.length === 1 ? 'linha' : 'linhas'}` : 'Reservar'}
+              {pedido ? 'Salvar pedido' : linhas.length ? `Reservar ${linhas.length} ${linhas.length === 1 ? 'item' : 'itens'}` : 'Reservar'}
             </AppButton>
           </div>
         </div>
@@ -704,7 +704,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           {rascunhoPendente && rascunhoAntigo && (
             <div className="reserva-aviso" role="status" data-testid="emendas-pedido-rascunho">
               <span>
-                Há uma reserva que não foi concluída ({rascunhoAntigo.linhas.length} {rascunhoAntigo.linhas.length === 1 ? 'linha' : 'linhas'}, guardada às {rascunhoAntigo.salvoEm}).
+                Há uma reserva que não foi concluída ({rascunhoAntigo.linhas.length} {rascunhoAntigo.linhas.length === 1 ? 'item' : 'itens'}, guardada às {rascunhoAntigo.salvoEm}).
               </span>
               <AppButton type="button" size="sm" onClick={recuperarRascunho}>
                 Continuar
@@ -832,7 +832,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           <div className="reserva-secao">
             <span className="reserva-rotulo">{orgaoNaFrente ? 'Órgão que pediu' : 'Beneficiário'}</span>
             {seletor({ alvo: 'pedido', atual: beneficiarioDoPedido, vazio: orgaoNaFrente ? 'Escolha o órgão' : 'A informar', erro: falta('emendas-pedido-beneficiario-pedido'), testId: 'emendas-pedido-beneficiario-pedido' })}
-            <p className="reserva-mudo reserva-texto">Vale para todas as linhas. Se uma linha for para outro órgão, troque só nela.</p>
+            <p className="reserva-mudo reserva-texto">Vale para todos os itens. Se um item for para outro órgão, troque só nele.</p>
           </div>
 
           <div className="reserva-secao" data-testid="emendas-pedido-linhas">
@@ -974,7 +974,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           </div>
 
           {tirou > 0 && (
-            <AppInput label="Por que as linhas foram tiradas?" placeholder="Ex.: parlamentar desistiu do item; ata vencida sem substituto" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+            <AppInput label="Por que os itens foram tirados?" placeholder="Ex.: parlamentar desistiu do item; ata vencida sem substituto" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
           )}
           {pedido && VOLTA_AO_OFICIO.has(pedido.etapa) && (
             <div className="reserva-aviso">Mudar itens ou quantidades volta o pedido para "Ofício recebido": o ofício e a emenda citam os itens antigos e precisam ser conferidos de novo. Só trocar o beneficiário não volta.</div>

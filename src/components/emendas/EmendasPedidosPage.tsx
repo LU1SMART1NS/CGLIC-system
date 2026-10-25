@@ -385,7 +385,7 @@ const OndeEstaOPedido: React.FC<{
       <ProgressBar value={posicao} max={TOTAL_ETAPAS_PEDIDO} showPercent={false} height="4px" colorScheme={contratado ? 'success' : 'primary'} testId={`emendas-pedido-progresso-${p.id}`} />
       {resumo.texto && (
         <div style={carteiraDetalhe} data-testid={`emendas-pedido-resumo-linhas-${p.id}`}>
-          {resumo.divergem ? 'Linhas: ' : ''}
+          {resumo.divergem ? 'Itens: ' : ''}
           {resumo.texto}
         </div>
       )}
@@ -412,7 +412,7 @@ const OndeEstaOPedido: React.FC<{
             )}
             {!jaEmpenhado(p.etapa) && (
               <>
-                <ActionButton action="editar" size="xs" label="Alterar linhas" onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
+                <ActionButton action="editar" size="xs" label="Alterar itens" onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
                 <ActionButton action="cancelarCiclo" size="xs" label="Cancelar pedido" onClick={() => onAcao('CANCELAR')} data-testid={`emendas-pedido-cancelar-${p.id}`} />
               </>
             )}
@@ -482,7 +482,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
         />
         {canceladas.length > 0 && (
           <div style={carteiraSubtitle}>
-            {canceladas.length} {canceladas.length === 1 ? 'linha tirada' : 'linhas tiradas'} do pedido: {[...new Set(canceladas.map((l) => l.canceladaMotivo).filter(Boolean))].join(' ')}
+            {canceladas.length} {canceladas.length === 1 ? 'item tirado' : 'itens tirados'} do pedido: {[...new Set(canceladas.map((l) => l.canceladaMotivo).filter(Boolean))].join(' ')}
           </div>
         )}
         {jaEmpenhado(p.etapa) && <ExecucaoDoPedidoResumo execucao={execucaoDoPedido(p, notas)} />}
@@ -671,7 +671,7 @@ export const EmendasPedidosPage: React.FC = () => {
         return (
           <>
             <div style={carteiraValor}>{resumo}</div>
-            {ativas.length > 2 && <div style={carteiraDetalhe}>+{ativas.length - 2} {ativas.length - 2 === 1 ? 'linha' : 'linhas'}</div>}
+            {ativas.length > 2 && <div style={carteiraDetalhe}>+{ativas.length - 2} {ativas.length - 2 === 1 ? 'item' : 'itens'}</div>}
           </>
         );
       }

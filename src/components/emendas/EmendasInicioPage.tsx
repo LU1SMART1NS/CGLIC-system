@@ -243,7 +243,7 @@ export const EmendasInicioPage: React.FC = () => {
         return (
           <>
             {primeiro ? <div style={carteiraValor}>{curto(primeiro.descricao, 48)}</div> : <span style={carteiraDetalhe}>—</span>}
-            {ativas.length > 1 && <div style={carteiraDetalhe}>{plural(ativas.length, 'linha', 'linhas')} no pedido</div>}
+            {ativas.length > 1 && <div style={carteiraDetalhe}>{plural(ativas.length, 'item', 'itens')} no pedido</div>}
           </>
         );
       }
@@ -408,7 +408,7 @@ export const EmendasInicioPage: React.FC = () => {
           valor={valor(r.empenhados)}
           unidade={r.empenhados === 1 ? 'pedido' : 'pedidos'}
           linhas={[
-            { rotulo: 'Linhas com nota de empenho', valor: `${formatNumber(r.linhasComNota)} de ${formatNumber(r.linhasEmpenhadas)}` },
+            { rotulo: 'Itens com nota de empenho', valor: `${formatNumber(r.linhasComNota)} de ${formatNumber(r.linhasEmpenhadas)}` },
             { rotulo: 'Em contratação', valor: formatNumber(r.porEtapa.CONTRATACAO ?? 0) }
           ]}
           onClick={() => navigate(`/emendas/pedidos?etapa=${r.porEtapa.EMPENHADO ? 'EMPENHADO' : 'CONTRATACAO'}`)}

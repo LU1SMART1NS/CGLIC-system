@@ -69,7 +69,7 @@ describe('pedidos das emendas', () => {
     expect(avisosDoPedido({ ...devolvido, devolvidoEm: '2026-09-10' }, itens, HOJE).map((a) => a.curto)).toEqual(['Ofício devolvido', '43 dias sem ofício']);
     expect(avisosDoPedido(pedido({ etapa: 'CGOFI', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].tipo).toBe('ataVencida');
     expect(avisosDoPedido(pedido({ linhas: [kit] }), itens, HOJE)[0].texto).toContain('Ata 00061/2024 vence em 57 dias');
-    expect(avisosDoPedido(pedido({ etapa: 'CONFERIDO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].texto).toBe('Ata 00020/2025 encerrada em 28/05/2026: trocar o item ou tirar a linha');
+    expect(avisosDoPedido(pedido({ etapa: 'CONFERIDO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].texto).toBe('Ata 00020/2025 encerrada em 28/05/2026: trocar o item ou tirá-lo do pedido');
     expect(avisosDoPedido(pedido({ etapa: 'EMPENHADO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)).toEqual([]);
     expect(avisosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)).toEqual([]);
   });
@@ -195,7 +195,7 @@ describe('nota e execução das linhas empenhadas (migration 164)', () => {
     expect(notaDaLinha(l1, notas)).toBe('2026NE000100');
     const p = pedido({ etapa: 'EMPENHADO', linhas: [l1, l2, l3, l4] });
     expect(execucaoDoPedido(p, notas)).toEqual({ notas: 2, empenhado: 1050, liquidado: 400, pago: 300, proximaEntrega: { data: '2026-11-15', valor: 200 }, linhasSemNota: 1 });
-    expect(avisosDoPedido(p, itens, HOJE, notas).find((a) => a.tipo === 'semNota')?.texto).toBe('1 linha sem nota de empenho');
+    expect(avisosDoPedido(p, itens, HOJE, notas).find((a) => a.tipo === 'semNota')?.texto).toBe('1 item sem nota de empenho');
   });
 });
 
@@ -327,7 +327,7 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     const notas = new Map<string, NotaDaLinha>([['l1', { ...nota('l1', '2026NE000230', null), regra: 'FORNECEDOR', emitidaEm: '2026-06-16' }]]);
     expect(situacaoDaLinha(p, l1, notas)).toMatchObject({ situacao: 'EMPENHADO', detalhe: 'NE 2026NE000230 emitida em 16/06/2026 · registre o empenho', pendente: false });
     expect(situacaoDaLinha(p, l3, notas)).toMatchObject({ situacao: 'NA_CGOFI' });
-    expect(notaEmitidaSemRegistro(p, notas)).toMatchObject({ tipo: 'notaEmitida', curto: 'Nota já emitida', texto: 'Nota de empenho emitida em 16/06/2026 para 1 linha: registre o empenho', linhaId: 'l1' });
+    expect(notaEmitidaSemRegistro(p, notas)).toMatchObject({ tipo: 'notaEmitida', curto: 'Nota já emitida', texto: 'Nota de empenho emitida em 16/06/2026 para 1 item: registre o empenho', linhaId: 'l1' });
     expect(avisosDoPedido(p, itens, HOJE, notas).some((a) => a.tipo === 'notaEmitida')).toBe(true);
     expect(notaEmitidaSemRegistro({ ...p, etapa: 'AUTORIZADO' }, notas)?.texto).toContain('registre o envio à CGOFI e o empenho');
     expect(notaEmitidaSemRegistro({ ...p, etapa: 'EMPENHADO' }, notas)).toBeNull();
@@ -382,7 +382,7 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     expect(situacaoDaLinha(ccga, l1, notas)).toMatchObject({ situacao: 'CONTRATADO', rotulo: 'Contratado · 00138/2026', pendente: false });
     expect(situacaoDaLinha(ccga, l3, notas)).toMatchObject({ situacao: 'NA_CCGA', pendente: true });
     const r = resumoDasLinhas(ccga, notas);
-    expect(r.texto).toBe('1 na CCGA · 1 contratada');
+    expect(r.texto).toBe('1 na CCGA · 1 contratado');
     expect([r.divergem, r.maisAtrasada]).toEqual([true, 'NA_CCGA']);
   });
 

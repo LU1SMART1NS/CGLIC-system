@@ -90,7 +90,7 @@ describe('prazo dos avisos novos (Início)', () => {
     const a = (tipo: Parameters<typeof prazoDoAviso>[0]['tipo']) => prazoDoAviso({ tipo, curto: '', texto: '' }, null, '2026-10-25');
     expect(a('semEnvioCgofi')).toBe('registrar o envio à CGOFI');
     expect(a('notaEmitida')).toBe('registrar o empenho');
-    expect(a('credorDiferente')).toBe('conferir a nota e o item da linha');
+    expect(a('credorDiferente')).toBe('conferir a nota e o item');
     expect(a('semNota')).toBe('procurar a nota pelo contrato');
   });
 });

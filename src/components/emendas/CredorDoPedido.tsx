@@ -37,7 +37,7 @@ const Notas: React.FC<Props> = ({ pedidoId, grupos, itens, podeGerir }) => {
         >
           <span style={{ fontWeight: 700 }}>{titulo(g)}</span>
           <span style={{ ...carteiraDetalhe, color: 'inherit', opacity: 0.85, display: 'block' }}>
-            {contextoCredor(g, itens)}. Confira a linha, o item ou a ata do pedido.
+            {contextoCredor(g, itens)}. Confira o item, a ata ou a nota ligada a ele.
           </span>
         </NoticeBar>
       ))}

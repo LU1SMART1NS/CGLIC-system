@@ -17,7 +17,7 @@ describe('nota de outro fornecedor (migration 190)', () => {
     const por = credorPorPedido(lista);
     expect(por.get('p520')).toHaveLength(1);
     expect(por.get('p520')![0].linhas).toHaveLength(2);
-    expect(tituloCredor(por.get('p520')![0])).toBe('Nota 2026NE000189 (3M GLOBAL CHANNEL SERVICES) em 2 linhas');
+    expect(tituloCredor(por.get('p520')![0])).toBe('Nota 2026NE000189 (3M GLOBAL CHANNEL SERVICES) em 2 itens');
     const chave = chaveAvisoCredor(por.get('p520')![0]);
     expect(chave).toBe('EMPENHO::CREDOR::200330::2026NE000189::520-2');
     expect(credorPorPedido(lista, new Set([chave])).get('p520')).toBeUndefined();
@@ -27,7 +27,7 @@ describe('nota de outro fornecedor (migration 190)', () => {
   it('vira o aviso do pedido, com a primeira linha', () => {
     const [g] = credorPorPedido([linha('l1')]).get('p520')!;
     expect(avisoDeCredor([g])).toMatchObject({ tipo: 'credorDiferente', curto: 'Nota de outro fornecedor', linhaId: 'l1' });
-    expect(avisoDeCredor([g])!.texto).toContain('2026NE000189 (3M GLOBAL CHANNEL SERVICES): credor diferente do fornecedor da ata em 1 linha');
+    expect(avisoDeCredor([g])!.texto).toContain('2026NE000189 (3M GLOBAL CHANNEL SERVICES): credor diferente do fornecedor da ata em 1 item');
     expect(avisoDeCredor(undefined)).toBeNull();
     expect(avisoDeCredor([])).toBeNull();
   });

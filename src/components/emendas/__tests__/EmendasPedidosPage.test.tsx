@@ -194,7 +194,7 @@ describe('Pedidos: linhas tiradas', () => {
 
   it('o mesmo motivo de várias linhas aparece uma vez só', () => {
     const html = render('/?pedido=tiradas');
-    expect(html).toContain('2 linhas tiradas do pedido');
+    expect(html).toContain('2 itens tirados do pedido');
     expect(html.split('Passou para o pedido 567').length - 1).toBe(1);
   });
 });
@@ -227,16 +227,16 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
     expect(html).toContain('emendas-pedido-ata-00031/2025');
     expect(html).toContain('emendas-pedido-ata-00048/2025');
     expect(html).toContain('emendas-pedido-abrir-atas-blocos');
-    // b-1 autorizada, b-2 aguardando a assinatura (2ª rodada), b-3 autorizada pela solicitação única da ata B.
+    // b-1 autorizado, b-2 aguardando a assinatura (2ª rodada), b-3 autorizada pela solicitação única da ata B.
     expect(html).toMatch(/emendas-linha-situacao-b-1" data-situacao="AUTORIZADO"/);
     expect(html).toMatch(/emendas-linha-situacao-b-2" data-situacao="AGUARDANDO_ASSINATURA"/);
     expect(html).toMatch(/emendas-linha-situacao-b-3" data-situacao="AUTORIZADO"/);
     expect(html).toContain('solicitação 37099000');
     expect(html).toContain('2ª rodada');
-    expect(html).toContain('cobre 1 de 2 linhas');
+    expect(html).toContain('cobre 1 de 2 itens');
     // O resumo das linhas no quadro "onde está" e na lista.
     expect(html).toContain('emendas-pedido-resumo-linhas-blocos');
-    expect(html).toContain('1 aguardando a assinatura · 2 autorizadas');
+    expect(html).toContain('1 aguardando a assinatura · 2 autorizados');
   });
 
   it('O que falta: a assinatura da solicitação com botão, o próximo passo e o beneficiário a informar', () => {
@@ -246,13 +246,14 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
     expect(html).toContain('emendas-pedido-tarefa-ass-37099000');
     expect(html).toContain('Registrar o envio à CGOFI');
     expect(html).toContain('emendas-pedido-proximo-blocos');
-    expect(html).toContain('Informar o beneficiário de 3 linhas');
+    expect(html).toContain('Informar o beneficiário de 3 itens');
     expect(html).toContain('emendas-pedidos-so-este');
   });
 
   it('vindo do Item 360 (?item=), as linhas daquele item ficam em destaque e o número do item é link para o Item 360', () => {
     const html = render(`/?pedido=blocos&item=${encodeURIComponent(`${A}-00001`)}`);
-    expect(html.split('Item de onde você veio').length - 1).toBeGreaterThanOrEqual(2);
+    expect(html).not.toContain('de onde você veio');
+    expect(html).toContain('background:var(--primary-light)');
     expect(html).toContain('emendas-item-link');
     expect(html).toContain('/atas/detalhe/00031%2F2025-200331/itens/00001?aba=emendas');
   });

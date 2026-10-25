@@ -321,7 +321,7 @@ export function notaEmitidaSemRegistro(p: PedidoEmenda, notas: Map<string, NotaD
   return {
     tipo: 'notaEmitida',
     curto: 'Nota já emitida',
-    texto: `Nota de empenho emitida${desde} para ${comNota.length === 1 ? '1 linha' : `${comNota.length} linhas`}: registre ${falta}`,
+    texto: `Nota de empenho emitida${desde} para ${comNota.length === 1 ? '1 item' : `${comNota.length} itens`}: registre ${falta}`,
     linhaId: comNota[0].id
   };
 }
@@ -370,7 +370,7 @@ export function avisosDoPedido(
   }
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
-    if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });
+    if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'item' : 'itens'} sem nota de empenho` });
   }
   if (jaEmpenhado(p.etapa)) {
     // A linha do primeiro item da diferença: o Início mostra esse item na coluna Item · ata.
@@ -384,7 +384,7 @@ export function avisosDoPedido(
     .map((l) => ataDaLinha(p, l, itens, hoje))
     .filter((a): a is AvisoPedido => Boolean(a));
   const vencida = atas.find((a) => a.tipo === 'ataVencida');
-  if (vencida) avisos.push({ ...vencida, texto: `${vencida.texto.split(':')[0]}: trocar o item ou tirar a linha` });
+  if (vencida) avisos.push({ ...vencida, texto: `${vencida.texto.split(':')[0]}: trocar o item ou tirá-lo do pedido` });
   else if (atas.length) {
     const prioridade = (a: AvisoPedido) => (a.tipo === 'ataNoCorte' ? 0 : 1);
     avisos.push(atas.sort((a, b) => prioridade(a) - prioridade(b) || a.texto.localeCompare(b.texto))[0]);
@@ -668,11 +668,11 @@ export const ORDEM_SITUACAO_LINHA: Record<SituacaoLinha, number> = {
 export const ROTULO_SITUACAO_LINHA: Record<Exclude<SituacaoLinha, 'ANTES' | 'CANCELADO'>, { etiqueta: string; uma: string; varias: string }> = {
   SOLICITACAO_A_INFORMAR: { etiqueta: 'Solicitação a informar', uma: 'com solicitação a informar', varias: 'com solicitação a informar' },
   AGUARDANDO_ASSINATURA: { etiqueta: 'Aguardando a assinatura', uma: 'aguardando a assinatura', varias: 'aguardando a assinatura' },
-  AUTORIZADO: { etiqueta: 'Autorizado', uma: 'autorizada', varias: 'autorizadas' },
+  AUTORIZADO: { etiqueta: 'Autorizado', uma: 'autorizado', varias: 'autorizados' },
   NA_CGOFI: { etiqueta: 'Na CGOFI', uma: 'na CGOFI', varias: 'na CGOFI' },
-  EMPENHADO: { etiqueta: 'Empenhado', uma: 'empenhada', varias: 'empenhadas' },
+  EMPENHADO: { etiqueta: 'Empenhado', uma: 'empenhado', varias: 'empenhados' },
   NA_CCGA: { etiqueta: 'Na CCGA', uma: 'na CCGA', varias: 'na CCGA' },
-  CONTRATADO: { etiqueta: 'Contratado', uma: 'contratada', varias: 'contratadas' }
+  CONTRATADO: { etiqueta: 'Contratado', uma: 'contratado', varias: 'contratados' }
 };
 
 export interface SituacaoDaLinha {
@@ -740,7 +740,7 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
   const notaLigada = temNota ? `NE ${nota!.nota} ligada` : 'sem nota ligada no sistema';
   const solicitacao = solicitacaoDaLinha(p, l);
   if (!solicitacao) {
-    return { situacao: 'SOLICITACAO_A_INFORMAR', rotulo: ROTULO_SITUACAO_LINHA.SOLICITACAO_A_INFORMAR.etiqueta, detalhe: 'nenhuma solicitação de empenho cobre esta linha', pendente: true, solicitacao: null };
+    return { situacao: 'SOLICITACAO_A_INFORMAR', rotulo: ROTULO_SITUACAO_LINHA.SOLICITACAO_A_INFORMAR.etiqueta, detalhe: 'nenhuma solicitação de empenho cobre este item', pendente: true, solicitacao: null };
   }
   if (!solicitacao.assinadaEm) {
     return { situacao: 'AGUARDANDO_ASSINATURA', rotulo: ROTULO_SITUACAO_LINHA.AGUARDANDO_ASSINATURA.etiqueta, detalhe: `solicitação ${solicitacao.numero} na DGFNSP`, pendente: true, solicitacao };
@@ -935,7 +935,7 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
     if (prox) {
       const detalhe =
         p.etapa === 'AUTORIZADO'
-          ? `${plural(das('AUTORIZADO').length, 'linha autorizada', 'linhas autorizadas')} ${das('AUTORIZADO').length === 1 ? 'pode' : 'podem'} ir${das('AUTORIZADO').length < linhas.length ? '; as outras ficam para o próximo lote' : ''}.`
+          ? `${plural(das('AUTORIZADO').length, 'item autorizado', 'itens autorizados')} ${das('AUTORIZADO').length === 1 ? 'pode' : 'podem'} ir${das('AUTORIZADO').length < linhas.length ? '; os outros ficam para o próximo lote' : ''}.`
           : p.etapa === 'CGOFI'
             ? 'A CGOFI emite uma nota por fornecedor.'
             : p.etapa === 'EMPENHADO'
@@ -958,7 +958,7 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
         t.push({
           chave: `sol-${a.ataKey}`,
           titulo: `Informar a solicitação de empenho da ata ${a.numeroAta}`,
-          detalhe: `${nomes(daAta)}. Ao informar, marque as linhas que o documento cobre.`,
+          detalhe: `${nomes(daAta)}. Ao informar, marque os itens que o documento cobre.`,
           tom: 'acao',
           botao: { tipo: 'solicitacao', rotulo: 'Informar a solicitação', ataKey: a.ataKey }
         });
@@ -979,10 +979,10 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
         const ultima = a.solicitacoes[a.solicitacoes.length - 1];
         t.push({
           chave: `marcar-${a.ataKey}`,
-          titulo: `Marcar as linhas que cada solicitação da ata ${a.numeroAta} cobre`,
-          detalhe: `${nomes(semSolicitacao)} sem solicitação marcada. A ata tem ${a.solicitacoes.length} solicitações: abra uma delas e marque as linhas.`,
+          titulo: `Marcar os itens que cada solicitação da ata ${a.numeroAta} cobre`,
+          detalhe: `${nomes(semSolicitacao)} sem solicitação marcada. A ata tem ${a.solicitacoes.length} solicitações: abra uma delas e marque os itens.`,
           tom: 'acao',
-          botao: { tipo: 'solicitacao', rotulo: 'Marcar as linhas', ataKey: a.ataKey, numero: ultima.numero, troca: true }
+          botao: { tipo: 'solicitacao', rotulo: 'Marcar os itens', ataKey: a.ataKey, numero: ultima.numero, troca: true }
         });
       }
     }
@@ -1006,10 +1006,10 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
     const podeAlterar = podeGerir && !jaEmpenhado(p.etapa);
     t.push({
       chave: 'beneficiario',
-      titulo: `Informar o beneficiário de ${plural(semBeneficiario.length, 'linha', 'linhas')}`,
+      titulo: `Informar o beneficiário de ${plural(semBeneficiario.length, 'item', 'itens')}`,
       detalhe: `${nomes(semBeneficiario)}. Sem isso o quadro e o ofício saem incompletos.`,
       tom: podeAlterar ? 'acao' : 'atencao',
-      botao: podeAlterar ? { tipo: 'alterar', rotulo: 'Alterar linhas' } : undefined
+      botao: podeAlterar ? { tipo: 'alterar', rotulo: 'Alterar itens' } : undefined
     });
   }
 
@@ -1018,14 +1018,14 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
   if (semNota.length) {
     t.push({
       chave: 'semNota',
-      titulo: `${plural(semNota.length, 'linha empenhada', 'linhas empenhadas')} sem nota ligada no sistema`,
+      titulo: `${plural(semNota.length, 'item empenhado', 'itens empenhados')} sem nota ligada no sistema`,
       detalhe: `${nomes(semNota)}. O sistema procura a nota de hora em hora pelo contrato e pelo plano interno; se o contrato não tem a nota, o gestor do contrato vincula em Vínculos.`,
       tom: 'espera'
     });
   }
   const naCcga = das('NA_CCGA');
   if (naCcga.length) {
-    t.push({ chave: 'ccga', titulo: `${plural(naCcga.length, 'linha aguarda', 'linhas aguardam')} o contrato na CCGA`, detalhe: `${nomes(naCcga)}. Atualiza sozinho quando o contrato entra no Contratos.gov.br.`, tom: 'espera' });
+    t.push({ chave: 'ccga', titulo: `${plural(naCcga.length, 'item aguarda', 'itens aguardam')} o contrato na CCGA`, detalhe: `${nomes(naCcga)}. Atualiza sozinho quando o contrato entra no Contratos.gov.br.`, tom: 'espera' });
   }
 
   // 5) Avisos das atas e do pedido (os mesmos da lista), menos os que já viraram tarefa acima.
@@ -1042,7 +1042,7 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
       if (!semContrato.length || dias > avisoIndicacaoDias()) continue;
       t.push({
         chave: `vence-${g.chave}`,
-        titulo: dias < 0 ? `Ata ${g.numeroAta} encerrada com ${plural(semContrato.length, 'linha sem contrato', 'linhas sem contrato')}` : `Ata ${g.numeroAta} vence em ${plural(dias, 'dia', 'dias')} e ${plural(semContrato.length, 'linha ainda não tem', 'linhas ainda não têm')} contrato`,
+        titulo: dias < 0 ? `Ata ${g.numeroAta} encerrada com ${plural(semContrato.length, 'item sem contrato', 'itens sem contrato')}` : `Ata ${g.numeroAta} vence em ${plural(dias, 'dia', 'dias')} e ${plural(semContrato.length, 'item ainda não tem', 'itens ainda não têm')} contrato`,
         detalhe: `${nomes(semContrato)}. O contrato precisa estar assinado antes do fim da ata (${dataBR(g.vigenciaFinal)}).`,
         tom: 'atencao'
       });

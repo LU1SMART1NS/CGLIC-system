@@ -248,7 +248,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   } else if (modo === 'SOLICITACAO_ATA') {
     if (!ataEscolhida) pendencias.push('a ata');
     if (!documentoSeiDaEtapaValido(numeroDaAta)) pendencias.push('documento SEI (um número, só números, 7 a 10 dígitos)');
-    if (marcadas.size === 0) pendencias.push('marcar pelo menos uma linha que a solicitação cobre');
+    if (marcadas.size === 0) pendencias.push('marcar pelo menos um item que a solicitação cobre');
   } else if (pedeSei && (numeros.length === 0 || numeros.some((n) => !documentoSeiDaEtapaValido(n)) || (!VARIOS.has(modo) && numeros.length > 1))) {
     pendencias.push(VARIOS.has(modo) ? 'documento SEI (só números, 7 a 10 dígitos; vários: separe por vírgula)' : 'documento SEI (um número, só números, 7 a 10 dígitos)');
   }
@@ -261,7 +261,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
     if (!emenda.trim()) pendencias.push('número da emenda');
     else if (!emendaLida) pendencias.push('nº da emenda com 8 dígitos (ex.: 4095 0004), ou 12 com o ano na frente');
     if (!todosPontos) pendencias.push('marcar os 6 pontos que batem (se algo não bate, use "Ofício com divergência")');
-    if (semBeneficiario) pendencias.push(`beneficiário em ${semBeneficiario === 1 ? 'uma linha' : `${semBeneficiario} linhas`} (use "Alterar linhas")`);
+    if (semBeneficiario) pendencias.push(`beneficiário em ${semBeneficiario === 1 ? 'um item' : `${semBeneficiario} itens`} (use "Alterar itens")`);
   }
   if (modo === 'DIVERGENCIA' && !divergencia.trim()) pendencias.push('o que não bate');
   if (modo === 'CANCELAR' && motivo === 'Outro' && !outroMotivo.trim()) pendencias.push('o motivo');
@@ -363,7 +363,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         {ataForaDoPrazo && (
           <div style={aviso('erro')} role="alert" data-testid="emendas-etapa-fora-do-prazo">
             A ata {ataForaDoPrazo.numeroAta} termina em {dataBR(ataForaDoPrazo.vigenciaFinal)} e passou do prazo de indicação ({corteIndicacaoDias()} dias antes do fim), para dar tempo
-            de empenhar e assinar o contrato. Troque o item em "Alterar linhas" ou cancele o pedido.
+            de empenhar e assinar o contrato. Troque o item em "Alterar itens" ou cancele o pedido.
           </div>
         )}
 
@@ -409,7 +409,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
             {ataDaJanela && (
               <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }} data-testid="emendas-etapa-linhas-cobertas">
                 <legend style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-                  Linhas que esta solicitação cobre * <span style={{ fontWeight: 500 }}>(a autorização de empenho lista os itens e as quantidades)</span>
+                  Itens que esta solicitação cobre * <span style={{ fontWeight: 500 }}>(a autorização de empenho lista os itens e as quantidades)</span>
                 </legend>
                 {linhasDaAta(ataDaJanela.ataKey).map((l) => {
                   const outra = solicitacaoDaLinha(pedido, l);
@@ -596,7 +596,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
 
         {modo === 'CANCELAR' && (
           <>
-            <div style={aviso('info')}>A quantidade de todas as linhas volta ao saldo da CAEP. O pedido continua na lista, em Cancelados.</div>
+            <div style={aviso('info')}>A quantidade de todos os itens volta ao saldo da CAEP. O pedido continua na lista, em Cancelados.</div>
             <AppSelect label="Motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
               {MOTIVOS_CANCELAMENTO.map((m) => (
                 <option key={m}>{m}</option>
