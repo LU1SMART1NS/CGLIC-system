@@ -52,7 +52,7 @@ As 17 que ficam de fora:
 
 ## Correção proposta
 
-Migration 183 (`20261025000183_notas_das_emendas_pelo_tesouro.sql`):
+Migration 184 (`20261025000184_notas_das_emendas_pelo_tesouro.sql`):
 
 1. `empenhos.fonte_origem` aceita `TESOURO`. A chave canônica é a do Contratos.gov.br: se a nota chegar depois por
    um contrato, a mesma linha é atualizada e vira `SINCRONIZADO`.
@@ -80,7 +80,7 @@ Tempo: gravação 1,2 s; religação das linhas 2,8 s.
 
 ### Próximos passos
 
-1. Aplicar a migration 183 depois do PR da 182 (ela redefine `notas_para_ler_no_siafi`).
+1. Aplicar a migration 184 depois do PR da 182 (#331) e da 183 (outra sessão, branch fix/emendas-nota-da-emenda) (ela redefine `notas_para_ler_no_siafi`).
 2. Carga inicial das 181 pela própria `gravar_notas_do_tesouro`, com as respostas do STA já lidas (como na carga do
    saldo contábil).
 3. Recurso no servidor para as notas citadas depois: perguntar ao STA as de `notas_das_emendas_a_trazer()` nas duas

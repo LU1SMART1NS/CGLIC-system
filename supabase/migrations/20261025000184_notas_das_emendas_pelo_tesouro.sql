@@ -1,6 +1,6 @@
 -- ==============================================================================
--- MIGRATION 183: NOTAS DAS EMENDAS PARLAMENTARES TRAZIDAS PELO TESOURO
--- Versão: 20261025000183_notas_das_emendas_pelo_tesouro.sql
+-- MIGRATION 184: NOTAS DAS EMENDAS PARLAMENTARES TRAZIDAS PELO TESOURO
+-- Versão: 20261025000184_notas_das_emendas_pelo_tesouro.sql
 --
 -- Por que (medição de 25/10/2026): os despachos de empenho do SEI dos pedidos citam 306 notas; 127 não
 -- existem em `empenhos` e outras 71 existem só como a nota de mesmo número da outra UG (o número se repete em 200330 e
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS public.emenda_notas_tesouro_tentativas (
 );
 
 COMMENT ON TABLE public.emenda_notas_tesouro_tentativas IS
-  'Última consulta ao Tesouro de cada nota citada no SEI das emendas e o resultado (migration 183). Escrita só por gravar_notas_do_tesouro.';
+  'Última consulta ao Tesouro de cada nota citada no SEI das emendas e o resultado (migration 184). Escrita só por gravar_notas_do_tesouro.';
 
 ALTER TABLE public.emenda_notas_tesouro_tentativas ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Leitura para logados: emenda_notas_tesouro_tentativas" ON public.emenda_notas_tesouro_tentativas;
@@ -241,7 +241,7 @@ AS $$
      GROUP BY ce.empenho_id
   ),
   -- Notas das emendas parlamentares (migration 182): ligadas às linhas dos pedidos ou citadas no SEI; a citada no
-  -- SEI só pela UG cujo plano interno é o da emenda (migration 183)
+  -- SEI só pela UG cujo plano interno é o da emenda (migration 184)
   das_emendas AS (
     SELECT n.empenho_id AS id FROM public.emenda_linha_notas n WHERE n.empenho_id IS NOT NULL
     UNION
