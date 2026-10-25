@@ -34,7 +34,7 @@ const item = (k: string, numeroAta: string, nomeCurto: string, fornecedor: strin
 const itens = new Map([item(`${A}-00001`, '00031/2025', 'Carabina', 'FORNECEDOR A'), item(`${B}-00001`, '00048/2025', 'Mira', 'FORNECEDOR B')].map((i) => [i.itemKey, i]));
 const linha = (id: string, itemKey: string, quantidade: number): LinhaPedido => ({
   id, ordem: 1, tipo: 'ITEM', itemKey, kitId: null, kitNome: null, kitVersao: null, kitComposicao: null, quantidade, beneficiarioId: null,
-  cancelada: false, canceladaMotivo: null, empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, aConferir: null, planilhaRef: null
+  cancelada: false, canceladaMotivo: null, empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null
 });
 const pedido = (etapa: PedidoEmenda['etapa'], documentos: PedidoEmenda['documentos'] = []): PedidoEmenda => ({
   id: 'p', numero: 1, autorId: 'A1', etapa, origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-09-01',

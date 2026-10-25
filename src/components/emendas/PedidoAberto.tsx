@@ -25,7 +25,7 @@ import {
 } from '../../utils/emendasPedidos';
 import type { BeneficiarioEmenda, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
-import { AConferirDaLinha, BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, ValorPrevisto } from './emendasPartes';
+import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, ValorPrevisto } from './emendasPartes';
 import type { AcaoDaJanela, ContextoDaJanela } from './EtapaPedidoModal';
 
 export type AoAgir = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => void;
@@ -119,7 +119,6 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
             {s.solicitacao && (p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && d.ataKey && itensDaLinha(l).some((x) => d.ataKey === x.itemKey.split('-').slice(0, 2).join('-'))).length > 1) && (
               <div style={carteiraDetalhe}>solicitação {s.solicitacao.numero}</div>
             )}
-            <AConferirDaLinha linha={l} />
             {ata && (
               <div style={{ marginTop: '0.3rem' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, borderRadius: 4, padding: '0.25rem 0.45rem', display: 'inline-block', color: avisoGrave(ata) ? 'var(--color-danger-text)' : 'var(--color-warning-text)', background: avisoGrave(ata) ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)' }}>

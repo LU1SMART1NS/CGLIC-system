@@ -188,7 +188,7 @@ export function orgaoDoPedido(p: PedidoEmenda, nomeDoBeneficiario: (id: string) 
   return nomes.length === 1 ? nomes[0] : `${nomes[0]} e mais ${nomes.length - 1}`;
 }
 
-export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'aConferir' | 'semNota' | 'semAutorizacao';
+export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'semNota' | 'semAutorizacao';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -201,7 +201,7 @@ export interface AvisoPedido {
 }
 
 /** Do mais grave ao mais leve: na lista aparece só o primeiro, com "+N" para os outros. */
-export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, divergencia: 2, semOficio: 3, ataVencendo: 4, semAutorizacao: 5, semNota: 6, aConferir: 7 };
+export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, divergencia: 2, semOficio: 3, ataVencendo: 4, semAutorizacao: 5, semNota: 6 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
 export const avisoGrave = (a: Pick<AvisoPedido, 'tipo'>) => GRAVIDADE_DO_AVISO[a.tipo] <= GRAVIDADE_DO_AVISO.semOficio;
@@ -249,10 +249,6 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
     if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });
-  }
-  const aConferir = linhasAtivas(p).filter((l) => l.aConferir).length;
-  if (aConferir) {
-    avisos.push({ tipo: 'aConferir', curto: `${aConferir} a conferir`, texto: `${aConferir} ${aConferir === 1 ? 'linha' : 'linhas'} a conferir com o controle anterior da CAEP` });
   }
   const atas = linhasAtivas(p)
     .map((l) => ataDaLinha(p, l, itens, hoje))

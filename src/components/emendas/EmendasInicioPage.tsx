@@ -41,8 +41,7 @@ const ABAS: ReadonlyArray<{ id: TipoAviso; rotulo: string }> = [
   { id: 'semOficio', rotulo: `Sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias` },
   { id: 'ataVencendo', rotulo: 'Ata vence em breve' },
   { id: 'semAutorizacao', rotulo: 'Ata sem autorização de empenho' },
-  { id: 'semNota', rotulo: 'Sem nota de empenho' },
-  { id: 'aConferir', rotulo: 'A conferir' }
+  { id: 'semNota', rotulo: 'Sem nota de empenho' }
 ];
 
 const VARIANTE_ETAPA: Record<EtapaPedido, StatusBadgeVariant> = {
@@ -259,7 +258,7 @@ export const EmendasInicioPage: React.FC = () => {
       <PageHeader
         title={role === 'gestor_emendas' ? 'Início' : 'Emendas'}
         subtitle="Pedidos dos parlamentares e saldo da CAEP que pedem atenção."
-        hint={`Os avisos são os mesmos da lista de Pedidos: ata encerrada antes do empenho, prazo de indicação vencido (a menos de ${corteIndicacaoDias()} dias do fim da ata), divergência com o SIOP, mais de ${AVISO_SEM_OFICIO_DIAS} dias sem ofício, ata vencendo em até ${avisoIndicacaoDias()} dias, linhas empenhadas sem nota e linhas a conferir com o controle anterior da CAEP. Os dois prazos ficam em Ajustes > Regras de Alertas. Saldo livre = alocado à CAEP − reservado nos pedidos, só nas atas vigentes. Item sem nome curto: alocado à CAEP em ata vigente e ainda sem o nome que sai no quadro do parlamentar.`}
+        hint={`Os avisos são os mesmos da lista de Pedidos: ata encerrada antes do empenho, prazo de indicação vencido (a menos de ${corteIndicacaoDias()} dias do fim da ata), divergência com o SIOP, mais de ${AVISO_SEM_OFICIO_DIAS} dias sem ofício, ata vencendo em até ${avisoIndicacaoDias()} dias e linhas empenhadas sem nota. Os dois prazos ficam em Ajustes > Regras de Alertas. Saldo livre = alocado à CAEP − reservado nos pedidos, só nas atas vigentes. Item sem nome curto: alocado à CAEP em ata vigente e ainda sem o nome que sai no quadro do parlamentar.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={recarregar} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-inicio-atualizar" tooltipTitle="Recarregar pedidos, notas e saldo" />}
       />
