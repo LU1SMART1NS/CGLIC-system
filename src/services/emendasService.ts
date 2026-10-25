@@ -797,8 +797,11 @@ export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
   return new Map(linhas.map((r) => [r.item_key as string, num(r.reservado)]));
 }
 
-/** Como a nota da linha foi achada: pelo documento SEI da nota no pedido (migration 177) ou pelo plano interno da nota (migration 164). */
-export type RegraDaNota = 'SEI' | 'CONTRATO' | 'ITEM' | 'AUTOR';
+/**
+ * Como a nota da linha foi achada: pelo documento SEI da nota no pedido (migration 177), pelo plano interno da nota
+ * (migration 164) ou, sem contrato, pela emenda e pelo fornecedor da ata (migration 188).
+ */
+export type RegraDaNota = 'SEI' | 'CONTRATO' | 'ITEM' | 'FORNECEDOR' | 'AUTOR';
 /** Por que a linha empenhada ainda não tem nota. */
 export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA';
 

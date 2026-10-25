@@ -334,6 +334,7 @@ export const ROTULO_REGRA_DA_NOTA: Record<RegraDaNota, string> = {
   SEI: 'achada pelo SEI',
   CONTRATO: 'achada pelo contrato',
   ITEM: 'achada pelo item da ata',
+  FORNECEDOR: 'achada pela emenda e pelo fornecedor da ata',
   AUTOR: 'achada pelo autor'
 };
 
