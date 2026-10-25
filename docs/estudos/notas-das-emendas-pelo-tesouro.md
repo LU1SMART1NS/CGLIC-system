@@ -87,6 +87,8 @@ Tempo: gravação 1,2 s; religação das linhas 1,0 s.
    da 182).
 2. Carga inicial das 181 pela própria `gravar_notas_do_tesouro`, com as respostas do STA já lidas (como na carga do
    saldo contábil).
-3. Recurso no servidor para as notas citadas depois: perguntar ao STA as de `notas_das_emendas_a_trazer()` nas duas
-   UGs e gravar. Do servidor o STA leva até 60 s por consulta: poucas notas por execução, uma vez por dia.
+3. Recurso `notas_emendas_tesouro` no servidor (`src/services/notasEmendasTesouroSyncService.ts`) para as notas
+   citadas depois: pergunta ao STA as de `notas_das_emendas_a_trazer()` nas duas UGs, 4 por vez, e grava nota a nota
+   por `gravar_notas_do_tesouro`; a nota que falha no Tesouro não é gravada como tentativa e volta na execução
+   seguinte. Agendado uma vez por dia às 10h35 de Brasília (migration 185), depois do saldo contábil da 200330.
 4. As 17 de fora: conferir no SEI ou pelo Portal (`/despesas/documentos`).
