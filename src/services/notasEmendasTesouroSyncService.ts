@@ -40,6 +40,8 @@ export interface NotaDoTesouro {
   pidescricao: string | null;
   naturezadespesa: string | null;
   naturezadespesadescricao: string | null;
+  /** Descrição da nota no SIAFI; vale quando o plano interno cadastrado não é o da emenda (migration 200). */
+  observacao: string | null;
 }
 
 const texto = (v: unknown): string | null => {
@@ -61,7 +63,8 @@ export function normalizarNotaDoTesouro(raw: any): NotaDoTesouro | null {
     picodigo: texto(raw?.picodigo),
     pidescricao: texto(raw?.pidescricao),
     naturezadespesa: texto(raw?.naturezadespesa),
-    naturezadespesadescricao: texto(raw?.naturezadespesadescricao)
+    naturezadespesadescricao: texto(raw?.naturezadespesadescricao),
+    observacao: texto(raw?.observacao)?.slice(0, 2000) ?? null
   };
 }
 

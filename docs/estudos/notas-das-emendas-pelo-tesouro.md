@@ -92,3 +92,28 @@ Tempo: gravação 1,2 s; religação das linhas 1,0 s.
    por `gravar_notas_do_tesouro`; a nota que falha no Tesouro não é gravada como tentativa e volta na execução
    seguinte. Agendado uma vez por dia às 10h35 de Brasília (migration 185), depois do saldo contábil da 200330.
 4. As 17 de fora: conferir no SEI ou pelo Portal (`/despesas/documentos`).
+
+## Conferência no SEI das recusadas (25/10/2026)
+
+Pelo PDF da nota anexado no SEI:
+
+| Pedido | Gravado | Nota no PDF | O que foi feito |
+|---|---|---|---|
+| 521 | 2025NE000015 | 2026NE000015 (ano lido errado) | Citação corrigida no banco (autorizado). A nota já estava no sistema. |
+| 528 | 2026NE000273 | 2026NE000272 (número lido errado) | Citação corrigida no banco (autorizado). A nota já tinha entrado pelo Tesouro. |
+| 495 | 2026NE000380 e 384 | Números certos; a descrição cita a emenda 43670006 | Plano interno errado no SIAFI (SP999S94316, "202643670016"). Migration 200. |
+
+Migration 200 (`20261025000200_notas_das_emendas_pela_descricao.sql`):
+
+1. `nota_descreve_emenda(observacao, emenda)` e, em `gravar_notas_do_tesouro`, a nota vale pela descrição do SIAFI
+   ("emenda parlamentar <nº>") quando nenhuma UG tem o plano interno da emenda. O plano interno guardado leva a emenda
+   da descrição à frente e o do SIAFI depois; a tentativa diz que foi pela descrição. O servidor manda a descrição
+   (`observacao`) desde esta versão.
+2. As 58 tentativas `SEM_PLANO_DA_EMENDA` de notas não citadas saem, para serem perguntadas de novo uma vez.
+3. `emendas_ligar_notas` (bloco s2): a linha que é a única do pedido com aquele item e aquela quantidade fica com a
+   única nota do fornecedor cujo valor é a quantidade × o preço da ata. Sem isso, a correção da citação do pedido 528
+   deixaria as duas linhas da Renault (1 e 4 veículos) sem nota.
+
+Ensaio (desfeito): 2 notas gravadas pela descrição (380 e 384); linhas com nota 2.137 → 2.149: pedido 495 (+2),
+416 (+2), 422 (+2), 423 (+4), 497 (+2), todas com o valor exato da linha; 528 com a linha de 4 veículos na 272;
+nenhuma linha perdeu nota. O pedido 537 (3 linhas iguais de 1 veículo e uma nota só) continua sem nota, de propósito.
