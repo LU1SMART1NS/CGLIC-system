@@ -292,7 +292,8 @@ describe('notas das emendas pelo Tesouro', () => {
     expect(validarPedido({ recurso: 'notas_emendas_tesouro' })).toMatchObject({ ok: true, pedido: { recurso: 'notas_emendas_tesouro' } });
     const d = deps();
     const r = await executarPedido({ recurso: 'notas_emendas_tesouro', forcar: true, dry: false }, d);
-    expect(d.sincronizarNotasDasEmendasDoTesouro).toHaveBeenCalledWith({ forcar: true, orcamentoMs: expect.any(Number) });
+    // A chave do Portal vai junto: as notas que o Tesouro não descreve são procuradas lá (migration 192).
+    expect(d.sincronizarNotasDasEmendasDoTesouro).toHaveBeenCalledWith({ forcar: true, orcamentoMs: expect.any(Number), chave: 'chave-de-teste' });
     expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 181 } });
   });
 
@@ -300,6 +301,7 @@ describe('notas das emendas pelo Tesouro', () => {
     const d = deps();
     const r = await executarPedido({ recurso: 'notas_emendas_tesouro', forcar: false, dry: true }, d);
     expect(d.sincronizarNotasDasEmendasDoTesouro).not.toHaveBeenCalled();
+    expect(d.contarNotasEmendasTesouroPendentes).toHaveBeenCalledWith('chave-de-teste');
     expect(r).toMatchObject({ dry: true, consulta: { pendentes: 198 } });
   });
 });
