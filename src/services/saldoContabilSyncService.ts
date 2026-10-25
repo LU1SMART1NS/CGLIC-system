@@ -4,6 +4,8 @@
  *
  * O ano corrente é lido em toda execução (o Tesouro atualiza uma vez por dia). Os anos fechados são lidos uma vez:
  * de novo só se a última leitura foi antes de fevereiro do ano seguinte, quando o ano fecha de vez no SIAFI.
+ * No ano corrente o Tesouro manda uma linha por período (mês) de cada conta corrente; todas vão para a gravação,
+ * que soma (migration 195).
  * Estudo: docs/estudos/saldo-contabil-tesouro.md.
  */
 import { supabase } from './supabaseClient';
