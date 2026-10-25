@@ -895,3 +895,73 @@ export async function fetchConferenciaEmpenho(): Promise<ConferenciaEmpenho[]> {
     notasComItemSemAta: lista(r.notas_com_item_sem_ata)
   }));
 }
+
+/** Linha cuja nota ligada tem credor diferente do fornecedor da ata do item, pela raiz do CNPJ (migration 190). */
+export interface CredorDiferente {
+  linhaId: string;
+  pedidoId: string;
+  pedido: number;
+  emenda: string | null;
+  itemKey: string;
+  nota: string;
+  ug: string;
+  credorNome: string | null;
+  credorDoc: string | null;
+  fornecedorNome: string | null;
+  fornecedorDoc: string | null;
+}
+
+export async function fetchCredorDiferente(): Promise<CredorDiferente[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('v_emendas_credor_diferente').select('*').order('pedido').order('nota').order('linha_id').range(de, ate)
+  );
+  return linhas.map((r) => ({
+    linhaId: r.linha_id,
+    pedidoId: r.pedido_id,
+    pedido: Number(r.pedido),
+    emenda: r.emenda ?? null,
+    itemKey: r.item_key,
+    nota: r.nota,
+    ug: r.ug,
+    credorNome: r.credor_nome ?? null,
+    credorDoc: r.credor_doc ?? null,
+    fornecedorNome: r.fornecedor_nome ?? null,
+    fornecedorDoc: r.fornecedor_doc ?? null
+  }));
+}
+
+/** Nota de emenda da UG 200330, do ano, cuja emenda nenhum pedido tem (migration 190). */
+export interface NotaSemPedido {
+  empenhoId: string;
+  nota: string;
+  ug: string;
+  dataEmissao: string | null;
+  valorEmpenhado: number;
+  credorNome: string | null;
+  planoInterno: string | null;
+  emenda: string;
+  emendaAno: number | null;
+  /** Parlamentares dos pedidos com o mesmo código de autor (4 primeiros dígitos da emenda). */
+  autoresDoCodigo: string[];
+  pedidosDoCodigo: string[];
+}
+
+export async function fetchNotasSemPedido(): Promise<NotaSemPedido[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('v_emendas_notas_sem_pedido').select('*').order('emenda').order('nota').range(de, ate)
+  );
+  return linhas.map((r) => ({
+    empenhoId: r.empenho_id,
+    nota: r.nota,
+    ug: r.ug,
+    dataEmissao: r.data_emissao ?? null,
+    valorEmpenhado: num(r.valor_empenhado),
+    credorNome: r.credor_nome ?? null,
+    planoInterno: r.plano_interno ?? null,
+    emenda: r.emenda,
+    emendaAno: r.emenda_ano == null ? null : Number(r.emenda_ano),
+    autoresDoCodigo: lista(r.autores_do_codigo),
+    pedidosDoCodigo: lista(r.pedidos_do_codigo)
+  }));
+}
+

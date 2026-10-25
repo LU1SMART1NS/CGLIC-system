@@ -29,7 +29,8 @@ import {
   usePodeGerirEmendas,
   usePodeVerContratos,
   useNotasDasLinhas,
-  useDiferencasDeEmpenho
+  useDiferencasDeEmpenho,
+  useCredorDiferente
 } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
@@ -67,9 +68,12 @@ import {
 import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ConferenciaEmpenho, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
+const SEM_CREDOR: CredorNoPedido[] = [];
 import { AutorDoPedido, ExecucaoDoPedidoResumo, ValorDoPedido } from './emendasPartes';
 import { LinhasPorAta, OQueFalta, type AoAgir } from './PedidoAberto';
 import { EmpenhoDoPedido } from './EmpenhoDoPedido';
+import { CredorDoPedido } from './CredorDoPedido';
+import type { CredorNoPedido } from '../../utils/emendasConferenciaNota';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
@@ -433,13 +437,15 @@ interface DetalheProps {
   conferencia: ConferenciaEmpenho[];
   conferenciaPorItem: Map<string, ConferenciaEmpenho>;
   resolvidos: { has: (chave: string) => boolean };
+  /** Notas ligadas com credor diferente do fornecedor da ata (migration 190), resolvidas ou não. */
+  credor: CredorNoPedido[];
 }
 
 /**
  * Pedido aberto (migration 180): à esquerda, as linhas em blocos por ata, cada uma com a sua situação; à direita, onde
  * o pedido está, a lista "O que falta" com os botões das janelas, e as fases com datas e SEI como histórico.
  */
-const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, onAlterar, conferencia, conferenciaPorItem, resolvidos }) => {
+const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, onAlterar, conferencia, conferenciaPorItem, resolvidos, credor }) => {
   const { precos } = usePrecosParaEmenda();
   const semAutor = !p.autorId;
   const canceladas = p.linhas.filter((l) => l.cancelada);
@@ -455,6 +461,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
             </div>
           ))}
         {jaEmpenhado(p.etapa) && <EmpenhoDoPedido pedidoId={p.id} conferencia={conferencia} itens={itens} podeGerir={podeGerir} />}
+        <CredorDoPedido pedidoId={p.id} grupos={credor} itens={itens} podeGerir={podeGerir} />
         <LinhasPorAta
           p={p}
           itens={itens}
@@ -505,6 +512,7 @@ export const EmendasPedidosPage: React.FC = () => {
   const { data: pedidos = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = usePedidosEmendas();
   const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
   const { conferencia, diferencas, porItem: conferenciaPorItem, resolvidos } = useDiferencasDeEmpenho();
+  const { porPedido: credorPendente, todosPorPedido: credorDoPedido } = useCredorDiferente();
   const { data: itensLista = [], isLoading: carregandoItens } = useItensCaep();
   const { data: autores = [] } = useAutoresEmendas();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
@@ -555,9 +563,9 @@ export const EmendasPedidosPage: React.FC = () => {
     () =>
       pedidos.map((p) => {
         const v = valorDoPedidoNaEtapa(p, itens, precos);
-        return { ...p, valor: v.valor, fonteDoValor: v.fonte, avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id)) };
+        return { ...p, valor: v.valor, fonteDoValor: v.fonte, avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id)) };
       }),
-    [pedidos, itens, hoje, notas, precos, diferencas]
+    [pedidos, itens, hoje, notas, precos, diferencas, credorPendente]
   );
 
   const contagem = useMemo(() => {
@@ -845,7 +853,9 @@ export const EmendasPedidosPage: React.FC = () => {
                 { value: 'semAutorizacao', label: 'Ata sem autorização de empenho', count: contaAviso('semAutorizacao') },
                 { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') },
                 { value: 'empenhoAMais', label: 'Empenhado a mais que o pedido', count: contaAviso('empenhoAMais') },
-                { value: 'empenhoAMenos', label: 'Empenhado a menos que o pedido', count: contaAviso('empenhoAMenos') }
+                { value: 'empenhoAMenos', label: 'Empenhado a menos que o pedido', count: contaAviso('empenhoAMenos') },
+                { value: 'notaEmitida', label: 'Nota emitida, empenho a registrar', count: contaAviso('notaEmitida') },
+                { value: 'credorDiferente', label: 'Nota de outro fornecedor', count: contaAviso('credorDiferente') }
               ]}
               onChange={setFiltroAviso}
               testId="emendas-pedidos-filtro-aviso"
@@ -894,6 +904,7 @@ export const EmendasPedidosPage: React.FC = () => {
                   onAcao={(acao, contexto) => setJanela({ pedido: l, acao, contexto })}
                   onAlterar={() => setEditando(l)}
                   conferencia={conferencia}
+                  credor={credorDoPedido.get(l.id) ?? SEM_CREDOR}
                   conferenciaPorItem={conferenciaPorItem}
                   resolvidos={resolvidos}
                 />
