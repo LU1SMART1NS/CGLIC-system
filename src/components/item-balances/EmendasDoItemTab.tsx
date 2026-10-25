@@ -14,7 +14,7 @@ import { hojeEmBrasilia, useAutoresEmendas, useBeneficiariosEmendas, useItensCae
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from '../../utils/emendasKits';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
-import { FASES_PEDIDO, faseDaEtapa, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_SITUACAO_LINHA, situacaoDaLinha, type FasePedido, type SituacaoDaLinha } from '../../utils/emendasPedidos';
+import { FASES_PEDIDO, faseDaEtapa, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_SITUACAO_LINHA, ROTULO_AVISO, situacaoDaLinha, type FasePedido, type SituacaoDaLinha } from '../../utils/emendasPedidos';
 import { rotuloBeneficiario, type LinhaPedido, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 import { AutorDoPedido, SituacaoDaLinhaEtiqueta } from '../emendas/emendasPartes';
 import { ClipboardList } from 'lucide-react';
@@ -100,11 +100,13 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
   const kitsDoItem = kits.filter((k) => k.ativo && k.itens.some((i) => i.itemKey === itemKey));
 
   const dias = item?.vigenciaFinal ? diasEntre(hoje, item.vigenciaFinal) : null;
+  // Mesmos nomes dos avisos (ROTULO_AVISO) e da gaveta do Início; com a data, para dizer por quê.
+  const semPrazo = Boolean(item?.vigenciaFinal) && (item!.ataEncerrada || passouDoCorte(dias));
   const prazo =
     !item?.vigenciaFinal ? null
-    : item.ataEncerrada ? { label: 'Ata encerrada', variant: 'neutral' as const }
-    : passouDoCorte(dias) ? { label: 'Indicação encerrada', variant: 'danger' as const }
-    : { label: `Indicação até ${dataBR(limiteDaIndicacao(item.vigenciaFinal))} · ${diasEntre(hoje, limiteDaIndicacao(item.vigenciaFinal))} dias`, variant: 'warning' as const };
+    : item.ataEncerrada ? { label: `${ROTULO_AVISO.ataVencida} · ${dataBR(item.vigenciaFinal)}`, variant: 'neutral' as const }
+    : passouDoCorte(dias) ? { label: `${ROTULO_AVISO.ataNoCorte} · ata vence em ${dataBR(item.vigenciaFinal)}`, variant: 'danger' as const }
+    : { label: `Indicar até ${dataBR(limiteDaIndicacao(item.vigenciaFinal))} · ${diasEntre(hoje, limiteDaIndicacao(item.vigenciaFinal))} dias`, variant: 'warning' as const };
 
   const colunas: Column<UsoDoItem>[] = [
     {
@@ -193,7 +195,8 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
             items={[
               { label: 'Alocado à CAEP', value: formatNumber(alocado) },
               { label: 'Reservado a parlamentares', value: formatNumber(reservado) },
-              { label: 'Saldo a oferecer', value: formatNumber(saldo), tone: saldo <= 0 ? 'warning' : 'success' }
+              // Sem prazo para indicar, o saldo que sobrou não é mais "a oferecer": fica sem cor.
+              { label: 'Saldo a oferecer', value: formatNumber(saldo), tone: semPrazo ? 'default' : saldo <= 0 ? 'warning' : 'success' }
             ]}
             progress={{ value: Math.min(reservado, alocado), max: alocado }}
             extra={prazo ? <StatusBadge label={prazo.label} variant={prazo.variant} size="sm" dot={false} /> : null}
@@ -226,6 +229,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
           <DataTable<UsoDoItem>
             testId="item360-emendas-tabela"
             className="data-table-container--flush emendas-tabela-topo"
+            isLoading={isLoading || carregandoPedidos}
             data={filtrados}
             keyExtractor={(u) => u.pedido.id}
             columns={colunas}

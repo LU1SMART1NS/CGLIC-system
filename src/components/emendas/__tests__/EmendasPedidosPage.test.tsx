@@ -252,7 +252,7 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
 
   it('vindo do Item 360 (?item=), as linhas daquele item ficam em destaque e o número do item é link para o Item 360', () => {
     const html = render(`/?pedido=blocos&item=${encodeURIComponent(`${A}-00001`)}`);
-    expect(html.split('item de onde você veio').length - 1).toBeGreaterThanOrEqual(2);
+    expect(html.split('Item de onde você veio').length - 1).toBeGreaterThanOrEqual(2);
     expect(html).toContain('emendas-item-link');
     expect(html).toContain('/atas/detalhe/00031%2F2025-200331/itens/00001?aba=emendas');
   });

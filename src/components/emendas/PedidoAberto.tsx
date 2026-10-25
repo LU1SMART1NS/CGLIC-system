@@ -137,7 +137,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
             <LinhaDoPedido linha={l} itens={itens} comLinks />
             {temItem(l) && (
               <div style={{ marginTop: '0.2rem' }}>
-                <StatusBadge label="item de onde você veio" variant="info" size="sm" dot={false} />
+                <StatusBadge label="Item de onde você veio" variant="info" size="sm" dot={false} />
               </div>
             )}
             {s.solicitacao && (p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && d.ataKey && itensDaLinha(l).some((x) => d.ataKey === x.itemKey.split('-').slice(0, 2).join('-'))).length > 1) && (
@@ -218,7 +218,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                 {pend.map((x) => (
                   <StatusBadge key={x} label={x} variant="warning" size="sm" dot={false} />
                 ))}
-                {comOrigem && <StatusBadge label="item de onde você veio" variant="info" size="sm" dot={false} />}
+                {comOrigem && <StatusBadge label="Item de onde você veio" variant="info" size="sm" dot={false} />}
               </span>
             </button>
             {estaAberto && (

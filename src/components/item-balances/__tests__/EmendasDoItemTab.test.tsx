@@ -43,7 +43,7 @@ describe('Item 360 › Emendas (decisão de 24/10/2026)', () => {
     // 38 + 14 reservados (o cancelado não conta); saldo 244.
     expect(html).toContain('>52<');
     expect(html).toContain('>244<');
-    expect(html).toContain('Indicação até 21/11/2026');
+    expect(html).toContain('Indicar até 21/11/2026');
     expect(html).toContain('item360-emendas-tabela');
     expect(html).toContain('Bancada MG');
     expect(html).toContain('Processo 08027.000215/2026-81');

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { avisosDeEmpenho } from '../emendasEmpenho';
 import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, atasSemAutorizacao, avisosDoPedido, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
-import type { NotaDaLinha } from '../../services/emendasService';
+import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
@@ -447,5 +448,12 @@ describe('ROTULO_AVISO — um nome por aviso em todas as telas', () => {
     }
     expect([...TIPOS_AVISO]).toEqual([...TIPOS_AVISO].sort((a, b) => GRAVIDADE_DO_AVISO[a] - GRAVIDADE_DO_AVISO[b]));
     expect(TIPOS_AVISO[0]).toBe('ataVencida');
+  });
+  it('a etiqueta curta dos avisos de empenho é o mesmo nome do filtro', () => {
+    const c: ConferenciaEmpenho = { emenda: '202612340001', itemKey: '00033/2025-200331-00003', qtdPedido: 38, qtdNasNotas: 41, notas: ['2026NE000456'], pedidoIds: ['p1'], pedidos: [1], situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [] };
+    const [mais] = avisosDeEmpenho([c], new Map());
+    const [menos] = avisosDeEmpenho([{ ...c, situacao: 'A_MENOS', qtdNasNotas: 30 }], new Map());
+    expect(mais.curto).toBe(ROTULO_AVISO.empenhoAMais);
+    expect(menos.curto).toBe(ROTULO_AVISO.empenhoAMenos);
   });
 });

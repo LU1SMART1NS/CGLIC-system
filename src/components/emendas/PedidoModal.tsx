@@ -665,7 +665,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   saldo={
                     fora ? (
                       <>
-                        <Etiqueta texto="Indicação encerrada" variante="danger" />
+                        <Etiqueta texto="Prazo de indicação vencido" variante="danger" />
                         <span className="reserva-mudo">
                           Em {dataBR(limiteDaIndicacao(i.vigenciaFinal!))}: a ata termina em {dataBR(i.vigenciaFinal)}.
                         </span>

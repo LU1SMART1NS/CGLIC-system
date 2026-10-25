@@ -274,9 +274,9 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   ataVencendo: 'Ata vence em breve',
   semEnvioCgofi: 'Sem envio à CGOFI',
   credorDiferente: 'Nota de outro fornecedor',
-  notaEmitida: 'Nota emitida, empenho a registrar',
+  notaEmitida: 'Nota já emitida',
   empenhoAMenos: 'Empenhado a menos',
-  semAutorizacao: 'Ata sem autorização de empenho',
+  semAutorizacao: 'Ata sem autorização',
   semNota: 'Sem nota de empenho'
 };
 

@@ -278,7 +278,7 @@ export const EmendasInicioPage: React.FC = () => {
       nowrap: true,
       render: (x) =>
         x.passouDoCorte ? (
-          <StatusBadge label="Prazo vencido" variant="danger" size="sm" dot={false} />
+          <StatusBadge label={ROTULO_AVISO.ataNoCorte} variant="danger" size="sm" dot={false} />
         ) : (
           <>
             <StatusBadge label={dataBR(x.indicarAte)} variant="warning" size="sm" dot={false} />
