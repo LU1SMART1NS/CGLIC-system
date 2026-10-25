@@ -817,12 +817,17 @@ export interface NotaDaLinha {
   valorPago: number | null;
   entregaPrevista: string | null;
   entregaPrevistaValor: number | null;
+  /** Data de emissão da nota ligada (migration 189). */
+  emitidaEm: string | null;
   atualizadoEm: string | null;
 }
 
 const numOuNulo = (v: unknown) => (v == null ? null : num(v));
 
-/** Nota de empenho e execução de cada linha empenhada, refeitas de hora em hora (migration 164). */
+/**
+ * Nota de empenho e execução de cada linha empenhada, refeitas de hora em hora (migration 164). Desde a migration 189,
+ * também a linha de pedido ainda sem o empenho registrado cuja nota a CGOFI já emitiu.
+ */
 export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
   const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_linha_notas').select('*').order('linha_id').range(de, ate));
   return new Map(
@@ -840,6 +845,7 @@ export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
         valorPago: numOuNulo(r.valor_pago),
         entregaPrevista: r.entrega_prevista ?? null,
         entregaPrevistaValor: numOuNulo(r.entrega_prevista_valor),
+        emitidaEm: r.emitida_em ?? null,
         atualizadoEm: r.atualizado_em ?? null
       }
     ])
