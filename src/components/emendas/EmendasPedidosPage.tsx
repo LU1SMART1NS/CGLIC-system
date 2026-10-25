@@ -37,6 +37,7 @@ import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import {
   atasDoPedido,
+  contaDosItens,
   avisoGrave,
   AUTOR_A_DEFINIR,
   avisosDoPedido,
@@ -165,8 +166,10 @@ const EtapasDoPedido: React.FC<{
   const atas = etapaDasAtas ? atasDoPedido(p) : [];
   const soltas = solicitacoesSemAta(p);
   const nenhumaSolicitacao = !p.documentos.some((d) => d.etapa === 'AUTORIZACAO');
-  const atasProntas = atas.filter((a) => (etapaDasAtas === 'AUTORIZADO' ? a.situacao === 'assinada' : a.situacao !== 'falta')).length;
-  const faltamAtas = atas.length > 0 && atasProntas < atas.length && !nenhumaSolicitacao;
+  // O contador conta itens: na solicitação, os que têm solicitação; na autorização, os de empenho autorizado.
+  const itens = etapaDasAtas ? contaDosItens(p) : null;
+  const itensProntos = itens ? (etapaDasAtas === 'AUTORIZADO' ? itens.autorizados : itens.solicitados) : 0;
+  const faltamItens = Boolean(itens?.total) && itensProntos < itens!.total && !nenhumaSolicitacao;
   const linhaDaEtapa = (feita: boolean, atualAqui: boolean, voltou: boolean): string =>
     ['emendas-etapa', feita ? 'emendas-etapa--feita' : '', atualAqui ? 'emendas-etapa--atual' : '', voltou ? 'emendas-etapa--voltou' : '', cancelado ? 'emendas-etapa--cancelada' : '']
       .filter(Boolean)
@@ -221,7 +224,7 @@ const EtapasDoPedido: React.FC<{
                   // Nota nova (outro fornecedor): mais um número no empenho ou no envio para contratação.
                   const acrescentar =
                     podeGerir && feita && ETAPAS_COM_VARIOS_SEI.has(etapa) && (etapa === 'EMPENHADO' ? jaEmpenhado(p.etapa) : p.etapa === 'CONTRATACAO');
-                  const avisoAtas = comAtas && faltamAtas && etapa === 'AUTORIZADO';
+                  const avisoAtas = comAtas && faltamItens && etapa === 'AUTORIZADO';
                   return (
                     <li key={etapa}>
                       <div className={linhaDaEtapa(mostraDados, atualAqui, voltou)}>
@@ -239,9 +242,9 @@ const EtapasDoPedido: React.FC<{
                         <span className="emendas-etapa__nome">
                           {e.rotulo}
                           {comRodada && <span className="emendas-etapa__rodada">{etapa === 'MINUTA' ? `${rodada}ª minuta` : `${rodada}º ofício`}</span>}
-                          {comAtas && atas.length > 0 && (
-                            <span className={faltamAtas ? 'emendas-etapa__contaatas emendas-etapa__contaatas--falta' : 'emendas-etapa__contaatas'} data-testid={`emendas-pedido-conta-atas-${p.id}`}>
-                              {atasProntas} de {atas.length} {atas.length === 1 ? 'ata' : 'atas'}
+                          {comAtas && itens && itens.total > 0 && (
+                            <span className={faltamItens ? 'emendas-etapa__contaatas emendas-etapa__contaatas--falta' : 'emendas-etapa__contaatas'} data-testid={`emendas-pedido-conta-itens-${p.id}`}>
+                              {itensProntos} de {itens.total} {itens.total === 1 ? 'item' : 'itens'} {etapa === 'AUTORIZADO' ? (itens.total === 1 ? 'autorizado' : 'autorizados') : itens.total === 1 ? 'solicitado' : 'solicitados'}
                             </span>
                           )}
                         </span>

@@ -276,7 +276,7 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   credorDiferente: 'Nota de outro fornecedor',
   notaEmitida: 'Nota já emitida',
   empenhoAMenos: 'Empenhado a menos',
-  semAutorizacao: 'Ata sem autorização',
+  semAutorizacao: 'Item sem empenho autorizado',
   semNota: 'Sem nota de empenho'
 };
 
@@ -351,7 +351,7 @@ export function avisosDoPedido(
       avisos.push({ tipo: 'divergencia', curto: 'Ofício devolvido', texto: `Ofício devolvido em ${dataBR(p.devolvidoEm)}: ${p.divergencia}` });
     }
   }
-  const semAutorizacao = atasSemAutorizacao(p);
+  const semAutorizacao = itensSemEmpenhoAutorizado(p);
   if (semAutorizacao) avisos.push(semAutorizacao);
   const emitida = notas ? notaEmitidaSemRegistro(p, notas) : null;
   if (emitida) avisos.push(emitida);
@@ -596,18 +596,38 @@ export const solicitacoesSemAta = (p: PedidoEmenda): string[] =>
   p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && !d.ataKey).map((d) => d.numero);
 
 /**
- * Aviso de ata sem solicitação assinada, depois da autorização. Pedido sem nenhuma solicitação informada não avisa:
- * são os do controle anterior da CAEP, que ainda não têm as solicitações (decisão de 24/10/2026).
+ * Itens ativos do pedido, os que têm solicitação de empenho informada e, entre eles, os de empenho autorizado. O kit
+ * conta pronto só com a solicitação de cada ata dos seus itens: a ligada à linha ou, sem ligação, a única da ata.
  */
-export function atasSemAutorizacao(p: PedidoEmenda): AvisoPedido | null {
+export function contaDosItens(p: PedidoEmenda): { total: number; solicitados: number; autorizados: number } {
+  const sols = solicitacoesComAta(p);
+  const cobertura = linhasAtivas(p).map((l) =>
+    [...new Set(itensDaLinha(l).map((x) => ataDoItem(x.itemKey)))].map((ata) => {
+      const daAta = sols.filter((d) => d.ataKey === ata);
+      return daAta.find((d) => d.linhas.some((x) => x.linhaId === l.id)) ?? (daAta.length === 1 ? daAta[0] : null);
+    })
+  );
+  return {
+    total: cobertura.length,
+    solicitados: cobertura.filter((c) => c.every(Boolean)).length,
+    autorizados: cobertura.filter((c) => c.every((d) => d?.assinadaEm)).length
+  };
+}
+
+/**
+ * Aviso de item sem empenho autorizado, depois da autorização: o item sem solicitação que o cubra ou com a solicitação
+ * ainda sem a assinatura. Pedido sem nenhuma solicitação informada não avisa: são os do controle anterior da CAEP, que
+ * ainda não têm as solicitações (decisão de 24/10/2026).
+ */
+export function itensSemEmpenhoAutorizado(p: PedidoEmenda): AvisoPedido | null {
   if (ORDEM_ETAPA[p.etapa] < ORDEM_ETAPA.AUTORIZADO || !p.documentos.some((d) => d.etapa === 'AUTORIZACAO')) return null;
-  const atas = atasDoPedido(p);
-  const n = atas.filter((a) => a.situacao !== 'assinada').length;
+  const { total, autorizados } = contaDosItens(p);
+  const n = total - autorizados;
   if (!n) return null;
   return {
     tipo: 'semAutorizacao',
-    curto: n === 1 ? '1 ata sem autorização' : `${n} atas sem autorização`,
-    texto: `${n} de ${atas.length} ${atas.length === 1 ? 'ata' : 'atas'} sem solicitação de empenho assinada pela Diretora do FNSP`
+    curto: n === 1 ? '1 item sem autorização' : `${n} itens sem autorização`,
+    texto: `${n} de ${total} ${total === 1 ? 'item' : 'itens'} sem empenho autorizado: sem solicitação que os cubra ou sem a assinatura da Diretora do FNSP`
   };
 }
 
