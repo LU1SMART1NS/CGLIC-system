@@ -344,7 +344,9 @@ export function avisosDoPedido(
     avisos.push({
       tipo: 'semEnvioCgofi',
       curto: 'Sem envio à CGOFI',
-      texto: `${semEnvio.length === 1 ? 'Solicitação assinada e ainda não enviada à CGOFI' : `${semEnvio.length} solicitações assinadas e ainda não enviadas à CGOFI`}: ${semEnvio.map(textoDaSolicitacao).join('; ')}`
+      texto: `${semEnvio.length === 1 ? 'Solicitação assinada e ainda não enviada à CGOFI' : `${semEnvio.length} solicitações assinadas e ainda não enviadas à CGOFI`}: ${semEnvio.map(textoDaSolicitacao).join('; ')}`,
+      // A linha da primeira solicitação sem envio: o Início mostra esse item na coluna Item · ata.
+      linhaId: linhasAtivas(p).find((l) => solicitacaoDaLinha(p, l)?.id === semEnvio[0].id)?.id
     });
   }
   if (notas && jaEmpenhado(p.etapa)) {
@@ -785,6 +787,8 @@ export interface RodadaDoPedido {
   envios: Array<{ numero: string; data: string | null }>;
   /** Solicitações da rodada cujo envio falta registrar (faltaEnvioCgofi). */
   faltaEnvio: number;
+  /** Atas dessas solicitações ("00058/2025"), para dizer o que falta enviar. */
+  atasSemEnvio: string[];
   /** Solicitações assinadas sem envio ligado num pedido antigo (envio gravado sem a lista do que levava). */
   semRegistro: number;
   /** As linhas da rodada por situação: "6 contratadas · 1 na CCGA". */
@@ -818,6 +822,7 @@ export function rodadasDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>
         solicitacoes: sols,
         envios: [...envios.values()].sort((a, b) => (a.data ?? '9999').localeCompare(b.data ?? '9999')),
         faltaEnvio: sols.filter((d) => falta.has(d.id)).length,
+        atasSemEnvio: [...new Set(sols.filter((d) => falta.has(d.id)).map((d) => d.ataKey?.split('-')[0] ?? '?'))],
         semRegistro: sols.filter((d) => d.assinadaEm && !d.enviosCgofi?.length && !falta.has(d.id)).length,
         linhas
       };

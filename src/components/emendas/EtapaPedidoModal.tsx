@@ -213,6 +213,10 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const emendaLida = lerNumeroDaEmenda(emenda);
   const conferenciaDaEmenda = modo === 'CONFERIDO' && emendaLida ? conferirNumeroDaEmenda(pedido, emendaLida.numero, emendaLida.ano ?? anoEmenda, pedidos) : null;
   const nomeDe = (autorId: string | null) => autores.find((a) => a.id === autorId)?.nome ?? 'outro autor';
+  // A emenda dividida em vários pedidos do mesmo processo: o processo uma vez só ("todos do Processo …").
+  const idsDosOutros = [...new Set((conferenciaDaEmenda?.mesmaEmenda ?? []).map((x) => identificacaoDoPedido(x)))];
+  const identificacoesDosOutros =
+    idsDosOutros.length === 1 && (conferenciaDaEmenda?.mesmaEmenda.length ?? 0) > 1 ? `todos do ${idsDosOutros[0]}` : idsDosOutros.join(', ');
   const valorDigitado = valor.trim() ? Number(valor.replace(/\./g, '').replace(',', '.')) : null;
   const previsto = valorDoPedido(pedido, itens, precos);
   const deHoje = valorDoPedido(pedido, itens);
@@ -469,7 +473,8 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
             {semEnvio.length === 0 && <div style={aviso('atencao')}>Nenhuma solicitação assinada sem envio. Informe a assinatura da solicitação antes do envio.</div>}
             {semEnvio.map((d) => {
               const ata = atas.find((a) => a.ataKey === d.ataKey);
-              const doDocumento = linhasAtivas(pedido).filter((l) => d.linhas.some((x) => x.linhaId === l.id));
+              // As linhas da solicitação: as ligadas a ela e, sem ligação gravada, as da sua ata (solicitacaoDaLinha).
+              const doDocumento = linhasAtivas(pedido).filter((l) => solicitacaoDaLinha(pedido, l)?.id === d.id);
               return (
                 <label key={d.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', fontSize: '0.85rem', padding: '0.45rem 0.6rem', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 6, cursor: 'pointer' }}>
                   <input
@@ -556,7 +561,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
             {conferenciaDaEmenda && conferenciaDaEmenda.mesmaEmenda.length > 0 && (
               <div style={aviso('info')} data-testid="emendas-etapa-emenda-outro-pedido">
                 Esta emenda também está em {conferenciaDaEmenda.mesmaEmenda.length === 1 ? 'outro pedido' : `${conferenciaDaEmenda.mesmaEmenda.length} outros pedidos`} de{' '}
-                {nomeDoAutor} ({conferenciaDaEmenda.mesmaEmenda.map((x) => identificacaoDoPedido(x)).join(', ')}): o valor do SIOP é da emenda inteira.
+                {nomeDoAutor} ({identificacoesDosOutros}): o valor do SIOP é da emenda inteira.
               </div>
             )}
             {valorDigitado != null && Number.isFinite(valorDigitado) && valorDigitado + 0.004 < previsto && (
