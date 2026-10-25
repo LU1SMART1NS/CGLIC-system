@@ -157,13 +157,13 @@ export const AddTaskForm: React.FC<{
   );
 };
 
-/** Título de etapa com renomear/excluir inline. */
+/** Título de etapa com renomear/excluir inline (sem os dois, só o título: plano só de leitura). */
 export const MacrotaskHeader: React.FC<{
   nome: string;
   /** Número da etapa no módulo (ex.: "2"), calculado pela posição. */
   numero?: string;
-  onRename: (nome: string) => void;
-  onDelete: () => void;
+  onRename?: (nome: string) => void;
+  onDelete?: () => void;
   isPending?: boolean;
   taskCount: number;
 }> = ({ nome: nomeBruto, numero, onRename, onDelete, isPending, taskCount }) => {
@@ -196,7 +196,7 @@ export const MacrotaskHeader: React.FC<{
           onSubmit={(e) => {
             e.preventDefault();
             if (!draft.trim()) return;
-            if (draft.trim() !== nome) onRename(draft.trim());
+            if (draft.trim() !== nome) onRename?.(draft.trim());
             setEditing(false);
           }}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flex: 1 }}
@@ -222,22 +222,26 @@ export const MacrotaskHeader: React.FC<{
         <h4 style={headingStyle}>{numero ? `${numero}. ${nome}` : nome}</h4>
       )}
 
-      {!editing && (
+      {!editing && (onRename || onDelete) && (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
-          <ActionButton action="renomear" iconOnly label="Renomear etapa"
-            type="button"
-            size="sm"
-            onClick={() => {
-              setDraft(nome);
-              setEditing(true);
-            }}
-          />
-          <ConfirmDeleteButton
-            label="Excluir etapa"
-            confirmMessage={taskCount > 0 ? `Excluir a etapa e suas ${taskCount} tarefa(s)?` : 'Excluir a etapa?'}
-            disabled={isPending}
-            onConfirm={onDelete}
-          />
+          {onRename && (
+            <ActionButton action="renomear" iconOnly label="Renomear etapa"
+              type="button"
+              size="sm"
+              onClick={() => {
+                setDraft(nome);
+                setEditing(true);
+              }}
+            />
+          )}
+          {onDelete && (
+            <ConfirmDeleteButton
+              label="Excluir etapa"
+              confirmMessage={taskCount > 0 ? `Excluir a etapa e suas ${taskCount} tarefa(s)?` : 'Excluir a etapa?'}
+              disabled={isPending}
+              onConfirm={onDelete}
+            />
+          )}
         </span>
       )}
     </div>

@@ -242,7 +242,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/atas/distribuicao"
               element={
-                <RequireRole allowedRoles={['admin', 'leitor']}>
+                <RequireRole allowedRoles={['admin']}>
                   <DistribuicaoEquipeRoute />
                 </RequireRole>
               }

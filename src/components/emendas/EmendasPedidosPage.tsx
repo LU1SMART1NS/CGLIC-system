@@ -494,7 +494,8 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
         {p.observacao && <div style={carteiraSubtitle}>Observação: {p.observacao}</div>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }} className="emendas-detalhe-pedido__etapas">
-        {(p.contatoNome || p.contatoTelefone || p.contatoEmail) && (
+        {/* Contato da assessoria: só para quem trata com ela, coordenador e gestor de emendas (decisão de 25/10/2026). */}
+        {podeGerir && (p.contatoNome || p.contatoTelefone || p.contatoEmail) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }} data-testid={`emendas-pedido-contato-${p.id}`}>
             <span style={carteiraSubtitle}>Contato na assessoria{p.contatoNome ? `: ${p.contatoNome}` : ''}</span>
             <ContatoDoResponsavel nome={p.contatoNome ?? 'assessoria'} telefone={p.contatoTelefone} email={p.contatoEmail} />
@@ -621,9 +622,10 @@ export const EmendasPedidosPage: React.FC = () => {
         const textoLinhas = linhasAtivas(l)
           .map((x) => `${(x.tipo === 'KIT' ? x.kitNome : itens.get(x.itemKey ?? '')?.descricao) ?? ''} ${textoDoBeneficiario(x.beneficiarioId)} ${x.contratoNumero ?? ''}`)
           .join(' ');
-        return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${l.contatoNome ?? ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`).includes(termo);
+        // O nome do contato da assessoria só entra na busca de quem o vê.
+        return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${podeGerir ? l.contatoNome ?? '' : ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`).includes(termo);
       });
-  }, [doSegmento, filtroEtapa, etapaDoFiltro, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios]);
+  }, [doSegmento, filtroEtapa, etapaDoFiltro, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios, podeGerir]);
 
   // Como nas carteiras: ordena pelo cabeçalho (?ordem=) antes de paginar.
   const ordem = useMemo<Record<string, CarteiraSortColumn<Linha>>>(
@@ -789,7 +791,7 @@ export const EmendasPedidosPage: React.FC = () => {
         <>
           <CarteiraFilterBar
             busca={busca}
-            searchPlaceholder="Buscar por autor, contato, ofício, SEI, emenda ou item..."
+            searchPlaceholder={podeGerir ? 'Buscar por autor, contato, ofício, SEI, emenda ou item...' : 'Buscar por autor, ofício, SEI, emenda ou item...'}
             onChangeBusca={setBusca}
             hasActiveFilters={filtrosAtivos}
             onResetFilters={() => {

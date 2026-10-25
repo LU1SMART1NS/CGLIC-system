@@ -344,14 +344,19 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       for (const role of ['admin', 'gestor', 'gestor_saldos', 'leitor', null] as const) expect(rotaInicialDoPerfil(role)).toBe('/instrumentos');
     });
 
-    it('o resumo das emendas aparece no Início do gestor de emendas (Painel) e do coordenador (Emendas), e de mais ninguém', () => {
+    it('o resumo das emendas aparece no Início do gestor de emendas (Painel), do coordenador e da consulta (Emendas), e de mais ninguém', () => {
       const inicioDoCoordenador = filterNavigationByRole(navigationConfig, 'admin').find((i) => i.id === 'visao-geral');
       expect(inicioDoCoordenador?.children?.map((c) => [c.label, c.route])).toEqual([
         ['Atas e Contratos', '/instrumentos'],
         ['Emendas', '/emendas/inicio'],
         ['Distribuição', '/atas/distribuicao']
       ]);
-      for (const role of ['gestor', 'gestor_saldos', 'leitor'] as const) {
+      const inicioDaConsulta = filterNavigationByRole(navigationConfig, 'leitor').find((i) => i.id === 'visao-geral');
+      expect(inicioDaConsulta?.children?.map((c) => [c.label, c.route])).toEqual([
+        ['Atas e Contratos', '/instrumentos'],
+        ['Emendas', '/emendas/inicio']
+      ]);
+      for (const role of ['gestor', 'gestor_saldos'] as const) {
         const inicio = filterNavigationByRole(navigationConfig, role).find((i) => i.id === 'visao-geral');
         expect(inicio?.children?.map((c) => c.route)).not.toContain('/emendas/inicio');
       }
@@ -373,9 +378,10 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos');
       expect(labels).toContain('Itens');
-      expect(labels).toContain('Distribuição');
 
-      // Vínculos e Alocação são filas de trabalho: a consulta vê o resultado na Carteira e nas telas 360.
+      // Vínculos, Alocação e Distribuição são filas de trabalho: a consulta vê o resultado na Carteira e nas telas 360.
+      // A Distribuição também mostra o nível de cada gestor, que fica só com o coordenador (25/10/2026).
+      expect(labels).not.toContain('Distribuição');
       const areas = visible.map((i) => i.id);
       expect(areas).not.toContain('vinculacao');
       expect(areas).not.toContain('alocacao');

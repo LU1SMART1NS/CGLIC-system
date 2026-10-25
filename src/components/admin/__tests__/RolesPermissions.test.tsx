@@ -77,7 +77,11 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
       expect(html).toContain('Execução financeira');
       expect(html).toContain('Atas atribuídas (com os contratos vinculados) e contratos avulsos atribuídos individualmente');
 
-      expect(html).toContain('Consulta; vincula empenhos à unidade interna, sem alterar as alocações');
+      // Sem Alocação desde 17/10/2026: a unidade interna da nota fica no item; emendas só na aba do item (25/10/2026).
+      expect(html).toContain('a unidade interna de cada nota de empenho');
+      expect(html).toContain('Consulta, na aba Emendas do item');
+      expect(html).not.toContain('Alocações');
+      expect(html).not.toContain('atribuir gestor');
       expect(html).not.toContain('Gestão completa');
       expect(html).not.toContain('Usuários e servidores');
       expect(html).not.toContain('Distribuição');
@@ -100,6 +104,10 @@ describe('RolesPermissions — Tela de Perfis (Fase Perfis, orientada a negócio
 
       expect(html).toContain('Consulta');
       expect(html).toContain('somente leitura');
+      // Distribuição, Vínculos e Alocação são filas de trabalho; o contato da assessoria fica com a CAEP (25/10/2026).
+      expect(html).not.toContain('Alocações');
+      expect(html).toContain('sem as filas de trabalho (Distribuição, Vínculos e Alocação)');
+      expect(html).toContain('sem o contato da assessoria');
       expect(html).not.toContain('Usuários e servidores');
       expect(html).not.toContain('Perfis');
     });

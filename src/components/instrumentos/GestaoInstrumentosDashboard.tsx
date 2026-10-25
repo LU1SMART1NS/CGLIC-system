@@ -434,9 +434,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   // ---- Gavetas: botões com resumo e uma área aberta por vez -------------------------------------------------------
   const extras = useContagensExtras();
+  // A gaveta Distribuição (ocupação de cada gestor) é só do coordenador, como a Central (decisão de 25/10/2026).
   const gavetasDisponiveis: PainelGavetaId[] = saldosOnly
     ? ['situacao', 'alocacao']
-    : podeFiltrarGestor && !gestorNome
+    : role === 'admin' && !gestorNome
       ? ['situacao', 'distribuicao']
       : ['situacao'];
   const gavetaUrl = searchParams.get('gaveta') as PainelGavetaId | null;

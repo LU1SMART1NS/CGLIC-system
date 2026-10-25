@@ -5,6 +5,7 @@ import { Ata360Page } from '../Ata360Page';
 import * as useAtaModule from '../../../hooks/useAta';
 import * as useAssignedManagementScopeModule from '../../../hooks/useAssignedManagementScope';
 import * as authContextModule from '../../../context/AuthContext';
+import * as reajusteModule from '../../../hooks/useReajusteAtas';
 import type { ArpRecord, ArpItemRecord } from '../../../types';
 
 let mockSearch = '';
@@ -382,7 +383,7 @@ describe('Ata360Page — Visão 360° da Ata de Registro de Preços', () => {
 });
 
 describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () => {
-  const asRole = (role: 'admin' | 'leitor') => {
+  const asRole = (role: 'admin' | 'leitor' | 'gestor_emendas' | 'gestor_saldos') => {
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
       user: { id: `${role}-user` } as any,
       session: null,
@@ -422,6 +423,36 @@ describe('Ata360Page — aba "Contratos vinculados" (vinculação manual)', () =
     const html = renderPage();
     expect(html).toContain('Nenhum contrato vinculado.');
     expect(html).toContain('Vincular Contrato');
+  });
+
+  it('gestor de emendas: abas Itens e Reajuste (só consulta), sem Ações, Plano e Contratos (decisão de 25/10/2026)', () => {
+    asRole('gestor_emendas');
+    const dados = { ataId: 'a1', parametros: { clausula: 'SEM_REAJUSTE' }, ciclos: [], itens: [], publicados: [], indices: [] };
+    const reajuste = vi.spyOn(reajusteModule, 'useReajusteDaAta').mockReturnValue({ data: dados, isLoading: false, consulta: {} } as any);
+    try {
+      const html = renderPage();
+      expect(reajuste).toHaveBeenCalledWith('00011/2026', '200331', { enabled: true });
+      expect(html).toContain('Itens (1)');
+      expect(html).toContain('>Reajuste<');
+      expect(html).not.toContain('Plano de gestão');
+      expect(html).not.toContain('Contratos vinculados');
+      expect(html).not.toContain('data-testid="ata-action-queue"');
+    } finally {
+      reajuste.mockRestore();
+    }
+  });
+
+  it('gestor de saldo: só a aba Itens, sem ler o reajuste', () => {
+    asRole('gestor_saldos');
+    const reajuste = vi.spyOn(reajusteModule, 'useReajusteDaAta');
+    try {
+      const html = renderPage();
+      expect(reajuste).toHaveBeenCalledWith('00011/2026', '200331', { enabled: false });
+      expect(html).toContain('Itens (1)');
+      expect(html).not.toContain('>Reajuste<');
+    } finally {
+      reajuste.mockRestore();
+    }
   });
 
   it('leitor não vê ações de vincular/desvincular', () => {

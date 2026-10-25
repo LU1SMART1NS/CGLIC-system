@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
+import { useAuth } from '../../context/AuthContext';
 import { ArrowRight } from 'lucide-react';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { ActionButton } from '../../design-system/components/ActionButton';
@@ -66,6 +67,8 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
   podeResolverAlvo
 }) => {
   const navigate = useNavigateWithOrigin();
+  // A consulta lê as pendências com rótulos "Ver …" (não informa nem indica nada).
+  const somenteConsulta = useAuth().role === 'leitor';
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -161,7 +164,7 @@ export const GestaoInstrumentosTable: React.FC<GestaoInstrumentosTableProps> = (
           <tbody>
             {pageRows.map(({ item, instrumento, motivo, situacao, fornecedor, responsavel }) => {
               const prazo = getPrazoLabel(item);
-              const acao = getAcaoInfo(item);
+              const acao = getAcaoInfo(item, somenteConsulta);
               // Como nas carteiras: a linha toda leva ao destino, já com o cartão encolhido e as ações à vista.
               const abrir = () => navigate(acao.targetUrl, { state: { ancorar: true } });
 

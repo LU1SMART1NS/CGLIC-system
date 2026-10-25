@@ -89,6 +89,8 @@ export interface TaskPlanController {
   deleteModule: PlanAction<[vars: { planId: string; moduloId: string }]>;
   renameModule: PlanAction<[vars: { planId: string; moduloId: string; nome: string }]>;
   createTask: PlanAction<[vars: { macrotaskId: string; nome: string; prazo: string | null; observacao: string | null }]>;
+  /** Plano só de leitura (perfil consulta): sem status clicável, edição, exclusão, modelos ou tarefas novas. */
+  somenteLeitura?: boolean;
 }
 
 const STATUS_OPTIONS: { value: ContractTaskStatusValue; label: string; icon: React.ReactNode; color: string }[] = [
@@ -100,11 +102,37 @@ const STATUS_OPTIONS: { value: ContractTaskStatusValue; label: string; icon: Rea
 
 const externalLinkOf = (task: PlanTask): string | undefined => (task as ContractTask).externalLinkUrl;
 
+/** Status da tarefa para quem só consulta: o mesmo ícone do seletor, sem clique. */
+const StatusSoLeitura: React.FC<{ status: ContractTaskStatusValue }> = ({ status }) => {
+  const opt = STATUS_OPTIONS.find((o) => o.value === status) ?? STATUS_OPTIONS[0];
+  return (
+    <span
+      title={opt.label}
+      aria-label={opt.label}
+      data-testid="plan-status-leitura"
+      style={{
+        width: '24px',
+        height: '24px',
+        borderRadius: '4px',
+        border: `1.5px solid ${opt.color}`,
+        background: `${opt.color}1a`,
+        color: opt.color,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0
+      }}
+    >
+      {opt.icon}
+    </span>
+  );
+};
+
 /** Linha de uma tarefa do plano, igual em Contrato e Ata. */
-export type TaskPlanRowController = Pick<TaskPlanController, 'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask'>;
+export type TaskPlanRowController = Pick<TaskPlanController, 'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask' | 'somenteLeitura'>;
 
 export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowController; numero?: string }> = ({ task, controller, numero }) => {
-  const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask } = controller;
+  const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask, somenteLeitura = false } = controller;
   const updateMutation = useUpdateTask(entityKey);
   const deleteMutation = useDeleteTask(entityKey);
   const [expanded, setExpanded] = useState(false);
@@ -189,6 +217,9 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
     <div style={{ borderBottom: '1px solid #f1f5f9', padding: '0.65rem 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         {/* Seletor Rápido de Status */}
+        {somenteLeitura ? (
+          <StatusSoLeitura status={task.status} />
+        ) : (
         <div className="plan-status-group" style={{ display: 'flex', gap: '2px' }}>
           {STATUS_OPTIONS.map((opt) => (
             <button
@@ -218,9 +249,13 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             </button>
           ))}
         </div>
+        )}
 
         {/* Informações da Tarefa */}
-        <div style={{ flex: '1 1 240px', minWidth: 0, cursor: 'pointer' }} onClick={() => alternarDetalhes()}>
+        <div
+          style={{ flex: '1 1 240px', minWidth: 0, cursor: somenteLeitura ? undefined : 'pointer' }}
+          onClick={somenteLeitura ? undefined : () => alternarDetalhes()}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span
               style={{
@@ -249,6 +284,10 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
               <span>Resp: {describeResponsavel(task.responsavelNome, gestorNome)}</span>
             )}
           </div>
+          {/* Quem só consulta não abre a edição: a observação aparece na própria linha. */}
+          {somenteLeitura && task.observacao && (
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{task.observacao}</div>
+          )}
         </div>
 
         {/* Ações e Expansor */}
@@ -277,18 +316,22 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             </a>
           )}
 
-          <ActionButton action={expanded ? 'recolher' : 'expandir'} iconOnly label={expanded ? 'Recolher detalhes' : 'Editar prazo e responsável'}
-            type="button"
-            size="sm"
-            onClick={() => alternarDetalhes()}
-          />
+          {!somenteLeitura && (
+            <>
+              <ActionButton action={expanded ? 'recolher' : 'expandir'} iconOnly label={expanded ? 'Recolher detalhes' : 'Editar prazo e responsável'}
+                type="button"
+                size="sm"
+                onClick={() => alternarDetalhes()}
+              />
 
-          <ConfirmDeleteButton
-            label="Excluir tarefa"
-            confirmMessage={task.status === 'CONCLUIDA' ? 'Excluir tarefa já concluída?' : 'Excluir tarefa?'}
-            disabled={deleteMutation.isPending}
-            onConfirm={() => deleteMutation.mutate(task.id)}
-          />
+              <ConfirmDeleteButton
+                label="Excluir tarefa"
+                confirmMessage={task.status === 'CONCLUIDA' ? 'Excluir tarefa já concluída?' : 'Excluir tarefa?'}
+                disabled={deleteMutation.isPending}
+                onConfirm={() => deleteMutation.mutate(task.id)}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -525,6 +568,16 @@ export const TaskPlanSection: React.FC<{
   }
 
   // 1. Caso Nenhum Plano Tenha Sido Aplicado Ainda
+  if (!plan && c.somenteLeitura) {
+    return (
+      <EmptyState
+        icon={<Sliders size={28} />}
+        title={labels.semPlanoTitulo}
+        description={`O ${labels.gestorLabel} ainda não aplicou um Modelo de Gestão.`}
+        testId="task-plan-empty"
+      />
+    );
+  }
   if (!plan) {
     return (
       <EmptyState
@@ -668,7 +721,7 @@ export const TaskPlanSection: React.FC<{
               onClick={() => setCollapsedGroups(allCollapsed ? new Set() : new Set(moduleGroups.map((g) => g.key)))}
             />
           )}
-          {showApplyModel ? (
+          {c.somenteLeitura ? null : showApplyModel ? (
             <ActionButton action="fechar" type="button" size="sm" onClick={() => setShowApplyModel(false)} />
           ) : (
             <AppButton type="button" variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setShowApplyModel(true)}>
@@ -678,7 +731,7 @@ export const TaskPlanSection: React.FC<{
         </div>
       </div>
 
-      {showApplyModel && (
+      {showApplyModel && !c.somenteLeitura && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <select
@@ -739,12 +792,12 @@ export const TaskPlanSection: React.FC<{
               onToggleCollapsed={() => toggleGroup(group.key)}
               isPending={c.deleteModule.isPending || c.renameModule.isPending}
               onRename={
-                group.modulo
+                group.modulo && !c.somenteLeitura
                   ? (nome) => c.renameModule.run({ planId: plan.id, moduloId: group.modulo!.id, nome })
                   : undefined
               }
               onDelete={
-                group.modulo
+                group.modulo && !c.somenteLeitura
                   ? async () => {
                       const ok = await confirm({
                         title: 'Excluir módulo',
@@ -772,15 +825,15 @@ export const TaskPlanSection: React.FC<{
               numero={numeroEtapa(macroIndex)}
               taskCount={macro.tarefas.length}
               isPending={c.saveMacrotask.isPending || c.deleteMacrotask.isPending}
-              onRename={(nome) => c.saveMacrotask.run({ id: macro.id, nome: stripNumeracaoManual(nome) })}
-              onDelete={() => c.deleteMacrotask.run(macro.id)}
+              onRename={c.somenteLeitura ? undefined : (nome) => c.saveMacrotask.run({ id: macro.id, nome: stripNumeracaoManual(nome) })}
+              onDelete={c.somenteLeitura ? undefined : () => c.deleteMacrotask.run(macro.id)}
             />
 
             <div>
               {macro.tarefas.map((tarefa, tarefaIndex) => (
                 <TaskPlanRow key={tarefa.id} task={tarefa} controller={c} numero={numeroTarefa(macroIndex, tarefaIndex)} />
               ))}
-              <AddTaskForm
+              {!c.somenteLeitura && <AddTaskForm
                 gestorNome={c.gestorNome}
                 isPending={c.createTask.isPending}
                 onSubmit={(values) =>
@@ -791,7 +844,7 @@ export const TaskPlanSection: React.FC<{
                     observacao: values.observacao || null
                   })
                 }
-              />
+              />}
             </div>
           </div>
         ))}
@@ -799,10 +852,12 @@ export const TaskPlanSection: React.FC<{
           );
         })}
 
-        <AddMacrotaskForm
-          isPending={c.saveMacrotask.isPending}
-          onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome: stripNumeracaoManual(nome) })}
-        />
+        {!c.somenteLeitura && (
+          <AddMacrotaskForm
+            isPending={c.saveMacrotask.isPending}
+            onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome: stripNumeracaoManual(nome) })}
+          />
+        )}
       </div>
     </div>
   );

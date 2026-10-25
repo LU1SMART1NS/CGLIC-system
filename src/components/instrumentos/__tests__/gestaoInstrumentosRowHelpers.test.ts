@@ -146,6 +146,38 @@ describe('gestaoInstrumentosRowHelpers — ação contextual de Atas com saldo c
   });
 });
 
+describe('gestaoInstrumentosRowHelpers — rótulos para quem só consulta (decisão de 25/10/2026)', () => {
+  const comMotivo = (category: DashboardAttentionItem['category'], extra: Partial<DashboardAttentionItem> = {}): DashboardAttentionItem => ({
+    id: `ATT-${category}`,
+    category,
+    severity: 'ATENCAO',
+    title: 't',
+    numeroAta: '00011/2026',
+    arpKey: '00011/2026-200331',
+    targetUrl: '/atas/detalhe/x',
+    ...extra
+  });
+
+  it('a consulta vê "Ver …" no lugar de "Informar …" e "Indicar …", com o mesmo destino', () => {
+    const casos: Array<[DashboardAttentionItem, string, string]> = [
+      [comMotivo('UNIDADE_PENDENTE'), 'Informar unidades', 'Ver unidades'],
+      [comMotivo('ATA_ASSINADA'), 'Informar qtd. da ata assinada', 'Ver ata assinada'],
+      [comMotivo('REAJUSTE_ATA', { motivoDetalhe: { chave: 'termo-a-informar' } as DashboardAttentionItem['motivoDetalhe'] }), 'Informar termo', 'Ver reajuste'],
+      [comMotivo('REAJUSTE_ATA', { motivoDetalhe: { chave: 'percentual-a-informar' } as DashboardAttentionItem['motivoDetalhe'] }), 'Informar percentual', 'Ver reajuste'],
+      [comMotivo('FORNECEDOR_PNCP'), 'Indicar Fornecedor', 'Ver fornecedor']
+    ];
+    for (const [item, deQuemAltera, daConsulta] of casos) {
+      expect(getAcaoInfo(item).label).toBe(deQuemAltera);
+      expect(getAcaoInfo(item, true)).toEqual({ ...getAcaoInfo(item), label: daConsulta });
+    }
+  });
+
+  it('rótulos que já são de leitura ficam iguais para a consulta', () => {
+    expect(getAcaoInfo(comMotivo('ATA_CRITICA'), true).label).toBe('Verificar saldo');
+    expect(getAcaoInfo(comMotivo('QUANTITATIVOS'), true).label).toBe('Conferir quantitativos');
+  });
+});
+
 describe('gestaoInstrumentosRowHelpers — chave de correlação (getLookupKey)', () => {
   it('usa contractKey quando disponível', () => {
     const item = { id: '1', category: 'PAGAMENTO_CRITICO', severity: 'CRITICA', title: 't', contractKey: '200331-1-2026', uasg: '200331' } as AttentionItemWithUasg;
