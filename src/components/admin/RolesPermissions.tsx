@@ -49,13 +49,14 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     description: 'Administração geral do sistema e gestão de todos os domínios.',
     icon: Shield,
     areas: [
-      { label: 'Painel e Distribuição', description: 'Visão de toda a carteira; distribui atas e contratos entre os gestores e ajusta a complexidade' },
-      { label: 'Atas e Itens', description: 'Gestão completa, de todas as atas' },
+      { label: 'Início e Distribuição', description: 'Visão de toda a carteira e das emendas; distribui atas e contratos entre os gestores e ajusta a complexidade e o nível de cada gestor' },
+      { label: 'Atas e Itens', description: 'Gestão completa, de todas as atas, inclusive o reajuste dos preços registrados' },
       { label: 'Contratos', description: 'Gestão completa, de todos os contratos' },
+      { label: 'Vínculos', description: 'Gestão completa: contratos à ata, notas de empenho ao contrato e aos itens' },
       { label: 'Execução financeira', description: 'Gestão completa de pagamentos e empenhos, inclusive excluir ciclos de pagamento' },
       { label: 'Alocações', description: 'Gestão completa' },
-      { label: 'Unidades internas', description: 'Gestão' },
-      { label: 'Emendas', description: 'Gestão completa' },
+      { label: 'Emendas', description: 'Gestão completa, com o contato da assessoria dos parlamentares' },
+      { label: 'Unidades internas e grupos das UASGs', description: 'Gestão' },
       { label: 'Modelos de gestão, alertas e feriados', description: 'Gestão' },
       { label: 'Usuários e servidores', description: 'Gestão' },
       { label: 'Perfis', description: 'Gestão, inclusive renomear os perfis' }
@@ -68,12 +69,13 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     description: 'Gestão das Atas atribuídas — e dos contratos vinculados a elas — além dos contratos avulsos atribuídos individualmente.',
     icon: UserCheck,
     areas: [
-      { label: 'Painel', description: 'Consulta' },
-      { label: 'Atas e Itens', description: 'Gestão dentro do escopo atribuído: atribuir gestor, vincular contratos aos itens e atualizar saldos' },
+      { label: 'Início', description: 'Consulta das pendências das atas e contratos atribuídos' },
+      { label: 'Atas e Itens', description: 'Gestão dentro do escopo atribuído: reajuste dos preços, quantidades da ata assinada e a unidade interna de cada nota de empenho' },
       { label: 'Contratos', description: 'Gestão dentro do escopo atribuído (via Ata ou atribuição direta): tarefas, prazos e atualização de itens' },
+      { label: 'Vínculos', description: 'Gestão dentro do escopo atribuído: contratos à ata, notas de empenho ao contrato e aos itens' },
       { label: 'Execução financeira', description: 'Gestão de pagamentos e empenhos dos contratos do escopo; não exclui ciclos de pagamento' },
-      { label: 'Alocações', description: 'Consulta; vincula empenhos à unidade interna, sem alterar as alocações' },
-      { label: 'Unidades internas', description: 'Consulta' },
+      { label: 'Emendas', description: 'Consulta, na aba Emendas do item: o que a CAEP reservou a cada parlamentar' },
+      { label: 'Unidades internas e grupos das UASGs', description: 'Consulta' },
       { label: 'Modelos de gestão', description: 'Gestão' }
     ],
     scope: 'Atas atribuídas (com os contratos vinculados) e contratos avulsos atribuídos individualmente'
@@ -84,10 +86,12 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     description: 'Gestão das alocações internas das Atas e das unidades internas.',
     icon: Coins,
     areas: [
-      { label: 'Painel', description: 'Consulta, somente os alertas de saldo das Atas' },
-      { label: 'Atas e Itens', description: 'Consulta, para acompanhar o saldo dos itens' },
+      { label: 'Início', description: 'Consulta, somente os alertas de saldo das Atas' },
+      { label: 'Atas e Itens', description: 'Consulta, sem contratos, para acompanhar o saldo dos itens' },
       { label: 'Alocações', description: 'Gestão completa das alocações; a unidade interna de cada nota de empenho fica com o gestor da ata e o coordenador' },
-      { label: 'Unidades internas', description: 'Gestão' }
+      { label: 'Emendas', description: 'Consulta, na aba Emendas do item: quanto da cota da CAEP já está reservado' },
+      { label: 'Unidades internas', description: 'Gestão' },
+      { label: 'Grupos das UASGs', description: 'Consulta' }
     ],
     scope: 'Todas as Atas'
   },
@@ -97,8 +101,9 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     description: 'Servidor da CAEP: reparte entre parlamentares a quantidade alocada à CAEP.',
     icon: ScrollText,
     areas: [
-      { label: 'Emendas', description: 'Gestão de kits, beneficiários e pedidos dos parlamentares' },
-      { label: 'Atas e Itens', description: 'Consulta, sem contratos' }
+      { label: 'Início', description: 'Resumo dos pedidos e do saldo livre da CAEP' },
+      { label: 'Emendas', description: 'Gestão de pedidos, kits e beneficiários, com o contato da assessoria dos parlamentares' },
+      { label: 'Atas e Itens', description: 'Consulta, sem contratos; o reajuste dos preços da ata só para consulta' }
     ],
     scope: 'Itens alocados à CAEP'
   },
@@ -108,15 +113,14 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     description: 'Consulta das informações do sistema, sem funções de administração.',
     icon: Eye,
     areas: [
-      { label: 'Painel e Distribuição', description: 'Consulta' },
+      { label: 'Início', description: 'Consulta das pendências das atas e contratos e do resumo das emendas' },
       { label: 'Atas e Itens', description: 'Consulta' },
       { label: 'Contratos', description: 'Consulta' },
       { label: 'Execução financeira', description: 'Consulta de pagamentos e empenhos' },
-      { label: 'Alocações', description: 'Consulta' },
-      { label: 'Unidades internas', description: 'Consulta' },
-      { label: 'Emendas', description: 'Consulta' }
+      { label: 'Emendas', description: 'Consulta, sem o contato da assessoria dos parlamentares' },
+      { label: 'Unidades internas, grupos das UASGs e beneficiários', description: 'Consulta' }
     ],
-    scope: 'Todas as atas e todos os contratos, somente leitura'
+    scope: 'Todas as atas e todos os contratos, somente leitura; sem as filas de trabalho (Distribuição, Vínculos e Alocação)'
   }
 ];
 

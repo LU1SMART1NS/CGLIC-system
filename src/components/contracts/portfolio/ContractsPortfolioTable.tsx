@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
+import { useAuth } from '../../../context/AuthContext';
 import { EmptyState } from '../../../design-system/components/EmptyState';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { SeverityBadge } from '../../../design-system/components/SeverityBadge';
@@ -107,6 +108,8 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   onFilter
 }) => {
   const navigate = useNavigateWithOrigin();
+  // A consulta lê as pendências com rótulos "Ver …" (não informa nem indica nada).
+  const somenteConsulta = useAuth().role === 'leitor';
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(rows, SORT_COLUMNS, linhaNova);
   const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
@@ -314,7 +317,7 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                                 <tbody>
                                   {pendencias.map((p) => {
                                     const motivo = getMotivoInfo(p.category);
-                                    const acao = getAcaoInfo(p);
+                                    const acao = getAcaoInfo(p, somenteConsulta);
                                     const abrirPendencia = () => navigate(acao.targetUrl, { state: { ancorar: true } });
                                     return (
                                       <tr key={p.id} className="carteira-row-link" onClick={abrirAoClicarNaLinha(abrirPendencia)}>
