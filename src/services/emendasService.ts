@@ -557,7 +557,10 @@ export interface PedidoEmenda {
   divergencia: string | null;
   /** Data da última devolução do ofício (o aviso "sem ofício" conta daqui). */
   devolvidoEm: string | null;
+  /** Nº da emenda: 8 dígitos, os 4 do autor e os 4 da emenda (migration 186). */
   siopEmenda: string | null;
+  /** Ano da emenda: o número se repete entre anos (migration 186). */
+  siopEmendaAno: number | null;
   siopValor: number | null;
   siopGnd: string | null;
   conferidoEm: string | null;
@@ -679,6 +682,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       divergencia: p.divergencia ?? null,
       devolvidoEm: p.devolvido_em ?? null,
       siopEmenda: p.siop_emenda ?? null,
+      siopEmendaAno: p.siop_emenda_ano ?? null,
       siopValor: p.siop_valor == null ? null : num(p.siop_valor),
       siopGnd: p.siop_gnd ?? null,
       conferidoEm: p.conferido_em ?? null,

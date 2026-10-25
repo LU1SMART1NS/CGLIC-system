@@ -4,10 +4,26 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta, usePedidosEmendas } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
-import { ataDoItem, atasDoPedido, documentoSeiDaEtapaValido, identificacaoDoPedido, itensDaLinha, linhasAtivas, numerosSei, ORDEM_ETAPA, rodadaDoPedido, solicitacaoDaLinha, valorDoPedido, type AtaDoPedido } from '../../utils/emendasPedidos';
+import {
+  ataDoItem,
+  atasDoPedido,
+  conferirNumeroDaEmenda,
+  documentoSeiDaEtapaValido,
+  identificacaoDoPedido,
+  itensDaLinha,
+  lerNumeroDaEmenda,
+  linhasAtivas,
+  numeroDaEmendaEmTexto,
+  numerosSei,
+  ORDEM_ETAPA,
+  rodadaDoPedido,
+  solicitacaoDaLinha,
+  valorDoPedido,
+  type AtaDoPedido
+} from '../../utils/emendasPedidos';
 import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
 import { QuadroGabinete } from './QuadroGabinete';
 import type { AcaoPedido, ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
@@ -165,7 +181,19 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const [data, setData] = useState(hojeEmBrasilia());
   const [documentoSei, setDocumentoSei] = useState('');
   const [processoSei, setProcessoSei] = useState(pedido.oficioProcessoSei ?? '');
-  const [emenda, setEmenda] = useState(pedido.siopEmenda ?? '');
+  const [emenda, setEmenda] = useState(pedido.siopEmenda ? numeroDaEmendaEmTexto(pedido.siopEmenda) : '');
+  // O número se repete entre anos (migration 186). Colar o código de 12 dígitos do SIOP preenche o ano.
+  const anoDeHoje = Number(hojeEmBrasilia().slice(0, 4));
+  const [anoEmenda, setAnoEmenda] = useState(pedido.siopEmendaAno ?? anoDeHoje);
+  const anosDaEmenda = [...new Set([...Array.from({ length: 5 }, (_, i) => anoDeHoje - i), anoEmenda])].sort((a, b) => b - a);
+  const digitarEmenda = (texto: string) => {
+    const lido = lerNumeroDaEmenda(texto);
+    if (lido?.ano) {
+      setAnoEmenda(lido.ano);
+      setEmenda(numeroDaEmendaEmTexto(lido.numero));
+    } else setEmenda(texto);
+  };
+  const { data: pedidos = [] } = usePedidosEmendas();
   // No formato brasileiro (1.234,56): a leitura abaixo tira os pontos de milhar.
   const [valor, setValor] = useState(pedido.siopValor != null ? pedido.siopValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
   const { precos } = usePrecosParaEmenda();
@@ -177,6 +205,9 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const [tentou, setTentou] = useState(false);
 
   const linhas = linhasAtivas(pedido);
+  const emendaLida = lerNumeroDaEmenda(emenda);
+  const conferenciaDaEmenda = modo === 'CONFERIDO' && emendaLida ? conferirNumeroDaEmenda(pedido, emendaLida.numero, emendaLida.ano ?? anoEmenda, pedidos) : null;
+  const nomeDe = (autorId: string | null) => autores.find((a) => a.id === autorId)?.nome ?? 'outro autor';
   const valorDigitado = valor.trim() ? Number(valor.replace(/\./g, '').replace(',', '.')) : null;
   const previsto = valorDoPedido(pedido, itens, precos);
   const deHoje = valorDoPedido(pedido, itens);
@@ -215,6 +246,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   if (modo === 'OFICIO' && !processoSei.trim()) pendencias.push('processo SEI');
   if (modo === 'CONFERIDO') {
     if (!emenda.trim()) pendencias.push('número da emenda');
+    else if (!emendaLida) pendencias.push('nº da emenda com 8 dígitos (ex.: 4095 0004), ou 12 com o ano na frente');
     if (!todosPontos) pendencias.push('marcar os 6 pontos que batem (se algo não bate, use "Ofício com divergência")');
     if (semBeneficiario) pendencias.push(`beneficiário em ${semBeneficiario === 1 ? 'uma linha' : `${semBeneficiario} linhas`} (use "Alterar linhas")`);
   }
@@ -265,7 +297,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 : modo === 'DIVERGENCIA'
                   ? { data, texto: divergencia.trim() }
                   : modo === 'CONFERIDO'
-                    ? { data, emenda: emenda.trim(), valor: valorDigitado, gnd, conferencia: pontos }
+                    ? { data, emenda: emendaLida?.numero, ano: emendaLida?.ano ?? anoEmenda, valor: valorDigitado, gnd, conferencia: pontos }
                     : VARIOS.has(modo)
                       ? { data, documentos_sei: numeros }
                       : { data, documento_sei: numeros[0] };
@@ -437,7 +469,22 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         {modo === 'CONFERIDO' && (
           <>
             <div style={grade}>
-              <AppInput label="Nº da emenda *" placeholder="Ex.: 2026 4095 0004" value={emenda} onChange={(e) => setEmenda(e.target.value)} data-testid="emendas-etapa-emenda" />
+              <AppSelect label="Ano da emenda *" value={String(anoEmenda)} onChange={(e) => setAnoEmenda(Number(e.target.value))} data-testid="emendas-etapa-emenda-ano">
+                {anosDaEmenda.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </AppSelect>
+              <AppInput
+                label="Nº da emenda *"
+                placeholder="Ex.: 4095 0004"
+                hint="8 dígitos. Pode colar o código do SIOP com o ano."
+                inputMode="numeric"
+                value={emenda}
+                onChange={(e) => digitarEmenda(e.target.value)}
+                data-testid="emendas-etapa-emenda"
+              />
               <AppInput label="Valor no SIOP (R$)" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
               <AppSelect label="GND" value={gnd} onChange={(e) => setGnd(e.target.value)}>
                 <option value="GND-4">GND-4 Investimento</option>
@@ -449,6 +496,19 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
               Valor previsto dos itens, com o reajuste das atas (o mesmo do quadro do parlamentar): {formatCurrency(previsto)}
               {Math.abs(previsto - deHoje) > 0.004 ? `; pelo preço de hoje, ${formatCurrency(deHoje)}` : ''}.
             </div>
+            {conferenciaDaEmenda && conferenciaDaEmenda.outroAutor.length > 0 && (
+              <div style={aviso('atencao')} role="status" data-testid="emendas-etapa-emenda-outro-autor">
+                Os 4 primeiros dígitos ({emendaLida!.numero.slice(0, 4)}) são o código do autor, e nos pedidos{' '}
+                {conferenciaDaEmenda.outroAutor.map((x) => `${nomeDe(x.autorId)} (emenda ${numeroDaEmendaEmTexto(x.siopEmenda!)})`).join(', ')} eles são de outro
+                parlamentar. Confira se o número não está trocado.
+              </div>
+            )}
+            {conferenciaDaEmenda && conferenciaDaEmenda.mesmaEmenda.length > 0 && (
+              <div style={aviso('info')} data-testid="emendas-etapa-emenda-outro-pedido">
+                Esta emenda também está em {conferenciaDaEmenda.mesmaEmenda.length === 1 ? 'outro pedido' : `${conferenciaDaEmenda.mesmaEmenda.length} outros pedidos`} de{' '}
+                {nomeDoAutor} ({conferenciaDaEmenda.mesmaEmenda.map((x) => identificacaoDoPedido(x)).join(', ')}): o valor do SIOP é da emenda inteira.
+              </div>
+            )}
             {valorDigitado != null && Number.isFinite(valorDigitado) && valorDigitado + 0.004 < previsto && (
               <div style={aviso('atencao')} role="status" data-testid="emendas-etapa-abaixo">
                 O valor no SIOP fica {formatCurrency(previsto - valorDigitado)} abaixo do previsto: pode faltar dinheiro para empenhar todos os itens.

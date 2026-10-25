@@ -3,12 +3,14 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../../services/emendasService';
 
+const naLista = vi.hoisted(() => ({ pedidos: [] as PedidoEmenda[] }));
 vi.mock('../../../hooks/useEmendas', () => ({
   hojeEmBrasilia: () => '2026-10-24',
   useAutoresEmendas: () => ({ data: [] }),
   useAvancarPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useCancelarPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
-  useInformarSolicitacaoDaAta: () => ({ isPending: false, mutateAsync: vi.fn() })
+  useInformarSolicitacaoDaAta: () => ({ isPending: false, mutateAsync: vi.fn() }),
+  usePedidosEmendas: () => ({ data: naLista.pedidos })
 }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined }) }));
 vi.mock('../../../design-system/components/Toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
@@ -39,7 +41,7 @@ const linha = (id: string, itemKey: string, quantidade: number): LinhaPedido => 
 const pedido = (etapa: PedidoEmenda['etapa'], documentos: PedidoEmenda['documentos'] = []): PedidoEmenda => ({
   id: 'p', numero: 1, autorId: 'A1', etapa, origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-09-01',
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null,
-  siopEmenda: '28630004', siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null,
+  siopEmenda: '28630004', siopEmendaAno: null, siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null,
   cgofiEm: null, cgofiDocumentoSei: null, empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null, canceladoMotivo: null,
   versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha('l1', `${A}-00001`, 8), linha('l2', `${B}-00001`, 3)], devolucoes: [], documentos
 });
@@ -96,5 +98,25 @@ describe('janela das etapas: as linhas que a solicitação cobre (migration 180)
     ]);
     const html = renderToStaticMarkup(<EtapaPedidoModal pedido={p} acao="SOLICITACAO_ATA" contexto={{ ataKey: A, numero: '36536429', troca: true }} itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
     expect(html).toContain('hoje na solicitação 35673658');
+  });
+
+  it('conferência: o ano vem à parte, e o código de autor de outro parlamentar acende o aviso', () => {
+    naLista.pedidos = [{ ...pedido('CONTRATACAO'), id: 'outro', autorId: 'B2', siopEmenda: '28630011' }];
+    const html = renderToStaticMarkup(<EtapaPedidoModal pedido={pedido('OFICIO')} acao="CONFERIDO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
+    naLista.pedidos = [];
+    expect(html).toContain('emendas-etapa-emenda-ano');
+    expect(html).toMatch(/<option value="2026" selected/);
+    expect(html).toContain('value="2863 0004"');
+    expect(html).toContain('emendas-etapa-emenda-outro-autor');
+    expect(html).not.toContain('emendas-etapa-emenda-outro-pedido');
+  });
+
+  it('conferência: a mesma emenda em outro pedido do mesmo parlamentar só informa', () => {
+    naLista.pedidos = [{ ...pedido('CONTRATACAO'), id: 'outro', siopEmenda: '28630004', oficioProcessoSei: '08027.000001/2026-01' }];
+    const html = renderToStaticMarkup(<EtapaPedidoModal pedido={pedido('OFICIO')} acao="CONFERIDO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
+    naLista.pedidos = [];
+    expect(html).toContain('emendas-etapa-emenda-outro-pedido');
+    expect(html).toContain('Processo 08027.000001/2026-01');
+    expect(html).not.toContain('emendas-etapa-emenda-outro-autor');
   });
 });
