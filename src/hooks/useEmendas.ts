@@ -25,6 +25,7 @@ import {
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
   informarSolicitacaoDaAta,
+  registrarEnvioCgofi,
   type AcaoPedido,
   type CredorDiferente,
   type BeneficiarioEmenda,
@@ -173,6 +174,11 @@ export function useAvancarPedido() {
 export function useInformarSolicitacaoDaAta() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: informarSolicitacaoDaAta, retry: 0, onSettled: invalidar });
+}
+
+export function useRegistrarEnvioCgofi() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarEnvioCgofi, retry: 0, onSettled: invalidar });
 }
 
 export function useCancelarPedido() {

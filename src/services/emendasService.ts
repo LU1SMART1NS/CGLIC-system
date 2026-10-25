@@ -518,6 +518,10 @@ export interface DocumentoSeiDoPedido {
   assinadaEm: string | null;
   /** Só na solicitação: as linhas do pedido que ela cobre (migration 180). */
   linhas: LinhaDaSolicitacao[];
+  /** Só na solicitação: os envios à CGOFI que a levaram (migration 193), do mais antigo ao mais novo. */
+  enviosCgofi?: Array<{ numero: string; data: string | null }>;
+  /** Só no envio à CGOFI: as solicitações (ids dos documentos) que ele leva (migration 193). */
+  solicitacoes?: string[];
 }
 
 /** Tentativa devolvida: a minuta e o ofício com divergência (migration 174). */
@@ -593,7 +597,7 @@ export interface PedidoEmenda {
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
@@ -602,7 +606,11 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       db().from('emenda_pedido_documentos_sei').select('id, pedido_id, etapa, documento_sei, data_documento, ata_key, assinado_em').order('id').range(de, ate)
     ),
     // Linhas que cada solicitação cobre (migration 180). Antes da migration a tabela não existe: segue sem ela.
-    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_solicitacao_linhas').select('documento_id, linha_id, quantidade').order('linha_id').range(de, ate)).catch(() => [])
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_solicitacao_linhas').select('documento_id, linha_id, quantidade').order('linha_id').range(de, ate)).catch(() => []),
+    // Solicitações que cada envio à CGOFI leva (migration 193). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('emenda_cgofi_solicitacoes').select('cgofi_id, solicitacao_id').order('cgofi_id').order('solicitacao_id').range(de, ate)
+    ).catch(() => [])
   ]);
   const linhasPorDocumento = new Map<string, LinhaDaSolicitacao[]>();
   for (const s of solicitacaoLinhas) {
@@ -610,6 +618,13 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     lista.push({ linhaId: s.linha_id, quantidade: num(s.quantidade) });
     linhasPorDocumento.set(s.documento_id, lista);
   }
+  const solicitacoesPorEnvio = new Map<string, string[]>();
+  const enviosPorSolicitacao = new Map<string, string[]>();
+  for (const x of cgofiSolicitacoes) {
+    solicitacoesPorEnvio.set(x.cgofi_id, [...(solicitacoesPorEnvio.get(x.cgofi_id) ?? []), x.solicitacao_id]);
+    enviosPorSolicitacao.set(x.solicitacao_id, [...(enviosPorSolicitacao.get(x.solicitacao_id) ?? []), x.cgofi_id]);
+  }
+  const documentoPorId = new Map(documentos.map((d) => [d.id as string, d]));
   const documentosPorPedido = new Map<string, DocumentoSeiDoPedido[]>();
   for (const d of documentos) {
     const lista = documentosPorPedido.get(d.pedido_id) ?? [];
@@ -620,7 +635,13 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       data: d.data_documento ?? null,
       ataKey: d.ata_key ?? null,
       assinadaEm: d.assinado_em ? diaEmBrasilia(d.assinado_em) : null,
-      linhas: linhasPorDocumento.get(d.id) ?? []
+      linhas: linhasPorDocumento.get(d.id) ?? [],
+      enviosCgofi: (enviosPorSolicitacao.get(d.id) ?? [])
+        .map((id) => documentoPorId.get(id))
+        .filter((e): e is Record<string, any> => Boolean(e))
+        .map((e) => ({ numero: e.documento_sei as string, data: (e.data_documento as string | null) ?? null }))
+        .sort((a, b) => (a.data ?? '9999').localeCompare(b.data ?? '9999')),
+      solicitacoes: solicitacoesPorEnvio.get(d.id) ?? []
     });
     documentosPorPedido.set(d.pedido_id, lista);
   }
@@ -781,6 +802,17 @@ export async function informarSolicitacaoDaAta(v: {
     p_assinada_em: v.assinadaEm,
     p_substitui: v.substitui ?? null,
     p_linhas: v.linhas ? v.linhas.map((l) => ({ linha_id: l.linhaId, quantidade: l.quantidade ?? null })) : null
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+/** Envio à CGOFI de uma ou mais solicitações assinadas (migration 193); o primeiro leva o pedido a "Enviado à CGOFI". */
+export async function registrarEnvioCgofi(v: { pedidoId: string; documentoSei: string; enviadoEm: string; solicitacoes: string[] }): Promise<void> {
+  const { error } = await db().rpc('registrar_envio_cgofi', {
+    p_id: v.pedidoId,
+    p_documento_sei: v.documentoSei,
+    p_enviado_em: v.enviadoEm,
+    p_solicitacoes: v.solicitacoes
   });
   if (error) throw new Error(mensagemDoBanco(error));
 }

@@ -4,7 +4,7 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta, usePedidosEmendas } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import {
@@ -21,6 +21,7 @@ import {
   ORDEM_ETAPA,
   rodadaDoPedido,
   solicitacaoDaLinha,
+  solicitacoesAssinadasSemEnvio,
   valorDoPedido,
   type AtaDoPedido
 } from '../../utils/emendasPedidos';
@@ -142,7 +143,11 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const avancar = useAvancarPedido();
   const cancelar = useCancelarPedido();
   const informar = useInformarSolicitacaoDaAta();
+  const registrarEnvio = useRegistrarEnvioCgofi();
   const atas = atasDoPedido(pedido, itens);
+  // Envio à CGOFI (migration 193): as solicitações assinadas que ainda não foram, todas marcadas de início.
+  const semEnvio = solicitacoesAssinadasSemEnvio(pedido);
+  const [paraEnviar, setParaEnviar] = useState<Set<string>>(() => new Set(semEnvio.map((d) => d.id)));
   const autorizado = ORDEM_ETAPA[pedido.etapa] >= ORDEM_ETAPA.AUTORIZADO;
   const [ataEscolhida, setAtaEscolhida] = useState(contexto?.ataKey ?? atas.find((a) => a.situacao === 'falta')?.ataKey ?? atas[0]?.ataKey ?? '');
   const [numeroDaAta, setNumeroDaAta] = useState(contexto?.numero ?? '');
@@ -216,7 +221,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const pedeSei = Boolean(ROTULO_SEI[modo]);
   const semBeneficiario = linhas.filter((l) => !l.beneficiarioId).length;
   const todosPontos = PONTOS_SIOP.every(([k]) => pontos[k]);
-  const ocupado = avancar.isPending || cancelar.isPending || informar.isPending;
+  const ocupado = avancar.isPending || cancelar.isPending || informar.isPending || registrarEnvio.isPending;
   const variasAtas = modo === 'SOLICITADO' && atas.length > 1;
   const numerosPorAta = atas
     .map((a) => ({ ata: a, numero: (porAta[a.ataKey] ?? '').replace(/\D/g, '') }))
@@ -244,6 +249,10 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
     pendencias.push(VARIOS.has(modo) ? 'documento SEI (só números, 7 a 10 dígitos; vários: separe por vírgula)' : 'documento SEI (um número, só números, 7 a 10 dígitos)');
   }
   if (modo === 'OFICIO' && !processoSei.trim()) pendencias.push('processo SEI');
+  if (modo === 'CGOFI') {
+    if (semEnvio.length === 0) pendencias.push('uma solicitação assinada e ainda não enviada (informe a assinatura na linha do tempo)');
+    else if (paraEnviar.size === 0) pendencias.push('marcar pelo menos uma solicitação que o despacho leva');
+  }
   if (modo === 'CONFERIDO') {
     if (!emenda.trim()) pendencias.push('número da emenda');
     else if (!emendaLida) pendencias.push('nº da emenda com 8 dígitos (ex.: 4095 0004), ou 12 com o ano na frente');
@@ -258,7 +267,10 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
     setTentou(true);
     if (pendencias.length || ataForaDoPrazo) return;
     try {
-      if (modo === 'SOLICITACAO_ATA') {
+      if (modo === 'CGOFI') {
+        await registrarEnvio.mutateAsync({ pedidoId: pedido.id, documentoSei: numeros[0], enviadoEm: data, solicitacoes: [...paraEnviar] });
+        toast.success(`${nomeDoAutor}: envio à CGOFI registrado (${paraEnviar.size === 1 ? '1 solicitação' : `${paraEnviar.size} solicitações`}).`);
+      } else if (modo === 'SOLICITACAO_ATA') {
         await informar.mutateAsync({
           pedidoId: pedido.id,
           ataKey: ataEscolhida,
@@ -447,6 +459,44 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
             )}
             {ROTULO_DATA[modo] && <AppInput label={ROTULO_DATA[modo]!} type="date" value={data} onChange={(e) => setData(e.target.value)} />}
           </div>
+        )}
+
+        {modo === 'CGOFI' && (
+          <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }} data-testid="emendas-etapa-envio-solicitacoes">
+            <legend style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+              Solicitações que o despacho leva * <span style={{ fontWeight: 500 }}>(o despacho à CGOFI cita as autorizações)</span>
+            </legend>
+            {semEnvio.length === 0 && <div style={aviso('atencao')}>Nenhuma solicitação assinada sem envio. Informe a assinatura da solicitação antes do envio.</div>}
+            {semEnvio.map((d) => {
+              const ata = atas.find((a) => a.ataKey === d.ataKey);
+              const doDocumento = linhasAtivas(pedido).filter((l) => d.linhas.some((x) => x.linhaId === l.id));
+              return (
+                <label key={d.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', fontSize: '0.85rem', padding: '0.45rem 0.6rem', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 6, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={paraEnviar.has(d.id)}
+                    onChange={(e) =>
+                      setParaEnviar((m) => {
+                        const prox = new Set(m);
+                        if (e.target.checked) prox.add(d.id);
+                        else prox.delete(d.id);
+                        return prox;
+                      })
+                    }
+                    style={{ marginTop: 3 }}
+                    data-testid={`emendas-etapa-envio-${d.numero}`}
+                  />
+                  <span style={{ flex: 1 }}>
+                    <b>Ata {ata?.numeroAta ?? d.ataKey?.split('-')[0]}{ata?.fornecedor ? ` · ${ata.fornecedor}` : ''}</b>
+                    {doDocumento.length > 0 && <> · {doDocumento.map(nomeDaLinha).join(', ')}</>}
+                    <br />
+                    <span style={{ color: 'var(--text-muted)' }}>Solicitação {d.numero}{d.assinadaEm ? `, assinada em ${dataBR(d.assinadaEm)}` : ''}</span>
+                  </span>
+                </label>
+              );
+            })}
+            {semEnvio.length > 0 && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Só aparecem as solicitações assinadas que ainda não foram enviadas; as já enviadas ficam nas rodadas do pedido.</div>}
+          </fieldset>
         )}
 
         {modo === 'MINUTA' && (
