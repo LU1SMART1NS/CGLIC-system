@@ -15,6 +15,7 @@ import {
   linhasAtivas,
   notaDaLinha,
   reservadoPorItem,
+  TIPOS_AVISO,
   type AvisoPedido,
   type TipoAviso
 } from './emendasPedidos';
@@ -57,8 +58,6 @@ export interface ResumoInicioEmendas {
   semNomeCurto: ItemCaep[];
 }
 
-const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'empenhoAMais', 'divergencia', 'semOficio', 'ataVencendo', 'semEnvioCgofi', 'credorDiferente', 'notaEmitida', 'empenhoAMenos', 'semAutorizacao', 'semNota'];
-
 /** Item da linha a que o aviso de ata se refere: o que tem a ata mais perto do fim. */
 function itemDoAviso(p: PedidoEmenda, aviso: AvisoPedido | undefined, itens: Map<string, ItemCaep>): ItemCaep | null {
   if (!aviso?.linhaId) return null;
@@ -94,7 +93,7 @@ export function resumoInicioEmendas(
   credor?: Map<string, CredorNoPedido[]>
 ): ResumoInicioEmendas {
   const itens = new Map(itensLista.map((i) => [i.itemKey, i]));
-  const porTipo = Object.fromEntries(TIPOS.map((t) => [t, 0])) as Record<TipoAviso, number>;
+  const porTipo = Object.fromEntries(TIPOS_AVISO.map((t) => [t, 0])) as Record<TipoAviso, number>;
   const porEtapa: Partial<Record<EtapaPedido, number>> = {};
   const pedidosComAviso: PedidoComAviso[] = [];
   let graves = 0;

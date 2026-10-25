@@ -9,13 +9,14 @@ import { HeaderRefreshAction } from '../../design-system/components/HeaderRefres
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
+import { ProgressBar } from '../../design-system/components/ProgressBar';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { hojeEmBrasilia, useItensCaep, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
-import { formatCurrency, formatNumber } from '../../utils/format';
+import { formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, rotuloItemDaAta } from '../../utils/emendasKits';
 import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
@@ -151,8 +152,8 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
         <>
           <div style={carteiraNumero}>{formatNumber(l.reservado)}</div>
           {l.pedidos > 0 && <div style={carteiraDetalhe}>{l.pedidos === 1 ? '1 pedido' : `${l.pedidos} pedidos`}</div>}
-          <div style={{ height: 6, borderRadius: 3, background: '#f1f5f9', marginTop: 4, overflow: 'hidden', minWidth: 80 }} aria-hidden="true">
-            <div style={{ height: '100%', width: `${l.alocado > 0 ? Math.min(100, (l.reservado / l.alocado) * 100) : 0}%`, background: 'var(--primary)' }} />
+          <div style={{ marginTop: 4, minWidth: 80 }} aria-hidden="true">
+            <ProgressBar value={Math.min(l.reservado, l.alocado)} max={l.alocado} showPercent={false} height="4px" colorScheme="primary" testId={`emendas-itens-barra-${l.itemKey}`} />
           </div>
         </>
       )
@@ -174,7 +175,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
       <PageHeader
         title="Itens e kits"
         subtitle="Quanto de cada item alocado à CAEP já foi reservado a parlamentares."
-        hint="Reservado soma os pedidos que não foram cancelados, em qualquer etapa, com os kits abertos nos seus itens. Saldo = alocado à CAEP − reservado. O valor unitário é o previsto para a emenda, com o reajuste da ata (o mesmo do quadro do parlamentar); embaixo, o preço de hoje. Para ter mais de um item, peça a alocação ao gestor de saldo. Clique na linha para abrir o item na aba Emendas: quem reservou, em que fase está cada pedido e em quais kits o item entra."
+        hint="Saldo = alocado à CAEP − reservado nos pedidos não cancelados (kits abertos nos itens). O valor é o previsto para a emenda, com o reajuste da ata (o mesmo do quadro do parlamentar); o reservado soma pelo preço previsto e o alocado pelo preço de hoje."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={seletor}
         actions={<HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />}
@@ -185,7 +186,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
         ariaLabel="Saldo dos itens"
         active={segmento}
         onSelect={setSegmento}
-        meta={valorAlocado > 0 ? `${formatCurrency(valorReservado)} reservados pelo preço previsto · ${formatCurrency(valorAlocado)} alocados pelo preço de hoje (atas vigentes)` : undefined}
+        meta={valorAlocado > 0 ? `${formatCurrencyCompact(valorReservado)} reservados · ${formatCurrencyCompact(valorAlocado)} alocados` : undefined}
         segments={[
           { id: 'com', label: 'Com saldo', count: contagem.com, dot: 'var(--color-success)' },
           { id: 'sem', label: 'Sem saldo', count: contagem.sem, dot: 'var(--color-warning-solid)' },

@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SummaryBar } from '../../design-system/components/SummaryBar';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { EmptyState } from '../../design-system/components/EmptyState';
+import { ErrorState } from '../../design-system/components/ErrorState';
 import { InstrumentSection } from '../instrument360/InstrumentSection';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
@@ -53,6 +54,15 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
   const item = itens.find((i) => i.itemKey === itemKey);
   const autorPorId = useMemo(() => new Map(autores.map((a) => [a.id, a])), [autores]);
   const beneficiarioPorId = useMemo(() => new Map(beneficiarios.map((b) => [b.id, b])), [beneficiarios]);
+  // Beneficiário ainda não carregado (ou cadastro juntado a outro): sem o "!" que derrubava a tela inteira.
+  const nomeDoBeneficiario = useCallback(
+    (id: string | null): string | null => {
+      if (!id) return null;
+      const b = beneficiarioPorId.get(id);
+      return b ? rotuloBeneficiario(b) : '…';
+    },
+    [beneficiarioPorId]
+  );
 
   const usos: UsoDoItem[] = useMemo(() => {
     const lista: UsoDoItem[] = [];
@@ -82,10 +92,10 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
     if (!termo) return doSegmento;
     return doSegmento.filter((u) => {
       const a = u.pedido.autorId ? autorPorId.get(u.pedido.autorId) : undefined;
-      const ben = u.linhas.map((x) => (x.linha.beneficiarioId ? rotuloBeneficiario(beneficiarioPorId.get(x.linha.beneficiarioId)!) : '')).join(' ');
+      const ben = u.linhas.map((x) => nomeDoBeneficiario(x.linha.beneficiarioId) ?? '').join(' ');
       return semAcento(`${a?.nome ?? 'Parlamentar a definir'} ${a?.uf ?? ''} ${u.pedido.oficioProcessoSei ?? ''} ${u.pedido.siopEmenda ?? ''} ${ben}`).includes(termo);
     });
-  }, [doSegmento, busca, autorPorId, beneficiarioPorId]);
+  }, [doSegmento, busca, autorPorId, nomeDoBeneficiario]);
   const unidadesDoSegmento = doSegmento.reduce((s, u) => s + u.quantidade, 0);
   const kitsDoItem = kits.filter((k) => k.ativo && k.itens.some((i) => i.itemKey === itemKey));
 
@@ -121,7 +131,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
       key: 'beneficiarios',
       header: 'Beneficiários',
       render: (u) => {
-        const nomes = [...new Set(u.linhas.map((x) => (x.linha.beneficiarioId ? rotuloBeneficiario(beneficiarioPorId.get(x.linha.beneficiarioId)!) : null)))];
+        const nomes = [...new Set(u.linhas.map((x) => nomeDoBeneficiario(x.linha.beneficiarioId)))];
         const informados = nomes.filter((n): n is string => Boolean(n));
         if (!informados.length) return <StatusBadge label="A informar" variant="warning" size="sm" dot={false} />;
         return (
@@ -174,7 +184,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
     <InstrumentSection id="item-emendas-section" title="Emendas parlamentares" subtitle="Quanto do alocado à CAEP já está reservado a parlamentares e em que situação está cada pedido." icon={ClipboardList}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} data-testid="item360-emendas">
         {isError ? (
-          <div style={{ color: 'var(--color-danger-text)', fontSize: '0.85rem' }}>Não foi possível carregar as emendas: {(error as Error | null)?.message || 'falha ao consultar os itens da CAEP.'}</div>
+          <ErrorState title="Não foi possível carregar as emendas" message={(error as Error | null)?.message || 'Falha ao consultar os itens da CAEP.'} testId="item360-emendas-erro" />
         ) : (
           <SummaryBar
             testId="item360-emendas-resumo"
@@ -222,7 +232,6 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
             rowOpen={(u) => () => navigate(`/emendas/pedidos?pedido=${u.pedido.id}&item=${encodeURIComponent(itemKey)}`)}
           />
         )}
-        <div style={carteiraSubtitle}>Clique na linha para abrir o pedido em Emendas › Pedidos, já aberto, onde ficam os botões de etapa.</div>
         {kitsDoItem.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }} data-testid="item360-emendas-kits">
             <span style={carteiraSubtitle}>Entra nos kits:</span>

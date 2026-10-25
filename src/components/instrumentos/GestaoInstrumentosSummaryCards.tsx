@@ -2,6 +2,7 @@ import React from 'react';
 import { Package, FileText, Coins, AlertTriangle } from 'lucide-react';
 import { SALDO_RULES, VIGENCIA_RULES } from '../../config/alertRules';
 import { formatCurrency } from '../../utils/format';
+import { PainelCartao, PainelCartoes, type PainelCartaoLinha } from './PainelCartao';
 
 export interface GestaoInstrumentosCounts {
   // Card 1 — ARP
@@ -33,34 +34,15 @@ interface GestaoInstrumentosSummaryCardsProps {
   saldosOnly?: boolean;
 }
 
-
 function formatPercent(part: number, total: number): string {
   if (!total) return '0,0%';
   return `${((part / total) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
-const cardBaseStyle: React.CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid #e2e8f0',
-  borderRadius: '10px',
-  padding: '1.1rem 1.25rem',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.6rem',
-  cursor: 'pointer',
-  textAlign: 'left',
-  transition: 'all 0.15s ease-in-out',
-  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
-};
+/** Valor em vermelho/âmbar só quando há o que olhar. */
+const seHouver = (n: number, tom: 'danger' | 'warning'): PainelCartaoLinha['tom'] => (n > 0 ? tom : undefined);
 
-const rowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  fontSize: '0.78rem',
-  color: '#64748b'
-};
-
+/** Os quatro cartões do Início (Atas, Contratos, Valor, Alertas), cada um com a peça comum PainelCartao. */
 export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryCardsProps> = ({
   counts,
   activeCard,
@@ -70,146 +52,72 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
   const saldoDisponivel = counts.valorVigenteTotal - counts.totalEmpenhado;
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))',
-        gap: '0.9rem'
-      }}
-    >
-      {/* Card 1 — Atas de Registro de Preço (ARP) */}
-      <button
-        type="button"
+    <PainelCartoes>
+      <PainelCartao
+        rotulo="Atas de Registro de Preço (ARP)"
+        icone={<Package size={16} />}
+        tom="primary"
+        valor={counts.totalAtas}
+        unidade="geridas"
+        ativo={activeCard === 'ARP'}
         onClick={() => onSelectCard('ARP')}
-        data-testid="instrumentos-card-arp"
-        style={{
-          ...cardBaseStyle,
-          border: activeCard === 'ARP' ? '2px solid var(--primary)' : cardBaseStyle.border
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-            Atas de Registro de Preço (ARP)
-          </span>
-          <div style={{ background: 'var(--color-info-bg)', color: 'var(--primary)', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
-            <Package size={16} />
-          </div>
-        </div>
-        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em' }}>
-          {counts.totalAtas} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>geridas</span>
-        </div>
-        <div style={rowStyle}>
-          <span>Saldo crítico ({'>'}{SALDO_RULES.criticoAcimaDePct}%)</span>
-          <strong style={{ color: counts.itensCriticosArp > 0 ? 'var(--color-danger)' : '#0f172a' }}>{counts.itensCriticosArp}</strong>
-        </div>
-        <div style={rowStyle}>
-          <span>Saldo em atenção ({SALDO_RULES.atencaoAcimaDePct}–{SALDO_RULES.criticoAcimaDePct}%)</span>
-          <strong style={{ color: counts.itensProximosLimiteArp > 0 ? 'var(--color-warning)' : '#0f172a' }}>{counts.itensProximosLimiteArp}</strong>
-        </div>
-      </button>
+        testId="instrumentos-card-arp"
+        linhas={[
+          { rotulo: `Saldo crítico (>${SALDO_RULES.criticoAcimaDePct}%)`, valor: counts.itensCriticosArp, tom: seHouver(counts.itensCriticosArp, 'danger') },
+          { rotulo: `Saldo em atenção (${SALDO_RULES.atencaoAcimaDePct}–${SALDO_RULES.criticoAcimaDePct}%)`, valor: counts.itensProximosLimiteArp, tom: seHouver(counts.itensProximosLimiteArp, 'warning') }
+        ]}
+      />
 
-      {!saldosOnly && (<>
-      {/* Card 2 — Contratos Vigentes */}
-      <button
-        type="button"
-        onClick={() => onSelectCard('CONTRATOS')}
-        data-testid="instrumentos-card-contratos"
-        style={{
-          ...cardBaseStyle,
-          border: activeCard === 'CONTRATOS' ? '2px solid var(--primary)' : cardBaseStyle.border
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-            Contratos Vigentes
-          </span>
-          <div style={{ background: '#ecfdf5', color: 'var(--color-success)', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
-            <FileText size={16} />
-          </div>
-        </div>
-        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--color-success)', letterSpacing: '-0.02em' }}>
-          {counts.contratosAtivos} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>ativos</span>
-        </div>
-        <div style={rowStyle}>
-          <span>Em atenção ({VIGENCIA_RULES.faixaCriticoAteDias + 1}–{VIGENCIA_RULES.faixaAtencaoAteDias} dias)</span>
-          <strong style={{ color: counts.contratosEmAtencao60a90d > 0 ? 'var(--color-warning)' : '#0f172a' }}>{counts.contratosEmAtencao60a90d}</strong>
-        </div>
-        <div style={rowStyle}>
-          <span>Em prorrogação</span>
-          <strong>{counts.contratosEmProrrogacao}</strong>
-        </div>
-        <div style={rowStyle}>
-          <span>A vencer (≤{VIGENCIA_RULES.faixaCriticoAteDias} dias)</span>
-          <strong style={{ color: counts.contratosAVencer30d > 0 ? 'var(--color-danger)' : '#0f172a' }}>{counts.contratosAVencer30d}</strong>
-        </div>
-      </button>
+      {!saldosOnly && (
+        <>
+          <PainelCartao
+            rotulo="Contratos Vigentes"
+            icone={<FileText size={16} />}
+            tom="success"
+            valor={counts.contratosAtivos}
+            unidade="ativos"
+            ativo={activeCard === 'CONTRATOS'}
+            onClick={() => onSelectCard('CONTRATOS')}
+            testId="instrumentos-card-contratos"
+            linhas={[
+              { rotulo: `Em atenção (${VIGENCIA_RULES.faixaCriticoAteDias + 1}–${VIGENCIA_RULES.faixaAtencaoAteDias} dias)`, valor: counts.contratosEmAtencao60a90d, tom: seHouver(counts.contratosEmAtencao60a90d, 'warning') },
+              { rotulo: 'Em prorrogação', valor: counts.contratosEmProrrogacao },
+              { rotulo: `A vencer (≤${VIGENCIA_RULES.faixaCriticoAteDias} dias)`, valor: counts.contratosAVencer30d, tom: seHouver(counts.contratosAVencer30d, 'danger') }
+            ]}
+          />
 
-      {/* Card 3 — Valor Total Global */}
-      <button
-        type="button"
-        onClick={() => onSelectCard('VALOR')}
-        data-testid="instrumentos-card-valor"
-        style={{
-          ...cardBaseStyle,
-          border: activeCard === 'VALOR' ? '2px solid var(--primary)' : cardBaseStyle.border
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-            Valor Total Global
-          </span>
-          <div style={{ background: '#fef9c3', color: '#a16207', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
-            <Coins size={16} />
-          </div>
-        </div>
-        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#a16207', letterSpacing: '-0.02em' }}>
-          {formatCurrency(counts.valorVigenteTotal)}
-        </div>
-        <div style={rowStyle}>
-          <span>Empenho realizado</span>
-          <strong>{formatCurrency(counts.totalEmpenhado)} ({formatPercent(counts.totalEmpenhado, counts.valorVigenteTotal)})</strong>
-        </div>
-        <div style={rowStyle}>
-          <span>Saldo disponível</span>
-          <strong>{formatCurrency(saldoDisponivel)} ({formatPercent(saldoDisponivel, counts.valorVigenteTotal)})</strong>
-        </div>
-      </button>
-      </>)}
+          <PainelCartao
+            rotulo="Valor Total Global"
+            icone={<Coins size={16} />}
+            tom="amber"
+            valor={<span style={{ fontSize: '1.35rem' }}>{formatCurrency(counts.valorVigenteTotal)}</span>}
+            ativo={activeCard === 'VALOR'}
+            onClick={() => onSelectCard('VALOR')}
+            testId="instrumentos-card-valor"
+            linhas={[
+              { rotulo: 'Empenho realizado', valor: `${formatCurrency(counts.totalEmpenhado)} (${formatPercent(counts.totalEmpenhado, counts.valorVigenteTotal)})` },
+              { rotulo: 'Saldo disponível', valor: `${formatCurrency(saldoDisponivel)} (${formatPercent(saldoDisponivel, counts.valorVigenteTotal)})` }
+            ]}
+          />
+        </>
+      )}
 
-      {/* Card 4 — Alertas Críticos (para o Gestor de Saldo: só os avisos de saldo das Atas) */}
-      <button
-        type="button"
+      {/* Para o Gestor de Saldo: só os avisos de saldo das Atas. */}
+      <PainelCartao
+        rotulo={saldosOnly ? 'Alertas de Saldo' : 'Alertas Críticos'}
+        icone={<AlertTriangle size={16} />}
+        tom="danger"
+        valor={counts.criticalCount}
+        unidade={saldosOnly ? 'itens esgotados' : 'itens críticos'}
+        ativo={activeCard === 'ALERTAS'}
         onClick={() => onSelectCard('ALERTAS')}
-        data-testid="instrumentos-card-alertas"
-        style={{
-          ...cardBaseStyle,
-          border: activeCard === 'ALERTAS' ? '2px solid var(--color-danger)' : cardBaseStyle.border
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-            {saldosOnly ? 'Alertas de Saldo' : 'Alertas Críticos'}
-          </span>
-          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
-            <AlertTriangle size={16} />
-          </div>
-        </div>
-        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--color-danger)', letterSpacing: '-0.02em' }}>
-          {counts.criticalCount} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>{saldosOnly ? 'itens esgotados' : 'itens críticos'}</span>
-        </div>
-        <div style={rowStyle}>
-          <span>{saldosOnly ? 'Pendências de saldo' : 'Pendências totais'}</span>
-          <strong>{counts.totalAlertasAtivos}</strong>
-        </div>
-        <div style={rowStyle}>
-          <span>{saldosOnly ? `Urgentes (acima de ${SALDO_RULES.criticoAcimaDePct}%)` : 'Urgentes'}</span>
-          <strong style={{ color: counts.urgenteCount > 0 ? 'var(--color-warning)' : '#0f172a' }}>{counts.urgenteCount}</strong>
-        </div>
-        <div style={rowStyle}>
-          <span>{saldosOnly ? `Em atenção (${SALDO_RULES.atencaoAcimaDePct}–${SALDO_RULES.criticoAcimaDePct}%)` : 'Em atenção'}</span>
-          <strong>{counts.atencaoCount}</strong>
-        </div>
-      </button>
-    </div>
+        testId="instrumentos-card-alertas"
+        linhas={[
+          { rotulo: saldosOnly ? 'Pendências de saldo' : 'Pendências totais', valor: counts.totalAlertasAtivos },
+          { rotulo: saldosOnly ? `Urgentes (acima de ${SALDO_RULES.criticoAcimaDePct}%)` : 'Urgentes', valor: counts.urgenteCount, tom: seHouver(counts.urgenteCount, 'warning') },
+          { rotulo: saldosOnly ? `Em atenção (${SALDO_RULES.atencaoAcimaDePct}–${SALDO_RULES.criticoAcimaDePct}%)` : 'Em atenção', valor: counts.atencaoCount }
+        ]}
+      />
+    </PainelCartoes>
   );
 };

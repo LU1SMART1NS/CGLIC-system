@@ -81,7 +81,8 @@ export const navigationConfig: NavItem[] = [
     children: [
       {
         id: 'gestao-instrumentos',
-        label: 'Painel',
+        // "Atas e Contratos" (pedido do usuário em 25/10/2026): a aba ao lado é "Emendas", então esta diz o assunto dela.
+        label: 'Atas e Contratos',
         icon: LayoutDashboard,
         route: '/instrumentos',
         status: 'active',

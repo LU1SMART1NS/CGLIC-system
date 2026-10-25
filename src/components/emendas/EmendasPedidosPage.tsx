@@ -10,6 +10,7 @@ import { StatusBadge, type StatusBadgeVariant } from '../../design-system/compon
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ProgressBar } from '../../design-system/components/ProgressBar';
+import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
@@ -63,6 +64,8 @@ import {
   ultimoContatoPorAutor,
   valorDoPedidoNaEtapa,
   execucaoDoPedido,
+  ROTULO_AVISO,
+  TIPOS_AVISO,
   type AvisoPedido
 } from '../../utils/emendasPedidos';
 import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ConferenciaEmpenho, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
@@ -456,9 +459,9 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
         {p.avisos
           .filter((a) => a.tipo === 'semOficio' || a.tipo === 'divergencia')
           .map((a) => (
-            <div key={a.tipo} style={{ fontSize: '0.8rem', fontWeight: 600, borderRadius: 6, padding: '0.5rem 0.7rem', color: avisoGrave(a) ? 'var(--color-danger-text)' : 'var(--color-warning-text)', background: avisoGrave(a) ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)' }}>
+            <NoticeBar key={a.tipo} tone={avisoGrave(a) ? 'danger' : 'warning'} testId={`emendas-pedido-aviso-faixa-${a.tipo}`}>
               {a.texto}
-            </div>
+            </NoticeBar>
           ))}
         {jaEmpenhado(p.etapa) && <EmpenhoDoPedido pedidoId={p.id} conferencia={conferencia} itens={itens} podeGerir={podeGerir} />}
         <CredorDoPedido pedidoId={p.id} grupos={credor} itens={itens} podeGerir={podeGerir} />
@@ -484,9 +487,9 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
         )}
         {jaEmpenhado(p.etapa) && <ExecucaoDoPedidoResumo execucao={execucaoDoPedido(p, notas)} />}
         {semAutor && (
-          <div style={{ fontSize: '0.8rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: 6, padding: '0.5rem 0.7rem', fontWeight: 600 }}>
+          <NoticeBar tone="warning" testId={`emendas-pedido-sem-autor-${p.id}`}>
             Reserva feita a pedido do órgão, ainda sem parlamentar. Quando um parlamentar ou bancada assumir, use "Indicar o parlamentar" para seguir com a minuta.
-          </div>
+          </NoticeBar>
         )}
         {p.observacao && <div style={carteiraSubtitle}>Observação: {p.observacao}</div>}
       </div>
@@ -726,7 +729,7 @@ export const EmendasPedidosPage: React.FC = () => {
       <PageHeader
         title="Pedidos"
         subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na fase escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
-        hint={`A reserva já ocupa o saldo da CAEP: o total reservado de um item nunca passa do alocado à CAEP, e a alocação da CAEP não pode baixar para menos do que está reservado. Etapas em três fases: Interlocução (itens reservados → minuta enviada ao parlamentar → ofício recebido), Empenho (emenda conferida no SIOP → empenho solicitado → empenho autorizado → processo enviado à CGOFI → nota de empenho emitida) e Contratação (processo enviado à CCGA → contratado, quando o contrato de cada nota aparece no Contratos.gov.br). Prazo: o contrato precisa ser assinado antes do fim da ata; a ${avisoIndicacaoDias()} dias do fim o pedido avisa, e a menos de ${corteIndicacaoDias()} dias o sistema não aceita nova reserva nem ofício com itens da ata (os dois prazos ficam em Ajustes > Regras de Alertas). A CAEP também reserva a pedido de um órgão (o beneficiário final) antes de haver parlamentar: a reserva fica com "Parlamentar a definir" e só segue para a minuta quando o parlamentar for indicado. Avisos: mais de 30 dias sem ofício (ou sem parlamentar), divergência com o SIOP, ata vencendo, ata que passou do prazo de indicação ou vencida antes do empenho e linhas a conferir com o controle anterior da CAEP. Pedidos trazidos do controle anterior da CAEP (antes do sistema) trazem o documento SEI do empenho (a nota é achada pelo contrato) e o contrato. Cancelar devolve o saldo. Ver por autor soma os pedidos da fase escolhida pelo preço das atas e o clique no autor abre os pedidos dele; Já empenhado (só em Todos) = pedidos que chegaram ao empenho.`}
+        hint={`A reserva já ocupa o saldo da CAEP e cancelar devolve o saldo. O contrato precisa ser assinado antes do fim da ata: a ${avisoIndicacaoDias()} dias do fim o pedido avisa e a menos de ${corteIndicacaoDias()} dias não entra reserva nem ofício com itens da ata (prazos em Ajustes › Regras de Alertas).`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={
           <CarteiraSegmentTabs<'pedido' | 'autor'>
@@ -845,19 +848,9 @@ export const EmendasPedidosPage: React.FC = () => {
               emptyValue=""
               options={[
                 { value: 'com', label: 'Com algum aviso', count: contaAviso('com') },
-                { value: 'grave', label: 'Pedem ação já (avisos vermelhos)', count: contaAviso('grave') },
-                { value: 'semOficio', label: 'Mais de 30 dias sem ofício ou parlamentar', count: contaAviso('semOficio') },
-                { value: 'divergencia', label: 'Ofício devolvido (nova minuta)', count: contaAviso('divergencia') },
-                { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
-                { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
-                { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
-                { value: 'semAutorizacao', label: 'Ata sem autorização de empenho', count: contaAviso('semAutorizacao') },
-                { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') },
-                { value: 'empenhoAMais', label: 'Empenhado a mais que o pedido', count: contaAviso('empenhoAMais') },
-                { value: 'empenhoAMenos', label: 'Empenhado a menos que o pedido', count: contaAviso('empenhoAMenos') },
-                { value: 'semEnvioCgofi', label: 'Solicitação assinada sem envio à CGOFI', count: contaAviso('semEnvioCgofi') },
-                { value: 'notaEmitida', label: 'Nota emitida, empenho a registrar', count: contaAviso('notaEmitida') },
-                { value: 'credorDiferente', label: 'Nota de outro fornecedor', count: contaAviso('credorDiferente') }
+                { value: 'grave', label: 'Urgentes (avisos vermelhos)', count: contaAviso('grave') },
+                // Um nome por aviso em todas as telas (ROTULO_AVISO), do mais grave ao mais leve.
+                ...TIPOS_AVISO.map((t) => ({ value: t, label: ROTULO_AVISO[t], count: contaAviso(t) }))
               ]}
               onChange={setFiltroAviso}
               testId="emendas-pedidos-filtro-aviso"

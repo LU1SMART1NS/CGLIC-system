@@ -23,10 +23,10 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
 
-    it('Início tem as abas Painel (/instrumentos), Painel das emendas (/emendas/inicio) e Distribuição (/atas/distribuicao)', () => {
+    it('Início tem as abas Atas e Contratos (/instrumentos), Painel das emendas (/emendas/inicio) e Distribuição (/atas/distribuicao)', () => {
       const area = navigationConfig.find((i) => i.id === 'visao-geral')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
-        ['Painel', '/instrumentos'],
+        ['Atas e Contratos', '/instrumentos'],
         ['Painel', '/emendas/inicio'],
         ['Emendas', '/emendas/inicio'],
         ['Distribuição', '/atas/distribuicao']
@@ -115,7 +115,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
     it('o gestor vê o Início com uma aba só (sem Distribuição)', () => {
       const gestor = filterNavigationByRole(navigationConfig, 'gestor');
-      expect(findAreaForTabs(gestor, '/instrumentos')?.children?.map((c) => c.label)).toEqual(['Painel']);
+      expect(findAreaForTabs(gestor, '/instrumentos')?.children?.map((c) => c.label)).toEqual(['Atas e Contratos']);
     });
   });
 
@@ -339,7 +339,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(findAreaForTabs(visible, '/emendas/beneficiarios')?.id).toBe('configuracoes');
     });
 
-    it('ao entrar, o gestor de emendas vai ao Início dele e os demais ao Painel', () => {
+    it('ao entrar, o gestor de emendas vai ao Início dele e os demais a Atas e Contratos', () => {
       expect(rotaInicialDoPerfil('gestor_emendas')).toBe('/emendas/inicio');
       for (const role of ['admin', 'gestor', 'gestor_saldos', 'leitor', null] as const) expect(rotaInicialDoPerfil(role)).toBe('/instrumentos');
     });
@@ -347,7 +347,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('o resumo das emendas aparece no Início do gestor de emendas (Painel) e do coordenador (Emendas), e de mais ninguém', () => {
       const inicioDoCoordenador = filterNavigationByRole(navigationConfig, 'admin').find((i) => i.id === 'visao-geral');
       expect(inicioDoCoordenador?.children?.map((c) => [c.label, c.route])).toEqual([
-        ['Painel', '/instrumentos'],
+        ['Atas e Contratos', '/instrumentos'],
         ['Emendas', '/emendas/inicio'],
         ['Distribuição', '/atas/distribuicao']
       ]);

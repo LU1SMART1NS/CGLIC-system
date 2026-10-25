@@ -6,7 +6,8 @@ import { StatusBadge, type StatusBadgeVariant } from '../../design-system/compon
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
-import { carteiraDetalhe, carteiraNumero, carteiraSubtitle } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraNumero } from '../carteira/carteiraStyles';
+import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
 import { buildAtaPath } from '../../hooks/useAta';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, dataBR, diasEntre } from '../../utils/emendasKits';
@@ -173,10 +174,9 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }} data-testid={`emendas-pedido-atas-${p.id}`}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <span style={carteiraSubtitle}>
+        <CarteiraDetailLabel>
           {grupos.length === 1 ? 'Itens do pedido' : `Itens por ata · ${grupos.length} ${grupos.some((g) => g.chave === 'KITS') ? 'grupos' : 'atas'}`}
-          {depoisDaSolicitacao && ' · a solicitação e a autorização de empenho são uma por ata'}
-        </span>
+        </CarteiraDetailLabel>
         {grupos.length > 1 && (
           <span style={{ ...carteiraDetalhe, display: 'inline-flex', gap: '0.4rem' }}>
             <AppButton size="xs" variant="link" onClick={() => todos(true)} data-testid={`emendas-pedido-abrir-atas-${p.id}`}>
@@ -300,7 +300,7 @@ export const OQueFalta: React.FC<{ p: PedidoEmenda; tarefas: TarefaDoPedido[]; o
     }
     if (b.tipo === 'solicitacao') {
       return (
-        <AppButton size="sm" variant="secondary" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: b.ataKey, numero: b.numero, troca: b.troca })} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
+        <AppButton size="sm" variant="outline" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: b.ataKey, numero: b.numero, troca: b.troca })} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
           {b.rotulo}
         </AppButton>
       );
@@ -317,7 +317,7 @@ export const OQueFalta: React.FC<{ p: PedidoEmenda; tarefas: TarefaDoPedido[]; o
   return (
     <div className="emendas-falta" data-testid={`emendas-pedido-falta-${p.id}`}>
       <div className="emendas-falta__topo">
-        <span className="emendas-fase__nome">O que falta</span>
+        <CarteiraDetailLabel>O que falta</CarteiraDetailLabel>
         <span style={carteiraDetalhe}>
           {tarefas.length} {tarefas.length === 1 ? 'tarefa' : 'tarefas'}
         </span>
@@ -405,12 +405,9 @@ export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, Not
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} data-testid={`emendas-pedido-rodadas-${p.id}`}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontWeight: 700, color: 'var(--color-primary, #0c326f)' }}>Rodadas de empenho</div>
-          <div style={carteiraDetalhe}>Cada envio à CGOFI leva uma ou mais solicitações assinadas.</div>
-        </div>
+        <CarteiraDetailLabel>Rodadas de empenho</CarteiraDetailLabel>
         {podeEnviar && (
-          <AppButton size="sm" variant="secondary" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-registrar-envio-${p.id}`}>
+          <AppButton size="sm" variant="outline" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-registrar-envio-${p.id}`}>
             Registrar envio à CGOFI
           </AppButton>
         )}

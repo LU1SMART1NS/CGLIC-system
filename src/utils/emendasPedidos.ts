@@ -261,6 +261,25 @@ export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
   semNota: 11
 };
 
+/** Os tipos de aviso do mais grave ao mais leve (ordem de GRAVIDADE_DO_AVISO): trilhos, filtros e cartões percorrem esta lista. */
+export const TIPOS_AVISO: readonly TipoAviso[] = (Object.keys(GRAVIDADE_DO_AVISO) as TipoAviso[]).sort((a, b) => GRAVIDADE_DO_AVISO[a] - GRAVIDADE_DO_AVISO[b]);
+
+/** Nome de cada aviso, o mesmo em todas as telas (filtro de Pedidos, cartões e filtro do Início). */
+export const ROTULO_AVISO: Record<TipoAviso, string> = {
+  ataVencida: 'Ata encerrada',
+  ataNoCorte: 'Prazo de indicação vencido',
+  empenhoAMais: 'Empenhado a mais',
+  divergencia: 'Ofício devolvido',
+  semOficio: `Sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias`,
+  ataVencendo: 'Ata vence em breve',
+  semEnvioCgofi: 'Sem envio à CGOFI',
+  credorDiferente: 'Nota de outro fornecedor',
+  notaEmitida: 'Nota emitida, empenho a registrar',
+  empenhoAMenos: 'Empenhado a menos',
+  semAutorizacao: 'Ata sem autorização de empenho',
+  semNota: 'Sem nota de empenho'
+};
+
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
 export const avisoGrave = (a: Pick<AvisoPedido, 'tipo'>) => GRAVIDADE_DO_AVISO[a.tipo] <= GRAVIDADE_DO_AVISO.semOficio;
 
@@ -899,7 +918,11 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
   const linhas = linhasAtivas(p);
   const situacoes = new Map(linhas.map((l) => [l.id, situacaoDaLinha(p, l, notas)]));
   const das = (s: SituacaoLinha) => linhas.filter((l) => situacoes.get(l.id)!.situacao === s);
-  const nomes = (ls: LinhaPedido[]) => ls.map((l) => nomeDaLinha(l, itens)).join(', ');
+  // Até três nomes e "e mais N": a tarefa é uma frase, não a lista inteira (as linhas estão nos blocos por ata).
+  const nomes = (ls: LinhaPedido[]) => {
+    const n = ls.map((l) => nomeDaLinha(l, itens));
+    return n.length <= 3 ? n.join(', ') : `${n.slice(0, 3).join(', ')} e mais ${n.length - 3}`;
+  };
   const semAutor = !p.autorId;
   const depoisDaSolicitacao = ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.SOLICITADO;
   const autorizado = ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.AUTORIZADO;

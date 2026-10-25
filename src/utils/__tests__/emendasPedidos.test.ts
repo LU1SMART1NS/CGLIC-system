@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, atasSemAutorizacao, avisosDoPedido, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -436,5 +436,16 @@ describe('nº da emenda (migration 186)', () => {
     const r = conferirNumeroDaEmenda(meu, '40950004', 2026, lista);
     expect(r.outroAutor.map((x) => x.id)).toEqual(['p2']);
     expect(r.mesmaEmenda.map((x) => x.id)).toEqual(['p3']);
+  });
+});
+
+describe('ROTULO_AVISO — um nome por aviso em todas as telas', () => {
+  it('todo tipo de aviso tem rótulo curto e a lista vai do mais grave ao mais leve', () => {
+    for (const t of TIPOS_AVISO) {
+      expect(ROTULO_AVISO[t]).toBeTruthy();
+      expect(ROTULO_AVISO[t].split(' ').length).toBeLessThanOrEqual(7);
+    }
+    expect([...TIPOS_AVISO]).toEqual([...TIPOS_AVISO].sort((a, b) => GRAVIDADE_DO_AVISO[a] - GRAVIDADE_DO_AVISO[b]));
+    expect(TIPOS_AVISO[0]).toBe('ataVencida');
   });
 });
