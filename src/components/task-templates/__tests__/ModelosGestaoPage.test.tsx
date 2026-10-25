@@ -7,6 +7,7 @@ import { ModelosGestaoPage, parseModelosGestaoTipo } from '../ModelosGestaoPage'
 const empty = { data: [], isLoading: false, error: null };
 const mutation = { mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null };
 
+vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }));
 vi.mock('../../../hooks/useAtaTaskTemplates', () => ({ useAtaTaskTemplates: () => empty }));
 vi.mock('../../../hooks/useContractTaskTemplates', () => ({ useContractTaskTemplates: () => empty }));
 vi.mock('../../../hooks/useSaveAtaTaskTemplate', () => ({ useSaveAtaTaskTemplate: () => mutation }));

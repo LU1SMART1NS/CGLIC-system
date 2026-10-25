@@ -76,7 +76,7 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
       { label: 'Execução financeira', description: 'Gestão de pagamentos e empenhos dos contratos do escopo; não exclui ciclos de pagamento' },
       { label: 'Emendas', description: 'Consulta, na aba Emendas do item: o que a CAEP reservou a cada parlamentar' },
       { label: 'Unidades internas e grupos das UASGs', description: 'Consulta' },
-      { label: 'Modelos de gestão', description: 'Gestão' }
+      { label: 'Modelos de gestão', description: 'Consulta; aplica os modelos no plano das atas e contratos do escopo' }
     ],
     scope: 'Atas atribuídas (com os contratos vinculados) e contratos avulsos atribuídos individualmente'
   },
