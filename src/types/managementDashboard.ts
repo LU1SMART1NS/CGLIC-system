@@ -53,6 +53,10 @@ export type DashboardAttentionCategory =
   /** Expectativa de pagamento: previsão mensal a enviar, nota mensal que não chegou, entrega prevista sem nota. */
   | 'PAGAMENTO_PREVISTO'
   | 'REAJUSTE_RADAR'
+  /** Reajuste dos preços registrados de uma ata da SENASP (migrations 158 e 159): percentual a informar, reajuste
+   *  devido, preço da ata sem o reajuste publicado, Termo de Conformidade a informar ou reajuste próximo. Pendência do
+   *  gestor da ata e do coordenador, na aba Reajustes. */
+  | 'REAJUSTE_ATA'
   | 'ATA_CRITICA'
   /** Contratado do item ainda sem unidade interna, ou divisão entre unidades a conferir (migration 103). */
   | 'UNIDADE_PENDENTE'
@@ -262,6 +266,17 @@ export interface ManagementDashboardAvailableFilters {
 }
 
 /**
+ * Fonte do painel que falhou nesta leitura (ex.: consulta estourando o tempo limite).
+ * DESATUALIZADA: o painel usou a última leitura boa da fonte. NAO_CARREGOU: não havia
+ * leitura anterior, então as contagens que dependem dela podem estar incompletas.
+ */
+export interface FonteComFalha {
+  rotulo: string;
+  situacao: 'DESATUALIZADA' | 'NAO_CARREGOU';
+  mensagem: string;
+}
+
+/**
  * Read Model Unificado do Dashboard Gerencial
  */
 export interface ManagementDashboardReadModel {
@@ -276,4 +291,6 @@ export interface ManagementDashboardReadModel {
   filtersApplied?: ManagementDashboardFilters;
   availableFilters?: ManagementDashboardAvailableFilters;
   syncInfo?: SyncMetadata;
+  /** Fontes que falharam nesta leitura; o painel carrega o resto e avisa (não trava a tela inteira). */
+  fontesComFalha?: FonteComFalha[];
 }

@@ -453,6 +453,36 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
       gerenciarUsuarios: false,
       gerenciarPerfis: false
     }
+  },
+  {
+    // Emendas parlamentares (migration 155): perfil da CAEP, id idêntico ao role_id de backend
+    // (public.roles.id = 'gestor_emendas'). A autoridade vem de emendas.view/emendas.manage
+    // (public.role_permissions), não desta matriz de contratos: todas as flags ficam desligadas.
+    id: 'gestor_emendas',
+    nome: 'Gestor de Emendas',
+    badgeColor: '#a16207',
+    descricao: 'Servidor da CAEP que reparte entre parlamentares a quantidade alocada à CAEP: kits, beneficiários e, nas próximas entregas, os pedidos. Consulta Atas e Itens; sem contratos, financeiro, alocação ou administração.',
+    isCustom: false,
+    permissoes: {
+      contractScope: 'ASSIGNED',
+      visualizarTodosContratos: false,
+      visualizarContratos: false,
+      visualizarAtas: false,
+      visualizarItens: false,
+      distribuirContratos: false,
+      editarTarefasContratuais: false,
+      aplicarTemplates: false,
+      visualizarEmpenhos: false,
+      sincronizarEmpenhos: false,
+      visualizarPagamentos: false,
+      registrarPagamentos: false,
+      visualizarPrazos: false,
+      gerenciarEventosContratuais: false,
+      gerenciarDepartamentos: false,
+      exportarRelatorios: false,
+      gerenciarUsuarios: false,
+      gerenciarPerfis: false
+    }
   }
 ];
 

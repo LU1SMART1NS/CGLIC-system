@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { navigationConfig, getBreadcrumbs, filterNavigationByRole, findAreaForTabs } from '../navigation';
+import { navigationConfig, getBreadcrumbs, filterNavigationByRole, findAreaForTabs, rotaInicialDoPerfil } from '../navigation';
 import { isExactChildActive, isItemActive } from '../../components/layout/Sidebar';
 
 function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] {
@@ -8,25 +8,28 @@ function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] 
 
 describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', () => {
   describe('Menu chave com 4 áreas e páginas como abas', () => {
-    it('deve conter as 6 áreas do menu chave, com Ajustes no pé', () => {
+    it('deve conter as 7 áreas do menu chave, com Ajustes no pé', () => {
       expect(navigationConfig.map((item) => item.id)).toEqual([
         'visao-geral',
         'carteira',
         'alocacao',
         'vinculacao',
         'execucao-financeira',
+        'emendas',
         'configuracoes'
       ]);
-      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Carteira', 'Alocação', 'Vínculos', 'Financeiro', 'Ajustes']);
+      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Carteira', 'Alocação', 'Vínculos', 'Financeiro', 'Emendas', 'Ajustes']);
       expect(navigationConfig.find((i) => i.id === 'configuracoes')?.placement).toBe('bottom');
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
 
-    it('Início tem as abas Painel (/instrumentos) e Distribuição (/atas/distribuicao)', () => {
+    it('Início tem os grupos Atas e Contratos (Painel · Distribuição) e Emendas, como Ajustes; o Painel das emendas fica sem grupo', () => {
       const area = navigationConfig.find((i) => i.id === 'visao-geral')!;
-      expect(area.children!.map((c) => [c.label, c.route])).toEqual([
-        ['Painel', '/instrumentos'],
-        ['Distribuição', '/atas/distribuicao']
+      expect(area.children!.map((c) => [c.label, c.route, c.group])).toEqual([
+        ['Painel', '/instrumentos', 'Atas e Contratos'],
+        ['Distribuição', '/atas/distribuicao', 'Atas e Contratos'],
+        ['Painel', '/emendas/inicio', undefined],
+        ['Emendas', '/emendas/inicio', 'Emendas']
       ]);
       expect(area.children![0].matchPrefixes).toContain('/prazos');
     });
@@ -53,6 +56,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const saldos = filterNavigationByRole(navigationConfig, 'gestor_saldos').map((i) => i.id);
       expect(saldos).toContain('alocacao');
       expect(saldos).not.toContain('vinculacao');
+      // Gestor de atas e contratos e consulta não veem a Alocação (lá só consultariam); só o coordenador e o gestor de saldo.
+      expect(filterNavigationByRole(navigationConfig, 'gestor').map((i) => i.id)).not.toContain('alocacao');
+      expect(filterNavigationByRole(navigationConfig, 'leitor').map((i) => i.id)).not.toContain('alocacao');
       // Página única: a área não mostra abas no topo.
       expect(findAreaForTabs(filterNavigationByRole(navigationConfig, 'admin'), '/alocacao')?.children).toHaveLength(1);
     });
@@ -66,7 +72,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(area.children!.every((c) => c.status === 'active')).toBe(true);
     });
 
-    it('Ajustes tem os Modelos de Gestão e a administração do sistema', () => {
+    it('Ajustes tem os Modelos de Gestão, o cadastro de beneficiários das emendas e a administração do sistema', () => {
       const area = navigationConfig.find((i) => i.id === 'configuracoes')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
         ['Modelos de Gestão', '/configuracoes/modelos'],
@@ -74,10 +80,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Feriados', '/admin/feriados'],
         ['Grupos das UASGs', '/admin/grupos-uasgs'],
         ['Unidades Internas', '/admin/departamentos'],
+        ['Beneficiários', '/emendas/beneficiarios'],
         ['Usuários e Servidores', '/admin/usuarios'],
         ['Perfis e Permissões', '/admin/perfis']
       ]);
-      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Acesso', 'Acesso']);
+      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Emendas', 'Acesso', 'Acesso']);
     });
 
     it('não deve conter itens legados isolados no menu (SEI, Exportar Excel, Prorrogações soltas)', () => {
@@ -316,6 +323,51 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Carteira');
     });
 
+    it('Gestor de Emendas (CAEP) vê o Início dele, Emendas, a Carteira só com Atas e Itens e Ajustes só com Beneficiários — sem Contratos, Alocação, Vínculos ou Financeiro', () => {
+      const visible = filterNavigationByRole(navigationConfig, 'gestor_emendas');
+      expect(visible.map((i) => i.id)).toEqual(['visao-geral', 'carteira', 'emendas', 'configuracoes']);
+      expect(visible.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route])).toEqual([['Painel', '/emendas/inicio']]);
+      expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
+      expect(visible.find((i) => i.id === 'emendas')?.children?.map((c) => [c.label, c.route])).toEqual([
+        ['Pedidos', '/emendas/pedidos'],
+        ['Itens e kits', '/emendas/itens']
+      ]);
+      // Beneficiários é cadastro de apoio: fica em Ajustes, no grupo Emendas
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([
+        ['Beneficiários', '/emendas/beneficiarios', 'Emendas']
+      ]);
+      expect(findAreaForTabs(visible, '/emendas/beneficiarios')?.id).toBe('configuracoes');
+    });
+
+    it('ao entrar, o gestor de emendas vai ao Início dele e os demais a Atas e Contratos', () => {
+      expect(rotaInicialDoPerfil('gestor_emendas')).toBe('/emendas/inicio');
+      for (const role of ['admin', 'gestor', 'gestor_saldos', 'leitor', null] as const) expect(rotaInicialDoPerfil(role)).toBe('/instrumentos');
+    });
+
+    it('o resumo das emendas aparece no Início do gestor de emendas (Painel), do coordenador e da consulta (Emendas), e de mais ninguém', () => {
+      const inicioDoCoordenador = filterNavigationByRole(navigationConfig, 'admin').find((i) => i.id === 'visao-geral');
+      expect(inicioDoCoordenador?.children?.map((c) => [c.label, c.route])).toEqual([
+        ['Painel', '/instrumentos'],
+        ['Distribuição', '/atas/distribuicao'],
+        ['Emendas', '/emendas/inicio']
+      ]);
+      const inicioDaConsulta = filterNavigationByRole(navigationConfig, 'leitor').find((i) => i.id === 'visao-geral');
+      expect(inicioDaConsulta?.children?.map((c) => [c.label, c.route])).toEqual([
+        ['Painel', '/instrumentos'],
+        ['Emendas', '/emendas/inicio']
+      ]);
+      for (const role of ['gestor', 'gestor_saldos'] as const) {
+        const inicio = filterNavigationByRole(navigationConfig, role).find((i) => i.id === 'visao-geral');
+        expect(inicio?.children?.map((c) => c.route)).not.toContain('/emendas/inicio');
+      }
+    });
+
+    it('Emendas fica fora do menu do gestor de atas e contratos e do gestor de saldo', () => {
+      expect(filterNavigationByRole(navigationConfig, 'gestor').map((i) => i.id)).not.toContain('emendas');
+      expect(filterNavigationByRole(navigationConfig, 'gestor_saldos').map((i) => i.id)).not.toContain('emendas');
+      expect(filterNavigationByRole(navigationConfig, 'admin').map((i) => i.id)).toContain('emendas');
+    });
+
     it('Consulta/Auditoria (leitor) consulta os módulos permitidos, sem Usuários, Perfis', () => {
       const visible = filterNavigationByRole(navigationConfig, 'leitor');
       const labels = flatLabels(visible);
@@ -326,11 +378,18 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos');
       expect(labels).toContain('Itens');
-      expect(labels).toContain('Distribuição');
+
+      // Vínculos, Alocação e Distribuição são filas de trabalho: a consulta vê o resultado na Carteira e nas telas 360.
+      // A Distribuição também mostra o nível de cada gestor, que fica só com o coordenador (25/10/2026).
+      expect(labels).not.toContain('Distribuição');
+      const areas = visible.map((i) => i.id);
+      expect(areas).not.toContain('vinculacao');
+      expect(areas).not.toContain('alocacao');
+      expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'emendas', 'configuracoes']);
 
       expect(labels).not.toContain('Modelos de Gestão');
-      // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs e das unidades internas
-      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Grupos das UASGs', 'Unidades Internas']);
+      // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs, das unidades internas e dos beneficiários
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Grupos das UASGs', 'Unidades Internas', 'Beneficiários']);
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
     });

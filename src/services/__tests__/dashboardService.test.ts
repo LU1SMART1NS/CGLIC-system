@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   getContractDaysRemaining,
   calculateExecutiveKPIs,
@@ -9,7 +9,9 @@ import {
   calculatePaymentsSummary,
   buildManagementDashboardReadModel,
   fetchManagementDashboardData,
-  fetchAllPaymentCyclesForDashboard
+  fetchAllPaymentCyclesForDashboard,
+  lerUmaVez,
+  COLUNAS_EMPENHOS_PAINEL
 } from '../dashboardService';
 import type {
   ContractDashboardRecord,
@@ -20,20 +22,101 @@ import type {
 } from '../../types';
 import type { PaymentFollowUpCycle } from '../../types/paymentFollowUp';
 import * as dbCacheService from '../dbCacheService';
-import * as contractService from '../contractService';
+import * as contratosOficiaisService from '../contratosOficiaisService';
 import * as contractManagementService from '../contractManagementService';
 import * as paymentCycleRpcAdapter from '../../adapters/paymentCycleRpcAdapter';
+import * as ataManagementService from '../ataManagementService';
+import * as avisosResolvidosService from '../avisosResolvidosService';
+import * as fornecedorAtaPncpService from '../fornecedorAtaPncpService';
+import * as vinculosAConferirService from '../vinculosAConferirService';
+import * as ausentesDaFonteService from '../ausentesDaFonteService';
+import * as empenhadoAcimaService from '../empenhadoAcimaService';
+import type { EmpenhadoAcima } from '../empenhadoAcimaService';
 
 vi.mock('../dbCacheService');
 vi.mock('../contractService');
+// As telas leem os contratos do banco (fetchContratosParaTela); aqui a leitura é simulada.
+vi.mock('../contratosOficiaisService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../contratosOficiaisService')>()),
+  fetchContratosParaTela: vi.fn()
+}));
 vi.mock('../contractManagementService');
 vi.mock('../../adapters/paymentCycleRpcAdapter');
+
+// Fontes do Início que não dependem da UASG: espiadas para contar quantas vezes cada uma é lida.
+vi.mock('../ataManagementService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ataManagementService')>()),
+  fetchAllAtaTaskPlans: vi.fn(async () => ({}))
+}));
+vi.mock('../avisosResolvidosService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../avisosResolvidosService')>()),
+  fetchAvisosResolvidos: vi.fn(async () => [])
+}));
+vi.mock('../fornecedorAtaPncpService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../fornecedorAtaPncpService')>()),
+  fetchRegistrosFornecedorPncp: vi.fn(async () => [])
+}));
+vi.mock('../vinculosAConferirService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../vinculosAConferirService')>()),
+  fetchVinculosAConferir: vi.fn(async () => [])
+}));
+vi.mock('../ausentesDaFonteService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ausentesDaFonteService')>()),
+  fetchAusentesDaFonte: vi.fn(async () => [])
+}));
+vi.mock('../empenhadoAcimaService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../empenhadoAcimaService')>()),
+  fetchEmpenhadoAcima: vi.fn(async () => [])
+}));
+
+// A alocação (arp_allocations) é lida dentro do próprio dashboardService: para contá-la, um banco de mentira
+// que responde vazio a tudo e anota as tabelas lidas. Ligado só nos testes que pedem.
+// `chamadas` guarda os métodos pedidos em cada tabela (select, order, range...); `responder` troca a resposta de uma
+// tabela (por página, pelo início do range).
+const bancoFalso = vi.hoisted(() => ({
+  ligado: false,
+  tabelas: [] as string[],
+  chamadas: [] as Array<{ tabela: string; metodo: string; args: unknown[] }>,
+  responder: undefined as undefined | ((tabela: string, de: number) => { data: unknown; error: unknown } | undefined)
+}));
+vi.mock('../supabaseClient', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../supabaseClient')>();
+  const consulta = (tabela: string, estado = { de: 0 }): any =>
+    new Proxy({}, {
+      get: (_alvo, prop) =>
+        prop === 'then'
+          ? (ok: (r: unknown) => void) => ok(bancoFalso.responder?.(tabela, estado.de) ?? { data: [], error: null })
+          : (...args: unknown[]) => {
+              bancoFalso.chamadas.push({ tabela, metodo: String(prop), args });
+              if (prop === 'range') estado.de = Number(args[0]);
+              return consulta(tabela, estado);
+            }
+    });
+  const cliente = {
+    from: (tabela: string) => {
+      bancoFalso.tabelas.push(tabela);
+      return consulta(tabela);
+    },
+    rpc: () => consulta('rpc')
+  };
+  return {
+    ...original,
+    get isSupabaseConfigured() {
+      return bancoFalso.ligado || original.isSupabaseConfigured;
+    },
+    get supabase() {
+      return bancoFalso.ligado ? cliente : original.supabase;
+    }
+  };
+});
 
 describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
   const referenceDate = new Date('2026-09-24T12:00:00Z');
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Banco sem ciclos de pagamento (o padrão do vi.fn() é undefined, que agora vira falha da fonte).
+    vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockResolvedValue([]);
   });
 
   describe('getContractDaysRemaining', () => {
@@ -998,7 +1081,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
 
   describe('fetchManagementDashboardData', () => {
     it('fetches and consolidates data across all data providers', async () => {
-      vi.mocked(contractService.fetchContractsForDashboard).mockResolvedValue([
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockResolvedValue([
         {
           id: 'c1',
           numero: '01/2026',
@@ -1035,6 +1118,285 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(result.uasg).toBe('200331');
       expect(result.executive.totalContratos).toBe(1);
       expect(result.arp.totalAtas).toBe(1);
+      expect(result.fontesComFalha).toBeUndefined();
+    });
+
+    it('fonte que falha não derruba o painel: sem leitura anterior, avisa que não carregou', async () => {
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockResolvedValue([]);
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValue(new Error('canceling statement due to statement timeout'));
+
+      const result = await fetchManagementDashboardData('209991', referenceDate);
+      expect(result.arp.totalAtas).toBe(0);
+      expect(result.fontesComFalha).toEqual([
+        { rotulo: 'atas (ARPs)', situacao: 'NAO_CARREGOU', mensagem: 'canceling statement due to statement timeout' }
+      ]);
+    });
+
+    it('as seis fontes que devolviam vazio caladas (atas, gestores, planos, avisos resolvidos, ciclos) entram na faixa; os contratos ficam', async () => {
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockResolvedValue([
+        { id: 'c1', numero: '01/2026', ano: 2026, uasg: '209995', objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', dataVigenciaFim: '2027-06-30', fonteDados: 'PNCP' } as any
+      ]);
+      const timeout = () => new Error('canceling statement due to statement timeout');
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValueOnce(timeout());
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockRejectedValueOnce(timeout());
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockRejectedValueOnce(timeout());
+      vi.mocked(ataManagementService.fetchAllAtaTaskPlans).mockRejectedValueOnce(timeout());
+      vi.mocked(avisosResolvidosService.fetchAvisosResolvidos).mockRejectedValueOnce(timeout());
+      vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockRejectedValueOnce(timeout());
+
+      const result = await fetchManagementDashboardData('209995', referenceDate);
+      expect(result.executive.totalContratos).toBe(1);
+      expect((result.fontesComFalha ?? []).map((f) => f.rotulo).sort()).toEqual(
+        ['atas (ARPs)', 'avisos resolvidos e notas deixadas como estão', 'ciclos de pagamento', 'gestores dos contratos', 'planos de gestão das atas', 'planos de tarefas dos contratos'].sort()
+      );
+    });
+
+    it('contratos que não carregaram do banco: o painel avisa (faixa "não carregou"), sem lista inventada', async () => {
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockRejectedValue(
+        new Error('Não foi possível ler os contratos da UASG 209993 no banco (página 1): canceling statement due to statement timeout')
+      );
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValue({ arps: [], syncInfo: { isCachedInDb: true } as any });
+
+      const result = await fetchManagementDashboardData('209993', referenceDate);
+      expect(result.executive.totalContratos).toBe(0);
+      expect(result.fontesComFalha).toEqual([
+        {
+          rotulo: 'contratos',
+          situacao: 'NAO_CARREGOU',
+          mensagem: 'Não foi possível ler os contratos da UASG 209993 no banco (página 1): canceling statement due to statement timeout'
+        }
+      ]);
+    });
+
+    it('fonte que falha depois de uma leitura boa: usa a última leitura e avisa que está desatualizada', async () => {
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockResolvedValue([]);
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValueOnce({
+        arps: [{ id: 'a1', numero: '01/2026', ano: 2026, objeto: 'Ata Teste', dataVigenciaFinal: '2027-06-30' } as any],
+        syncInfo: { isCachedInDb: true } as any
+      });
+      const primeira = await fetchManagementDashboardData('209992', referenceDate);
+      expect(primeira.arp.totalAtas).toBe(1);
+
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
+      const segunda = await fetchManagementDashboardData('209992', referenceDate);
+      expect(segunda.arp.totalAtas).toBe(1);
+      expect(segunda.fontesComFalha?.[0]).toMatchObject({ rotulo: 'atas (ARPs)', situacao: 'DESATUALIZADA' });
+    });
+  });
+
+  describe('fontes sem UASG lidas uma vez só no Início (as duas UASGs abrem juntas)', () => {
+    const contrato = (id: string, uasg: string) =>
+      ({ id, numero: id, ano: 2026, numeroFormatado: `${id}/2026`, objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', uasg, fonteDados: 'Compras.gov.br' }) as ContractDashboardRecord;
+    const acima = (contractKey: string): EmpenhadoAcima => ({
+      contractKey,
+      numeroItem: 1,
+      descricao: null,
+      quantidadeContratada: 10,
+      quantidadeEmpenhada: 12,
+      quantidadeAcima: 2,
+      notas: 1,
+      ultimaNota: null,
+      ultimaOrigem: null,
+      periodoInicio: null,
+      periodoFim: null,
+      peloValor: false,
+      valorContratado: 0,
+      valorEmpenhado: 0,
+      valorAcima: 0
+    });
+    const fontesSemUasg = () => [
+      ataManagementService.fetchAllAtaTaskPlans,
+      avisosResolvidosService.fetchAvisosResolvidos,
+      fornecedorAtaPncpService.fetchRegistrosFornecedorPncp,
+      vinculosAConferirService.fetchVinculosAConferir,
+      ausentesDaFonteService.fetchAusentesDaFonte,
+      empenhadoAcimaService.fetchEmpenhadoAcima
+    ];
+    const leiturasDaAlocacao = () => bancoFalso.tabelas.filter((t) => t === 'arp_allocations').length;
+    const avisosAcima = (rm: { attention: { items: { id: string }[] } }) =>
+      rm.attention.items.map((i) => i.id).filter((id) => id.startsWith('ATT-ACIMA-')).sort();
+    const abrirInicio = () =>
+      Promise.all([fetchManagementDashboardData('200330', referenceDate), fetchManagementDashboardData('200331', referenceDate)]);
+
+    beforeEach(() => {
+      bancoFalso.ligado = true;
+      bancoFalso.tabelas = [];
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockImplementation(async (uasg?: string) =>
+        uasg === '200330' ? [contrato('C330', '200330')] : [contrato('C331', '200331')]
+      );
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValue({ arps: [], syncInfo: { isCachedInDb: true } as any });
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+      // Uma lista nova a cada leitura: se a fonte fosse lida duas vezes, as UASGs receberiam listas diferentes.
+      vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockImplementation(async () => [acima('C330'), acima('C331')]);
+    });
+
+    afterEach(() => {
+      bancoFalso.ligado = false;
+    });
+
+    it('cada uma das 7 fontes é lida 1 vez e as duas UASGs recebem o mesmo dado, recortado depois por UASG', async () => {
+      const [r330, r331] = await abrirInicio();
+
+      for (const fonte of fontesSemUasg()) expect(fonte).toHaveBeenCalledTimes(1);
+      expect(leiturasDaAlocacao()).toBe(1);
+      // Fontes que dependem da UASG continuam lidas uma vez por UASG.
+      expect(contratosOficiaisService.fetchContratosParaTela).toHaveBeenCalledTimes(2);
+
+      expect(r330.fontesComFalha).toBeUndefined();
+      expect(r331.fontesComFalha).toBeUndefined();
+      // A mesma lista chegou às duas; cada uma mostra só o aviso do seu contrato.
+      expect(avisosAcima(r330)).toEqual(['ATT-ACIMA-C330-1']);
+      expect(avisosAcima(r331)).toEqual(['ATT-ACIMA-C331-1']);
+    });
+
+    it('a próxima abertura lê de novo (nada fica guardado depois que a leitura termina)', async () => {
+      await abrirInicio();
+      await abrirInicio();
+
+      for (const fonte of fontesSemUasg()) expect(fonte).toHaveBeenCalledTimes(2);
+      expect(leiturasDaAlocacao()).toBe(2);
+    });
+
+    it('falha numa fonte sem UASG: lida 1 vez, as duas usam a mesma última leitura boa e avisam igual', async () => {
+      await abrirInicio();
+      vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockClear();
+      vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
+
+      const [r330, r331] = await abrirInicio();
+
+      expect(empenhadoAcimaService.fetchEmpenhadoAcima).toHaveBeenCalledTimes(1);
+      const falha = { rotulo: 'empenhado acima do contratado', situacao: 'DESATUALIZADA', mensagem: 'canceling statement due to statement timeout' };
+      expect(r330.fontesComFalha).toEqual([falha]);
+      expect(r331.fontesComFalha).toEqual([falha]);
+      expect(avisosAcima(r330)).toEqual(['ATT-ACIMA-C330-1']);
+      expect(avisosAcima(r331)).toEqual(['ATT-ACIMA-C331-1']);
+    });
+  });
+
+  describe('empenhos do Início: lidos uma vez para as duas UASGs, em ordem fixa, e falha não vira lista parcial', () => {
+    const contrato = (id: string, uasg: string) =>
+      ({ id, numero: id, ano: 2026, numeroFormatado: `${id}/2026`, objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', uasg, fonteDados: 'Compras.gov.br' }) as ContractDashboardRecord;
+    const empenho = (id: string, uasg: string, valor: number) => ({ empenho_id: id, numero_oficial: `2026NE${id}`, ano_exercicio: 2026, uasg_emitente: uasg, valor_empenhado: valor });
+    const abrirInicio = () =>
+      Promise.all([fetchManagementDashboardData('200330', referenceDate), fetchManagementDashboardData('200331', referenceDate)]);
+    const leituras = (tabela: string) => bancoFalso.tabelas.filter((t) => t === tabela).length;
+    const metodos = (tabela: string, metodo: string) => bancoFalso.chamadas.filter((c) => c.tabela === tabela && c.metodo === metodo).map((c) => c.args);
+
+    beforeEach(() => {
+      bancoFalso.ligado = true;
+      bancoFalso.tabelas = [];
+      bancoFalso.chamadas = [];
+      vi.mocked(contratosOficiaisService.fetchContratosParaTela).mockImplementation(async (uasg?: string) =>
+        uasg === '200330' ? [contrato('C330', '200330')] : [contrato('C331', '200331')]
+      );
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockResolvedValue({ arps: [], syncInfo: { isCachedInDb: true } as any });
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockResolvedValue({});
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockResolvedValue({});
+    });
+
+    afterEach(() => {
+      bancoFalso.ligado = false;
+      bancoFalso.responder = undefined;
+    });
+
+    it('1 leitura dos empenhos e 1 dos vínculos para as duas UASGs; cada uma soma só o que é dela', async () => {
+      bancoFalso.responder = (tabela) => {
+        if (tabela === 'v_empenhos_resumo') return { data: [empenho('e1', '200330', 100), empenho('e2', '200331', 40)], error: null };
+        return undefined;
+      };
+      const [r330, r331] = await abrirInicio();
+
+      expect(leituras('v_empenhos_resumo')).toBe(1);
+      expect(leituras('contrato_empenhos')).toBe(1);
+      expect(r330.financial.totalEmpenhado).toBe(100);
+      expect(r331.financial.totalEmpenhado).toBe(40);
+      expect(r330.fontesComFalha).toBeUndefined();
+    });
+
+    it('pede só as colunas que o número usa, com ordem fixa pela chave única nas duas leituras', async () => {
+      bancoFalso.responder = (tabela) => (tabela === 'v_empenhos_resumo' ? { data: [empenho('e1', '200330', 1)], error: null } : undefined);
+      await abrirInicio();
+
+      expect(metodos('v_empenhos_resumo', 'select')).toEqual([[COLUNAS_EMPENHOS_PAINEL.join(',')]]);
+      expect(metodos('v_empenhos_resumo', 'order')).toEqual([['empenho_id', { ascending: true }]]);
+      expect(metodos('contrato_empenhos', 'select')).toEqual([['empenho_id, contract_key']]);
+      expect(metodos('contrato_empenhos', 'order')).toEqual([['id', { ascending: true }]]);
+    });
+
+    it('falha na 2ª página vira falha da fonte (faixa "não carregou"), e não as mil linhas da 1ª página caladas', async () => {
+      // Uma leitura boa e vazia antes, para a última leitura boa ser conhecida.
+      await abrirInicio();
+      bancoFalso.tabelas = [];
+      const milLinhas = Array.from({ length: 1000 }, (_, i) => empenho(`p${i}`, '200331', 1));
+      bancoFalso.responder = (tabela, de) => {
+        if (tabela !== 'v_empenhos_resumo') return undefined;
+        return de === 0 ? { data: milLinhas, error: null } : { data: null, error: { message: 'canceling statement due to statement timeout' } };
+      };
+
+      const [r330, r331] = await abrirInicio();
+
+      expect(leituras('v_empenhos_resumo')).toBe(2);
+      for (const r of [r330, r331]) {
+        expect(r.fontesComFalha).toEqual([
+          { rotulo: 'empenhos', situacao: 'DESATUALIZADA', mensagem: 'Não foi possível ler os empenhos: canceling statement due to statement timeout' }
+        ]);
+      }
+      // Usa a última leitura boa (vazia), nunca a primeira página sozinha.
+      expect(r331.financial.totalEmpenhado).toBe(0);
+    });
+
+    it('falha nos vínculos aos contratos também vira falha da fonte', async () => {
+      bancoFalso.responder = (tabela) => {
+        if (tabela === 'v_empenhos_resumo') return { data: [empenho('e1', '200331', 10)], error: null };
+        if (tabela === 'contrato_empenhos') return { data: null, error: { message: 'tempo limite' } };
+        return undefined;
+      };
+      const [, r331] = await abrirInicio();
+      expect(r331.fontesComFalha?.map((f) => f.rotulo)).toEqual(['empenhos']);
+      expect(r331.fontesComFalha?.[0].mensagem).toContain('vínculos dos empenhos');
+    });
+  });
+
+  describe('lerUmaVez', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('quem chega enquanto a leitura está em andamento recebe a mesma promessa', async () => {
+      const buscar = vi.fn(async () => ['dado']);
+      const a = lerUmaVez('teste-junto', buscar);
+      const b = lerUmaVez('teste-junto', buscar);
+      expect(b).toBe(a);
+      expect(buscar).toHaveBeenCalledTimes(1);
+      expect(await b).toEqual(['dado']);
+    });
+
+    it('leitura que começou há mais de 1 s não é aproveitada (pode ser anterior a uma gravação)', async () => {
+      const agora = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+      let terminar!: (v: string) => void;
+      const lenta = vi.fn(() => new Promise<string>((ok) => { terminar = ok; }));
+      const primeira = lerUmaVez('teste-janela', lenta);
+
+      agora.mockReturnValue(11_500);
+      const nova = vi.fn(async () => 'nova');
+      expect(await lerUmaVez('teste-janela', nova)).toBe('nova');
+      expect(nova).toHaveBeenCalledTimes(1);
+      terminar('antiga');
+      expect(await primeira).toBe('antiga');
+    });
+
+    it('depois de uma falha a próxima chamada tenta de novo', async () => {
+      const buscar = vi.fn().mockRejectedValueOnce(new Error('tempo limite')).mockResolvedValueOnce('ok');
+      await expect(lerUmaVez('teste-falha', buscar)).rejects.toThrow('tempo limite');
+      expect(await lerUmaVez('teste-falha', buscar)).toBe('ok');
+      expect(buscar).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -1075,14 +1437,13 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(result[0].contractKey).toBe('c1');
     });
 
-    it('retorna array vazio (sem lançar) se a consulta ao Supabase falhar', async () => {
+    it('falha do banco vira erro (o painel avisa na faixa), e não uma lista vazia calada', async () => {
       const contracts: ContractDashboardRecord[] = [
         { id: 'c1', numero: '01/2026', ano: 2026, numeroFormatado: '01/2026', uasg: '200331', objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', fonteDados: 'PNCP' } as any
       ];
       vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockRejectedValue(new Error('network error'));
 
-      const result = await fetchAllPaymentCyclesForDashboard(contracts);
-      expect(result).toEqual([]);
+      await expect(fetchAllPaymentCyclesForDashboard(contracts)).rejects.toThrow('network error');
     });
   });
 });

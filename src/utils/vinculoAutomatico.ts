@@ -108,9 +108,23 @@ export type EstadoMotivos = 'CARREGANDO' | 'FALHOU' | 'OK';
 export function textoMotivoDaFila(
   motivo: MotivoVinculoManual | undefined,
   grupo: GrupoFila,
-  ctx: { numeroAta?: string; gestorContrato?: string; gestorAta?: string; vinculoParcial?: boolean; motivos?: EstadoMotivos } = {}
+  ctx: {
+    numeroAta?: string;
+    gestorContrato?: string;
+    gestorAta?: string;
+    vinculoParcial?: boolean;
+    motivos?: EstadoMotivos;
+    /** Marca "não pertence a ata" desfeita (migration 152): o contrato voltou à fila para nova decisão. */
+    marcaDesfeita?: { porNome?: string; em?: string };
+  } = {}
 ): TextoMotivo {
   if (grupo === 'NAO_PERTENCE') return textoMotivoManual('NAO_PERTENCE_A_ATA');
+  // Com ata provável, vale o motivo de sempre (a ata está ali para conferir); sem ela, diz por que o contrato voltou.
+  if (ctx.marcaDesfeita && grupo !== 'ATA_PROVAVEL') {
+    const quem = ctx.marcaDesfeita.porNome || 'O coordenador';
+    const quando = ctx.marcaDesfeita.em ? ` em ${new Date(ctx.marcaDesfeita.em).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}` : '';
+    return { titulo: 'Marca desfeita', detalhe: `${quem} desfez o "não pertence a ata"${quando}. Vincule a uma ata ou marque de novo.`, tipo: 'EQUIPE' };
+  }
   if (motivo) return textoMotivoManual(motivo, ctx);
   if (ctx.vinculoParcial) {
     return { titulo: 'Vínculo parcial', detalhe: 'Parte dos itens do contrato já está vinculada; falta conferir o resto.', tipo: 'DADO' };

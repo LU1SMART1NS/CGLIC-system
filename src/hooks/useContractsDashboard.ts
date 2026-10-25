@@ -32,18 +32,17 @@ export function getContractsDashboardQueryOptions(uasg?: string) {
  *
  * Arquitetura:
  * UI -> useContractsDashboard(uasg) -> fetchContratosParaTela() -> Supabase (contratos_oficiais)
- * As APIs federais só são consultadas pela sincronização (contratosOficiaisService) ou quando o banco
- * ainda não tem a carteira.
+ * As APIs federais só são consultadas pela sincronização no servidor. Leitura do banco que falha chega
+ * como erro da query (nunca como lista vazia ou pela metade).
  *
  * `refresh` relê o banco. Quem atualiza com as fontes oficiais é useSincronizacaoContratos.
  */
-export function useContractsDashboard(uasg?: string) {
+export function useContractsDashboard(uasg?: string, { enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient();
   const cleanUasg = (uasg || '').trim();
 
-  const query = useQuery<ContractDashboardRecord[], Error>(
-    getContractsDashboardQueryOptions(cleanUasg)
-  );
+  const opcoes = getContractsDashboardQueryOptions(cleanUasg);
+  const query = useQuery<ContractDashboardRecord[], Error>({ ...opcoes, enabled: opcoes.enabled && enabled });
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['contracts-dashboard', cleanUasg] });

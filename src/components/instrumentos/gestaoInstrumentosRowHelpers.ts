@@ -77,6 +77,7 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   PAGAMENTO_CRITICO: { label: 'Execução / Pagamento', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' },
   PAGAMENTO_PREVISTO: { label: 'Pagamento previsto', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   REAJUSTE_RADAR: { label: 'Reajuste / Repactuação', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  REAJUSTE_ATA: { label: 'Reajuste da ata', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   TAREFA_ATRASADA: { label: 'Tarefa atrasada', color: 'var(--color-danger-text-strong)', bg: 'var(--color-danger-bg)' },
   TAREFA_PROXIMA: { label: 'Tarefa próxima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   LEMBRETE: { label: 'Planejamento da vigência', color: '#475569', bg: '#f1f5f9' }
@@ -165,8 +166,26 @@ function ataItemUrl(item: DashboardAttentionItem & { uasg?: string }): string {
   return buildAtaPath(item.numeroAta, uasg, 'acoes');
 }
 
+/**
+ * Rótulo para quem só consulta (perfil leitor): o destino é o mesmo, mas o texto não manda fazer o que ele não pode
+ * (decisão de 25/10/2026, mesma regra dos textos do gestor de saldo).
+ */
+const ROTULO_DE_CONSULTA: Record<string, string> = {
+  'Informar unidades': 'Ver unidades',
+  'Informar qtd. da ata assinada': 'Ver ata assinada',
+  'Informar percentual': 'Ver reajuste',
+  'Informar termo': 'Ver reajuste',
+  'Indicar Fornecedor': 'Ver fornecedor',
+  'Conferir Fornecedor': 'Ver fornecedor'
+};
+
 /** Ação contextual em 1 clique, sempre apontando para um fluxo/rota já existente no sistema. */
-export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo {
+export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }, somenteConsulta = false): AcaoInfo {
+  const acao = acaoDoItem(item);
+  return somenteConsulta && ROTULO_DE_CONSULTA[acao.label] ? { ...acao, label: ROTULO_DE_CONSULTA[acao.label] } : acao;
+}
+
+function acaoDoItem(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo {
   if (item.arpKey && item.numeroAta && (item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA')) {
     return { label: 'Abrir tarefa', targetUrl: ataItemUrl(item) };
   }
@@ -184,6 +203,11 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): A
       return { label: 'Informar qtd. da ata assinada', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'REGISTRADO_ACIMA':
       return { label: 'Conferir quantitativos', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'REAJUSTE_ATA':
+      return {
+        label: item.motivoDetalhe?.chave === 'percentual-a-informar' ? 'Informar percentual' : item.motivoDetalhe?.chave === 'termo-a-informar' ? 'Informar termo' : 'Ver reajuste',
+        targetUrl: item.targetUrl || ataItemUrl(item)
+      };
     case 'FORNECEDOR_PNCP':
       return { label: item.badgeLabel === 'conferir itens' ? 'Conferir Fornecedor' : 'Indicar Fornecedor', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'FONTE_A_CONFERIR':

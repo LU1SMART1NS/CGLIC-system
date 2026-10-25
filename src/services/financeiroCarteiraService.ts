@@ -11,27 +11,32 @@
  */
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
 import type { RpcContractPaymentCycleRow, RpcPaymentCycleItemRow } from '../types/rpc';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
+import type { FaturaParaAviso } from './avisosPagamentoService';
 
 const PAGINA = 1000;
 
-/** Lê a tabela ou view inteira, de mil em mil linhas (o PostgREST corta em mil). */
-async function lerTudo<T>(tabela: string, colunas: string, ordem: string): Promise<T[]> {
+/**
+ * Lê a tabela ou view inteira, de mil em mil linhas (o PostgREST corta em mil). `ordem` é a coluna única da tabela,
+ * ou as colunas da chave quando ela é composta: com ordem que empata, as páginas repetem ou pulam linhas. Falha em
+ * qualquer página vira erro (nunca lista pela metade).
+ */
+async function lerTudo<T>(tabela: string, colunas: string, ordem: string | readonly string[]): Promise<T[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  const linhas: T[] = [];
-  for (let de = 0; ; de += PAGINA) {
-    const { data, error } = await supabase
-      .from(tabela)
-      .select(colunas)
-      .order(ordem, { ascending: true })
-      .range(de, de + PAGINA - 1);
-    if (error) throw mapPostgresErrorToAppError(error);
-    linhas.push(...((data ?? []) as T[]));
-    if (!data || data.length < PAGINA) break;
+  const db = supabase;
+  const colunasDaOrdem = typeof ordem === 'string' ? [ordem] : ordem;
+  try {
+    return await lerTodasAsPaginas<T>((de, ate) => {
+      let consulta = db.from(tabela).select(colunas);
+      for (const coluna of colunasDaOrdem) consulta = consulta.order(coluna, { ascending: true });
+      return consulta.range(de, ate);
+    });
+  } catch (error) {
+    throw mapPostgresErrorToAppError(error);
   }
-  return linhas;
 }
 
 // -----------------------------------------------------------------------------------------------------
@@ -74,8 +79,11 @@ export interface FaturaCarteira {
 
 export type SituacaoTesouroFatura = 'PAGO' | 'PARCIAL' | 'NAO_PAGO';
 
-/** O que o Tesouro diz das faturas a conferir, por id da fatura (v_fatura_conferencia_tesouro). */
-async function lerConferenciaTesouro(): Promise<Map<number, SituacaoTesouroFatura>> {
+/**
+ * O que o Tesouro diz das faturas a conferir, por id da fatura (v_fatura_conferencia_tesouro). Leitura à parte das
+ * faturas: se falhar, a lista de pagamentos sai sem o aviso do Tesouro e a tela diz que ele não carregou.
+ */
+export async function fetchConferenciaTesouro(): Promise<Map<number, SituacaoTesouroFatura>> {
   const linhas = await lerTudo<{ id_fatura: number; situacao_tesouro: SituacaoTesouroFatura }>(
     'v_fatura_conferencia_tesouro',
     'id_fatura, situacao_tesouro',
@@ -84,16 +92,22 @@ async function lerConferenciaTesouro(): Promise<Map<number, SituacaoTesouroFatur
   return new Map(linhas.map((l) => [Number(l.id_fatura), l.situacao_tesouro]));
 }
 
+/** Põe nas faturas o que o Tesouro diz delas (fetchConferenciaTesouro); sem a leitura, ficam sem o aviso (null). */
+export function aplicarConferenciaTesouro(faturas: FaturaCarteira[], tesouro: Map<number, SituacaoTesouroFatura> | undefined): FaturaCarteira[] {
+  if (!tesouro || tesouro.size === 0) return faturas;
+  return faturas.map((f) => {
+    const situacao = tesouro.get(f.idFatura);
+    return situacao ? { ...f, situacaoTesouro: situacao } : f;
+  });
+}
+
+/** Faturas de todos os contratos (v_contrato_faturas), sem o aviso do Tesouro: ele vem de fetchConferenciaTesouro. */
 export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
-  const [linhas, tesouro] = await Promise.all([
-    lerTudo<any>(
-      'v_contrato_faturas',
-      'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros, pagamento_a_conferir, obs_a_conferir',
-      'id_fatura'
-    ),
-    // O aviso do Tesouro é um extra: se a leitura falhar, a lista de pagamentos sai sem ele.
-    lerConferenciaTesouro().catch(() => new Map<number, SituacaoTesouroFatura>())
-  ]);
+  const linhas = await lerTudo<any>(
+    'v_contrato_faturas',
+    'id_fatura, contract_key, numero, tipo, emissao, vencimento, valor_liquido, data_liquidacao, situacao, cancelada, np, referencia, ordens_bancarias, ob_emissao, paga, np_contratos, empenhos, empenhos_sem_vinculo, empenhos_sem_vinculo_numeros, pagamento_a_conferir, obs_a_conferir',
+    'id_fatura'
+  );
   return linhas.map((f) => ({
     idFatura: Number(f.id_fatura),
     contractKey: String(f.contract_key),
@@ -116,8 +130,42 @@ export async function fetchFaturasCarteira(): Promise<FaturaCarteira[]> {
     empenhosSemVinculoNumeros: f.empenhos_sem_vinculo_numeros ?? null,
     pagamentoAConferir: Boolean(f.pagamento_a_conferir),
     obsAConferir: f.obs_a_conferir ?? null,
-    situacaoTesouro: tesouro.get(Number(f.id_fatura)) ?? null
+    situacaoTesouro: null
   }));
+}
+
+/** Contratos por pedido na leitura leve das faturas (a lista vai no endereço do pedido). */
+const CONTRATOS_POR_PEDIDO = 100;
+
+/**
+ * Faturas para os avisos de pagamento do Início (nota mensal que não chegou, entrega sem nota): só as quatro colunas
+ * que a regra usa (calcularAvisosPagamento), da TABELA contrato_faturas, e só dos contratos pedidos (os que têm
+ * expectativa de pagamento marcada). A view v_contrato_faturas recalcula OBs e notas de todas as faturas e não
+ * acrescenta nada a estes campos: contract_key, emissao, referencia e cancelada saem da tabela sem mudança.
+ * Falha vira erro, nunca lista parcial calada.
+ */
+export async function fetchFaturasParaAvisos(contractKeys: readonly string[]): Promise<FaturaParaAviso[]> {
+  if (!isSupabaseConfigured || !supabase || contractKeys.length === 0) return [];
+  const db = supabase;
+  const chaves = [...new Set(contractKeys)].sort();
+  const faturas: FaturaParaAviso[] = [];
+  for (let i = 0; i < chaves.length; i += CONTRATOS_POR_PEDIDO) {
+    const lote = chaves.slice(i, i + CONTRATOS_POR_PEDIDO);
+    for (let de = 0; ; de += PAGINA) {
+      const { data, error } = await db
+        .from('contrato_faturas')
+        .select('contract_key, emissao, referencia, cancelada')
+        .in('contract_key', lote)
+        .order('id_fatura', { ascending: true })
+        .range(de, de + PAGINA - 1);
+      if (error) throw mapPostgresErrorToAppError(error);
+      for (const f of (data ?? []) as Array<{ contract_key: string; emissao: string | null; referencia: string | null; cancelada: boolean | null }>) {
+        faturas.push({ contractKey: String(f.contract_key), emissao: f.emissao ?? null, referencia: f.referencia ?? null, cancelada: Boolean(f.cancelada) });
+      }
+      if (!data || data.length < PAGINA) break;
+    }
+  }
+  return faturas;
 }
 
 // -----------------------------------------------------------------------------------------------------
@@ -358,8 +406,10 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
       'empenho_id, canonical_key, numero_oficial, ano_exercicio, uasg_emitente, data_emissao, valor_empenhado, credor_nome, credor_cnpj_cpf, identificador_fonte',
       'empenho_id'
     ),
-    lerTudo<{ empenho_id: string; contract_key: string }>('contrato_empenhos', 'empenho_id, contract_key', 'empenho_id'),
-    lerTudo<FaturaEmpenhoDb>('fatura_empenhos', 'id_fatura, id_empenho_gov, valor', 'id_fatura'),
+    // Ordem pela chave única: por empenho_id (uma NE em vários contratos) ou só por id_fatura (uma fatura com várias
+    // NEs) as páginas empatavam e podiam repetir ou pular linhas.
+    lerTudo<{ empenho_id: string; contract_key: string }>('contrato_empenhos', 'empenho_id, contract_key', 'id'),
+    lerTudo<FaturaEmpenhoDb>('fatura_empenhos', 'id_fatura, id_empenho_gov, valor', ['id_fatura', 'id_empenho_gov']),
     lerTudo<{ contract_key: string }>('contrato_faturas_sincronizacao', 'contract_key', 'contract_key'),
     lerTudo<{ id: string; plano_interno: string | null; natureza_despesa: string | null }>('empenhos', 'id, plano_interno, natureza_despesa', 'id'),
     lerSaldosTesouro()

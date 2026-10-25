@@ -160,7 +160,8 @@ describe('QuantitativosOutroOrgaoTab — SENASP em adesão', () => {
     };
     const h = html({ ...ADES_BASE, quantitativos: q, adesoes: [ADESOES[1], adesao('2026-10-02T09:57:35', null)] });
     expect(h).toContain('Informada por <b>Maria Souza</b>');
-    expect(h).toContain('SEI nº 87654321');
+    expect(h).toContain('data-testid="adesao-sei"');
+    expect(h).toContain('87654321');
     expect(h).toContain('>Corrigir<');
     expect(h).not.toContain('Quantidade não informada');
   });

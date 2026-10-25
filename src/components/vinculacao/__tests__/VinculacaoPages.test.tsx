@@ -20,8 +20,8 @@ vi.mock('../../financeiro/useContratosDoFinanceiro', async (orig) => ({
   useContratosDoFinanceiro: vi.fn()
 }));
 vi.mock('../../../hooks/useAtasPortfolio', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useAtasPortfolio')>()), useAtasPortfolio: vi.fn() }));
-vi.mock('../../../hooks/useCarteiraItens', () => ({ useCarteiraItens: vi.fn() }));
-vi.mock('../../../hooks/useAvisosResolvidos', () => ({ useAvisosResolvidos: vi.fn() }));
+vi.mock('../../../hooks/useCarteiraItens', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useCarteiraItens')>()), useCarteiraItens: vi.fn() }));
+vi.mock('../../../hooks/useAvisosResolvidos', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useAvisosResolvidos')>()), useAvisosResolvidos: vi.fn() }));
 // Janelas: não abrem no render estático; os hooks delas não rodam.
 vi.mock('../VincularAosItensDialog', () => ({ VincularAosItensDialog: () => null }));
 vi.mock('../../alocacao/AlocarUnidadeModal', () => ({ AlocarUnidadeModal: () => null }));
@@ -58,7 +58,9 @@ const contratos = (escopo: Set<string> | null = null) =>
     lista: [],
     escopo,
     showGestorFilter: escopo === null,
-    isLoading: false
+    isLoading: false,
+    leituras: [],
+    contratosNaoCarregaram: false
   } as any);
 /** Marcas "Deixar como está" gravadas (avisos_resolvidos). */
 const deixadas = (...chaves: string[]) =>
@@ -67,7 +69,8 @@ const deixadas = (...chaves: string[]) =>
     resolver: { mutateAsync: vi.fn() },
     reexibir: { mutate: vi.fn(), isPending: false },
     podeResolver: true,
-    podeConcluirTarefas: true
+    podeConcluirTarefas: true,
+    consulta: { data: [], isError: false, error: null, refetch: vi.fn() }
   } as any);
 const nota = (over: any) =>
   mapDistribuicao({ contrato_empenho_id: over.ne, contract_key: 'K1', empenho_id: over.ne, numero_oficial: over.ne, valor_nota: 14700, itens_no_contrato: 3, parcelas: [], sugestao: [], situacao: 'A_DISTRIBUIR', ...over });
@@ -367,5 +370,154 @@ describe('Alocação → Itens às unidades', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     expect(render(<ItensUnidadesPage />, '/?ver=ITEM')).not.toContain('vinc-itens-alocar-');
     expect(render(<ItensUnidadesPage />, '/?busca=placa')).not.toContain('vinc-itens-alocar-');
+  });
+  describe('uma leitura falha: a faixa avisa e o resto fica', () => {
+    const falhou = () => ({ data: undefined, isError: true, error: new Error('canceling statement due to statement timeout'), refetch: vi.fn() });
+    const ok = { data: [], isError: false, error: null, refetch: vi.fn() };
+    const comLeituras = (leituras: any[], atas: any = {}) => {
+      vi.mocked(useCarteiraItens).mockReturnValue({ ...vi.mocked(useCarteiraItens)(), leituras } as any);
+      vi.mocked(useAtasPortfolio).mockReturnValue({ ...vi.mocked(useAtasPortfolio)(), ...atas } as any);
+    };
+
+    it('o contratado não carregou: a faixa diz, e os segmentos e os itens ficam', () => {
+      vi.mocked(useAuth).mockReturnValue({ role: 'gestor_saldos' } as any);
+      comLeituras([
+        { rotulo: 'alocações às unidades internas', query: ok },
+        { rotulo: 'quantidade contratada dos itens', query: falhou() }
+      ]);
+      const html = render(<ItensUnidadesPage />, '/?alocacao=TODOS&ver=ITEM');
+      expect(html).toContain('data-testid="alocacao-fontes-com-falha"');
+      expect(html).toContain('Parte da alocação não carregou');
+      expect(html).toContain('<strong>Quantidade contratada dos itens</strong>');
+      // O empenhado não aparece nesta tela: nem é lido (o hook tira a leitura da lista).
+      expect(vi.mocked(useCarteiraItens)).toHaveBeenCalledWith(expect.objectContaining({ semEmpenhado: true }));
+      expect(html).toMatch(/Sem alocação<span class="segment-pill__count">1</);
+      expect(html).toContain('Placa balística');
+    });
+
+    it('as alocações não carregaram: aviso no lugar da lista, sem contar tudo como "Sem alocação" e sem travar a tela', () => {
+      comLeituras([{ rotulo: 'alocações às unidades internas', query: falhou() }]);
+      const html = render(<ItensUnidadesPage />);
+      expect(html).toContain('Itens a alocar às unidades internas');
+      expect(html).toContain('<strong>Alocações às unidades internas</strong>');
+      expect(html).toContain('data-testid="alocacao-nao-carregou"');
+      expect(html).toContain('sem elas, todo item pareceria sem alocação');
+      expect(html).not.toContain('data-testid="vinc-itens-nivel-SEM"');
+      expect(html).not.toContain('Erro ao carregar as alocações');
+    });
+
+    it('o saldo dos itens não carregou: "não carregou", e não "nenhum item com quantitativo SENASP" (3d)', () => {
+      comLeituras([{ rotulo: 'saldo dos itens', query: falhou() }]);
+      const html = render(<ItensUnidadesPage />);
+      expect(html).toContain('<strong>Saldo dos itens</strong>');
+      expect(html).toContain('O saldo dos itens não carregou');
+      expect(html).not.toContain('Nenhum item com quantitativo SENASP');
+    });
+
+    it('perfil gestor de saldos sem o recorte: a faixa e "as atas não carregaram"', () => {
+      vi.mocked(useCarteiraItens).mockReturnValue({ ...vi.mocked(useCarteiraItens)(), rows: [], leituras: [] } as any);
+      comLeituras([], { leiturasDasAtas: [{ rotulo: 'gestores das atas', query: falhou() }], atasNaoCarregaram: true });
+      const html = render(<ItensUnidadesPage />);
+      expect(html).toContain('<strong>Gestores das atas</strong>');
+      expect(html).toContain('As atas não carregaram.');
+      expect(html).not.toContain('Nenhum item com quantitativo SENASP');
+    });
+
+    it('tudo carregou: sem faixa', () => {
+      expect(render(<ItensUnidadesPage />)).not.toContain('alocacao-fontes-com-falha');
+    });
+  });
+});
+
+describe('Vínculos: uma leitura falha, a faixa avisa e o resto fica', () => {
+  const falhou = (mensagem = 'canceling statement due to statement timeout') => ({ data: undefined, isError: true, error: new Error(mensagem), refetch: vi.fn() });
+  const notas = () =>
+    vi.mocked(useEmpenhosParaVincularAosItens).mockReturnValue({
+      data: [nota({ ne: '2024NE000328', sugestao_tipo: 'MULTIPLO_DO_PRECO', sugestao: [{ numero_item: 13, quantidade: 3 }] })],
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn()
+    } as any);
+
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
+    contratos(new Set(['K1', 'K3']));
+    deixadas();
+    vi.mocked(useConferenciasDaNota).mockReturnValue({ data: [] } as any);
+  });
+
+  it('Empenhos aos itens: as notas a conferir não carregaram → faixa; as notas a vincular ficam', () => {
+    notas();
+    vi.mocked(useConferenciasDaNota).mockReturnValue(falhou() as any);
+    const html = render(<EmpenhosItensPage />);
+    expect(html).toContain('data-testid="vinc-empenhos-fontes-com-falha"');
+    expect(html).toContain('Parte da fila não carregou');
+    expect(html).toContain('<strong>Notas a conferir no Contratos.gov.br</strong>');
+    expect(html).toContain('2024NE000328');
+    expect(html).toMatch(/A vincular<span class="segment-pill__count">1</);
+    // No segmento da conferência, "não carregou" no lugar de "nenhuma nota pede conferência".
+    const conferir = render(<EmpenhosItensPage />, '/?fila=CONFERIR');
+    expect(conferir).toContain('data-testid="vinc-nota-nao-carregou"');
+    expect(conferir).not.toContain('Nenhuma nota pede conferência');
+  });
+
+  it('Empenhos aos itens: as notas não carregaram → "não carregaram", e não "todas já estão vinculadas"', () => {
+    vi.mocked(useEmpenhosParaVincularAosItens).mockReturnValue({ ...falhou(), isLoading: false, isFetching: false } as any);
+    const html = render(<EmpenhosItensPage />);
+    expect(html).toContain('<strong>Notas a vincular aos itens</strong>');
+    expect(html).toContain('data-testid="vinc-empenhos-nao-carregou"');
+    expect(html).not.toContain('Todas as notas dos contratos da sua carteira já estão vinculadas');
+    expect(html).not.toContain('Erro ao carregar os empenhos');
+  });
+
+  it('Empenhos aos itens: as notas deixadas como estão não carregaram → a faixa avisa', () => {
+    notas();
+    vi.mocked(useAvisosResolvidos).mockReturnValue({
+      porChave: new Map(),
+      resolver: { mutateAsync: vi.fn() },
+      reexibir: { mutate: vi.fn(), isPending: false },
+      podeResolver: true,
+      podeConcluirTarefas: true,
+      consulta: falhou('Failed to fetch')
+    } as any);
+    const html = render(<EmpenhosItensPage />);
+    expect(html).toContain('<strong>Avisos resolvidos e notas deixadas como estão</strong>');
+    expect(html).toContain('sem conexão com o banco');
+    expect(html).toContain('2024NE000328');
+  });
+
+  it('Empenhos ao contrato: as notas não carregaram → faixa e "não carregaram", sem travar a tela', () => {
+    vi.mocked(useEmpenhosForaDoContrato).mockReturnValue({ ...falhou(), isLoading: false } as any);
+    const html = render(<EmpenhosContratoPage />);
+    expect(html).toContain('Empenhos citados fora do contrato');
+    expect(html).toContain('data-testid="vinc-ne-contrato-fontes-com-falha"');
+    expect(html).toContain('<strong>Notas citadas fora do contrato</strong>');
+    expect(html).toContain('data-testid="vinc-ne-contrato-nao-carregou"');
+    expect(html).not.toContain('Nenhuma fatura cita empenho fora do contrato');
+    expect(html).not.toContain('Erro ao carregar as notas');
+  });
+
+  it('perfil gestor sem os contratos do recorte: a faixa lista os contratos e a fila diz que não carregou', () => {
+    notas();
+    vi.mocked(useContratosDoFinanceiro).mockReturnValue({
+      contrato: (k: string) => ({ numero: k }),
+      lista: [],
+      escopo: new Set<string>(),
+      showGestorFilter: false,
+      isLoading: false,
+      leituras: [{ rotulo: 'contratos da UASG 200331', query: falhou() }],
+      contratosNaoCarregaram: true
+    } as any);
+    const html = render(<EmpenhosItensPage />);
+    expect(html).toContain('<strong>Contratos da UASG 200331</strong>');
+    expect(html).toContain('data-testid="vinc-empenhos-nao-carregou"');
+    expect(html).not.toContain('Todas as notas dos contratos da sua carteira já estão vinculadas');
+  });
+
+  it('tudo carregou: sem faixa', () => {
+    notas();
+    expect(render(<EmpenhosItensPage />)).not.toContain('fontes-com-falha');
   });
 });

@@ -35,7 +35,7 @@ export const AreaTabs: React.FC = () => {
   const tabs = area?.children ?? [];
   if (!area || tabs.length < 2) return null;
 
-  // Com abas de mais de um grupo (Ajustes: Gestão · Acesso), a primeira linha mostra os grupos
+  // Com abas de mais de um grupo (Ajustes: Gestão · Emendas · Acesso), a primeira linha mostra os grupos
   // e a segunda as páginas do grupo ativo. Com um grupo só, as páginas aparecem direto.
   const groups = Array.from(new Set(tabs.map((t) => t.group).filter((g): g is string => Boolean(g))));
   const grouped = groups.length > 1;

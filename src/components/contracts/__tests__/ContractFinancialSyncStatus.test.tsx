@@ -281,11 +281,17 @@ describe('ContractFinancialExecutionSection: divisão da nota entre os itens do 
     vi.mocked(useFaturasDoContrato).mockReturnValue({
       data: { faturas: [{ idFatura: 7, numero: '1490', empenhos: '2024NE000412', empenhosSemVinculo: 1, empenhosSemVinculoNumeros: '2024NE000412', valor: 10 }], resumo: null, sincronizadoEm: null }
     } as any);
+    vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     const html = renderToStaticMarkup(<ContractFinancialExecutionSection contract={contract} contractKey={contract.id} onAbrirFatura={vi.fn()} />);
     expect(html).toContain('contract-financial-fatura-ne-fora');
     expect(html).toContain('2024NE000412');
     expect(html).toContain('Ver a conferência');
     expect(html).toContain('contract-financial-fatura-ne-fora-conferir');
+    // A consulta não entra em Vínculos: vê o aviso, sem o botão.
+    vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
+    const doLeitor = renderToStaticMarkup(<ContractFinancialExecutionSection contract={contract} contractKey={contract.id} onAbrirFatura={vi.fn()} />);
+    expect(doLeitor).toContain('2024NE000412');
+    expect(doLeitor).not.toContain('contract-financial-fatura-ne-fora-conferir');
   });
 
   const detalhe = (d: DistribuicaoDoEmpenho | undefined, podeEditar = true, faturas: any[] = [], extra: Record<string, unknown> = {}) =>

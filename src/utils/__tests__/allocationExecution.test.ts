@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { summarizeAllocationExecution, vinculosSemQuantidade } from '../allocationExecution';
+import { limpezaDeVinculosDoItem, summarizeAllocationExecution, vinculosSemQuantidade } from '../allocationExecution';
 import type { ParcelaDoItem } from '../empenhoDoItem';
 
 const parcela = (numeroOficial: string, quantidade: number | null): ParcelaDoItem => ({
@@ -62,5 +62,35 @@ describe('vinculosSemQuantidade (nota só fica na unidade com quantidade definid
   it('nada a tirar: nulo', () => {
     expect(vinculosSemQuantidade({ '2024NE000337': 'a1' }, [parcela('2024NE000337', 10)])).toBeNull();
     expect(vinculosSemQuantidade({}, [])).toBeNull();
+  });
+});
+
+describe('limpezaDeVinculosDoItem (Item 360 só limpa com tudo lido do banco)', () => {
+  const tudoCerto = {
+    alocacoesCarregadas: true,
+    vinculosCarregados: true,
+    empenhoDoItemPronto: true,
+    podeMexer: true,
+    gravando: false,
+    links: { '2024NE000337': 'a1', '2024NE000500': 'a1' },
+    parcelas: [parcela('2024NE000337', 10)]
+  };
+
+  it('com as leituras certas, devolve o vínculo que sai', () => {
+    expect(limpezaDeVinculosDoItem(tudoCerto)?.removidos).toEqual([{ numero: '2024NE000500', allocationId: 'a1' }]);
+  });
+
+  it('não roda se a leitura das alocações falhou', () => {
+    expect(limpezaDeVinculosDoItem({ ...tudoCerto, alocacoesCarregadas: false })).toBeNull();
+  });
+
+  it('não roda se a leitura dos vínculos falhou', () => {
+    expect(limpezaDeVinculosDoItem({ ...tudoCerto, vinculosCarregados: false })).toBeNull();
+  });
+
+  it('não roda sem o empenho do item, sem permissão ou com outra gravação em curso', () => {
+    expect(limpezaDeVinculosDoItem({ ...tudoCerto, empenhoDoItemPronto: false })).toBeNull();
+    expect(limpezaDeVinculosDoItem({ ...tudoCerto, podeMexer: false })).toBeNull();
+    expect(limpezaDeVinculosDoItem({ ...tudoCerto, gravando: true })).toBeNull();
   });
 });

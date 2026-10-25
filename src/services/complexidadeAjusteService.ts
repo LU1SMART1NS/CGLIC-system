@@ -20,8 +20,8 @@ export interface ComplexidadeAjuste {
 export const chaveAjuste = (tipo: TipoInstrumentoAjuste, chave: string) => `${tipo}:${chave}`;
 
 /**
- * Todos os ajustes (tabela pequena: só o que o coordenador corrigiu). Sem a tabela (migration 66 ainda não
- * aplicada) ou com erro, devolve vazio: a Distribuição segue só com a complexidade automática.
+ * Todos os ajustes (tabela pequena: só o que o coordenador corrigiu). Falha de leitura vira erro: quem usa decide
+ * se segue só com a complexidade automática, mas não em silêncio.
  */
 export async function fetchComplexidadeAjustes(): Promise<Record<string, ComplexidadeAjuste>> {
   if (!isSupabaseConfigured || !supabase) return {};
@@ -43,8 +43,9 @@ export async function fetchComplexidadeAjustes(): Promise<Record<string, Complex
     }
     return map;
   } catch (err) {
-    console.warn('Ajustes de complexidade indisponíveis (migration 66 aplicada?)', err);
-    return {};
+    // Falha vira erro: um mapa vazio fazia a carga dos gestores sair sem os ajustes do coordenador.
+    console.warn('Ajustes de complexidade indisponíveis', err);
+    throw err;
   }
 }
 

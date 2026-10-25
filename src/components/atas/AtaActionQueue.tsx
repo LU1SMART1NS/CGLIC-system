@@ -11,7 +11,7 @@ import { formatDateBR } from '../../services/temporalEngineService';
 import { AvisosResolvidosLista, BotaoResolvido, EspacoResolvido, useResolverAviso, type AlvoResolucao } from '../avisos/ResolverAviso';
 import type { AtaActionItem, AtaActionQueue as AtaActionQueueData } from '../../services/ataActionQueueService';
 
-export type Ata360Tab = 'acoes' | 'plano' | 'itens' | 'contratos';
+export type Ata360Tab = 'acoes' | 'plano' | 'itens' | 'contratos' | 'reajuste';
 
 interface AtaActionQueueProps {
   queue: AtaActionQueueData;

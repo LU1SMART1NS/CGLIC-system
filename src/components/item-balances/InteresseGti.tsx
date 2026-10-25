@@ -1,6 +1,6 @@
 import React from 'react';
 import { isUasgCglic } from '../../config/unidadesGestoras';
-import { useGruposDasUasgs } from '../../hooks/useGruposGti';
+import { useGruposDasUasgsLeitura } from '../../hooks/useGruposGti';
 import { resumirFatias, type FatiasDaAta, type GrupoDaFatia } from '../../config/gruposGti';
 import type { QuantitativosDoItem } from '../../services/quantitativosService';
 import type { UnidadeItemRecord } from '../../types';
@@ -12,7 +12,11 @@ const digitos = (v: unknown) => String(v ?? '').replace(/\D/g, '');
  * (migration 139). Ficam fora a SENASP, a gerenciadora e as adesões. Com a ata assinada informada, vale a lista dela;
  * sem ela, a lista de órgãos do Compras.gov.br.
  */
-export function useInteresseGti(input: { unidades: UnidadeItemRecord[]; quantitativos: QuantitativosDoItem; ataDaCglic: boolean }): FatiasDaAta {
+export function useInteresseGti(input: { unidades: UnidadeItemRecord[]; quantitativos: QuantitativosDoItem; ataDaCglic: boolean }): {
+  fatias: FatiasDaAta;
+  /** A leitura dos grupos das UASGs, para a faixa "não carregou". */
+  consulta: ReturnType<typeof useGruposDasUasgsLeitura>['consulta'];
+} {
   const { unidades, quantitativos: q, ataDaCglic } = input;
   const linhas = React.useMemo(
     () =>
@@ -25,8 +29,8 @@ export function useInteresseGti(input: { unidades: UnidadeItemRecord[]; quantita
           }),
     [q.informado, q.orgaos, unidades, ataDaCglic]
   );
-  const grupos = useGruposDasUasgs(linhas.map((l) => l.uasg));
-  return React.useMemo(() => {
+  const { grupos, consulta } = useGruposDasUasgsLeitura(linhas.map((l) => l.uasg));
+  const fatias = React.useMemo(() => {
     const porGrupo = new Map<GrupoDaFatia, { quantidade: number; orgaos: number }>();
     for (const l of linhas) {
       if (!l.conta) continue;
@@ -36,4 +40,5 @@ export function useInteresseGti(input: { unidades: UnidadeItemRecord[]; quantita
     }
     return resumirFatias([...porGrupo].map(([grupo, v]) => ({ grupo, ...v })));
   }, [linhas, grupos]);
+  return { fatias, consulta };
 }

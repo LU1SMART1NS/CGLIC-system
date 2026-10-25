@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
-import { ErrorState } from '../../design-system/components/ErrorState';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { ActionButton, AppButton, AppTextarea, Modal, StatusBadge, useToast, useConfirm, AvisoCarregando } from '../../design-system';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
@@ -86,15 +88,26 @@ export const EmpenhosItensPage: React.FC = () => {
   const toast = useToast();
   const { role } = useAuth();
   const podeVincular = role === 'admin' || role === 'gestor';
-  const { data: todas = [], isLoading, isFetching, error, refetch } = useEmpenhosParaVincularAosItens();
-  const { data: conferencias = [] } = useConferenciasDaNota();
-  const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
+  const notasQuery = useEmpenhosParaVincularAosItens();
+  const { data: todas = [], isLoading, isFetching } = notasQuery;
+  const conferenciasQuery = useConferenciasDaNota();
+  const { data: conferencias = [] } = conferenciasQuery;
+  const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos, leituras: leiturasContratos, contratosNaoCarregaram } = useContratosDoFinanceiro();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
 
   // Contrato encerrado: nada mais será empenhado; o gestor pode deixar a nota como está (sai da fila e do menu).
   const deixar = useDeixarComoEsta(
     'A nota continua "a vincular" no Contrato 360 e no Financeiro; só a fila e o número do menu deixam de cobrar. Se o contrato voltar a ficar vigente, a nota volta à fila. Dá para reexibir a qualquer momento.'
   );
+  // Uma fonte que falha não some calada: o que carregou aparece e a faixa diz o que ficou de fora.
+  const leituras = useLeiturasComFalha([
+    { rotulo: 'notas a vincular aos itens', query: notasQuery },
+    { rotulo: 'notas a conferir no Contratos.gov.br', query: conferenciasQuery },
+    ...leiturasContratos,
+    deixar.leitura
+  ]);
+  // Perfil gestor: sem os contratos, o recorte fica vazio e a fila diria "nada a fazer".
+  const recorteNaoCarregou = Boolean(escopo) && contratosNaoCarregaram;
   const marcaDe = (d: DistribuicaoDoEmpenho) => deixar.porChave.get(chaveAvisoDeixarNota(d.contractKey, d.contratoEmpenhoId));
   const deixada = (d: DistribuicaoDoEmpenho) => deixadaComoEsta(contrato(d.contractKey).expirado, Boolean(marcaDe(d)));
 
@@ -230,14 +243,6 @@ export const EmpenhosItensPage: React.FC = () => {
   const abrirContrato = (d: DistribuicaoDoEmpenho) => navigate(`/contratos/${encodeURIComponent(d.contractKey)}?aba=financeiro&abrir=${encodeURIComponent(d.numeroOficial)}`);
   const abrirNota = (d: DistribuicaoDoEmpenho) => (podeVincular ? setNota(d) : abrirContrato(d));
 
-  if (error && todas.length === 0) {
-    return (
-      <PageContainer style={{ padding: '2rem 0' }}>
-        <ErrorState title="Erro ao carregar os empenhos" message={error.message} onRetry={() => void refetch()} />
-      </PageContainer>
-    );
-  }
-
   const hasActive = hasActiveCarteiraFilters(SCHEMA, filters) && filters.fila === SCHEMA.fila.default;
   const isBusy = isLoading || carregandoContratos;
 
@@ -248,6 +253,8 @@ export const EmpenhosItensPage: React.FC = () => {
         subtitle="Notas de empenho de contratos com dois ou mais itens. Cada nota só entra no empenhado do item depois de vinculada aos itens."
         hint="O servidor lê cada nota no SIAFI e a vincula aos itens que ela diz, sem clique; essas não aparecem aqui. Quando a nota e o contrato não batem, a nota vai para “Conferir no Contratos.gov.br”. Quando a nota não diz o item ou a quantidade, ela fica em “A vincular”. Em contrato encerrado nada mais será empenhado: se a nota não vale o trabalho de vincular, deixe como está, com justificativa; a linha sai da fila e do número do menu."
       />
+
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da fila" testIdPrefix="vinc-empenhos-fontes" />
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando empenhos...">
@@ -272,7 +279,7 @@ export const EmpenhosItensPage: React.FC = () => {
           />
 
           {filters.fila === 'CONFERIR' ? (
-            <ConferirNoContratosGov linhas={aConferir} contrato={contrato} showGestorFilter={showGestorFilter} podeMarcar={podeVincular} />
+            <ConferirNoContratosGov linhas={aConferir} contrato={contrato} showGestorFilter={showGestorFilter} podeMarcar={podeVincular} naoCarregou={naoCarregou(conferenciasQuery) || recorteNaoCarregou} />
           ) : (
             <>
             <CarteiraFilterBar
@@ -334,7 +341,9 @@ export const EmpenhosItensPage: React.FC = () => {
               </div>
             )}
 
-            {base.length === 0 ? (
+            {base.length === 0 && (naoCarregou(notasQuery) || recorteNaoCarregou) ? (
+              <ListaNaoCarregou titulo="As notas não carregaram." testId="vinc-empenhos-nao-carregou" />
+            ) : base.length === 0 ? (
               <EmptyState
                 title={
                   filters.fila === 'EQUIPE' ? 'Nenhuma nota vinculada pela equipe nos últimos 30 dias.' : filters.fila === 'VALOR' ? 'Nenhuma nota vinculada pelo valor.' : 'Nenhuma nota a vincular aos itens.'

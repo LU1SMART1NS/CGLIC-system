@@ -15,10 +15,12 @@ export interface RequireRoleProps {
 /**
  * Área segura para onde redirecionar um usuário autenticado mas não
  * autorizado a ver a rota atual. gestor_saldos não tem acesso a Contratos, ao
- * Financeiro nem à Administração (fora do seu domínio), por isso ganha um destino próprio.
+ * Financeiro nem à Administração (fora do seu domínio), por isso ganha um destino próprio;
+ * o gestor de emendas cai no Início dele (avisos dos pedidos e saldo da CAEP).
  */
 function getSafeFallbackRoute(role: AppRole | null): string {
   if (role === 'gestor_saldos') return '/itens';
+  if (role === 'gestor_emendas') return '/emendas/inicio';
   return '/instrumentos';
 }
 

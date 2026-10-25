@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   chaveItemGti,
+  contarUasgsSemGrupo,
   contarPorGti,
   montarFatiasGti,
   montarFatiasItensGti,
@@ -9,6 +10,7 @@ import {
   resumirFatias,
   sugerirGrupoGti,
   textoDaFatia,
+  type GrupoConfirmavel,
   type LinhaFatiaGti
 } from '../gruposGti';
 
@@ -177,5 +179,12 @@ describe('texto da célula GTI (casos reais de 15/10/2026)', () => {
   });
   it('sem fatias: nada', () => {
     expect(resumirCelulaGti(undefined)).toEqual({ destaque: null, secundaria: null });
+  });
+});
+
+describe('contarUasgsSemGrupo', () => {
+  const uasg = (nome: string, grupo: GrupoConfirmavel | null = null) => ({ nome, nomeNaAta: null, siglaOrgao: null, esferaOrgao: null, grupo });
+  it('separa as sem grupo em com e sem sugestão; confirmadas ficam fora', () => {
+    expect(contarUasgsSemGrupo([uasg('POLICIA MILITAR DO PARANA'), uasg('CORPO DE BOMBEIROS MILITAR DE GOIAS', 'LIGABOM'), uasg('XYZ')])).toEqual({ aConfirmar: 1, semSugestao: 1 });
   });
 });

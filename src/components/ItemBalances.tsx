@@ -10,6 +10,11 @@ import { useItemUnidades } from '../hooks/useItemUnidades';
 import { useCadastroUasgs } from '../hooks/useCadastroUasgs';
 import { localDaUasg } from '../services/cadastroUasgsSyncService';
 import { escolherAdesoes, useItemAdesoes } from '../hooks/useItemAdesoes';
+import { FontesComFalhaAviso } from './fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha, type LeituraDaTela } from './fonte/useLeiturasComFalha';
+import { ROTULO_SALDO_ITENS } from '../hooks/useAtasPortfolio';
+import { ROTULO_GRUPOS_UASGS } from '../hooks/useGruposGti';
+import { ROTULO_CONTRATOS_DO_ITEM } from '../hooks/useEmpenhoDoItem';
 import { useDepartments } from '../hooks/useDepartments';
 import { useItemAllocations } from '../hooks/useItemAllocations';
 import { useItemEmpenhoLinks } from '../hooks/useItemEmpenhoLinks';
@@ -40,6 +45,7 @@ import {
 import { useDismissContractSuggestion } from '../hooks/useDismissContractSuggestion';
 import { useRestoreContractSuggestion } from '../hooks/useRestoreContractSuggestion';
 import { useContractsDashboard } from '../hooks/useContractsDashboard';
+import { useContratosPorChave } from '../hooks/useContratosPorChave';
 import { useItemNosContratos } from '../hooks/useItensDoContrato';
 import { enrichContractLinks } from '../services/arpContractLinkService';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
@@ -63,11 +69,12 @@ import { Instrument360Page } from './instrument360/Instrument360Page';
 import { Instrument360TabPanel } from './instrument360/Instrument360TabPanel';
 import { useInstrumentTab } from './instrument360/useInstrumentTab';
 import { AllocationsTab, type AllocationRow } from './item-balances/AllocationsTab';
-import { summarizeAllocationExecution, vinculosSemQuantidade } from '../utils/allocationExecution';
+import { limpezaDeVinculosDoItem, summarizeAllocationExecution } from '../utils/allocationExecution';
 import { ItemExecutionSummaryStrip } from './item-balances/ItemExecutionSummaryStrip';
 import { Instrument360Head } from './instrument360/Instrument360Head';
 import { Instrument360Tabs } from './instrument360/Instrument360Tabs';
 import { useAuth } from '../context/AuthContext';
+import { semContratos } from '../types/rbac';
 import { useToast, useConfirmDialog, StatusBadge } from '../design-system';
 import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
@@ -81,6 +88,7 @@ import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOr
 import { adesoesDaSenasp, papelDoItem } from '../utils/quantitativosOutroOrgao';
 import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
 import { AdesoesTab } from './item-balances/AdesoesTab';
+import { EmendasDoItemTab } from './item-balances/EmendasDoItemTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
 import { abrirAoClicarNaLinha, CarteiraIdLink } from './carteira/CarteiraRowLink';
 import type { ArpRecord, ArpItemRecord, InternalAllocation, PncpContract, UnidadeItemRecord } from '../types';
@@ -100,6 +108,10 @@ interface ItemBalancesProps {
 const ITEM_TABS: ItemTab[] = ['quantitativos', 'contratos', 'adesoes'];
 // Gestor de saldo não vê contratos: fica com os quantitativos (empenhado por unidade incluído) e as adesões.
 const SALDOS_ITEM_TABS: ItemTab[] = ['quantitativos', 'adesoes'];
+/** Unidade interna das emendas (unidade_das_emendas() no banco): com alocação a ela, o item ganha a aba Emendas. */
+const UNIDADE_DAS_EMENDAS = 'CAEP';
+/** Perfis que leem as emendas (emendas.view: migrations 155, 180 e 198, esta para o gestor de atas e contratos). */
+const LEEM_EMENDAS = new Set(['admin', 'gestor', 'gestor_emendas', 'gestor_saldos', 'leitor']);
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 const EMPTY_UNIDADES: UnidadeItemRecord[] = [];
@@ -118,18 +130,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const unidades = unidadesDoItem?.unidades ?? EMPTY_UNIDADES;
   // Nome, cidade e UF dos órgãos no cadastro de UASGs (o nome da ata vem cortado em 45 letras).
   const cadastroUasgs = useCadastroUasgs(unidades.map((u) => String(u.codigoUnidade ?? '').replace(/\D/g, '')));
-  const { saldos: saldosDaAta } = useAtaItemSaldos(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
+  const { saldos: saldosDaAta, consulta: saldosDaAtaQuery } = useAtaItemSaldos(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
   const error = unidadesQueryError ? (unidadesQueryError.message || 'Erro ao buscar saldos por unidade.') : null;
 
-  const {
-    data: leituraAdesoes,
-    isLoading: adesoesLoading,
-    error: adesoesQueryError
-  } = useItemAdesoes(
+  const adesoesQuery = useItemAdesoes(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
     item.numeroItem
   );
+  const { data: leituraAdesoes, isLoading: adesoesLoading, error: adesoesQueryError } = adesoesQuery;
   // A resposta vazia só vale como "nenhuma adesão" quando os órgãos do item vieram da API agora.
   const adesoesDoItem = React.useMemo(
     () => escolherAdesoes(leituraAdesoes, loading ? undefined : unidadesDoItem?.origem),
@@ -142,9 +151,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // 'empenhos' era uma aba própria; os empenhos agora ficam dentro de cada contrato.
   const navigate = useNavigateWithOrigin();
   const { role } = useAuth();
-  const verContratos = role !== 'gestor_saldos';
+  const verContratos = !semContratos(role);
+  // Aba Emendas (decisão de 24/10/2026): só em item com alocação à CAEP, para quem lê as emendas.
+  const alocacoesParaAba = useItemAllocations(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
+  const temCaep = Boolean(alocacoesParaAba.data?.allocations.some((a) => a.unitName === UNIDADE_DAS_EMENDAS && a.allocatedQty > 0));
+  const comEmendas = temCaep && Boolean(role) && LEEM_EMENDAS.has(role as string);
+  const abasDoItem = useMemo<ItemTab[]>(() => [...(verContratos ? ITEM_TABS : SALDOS_ITEM_TABS), ...(comEmendas ? (['emendas'] as ItemTab[]) : [])], [verContratos, comEmendas]);
   const { activeTab, goToTab: setActiveTab, tabsRef } = useInstrumentTab<ItemTab>({
-    tabs: verContratos ? ITEM_TABS : SALDOS_ITEM_TABS,
+    tabs: abasDoItem,
     defaultTab: 'quantitativos',
     // Órgãos participantes e Alocação interna viraram a aba Órgãos e quantitativos (migration 109).
     aliases: { empenhos: 'contratos', unidades: 'quantitativos', alocacao: 'quantitativos' }
@@ -164,8 +178,14 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const [expandedContracts, setExpandedContracts] = useState<Record<string, boolean>>({});
 
+  // Alocações e vínculos nota → unidade vêm só do banco: falha vira erro (aviso com "Tentar de novo"), nunca a cópia do
+  // navegador. Sem as duas leituras certas, a limpeza automática dos vínculos não roda.
   const {
-    data: allocationsState
+    data: allocationsState,
+    isSuccess: alocacoesCarregadas,
+    isError: alocacoesComErro,
+    isFetching: relendoAlocacoes,
+    refetch: relerAlocacoes
   } = useItemAllocations(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
@@ -175,7 +195,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
 
   const {
     data: empenhoLinksState,
-    isSuccess: empenhoLinksCarregados
+    isSuccess: empenhoLinksCarregados,
+    isError: empenhoLinksComErro,
+    isFetching: relendoEmpenhoLinks,
+    refetch: relerEmpenhoLinks
   } = useItemEmpenhoLinks(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
@@ -183,6 +206,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   );
   const empenhoLinks = empenhoLinksState?.links ?? EMPTY_RECORD;
   const empenhoLinkVersion = empenhoLinksState?.version ?? 1;
+  const unidadesNaoCarregaram = alocacoesComErro || empenhoLinksComErro;
+  const relerUnidades = () => {
+    if (alocacoesComErro) void relerAlocacoes();
+    if (empenhoLinksComErro) void relerEmpenhoLinks();
+  };
 
   const saveEmpenhoLinksMutation = useSaveEmpenhoLinks();
 
@@ -192,7 +220,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const canonicalItemKey = normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem);
 
   // Contratado por unidade (migration 103): quantidade de cada contrato (fonte, ajuste) e a divisão entre as unidades.
-  const { data: contratadoDoItem } = useContratadoDoItem(canonicalItemKey);
+  const { data: contratadoDoItem, consulta: contratadoDoItemQuery } = useContratadoDoItem(canonicalItemKey);
   const quantidadePorContrato = useMemo(
     () => new Map(contratadoDoItem.contratos.map((c) => [c.contractKey, c])),
     [contratadoDoItem.contratos]
@@ -202,13 +230,21 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const [contratoDividindo, setContratoDividindo] = useState<ContratoParaDividir | null>(null);
 
   // Vínculos Oficiais com Contratos do CGLIC (Fase 6.2)
-  const { data: contractLinks = [] } = useItemContractLinks(
+  const contractLinksQuery = useItemContractLinks(
     arp.numeroAtaRegistroPreco,
     arp.codigoUnidadeGerenciadora,
     item.numeroItem,
     canonicalItemKey
   );
-  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = useContractsDashboard(carteiraDaAta(arp));
+  const { data: contractLinks = [] } = contractLinksQuery;
+  // Contratos dos vínculos deste item: só eles (antes, a carteira inteira de contratos da UASG em qualquer aba).
+  const chavesVinculadas = useMemo(() => (contractLinksQuery.data ? contractLinksQuery.data.map((l) => l.contractKey) : undefined), [contractLinksQuery.data]);
+  const contratosVinculadosQuery = useContratosPorChave(carteiraDaAta(arp), chavesVinculadas);
+  const { data: contratosVinculados = [] } = contratosVinculadosQuery;
+  // A carteira inteira de contratos só serve às sugestões, que ficam na aba Contratos: lida quando a aba abre.
+  const abaContratos = verContratos && activeTab === 'contratos';
+  const officialContractsQuery = useContractsDashboard(carteiraDaAta(arp), { enabled: abaContratos });
+  const { data: officialDashboardContracts = [], isLoading: officialContractsLoading } = officialContractsQuery;
   const unlinkContractMutation = useUnlinkContractFromItem();
   const [isLinkContractModalOpen, setIsLinkContractModalOpen] = useState<boolean>(false);
   const [linkingSuggestion, setLinkingSuggestion] = useState<ItemContractSuggestion | null>(null);
@@ -261,12 +297,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   // Vínculos confirmados; a quantidade do item no contrato é a gravada no vínculo (relida pelo servidor a cada 6 horas),
   // a mesma das telas de Ata e dos painéis.
   const enrichedOfficialLinks = useMemo(() => {
-    return enrichContractLinks(contractLinks, officialDashboardContracts);
-  }, [contractLinks, officialDashboardContracts]);
+    return enrichContractLinks(contractLinks, contratosVinculados);
+  }, [contractLinks, contratosVinculados]);
 
   // Empenho do item: as parcelas deste item nas notas vinculadas aos itens dos contratos (migration 94) e as notas que
   // ainda faltam vincular. As notas dos contratos chegam pela sincronização do servidor, de hora em hora.
-  const { data: empenhoDoItem, isLoading: vinculosLoading, isReady: empenhoDoItemPronto } = useEmpenhoDoItem(canonicalItemKey);
+  const { data: empenhoDoItem, isLoading: vinculosLoading, isReady: empenhoDoItemPronto, leituras: leiturasDoEmpenho } = useEmpenhoDoItem(canonicalItemKey);
   const [notaParaVincular, setNotaParaVincular] = useState<DistribuicaoDoEmpenho | null>(null);
   // Quantidade da nota no item (migration 104): gravar, conferir e, se a nova quantidade não cabe na unidade, tirar a
   // nota de lá e avisar.
@@ -328,8 +364,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const { data: dismissedSuggestions = [] } = useDismissedContractSuggestions(canonicalItemKey);
   // Não sugerir: contrato já vinculado a ata de outra compra, ou com este item em outra ata (cada item do contrato
   // pertence a uma só ata, migration 86), ou marcado pelo coordenador como "não pertence a ata".
-  const { data: todosVinculos = [] } = useArpItemContractLinks();
-  const { data: contratosSemAta = {} } = useContratosSemAta();
+  // Vínculos de todas as atas e marcas "não pertence": só para as sugestões (aba Contratos).
+  const { data: todosVinculos = [] } = useArpItemContractLinks(abaContratos);
+  const { data: contratosSemAta = {} } = useContratosSemAta({ enabled: abaContratos });
   const naoSugerir = useMemo(() => {
     const chaveDaAta = arp ? chaveGestaoDaArp(arp) : '';
     const compra = arp ? buildItemSuggestionCriteria(arp, item).compra : undefined;
@@ -424,7 +461,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   );
   // Com a ata assinada informada (migration 109), a base do saldo e o limite da alocação são a cota própria:
   // o registrado da SENASP menos o que ela gerencia para os órgãos participantes.
-  const { data: quantitativos, isLoading: quantitativosLoading } = useQuantitativosDoItem(canonicalItemKey);
+  const { data: quantitativos, isLoading: quantitativosLoading, consulta: quantitativosQuery } = useQuantitativosDoItem(canonicalItemKey);
   // Só na ata da SENASP: na ata de outro órgão (migration 114) a base continua o registrado (ou o aprovado na adesão).
   const cotaPropriaInformada = !ataDeOutroOrgao(arp) && quantitativos.informado;
   const baseSaldo = (cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty) - descontoRegistradoAcima;
@@ -434,6 +471,11 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const limiteProvisorioOutrosOrgaos = !ataDeOutroOrgao(arp) && !quantitativosLoading && !quantitativos.informado ? outrosOrgaosRegistrados : 0;
 
   const handleLinkEmpenho = async (empenhoUnidade: string, departmentId: string) => {
+    // Sem os vínculos lidos do banco, gravar a lista nova apagaria os que não chegaram à tela.
+    if (!empenhoLinksCarregados) {
+      setAllocationError('Os vínculos das notas às unidades não carregaram. Tente de novo antes de mudar a unidade da nota.');
+      return;
+    }
     const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
     const updatedLinks = {
       ...empenhoLinks,
@@ -546,9 +588,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const [vinculosDesfeitos, setVinculosDesfeitos] = useState<Array<{ numero: string; unidade: string }>>([]);
   const limpezaTentada = React.useRef<string | null>(null);
   useEffect(() => {
-    if (!empenhoDoItemPronto || !empenhoLinksCarregados || !(canLinkEmpenhos || canManageAllocations)) return;
-    if (saveEmpenhoLinksMutation.isPending) return;
-    const limpeza = vinculosSemQuantidade(empenhoLinks, empenhoDoItem.parcelas);
+    const limpeza = limpezaDeVinculosDoItem({
+      alocacoesCarregadas,
+      vinculosCarregados: empenhoLinksCarregados,
+      empenhoDoItemPronto,
+      podeMexer: canLinkEmpenhos || canManageAllocations,
+      gravando: saveEmpenhoLinksMutation.isPending,
+      links: empenhoLinks,
+      parcelas: empenhoDoItem.parcelas
+    });
     if (!limpeza) return;
     const assinatura = `${empenhoLinkVersion}:${limpeza.removidos.map((r) => r.numero).join(',')}`;
     if (limpezaTentada.current === assinatura) return;
@@ -562,7 +610,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       // novo com o que está gravado agora.
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empenhoDoItemPronto, empenhoLinksCarregados, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
+  }, [empenhoDoItemPronto, empenhoLinksCarregados, alocacoesCarregadas, empenhoLinks, empenhoLinkVersion, empenhoDoItem, canLinkEmpenhos, canManageAllocations]);
 
   const handleInformarQuantidade = (p: ParcelaDoItem, quantidade: number | null, sairDaUnidade: string | null) =>
     acoesQuantidade.informar.mutate(
@@ -606,12 +654,60 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   });
 
   // Interesse por GTI (só na ata da SENASP): botão no cartão do topo e gaveta entre o cartão e as abas, como no Início.
-  const fatiasGti = useInteresseGti({ unidades, quantitativos, ataDaCglic });
+  const { fatias: fatiasGti, consulta: gruposGtiQuery } = useInteresseGti({ unidades, quantitativos, ataDaCglic });
   const [gtiAberto, setGtiAberto] = React.useState(false);
+
+  // Uma fonte que falha não vira "0% consumido", "nenhuma adesão" ou contratado e empenhado zerados: a faixa diz o
+  // que não carregou. Alocações e vínculos das notas às unidades têm o aviso próprio, dentro da aba.
+  const leiturasDaTela: LeituraDaTela[] = [
+    { rotulo: ROTULO_SALDO_ITENS, query: saldosDaAtaQuery },
+    { rotulo: 'ata assinada e órgãos do item', query: quantitativosQuery },
+    { rotulo: 'quantidade contratada do item', query: contratadoDoItemQuery },
+    { rotulo: 'adesões do item no Compras.gov.br', query: adesoesQuery },
+    // A API falhou e a tela mostra a cópia guardada pelo servidor: "não atualizou — mostrando a última leitura".
+    ...(leituraAdesoes?.falhaAoVivo && leituraAdesoes.copia
+      ? [{ rotulo: 'adesões do item no Compras.gov.br', query: { data: leituraAdesoes, isError: true, error: new Error(leituraAdesoes.falhaAoVivo), refetch: adesoesQuery.refetch } }]
+      : []),
+    ...(ataDaCglic ? [{ rotulo: ROTULO_GRUPOS_UASGS, query: gruposGtiQuery }] : []),
+    ...(verContratos
+      ? [
+          { rotulo: ROTULO_CONTRATOS_DO_ITEM, query: contractLinksQuery },
+          { rotulo: `contratos da UASG ${carteiraDaAta(arp)}`, query: contratosVinculadosQuery },
+          { rotulo: `contratos da UASG ${carteiraDaAta(arp)}`, query: officialContractsQuery },
+          ...leiturasDoEmpenho
+        ]
+      : [])
+  ];
+  const leituras = useLeiturasComFalha(leiturasDaTela);
+  // Nada que grava roda sobre leitura que falhou: sem o saldo ou a ata assinada, o limite da alocação (a cota própria)
+  // ficaria errado; sem a ata assinada, informar ou remanejar partiria de um quadro vazio.
+  const quantitativosNaoCarregaram = naoCarregou(quantitativosQuery);
+  const limiteDaAlocacaoNaoCarregou = naoCarregou(saldosDaAtaQuery) || quantitativosNaoCarregaram;
 
   // Papel da SENASP neste item (ata de outro órgão: participante ou adesão, migration 114).
   const papelDoAItem = papelDoItem(papelSenaspDaAta(arp), unidades, adesoesDaSenasp(adesoes));
-  const unidadesInternasDoItem = (
+  const avisoUnidadesNaoCarregaram = unidadesNaoCarregaram ? (
+    <NoticeBar
+      tone="danger"
+      testId="item-unidades-falha"
+      action={
+        <AppButton variant="secondary" size="sm" onClick={relerUnidades} disabled={relendoAlocacoes || relendoEmpenhoLinks}>
+          {relendoAlocacoes || relendoEmpenhoLinks ? 'Carregando…' : 'Tentar de novo'}
+        </AppButton>
+      }
+    >
+      Não foi possível carregar {alocacoesComErro ? 'as alocações às unidades internas' : 'os vínculos das notas às unidades internas'} deste item.
+      Os números de alocação e a unidade de cada nota não aparecem até carregar.
+    </NoticeBar>
+  ) : null;
+  const unidadesInternasDoItem = unidadesNaoCarregaram ? avisoUnidadesNaoCarregaram : (
+    <>
+    {limiteDaAlocacaoNaoCarregou && (
+      <NoticeBar tone="warning" testId="item-alocar-fechado">
+        O saldo ou a ata assinada do item não carregou: sem eles o limite da alocação ficaria errado. Dá para ver as
+        alocações, mas alocar fica fechado até carregar (use “Tentar novamente” no aviso acima).
+      </NoticeBar>
+    )}
     <AllocationsTab
       ugUasg={arp.codigoUnidadeGerenciadora}
       item={{
@@ -634,11 +730,12 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       contratosAConferir={contratosAConferir}
       departments={departments}
       departmentsLoading={departmentsLoading}
-      canManage={canManageAllocations}
-      canInformUnits={canEditData}
+      canManage={canManageAllocations && !limiteDaAlocacaoNaoCarregou}
+      canInformUnits={canEditData && !limiteDaAlocacaoNaoCarregou}
       error={allocationError}
       onGoToContracts={() => setActiveTab('contratos')}
     />
+    </>
   );
 
   const linkedContractsCount = enrichedOfficialLinks.length;
@@ -665,7 +762,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
           valorFinanceiroDisponivel,
           valorFinanceiroConsumido,
           notasAVincular: executionSummary.notasAVincular,
-          quantidadeAlocada: totalAllocatedSum,
+          quantidadeAlocada: alocacoesComErro ? null : totalAllocatedSum,
           quantidadeTotalAta: item.quantidadeHomologadaItem || totalRegistrado,
           orgaosParticipantes: unidades.length,
           adesoesSemDados: !loading && !adesoesLoading && adesoesDoItem.origem === 'SEM_DADOS'
@@ -685,7 +782,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         tabs={[
           { id: 'quantitativos', label: 'Órgãos e quantitativos' },
           ...(verContratos ? [{ id: 'contratos' as const, label: `Contratos e empenhos (${contractsCount})` }] : []),
-          { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` }
+          { id: 'adesoes', label: adesoesDoItem.origem === 'SEM_DADOS' ? 'Adesões' : `Adesões (${adesoes.length})` },
+          ...(comEmendas ? [{ id: 'emendas' as const, label: 'Emendas' }] : [])
         ]}
         active={activeTab}
         onSelect={(tab) => setActiveTab(tab)}
@@ -693,6 +791,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         ariaLabel="Seções do item"
       />
       </Instrument360Head>
+
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="do item" testIdPrefix="item360-fontes" />
 
       <Instrument360TabPanel idPrefix="item" activeTab={activeTab}>
         {activeTab === 'quantitativos' ? (
@@ -714,9 +814,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               registradoAcima={registradoAcima}
               pdfDaAta={formatPncpAtaPdfUrl(arp.numeroControlePncpAta)}
               pregaoItem={`${arp.numeroCompra ? `Pregão ${arp.numeroCompra}${arp.anoCompra ? `/${arp.anoCompra}` : ''} · ` : ''}item ${Number(item.numeroItem) || item.numeroItem}`}
-              podeInformar={canEditData}
-              podeRemanejar={canManageAllocations}
-              alocado={totalAllocatedSum}
+              podeInformar={canEditData && !quantitativosNaoCarregaram}
+              podeRemanejar={canManageAllocations && !quantitativosNaoCarregaram}
+              alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}
             />
@@ -736,9 +836,9 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               contratadoSenasp={executionSummary.contratado}
               quantitativos={quantitativos}
               adesoes={adesoes}
-              podeInformar={canEditData}
-              podeRemanejar={canManageAllocations}
-              alocado={totalAllocatedSum}
+              podeInformar={canEditData && !quantitativosNaoCarregaram}
+              podeRemanejar={canManageAllocations && !quantitativosNaoCarregaram}
+              alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}
             />
@@ -766,6 +866,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                   {saidasDaUnidade.map((x) => `A nota ${x.numero} saiu da unidade ${x.unidade}: a nova quantidade (${formatNumber(x.quantidade)} un) não cabe no saldo dela.`).join(' ')}
                 </NoticeBar>
               )}
+              {avisoUnidadesNaoCarregaram}
               {allocationError && (
                 <NoticeBar tone="danger" testId="vinculo-unidade-erro">{allocationError}</NoticeBar>
               )}
@@ -1119,6 +1220,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
                 </div>
               )}
           </div>
+        ) : activeTab === 'emendas' ? (
+          <EmendasDoItemTab itemKey={canonicalItemKey} podeVerContratos={verContratos} />
         ) : (
           <AdesoesTab
             adesoesLoading={adesoesLoading || loading}

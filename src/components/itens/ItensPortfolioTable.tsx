@@ -8,14 +8,14 @@ import { CarteiraNivelPill } from '../carteira/CarteiraNivelPill';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { TODAS_UNIDADES } from '../carteira/CarteiraExecucaoSelects';
 import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
-import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraTableShell, carteiraTd, carteiraTdBarra, carteiraTh, ESPACO_ATE_A_BARRA, LARGURA_BARRA_CARTEIRA, LINHA_ACIMA_DA_BARRA } from '../carteira/carteiraStyles';
 import { saldoBarColor } from '../atas/ataSaldoStats';
 import { CarteiraSortButton, CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import { situacaoDaFaixa } from '../carteira/carteiraPrazo';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import type { ItensPortfolioFilterState } from './ItensPortfolioFilters';
@@ -57,9 +57,9 @@ const ataOrdem = (numero: string) => numero.split('/').reverse().join('/');
 const ConsumoBar: React.FC<{ pct: number | null }> = ({ pct }) => {
   if (pct === null) return <span style={{ color: '#94a3b8' }}>—</span>;
   return (
-    <div style={{ minWidth: '72px' }}>
-      <span style={{ fontWeight: 800 }}>{pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%</span>
-      <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', marginTop: '0.2rem', overflow: 'hidden' }}>
+    <div style={{ minWidth: LARGURA_BARRA_CARTEIRA }}>
+      <span style={{ ...LINHA_ACIMA_DA_BARRA, fontWeight: 800 }}>{pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%</span>
+      <div style={{ width: LARGURA_BARRA_CARTEIRA, maxWidth: '100%', height: '4px', background: '#f1f5f9', borderRadius: '2px', marginTop: ESPACO_ATE_A_BARRA, overflow: 'hidden' }}>
         <div style={{ width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%', background: saldoBarColor(pct) }} />
       </div>
     </div>
@@ -177,7 +177,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                       {itemNovo(row) && <CarteiraNovoBadge genero="m" testId={`itens-novo-${row.key}`} />}
                     </div>
                     <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp(2) }}>
-                      {toSentenceCaseIfAllCaps(item.descricaoItem)}
+                      {descricaoItemEmFrase(item.descricaoItem)}
                     </div>
                   </td>
                   <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
@@ -222,15 +222,15 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                       )}
                     </div>
                   </td>
-                  <td data-label="Consumo" style={carteiraTd}>
+                  <td data-label="Consumo" style={carteiraTdBarra}>
                     <ConsumoBar pct={row.consumoPct} />
                   </td>
-                  <td data-label="GTI" style={carteiraTd}>
+                  <td data-label="GTI" style={carteiraTdBarra}>
                     {(() => {
                       const fatias = fatiasDaLinha?.(row);
                       const principal = fatias?.principal?.grupo;
                       return (
-                        <CarteiraCellFilter descricao="este GTI" onFilter={onFilter && principal ? () => onFilter('gti', principal) : undefined}>
+                        <CarteiraCellFilter descricao="este GTI" bloco onFilter={onFilter && principal ? () => onFilter('gti', principal) : undefined}>
                           <GtiCelulaAta fatias={fatias} testId={`itens-gti-${row.key}`} />
                         </CarteiraCellFilter>
                       );

@@ -4,7 +4,9 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
-import { ErrorState } from '../../design-system/components/ErrorState';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { ContractsPartialNotice } from '../carteira/ContractsPartialNotice';
 import { canAssignManager } from '../carteira/ManagerAssign';
@@ -19,7 +21,7 @@ import { getArpPrazo } from '../../hooks/useAtasPortfolio';
 import { useComplexidadeAjustes } from '../../hooks/useComplexidadeAjustes';
 import { formatContractNumber } from '../../utils/contractNumber';
 import type { ManagerTarget } from '../../services/managerAssignmentService';
-import { AvisoCarregando } from '../../design-system';
+import { AvisoCarregando, ErrorState, Modal } from '../../design-system';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 
 /**
@@ -31,12 +33,18 @@ export const ContratosAtaPage: React.FC = () => {
   const { role } = useAuth();
   const podeVincular = role === 'admin' || role === 'gestor';
   const podeDecidir = canAssignManager(role);
-  const { atas, contratos, links, confirmacoesSemAta, motivosManual, motivosEstado, relerMotivos, pendencias, totalSemVinculo, ataDe, itensDaAta, atasFila, isBusy, refresh } =
-    usePendenciasVinculoAta();
-  const { data: ajustes } = useComplexidadeAjustes();
-
   // "Para quem atribuo?" (depois de marcar "não pertence a ata"): precisa da carga de cada gestor.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void } | null>(null);
+  // As pendências de cada contrato (painel do Início) só entram na carga dos gestores: são lidas quando o modal abre.
+  const { atas, contratos, links, confirmacoesSemAta, motivosManual, motivosEstado, relerMotivos, pendencias, totalSemVinculo, ataDe, itensDaAta, atasFila, isBusy, refresh, leituras: leiturasDaFila, filaIndisponivel } =
+    usePendenciasVinculoAta({ pendencias: Boolean(transferencia) });
+  const ajustesQuery = useComplexidadeAjustes();
+  const { data: ajustes } = ajustesQuery;
+  // Uma fonte que falha não some calada: a fila mostra o que carregou e a faixa diz o que ficou de fora.
+  const leituras = useLeiturasComFalha([...leiturasDaFila, { rotulo: 'ajustes de complexidade (carga dos gestores)', query: ajustesQuery }]);
+  // Contratos de alguma UASG (ou, no perfil gestor, o recorte dele) não carregaram: "todos têm ata" não vale.
+  const contratosNaoCarregaram = (contratos.leiturasDosContratos ?? []).some((l) => naoCarregou(l.query));
+
   const distribuicao = React.useMemo(
     () =>
       transferencia
@@ -69,14 +77,6 @@ export const ContratosAtaPage: React.FC = () => {
     [transferencia, atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes]
   );
 
-  if (contratos.error && !contratos.hasAnyData && atas.arps.length === 0) {
-    return (
-      <PageContainer style={{ padding: '2rem 0' }}>
-        <ErrorState title="Erro ao carregar os contratos" message={contratos.error.message || 'Não foi possível carregar atas e contratos.'} onRetry={refresh} />
-      </PageContainer>
-    );
-  }
-
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
@@ -96,6 +96,8 @@ export const ContratosAtaPage: React.FC = () => {
         }
       />
 
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da fila" testIdPrefix="vinculacao-contratos-fontes" />
+
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando contratos...">
           <AvisoCarregando label="Carregando contratos" />
@@ -113,7 +115,11 @@ export const ContratosAtaPage: React.FC = () => {
             />
           )}
 
-          {totalSemVinculo === 0 && pendencias.naoPertencem.length === 0 ? (
+          {filaIndisponivel ? (
+            <ListaNaoCarregou titulo="A fila não carregou: sem os vínculos com as atas, todo contrato pareceria sem ata." testId="vinculacao-contratos-nao-carregou" />
+          ) : totalSemVinculo === 0 && pendencias.naoPertencem.length === 0 && contratosNaoCarregaram ? (
+            <ListaNaoCarregou titulo="Os contratos não carregaram." testId="vinculacao-contratos-nao-carregou" />
+          ) : totalSemVinculo === 0 && pendencias.naoPertencem.length === 0 ? (
             <EmptyState
               title="Todos os contratos da sua carteira têm ata vinculada."
               description="Quando um contrato novo chegar sem ata, ele aparece aqui com a ata provável."
@@ -142,7 +148,24 @@ export const ContratosAtaPage: React.FC = () => {
             />
           )}
 
-          {transferencia && distribuicao && (
+          {transferencia && contratos.pendenciasCarregando && (
+            <Modal isOpen onClose={() => setTransferencia(null)} size="lg" title="Atribuir gestor" testId="atribuir-gestor-carregando">
+              <AvisoCarregando label="Carregando a carga dos gestores" />
+            </Modal>
+          )}
+
+          {transferencia && !contratos.pendenciasCarregando && contratos.pendenciasComErro && (
+            <Modal isOpen onClose={() => setTransferencia(null)} size="lg" title="Atribuir gestor" testId="atribuir-gestor-erro">
+              <ErrorState
+                title="A carga dos gestores não carregou"
+                message="Sem as pendências de cada contrato, a comparação entre os gestores sairia errada."
+                onRetry={() => void contratos.relerPendencias()}
+                testId="atribuir-gestor-erro-estado"
+              />
+            </Modal>
+          )}
+
+          {transferencia && distribuicao && !contratos.pendenciasCarregando && !contratos.pendenciasComErro && (
             <AtribuirGestorModal
               targets={transferencia.targets}
               origem={transferencia.origem}

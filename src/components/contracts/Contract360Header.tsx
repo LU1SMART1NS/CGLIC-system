@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import type { OrchestrationStatus } from '../../types/empenhoSync';
 import { useContractManager } from '../../hooks/useContractManager';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
+import { naoCarregou } from '../fonte/useLeiturasComFalha';
 import { MissingValue } from '../instrument360/MissingValue';
 import { getContractDaysRemaining } from '../../services/dashboardService';
 import { formatContractNumber } from '../../utils/contractNumber';
@@ -76,7 +77,8 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
   // Itens da ata são gravados por RPCs de gestor/admin: só esses perfis refazem a parte dos itens.
   const { role } = useAuth();
   const canRefreshItems = role === 'gestor' || role === 'admin';
-  const { data: manager, isLoading: loadingManager } = useContractManager(contractKey);
+  const managerQuery = useContractManager(contractKey);
+  const { data: manager, isLoading: loadingManager } = managerQuery;
   // Id PNCP e data de divulgação: o Contratos.gov.br não os devolve; vêm do PNCP e só aparecem se o PNCP responder.
   const { data: pncp, isLoading: loadingPncp } = useContractPncp(contract);
   const numeroControlePncp = contract.numeroControlePncp || pncp?.numeroControlePncp;
@@ -260,7 +262,7 @@ export const Contract360Header: React.FC<Contract360HeaderProps> = ({
       novidade={contratoEhNovo(contract) ? 'm' : undefined}
       status={{ faixa: expirado ? 'EXPIRADO' : 'REGULAR', label: instrumentSituationLabel(faixa, false), neutral: !expirado }}
       dockSubtitle={contract.fornecedorNome || undefined}
-      manager={<ManagerInfo label="Gestor do contrato" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="contract-manager-info" />}
+      manager={<ManagerInfo label="Gestor do contrato" gestorNome={manager?.gestorNome} isLoading={loadingManager} naoCarregou={naoCarregou(managerQuery)} testId="contract-manager-info" />}
       subtitle={
         contract.fornecedorNome ? (
           <>

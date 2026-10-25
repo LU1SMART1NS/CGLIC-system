@@ -10,7 +10,7 @@
  * Princípio: ausência de mapeamento = ausência de autoridade. Nunca retornar
  * um valor padrão de role aqui — cada entrada precisa ser explícita.
  */
-export type DbRole = 'admin' | 'gestor' | 'leitor' | 'gestor_saldos';
+export type DbRole = 'admin' | 'gestor' | 'leitor' | 'gestor_saldos' | 'gestor_emendas';
 
 const PERFIL_TO_DB_ROLE: Readonly<Record<string, DbRole>> = Object.freeze({
   coordenador: 'admin',
@@ -20,6 +20,8 @@ const PERFIL_TO_DB_ROLE: Readonly<Record<string, DbRole>> = Object.freeze({
   // (public.roles.id = 'gestor_saldos') — sem indireção, ao contrário do
   // mapeamento legado dos 3 perfis originais.
   gestor_saldos: 'gestor_saldos',
+  // Emendas parlamentares (migration 155): gestor de emendas da CAEP, mesmo id do backend.
+  gestor_emendas: 'gestor_emendas',
 });
 
 export function mapPerfilToDbRole(perfil: unknown): DbRole | null {

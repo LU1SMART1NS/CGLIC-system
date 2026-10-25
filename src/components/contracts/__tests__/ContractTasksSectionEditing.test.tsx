@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
 
 const idle = (mutate: any) => ({ mutate, isPending: false, error: null });
 
+const perfil = vi.hoisted(() => ({ role: 'gestor' }));
+vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: perfil.role }) }));
 vi.mock('../../../hooks/useUpdateContractTask', () => ({ useUpdateContractTask: () => idle(mocks.updateMutate) }));
 vi.mock('../../../hooks/useApplyContractTaskTemplate', () => ({ useApplyContractTaskTemplate: () => idle(mocks.applyMutate) }));
 vi.mock('../../../hooks/useContractTaskTemplates', () => ({
@@ -76,6 +78,24 @@ describe('ContractTasksSection — plano editável pelo gestor', () => {
     expect(html).toContain('Resp: João Fiscal');
   });
 
+  it('mostra o número SEI ao lado da tarefa concluída, com botão de copiar', () => {
+    const comSei: ContractTaskPlan = {
+      ...plan,
+      macrotarefas: [
+        {
+          ...plan.macrotarefas[0],
+          tarefas: [{ ...plan.macrotarefas[0].tarefas[0], status: 'CONCLUIDA', seiNumero: '28451237' }, plan.macrotarefas[0].tarefas[1]]
+        }
+      ]
+    };
+    const html = renderToStaticMarkup(<ContractTasksSection contract={contract} plan={comSei} />);
+    expect(html.match(/data-testid="numero-sei-tarefa"/g)).toHaveLength(1);
+    expect(html).toContain('>28451237<');
+    expect(html).toContain('aria-label="Copiar número SEI 28451237"');
+    // A pergunta só abre ao clicar em Concluída.
+    expect(html).not.toContain('Esta tarefa tem número SEI?');
+  });
+
   it('marca tarefas criadas pelo gestor como Personalizada', () => {
     const html = renderToStaticMarkup(<ContractTasksSection contract={contract} plan={plan} />);
     expect(html.match(/Personalizada/g)).toHaveLength(1);
@@ -89,6 +109,22 @@ describe('ContractTasksSection — plano editável pelo gestor', () => {
     expect(html).toContain('aria-label="Excluir etapa"');
     expect(html).toContain('aria-label="Renomear etapa"');
     expect(html).toContain('Aplicar modelo');
+  });
+
+  it('consulta (leitor): o mesmo plano sem criar, excluir, renomear nem aplicar modelo (decisão de 25/10/2026)', () => {
+    perfil.role = 'leitor';
+    try {
+      const html = renderToStaticMarkup(<ContractTasksSection contract={contract} plan={plan} />);
+      expect(html).not.toContain('Adicionar tarefa');
+      expect(html).not.toContain('Nova etapa');
+      expect(html).not.toContain('aria-label="Excluir tarefa"');
+      expect(html).not.toContain('aria-label="Excluir etapa"');
+      expect(html).not.toContain('aria-label="Renomear etapa"');
+      expect(html).not.toContain('Aplicar modelo');
+      expect(html).toContain('plan-status-leitura');
+    } finally {
+      perfil.role = 'gestor';
+    }
   });
 
   it('plano criado do zero não exibe rótulo "Modelo:"', () => {

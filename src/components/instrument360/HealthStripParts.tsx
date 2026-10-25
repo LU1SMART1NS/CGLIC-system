@@ -190,7 +190,7 @@ export const HealthTile: React.FC<{
  * que perde cerca de 350px para o menu lateral e as margens): até 890px são 2 por linha e até 420px, 1.
  * Sem `columns`, o número de colunas se ajusta sozinho ao espaço.
  */
-export const HealthTileGrid: React.FC<{ children: React.ReactNode; columns?: 4 | 5 }> = ({ children, columns }) => (
+export const HealthTileGrid: React.FC<{ children: React.ReactNode; columns?: 4 | 5 | 6 }> = ({ children, columns }) => (
   <div className="health-tiles-wrap">
     <div className="health-tile-grid" data-columns={columns}>
       {children}

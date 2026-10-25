@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ContractsRoute } from '../ContractsRoute';
 import { ContractsPortfolioHeader } from '../../components/contracts/portfolio/ContractsPortfolioHeader';
@@ -39,6 +39,14 @@ vi.mock('../../hooks/useSincronizacaoContratos', () => ({
 vi.mock('../../hooks/useCarteiraItens', () => ({
   useCarteiraItens: () => ({ unidades: [], unidadesDoContrato: new Map(), rows: [], resumoPorAta: new Map(), isLoading: false })
 }));
+
+// As vigências abaixo foram montadas para 24/09/2026. Sem relógio fixo, o
+// 00002/2024 (fim em 15/10/2026) passou a "Encerrado" e sumiu da lista padrão.
+vi.useFakeTimers({ toFake: ['Date'] });
+vi.setSystemTime(new Date('2026-09-24T12:00:00-03:00'));
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 // Contratos marcados "não pertence a ata" (consulta ao banco): cada teste escolhe.
 let semAtaConfirmados: Record<string, unknown> = {};
@@ -297,7 +305,8 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
 
   it('8. deve renderizar estado de erro explícito com mensagem quando a query falhar', () => {
     vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockReturnValue({
-      data: [],
+      // Leitura que falha sem leitura anterior: o React Query não tem lista nenhuma.
+      data: undefined,
       isLoading: false,
       isFetching: false,
       isError: true,
@@ -311,6 +320,56 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).toContain('Erro ao carregar carteira de contratos');
     expect(html).toContain('Falha de conexão com a API de Contratos');
     expect(html).toContain('Tentar Novamente');
+  });
+
+  it('8b. uma UASG falhou e a outra carregou: mostra o erro com "tentar novamente", não a carteira pela metade', () => {
+    const refetch = vi.fn();
+    vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockImplementation(
+      (uasg?: string) =>
+        (uasg === '200331'
+          ? {
+              data: undefined,
+              isLoading: false,
+              isFetching: false,
+              isError: true,
+              error: new Error('Não foi possível ler os contratos da UASG 200331 no banco (página 2): canceling statement due to statement timeout'),
+              refetch,
+              refresh: vi.fn()
+            }
+          : {
+              data: [{ ...mockContracts[0], id: '200330-00009-2025', uasg: '200330', fornecedorNome: 'Só da 200330 Ltda' }],
+              isLoading: false,
+              isFetching: false,
+              isError: false,
+              error: null,
+              refetch: vi.fn(),
+              refresh: vi.fn()
+            }) as any
+    );
+
+    const html = renderToStaticMarkup(<ContractsRoute />);
+
+    expect(html).toContain('Erro ao carregar carteira de contratos');
+    expect(html).toContain('UASG 200331 no banco (página 2)');
+    expect(html).toContain('Tentar Novamente');
+    expect(html).not.toContain('Só da 200330 Ltda');
+  });
+
+  it('8c. falha ao reler com uma leitura boa anterior: a carteira continua na tela', () => {
+    vi.spyOn(useContractsDashboardModule, 'useContractsDashboard').mockReturnValue({
+      data: mockContracts,
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      error: new Error('canceling statement due to statement timeout'),
+      refetch: vi.fn(),
+      refresh: vi.fn()
+    } as any);
+
+    const html = renderToStaticMarkup(<ContractsRoute />);
+
+    expect(html).not.toContain('Erro ao carregar carteira de contratos');
+    expect(html).toContain('Empresa Alfa Serviços');
   });
 
   it('9. deve renderizar loading skeleton quando isLoading for verdadeiro', () => {

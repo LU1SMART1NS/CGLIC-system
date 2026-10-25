@@ -278,6 +278,34 @@ export async function updateAtaTaskRpc(input: UpdateAtaTaskInput): Promise<RpcUp
   }
 }
 
+export interface DefinirSeiTarefaAtaInput {
+  taskId: string;
+  /** Documento (7 a 10 dígitos) ou processo SEI; vazio ou null retira o número. */
+  sei: string | null;
+  /** Conclui a tarefa na mesma gravação (pergunta feita ao concluir). */
+  concluir?: boolean;
+}
+
+/** Grava o número SEI da tarefa (migration 154) e, se pedido, conclui a tarefa junto. */
+export async function definirSeiTarefaAtaRpc(input: DefinirSeiTarefaAtaInput): Promise<RpcUpdateAtaTaskResult> {
+  const client = requireSupabase();
+  try {
+    const { data, error } = await client.rpc('definir_sei_tarefa_ata', {
+      p_task_id: input.taskId.trim(),
+      p_sei: input.sei?.trim() || null,
+      p_concluir: input.concluir ?? false
+    });
+    if (error) throw mapPostgresErrorToAppError(error);
+    if (!data || typeof data !== 'object') {
+      throw mapPostgresErrorToAppError(new Error('INVALID_PAYLOAD: Resposta inválida da RPC definir_sei_tarefa_ata'));
+    }
+    return data as RpcUpdateAtaTaskResult;
+  } catch (err: any) {
+    if (err && err.code && typeof err.code === 'string') throw err;
+    throw mapPostgresErrorToAppError(err);
+  }
+}
+
 // -------------------------------------------------------------
 // Plano de gestão editável pelo gestor (criar/renomear/excluir etapas e tarefas)
 // -------------------------------------------------------------

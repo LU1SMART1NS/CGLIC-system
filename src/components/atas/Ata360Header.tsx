@@ -13,6 +13,7 @@ import { useAtaPncp } from '../../hooks/useAtaPncp';
 import { useEyebrowDaGerenciadora } from '../../hooks/useCadastroUasgs';
 import { useAtaAssinatura } from '../../hooks/useAtaAssinatura';
 import { ManagerInfo } from '../instrument360/ManagerInfo';
+import { naoCarregou } from '../fonte/useLeiturasComFalha';
 import { MissingValue } from '../instrument360/MissingValue';
 import { formatPncpAtaUrl, formatPncpCompraUrl } from '../../utils/pncpUtils';
 import { formatProcessoSei } from '../../utils/format';
@@ -44,6 +45,9 @@ interface Ata360HeaderProps {
   onIndicarFornecedor?: () => void;
   /** Botões abaixo dos indicadores (ex.: Interesse por GTI); encolhem junto com o cartão. */
   verMais?: React.ReactNode;
+  /** Quadro do reajuste (migrations 158 e 159): só nas atas da SENASP com o reajuste lido. */
+  reajuste?: { valor: string; hint: string; tone?: 'danger' | 'warning'; indice?: string | null } | null;
+  onOpenReajuste?: () => void;
 }
 
 export const pncpLinkStyle: React.CSSProperties = {
@@ -91,11 +95,14 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   onBack,
   fornecedorPncp = null,
   onIndicarFornecedor,
-  verMais
+  verMais,
+  reajuste = null,
+  onOpenReajuste
 }) => {
   const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
-  const { data: manager, isLoading: loadingManager } = useAtaManager(chaveGestaoDaArp(arp));
+  const managerQuery = useAtaManager(chaveGestaoDaArp(arp));
+  const { data: manager, isLoading: loadingManager } = managerQuery;
   // Ata de outro órgão em que a SENASP é participante ou fez adesão (migration 106).
   const outroOrgao = ataDeOutroOrgao(arp);
   const eyebrow = useEyebrowDaGerenciadora(String(arp.codigoUnidadeGerenciadora ?? ''), arp.nomeUnidadeGerenciadora, outroOrgao);
@@ -186,7 +193,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
           ? dias === 0 ? 'Vence hoje' : `Vence em ${dias} ${dias === 1 ? 'dia' : 'dias'}`
           : undefined
       }
-      manager={<ManagerInfo label="Gestor da ata" gestorNome={manager?.gestorNome} isLoading={loadingManager} testId="ata-manager-info" />}
+      manager={<ManagerInfo label="Gestor da ata" gestorNome={manager?.gestorNome} isLoading={loadingManager} naoCarregou={naoCarregou(managerQuery)} testId="ata-manager-info" />}
       subtitle={
         outroOrgao ? (
           <span data-testid="ata-outro-orgao" style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem' }}>
@@ -224,7 +231,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
       ]}
     >
       <div data-testid="ata-health-strip">
-        <HealthTileGrid columns={5}>
+        <HealthTileGrid columns={reajuste ? 6 : 5}>
           <HealthTile
             wide
             label="Vigência"
@@ -273,6 +280,17 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
             />
           ) : (
             <HealthTile label="Ações" value="Nenhuma" hint="tudo em dia" positive onClick={onOpenActions} testId="ata-health-acoes" />
+          )}
+          {reajuste && (
+            <HealthTile
+              label={reajuste.indice ? `Reajuste · ${reajuste.indice}` : 'Reajuste'}
+              value={reajuste.valor}
+              hint={reajuste.hint}
+              compact={reajuste.valor.length > 12}
+              tone={reajuste.tone === 'danger' ? 'CRITICA' : reajuste.tone === 'warning' ? 'ATENCAO' : undefined}
+              onClick={onOpenReajuste}
+              testId="ata-health-reajuste"
+            />
           )}
         </HealthTileGrid>
         {verMais}

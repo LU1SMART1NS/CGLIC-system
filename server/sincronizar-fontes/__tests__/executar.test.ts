@@ -24,6 +24,13 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarItensNotasSiafiPendentes: vi.fn(async () => ({ pendentes: 416, amostra: null })),
     sincronizarSaldoContabil: vi.fn(async (): Promise<ResultadoSincronizacao> => ({ status: 'SUCESSO', total: 10, fontesComFalha: [], mensagem: '10 de 10 conta(s) lida(s)' })),
     contarSaldoContabilPendentes: vi.fn(async () => ({ leituras: 10, anosFechados: 0, amostraPagoNoAno: 22 })),
+    sincronizarAutoresEmendas: vi.fn(async () => sucesso(27)),
+    contarAutoresEmendas: vi.fn(async () => ({ legislatura: 57, deputados: 648, deputadosNoCargo: 513, senadores: 126, senadoresNoCargo: 81 })),
+    sincronizarReajusteAtas: vi.fn(async () => sucesso(29)),
+    contarReajusteAtasPendentes: vi.fn(async () => ({ pendentes: 149, semEdital: 64, mesesProjetados: 25 })),
+    sincronizarNotasDasEmendasDoTesouro: vi.fn(async () => sucesso(181)),
+    contarNotasEmendasTesouroPendentes: vi.fn(async () => ({ pendentes: 198, amostra: '2026NE000043', amostraUgs: [] })),
+    medirEmendasDoPortal: vi.fn(async () => ({ ano2026: { emendas: 12 } })),
     chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
@@ -242,5 +249,73 @@ describe('executarPedido', () => {
     const dry = await executarPedido({ recurso: 'cadastro_uasgs', dry: true }, d);
     expect(dry).toMatchObject({ dry: true, consulta: { pendentes: 260 } });
     expect(d.sincronizarCadastroUasgs).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('autores das emendas', () => {
+  it('vale para todas as carteiras (sem UASG) e executa a leitura de Câmara e Senado', async () => {
+    const v = validarPedido({ recurso: 'autores_emendas' });
+    expect(v).toMatchObject({ ok: true, pedido: { recurso: 'autores_emendas' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'autores_emendas', forcar: true, dry: false }, d);
+    expect(d.sincronizarAutoresEmendas).toHaveBeenCalledWith({ forcar: true });
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 27 } });
+  });
+
+  it('no teste (dry) só conta, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'autores_emendas', forcar: false, dry: true }, d);
+    expect(d.sincronizarAutoresEmendas).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { deputados: 648, senadores: 126 } });
+  });
+});
+
+describe('reajuste das atas', () => {
+  it('vale para as duas carteiras (sem UASG) e lê com o leitor de PDF do servidor', async () => {
+    expect(validarPedido({ recurso: 'reajuste_atas' })).toMatchObject({ ok: true, pedido: { recurso: 'reajuste_atas' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'reajuste_atas', forcar: true, dry: false }, d);
+    expect(d.sincronizarReajusteAtas).toHaveBeenCalledWith(expect.objectContaining({ forcar: true, orcamentoMs: expect.any(Number), leitor: expect.objectContaining({ textoDoPdf: expect.any(Function), arquivosDoZip: expect.any(Function) }) }));
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 29 } });
+  });
+
+  it('no teste (dry) só conta a fila e lê os índices, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'reajuste_atas', forcar: false, dry: true }, d);
+    expect(d.sincronizarReajusteAtas).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { pendentes: 149 } });
+  });
+});
+
+describe('notas das emendas pelo Tesouro', () => {
+  it('vale para as duas UGs (sem UASG) e grava com o orçamento de tempo', async () => {
+    expect(validarPedido({ recurso: 'notas_emendas_tesouro' })).toMatchObject({ ok: true, pedido: { recurso: 'notas_emendas_tesouro' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'notas_emendas_tesouro', forcar: true, dry: false }, d);
+    // A chave do Portal vai junto: as notas que o Tesouro não descreve são procuradas lá (migration 192).
+    expect(d.sincronizarNotasDasEmendasDoTesouro).toHaveBeenCalledWith({ forcar: true, orcamentoMs: expect.any(Number), chave: 'chave-de-teste' });
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 181 } });
+  });
+
+  it('no teste (dry) só conta a fila e consulta uma nota, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'notas_emendas_tesouro', forcar: false, dry: true }, d);
+    expect(d.sincronizarNotasDasEmendasDoTesouro).not.toHaveBeenCalled();
+    expect(d.contarNotasEmendasTesouroPendentes).toHaveBeenCalledWith('chave-de-teste');
+    expect(r).toMatchObject({ dry: true, consulta: { pendentes: 198 } });
+  });
+});
+
+describe('medição das emendas do Portal', () => {
+  it('só em modo de teste: mede com a chave do servidor e não grava', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'emendas_portal', forcar: false, dry: true }, d);
+    expect(d.medirEmendasDoPortal).toHaveBeenCalledWith(expect.objectContaining({ chave: 'chave-de-teste' }));
+    expect(r).toMatchObject({ dry: true, consulta: { ano2026: { emendas: 12 } } });
+  });
+
+  it('fora do modo de teste recusa', async () => {
+    const r = await executarPedido({ recurso: 'emendas_portal', forcar: false, dry: false }, deps());
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'ERRO' } });
   });
 });

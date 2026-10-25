@@ -18,8 +18,9 @@ import type { ArpRecord, ArpItemRecord } from '../../types';
 import type { ComprasGovReferencia } from './ItemExecutionSummaryStrip';
 import { ataDeOutroOrgao, chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { useEyebrowDaGerenciadora } from '../../hooks/useCadastroUasgs';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 
-export type ItemTab = 'quantitativos' | 'contratos' | 'adesoes';
+export type ItemTab = 'quantitativos' | 'contratos' | 'adesoes' | 'emendas';
 
 export interface ItemHeroMetrics {
   officialSaldo: number;
@@ -34,7 +35,8 @@ export interface ItemHeroMetrics {
   /** Notas dos contratos do item ainda a vincular aos itens, que podem conter este item. */
   notasAVincular?: number;
   /** Soma das alocações internas do quantitativo SENASP. */
-  quantidadeAlocada?: number;
+  /** Nulo: as alocações não carregaram (o quadro mostra "—" em vez de 0). */
+  quantidadeAlocada?: number | null;
   /** Total registrado do item na ata, somando todos os órgãos. */
   quantidadeTotalAta?: number;
   /** Órgãos com quantidade registrada no item (gerenciador e participantes). */
@@ -114,6 +116,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
   const notasAVincular = metrics.notasAVincular ?? 0;
 
   // Alocação interna: o quantitativo SENASP (`itemTotalQty`) menos o que já foi distribuído às unidades internas.
+  const alocacaoNaoCarregou = metrics.quantidadeAlocada === null;
   const alocada = metrics.quantidadeAlocada ?? 0;
   const aAlocar = metrics.itemTotalQty - alocada;
   const alocadaAcima = aAlocar < 0;
@@ -178,7 +181,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           {item.niFornecedor && <span style={{ color: '#64748b' }}> · CNPJ {formatCnpj(item.niFornecedor)}</span>}
         </>
       }
-      objeto={item.descricaoItem}
+      objeto={descricaoItemEmFrase(item.descricaoItem)}
       origin={{
         label: 'Ata de origem',
         value: onOpenAta ? (
@@ -234,9 +237,9 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
           />
           <HealthTile
             label="Alocação interna"
-            value={`${formatNumber(alocada)} un`}
-            hint={alocadaAcima ? `acima do limite em ${formatNumber(-aAlocar)} un` : `a alocar ${formatNumber(aAlocar)} un`}
-            tone={alocadaAcima ? 'ATENCAO' : undefined}
+            value={alocacaoNaoCarregou ? '—' : `${formatNumber(alocada)} un`}
+            hint={alocacaoNaoCarregou ? 'não carregou' : alocadaAcima ? `acima do limite em ${formatNumber(-aAlocar)} un` : `a alocar ${formatNumber(aAlocar)} un`}
+            tone={!alocacaoNaoCarregou && alocadaAcima ? 'ATENCAO' : undefined}
             onClick={() => onGoTo('quantitativos')}
             testId="item-health-alocacao"
           />

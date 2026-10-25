@@ -9,7 +9,9 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
 import { useCarteiraItens } from '../../hooks/useCarteiraItens';
-import { SaldoItensFalhaNotice } from '../carteira/SaldoItensFalhaNotice';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { CarteiraSituacaoTabs } from '../carteira/CarteiraSituacaoTabs';
 import { useCarteiraFilters } from '../carteira/carteiraFilters';
@@ -24,7 +26,7 @@ import { ItensPortfolioFilters, ITENS_FILTER_SCHEMA } from './ItensPortfolioFilt
 import { ItensPortfolioTable } from './ItensPortfolioTable';
 import { AvisoCarregando } from '../../design-system';
 import { contarPorPapel, passaFiltroPapel } from '../../utils/ataIdentidade';
-import { useFatiasItensGti } from '../../hooks/useGruposGti';
+import { ROTULO_GTI_ITENS, useFatiasItensGtiLeitura } from '../../hooks/useGruposGti';
 import { chaveItemGti, contarPorGti, passaFiltroGti, pctDoGti } from '../../config/gruposGti';
 import type { ItensPortfolioFilterState } from './ItensPortfolioFilters';
 
@@ -37,15 +39,8 @@ export const ItensPortfolio: React.FC = () => {
   const { role } = useAuth();
   const showGestorFilter = canFilterByGestor(role);
 
-  const { arps, scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, syncError, reload } = useAtasPortfolio();
-  const {
-    rows,
-    unidades,
-    isLoading: loadingExecucao,
-    saldosComErro,
-    recarregandoSaldos,
-    recarregarSaldos
-  } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  const { arps, scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, syncError, reload, leiturasDasAtas, leiturasDosSaldos, atasNaoCarregaram } = useAtasPortfolio();
+  const { rows, unidades, isLoading: loadingExecucao, saldosComErro, leituras: leiturasDosItens } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
 
   const { filters, setFilter: setFilterUrl, setFilters, resetFilters } = useCarteiraFilters(ITENS_FILTER_SCHEMA);
   // Sem o saldo dos itens a situação da ata assinada é desconhecida: o filtro "Qtd. assinada" não filtra.
@@ -60,7 +55,16 @@ export const ItensPortfolio: React.FC = () => {
   );
 
   // Fatia de cada GTI do ComprasSUSP no item (migration 139): coluna e filtro "GTI".
-  const fatiasItens = useFatiasItensGti();
+  const { fatias: fatiasItens, consulta: fatiasItensQuery } = useFatiasItensGtiLeitura();
+  // Uma fonte que falha não some calada: a carteira mostra o que carregou e a faixa diz o que ficou de fora.
+  const leituras = useLeiturasComFalha([
+    ...(leiturasDasAtas ?? []),
+    ...(leiturasDosSaldos ?? []),
+    ...(leiturasDosItens ?? []),
+    { rotulo: ROTULO_GTI_ITENS, query: fatiasItensQuery }
+  ]);
+  // Sem as atas (ou o recorte do gestor), a lista vazia é "não carregou", e não "nenhum item".
+  const listaNaoCarregou = rows.length === 0 && Boolean(atasNaoCarregaram);
   const fatiasDaLinha = useCallback(
     (r: CarteiraItemRow) => fatiasItens.get(chaveItemGti(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)),
     [fatiasItens]
@@ -205,7 +209,7 @@ export const ItensPortfolio: React.FC = () => {
         </div>
       ) : (
         <>
-          {saldosComErro && <SaldoItensFalhaNotice onRetry={recarregarSaldos} isRetrying={recarregandoSaldos} />}
+          <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da carteira" testIdPrefix="itens-fontes" />
 
           <CarteiraSituacaoTabs
             testIdPrefix="itens"
@@ -255,6 +259,9 @@ export const ItensPortfolio: React.FC = () => {
             totalItens={rows.length}
           />
 
+          {listaNaoCarregou ? (
+            <ListaNaoCarregou titulo="Os itens não carregaram." testId="itens-nao-carregou" />
+          ) : (
           <ItensPortfolioTable
             rows={lista}
             totalItens={rows.length}
@@ -266,6 +273,7 @@ export const ItensPortfolio: React.FC = () => {
             canFilterGestor={showGestorFilter}
             onResetFilters={resetFilters}
           />
+          )}
         </>
       )}
 

@@ -9,9 +9,8 @@ import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/C
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { formatCurrencyOrDash } from '../carteira/carteiraFormat';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTdBarra, carteiraTh } from '../carteira/carteiraStyles';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
@@ -21,13 +20,14 @@ import { ManagerCell } from '../carteira/ManagerAssign';
 import { CarteiraNivelPill } from '../carteira/CarteiraNivelPill';
 import { TODAS_UNIDADES } from '../carteira/CarteiraExecucaoSelects';
 import { NIVEL_ALOCACAO_ATA_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
-import type { CarteiraAtaExecucao } from '../../utils/carteiraItens';
+import type { CarteiraAtaExecucao, CarteiraItemRow } from '../../utils/carteiraItens';
+import { ItensDaAtaTabela } from './ItensDaAtaTabela';
 import type { ArpPortfolioFilterState } from './ArpPortfolioFilters';
-import { normalizeItemNumber, saldoBarColor, type AtaSaldoStats } from './ataSaldoStats';
+import { normalizeItemNumber, type AtaSaldoStats } from './ataSaldoStats';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { chaveGestaoDaArp } from '../../utils/ataIdentidade';
 import { AvisoCarregando } from '../../design-system';
+import { ConsumoItensCelula, type ConsumoItem } from './ConsumoItensCelula';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
 import { GtiCelulaAta } from '../gti/GtiVisual';
 import { chaveAtaGti, type FatiasDaAta } from '../../config/gruposGti';
@@ -38,11 +38,14 @@ interface ArpPortfolioListProps {
   cards: AtaGroupedCard[];
   totalAtas: number;
   isLoading?: boolean;
-  itemsLoadingByAta?: Record<string, boolean>;
   /** Resumo de consumo de saldo por número de ata. */
   saldoStatsByAta?: Record<string, AtaSaldoStats>;
   /** Alocação, empenho e unidades de cada ata (chave "{numeroAta}-{uasg}"), somados dos itens. */
   execucaoPorAta?: Map<string, CarteiraAtaExecucao>;
+  /** Linhas dos itens (as mesmas da Carteira de Itens): saldo, alocação e empenho na tabela de itens da ata. */
+  linhasDosItens?: CarteiraItemRow[];
+  /** Gestor de saldo não vê empenho. */
+  mostrarEmpenhoDosItens?: boolean;
   /** Fatia de cada GTI do ComprasSUSP por ata (chave "{numeroAta}-{uasg}", migration 139). */
   fatiasGti?: Map<string, FatiasDaAta>;
   /** Unidades internas (para exibir o nome da unidade filtrada). */
@@ -55,7 +58,6 @@ interface ArpPortfolioListProps {
   busca?: string;
   onSelectArp: (arp: ArpRecord) => void;
   onSelectItem: (arp: ArpRecord, item: ArpItemRecord) => void;
-  onExpandAta?: (arp: ArpRecord) => void;
   onResetFilters: () => void;
   pageSize?: number;
   /** Coordenador: "Sem gestor" vira atalho para a Central de Distribuição (a atribuição é feita só lá). */
@@ -73,32 +75,20 @@ function formatDateBR(dateStr?: string): string {
   return y && m && d ? `${d}/${m}/${y}` : dateStr;
 }
 
-const SaldoBar: React.FC<{ pct: number | null }> = ({ pct }) => {
-  if (pct === null) return <span style={{ color: '#94a3b8' }}>—</span>;
-  return (
-    <div style={{ minWidth: '84px' }}>
-      <span style={{ fontWeight: 800 }}>{pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%</span>
-      <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', marginTop: '0.2rem', overflow: 'hidden' }}>
-        <div style={{ width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%', background: saldoBarColor(pct) }} />
-      </div>
-    </div>
-  );
-};
-
 export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   cards,
   totalAtas,
   isLoading = false,
-  itemsLoadingByAta = {},
   saldoStatsByAta = {},
   execucaoPorAta,
+  linhasDosItens,
+  mostrarEmpenhoDosItens = true,
   fatiasGti,
   unidades = [],
   filters,
   gestorByAta = {},
   busca = '',
   onSelectItem,
-  onExpandAta,
   onResetFilters,
   pageSize = 15,
   canAssign = false,
@@ -119,6 +109,9 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   );
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(cards, sortColumns, cardNovo);
   const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
+  const linhaPorChave = useMemo(() => new Map((linhasDosItens ?? []).map((l) => [l.key, l])), [linhasDosItens]);
+  const nomesDasUnidades = useMemo(() => new Map((unidades ?? []).map((u) => [u.chave, u.nome])), [unidades]);
+  const nomeDaUnidade = useCallback((chave: string) => nomesDasUnidades.get(chave) ?? chave, [nomesDasUnidades]);
   const { currentPage, setPage, pageItems: pageCards, signature } = useCarteiraPagination(
     sorted,
     useCallback((c: AtaGroupedCard) => c.key, []),
@@ -176,7 +169,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               <CarteiraSortHeader label="Ata" sortKey="numero" {...sortProps} />
               <CarteiraSortHeader label="Vigência" sortKey="vigencia" {...sortProps} />
               <CarteiraSortHeader label="Itens" sortKey="itens" {...sortProps} />
-              <CarteiraSortHeader label="Maior consumo" sortKey="consumo" {...sortProps} />
+              <CarteiraSortHeader label="Consumo dos itens" sortKey="consumo" {...sortProps} />
               <th style={carteiraTh} title="Interesse principal e fatia de cada Grupo de Trabalho Integrado no valor registrado dos participantes (quantidade × valor unitário de cada item)">GTI</th>
               {colAlocacao && <th style={carteiraTh}>Alocação interna</th>}
               {colEmpenho && <th style={carteiraTh}>Empenho</th>}
@@ -197,7 +190,6 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               const stats = saldoStatsByAta[chaveGestao];
               const gestor = gestorByAta[chaveGestao];
               const totalItens = card.itens.length || arp.quantidadeItens || 0;
-              const isItemsLoading = Boolean(itemsLoadingByAta[ataKey]);
               const abrirAta = () => navigate(`/atas/detalhe/${encodeURIComponent(buildAtaKey(numeroAta, arp.codigoUnidadeGerenciadora))}`);
 
               const matchedItems = query
@@ -217,6 +209,10 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                 if (aHit !== bHit) return bHit - aHit;
                 return (pctOf(b) ?? -1) - (pctOf(a) ?? -1);
               });
+              const consumoItens: ConsumoItem[] = card.itens.flatMap((item) => {
+                const pct = pctOf(item);
+                return pct === null ? [] : [{ numero: normalizeItemNumber(item.numeroItem), descricao: item.descricaoItem || '', pct }];
+              });
               const visibleItems = orderedItems.slice(0, MAX_ITENS_EXPANDIDOS);
               const hiddenCount = orderedItems.length - visibleItems.length;
 
@@ -230,7 +226,6 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         type="button"
                         size="xs"
                         onClick={() => {
-                          if (!isExpanded) onExpandAta?.(arp);
                           setOverrides((prev) => ({ ...prev, [card.key]: !isExpanded }));
                         }}
                         expanded={isExpanded}
@@ -279,16 +274,17 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         </div>
                       ) : null}
                     </td>
-                    <td data-label="Maior consumo" style={carteiraTd}>
-                      <SaldoBar pct={stats?.maxPct ?? null} />
+                    <td data-label="Consumo dos itens" style={carteiraTdBarra}>
+                      <ConsumoItensCelula itens={consumoItens} testId={`arp-consumo-${numeroAta}`} />
                     </td>
-                    <td data-label="GTI" style={carteiraTd}>
+                    <td data-label="GTI" style={carteiraTdBarra}>
                       {(() => {
                         const fatias = fatiasGti?.get(chaveAtaGti(numeroAta, arp.codigoUnidadeGerenciadora));
                         const principal = fatias?.principal?.grupo;
                         return (
                           <CarteiraCellFilter
                             descricao="este GTI"
+                            bloco
                             onFilter={onFilter && principal ? () => onFilter('gti', principal) : undefined}
                           >
                             <GtiCelulaAta fatias={fatias} testId={`arp-gti-${numeroAta}`} />
@@ -338,49 +334,21 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                   {isExpanded && (
                     <tr className="carteira-expanded" data-testid={`arp-expanded-${numeroAta}`}>
                       <td colSpan={totalColunas} style={CARTEIRA_EXPANDED_CELL_STYLE}>
-                        {isItemsLoading ? (
-                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Carregando itens…</div>
-                        ) : orderedItems.length === 0 ? (
-                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Nenhum item disponível.</div>
+                        {orderedItems.length === 0 ? (
+                          // Os itens vêm só do banco (gravados pela sincronização do servidor); a faixa da carteira lista as atas sem itens.
+                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Itens ainda não gravados no banco. A sincronização do servidor traz os itens de hora em hora.</div>
                         ) : (
                           <>
                             <CarteiraDetailLabel>Itens da ata</CarteiraDetailLabel>
-                            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
-                              <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                  <tr>
-                                    <th style={carteiraTh}>Descrição</th>
-                                    <th style={{ ...carteiraTh, textAlign: 'right' }}>Valor unitário</th>
-                                    <th style={carteiraTh}>Consumo</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {visibleItems.map((item, idx) => (
-                                    <tr
-                                      key={`${item.numeroItem}-${item.codigoItem}-${idx}`}
-                                      data-testid={`arp-item-${numeroAta}-${item.numeroItem}`}
-                                      className="carteira-row-link"
-                                      onClick={abrirAoClicarNaLinha(() => onSelectItem(arp, item))}
-                                    >
-                                      <td data-role="id" style={{ ...carteiraTd, minWidth: '240px', maxWidth: '520px' }}>
-                                        <CarteiraIdLink onClick={() => onSelectItem(arp, item)} label={`Ver saldo do item ${item.numeroItem} da ata ${numeroAta}`} title="Ver o saldo do item">
-                                          {item.numeroItem}
-                                        </CarteiraIdLink>
-                                        <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                          {toSentenceCaseIfAllCaps(item.descricaoItem) || '—'}
-                                        </div>
-                                      </td>
-                                      <td data-label="Valor unitário" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                                        {formatCurrencyOrDash(item.valorUnitario)}
-                                      </td>
-                                      <td data-label="Consumo" style={carteiraTd}>
-                                        <SaldoBar pct={pctOf(item)} />
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                            <ItensDaAtaTabela
+                              numeroAta={numeroAta}
+                              itens={visibleItems}
+                              linhaDoItem={(item) => linhaPorChave.get(`${ataKey}-${item.numeroItem}`)}
+                              pctDoItem={pctOf}
+                              nomeDaUnidade={nomeDaUnidade}
+                              mostrarEmpenho={mostrarEmpenhoDosItens}
+                              onSelectItem={(item) => onSelectItem(arp, item)}
+                            />
                             {hiddenCount > 0 && (
                               <div style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700, paddingTop: '0.5rem' }}>
                                 + {hiddenCount} {hiddenCount === 1 ? 'item' : 'itens'} · veja todos nos detalhes da ata

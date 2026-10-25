@@ -25,7 +25,8 @@ const REGRA: Record<AvisoResolvivelTipo, string> = {
   SALDO: 'O aviso volta se a situação do saldo piorar.',
   REAJUSTE: 'O aviso não aparece mais neste ciclo de reajuste.',
   LEMBRETE: 'O lembrete não aparece mais nesta vigência.',
-  FONTE: 'Só esconde o aviso: a nota ou a fatura continua no contrato até o coordenador decidir.'
+  FONTE: 'Só esconde o aviso: a nota ou a fatura continua no contrato até o coordenador decidir.',
+  EMPENHO: 'O aviso volta se a quantidade do pedido ou das notas mudar.'
 };
 /** Aviso de vínculo a conferir (migration 112): resolver só esconde, não decide o vínculo. */
 const REGRA_VINCULO = 'Só esconde o aviso: o vínculo continua como está até o coordenador decidir. O aviso volta se o motivo mudar.';
@@ -49,7 +50,7 @@ async function observacaoComJustificativa(tabela: 'ata_tasks' | 'contract_tasks'
 export function useResolverAviso() {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { porChave, resolver, reexibir, podeResolver, podeConcluirTarefas } = useAvisosResolvidos();
+  const { porChave, resolver, reexibir, podeResolver, podeConcluirTarefas, consulta } = useAvisosResolvidos();
   const [alvo, setAlvo] = React.useState<AlvoResolucao | null>(null);
   const [texto, setTexto] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
@@ -147,7 +148,7 @@ export function useResolverAviso() {
     </Modal>
   );
 
-  return { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo, tarefasConcluidas };
+  return { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo, tarefasConcluidas, consulta };
 }
 
 /** Botão ✓ (só o ícone, dica "Resolvido"). */

@@ -88,6 +88,21 @@ describe('DataTable — modos desktop e mobile', () => {
     expect(html).toContain('aria-sort="none"');
   });
 
+  it('ordenação controlada: mostra a seta escolhida fora e não reordena os dados', () => {
+    mockMobile(false);
+    const html = renderToStaticMarkup(
+      <DataTable<Row>
+        columns={[{ key: 'sigla', header: 'Sigla', sortValue: (r) => r.sigla }]}
+        data={[data[1], data[0]]}
+        keyExtractor={(r) => r.id}
+        sort={{ key: 'sigla', dir: 'asc' }}
+        onSort={() => {}}
+      />
+    );
+    expect(html).toContain('aria-sort="ascending"');
+    expect(html.indexOf('DGE')).toBeLessThan(html.indexOf('CGLIC'));
+  });
+
   it('rowOpen: só a linha com destino vira clicável (tabela e cartão); sem rowOpen nada muda', () => {
     const abrir = () => undefined;
     const rowOpen = (r: Row) => (r.id === '1' ? abrir : null);

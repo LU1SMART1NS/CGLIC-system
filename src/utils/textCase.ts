@@ -21,11 +21,9 @@ const SIGLAS = new Set(SIGLAS_MANTIDAS);
 const HAS_LOWERCASE = /[a-zà-ÿ]/;
 const UPPER_WORD = /[A-ZÀ-Ý0-9]+/g;
 
-export function toSentenceCaseIfAllCaps(text: string | null | undefined): string {
-  if (!text) return '';
-  if (HAS_LOWERCASE.test(text)) return text;
-
-  const lowered = text.replace(UPPER_WORD, (word, offset: number) => {
+/** Passa para minúsculas as palavras em maiúsculas, menos siglas, UF depois de barra e palavras com número. */
+function baixarMaiusculas(text: string): string {
+  return text.replace(UPPER_WORD, (word, offset: number) => {
     const prev = text.charAt(offset - 1);
     const next = text.charAt(offset + word.length);
     if (SIGLAS.has(word)) return word;
@@ -37,7 +35,43 @@ export function toSentenceCaseIfAllCaps(text: string | null | undefined): string
     if (/\d/.test(word)) return word;
     return word.toLowerCase();
   });
+}
 
-  // Maiúscula no começo do texto e depois de ponto final
-  return lowered.replace(/(^|[.!?]\s+)([a-zà-ÿ])/g, (_m, before: string, letter: string) => before + letter.toUpperCase());
+/** Maiúscula no começo do texto e depois de ponto final. */
+const capitalizarFrases = (text: string) =>
+  text.replace(/(^|[.!?]\s+)([a-zà-ÿ])/g, (_m, before: string, letter: string) => before + letter.toUpperCase());
+
+export function toSentenceCaseIfAllCaps(text: string | null | undefined): string {
+  if (!text) return '';
+  if (HAS_LOWERCASE.test(text)) return text;
+  return capitalizarFrases(baixarMaiusculas(text));
+}
+
+const LETRA = /[A-Za-zÀ-ÖØ-öø-ÿ]/g;
+const MAIUSCULA = /[A-ZÀ-ÖØ-Ý]/;
+const PALAVRA_LONGA = /[A-Za-zÀ-ÖØ-öø-ÿ]{3,}/g;
+const PALAVRA = /[A-Za-zÀ-ÖØ-öø-ÿ0-9]+/g;
+
+/**
+ * Descrição do item (catálogo de materiais) em frase normal nas listas. O catálogo manda o texto em três jeitos:
+ * todo em maiúsculas, quase todo em maiúsculas com alguma minúscula ("C/", "mm") e Com Cada Palavra Maiúscula.
+ * Os três viram frase normal; texto que já é frase normal fica como está. Siglas e palavras com número são mantidas.
+ */
+export function descricaoItemEmFrase(text: string | null | undefined): string {
+  if (!text) return '';
+  const letras = text.match(LETRA) ?? [];
+  if (letras.length === 0) return text;
+  const maiusculas = letras.filter((l) => MAIUSCULA.test(l)).length;
+  if (maiusculas / letras.length >= 0.6) return capitalizarFrases(baixarMaiusculas(text));
+
+  const palavras = text.match(PALAVRA_LONGA) ?? [];
+  const comInicial = palavras.filter((w) => MAIUSCULA.test(w.charAt(0))).length;
+  if (palavras.length < 2 || comInicial / palavras.length < 0.7) return text;
+  const emFrase = text.replace(PALAVRA, (w) => {
+    // Sigla (duas letras ou mais, todas maiúsculas) e palavra com número ficam como estão.
+    if (w.length >= 2 && w === w.toUpperCase() && /[A-ZÀ-Ý]/.test(w)) return w;
+    if (/\d/.test(w)) return w;
+    return w.toLowerCase();
+  });
+  return capitalizarFrases(emFrase);
 }

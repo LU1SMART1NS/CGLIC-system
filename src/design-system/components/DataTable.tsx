@@ -70,6 +70,12 @@ export interface DataTableProps<T> {
   expandLabel?: (item: T, index: number) => string;
   /** Só as linhas em que devolve true abrem detalhes (sem ele, todas abrem). */
   canExpand?: (item: T, index: number) => boolean;
+  /**
+   * Ordenação controlada por quem usa a tabela (ex.: `useCarteiraSort`, que guarda na URL e ordena antes de paginar).
+   * Com `onSort`, a tabela só desenha as setas e não reordena `data`.
+   */
+  sort?: { key: string | null; dir: SortDir | null };
+  onSort?: (key: string) => void;
 }
 
 const hideClass = (col: { hideBelow?: 'sm' | 'md' }) =>
@@ -95,7 +101,9 @@ export function DataTable<T>({
   expandedKeys,
   onToggleExpand,
   expandLabel,
-  canExpand
+  canExpand,
+  sort: sortControlado,
+  onSort
 }: DataTableProps<T>) {
   const isMobile = useMediaQuery(`(max-width: ${breakpoints.md - 1}px)`);
   const [internalExpanded, setInternalExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -135,16 +143,22 @@ export function DataTable<T>({
       />
     );
   };
-  const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
+  const [sortInterno, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
+  const sort = onSort
+    ? sortControlado?.key && sortControlado.dir
+      ? { key: sortControlado.key, dir: sortControlado.dir }
+      : null
+    : sortInterno;
 
   // Ordenação estável: sem escolha (ou no terceiro clique) vale a ordem em que `data` chegou.
   const rows = useMemo(() => {
-    const col = sort ? columns.find((c) => c.key === sort.key) : undefined;
-    return sort && col?.sortValue ? sortRows(data, { value: col.sortValue }, sort.dir) : data;
-  }, [data, columns, sort]);
+    if (onSort) return data;
+    const col = sortInterno ? columns.find((c) => c.key === sortInterno.key) : undefined;
+    return sortInterno && col?.sortValue ? sortRows(data, { value: col.sortValue }, sortInterno.dir) : data;
+  }, [data, columns, sortInterno, onSort]);
 
   const toggleSort = (key: string) =>
-    setSort((atual) => {
+    onSort ? onSort(key) : setSort((atual) => {
       const first = columns.find((c) => c.key === key)?.sortFirstDir ?? 'asc';
       if (!atual || atual.key !== key) return { key, dir: first };
       return atual.dir === first ? { key, dir: first === 'asc' ? 'desc' : 'asc' } : null;

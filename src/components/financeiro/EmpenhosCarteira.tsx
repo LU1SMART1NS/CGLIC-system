@@ -4,10 +4,12 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
-import { ErrorState } from '../../design-system/components/ErrorState';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useSincronizacaoEmpenhos } from '../../hooks/useSincronizacaoEmpenhos';
-import { useEmpenhosCarteira } from '../../hooks/useFinanceiroCarteira';
+import { ROTULOS_FINANCEIRO, useEmpenhosCarteira } from '../../hooks/useFinanceiroCarteira';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../carteira/CarteiraFilterBar';
@@ -75,11 +77,18 @@ function contar(rows: EmpenhoCarteiraRow[], chave: (r: EmpenhoCarteiraRow) => st
 export const EmpenhosCarteira: React.FC = () => {
   const navigate = useNavigateWithOrigin();
   const sincronizacao = useSincronizacaoEmpenhos();
-  const { rows: todos, isLoading, isFetching, error, refetch } = useEmpenhosCarteira();
-  const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos } = useContratosDoFinanceiro();
+  const { rows: todos, isLoading, isFetching, leituras: leiturasEmpenhos } = useEmpenhosCarteira();
+  const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos, leituras: leiturasContratos, contratosNaoCarregaram } = useContratosDoFinanceiro();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(EMPENHOS_FILTER_SCHEMA);
   // Coluna "Itens": situação do vínculo de cada nota aos itens do contrato (o trabalho fica no menu Vínculos).
-  const { data: situacaoItens } = useSituacaoDistribuicaoPorEmpenho();
+  const situacaoItensQuery = useSituacaoDistribuicaoPorEmpenho();
+  const { data: situacaoItens } = situacaoItensQuery;
+  // Uma fonte que falha não trava a tela: o que carregou aparece e a faixa diz o que ficou de fora.
+  const leituras = useLeiturasComFalha([
+    ...leiturasEmpenhos,
+    ...leiturasContratos,
+    { rotulo: 'situação das notas nos itens (coluna Itens)', query: situacaoItensQuery }
+  ]);
 
   // Perfil gestor: só os empenhos dos próprios contratos.
   const rows = useMemo(
@@ -151,15 +160,12 @@ export const EmpenhosCarteira: React.FC = () => {
       .sort((a, b) => (b.dataEmissao ?? '').localeCompare(a.dataEmissao ?? ''));
   }, [rows, filters, showGestorFilter, contrato, gestorDe]);
 
-  const abrir = (row: EmpenhoCarteiraRow) => navigate(`/contratos/${encodeURIComponent(row.contractKeys[0])}?aba=financeiro`);
+  // Lista vazia porque a leitura falhou (empenhos; no perfil gestor, também os contratos do recorte): não é "nenhum empenho".
+  const listaNaoCarregou =
+    rows.length === 0 &&
+    (leiturasEmpenhos.some((l) => l.rotulo === ROTULOS_FINANCEIRO.empenhos && naoCarregou(l.query)) || (Boolean(escopo) && contratosNaoCarregaram));
 
-  if (error && todos.length === 0) {
-    return (
-      <PageContainer style={{ padding: '2rem 0' }}>
-        <ErrorState title="Erro ao carregar os empenhos" message={error.message} onRetry={() => void refetch()} />
-      </PageContainer>
-    );
-  }
+  const abrir = (row: EmpenhoCarteiraRow) => navigate(`/contratos/${encodeURIComponent(row.contractKeys[0])}?aba=financeiro`);
 
   const hasActive = hasActiveCarteiraFilters(EMPENHOS_FILTER_SCHEMA, filters);
   const isBusy = isLoading || carregandoContratos;
@@ -185,6 +191,8 @@ export const EmpenhosCarteira: React.FC = () => {
           />
         }
       />
+
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="dos Empenhos" testIdPrefix="empenhos-fontes" />
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando empenhos...">
@@ -250,16 +258,20 @@ export const EmpenhosCarteira: React.FC = () => {
             )}
           </CarteiraFilterBar>
 
-          <EmpenhosCarteiraTable
-            rows={lista}
-            totalEmpenhos={rows.length}
-            contrato={contrato}
-            onOpen={abrir}
-            onResetFilters={resetFilters}
-            onFilter={setFilter}
-            canFilterGestor={showGestorFilter}
-            itensDe={(empenhoId) => situacaoItens?.get(empenhoId)}
-          />
+          {listaNaoCarregou ? (
+            <ListaNaoCarregou titulo="Os empenhos não carregaram." testId="empenhos-nao-carregou" />
+          ) : (
+            <EmpenhosCarteiraTable
+              rows={lista}
+              totalEmpenhos={rows.length}
+              contrato={contrato}
+              onOpen={abrir}
+              onResetFilters={resetFilters}
+              onFilter={setFilter}
+              canFilterGestor={showGestorFilter}
+              itensDe={(empenhoId) => situacaoItens?.get(empenhoId)}
+            />
+          )}
         </>
       )}
     </PageContainer>

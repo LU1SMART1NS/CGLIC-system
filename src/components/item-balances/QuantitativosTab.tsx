@@ -41,6 +41,7 @@ import { useOrgaosRecolhidos } from './useOrgaosRecolhidos';
 import { useGruposDasUasgs } from '../../hooks/useGruposGti';
 import { GtiTag } from '../gti/GtiVisual';
 import type { GrupoDaFatia } from '../../config/gruposGti';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 export interface QuantitativosTabProps {
   itemKey: string;
@@ -68,7 +69,8 @@ export interface QuantitativosTabProps {
   pregaoItem?: string;
   podeInformar: boolean;
   podeRemanejar: boolean;
-  alocado: number;
+  /** Nulo: as alocações não carregaram (o quadro mostra "—" em vez de 0). */
+  alocado: number | null;
   totalUnidadesInternas: number;
   /** Alocação às unidades internas: aparece ao abrir a linha da SENASP. */
   unidadesInternas: React.ReactNode;
@@ -158,7 +160,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
   const estado = (l: Linha): EstadoContratado => contratadoDoOrgao(l.uasg, l.ehSenasp, q, p.contratadoSenasp);
   const extrato = q.informado ? extratoDaCotaPropria(q) : null;
   const saldoSenasp = p.baseSaldo - p.contratadoSenasp;
-  const livreParaAlocar = p.baseSaldo - p.alocado;
+  const livreParaAlocar = p.baseSaldo - (p.alocado ?? 0);
   const contratouAcima = linhas.filter((l) => !l.ehSenasp && l.registrado != null && estado(l).tipo === 'CONTRATOS' && (estado(l) as any).quantidade > l.registrado).length;
 
   const desfazer = async (rotulo: string, acao: () => Promise<unknown>, ok: string) => {
@@ -371,7 +373,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       action={p.podeInformar ? <AppButton variant="outline" size="sm" onClick={() => setInformando(true)} data-testid="corrigir-ata-assinada">Corrigir qtd. da ata assinada</AppButton> : undefined}
     >
       <StatusBadge label="Informado" variant="success" size="sm" dot={false} />{' '}
-      Quantidades da ata assinada informadas por <b>{q.informadoPorNome}</b> em {q.informadoEm ? formatDataHoraBR(q.informadoEm) : '—'}. Documento SEI nº <b>{q.documentoSei}</b>.{' '}
+      Quantidades da ata assinada informadas por <b>{q.informadoPorNome}</b> em {q.informadoEm ? formatDataHoraBR(q.informadoEm) : '—'}. {q.documentoSei && <>Documento <NumeroSeiEtiqueta numero={q.documentoSei} testId="ata-assinada-sei" /></>}{' '}
       <AppButton variant="ghost" size="xs" onClick={() => setVerRegistros((v) => !v)} data-testid="ver-alteracoes-ata-assinada">
         {verRegistros ? 'Fechar alterações' : `Ver alterações (${q.registros.length})`}
       </AppButton>
@@ -396,13 +398,13 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         { label: 'Registrado', value: formatNumber(p.registradoSenasp), hint: `no Compras.gov.br · ata assinada ${formatNumber(q.assinadaSenasp)}`, testId: 'metrica-registrado' },
         { label: 'Gerenciado p/ participantes', value: formatNumber(q.gerenciadoParticipantes), hint: 'dos órgãos, dentro do registrado', tone: 'warning', testId: 'metrica-gerenciado' },
         { label: 'Cota própria', value: formatNumber(p.baseSaldo), hint: desconto > 0 ? `menor entre registrado (${formatNumber(p.registradoSenasp - q.gerenciadoParticipantes)}) e ata assinada (${formatNumber(q.assinadaSenasp)})` : 'registrado − gerenciado', tone: p.baseSaldo < 0 ? 'danger' : 'default', testId: 'metrica-cota' },
-        { label: 'Alocado às unidades', value: formatNumber(p.alocado), hint: livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
+        { label: 'Alocado às unidades', value: p.alocado === null ? '—' : formatNumber(p.alocado), hint: p.alocado === null ? 'não carregou' : livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: p.alocado !== null && livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
         { label: 'Contratado', value: formatNumber(p.contratadoSenasp), hint: 'contratos vinculados', testId: 'metrica-contratado' },
         { label: 'Saldo da cota própria', value: formatNumber(saldoSenasp), hint: desconto > 0 ? `${formatNumber(desconto)} acima da ata assinada fora do saldo` : `registrado − contratado: ${formatNumber(p.registradoSenasp - p.contratadoSenasp)}`, tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
       ]
     : [
         { label: 'Quantidade SENASP', value: formatNumber(p.baseSaldo), hint: desconto > 0 ? `registrado ${formatNumber(p.registradoSenasp)} − excedente ${formatNumber(desconto)} (provisório)` : p.ataDaCglic ? 'ata assinada não informada' : 'registrado no Compras.gov.br', testId: 'metrica-cota' },
-        { label: 'Alocado às unidades', value: formatNumber(p.alocado), hint: livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
+        { label: 'Alocado às unidades', value: p.alocado === null ? '—' : formatNumber(p.alocado), hint: p.alocado === null ? 'não carregou' : livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: p.alocado !== null && livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
         { label: 'Contratado', value: formatNumber(p.contratadoSenasp), hint: 'contratos vinculados', testId: 'metrica-contratado' },
         { label: 'Saldo', value: formatNumber(saldoSenasp), hint: desconto > 0 ? 'quantidade − contratado' : 'registrado − contratado', tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }
       ];
@@ -435,7 +437,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }} data-testid="alteracoes-ata-assinada">
           {q.registros.map((r) => (
             <div key={r.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 0.65rem', background: 'var(--surface)' }}>
-              <b>{formatDataHoraBR(r.informadoEm)}</b> · {r.informadoPorNome} · documento SEI nº {r.documentoSei} · total {formatNumber(r.total)} · {r.justificativa ? `“${r.justificativa}”` : 'primeiro registro'}
+              <b>{formatDataHoraBR(r.informadoEm)}</b> · {r.informadoPorNome} · documento <NumeroSeiEtiqueta numero={r.documentoSei} testId="ata-assinada-registro-sei" /> · total {formatNumber(r.total)} · {r.justificativa ? `“${r.justificativa}”` : 'primeiro registro'}
             </div>
           ))}
         </div>

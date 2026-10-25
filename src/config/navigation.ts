@@ -18,7 +18,10 @@ import {
   Link2,
   FileSignature,
   Boxes,
-  Network
+  Network,
+  ScrollText,
+  ClipboardList,
+  Building
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -48,7 +51,7 @@ export interface NavItem {
    * filtro — ver `filterNavigationByRole`.
    */
   allowedRoles?: AppRole[];
-  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Acesso). */
+  /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Emendas · Acesso). */
   group?: string;
   /** 'bottom' = área fica no pé do menu chave (ex.: Ajustes). */
   placement?: 'bottom';
@@ -58,14 +61,16 @@ export interface NavItem {
  * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
- * - Início: Painel (/instrumentos) · Distribuição (/atas/distribuicao)
+ * - Início, em dois grupos como Ajustes: Atas e Contratos (Painel /instrumentos · Distribuição /atas/distribuicao) e
+ *   Emendas (/emendas/inicio, coordenador e consulta). O gestor de emendas tem o Painel dele em /emendas/inicio.
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Ajustes (no pé do menu), em dois grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
- *   Feriados · Unidades Internas) e Acesso (Usuários e Servidores · Perfis e Permissões)
+ * - Emendas: Pedidos (Ver por pedido ou por autor) · Itens e kits (Por item · Por kit) (CAEP reparte a sua alocação entre parlamentares; migration 155)
+ * - Ajustes (no pé do menu), em três grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
+ *   Feriados · Unidades Internas), Emendas (Beneficiários) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
 export const navigationConfig: NavItem[] = [
   {
@@ -76,22 +81,49 @@ export const navigationConfig: NavItem[] = [
     children: [
       {
         id: 'gestao-instrumentos',
+        // Grupos como em Ajustes (protótipo aprovado em 25/10/2026): "Atas e Contratos" (Painel · Distribuição) · "Emendas".
+        // Quem só vê esta aba não vê barra de abas; a consulta vê só a linha dos grupos.
         label: 'Painel',
         icon: LayoutDashboard,
         route: '/instrumentos',
         status: 'active',
         matchPrefixes: ['/instrumentos', '/prazos'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor'],
+        group: 'Atas e Contratos'
       },
       {
-        // Atas e contratos por gestor: visão de coordenação (contratos vinculados herdam o gestor da ata).
+        // Atas e contratos por gestor: visão de coordenação (contratos vinculados herdam o gestor da ata). Só o
+        // coordenador: são filas dele e a Equipe mostra o nível de cada gestor (consulta saiu em 25/10/2026).
         id: 'central-distribuicao',
         label: 'Distribuição',
         icon: UsersRound,
         route: '/atas/distribuicao',
         status: 'active',
         matchPrefixes: ['/atas/distribuicao'],
-        allowedRoles: ['admin', 'leitor']
+        allowedRoles: ['admin'],
+        group: 'Atas e Contratos'
+      },
+      {
+        // Início do gestor de emendas: avisos dos pedidos e saldo livre da CAEP (protótipo aprovado em 23/10/2026).
+        id: 'emendas-inicio',
+        label: 'Painel',
+        icon: LayoutDashboard,
+        route: '/emendas/inicio',
+        status: 'active',
+        matchPrefixes: ['/emendas/inicio'],
+        allowedRoles: ['gestor_emendas']
+      },
+      {
+        // O coordenador vê o mesmo resumo das emendas numa aba do Início dele (decisão de 23/10/2026); a consulta
+        // também, só leitura, porque já lê Pedidos e Itens e kits (decisão de 25/10/2026).
+        id: 'emendas-inicio-coordenador',
+        label: 'Emendas',
+        icon: ScrollText,
+        route: '/emendas/inicio',
+        status: 'active',
+        matchPrefixes: ['/emendas/inicio'],
+        allowedRoles: ['admin', 'leitor'],
+        group: 'Emendas'
       }
     ]
   },
@@ -109,7 +141,7 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/atas', '/atas/detalhe'],
         excludePrefixes: ['/atas/distribuicao'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']
       },
       {
         id: 'contratos-acompanhamento',
@@ -128,7 +160,7 @@ export const navigationConfig: NavItem[] = [
         route: '/itens',
         status: 'active',
         matchPrefixes: ['/itens'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']
       }
     ]
   },
@@ -146,12 +178,14 @@ export const navigationConfig: NavItem[] = [
         route: '/alocacao',
         status: 'active',
         matchPrefixes: ['/alocacao'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        // Gestor de atas e contratos e consulta só olhariam a fila: o alocado já aparece na Carteira › Itens e no Item 360.
+        allowedRoles: ['admin', 'gestor_saldos']
       }
     ]
   },
   {
     // Filas de vínculo: ligar uma coisa à outra. "Distribuição" (Início) fica só com atas e contratos para gestores.
+    // A consulta fica de fora: são filas de trabalho, e o vínculo feito já aparece na Carteira e nas telas 360.
     id: 'vinculacao',
     label: 'Vínculos',
     icon: Link2,
@@ -164,7 +198,7 @@ export const navigationConfig: NavItem[] = [
         route: '/vinculacao/contratos',
         status: 'active',
         matchPrefixes: ['/vinculacao/contratos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor']
       },
       {
         id: 'vinculacao-empenhos-contrato',
@@ -173,7 +207,7 @@ export const navigationConfig: NavItem[] = [
         route: '/vinculacao/empenhos-contrato',
         status: 'active',
         matchPrefixes: ['/vinculacao/empenhos-contrato'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor']
       },
       {
         id: 'vinculacao-empenhos-itens',
@@ -182,7 +216,7 @@ export const navigationConfig: NavItem[] = [
         route: '/vinculacao/empenhos-itens',
         status: 'active',
         matchPrefixes: ['/vinculacao/empenhos-itens'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor']
       }
     ]
   },
@@ -210,6 +244,33 @@ export const navigationConfig: NavItem[] = [
         route: '/pagamentos',
         matchPrefixes: ['/pagamentos'],
         allowedRoles: ['admin', 'gestor', 'leitor']
+      }
+    ]
+  },
+  {
+    // Emendas parlamentares (migration 155): só o gestor de emendas (CAEP) e o coordenador alteram; a consulta lê.
+    id: 'emendas',
+    label: 'Emendas',
+    icon: ScrollText,
+    status: 'active',
+    children: [
+      {
+        id: 'emendas-pedidos',
+        label: 'Pedidos',
+        icon: ClipboardList,
+        route: '/emendas/pedidos',
+        status: 'active',
+        matchPrefixes: ['/emendas/pedidos'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
+        id: 'emendas-itens',
+        label: 'Itens e kits',
+        icon: Boxes,
+        route: '/emendas/itens',
+        status: 'active',
+        matchPrefixes: ['/emendas/itens'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       }
     ]
   },
@@ -273,6 +334,17 @@ export const navigationConfig: NavItem[] = [
         allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
       },
       {
+        // Cadastro de apoio das emendas: fica em Ajustes, longe do trabalho do dia (Pedidos, Itens, Kits).
+        id: 'emendas-beneficiarios',
+        label: 'Beneficiários',
+        icon: Building,
+        route: '/emendas/beneficiarios',
+        status: 'active',
+        group: 'Emendas',
+        matchPrefixes: ['/emendas/beneficiarios'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
         id: 'admin-usuarios',
         label: 'Usuários e Servidores',
         icon: Users,
@@ -295,6 +367,11 @@ export const navigationConfig: NavItem[] = [
     ]
   }
 ];
+
+/** Primeira tela do perfil ao entrar no sistema: o gestor de emendas tem o próprio Início. */
+export function rotaInicialDoPerfil(role: AppRole | null): string {
+  return role === 'gestor_emendas' ? '/emendas/inicio' : '/instrumentos';
+}
 
 /**
  * Área cujas abas aparecem no topo da página: só nas páginas de lista (rota igual

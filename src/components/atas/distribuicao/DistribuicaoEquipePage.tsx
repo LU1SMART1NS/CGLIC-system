@@ -41,7 +41,7 @@ const VERMELHO = 'var(--color-danger)';
  * contrato à ata saiu daqui para o menu Vínculos.
  */
 export const DistribuicaoEquipePage: React.FC = () => {
-  const { atas, contratos, links, pendencias, totalSemVinculo, gestorDoContrato, isBusy, refresh } = usePendenciasVinculoAta();
+  const { atas, contratos, links, pendencias, totalSemVinculo, gestorDoContrato, isBusy, refresh } = usePendenciasVinculoAta({ pendencias: true });
   // Só quem pode atribuir (admin) vê as ações de transferir; o leitor acompanha.
   const { role } = useAuth();
   const canAssign = canAssignManager(role);
@@ -181,11 +181,11 @@ export const DistribuicaoEquipePage: React.FC = () => {
             <NoticeBar
               tone="info"
               testId="distribuicao-contratos-sem-vinculo"
-              action={
+              action={canAssign ? (
                 <AppButton variant="outline" size="sm" onClick={() => navigate(ROTAS_VINCULACAO.contratos)}>
                   Abrir Vínculos
                 </AppButton>
-              }
+              ) : undefined}
             >
               <strong>{totalSemVinculo}</strong> {totalSemVinculo === 1 ? 'contrato ainda não tem' : 'contratos ainda não têm'} item de ata vinculado. O vínculo é
               feito no menu Vínculos; quando vinculado, o contrato segue o gestor da ata.

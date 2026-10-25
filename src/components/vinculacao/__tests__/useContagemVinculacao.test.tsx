@@ -7,11 +7,13 @@ vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: '
 vi.mock('../../../hooks/useVinculacaoEmpenhos', () => ({ useEmpenhosParaVincularAosItens: vi.fn() }));
 vi.mock('../../../hooks/useEmpenhosForaDoContrato', () => ({ useEmpenhosForaDoContrato: vi.fn() }));
 vi.mock('../../financeiro/useContratosDoFinanceiro', () => ({ useContratosDoFinanceiro: vi.fn() }));
+vi.mock('../../layout/useTelaCarregada', () => ({ useTelaCarregada: vi.fn(() => true) }));
 
 import { useAuth } from '../../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../../hooks/useVinculacaoEmpenhos';
 import { useEmpenhosForaDoContrato } from '../../../hooks/useEmpenhosForaDoContrato';
 import { useContratosDoFinanceiro } from '../../financeiro/useContratosDoFinanceiro';
+import { useTelaCarregada } from '../../layout/useTelaCarregada';
 import { useContagemVinculacao } from '../useContagemVinculacao';
 
 const Numero: React.FC = () => {
@@ -30,6 +32,7 @@ const contratos = (escopo: Set<string> | null, isLoading = false) =>
 describe('número do menu Vínculos (empenhos)', () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
+    vi.mocked(useTelaCarregada).mockReturnValue(true);
     vi.mocked(useEmpenhosParaVincularAosItens).mockReturnValue({ data: [nota('a', 'VIG'), nota('b', 'VIG', 'REVISAR'), nota('c', 'ENC'), nota('d', 'SEM'), nota('e', 'VIG', 'DISTRIBUIDA')] } as any);
     vi.mocked(useEmpenhosForaDoContrato).mockReturnValue({ data: [fora(1, 'VIG'), fora(2, 'ENC'), fora(3, 'SEM'), fora(4, 'VIG', 'CORRIGINDO')] } as any);
     contratos(null);
@@ -50,8 +53,29 @@ describe('número do menu Vínculos (empenhos)', () => {
     expect(render()).toContain('nulo');
   });
 
+  it('antes de a tela aberta encher, as filas não são lidas e não há número', () => {
+    vi.mocked(useTelaCarregada).mockReturnValue(false);
+    expect(render()).toContain('nulo');
+    expect(useEmpenhosParaVincularAosItens).toHaveBeenLastCalledWith(false);
+    expect(useEmpenhosForaDoContrato).toHaveBeenLastCalledWith(false);
+    // A carteira de contratos também espera (passo 3 da auditoria das telas).
+    expect(useContratosDoFinanceiro).toHaveBeenLastCalledWith({ enabled: false });
+  });
+
   it('consulta e gestor de saldo não têm o número', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'leitor' } as any);
+    expect(render()).toContain('nulo');
+  });
+
+  it('contratos que não carregaram: sem número (a vigência e o recorte dependem deles), em vez de um número errado', () => {
+    vi.mocked(useContratosDoFinanceiro).mockReturnValue({
+      contrato: (k: string) => ({ numero: k }),
+      escopo: null,
+      isLoading: false,
+      lista: [],
+      showGestorFilter: true,
+      contratosNaoCarregaram: true
+    } as any);
     expect(render()).toContain('nulo');
   });
 });

@@ -85,6 +85,8 @@ export interface UseContractPaymentFollowUpResult {
   updateCycleInfo: (input: { cycleKey: string; responsavelNome?: string; responsavelUserId?: string; observacoes?: string }) => Promise<void>;
   /** Escolhe (ou troca) as faturas de um ciclo já enviado à CGOFI. */
   ligarFaturas: (input: { cycleKey: string; faturas: number[]; justificativa?: string; registradoPorNome?: string }) => Promise<void>;
+  /** A leitura dos ciclos, para a faixa "não carregou" (sem ela, o contrato pareceria sem ciclos). */
+  consulta?: { data?: unknown; isError: boolean; error: unknown; isFetching?: boolean; refetch: () => Promise<unknown> };
   refetch: () => void;
 }
 
@@ -96,7 +98,7 @@ export function useContractPaymentFollowUp(
   const baseDate = options?.baseDate;
   const financialBalances = options?.financialBalances;
 
-  const { data, isLoading, refetch: refetchQuery } = useQuery<PaymentCyclesData, Error>({
+  const consultaCiclos = useQuery<PaymentCyclesData, Error>({
     queryKey: paymentCyclesQueryKey(contractKey),
     queryFn: async () => {
       const rows = await fetchPaymentCyclesForContract(contractKey);
@@ -106,6 +108,7 @@ export function useContractPaymentFollowUp(
     enabled: Boolean(contractKey),
     staleTime: 60 * 1000
   });
+  const { data, isLoading, refetch: refetchQuery } = consultaCiclos;
 
   const cycles = useMemo<PaymentFollowUpCycle[]>(() => {
     if (!data) return [];
@@ -202,6 +205,7 @@ export function useContractPaymentFollowUp(
     updateCycleInfo,
     deleteCycle,
     ligarFaturas,
+    consulta: consultaCiclos,
     refetch: refetchQuery
   };
 }

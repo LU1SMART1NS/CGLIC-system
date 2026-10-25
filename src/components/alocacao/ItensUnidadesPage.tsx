@@ -21,7 +21,7 @@ import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLin
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/CarteiraDetailLabel';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
+import { descricaoItemEmFrase } from '../../utils/textCase';
 import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { SeloPapelSenasp } from '../atas/SeloPapelSenasp';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
@@ -37,6 +37,10 @@ import { PageHeader } from '../../design-system/components/PageHeader';
 import { AlocarUnidadeModal, type ItemParaAlocar } from './AlocarUnidadeModal';
 import { carteiraDaAta } from '../../utils/ataIdentidade';
 import { formatDateBR } from '../../utils/format';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
+import { ROTULOS_CARTEIRA_ITENS } from '../../hooks/useCarteiraItens';
 
 
 interface Filtros {
@@ -113,8 +117,22 @@ export const ItensUnidadesPage: React.FC = () => {
   const { role } = useAuth();
   const podeAlocar = role === 'admin' || role === 'gestor_saldos';
   const showGestorFilter = canFilterByGestor(role);
-  const { arps, scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, syncError, reload } = useAtasPortfolio();
-  const { rows, unidades, isLoading: loadingExecucao } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta });
+  const { arps, scopedArps, isLoading, scopeLoading, itemsByAta, gestorByAta, syncError, reload, leiturasDasAtas, atasNaoCarregaram } = useAtasPortfolio();
+  // O empenhado não aparece nesta tela: nem é lido.
+  const { rows, unidades, isLoading: loadingExecucao, leituras: leiturasDosItens } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta, semEmpenhado: true });
+  // Uma fonte que falha não some calada: a tela mostra o que carregou e a faixa diz o que ficou de fora.
+  const leiturasDaTela = [...(leiturasDasAtas ?? []), ...(leiturasDosItens ?? [])];
+  const leituras = useLeiturasComFalha(leiturasDaTela);
+  const naoCarregouAlgo = (rotulo: string) => leiturasDaTela.some((l) => l.rotulo === rotulo && naoCarregou(l.query));
+  // Sem as alocações, todo item pareceria "Sem alocação"; sem o saldo, nenhum item teria quantitativo SENASP; sem as
+  // atas (ou o recorte do gestor), não haveria itens. Nesses casos a lista diz que não carregou.
+  const motivoListaNaoCarregou = naoCarregouAlgo(ROTULOS_CARTEIRA_ITENS.alocacoes)
+    ? 'As alocações não carregaram: sem elas, todo item pareceria sem alocação.'
+    : naoCarregouAlgo(ROTULOS_CARTEIRA_ITENS.saldos)
+      ? 'O saldo dos itens não carregou: sem ele, nenhum item mostra o quantitativo SENASP.'
+      : atasNaoCarregaram && rows.length === 0
+        ? 'As atas não carregaram.'
+        : null;
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
   const [alocando, setAlocando] = useState<ItemParaAlocar | null>(null);
   const porAta = filters.ver === 'ATA';
@@ -274,7 +292,7 @@ export const ItensUnidadesPage: React.FC = () => {
             )}
           </div>
           <div title={r.item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp2 }}>
-            {toSentenceCaseIfAllCaps(r.item.descricaoItem) || '—'}
+            {descricaoItemEmFrase(r.item.descricaoItem) || '—'}
           </div>
         </td>
         <td data-label="Quantitativo SENASP" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatNumber(r.quantitativoSenasp)} un</td>
@@ -535,6 +553,8 @@ export const ItensUnidadesPage: React.FC = () => {
         }
       />
 
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da alocação" testIdPrefix="alocacao-fontes" />
+
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando itens...">
           <AvisoCarregando label="Carregando itens" />
@@ -542,6 +562,9 @@ export const ItensUnidadesPage: React.FC = () => {
           <SkeletonLoader variant="rectangular" height="46px" count={1} />
           <SkeletonLoader variant="rectangular" height="300px" count={1} />
         </div>
+      ) : motivoListaNaoCarregou ? (
+        // Os segmentos e a lista contariam errado (ex.: todo item "Sem alocação"): só o aviso, até a leitura voltar.
+        <ListaNaoCarregou titulo={motivoListaNaoCarregou} testId="alocacao-nao-carregou" />
       ) : (
         <>
           <CarteiraSegmentTabs

@@ -147,8 +147,9 @@ export async function fetchAllContractManagers(uasg?: string): Promise<Record<st
     }
     return map;
   } catch (err) {
+    // Falha vira erro: um mapa vazio deixava a coluna Gestor em branco e o perfil gestor sem carteira, sem aviso.
     console.warn('Erro ao carregar gestores de contratos', err);
-    return {};
+    throw err;
   }
 }
 
@@ -255,7 +256,8 @@ export async function fetchContractTaskPlan(contractKey: string): Promise<Contra
       criadoEm: t.criado_em,
       atualizadoEm: t.atualizado_em,
       concluidoEm: t.concluido_em || undefined,
-      concluidoPor: t.concluido_por || undefined
+      concluidoPor: t.concluido_por || undefined,
+      seiNumero: t.sei_numero || undefined
     });
     tasksByMacrotask.set(t.macrotask_id, list);
   }
@@ -341,7 +343,8 @@ export async function fetchAllContractTaskPlans(uasg?: string): Promise<Record<s
         criadoEm: t.criado_em,
         atualizadoEm: t.atualizado_em,
         concluidoEm: t.concluido_em || undefined,
-        concluidoPor: t.concluido_por || undefined
+        concluidoPor: t.concluido_por || undefined,
+        seiNumero: t.sei_numero || undefined
       });
       tasksByMacrotask.set(t.macrotask_id, list);
     }
@@ -379,7 +382,8 @@ export async function fetchAllContractTaskPlans(uasg?: string): Promise<Record<s
     }
     return map;
   } catch (err) {
+    // Falha vira erro (o Início avisa): um mapa vazio fazia as tarefas atrasadas sumirem.
     console.warn('Erro ao carregar todos os planos de gestão de contratos', err);
-    return {};
+    throw err;
   }
 }

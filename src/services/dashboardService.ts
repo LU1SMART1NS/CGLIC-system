@@ -14,6 +14,8 @@
  */
 
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
+import { fetchResumoReajusteAtas, type ResumoReajusteAta } from './reajusteAtasService';
+import { avisosDoReajusteDasAtas } from './reajusteAtasAvisos';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
 import { fetchAusentesDaFonte, rotuloAusente, trabalhoNaFonte, type AusenteDaFonte } from './ausentesDaFonteService';
 import { fetchEmpenhadoAcima, textoDaOrigem, type EmpenhadoAcima } from './empenhadoAcimaService';
@@ -37,7 +39,8 @@ import type {
   ManagementDashboardArpItemSummary,
   ManagementDashboardPaymentsSummary,
   ManagementDashboardFilters,
-  ManagementDashboardFilterOption
+  ManagementDashboardFilterOption,
+  FonteComFalha
 } from '../types/managementDashboard';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
 
@@ -61,6 +64,7 @@ import { fetchAllContractManagers, fetchAllContractTaskPlans } from './contractM
 import { chaveAvisoAtaAssinada, chaveAvisoLembrete, chaveAvisoQuantitativos, chaveAvisoReajuste, chaveAvisoSaldo, chaveAvisoUnidade, chaveAvisoVinculo, chaveAvisoFonte, chaveAvisoEmpenhoAcima, fetchAvisosResolvidos } from './avisosResolvidosService';
 import { fetchAllAtaTaskPlans } from './ataManagementService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { classifyArpItemSaldo } from './balanceService';
 import { severityFromReajusteRadarNivel, severityFromPaymentStatusPrazo } from './severityService';
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
@@ -306,6 +310,8 @@ function naGerenciadoraTexto(aItem: any): string {
 }
 
 export function calculateAttentionSummary(params: {
+  /** Resumo do reajuste das atas (v_ata_reajuste_resumo, migrations 158 e 159). */
+  reajustesAtas?: ResumoReajusteAta[];
   contracts?: ContractDashboardRecord[];
   arps?: ArpRecord[];
   managers?: Record<string, ContractManager>;
@@ -341,6 +347,7 @@ export function calculateAttentionSummary(params: {
     vinculosAConferir = [],
     ausentesDaFonte = [],
     empenhadoAcima = [],
+    reajustesAtas = [],
     currentDate
   } = params;
 
@@ -901,6 +908,9 @@ export function calculateAttentionSummary(params: {
     });
   }
 
+  // Reajuste dos preços registrados das atas (migrations 158 e 159): só as atas que estão no painel (escopo do perfil).
+  items.push(...avisosDoReajusteDasAtas(reajustesAtas, arps, currentDate));
+
   // 6. Tarefas do plano de gestão das Atas — mesma regra das tarefas de contrato
   // (vencida = crítica, vence hoje ou em até 7 dias = urgente). Sem isso, o que a
   // Ata 360 mostra na aba "Ações" nunca chegava à visão global.
@@ -1390,6 +1400,7 @@ export function buildManagementDashboardReadModel(params: {
   vinculosAConferir?: VinculoAConferir[];
   ausentesDaFonte?: AusenteDaFonte[];
   empenhadoAcima?: EmpenhadoAcima[];
+  reajustesAtas?: ResumoReajusteAta[];
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1650,6 +1661,7 @@ export function buildManagementDashboardReadModel(params: {
     vinculosAConferir: params.vinculosAConferir,
     ausentesDaFonte: params.ausentesDaFonte,
     empenhadoAcima: params.empenhadoAcima,
+    reajustesAtas: params.reajustesAtas,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1675,11 +1687,23 @@ export function buildManagementDashboardReadModel(params: {
 }
 
 /**
+ * Leituras do painel que a página e o menu também fazem. O hook do painel (useManagementDashboard) as passa lendo pelo
+ * cache do React Query, com as mesmas chaves e opções das outras telas: o que já foi lido e ainda vale não é lido de
+ * novo, e o que está sendo lido é aproveitado. Sem elas (chamada direta), o painel lê do banco como antes.
+ */
+export interface FontesDoPainelNoCache {
+  contratos: (uasg: string) => Promise<ContractDashboardRecord[]>;
+  gestores: (uasg: string) => Promise<Record<string, ContractManager>>;
+  atas: (uasg: string) => Promise<{ arps: ArpRecord[]; syncInfo: SyncMetadata }>;
+}
+
+/**
  * 7. Consulta assíncrona consolidada via Supabase / Serviços oficiais (Promise.all)
  */
 export async function fetchManagementDashboardData(
   filtersOrUasg: string | ManagementDashboardFilters = '200331',
-  currentDate?: Date
+  currentDate?: Date,
+  cache?: FontesDoPainelNoCache
 ): Promise<ManagementDashboardReadModel> {
   const filters: ManagementDashboardFilters = typeof filtersOrUasg === 'string'
     ? { uasg: filtersOrUasg.trim() || '200331' }
@@ -1687,20 +1711,16 @@ export async function fetchManagementDashboardData(
 
   const cleanUasg = filters.uasg || '200331';
 
-  // Execução paralela das fontes soberanas.
-  //
-  // Fontes de CONTAGEM: se a leitura falhar (ex.: banco estrangulado, consulta
-  // estourando o tempo), o painel NÃO pode mostrar 0 no lugar do dado real.
-  // Propagamos o erro para o React Query segurar o último valor bom e tentar de
-  // novo, em vez de sobrescrever a contagem boa com vazio — era o que fazia os
-  // avisos "sumirem" da tela (Saldos, Reajustes, Pagamentos...) em momentos de
-  // carga. Fontes de ENRIQUECIMENTO (gestores, alocação interna) seguem
-  // tolerantes: a falha delas não zera contagem, no máximo omite um nome ou marca.
-  const soberana = <T,>(label: string, p: Promise<T>): Promise<T> =>
-    p.catch((err) => {
-      console.error(`Erro ao consultar ${label} para o dashboard:`, err);
-      throw err;
-    });
+  // Execução paralela das fontes soberanas. Uma fonte que falha (ex.: consulta
+  // estourando o tempo limite) não derruba o painel: usa a última leitura boa
+  // dela, ou fica vazia, e entra em `fontesComFalha` para a tela avisar.
+  const falhas: FonteComFalha[] = [];
+  const ler = <T,>(nome: string, rotulo: string, p: Promise<T>, vazio: T) =>
+    lerFonte(`${cleanUasg}:${nome}`, rotulo, p, vazio, falhas);
+  // Fontes que não dependem da UASG: o Início abre as duas UASGs ao mesmo tempo e lia cada uma em dobro.
+  // Agora as duas chamadas dividem a mesma leitura; o recorte por UASG é feito depois, no read model.
+  const lerSemUasg = <T,>(nome: string, rotulo: string, buscar: () => Promise<T>, vazio: T) =>
+    lerFonte(`todas:${nome}`, rotulo, lerUmaVez(nome, buscar), vazio, falhas);
 
   const [
     contracts,
@@ -1715,34 +1735,31 @@ export async function fetchManagementDashboardData(
     fornecedoresPncp,
     vinculosAConferir,
     ausentesDaFonte,
-    empenhadoAcima
+    empenhadoAcima,
+    reajustesAtas
   ] = await Promise.all([
-    soberana('contratos', fetchContratosParaTela(cleanUasg)),
-    soberana('ARPs', fetchArpsFromDb(cleanUasg)),
-    fetchAllContractManagers(cleanUasg).catch((err) => {
-      console.warn('Erro ao consultar gestores para o dashboard:', err);
-      return {} as Record<string, ContractManager>;
-    }),
-    soberana('planos de tarefas', fetchAllContractTaskPlans(cleanUasg)),
-    soberana('planos de gestão das atas', fetchAllAtaTaskPlans()),
-    fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))),
-    soberana('empenhos', fetchEmpenhosResumoFromDb(cleanUasg)),
-    soberana('saldos de itens de ARP', fetchArpItemSaldosFromDb(cleanUasg)),
-    fetchItensComAlocacao().catch((err) => {
-      console.warn('Erro ao consultar os itens com alocação interna para o dashboard:', err);
-      return new Set<string>();
-    }),
-    soberana('atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp()),
-    soberana('vínculos a conferir', fetchVinculosAConferir()),
-    soberana('notas e faturas a conferir', fetchAusentesDaFonte()),
-    soberana('itens com empenhado acima do contratado', fetchEmpenhadoAcima())
+    ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
+    ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
+    // Rótulos iguais aos das leituras da tela (ROTULO_GESTORES_CONTRATOS, ROTULO_AVISOS_RESOLVIDOS): a faixa junta numa linha.
+    ler('gestores', 'gestores dos contratos', cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg), {} as Record<string, ContractManager>),
+    ler('planos', 'planos de tarefas dos contratos', fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
+    lerSemUasg('planosAtas', 'planos de gestão das atas', fetchAllAtaTaskPlans, {} as Record<string, AtaTaskPlan>),
+    lerSemUasg('avisosResolvidos', 'avisos resolvidos e notas deixadas como estão', () => fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
+    lerSemUasg('empenhos', 'empenhos', fetchEmpenhosResumoFromDb, [] as any[]),
+    ler('saldoItens', 'saldo dos itens', fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
+    lerSemUasg('alocacao', 'alocação interna dos itens', fetchItensComAlocacao, new Set<string>()),
+    lerSemUasg('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp, [] as RegistroFornecedorPncp[]),
+    lerSemUasg('vinculos', 'vínculos a conferir', fetchVinculosAConferir, [] as VinculoAConferir[]),
+    lerSemUasg('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte, [] as AusenteDaFonte[]),
+    lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[]),
+    lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[])
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
 
-  const paymentCycles = await fetchAllPaymentCyclesForDashboard(contracts);
+  const paymentCycles = await ler('ciclos', 'ciclos de pagamento', fetchAllPaymentCyclesForDashboard(contracts), [] as PaymentFollowUpCycle[]);
 
-  return buildManagementDashboardReadModel({
+  const readModel = buildManagementDashboardReadModel({
     uasg: cleanUasg,
     contracts,
     arps: arpsRes.arps,
@@ -1757,10 +1774,70 @@ export async function fetchManagementDashboardData(
     vinculosAConferir,
     ausentesDaFonte,
     empenhadoAcima,
+    reajustesAtas,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate
   });
+  return falhas.length > 0 ? { ...readModel, fontesComFalha: falhas } : readModel;
+}
+
+/** Última leitura boa de cada fonte do painel (por UASG, ou `todas:` nas fontes sem UASG), guardada na memória da aba. */
+const ultimaLeituraBoa = new Map<string, unknown>();
+
+/**
+ * Por quanto tempo uma leitura em andamento pode ser aproveitada por outra chamada. As duas UASGs do Início
+ * pedem juntas (milissegundos de diferença); a janela curta evita que uma releitura pedida depois de uma
+ * gravação (ex.: aviso resolvido) pegue a leitura antiga, que começou antes da gravação.
+ */
+const JANELA_LEITURA_COMPARTILHADA_MS = 1000;
+const leiturasEmAndamento = new Map<string, { promessa: Promise<unknown>; inicio: number }>();
+
+/**
+ * Busca uma fonte sem UASG uma vez só para as chamadas que chegam juntas: quem chega enquanto a leitura
+ * está em andamento (e começou há menos de 1 s) recebe a mesma promessa. Terminada (com dado ou falha),
+ * a próxima chamada lê de novo — nada fica guardado aqui além da leitura em andamento.
+ */
+export function lerUmaVez<T>(nome: string, buscar: () => Promise<T>): Promise<T> {
+  const agora = Date.now();
+  const atual = leiturasEmAndamento.get(nome);
+  if (atual && agora - atual.inicio < JANELA_LEITURA_COMPARTILHADA_MS) return atual.promessa as Promise<T>;
+  let promessa: Promise<T>;
+  try {
+    promessa = buscar();
+  } catch (err) {
+    promessa = Promise.reject(err);
+  }
+  const entrada = { promessa, inicio: agora };
+  leiturasEmAndamento.set(nome, entrada);
+  const terminar = () => {
+    if (leiturasEmAndamento.get(nome) === entrada) leiturasEmAndamento.delete(nome);
+  };
+  promessa.then(terminar, terminar);
+  return promessa;
+}
+
+/**
+ * Lê uma fonte do painel sem deixar a falha dela derrubar a tela. Se a leitura falhar,
+ * devolve a última leitura boa (DESATUALIZADA) ou, sem ela, o vazio (NAO_CARREGOU),
+ * e registra a falha para o aviso. Nunca devolve vazio calado: era o que fazia os
+ * avisos "sumirem" da tela quando uma consulta estourava o tempo limite.
+ */
+async function lerFonte<T>(chave: string, rotulo: string, p: Promise<T>, vazio: T, falhas: FonteComFalha[]): Promise<T> {
+  try {
+    const valor = await p;
+    ultimaLeituraBoa.set(chave, valor);
+    return valor;
+  } catch (err) {
+    console.error(`Erro ao consultar ${rotulo} para o painel:`, err);
+    const anterior = ultimaLeituraBoa.get(chave) as T | undefined;
+    falhas.push({
+      rotulo,
+      situacao: anterior !== undefined ? 'DESATUALIZADA' : 'NAO_CARREGOU',
+      mensagem: err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err)
+    });
+    return anterior !== undefined ? anterior : vazio;
+  }
 }
 
 /**
@@ -1781,93 +1858,77 @@ export async function fetchAllPaymentCyclesForDashboard(contracts?: ContractDash
     .map((c) => c?.id || (c as any)?.contractKey || `${c?.numero || ''}${c?.ano ? `/${c.ano}` : ''}`)
     .filter(Boolean);
 
-  try {
-    const rows = await fetchPaymentCyclesForContracts(contractKeys);
-    return rows.map((row) => rowToPaymentFollowUpCycle(row));
-  } catch (err) {
-    console.warn('Erro ao carregar ciclos de pagamento persistidos:', err);
-    return [];
-  }
+  // Falha vira erro: o painel (lerFonte) usa a última leitura boa e avisa, em vez de sumir com os ciclos.
+  const rows = await fetchPaymentCyclesForContracts(contractKeys);
+  return rows.map((row) => rowToPaymentFollowUpCycle(row));
 }
 
 /**
- * Consulta segura à view SQL v_empenhos_resumo enriquecida com vínculos de contrato
+ * Colunas de v_empenhos_resumo que o Início usa: as somas de calculateFinancialSummary (valores, número, ano, credor)
+ * e o recorte por UASG e por contrato de buildManagementDashboardReadModel (uasg_emitente; o contrato vem de
+ * contrato_empenhos). As demais colunas da view não entram em nenhum número da tela.
  */
-export async function fetchEmpenhosResumoFromDb(_uasg?: string): Promise<any[]> {
+export const COLUNAS_EMPENHOS_PAINEL = [
+  'empenho_id',
+  'canonical_key',
+  'numero_oficial',
+  'ano_exercicio',
+  'uasg_emitente',
+  'valor_empenhado',
+  'valor_liquidado',
+  'valor_pago',
+  'valor_rpinscrito',
+  'credor_nome'
+] as const;
+
+/**
+ * Empenhos de v_empenhos_resumo (a view não depende da UASG) com os contratos de cada um (contrato_empenhos).
+ * As duas leituras vão em páginas de mil com ordem fixa pela chave única, para nenhuma linha repetir ou faltar
+ * entre páginas. Falha em qualquer página vira erro: uma lista pela metade mostrava um "Empenhado" errado sem aviso.
+ */
+export async function fetchEmpenhosResumoFromDb(): Promise<any[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  try {
-    const allEmpenhos: any[] = [];
-    const pageSize = 1000;
-    let from = 0;
+  const db = supabase;
+  const PAGINA = 1000;
 
-    // Busca paginada em v_empenhos_resumo para suportar universos superiores a 1.000 registros
-    while (true) {
-      const { data, error } = await supabase
-        .from('v_empenhos_resumo')
-        .select('*')
-        .range(from, from + pageSize - 1);
-
-      if (error) {
-        console.error('Erro ao consultar v_empenhos_resumo:', error);
-        break;
-      }
-      if (!data || data.length === 0) break;
-      allEmpenhos.push(...data);
-      if (data.length < pageSize) break;
-      from += pageSize;
-    }
-
-    if (allEmpenhos.length === 0) return [];
-
-    // Busca vínculos de contratos na tabela canônica contrato_empenhos de forma paginada e segura
-    try {
-      const linksByEmpenho = new Map<string, string[]>();
-      let linkFrom = 0;
-
-      while (true) {
-        const { data: links, error: linkErr } = await supabase
-          .from('contrato_empenhos')
-          .select('empenho_id, contract_key, valor_vinculado')
-          .range(linkFrom, linkFrom + pageSize - 1);
-
-        if (linkErr) {
-          console.error('Erro ao consultar vínculos contrato_empenhos:', linkErr);
-          break;
-        }
-        if (!links || links.length === 0) break;
-
-        for (const l of links) {
-          const key = String(l.empenho_id);
-          if (!linksByEmpenho.has(key)) {
-            linksByEmpenho.set(key, []);
-          }
-          if (l.contract_key && !linksByEmpenho.get(key)!.includes(l.contract_key)) {
-            linksByEmpenho.get(key)!.push(l.contract_key);
-          }
-        }
-
-        if (links.length < pageSize) break;
-        linkFrom += pageSize;
-      }
-
-      return allEmpenhos.map((item: any) => {
-        const empId = String(item.empenho_id || item.id || '');
-        const contractKeys = linksByEmpenho.get(empId) || [];
-        return {
-          ...item,
-          contract_keys: contractKeys,
-          contract_key: contractKeys[0] || item.contract_key || undefined
-        };
-      });
-    } catch (linkErr) {
-      console.warn('Erro ao consultar vínculos contrato_empenhos:', linkErr);
-    }
-
-    return allEmpenhos;
-  } catch (err) {
-    console.warn('Erro ao consultar v_empenhos_resumo:', err);
-    return [];
+  const allEmpenhos: any[] = [];
+  for (let from = 0; ; from += PAGINA) {
+    const { data, error } = await db
+      .from('v_empenhos_resumo')
+      .select(COLUNAS_EMPENHOS_PAINEL.join(','))
+      .order('empenho_id', { ascending: true })
+      .range(from, from + PAGINA - 1);
+    if (error) throw new Error(`Não foi possível ler os empenhos: ${error.message}`);
+    allEmpenhos.push(...(data ?? []));
+    if (!data || data.length < PAGINA) break;
   }
+  if (allEmpenhos.length === 0) return [];
+
+  const linksByEmpenho = new Map<string, string[]>();
+  for (let from = 0; ; from += PAGINA) {
+    const { data: links, error } = await db
+      .from('contrato_empenhos')
+      .select('empenho_id, contract_key')
+      .order('id', { ascending: true })
+      .range(from, from + PAGINA - 1);
+    if (error) throw new Error(`Não foi possível ler os vínculos dos empenhos aos contratos: ${error.message}`);
+    for (const l of links ?? []) {
+      const key = String(l.empenho_id);
+      const lista = linksByEmpenho.get(key) ?? [];
+      if (l.contract_key && !lista.includes(l.contract_key)) lista.push(l.contract_key);
+      linksByEmpenho.set(key, lista);
+    }
+    if (!links || links.length < PAGINA) break;
+  }
+
+  return allEmpenhos.map((item: any) => {
+    const contractKeys = linksByEmpenho.get(String(item.empenho_id || '')) || [];
+    return {
+      ...item,
+      contract_keys: contractKeys,
+      contract_key: contractKeys[0] || undefined
+    };
+  });
 }
 
 /** Chaves dos itens de ata com alguma unidade interna alocada (arp_allocations), em páginas de 1000. */
@@ -1908,18 +1969,24 @@ export const COLUNAS_SALDO_CARTEIRA = [
 /**
  * Saldo por item da view v_arp_item_saldo_detalhado (todas as colunas, ou só as pedidas).
  * Falha da consulta vira erro: um vazio aqui parecia "nenhum item informado" e zerava os filtros da carteira.
+ * Lê em páginas de mil (o PostgREST corta em mil sem avisar; a 200331 tinha 667 itens em 17/10/2026), na ordem de
+ * item_key (um item por linha); item_ata_id desempata se dois números de item derem a mesma chave. Falha em qualquer
+ * página vira erro, nunca lista pela metade.
  */
 export async function fetchArpItemSaldosFromDb(uasg?: string, colunas?: readonly string[]): Promise<any[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  let query = supabase.from('v_arp_item_saldo_detalhado').select(colunas?.length ? colunas.join(',') : '*');
-  if (uasg) {
-    // Carteira da CGLIC inclui as atas de outros órgãos em que a SENASP participa (migration 106).
-    query = query.eq(colunaDaUasgDaAta(uasg), uasg);
-  }
-  const { data, error } = await query;
-  if (error) {
+  const db = supabase;
+  try {
+    return await lerTodasAsPaginas<any>((de, ate) => {
+      let query = db.from('v_arp_item_saldo_detalhado').select(colunas?.length ? colunas.join(',') : '*');
+      if (uasg) {
+        // Carteira da CGLIC inclui as atas de outros órgãos em que a SENASP participa (migration 106).
+        query = query.eq(colunaDaUasgDaAta(uasg), uasg);
+      }
+      return query.order('item_key', { ascending: true }).order('item_ata_id', { ascending: true }).range(de, ate);
+    });
+  } catch (error: any) {
     console.error('Erro ao consultar v_arp_item_saldo_detalhado:', error);
-    throw new Error(`Não foi possível ler o saldo dos itens: ${error.message}`);
+    throw new Error(`Não foi possível ler o saldo dos itens: ${error?.message ?? error}`);
   }
-  return data ?? [];
 }

@@ -278,7 +278,11 @@ export async function fetchArps(params: FilterParams): Promise<ArpResponse> {
     };
   } catch (error) {
     console.warn("Falha na requisição API. Consultando cache do Supabase...", error);
-    const cached = await fetchArpsFromDb(params.codigoUnidadeGerenciadora, params.numeroAtaRegistroPreco);
+    // Reserva da sincronização: se o banco também não responder, segue como antes (lista vazia), sem derrubar quem chamou.
+    const cached = await fetchArpsFromDb(params.codigoUnidadeGerenciadora, params.numeroAtaRegistroPreco).catch((erroDoBanco) => {
+      console.warn('Falha ao ler as atas do banco como reserva da API', erroDoBanco);
+      return { arps: [] as ArpRecord[] };
+    });
     return {
       resultado: cached.arps,
       totalRegistros: cached.arps.length,
@@ -1611,6 +1615,26 @@ export async function fetchSaldoContabil(ano: number, ug: string, conta: string,
     throw new Error(`Tesouro (STA) devolveu um formato inesperado para o saldo contábil ${conta} de ${ano}.`);
   }
   return data;
+}
+
+/**
+ * Nota de empenho no Tesouro (STA): credor, emissão, natureza e plano interno. Null quando o Tesouro não tem a nota
+ * naquela UG (responde `{}`); falha de rede ou HTTP de erro viram exceção, para não confundir com "não tem".
+ */
+export async function fetchNotaDoTesouro(ug: string, numero: string, gestao = '00001'): Promise<Record<string, any> | null> {
+  const res = await fetchComTempoLimite(
+    `/api-sta/api/empenho/${ug}${gestao}${numero.trim().toUpperCase()}`,
+    TEMPO_LIMITE_EMPENHOS_MS,
+    'Tesouro (STA)'
+  );
+  if (!res.ok) {
+    throw new Error(`Tesouro (STA) respondeu ${res.status} ao consultar a nota ${numero} da UG ${ug}.`);
+  }
+  const data = await res.json().catch(() => undefined);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error(`Tesouro (STA) devolveu um formato inesperado para a nota ${numero} da UG ${ug}.`);
+  }
+  return Object.keys(data).length === 0 ? null : data;
 }
 
 /** Opção das consultas por contrato: lançar em vez de devolver vazio, para a falha não virar "não há". */

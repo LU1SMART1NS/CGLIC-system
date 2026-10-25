@@ -5,20 +5,33 @@ import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import { useAtualizacaoNoServidor } from './useAtualizacaoNoServidor';
 import { podeForcarAtualizacao, useSituacaoSincronizacao } from './useSituacaoSincronizacao';
 import {
+  aplicarConferenciaTesouro,
   fetchCiclosEmAberto,
+  fetchConferenciaTesouro,
   fetchEmpenhosCarteira,
   fetchFaturasCarteira,
   fetchLigacoesCicloFatura,
   montarPagamentosCarteira
 } from '../services/financeiroCarteiraService';
+import type { LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
 
 /** Chaves do cache das abas do Financeiro (as faturas servem às duas). */
 export const FINANCEIRO_QUERY_KEYS = {
   faturas: ['financeiro-faturas'] as const,
+  tesouro: ['financeiro-faturas-conferencia-tesouro'] as const,
   empenhos: ['financeiro-empenhos'] as const,
   ciclos: ['financeiro-ciclos-em-aberto'] as const,
   ligacoes: ['financeiro-faturas-em-ciclo'] as const
 };
+
+/** Rótulos das leituras do Financeiro na faixa "não carregou". */
+export const ROTULOS_FINANCEIRO = {
+  faturas: 'faturas',
+  tesouro: 'conferência das faturas pelo Tesouro',
+  empenhos: 'empenhos',
+  ciclos: 'ciclos de pagamento',
+  ligacoes: 'faturas ligadas aos ciclos'
+} as const;
 
 const OPCOES = { staleTime: 10 * 60 * 1000, gcTime: 30 * 60 * 1000, refetchOnWindowFocus: false } as const;
 
@@ -27,25 +40,48 @@ export async function invalidarFinanceiro(queryClient: QueryClient): Promise<voi
   await Promise.all(Object.values(FINANCEIRO_QUERY_KEYS).map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
+/**
+ * Faturas de todos os contratos, com o aviso do Tesouro das que estão a conferir. São duas leituras: se a do Tesouro
+ * falhar, as faturas saem sem o aviso e `tesouro` fica em erro (a tela avisa em vez de zerar os contadores).
+ */
 export function useFaturasCarteira(opts: { enabled?: boolean } = {}) {
-  return useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.faturas, queryFn: fetchFaturasCarteira, enabled: opts.enabled ?? true, ...OPCOES });
+  const enabled = opts.enabled ?? true;
+  const faturas = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.faturas, queryFn: fetchFaturasCarteira, enabled, ...OPCOES });
+  const tesouro = useQuery({ queryKey: FINANCEIRO_QUERY_KEYS.tesouro, queryFn: fetchConferenciaTesouro, enabled, ...OPCOES });
+  const data = useMemo(() => (faturas.data ? aplicarConferenciaTesouro(faturas.data, tesouro.data) : undefined), [faturas.data, tesouro.data]);
+  return { ...faturas, data, tesouro };
 }
 
-/** Empenhos dos contratos, com o pago somado pelas faturas com OB. */
+/** As duas leituras das faturas (lista e aviso do Tesouro), para a faixa "não carregou". */
+export function leiturasDasFaturas(faturas: ReturnType<typeof useFaturasCarteira>): LeituraDaTela[] {
+  return [
+    { rotulo: ROTULOS_FINANCEIRO.faturas, query: faturas },
+    { rotulo: ROTULOS_FINANCEIRO.tesouro, query: faturas.tesouro }
+  ];
+}
+
+/**
+ * Empenhos dos contratos, com o pago somado pelas faturas com OB. Se as faturas falharem, os empenhos carregam assim
+ * mesmo (o pago pelo Tesouro não depende delas) e a falha das faturas vai para a faixa.
+ */
 export function useEmpenhosCarteira() {
   const faturas = useFaturasCarteira();
   const empenhos = useQuery({
     queryKey: [...FINANCEIRO_QUERY_KEYS.empenhos, faturas.dataUpdatedAt],
     queryFn: () => fetchEmpenhosCarteira(faturas.data ?? []),
-    enabled: Boolean(faturas.data),
+    enabled: faturas.data !== undefined || faturas.isError,
     ...OPCOES
   });
   return {
     rows: empenhos.data ?? [],
     isLoading: faturas.isLoading || empenhos.isLoading,
     isFetching: faturas.isFetching || empenhos.isFetching,
-    error: (faturas.error || empenhos.error) as Error | null,
-    refetch: () => Promise.all([faturas.refetch(), empenhos.refetch()])
+    error: (empenhos.error || faturas.error) as Error | null,
+    refetch: () => Promise.all([faturas.refetch(), empenhos.refetch()]),
+    leituras: [
+      { rotulo: ROTULOS_FINANCEIRO.empenhos, query: empenhos },
+      { rotulo: ROTULOS_FINANCEIRO.faturas, query: faturas }
+    ] as LeituraDaTela[]
   };
 }
 
@@ -64,7 +100,12 @@ export function usePagamentosCarteira(opts: { enabled?: boolean } = {}) {
     isLoading: faturas.isLoading || ciclos.isLoading,
     isFetching: faturas.isFetching || ciclos.isFetching || ligacoes.isFetching,
     error: (faturas.error || ciclos.error) as Error | null,
-    refetch: () => Promise.all([faturas.refetch(), ciclos.refetch(), ligacoes.refetch()])
+    refetch: () => Promise.all([faturas.refetch(), ciclos.refetch(), ligacoes.refetch()]),
+    leituras: [
+      ...leiturasDasFaturas(faturas),
+      { rotulo: ROTULOS_FINANCEIRO.ciclos, query: ciclos },
+      { rotulo: ROTULOS_FINANCEIRO.ligacoes, query: ligacoes }
+    ] as LeituraDaTela[]
   };
 }
 

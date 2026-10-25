@@ -8,8 +8,10 @@ import type { OrigemUnidadesItem } from './useItemUnidades';
 export interface LeituraAdesoesItem {
   /** O que o Compras.gov.br devolveu agora. */
   aoVivo: AdesaoItemRecord[];
-  /** Última lista guardada pelo servidor; só lida quando a API voltou vazia. */
+  /** Última lista guardada pelo servidor; só lida quando a API voltou vazia ou falhou. */
   copia: CopiaAdesoesItem | null;
+  /** A API falhou (em qualquer página): a lista de agora não vale, nem como "nenhuma adesão". */
+  falhaAoVivo?: string | null;
 }
 
 export interface AdesoesDoItem {
@@ -26,7 +28,7 @@ export interface AdesoesDoItem {
  */
 export function escolherAdesoes(leitura: LeituraAdesoesItem | undefined, origemUnidades: OrigemUnidadesItem | undefined): AdesoesDoItem {
   const aoVivo = leitura?.aoVivo ?? [];
-  if (aoVivo.length > 0 || origemUnidades === 'API') return { adesoes: aoVivo, origem: 'API', copiadoEm: null };
+  if (aoVivo.length > 0 || (origemUnidades === 'API' && !leitura?.falhaAoVivo)) return { adesoes: aoVivo, origem: 'API', copiadoEm: null };
   if (leitura?.copia) return { adesoes: leitura.copia.adesoes, origem: 'COPIA', copiadoEm: leitura.copia.copiadoEm };
   return { adesoes: [], origem: 'SEM_DADOS', copiadoEm: null };
 }
@@ -50,10 +52,17 @@ export function getItemAdesoesQueryOptions(
         return { aoVivo: [], copia: null };
       }
 
-      // A API já filtra pelo item e não devolve numeroItem nos registros.
-      const response = await fetchAdesoesItem(numeroAta.trim(), uasg.trim(), numeroItem.trim());
-      const aoVivo = response.resultado || [];
-      if (aoVivo.length > 0) return { aoVivo, copia: null };
+      // A API já filtra pelo item e não devolve numeroItem nos registros. Falha em qualquer página vira falha: antes a
+      // lista saía pela metade (só as páginas lidas) ou vazia, como se o item tivesse menos adesões.
+      let aoVivo: AdesaoItemRecord[] = [];
+      let falhaAoVivo: string | null = null;
+      try {
+        const response = await fetchAdesoesItem(numeroAta.trim(), uasg.trim(), numeroItem.trim(), { falharSeErro: true });
+        aoVivo = response.resultado || [];
+      } catch (err) {
+        falhaAoVivo = err instanceof Error ? err.message : String(err);
+      }
+      if (aoVivo.length > 0) return { aoVivo, copia: null, falhaAoVivo: null };
 
       let copia: CopiaAdesoesItem | null = null;
       try {
@@ -61,7 +70,9 @@ export function getItemAdesoesQueryOptions(
       } catch (err) {
         console.warn('Falha ao ler a cópia das adesões do item.', err);
       }
-      return { aoVivo, copia };
+      // Sem a API e sem a cópia do servidor, não há lista para mostrar: a consulta fica em erro (a tela avisa).
+      if (falhaAoVivo && !copia) throw new Error(`O Compras.gov.br não respondeu às adesões do item: ${falhaAoVivo}`);
+      return { aoVivo, copia, falhaAoVivo };
     },
     enabled: isEnabled,
     staleTime: 5 * 60 * 1000 // 5 minutos

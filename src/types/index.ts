@@ -639,6 +639,8 @@ export interface ContractTask {
   atualizadoEm: string;
   concluidoEm?: string;
   concluidoPor?: string;
+  /** Número SEI informado ao concluir (documento ou processo, migration 154). */
+  seiNumero?: string;
 }
 
 /** Módulo do plano: conjunto de etapas criadas por uma mesma aplicação de Modelo de Gestão. */
@@ -729,6 +731,8 @@ export interface AtaTask {
   atualizadoEm: string;
   concluidoEm?: string;
   concluidoPor?: string;
+  /** Número SEI informado ao concluir (documento ou processo, migration 154). */
+  seiNumero?: string;
 }
 
 export interface AtaTaskMacrotask {

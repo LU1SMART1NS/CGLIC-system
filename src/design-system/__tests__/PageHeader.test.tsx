@@ -21,3 +21,13 @@ describe('PageHeader Component', () => {
     expect(html).toContain('Action');
   });
 });
+
+describe('PageHeader viewToggle', () => {
+  it('põe o seletor de visão à direita do título, antes das ações', () => {
+    const html = renderToStaticMarkup(
+      <PageHeader title="Title" viewToggle={<span>Por ata</span>} actions={<button>Action</button>} />
+    );
+    expect(html).toContain('ds-page-header__right');
+    expect(html.indexOf('Por ata')).toBeLessThan(html.indexOf('Action'));
+  });
+});

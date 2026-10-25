@@ -11,6 +11,7 @@ import { isoToBR } from './paymentFormUtils';
 import { isPaymentCycleEncerrado } from '../../../services/paymentFollowUpService';
 import type { useContractPaymentFollowUp } from '../../../hooks/useContractPaymentFollowUp';
 import { formatCurrency } from '../../../utils/format';
+import { NumeroSeiEtiqueta } from '../../../design-system/components/NumeroSeiEtiqueta';
 
 /** Marcos do ciclo. Liquidado e Pago entram sozinhos (conciliação com a fatura e a ordem bancária). */
 export const MARCOS: Array<{ id: string; title: string }> = [
@@ -183,9 +184,7 @@ export const PaymentCyclePanel: React.FC<PaymentCyclePanelProps> = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem 1.25rem', fontSize: '0.8rem', color: '#64748b', flexWrap: 'wrap' }}>
-        <span>
-          Id. SEI: <strong>{cycle.input.documentoAtestoSei}</strong>
-        </span>
+        <NumeroSeiEtiqueta numero={cycle.input.documentoAtestoSei} testId="payment-atesto-sei" />
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
           <Calendar size={13} /> Atesto <strong>{isoToBR(cycle.input.dataAssinaturaAtesto)}</strong> · chegou em{' '}
           <strong>{isoToBR(cycle.input.dataRecebimento)}</strong>

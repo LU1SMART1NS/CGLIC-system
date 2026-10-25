@@ -35,6 +35,14 @@ import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 import { Instrument360Head } from '../instrument360/Instrument360Head';
 import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
+import { useContractManager } from '../../hooks/useContractManager';
+import { useContractPaymentFollowUp } from '../../hooks/useContractPaymentFollowUp';
+import { ROTULO_AVISOS_RESOLVIDOS, useAvisosResolvidos } from '../../hooks/useAvisosResolvidos';
+import { useVinculosAConferir } from '../../hooks/useVinculosAConferir';
+import { useAusentesDaFonte } from '../../hooks/useAusentesDaFonte';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
+import { useLeiturasComFalha, type LeituraDaTela } from '../fonte/useLeiturasComFalha';
+import { EscopoNaoConferido, escopoNaoConferido } from '../instrument360/EscopoNaoConferido';
 
 const TAB_IDS: Contract360Tab[] = ['acoes', 'plano', 'itens', 'financeiro', 'pagamentos', 'historico'];
 
@@ -62,10 +70,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
     ? contract.id || getContractManagementKey(contract.uasg, contract.numero, contract.ano)
     : '';
 
-  const { data: plan = null, isLoading: loadingPlan } = useContractTaskPlan(
-    resolvedContractKey,
-    Boolean(contract && resolvedContractKey)
-  );
+  const planQuery = useContractTaskPlan(resolvedContractKey, Boolean(contract && resolvedContractKey));
+  const { data: plan = null, isLoading: loadingPlan } = planQuery;
 
   const { queue, isLoading: loadingQueue } = useContractActionQueue(contract, plan);
 
@@ -90,7 +96,25 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
   // contratos de outros gestores, mas isso não impede acesso direto por URL
   // (/contratos/:contractKey). Esta guarda fecha essa lacuna de deep-link.
   const { user, role } = useAuth();
-  const { contractKeys: assignedContractKeys, isLoading: loadingManager } = useAssignedManagementScope(uasg);
+  const { contractKeys: assignedContractKeys, isLoading: loadingManager, leituras: leiturasDoEscopo } = useAssignedManagementScope(uasg);
+
+  // Mesmas consultas (e o mesmo cache) do cabeçalho e da fila de ações, para a faixa "não carregou": sem elas o
+  // contrato aparecia "sem plano", "Não atribuído", sem ciclos de pagamento ou com avisos já resolvidos de volta.
+  // Itens, empenhos e faturas já avisam dentro das próprias abas.
+  const gestorQuery = useContractManager(resolvedContractKey);
+  const { consulta: ciclosQuery } = useContractPaymentFollowUp(resolvedContractKey);
+  const { consulta: avisosResolvidosQuery } = useAvisosResolvidos();
+  const { consulta: vinculosAConferirQuery } = useVinculosAConferir();
+  const { consulta: ausentesQuery } = useAusentesDaFonte();
+  const leiturasDaTela: LeituraDaTela[] = [
+    { rotulo: 'plano de gestão do contrato', query: planQuery },
+    { rotulo: 'gestor do contrato', query: gestorQuery },
+    ...(ciclosQuery ? [{ rotulo: 'ciclos de pagamento', query: ciclosQuery }] : []),
+    { rotulo: ROTULO_AVISOS_RESOLVIDOS, query: avisosResolvidosQuery },
+    { rotulo: 'vínculos a conferir', query: vinculosAConferirQuery },
+    { rotulo: 'notas e faturas a conferir', query: ausentesQuery }
+  ];
+  const leituras = useLeiturasComFalha(leiturasDaTela);
   const isScopedRole = role === 'gestor';
   const isOwnContract = Boolean(
     user && resolvedContractKey && assignedContractKeys?.includes(resolvedContractKey)
@@ -136,6 +160,11 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
     return <InstrumentPageState kind="loading" title="Verificando permissão de acesso..." />;
   }
 
+  // A leitura das atribuições falhou: não dá para saber se o contrato é do gestor. A faixa, e não "Acesso não autorizado".
+  if (!isOwnContract && escopoNaoConferido(isScopedRole, leiturasDoEscopo)) {
+    return <EscopoNaoConferido leituras={leiturasDoEscopo ?? []} oQueConferir="este contrato está atribuído a você" backLabel={back.label} onBack={back.back} />;
+  }
+
   if (isScopedRole && !isOwnContract) {
     return (
       <InstrumentPageState
@@ -179,6 +208,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
         ariaLabel="Seções do contrato"
       />
       </Instrument360Head>
+
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="do contrato" testIdPrefix="contrato360-fontes" />
 
       <Instrument360TabPanel idPrefix="contract" activeTab={activeTab}>
         {activeTab === 'acoes' && (

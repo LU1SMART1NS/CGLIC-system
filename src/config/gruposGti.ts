@@ -70,6 +70,26 @@ export function sugerirGrupoGti(nome: string | null | undefined, sigla?: string 
   return null;
 }
 
+/** Situação da UASG em Ajustes › Grupos das UASGs: confirmada, com sugestão a confirmar ou sem sugestão. */
+export type SituacaoGrupoUasg = 'CONFIRMADAS' | 'A_CONFIRMAR' | 'SEM_SUGESTAO';
+
+export function situacaoGrupoUasg(grupo: GrupoConfirmavel | null, sugestao: GrupoConfirmavel | null): SituacaoGrupoUasg {
+  return grupo ? 'CONFIRMADAS' : sugestao ? 'A_CONFIRMAR' : 'SEM_SUGESTAO';
+}
+
+/** UASGs ainda sem grupo confirmado, separadas em com sugestão (a confirmar) e sem sugestão (número do menu Ajustes). */
+export function contarUasgsSemGrupo(
+  uasgs: Array<{ nome: string | null; nomeNaAta: string | null; siglaOrgao: string | null; esferaOrgao: string | null; grupo: GrupoConfirmavel | null }>
+): { aConfirmar: number; semSugestao: number } {
+  const c = { aConfirmar: 0, semSugestao: 0 };
+  for (const u of uasgs) {
+    const situacao = situacaoGrupoUasg(u.grupo, sugerirGrupoGti(u.nome ?? u.nomeNaAta, u.siglaOrgao, u.esferaOrgao));
+    if (situacao === 'A_CONFIRMAR') c.aConfirmar++;
+    else if (situacao === 'SEM_SUGESTAO') c.semSugestao++;
+  }
+  return c;
+}
+
 // ------------------------------------------------------------------------------
 // Fatias
 // ------------------------------------------------------------------------------

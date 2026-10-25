@@ -102,13 +102,18 @@ export function prepareContractEmpenhosList(
  * vindos do "Atualizar" do Contrato ou da sincronização do Item). Não consulta a API ao vivo: o que a tela
  * mostra é o mesmo registro que o Item usa.
  */
-export function useContractFinancialSummary(contract: ContractDashboardRecord, contractKey: string) {
-  const query = useQuery({
-    queryKey: ['contract-empenhos', contractKey],
-    queryFn: () => fetchContractEmpenhosFromDb(contractKey),
+/** Empenhos gravados do contrato (contrato_empenhos + v_empenhos_resumo): a leitura que o Contrato 360 reparte. */
+export function getContractEmpenhosQueryOptions(contractKey: string) {
+  return {
+    queryKey: ['contract-empenhos', contractKey] as const,
+    queryFn: (): Promise<any[]> => fetchContractEmpenhosFromDb(contractKey),
     enabled: Boolean(contractKey),
     staleTime: 60 * 1000
-  });
+  };
+}
+
+export function useContractFinancialSummary(contract: ContractDashboardRecord, contractKey: string) {
+  const query = useQuery(getContractEmpenhosQueryOptions(contractKey));
 
   const empenhosList = useMemo(
     () => prepareContractEmpenhosList(contract, [], query.data ?? []),

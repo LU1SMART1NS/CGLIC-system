@@ -26,6 +26,8 @@ import { classifyTaskAttention } from '../contracts/taskAttentionDisplay';
 import { severityFromAttentionPriorityLevel } from '../../services/severityService';
 import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { ActionButton, AppButton, DataTable, EmptyState, InfoHint, Modal, SummaryBar, useConfirmDialog } from '../../design-system';
+import { lerNumeroSei, descreverNumeroSei } from '../../utils/numeroSei';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 /**
  * Plano de gestão: mesma tela para Contrato e Ata. O componente só desenha; quem usa informa por
@@ -37,7 +39,7 @@ export type TaskPlan = ContractTaskPlan | AtaTaskPlan;
 
 /** Mutação já ligada a um hook do React Query, no mínimo que a tela precisa. */
 export interface PlanMutation<V> {
-  mutate: (variables: V) => void;
+  mutate: (variables: V, options?: { onSuccess?: () => void }) => void;
   isPending: boolean;
   error: unknown;
 }
@@ -57,6 +59,8 @@ export interface TaskUpdateVars {
   responsavelUserId?: string;
   prazo?: string | null;
   observacao?: string | null;
+  /** Número SEI: undefined mantém; texto grava; null retira. */
+  sei?: string | null;
 }
 
 export interface TaskPlanLabels {
@@ -85,6 +89,8 @@ export interface TaskPlanController {
   deleteModule: PlanAction<[vars: { planId: string; moduloId: string }]>;
   renameModule: PlanAction<[vars: { planId: string; moduloId: string; nome: string }]>;
   createTask: PlanAction<[vars: { macrotaskId: string; nome: string; prazo: string | null; observacao: string | null }]>;
+  /** Plano só de leitura (perfil consulta): sem status clicável, edição, exclusão, modelos ou tarefas novas. */
+  somenteLeitura?: boolean;
 }
 
 const STATUS_OPTIONS: { value: ContractTaskStatusValue; label: string; icon: React.ReactNode; color: string }[] = [
@@ -96,11 +102,37 @@ const STATUS_OPTIONS: { value: ContractTaskStatusValue; label: string; icon: Rea
 
 const externalLinkOf = (task: PlanTask): string | undefined => (task as ContractTask).externalLinkUrl;
 
+/** Status da tarefa para quem só consulta: o mesmo ícone do seletor, sem clique. */
+const StatusSoLeitura: React.FC<{ status: ContractTaskStatusValue }> = ({ status }) => {
+  const opt = STATUS_OPTIONS.find((o) => o.value === status) ?? STATUS_OPTIONS[0];
+  return (
+    <span
+      title={opt.label}
+      aria-label={opt.label}
+      data-testid="plan-status-leitura"
+      style={{
+        width: '24px',
+        height: '24px',
+        borderRadius: '4px',
+        border: `1.5px solid ${opt.color}`,
+        background: `${opt.color}1a`,
+        color: opt.color,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0
+      }}
+    >
+      {opt.icon}
+    </span>
+  );
+};
+
 /** Linha de uma tarefa do plano, igual em Contrato e Ata. */
-export type TaskPlanRowController = Pick<TaskPlanController, 'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask'>;
+export type TaskPlanRowController = Pick<TaskPlanController, 'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask' | 'somenteLeitura'>;
 
 export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowController; numero?: string }> = ({ task, controller, numero }) => {
-  const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask } = controller;
+  const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask, somenteLeitura = false } = controller;
   const updateMutation = useUpdateTask(entityKey);
   const deleteMutation = useDeleteTask(entityKey);
   const [expanded, setExpanded] = useState(false);
@@ -112,6 +144,10 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
   });
   const [prazo, setPrazo] = useState(task.prazo || '');
   const [observacao, setObservacao] = useState(task.observacao || '');
+  const [sei, setSei] = useState(task.seiNumero || '');
+  // Pergunta do número SEI aberta ao clicar em Concluída.
+  const [perguntandoSei, setPerguntandoSei] = useState(false);
+  const [seiConclusao, setSeiConclusao] = useState('');
   // Só as tarefas de contrato trazem o sistema de destino (ex.: SEI, SICAF).
   const externalLinkUrl = externalLinkOf(task);
   const sistemaDestino = (task as ContractTask).sistemaDestino;
@@ -129,11 +165,40 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
 
   const handleStatusChange = (status: ContractTaskStatusValue) => {
     if (status === task.status) return;
+    if (status === 'CONCLUIDA') {
+      setSeiConclusao(task.seiNumero || '');
+      setPerguntandoSei(true);
+      setExpanded(false);
+      return;
+    }
+    setPerguntandoSei(false);
     updateMutation.mutate({ taskId: task.id, status });
   };
 
+  const seiConclusaoLido = lerNumeroSei(seiConclusao);
+  /** `semNumero`: conclui sem número (retira o que estava guardado de uma conclusão anterior). */
+  const concluir = (semNumero: boolean) => {
+    const lido = semNumero ? ({ tipo: 'VAZIO' } as const) : seiConclusaoLido;
+    if (lido.tipo === 'INVALIDO') return;
+    const numero = lido.tipo === 'VAZIO' ? null : lido.valor;
+    updateMutation.mutate(
+      // Sem número e nada guardado: só troca o status, como antes.
+      { taskId: task.id, status: 'CONCLUIDA', sei: numero === null && !task.seiNumero ? undefined : numero },
+      { onSuccess: () => setPerguntandoSei(false) }
+    );
+  };
+
+  // Ao abrir, o campo relê o número (pode ter sido gravado pela pergunta da conclusão).
+  const alternarDetalhes = () => {
+    if (!expanded) setSei(task.seiNumero || '');
+    setExpanded(!expanded);
+  };
+
+  const seiLido = lerNumeroSei(sei);
   const handleSaveDetails = (e: React.FormEvent) => {
     e.preventDefault();
+    if (seiLido.tipo === 'INVALIDO') return;
+    const novoSei = seiLido.tipo === 'VAZIO' ? null : seiLido.valor;
     updateMutation.mutate({
       taskId: task.id,
       status: task.status,
@@ -142,7 +207,8 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
       responsavelNome: responsavel.nome.trim(),
       responsavelUserId: responsavel.nome.trim() ? responsavel.userId : undefined,
       prazo: prazo || null,
-      observacao: observacao || null
+      observacao: observacao || null,
+      sei: novoSei === (task.seiNumero ?? null) ? undefined : novoSei
     });
     setExpanded(false);
   };
@@ -151,6 +217,9 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
     <div style={{ borderBottom: '1px solid #f1f5f9', padding: '0.65rem 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         {/* Seletor Rápido de Status */}
+        {somenteLeitura ? (
+          <StatusSoLeitura status={task.status} />
+        ) : (
         <div className="plan-status-group" style={{ display: 'flex', gap: '2px' }}>
           {STATUS_OPTIONS.map((opt) => (
             <button
@@ -180,9 +249,13 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             </button>
           ))}
         </div>
+        )}
 
         {/* Informações da Tarefa */}
-        <div style={{ flex: '1 1 240px', minWidth: 0, cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
+        <div
+          style={{ flex: '1 1 240px', minWidth: 0, cursor: somenteLeitura ? undefined : 'pointer' }}
+          onClick={somenteLeitura ? undefined : () => alternarDetalhes()}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span
               style={{
@@ -195,6 +268,8 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
               {numero ? `${numero}. ${nomeTarefa}` : nomeTarefa}
             </span>
 
+
+            {task.seiNumero && <NumeroSeiEtiqueta numero={task.seiNumero} />}
 
             {task.origem === 'PERSONALIZADA' && <span style={PERSONALIZADA_BADGE_STYLE}>Personalizada</span>}
 
@@ -209,6 +284,10 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
               <span>Resp: {describeResponsavel(task.responsavelNome, gestorNome)}</span>
             )}
           </div>
+          {/* Quem só consulta não abre a edição: a observação aparece na própria linha. */}
+          {somenteLeitura && task.observacao && (
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{task.observacao}</div>
+          )}
         </div>
 
         {/* Ações e Expansor */}
@@ -237,20 +316,89 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             </a>
           )}
 
-          <ActionButton action={expanded ? 'recolher' : 'expandir'} iconOnly label={expanded ? 'Recolher detalhes' : 'Editar prazo e responsável'}
-            type="button"
-            size="sm"
-            onClick={() => setExpanded(!expanded)}
-          />
+          {!somenteLeitura && (
+            <>
+              <ActionButton action={expanded ? 'recolher' : 'expandir'} iconOnly label={expanded ? 'Recolher detalhes' : 'Editar prazo e responsável'}
+                type="button"
+                size="sm"
+                onClick={() => alternarDetalhes()}
+              />
 
-          <ConfirmDeleteButton
-            label="Excluir tarefa"
-            confirmMessage={task.status === 'CONCLUIDA' ? 'Excluir tarefa já concluída?' : 'Excluir tarefa?'}
-            disabled={deleteMutation.isPending}
-            onConfirm={() => deleteMutation.mutate(task.id)}
-          />
+              <ConfirmDeleteButton
+                label="Excluir tarefa"
+                confirmMessage={task.status === 'CONCLUIDA' ? 'Excluir tarefa já concluída?' : 'Excluir tarefa?'}
+                disabled={deleteMutation.isPending}
+                onConfirm={() => deleteMutation.mutate(task.id)}
+              />
+            </>
+          )}
         </div>
       </div>
+
+      {perguntandoSei && (
+        <form
+          aria-label="Número SEI da tarefa"
+          onSubmit={(e) => {
+            e.preventDefault();
+            concluir(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setPerguntandoSei(false);
+          }}
+          style={{
+            marginTop: '0.65rem',
+            padding: '0.75rem 1rem',
+            background: 'var(--color-success-bg)',
+            border: '1px solid var(--color-success-border)',
+            borderRadius: '6px',
+            display: 'grid',
+            gap: '0.5rem',
+            maxWidth: '640px'
+          }}
+        >
+          <label htmlFor={`sei-conclusao-${task.id}`} style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>
+            Esta tarefa tem número SEI? <span style={{ fontWeight: 400, color: '#64748b' }}>(opcional)</span>
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              id={`sei-conclusao-${task.id}`}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus
+              value={seiConclusao}
+              onChange={(e) => setSeiConclusao(e.target.value)}
+              placeholder="Ex.: 28451237"
+              className="form-input"
+              aria-invalid={seiConclusaoLido.tipo === 'INVALIDO'}
+              aria-describedby={`sei-conclusao-ajuda-${task.id}`}
+              style={{ width: '16rem', maxWidth: '100%', fontVariantNumeric: 'tabular-nums' }}
+            />
+            <ActionButton
+              action="salvar"
+              label="Concluir"
+              type="submit"
+              size="sm"
+              disabled={updateMutation.isPending || seiConclusaoLido.tipo === 'INVALIDO'}
+              isLoading={updateMutation.isPending}
+            />
+            <AppButton type="button" variant="link" size="sm" disabled={updateMutation.isPending} onClick={() => concluir(true)}>
+              Concluir sem número
+            </AppButton>
+            <ActionButton action="cancelar" type="button" size="sm" onClick={() => setPerguntandoSei(false)} />
+          </div>
+          <div
+            id={`sei-conclusao-ajuda-${task.id}`}
+            style={{
+              fontSize: '0.75rem',
+              color: seiConclusaoLido.tipo === 'INVALIDO' ? 'var(--color-danger-text)' : seiConclusaoLido.tipo === 'VAZIO' ? '#64748b' : 'var(--color-success-text)'
+            }}
+          >
+            {descreverNumeroSei(seiConclusaoLido)}
+          </div>
+          <MutationError error={updateMutation.error} />
+        </form>
+      )}
 
       {/* Painel Expansível de Detalhes da Tarefa */}
       {expanded && (
@@ -308,6 +456,29 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             {gestorNome ? labels.herancaMsg : labels.semGestorMsg}
           </div>
 
+          <div>
+            <label htmlFor={`sei-${task.id}`} className="form-label">
+              Número SEI
+            </label>
+            <input
+              id={`sei-${task.id}`}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={sei}
+              onChange={(e) => setSei(e.target.value)}
+              placeholder="Sem número"
+              className="form-input"
+              aria-invalid={seiLido.tipo === 'INVALIDO'}
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+            />
+            {seiLido.tipo === 'INVALIDO' && (
+              <div role="alert" style={{ fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.25rem' }}>
+                {descreverNumeroSei(seiLido)}
+              </div>
+            )}
+          </div>
+
           <div style={{ gridColumn: '1 / -1' }}>
             <label className="form-label">
               Observação / Justificativa
@@ -329,7 +500,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             <ActionButton action="salvar"
               type="submit"
               size="sm"
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || seiLido.tipo === 'INVALIDO'}
               isLoading={updateMutation.isPending}
             >
               Salvar Alterações
@@ -397,6 +568,16 @@ export const TaskPlanSection: React.FC<{
   }
 
   // 1. Caso Nenhum Plano Tenha Sido Aplicado Ainda
+  if (!plan && c.somenteLeitura) {
+    return (
+      <EmptyState
+        icon={<Sliders size={28} />}
+        title={labels.semPlanoTitulo}
+        description={`O ${labels.gestorLabel} ainda não aplicou um Modelo de Gestão.`}
+        testId="task-plan-empty"
+      />
+    );
+  }
   if (!plan) {
     return (
       <EmptyState
@@ -540,7 +721,7 @@ export const TaskPlanSection: React.FC<{
               onClick={() => setCollapsedGroups(allCollapsed ? new Set() : new Set(moduleGroups.map((g) => g.key)))}
             />
           )}
-          {showApplyModel ? (
+          {c.somenteLeitura ? null : showApplyModel ? (
             <ActionButton action="fechar" type="button" size="sm" onClick={() => setShowApplyModel(false)} />
           ) : (
             <AppButton type="button" variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setShowApplyModel(true)}>
@@ -550,7 +731,7 @@ export const TaskPlanSection: React.FC<{
         </div>
       </div>
 
-      {showApplyModel && (
+      {showApplyModel && !c.somenteLeitura && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <select
@@ -611,12 +792,12 @@ export const TaskPlanSection: React.FC<{
               onToggleCollapsed={() => toggleGroup(group.key)}
               isPending={c.deleteModule.isPending || c.renameModule.isPending}
               onRename={
-                group.modulo
+                group.modulo && !c.somenteLeitura
                   ? (nome) => c.renameModule.run({ planId: plan.id, moduloId: group.modulo!.id, nome })
                   : undefined
               }
               onDelete={
-                group.modulo
+                group.modulo && !c.somenteLeitura
                   ? async () => {
                       const ok = await confirm({
                         title: 'Excluir módulo',
@@ -644,15 +825,15 @@ export const TaskPlanSection: React.FC<{
               numero={numeroEtapa(macroIndex)}
               taskCount={macro.tarefas.length}
               isPending={c.saveMacrotask.isPending || c.deleteMacrotask.isPending}
-              onRename={(nome) => c.saveMacrotask.run({ id: macro.id, nome: stripNumeracaoManual(nome) })}
-              onDelete={() => c.deleteMacrotask.run(macro.id)}
+              onRename={c.somenteLeitura ? undefined : (nome) => c.saveMacrotask.run({ id: macro.id, nome: stripNumeracaoManual(nome) })}
+              onDelete={c.somenteLeitura ? undefined : () => c.deleteMacrotask.run(macro.id)}
             />
 
             <div>
               {macro.tarefas.map((tarefa, tarefaIndex) => (
                 <TaskPlanRow key={tarefa.id} task={tarefa} controller={c} numero={numeroTarefa(macroIndex, tarefaIndex)} />
               ))}
-              <AddTaskForm
+              {!c.somenteLeitura && <AddTaskForm
                 gestorNome={c.gestorNome}
                 isPending={c.createTask.isPending}
                 onSubmit={(values) =>
@@ -663,7 +844,7 @@ export const TaskPlanSection: React.FC<{
                     observacao: values.observacao || null
                   })
                 }
-              />
+              />}
             </div>
           </div>
         ))}
@@ -671,10 +852,12 @@ export const TaskPlanSection: React.FC<{
           );
         })}
 
-        <AddMacrotaskForm
-          isPending={c.saveMacrotask.isPending}
-          onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome: stripNumeracaoManual(nome) })}
-        />
+        {!c.somenteLeitura && (
+          <AddMacrotaskForm
+            isPending={c.saveMacrotask.isPending}
+            onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome: stripNumeracaoManual(nome) })}
+          />
+        )}
       </div>
     </div>
   );

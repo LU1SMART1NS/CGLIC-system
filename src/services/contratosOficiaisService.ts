@@ -1,21 +1,16 @@
 /**
  * Contratos oficiais persistidos no Supabase (migration 72).
  *
- * As telas leem a lista de contratos do banco (`contratos_oficiais`), e não mais das APIs do governo
- * a cada carga. A sincronização com o Contratos.gov.br e o Compras.gov.br roda em segundo plano, uma
- * vez para todos os usuários: a trava em `sincronizacao_fontes` garante que só um navegador sincroniza
- * por vez e só quando os dados passaram da validade. O coordenador força a atualização pelo botão.
- *
- * Provisório: a sincronização roda no navegador de quem tem perfil de gravação (gestor/coordenador).
- * Ela vai para uma Edge Function agendada no item 2 do docs/historico/PLANO_PERSISTENCIA_CONTRATOS_E_CACHE.md.
+ * As telas leem a lista de contratos do banco (`contratos_oficiais`) e nunca as APIs do governo: quem
+ * consulta o Contratos.gov.br e o Compras.gov.br é a sincronização no servidor (server/sincronizar-fontes,
+ * que usa `sincronizarContratos` daqui). A trava em `sincronizacao_fontes` garante uma sincronização por vez.
  */
 
 import type { ContractDashboardRecord } from '../types';
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import {
   buscarContratosNasFontes,
   calculateStatusVigencia,
-  fetchContractsForDashboard,
   ordenarContratos
 } from './contractService';
 import {
@@ -35,8 +30,12 @@ export {
 export const RECURSO_CONTRATOS = 'contratos' as const;
 /** Validade da lista no banco: passado isso, a próxima abertura de quem pode gravar sincroniza. */
 export const VALIDADE_CONTRATOS = VALIDADE_PADRAO;
-/** O Supabase devolve no máximo 1000 linhas por consulta e corta o resto sem avisar. */
-const PAGINA_LEITURA = 1000;
+/**
+ * Contratos por página na leitura. O Supabase devolve no máximo 1000 linhas e corta o resto sem avisar, mas a página
+ * de 1000 da UASG 200331 tem ~4 MB de `registro` e estourou o tempo limite de 8 s do usuário logado com o banco
+ * cheio (17/10/2026). Com 250 cada página tem ~1 MB e um quarto do trabalho.
+ */
+export const PAGINA_LEITURA = 250;
 /** Contratos por chamada de gravação (a função aceita até 500). */
 const LOTE_GRAVACAO = 100;
 
@@ -52,19 +51,38 @@ export function registroParaContrato(registro: Record<string, any>): ContractDas
   };
 }
 
-/** Contratos da carteira (UASG) gravados no banco, em páginas. Lista vazia quando nada foi sincronizado. */
+/**
+ * Coluna lida: `registro` é o registro completo (com o `raw` inteiro da fonte); `registro_tela` é o mesmo registro
+ * com só as partes do `raw` que as telas usam (migration 150: ~2/3 menos dados na UASG 200331).
+ */
+type ColunaRegistro = 'registro' | 'registro_tela';
+
+/**
+ * Contratos da carteira (UASG) gravados no banco, em páginas. Lista vazia quando nada foi sincronizado.
+ * A ordem é fixa (contract_key, único na UASG), para nenhuma linha pular ou repetir entre as páginas. Falha em
+ * qualquer página vira erro: nunca devolve a carteira pela metade.
+ * Lê o registro completo: é a base da sincronização do servidor.
+ */
 export async function fetchContratosOficiaisDoBanco(uasg: string): Promise<ContractDashboardRecord[]> {
+  return lerContratosDoBanco(uasg, 'registro');
+}
+
+async function lerContratosDoBanco(uasg: string, coluna: ColunaRegistro): Promise<ContractDashboardRecord[]> {
   if (!supabase) return [];
   const cleanUasg = (uasg || '').trim();
   const contratos: ContractDashboardRecord[] = [];
-  for (let from = 0; ; from += PAGINA_LEITURA) {
+  for (let from = 0, pagina = 1; ; from += PAGINA_LEITURA, pagina++) {
     const { data, error } = await supabase
       .from('contratos_oficiais')
-      .select('registro')
+      .select(coluna === 'registro' ? 'registro' : 'registro:registro_tela')
       .eq('uasg', cleanUasg)
       .order('contract_key', { ascending: true })
       .range(from, from + PAGINA_LEITURA - 1);
-    if (error) throw error;
+    if (error) {
+      throw new Error(`Não foi possível ler os contratos da UASG ${cleanUasg} no banco (página ${pagina}): ${error.message}`, {
+        cause: error
+      });
+    }
     for (const row of data ?? []) contratos.push(registroParaContrato(row.registro));
     if (!data || data.length < PAGINA_LEITURA) break;
   }
@@ -72,20 +90,69 @@ export async function fetchContratosOficiaisDoBanco(uasg: string): Promise<Contr
 }
 
 /**
- * Lista de contratos para as telas (queryFn de ['contracts-dashboard', uasg]).
- * Lê do banco. Só consulta as APIs do governo quando o banco ainda não tem a carteira (antes da
- * primeira sincronização) ou não respondeu.
+ * Lista de contratos para as telas (queryFn de ['contracts-dashboard', uasg]). Só lê o banco.
+ * Leitura que falha vira erro, e cada tela o trata: o painel do Início usa a última leitura boa ou avisa que não
+ * carregou; a Carteira de Contratos mostra o erro com "tentar novamente". O navegador não consulta as fontes oficiais
+ * nem quando o banco falha nem quando ainda não tem a carteira (devolve lista vazia).
+ *
+ * Lê `registro_tela`: o `raw` vem resumido (categoria, prorrogável, valor acumulado, publicação, termos aditivos e
+ * UASG de origem) e marcado com `_resumido`. Quem regrava este registro (Contrato 360, sincronização de empenhos)
+ * pode mandá-lo como está: o banco mantém o `raw` inteiro já gravado e só junta o que mudou (migration 150).
  */
 export async function fetchContratosParaTela(uasg: string): Promise<ContractDashboardRecord[]> {
+  return lerContratosDoBanco(uasg, 'registro_tela');
+}
+
+/**
+ * Um contrato só, para o Contrato 360 (queryFn de ['contracts-dashboard', uasg, 'contrato', chave]): a mesma coluna
+ * `registro_tela` da lista, pela chave do contrato (ou pelo número de controle do PNCP, que o endereço também aceita).
+ * Usa o índice (uasg, contract_key) em vez de ler a carteira inteira (~4 MB). Devolve 0, 1 ou, se a chave casar com
+ * mais de um registro, todos eles: quem chama escolhe com a mesma regra que usava na lista. Falha vira erro.
+ */
+export async function fetchContratoParaTela(uasg: string, chave: string): Promise<ContractDashboardRecord[]> {
+  if (!supabase) return [];
   const cleanUasg = (uasg || '').trim();
-  if (!isSupabaseConfigured || !supabase) return fetchContractsForDashboard(cleanUasg, false);
-  try {
-    const doBanco = await fetchContratosOficiaisDoBanco(cleanUasg);
-    if (doBanco.length > 0) return doBanco;
-  } catch (err) {
-    console.warn(`[contratosOficiais] leitura do banco falhou para a UASG ${cleanUasg}; consultando as fontes oficiais.`, err);
+  const alvo = (chave || '').trim();
+  if (!cleanUasg || !alvo) return [];
+  // Aspas: a chave e o número do PNCP têm "-" e "/", que o filtro "or" do PostgREST aceita entre aspas.
+  const valores = [...new Set([alvo, alvo.toUpperCase()])].map((v) => `"${v.replace(/"/g, '')}"`);
+  const filtro = valores.flatMap((v) => [`contract_key.eq.${v}`, `numero_controle_pncp.eq.${v}`]).join(',');
+  const { data, error } = await supabase
+    .from('contratos_oficiais')
+    .select('registro:registro_tela')
+    .eq('uasg', cleanUasg)
+    .or(filtro)
+    .order('contract_key', { ascending: true });
+  if (error) {
+    throw new Error(`Não foi possível ler o contrato ${alvo} no banco: ${error.message}`, { cause: error });
   }
-  return fetchContractsForDashboard(cleanUasg, false);
+  return (data ?? []).map((row: { registro: Record<string, any> }) => registroParaContrato(row.registro));
+}
+
+/**
+ * Só os contratos destas chaves (contratos vinculados a uma ata ou a um item), com a mesma coluna `registro_tela` da
+ * lista. Em lotes de 100 chaves, pelo índice (uasg, contract_key). Falha em qualquer lote vira erro.
+ */
+export async function fetchContratosParaTelaPorChaves(uasg: string, chaves: readonly string[]): Promise<ContractDashboardRecord[]> {
+  if (!supabase) return [];
+  const cleanUasg = (uasg || '').trim();
+  const todas = [...new Set(chaves.flatMap((c) => [c.trim(), c.trim().toUpperCase()]).filter(Boolean))].sort();
+  if (!cleanUasg || todas.length === 0) return [];
+  const contratos: ContractDashboardRecord[] = [];
+  for (let i = 0; i < todas.length; i += 100) {
+    const lote = todas.slice(i, i + 100);
+    const { data, error } = await supabase
+      .from('contratos_oficiais')
+      .select('registro:registro_tela')
+      .eq('uasg', cleanUasg)
+      .in('contract_key', lote)
+      .order('contract_key', { ascending: true });
+    if (error) {
+      throw new Error(`Não foi possível ler os contratos vinculados no banco: ${error.message}`, { cause: error });
+    }
+    for (const row of data ?? []) contratos.push(registroParaContrato((row as { registro: Record<string, any> }).registro));
+  }
+  return ordenarContratos(contratos);
 }
 
 // ------------------------------------------------------------------------------

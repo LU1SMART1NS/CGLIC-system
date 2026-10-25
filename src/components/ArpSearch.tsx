@@ -6,8 +6,11 @@ import { ArpPortfolioSummary, type ArpVigenciaFilterOption } from './atas/ArpPor
 import { matchesStatusFilter, comparePrazo } from './carteira/carteiraPrazo';
 import { getArpPrazo, useAtasPortfolio } from '../hooks/useAtasPortfolio';
 import { useAuth } from '../context/AuthContext';
+import { semContratos } from '../types/rbac';
 import { useCarteiraItens } from '../hooks/useCarteiraItens';
-import { SaldoItensFalhaNotice } from './carteira/SaldoItensFalhaNotice';
+import { FontesComFalhaAviso } from './fonte/FontesComFalhaAviso';
+import { useLeiturasComFalha } from './fonte/useLeiturasComFalha';
+import { ListaNaoCarregou } from './fonte/ListaNaoCarregou';
 import { passaFiltroNivel, type NivelAtendimento } from '../utils/itemAtendimento';
 import { TODAS_UNIDADES } from './carteira/CarteiraExecucaoSelects';
 import { canAssignManager } from './carteira/ManagerAssign';
@@ -21,7 +24,7 @@ import { SincronizacaoFalhaNotice } from './carteira/SincronizacaoFalhaNotice';
 import type { ArpRecord, ArpItemRecord } from '../types';
 import { AvisoCarregando } from '../design-system';
 import { chaveGestaoDaArp, contarPorPapel, passaFiltroPapel } from '../utils/ataIdentidade';
-import { useFatiasGti } from '../hooks/useGruposGti';
+import { ROTULO_GTI_ATAS, useFatiasGtiLeitura } from '../hooks/useGruposGti';
 import { chaveAtaGti, contarPorGti, passaFiltroGti, pctDoGti } from '../config/gruposGti';
 import type { ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
 
@@ -43,9 +46,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     isLoading,
     scopeLoading,
     itemsByAta,
-    itemsLoadingByAta,
-    loadItemsForArp,
-    loadItemsForArps,
     gestorByAta,
     saldoStatsByAta,
     syncInfo,
@@ -54,11 +54,15 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     syncError,
     situacaoSincronizacao,
     triggerSync,
-    reload
+    reload,
+    leiturasDasAtas,
+    leiturasDosSaldos,
+    leituraDosItensNasFontes,
+    atasNaoCarregaram
   } = useAtasPortfolio();
 
   // Alocação, empenho e unidades de cada ata, somados dos itens (filtros e colunas da carteira).
-  const { resumoPorAta, unidades, saldosComErro, recarregandoSaldos, recarregarSaldos } = useCarteiraItens({
+  const { rows: linhasDosItens, resumoPorAta, unidades, saldosComErro, leituras: leiturasDosItens } = useCarteiraItens({
     arps: scopedArps,
     itemsByAta,
     gestorByAta
@@ -85,7 +89,16 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
   );
 
   // Fatia de cada GTI do ComprasSUSP nas atas (migration 139): coluna e filtro "GTI".
-  const fatiasGti = useFatiasGti();
+  const { fatias: fatiasGti, consulta: fatiasGtiQuery } = useFatiasGtiLeitura();
+  // Uma fonte que falha não some calada: a carteira mostra o que carregou e a faixa diz o que ficou de fora (atas,
+  // gestores, recorte do gestor, saldo, alocação, contratado, empenhado, GTI e itens buscados nas fontes oficiais).
+  const leituras = useLeiturasComFalha([
+    ...(leiturasDasAtas ?? []),
+    ...(leiturasDosSaldos ?? []),
+    ...(leiturasDosItens ?? []),
+    { rotulo: ROTULO_GTI_ATAS, query: fatiasGtiQuery },
+    ...(leituraDosItensNasFontes ? [leituraDosItensNasFontes] : [])
+  ]);
   const fatiasDaArp = useCallback(
     (arp: ArpRecord) => fatiasGti.get(chaveAtaGti(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora)),
     [fatiasGti]
@@ -211,13 +224,6 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     });
   }, [scopedArps, filterState, filtroAtaAssinada, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta, fatiasDaArp]);
 
-  // Carregar itens para as atas filtradas
-  useEffect(() => {
-    if (filteredArps.length > 0) {
-      loadItemsForArps(filteredArps.slice(0, 15));
-    }
-  }, [filteredArps, loadItemsForArps]);
-
   // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
 
@@ -273,7 +279,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         />
       )}
 
-      {saldosComErro && <SaldoItensFalhaNotice onRetry={recarregarSaldos} isRetrying={recarregandoSaldos} />}
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da carteira" testIdPrefix="atas-fontes" />
 
       <ArpPortfolioSummary
         totalAtas={summaryMetrics.total}
@@ -301,21 +307,24 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         totalAtas={scopedArps.length}
       />
 
+      {scopedArps.length === 0 && atasNaoCarregaram ? (
+        <ListaNaoCarregou titulo="As atas não carregaram." testId="atas-nao-carregou" />
+      ) : (
       <ArpPortfolioList
         canAssign={canAssign}
         onFilter={handleFilterChange}
         cards={groupedCards}
         totalAtas={scopedArps.length}
         isLoading={isLoading}
-        itemsLoadingByAta={itemsLoadingByAta}
         saldoStatsByAta={saldoStatsByAta}
         execucaoPorAta={resumoPorAta}
+        linhasDosItens={linhasDosItens}
+        mostrarEmpenhoDosItens={!semContratos(role)}
         fatiasGti={fatiasGti}
         unidades={unidades}
         filters={filterState}
         gestorByAta={gestorByAta}
         busca={filterState.busca}
-        onExpandAta={loadItemsForArp}
         onSelectArp={onSelectArp}
         onSelectItem={(arp, item) => {
           if (onSelectItem) {
@@ -326,6 +335,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         }}
         onResetFilters={handleResetFilters}
       />
+      )}
       </>
       )}
     </PageContainer>

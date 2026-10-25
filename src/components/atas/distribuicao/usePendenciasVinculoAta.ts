@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useAtasPortfolio, getArpPrazo } from '../../../hooks/useAtasPortfolio';
 import { useContractsPortfolio } from '../../../hooks/useContractsPortfolio';
 import { useArpItemContractLinks } from '../../../hooks/useAtaManagers';
-import { useContratosSemAta } from '../../../hooks/useContratosSemAta';
+import { useContratosSemAta, useMarcasSemAtaDesfeitas } from '../../../hooks/useContratosSemAta';
 import { useDescartesAtaContrato } from '../../../hooks/useDescartesAtaContrato';
 import { useMotivosVinculoManual } from '../../../hooks/useVinculoAutomatico';
 import { useNumerosDosItensDosContratos } from '../../../hooks/useItensDoContrato';
@@ -11,18 +11,37 @@ import { agruparVinculos, buildPendenciasDistribuicao, contratosParaConferirParc
 import type { ItemDaAta } from './vinculoEmMassa';
 import { chaveGestaoDaArp } from '../../../utils/ataIdentidade';
 import type { EstadoMotivos } from '../../../utils/vinculoAutomatico';
+import type { ArpItemContractLinkPair } from '../../../services/arpContractLinkService';
+import type { ContratoSemAtaConfirmacao, MarcaSemAtaDesfeita } from '../../../services/contratoSemAtaService';
+import type { DescarteAtaContrato } from '../../../services/contratoAtaDescarteService';
+import { ROTULO_VINCULOS_ITEM_CONTRATO } from '../../../hooks/useAssignedManagementScope';
+import { naoCarregou, type LeituraDaTela } from '../../fonte/useLeiturasComFalha';
 
 /**
  * Atas, contratos e vínculos da carteira, cruzados para dizer quais contratos ainda não têm ata (e qual é a ata
  * provável). Serve à fila "Contratos à ata" do menu Vínculos e à Central de Distribuição (atas sem gestor e carga
  * por gestor usam as mesmas pendências).
  */
-export function usePendenciasVinculoAta() {
+const SEM_LINKS: ArpItemContractLinkPair[] = [];
+const SEM_CONFIRMACOES: Record<string, ContratoSemAtaConfirmacao> = {};
+const SEM_DESCARTES: Record<string, DescarteAtaContrato> = {};
+const SEM_DESFEITAS: Record<string, MarcaSemAtaDesfeita> = {};
+
+/**
+ * `pendencias: true` lê também o painel do Início (pendências de cada contrato), que só a carga dos gestores usa: a
+ * Central de Distribuição e o "Atribuir gestor" aberto. A fila, os números do menu e a gaveta do Início não precisam.
+ */
+export function usePendenciasVinculoAta({ pendencias: comPendencias = false }: { pendencias?: boolean } = {}) {
   const atas = useAtasPortfolio();
-  const contratos = useContractsPortfolio();
-  const { data: links = [], isLoading: linksLoading } = useArpItemContractLinks();
-  const { data: confirmacoesSemAta = {}, isLoading: semAtaLoading } = useContratosSemAta();
-  const { data: descartesAta = {} } = useDescartesAtaContrato();
+  const contratos = useContractsPortfolio({ pendencias: comPendencias });
+  const linksQuery = useArpItemContractLinks();
+  const { data: links = SEM_LINKS, isLoading: linksLoading } = linksQuery;
+  const semAtaQuery = useContratosSemAta();
+  const { data: confirmacoesSemAta = SEM_CONFIRMACOES, isLoading: semAtaLoading } = semAtaQuery;
+  const desfeitasQuery = useMarcasSemAtaDesfeitas();
+  const { data: marcasDesfeitasPorChave = SEM_DESFEITAS } = desfeitasQuery;
+  const descartesQuery = useDescartesAtaContrato();
+  const { data: descartesAta = SEM_DESCARTES } = descartesQuery;
   const motivosQuery = useMotivosVinculoManual();
   const motivosManual = motivosQuery.data;
   /** Leitura dos motivos (RPC prever_vinculos_automaticos): a fila não promete vínculo automático enquanto carrega ou se falhou. */
@@ -74,6 +93,10 @@ export function usePendenciasVinculoAta() {
   );
   const vinculosDoContrato = useMemo(() => agruparVinculos(links, (n) => atas.gestorByAta[n]), [links, atas.gestorByAta]);
   const descartes = useMemo(() => new Set(Object.keys(descartesAta)), [descartesAta]);
+  const marcasDesfeitas = useMemo(
+    () => new Map(Object.values(marcasDesfeitasPorChave).map((m) => [m.contractKey, { porNome: m.desfeitoPorNome, em: m.desfeitoEm }])),
+    [marcasDesfeitasPorChave]
+  );
   const gestorPorContrato = useMemo(() => new Map(contratos.rows.map((r) => [r.contractKey, r.gestorNome])), [contratos.rows]);
   const gestorDoContrato = React.useCallback((contractKey: string) => gestorPorContrato.get(contractKey), [gestorPorContrato]);
   // Contrato em mais de uma ata (migration 86): os vinculados com outra ata provável podem estar com item faltando.
@@ -90,9 +113,10 @@ export function usePendenciasVinculoAta() {
         vinculosDoContrato,
         itensDoContrato,
         naoPertencemAAta: new Set(Object.keys(confirmacoesSemAta)),
+        marcasDesfeitas,
         descartes
       }),
-    [contratosFila, atasFila, vinculosDoContrato, itensDoContrato, confirmacoesSemAta, descartes]
+    [contratosFila, atasFila, vinculosDoContrato, itensDoContrato, confirmacoesSemAta, marcasDesfeitas, descartes]
   );
   const atasPorChave = useMemo(() => new Map(atasFila.map((a) => [`${a.numeroAta}-${a.uasg}`, a])), [atasFila]);
   const ataDe = React.useCallback((numeroAta: string, uasg: string) => atasPorChave.get(`${numeroAta}-${uasg}`), [atasPorChave]);
@@ -114,10 +138,27 @@ export function usePendenciasVinculoAta() {
   // Marcados "não pertence a ata" e ainda sem gestor: continuam pendentes na fila de Vínculos.
   const naoPertencemSemGestor = pendencias.naoPertencem.filter((i) => !i.gestorNome).length;
 
+  /** Leituras da fila, para a faixa "não carregou". */
+  const leituras: LeituraDaTela[] = [
+    ...(atas.leiturasDasAtas ?? []),
+    ...(contratos.leiturasDosContratos ?? []),
+    { rotulo: ROTULO_VINCULOS_ITEM_CONTRATO, query: linksQuery },
+    { rotulo: 'contratos marcados "não pertence a ata"', query: semAtaQuery },
+    { rotulo: 'marcas "não pertence a ata" desfeitas', query: desfeitasQuery },
+    { rotulo: 'atas descartadas', query: descartesQuery }
+  ];
+  /**
+   * Sem os vínculos, todo contrato pareceria sem ata; sem as marcas "não pertence", eles voltariam à fila. A fila e o
+   * número do menu esperam essas duas leituras em vez de mostrar uma pendência que não existe.
+   */
+  const filaIndisponivel = naoCarregou(linksQuery) || naoCarregou(semAtaQuery);
+
   return {
     atas,
     contratos,
     links,
+    leituras,
+    filaIndisponivel,
     confirmacoesSemAta,
     motivosManual,
     motivosEstado,

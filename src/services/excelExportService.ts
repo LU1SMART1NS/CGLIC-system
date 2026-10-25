@@ -11,6 +11,8 @@ import type {
 } from '../types/reportTypes';
 import { SALDO_RULES, VIGENCIA_RULES } from '../config/alertRules';
 import { classifyArpItemSaldo } from './balanceService';
+import { fetchAllAllocationsGlobal, type GlobalAllocationRecord } from './allocationService';
+import { normalizeItemKey } from '../utils/itemKeyUtils';
 
 // ============================================================================
 // METADADOS DE GRUPOS DE COLUNAS
@@ -600,7 +602,6 @@ export async function buildFlattenedReportData(
   // 1. Scan ultrarrápido do localStorage em memória (1 passagem única < 2ms para todos os registros)
   const manualEmpenhosMap: Record<string, any[]> = {};
   const manualContratosMap: Record<string, any[]> = {};
-  const allocationsMap: Record<string, any[]> = {};
 
   try {
     for (let i = 0; i < localStorage.length; i++) {
@@ -614,10 +615,6 @@ export async function buildFlattenedReportData(
         const itemKey = key.replace('saldoarp-manual-contratos-', '');
         const raw = localStorage.getItem(key);
         if (raw) manualContratosMap[itemKey] = JSON.parse(raw);
-      } else if (key.startsWith('saldoarp-allocations-')) {
-        const itemKey = key.replace('saldoarp-allocations-', '');
-        const raw = localStorage.getItem(key);
-        if (raw) allocationsMap[itemKey] = JSON.parse(raw);
       }
     }
   } catch {}
@@ -630,6 +627,18 @@ export async function buildFlattenedReportData(
     const porUasg = await Promise.all(uasgs.map((u) => fetchArpItemSaldosFromDb(u)));
     for (const s of porUasg.flat()) {
       saldosPorItem.set(`${s.numero_ata}|${s.codigo_uasg}|${Number(s.numero_item)}`, s);
+    }
+  }
+
+  // Alocações às unidades internas, lidas do banco (todas as páginas) e agrupadas pela chave canônica do item. Se a
+  // leitura falhar, o relatório não sai, como no saldo. Antes vinham da cópia do navegador, que podia estar velha ou
+  // faltar itens que a pessoa nunca abriu.
+  const alocacoesPorItem = new Map<string, GlobalAllocationRecord[]>();
+  if (granularity === 'BY_ALLOCATION') {
+    for (const a of await fetchAllAllocationsGlobal()) {
+      const lista = alocacoesPorItem.get(a.itemKey);
+      if (lista) lista.push(a);
+      else alocacoesPorItem.set(a.itemKey, [a]);
     }
   }
 
@@ -702,10 +711,11 @@ export async function buildFlattenedReportData(
     for (const item of items) {
       const itemKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}-${item.numeroItem}`;
       
-      // Busca empenhos e alocações locais do mapa pré-carregado
+      // Empenhos e contratos manuais do mapa pré-carregado; alocações do banco
       const storedEmpenhos = manualEmpenhosMap[itemKey] || [];
       const storedContratos = manualContratosMap[itemKey] || [];
-      const storedAllocations = allocationsMap[itemKey] || [];
+      const storedAllocations =
+        alocacoesPorItem.get(normalizeItemKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora, item.numeroItem)) || [];
 
       const totalEmpenhadoQtd = storedEmpenhos.reduce((acc, e) => acc + (Number(e.quantidade) || 0), 0);
       const qtdHomologada = Number(item.quantidadeHomologadaItem) || 0;

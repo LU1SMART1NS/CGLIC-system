@@ -15,6 +15,8 @@ export interface PageHeaderProps {
   /** Explicação detalhada, mostrada sob demanda num ícone ⓘ ao lado do título. */
   hint?: string;
   actions?: React.ReactNode;
+  /** Seletor de visão (ex.: Por ata · Por item): fica sempre à direita do título, mesmo quando as ações sobem para as abas. */
+  viewToggle?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -26,6 +28,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   badge,
   hint,
   actions,
+  viewToggle,
   className,
   style
 }) => {
@@ -86,7 +89,12 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         )}
       </div>
 
-      {actionsNode && !slot && actionsNode}
+      {(viewToggle || (actionsNode && !slot)) && (
+        <div className="ds-page-header__right" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm }}>
+          {viewToggle}
+          {!slot && actionsNode}
+        </div>
+      )}
       {actionsNode && slot && createPortal(actionsNode, slot)}
     </header>
   );

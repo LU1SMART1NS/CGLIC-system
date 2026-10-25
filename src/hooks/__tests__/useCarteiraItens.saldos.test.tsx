@@ -5,14 +5,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const { saldos, fetchSaldos } = vi.hoisted(() => ({
+const { saldos, fetchSaldos, consultasDoHook } = vi.hoisted(() => ({
   saldos: { porUasg: {} as Record<string, any> },
-  fetchSaldos: vi.fn()
+  fetchSaldos: vi.fn(),
+  /** Resposta das consultas do próprio hook (alocações, vínculos, empenhos), pela chave. */
+  consultasDoHook: { porChave: {} as Record<string, any> }
 }));
 
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-query')>()),
-  useQuery: vi.fn(() => ({ data: [], isPending: false, isError: false, isFetching: false, refetch: vi.fn() }))
+  useQuery: vi.fn(
+    (opcoes: { queryKey: unknown[] }) =>
+      consultasDoHook.porChave[JSON.stringify(opcoes.queryKey)] ?? { data: [], isPending: false, isError: false, isFetching: false, refetch: vi.fn() }
+  )
 }));
 vi.mock('../../services/dashboardService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../services/dashboardService')>()),
@@ -26,7 +31,9 @@ vi.mock('../useAta', async (importOriginal) => ({
 import { useCarteiraItens } from '../useCarteiraItens';
 import { getCarteiraSaldosQueryOptions } from '../useAta';
 import { COLUNAS_SALDO_CARTEIRA } from '../../services/dashboardService';
-import { SaldoItensFalhaNotice } from '../../components/carteira/SaldoItensFalhaNotice';
+import { AlocacoesFalhaNotice } from '../../components/carteira/AlocacoesFalhaNotice';
+import { CARTEIRA_ALOCACOES_KEY, ROTULOS_CARTEIRA_ITENS } from '../useCarteiraItens';
+import { falhasDasLeituras } from '../../components/fonte/useLeiturasComFalha';
 
 function consulta(over: Record<string, unknown> = {}) {
   return { data: [], isPending: false, isError: false, isFetching: false, refetch: vi.fn(), ...over };
@@ -46,6 +53,7 @@ describe('useCarteiraItens — saldo dos itens', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saldos.porUasg = { '200330': consulta(), '200331': consulta() };
+    consultasDoHook.porChave = {};
   });
 
   it('sem erro, saldosComErro é falso', () => {
@@ -82,16 +90,52 @@ describe('getCarteiraSaldosQueryOptions', () => {
   });
 });
 
-describe('SaldoItensFalhaNotice', () => {
-  it('explica o problema e oferece "Tentar de novo"', () => {
-    const html = renderToStaticMarkup(<SaldoItensFalhaNotice onRetry={() => {}} />);
-    expect(html).toContain('Não foi possível carregar a situação dos itens');
-    expect(html).toContain('Tentar de novo');
+describe('useCarteiraItens — leituras para a faixa "não carregou"', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saldos.porUasg = { '200330': consulta(), '200331': consulta() };
+    consultasDoHook.porChave = {};
   });
 
-  it('enquanto relê, o botão fica desativado', () => {
-    const html = renderToStaticMarkup(<SaldoItensFalhaNotice onRetry={() => {}} isRetrying />);
-    expect(html).toContain('Carregando…');
-    expect(html).toMatch(/<button[^>]*disabled/);
+  it('entrega alocações, contratado, empenhado e o saldo das duas UASGs, com o rótulo de cada um', () => {
+    saldos.porUasg['200331'] = consulta({ isError: true, data: undefined });
+    const r = rodarHook();
+    expect(r.leituras.map((l) => l.rotulo)).toEqual([
+      ROTULOS_CARTEIRA_ITENS.alocacoes,
+      ROTULOS_CARTEIRA_ITENS.vinculos,
+      ROTULOS_CARTEIRA_ITENS.empenhos,
+      ROTULOS_CARTEIRA_ITENS.saldos,
+      ROTULOS_CARTEIRA_ITENS.saldos
+    ]);
+    expect(falhasDasLeituras(r.leituras)).toMatchObject([{ rotulo: 'saldo dos itens', situacao: 'NAO_CARREGOU' }]);
+  });
+});
+
+describe('useCarteiraItens — alocações às unidades (só do banco)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saldos.porUasg = { '200330': consulta(), '200331': consulta() };
+    consultasDoHook.porChave = {};
+  });
+
+  it('sem erro, alocacoesComErro é falso', () => {
+    expect(rodarHook().alocacoesComErro).toBe(false);
+  });
+
+  it('falha da leitura liga o aviso e "Tentar de novo" relê as alocações', () => {
+    const alocacoes = consulta({ isError: true, data: undefined });
+    consultasDoHook.porChave[JSON.stringify(CARTEIRA_ALOCACOES_KEY)] = alocacoes;
+    const r = rodarHook();
+    expect(r.alocacoesComErro).toBe(true);
+    r.recarregarAlocacoes();
+    expect(alocacoes.refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AlocacoesFalhaNotice', () => {
+  it('explica o problema e oferece "Tentar de novo"', () => {
+    const html = renderToStaticMarkup(<AlocacoesFalhaNotice onRetry={() => {}} />);
+    expect(html).toContain('Não foi possível carregar as alocações às unidades internas');
+    expect(html).toContain('Tentar de novo');
   });
 });

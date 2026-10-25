@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { fetchArpItems } from '../services/api';
-import { fetchAtasWithAllocationsSet, fetchAtasWithEmpenhosSet } from '../services/dbCacheService';
+import { useQueries, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { RECURSO_ATAS } from '../services/syncService';
 import { useAtualizacaoNoServidor } from './useAtualizacaoNoServidor';
 import { useAuth } from '../context/AuthContext';
@@ -12,20 +10,16 @@ import { buildAtaSaldoStats } from '../components/atas/ataSaldoStats';
 import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import { buildAtaKey, getAtaSourceQueryOptions, useAllAtaItemSaldos } from './useAta';
 import { useAllAtaManagers } from './useAtaManagers';
-import { useAssignedManagementScope } from './useAssignedManagementScope';
+import { ROTULO_GESTORES_ATAS, useAssignedManagementScope } from './useAssignedManagementScope';
+import { naoCarregou, type LeituraDaTela } from '../components/fonte/useLeiturasComFalha';
 import type { ArpRecord, ArpItemRecord, SyncMetadata } from '../types';
 import { carteiraDaAta, chaveGestaoDaArp } from '../utils/ataIdentidade';
-
-const EMPENHOS_SET_KEY = ['atas-with-empenhos-set'] as const;
-const ALLOCATIONS_SET_KEY = ['atas-with-allocations-set'] as const;
 
 /** Relê do banco tudo o que a sincronização das atas pode ter mudado (inclusive o cache da Ata 360). */
 export async function invalidarDadosDeAtas(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['ata-detail-source'] }),
     queryClient.invalidateQueries({ queryKey: ['ata-item-saldos'] }),
-    queryClient.invalidateQueries({ queryKey: EMPENHOS_SET_KEY }),
-    queryClient.invalidateQueries({ queryKey: ALLOCATIONS_SET_KEY }),
     queryClient.invalidateQueries({ queryKey: ['management-dashboard'] }),
     queryClient.invalidateQueries({ queryKey: chaveStatusSincronizacao(RECURSO_ATAS) })
   ]);
@@ -34,6 +28,10 @@ export async function invalidarDadosDeAtas(queryClient: QueryClient): Promise<vo
 function relerAtas(queryClient: QueryClient) {
   void invalidarDadosDeAtas(queryClient);
 }
+
+/** Rótulo do saldo dos itens na faixa: o mesmo do Início (lerFonte), para juntar numa linha. */
+export const ROTULO_SALDO_ITENS = 'saldo dos itens';
+export const ROTULO_ITENS_NAS_FONTES = 'itens das atas';
 
 export type SyncProgress = { step: string; percent: number; current?: number; total?: number };
 
@@ -50,7 +48,7 @@ export function getArpPrazo(arp: ArpRecord) {
 
 /**
  * Carteira de Atas das UASGs da CGLIC, no escopo do usuário: atas e itens (mesmo cache da Ata 360),
- * gestor e consumo de saldo por ata, atas com empenho/alocação e a sincronização com as fontes oficiais.
+ * gestor e consumo de saldo por ata e a sincronização com as fontes oficiais.
  * Fonte única para a Carteira de Atas e para quem precisar dos mesmos números.
  */
 export function useAtasPortfolio() {
@@ -94,44 +92,41 @@ export function useAtasPortfolio() {
     });
   }, [arps, scope200330.ataKeys, scope200331.ataKeys]);
 
-  // Itens buscados sob demanda na API para atas que vieram do banco sem itens.
-  const [apiItemsByAta, setApiItemsByAta] = useState<Record<string, ArpItemRecord[]>>({});
-  const [itemsLoadingByAta, setItemsLoadingByAta] = useState<Record<string, boolean>>({});
-  const itemsByAta = useMemo(() => ({ ...apiItemsByAta, ...dbItemsByAta }), [apiItemsByAta, dbItemsByAta]);
+  // Os itens vêm só do banco: quem os grava é a sincronização do servidor (de hora em hora). Antes, até 15 atas sem
+  // itens no banco disparavam chamadas ao Compras.gov.br e ao PNCP pelo navegador a cada troca de filtro.
+  const itemsByAta = dbItemsByAta;
 
-  const loadItemsForArp = useCallback(async (arp: ArpRecord) => {
-    const ataKey = buildAtaKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
-    if (itemsByAta[ataKey] || itemsLoadingByAta[ataKey]) return;
-
-    setItemsLoadingByAta((prev) => ({ ...prev, [ataKey]: true }));
-    try {
-      const data = await fetchArpItems(arp.dataVigenciaInicial, arp.codigoUnidadeGerenciadora, arp.numeroAtaRegistroPreco, arp);
-      if (data && data.resultado) {
-        setApiItemsByAta((prev) => ({ ...prev, [ataKey]: data.resultado }));
-      }
-    } catch (err) {
-      console.warn(`Erro ao carregar itens da Ata ${arp.numeroAtaRegistroPreco}:`, err);
-    } finally {
-      setItemsLoadingByAta((prev) => ({ ...prev, [ataKey]: false }));
-    }
-  }, [itemsByAta, itemsLoadingByAta]);
-
-  const loadItemsForArps = useCallback((arpsToLoad: ArpRecord[]) => {
-    arpsToLoad.forEach((arp) => {
-      const ataKey = buildAtaKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora);
-      if (!itemsByAta[ataKey] && !itemsLoadingByAta[ataKey]) loadItemsForArp(arp);
-    });
-  }, [itemsByAta, itemsLoadingByAta, loadItemsForArp]);
-
-  // Atas com empenho / com alocação interna (filtros da carteira).
-  const empenhosQuery = useQuery({ queryKey: EMPENHOS_SET_KEY, queryFn: fetchAtasWithEmpenhosSet, staleTime: 5 * 60 * 1000 });
-  const allocationsQuery = useQuery({ queryKey: ALLOCATIONS_SET_KEY, queryFn: fetchAtasWithAllocationsSet, staleTime: 5 * 60 * 1000 });
-  const emptySet = useMemo(() => new Set<string>(), []);
-  const empenhosDbSet = empenhosQuery.data ?? emptySet;
-  const allocationsDbSet = allocationsQuery.data ?? emptySet;
+  // Atas da carteira ainda sem itens no banco: a faixa diz quais, em vez de a carteira mostrá-las vazias, caladas.
+  const atasSemItensNoBanco = useMemo(
+    () =>
+      isLoading
+        ? []
+        : scopedArps
+            .filter((a) => !dbItemsByAta[buildAtaKey(a.numeroAtaRegistroPreco, a.codigoUnidadeGerenciadora)]?.length)
+            .map((a) => a.numeroAtaRegistroPreco),
+    [isLoading, scopedArps, dbItemsByAta]
+  );
+  const leituraDosItensNasFontes: LeituraDaTela | null =
+    atasSemItensNoBanco.length > 0
+      ? {
+          rotulo: ROTULO_ITENS_NAS_FONTES,
+          query: {
+            data: undefined,
+            isError: true,
+            error: new Error(
+              `${atasSemItensNoBanco.length === 1 ? 'a ata' : `${atasSemItensNoBanco.length} atas`} ${atasSemItensNoBanco
+                .slice(0, 5)
+                .join(', ')}${atasSemItensNoBanco.length > 5 ? '…' : ''} ainda sem itens no banco; a sincronização do servidor traz os itens de hora em hora`
+            ),
+            // "Tentar novamente" relê as atas do banco (não chama as fontes oficiais).
+            refetch: () => invalidarDadosDeAtas(queryClient)
+          }
+        }
+      : null;
 
   // Gestor por ata (mesma fonte do detalhe da Ata e do Início), indexado pela chave de gestão (chaveGestaoDaArp).
-  const { data: ataManagers } = useAllAtaManagers();
+  const ataManagersQuery = useAllAtaManagers();
+  const { data: ataManagers } = ataManagersQuery;
   const gestorByAta = useMemo(() => {
     const map: Record<string, string> = {};
     for (const [ataKey, manager] of Object.entries(ataManagers || {})) {
@@ -142,8 +137,10 @@ export function useAtasPortfolio() {
 
   // Consumo de saldo por item (mesma fonte do detalhe da Ata e do Início).
   // Atas vencidas, canceladas ou sem data não geram alerta de saldo (mesma regra do Início).
-  const { data: saldos200330 } = useAllAtaItemSaldos(UASGS_CGLIC[0]);
-  const { data: saldos200331 } = useAllAtaItemSaldos(UASGS_CGLIC[1]);
+  const saldos200330Query = useAllAtaItemSaldos(UASGS_CGLIC[0]);
+  const saldos200331Query = useAllAtaItemSaldos(UASGS_CGLIC[1]);
+  const { data: saldos200330 } = saldos200330Query;
+  const { data: saldos200331 } = saldos200331Query;
   const saldoStatsByAta = useMemo(() => {
     const encerradas = new Set(
       arps
@@ -197,19 +194,41 @@ export function useAtasPortfolio() {
     }
   }, [podeForcar, reload, atualizarNoServidor]);
 
+  /**
+   * Leituras das atas, dos gestores e do recorte do perfil gestor, para a faixa "não carregou": sem elas a carteira
+   * dizia "0 atas" ou "Ata não encontrada" e o gestor via a carteira vazia, como se fosse verdade.
+   */
+  const leiturasDasAtas: LeituraDaTela[] = [
+    ...sources.map((query, i) => ({ rotulo: `atas da UASG ${UASGS_CGLIC[i]}`, query })),
+    { rotulo: ROTULO_GESTORES_ATAS, query: ataManagersQuery },
+    ...(scope200330.leituras ?? []),
+    ...(scope200331.leituras ?? [])
+  ];
+  /** Saldo dos itens (consumo e situação da ata assinada), para a faixa. */
+  const leiturasDosSaldos: LeituraDaTela[] = [
+    { rotulo: ROTULO_SALDO_ITENS, query: saldos200330Query },
+    { rotulo: ROTULO_SALDO_ITENS, query: saldos200331Query }
+  ];
+  /**
+   * As atas de alguma UASG (ou, no perfil gestor, o recorte dele) falharam sem leitura anterior: a lista vazia não é
+   * "nenhuma ata", é "não carregou".
+   */
+  const atasNaoCarregaram =
+    sources.some((q) => naoCarregou(q)) || [...(scope200330.leituras ?? []), ...(scope200331.leituras ?? [])].some((l) => naoCarregou(l.query));
+
   return {
     /** Todas as atas carregadas (sem o escopo do gestor). */
     arps,
+    leiturasDasAtas,
+    leiturasDosSaldos,
+    /** Atas da carteira ainda sem itens no banco (só na Carteira de Atas); null quando nenhuma. */
+    leituraDosItensNasFontes,
+    atasNaoCarregaram,
     /** Atas no escopo do usuário. */
     scopedArps,
     isLoading,
     scopeLoading,
     itemsByAta,
-    itemsLoadingByAta,
-    loadItemsForArp,
-    loadItemsForArps,
-    empenhosDbSet,
-    allocationsDbSet,
     gestorByAta,
     saldoStatsByAta,
     syncInfo,

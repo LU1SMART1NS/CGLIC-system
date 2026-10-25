@@ -26,11 +26,21 @@ export interface EmpenhoParaPagamento {
   naturezaDescricao: string | null;
 }
 
-export async function fetchEmpenhosDoContratoParaPagamento(contractKey: string): Promise<EmpenhoParaPagamento[]> {
+/**
+ * `idsDoContrato`: as notas do contrato já lidas pela tela (Contrato 360); sem elas, lê contrato_empenhos.
+ */
+export async function fetchEmpenhosDoContratoParaPagamento(
+  contractKey: string,
+  opts: { idsDoContrato?: readonly string[] } = {}
+): Promise<EmpenhoParaPagamento[]> {
   if (!isSupabaseConfigured || !supabase || !contractKey) return [];
-  const vinculos = await supabase.from('contrato_empenhos').select('empenho_id').eq('contract_key', contractKey);
-  if (vinculos.error) throw mapPostgresErrorToAppError(vinculos.error);
-  const ids = [...new Set((vinculos.data ?? []).map((v: any) => String(v.empenho_id)))];
+  let idsLidos = opts.idsDoContrato;
+  if (!idsLidos) {
+    const vinculos = await supabase.from('contrato_empenhos').select('empenho_id').eq('contract_key', contractKey);
+    if (vinculos.error) throw mapPostgresErrorToAppError(vinculos.error);
+    idsLidos = (vinculos.data ?? []).map((v: any) => String(v.empenho_id));
+  }
+  const ids = [...new Set(idsLidos)];
   if (ids.length === 0) return [];
 
   const emp = await supabase

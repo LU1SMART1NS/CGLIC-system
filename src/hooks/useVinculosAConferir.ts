@@ -19,11 +19,12 @@ export function useVinculosAConferir() {
   const queryClient = useQueryClient();
   const { role } = useAuth();
 
-  const { data = [], isLoading } = useQuery<VinculoAConferir[], Error>({
+  const consulta = useQuery<VinculoAConferir[], Error>({
     queryKey: VINCULOS_A_CONFERIR_QUERY_KEY,
     queryFn: fetchVinculosAConferir,
     staleTime: 5 * 60 * 1000
   });
+  const { data = [], isLoading } = consulta;
 
   const porPar = useMemo(() => new Map(data.map((v) => [`${v.itemKey}|${v.contractKey}`, v])), [data]);
 
@@ -38,5 +39,5 @@ export function useVinculosAConferir() {
   const manter = useMutation({ mutationFn: manterVinculoAConferirRpc, retry: 0, onSuccess: invalidate });
   const retirar = useMutation({ mutationFn: retirarVinculoAConferirRpc, retry: 0, onSuccess: invalidate });
 
-  return { vinculos: data, porPar, isLoading, manter, retirar, podeDecidir: podeDecidirVinculo(role) };
+  return { vinculos: data, porPar, isLoading, manter, retirar, podeDecidir: podeDecidirVinculo(role), /** Para a faixa "não carregou". */ consulta };
 }

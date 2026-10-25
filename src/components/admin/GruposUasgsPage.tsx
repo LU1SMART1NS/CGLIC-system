@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Network } from 'lucide-react';
 import {
   ActionButton,
@@ -21,7 +22,7 @@ import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { GtiTag } from '../gti/GtiVisual';
 import { useAuth } from '../../context/AuthContext';
 import { useDefinirGruposUasgs, useUasgsParticipantesGti } from '../../hooks/useGruposGti';
-import { GRUPO_GTI_INFO, GRUPOS_CONFIRMAVEIS, sugerirGrupoGti, type GrupoConfirmavel } from '../../config/gruposGti';
+import { GRUPO_GTI_INFO, GRUPOS_CONFIRMAVEIS, situacaoGrupoUasg, sugerirGrupoGti, type GrupoConfirmavel } from '../../config/gruposGti';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import type { UasgParticipanteGti } from '../../services/gruposGtiService';
 import { formatDataHoraBR } from '../../utils/format';
@@ -34,6 +35,7 @@ interface Linha extends UasgParticipanteGti {
 }
 
 const POR_PAGINA = 25;
+const SITUACOES: readonly Situacao[] = ['A_CONFIRMAR', 'SEM_SUGESTAO', 'CONFIRMADAS', 'TODAS'];
 const chaveDaLinha = (l: { uasg: string }) => l.uasg;
 const pequeno: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)' };
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -49,7 +51,20 @@ export const GruposUasgsPage: React.FC = () => {
   const confirm = useConfirmDialog();
   const consulta = useUasgsParticipantesGti();
   const definir = useDefinirGruposUasgs();
-  const [situacao, setSituacao] = React.useState<Situacao>('A_CONFIRMAR');
+  // Aba na URL (?situacao=): o número do menu Ajustes abre direto em "A confirmar", mesmo com a tela já aberta noutra aba.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paramSituacao = searchParams.get('situacao');
+  const situacao: Situacao = SITUACOES.find((s) => s === paramSituacao) ?? 'A_CONFIRMAR';
+  const setSituacao = (s: Situacao) =>
+    setSearchParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual);
+        if (s === 'A_CONFIRMAR') proximo.delete('situacao');
+        else proximo.set('situacao', s);
+        return proximo;
+      },
+      { replace: true }
+    );
   const [busca, setBusca] = React.useState('');
   /** GTI do filtro: o grupo confirmado ou, sem confirmação, o sugerido. '' = todos. */
   const [filtroGrupo, setFiltroGrupo] = React.useState<string>('');
@@ -59,7 +74,7 @@ export const GruposUasgsPage: React.FC = () => {
     () =>
       (consulta.data ?? []).map((u) => {
         const sugestao = sugerirGrupoGti(u.nome ?? u.nomeNaAta, u.siglaOrgao, u.esferaOrgao);
-        return { ...u, sugestao, situacao: u.grupo ? 'CONFIRMADAS' : sugestao ? 'A_CONFIRMAR' : 'SEM_SUGESTAO' };
+        return { ...u, sugestao, situacao: situacaoGrupoUasg(u.grupo, sugestao) };
       }),
     [consulta.data]
   );
@@ -319,8 +334,6 @@ export const GruposUasgsPage: React.FC = () => {
           )}
 
           <AdminListShell
-            title="UASGs participantes"
-            icon={<Network size={16} />}
               stripActions={
                 chavesSelecionaveis.length > 0 ? (
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
@@ -350,6 +363,7 @@ export const GruposUasgsPage: React.FC = () => {
               keyExtractor={(l) => l.uasg}
               rowStyle={(l) => (selecao.selecionadas.has(l.uasg) ? { background: SELECIONADA_BG } : undefined)}
               testId="grupos-uasgs-tabela"
+              className="data-table-container--flush"
             />
             <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={visiveis.length} onChange={setPage} testIdPrefix="grupos-uasgs" />
           </AdminListShell>

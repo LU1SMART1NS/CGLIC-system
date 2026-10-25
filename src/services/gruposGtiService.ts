@@ -16,13 +16,21 @@ import {
 /** Migration 139 ainda não aplicada: as telas seguem sem GTI, sem erro. */
 const semMigration = (code?: string) => code === '42P01' || code === 'PGRST205' || code === 'PGRST202';
 
-export async function fetchFatiasGti(): Promise<Map<string, FatiasDaAta>> {
+/** Uma ata só (Ata 360): número e UASG gerenciadora. Sem filtro, todas as atas (Carteira de Atas). */
+export interface FiltroFatiasGti {
+  numeroAta: string;
+  uasg: string;
+}
+
+export async function fetchFatiasGti(filtro?: FiltroFatiasGti): Promise<Map<string, FatiasDaAta>> {
   if (!supabase) return new Map();
   const linhas: LinhaFatiaGti[] = [];
   for (let de = 0; ; de += 1000) {
-    const { data, error } = await supabase
+    let consulta = supabase
       .from('v_ata_gti_fatias')
-      .select('numero_ata, uasg_gerenciadora, grupo, quantidade, orgaos, valor')
+      .select('numero_ata, uasg_gerenciadora, grupo, quantidade, orgaos, valor');
+    if (filtro) consulta = consulta.eq('numero_ata', filtro.numeroAta).eq('uasg_gerenciadora', filtro.uasg);
+    const { data, error } = await consulta
       .order('numero_ata')
       .order('uasg_gerenciadora')
       .order('grupo')
@@ -30,7 +38,7 @@ export async function fetchFatiasGti(): Promise<Map<string, FatiasDaAta>> {
     if (error) {
       if (semMigration(error.code)) return new Map();
       // Antes da migration 141 a coluna `valor` não existe: lê como antes (por quantidade).
-      if (error.code === '42703') return fetchFatiasGtiSemValor();
+      if (error.code === '42703') return fetchFatiasGtiSemValor(filtro);
       throw new Error(error.message);
     }
     linhas.push(...((data ?? []) as LinhaFatiaGti[]));
@@ -40,13 +48,15 @@ export async function fetchFatiasGti(): Promise<Map<string, FatiasDaAta>> {
 }
 
 /** Leitura antiga, sem a coluna `valor` (migration 141 ainda não aplicada). */
-async function fetchFatiasGtiSemValor(): Promise<Map<string, FatiasDaAta>> {
+async function fetchFatiasGtiSemValor(filtro?: FiltroFatiasGti): Promise<Map<string, FatiasDaAta>> {
   if (!supabase) return new Map();
   const linhas: LinhaFatiaGti[] = [];
   for (let de = 0; ; de += 1000) {
-    const { data, error } = await supabase
+    let consulta = supabase
       .from('v_ata_gti_fatias')
-      .select('numero_ata, uasg_gerenciadora, grupo, quantidade, orgaos')
+      .select('numero_ata, uasg_gerenciadora, grupo, quantidade, orgaos');
+    if (filtro) consulta = consulta.eq('numero_ata', filtro.numeroAta).eq('uasg_gerenciadora', filtro.uasg);
+    const { data, error } = await consulta
       .order('numero_ata')
       .order('uasg_gerenciadora')
       .order('grupo')

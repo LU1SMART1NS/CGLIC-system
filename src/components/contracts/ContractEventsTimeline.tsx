@@ -30,6 +30,7 @@ import { buildContractValueEvolutionModel } from '../../services/contractValueEv
 import { AppButton, DataTable, EmptyState, ErrorState, NoticeBar, SectionHeader, StatusBadge } from '../../design-system';
 import { formatDataHoraBR } from '../../utils/format';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 interface ContractEventsTimelineProps {
   contract: ContractDashboardRecord;
@@ -659,7 +660,7 @@ export const ContractEventsTimeline: React.FC<ContractEventsTimelineProps> = ({
                           {/* Fonte da Informação */}
                           <span style={{ color: '#64748b', marginLeft: 'auto' }}>
                             Fonte: <strong>{event.fonteOrigem || 'Não Informada'}</strong>
-                            {event.processoSeiNumero && ` • SEI ${event.processoSeiNumero}`}
+                            {event.processoSeiNumero && <> • <NumeroSeiEtiqueta numero={event.processoSeiNumero} testId="evento-sei" /></>}
                           </span>
                         </div>
                       </div>

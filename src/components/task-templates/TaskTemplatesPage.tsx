@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import {
   Plus,
@@ -20,6 +20,7 @@ import { EmptyState } from '../../design-system/components/EmptyState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
+import { useAuth } from '../../context/AuthContext';
 import { TaskTemplatesKitContext, useTaskTemplatesKit, type TaskTemplatesKit, type TaskTemplate, type TaskTemplateMacrotask } from './taskTemplatesKit';
 
 const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrotask }> = ({ templateId, macro }) => {
@@ -29,7 +30,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskNome, setEditingTaskNome] = useState('');
 
-  const { hooks } = useTaskTemplatesKit();
+  const { hooks, somenteLeitura } = useTaskTemplatesKit();
   const saveMacrotask = hooks.useSaveMacrotask();
   const deleteMacrotask = hooks.useDeleteMacrotask();
   const saveTask = hooks.useSaveTask();
@@ -102,6 +103,8 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
               {macro.tarefas.length} tarefa{macro.tarefas.length !== 1 ? 's' : ''}
             </span>
+            {!somenteLeitura && (
+            <>
             <ActionButton
               action="renomear"
               iconOnly
@@ -127,6 +130,8 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
               }}
               label="Excluir macrotarefa"
             />
+            </>
+            )}
           </>
         )}
       </div>
@@ -187,6 +192,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                   ) : (
                     <>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
+                      {!somenteLeitura && (
                       <ActionButton
                         action="renomear"
                         iconOnly
@@ -198,8 +204,10 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                         }}
                         label="Renomear tarefa"
                       />
+                      )}
                     </>
                   )}
+                  {!somenteLeitura && (
                   <ActionButton
                     action="excluir"
                     iconOnly
@@ -218,11 +226,13 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                     }}
                     label="Excluir tarefa"
                   />
+                  )}
                 </div>
               ))}
             </div>
           )}
 
+          {!somenteLeitura && (
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             <input
               type="text"
@@ -244,6 +254,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
               isLoading={saveTask.isPending}
             />
           </div>
+          )}
 
           {saveTask.isError && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: 'var(--color-danger)', fontSize: '0.75rem' }}>
@@ -339,7 +350,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
   const [expanded, setExpanded] = useState(true);
   const [newMacroNome, setNewMacroNome] = useState('');
   const [editing, setEditing] = useState(false);
-  const { hooks, copy } = useTaskTemplatesKit();
+  const { hooks, copy, somenteLeitura } = useTaskTemplatesKit();
   const saveTemplate = hooks.useSaveTemplate();
   const deleteTemplate = hooks.useDeleteTemplate();
   const saveMacrotask = hooks.useSaveMacrotask();
@@ -394,6 +405,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
           </div>
         </div>
 
+        {!somenteLeitura && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <ActionButton
             action="editar"
@@ -428,6 +440,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
             }}
           />
         </div>
+        )}
       </div>
 
       {expanded && (
@@ -445,6 +458,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
               ))
           )}
 
+          {!somenteLeitura && (
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
             <input
               type="text"
@@ -469,6 +483,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
               Adicionar Macrotarefa
             </AppButton>
           </div>
+          )}
 
           {saveMacrotask.isError && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', color: 'var(--color-danger)', fontSize: '0.78rem' }}>
@@ -487,7 +502,7 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
 
 /** `embedded`: dentro de outra página (abas), sem o cabeçalho e o container próprios. */
 const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
-  const { hooks, copy } = useTaskTemplatesKit();
+  const { hooks, copy, somenteLeitura } = useTaskTemplatesKit();
   const { data: templates = [], isLoading, error } = hooks.useTemplates();
   const [creating, setCreating] = useState(false);
 
@@ -516,8 +531,8 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
         <SectionHeader
           title="Modelos disponíveis"
           countBadge={templates.length}
-          subtitle={copy.activeHint}
-          actions={<ActionButton action="novo" label="Novo modelo" onClick={() => setCreating(true)} data-testid="template-new" />}
+          subtitle={somenteLeitura ? `${copy.activeHint} Só o coordenador altera os modelos.` : copy.activeHint}
+          actions={somenteLeitura ? undefined : <ActionButton action="novo" label="Novo modelo" onClick={() => setCreating(true)} data-testid="template-new" />}
           testId="templates-header"
         />
 
@@ -538,13 +553,19 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
         )}
       </div>
 
-      {creating && <TemplateFormModal onClose={() => setCreating(false)} />}
+      {creating && !somenteLeitura && <TemplateFormModal onClose={() => setCreating(false)} />}
     </Container>
   );
 };
 
-export const TaskTemplatesPage: React.FC<{ kit: TaskTemplatesKit; embedded?: boolean }> = ({ kit, embedded }) => (
-  <TaskTemplatesKitContext.Provider value={kit}>
-    <TaskTemplatesContent embedded={embedded} />
-  </TaskTemplatesKitContext.Provider>
-);
+/** Só o coordenador cria, edita e exclui modelos (migration 199); o gestor vê e aplica no plano dos seus. */
+export const TaskTemplatesPage: React.FC<{ kit: TaskTemplatesKit; embedded?: boolean }> = ({ kit, embedded }) => {
+  const { role } = useAuth();
+  const somenteLeitura = role !== 'admin';
+  const value = useMemo(() => ({ ...kit, somenteLeitura }), [kit, somenteLeitura]);
+  return (
+    <TaskTemplatesKitContext.Provider value={value}>
+      <TaskTemplatesContent embedded={embedded} />
+    </TaskTemplatesKitContext.Provider>
+  );
+};

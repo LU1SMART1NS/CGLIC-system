@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useContractsPortfolio } from '../../hooks/useContractsPortfolio';
 import { canFilterByGestor } from '../carteira/carteiraGestor';
 import { formatContractNumber } from '../../utils/contractNumber';
+import { naoCarregou } from '../fonte/useLeiturasComFalha';
 
 export interface ContratoDoFinanceiro {
   numero: string;
@@ -30,11 +31,13 @@ export function uasgDaChave(contractKey: string): string {
 
 /**
  * Contratos da carteira (mesmo cache da Carteira de Contratos) para as abas do Financeiro: número, fornecedor e
- * gestor de cada chave, e o recorte do perfil "gestor", que vê só o financeiro dos próprios contratos.
+ * gestor de cada chave, e o recorte do perfil "gestor", que vê só o financeiro dos próprios contratos. Usa a versão
+ * leve da carteira, sem o painel do Início: nenhuma aba do Financeiro mostra as pendências dos contratos.
  */
-export function useContratosDoFinanceiro() {
+export function useContratosDoFinanceiro({ enabled = true }: { enabled?: boolean } = {}) {
   const { role } = useAuth();
-  const { rows, isLoading, isLoadingScope } = useContractsPortfolio();
+  // enabled: false (números do menu antes de a tela encher) não lê nada; as telas do Financeiro e de Vínculos leem na hora.
+  const { rows, isLoading, isLoadingScope, leiturasDosContratos } = useContractsPortfolio({ pendencias: false, enabled });
   const showGestorFilter = canFilterByGestor(role);
 
   const porChave = useMemo(() => {
@@ -52,6 +55,9 @@ export function useContratosDoFinanceiro() {
     }
     return map;
   }, [rows]);
+
+  const leituras = leiturasDosContratos ?? [];
+  const contratosNaoCarregaram = leituras.some((l) => (role === 'gestor' || l.rotulo.startsWith('contratos da UASG')) && naoCarregou(l.query));
 
   /** Perfil gestor: só as chaves da carteira dele. Demais perfis: sem recorte (null). */
   const escopo = useMemo(() => (role === 'gestor' ? new Set(porChave.keys()) : null), [role, porChave]);
@@ -81,6 +87,13 @@ export function useContratosDoFinanceiro() {
     lista,
     escopo,
     showGestorFilter,
-    isLoading: isLoading || (role === 'gestor' && isLoadingScope)
+    isLoading: isLoading || (role === 'gestor' && isLoadingScope),
+    /** Contratos, gestores e o escopo do gestor: se falharem, a tela avisa (sem eles o gestor veria o Financeiro vazio). */
+    leituras,
+    /**
+     * Os contratos (ou, no perfil gestor, alguma leitura do recorte dele) falharam sem leitura anterior: número,
+     * vigência e recorte dependem deles, então contagens e "nada a fazer" não valem.
+     */
+    contratosNaoCarregaram
   };
 }

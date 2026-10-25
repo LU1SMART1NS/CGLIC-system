@@ -15,7 +15,7 @@ export interface DescarteAtaContrato {
 
 export const chaveDescarte = (contractKey: string, ataKey: string) => `${contractKey}|${ataKey}`;
 
-/** Todos os descartes. Sem a tabela (migration 71 não aplicada), devolve vazio e a Central segue sem descartes. */
+/** Todos os descartes. Falha de leitura vira erro (a tela avisa). */
 export async function fetchDescartesAtaContrato(): Promise<Record<string, DescarteAtaContrato>> {
   if (!isSupabaseConfigured || !supabase) return {};
   try {
@@ -34,8 +34,9 @@ export async function fetchDescartesAtaContrato(): Promise<Record<string, Descar
     }
     return map;
   } catch (err) {
-    console.warn('Descartes de ata indisponíveis (migration 71 aplicada?)', err);
-    return {};
+    // Falha vira erro: um mapa vazio fazia as atas descartadas voltarem como sugestão.
+    console.warn('Descartes de ata indisponíveis', err);
+    throw err;
   }
 }
 

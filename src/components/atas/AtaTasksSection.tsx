@@ -14,6 +14,8 @@ import {
   useDeleteAtaTask
 } from '../../hooks/useAtaTaskPlanEditing';
 import { TaskPlanSection, type TaskPlanController, type TaskPlanLabels } from '../plan/TaskPlanSection';
+import { useAuth } from '../../context/AuthContext';
+import { podeConcluirTarefas } from '../../hooks/useAvisosResolvidos';
 
 interface AtaTasksSectionProps {
   ataKey: string;
@@ -40,9 +42,12 @@ function useAtaPlanController(ataKey: string): TaskPlanController {
   const renameModule = useRenameAtaTaskModule(ataKey);
   const createTask = useCreateAtaTask(ataKey);
   const { data: manager } = useAtaManager(ataKey);
+  // A consulta vê o plano sem botões: as RPCs das tarefas só aceitam gestor e coordenador.
+  const { role } = useAuth();
 
   return {
     entityKey: ataKey,
+    somenteLeitura: !podeConcluirTarefas(role),
     gestorNome: manager?.gestorNome || undefined,
     labels: ATA_LABELS,
     useUpdateTask: useUpdateAtaTask,

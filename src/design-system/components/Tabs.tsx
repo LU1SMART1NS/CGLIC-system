@@ -82,6 +82,7 @@ export const Tabs: React.FC<TabsProps> = ({
         return (
           <button
             key={tab.id}
+            type="button"
             ref={(el) => { tabRefs.current[tab.id] = el; }}
             role="tab"
             id={`tab-${tab.id}`}

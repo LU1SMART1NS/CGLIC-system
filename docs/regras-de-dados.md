@@ -18,6 +18,7 @@ Regras que valem para o sistema inteiro. Antes de criar um indicador, uma sugest
   - **Coordenador** (`admin`): faz tudo, inclusive decidir conflitos e marcar avisos como resolvidos.
   - **Gestor de atas e contratos** (`gestor`): cuida das próprias atas e contratos; informa e corrige a quantidade da ata assinada.
   - **Gestor de saldos** (`gestor_saldos`): aloca quantitativo às unidades internas, confirma remanejamentos entre órgãos; não vê o Financeiro nem a Administração.
+  - **Gestor de emendas** (`gestor_emendas`): da CAEP; monta kits com os itens alocados à CAEP e cadastra beneficiários; na Carteira só consulta Atas e Itens.
   - **Leitor** (`leitor`): só consulta.
 
 ## Atas e itens

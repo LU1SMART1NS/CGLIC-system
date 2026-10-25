@@ -5,9 +5,7 @@ import * as dbCacheService from '../../services/dbCacheService';
 import type { ArpRecord } from '../../types';
 
 vi.mock('../../services/dbCacheService', () => ({
-  fetchArpsWithItemsFromDb: vi.fn(),
-  fetchAtasWithEmpenhosSet: vi.fn(),
-  fetchAtasWithAllocationsSet: vi.fn()
+  fetchArpsWithItemsFromDb: vi.fn()
 }));
 
 function isoDaysFromNow(days: number): string {

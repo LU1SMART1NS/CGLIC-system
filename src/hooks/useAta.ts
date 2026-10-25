@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchArpsWithItemsFromDb } from '../services/dbCacheService';
+import { useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchArpsWithItemsFromDb, fetchAtaWithItemsFromDb } from '../services/dbCacheService';
+import { sementeDaCarteira } from './sementeDaCarteira';
 import { COLUNAS_SALDO_CARTEIRA, fetchArpItemSaldosFromDb } from '../services/dashboardService';
 import { fetchArpItemContractLinksByAta, enrichContractLinks } from '../services/arpContractLinkService';
-import { useContractsDashboard } from './useContractsDashboard';
+import { useContratosPorChave } from './useContratosPorChave';
 import type { ArpRecord, ArpItemRecord } from '../types';
 import type { EnrichedArpItemContract } from '../types/arpContractLinks';
 
@@ -40,25 +42,64 @@ export function getAtaSourceQueryOptions(uasg: string) {
   };
 }
 
+/** Número da ata dentro da chave ("00059/2025-200331" → "00059/2025"). */
+export function numeroDaAtaKey(ataKey?: string): string {
+  return (ataKey || '').trim().replace(/-\d{6}$/, '');
+}
+
+type FonteDasAtas = Awaited<ReturnType<typeof fetchArpsWithItemsFromDb>>;
+
+/** A ata da chave numa lista de atas (pela chave número-UASG ou só pelo número), na mesma regra de sempre. */
+function acharAta(arps: readonly ArpRecord[], ataKey?: string): ArpRecord | null {
+  const normalizedTarget = (ataKey || '').trim().toUpperCase();
+  return (
+    arps.find((a) => {
+      const key = buildAtaKey(a.numeroAtaRegistroPreco, a.codigoUnidadeGerenciadora);
+      return key.toUpperCase() === normalizedTarget || a.numeroAtaRegistroPreco.toUpperCase() === normalizedTarget;
+    }) || null
+  );
+}
+
 /**
- * Hook canônico para recuperar uma única Ata (+ seus itens) por ataKey
- * (`${numeroAta}-${uasg}`), no mesmo espírito de useContract.ts: reaproveita
- * uma única query cacheada por UASG em vez de disparar uma consulta por Ata.
+ * Consulta de uma ata só (+ itens), sob o prefixo ['ata-detail-source', uasg]: quem invalida as atas da UASG
+ * invalida também esta.
+ */
+export function getAtaUnicaQueryOptions(ataKey: string, uasg: string) {
+  const cleanUasg = (uasg || '').trim();
+  const numeroAta = numeroDaAtaKey(ataKey);
+  return {
+    queryKey: ['ata-detail-source', cleanUasg, 'ata', numeroAta] as const,
+    queryFn: () => fetchAtaWithItemsFromDb(numeroAta, cleanUasg),
+    enabled: Boolean(numeroAta && cleanUasg),
+    staleTime: 5 * 60 * 1000
+  };
+}
+
+/**
+ * Hook canônico para recuperar uma única Ata (+ seus itens) por ataKey (`${numeroAta}-${uasg}`). Lê só essa ata do
+ * banco (antes lia todas as atas da UASG com todos os itens). Quem vem da Carteira de Atas, de Itens ou do Início já
+ * tem a lista ['ata-detail-source', uasg] no navegador: a ata sai dela, sem pedido.
  */
 export function useAta(ataKey?: string, uasg?: string) {
   const cleanUasg = (uasg || '').trim();
+  const queryClient = useQueryClient();
 
-  const query = useQuery({
-    ...getAtaSourceQueryOptions(cleanUasg),
-    enabled: Boolean(ataKey && cleanUasg)
+  const query = useQuery<FonteDasAtas>({
+    ...getAtaUnicaQueryOptions(ataKey || '', cleanUasg),
+    enabled: Boolean(ataKey && cleanUasg && numeroDaAtaKey(ataKey)),
+    ...sementeDaCarteira<FonteDasAtas, FonteDasAtas>(queryClient, getAtaSourceQueryOptions(cleanUasg).queryKey, (lista) => {
+      const achada = acharAta(lista.arps, ataKey);
+      if (!achada) return undefined;
+      const chave = buildAtaKey(achada.numeroAtaRegistroPreco, achada.codigoUnidadeGerenciadora);
+      return {
+        arps: [achada],
+        itemsByAta: lista.itemsByAta[chave] ? { [chave]: lista.itemsByAta[chave] } : {},
+        syncInfo: lista.syncInfo
+      };
+    })
   });
 
-  const normalizedTarget = (ataKey || '').trim().toUpperCase();
-  const arp: ArpRecord | null =
-    (query.data?.arps || []).find((a) => {
-      const key = buildAtaKey(a.numeroAtaRegistroPreco, a.codigoUnidadeGerenciadora);
-      return key.toUpperCase() === normalizedTarget || a.numeroAtaRegistroPreco.toUpperCase() === normalizedTarget;
-    }) || null;
+  const arp: ArpRecord | null = acharAta(query.data?.arps || [], ataKey);
 
   const itens: ArpItemRecord[] = arp
     ? query.data?.itemsByAta[buildAtaKey(arp.numeroAtaRegistroPreco, arp.codigoUnidadeGerenciadora)] || []
@@ -90,8 +131,9 @@ export function getCarteiraSaldosQueryOptions(uasg?: string) {
   };
 }
 
-export function useAllAtaItemSaldos(uasg?: string) {
-  return useQuery(getCarteiraSaldosQueryOptions(uasg));
+export function useAllAtaItemSaldos(uasg?: string, { enabled = true }: { enabled?: boolean } = {}) {
+  const opcoes = getCarteiraSaldosQueryOptions(uasg);
+  return useQuery({ ...opcoes, enabled: opcoes.enabled && enabled });
 }
 
 /** Saldo físico (homologado/consumido/percentual) dos itens de UMA Ata, via v_arp_item_saldo_detalhado (todas as colunas). */
@@ -110,7 +152,7 @@ export function useAtaItemSaldos(numeroAta?: string, uasg?: string) {
     (i: any) => (i.numero_ata || i.numeroAta) === numeroAta && String(i.codigo_uasg || i.codigoUasg || cleanUasg) === cleanUasg
   );
 
-  return { saldos, isLoading: query.isLoading };
+  return { saldos, isLoading: query.isLoading, /** Para a faixa "não carregou": sem ele, o consumo sai 0% e o saldo cheio. */ consulta: query };
 }
 
 /** Contratos oficiais vinculados a qualquer item de uma Ata (arp_item_contract_links), já enriquecidos. */
@@ -125,9 +167,20 @@ export function useAtaLinkedContracts(numeroAta?: string, uasg?: string, uasgCar
     enabled: Boolean(numeroAta && cleanUasg)
   });
 
-  const { data: contracts = [] } = useContractsDashboard(carteira);
+  // Só os contratos vinculados (antes, a carteira inteira de contratos da UASG para enriquecer uns poucos vínculos).
+  const chavesVinculadas = useMemo(() => (linksQuery.data ? linksQuery.data.map((l) => l.contractKey) : undefined), [linksQuery.data]);
+  const contractsQuery = useContratosPorChave(carteira, chavesVinculadas);
+  const { data: contracts = [] } = contractsQuery;
 
   const linkedContracts: EnrichedArpItemContract[] = enrichContractLinks(linksQuery.data || [], contracts);
 
-  return { linkedContracts, isLoading: linksQuery.isLoading };
+  return {
+    linkedContracts,
+    isLoading: linksQuery.isLoading,
+    /** Os vínculos e os contratos, para a faixa "não carregou" (sem eles, "nenhum contrato vinculado" seria falso). */
+    leituras: [
+      { rotulo: 'contratos vinculados à ata', query: linksQuery },
+      { rotulo: `contratos da UASG ${carteira}`, query: contractsQuery }
+    ]
+  };
 }

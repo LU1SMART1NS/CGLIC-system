@@ -149,6 +149,8 @@ export interface ContextoDoPortal {
   esperar?: (ms: number) => Promise<void>;
   /** Pausa antes de cada consulta (ritmo do portal). */
   pausaMs?: number;
+  /** Início do caminho; padrão: as despesas da API de dados. */
+  base?: string;
 }
 
 export type ConsultorDoPortal = (caminho: string) => Promise<unknown>;
@@ -169,7 +171,7 @@ export function criarConsultorDoPortal(ctx: ContextoDoPortal): ConsultorDoPortal
       primeira = false;
       let resposta: Response;
       try {
-        resposta = await fetcher(`${BASE}${caminho}`, { headers: { 'chave-api-dados': ctx.chave, accept: 'application/json' } });
+        resposta = await fetcher(`${ctx.base ?? BASE}${caminho}`, { headers: { 'chave-api-dados': ctx.chave, accept: 'application/json' } });
       } catch (err) {
         ultimoErro = err;
         await esperar(5_000 * tentativa);

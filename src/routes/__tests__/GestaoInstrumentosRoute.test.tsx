@@ -9,6 +9,8 @@ import * as useAllContractManagersModule from '../../hooks/useAllContractManager
 import * as useAtaManagersModule from '../../hooks/useAtaManagers';
 import * as useUsersModule from '../../hooks/useUsers';
 import type { ManagementDashboardReadModel } from '../../types/managementDashboard';
+import * as authModule from '../../context/AuthContext';
+import * as resolverAvisoModule from '../../components/avisos/ResolverAviso';
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
@@ -44,17 +46,24 @@ vi.mock('../../hooks/useAvisosPagamento', () => ({
   useAvisosPagamentoGerais: () => ({ avisos: [], isLoading: false })
 }));
 
+const resolucaoPadrao = () => ({
+  abrir: vi.fn(),
+  dialog: null,
+  porChave: new Map(),
+  reexibir: { mutate: vi.fn(), isPending: false },
+  podeResolver: true,
+  podeResolverAlvo: () => true,
+  tarefasConcluidas: new Set()
+});
 vi.mock('../../components/avisos/ResolverAviso', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../components/avisos/ResolverAviso')>()),
-  useResolverAviso: () => ({
-    abrir: vi.fn(),
-    dialog: null,
-    porChave: new Map(),
-    reexibir: { mutate: vi.fn(), isPending: false },
-    podeResolver: true,
-    podeResolverAlvo: () => true,
-    tarefasConcluidas: new Set()
-  })
+  useResolverAviso: vi.fn(() => resolucaoPadrao())
+}));
+
+// Sem provedor: o mesmo padrão do AuthContext real (sem usuário). Os testes da faixa trocam o perfil.
+vi.mock('../../context/AuthContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../context/AuthContext')>()),
+  useAuth: vi.fn(() => ({ user: null, session: null, loading: false, role: null, roleStatus: 'loading', signOut: async () => {} }))
 }));
 
 const mockReadModel: ManagementDashboardReadModel = {
@@ -476,5 +485,64 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
 
     expect(html).toContain('skeleton');
     expect(html).not.toContain('Consumo Crítico');
+  });
+
+  describe('faixa "não carregou" com as leituras da própria tela', () => {
+    const painel = (rm: ManagementDashboardReadModel = mockReadModel) =>
+      vi.spyOn(useManagementDashboardModule, 'useManagementDashboard').mockReturnValue({
+        readModel: rm,
+        data: rm,
+        isLoading: false,
+        isFetching: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+        refresh: vi.fn()
+      });
+
+    it('perfil gestor: as atribuições não carregaram → a faixa avisa, e não "você ainda não tem atas ou contratos"', () => {
+      painel();
+      vi.mocked(authModule.useAuth).mockReturnValue({ user: { id: 'u1' }, role: 'gestor', loading: false } as any);
+      vi.spyOn(useAtaManagersModule, 'useAllAtaManagers').mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new Error('canceling statement due to statement timeout'),
+        refetch: vi.fn()
+      } as any);
+
+      const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
+
+      expect(html).toContain('data-testid="inicio-fontes-com-falha"');
+      expect(html).toContain('Parte do Início não carregou');
+      expect(html).toContain('<strong>Gestores das atas</strong>');
+      expect(html).not.toContain('data-testid="instrumentos-sem-carteira"');
+    });
+
+    it('lista viva dos resolvidos não carregou: o resolvido pelo painel continua resolvido, os outros avisos ficam e a faixa avisa', () => {
+      const comResolvido: ManagementDashboardReadModel = {
+        ...mockReadModel,
+        attention: {
+          ...mockReadModel.attention,
+          resolvidos: [
+            { id: 'ATT-RES-1', category: 'LEMBRETE', severity: 'INFO', title: 'Lembrete já resolvido', description: 'x', avisoChave: 'LEMBRETE::1' } as any
+          ]
+        }
+      };
+      painel(comResolvido);
+      vi.mocked(authModule.useAuth).mockReturnValue({ user: { id: 'c1' }, role: 'admin', loading: false } as any);
+      vi.mocked(resolverAvisoModule.useResolverAviso).mockReturnValue({
+        ...resolucaoPadrao(),
+        consulta: { data: undefined, isError: true, error: new Error('Failed to fetch'), refetch: vi.fn() }
+      } as any);
+
+      const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
+
+      // Os 5 avisos em aberto das duas UASGs (o mesmo read model) ficam; o resolvido não volta para a lista.
+      expect(html).toContain('Todas<span class="segment-pill__count">10</span>');
+      expect(html).toContain('<strong>Avisos resolvidos e notas deixadas como estão</strong>');
+      expect(html).toContain('sem conexão com o banco');
+      expect(html).toContain('2 avisos marcados como resolvidos');
+    });
   });
 });
