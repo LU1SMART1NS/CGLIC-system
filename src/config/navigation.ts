@@ -61,8 +61,8 @@ export interface NavItem {
  * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
- * - Início: Painel (/instrumentos; o gestor de emendas tem o seu em /emendas/inicio) · Emendas (/emendas/inicio, coordenador e consulta)
- *   · Distribuição (/atas/distribuicao)
+ * - Início, em dois grupos como Ajustes: Atas e Contratos (Painel /instrumentos · Distribuição /atas/distribuicao) e
+ *   Emendas (/emendas/inicio, coordenador e consulta). O gestor de emendas tem o Painel dele em /emendas/inicio.
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
@@ -81,13 +81,27 @@ export const navigationConfig: NavItem[] = [
     children: [
       {
         id: 'gestao-instrumentos',
-        // "Atas e Contratos" (pedido do usuário em 25/10/2026): a aba ao lado é "Emendas", então esta diz o assunto dela.
-        label: 'Atas e Contratos',
+        // Grupos como em Ajustes (protótipo aprovado em 25/10/2026): "Atas e Contratos" (Painel · Distribuição) · "Emendas".
+        // Quem só vê esta aba não vê barra de abas; a consulta vê só a linha dos grupos.
+        label: 'Painel',
         icon: LayoutDashboard,
         route: '/instrumentos',
         status: 'active',
         matchPrefixes: ['/instrumentos', '/prazos'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'leitor'],
+        group: 'Atas e Contratos'
+      },
+      {
+        // Atas e contratos por gestor: visão de coordenação (contratos vinculados herdam o gestor da ata). Só o
+        // coordenador: são filas dele e a Equipe mostra o nível de cada gestor (consulta saiu em 25/10/2026).
+        id: 'central-distribuicao',
+        label: 'Distribuição',
+        icon: UsersRound,
+        route: '/atas/distribuicao',
+        status: 'active',
+        matchPrefixes: ['/atas/distribuicao'],
+        allowedRoles: ['admin'],
+        group: 'Atas e Contratos'
       },
       {
         // Início do gestor de emendas: avisos dos pedidos e saldo livre da CAEP (protótipo aprovado em 23/10/2026).
@@ -108,18 +122,8 @@ export const navigationConfig: NavItem[] = [
         route: '/emendas/inicio',
         status: 'active',
         matchPrefixes: ['/emendas/inicio'],
-        allowedRoles: ['admin', 'leitor']
-      },
-      {
-        // Atas e contratos por gestor: visão de coordenação (contratos vinculados herdam o gestor da ata). Só o
-        // coordenador: são filas dele e a Equipe mostra o nível de cada gestor (consulta saiu em 25/10/2026).
-        id: 'central-distribuicao',
-        label: 'Distribuição',
-        icon: UsersRound,
-        route: '/atas/distribuicao',
-        status: 'active',
-        matchPrefixes: ['/atas/distribuicao'],
-        allowedRoles: ['admin']
+        allowedRoles: ['admin', 'leitor'],
+        group: 'Emendas'
       }
     ]
   },
