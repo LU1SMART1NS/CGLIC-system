@@ -10,7 +10,7 @@ const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
 const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
   id: 'l' + Math.random(), ordem: 1, tipo: 'ITEM', itemKey: 'longe', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
   quantidade: 1, beneficiarioId: null, cancelada: false, canceladaMotivo: null,
-  empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, aConferir: null, planilhaRef: null, ...extra
+  empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, ...extra
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   id: 'p' + Math.random(), numero: 1, autorId: 'C:1', etapa: 'RESERVADO', origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-10-20',
@@ -38,14 +38,14 @@ describe('Início do gestor de emendas', () => {
     pedido({ id: 'vencendo', linhas: [linha({ itemKey: 'perto', quantidade: 10 })] }),
     pedido({ id: 'encerrada', linhas: [linha({ itemKey: 'fim', quantidade: 5 })] }),
     pedido({ id: 'corte', etapa: 'OFICIO', linhas: [linha({ itemKey: 'corte', quantidade: 30 })] }),
-    pedido({ id: 'empenhado', etapa: 'EMPENHADO', linhas: [comNota, semNota, linha({ itemKey: 'longe', aConferir: 'quantidade' })] }),
+    pedido({ id: 'empenhado', etapa: 'EMPENHADO', linhas: [comNota, semNota, linha({ itemKey: 'longe' })] }),
     pedido({ id: 'tranquilo', linhas: [linha({ itemKey: 'longe', quantidade: 20 })] }),
     pedido({ id: 'cancelado', etapa: 'CANCELADO', linhas: [linha({ itemKey: 'longe', quantidade: 70 })] })
   ];
   const r = resumoInicioEmendas(pedidos, ITENS, new Map([[comNota.id, nota(comNota.id)]]), HOJE);
 
   it('conta os pedidos por aviso e os vermelhos, sem os cancelados', () => {
-    expect(r.porTipo).toMatchObject({ ataVencida: 1, ataNoCorte: 1, ataVencendo: 1, semNota: 1, aConferir: 1, semOficio: 0, divergencia: 0 });
+    expect(r.porTipo).toMatchObject({ ataVencida: 1, ataNoCorte: 1, ataVencendo: 1, semNota: 1, semOficio: 0, divergencia: 0 });
     expect(r.graves).toBe(2);
     expect(r.antesDoEmpenho).toBe(4);
     expect(r.porEtapa).toEqual({ RESERVADO: 3, OFICIO: 1, EMPENHADO: 1 });

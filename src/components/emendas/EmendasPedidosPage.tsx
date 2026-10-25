@@ -821,7 +821,6 @@ export const EmendasPedidosPage: React.FC = () => {
                 { value: 'ataNoCorte', label: 'Passou do prazo de indicação', count: contaAviso('ataNoCorte') },
                 { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
                 { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
-                { value: 'aConferir', label: 'Linhas a conferir (controle anterior da CAEP)', count: contaAviso('aConferir') },
                 { value: 'semAutorizacao', label: 'Ata sem autorização de empenho', count: contaAviso('semAutorizacao') },
                 { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') }
               ]}

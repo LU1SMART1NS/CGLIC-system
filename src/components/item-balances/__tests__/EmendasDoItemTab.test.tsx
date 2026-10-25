@@ -10,7 +10,7 @@ const item: ItemCaep = {
 };
 const linha = (id: string, quantidade: number): LinhaPedido => ({
   id, ordem: 1, tipo: 'ITEM', itemKey: `${A}-00003`, kitId: null, kitNome: null, kitVersao: null, kitComposicao: null, quantidade, beneficiarioId: null,
-  cancelada: false, canceladaMotivo: null, empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, aConferir: null, planilhaRef: null
+  cancelada: false, canceladaMotivo: null, empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null
 });
 const pedido = (id: string, autorId: string, etapa: PedidoEmenda['etapa'], quantidade: number): PedidoEmenda => ({
   id, numero: 1, autorId, etapa, origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-10-20',

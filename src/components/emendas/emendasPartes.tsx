@@ -233,17 +233,6 @@ export const ExecucaoDoPedidoResumo: React.FC<{ execucao: ExecucaoDoPedido }> = 
   </div>
 );
 
-/** O que não bate entre as planilhas da CAEP nesta linha (migration 160). */
-export const AConferirDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'aConferir' | 'planilhaRef'> }> = ({ linha }) =>
-  linha.aConferir ? (
-    <div
-      title={linha.planilhaRef ? `Na planilha: ${linha.planilhaRef}` : undefined}
-      style={{ marginTop: '0.3rem', fontSize: '0.75rem', color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', borderRadius: 4, padding: '0.25rem 0.45rem' }}
-    >
-      A conferir: {linha.aConferir}
-    </div>
-  ) : null;
-
 /**
  * Valor pelo preço previsto para a emenda (o mesmo do quadro do parlamentar), com o de hoje embaixo quando muda e o
  * motivo ao passar o mouse.

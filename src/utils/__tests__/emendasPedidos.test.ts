@@ -13,7 +13,7 @@ const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
 const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
   id: 'l' + Math.random(), ordem: 1, tipo: 'ITEM', itemKey: 'a', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
   quantidade: 1, beneficiarioId: null, cancelada: false, canceladaMotivo: null,
-  empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, aConferir: null, planilhaRef: null, ...extra
+  empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, ...extra
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   id: 'p' + Math.random(), numero: 1, autorId: 'C:1', etapa: 'RESERVADO', origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-10-20',
@@ -127,11 +127,6 @@ describe('pedidos que vieram das planilhas da CAEP (migration 160)', () => {
     expect(identificacaoDoPedido({ reservadoEm: '2026-10-23', siopEmenda: null, origem: 'PLANILHA' })).toBe('Reserva da planilha');
   });
 
-  it('avisa as linhas a conferir', () => {
-    const p = pedido({ etapa: 'EMPENHADO', linhas: [linha({ aConferir: 'Planilha de saldo indica 5; a execução soma 4.' }), linha({ aConferir: 'x' }), linha({})] });
-    expect(avisosDoPedido(p, itens, HOJE)).toEqual([{ tipo: 'aConferir', curto: '2 a conferir', texto: '2 linhas a conferir com o controle anterior da CAEP' }]);
-  });
-
   it('monta a chave do contrato da planilha', async () => {
     const { chaveDoContratoDaEmenda } = await import('../emendasPedidos');
     expect(chaveDoContratoDaEmenda('00138/2026')).toBe('200331-00138-2026');
@@ -172,9 +167,9 @@ describe('reserva para um órgão (parlamentar a definir)', () => {
 
 describe('etiqueta curta dos avisos na lista', () => {
   it('cada aviso tem até 4 palavras e o mais grave vem primeiro', () => {
-    const p = pedido({ reservadoEm: '2026-09-01', linhas: [linha({ itemKey: 'v', aConferir: 'x' })] });
+    const p = pedido({ reservadoEm: '2026-09-01', linhas: [linha({ itemKey: 'v' })] });
     const a = avisosDoPedido(p, itens, HOJE);
-    expect(a.map((x) => x.curto)).toEqual(['Ata encerrada', '52 dias sem ofício', '1 a conferir']);
+    expect(a.map((x) => x.curto)).toEqual(['Ata encerrada', '52 dias sem ofício']);
     expect(a.every((x) => x.curto.split(' ').length <= 4)).toBe(true);
     expect(a[1].texto).toBe('52 dias sem ofício desde a reserva (01/09/2026)');
   });

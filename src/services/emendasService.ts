@@ -496,9 +496,6 @@ export interface LinhaPedido {
   contratoNumero: string | null;
   /** Documento SEI do despacho para contratação da nota desta linha (planilha de execução). */
   despachoDocumentoSei: string | null;
-  /** O que não bate entre as planilhas da CAEP nesta linha. */
-  aConferir: string | null;
-  planilhaRef: string | null;
 }
 
 /** Etapa dos documentos SEI do pedido (migration 177): AUTORIZACAO é a solicitação de empenho, que a DGFNSP assina. */
@@ -657,9 +654,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       canceladaMotivo: l.cancelada_motivo ?? null,
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
       contratoNumero: l.contrato_numero ?? null,
-      despachoDocumentoSei: l.despacho_documento_sei ?? null,
-      aConferir: l.a_conferir ?? null,
-      planilhaRef: l.planilha_ref ?? null
+      despachoDocumentoSei: l.despacho_documento_sei ?? null
     });
     porPedido.set(l.pedido_id, lista);
   }
