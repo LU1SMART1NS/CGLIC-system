@@ -2,10 +2,11 @@
  * Regras dos pedidos das emendas (migration 157), fora das telas para poder testar: etapas, valor, itens que cada
  * linha ocupa e avisos (30 dias sem ofício, divergência com o SIOP, ata vencendo ou vencida antes do empenho).
  */
-import type { AcaoPedido, DocumentoSeiDoPedido, EtapaDoDocumento, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
+import type { AcaoPedido, ConferenciaEmpenho, DocumentoSeiDoPedido, EtapaDoDocumento, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, passouDoCorte } from './emendasKits';
 import { chaveDoContrato, numeroDaChave } from './contractKeyUtils';
 import { formatCurrency } from './format';
+import { avisosDeEmpenho } from './emendasEmpenho';
 import type { PrecoPrevisto } from '../services/emendasQuadroService';
 
 /** Dias de reserva sem ofício até o aviso (decisão de 23/10/2026). */
@@ -188,7 +189,7 @@ export function orgaoDoPedido(p: PedidoEmenda, nomeDoBeneficiario: (id: string) 
   return nomes.length === 1 ? nomes[0] : `${nomes[0]} e mais ${nomes.length - 1}`;
 }
 
-export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'semNota' | 'semAutorizacao';
+export type TipoAviso = 'semOficio' | 'divergencia' | 'ataVencida' | 'ataNoCorte' | 'ataVencendo' | 'semNota' | 'semAutorizacao' | 'empenhoAMais' | 'empenhoAMenos';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -196,12 +197,12 @@ export interface AvisoPedido {
   texto: string;
   /** Etiqueta da lista, de até 3 palavras, para a coluna não crescer. */
   curto: string;
-  /** Linha a que o aviso se refere (ata), quando houver. */
+  /** Linha a que o aviso se refere (ata ou item da nota de empenho), quando houver. */
   linhaId?: string;
 }
 
 /** Do mais grave ao mais leve: na lista aparece só o primeiro, com "+N" para os outros. */
-export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, divergencia: 2, semOficio: 3, ataVencendo: 4, semAutorizacao: 5, semNota: 6 };
+export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = { ataVencida: 0, ataNoCorte: 1, empenhoAMais: 2, divergencia: 3, semOficio: 4, ataVencendo: 5, empenhoAMenos: 6, semAutorizacao: 7, semNota: 8 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
 export const avisoGrave = (a: Pick<AvisoPedido, 'tipo'>) => GRAVIDADE_DO_AVISO[a.tipo] <= GRAVIDADE_DO_AVISO.semOficio;
@@ -230,7 +231,8 @@ export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, I
   return null;
 }
 
-export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, hoje: string, notas?: Map<string, NotaDaLinha>): AvisoPedido[] {
+/** `empenho`: diferenças entre o pedido e as notas ainda não resolvidas (migration 187), de diferencasPorPedido. */
+export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, hoje: string, notas?: Map<string, NotaDaLinha>, empenho?: ConferenciaEmpenho[]): AvisoPedido[] {
   const avisos: AvisoPedido[] = [];
   if (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA') {
     // Depois de uma devolução, conta da devolução: contar da reserva faria o pedido devolvido já nascer atrasado.
@@ -249,6 +251,14 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
     if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });
+  }
+  if (jaEmpenhado(p.etapa)) {
+    // A linha do primeiro item da diferença: o Início mostra esse item na coluna Item · ata.
+    for (const a of avisosDeEmpenho(empenho, itens)) {
+      const c = empenho?.find((x) => (x.situacao === 'A_MAIS') === (a.tipo === 'empenhoAMais'));
+      const l = c && linhasAtivas(p).find((x) => x.itemKey === c.itemKey);
+      avisos.push(l ? { ...a, linhaId: l.id } : a);
+    }
   }
   const atas = linhasAtivas(p)
     .map((l) => ataDaLinha(p, l, itens, hoje))

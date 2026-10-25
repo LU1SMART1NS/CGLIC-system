@@ -3,7 +3,7 @@
  * Usa os mesmos avisos da lista de Pedidos (avisosDoPedido); as contas novas são o saldo livre perto do fim da ata e os
  * itens que chegaram à CAEP sem nome curto (no quadro do parlamentar sai o começo da descrição do catálogo).
  */
-import type { EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
+import type { ConferenciaEmpenho, EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
 import { avisoIndicacaoDias, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from './emendasKits';
 import {
   ANTES_DO_EMPENHO,
@@ -56,7 +56,7 @@ export interface ResumoInicioEmendas {
   semNomeCurto: ItemCaep[];
 }
 
-const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'divergencia', 'semOficio', 'ataVencendo', 'semAutorizacao', 'semNota'];
+const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'empenhoAMais', 'divergencia', 'semOficio', 'ataVencendo', 'empenhoAMenos', 'semAutorizacao', 'semNota'];
 
 /** Item da linha a que o aviso de ata se refere: o que tem a ata mais perto do fim. */
 function itemDoAviso(p: PedidoEmenda, aviso: AvisoPedido | undefined, itens: Map<string, ItemCaep>): ItemCaep | null {
@@ -83,7 +83,14 @@ function comparar(a: PedidoComAviso, b: PedidoComAviso): number {
   return linhasDoAviso(b.avisos[0]) - linhasDoAviso(a.avisos[0]);
 }
 
-export function resumoInicioEmendas(pedidos: PedidoEmenda[], itensLista: ItemCaep[], notas: Map<string, NotaDaLinha>, hoje: string): ResumoInicioEmendas {
+/** `empenho`: diferenças entre pedido e notas ainda não resolvidas, por pedido (diferencasPorPedido, migration 187). */
+export function resumoInicioEmendas(
+  pedidos: PedidoEmenda[],
+  itensLista: ItemCaep[],
+  notas: Map<string, NotaDaLinha>,
+  hoje: string,
+  empenho?: Map<string, ConferenciaEmpenho[]>
+): ResumoInicioEmendas {
   const itens = new Map(itensLista.map((i) => [i.itemKey, i]));
   const porTipo = Object.fromEntries(TIPOS.map((t) => [t, 0])) as Record<TipoAviso, number>;
   const porEtapa: Partial<Record<EtapaPedido, number>> = {};
@@ -105,7 +112,7 @@ export function resumoInicioEmendas(pedidos: PedidoEmenda[], itensLista: ItemCae
         if (notaDaLinha(l, notas)) linhasComNota++;
       }
     }
-    const avisos = avisosDoPedido(p, itens, hoje, notas);
+    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id));
     if (avisos.length === 0) continue;
     for (const t of new Set(avisos.map((a) => a.tipo))) porTipo[t]++;
     if (avisos.some(avisoGrave)) graves++;
@@ -170,6 +177,10 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
       return 'fazer a nova minuta';
     case 'semAutorizacao':
       return 'informar a solicitação de cada ata';
+    case 'empenhoAMais':
+      return 'corrigir o pedido ou a reserva';
+    case 'empenhoAMenos':
+      return 'conferir as notas no SEI';
     default:
       return 'procurar a nota pelo contrato';
   }

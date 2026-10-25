@@ -838,3 +838,47 @@ export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
     ])
   );
 }
+
+/**
+ * Empenhado × pedido (migration 187): por emenda e item, a soma das linhas dos pedidos já empenhados e a soma das
+ * notas da emenda lidas no Portal da Transparência. A_MAIS é certeza; A_MENOS só quando todas as notas do SEI estão no
+ * sistema e lidas; A_CONFERIR quando falta nota, há nota não lida, nota por valor ou item sem ata.
+ */
+export type SituacaoConferencia = 'IGUAL' | 'A_MAIS' | 'A_MENOS' | 'A_CONFERIR' | 'SEM_NOTA';
+
+export interface ConferenciaEmpenho {
+  emenda: string;
+  itemKey: string;
+  qtdPedido: number;
+  qtdNasNotas: number;
+  notas: string[];
+  pedidos: number[];
+  pedidoIds: string[];
+  situacao: SituacaoConferencia;
+  notasFora: string[];
+  notasNaoLidas: string[];
+  notasPorValor: string[];
+  notasComItemSemAta: string[];
+}
+
+const lista = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+
+export async function fetchConferenciaEmpenho(): Promise<ConferenciaEmpenho[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('v_emendas_empenho_x_pedido').select('*').order('emenda').order('item_key').range(de, ate)
+  );
+  return linhas.map((r) => ({
+    emenda: r.emenda,
+    itemKey: r.item_key,
+    qtdPedido: num(r.qtd_pedido),
+    qtdNasNotas: num(r.qtd_nas_notas),
+    notas: lista(r.notas),
+    pedidos: Array.isArray(r.pedidos) ? r.pedidos.map(Number) : [],
+    pedidoIds: lista(r.pedido_ids),
+    situacao: r.situacao,
+    notasFora: lista(r.notas_fora),
+    notasNaoLidas: lista(r.notas_nao_lidas),
+    notasPorValor: lista(r.notas_por_valor),
+    notasComItemSemAta: lista(r.notas_com_item_sem_ata)
+  }));
+}

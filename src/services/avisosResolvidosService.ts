@@ -7,7 +7,8 @@ import { lerTodasAsPaginas } from './lerTodasAsPaginas';
  * embute o que faz o aviso voltar: o nível do saldo, o ciclo do reajuste ou a vigência
  * do lembrete. Tarefa se resolve concluindo-a no plano; pagamento, registrando a etapa.
  */
-export type AvisoResolvivelTipo = 'SALDO' | 'REAJUSTE' | 'LEMBRETE' | 'FONTE';
+/** EMPENHO: empenhado × pedido das emendas (migration 187), resolvido pelo gestor de emendas ou pelo coordenador. */
+export type AvisoResolvivelTipo = 'SALDO' | 'REAJUSTE' | 'LEMBRETE' | 'FONTE' | 'EMPENHO';
 
 export interface AvisoResolvido {
   chave: string;
