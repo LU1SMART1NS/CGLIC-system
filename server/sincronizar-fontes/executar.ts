@@ -254,7 +254,7 @@ export async function executarPedido(
     } else if (pedido.recurso === 'reajuste_atas') {
       consulta = await deps.contarReajusteAtasPendentes();
     } else if (pedido.recurso === 'notas_emendas_tesouro') {
-      consulta = await deps.contarNotasEmendasTesouroPendentes();
+      consulta = await deps.contarNotasEmendasTesouroPendentes(deps.chaveDoPortal());
     } else if (pedido.recurso === 'emendas_portal') {
       consulta = await deps.medirEmendasDoPortal({ chave: deps.chaveDoPortal(), orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
     } else if (pedido.recurso === 'itens_notas_siafi') {
@@ -287,7 +287,7 @@ export async function executarPedido(
   } else if (pedido.recurso === 'reajuste_atas') {
     resultado = await deps.sincronizarReajusteAtas({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_REAJUSTE_ATAS_MS, leitor: criarLeitorDeArquivos() });
   } else if (pedido.recurso === 'notas_emendas_tesouro') {
-    resultado = await deps.sincronizarNotasDasEmendasDoTesouro({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_NOTAS_EMENDAS_TESOURO_MS });
+    resultado = await deps.sincronizarNotasDasEmendasDoTesouro({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_NOTAS_EMENDAS_TESOURO_MS, chave: deps.chaveDoPortal() });
   } else if (pedido.recurso === 'emendas_portal') {
     // Medição: só existe em modo de teste (dry); não há o que gravar.
     resultado = { status: 'ERRO', erro: 'emendas_portal só roda em modo de teste (dry).' };
