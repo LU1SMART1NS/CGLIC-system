@@ -29,6 +29,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   hojeEmBrasilia: () => '2026-10-23',
   usePedidosEmendas: () => ({ data: PEDIDOS, isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn(), dataUpdatedAt: 0 }),
   useNotasDasLinhas: () => ({ data: new Map() }),
+  useDiferencasDeEmpenho: () => ({ conferencia: [], diferencas: new Map(), porItem: new Map(), resolvidos: new Set<string>() }),
   useItensCaep: () => ({ data: ITENS, isLoading: false }),
   useAutoresEmendas: () => ({ data: AUTORES }),
   useBeneficiariosEmendas: () => ({ data: [] }),

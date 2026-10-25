@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAvisosResolvidos } from './useAvisosResolvidos';
+import { conferenciaPorItem, diferencasPorPedido } from '../utils/emendasEmpenho';
 import { useAuth } from '../context/AuthContext';
 import { semContratos } from '../types/rbac';
 import {
@@ -14,6 +17,7 @@ import {
   fetchPedidosEmendas,
   fetchReservadoPorItem,
   fetchNotasDasLinhas,
+  fetchConferenciaEmpenho,
   salvarPedidoEmenda,
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
@@ -21,6 +25,7 @@ import {
   type AcaoPedido,
   type BeneficiarioEmenda,
   type BeneficiarioParaSalvar,
+  type ConferenciaEmpenho,
   type KitParaSalvar
 } from '../services/emendasService';
 
@@ -106,6 +111,23 @@ export function useReservadoPorItem() {
 /** Nota de empenho e execução de cada linha empenhada (migration 164; o banco refaz de hora em hora). */
 export function useNotasDasLinhas() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'notas'], queryFn: fetchNotasDasLinhas, staleTime: 5 * 60_000 });
+}
+
+/** Empenhado × pedido por emenda e item (migration 187; acompanha as notas, refeitas de hora em hora). */
+export function useConferenciaEmpenho() {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'conferencia-empenho'], queryFn: fetchConferenciaEmpenho, staleTime: 5 * 60_000 });
+}
+
+const SEM_CONFERENCIA: ConferenciaEmpenho[] = [];
+
+/** Conferência com as diferenças ainda não resolvidas por pedido e a conferência de cada item (etiqueta da linha). */
+export function useDiferencasDeEmpenho() {
+  const consulta = useConferenciaEmpenho();
+  const { porChave } = useAvisosResolvidos();
+  const conferencia = consulta.data ?? SEM_CONFERENCIA;
+  const diferencas = useMemo(() => diferencasPorPedido(conferencia, porChave), [conferencia, porChave]);
+  const porItem = useMemo(() => conferenciaPorItem(conferencia), [conferencia]);
+  return { consulta, conferencia, diferencas, porItem, resolvidos: porChave };
 }
 
 /** Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). */

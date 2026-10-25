@@ -28,7 +28,8 @@ import {
   usePedidosEmendas,
   usePodeGerirEmendas,
   usePodeVerContratos,
-  useNotasDasLinhas
+  useNotasDasLinhas,
+  useDiferencasDeEmpenho
 } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
@@ -63,11 +64,12 @@ import {
   execucaoDoPedido,
   type AvisoPedido
 } from '../../utils/emendasPedidos';
-import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
+import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ConferenciaEmpenho, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 import { AutorDoPedido, ExecucaoDoPedidoResumo, ValorDoPedido } from './emendasPartes';
 import { LinhasPorAta, OQueFalta, type AoAgir } from './PedidoAberto';
+import { EmpenhoDoPedido } from './EmpenhoDoPedido';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
@@ -427,13 +429,17 @@ interface DetalheProps {
   itemDeOrigem: string | null;
   onAcao: AoAgir;
   onAlterar: () => void;
+  /** Empenhado × pedido (migration 187): conferência dos itens das emendas e os avisos já resolvidos. */
+  conferencia: ConferenciaEmpenho[];
+  conferenciaPorItem: Map<string, ConferenciaEmpenho>;
+  resolvidos: { has: (chave: string) => boolean };
 }
 
 /**
  * Pedido aberto (migration 180): à esquerda, as linhas em blocos por ata, cada uma com a sua situação; à direita, onde
  * o pedido está, a lista "O que falta" com os botões das janelas, e as fases com datas e SEI como histórico.
  */
-const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, onAlterar }) => {
+const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, onAlterar, conferencia, conferenciaPorItem, resolvidos }) => {
   const { precos } = usePrecosParaEmenda();
   const semAutor = !p.autorId;
   const canceladas = p.linhas.filter((l) => l.cancelada);
@@ -448,7 +454,21 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
               {a.texto}
             </div>
           ))}
-        <LinhasPorAta p={p} itens={itens} beneficiarios={beneficiarios} notas={notas} precos={precos} podeGerir={podeGerir} podeVerContratos={podeVerContratos} hoje={hoje} itemDeOrigem={itemDeOrigem} onAcao={onAcao} />
+        {jaEmpenhado(p.etapa) && <EmpenhoDoPedido pedidoId={p.id} conferencia={conferencia} itens={itens} podeGerir={podeGerir} />}
+        <LinhasPorAta
+          p={p}
+          itens={itens}
+          beneficiarios={beneficiarios}
+          notas={notas}
+          precos={precos}
+          podeGerir={podeGerir}
+          podeVerContratos={podeVerContratos}
+          hoje={hoje}
+          itemDeOrigem={itemDeOrigem}
+          onAcao={onAcao}
+          conferencia={conferenciaPorItem}
+          resolvidos={resolvidos}
+        />
         {canceladas.length > 0 && (
           <div style={carteiraSubtitle}>
             {canceladas.length} {canceladas.length === 1 ? 'linha tirada' : 'linhas tiradas'} do pedido: {[...new Set(canceladas.map((l) => l.canceladaMotivo).filter(Boolean))].join(' ')}
@@ -484,6 +504,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
 export const EmendasPedidosPage: React.FC = () => {
   const { data: pedidos = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = usePedidosEmendas();
   const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
+  const { conferencia, diferencas, porItem: conferenciaPorItem, resolvidos } = useDiferencasDeEmpenho();
   const { data: itensLista = [], isLoading: carregandoItens } = useItensCaep();
   const { data: autores = [] } = useAutoresEmendas();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
@@ -534,9 +555,9 @@ export const EmendasPedidosPage: React.FC = () => {
     () =>
       pedidos.map((p) => {
         const v = valorDoPedidoNaEtapa(p, itens, precos);
-        return { ...p, valor: v.valor, fonteDoValor: v.fonte, avisos: avisosDoPedido(p, itens, hoje, notas) };
+        return { ...p, valor: v.valor, fonteDoValor: v.fonte, avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id)) };
       }),
-    [pedidos, itens, hoje, notas, precos]
+    [pedidos, itens, hoje, notas, precos, diferencas]
   );
 
   const contagem = useMemo(() => {
@@ -822,7 +843,9 @@ export const EmendasPedidosPage: React.FC = () => {
                 { value: 'ataVencendo', label: 'Ata vencendo', count: contaAviso('ataVencendo') },
                 { value: 'ataVencida', label: 'Ata vencida', count: contaAviso('ataVencida') },
                 { value: 'semAutorizacao', label: 'Ata sem autorização de empenho', count: contaAviso('semAutorizacao') },
-                { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') }
+                { value: 'semNota', label: 'Empenhado com linha sem nota', count: contaAviso('semNota') },
+                { value: 'empenhoAMais', label: 'Empenhado a mais que o pedido', count: contaAviso('empenhoAMais') },
+                { value: 'empenhoAMenos', label: 'Empenhado a menos que o pedido', count: contaAviso('empenhoAMenos') }
               ]}
               onChange={setFiltroAviso}
               testId="emendas-pedidos-filtro-aviso"
@@ -870,6 +893,9 @@ export const EmendasPedidosPage: React.FC = () => {
                   itemDeOrigem={itemDeOrigem}
                   onAcao={(acao, contexto) => setJanela({ pedido: l, acao, contexto })}
                   onAlterar={() => setEditando(l)}
+                  conferencia={conferencia}
+                  conferenciaPorItem={conferenciaPorItem}
+                  resolvidos={resolvidos}
                 />
               )}
             />
