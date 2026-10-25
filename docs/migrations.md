@@ -153,6 +153,7 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 | 179 | `20261024000179_emendas_solicitacao_por_rodada.sql` | Emendas, a ata aceita mais de uma solicitação de autorização de empenho (uma por rodada): sai a trava de uma por ata (`ux_emenda_pedido_documentos_sei_ata`) e `informar_solicitacao_da_ata` ganha `p_substitui` (troca só aquela solicitação; sem ele, entra a mais na ata). |
 | 181 | `20261024000181_emendas_sem_textos_da_planilha.sql` | Emendas, saem os textos fixos da carga das planilhas da CAEP: colunas `emenda_pedido_linhas.a_conferir` e `planilha_ref` apagadas e a observação da carga limpa nos 144 pedidos importados (os pedidos foram conferidos com as autorizações do SEI em 24/10/2026). Cópia em `supabase/limpezas/copia-20261024-emendas-textos-planilha.json`. |
 | 182 | `20261024000182_notas_das_emendas_no_portal.sql` | Leitura das notas no Portal da Transparência (SIAFI): `notas_para_ler_no_siafi` passa a incluir as notas das emendas parlamentares (ligadas às linhas dos pedidos ou citadas nos despachos de empenho do SEI), em qualquer contrato, para conferir os pedidos com o empenho de fato. Gravação e Edge Function iguais. |
+| 183 | `20261025000183_emendas_nota_sei_da_emenda.sql` | Emendas, a nota citada no SEI só liga à linha do pedido quando o plano interno é da emenda (número da emenda ou código do autor). Antes, faltando a nota da 200330, a regra pegava a de mesmo número da 200331 (outra despesa): 41 linhas em 16 pedidos em 25/10/2026. |
 
 ## Por tema
 
