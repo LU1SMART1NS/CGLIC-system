@@ -26,6 +26,7 @@ const respostaSta = (ug: string, numero: string) => ({
   pidescricao: ug === '200330' ? 'AUTOR 202645570012' : 'EVENTOS',
   naturezadespesa: '449052',
   naturezadespesadescricao: 'EQUIPAMENTOS E MATERIAL PERMANENTE',
+  observacao: ug === '200330' ? 'VALOR QUE SE EMPENHA PARA ATENDER DESPESAS DA EMENDA PARLAMENTAR 45570012, DEP. FEDERAL' : 'DIARIAS',
   itens: [{ numitem: '001', subitem: '52', quantidade: '16.00000', valortotal: '5683680.00' }]
 });
 // 2026NE000999: o Tesouro não tem a nota na 200330
@@ -57,8 +58,13 @@ describe('normalizarNotaDoTesouro', () => {
       picodigo: 'SP999S94557',
       pidescricao: 'AUTOR 202645570012',
       naturezadespesa: '449052',
-      naturezadespesadescricao: 'EQUIPAMENTOS E MATERIAL PERMANENTE'
+      naturezadespesadescricao: 'EQUIPAMENTOS E MATERIAL PERMANENTE',
+      observacao: 'VALOR QUE SE EMPENHA PARA ATENDER DESPESAS DA EMENDA PARLAMENTAR 45570012, DEP. FEDERAL'
     });
+  });
+  it('leva a descrição da nota, que vale quando o plano interno do SIAFI não é o da emenda', () => {
+    expect(normalizarNotaDoTesouro({ ...respostaSta('200330', '2026NE000380'), observacao: '  ' })?.observacao).toBeNull();
+    expect(normalizarNotaDoTesouro({ ...respostaSta('200330', '2026NE000380'), observacao: 'X'.repeat(3000) })?.observacao).toHaveLength(2000);
   });
   it('descarta resposta sem UG ou sem número de nota', () => {
     expect(normalizarNotaDoTesouro(null)).toBeNull();
