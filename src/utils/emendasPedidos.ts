@@ -157,6 +157,37 @@ export function identificacaoDoPedido(p: Pick<PedidoEmenda, 'reservadoEm'> & Par
   return p.origem === 'PLANILHA' ? 'Reserva da planilha' : `Reserva de ${dataBR(p.reservadoEm)}`;
 }
 
+/**
+ * Nº da emenda como o banco guarda (migration 186): 8 dígitos (os 4 do autor e os 4 da emenda) e o ano à parte.
+ * Aceita espaços, pontos e traços, e o código de 12 dígitos do SIOP (ano + número), de onde também sai o ano.
+ */
+export function lerNumeroDaEmenda(texto: string): { numero: string; ano: number | null } | null {
+  const d = texto.replace(/\D/g, '');
+  if (/^20\d{10}$/.test(d)) return { numero: d.slice(4), ano: Number(d.slice(0, 4)) };
+  if (/^\d{8}$/.test(d)) return { numero: d, ano: null };
+  return null;
+}
+
+/** "4095 0004": o código do autor e o número da emenda dele. */
+export const numeroDaEmendaEmTexto = (numero: string): string => (/^\d{8}$/.test(numero) ? `${numero.slice(0, 4)} ${numero.slice(4)}` : numero);
+
+/**
+ * Outros pedidos que ajudam a conferir o nº digitado: os de outro autor com o mesmo código de autor (os 4 primeiros
+ * dígitos), sinal de número trocado (casos de 24/10/2026), e os do mesmo autor com a mesma emenda (emenda dividida).
+ */
+export function conferirNumeroDaEmenda(
+  p: Pick<PedidoEmenda, 'id' | 'autorId'>,
+  numero: string,
+  ano: number | null,
+  pedidos: PedidoEmenda[]
+): { outroAutor: PedidoEmenda[]; mesmaEmenda: PedidoEmenda[] } {
+  const outros = pedidos.filter((x) => x.id !== p.id && x.etapa !== 'CANCELADO' && x.siopEmenda && x.autorId);
+  return {
+    outroAutor: outros.filter((x) => x.autorId !== p.autorId && x.siopEmenda!.slice(0, 4) === numero.slice(0, 4)),
+    mesmaEmenda: outros.filter((x) => x.autorId === p.autorId && x.siopEmenda === numero && (ano == null || x.siopEmendaAno == null || x.siopEmendaAno === ano))
+  };
+}
+
 /** UASG dos contratos citados na planilha de execução da CAEP (os 130 achados em 23/10/2026 eram todos da 200331). */
 const UASG_DOS_CONTRATOS_DAS_EMENDAS = '200331';
 

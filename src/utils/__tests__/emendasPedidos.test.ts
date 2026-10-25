@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { atasDoPedido, atasSemAutorizacao, avisosDoPedido, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -17,7 +17,7 @@ const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   id: 'p' + Math.random(), numero: 1, autorId: 'C:1', etapa: 'RESERVADO', origem: 'SISTEMA', observacao: null, contatoNome: null, contatoTelefone: null, contatoEmail: null, reservadoEm: '2026-10-20',
-  minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null,
+  minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
   canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], ...extra
@@ -372,5 +372,31 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     expect(te.map((x) => [x.chave, x.tom])).toEqual([['proxima', 'acao'], ['beneficiario', 'atencao'], ['semNota', 'espera']]);
     // Quem não gere não tem os botões, mas vê as tarefas.
     expect(tarefasDoPedido(p, catalogo, semNotas, HOJE, false).find((x) => x.chave === 'beneficiario')?.botao).toBeUndefined();
+  });
+});
+
+describe('nº da emenda (migration 186)', () => {
+  it('aceita 8 dígitos com espaços ou o código de 12 com o ano; recusa o resto', () => {
+    expect(lerNumeroDaEmenda('4095 0004')).toEqual({ numero: '40950004', ano: null });
+    expect(lerNumeroDaEmenda('2026 4095 0004')).toEqual({ numero: '40950004', ano: 2026 });
+    expect(lerNumeroDaEmenda('2025.4095.0004')).toEqual({ numero: '40950004', ano: 2025 });
+    expect(lerNumeroDaEmenda('elef')).toBeNull();
+    expect(lerNumeroDaEmenda('4095 004')).toBeNull();
+    expect(lerNumeroDaEmenda('1926 4095 0004')).toBeNull();
+    expect(numeroDaEmendaEmTexto('40950004')).toBe('4095 0004');
+  });
+
+  it('confere o código do autor com os outros pedidos', () => {
+    const meu = pedido({ id: 'p1', autorId: 'A' });
+    const lista = [
+      pedido({ id: 'p2', autorId: 'B', siopEmenda: '40950011' }),
+      pedido({ id: 'p3', autorId: 'A', siopEmenda: '40950004', siopEmendaAno: 2026 }),
+      pedido({ id: 'p4', autorId: 'A', siopEmenda: '40950004', siopEmendaAno: 2025 }),
+      pedido({ id: 'p5', autorId: 'C', siopEmenda: '40950004', etapa: 'CANCELADO' }),
+      pedido({ id: 'p6', autorId: 'D', siopEmenda: '11110001' })
+    ];
+    const r = conferirNumeroDaEmenda(meu, '40950004', 2026, lista);
+    expect(r.outroAutor.map((x) => x.id)).toEqual(['p2']);
+    expect(r.mesmaEmenda.map((x) => x.id)).toEqual(['p3']);
   });
 });
