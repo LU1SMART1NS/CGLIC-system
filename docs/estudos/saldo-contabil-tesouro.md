@@ -7,7 +7,11 @@ Nada aqui muda o sistema. A medição se reproduz com `scripts/estudo-saldo-cont
 ## A fonte
 
 - **Consulta:** `GET https://sta.api.gov.br/api/saldocontabil/ano/{ano}/ug/{ug}/gestao/00001/contacontabil/{conta}`. Aberta, sem login. Documentação em `https://sta.api.gov.br/docs/api-docs.json`.
-- **Resposta:** uma linha por conta corrente, com `saldo`, movimento do mês (`debito_mensal`, `credito_mensal`) e `created_at`. A conta corrente é a nota de empenho seguida do subitem: `2025NE00047152` é a 2025NE000471, subitem 52.
+- **Resposta:** linhas com `saldo`, `debito_mensal`, `credito_mensal` e `created_at`. A conta corrente é a nota de empenho seguida do subitem: `2025NE00047152` é a 2025NE000471, subitem 52.
+  - **Ano corrente: uma linha por período (mês) de cada conta corrente**, com o movimento do período (saldo = crédito − débito; débito e crédito iniciais zerados; `tiposaldo` sempre `C`; sem campo de mês). O saldo da conta corrente é a **soma de todas as linhas**. Ex.: 2026NE00001233 na 622920101 vem com +71.996,00 (empenho) e −71.996,00 (liquidação). Achado de 25/10/2026: a gravação guardava uma linha só e 2.260 das 7.020 contas correntes de 2026 ficaram erradas; corrigido na migration 195. Com a soma, o empenhado bate com o Portal da Transparência em 40 de 40 notas sorteadas.
+  - **Anos fechados:** uma linha por conta corrente (2016 a 2025 conferidos).
+  - A consulta por conta corrente (`…/contacorrente/{cc}`) devolve só a primeira linha; o `POST /api/saldocontabil` devolve todas.
+  - Os itens de `/api/empenho` não servem para o valor da nota: a lista repete as linhas e o total vem em dobro em 450 de 624 notas de 2026.
 - **Atualização:** diária. Em 14/10/2026 os dados de 2026 eram de 13/10/2026 08:36. Os anos fechados ficam congelados (2025 parou em 05/01/2026).
 - **Desempenho:** cada consulta leva menos de meio segundo. As duas UGs da CGLIC em 11 anos (2016 a 2026) e 10 contas deram 220 consultas, 51.351 linhas, em 33 segundos. Para o ano corrente bastam 20 consultas.
 
@@ -57,7 +61,7 @@ O pago de cada ano fica no ano em que ocorreu. O total pago de um empenho é a s
 ## Limites
 
 - **Por empenho, não por fatura.** Num empenho com várias faturas, o saldo diz quanto foi pago, não qual fatura. Para a fatura, a confirmação continua sendo a OB (migration 123); o saldo serve de segunda prova, no nível do empenho.
-- **Saldo sem data.** O saldo é acumulado no ano; o movimento só existe para o mês corrente. Para "liquidado a pagar há X dias", seria preciso guardar a série diária ou continuar usando a data da fatura.
+- **Saldo sem data.** O sistema guarda o saldo acumulado no ano (a soma dos períodos); os períodos não trazem a data. Para "liquidado a pagar há X dias", seria preciso guardar a série diária ou continuar usando a data da fatura.
 - **Defasagem de um dia** em relação ao SIAFI.
 - **Só as UGs consultadas.** Empenho emitido por outra UG (órgão participante, por exemplo) precisa de consulta à UG dele.
 - **Valor empenhado.** O valor empenhado do Contratos.gov.br às vezes está defasado (a 2025NE000471 aparece com R$ 38,2 mi; no Tesouro, R$ 109,8 mi foram inscritos em restos a pagar). O saldo contábil também permite reconstituir o empenhado, mas isso não foi medido aqui.
