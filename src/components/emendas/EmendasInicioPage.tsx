@@ -17,7 +17,8 @@ import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { PainelBotoesGavetas, PainelGaveta, type PainelGavetaId } from '../instrumentos/PainelGavetas';
-import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useNotasDasLinhas, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useDiferencasDeEmpenho, useItensCaep, useNotasDasLinhas, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
+import { emendasAConferir, type EmendaAConferir } from '../../utils/emendasEmpenho';
 import { formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import { AVISO_SEM_OFICIO_DIAS, avisoGrave, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_ETAPA, ROTULO_ETAPA, type TipoAviso } from '../../utils/emendasPedidos';
@@ -37,9 +38,11 @@ const chave = (l: PedidoComAviso) => l.pedido.id;
 const ABAS: ReadonlyArray<{ id: TipoAviso; rotulo: string }> = [
   { id: 'ataVencida', rotulo: 'Ata encerrada' },
   { id: 'ataNoCorte', rotulo: 'Prazo de indicação vencido' },
+  { id: 'empenhoAMais', rotulo: 'Empenhado a mais' },
   { id: 'divergencia', rotulo: 'Ofício devolvido' },
   { id: 'semOficio', rotulo: `Sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias` },
   { id: 'ataVencendo', rotulo: 'Ata vence em breve' },
+  { id: 'empenhoAMenos', rotulo: 'Empenhado a menos' },
   { id: 'semAutorizacao', rotulo: 'Ata sem autorização de empenho' },
   { id: 'semNota', rotulo: 'Sem nota de empenho' }
 ];
@@ -63,6 +66,7 @@ const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${
 const NO_CARTAO_GRAVE: Partial<Record<TipoAviso, [string, string]>> = {
   ataVencida: ['com ata encerrada', 'com ata encerrada'],
   ataNoCorte: ['passou do prazo de indicação', 'passaram do prazo de indicação'],
+  empenhoAMais: ['com nota acima do pedido', 'com nota acima do pedido'],
   divergencia: ['com ofício devolvido', 'com ofício devolvido'],
   semOficio: [`sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias`, `sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias`]
 };
@@ -96,6 +100,7 @@ export const EmendasInicioPage: React.FC = () => {
   const { data: notas = SEM_NOTAS, refetch: recarregarNotas } = useNotasDasLinhas();
   const { data: itensLista = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
   const { data: autores = [] } = useAutoresEmendas();
+  const { consulta: consultaEmpenho, conferencia, diferencas } = useDiferencasDeEmpenho();
   const hoje = hojeEmBrasilia();
   const [aba, setAba] = useState<Aba>('todas');
   const [gavetaAberta, setGavetaAberta] = useState<PainelGavetaId | null>('saldoLivre');
@@ -103,9 +108,11 @@ export const EmendasInicioPage: React.FC = () => {
   const [editando, setEditando] = useState<ItemCaep | null>(null);
 
   const carregando = isLoading || carregandoItens;
-  const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje), [pedidos, itensLista, notas, hoje]);
+  const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas), [pedidos, itensLista, notas, hoje, diferencas]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
+  const aConferir = useMemo(() => emendasAConferir(conferencia, itens), [conferencia, itens]);
+  const pedidoPorId = useMemo(() => new Map(pedidos.map((p) => [p.id, p])), [pedidos]);
 
   const abasComPedido = ABAS.filter((a) => r.porTipo[a.id] > 0);
   const abasZeradas = ABAS.filter((a) => r.porTipo[a.id] === 0);
@@ -145,6 +152,7 @@ export const EmendasInicioPage: React.FC = () => {
     refetch();
     recarregarNotas();
     recarregarItens();
+    void consultaEmpenho.refetch();
   };
 
   const colunas: Column<PedidoComAviso>[] = [
@@ -251,6 +259,32 @@ export const EmendasInicioPage: React.FC = () => {
     { key: 'fim', header: 'Fim da ata', nowrap: true, sortValue: (i) => i.vigenciaFinal, render: (i) => <span style={carteiraValor}>{dataBR(i.vigenciaFinal)}</span> }
   ];
 
+  const colunasAConferir: Column<EmendaAConferir>[] = [
+    {
+      key: 'autor',
+      header: 'Parlamentar',
+      priority: 'primary',
+      minWidth: '200px',
+      render: (e) => {
+        const autorId = e.pedidoIds.map((id) => pedidoPorId.get(id)?.autorId).find(Boolean) ?? null;
+        return (
+          <>
+            <AutorDoPedido autor={autorId ? autorPorId.get(autorId) : undefined} autorId={autorId} destaque />
+            <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>emenda {e.emenda} · {e.pedidos.length === 1 ? 'pedido' : 'pedidos'} {e.pedidos.join(', ')}</div>
+          </>
+        );
+      }
+    },
+    { key: 'itens', header: 'Itens a conferir', align: 'right', nowrap: true, sortValue: (e) => e.itens, sortFirstDir: 'desc', render: (e) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(e.itens)}</span> },
+    { key: 'motivo', header: 'Por que ainda não dá', minWidth: '260px', render: (e) => <span style={carteiraDetalhe}>{e.motivo}</span> },
+    {
+      key: 'parcial',
+      header: 'O que as notas lidas já mostram',
+      minWidth: '220px',
+      render: (e) => (e.parciais.length ? <span style={carteiraDetalhe}>{e.parciais.slice(0, 3).join(' · ')}{e.parciais.length > 3 ? ` · e mais ${e.parciais.length - 3}` : ''}</span> : <span style={carteiraDetalhe}>—</span>)
+    }
+  ];
+
   const valor = (n: number) => (carregando ? '—' : formatNumber(n));
 
   return (
@@ -258,7 +292,7 @@ export const EmendasInicioPage: React.FC = () => {
       <PageHeader
         title={role === 'gestor_emendas' ? 'Início' : 'Emendas'}
         subtitle="Pedidos dos parlamentares e saldo da CAEP que pedem atenção."
-        hint={`Os avisos são os mesmos da lista de Pedidos: ata encerrada antes do empenho, prazo de indicação vencido (a menos de ${corteIndicacaoDias()} dias do fim da ata), divergência com o SIOP, mais de ${AVISO_SEM_OFICIO_DIAS} dias sem ofício, ata vencendo em até ${avisoIndicacaoDias()} dias e linhas empenhadas sem nota. Os dois prazos ficam em Ajustes > Regras de Alertas. Saldo livre = alocado à CAEP − reservado nos pedidos, só nas atas vigentes. Item sem nome curto: alocado à CAEP em ata vigente e ainda sem o nome que sai no quadro do parlamentar.`}
+        hint={`Os avisos são os mesmos da lista de Pedidos: ata encerrada antes do empenho, prazo de indicação vencido (a menos de ${corteIndicacaoDias()} dias do fim da ata), divergência com o SIOP, mais de ${AVISO_SEM_OFICIO_DIAS} dias sem ofício, ata vencendo em até ${avisoIndicacaoDias()} dias, linhas empenhadas sem nota e empenhado diferente do pedido (a nota da emenda, lida no Portal da Transparência, com mais ou com menos que o pedido; a menos só quando todas as notas do SEI estão no sistema e lidas). Os dois prazos ficam em Ajustes > Regras de Alertas. Saldo livre = alocado à CAEP − reservado nos pedidos, só nas atas vigentes. Item sem nome curto: alocado à CAEP em ata vigente e ainda sem o nome que sai no quadro do parlamentar.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={recarregar} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-inicio-atualizar" tooltipTitle="Recarregar pedidos, notas e saldo" />}
       />
@@ -305,6 +339,15 @@ export const EmendasInicioPage: React.FC = () => {
                 ? `nenhum item com ata vencendo em até ${avisoIndicacaoDias()} dias`
                 : `${plural(r.livrePertoDoFim.length, 'item', 'itens')} com ata vencendo em até ${avisoIndicacaoDias()} dias${passaramDoCorte ? ` · ${formatNumber(passaramDoCorte)} já passaram do prazo de indicação` : ''}`,
             atencao: r.livrePertoDoFim.length > 0
+          },
+          {
+            id: 'empenhoAConferir',
+            resumo: consultaEmpenho.isLoading
+              ? undefined
+              : aConferir.length === 0
+                ? 'todas as notas do SEI no sistema e lidas'
+                : `${plural(aConferir.length, 'emenda', 'emendas')} com nota do SEI fora do sistema ou ainda não lida`,
+            atencao: false
           },
           {
             id: 'semNomeCurto',
@@ -356,6 +399,26 @@ export const EmendasInicioPage: React.FC = () => {
                   ? (i) => <ActionButton action="editar" iconOnly label={`Nome curto e GND de ${nomeDoItem(i, i.itemKey)}`} onClick={() => setEditando(i)} data-testid={`emendas-inicio-nome-${i.itemKey}`} />
                   : undefined
               }
+            />
+          )}
+        </PainelGaveta>
+      )}
+      {gavetaAberta === 'empenhoAConferir' && (
+        <PainelGaveta
+          id="empenhoAConferir"
+          subtitulo="Pedidos empenhados em que ainda não dá para comparar as linhas com as notas: falta no sistema alguma nota citada no despacho de empenho do SEI, a nota ainda não foi lida no Portal da Transparência ou foi empenhada em reais. Não conta nos avisos; a lista encolhe sozinha quando as notas chegam."
+          onFechar={() => setGavetaAberta(null)}
+        >
+          {aConferir.length === 0 ? (
+            <div style={carteiraSubtitle}>{consultaEmpenho.isLoading ? 'Carregando…' : 'Nenhuma emenda esperando nota.'}</div>
+          ) : (
+            <DataTable<EmendaAConferir>
+              testId="emendas-inicio-a-conferir"
+              className="data-table-container--flush"
+              data={aConferir}
+              keyExtractor={(e) => e.emenda}
+              columns={colunasAConferir}
+              rowOpen={(e) => () => navigate(`/emendas/pedidos?pedido=${e.pedidoIds[0]}`)}
             />
           )}
         </PainelGaveta>

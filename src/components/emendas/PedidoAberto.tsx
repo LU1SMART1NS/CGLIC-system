@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
-import { StatusBadge } from '../../design-system/components/StatusBadge';
+import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
@@ -16,6 +16,7 @@ import {
   avisoGrave,
   chaveDoContratoDaEmenda,
   itensDaLinha,
+  jaEmpenhado,
   linhasPorAta,
   ORDEM_ETAPA,
   situacaoDaLinha,
@@ -23,7 +24,8 @@ import {
   type GrupoDeLinhas,
   type TarefaDoPedido
 } from '../../utils/emendasPedidos';
-import type { BeneficiarioEmenda, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
+import type { BeneficiarioEmenda, ConferenciaEmpenho, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
+import { chaveAvisoEmpenho, etiquetaDaConferencia, type EtiquetaConferencia } from '../../utils/emendasEmpenho';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, ValorPrevisto } from './emendasPartes';
 import type { AcaoDaJanela, ContextoDaJanela } from './EtapaPedidoModal';
@@ -50,6 +52,19 @@ const ContratoDaLinha: React.FC<{ linha: LinhaPedido; nota: NotaDaLinha | undefi
   );
 };
 
+/** Quanto a nota da emenda tem do item da linha (soma da emenda), só depois do empenho. */
+const ConferenciaDaLinha: React.FC<{ p: PedidoEmenda; linha: LinhaPedido; conferencia?: Map<string, ConferenciaEmpenho>; resolvidos?: { has: (chave: string) => boolean } }> = ({ p, linha, conferencia, resolvidos }) => {
+  if (!conferencia || !p.siopEmenda || !linha.itemKey || !jaEmpenhado(p.etapa)) return null;
+  const c = conferencia.get(`${p.siopEmenda}|${linha.itemKey}`);
+  const e = etiquetaDaConferencia(c, Boolean(c && resolvidos?.has(chaveAvisoEmpenho(c))));
+  if (!e) return null;
+  return (
+    <div style={{ marginTop: '0.25rem' }} title={e.dica} data-testid={`emendas-linha-conferencia-${linha.id}`}>
+      <StatusBadge label={e.texto} variant={VARIANTE_CONFERENCIA[e.tom]} size="sm" dot={false} />
+    </div>
+  );
+};
+
 interface BlocosProps {
   p: PedidoEmenda;
   itens: Map<string, ItemCaep>;
@@ -62,7 +77,12 @@ interface BlocosProps {
   /** Item de onde o gestor veio (Item 360 › Emendas): as linhas dele ficam em destaque e a ata delas abre. */
   itemDeOrigem?: string | null;
   onAcao: AoAgir;
+  /** Empenhado × pedido (migration 187), por `emenda|item`: a etiqueta "X de Y na nota" de cada linha. */
+  conferencia?: Map<string, ConferenciaEmpenho>;
+  resolvidos?: { has: (chave: string) => boolean };
 }
+
+const VARIANTE_CONFERENCIA: Record<EtiquetaConferencia['tom'], StatusBadgeVariant> = { ok: 'success', mais: 'danger', menos: 'warning', cinza: 'neutral' };
 
 /** Pendências da ata para o cabeçalho do bloco: sem beneficiário, aguardando a solicitação, sem nota ligada, ata vencendo. */
 function pendenciasDoGrupo(p: PedidoEmenda, g: GrupoDeLinhas, notas: Map<string, NotaDaLinha>, hoje: string): string[] {
@@ -87,7 +107,7 @@ function pendenciasDoGrupo(p: PedidoEmenda, g: GrupoDeLinhas, notas: Map<string,
  * valor e pendências; dentro, as solicitações de empenho da ata (uma por rodada, com as linhas que cada uma cobre) e
  * as linhas com a situação de cada uma. O bloco nasce aberto só com pendência ou com o item de onde o gestor veio.
  */
-export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, notas, precos, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao }) => {
+export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, notas, precos, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, conferencia, resolvidos }) => {
   const grupos = linhasPorAta(p, itens);
   const temItem = (l: LinhaPedido) => Boolean(itemDeOrigem) && itensDaLinha(l).some((x) => x.itemKey === itemDeOrigem);
   const depoisDaSolicitacao = ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.SOLICITADO;
@@ -141,6 +161,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
         <>
           <SituacaoDaLinhaEtiqueta s={situacaoDaLinha(p, l, notas)} testId={`emendas-linha-situacao-${l.id}`} />
           <ContratoDaLinha linha={l} nota={notas.get(l.id)} podeVerContratos={podeVerContratos} />
+          <ConferenciaDaLinha p={p} linha={l} conferencia={conferencia} resolvidos={resolvidos} />
         </>
       )
     }

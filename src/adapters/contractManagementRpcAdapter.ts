@@ -460,7 +460,7 @@ export async function deleteContractTaskRpc(id: string): Promise<RpcGenericDelet
 // -------------------------------------------------------------
 export interface ResolverAvisoInput {
   chave: string;
-  tipo: 'SALDO' | 'REAJUSTE' | 'LEMBRETE' | 'FONTE';
+  tipo: 'SALDO' | 'REAJUSTE' | 'LEMBRETE' | 'FONTE' | 'EMPENHO';
   justificativa: string;
 }
 
