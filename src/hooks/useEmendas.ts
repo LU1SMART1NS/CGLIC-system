@@ -40,6 +40,19 @@ export function usePodeGerirEmendas(): boolean {
   return role === 'admin' || role === 'gestor_emendas';
 }
 
+/**
+ * Quem abre as telas do menu Emendas (rotas /emendas/*): coordenador, gestor de emendas e consulta. O gestor de atas e
+ * contratos e o gestor de saldo leem as emendas só na aba do Item 360, sem ir a Pedidos (decisão de 25/10/2026).
+ */
+export function podeAbrirTelasDeEmendas(role: string | null | undefined): boolean {
+  return role === 'admin' || role === 'gestor_emendas' || role === 'leitor';
+}
+
+export function usePodeAbrirTelasDeEmendas(): boolean {
+  const { role } = useAuth();
+  return podeAbrirTelasDeEmendas(role);
+}
+
 /** O contrato citado no pedido só vira link para quem consulta contratos (o gestor de emendas não consulta). */
 export function usePodeVerContratos(): boolean {
   const { role } = useAuth();

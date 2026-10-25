@@ -61,7 +61,7 @@ export interface NavItem {
  * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
- * - Início: Painel (/instrumentos; o gestor de emendas tem o seu em /emendas/inicio) · Emendas (/emendas/inicio, só coordenador)
+ * - Início: Painel (/instrumentos; o gestor de emendas tem o seu em /emendas/inicio) · Emendas (/emendas/inicio, coordenador e consulta)
  *   · Distribuição (/atas/distribuicao)
  * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
@@ -100,24 +100,26 @@ export const navigationConfig: NavItem[] = [
         allowedRoles: ['gestor_emendas']
       },
       {
-        // O coordenador vê o mesmo resumo das emendas numa aba do Início dele (decisão de 23/10/2026).
+        // O coordenador vê o mesmo resumo das emendas numa aba do Início dele (decisão de 23/10/2026); a consulta
+        // também, só leitura, porque já lê Pedidos e Itens e kits (decisão de 25/10/2026).
         id: 'emendas-inicio-coordenador',
         label: 'Emendas',
         icon: ScrollText,
         route: '/emendas/inicio',
         status: 'active',
         matchPrefixes: ['/emendas/inicio'],
-        allowedRoles: ['admin']
+        allowedRoles: ['admin', 'leitor']
       },
       {
-        // Atas e contratos por gestor: visão de coordenação (contratos vinculados herdam o gestor da ata).
+        // Atas e contratos por gestor: visão de coordenação (contratos vinculados herdam o gestor da ata). Só o
+        // coordenador: são filas dele e a Equipe mostra o nível de cada gestor (consulta saiu em 25/10/2026).
         id: 'central-distribuicao',
         label: 'Distribuição',
         icon: UsersRound,
         route: '/atas/distribuicao',
         status: 'active',
         matchPrefixes: ['/atas/distribuicao'],
-        allowedRoles: ['admin', 'leitor']
+        allowedRoles: ['admin']
       }
     ]
   },

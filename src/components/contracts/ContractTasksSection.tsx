@@ -15,6 +15,8 @@ import {
 } from '../../hooks/useContractTaskPlanEditing';
 import { getContractManagementKey } from '../../services/contractManagementService';
 import { TaskPlanSection, type TaskPlanController, type TaskPlanLabels } from '../plan/TaskPlanSection';
+import { useAuth } from '../../context/AuthContext';
+import { podeConcluirTarefas } from '../../hooks/useAvisosResolvidos';
 
 interface ContractTasksSectionProps {
   contract: ContractDashboardRecord;
@@ -45,9 +47,12 @@ function useContractPlanController(contract: ContractDashboardRecord): TaskPlanC
   const renameModule = useRenameContractTaskModule(contractKey);
   const createTask = useCreateContractTask(contractKey);
   const { data: manager } = useContractManager(contractKey);
+  // A consulta vê o plano sem botões: as RPCs das tarefas só aceitam gestor e coordenador.
+  const { role } = useAuth();
 
   return {
     entityKey: contractKey,
+    somenteLeitura: !podeConcluirTarefas(role),
     gestorNome: manager?.gestorNome || undefined,
     labels: CONTRACT_LABELS,
     useUpdateTask: useUpdateContractTask,

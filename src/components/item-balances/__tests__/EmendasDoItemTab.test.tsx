@@ -21,8 +21,11 @@ const pedido = (id: string, autorId: string, etapa: PedidoEmenda['etapa'], quant
 });
 const autor: AutorEmenda = { id: 'B:MG', nome: 'Bancada MG', tipo: 'BANCADA', nomeCivil: null, partido: null, uf: 'MG', emExercicio: true, legislatura: 57, lidoEm: null };
 
+const perfil = vi.hoisted(() => ({ abreEmendas: true }));
+
 vi.mock('../../../hooks/useEmendas', () => ({
   hojeEmBrasilia: () => '2026-10-24',
+  usePodeAbrirTelasDeEmendas: () => perfil.abreEmendas,
   useItensCaep: () => ({ data: [item], isLoading: false, isError: false, error: null }),
   usePedidosEmendas: () => ({ data: [pedido('p1', 'B:MG', 'AUTORIZADO', 38), pedido('p2', 'B:MG', 'RESERVADO', 14), pedido('p3', 'B:MG', 'CANCELADO', 99)], isLoading: false }),
   useAutoresEmendas: () => ({ data: [autor] }),
@@ -50,6 +53,26 @@ describe('Item 360 › Emendas (decisão de 24/10/2026)', () => {
     expect(html).toContain('>Reservado<'.replace('>Reservado<', 'Itens reservados'));
     expect(html).toContain('Kit viatura');
     expect(html).not.toContain('Registrar');
+  });
+
+  it('quem abre as telas de Emendas vai ao pedido pela linha e ao kit pelo nome', () => {
+    perfil.abreEmendas = true;
+    const html = render(`${A}-00003`);
+    expect(html).toContain('carteira-row-link');
+    expect(html).toContain('href="/emendas/itens?ver=kit&amp;abrir=k1"');
+  });
+
+  it('gestor de atas e contratos e gestor de saldo (sem as telas de Emendas): linha sem clique e kit sem link (decisão de 25/10/2026)', () => {
+    perfil.abreEmendas = false;
+    try {
+      const html = render(`${A}-00003`);
+      expect(html).toContain('Bancada MG');
+      expect(html).toContain('Kit viatura');
+      expect(html).not.toContain('carteira-row-link');
+      expect(html).not.toContain('/emendas/');
+    } finally {
+      perfil.abreEmendas = true;
+    }
   });
 
   it('item sem alocação à CAEP: diz isso e não lista nada', () => {

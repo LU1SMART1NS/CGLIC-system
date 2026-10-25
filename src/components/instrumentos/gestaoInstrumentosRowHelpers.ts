@@ -166,8 +166,26 @@ function ataItemUrl(item: DashboardAttentionItem & { uasg?: string }): string {
   return buildAtaPath(item.numeroAta, uasg, 'acoes');
 }
 
+/**
+ * Rótulo para quem só consulta (perfil leitor): o destino é o mesmo, mas o texto não manda fazer o que ele não pode
+ * (decisão de 25/10/2026, mesma regra dos textos do gestor de saldo).
+ */
+const ROTULO_DE_CONSULTA: Record<string, string> = {
+  'Informar unidades': 'Ver unidades',
+  'Informar qtd. da ata assinada': 'Ver ata assinada',
+  'Informar percentual': 'Ver reajuste',
+  'Informar termo': 'Ver reajuste',
+  'Indicar Fornecedor': 'Ver fornecedor',
+  'Conferir Fornecedor': 'Ver fornecedor'
+};
+
 /** Ação contextual em 1 clique, sempre apontando para um fluxo/rota já existente no sistema. */
-export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo {
+export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }, somenteConsulta = false): AcaoInfo {
+  const acao = acaoDoItem(item);
+  return somenteConsulta && ROTULO_DE_CONSULTA[acao.label] ? { ...acao, label: ROTULO_DE_CONSULTA[acao.label] } : acao;
+}
+
+function acaoDoItem(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo {
   if (item.arpKey && item.numeroAta && (item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA')) {
     return { label: 'Abrir tarefa', targetUrl: ataItemUrl(item) };
   }

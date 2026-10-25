@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
 
 const idle = (mutate: any) => ({ mutate, isPending: false, error: null });
 
+const perfil = vi.hoisted(() => ({ role: 'gestor' }));
+vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: perfil.role }) }));
 vi.mock('../../../hooks/useUpdateContractTask', () => ({ useUpdateContractTask: () => idle(mocks.updateMutate) }));
 vi.mock('../../../hooks/useApplyContractTaskTemplate', () => ({ useApplyContractTaskTemplate: () => idle(mocks.applyMutate) }));
 vi.mock('../../../hooks/useContractTaskTemplates', () => ({
@@ -107,6 +109,22 @@ describe('ContractTasksSection — plano editável pelo gestor', () => {
     expect(html).toContain('aria-label="Excluir etapa"');
     expect(html).toContain('aria-label="Renomear etapa"');
     expect(html).toContain('Aplicar modelo');
+  });
+
+  it('consulta (leitor): o mesmo plano sem criar, excluir, renomear nem aplicar modelo (decisão de 25/10/2026)', () => {
+    perfil.role = 'leitor';
+    try {
+      const html = renderToStaticMarkup(<ContractTasksSection contract={contract} plan={plan} />);
+      expect(html).not.toContain('Adicionar tarefa');
+      expect(html).not.toContain('Nova etapa');
+      expect(html).not.toContain('aria-label="Excluir tarefa"');
+      expect(html).not.toContain('aria-label="Excluir etapa"');
+      expect(html).not.toContain('aria-label="Renomear etapa"');
+      expect(html).not.toContain('Aplicar modelo');
+      expect(html).toContain('plan-status-leitura');
+    } finally {
+      perfil.role = 'gestor';
+    }
   });
 
   it('plano criado do zero não exibe rótulo "Modelo:"', () => {

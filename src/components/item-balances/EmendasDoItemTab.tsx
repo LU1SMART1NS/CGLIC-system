@@ -10,7 +10,7 @@ import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { hojeEmBrasilia, useAutoresEmendas, useBeneficiariosEmendas, useItensCaep, useKitsEmendas, useNotasDasLinhas, usePedidosEmendas } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, usePodeAbrirTelasDeEmendas, useAutoresEmendas, useBeneficiariosEmendas, useItensCaep, useKitsEmendas, useNotasDasLinhas, usePedidosEmendas } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from '../../utils/emendasKits';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
@@ -37,10 +37,12 @@ const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 /**
  * Item 360 › Emendas (decisão de 24/10/2026): o item inteiro nas emendas. Alocado à CAEP → reservado a parlamentares →
  * saldo a oferecer, o prazo de indicação, e um pedido por linha com a situação das linhas deste item (migration 180).
- * A linha abre o pedido em Emendas › Pedidos, onde ficam os botões de etapa; aqui não há botão de etapa.
+ * A linha abre o pedido em Emendas › Pedidos, onde ficam os botões de etapa; aqui não há botão de etapa. O gestor de
+ * atas e contratos e o gestor de saldo não abrem as telas de Emendas: para eles a linha e o kit não são links.
  */
 export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boolean }> = ({ itemKey, podeVerContratos }) => {
   const navigate = useNavigateWithOrigin();
+  const abreEmendas = usePodeAbrirTelasDeEmendas();
   const hoje = hojeEmBrasilia();
   const { data: itens = [], isLoading, isError, error } = useItensCaep();
   const { data: pedidos = [], isLoading: carregandoPedidos } = usePedidosEmendas();
@@ -224,7 +226,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
           testIdPrefix="item360-emendas"
         />
         {!isLoading && !carregandoPedidos && filtrados.length === 0 ? (
-          <EmptyState title={usos.length === 0 ? 'Nenhum parlamentar reservou este item ainda.' : 'Nenhum pedido nesta situação.'} description={usos.length === 0 ? 'A CAEP reserva em Emendas › Pedidos.' : 'Ajuste a busca ou escolha outra fase.'} />
+          <EmptyState title={usos.length === 0 ? 'Nenhum parlamentar reservou este item ainda.' : 'Nenhum pedido nesta situação.'} description={usos.length === 0 ? (abreEmendas ? 'A CAEP reserva em Emendas › Pedidos.' : 'A CAEP reserva o item aos parlamentares.') : 'Ajuste a busca ou escolha outra fase.'} />
         ) : (
           <DataTable<UsoDoItem>
             testId="item360-emendas-tabela"
@@ -233,17 +235,21 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
             data={filtrados}
             keyExtractor={(u) => u.pedido.id}
             columns={colunas}
-            rowOpen={(u) => () => navigate(`/emendas/pedidos?pedido=${u.pedido.id}&item=${encodeURIComponent(itemKey)}`)}
+            rowOpen={abreEmendas ? (u) => () => navigate(`/emendas/pedidos?pedido=${u.pedido.id}&item=${encodeURIComponent(itemKey)}`) : undefined}
           />
         )}
         {kitsDoItem.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }} data-testid="item360-emendas-kits">
             <span style={carteiraSubtitle}>Entra nos kits:</span>
-            {kitsDoItem.map((k) => (
-              <Link key={k.id} to={`/emendas/itens?ver=kit&abrir=${encodeURIComponent(k.id)}`} style={{ ...carteiraValor, color: 'var(--primary)' }}>
-                {k.nome}
-              </Link>
-            ))}
+            {kitsDoItem.map((k) =>
+              abreEmendas ? (
+                <Link key={k.id} to={`/emendas/itens?ver=kit&abrir=${encodeURIComponent(k.id)}`} style={{ ...carteiraValor, color: 'var(--primary)' }}>
+                  {k.nome}
+                </Link>
+              ) : (
+                <span key={k.id} style={carteiraValor}>{k.nome}</span>
+              )
+            )}
           </div>
         )}
       </div>

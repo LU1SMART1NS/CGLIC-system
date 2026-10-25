@@ -49,6 +49,9 @@ import { TrendingUp } from 'lucide-react';
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos', 'reajuste'];
 // Gestor de Saldo (domínio de alocações) só precisa chegar aos itens da ata.
 const SALDOS_TAB_IDS: Ata360Tab[] = ['itens'];
+// Gestor de emendas: os itens e o reajuste só para consulta, porque o preço previsto do quadro do parlamentar usa
+// esse reajuste (decisão de 25/10/2026). Sem ações, plano e contratos.
+const EMENDAS_TAB_IDS: Ata360Tab[] = ['itens', 'reajuste'];
 
 interface Ata360PageProps {
   ataKeyOverride?: string;
@@ -96,15 +99,16 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
 
   const { role } = useAuth();
   const saldosOnly = semContratos(role);
+  const abasDoPerfil = role === 'gestor_emendas' ? EMENDAS_TAB_IDS : SALDOS_TAB_IDS;
   // Reajuste dos preços registrados (migrations 158 e 159): só nas atas gerenciadas pela SENASP, fora do gestor de saldo.
-  const comReajuste = Boolean(arp && !ataDeOutroOrgao(arp)) && !saldosOnly;
+  const comReajuste = Boolean(arp && !ataDeOutroOrgao(arp)) && role !== 'gestor_saldos';
   const reajusteQuery = useReajusteDaAta(arp?.numeroAtaRegistroPreco, arp?.codigoUnidadeGerenciadora, { enabled: comReajuste });
   const saldosDoReajuste: SaldoDoItem[] = React.useMemo(
     () => (saldos as any[]).map((s) => ({ numeroItem: String(s.numero_item ?? s.numeroItem ?? ''), saldo: Number(s.saldo_disponivel) || 0 })),
     [saldos]
   );
   const { activeTab, goToTab, tabsRef } = useInstrumentTab<Ata360Tab>({
-    tabs: saldosOnly ? SALDOS_TAB_IDS : TAB_IDS,
+    tabs: saldosOnly ? abasDoPerfil : TAB_IDS,
     defaultTab: saldosOnly ? 'itens' : 'acoes'
   });
   const { ataKeys: assignedAtaKeys, isLoading: loadingScope, leituras: leiturasDoEscopo } = useAssignedManagementScope(carteira);
@@ -278,7 +282,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
       ? [{ id: 'reajuste' as const, label: contarComAcao(reajusteQuery.data.itens) > 0 ? `Reajuste (${contarComAcao(reajusteQuery.data.itens)})` : 'Reajuste' }]
       : [])
   ];
-  const tabs = saldosOnly ? allTabs.filter((t) => SALDOS_TAB_IDS.includes(t.id)) : allTabs;
+  const tabs = saldosOnly ? allTabs.filter((t) => abasDoPerfil.includes(t.id)) : allTabs;
 
   return (
     <Instrument360Page>

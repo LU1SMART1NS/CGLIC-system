@@ -21,9 +21,12 @@ const pedido = (id: string, autorId: string | null, etapa: PedidoEmenda['etapa']
 });
 const autor = (id: string, nome: string, tipo: AutorEmenda['tipo']): AutorEmenda => ({ id, nome, tipo, nomeCivil: null, partido: 'PX', uf: 'SP', emExercicio: true, legislatura: 57, lidoEm: null });
 
-const PEDIDOS = [pedido('p1', 'A1', 'OFICIO', 3), pedido('p2', 'A1', 'EMPENHADO', 2), pedido('p3', 'A2', 'RESERVADO', 1), pedido('p4', null, 'RESERVADO', 4)];
+const COM_CONTATO = { ...pedido('p1', 'A1', 'OFICIO', 3), contatoNome: 'Maria da Assessoria', contatoTelefone: '61999990000', contatoEmail: 'maria@camara.leg.br' };
+const PEDIDOS = [COM_CONTATO, pedido('p2', 'A1', 'EMPENHADO', 2), pedido('p3', 'A2', 'RESERVADO', 1), pedido('p4', null, 'RESERVADO', 4)];
 const ITENS: ItemCaep[] = [item];
 const AUTORES = [autor('A1', 'Deputado Um', 'DEPUTADO'), autor('A2', 'Senadora Dois', 'SENADOR'), autor('A3', 'Bancada Três', 'BANCADA')];
+
+const perfil = vi.hoisted(() => ({ gerir: true }));
 
 vi.mock('../../../hooks/useEmendas', () => ({
   hojeEmBrasilia: () => '2026-10-23',
@@ -35,7 +38,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useAutoresEmendas: () => ({ data: AUTORES }),
   useBeneficiariosEmendas: () => ({ data: [] }),
   useKitsEmendas: () => ({ data: [] }),
-  usePodeGerirEmendas: () => true,
+  usePodeGerirEmendas: () => perfil.gerir,
   usePodeVerContratos: () => false
 }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));
@@ -103,6 +106,21 @@ describe('Pedidos: linha do tempo com o SEI de cada etapa (migration 174)', () =
       },
       { ...pedido('ccga', 'A2', 'CONTRATACAO', 1), solicitadoDocumentoSei: '41000001', cgofiDocumentoSei: '41000003', empenhadoDocumentosSei: ['41000004', '41000005'], contratacaoDocumentosSei: ['41000006'] }
     );
+  });
+
+  it('contato da assessoria: o coordenador e o gestor de emendas veem; a consulta não (decisão de 25/10/2026)', () => {
+    expect(render('/?pedido=p1')).toContain('Maria da Assessoria');
+    perfil.gerir = false;
+    try {
+      const html = render('/?pedido=p1');
+      expect(html).toContain('Deputado Um');
+      expect(html).not.toContain('Maria da Assessoria');
+      expect(html).not.toContain('61999990000');
+      expect(html).not.toContain('maria@camara.leg.br');
+      expect(html).not.toContain('emendas-pedido-contato-p1');
+    } finally {
+      perfil.gerir = true;
+    }
   });
 
   it('ofício devolvido: a próxima etapa é a 2ª minuta, com a tentativa anterior e o aviso', () => {

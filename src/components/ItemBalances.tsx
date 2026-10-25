@@ -110,8 +110,8 @@ const ITEM_TABS: ItemTab[] = ['quantitativos', 'contratos', 'adesoes'];
 const SALDOS_ITEM_TABS: ItemTab[] = ['quantitativos', 'adesoes'];
 /** Unidade interna das emendas (unidade_das_emendas() no banco): com alocação a ela, o item ganha a aba Emendas. */
 const UNIDADE_DAS_EMENDAS = 'CAEP';
-/** Perfis que leem as emendas (emendas.view: migrations 155 e 180). */
-const LEEM_EMENDAS = new Set(['admin', 'gestor_emendas', 'gestor_saldos', 'leitor']);
+/** Perfis que leem as emendas (emendas.view: migrations 155, 180 e 198, esta para o gestor de atas e contratos). */
+const LEEM_EMENDAS = new Set(['admin', 'gestor', 'gestor_emendas', 'gestor_saldos', 'leitor']);
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
 const EMPTY_RECORD: Record<string, string> = {};
 const EMPTY_UNIDADES: UnidadeItemRecord[] = [];
