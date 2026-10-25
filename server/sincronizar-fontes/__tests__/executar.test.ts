@@ -28,6 +28,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarAutoresEmendas: vi.fn(async () => ({ legislatura: 57, deputados: 648, deputadosNoCargo: 513, senadores: 126, senadoresNoCargo: 81 })),
     sincronizarReajusteAtas: vi.fn(async () => sucesso(29)),
     contarReajusteAtasPendentes: vi.fn(async () => ({ pendentes: 149, semEdital: 64, mesesProjetados: 25 })),
+    sincronizarNotasDasEmendasDoTesouro: vi.fn(async () => sucesso(181)),
+    contarNotasEmendasTesouroPendentes: vi.fn(async () => ({ pendentes: 198, amostra: '2026NE000043', amostraUgs: [] })),
     medirEmendasDoPortal: vi.fn(async () => ({ ano2026: { emendas: 12 } })),
     chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
@@ -282,6 +284,23 @@ describe('reajuste das atas', () => {
     const r = await executarPedido({ recurso: 'reajuste_atas', forcar: false, dry: true }, d);
     expect(d.sincronizarReajusteAtas).not.toHaveBeenCalled();
     expect(r).toMatchObject({ dry: true, consulta: { pendentes: 149 } });
+  });
+});
+
+describe('notas das emendas pelo Tesouro', () => {
+  it('vale para as duas UGs (sem UASG) e grava com o orçamento de tempo', async () => {
+    expect(validarPedido({ recurso: 'notas_emendas_tesouro' })).toMatchObject({ ok: true, pedido: { recurso: 'notas_emendas_tesouro' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'notas_emendas_tesouro', forcar: true, dry: false }, d);
+    expect(d.sincronizarNotasDasEmendasDoTesouro).toHaveBeenCalledWith({ forcar: true, orcamentoMs: expect.any(Number) });
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 181 } });
+  });
+
+  it('no teste (dry) só conta a fila e consulta uma nota, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'notas_emendas_tesouro', forcar: false, dry: true }, d);
+    expect(d.sincronizarNotasDasEmendasDoTesouro).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { pendentes: 198 } });
   });
 });
 
